@@ -10,6 +10,7 @@ import {
 	ContactDiscovery,
 	type DiscoverContactsInput,
 } from './contact-discovery'
+import type { EntityTargets } from './entity-guard'
 import {
 	Budget,
 	type RegistryInput,
@@ -108,6 +109,62 @@ const webSearchInput = async (params: {
 				researchToolkitLayer.pipe(
 					Layer.provide(Layer.mergeAll(ports, testInfra)),
 				),
+			),
+		),
+	)
+	if (captured === undefined) {
+		throw new Error('web_search handler never called the search provider')
+	}
+	return captured
+}
+
+// Drive web_search under a run context that targets a specific company, so the
+// captured query reveals whether the handler re-anchored it to that company
+// before the query reached the provider.
+const webSearchInputForTarget = async (
+	params: { query: string },
+	target: {
+		entityTargets: EntityTargets | null
+		entityName?: string | undefined
+	},
+): Promise<SearchInput> => {
+	let captured: SearchInput | undefined
+	const ports = Layer.mergeAll(
+		Layer.succeed(SearchProvider)(
+			SearchProvider.of({
+				search: input => {
+					captured = input
+					return Effect.succeed(new SearchResult({ items: [], units: 0 }))
+				},
+			}),
+		),
+		StubScrapeProvider,
+		StubRegistryEsProvider,
+	)
+	const infra = Layer.mergeAll(
+		stubBudget,
+		Layer.succeed(ResearchRunContext)({ researchId: 'test-run', ...target }),
+		Layer.succeed(ContactDiscovery)({
+			discover: () =>
+				Effect.succeed({
+					status: 'no_reliable_contact' as const,
+					researchId: 'test-run',
+				}),
+		}),
+	)
+	await Effect.runPromise(
+		Effect.gen(function* () {
+			const toolkit = yield* researchToolkit
+			const stream = yield* toolkit.handle('web_search', {
+				limit: null,
+				recency_days: null,
+				location: null,
+				...params,
+			})
+			yield* Stream.runDrain(stream)
+		}).pipe(
+			Effect.provide(
+				researchToolkitLayer.pipe(Layer.provide(Layer.mergeAll(ports, infra))),
 			),
 		),
 	)
@@ -334,6 +391,55 @@ const discoverContactsInput = async (params: {
 	}
 	return captured
 }
+
+describe('researchToolkit web_search — a drifted query is re-anchored to the run target', () => {
+	const acme: EntityTargets = {
+		cores: ['acmelogistics'],
+		words: ['acme'],
+		domains: ['acme.com'],
+		places: [],
+	}
+
+	describe('when the run targets a company and the query dropped its name', () => {
+		it('should prepend the company name before the query reaches the provider', async () => {
+			// GIVEN a run whose target is Acme and a query naming neither it nor its domain
+			// WHEN the web_search handler runs
+			// THEN the provider is called with the query re-anchored to the target
+			const input = await webSearchInputForTarget(
+				{ query: 'number of employees' },
+				{ entityTargets: acme, entityName: 'Acme Logistics' },
+			)
+			expect(input.query).toBe('"Acme Logistics" number of employees')
+		})
+	})
+
+	describe('when the query already names the company', () => {
+		it('should pass the query through unchanged', async () => {
+			// GIVEN a query that already reaches the target (a strong name match)
+			// WHEN the handler runs
+			// THEN it is sent as-is — re-anchoring would only narrow an on-target query
+			const input = await webSearchInputForTarget(
+				{ query: 'Acme Logistics headquarters city' },
+				{ entityTargets: acme, entityName: 'Acme Logistics' },
+			)
+			expect(input.query).toBe('Acme Logistics headquarters city')
+		})
+	})
+
+	describe('when the run has no single target company', () => {
+		it('should pass the query through unchanged', async () => {
+			// GIVEN a scan/freeform run (no entity targets) that legitimately searches
+			// for third parties
+			// WHEN the handler runs
+			// THEN the query is never narrowed to a name
+			const input = await webSearchInputForTarget(
+				{ query: 'top metal fabrication shops in Ohio' },
+				{ entityTargets: null, entityName: 'Acme Logistics' },
+			)
+			expect(input.query).toBe('top metal fabrication shops in Ohio')
+		})
+	})
+})
 
 describe('researchToolkit tool params — null and quoted numbers are read, not refused', () => {
 	describe('web_search handler', () => {

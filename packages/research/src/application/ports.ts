@@ -10,6 +10,7 @@ import type {
 	ProviderError,
 	UnsupportedSite,
 } from '../domain/errors'
+import type { EntityTargets } from './entity-guard'
 
 // ── Research run context (available inside the LLM tool loop fiber) ──
 
@@ -22,6 +23,14 @@ export class ResearchRunContext extends Context.Service<
 		// own pages are rarely in English for a non-English target.
 		readonly language?: string | undefined
 		readonly location?: string | undefined
+		// The run's target company, so a web search that dropped the company name can
+		// be re-anchored to it before it reaches the provider. `entityTargets` is the
+		// match keys used to tell an already-anchored query from one that drifted off
+		// the company; `entityName` is the display name appended to a drifted query.
+		// `entityTargets` is null for a scan/freeform run that has no single target
+		// company, and that alone turns the re-anchoring off.
+		readonly entityTargets?: EntityTargets | null | undefined
+		readonly entityName?: string | undefined
 	}
 >()('research/ResearchRunContext') {}
 

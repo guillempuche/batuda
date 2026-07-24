@@ -37,6 +37,7 @@ import {
 	SearchProvider,
 } from './ports'
 import { describedLenientNumber } from './schemas/_shared'
+import { scopeSearchQuery } from './search-query-scope'
 import {
 	REGISTRY_LOOKUP_COST_CENTS,
 	SCRAPE_COST_CENTS,
@@ -289,6 +290,8 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 			researchId,
 			language: hintLanguage,
 			location: hintLocation,
+			entityTargets,
+			entityName,
 		} = yield* ResearchRunContext
 
 		// Charged against the run before each vendor call (cheap tier for
@@ -349,11 +352,28 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 					yield* budget.chargeCheap('search', SEARCH_COST_CENTS)
 					// Drop a made-up placeholder site: filter (e.g. site:example.com)
 					// so it can't force a zero-result search.
-					const query = stripPlaceholderSiteFilters(params.query)
-					if (query !== params.query) {
+					const stripped = stripPlaceholderSiteFilters(params.query)
+					if (stripped !== params.query) {
 						yield* Effect.logWarning(
 							'research.search.placeholder_site_stripped',
 						).pipe(Effect.annotateLogs({ tool: 'web_search' }))
+					}
+					// Re-anchor a query that dropped the company name to the run's target,
+					// so the provider stays on it instead of returning off-company pages
+					// the run would then waste a fetch on. A no-op for an already-on-target
+					// query or a scan/freeform run with no single target.
+					const query = scopeSearchQuery({
+						query: stripped,
+						name: entityName,
+						targets: entityTargets,
+					})
+					if (query !== stripped) {
+						yield* Effect.logInfo('research.search.scoped_to_entity').pipe(
+							Effect.annotateLogs({
+								tool: 'web_search',
+								'research.run_id': researchId,
+							}),
+						)
 					}
 					return yield* search.search({
 						query,
