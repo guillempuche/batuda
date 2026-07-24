@@ -53,7 +53,14 @@ export {
 export { Page, PageId } from './pages'
 export { Product, ProductId } from './products'
 export { Proposal, ProposalId } from './proposals'
-export { ResearchRun, ResearchRunId } from './research-runs'
+export {
+	isSucceededResearchStatus,
+	isTerminalResearchStatus,
+	ResearchRun,
+	ResearchRunId,
+	SUCCEEDED_RESEARCH_STATUSES,
+	TERMINAL_RESEARCH_STATUSES,
+} from './research-runs'
 export { TaskActorKind, TaskEvent, TaskEventId } from './task-events'
 export {
 	Task,

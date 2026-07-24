@@ -25,8 +25,8 @@ export class ResearchRun extends Model.Class<ResearchRun>('ResearchRun')({
 	// How far the engine has progressed through its phases.
 	phase: Schema.Number,
 
-	// values: queued | running | succeeded | failed | cancelled | deleted
-	//         | no_reliable_data
+	// values: queued | running | succeeded | succeeded_low_confidence | failed
+	//         | cancelled | deleted | no_reliable_data
 	status: Schema.String,
 	// The run's inputs (subjects, selector, hints).
 	context: Schema.Unknown,
@@ -74,3 +74,28 @@ export class ResearchRun extends Model.Class<ResearchRun>('ResearchRun')({
 	// A structured code for why a run ended without usable data, or null.
 	reasonCode: Schema.NullOr(Schema.String),
 }) {}
+
+// The statuses that end a run — nothing more happens to it. Anything polling a
+// run for completion keys off this set, so a new terminal status is added here
+// once and every poller sees it.
+export const TERMINAL_RESEARCH_STATUSES = [
+	'succeeded',
+	'succeeded_low_confidence',
+	'no_reliable_data',
+	'failed',
+	'cancelled',
+	'deleted',
+] as const
+
+// The terminal statuses that carry usable findings. A low-confidence success is
+// flagged for review, not discarded, so it counts as a success that produced data.
+export const SUCCEEDED_RESEARCH_STATUSES = [
+	'succeeded',
+	'succeeded_low_confidence',
+] as const
+
+export const isTerminalResearchStatus = (status: string): boolean =>
+	(TERMINAL_RESEARCH_STATUSES as ReadonlyArray<string>).includes(status)
+
+export const isSucceededResearchStatus = (status: string): boolean =>
+	(SUCCEEDED_RESEARCH_STATUSES as ReadonlyArray<string>).includes(status)

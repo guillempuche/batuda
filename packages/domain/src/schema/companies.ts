@@ -29,6 +29,10 @@ export const COMPANY_SIZE_RANGES = [
 	'11-25',
 	'26-50',
 	'51-200',
+	'201-500',
+	'501-1000',
+	'1001-5000',
+	'5001+',
 ] as const
 export const CompanySizeRange = Schema.Literals(COMPANY_SIZE_RANGES)
 export type CompanySizeRange = typeof CompanySizeRange.Type
@@ -82,6 +86,67 @@ export class Company extends Model.Class<Company>('Company')({
 	painPoints: Schema.NullOr(Schema.String),
 	currentTools: Schema.NullOr(Schema.String),
 
+	// What research found out about this company, and where it came from.
+	//
+	// accountBrief is the running written summary of the account, in markdown.
+	// Both a person and the research pipeline write it, so briefUpdatedBy holds
+	// the id of the person who last edited it — null while nobody has, which is
+	// what makes it safe to replace wholesale. Once it is set, research is added
+	// to the end instead of overwriting what the person wrote.
+	//
+	// fieldProvenance answers "where did this come from?" for the individual
+	// facts on the row: for each field name, the page it was read from, the run
+	// that read it, how sure that run was, and the date it was true as of.
+	//
+	// lastEnrichedAt is when research findings were last accepted onto this row.
+	//
+	// The fit fields hold whether this company is worth selling to: an overall
+	// verdict, the per-criterion checks behind it, and the points where two
+	// sources disagreed. Leaf values stay free text for the same reason industry
+	// and size do — the research guards are the enforcement point, so a stored
+	// value the vocabulary does not know is shown, never decode-rejected.
+	// fitVerdict values: strong_fit | possible_fit | weak_fit | no_fit
+	// fitChecks[].result values: pass | fail | unknown
+	//
+	// The json keys are camelCase because the Postgres client camelCases every key
+	// it reads, including the ones inside a jsonb value — writing them that way
+	// already is what makes a stored shape survive the round trip unchanged.
+	accountBrief: Schema.NullOr(Schema.String),
+	briefUpdatedBy: Schema.NullOr(Schema.String),
+	briefUpdatedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
+	lastEnrichedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
+	fieldProvenance: Schema.NullOr(
+		Schema.Record(
+			Schema.String,
+			Schema.Struct({
+				sourceUrl: Schema.String,
+				runId: Schema.String,
+				confidence: Schema.optionalKey(Schema.Number),
+				asOf: Schema.optionalKey(Schema.String),
+			}),
+		),
+	),
+	fitVerdict: Schema.NullOr(Schema.String),
+	fitChecks: Schema.NullOr(
+		Schema.Array(
+			Schema.Struct({
+				criterion: Schema.String,
+				result: Schema.String,
+				evidenceQuote: Schema.optionalKey(Schema.String),
+				sourceId: Schema.optionalKey(Schema.String),
+			}),
+		),
+	),
+	fitConflicts: Schema.NullOr(
+		Schema.Array(
+			Schema.Struct({
+				field: Schema.String,
+				value: Schema.String,
+				sourceId: Schema.optionalKey(Schema.String),
+				note: Schema.optionalKey(Schema.String),
+			}),
+		),
+	),
 	// Next action
 	nextAction: Schema.NullOr(Schema.String),
 	nextActionAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
