@@ -21,6 +21,7 @@ import {
 	type StackSummary,
 	type StackWriteResult,
 	setDefaultStack,
+	templateInUse,
 	transferTemplateToUser,
 	updateStack,
 	updateTemplateFields,
@@ -53,6 +54,7 @@ export type TransferOutcome =
 	| { readonly outcome: 'transferred'; readonly template: InstructionTemplate }
 	| { readonly outcome: 'forbidden' }
 	| { readonly outcome: 'invalid_target' }
+	| { readonly outcome: 'in_use' }
 	| { readonly outcome: 'not_found' }
 
 // Every stack write funnels through one outcome union: the successful shape
@@ -211,6 +213,10 @@ export class InstructionsService extends Context.Service<InstructionsService>()(
 						if (!existing) return { outcome: 'not_found' as const }
 						if (existing.ownerUserId !== userId)
 							return { outcome: 'forbidden' as const }
+						// Handing the template away moves it out of the giver's readable
+						// set, so any of their stacks still listing it would silently drop
+						// it at resolution. Make them take it out of their stacks first.
+						if (yield* templateInUse(id)) return { outcome: 'in_use' as const }
 						const target = yield* sql<{ id: string }>`
 							SELECT "userId" AS id FROM member
 							WHERE "userId" = ${targetUserId}

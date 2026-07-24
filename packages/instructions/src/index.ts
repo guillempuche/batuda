@@ -32,6 +32,7 @@ export {
 	listStacks,
 	listTemplates,
 	setDefaultStack,
+	templateInUse,
 	transferTemplateToUser,
 	updateStack,
 	updateTemplateFields,
