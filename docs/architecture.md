@@ -366,7 +366,50 @@ One entry point, three shapes of request:
 
 A run is dispatched, not run inline. `start_research` commits a run row as `queued` inside the request transaction and returns immediately; a consumer daemon drains the queue and runs each as a fiber on its own connection. The fiber has three phases: a tool-calling loop (search, read, registry, CRM lookup — accumulating findings and archiving each source), a structured-output pass that validates the findings against the run's schema, and a brief pass that renders a human-readable markdown summary. Tool calls stream to the web app over SSE as they happen; findings, sources, and the tool log persist at the end.
 
+The first phase starts from the target's own site where there is one: the run maps that domain and reads its own pages before anything a search engine offers, because a company is the best source on itself. The second phase does not settle for what the first pass happened to find — fields still empty afterwards earn further rounds of targeted search and scraping, each round re-running the guards, until the fields fill or the run's budget or deadline stops it.
+
+A run says how far it got rather than reporting a flat success. `succeeded` means the findings are grounded and confident; `succeeded_low_confidence` means real findings came back but thin enough to want a person's eye, and the web app surfaces those for review; `no_reliable_data` is the honest answer when nothing could be grounded, which is preferred to shipping a confident guess; `failed` and `cancelled` cover a run that broke or was stopped.
+
 Because those fibers live in the server process, a deploy interrupts in-flight runs. A running fiber refreshes a heartbeat while it works, and a periodic sweep fails any run whose heartbeat has gone stale — so an orphaned run is reclaimed within about a minute, while a legitimately long run keeps beating and is never mistaken for dead. Reclaim only marks a run `failed`; a paid run is never silently re-run.
+
+At a glance:
+
+```
+  start_research  →  run row 'queued'  →  consumer daemon  →  fiber (own connection)
+
+  Phase 1 · agent reflect-loop
+      web_search · scrape_page · registry_lookup · crm_lookup
+      site discovery: map the target's own domain and read its own pages first
+      accumulate findings, archive each source as it is read
+
+  Phase 2 · structured extraction
+      validate the findings against the run's schema
+      guard chain — a list of named links, run in the order they are written:
+          citations · contact entity · scalars · websites · value provenance
+          fit evidence · vocabulary · applicability · discovered-existing
+          prospect criteria · model critics · per-source entity · source tier
+      gap rounds: fields still empty earn another targeted search and scrape,
+          until the run's budget or its deadline says stop
+
+  Phase 3 · brief
+      render a markdown summary, headed with the company and the date
+
+  tool calls stream to the web app over SSE as they happen
+  findings + sources + tool log persist
+  status = succeeded | succeeded_low_confidence | no_reliable_data
+         | failed | cancelled
+  proposed updates  →  a human (or the org's auto-apply threshold) applies each
+```
+
+### What an apply writes
+
+Research proposes; applying is what actually changes a CRM row, and it records more than the values themselves.
+
+Alongside each accepted value the row keeps **where that value came from** — the page it was read from, the run that read it, how sure that run was, and the date it was true as of. That trail accumulates rather than being replaced: a run that fills only a phone number leaves untouched the note saying where an earlier run found the industry. The row also keeps **when research was last accepted onto it**, so a stale company is visible without opening anything, and the run's **fit judgement** — an overall verdict, the per-criterion checks with the quote and page that decided each, and any readings the sources disagreed on. Fit is filterable, so "who actually passes this rule?" is a question the CRM can answer.
+
+The **account brief** is written by both sides. While nobody has edited it, an apply replaces it with the run's own brief — the AI may freely improve its own text. Once a person edits it, the brief becomes theirs: later runs add a new dated section underneath and never overwrite what was written. That decision is made inside the same statement that performs the write, reading the row as it stands, so a person's edit and a run's apply cannot interleave and lose each other. An agent editing over MCP writes the text but does not take ownership, so it can never make its own writing look like a person's and shut research out.
+
+Auto-apply is narrower than a person's reach. An org can set a confidence threshold above which proposals apply without review, but it only ever runs for a fully succeeded run, and never for a value whose confidence was capped for coming from a third party rather than the company itself — an outside estimate always waits for a human.
 
 ### Contact discovery
 
