@@ -48,7 +48,11 @@ const Hints = Schema.Struct({
 	max_employees: Schema.optional(Schema.Number),
 })
 
-const ContextInput = Schema.Struct({
+// Exported so the MCP tools can validate a caller's `context` against the same
+// shape the HTTP route enforces. Without this the MCP path took `context` as an
+// unchecked `unknown` and a selector missing its `filter` wrapper reached the
+// engine and crashed on `filter.status`.
+export const ContextInput = Schema.Struct({
 	subjects: Schema.optional(Schema.Array(SubjectRef)),
 	selector: Schema.optional(SelectorRef),
 	hints: Schema.optional(Hints),

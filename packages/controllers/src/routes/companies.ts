@@ -11,6 +11,17 @@ import { NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 
+// One research run whose findings were applied to a company, with the pages its
+// citations point at — so a reader can trace a fact on the row back to the run
+// and the page it came from.
+export const CompanyResearchRun = Schema.Struct({
+	runId: Schema.String,
+	runCompletedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
+	sources: Schema.Array(
+		Schema.Struct({ sourceId: Schema.String, url: Schema.String }),
+	),
+})
+
 // Company detail: the company plus its contacts (each with the raw json_agg
 // `channels` blob the client parses) and recent interactions.
 export const CompanyDetail = Schema.Struct({
@@ -22,6 +33,7 @@ export const CompanyDetail = Schema.Struct({
 		}),
 	),
 	recentInteractions: Schema.Array(Interaction.json),
+	researchRuns: Schema.Array(CompanyResearchRun),
 })
 
 const CreateCompanyInput = Schema.Struct({
@@ -54,6 +66,9 @@ const CreateCompanyInput = Schema.Struct({
 })
 
 const UpdateCompanyInput = Schema.Struct({
+	// The account's running notes, in markdown. A person editing them takes
+	// ownership of them, which is what stops later research replacing their text.
+	accountBrief: Schema.optional(Schema.String),
 	name: Schema.optional(Schema.String),
 	// null clears the owner (release a lead); omitting leaves it unchanged.
 	ownerId: Schema.optional(Schema.NullOr(Schema.String)),
@@ -92,6 +107,8 @@ export const CompaniesGroup = HttpApiGroup.make('companies')
 				industry: Schema.optional(Schema.String),
 				priority: Schema.optional(Schema.NumberFromString),
 				owner: Schema.optional(Schema.String),
+				fitVerdict: Schema.optional(Schema.String),
+				fitCriterionPassed: Schema.optional(Schema.String),
 				sort: Schema.optional(Schema.String),
 				query: Schema.optional(Schema.String),
 				minLat: Schema.optional(Schema.NumberFromString),
