@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process'
 
 import { expect, test } from '@playwright/test'
 
+import { DATABASE_URL } from './helpers/database-url'
 import {
 	clearCatcher,
 	expectNoMessage,
@@ -17,11 +18,6 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 //   apps/internal/src/components/emails/compose-form.tsx (compose-{form,to,
 //   subject,send})
 //   apps/internal/src/routes/emails/index.tsx (emails-compose)
-
-const DATABASE_URL =
-	process.env['E2E_DATABASE_URL'] ??
-	process.env['DATABASE_URL'] ??
-	'postgresql://batuda:batuda@localhost:5433/batuda'
 
 const SUPPRESSED_EMAIL = 'pep@calpepfonda.cat'
 const SUPPRESSED_REASON = '550 5.1.1 mailbox not found (e2e fixture)'

@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process'
 
 import { expect, test } from '@playwright/test'
 
+import { DATABASE_URL } from './helpers/database-url'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 // Thread-render path. The seed direct-INSERTs three messages on the
@@ -14,11 +15,6 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 // Selectors verified against:
 //   apps/internal/src/routes/emails/$threadId.tsx
 //     (thread-message-card, thread-cc-toggle)
-
-const DATABASE_URL =
-	process.env['E2E_DATABASE_URL'] ??
-	process.env['DATABASE_URL'] ??
-	'postgresql://batuda:batuda@localhost:5433/batuda'
 
 const psql = (sqlText: string): string =>
 	execSync(`psql "${DATABASE_URL}" -tA -c "${sqlText.replace(/"/g, '\\"')}"`, {

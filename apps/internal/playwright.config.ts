@@ -1,19 +1,66 @@
-import { readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { defineConfig, devices } from '@playwright/test'
 
-// Golden-path E2E suite. Hits the running dev stack at
-// https://batuda.localhost so the browser exercises real Better-Auth
-// cookies, real RLS-gated reads, real local-inbox writes — none of which
-// a unit test can prove together.
+const CONFIG_DIR = dirname(fileURLToPath(import.meta.url))
+
+// One `git` invocation, or null when git can't answer (a tarball checkout).
+// Run from this file's directory so it resolves the checkout the tests live in,
+// not wherever the process happened to start.
+const git = (...args: string[]): string | null => {
+	try {
+		return execFileSync('git', args, {
+			cwd: CONFIG_DIR,
+			encoding: 'utf8',
+		}).trim()
+	} catch {
+		return null
+	}
+}
+
+// The checkout root — a linked worktree's own root, or the main repo. Its `.env`
+// (written by `pnpm cli worktree up`) names this checkout's own database and mail
+// catcher, and the branch here drives the host portless serves it on.
+const CHECKOUT_ROOT =
+	git('rev-parse', '--show-toplevel') ?? resolve(CONFIG_DIR, '../..')
+
+// Playwright never loads `.env`, so a fixture that seeds through `psql` falls
+// back to the MAIN checkout's database — writing rows the browser, pointed at
+// THIS checkout's app, never sees. Copy the connection vars the suite reads out
+// of the checkout's own `.env` into the environment its workers inherit, unless
+// already set (an explicit export or CI still wins). Only these keys are copied;
+// the rest of `.env` holds secrets the suite has no use for.
+for (const key of [
+	'DATABASE_URL',
+	'MAIL_CATCHER_HTTP_URL',
+	'MAIL_CATCHER_SMTP_HOST',
+	'MAIL_CATCHER_SMTP_PORT',
+]) {
+	if (process.env[key] !== undefined) continue
+	const envPath = join(CHECKOUT_ROOT, '.env')
+	if (!existsSync(envPath)) break
+	const value = readFileSync(envPath, 'utf8')
+		.match(new RegExp(`^${key}=(.+)$`, 'm'))?.[1]
+		?.trim()
+	if (value) process.env[key] = value
+}
+
+// Golden-path E2E suite. Hits the running dev stack — this checkout's own
+// origin, resolved below — so the browser exercises real Better-Auth cookies,
+// real RLS-gated reads, real local-inbox writes, none of which a unit test can
+// prove together. From a linked worktree it targets that worktree's app and
+// database automatically; no env exports needed.
 //
 // Prerequisites for `pnpm test:e2e`:
 //   1. `pnpm cli services up`    — Postgres + MinIO containers
 //   2. `pnpm cli db reset`        — fresh migrations
 //   3. `pnpm cli seed`            — DEMO_* personas + sample CRM
-//   4. `pnpm dev`                 — server + internal stack on batuda.localhost
+//   4. `pnpm dev`                 — server + internal stack for this checkout
 //   5. `pnpm exec playwright install chromium` (one-time per machine)
 //
 // The suite intentionally targets only flows whose components carry
@@ -21,12 +68,10 @@ import { defineConfig, devices } from '@playwright/test'
 // when the next flow's testids land — don't pre-write tests for
 // selectors that don't exist yet.
 
-// E2E_BASE_URL wins (CI / staging / an explicit port). Otherwise target the
-// portless dev origin: portless can't bind 443 without root, so it falls back to
-// a non-privileged port and records it in ~/.portless/proxy.port — read that so
-// `pnpm test:e2e` hits the same origin the browser does, with no manual export.
-// Fall back to the bare host (portless on its 443 default, or no portless) when
-// the file is absent.
+// portless can't bind 443 without root, so it falls back to a non-privileged
+// port and records it in ~/.portless/proxy.port — read that so `pnpm test:e2e`
+// hits the same origin the browser does, with no manual export. Fall back to the
+// bare host (portless on its 443 default, or no portless) when the file is absent.
 const portlessPortSuffix = (() => {
 	try {
 		const port = readFileSync(
@@ -38,8 +83,42 @@ const portlessPortSuffix = (() => {
 		return ''
 	}
 })()
+
+// portless serves the main checkout on the bare `batuda.localhost` and each
+// linked worktree on its own `<label>.batuda.localhost`, where the label is the
+// branch's last path segment as a DNS label. Mirror that derivation (kept in step
+// with apps/cli/src/commands/worktree.ts) so a run inside a worktree targets its
+// own app, not main's — otherwise the browser and the psql fixtures land on
+// different checkouts. A linked worktree is one whose root differs from the repo
+// that owns the shared `.git` directory.
+const MAX_DNS_LABEL = 63
+const dnsLabel = (raw: string): string => {
+	const sane = raw
+		.toLowerCase()
+		.replace(/[^a-z0-9-]/g, '-')
+		.replace(/-{2,}/g, '-')
+		.replace(/^-+|-+$/g, '')
+	if (sane.length <= MAX_DNS_LABEL) return sane
+	const hash = createHash('sha256').update(sane).digest('hex').slice(0, 6)
+	return `${sane.slice(0, MAX_DNS_LABEL - 7).replace(/-+$/, '')}-${hash}`
+}
+const isLinkedWorktree = (() => {
+	const commonDir = git('rev-parse', '--git-common-dir')
+	if (!commonDir) return false
+	return (
+		resolve(dirname(resolve(CONFIG_DIR, commonDir))) !== resolve(CHECKOUT_ROOT)
+	)
+})()
+const worktreeHost = (() => {
+	const branch = git('rev-parse', '--abbrev-ref', 'HEAD')
+	if (!isLinkedWorktree || !branch) return 'batuda.localhost'
+	return `${dnsLabel(branch.split('/').pop() ?? branch)}.batuda.localhost`
+})()
+
+// E2E_BASE_URL wins (CI / staging / an explicit port); otherwise the worktree's
+// own origin on the portless port.
 const BASE_URL =
-	process.env['E2E_BASE_URL'] ?? `https://batuda.localhost${portlessPortSuffix}`
+	process.env['E2E_BASE_URL'] ?? `https://${worktreeHost}${portlessPortSuffix}`
 
 const STORAGE_STATE = 'tests/e2e/.auth/alice.json'
 

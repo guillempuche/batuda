@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process'
 
 import { expect, test } from '@playwright/test'
 
+import { DATABASE_URL } from './helpers/database-url'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 // Bounce visibility on the contact page: the suppression banner (and inline
@@ -18,11 +19,6 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 // Selectors verified against:
 //   apps/internal/src/routes/companies/$slug.tsx (suppression banner +
 //   badge + clear action; testids: contact-suppression-{badge,banner,clear}-{id})
-
-const DATABASE_URL =
-	process.env['E2E_DATABASE_URL'] ??
-	process.env['DATABASE_URL'] ??
-	'postgresql://batuda:batuda@localhost:5433/batuda'
 
 const TARGET_EMAIL = 'pep@calpepfonda.cat'
 const TARGET_REASON = '550 5.1.1 mailbox not found (e2e fixture)'

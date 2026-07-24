@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 
 import { expect, test } from '@playwright/test'
 
+import { DATABASE_URL } from './helpers/database-url'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 // Asserts the upcoming-meetings card on the company Profile tab and the
@@ -20,11 +21,6 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 //     company-calendar-event-{id})
 //   apps/internal/src/routes/companies/$slug.tsx (company-calendar-tab,
 //     ?tab=calendar)
-
-const DATABASE_URL =
-	process.env['E2E_DATABASE_URL'] ??
-	process.env['DATABASE_URL'] ??
-	'postgresql://batuda:batuda@localhost:5433/batuda'
 
 const COMPANY_SLUG = 'cal-pep-fonda'
 

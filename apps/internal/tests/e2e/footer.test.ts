@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process'
 
 import { expect, test } from '@playwright/test'
 
+import { DATABASE_URL } from './helpers/database-url'
 import {
 	clearCatcher,
 	getMessage,
@@ -20,11 +21,6 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 // call in apps/server/src/services/email.ts; the catcher captures the
 // SMTP-receive side, storage captures the nodemailer-emit side. Equally
 // authoritative for the "did the footer make it on the wire" question.
-
-const DATABASE_URL =
-	process.env['E2E_DATABASE_URL'] ??
-	process.env['DATABASE_URL'] ??
-	'postgresql://batuda:batuda@localhost:5433/batuda'
 
 const SEEDED_INBOX_EMAIL = 'admin@taller.cat'
 

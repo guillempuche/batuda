@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process'
 
 import { expect, test } from '@playwright/test'
 
+import { DATABASE_URL } from './helpers/database-url'
 import { waitForInteractive } from './helpers/hydration'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
@@ -13,11 +14,6 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 // Proposals only exist as JSONB inside a research_runs row (a stub run
 // produces none), so the fixture is seeded directly through psql, matching
 // research-on-company.test.ts.
-
-const DATABASE_URL =
-	process.env['E2E_DATABASE_URL'] ??
-	process.env['DATABASE_URL'] ??
-	'postgresql://batuda:batuda@localhost:5433/batuda'
 
 const psql = (sqlText: string): string =>
 	execSync(`psql "${DATABASE_URL}" -tA -c "${sqlText.replace(/"/g, '\\"')}"`, {
