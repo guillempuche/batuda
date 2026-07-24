@@ -62,10 +62,50 @@ type EnrichmentBlock = {
 	readonly sizeRange?: SourcedString
 	readonly painPoints?: SourcedString
 	readonly currentTools?: SourcedString
-	readonly productsFit?: ReadonlyArray<string>
 	readonly tags?: ReadonlyArray<string>
 	readonly location?: SourcedString
 	readonly country?: SourcedString
+}
+
+// An evidence-backed row (a fit check or a disqualifier): the source URL and,
+// where present, the quote that decides it, camelCased from the stored shape.
+type EvidenceRef = {
+	readonly evidenceQuote?: string
+	readonly sourceId?: string
+}
+
+const evidenceToCitations = (e: EvidenceRef): ReadonlyArray<Citation> =>
+	e.sourceId !== undefined
+		? [
+				{
+					sourceId: e.sourceId,
+					...(e.evidenceQuote !== undefined ? { quote: e.evidenceQuote } : {}),
+				},
+			]
+		: []
+
+type FitCheck = EvidenceRef & {
+	readonly criterion: string
+	readonly result: 'pass' | 'fail' | 'unknown'
+}
+
+type Disqualifier = EvidenceRef & { readonly rule: string }
+
+type ConflictEntry = {
+	readonly field: string
+	readonly value: string
+	readonly sourceId?: string
+	readonly note?: string
+}
+
+// The run's quality signal (camelCased): how well the run grounded, and whether
+// it is thin enough that an automation should not act on it unreviewed.
+type QualityBlock = {
+	readonly rounds?: number
+	readonly sourcesMatched?: number
+	readonly fieldsGrounded?: number
+	readonly groundingRatio?: number
+	readonly lowConfidence?: boolean
 }
 
 type CompetitorEntry = {
@@ -84,8 +124,43 @@ type ContactEntry = {
 
 type CompanyEnrichmentFindings = CommonFindings & {
 	readonly enrichment?: EnrichmentBlock
+	readonly verdict?: string
+	readonly verdictRationale?: string
+	readonly fitChecks?: ReadonlyArray<FitCheck>
+	readonly disqualifiers?: ReadonlyArray<Disqualifier>
+	readonly hook?: string
+	readonly conflicts?: ReadonlyArray<ConflictEntry>
+	readonly quality?: QualityBlock
 	readonly competitors?: ReadonlyArray<CompetitorEntry>
 	readonly contacts?: ReadonlyArray<ContactEntry>
+}
+
+// Humanized, localized label for the holistic fit verdict token.
+function VerdictLabel({ verdict }: { readonly verdict: string }) {
+	switch (verdict) {
+		case 'strong_fit':
+			return <Trans>Strong fit</Trans>
+		case 'possible_fit':
+			return <Trans>Possible fit</Trans>
+		case 'weak_fit':
+			return <Trans>Weak fit</Trans>
+		case 'no_fit':
+			return <Trans>No fit</Trans>
+		default:
+			return <>{verdict}</>
+	}
+}
+
+// Localized label for one fit check's pass/fail/unknown result.
+function CheckResult({ result }: { readonly result: string }) {
+	switch (result) {
+		case 'pass':
+			return <Trans>Pass</Trans>
+		case 'fail':
+			return <Trans>Fail</Trans>
+		default:
+			return <Trans>Unknown</Trans>
+	}
 }
 
 const ENRICHMENT_FIELDS: ReadonlyArray<{
@@ -114,9 +189,84 @@ export function CompanyEnrichmentView({
 	const e = findings?.enrichment
 	const competitors = findings?.competitors ?? []
 	const contacts = findings?.contacts ?? []
+	const verdict = findings?.verdict
+	const verdictRationale = findings?.verdictRationale
+	const fitChecks = findings?.fitChecks ?? []
+	const disqualifiers = findings?.disqualifiers ?? []
+	const hook = findings?.hook
+	const conflicts = findings?.conflicts ?? []
+	const quality = findings?.quality
 
 	return (
 		<Sections>
+			{verdict !== undefined ||
+			fitChecks.length > 0 ||
+			disqualifiers.length > 0 ||
+			hook !== undefined ? (
+				<Section data-testid='research-fit'>
+					<SectionTitle>
+						<Trans>Fit</Trans>
+					</SectionTitle>
+					{verdict !== undefined ? (
+						<RowHead>
+							<Pill>
+								<VerdictLabel verdict={verdict} />
+							</Pill>
+							{verdictRationale !== undefined ? (
+								<Reason>{verdictRationale}</Reason>
+							) : null}
+						</RowHead>
+					) : null}
+					{fitChecks.length > 0 ? (
+						<FieldsTable>
+							{fitChecks.map(c => (
+								<FieldRow key={c.criterion}>
+									<FieldKey>{c.criterion}</FieldKey>
+									<FieldValue>
+										<CheckResult result={c.result} />
+										<CitationList citations={evidenceToCitations(c)} />
+									</FieldValue>
+								</FieldRow>
+							))}
+						</FieldsTable>
+					) : null}
+					{disqualifiers.length > 0 ? (
+						<List>
+							{disqualifiers.map(d => (
+								<ListItem key={d.rule}>
+									<Reason>{d.rule}</Reason>
+									<CitationList citations={evidenceToCitations(d)} />
+								</ListItem>
+							))}
+						</List>
+					) : null}
+					{hook !== undefined ? <Reason>{hook}</Reason> : null}
+				</Section>
+			) : null}
+
+			{conflicts.length > 0 ? (
+				<Section data-testid='research-conflicts'>
+					<SectionTitle>
+						<Trans>Sources disagree</Trans>
+					</SectionTitle>
+					<FieldsTable>
+						{conflicts.map(c => (
+							<FieldRow key={`${c.field}|${c.value}`}>
+								<FieldKey>{c.field}</FieldKey>
+								<FieldValue>
+									{c.value}
+									<CitationList
+										citations={
+											c.sourceId !== undefined ? [{ sourceId: c.sourceId }] : []
+										}
+									/>
+									{c.note !== undefined ? <Reason>{c.note}</Reason> : null}
+								</FieldValue>
+							</FieldRow>
+						))}
+					</FieldsTable>
+				</Section>
+			) : null}
 			{e !== undefined ? (
 				<Section data-testid='research-enrichment'>
 					<SectionTitle>
@@ -138,20 +288,6 @@ export function CompanyEnrichmentView({
 								</FieldRow>
 							)
 						})}
-						{e.productsFit !== undefined && e.productsFit.length > 0 ? (
-							<FieldRow>
-								<FieldKey>
-									<Trans>Products fit</Trans>
-								</FieldKey>
-								<FieldValue>
-									<TagList>
-										{e.productsFit.map(p => (
-											<Tag key={p}>{p}</Tag>
-										))}
-									</TagList>
-								</FieldValue>
-							</FieldRow>
-						) : null}
 						{e.tags !== undefined && e.tags.length > 0 ? (
 							<FieldRow>
 								<FieldKey>
@@ -237,6 +373,21 @@ export function CompanyEnrichmentView({
 							</ListItem>
 						))}
 					</List>
+				</Section>
+			) : null}
+
+			{quality !== undefined ? (
+				<Section data-testid='research-quality'>
+					<SectionTitle>
+						<Trans>Quality</Trans>
+					</SectionTitle>
+					<Reason>
+						<Trans>
+							{quality.fieldsGrounded ?? 0} fields grounded ·{' '}
+							{quality.sourcesMatched ?? 0} own-domain sources ·{' '}
+							{quality.rounds ?? 0} rounds
+						</Trans>
+					</Reason>
 				</Section>
 			) : null}
 

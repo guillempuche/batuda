@@ -62,7 +62,14 @@ import { emailsSearchAtom } from '#/atoms/emails-atoms'
 import { pagesSearchAtom } from '#/atoms/pages-atoms'
 import { researchListAtom } from '#/atoms/research-atoms'
 import { AboutSection } from '#/components/companies/about-section'
+import { AccountBriefSection } from '#/components/companies/account-brief-section'
 import { CadenceCard } from '#/components/companies/cadence-card'
+import {
+	CompanyFitSection,
+	type FieldSource,
+	type FitCheck,
+	type FitConflict,
+} from '#/components/companies/company-fit-section'
 import { CompanyOwnerControl } from '#/components/companies/company-owner-control'
 import { ConversationsTab } from '#/components/companies/conversations-tab'
 import { DocumentsPanel } from '#/components/companies/documents-panel'
@@ -170,6 +177,14 @@ type CompanyDetail = {
 	readonly longitude: number | null
 	readonly geocodedAt: string | null
 	readonly geocodeSource: string | null
+	readonly accountBrief: string | null
+	readonly briefUpdatedBy: string | null
+	readonly briefUpdatedAt: string | null
+	readonly lastEnrichedAt: string | null
+	readonly fitVerdict: string | null
+	readonly fitChecks: ReadonlyArray<FitCheck> | null
+	readonly fitConflicts: ReadonlyArray<FitConflict> | null
+	readonly fieldProvenance: Readonly<Record<string, FieldSource>> | null
 }
 
 type ContactProvenance = {
@@ -1211,9 +1226,15 @@ function DetailBody({
 								<Stack $gap='md'>
 									<ResearchSummaryCard
 										runs={researchRuns}
+										lastEnrichedAt={company.lastEnrichedAt}
 										onRunNew={() => openResearchDlg({ kind: 'research' })}
 									/>
 									<WherePanel company={company} compact />
+									<AccountBriefSection
+										company={company}
+										onSave={(field, next) => saveField(field, next)}
+									/>
+									<CompanyFitSection company={company} />
 									<AboutSection
 										company={company}
 										onSave={(field, next) => saveField(field, next)}
@@ -1630,7 +1651,77 @@ function narrowCompany(raw: unknown): CompanyDetail | null {
 		longitude: numeric('longitude'),
 		geocodedAt: str('geocodedAt'),
 		geocodeSource: str('geocodeSource'),
+		accountBrief: str('accountBrief'),
+		briefUpdatedBy: str('briefUpdatedBy'),
+		briefUpdatedAt: str('briefUpdatedAt'),
+		lastEnrichedAt: str('lastEnrichedAt'),
+		fitVerdict: str('fitVerdict'),
+		fitChecks: fitCheckList(r['fitChecks']),
+		fitConflicts: fitConflictList(r['fitConflicts']),
+		fieldProvenance: fieldSourceMap(r['fieldProvenance']),
 	}
+}
+
+const optionalText = (raw: unknown, key: string): string | undefined => {
+	const value = (raw as Record<string, unknown>)[key]
+	return typeof value === 'string' && value !== '' ? value : undefined
+}
+
+function fitCheckList(raw: unknown): ReadonlyArray<FitCheck> | null {
+	if (!Array.isArray(raw)) return null
+	const out: Array<FitCheck> = []
+	for (const entry of raw) {
+		if (!entry || typeof entry !== 'object') continue
+		const e = entry as Record<string, unknown>
+		if (typeof e['criterion'] !== 'string') continue
+		if (typeof e['result'] !== 'string') continue
+		out.push({
+			criterion: e['criterion'],
+			result: e['result'],
+			evidenceQuote: optionalText(e, 'evidenceQuote'),
+			sourceId: optionalText(e, 'sourceId'),
+		})
+	}
+	return out
+}
+
+function fitConflictList(raw: unknown): ReadonlyArray<FitConflict> | null {
+	if (!Array.isArray(raw)) return null
+	const out: Array<FitConflict> = []
+	for (const entry of raw) {
+		if (!entry || typeof entry !== 'object') continue
+		const e = entry as Record<string, unknown>
+		if (typeof e['field'] !== 'string') continue
+		if (typeof e['value'] !== 'string') continue
+		out.push({
+			field: e['field'],
+			value: e['value'],
+			sourceId: optionalText(e, 'sourceId'),
+			note: optionalText(e, 'note'),
+		})
+	}
+	return out
+}
+
+function fieldSourceMap(
+	raw: unknown,
+): Readonly<Record<string, FieldSource>> | null {
+	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+	const out: Record<string, FieldSource> = {}
+	for (const [field, entry] of Object.entries(raw)) {
+		if (!entry || typeof entry !== 'object') continue
+		const e = entry as Record<string, unknown>
+		if (typeof e['sourceUrl'] !== 'string') continue
+		if (typeof e['runId'] !== 'string') continue
+		out[field] = {
+			sourceUrl: e['sourceUrl'],
+			runId: e['runId'],
+			confidence:
+				typeof e['confidence'] === 'number' ? e['confidence'] : undefined,
+			asOf: optionalText(e, 'asOf'),
+		}
+	}
+	return out
 }
 
 function narrowContacts(

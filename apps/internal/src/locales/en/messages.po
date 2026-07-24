@@ -73,6 +73,13 @@ msgstr "{0} companies"
 msgid "{0} companies with filters applied"
 msgstr "{0} companies with filters applied"
 
+#. placeholder {0}: quality.fieldsGrounded ?? 0
+#. placeholder {1}: quality.sourcesMatched ?? 0
+#. placeholder {2}: quality.rounds ?? 0
+#: src/components/research/findings/company-enrichment-view.tsx
+msgid "{0} fields grounded · {1} own-domain sources · {2} rounds"
+msgstr "{0} fields grounded · {1} own-domain sources · {2} rounds"
+
 #. placeholder {0}: thread.messageCount
 #: src/routes/emails/index.tsx
 msgid "{0} msgs"
@@ -199,6 +206,11 @@ msgstr "Accepted"
 #: src/routes/oauth/consent.tsx
 msgid "Access"
 msgstr "Access"
+
+#: src/components/companies/account-brief-section.tsx
+#: src/components/companies/account-brief-section.tsx
+msgid "Account brief"
+msgstr "Account brief"
 
 #: src/components/research/target-correction.tsx
 msgid "acme.com"
@@ -420,6 +432,11 @@ msgstr "Already in CRM"
 #: src/components/research/proposal-outcome.tsx
 msgid "Already resolved"
 msgstr "Already resolved"
+
+#. placeholder {0}: conflict.value
+#: src/components/companies/company-fit-section.tsx
+msgid "also reported as {0}"
+msgstr "also reported as {0}"
 
 #: src/routes/oauth/consent.tsx
 msgid "An AI assistant wants to connect to your Batuda account over MCP and act on your behalf. Only approve assistants you trust."
@@ -710,6 +727,7 @@ msgstr "Call phone"
 msgid "Calls"
 msgstr "Calls"
 
+#: src/components/companies/account-brief-section.tsx
 #: src/components/companies/documents-panel.tsx
 #: src/components/companies/followup-dialog.tsx
 #: src/components/companies/proposals-panel.tsx
@@ -1476,6 +1494,10 @@ msgstr "Created by agent"
 msgid "Creating…"
 msgstr "Creating…"
 
+#: src/components/companies/company-fit-section.tsx
+msgid "Criteria"
+msgstr "Criteria"
+
 #: src/components/companies/proposals-panel.tsx
 msgid "Currency"
 msgstr "Currency"
@@ -1745,6 +1767,7 @@ msgstr "e.g. Setup fee"
 msgid "e.g. vip, warm"
 msgstr "e.g. vip, warm"
 
+#: src/components/companies/account-brief-section.tsx
 #: src/components/companies/documents-panel.tsx
 #: src/routes/companies/$slug.tsx
 #: src/routes/emails/inboxes.tsx
@@ -1793,6 +1816,14 @@ msgstr "Edit task title"
 #: src/components/instructions/template-editor-dialog.tsx
 msgid "Edit template"
 msgstr "Edit template"
+
+#: src/components/companies/account-brief-section.tsx
+msgid "Edited by hand <0/>. Research adds below your text."
+msgstr "Edited by hand <0/>. Research adds below your text."
+
+#: src/components/companies/account-brief-section.tsx
+msgid "Edited by hand. Research adds below your text."
+msgstr "Edited by hand. Research adds below your text."
 
 #: src/routes/pages/$id.tsx
 #: src/routes/pages/$id.tsx
@@ -1923,6 +1954,10 @@ msgstr "Extending the org default"
 msgid "Extracting findings"
 msgstr "Extracting findings"
 
+#: src/components/research/findings/company-enrichment-view.tsx
+msgid "Fail"
+msgstr "Fail"
+
 #: src/components/research/run-labels.ts
 #: src/routes/emails/$threadId.tsx
 msgid "Failed"
@@ -1988,6 +2023,11 @@ msgstr "Findings"
 #: src/components/shared/status-badge.tsx
 msgid "First outreach sent"
 msgstr "First outreach sent"
+
+#: src/components/companies/company-fit-section.tsx
+#: src/components/research/findings/company-enrichment-view.tsx
+msgid "Fit"
+msgstr "Fit"
 
 #: src/routes/emails/$threadId.tsx
 msgid "Flagged as spam by the provider. The body is shown for review only."
@@ -2647,6 +2687,10 @@ msgstr "Needs action"
 msgid "Needs attention"
 msgstr "Needs attention"
 
+#: src/components/research/run-labels.ts
+msgid "Needs review"
+msgstr "Needs review"
+
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Needs your review"
 msgstr "Needs your review"
@@ -2742,6 +2786,10 @@ msgstr "No active organization. Pick one from the switcher in the top bar."
 msgid "No activity yet"
 msgstr "No activity yet"
 
+#: src/components/companies/account-brief-section.tsx
+msgid "No brief yet. Research writes one here, or you can start it yourself."
+msgstr "No brief yet. Research writes one here, or you can start it yourself."
+
 #: src/routes/calendar/index.tsx
 msgid "No calendar events yet"
 msgstr "No calendar events yet"
@@ -2808,6 +2856,10 @@ msgstr "no due date"
 #: src/routes/tasks/index.tsx
 msgid "No due date"
 msgstr "No due date"
+
+#: src/components/research/findings/company-enrichment-view.tsx
+msgid "No fit"
+msgstr "No fit"
 
 #: src/routes/emails/inboxes.tsx
 msgid "No footers"
@@ -2943,6 +2995,10 @@ msgstr "none scheduled"
 #: src/components/shared/task-item.tsx
 msgid "Normal priority"
 msgstr "Normal priority"
+
+#: src/components/companies/company-fit-section.tsx
+msgid "Not a fit"
+msgstr "Not a fit"
 
 #: src/components/research/research-dialog.tsx
 msgid "Not enough research budget for this run. Raise the budget or narrow the search."
@@ -3240,6 +3296,10 @@ msgstr "Pain indicators"
 msgid "Pain points"
 msgstr "Pain points"
 
+#: src/components/research/findings/company-enrichment-view.tsx
+msgid "Pass"
+msgstr "Pass"
+
 #: src/routes/login.tsx
 msgid "Password"
 msgstr "Password"
@@ -3370,6 +3430,11 @@ msgstr "Plain"
 msgid "Please try again."
 msgstr "Please try again."
 
+#: src/components/companies/company-fit-section.tsx
+#: src/components/research/findings/company-enrichment-view.tsx
+msgid "Possible fit"
+msgstr "Possible fit"
+
 #: src/routes/calendar/index.tsx
 msgid "Preparing calendar view…"
 msgstr "Preparing calendar view…"
@@ -3420,7 +3485,6 @@ msgid "Private inbox"
 msgstr "Private inbox"
 
 #: src/components/companies/about-section.tsx
-#: src/components/research/findings/company-enrichment-view.tsx
 msgid "Products fit"
 msgstr "Products fit"
 
@@ -3497,6 +3561,10 @@ msgstr "Purpose"
 msgid "Qty"
 msgstr "Qty"
 
+#: src/components/research/findings/company-enrichment-view.tsx
+msgid "Quality"
+msgstr "Quality"
+
 #: src/components/companies/proposals-panel.tsx
 msgid "Quantity"
 msgstr "Quantity"
@@ -3550,6 +3618,11 @@ msgstr "Recent changes"
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Recent runs"
 msgstr "Recent runs"
+
+#: src/components/companies/account-brief-section.tsx
+#: src/components/companies/research-summary-card.tsx
+msgid "recently"
+msgstr "recently"
 
 #: src/routes/companies/index.tsx
 msgid "Recently contacted"
@@ -3778,6 +3851,10 @@ msgstr "Role"
 msgid "Role (optional)"
 msgstr "Role (optional)"
 
+#: src/components/companies/company-fit-section.tsx
+msgid "run"
+msgstr "run"
+
 #: src/components/research/run-actions.tsx
 msgid "Run again"
 msgstr "Run again"
@@ -3811,6 +3888,7 @@ msgstr "Running"
 msgid "Sales context"
 msgstr "Sales context"
 
+#: src/components/companies/account-brief-section.tsx
 #: src/components/companies/documents-panel.tsx
 #: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
@@ -4148,6 +4226,11 @@ msgstr "Something went wrong. Try again."
 msgid "Sort"
 msgstr "Sort"
 
+#: src/components/companies/company-fit-section.tsx
+#: src/components/companies/company-fit-section.tsx
+msgid "source"
+msgstr "source"
+
 #: src/components/companies/about-section.tsx
 #: src/routes/calendar/index.tsx
 #: src/routes/tasks/index.tsx
@@ -4161,6 +4244,11 @@ msgstr "Sourced from research"
 #: src/components/research/provenance.tsx
 msgid "Sourced from research on {dateLabel}"
 msgstr "Sourced from research on {dateLabel}"
+
+#: src/components/companies/company-fit-section.tsx
+#: src/components/research/findings/company-enrichment-view.tsx
+msgid "Sources disagree"
+msgstr "Sources disagree"
 
 #: src/components/research/research-dialog.tsx
 msgid "Sources language"
@@ -4273,6 +4361,11 @@ msgstr "Strengths"
 #: src/components/primitives/pri-rich-text.tsx
 msgid "Strikethrough"
 msgstr "Strikethrough"
+
+#: src/components/companies/company-fit-section.tsx
+#: src/components/research/findings/company-enrichment-view.tsx
+msgid "Strong fit"
+msgstr "Strong fit"
 
 #: src/components/research/run-progress.tsx
 msgid "Structuring the findings"
@@ -4708,6 +4801,7 @@ msgstr "Unit price"
 msgid "unknown"
 msgstr "unknown"
 
+#: src/components/research/findings/company-enrichment-view.tsx
 #: src/routes/emails/index.tsx
 msgid "Unknown"
 msgstr "Unknown"
@@ -4761,6 +4855,10 @@ msgstr "Update"
 #: src/routes/emails/inboxes.tsx
 msgid "Update failed"
 msgstr "Update failed"
+
+#: src/components/companies/research-summary-card.tsx
+msgid "updated <0/>"
+msgstr "updated <0/>"
 
 #: src/components/emails/attachment-picker.tsx
 msgid "Upload failed"
@@ -4869,6 +4967,11 @@ msgstr "We don't recognize that email. Ask an admin to invite you."
 msgid "We sent a sign-in link to"
 msgstr "We sent a sign-in link to"
 
+#: src/components/companies/company-fit-section.tsx
+#: src/components/research/findings/company-enrichment-view.tsx
+msgid "Weak fit"
+msgstr "Weak fit"
+
 #: src/components/research/findings/competitor-scan-view.tsx
 msgid "Weaknesses"
 msgstr "Weaknesses"
@@ -4920,6 +5023,10 @@ msgstr "When"
 msgid "Where"
 msgstr "Where"
 
+#: src/components/companies/company-fit-section.tsx
+msgid "Where each fact came from"
+msgstr "Where each fact came from"
+
 #: src/components/research/research-dialog.tsx
 msgid "Where to look (optional)"
 msgstr "Where to look (optional)"
@@ -4949,6 +5056,10 @@ msgstr "Write your message…"
 #: src/components/research/run-progress.tsx
 msgid "Writing the brief"
 msgstr "Writing the brief"
+
+#: src/components/companies/account-brief-section.tsx
+msgid "Written by research. Editing it makes it yours."
+msgstr "Written by research. Editing it makes it yours."
 
 #: src/components/research/target-correction.tsx
 msgid "Wrong company? Enter its official website"

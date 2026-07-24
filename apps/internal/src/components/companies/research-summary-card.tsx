@@ -15,9 +15,12 @@ import {
 
 export function ResearchSummaryCard({
 	runs,
+	lastEnrichedAt,
 	onRunNew,
 }: {
 	readonly runs: ReadonlyArray<ResearchRunRow>
+	/** When research findings were last accepted onto this company. */
+	readonly lastEnrichedAt: string | null
 	readonly onRunNew: () => void
 }) {
 	const { t } = useLingui()
@@ -29,6 +32,16 @@ export function ResearchSummaryCard({
 				<Heading>
 					<Microscope size={14} aria-hidden />
 					<Trans>Research</Trans>
+					{/* How current the company's researched facts are — a run that was
+					    never applied does not make the row any fresher. */}
+					{lastEnrichedAt !== null ? (
+						<Freshness data-testid='company-research-freshness'>
+							<Trans>
+								updated{' '}
+								<RelativeDate value={lastEnrichedAt} fallback={t`recently`} />
+							</Trans>
+						</Freshness>
+					) : null}
 				</Heading>
 				<PriButton
 					type='button'
@@ -147,5 +160,11 @@ const Empty = styled.p`
 	margin: 0;
 	font-family: var(--font-body);
 	font-style: italic;
+	color: var(--color-on-surface-variant);
+`
+
+const Freshness = styled.span`
+	font-weight: 400;
+	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface-variant);
 `

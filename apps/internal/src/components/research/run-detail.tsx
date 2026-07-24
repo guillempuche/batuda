@@ -185,7 +185,9 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 				) : null}
 
 				{!isRunning &&
-				(run.status === 'no_reliable_data' || run.status === 'succeeded') ? (
+				(run.status === 'no_reliable_data' ||
+					run.status === 'succeeded' ||
+					run.status === 'succeeded_low_confidence') ? (
 					<TargetCorrection researchId={run.id} />
 				) : null}
 
