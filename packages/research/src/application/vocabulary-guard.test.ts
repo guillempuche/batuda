@@ -74,18 +74,28 @@ describe('mapSizeRange', () => {
 			expect(mapSizeRange('3')).toBe('1-5')
 		})
 
-		it('should fall a value above the top bucket to the closest one', () => {
-			// GIVEN a company larger than the top bracket
-			expect(mapSizeRange('500')).toBe('51-200')
+		it('should bucket a mid-to-large company into its own band', () => {
+			// GIVEN companies above the old 51-200 ceiling — these used to all collapse
+			// to 51-200, so a 500-person company read as small and its band contradicted
+			// its own evidence quote
+			expect(mapSizeRange('201-500')).toBe('201-500')
+			expect(mapSizeRange('500')).toBe('201-500')
+			expect(mapSizeRange('501-1,000')).toBe('501-1000')
 			// AND a head-count written with a thousands separator — "1,700" must read
 			// as 1700, not 1, so a large company is not bucketed as 1-5
-			expect(mapSizeRange('1,700 employees')).toBe('51-200')
-			expect(mapSizeRange('1.700 empleados')).toBe('51-200')
+			expect(mapSizeRange('1,700 employees')).toBe('1001-5000')
+			expect(mapSizeRange('1.700 empleados')).toBe('1001-5000')
 			// AND a size written as a long sentence still buckets on its first integer,
 			// instead of being discarded for having more than five words
 			expect(
 				mapSizeRange('over 1,700 employees across North America and Europe'),
-			).toBe('51-200')
+			).toBe('1001-5000')
+		})
+
+		it('should put a very large company in the open top band', () => {
+			// GIVEN a company past every closed band
+			expect(mapSizeRange('8000 employees')).toBe('5001+')
+			expect(mapSizeRange('5001+')).toBe('5001+')
 		})
 	})
 

@@ -70,6 +70,20 @@ describe('outcomeFromRun', () => {
 		})
 	})
 
+	describe('when a run succeeded with low confidence', () => {
+		it('should keep the status instead of coercing it to failed', () => {
+			// GIVEN a finished thin run with real findings
+			const outcome = outcomeFromRun({
+				status: 'succeeded_low_confidence',
+				findings: { enrichment: { industry: 'transport' } },
+				fetchedUrls: [],
+			})
+
+			// WHEN adapted — THEN the low-confidence success carries through
+			expect(outcome.status).toBe('succeeded_low_confidence')
+		})
+	})
+
 	describe('when the run fetched several pages', () => {
 		it('should reach each host, stripping www and dropping unparseable URLs', () => {
 			// GIVEN the run fetched the official site, a registry, and a bad URL

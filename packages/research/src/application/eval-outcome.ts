@@ -17,9 +17,11 @@ import {
 	type ScorableField,
 	type TerminalStatus,
 } from './eval-scoring'
+import { hostOf } from './source-key'
 
 const TERMINAL_STATUSES: ReadonlySet<string> = new Set<TerminalStatus>([
 	'succeeded',
+	'succeeded_low_confidence',
 	'no_reliable_data',
 	'failed',
 	'cancelled',
@@ -42,14 +44,6 @@ const readFieldValue = (raw: unknown): string | null => {
 		return typeof inner === 'string' ? inner : null
 	}
 	return null
-}
-
-const hostOf = (url: string): string | null => {
-	try {
-		return new URL(url).hostname.toLowerCase().replace(/^www\./, '')
-	} catch {
-		return null
-	}
 }
 
 const enrichmentOf = (

@@ -26,6 +26,8 @@
  * mistaken for a scalar field.
  */
 
+import { isSourcedField } from './guard-shapes'
+
 // Generic non-answers a model emits when it has nothing — never a real value.
 const PLACEHOLDER_VALUES = new Set([
 	'',
@@ -171,23 +173,6 @@ export const isInCorpus = (text: string, lowerCorpus: string): boolean => {
 	const present = tokens.filter(token => lowerCorpus.includes(token)).length
 	return present / tokens.length >= QUOTE_PRESENCE_THRESHOLD
 }
-
-// A per-field Sourced wrapper: `{ value, source_id?, quote?, confidence? }`. Keys on
-// its own `value` beside at least one provenance field, which distinguishes it from
-// an arbitrary object that merely happens to have a `value` property.
-const isSourcedField = (
-	v: unknown,
-): v is {
-	value: unknown
-	source_id?: unknown
-	quote?: unknown
-	confidence?: unknown
-} =>
-	v !== null &&
-	typeof v === 'object' &&
-	!Array.isArray(v) &&
-	'value' in v &&
-	('source_id' in v || 'quote' in v || 'confidence' in v)
 
 /** Why a per-field scalar was dropped, for the run's grounding trace. */
 export type FieldDropReason =

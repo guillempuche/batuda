@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 
 import { describe, expect, it } from 'vitest'
 
-import { canonicalizeUrl, hostOf, urlHashForScrape } from './source-key'
+import { canonicalizeUrl, hostOf, pathOf, urlHashForScrape } from './source-key'
 
 describe('canonicalizeUrl', () => {
 	it('should lowercase the hostname', () => {
@@ -156,6 +156,25 @@ describe('hostOf', () => {
 		it('should return null for text that is not a URL', () => {
 			// GIVEN a non-URL citation (a title, prose)
 			expect(hostOf('Monzo Bank plc')).toBeNull()
+		})
+	})
+})
+
+describe('pathOf', () => {
+	describe('when telling namespaces apart on one host', () => {
+		it('should return the lowercased path, with or without a scheme', () => {
+			// GIVEN URLs that differ only by path — a person vs a company
+			expect(pathOf('https://www.linkedin.com/in/Jane-Doe/')).toBe(
+				'/in/jane-doe/',
+			)
+			expect(pathOf('https://www.linkedin.com/company/acme')).toBe(
+				'/company/acme',
+			)
+			expect(pathOf('zoominfo.com/p/Someone/1')).toBe('/p/someone/1')
+		})
+
+		it('should return null for text that is not a URL', () => {
+			expect(pathOf('just a title')).toBeNull()
 		})
 	})
 })

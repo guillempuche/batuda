@@ -7,10 +7,12 @@ import {
 	buildExtractionPrompt,
 	buildResearchSystemPrompt,
 	cancelOutcome,
+	citedUnscrapedSources,
 	clampPagination,
 	computeResearchCacheKey,
 	groundedPageTexts,
 	isValidUuid,
+	labelledGroundedPages,
 	normalizeResearchQuery,
 	researchCacheTtlDaysFor,
 	schemaVersionFor,
@@ -18,6 +20,7 @@ import {
 	subjectsForPrompt,
 	withProposalIds,
 } from './research-service'
+import { urlHashForScrape } from './source-key'
 
 describe('normalizeResearchQuery', () => {
 	it('should collapse whitespace and lowercase so equivalent phrasings share a cache key', () => {
@@ -345,6 +348,27 @@ describe('buildExtractionPrompt', () => {
 			)
 		})
 
+		it('should ask for a fit verdict only when the schema carries the fields', () => {
+			// GIVEN an enrichment run (fitVerdict on) versus any other schema (off)
+			const withVerdict = buildExtractionPrompt({
+				citationInstruction: '',
+				evidenceBlock: '',
+				subjects: [],
+				fitVerdict: true,
+			})
+			const withoutVerdict = buildExtractionPrompt({
+				citationInstruction: '',
+				evidenceBlock: '',
+				subjects: [],
+			})
+
+			// THEN only the enrichment prompt asks the model to record the verdict, so a
+			// scan or freeform run is never pushed to fill fields it has no home for
+			expect(withVerdict).toContain('set `verdict`')
+			expect(withVerdict).toContain('disqualifiers')
+			expect(withoutVerdict).not.toContain('set `verdict`')
+		})
+
 		it('should carry the anti-fabrication rules the guards depend on', () => {
 			// GIVEN any extraction prompt
 			const prompt = buildExtractionPrompt({
@@ -373,7 +397,29 @@ describe('buildExtractionPrompt', () => {
 			// THEN it asks the model to read to the end and report what is there — the
 			// lever against a run that answers from the first page and stops
 			expect(prompt).toContain('Read ALL of the evidence')
-			expect(prompt).toContain('name EVERY person')
+			expect(prompt).toContain('Name EVERY person')
+		})
+
+		it('should keep standing instructions out of the extraction prompt', () => {
+			// GIVEN a run whose agent prompt carries a standing instruction
+			const system = buildResearchSystemPrompt({
+				schemaName: 'company_enrichment_v1',
+				subjectContext: '',
+				hintsContext: '',
+				segments: ['Prefer small family firms in Aragón'],
+			})
+			// AND the extraction prompt for the same run — its inputs carry no
+			// instruction channel at all, so a framing can steer where the agent
+			// searches but never what counts as evidence
+			const extraction = buildExtractionPrompt({
+				citationInstruction: '',
+				evidenceBlock: 'EVIDENCE',
+				subjects: [],
+			})
+
+			// THEN the framing reaches the agent prompt only
+			expect(system).toContain('Prefer small family firms')
+			expect(extraction).not.toContain('Prefer small family firms')
 		})
 
 		it('should not push exhaustiveness on the fields no guard can check', () => {
@@ -744,6 +790,114 @@ describe('groundedPageTexts', () => {
 				'CEVA freight',
 				'DHL logistics',
 			])
+		})
+	})
+})
+
+describe('labelledGroundedPages', () => {
+	const targets: EntityTargets = {
+		cores: ['acmelogistics'],
+		words: ['acme'],
+		domains: ['acme.es'],
+		places: [],
+	}
+
+	describe('when a grounded page carries its source host', () => {
+		it('should prefix the block with the host so the model attributes the fact', () => {
+			// GIVEN a grounded own-domain page that carries its host
+			const pages = [
+				{ urlHash: 'h1', text: 'Head office: Barcelona', host: 'acme.es' },
+			]
+			// WHEN labelled — THEN the block is prefixed with its source host
+			expect(labelledGroundedPages(targets, pages)).toEqual([
+				'[source: acme.es]\nHead office: Barcelona',
+			])
+		})
+	})
+
+	describe('when a page has no source host', () => {
+		it('should pass the text through unlabelled', () => {
+			// GIVEN a scan run with no target and a page that carries no host
+			const pages = [{ urlHash: 'h1', text: 'anything' }]
+			// WHEN labelled — THEN the text is returned without a source prefix
+			expect(labelledGroundedPages(null, pages)).toEqual(['anything'])
+		})
+	})
+
+	describe('when own-domain and aggregator pages both concern the target', () => {
+		it('should label each with its host, own domain first', () => {
+			// GIVEN an aggregator page fetched before the company's own page, both naming the target
+			const pages = [
+				{
+					urlHash: 'h1',
+					text: 'Acme Logistics profile',
+					host: 'aggregator.com',
+				},
+				{ urlHash: 'h2', text: 'Acme Logistics at acme.es', host: 'acme.es' },
+			]
+			// WHEN labelled — THEN the own-domain block comes first, each tagged with its host
+			expect(labelledGroundedPages(targets, pages)).toEqual([
+				'[source: acme.es]\nAcme Logistics at acme.es',
+				'[source: aggregator.com]\nAcme Logistics profile',
+			])
+		})
+	})
+})
+
+describe('citedUnscrapedSources', () => {
+	const hasNone = () => false
+
+	describe('when company fields cite pages the run never fetched', () => {
+		it('should return each ordinary citation once, up to the cap', () => {
+			// GIVEN two fields citing the same unfetched page and one citing another
+			const findings = {
+				enrichment: {
+					industry: { value: 'transport', source_id: 'https://a.com/x' },
+					size_range: { value: '11-50', source_id: 'https://a.com/x' },
+					location: { value: 'BCN', source_id: 'https://b.com/y' },
+				},
+			}
+
+			// WHEN collected — THEN deduped, in field order, and capped
+			expect(citedUnscrapedSources(findings, hasNone, 3)).toEqual([
+				'https://a.com/x',
+				'https://b.com/y',
+			])
+			expect(citedUnscrapedSources(findings, hasNone, 1)).toEqual([
+				'https://a.com/x',
+			])
+		})
+	})
+
+	describe('when a citation is already fetched or cannot help', () => {
+		it('should skip fetched pages, blocked namespaces, and unparseable ids', () => {
+			// GIVEN a fetched page, a person profile, and a junk citation id
+			const findings = {
+				enrichment: {
+					industry: { value: 't', source_id: 'https://fetched.com/p' },
+					size_range: {
+						value: '51-200',
+						source_id: 'https://www.zoominfo.com/p/Someone/1',
+					},
+					location: { value: 'x', source_id: 'not a url' },
+				},
+			}
+
+			// WHEN collected — THEN none qualify for a fetch
+			expect(
+				citedUnscrapedSources(
+					findings,
+					hash => hash === urlHashForScrape('https://fetched.com/p'),
+					5,
+				),
+			).toEqual([])
+		})
+	})
+
+	describe('when findings are not an enrichment object', () => {
+		it('should return nothing', () => {
+			expect(citedUnscrapedSources({ error: 'x' }, hasNone, 3)).toEqual([])
+			expect(citedUnscrapedSources(null, hasNone, 3)).toEqual([])
 		})
 	})
 })

@@ -15,6 +15,7 @@
 import { Effect } from 'effect'
 
 import type { BudgetSnapshot } from '../domain/types'
+import { stripReasoning } from './strip-reasoning'
 import { CHEAP_MIN_COST_CENTS, REGISTRY_LOOKUP_COST_CENTS } from './tool-costs'
 
 /** One round of the loop, reduced to the plain data the stop conditions need. */
@@ -169,7 +170,11 @@ export const runAgentResearchLoop = <E, R>(
 		}
 
 		return {
-			researchText: transcript.join('\n\n'),
+			// Strip any model chain-of-thought here, at the one place the transcript
+			// is assembled, so neither the persisted transcript nor the extractor's
+			// input carries a `<think>` block. Evidence text is left untouched — it
+			// holds tool results, never model prose.
+			researchText: stripReasoning(transcript.join('\n\n')),
 			evidenceText: evidenceParts.join('\n\n'),
 			scrapedUrlHashes: Array.from(urlHashes),
 			tokensIn,

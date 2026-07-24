@@ -23,11 +23,13 @@ import {
 	type ContactGoldenExpectation,
 	type ContactRunScore,
 	type CreateResearchInput,
+	compareFramings,
 	contactEvalSpanAttributes,
 	contactEvalSummaryAttributes,
 	type EvalSummary,
 	evalSpanAttributes,
 	evalSummaryAttributes,
+	type FramingOutcome,
 	type GoldenExpectation,
 	type ModelProbeResult,
 	makeResearchLlmLive,
@@ -41,6 +43,7 @@ import {
 	type RawGoldenRow,
 	ResearchEventSink,
 	ResearchService,
+	type ResolvedInstructions,
 	type RunScore,
 	researchToolkitWireFormat,
 	type SystemDefaults,
@@ -156,6 +159,7 @@ const researchLive = ResearchService.layer.pipe(
 
 const TERMINAL = new Set([
 	'succeeded',
+	'succeeded_low_confidence',
 	'failed',
 	'cancelled',
 	'no_reliable_data',
@@ -188,6 +192,8 @@ const systemDefaults = Effect.gen(function* () {
 interface FinishedRun {
 	readonly status?: string
 	readonly findings?: unknown
+	// The run's final entity verdict, from its own column (not the findings JSON).
+	readonly entityMatch?: string | null
 }
 
 // Poll get() until the dispatch consumer drives the run to a terminal status, or
@@ -206,6 +212,26 @@ const pollToTerminal = (runId: string, maxAttempts: number) =>
 		return run
 	})
 
+// Create a fresh eval run and poll it to a terminal status. A single golden
+// company never fans out, so a confirm-required result is a bug — die on it.
+// A deep run does several search/scrape/LLM rounds, so allow ~15 minutes (900
+// one-second polls). Returns the run id (for source lookups) and the finished run.
+const createRunToTerminal = (
+	user: string,
+	org: string,
+	input: CreateResearchInput,
+	defaults: SystemDefaults,
+	instructions?: ResolvedInstructions,
+) =>
+	Effect.gen(function* () {
+		const svc = yield* ResearchService
+		const created = yield* svc.create(user, org, input, defaults, instructions)
+		if (created.status === 'confirm_required')
+			return yield* Effect.die(new Error('eval run should not fan out'))
+		const run = yield* pollToTerminal(created.id, 900)
+		return { runId: created.id, run }
+	})
+
 const driveOne = (
 	org: string,
 	user: string,
@@ -215,7 +241,6 @@ const driveOne = (
 	language: string | undefined,
 ) =>
 	Effect.gen(function* () {
-		const svc = yield* ResearchService
 		// Narrow the free-text flag to a supported language, dropping anything else.
 		const lang = (['ca', 'es', 'en'] as const).find(l => l === language)
 		const input: CreateResearchInput = {
@@ -227,21 +252,19 @@ const driveOne = (
 			// language — the seam for testing a non-English company end to end.
 			...(lang ? { context: { hints: { language: lang } } } : {}),
 		}
-		const created = yield* svc.create(user, org, input, defaults)
-		// A single-subject eval never fans out, so it always carries a run id;
-		// rule out the confirm-required variant to keep the type honest.
-		if (created.status === 'confirm_required')
-			return yield* Effect.die(new Error('eval run should not fan out'))
-		// A deep run does several search/scrape/LLM rounds, so allow up to ~15
-		// minutes to finish (900 one-second polls) before reporting its last status.
-		const run = yield* pollToTerminal(created.id, 900)
+		const { runId, run } = yield* createRunToTerminal(
+			user,
+			org,
+			input,
+			defaults,
+		)
 		// Grounding is judged by the pages the run reached, so pull its fetched
 		// source URLs — per-field citations may point at third-party fact-sources.
 		const sql = yield* SqlClient.SqlClient
 		const sourceRows = yield* sql<{ url: string }>`
 			SELECT DISTINCT s.url
 			FROM research_run_sources rs JOIN sources s ON s.id = rs.source_id
-			WHERE rs.research_id = ${created.id}
+			WHERE rs.research_id = ${runId}
 		`
 		const outcome = outcomeFromRun({
 			status: run?.status ?? 'failed',
@@ -519,6 +542,155 @@ const formatContactSummary = (summary: ContactEvalSummary): string =>
 				: `${summary.costPerVerifiedContact.toFixed(1)}¢`
 		}`,
 	].join('\n')
+
+// The two opposite framings the invariance eval injects, hand-built so the
+// check needs no instruction rows in the database. Each may steer WHERE the
+// agent searches; neither may change the facts, the entity verdict, or the
+// people — that is the invariant under test.
+const FRAMING_A: ResolvedInstructions = {
+	segments: [
+		'Focus on small, family-run businesses; prefer local, independent companies.',
+	],
+	fingerprint: 'eval-invariance-a',
+	templateIds: [],
+	templateNames: ['eval-invariance-a'],
+}
+const FRAMING_B: ResolvedInstructions = {
+	segments: [
+		'Focus on large enterprises; prefer companies with hundreds of employees and several offices.',
+	],
+	fingerprint: 'eval-invariance-b',
+	templateIds: [],
+	templateNames: ['eval-invariance-b'],
+}
+
+// One framed run, adapted to the shape the comparator reads: scorable fields,
+// the final entity verdict, and the named contacts.
+const driveFramed = (
+	org: string,
+	user: string,
+	defaults: SystemDefaults,
+	golden: GoldenExpectation,
+	schemaName: string,
+	instructions: ResolvedInstructions,
+) =>
+	Effect.gen(function* () {
+		const input: CreateResearchInput = {
+			query: golden.query,
+			schemaName,
+			forceFresh: true,
+		}
+		const { run } = yield* createRunToTerminal(
+			user,
+			org,
+			input,
+			defaults,
+			instructions,
+		)
+		const outcome = outcomeFromRun({
+			status: run?.status ?? 'failed',
+			findings: run?.findings,
+			fetchedUrls: [],
+		})
+		// entity_match is a top-level run column (camelCased by the client), never
+		// a key inside the findings JSON — read it from the run, not the findings.
+		return {
+			fields: outcome.fields,
+			entityMatch: run?.entityMatch ?? null,
+			contacts: outcome.contacts,
+		} satisfies FramingOutcome
+	})
+
+export const researchEvalInvariance = (opts: {
+	readonly org: string
+	readonly user: string
+	readonly goldenPath: string
+	readonly schemaName: string
+	readonly concurrency: number
+}) =>
+	Effect.gen(function* () {
+		const raw = yield* Effect.tryPromise({
+			try: () => readFile(fromRepoRoot(opts.goldenPath), 'utf8'),
+			catch: error => new Error(`cannot read golden set: ${String(error)}`),
+		})
+		const rows = JSON.parse(raw) as ReadonlyArray<RawGoldenRow>
+		const { golden, errors } = parseGoldenSet(rows)
+		for (const bad of errors) {
+			yield* Console.error(`skipped ${bad.id}: ${bad.error}`)
+		}
+		if (golden.length === 0) {
+			return yield* Effect.fail(new Error('golden set has no valid rows'))
+		}
+		yield* Console.log(
+			`Framing-invariance eval on ${golden.length} companies (2 runs each)…\n`,
+		)
+		const results = yield* Effect.gen(function* () {
+			const defaults = yield* systemDefaults
+			return yield* Effect.forEach(
+				golden,
+				company =>
+					Effect.gen(function* () {
+						const a = yield* driveFramed(
+							opts.org,
+							opts.user,
+							defaults,
+							company,
+							opts.schemaName,
+							FRAMING_A,
+						)
+						const b = yield* driveFramed(
+							opts.org,
+							opts.user,
+							defaults,
+							company,
+							opts.schemaName,
+							FRAMING_B,
+						)
+						return { id: company.id, comparison: compareFramings(a, b) }
+					}).pipe(
+						Effect.withSpan('research_eval_invariance.company', {
+							attributes: { 'eval.company_id': company.id },
+						}),
+					),
+				{ concurrency: opts.concurrency },
+			)
+		}).pipe(Effect.provide(researchLive))
+		let broken = 0
+		for (const { id, comparison } of results) {
+			if (comparison.invariant) {
+				yield* Console.log(`ok   ${id}: invariant holds`)
+				continue
+			}
+			broken++
+			const parts: string[] = []
+			if (comparison.divergentFields.length > 0)
+				parts.push(`fields: ${comparison.divergentFields.join(', ')}`)
+			if (comparison.entityMatchDiverged) parts.push('entity verdict diverged')
+			if (comparison.contactsOnlyInA.length > 0)
+				parts.push(
+					`only under framing A: ${comparison.contactsOnlyInA.join(', ')}`,
+				)
+			if (comparison.contactsOnlyInB.length > 0)
+				parts.push(
+					`only under framing B: ${comparison.contactsOnlyInB.join(', ')}`,
+				)
+			yield* Console.log(`LEAK ${id}: ${parts.join(' · ')}`)
+		}
+		yield* Console.log(
+			`\n${results.length - broken}/${results.length} companies invariant under opposite framings`,
+		)
+		if (broken > 0)
+			return yield* Effect.fail(
+				new Error(`framing leaked into acceptance for ${broken} company(ies)`),
+			)
+	}).pipe(
+		Effect.withSpan('research_eval_invariance.batch', {
+			attributes: { 'eval.schema': opts.schemaName },
+		}),
+		Effect.provide(
+			makeOtlpObservability({ serviceName: 'batuda-research-eval' }),
+		),
+	)
 
 /**
  * Run the contact golden set through the live discover_contacts flow and report

@@ -144,7 +144,11 @@ export const mapSizeRange = (raw: string): CrmSizeRange | null => {
 	if (count <= 10) return '6-10'
 	if (count <= 25) return '11-25'
 	if (count <= 50) return '26-50'
-	return '51-200'
+	if (count <= 200) return '51-200'
+	if (count <= 500) return '201-500'
+	if (count <= 1000) return '501-1000'
+	if (count <= 5000) return '1001-5000'
+	return '5001+'
 }
 
 // Common country names → ISO 3166-1 alpha-2, so the extractor's "France" / "United

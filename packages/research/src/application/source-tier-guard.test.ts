@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+	AUTO_APPLY_CONFIDENCE_FLOOR,
 	enforceSourceTier,
 	THIRD_PARTY_CONFIDENCE_CAP,
 } from './source-tier-guard'
@@ -17,6 +18,15 @@ const enrichment = (findings: unknown): EnrichmentView =>
 	(findings as { enrichment: EnrichmentView }).enrichment
 
 const TARGETS = ['acme.com']
+
+describe('AUTO_APPLY_CONFIDENCE_FLOOR', () => {
+	it('should sit above the third-party cap so a capped value never auto-applies', () => {
+		// GIVEN the cap applied to outside estimates — THEN the floor clears it
+		expect(AUTO_APPLY_CONFIDENCE_FLOOR).toBeGreaterThan(
+			THIRD_PARTY_CONFIDENCE_CAP,
+		)
+	})
+})
 
 describe('enforceSourceTier', () => {
 	describe("when a value is cited to the target's own domain", () => {

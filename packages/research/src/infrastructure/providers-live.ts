@@ -17,6 +17,7 @@ import {
 	type EnrichmentAttempt,
 	EnrichmentChain,
 	EnrichmentProvider,
+	MapProvider,
 	type RegistryInput,
 	RegistryRouter,
 	type ReportInput,
@@ -25,6 +26,7 @@ import {
 	ScrapeProvider,
 	type SearchInput,
 	SearchProvider,
+	type SiteMapInput,
 } from '../application/ports'
 import {
 	isRegistryCountry,
@@ -57,6 +59,7 @@ import { makeBraveSearch } from './brave/search'
 import { makeCachedScrape } from './cached-scrape'
 import { makeCachedSearch } from './cached-search'
 import { makeCompaniesHouseRegistry } from './companies-house/registry'
+import { makeFirecrawlMap } from './firecrawl/map'
 import { makeFirecrawlScrape } from './firecrawl/scrape'
 import { makeFirecrawlSearch } from './firecrawl/search'
 import { makeFullEnrichEnrichment } from './fullenrich/enrichment'
@@ -65,6 +68,7 @@ import { makeHunterVerifier } from './hunter/verifier'
 import { makeLibreborRegistry } from './librebor/registry'
 import { MxResolverLive } from './mx-verify'
 import { StubEnrichmentProviderInstance } from './stub/enrichment'
+import { StubMapProviderInstance } from './stub/map'
 import { StubRegistryEsProviderInstance } from './stub/registry-es'
 import { StubRegistryGbProviderInstance } from './stub/registry-gb'
 import { StubReportEsProviderInstance } from './stub/report-es'
@@ -76,11 +80,15 @@ import { StubEmailVerifierInstance } from './stub/verifier'
 
 const SEARCH_VENDORS = ['stub', 'brave', 'brave-context', 'firecrawl'] as const
 const SCRAPE_VENDORS = ['stub', 'firecrawl', 'local'] as const
+// 'none' is the default: site discovery only runs where a vendor is configured,
+// so an unconfigured environment never injects stub pages into real evidence.
+const MAP_VENDORS = ['stub', 'firecrawl', 'none'] as const
 const ENRICH_VENDORS = ['stub', 'hunter', 'fullenrich', 'none'] as const
 const VERIFY_VENDORS = ['stub', 'hunter', 'none'] as const
 
 type SearchVendor = (typeof SEARCH_VENDORS)[number]
 type ScrapeVendor = (typeof SCRAPE_VENDORS)[number]
+type MapVendor = (typeof MAP_VENDORS)[number]
 type EnrichVendor = (typeof ENRICH_VENDORS)[number]
 type VerifyVendor = (typeof VERIFY_VENDORS)[number]
 
@@ -111,6 +119,17 @@ const scrapeInstance = (vendor: ScrapeVendor, slot: number) => {
 					scrape: () => notYetImplementedError('scrape', 'local'),
 				}),
 			)
+	}
+}
+
+const mapInstance = (vendor: MapVendor, slot: number) => {
+	switch (vendor) {
+		case 'stub':
+			return Effect.succeed(StubMapProviderInstance)
+		case 'firecrawl':
+			return makeFirecrawlMap(slot)
+		case 'none':
+			return Effect.succeed(MapProvider.of({ map: () => disabledError('map') }))
 	}
 }
 
@@ -259,6 +278,30 @@ const scrapeLayer = Layer.effect(
 				svc.scrape(input),
 		)
 		return ScrapeProvider.of({ scrape })
+	}),
+)
+
+const mapLayer = Layer.effect(
+	MapProvider,
+	Effect.gen(function* () {
+		const vendors = yield* providerListConfig(
+			MAP_VENDORS,
+			'RESEARCH_PROVIDER_MAP',
+			['none'] as const,
+		)
+		yield* Effect.logInfo(`research.map: ${vendors.join(',')}`)
+		const instances = yield* Effect.all(
+			vendors.map((vendor, slot) => mapInstance(vendor, slot)),
+		)
+		if (instances.length === 1) return instances[0]!
+		const map = withFallback(
+			instances,
+			(
+				svc,
+				input: SiteMapInput,
+			): Effect.Effect<ReadonlyArray<string>, ProviderError> => svc.map(input),
+		)
+		return MapProvider.of({ map })
 	}),
 )
 
@@ -423,6 +466,7 @@ const reportLayer = Layer.effect(
 export const makeResearchProvidersLive = Layer.mergeAll(
 	cachedSearchLayer,
 	cachedScrapeLayer.pipe(Layer.provide(scrapeLayer)),
+	mapLayer,
 	enrichmentLayer,
 	verifierLayer,
 	MxResolverLive,

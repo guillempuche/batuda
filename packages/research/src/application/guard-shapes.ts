@@ -1,0 +1,58 @@
+/**
+ * The shape tests the findings guards share.
+ *
+ * Every guard walks the same extracted-findings tree, so each had grown its own
+ * copy of "is this a plain object?" and "is this a per-field value with its
+ * source?". The copies had already drifted, which is the danger: a guard that
+ * recognises one shape more loosely than its neighbour silently judges a
+ * borderline object differently.
+ *
+ * The three value tests below are deliberately NOT one predicate — they answer
+ * different questions, and each guard needs the one it asks:
+ *  - `isValueWrapper` — anything carrying a `value`, however unprovenanced. The
+ *    loosest; used where the guard reads the source itself and treats a missing
+ *    one as its own signal.
+ *  - `isSourcedField` — a `value` beside at least one provenance key
+ *    (source_id / quote / confidence), which is what distinguishes a real
+ *    per-field wrapper from an arbitrary object that happens to have a `value`.
+ *  - `isCitedField` — a `value` whose `source_id` is a usable string. The
+ *    strictest; used where the guard must actually resolve the citation.
+ */
+
+/** A non-null, non-array object — the only thing worth walking into. */
+export const isPlainObject = (
+	value: unknown,
+): value is Record<string, unknown> =>
+	value !== null && typeof value === 'object' && !Array.isArray(value)
+
+/** Carries a `value`, with or without provenance. */
+export const isValueWrapper = (
+	value: unknown,
+): value is { value: unknown; source_id?: unknown } =>
+	isPlainObject(value) && 'value' in value
+
+/**
+ * A per-field Sourced wrapper: `{ value, source_id?, quote?, confidence? }`.
+ * The provenance key is what separates it from an arbitrary `{ value }` object.
+ */
+export const isSourcedField = (
+	value: unknown,
+): value is {
+	value: unknown
+	source_id?: unknown
+	quote?: unknown
+	confidence?: unknown
+} =>
+	isValueWrapper(value) &&
+	('source_id' in value || 'quote' in value || 'confidence' in value)
+
+/**
+ * A Sourced wrapper whose citation is resolvable: `source_id` is a string. No
+ * other shape carries both — a bare citation has a source_id but no value, a
+ * contact channel has a value but no source_id.
+ */
+export const isCitedField = (
+	value: unknown,
+): value is { value: unknown; source_id: string; quote?: string } =>
+	isValueWrapper(value) &&
+	typeof (value as { source_id?: unknown }).source_id === 'string'

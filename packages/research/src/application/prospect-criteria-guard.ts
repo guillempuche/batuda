@@ -15,6 +15,7 @@
  */
 
 import { parseCountryAlpha2 } from '../domain/country'
+import { isPlainObject } from './guard-shapes'
 
 // A country read as a canonical two-letter code, or nothing when it is not clearly
 // a country. Both the request's countries and a prospect's stated country pass
@@ -42,9 +43,6 @@ export interface ProspectCriteriaResult {
 	/** Prospects dropped for stating a size or place the request ruled out. */
 	readonly dropped: number
 }
-
-const isPlainObject = (value: unknown): value is Record<string, unknown> =>
-	value !== null && typeof value === 'object' && !Array.isArray(value)
 
 // A prospect's stated headcount, if it gave one that reads as a real number. The
 // field pairs the number with the source that backs it, so the number is one level

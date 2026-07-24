@@ -25,6 +25,7 @@
  */
 
 import { collapse, nameCore } from './entity-guard'
+import { isPlainObject } from './guard-shapes'
 import { hostOf } from './source-key'
 
 // Directories whose company-profile pages a model most often mistakes for a
@@ -100,9 +101,6 @@ export interface WebsiteGuardResult {
 	/** Websites blanked because the name sat in a deeper path of another host. */
 	readonly blankedProfilePage: number
 }
-
-const isPlainObject = (value: unknown): value is Record<string, unknown> =>
-	value !== null && typeof value === 'object' && !Array.isArray(value)
 
 export const guardCompanyWebsites = (findings: unknown): WebsiteGuardResult => {
 	let blankedDirectory = 0

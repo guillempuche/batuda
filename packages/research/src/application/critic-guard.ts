@@ -20,6 +20,8 @@
 
 import { Effect, Schema } from 'effect'
 
+import { isCitedField } from './guard-shapes'
+
 // One extracted field to audit: its dotted path (enrichment.industry,
 // contacts.0.email), the leaf key, the value, and the quote said to back it.
 export interface FieldClaim {
@@ -83,18 +85,6 @@ export const CriticVerdictsSchema = Schema.Struct({
 	),
 })
 
-// A per-field Sourced wrapper: { value, source_id, quote?, confidence? }. Keys on
-// its own `value` + string `source_id`, which no other shape carries (a bare
-// citation has source_id but no value; a channel has value but no source_id).
-const isSourcedField = (
-	v: unknown,
-): v is { value: unknown; source_id: string; quote?: string } =>
-	v !== null &&
-	typeof v === 'object' &&
-	!Array.isArray(v) &&
-	'value' in v &&
-	typeof (v as { source_id?: unknown }).source_id === 'string'
-
 // Subtrees that are not per-field sourced values and must not be walked into: the
 // block-level citation arrays and the freeform proposed-updates JSON blob (which
 // could hold arbitrary { value, source_id }-looking objects).
@@ -126,7 +116,7 @@ export const collectFieldClaims = (
 		for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
 			if (SKIP_KEYS.has(key)) continue
 			const p = childPath(path, key)
-			if (isSourcedField(v)) {
+			if (isCitedField(v)) {
 				// Only critique a field that offers a quote to check against and that the
 				// critic can meaningfully judge; a quote-less field was already vetted by
 				// the deterministic guards, and a CRITIC_SKIP_FIELDS code cannot be
@@ -180,7 +170,7 @@ export const applyCriticVerdicts = (
 				continue
 			}
 			const p = childPath(path, key)
-			if (isSourcedField(v)) {
+			if (isCitedField(v)) {
 				// A CRITIC_SKIP_FIELDS code was never sent to the judge, so it must not be
 				// changed here either — keep it as-is even if a verdict names it, guarding
 				// against a stray ruling the model returns for an id it was not asked about.

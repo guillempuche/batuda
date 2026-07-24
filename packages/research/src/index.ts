@@ -45,6 +45,11 @@ export {
 	parseGoldenSet,
 	type RawGoldenRow,
 } from './application/eval-golden'
+export {
+	compareFramings,
+	type FramingComparison,
+	type FramingOutcome,
+} from './application/eval-invariance'
 export { outcomeFromRun } from './application/eval-outcome'
 export {
 	buildEvalReport,
@@ -87,6 +92,7 @@ export {
 	EmailVerifier,
 	EnrichmentProvider,
 	ExtractLanguageModel,
+	MapProvider,
 	MxResolver,
 	ProviderQuota,
 	RegistryRouter,
@@ -109,6 +115,7 @@ export {
 	type ResearchEvent,
 	type ResearchEventType,
 	ResearchService,
+	type ResolvedInstructions,
 	stampRunCostFromLedger,
 	type ToolLogEntry,
 	withProposalIds,
@@ -124,6 +131,7 @@ export {
 	SchemaNameSchema,
 	schemaRegistry,
 } from './application/schemas/index'
+export { AUTO_APPLY_CONFIDENCE_FLOOR } from './application/source-tier-guard'
 export {
 	researchToolkit,
 	researchToolkitLayer,

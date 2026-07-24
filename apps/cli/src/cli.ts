@@ -30,6 +30,7 @@ import { emailInject } from './commands/email'
 import {
 	researchEval,
 	researchEvalContacts,
+	researchEvalInvariance,
 	researchProbe,
 } from './commands/research'
 import { seed, seedIdentities } from './commands/seed'
@@ -1083,12 +1084,51 @@ const researchEvalContactsCommand = Command.make(
 	),
 )
 
+const researchEvalInvarianceCommand = Command.make(
+	'eval-invariance',
+	{
+		org: Flag.string('org').pipe(
+			Flag.withDescription('Organization id to run the research under'),
+		),
+		user: Flag.string('user').pipe(
+			Flag.withDescription('User id the runs are attributed to'),
+		),
+		golden: Flag.string('golden').pipe(
+			Flag.withDescription('Path to the golden-set JSON file'),
+		),
+		schema: Flag.string('schema').pipe(
+			Flag.withDescription('Research output schema to run'),
+			Flag.withDefault('company_enrichment_v1'),
+		),
+		concurrency: Flag.integer('concurrency').pipe(
+			Flag.withDescription('How many companies to evaluate at once'),
+			Flag.withDefault(2),
+		),
+	},
+	({ org, user, golden, schema, concurrency }) =>
+		researchEvalInvariance({
+			org,
+			user,
+			goldenPath: golden,
+			schemaName: schema,
+			concurrency,
+		}),
+).pipe(
+	Command.withShortDescription(
+		'Prove instruction framing cannot bend the extracted facts',
+	),
+	Command.withDescription(
+		'Run each golden company twice under two opposite framings (small-family vs large-enterprise) and compare: the firmographics, the entity verdict, and the named contacts must come out the same — a divergence means the framing leaked into what counts as evidence. Live and billable (two runs per company). Needs the research env configured and an --org / --user to run as.',
+	),
+)
+
 const researchCommand = Command.make('research').pipe(
 	Command.withDescription('Research context tools'),
 	Command.withSubcommands([
 		researchProbeCommand,
 		researchEvalCommand,
 		researchEvalContactsCommand,
+		researchEvalInvarianceCommand,
 	]),
 )
 
