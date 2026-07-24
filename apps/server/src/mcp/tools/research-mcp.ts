@@ -1,8 +1,9 @@
-import { Effect, Schema } from 'effect'
+import { Effect, Result, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
 import {
+	ContextInput,
 	CurrentOrg,
 	ResearchRunDetail,
 	SessionContext,
@@ -35,12 +36,49 @@ const REQUEST_DEPENDENCIES = [SessionContext, CurrentOrg]
 const RESEARCH_SYNC_MAX_WAIT_SECONDS = 45
 
 // A run plus `applied_instructions` (the instruction templates that shaped it).
-// Dates encode to ISO strings via ResearchRunDetail.
+// Dates encode to ISO strings via ResearchRunDetail. `instructionSegments` is
+// overridden to optional so it can be dropped from the response by default: it
+// repeats the full instruction-template text (~9k chars) on every fetch, and
+// templateNames + templateFingerprint already identify the stack.
 const RunWithInstructions = Schema.Struct({
 	...ResearchRunDetail.fields,
+	instructionSegments: Schema.optional(Schema.Unknown),
 	applied_instructions: Schema.Array(Schema.String),
 })
 const NotFoundResult = Schema.Struct({ error: Schema.String })
+
+// A caller passed a `context` that doesn't match the expected shape (most often a
+// selector without its `filter` wrapper). Returned instead of letting the bad
+// value reach the engine, where reading `selector.filter.status` on the wrong
+// shape used to crash the run.
+const InvalidContext = Schema.Struct({
+	_tag: Schema.Literal('invalid_context'),
+	error: Schema.String,
+})
+
+const decodeContext = Schema.decodeUnknownEffect(ContextInput)
+
+// The exact shape a caller's `context` must take, spelled out in the rejection so
+// an agent can correct the call without reading the source.
+const CONTEXT_SHAPE_HINT =
+	'Expected context = { subjects?: [{ table, id }], selector?: { table: "companies", filter: { status?, industry?, country?, tags? } }, hints?: { language?, recency_days?, location?, min_employees?, max_employees? } }.'
+
+const describeContextError = (error: unknown): string => {
+	const detail = error instanceof Error ? error.message : String(error)
+	return `Invalid context. ${CONTEXT_SHAPE_HINT} ${detail}`
+}
+
+// Validate a caller's `context` (absent is valid) and fold a decode failure into
+// a tagged result the handler can return directly. The decode is the same one the
+// HTTP route runs, so both entry points reject a malformed selector the same way.
+const readContext = (raw: unknown) =>
+	Effect.gen(function* () {
+		if (raw === undefined) return { ok: true as const, value: undefined }
+		const decoded = yield* Effect.result(decodeContext(raw))
+		return Result.isFailure(decoded)
+			? { ok: false as const, error: describeContextError(decoded.failure) }
+			: { ok: true as const, value: decoded.success }
+	})
 
 // An unconfirmed selector fan-out: how many companies matched and the paid-data
 // ceiling summed across them, so the caller can re-submit with confirm:true (or
@@ -62,13 +100,14 @@ const ResearchSyncResult = Schema.Union([
 	NotFoundResult,
 	ConfirmRequired,
 	InstructionClarification,
+	InvalidContext,
 ])
 
 // ── start_research (async) ──
 
 const StartResearch = Tool.make('start_research', {
 	description:
-		"Start a research run; returns {_tag:'started', id, status, applied_instructions} immediately — poll get_research for results. applied_instructions lists the instruction templates that shaped the run. The user's default research instructions apply automatically; pass `instructions` (template names or ids) to override them for this run. An unknown or ambiguous name returns {_tag:'instruction_clarification'} with candidates instead of starting. A `context.selector` researches every matching company (one run each); without `confirm:true` it returns {_tag:'confirm_required', subject_count, estimated_cost_cents} first so you can preview the scale — re-submit with confirm:true to launch (or narrow the filter). If the user states a new standing preference, save it with manage_instruction_template.",
+		"Start a research run; returns {_tag:'started', id, status, applied_instructions} immediately — poll get_research for results. applied_instructions lists the instruction templates that shaped the run. The user's default research instructions apply automatically; pass `instructions` (template names or ids) to override them for this run. An unknown or ambiguous name returns {_tag:'instruction_clarification'} with candidates instead of starting. A `context.selector` — shaped `{ table: \"companies\", filter: { status?, industry?, country?, tags? } }` — researches every matching company (one run each); without `confirm:true` it returns {_tag:'confirm_required', subject_count, estimated_cost_cents} first so you can preview the scale — re-submit with confirm:true to launch (or narrow the filter). A malformed context returns {_tag:'invalid_context', error} without starting a run. If the user states a new standing preference, save it with manage_instruction_template.",
 	parameters: Schema.Struct({
 		query: ResearchQuery,
 		context: Schema.optional(Schema.Unknown),
@@ -85,6 +124,7 @@ const StartResearch = Tool.make('start_research', {
 		}),
 		ConfirmRequired,
 		InstructionClarification,
+		InvalidContext,
 	]),
 	dependencies: REQUEST_DEPENDENCIES,
 })
@@ -96,9 +136,14 @@ const StartResearch = Tool.make('start_research', {
 
 const GetResearch = Tool.make('get_research', {
 	description:
-		'Get the current state of a research run. Returns status, findings (if complete), cost, sources, and applied_instructions — the instruction templates that shaped the run.',
+		"Get the current state of a research run. Returns status, findings (if complete), cost, sources, and applied_instructions — the instruction templates that shaped the run. The full instruction-template text is omitted by default to keep the response small; pass include:['instruction_segments'] to get it back.",
 	parameters: Schema.Struct({
 		id: Uuid,
+		// Opt back into heavy fields dropped by default. Only the full instruction
+		// text qualifies today; kept as a list so more can join without a shape change.
+		include: Schema.optional(
+			Schema.Array(Schema.Literals(['instruction_segments'])),
+		),
 	}),
 	success: GetResearchResult,
 	dependencies: REQUEST_DEPENDENCIES,
@@ -112,7 +157,7 @@ const GetResearch = Tool.make('get_research', {
 
 const ResearchSync = Tool.make('research_sync', {
 	description:
-		"Run research and return full findings inline when it finishes quickly; best for short or cached research. Blocks up to ~45s (the transport's limit): a short/cached run returns completed findings; a longer one returns the run still 'running' for you to poll get_research — the run keeps going regardless and is never lost. The returned run includes applied_instructions — the instruction templates that shaped it. The user's default research instructions apply automatically; pass `instructions` (template names or ids) to override them for this run. An unknown or ambiguous name returns {_tag:'instruction_clarification'} with candidates instead of running. A `context.selector` fans out one run per matching company; without `confirm:true` it returns {_tag:'confirm_required', subject_count, estimated_cost_cents} first.",
+		"Run research and return full findings inline when it finishes quickly; best for short or cached research. Blocks up to ~45s (the transport's limit): a short/cached run returns completed findings; a longer one returns the run still 'running' for you to poll get_research — the run keeps going regardless and is never lost. The returned run includes applied_instructions — the instruction templates that shaped it. The user's default research instructions apply automatically; pass `instructions` (template names or ids) to override them for this run. An unknown or ambiguous name returns {_tag:'instruction_clarification'} with candidates instead of running. A `context.selector` — shaped `{ table: \"companies\", filter: { status?, industry?, country?, tags? } }` — fans out one run per matching company; without `confirm:true` it returns {_tag:'confirm_required', subject_count, estimated_cost_cents} first. A malformed context returns {_tag:'invalid_context', error} without starting a run.",
 	parameters: Schema.Struct({
 		query: ResearchQuery,
 		context: Schema.optional(Schema.Unknown),
@@ -139,15 +184,26 @@ export const ResearchMcpTools = Toolkit.make(
 // Surface the instruction templates a run applied under one consistent field.
 // The run carries the persisted `templateNames` (jsonb, so typed Unknown);
 // normalize it to applied_instructions so sync/poll callers read the same shape
-// start_research returns.
-const withAppliedInstructions = (run: typeof ResearchRunDetail.Type) => {
+// start_research returns. The full instruction text (`instructionSegments`) is
+// dropped unless the caller opted back in — it is ~9k chars repeated on every
+// fetch and templateNames + templateFingerprint already identify the stack.
+const withAppliedInstructions = (
+	run: typeof ResearchRunDetail.Type,
+	includeSegments = false,
+) => {
 	const names = run.templateNames
-	return {
+	const withInstructions = {
 		...run,
 		applied_instructions: Array.isArray(names)
 			? names.filter((name): name is string => typeof name === 'string')
 			: [],
 	}
+	if (includeSegments) return withInstructions
+	// Drop the heavy instruction text while keeping the run's typed shape — cast
+	// only the delete operand, so the returned object stays fully typed.
+	const trimmed = { ...withInstructions }
+	delete (trimmed as { instructionSegments?: unknown }).instructionSegments
+	return trimmed
 }
 
 export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
@@ -193,12 +249,16 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 						params.instructions ?? [],
 					)
 					if (!resolved.ok) return resolved.clarification
+					const context = yield* readContext(params.context)
+					if (!context.ok) {
+						return { _tag: 'invalid_context' as const, error: context.error }
+					}
 					const result = yield* svc.create(
 						userId,
 						orgId,
 						{
 							query: params.query,
-							context: params.context as CreateResearchInput['context'],
+							context: context.value as CreateResearchInput['context'],
 							schemaName: params.schema_name,
 							// Default off: a selector that matches companies bounces with
 							// the matched count so the caller can preview the scale before
@@ -226,7 +286,11 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 			get_research: params =>
 				Effect.gen(function* () {
 					const run = yield* svc.get(params.id)
-					return run ? withAppliedInstructions(run) : { error: 'not found' }
+					if (!run) return { error: 'not found' }
+					const includeSegments = (params.include ?? []).includes(
+						'instruction_segments',
+					)
+					return withAppliedInstructions(run, includeSegments)
 				}).pipe(redactDbErrors),
 
 			research_sync: params =>
@@ -239,6 +303,10 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 						params.instructions ?? [],
 					)
 					if (!resolved.ok) return resolved.clarification
+					const context = yield* readContext(params.context)
+					if (!context.ok) {
+						return { _tag: 'invalid_context' as const, error: context.error }
+					}
 
 					// Create the run in its OWN top-level transaction on a fresh
 					// pooled connection, detached from this request's transaction.
@@ -256,7 +324,7 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 							org.id,
 							{
 								query: params.query,
-								context: params.context as CreateResearchInput['context'],
+								context: context.value as CreateResearchInput['context'],
 								schemaName: params.schema_name,
 								confirm: params.confirm ?? false,
 							},

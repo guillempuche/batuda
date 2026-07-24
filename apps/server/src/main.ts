@@ -15,6 +15,7 @@ import { BookingProviderLive, IcsParserLive } from '@batuda/calendar'
 import { BatudaApi } from '@batuda/controllers'
 import { ParticipantMatcher } from '@batuda/email/participant-matcher'
 import {
+	AUTO_APPLY_CONFIDENCE_FLOOR,
 	ContactDiscovery,
 	makeResearchLlmLive,
 	makeResearchProvidersLive,
@@ -158,10 +159,11 @@ const ResearchEventSinkLive = Layer.effect(
 						query: string
 						briefMd: string | null
 						schemaName: string | null
+						status: string
 						paidPolicy: { autoApplyMinConfidence?: number | null } | null
 					}>`
 						SELECT organization_id, created_by, query, brief_md, schema_name,
-							paid_policy
+							status, paid_policy
 						FROM research_runs
 						WHERE id = ${researchId} LIMIT 1
 					`
@@ -241,11 +243,22 @@ const ResearchEventSinkLive = Layer.effect(
 							// that finding pending.
 							const autoApplyMin =
 								run.paidPolicy?.autoApplyMinConfidence ?? null
-							if (status === 'succeeded' && autoApplyMin != null) {
+							// Gate on the run's PERSISTED status, not the event-derived one:
+							// both a full and a low-confidence run fire research.succeeded, but
+							// only a full 'succeeded' run may auto-write. A low-confidence run
+							// (weak entity match — possibly the wrong company) keeps every
+							// finding pending for a human, per the status's whole purpose.
+							if (run.status === 'succeeded' && autoApplyMin != null) {
 								const eligible = yield* queryPendingProposals(sql, {
 									researchId,
 									machineCheckable: true,
-									minConfidence: autoApplyMin,
+									// A threshold at or below the third-party cap would let a
+									// capped outside estimate write itself; hold it to the floor
+									// so a weak value always waits for a person.
+									minConfidence: Math.max(
+										autoApplyMin,
+										AUTO_APPLY_CONFIDENCE_FLOOR,
+									),
 								})
 								const deliverable = eligible.filter(
 									(p): p is typeof p & { proposedUpdateId: string } =>

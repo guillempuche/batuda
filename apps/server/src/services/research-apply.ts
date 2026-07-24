@@ -3,6 +3,11 @@ import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
 
+export {
+	type ProvenanceEntry,
+	researchProvenance,
+} from './research-provenance'
+
 import { forkCompanyRegeocode } from './company-geocoding'
 import { type ChannelInput, writeChannels } from './contact-channels'
 import {
@@ -62,33 +67,69 @@ export const CONTACT_FIELDS = new Set([
 const snakeToCamel = (s: string) =>
 	s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
 
+// Where one applied value came from: the page it was read from, how sure the run
+// was of it, and the date it was true as of. Kept beside the value it explains so
+// a reader can ask "where did this come from?" of any single fact on the row.
+export type FieldSource = {
+	readonly sourceUrl: string
+	readonly confidence?: number
+	readonly asOf?: string
+}
+
 // A field value the model may have wrapped as { value, source_id, … } — the
 // per-field provenance shape enrichment findings use. CRM columns hold plain
-// text, so unwrap to the inner value before writing; a plain value is unchanged.
-const unwrapSourced = (value: unknown): unknown =>
-	value !== null &&
-	typeof value === 'object' &&
-	!Array.isArray(value) &&
-	'value' in value &&
-	'source_id' in (value as Record<string, unknown>)
-		? (value as { value: unknown }).value
-		: value
+// text, so the inner value is what gets written, and the wrapper around it is
+// what says where that value came from. A plain value has neither.
+const readSourced = (
+	value: unknown,
+): { readonly value: unknown; readonly source?: FieldSource } => {
+	if (
+		value === null ||
+		typeof value !== 'object' ||
+		Array.isArray(value) ||
+		!('value' in value) ||
+		!('source_id' in (value as Record<string, unknown>))
+	)
+		return { value }
+	const wrapper = value as Record<string, unknown>
+	const sourceUrl = wrapper['source_id']
+	if (typeof sourceUrl !== 'string' || sourceUrl === '')
+		return { value: wrapper['value'] }
+	const confidence = wrapper['confidence']
+	const asOf = wrapper['as_of']
+	return {
+		value: wrapper['value'],
+		source: {
+			sourceUrl,
+			...(typeof confidence === 'number' ? { confidence } : {}),
+			...(typeof asOf === 'string' ? { asOf } : {}),
+		},
+	}
+}
 
 /**
  * Keep only the proposal fields that map to a writable column on the target
- * table, normalizing snake_case keys to the camelCase the SQL client expects.
+ * table, normalizing snake_case keys to the camelCase the SQL client expects,
+ * and collect where each kept value came from.
  */
 export const allowlistFields = (
 	table: 'companies' | 'contacts',
 	fields: Record<string, unknown>,
-): Record<string, unknown> => {
+): {
+	readonly fields: Record<string, unknown>
+	readonly sources: Record<string, FieldSource>
+} => {
 	const allowed = table === 'companies' ? COMPANY_FIELDS : CONTACT_FIELDS
 	const out: Record<string, unknown> = {}
+	const sources: Record<string, FieldSource> = {}
 	for (const [key, value] of Object.entries(fields)) {
 		const camel = snakeToCamel(key)
-		if (allowed.has(camel)) out[camel] = unwrapSourced(value)
+		if (!allowed.has(camel)) continue
+		const read = readSourced(value)
+		out[camel] = read.value
+		if (read.source !== undefined) sources[camel] = read.source
 	}
-	return out
+	return { fields: out, sources }
 }
 
 export type Validated =
@@ -185,7 +226,7 @@ export const validateCreate = (
 	return {
 		ok: true,
 		companyId,
-		fields: allowlistFields('contacts', fields),
+		fields: allowlistFields('contacts', fields).fields,
 		channels: parseChannels(fields['channels']),
 	}
 }
@@ -227,34 +268,92 @@ const pgErrorCode = (error: unknown): string | undefined => {
 	return undefined
 }
 
+// What an apply records about a company beyond the proposed values themselves:
+// where each value came from, and — when this company is the one the run was
+// about — the run's overall judgement of it and its written brief.
+export type CompanyEnrichment = {
+	/** Where each written value came from, keyed by the column it explains. */
+	readonly provenance: Record<string, FieldSource>
+	/** True when this row is the company the run researched. */
+	readonly isRunTarget: boolean
+	readonly fitVerdict: string | null
+	readonly fitChecks: unknown
+	readonly fitConflicts: unknown
+	/** The run's brief, in markdown, already carrying its own dated heading. */
+	readonly brief: string | null
+}
+
+// Serialize a json column value, or null to leave the stored one alone.
+const jsonOrNull = (value: unknown): string | null =>
+	value === null || value === undefined ? null : JSON.stringify(value)
+
 // Optimistic-concurrency write: lands only if `version` still equals the version
 // the proposal was made against, and bumps it. Branches on the table so the name
 // is never interpolated. Returns the new row (empty on a version/id mismatch).
-const occUpdate = (
+//
+// A company update also folds in what the run learned about the row. Each of
+// those clauses leaves the stored value alone when there is nothing to say, so
+// one statement serves both an ordinary field update and a full enrichment:
+//   - provenance is MERGED, never replaced — a run that fills only the phone
+//     must not erase where an earlier run found the industry;
+//   - the brief is seeded while nobody has edited it and appended once somebody
+//     has, so research can extend a person's notes but never overwrite them.
+// Both decisions read the row as it is at write time, inside the same statement
+// that checks the version, so a concurrent edit cannot slip between the two.
+export const occUpdate = (
 	sql: SqlClient.SqlClient,
 	table: 'companies' | 'contacts',
 	subjectId: string,
 	orgId: string,
 	expectedVersion: number,
 	fields: Record<string, unknown>,
-) =>
-	table === 'companies'
-		? sql<{ version: number }>`
-				UPDATE companies
-				SET ${sql.update(fields)}, version = version + 1, updated_at = now()
-				WHERE id = ${subjectId}
-					AND organization_id = ${orgId}
-					AND version = ${expectedVersion}
-				RETURNING version
-			`
-		: sql<{ version: number }>`
-				UPDATE contacts
-				SET ${sql.update(fields)}, version = version + 1, updated_at = now()
-				WHERE id = ${subjectId}
-					AND organization_id = ${orgId}
-					AND version = ${expectedVersion}
-				RETURNING version
-			`
+	enrichment?: CompanyEnrichment,
+) => {
+	if (table === 'contacts')
+		return sql<{ version: number }>`
+			UPDATE contacts
+			SET ${sql.update(fields)}, version = version + 1, updated_at = now()
+			WHERE id = ${subjectId}
+				AND organization_id = ${orgId}
+				AND version = ${expectedVersion}
+			RETURNING version
+		`
+	const provenance =
+		enrichment && Object.keys(enrichment.provenance).length > 0
+			? JSON.stringify(enrichment.provenance)
+			: null
+	const isRunTarget = enrichment?.isRunTarget ?? false
+	const fitVerdict = isRunTarget ? (enrichment?.fitVerdict ?? null) : null
+	const fitChecks = isRunTarget ? jsonOrNull(enrichment?.fitChecks) : null
+	const fitConflicts = isRunTarget ? jsonOrNull(enrichment?.fitConflicts) : null
+	const brief = isRunTarget ? (enrichment?.brief ?? null) : null
+	return sql<{ version: number }>`
+		UPDATE companies
+		SET ${sql.update(fields)},
+			field_provenance = CASE
+				WHEN ${provenance}::jsonb IS NULL THEN field_provenance
+				ELSE COALESCE(field_provenance, '{}'::jsonb) || ${provenance}::jsonb
+			END,
+			last_enriched_at = CASE
+				WHEN ${isRunTarget}::boolean THEN now()
+				ELSE last_enriched_at
+			END,
+			fit_verdict = COALESCE(${fitVerdict}::text, fit_verdict),
+			fit_checks = COALESCE(${fitChecks}::jsonb, fit_checks),
+			fit_conflicts = COALESCE(${fitConflicts}::jsonb, fit_conflicts),
+			account_brief = CASE
+				WHEN ${brief}::text IS NULL THEN account_brief
+				WHEN brief_updated_by IS NULL THEN ${brief}::text
+				ELSE COALESCE(account_brief, '') || E'\n\n---\n\n' || ${brief}::text
+			END,
+			version = version + 1,
+			updated_at = now()
+		WHERE id = ${subjectId}
+			AND organization_id = ${orgId}
+			AND version = ${expectedVersion}
+		RETURNING version
+	`
+}
 
 // A citation the model attached to a suggestion: which fetched source backed a
 // claim, so the applied row can point back at its evidence.
@@ -306,39 +405,6 @@ export const linkSubjectToRun = (
 		)
 		ON CONFLICT (research_id, subject_table, subject_id)
 			DO UPDATE SET citations = EXCLUDED.citations
-	`
-
-export interface ProvenanceEntry {
-	readonly runId: string
-	readonly runCompletedAt: Date | null
-	readonly sources: ReadonlyArray<{ sourceId: string; url: string }>
-}
-
-// Where an applied row's evidence came from: for every research run linked to
-// the row, the run's completion date and the URLs of the sources its citations
-// point at. Resolves from the run↔row link and the sources table alone, so it
-// still works after a run's bulkier transcript is pruned for retention.
-export const researchProvenance = (
-	sql: SqlClient.SqlClient,
-	orgId: string,
-	subjectTable: 'companies' | 'contacts',
-	subjectId: string,
-) =>
-	sql<ProvenanceEntry>`
-		SELECT
-			rl.research_id AS run_id,
-			r.completed_at AS run_completed_at,
-			COALESCE((
-				SELECT json_agg(json_build_object('sourceId', s.id, 'url', s.url))
-				FROM jsonb_array_elements(rl.citations) cit
-				JOIN sources s ON s.id = cit->>'source_id'
-			), '[]'::json) AS sources
-		FROM research_links rl
-		JOIN research_runs r ON r.id = rl.research_id
-		WHERE rl.organization_id = ${orgId}
-			AND rl.subject_table = ${subjectTable}
-			AND rl.subject_id = ${subjectId}
-		ORDER BY r.completed_at DESC NULLS LAST
 	`
 
 // A create proposal describes a newly discovered person. Before inserting a
@@ -482,8 +548,10 @@ export const resolveResearchProposedUpdate = (
 			findings: string | null
 			context: string | null
 			country: string | null
+			briefMd: string | null
 		}>`
-			SELECT findings::text AS findings, context::text AS context, country
+			SELECT findings::text AS findings, context::text AS context, country,
+				brief_md AS "briefMd"
 			FROM research_runs
 			WHERE id = ${runId} AND organization_id = ${org.id}
 			LIMIT 1
@@ -502,6 +570,9 @@ export const resolveResearchProposedUpdate = (
 				subject_id?: string
 				name?: string
 			}>
+			verdict?: unknown
+			fit_checks?: unknown
+			conflicts?: unknown
 		} | null
 		const proposals = findings?.proposed_updates ?? []
 		const discoveredExisting = findings?.discovered_existing ?? []
@@ -638,7 +709,10 @@ export const resolveResearchProposedUpdate = (
 				reason: validated.reason,
 			} satisfies ResolveOutcome
 
-		const fields = allowlistFields(validated.table, validated.fields)
+		const { fields, sources } = allowlistFields(
+			validated.table,
+			validated.fields,
+		)
 		// Persist the run's country onto its own target company as the run's
 		// findings are applied. `country` is not an allowlisted proposal field —
 		// it comes from the run, not the model's per-field suggestions.
@@ -654,6 +728,12 @@ export const resolveResearchProposedUpdate = (
 		// A subject_id that isn't a UUID trips text parsing (22P02) in the WHERE
 		// clause; that is a bad proposal (the model can invent an id), not a server
 		// error, so report it as invalid the way the create branch does.
+		// The run's own judgement and brief belong only to the company the run was
+		// about — a competitor it merely mentioned gets its values and their sources,
+		// nothing more.
+		const isRunTarget =
+			validated.table === 'companies' &&
+			targetCompanyIds.has(validated.subjectId)
 		const updatedRows = yield* occUpdate(
 			sql,
 			validated.table,
@@ -661,6 +741,17 @@ export const resolveResearchProposedUpdate = (
 			org.id,
 			validated.expectedVersion,
 			fields,
+			validated.table === 'companies'
+				? {
+						provenance: sources,
+						isRunTarget,
+						fitVerdict:
+							typeof findings?.verdict === 'string' ? findings.verdict : null,
+						fitChecks: findings?.fit_checks ?? null,
+						fitConflicts: findings?.conflicts ?? null,
+						brief: run.briefMd,
+					}
+				: undefined,
 		).pipe(
 			Effect.catchTag('SqlError', e => {
 				const code = pgErrorCode(e)

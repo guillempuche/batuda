@@ -17,6 +17,7 @@ import {
 	AgentLanguageModel,
 	ContactDiscovery,
 	ExtractLanguageModel,
+	MapProvider,
 	RegistryRouter,
 	ResearchEventSink,
 	ResearchService,
@@ -80,6 +81,7 @@ const providersLayer = Layer.mergeAll(
 	Layer.succeed(ScrapeProvider)(
 		ScrapeProvider.of({ scrape: () => Effect.die(die) }),
 	),
+	Layer.succeed(MapProvider)(MapProvider.of({ map: () => Effect.die(die) })),
 	Layer.succeed(RegistryRouter)(
 		RegistryRouter.of({
 			lookup: () =>

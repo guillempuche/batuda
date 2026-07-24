@@ -10,6 +10,7 @@ import {
 	PendingProposal,
 	SessionContext,
 } from '@batuda/controllers'
+import { isTerminalResearchStatus } from '@batuda/domain'
 import { resolveInstructions } from '@batuda/instructions'
 import {
 	type CreateResearchInput,
@@ -175,15 +176,7 @@ export const ResearchLive = HttpApiBuilder.group(
 						const status = (run as { status: string }).status
 
 						// If already terminal, return final state immediately
-						if (
-							[
-								'succeeded',
-								'failed',
-								'cancelled',
-								'deleted',
-								'no_reliable_data',
-							].includes(status)
-						) {
+						if (isTerminalResearchStatus(status)) {
 							// completedAt decodes to a DateTime.Utc (or null); emit it as an
 							// ISO string so the event payload stays plain JSON.
 							const completedAtIso =
