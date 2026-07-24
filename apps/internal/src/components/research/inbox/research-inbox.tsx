@@ -52,8 +52,14 @@ export function inboxPendingProposalsAtom() {
 	return pendingProposalsAtom({ limit: INBOX_PROPOSAL_LIMIT })
 }
 
-/** Run statuses that demand a human even without a pending proposal. */
-const ATTENTION_STATUSES = new Set(['failed', 'no_reliable_data'])
+/** Run statuses that demand a human even without a pending proposal. A
+ * low-confidence success is included: its whole purpose is that an automation
+ * should not act on it unreviewed. */
+const ATTENTION_STATUSES = new Set([
+	'failed',
+	'no_reliable_data',
+	'succeeded_low_confidence',
+])
 
 type SubjectFilter = 'all' | 'companies' | 'contacts'
 
