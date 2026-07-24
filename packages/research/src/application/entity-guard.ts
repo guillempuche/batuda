@@ -170,7 +170,7 @@ const QUOTED_NAME = /["“]([^"”]{2,80})["”]/
 // A free-text query's company name: the first quoted phrase if one is present,
 // else the part before the first comma ("Sunset Transportation, St. Louis MO");
 // fall back to the whole query.
-const queryName = (query: string): string =>
+export const queryName = (query: string): string =>
 	query.match(QUOTED_NAME)?.[1] ?? query.split(',')[0] ?? query
 
 // Administrative words that name no particular place — dropped so only the

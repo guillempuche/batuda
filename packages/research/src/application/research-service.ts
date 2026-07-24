@@ -79,6 +79,7 @@ import {
 	groundedSourceIds,
 	isConfirmedRegistryMatch,
 	isEntityGroundedSchema,
+	queryName,
 	reachedOwnSite,
 	withRedirectDomain,
 } from './entity-guard'
@@ -1650,6 +1651,16 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					})
 					let entityMatch: EntityMatch | null =
 						(run as { entityMatch?: EntityMatch | null }).entityMatch ?? null
+
+					// The target's display name, to re-anchor a web search that dropped it:
+					// an anchored subject's own name, else the name read from the query. Used
+					// only when `entityTargets` is set (an enrichment/contact run with one
+					// subject); a scan/freeform run never scopes its searches to a name.
+					const entityName =
+						subjectTargets
+							.map(s => s.name)
+							.find((n): n is string => n != null && n.trim() !== '') ??
+						queryName((run as { query: string }).query)
 
 					// The company's own official site to fetch up front, when the caller
 					// gave its domain — a target-correction re-run's anchor, an anchored
@@ -3480,6 +3491,8 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									researchId,
 									language: hints?.language,
 									location: hints?.location,
+									entityTargets,
+									entityName,
 								}),
 							),
 							Effect.withSpan('research.phase1', {
