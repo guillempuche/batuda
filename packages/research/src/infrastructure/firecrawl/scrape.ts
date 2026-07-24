@@ -51,7 +51,8 @@ const sha256Hex = (input: string): string =>
 	createHash('sha256').update(input).digest('hex')
 
 // 429 + 5xx are transient (retry); other 4xx are auth/quota/bad-request (fail fast).
-const statusRecoverable = (status: number): boolean =>
+// Shared with the sibling firecrawl/map adapter, which retries on the same codes.
+export const statusRecoverable = (status: number): boolean =>
 	status === 429 || status >= 500
 
 // Firecrawl answers a fetch of a site it refuses (LinkedIn and other people

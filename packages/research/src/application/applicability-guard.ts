@@ -15,8 +15,7 @@
  * supplies it so this module stays free of a database.
  */
 
-const isPlainObject = (value: unknown): value is Record<string, unknown> =>
-	value !== null && typeof value === 'object' && !Array.isArray(value)
+import { isPlainObject } from './guard-shapes'
 
 export interface ApplicabilityResult {
 	readonly findings: unknown

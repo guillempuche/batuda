@@ -17,8 +17,8 @@ export const ENRICHMENT_FIELDS: ReadonlyArray<string> = Object.keys(
 )
 
 // A field holds something usable when it carries a real value. Most fields pair a
-// value with the source that backs it; the product-fit and tag fields are plain
-// lists. A field a guard emptied (`{value: null}`) counts as unfilled.
+// value with the source that backs it; the tag field is a plain list. A field a
+// guard emptied (`{value: null}`) counts as unfilled.
 const isFilled = (field: unknown): boolean => {
 	if (Array.isArray(field)) return field.length > 0
 	if (field === null || typeof field !== 'object') return false

@@ -115,6 +115,29 @@ export class ScrapeProvider extends Context.Service<
 	}
 >()('research/ScrapeProvider') {}
 
+// ── Site map (discover a site's own pages, whatever its URL structure) ──
+
+export interface SiteMapInput {
+	/** The site to map — a full URL like "https://acme.es". */
+	readonly url: string
+	/** Cap on returned page URLs; the provider may return fewer. */
+	readonly limit?: number | undefined
+}
+
+export class MapProvider extends Context.Service<
+	MapProvider,
+	{
+		/**
+		 * Page URLs discovered on the site itself (sitemap + crawl), so a run can
+		 * reach a team or about page the homepage never links. Configured 'none'
+		 * in environments without a vendor — callers treat an error as "no map".
+		 */
+		readonly map: (
+			input: SiteMapInput,
+		) => Effect.Effect<ReadonlyArray<string>, ProviderError>
+	}
+>()('research/MapProvider') {}
+
 // ── Enrichment (decision-maker name + email discovery, universal) ──
 
 export interface EnrichmentInput {

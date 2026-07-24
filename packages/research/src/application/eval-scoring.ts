@@ -54,9 +54,14 @@ export type GoldenBucket = (typeof GOLDEN_BUCKETS)[number]
 /** The run outcomes that end a run; a run in any of these is what the eval scores. */
 export type TerminalStatus =
 	| 'succeeded'
+	| 'succeeded_low_confidence'
 	| 'no_reliable_data'
 	| 'failed'
 	| 'cancelled'
+
+/** Succeeded-class outcomes — a thin (low-confidence) success still carries findings to score. */
+export const isSucceeded = (status: TerminalStatus): boolean =>
+	status === 'succeeded' || status === 'succeeded_low_confidence'
 
 /**
  * One company's known-correct answer. This lives in code as a type; the actual
@@ -414,7 +419,7 @@ export const scoreRun = (
 	const anyFilled = SCORABLE_FIELDS.some(field =>
 		isFilled(outcome.fields[field]),
 	)
-	const empty = outcome.status !== 'succeeded' || !anyFilled
+	const empty = !isSucceeded(outcome.status) || !anyFilled
 
 	// Contact recall: of the people we know the company publishes, how many the run
 	// returned WITH a title — a named person with no title doesn't count, since a
@@ -443,7 +448,7 @@ export const scoreRun = (
 	const agreesWithGolden =
 		anyContactMatched || specificLocationAgrees(expected, outcome)
 	const wrongCompany =
-		outcome.status === 'succeeded' && !empty && !grounded && !agreesWithGolden
+		isSucceeded(outcome.status) && !empty && !grounded && !agreesWithGolden
 
 	return {
 		id: expected.id,

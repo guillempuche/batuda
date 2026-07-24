@@ -3,85 +3,8 @@ import { describe, expect, it } from 'vitest'
 import {
 	contactsRescuePrompt,
 	mergeContacts,
-	needsContactRescue,
 	normalizeContactName,
 } from './contacts-rescue'
-
-// A contact with a real title, as the broad pass returns one when it does its job.
-const titled = (name: string, role: string) => ({
-	name,
-	role: { value: role, source_id: 's1', confidence: null },
-})
-
-describe('needsContactRescue', () => {
-	describe('when the broad pass returned few or no named contacts', () => {
-		it('should ask for a rescue on zero contacts', () => {
-			// GIVEN findings with no contacts
-			// THEN a rescue is warranted
-			expect(needsContactRescue({ contacts: [] })).toBe(true)
-			expect(needsContactRescue({})).toBe(true)
-		})
-
-		it('should ask for a rescue on a single contact', () => {
-			// GIVEN one named contact
-			// THEN still thin enough to rescue
-			expect(needsContactRescue({ contacts: [{ name: 'Ada' }] })).toBe(true)
-		})
-
-		it('should not count a nameless entry', () => {
-			// GIVEN one entry with a blank name
-			// THEN it doesn't count, so a rescue is warranted
-			expect(needsContactRescue({ contacts: [{ name: '   ' }] })).toBe(true)
-		})
-	})
-
-	describe('when the broad pass already found people with titles', () => {
-		it('should not rescue with two or more titled contacts', () => {
-			// GIVEN two named contacts that both carry a title
-			// THEN the broad pass delivered; no rescue
-			expect(
-				needsContactRescue({
-					contacts: [titled('Ada', 'CEO'), titled('Chad', 'CFO')],
-				}),
-			).toBe(false)
-		})
-	})
-
-	describe('when contacts came back named but without a title', () => {
-		it('should rescue even with a full list — a titleless contact is a miss', () => {
-			// GIVEN several named people, none with a title (the Lectra symptom)
-			// THEN a rescue is warranted to recover the titles
-			expect(
-				needsContactRescue({
-					contacts: [{ name: 'Ada' }, { name: 'Chad' }, { name: 'Grace' }],
-				}),
-			).toBe(true)
-		})
-
-		it('should rescue when even one of many contacts lacks a title', () => {
-			// GIVEN a list where one person's title is missing
-			// THEN the focused pass runs to fill it
-			expect(
-				needsContactRescue({
-					contacts: [titled('Ada', 'CEO'), { name: 'Chad' }],
-				}),
-			).toBe(true)
-		})
-
-		it('should treat a guard-nulled title as missing', () => {
-			// GIVEN a contact whose title a guard emptied to null
-			// THEN it still counts as titleless, so a rescue is warranted
-			expect(
-				needsContactRescue({
-					contacts: [
-						titled('Ada', 'CEO'),
-						{ name: 'Chad', role: { value: null, source_id: 's1' } },
-					],
-				}),
-			).toBe(true)
-		})
-	})
-})
 
 describe('contactsRescuePrompt', () => {
 	describe('when the run has fetched source URLs', () => {

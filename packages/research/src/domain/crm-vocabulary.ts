@@ -23,6 +23,10 @@ export const CRM_SIZE_RANGES = [
 	'11-25',
 	'26-50',
 	'51-200',
+	'201-500',
+	'501-1000',
+	'1001-5000',
+	'5001+',
 ] as const
 export type CrmSizeRange = (typeof CRM_SIZE_RANGES)[number]
 

@@ -49,3 +49,20 @@ export const hostOf = (url: string): string | null => {
 		}
 	}
 }
+
+/**
+ * The lowercased path of a URL (always starting with "/"), or null if it doesn't
+ * parse — for telling apart namespaces on one host, e.g. LinkedIn's `/in/` (a
+ * person) from `/company/`, or ZoomInfo's `/p/` (a person) from a company record.
+ */
+export const pathOf = (url: string): string | null => {
+	try {
+		return new URL(url).pathname.toLowerCase()
+	} catch {
+		try {
+			return new URL(`https://${url}`).pathname.toLowerCase()
+		} catch {
+			return null
+		}
+	}
+}

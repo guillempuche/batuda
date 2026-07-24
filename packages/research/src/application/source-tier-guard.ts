@@ -19,6 +19,7 @@
  * target domains); a discovery scan with no single subject is left untouched.
  */
 
+import { isSourcedField } from './guard-shapes'
 import { hostOf } from './source-key'
 
 // Confidence a third-party-sourced value is held to: kept and usable, but marked
@@ -26,27 +27,26 @@ import { hostOf } from './source-key'
 // so". Below the 0.7 the UI treats as trustworthy.
 export const THIRD_PARTY_CONFIDENCE_CAP = 0.6
 
+/**
+ * The lowest auto-apply threshold an org can effectively set. Kept above the
+ * third-party cap so a value whose confidence was capped (an outside estimate,
+ * not the company's own word) can never clear an auto-apply bar — it always
+ * waits for a person.
+ */
+export const AUTO_APPLY_CONFIDENCE_FLOOR = THIRD_PARTY_CONFIDENCE_CAP + 0.05
+
 // Subtrees that are not per-field values: block-level citation arrays and the
 // freeform proposed-update blob, whose contents could otherwise look like a field.
 const SKIP_KEYS = new Set(['citations', 'proposed_updates'])
 
 // The value came from one of the target's own hosts — the company's own domain or
 // a subdomain of it. A look-alike or aggregator host never ends with ".<target>".
-const isFirstPartyHost = (
+// Exported so page ranking can float the company's own pages ahead of aggregators.
+export const isFirstPartyHost = (
 	host: string,
 	targetHosts: ReadonlyArray<string>,
 ): boolean =>
 	targetHosts.some(target => host === target || host.endsWith(`.${target}`))
-
-// A per-field Sourced wrapper: `{ value, source_id, quote?, confidence? }`.
-const isSourcedField = (
-	v: unknown,
-): v is { value: unknown; source_id?: unknown; confidence?: unknown } =>
-	v !== null &&
-	typeof v === 'object' &&
-	!Array.isArray(v) &&
-	'value' in v &&
-	('source_id' in v || 'quote' in v || 'confidence' in v)
 
 export interface SourceTierResult {
 	readonly findings: unknown

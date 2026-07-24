@@ -15,16 +15,15 @@ const sourced = (value: string) => ({
 })
 
 describe('ENRICHMENT_FIELDS', () => {
-	it('should list the eight company-profile fields, from the schema itself', () => {
+	it('should list the seven company-profile fields, from the schema itself', () => {
 		// GIVEN the field list derived from the enrichment schema
-		// THEN it is exactly the eight the model is asked to fill
+		// THEN it is exactly the seven the model is asked to fill
 		expect([...ENRICHMENT_FIELDS].sort()).toEqual([
 			'country',
 			'current_tools',
 			'industry',
 			'location',
 			'pain_points',
-			'products_fit',
 			'size_range',
 			'tags',
 		])
@@ -38,27 +37,26 @@ describe('enrichmentFill', () => {
 			const result = enrichmentFill({ enrichment: {} })
 
 			// THEN every field is missing and none is filled
-			expect(result.total).toBe(8)
+			expect(result.total).toBe(7)
 			expect(result.filled).toBe(0)
-			expect(result.missing.length).toBe(8)
+			expect(result.missing.length).toBe(7)
 		})
 	})
 
 	describe('when some fields carry a value and others do not', () => {
 		it('should count only the ones with a real value', () => {
-			// GIVEN a mix of filled scalar fields, a filled list, and an empty list
+			// GIVEN a mix of filled scalar fields and an empty list
 			const result = enrichmentFill({
 				enrichment: {
 					industry: sourced('logistics'),
 					size_range: sourced('51-200'),
-					products_fit: ['tms'],
 					tags: [],
 				},
 			})
 
-			// THEN the three with content count, the empty list and the absent
+			// THEN the two with content count, the empty list and the absent
 			// fields do not
-			expect(result.filled).toBe(3)
+			expect(result.filled).toBe(2)
 			expect(result.missing).toContain('tags')
 			expect(result.missing).toContain('location')
 		})

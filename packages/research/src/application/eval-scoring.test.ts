@@ -218,6 +218,24 @@ describe('scoreRun', () => {
 		})
 	})
 
+	describe('when a run succeeded only with low confidence', () => {
+		it('should still score its findings rather than reading as empty', () => {
+			// GIVEN a thin-but-real success that filled a field
+			const result = scoreRun(
+				acme,
+				outcome({
+					status: 'succeeded_low_confidence',
+					reachedDomains: ['https://www.acme.es/about'],
+					fields: { industry: 'transport' },
+				}),
+			)
+
+			// WHEN scored — THEN it counts as a success with data, not an empty run
+			expect(result.empty).toBe(false)
+			expect(result.grounded).toBe(true)
+		})
+	})
+
 	describe('when a succeeded run filled no scorable field', () => {
 		it('should count as empty', () => {
 			// GIVEN a run that succeeded but produced only blanks

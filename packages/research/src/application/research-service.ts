@@ -51,13 +51,17 @@ import {
 	ContactsRescueSchema,
 	contactsRescuePrompt,
 	mergeContacts,
-	needsContactRescue,
 } from './contacts-rescue'
 import {
 	CriticVerdictsSchema,
 	criticPrompt,
 	critiqueFieldSupport,
 } from './critic-guard'
+import {
+	discoveredEntryKey,
+	filterDiscoveredExisting,
+	readDiscoveredEntry,
+} from './discovered-existing-guard'
 import {
 	isDiscoveryScanEmpty,
 	isRetryEligible,
@@ -78,6 +82,7 @@ import {
 	reachedOwnSite,
 	withRedirectDomain,
 } from './entity-guard'
+import { classifyNamespace, guardEntitySources } from './entity-source-guard'
 import { contactFill, enrichmentFill } from './extraction-fill'
 import {
 	FirmographicsRescueSchema,
@@ -89,7 +94,9 @@ import {
 	SizeRescueSchema,
 	sizeRescuePrompt,
 } from './firmographics-rescue'
+import { guardFitEvidence } from './fit-evidence-guard'
 import { harvestGenericEmails } from './generic-emails'
+import { type GuardLink, runGuardChain } from './guard-chain'
 import { normalizePaidActionTool } from './paid-action-tool'
 import {
 	MAX_PER_FIELD_SEARCHES,
@@ -102,6 +109,7 @@ import {
 	AgentLanguageModel,
 	Budget,
 	ExtractLanguageModel,
+	MapProvider,
 	RegistryRouter,
 	ResearchEventSink,
 	ResearchRunContext,
@@ -113,11 +121,17 @@ import {
 	filterProspectsByCriteria,
 	prospectCriteriaFromHints,
 } from './prospect-criteria-guard'
+import { computeRunQuality } from './research-quality'
 import { guardScalarFields } from './scalar-field-guard'
 import { type FreeformSchema, schemaRegistry } from './schemas/index'
-import { urlHashForScrape } from './source-key'
-import { enforceSourceTier } from './source-tier-guard'
-import { REGISTRY_LOOKUP_COST_CENTS, SCRAPE_COST_CENTS } from './tool-costs'
+import { hostOf, urlHashForScrape } from './source-key'
+import { enforceSourceTier, isFirstPartyHost } from './source-tier-guard'
+import { stripReasoning } from './strip-reasoning'
+import {
+	REGISTRY_LOOKUP_COST_CENTS,
+	SCRAPE_COST_CENTS,
+	SEARCH_COST_CENTS,
+} from './tool-costs'
 import {
 	isUnsupportedScrapeUrl,
 	researchToolkit,
@@ -213,6 +227,21 @@ const MAX_LOGGED_FIELD_DROPS = 20
 // links. Small on purpose — these carry the location and named leaders a homepage
 // omits, but each is a paid scrape, so a handful is enough.
 const MAX_ABOUT_PAGES = 3
+// Cap on additional own-site pages fetched from the site map, over and above
+// the homepage-linked seeds — enough for a team + leadership + offices spread
+// without turning discovery into a full-site crawl.
+const MAX_DISCOVERY_PAGES = 6
+// Hard cap on the gap-closing rounds after phase 2 — each re-searches only what
+// is still missing, so a thin run earns its grounding instead of shipping on
+// the first pass.
+const MAX_GAP_ROUNDS = 4
+// Cited-but-never-fetched pages scraped per round, turning the per-source
+// entity check's fail-open into a real verdict on the cited page.
+const MAX_CITED_SCRAPES_PER_ROUND = 3
+// How many of a round's cited scrapes / per-field searches run at once.
+const GAP_ROUND_CONCURRENCY = 3
+// No new gap round starts beyond this share of the run deadline.
+const GAP_ROUND_DEADLINE_FRACTION = 0.8
 
 // A research id is always a uuid. Checking the shape before a lookup — instead of
 // passing an arbitrary path param straight to a uuid column — turns a bad id (a bot,
@@ -245,19 +274,24 @@ const HEADCOUNT_SEARCH_INSTRUCTION =
 const ANCHOR_DOMAIN_INSTRUCTION = (host: string): string =>
 	`The correct official website for this company is https://${host}. Use scrape_page on that site first and treat it as the authoritative source for the company's identity and details.`
 
+interface SourcedPage {
+	readonly urlHash: string
+	readonly text: string
+	readonly host?: string | undefined
+}
+
 // Feed extraction only the fetched pages that concern the target, so a look-alike
 // company's page pulled in alongside it cannot leak into the extracted fields.
 // Falls back to every page when the per-source check grounds none, so a run that
-// matched only through a search snippet still has something to extract from.
-export const groundedPageTexts = (
+// matched only through a search snippet still has something to extract from. The
+// company's own pages come first, so a fact stated on both the official site and an
+// aggregator is extracted from — and attributed to — the official one, instead of
+// the aggregator that happened to sit earlier in the fetch order.
+export const groundedPages = (
 	targets: EntityTargets | null,
-	pages: ReadonlyArray<{
-		readonly urlHash: string
-		readonly text: string
-		readonly host?: string | undefined
-	}>,
-): ReadonlyArray<string> => {
-	if (targets === null) return pages.map(page => page.text)
+	pages: ReadonlyArray<SourcedPage>,
+): ReadonlyArray<SourcedPage> => {
+	if (targets === null) return pages
 	const verdicts = classifyEntityMatchPerSource(
 		targets,
 		pages.map(page => ({
@@ -268,7 +302,60 @@ export const groundedPageTexts = (
 	)
 	const keep = new Set(groundedSourceIds(verdicts))
 	const grounded = pages.filter(page => keep.has(page.urlHash))
-	return (grounded.length > 0 ? grounded : pages).map(page => page.text)
+	const chosen = grounded.length > 0 ? grounded : pages
+	return [...chosen].sort(
+		(a, b) =>
+			(isFirstPartyHost(a.host ?? '', targets.domains) ? 0 : 1) -
+			(isFirstPartyHost(b.host ?? '', targets.domains) ? 0 : 1),
+	)
+}
+
+// The grounded page texts, for building the guard grounding corpus (values are
+// checked against this, so it stays free of source labels).
+export const groundedPageTexts = (
+	targets: EntityTargets | null,
+	pages: ReadonlyArray<SourcedPage>,
+): ReadonlyArray<string> => groundedPages(targets, pages).map(page => page.text)
+
+// The grounded pages for extraction, each block prefixed with the host it came
+// from, so the model attributes a fact to the page it physically sits on (the
+// official site vs an aggregator) instead of guessing from the flat source list.
+export const labelledGroundedPages = (
+	targets: EntityTargets | null,
+	pages: ReadonlyArray<SourcedPage>,
+): ReadonlyArray<string> =>
+	groundedPages(targets, pages).map(page =>
+		page.host ? `[source: ${page.host}]\n${page.text}` : page.text,
+	)
+
+// The cited-but-never-fetched sources of an enrichment's company fields — the
+// citations the per-source entity check had to fail open on. A gap round
+// scrapes these first: fetching the cited page turns fail-open into a real
+// verdict, and the page often carries the very facts still missing. Blocked
+// namespaces (posts, person pages) are skipped — fetching one changes nothing.
+export const citedUnscrapedSources = (
+	findings: unknown,
+	hasPage: (urlHash: string) => boolean,
+	cap: number,
+): ReadonlyArray<string> => {
+	if (findings === null || typeof findings !== 'object') return []
+	const enrichment = (findings as { enrichment?: unknown }).enrichment
+	if (enrichment === null || typeof enrichment !== 'object') return []
+	const out: string[] = []
+	const seen = new Set<string>()
+	for (const value of Object.values(enrichment as Record<string, unknown>)) {
+		if (value === null || typeof value !== 'object') continue
+		const id = (value as { source_id?: unknown }).source_id
+		if (typeof id !== 'string' || id.trim() === '') continue
+		if (seen.has(id)) continue
+		seen.add(id)
+		if (classifyNamespace(id) !== null) continue
+		if (hostOf(id) === null) continue
+		if (hasPage(urlHashForScrape(id))) continue
+		out.push(id)
+		if (out.length >= cap) break
+	}
+	return out
 }
 
 /**
@@ -630,6 +717,7 @@ export const buildResearchSystemPrompt = (args: {
 		'Never fabricate sources. Every claim must be verifiable.',
 		'Confirm key facts (employee count, location, sector) from scraped page content where you can — the company site, LinkedIn, or press — and cite the page. When such a fact appears only in a search result you could not open as a page, still report it and quote the search snippet rather than dropping a real, sourced fact; never invent one that appears nowhere.',
 		'The employee headcount is rarely on a company\'s own homepage. If the site does not state it, search for it (the company name with "number of employees", or its LinkedIn / ZoomInfo profile) before finishing — do not conclude the size is unknown without having searched.',
+		"The company's own site rarely tells the whole story. Vary your searches across the open web — recent news and trade press (roughly the last 12 months), industry blogs, magazines, and event or conference pages — for funding, leadership changes, tooling, and growth signals the site omits.",
 		'For a citation to a page you scraped, set source_id to the exact URL you scraped with scrape_page. Never invent an identifier — a made-up source is dropped.',
 		'When you search, use plain keywords, and only add a site: filter for a real domain you know — never a placeholder like site:example.com.',
 		'For discovery or prospecting queries, prefer authoritative sources — business directories, industry association member lists, and sector registries — over social media, forums, or glossary pages. Treat such a page as somewhere to find candidates, not as the answer: a "top N" or "largest" ranking lists the biggest firms in a sector, which is the opposite of what most prospecting asks for. Carry every qualifier in the request — size, place, and niche — into each search, and check each candidate against all of them before returning it; leave out one that fails any, however prominently a directory listed it.',
@@ -705,24 +793,35 @@ const PROPOSE_UPDATES_DIRECTIVE = [
  * the reading push is on how much of the evidence the model uses, never on how many
  * fields it fills, so a field the evidence does not support still stays empty rather
  * than being invented. The push names only fields a downstream guard can check; the
- * plain-list fields (products, tags) are left out on purpose, since nothing verifies
- * them and pushing there would only invite made-up entries.
+ * plain-list tags field is left out on purpose, since nothing verifies it and
+ * pushing there would only invite made-up entries.
  *
  * When the run already holds the subjects on file, they are shown to the model with
  * an instruction to propose a correction wherever the evidence disagrees — the only
  * way a run turns up an edit for a company it was handed rather than one it found.
  */
+// Asks the model to land the fit judgement in the structured output, not only in
+// the brief. Added only for the enrichment schema, which is the one that carries
+// the verdict/disqualifiers/fit_checks/hook fields.
+const FIT_VERDICT_DIRECTIVE =
+	'Decide whether this company fits the target customer profile using the fit rules in the instructions above, and record it: set `verdict` (strong_fit / possible_fit / weak_fit / no_fit) with a short `verdict_rationale`; for a company that fails a rule, list each failure in `disqualifiers` with the rule and the evidence quote that shows it; and only when the evidence supports one, put a single grounded outreach angle in `hook` — never a figure or claim the evidence does not state. Also fill `fit_checks` with one row per fit rule in the instructions — every rule, including the ones the company passes — each marked pass, fail, or unknown per the evidence, with the quote and source URL that decide it.'
+
 export const buildExtractionPrompt = (args: {
 	readonly citationInstruction: string
 	readonly evidenceBlock: string
 	readonly subjects: ReadonlyArray<SubjectForPrompt>
+	readonly fitVerdict?: boolean
 }): string => {
 	const lines = [
 		'Produce structured findings STRICTLY from the evidence below (the fetched pages and the research transcript).',
 		'',
-		"Read ALL of the evidence to the end — every fetched page and every search result in the transcript — and report every fact it states; the evidence routinely states far more than a first pass returns. In particular: name EVERY person the evidence identifies as this company's own leader or employee, each with the exact job title the evidence gives them; and report the industry, employee-count band, location, country, and the company's own operational software wherever the evidence states them — including on a third-party page rather than the company's own site.",
+		"Read ALL of the evidence to the end — every fetched page and every search result in the transcript — and report every fact it states; the evidence routinely states far more than a first pass returns. Report the industry, employee-count band, location, country, and the company's own operational software wherever the evidence states them — including on a third-party page rather than the company's own site.",
+		'',
+		"Name EVERY person the evidence identifies as this company's own leader or employee — a titled executive on the team page, a quoted founder, a signed author — each with the exact job title the evidence gives them. Leaving the people list empty while the evidence names the company's own staff is an incomplete extraction.",
 		'',
 		"Report ONLY what the evidence states. If it does not support a field, omit it or leave it null — never fill a field from prior knowledge, never guess, and never put a placeholder or the field's own name as its value. Leaving a field empty is always better than inventing a value for it.",
+		'',
+		"When sources disagree on a time-sensitive fact (employee count, tools in use, leadership), fill the field from the most recently published reading among sources of equal standing — the company's own site still outranks an aggregator — and record each reading the field did not take in `conflicts`, with its value and the URL of the source that stated it.",
 	]
 	if (args.subjects.length > 0) {
 		lines.push(
@@ -731,6 +830,9 @@ export const buildExtractionPrompt = (args: {
 			'',
 			PROPOSE_UPDATES_DIRECTIVE,
 		)
+	}
+	if (args.fitVerdict) {
+		lines.push('', FIT_VERDICT_DIRECTIVE)
 	}
 	lines.push('', args.citationInstruction, '', args.evidenceBlock)
 	return lines.join('\n')
@@ -1670,11 +1772,17 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						(run as { tokensOut?: number | null }).tokensOut ?? 0
 
 					// ── Phase 1: LLM research pass ──
+					// Wall-clock epoch for the gap rounds' stop-with-margin check —
+					// aligned with the whole-run deadline, which starts with the run body.
+					const runStartedAtMs = DateTime.toEpochMillis(DateTime.nowUnsafe())
 					// Skipped on resume if the checkpoint captured research_text.
 					let researchText: string
 					// Evidence-only corpus (tool results, no model prose) for the value
 					// guard; empty on a resume that skips phase 1.
 					let evidenceText = ''
+					// How many reflect-loop rounds phase 1 ran, for the run's quality
+					// signal; stays 0 on a resume that skips phase 1.
+					let runRounds = 0
 					let tokensIn = priorTokensIn
 					let tokensOut = priorTokensOut
 					// Full scraped page content gathered this run — the corpus the value
@@ -1714,6 +1822,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// budget once phase 1 ends and stamped onto the run as cost_cents. Stays
 					// 0 on a resume that skips phase 1 — the budget only counts this attempt.
 					let cheapSpentCents = 0
+					// Cheap spend the phase-2 gap rounds add on top: they run outside the
+					// phase-1 Budget scope, so they tally their own scrape/search cost here
+					// to keep both the mid-loop budget-margin check and the run's stamped
+					// cost_cents honest. Stays 0 when no gap round runs.
+					let gapSpentCents = 0
 
 					// Phase-2 extraction + every grounding guard, shared so both the
 					// normal path and the discovery-scan retry run the same logic. Returns
@@ -1784,6 +1897,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									citationInstruction,
 									evidenceBlock,
 									subjects: subjectsForPrompt(subjects),
+									fitVerdict: schemaName === 'company_enrichment_v1',
 								}),
 							})
 							let result = withProposalIds(structuredResponse.value as unknown)
@@ -1822,13 +1936,13 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										? rescueSnapshot['website']
 										: undefined) ?? entityTargets?.domains?.[0],
 							}
-							// Contacts rescue: the broad pass reliably drops the people list. If it
-							// came back with at most one contact, or with named people missing their
-							// titles, run a focused pass that pulls only named people + titles from
-							// the same evidence and fold them in — before the guard chain, so
-							// recovered contacts are guarded like the rest. Fail-open: a rescue error
-							// keeps the broad result.
-							if (isEnrichmentRun && needsContactRescue(result)) {
+							// Contacts rescue: the broad pass reliably under-delivers the people
+							// list, so a focused pass that pulls only named people + titles from
+							// the same evidence always runs for an enrichment — the merge only
+							// ever adds or completes people, and it happens before the guard
+							// chain, so recovered contacts are guarded like the rest. Fail-open:
+							// a rescue error keeps the broad result.
+							if (isEnrichmentRun) {
 								const rescue = yield* extractLlm
 									.generateObject({
 										schema: ContactsRescueSchema,
@@ -1843,8 +1957,18 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											contacts: (r.value as { contacts?: unknown }).contacts,
 											tokens: r.usage.outputTokens.total ?? 0,
 										})),
-										Effect.catchCause(() =>
-											Effect.succeed({ contacts: undefined, tokens: 0 }),
+										Effect.catchCause(cause =>
+											Cause.hasInterruptsOnly(cause)
+												? Effect.failCause(cause)
+												: Effect.logWarning(
+														'research.contacts.rescue_failed',
+													).pipe(
+														Effect.annotateLogs({
+															research_id: researchId,
+															cause: Cause.pretty(cause),
+														}),
+														Effect.as({ contacts: undefined, tokens: 0 }),
+													),
 										),
 									)
 								rescueOutputTokens += rescue.tokens
@@ -1954,9 +2078,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									'research.contacts.titled_rescued': rescuedContacts.titled,
 								})
 							}
-							// Drop citations the model invented: keep only source_ids that map
-							// to a page this run actually fetched. A proposed CRM update left
-							// with no valid citation is dropped whole.
 							const groundedRows = yield* sql<{
 								localRef: string
 								sourceId: string
@@ -1964,254 +2085,453 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								SELECT local_ref AS "localRef", source_id AS "sourceId"
 								FROM research_run_sources WHERE research_id = ${researchId}
 							`
-							const citationCheck = validateFindingCitations(
-								result,
-								groundedCitationTest(groundedRows, [...searchResultHosts]),
-							)
-							result = citationCheck.findings
-							if (citationCheck.total > citationCheck.kept) {
-								yield* Effect.logWarning('research.citations.dropped').pipe(
-									Effect.annotateLogs({
-										research_id: researchId,
-										total: citationCheck.total,
-										kept: citationCheck.kept,
-									}),
-								)
-							}
-							// Per-field detail: which scalar the citation guard nulled and the
-							// unfetched source it was cited to, so an empty field is diagnosable.
-							for (const fieldDrop of citationCheck.drops.slice(
-								0,
-								MAX_LOGGED_FIELD_DROPS,
-							)) {
-								yield* Effect.logInfo('research.field.dropped').pipe(
-									Effect.annotateLogs({
-										research_id: researchId,
-										guard: 'citation',
-										field: fieldDrop.field,
-										reason: 'citation_ungrounded',
-										value: fieldDrop.value,
-										source_id: fieldDrop.sourceId,
-									}),
-								)
-							}
-							// Contact entity binding: drop a person whose quotes name only a
-							// different company (a client testimonial or a competitor's exec
-							// quoted on the target's own page), so the richer extraction can't
-							// present someone else's leader as this company's contact.
-							const contactBind = bindContactsToEntity(result, entityTargets)
-							result = contactBind.findings
-							if (contactBind.dropped > 0) {
-								yield* Effect.logWarning('research.contacts.wrong_entity').pipe(
-									Effect.annotateLogs({
-										research_id: researchId,
-										dropped: contactBind.dropped,
-									}),
-								)
-							}
-							// Scalar grounding: hold each per-field value to "grounded or absent".
-							// The citation guard has just removed fabricated sources, so a scalar
-							// left without one is dropped here rather than shipped unsourced; a
-							// placeholder word or a quote that does not back the value goes too.
-							const scalarCheck = guardScalarFields(result, evidenceCorpus)
-							result = scalarCheck.findings
-							if (
-								scalarCheck.droppedPlaceholder > 0 ||
-								scalarCheck.droppedWrongKind > 0 ||
-								scalarCheck.droppedUngrounded > 0 ||
-								scalarCheck.droppedUnsupported > 0
-							) {
-								yield* Effect.logWarning('research.fields.ungrounded').pipe(
-									Effect.annotateLogs({
-										research_id: researchId,
-										dropped_placeholder: scalarCheck.droppedPlaceholder,
-										dropped_wrong_kind: scalarCheck.droppedWrongKind,
-										dropped_ungrounded: scalarCheck.droppedUngrounded,
-										dropped_unsupported: scalarCheck.droppedUnsupported,
-									}),
-								)
-							}
-							// Per-field detail for the scalar guard, so an empty field can be traced to
-							// why it was nulled — an on-page value wrongly dropped (a guard bug) versus
-							// one that was genuinely absent.
-							for (const fieldDrop of scalarCheck.drops.slice(
-								0,
-								MAX_LOGGED_FIELD_DROPS,
-							)) {
-								yield* Effect.logInfo('research.field.dropped').pipe(
-									Effect.annotateLogs({
-										research_id: researchId,
-										guard: 'scalar',
-										field: fieldDrop.field,
-										reason: fieldDrop.reason,
-										value: fieldDrop.value,
-										source_id: fieldDrop.sourceId ?? '',
-									}),
-								)
-							}
-							// Website sanity: a scanned competitor or prospect sometimes comes
-							// back with a directory's profile page ("cbinsights.com/company/…")
-							// where its own site belongs. Blank that, so a stranger's URL never
-							// lands in the CRM's website field. Deterministic and evidence-free,
-							// so it runs here among the plain checks, ahead of the model critics.
-							const websiteCheck = guardCompanyWebsites(result)
-							result = websiteCheck.findings
-							if (
-								websiteCheck.blankedDirectory > 0 ||
-								websiteCheck.blankedProfilePage > 0
-							) {
-								yield* Effect.logWarning('research.websites.blanked').pipe(
-									Effect.annotateLogs({
-										research_id: researchId,
-										blanked_directory: websiteCheck.blankedDirectory,
-										blanked_profile_page: websiteCheck.blankedProfilePage,
-									}),
-								)
-							}
-							// Grounding telemetry on the phase-2 span, so the share of fields a
-							// run drops for want of a real source is a dashboard, not an anecdote.
-							yield* Effect.annotateCurrentSpan({
-								'research.citations.total': citationCheck.total,
-								'research.citations.kept': citationCheck.kept,
-								'research.websites.blanked':
-									websiteCheck.blankedDirectory +
-									websiteCheck.blankedProfilePage,
-								'research.fields.dropped_placeholder':
-									scalarCheck.droppedPlaceholder,
-								'research.fields.dropped_wrong_kind':
-									scalarCheck.droppedWrongKind,
-								'research.fields.dropped_ungrounded':
-									scalarCheck.droppedUngrounded,
-								'research.fields.dropped_unsupported':
-									scalarCheck.droppedUnsupported,
-							})
-							// Value provenance: the citation guard proved the cited pages were
-							// fetched, not that they contain the claimed values. Drop any
-							// proposed CRM write whose email/phone/tax-id value appears nowhere
-							// in the run's evidence — that value was invented, real citation or
-							// not. Evidence is tool results only, never the model's own prose.
-							const valueCheck = verifyValueProvenance(result, evidenceCorpus)
-							result = valueCheck.findings
-							if (
-								valueCheck.droppedProposals > 0 ||
-								valueCheck.strippedValues > 0
-							) {
-								yield* Effect.logWarning('research.values.unsupported').pipe(
-									Effect.annotateLogs({
-										research_id: researchId,
-										dropped_proposals: valueCheck.droppedProposals,
-										stripped_values: valueCheck.strippedValues,
-									}),
-								)
-							}
-							// Vocabulary: rewrite industry/size to the CRM's fixed codes so
-							// what reaches the CRM matches the classification the UI offers — a
-							// real-but-uncategorized value becomes 'other', junk is dropped. Runs
-							// before applicability, so a proposal emptied by dropping its only
-							// field is then dropped as unappliable.
-							const vocab = constrainVocabulary(result)
-							result = vocab.findings
-							if (vocab.mapped > 0 || vocab.blanked > 0) {
-								yield* Effect.logInfo('research.vocabulary.normalized').pipe(
-									Effect.annotateLogs({
-										research_id: researchId,
-										mapped: vocab.mapped,
-										blanked: vocab.blanked,
-									}),
-								)
-							}
-							// Applicability: drop any proposed CRM update that could never be
-							// applied — an update whose subject_id names no live row (the model
-							// can invent one for a company that does not exist), or a proposal
-							// whose fields carry no real values. Existence is checked against
-							// the org's own rows; a malformed id trips a cast error read as
-							// "not found".
+							// The phase-2 guard chain. Each link receives what the previous ones
+							// kept and hands back what it keeps, so reading this array top to
+							// bottom IS the order the guards run in — a link's position is its
+							// whole contract with its neighbours. A link also reports the span
+							// attributes it contributes, so the phase's grounding telemetry is
+							// assembled from the links themselves.
 							const organizationId = (run as { organizationId: string })
 								.organizationId
-							const proposalList =
-								result != null &&
-								typeof result === 'object' &&
-								!Array.isArray(result)
-									? (result as Record<string, unknown>)['proposed_updates']
-									: undefined
-							const liveSubjects = new Set<string>()
-							if (Array.isArray(proposalList)) {
-								for (const proposal of proposalList) {
-									if (proposal == null || typeof proposal !== 'object') continue
-									const pu = proposal as Record<string, unknown>
-									if (pu['operation'] === 'create') continue
-									const table = pu['subject_table']
-									const id = pu['subject_id']
-									if (
-										(table !== 'companies' && table !== 'contacts') ||
-										typeof id !== 'string' ||
-										id.trim() === '' ||
-										liveSubjects.has(`${table}:${id}`)
-									)
-										continue
-									const rows = yield* sql`
-										SELECT id FROM ${sql(table)}
-										WHERE id = ${id}
-											AND organization_id = ${organizationId}
-											AND deleted_at IS NULL
-										LIMIT 1
-									`.pipe(Effect.catchTag('SqlError', () => Effect.succeed([])))
-									if (rows.length > 0) liveSubjects.add(`${table}:${id}`)
-								}
-							}
-							const applicability = filterApplicableProposals(
-								result,
-								(table, id) => liveSubjects.has(`${table}:${id}`),
-							)
-							result = applicability.findings
-							if (applicability.dropped > 0) {
-								yield* Effect.logWarning('research.proposals.unappliable').pipe(
-									Effect.annotateLogs({
-										research_id: researchId,
-										dropped: applicability.dropped,
-									}),
-								)
-							}
-							// Prospect criteria: a scan sometimes returns a company outside the
-							// size or place the request asked for, because the page it came from
-							// was about the right sector. Drop one that states a size or country
-							// the request ruled out — only on a stated conflict, so a thin list is
-							// never emptied. A scan emptied here still earns the refined retry
-							// below, and if it is still all giants, ends honestly instead of green.
-							if (schemaName === 'prospect_scan_v1') {
-								const hintCountry = parseCountryAlpha2(hints?.location)
-								const prospectCriteria = prospectCriteriaFromHints(
-									hints as
-										| { minEmployees?: number; maxEmployees?: number }
-										| undefined,
-									hintCountry ? [hintCountry] : [],
-								)
-								const criteriaCheck = filterProspectsByCriteria(
-									result,
-									prospectCriteria,
-								)
-								result = criteriaCheck.findings
-								if (criteriaCheck.dropped > 0) {
-									yield* Effect.logWarning(
-										'research.prospects.off_criteria',
-									).pipe(
-										Effect.annotateLogs({
-											research_id: researchId,
-											dropped: criteriaCheck.dropped,
+							const guardChain: ReadonlyArray<GuardLink> = [
+								{
+									// Drop citations the model invented: keep only source_ids that
+									// map to a page this run actually fetched. A proposed CRM update
+									// left with no valid citation is dropped whole.
+									name: 'citations',
+									run: findings =>
+										Effect.gen(function* () {
+											const check = validateFindingCitations(
+												findings,
+												groundedCitationTest(groundedRows, [
+													...searchResultHosts,
+												]),
+											)
+											if (check.total > check.kept) {
+												yield* Effect.logWarning(
+													'research.citations.dropped',
+												).pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														total: check.total,
+														kept: check.kept,
+													}),
+												)
+											}
+											// Per-field detail: which scalar the citation guard nulled
+											// and the unfetched source it was cited to, so an empty
+											// field is diagnosable.
+											for (const fieldDrop of check.drops.slice(
+												0,
+												MAX_LOGGED_FIELD_DROPS,
+											)) {
+												yield* Effect.logInfo('research.field.dropped').pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														guard: 'citation',
+														field: fieldDrop.field,
+														reason: 'citation_ungrounded',
+														value: fieldDrop.value,
+														source_id: fieldDrop.sourceId,
+													}),
+												)
+											}
+											return {
+												findings: check.findings,
+												spanCounts: {
+													'research.citations.total': check.total,
+													'research.citations.kept': check.kept,
+												},
+											}
 										}),
-									)
-								}
-							}
+								},
+								{
+									// Contact entity binding: drop a person whose quotes name only a
+									// different company (a client testimonial or a competitor's exec
+									// quoted on the target's own page), so the richer extraction
+									// can't present someone else's leader as this company's contact.
+									name: 'contact-entity',
+									run: findings =>
+										Effect.gen(function* () {
+											const check = bindContactsToEntity(
+												findings,
+												entityTargets,
+											)
+											if (check.dropped > 0) {
+												yield* Effect.logWarning(
+													'research.contacts.wrong_entity',
+												).pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														dropped: check.dropped,
+													}),
+												)
+											}
+											return { findings: check.findings }
+										}),
+								},
+								{
+									// Scalar grounding: hold each per-field value to "grounded or
+									// absent". The citation guard has just removed fabricated
+									// sources, so a scalar left without one is dropped here rather
+									// than shipped unsourced; a placeholder word or a quote that
+									// does not back the value goes too.
+									name: 'scalars',
+									run: findings =>
+										Effect.gen(function* () {
+											const check = guardScalarFields(findings, evidenceCorpus)
+											if (
+												check.droppedPlaceholder > 0 ||
+												check.droppedWrongKind > 0 ||
+												check.droppedUngrounded > 0 ||
+												check.droppedUnsupported > 0
+											) {
+												yield* Effect.logWarning(
+													'research.fields.ungrounded',
+												).pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														dropped_placeholder: check.droppedPlaceholder,
+														dropped_wrong_kind: check.droppedWrongKind,
+														dropped_ungrounded: check.droppedUngrounded,
+														dropped_unsupported: check.droppedUnsupported,
+													}),
+												)
+											}
+											// Per-field detail for the scalar guard, so an empty field
+											// can be traced to why it was nulled — an on-page value
+											// wrongly dropped (a guard bug) versus one genuinely absent.
+											for (const fieldDrop of check.drops.slice(
+												0,
+												MAX_LOGGED_FIELD_DROPS,
+											)) {
+												yield* Effect.logInfo('research.field.dropped').pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														guard: 'scalar',
+														field: fieldDrop.field,
+														reason: fieldDrop.reason,
+														value: fieldDrop.value,
+														source_id: fieldDrop.sourceId ?? '',
+													}),
+												)
+											}
+											return {
+												findings: check.findings,
+												spanCounts: {
+													'research.fields.dropped_placeholder':
+														check.droppedPlaceholder,
+													'research.fields.dropped_wrong_kind':
+														check.droppedWrongKind,
+													'research.fields.dropped_ungrounded':
+														check.droppedUngrounded,
+													'research.fields.dropped_unsupported':
+														check.droppedUnsupported,
+												},
+											}
+										}),
+								},
+								{
+									// Website sanity: a scanned competitor or prospect sometimes comes
+									// back with a directory's profile page ("cbinsights.com/company/…")
+									// where its own site belongs. Blank that, so a stranger's URL never
+									// lands in the CRM's website field. Deterministic and evidence-free,
+									// so it runs here among the plain checks, ahead of the model critics.
+									name: 'websites',
+									run: findings =>
+										Effect.gen(function* () {
+											const check = guardCompanyWebsites(findings)
+											if (
+												check.blankedDirectory > 0 ||
+												check.blankedProfilePage > 0
+											) {
+												yield* Effect.logWarning(
+													'research.websites.blanked',
+												).pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														blanked_directory: check.blankedDirectory,
+														blanked_profile_page: check.blankedProfilePage,
+													}),
+												)
+											}
+											return {
+												findings: check.findings,
+												spanCounts: {
+													'research.websites.blanked':
+														check.blankedDirectory + check.blankedProfilePage,
+												},
+											}
+										}),
+								},
+								{
+									// Value provenance: the citation guard proved the cited pages were
+									// fetched, not that they contain the claimed values. Drop any
+									// proposed CRM write whose email/phone/tax-id value appears nowhere
+									// in the run's evidence — that value was invented, real citation or
+									// not. Evidence is tool results only, never the model's own prose.
+									name: 'value-provenance',
+									run: findings =>
+										Effect.gen(function* () {
+											const check = verifyValueProvenance(
+												findings,
+												evidenceCorpus,
+											)
+											if (
+												check.droppedProposals > 0 ||
+												check.strippedValues > 0
+											) {
+												yield* Effect.logWarning(
+													'research.values.unsupported',
+												).pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														dropped_proposals: check.droppedProposals,
+														stripped_values: check.strippedValues,
+													}),
+												)
+											}
+											return { findings: check.findings }
+										}),
+								},
+								{
+									// Fit evidence: the verdict's disqualifiers and per-criterion
+									// checks each cite a quote, but nothing above verifies it. Drop a
+									// disqualifier whose quote is in no fetched page, and downgrade a
+									// fit check with a fabricated quote to 'unknown', so the "auditable"
+									// fit trail can't be invented.
+									name: 'fit-evidence',
+									run: findings =>
+										Effect.gen(function* () {
+											const check = guardFitEvidence(findings, evidenceCorpus)
+											if (
+												check.droppedDisqualifiers > 0 ||
+												check.unverifiedChecks > 0
+											) {
+												yield* Effect.logWarning(
+													'research.fit.unsupported',
+												).pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														dropped_disqualifiers: check.droppedDisqualifiers,
+														unverified_checks: check.unverifiedChecks,
+													}),
+												)
+											}
+											return { findings: check.findings }
+										}),
+								},
+								{
+									// Vocabulary: rewrite industry/size to the CRM's fixed codes so
+									// what reaches the CRM matches the classification the UI offers — a
+									// real-but-uncategorized value becomes 'other', junk is dropped.
+									// Runs before applicability, so a proposal emptied by dropping its
+									// only field is then dropped as unappliable.
+									name: 'vocabulary',
+									run: findings =>
+										Effect.gen(function* () {
+											const check = constrainVocabulary(findings)
+											if (check.mapped > 0 || check.blanked > 0) {
+												yield* Effect.logInfo(
+													'research.vocabulary.normalized',
+												).pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														mapped: check.mapped,
+														blanked: check.blanked,
+													}),
+												)
+											}
+											return { findings: check.findings }
+										}),
+								},
+								{
+									// Applicability: drop any proposed CRM update that could never be
+									// applied — an update whose subject_id names no live row (the model
+									// can invent one for a company that does not exist), or a proposal
+									// whose fields carry no real values. Existence is checked against
+									// the org's own rows; a malformed id trips a cast error read as
+									// "not found".
+									name: 'applicability',
+									run: findings =>
+										Effect.gen(function* () {
+											const proposalList =
+												findings != null &&
+												typeof findings === 'object' &&
+												!Array.isArray(findings)
+													? (findings as Record<string, unknown>)[
+															'proposed_updates'
+														]
+													: undefined
+											const liveSubjects = new Set<string>()
+											if (Array.isArray(proposalList)) {
+												for (const proposal of proposalList) {
+													if (proposal == null || typeof proposal !== 'object')
+														continue
+													const pu = proposal as Record<string, unknown>
+													if (pu['operation'] === 'create') continue
+													const table = pu['subject_table']
+													const id = pu['subject_id']
+													if (
+														(table !== 'companies' && table !== 'contacts') ||
+														typeof id !== 'string' ||
+														id.trim() === '' ||
+														liveSubjects.has(`${table}:${id}`)
+													)
+														continue
+													const rows = yield* sql`
+														SELECT id FROM ${sql(table)}
+														WHERE id = ${id}
+															AND organization_id = ${organizationId}
+															AND deleted_at IS NULL
+														LIMIT 1
+													`.pipe(
+														Effect.catchTag('SqlError', () =>
+															Effect.succeed([]),
+														),
+													)
+													if (rows.length > 0)
+														liveSubjects.add(`${table}:${id}`)
+												}
+											}
+											const check = filterApplicableProposals(
+												findings,
+												(table, id) => liveSubjects.has(`${table}:${id}`),
+											)
+											if (check.dropped > 0) {
+												yield* Effect.logWarning(
+													'research.proposals.unappliable',
+												).pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														dropped: check.dropped,
+													}),
+												)
+											}
+											return { findings: check.findings }
+										}),
+								},
+								{
+									// Discovered-existing: the model fills `subject_id` from prompt or
+									// page text, not a CRM lookup, so it is often a company name, a
+									// docket, or "0". Resolve each entry to a live row — by id, or by
+									// name as the contact de-dup does — and drop the rest, so a phantom
+									// "already in CRM" row never reaches the review surface.
+									name: 'discovered-existing',
+									run: findings =>
+										Effect.gen(function* () {
+											const discoveredList =
+												findings != null &&
+												typeof findings === 'object' &&
+												!Array.isArray(findings)
+													? (findings as Record<string, unknown>)[
+															'discovered_existing'
+														]
+													: undefined
+											const resolvedDiscovered = new Set<string>()
+											if (Array.isArray(discoveredList)) {
+												for (const item of discoveredList) {
+													const entry = readDiscoveredEntry(item)
+													if (entry === null) continue
+													const key = discoveredEntryKey(entry)
+													if (resolvedDiscovered.has(key)) continue
+													const byId =
+														entry.subjectId.trim() === ''
+															? []
+															: yield* sql`
+																	SELECT id FROM ${sql(entry.subjectTable)}
+																	WHERE id = ${entry.subjectId}
+																		AND organization_id = ${organizationId}
+																		AND deleted_at IS NULL
+																	LIMIT 1
+																`.pipe(
+																	Effect.catchTag('SqlError', () =>
+																		Effect.succeed([]),
+																	),
+																)
+													let live = byId.length > 0
+													if (!live && entry.name.trim() !== '') {
+														const byName = yield* sql`
+															SELECT id FROM ${sql(entry.subjectTable)}
+															WHERE lower(name) = lower(${entry.name})
+																AND organization_id = ${organizationId}
+																AND deleted_at IS NULL
+															LIMIT 1
+														`.pipe(
+															Effect.catchTag('SqlError', () =>
+																Effect.succeed([]),
+															),
+														)
+														live = byName.length > 0
+													}
+													if (live) resolvedDiscovered.add(key)
+												}
+											}
+											const check = filterDiscoveredExisting(findings, entry =>
+												resolvedDiscovered.has(discoveredEntryKey(entry)),
+											)
+											if (check.dropped > 0) {
+												yield* Effect.logWarning(
+													'research.discovered_existing.unresolved',
+												).pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														dropped: check.dropped,
+													}),
+												)
+											}
+											return { findings: check.findings }
+										}),
+								},
+								{
+									// Prospect criteria: a scan sometimes returns a company outside the
+									// size or place the request asked for, because the page it came from
+									// was about the right sector. Drop one that states a size or country
+									// the request ruled out — only on a stated conflict, so a thin list is
+									// never emptied. A scan emptied here still earns the refined retry
+									// below, and if it is still all giants, ends honestly instead of green.
+									// Only a scan has criteria to judge against; any other run passes through.
+									name: 'prospect-criteria',
+									run: findings =>
+										Effect.gen(function* () {
+											if (schemaName !== 'prospect_scan_v1') return { findings }
+											const hintCountry = parseCountryAlpha2(hints?.location)
+											const prospectCriteria = prospectCriteriaFromHints(
+												hints as
+													| { minEmployees?: number; maxEmployees?: number }
+													| undefined,
+												hintCountry ? [hintCountry] : [],
+											)
+											const check = filterProspectsByCriteria(
+												findings,
+												prospectCriteria,
+											)
+											if (check.dropped > 0) {
+												yield* Effect.logWarning(
+													'research.prospects.off_criteria',
+												).pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														dropped: check.dropped,
+													}),
+												)
+											}
+											return { findings: check.findings }
+										}),
+								},
+							]
+							const guarded = yield* runGuardChain(guardChain, result)
+							result = guarded.findings
+							// Grounding telemetry on the phase-2 span, so the share of fields a
+							// run drops for want of a real source is a dashboard, not an anecdote.
+							yield* Effect.annotateCurrentSpan(guarded.spanCounts)
 							yield* publishEvent(researchId, 'tool.result', {
 								tool: 'llm.generateObject',
 								phase: 2,
 								schema: schemaName,
 							})
-							// Critic: a final per-field second look. For each value still carrying a
-							// source + quote, ask the extract model whether the quote really backs
-							// the value and is about the target company — the deterministic guards
-							// proved the value is in the evidence, this checks the cited quote
-							// supports it. Fail open: a judge error keeps the guarded fields.
+							// Who the critics judge a value against: the target's own name and
+							// domain, from the CRM row when there is one and the request otherwise.
 							const targetSnapshot = subjects[0]?.snapshot as
 								| Record<string, unknown>
 								| undefined
@@ -2225,86 +2545,194 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										? targetSnapshot['website']
 										: entityTargets?.domains[0],
 							}
-							// Contact entity critic: before the field critic, judge each
-							// remaining contact as a whole — is this person the company's own
-							// staff, or a client / partner / competitor quoted on its site? The
-							// deterministic contact guard catches only a quote that names
-							// another company; this catches a testimonial that names none. Fail
-							// open, and gentle: it drops only a clear outsider. Runs first so the
-							// field critic never spends a judgement on a contact about to go.
-							const contactCritiqued = yield* critiqueContactEntities(
-								result,
-								claims =>
-									extractLlm
-										.generateObject({
-											schema: ContactVerdictsSchema,
-											prompt: contactCriticPrompt(criticTarget, claims),
-										})
-										.pipe(
-											Effect.map(response => ({
-												verdicts: response.value.verdicts,
-												outputTokens: response.usage.outputTokens.total ?? 0,
-											})),
-											Effect.catchCause(() =>
-												Effect.succeed({ verdicts: [], outputTokens: 0 }),
-											),
-										),
-							)
-							result = contactCritiqued.findings
-							if (contactCritiqued.dropped > 0) {
-								yield* Effect.logWarning(
-									'research.contacts.critic_dropped',
-								).pipe(
-									Effect.annotateLogs({
-										research_id: researchId,
-										dropped: contactCritiqued.dropped,
-									}),
-								)
-							}
-							const critiqued = yield* critiqueFieldSupport(result, claims =>
-								extractLlm
-									.generateObject({
-										schema: CriticVerdictsSchema,
-										prompt: criticPrompt(criticTarget, claims),
-									})
-									.pipe(
-										Effect.map(response => ({
-											verdicts: response.value.verdicts,
-											outputTokens: response.usage.outputTokens.total ?? 0,
-										})),
-										Effect.catchCause(() =>
-											Effect.succeed({ verdicts: [], outputTokens: 0 }),
-										),
-									),
-							)
-							result = critiqued.findings
-							if (critiqued.dropped > 0 || critiqued.flagged > 0) {
-								yield* Effect.logWarning('research.critic.dropped').pipe(
-									Effect.annotateLogs({
-										research_id: researchId,
-										criticised: critiqued.criticised,
-										dropped: critiqued.dropped,
-										flagged: critiqued.flagged,
-									}),
-								)
-							}
-							// Source tier: a value cited to a third-party company-profile site
-							// (an aggregator surfaced by the richer search vendors), rather than
-							// the company's own domain, has its confidence held to medium — so an
-							// outside estimate never ships trusted like the company's own word.
-							const sourceTier = enforceSourceTier(
-								result,
-								entityTargets?.domains ?? [],
-							)
-							result = sourceTier.findings
-							if (sourceTier.capped > 0) {
-								yield* Effect.logInfo('research.source_tier.capped').pipe(
-									Effect.annotateLogs({
-										research_id: researchId,
-										capped: sourceTier.capped,
-									}),
-								)
-							}
+							// How many company fields the per-source checks removed. The caller
+							// reports it, so that link hands the count back out through here.
+							let entityFieldsDropped = 0
+							// The second half of the chain: the links that ask a model, plus the
+							// per-source checks that need the pages this run fetched. Same reading
+							// rule as the deterministic half — the array order is the run order.
+							const criticChain: ReadonlyArray<GuardLink> = [
+								{
+									// Contact entity critic: before the field critic, judge each
+									// remaining contact as a whole — is this person the company's own
+									// staff, or a client / partner / competitor quoted on its site? The
+									// deterministic contact guard catches only a quote that names
+									// another company; this catches a testimonial that names none. Fail
+									// open, and gentle: it drops only a clear outsider. Runs first so the
+									// field critic never spends a judgement on a contact about to go.
+									name: 'contact-entity-critic',
+									run: findings =>
+										Effect.gen(function* () {
+											const check = yield* critiqueContactEntities(
+												findings,
+												claims =>
+													extractLlm
+														.generateObject({
+															schema: ContactVerdictsSchema,
+															prompt: contactCriticPrompt(criticTarget, claims),
+														})
+														.pipe(
+															Effect.map(response => ({
+																verdicts: response.value.verdicts,
+																outputTokens:
+																	response.usage.outputTokens.total ?? 0,
+															})),
+															Effect.catchCause(() =>
+																Effect.succeed({
+																	verdicts: [],
+																	outputTokens: 0,
+																}),
+															),
+														),
+											)
+											if (check.dropped > 0) {
+												yield* Effect.logWarning(
+													'research.contacts.critic_dropped',
+												).pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														dropped: check.dropped,
+													}),
+												)
+											}
+											return {
+												findings: check.findings,
+												outputTokens: check.outputTokens,
+											}
+										}),
+								},
+								{
+									// Critic: a final per-field second look. For each value still
+									// carrying a source + quote, ask the extract model whether the
+									// quote really backs the value and is about the target company —
+									// the deterministic guards proved the value is in the evidence,
+									// this checks the cited quote supports it. Fail open: a judge
+									// error keeps the guarded fields.
+									name: 'field-support-critic',
+									run: findings =>
+										Effect.gen(function* () {
+											const check = yield* critiqueFieldSupport(
+												findings,
+												claims =>
+													extractLlm
+														.generateObject({
+															schema: CriticVerdictsSchema,
+															prompt: criticPrompt(criticTarget, claims),
+														})
+														.pipe(
+															Effect.map(response => ({
+																verdicts: response.value.verdicts,
+																outputTokens:
+																	response.usage.outputTokens.total ?? 0,
+															})),
+															Effect.catchCause(() =>
+																Effect.succeed({
+																	verdicts: [],
+																	outputTokens: 0,
+																}),
+															),
+														),
+											)
+											if (check.dropped > 0 || check.flagged > 0) {
+												yield* Effect.logWarning(
+													'research.critic.dropped',
+												).pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														criticised: check.criticised,
+														dropped: check.dropped,
+														flagged: check.flagged,
+													}),
+												)
+											}
+											return {
+												findings: check.findings,
+												outputTokens: check.outputTokens,
+											}
+										}),
+								},
+								{
+									// Per-source namespace block: a company firmographic cited to a
+									// person page or a social post, or a contact whose only tie is a
+									// user post, cannot speak for the company — drop it, even when the
+									// whole-corpus entity check passed. With the pages fetched this run
+									// in hand, each company field's cited page is also judged for the
+									// right company — a field sourced to a look-alike's page is dropped,
+									// while a citation the run never fetched keeps its field. Runs
+									// before the source-tier cap so a blocked field is gone, not merely
+									// down-weighted. Only an enrichment run has a single subject to
+									// check against; any other run passes through.
+									name: 'entity-sources',
+									run: findings =>
+										Effect.gen(function* () {
+											if (!isEnrichmentRun || !entityTargets)
+												return { findings }
+											const corpusByHash = new Map(
+												scrapeCorpus.map(
+													page =>
+														[
+															page.urlHash,
+															{ text: page.text, host: page.host },
+														] as const,
+												),
+											)
+											const check = guardEntitySources(
+												findings,
+												entityTargets,
+												sourceId =>
+													corpusByHash.get(urlHashForScrape(sourceId)),
+											)
+											entityFieldsDropped =
+												check.droppedCompanyFields + check.droppedOffEntity
+											if (
+												check.droppedCompanyFields > 0 ||
+												check.droppedOffEntity > 0 ||
+												check.droppedContacts > 0 ||
+												check.droppedUncited > 0
+											) {
+												yield* Effect.logWarning(
+													'research.entity_source.blocked',
+												).pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														dropped_fields: check.droppedCompanyFields,
+														dropped_off_entity: check.droppedOffEntity,
+														dropped_contacts: check.droppedContacts,
+														dropped_uncited: check.droppedUncited,
+													}),
+												)
+											}
+											return { findings: check.findings }
+										}),
+								},
+								{
+									// Source tier: a value cited to a third-party company-profile site
+									// (an aggregator surfaced by the richer search vendors), rather than
+									// the company's own domain, has its confidence held to medium — so an
+									// outside estimate never ships trusted like the company's own word.
+									name: 'source-tier',
+									run: findings =>
+										Effect.gen(function* () {
+											const check = enforceSourceTier(
+												findings,
+												entityTargets?.domains ?? [],
+											)
+											if (check.capped > 0) {
+												yield* Effect.logInfo(
+													'research.source_tier.capped',
+												).pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														capped: check.capped,
+													}),
+												)
+											}
+											return { findings: check.findings }
+										}),
+								},
+							]
+							const critics = yield* runGuardChain(criticChain, result)
+							result = critics.findings
 							// What actually ships, after every rescue and guard — the number a
 							// reader of the findings sees. The gap from filled_rescued is what
 							// the guards removed; a low value here with a healthy broad fill
@@ -2324,8 +2752,8 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								outputTokens:
 									(structuredResponse.usage.outputTokens.total ?? 0) +
 									rescueOutputTokens +
-									contactCritiqued.outputTokens +
-									critiqued.outputTokens,
+									critics.outputTokens,
+								entityFieldsDropped,
 							}
 						}).pipe(
 							Effect.withSpan('research.phase2', {
@@ -2432,6 +2860,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							const budget = yield* Budget
 							const toolkit = yield* researchToolkit
 							const scrape = yield* ScrapeProvider
+							const siteMap = yield* MapProvider
 							const registry = yield* RegistryRouter
 
 							// Anchor: when the caller handed in the company's own domain, fetch
@@ -2539,25 +2968,122 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											}
 										}).pipe(
 											Effect.catchCause(cause =>
-												Effect.logWarning('research.anchor.about_skipped').pipe(
-													Effect.annotateLogs({
-														research_id: researchId,
-														url: aboutUrl,
-														cause: Cause.pretty(cause),
-													}),
-												),
+												Cause.hasInterruptsOnly(cause)
+													? Effect.failCause(cause)
+													: Effect.logWarning(
+															'research.anchor.about_skipped',
+														).pipe(
+															Effect.annotateLogs({
+																research_id: researchId,
+																url: aboutUrl,
+																cause: Cause.pretty(cause),
+															}),
+														),
 											),
 										)
 									}
+									// Site discovery: the homepage nav only links part of a site,
+									// so ask the map provider for the site's own page list (sitemap
+									// + crawl) and fetch the best people/about pages it finds that
+									// the seeds above did not already cover. Environments without a
+									// vendor run with map 'none', so any map failure is a logged
+									// skip here, never a failed run.
+									yield* Effect.gen(function* () {
+										const mapped = yield* siteMap.map({
+											url: `https://${seedHost}`,
+											limit: 100,
+										})
+										// One provider unit, charged after the call returns so a
+										// disabled ('none') map never bills the run.
+										yield* budget.chargeCheap('scrape', SCRAPE_COST_CENTS)
+										// Drop already-seeded pages before ranking, so an overlap with
+										// the homepage-linked seeds never wastes a discovery slot.
+										const seeded = new Set(seededAnchorHashes)
+										const discovered = aboutPageCandidates(
+											mapped.filter(url => !seeded.has(urlHashForScrape(url))),
+											seedHost,
+											MAX_DISCOVERY_PAGES,
+										)
+										if (discovered.length > 0) {
+											yield* Effect.logInfo('research.discovery.mapped').pipe(
+												Effect.annotateLogs({
+													research_id: researchId,
+													mapped: mapped.length,
+													fetching: discovered.length,
+												}),
+											)
+										}
+										for (const url of discovered) {
+											if (isUnsupportedScrapeUrl(url)) continue
+											yield* Effect.gen(function* () {
+												yield* budget.chargeCheap('scrape', SCRAPE_COST_CENTS)
+												const found = yield* scrape.scrape({
+													url,
+													formats: ['markdown'],
+												})
+												if (
+													found.markdown !== undefined &&
+													found.markdown.trim().length > 0
+												) {
+													const foundHash = urlHashForScrape(found.url)
+													scrapeCorpus.push({
+														urlHash: foundHash,
+														text: found.markdown,
+														host: domainHost(found.resolvedUrl ?? found.url),
+													})
+													seededAnchorHashes.push(foundHash)
+													seededTranscriptParts.push(
+														`[scrape_page] ${boundedToolResult({ url: found.url, markdown: found.markdown })}`,
+													)
+													yield* Effect.logInfo(
+														'research.discovery.page_seeded',
+													).pipe(
+														Effect.annotateLogs({
+															research_id: researchId,
+															url,
+														}),
+													)
+												}
+											}).pipe(
+												Effect.catchCause(cause =>
+													Cause.hasInterruptsOnly(cause)
+														? Effect.failCause(cause)
+														: Effect.logWarning(
+																'research.discovery.page_skipped',
+															).pipe(
+																Effect.annotateLogs({
+																	research_id: researchId,
+																	url,
+																	cause: Cause.pretty(cause),
+																}),
+															),
+												),
+											)
+										}
+									}).pipe(
+										Effect.catchCause(cause =>
+											Cause.hasInterruptsOnly(cause)
+												? Effect.failCause(cause)
+												: Effect.logInfo('research.discovery.skipped').pipe(
+														Effect.annotateLogs({
+															research_id: researchId,
+															host: seedHost,
+															cause: Cause.pretty(cause),
+														}),
+													),
+										),
+									)
 								}).pipe(
 									Effect.catchCause(cause =>
-										Effect.logWarning('research.anchor.seed_failed').pipe(
-											Effect.annotateLogs({
-												research_id: researchId,
-												host: anchorHost,
-												cause: Cause.pretty(cause),
-											}),
-										),
+										Cause.hasInterruptsOnly(cause)
+											? Effect.failCause(cause)
+											: Effect.logWarning('research.anchor.seed_failed').pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														host: anchorHost,
+														cause: Cause.pretty(cause),
+													}),
+												),
 									),
 								)
 							}
@@ -2648,13 +3174,17 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									// list this company. None of that is a reason to abandon the
 									// research — the run carries on with what the web tells it.
 									Effect.catchCause(cause =>
-										Effect.logWarning('research.registry.seed_skipped').pipe(
-											Effect.annotateLogs({
-												research_id: researchId,
-												country: registryCountry,
-												cause: Cause.pretty(cause),
-											}),
-										),
+										Cause.hasInterruptsOnly(cause)
+											? Effect.failCause(cause)
+											: Effect.logWarning(
+													'research.registry.seed_skipped',
+												).pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														country: registryCountry,
+														cause: Cause.pretty(cause),
+													}),
+												),
 									),
 								)
 							}
@@ -2958,6 +3488,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						)
 
 						const loopResult = phaseOutcome.loop
+						runRounds = loopResult.rounds
 						// Prepend the anchor site's content so phase-2 extraction reads the
 						// official page first; empty when nothing was seeded.
 						researchText = [...seededTranscriptParts, loopResult.researchText]
@@ -3082,93 +3613,253 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									...seededEvidenceParts,
 									...groundedPageTexts(entityTargets, scrapeCorpus),
 								].join('\n'),
-								groundedPageTexts(entityTargets, anchorFirstCorpus),
+								labelledGroundedPages(entityTargets, anchorFirstCorpus),
 							)
 							findings = extracted.findings
 							tokensOut += extracted.outputTokens
-							// Per-field web search: for each high-value firmographic the broad
-							// pass and the focused rescues still left empty, fire one focused
-							// web search and re-extract over the enlarged evidence — a backstop
-							// for a fact (country, sector, city, size) that was on no page the
-							// run reached. Fail-open and capped: a complete run fires none, and
-							// a re-extraction that recovers nothing leaves findings unchanged.
-							const perFieldMissing = needsPerFieldSearch(findings).slice(
-								0,
-								MAX_PER_FIELD_SEARCHES,
-							)
-							if (perFieldMissing.length > 0) {
-								const search = yield* SearchProvider
-								const perFieldTargetName =
-									(run as { query: string }).query.split(',')[0]?.trim() ||
-									(run as { query: string }).query
-								const perFieldHashes: string[] = []
-								let perFieldFired = 0
-								// Phase-2 runs outside the loop's Budget scope, and the focused
-								// rescues here are unbudgeted too; the per-field cap above bounds
-								// the extra spend instead of a per-search charge.
-								for (const field of perFieldMissing) {
-									perFieldFired++
-									const searched = yield* search
-										.search({
-											query: perFieldSearchQuery(
-												perFieldTargetName,
-												hintLocation,
-												field,
-											),
-											limit: 3,
-											location: hintLocation,
-										})
-										.pipe(Effect.catchCause(() => Effect.succeed(null)))
-									for (const item of searched?.items ?? []) {
-										const host = domainHost(item.url)
-										if (host !== undefined) searchResultHosts.add(host)
-										if (item.content && item.content.trim().length > 0) {
-											const hash = urlHashForScrape(item.url)
-											perFieldHashes.push(hash)
-											scrapeCorpus.push({
-												urlHash: hash,
-												text: item.content,
-												host,
-											})
-										}
-									}
+							// A company field dropped for coming from a person page or a social
+							// post means the strong whole-corpus match was partly built on a
+							// source that can't speak for the company. Downgrade the verdict so
+							// the run reports honestly (and the quality signal sees it).
+							if (
+								extracted.entityFieldsDropped > 0 &&
+								entityMatch === 'strong'
+							) {
+								entityMatch = 'weak'
+								yield* Effect.logWarning(
+									'research.entity.downgraded_source',
+								).pipe(Effect.annotateLogs({ research_id: researchId }))
+							}
+							// Gap rounds: for each high-value firmographic the broad pass and
+							// the focused rescues still left empty, first fetch the cited
+							// pages the run never opened (turning the per-source check's
+							// fail-open into a real verdict on the cited page), then fire one
+							// focused web search per missing field, and re-extract over the
+							// enlarged evidence. Loops while the gaps keep closing —
+							// hard-capped, and every round first checks the wall-clock and
+							// budget margin, because finishing low-confidence is a result
+							// while riding into the terminal run deadline loses the run.
+							// Phase-2 runs outside the loop's Budget scope, so each round
+							// tallies its scrape/search cost into gapSpentCents to keep the
+							// margin check and the stamped cost honest.
+							const gapSearch = yield* SearchProvider
+							const gapScrape = yield* ScrapeProvider
+							const perFieldTargetName =
+								(run as { query: string }).query.split(',')[0]?.trim() ||
+								(run as { query: string }).query
+							// Cited pages already attempted this run (fetched, empty, or errored),
+							// so one that yields nothing is not re-fetched every round — otherwise
+							// it never enters the corpus and keeps reappearing as cited-but-unscraped.
+							const citedAttempted = new Set<string>()
+							for (let gapRound = 1; gapRound <= MAX_GAP_ROUNDS; gapRound++) {
+								const perFieldMissing = needsPerFieldSearch(findings).slice(
+									0,
+									MAX_PER_FIELD_SEARCHES,
+								)
+								const corpusHashes = new Set(
+									scrapeCorpus.map(page => page.urlHash),
+								)
+								const citedUnscraped = citedUnscrapedSources(
+									findings,
+									hash => corpusHashes.has(hash) || citedAttempted.has(hash),
+									MAX_CITED_SCRAPES_PER_ROUND,
+								)
+								// Grounded and fully fetched — nothing left to close.
+								if (perFieldMissing.length === 0 && citedUnscraped.length === 0)
+									break
+								const elapsedMs =
+									DateTime.toEpochMillis(DateTime.nowUnsafe()) - runStartedAtMs
+								const thinDeadline =
+									elapsedMs >
+									runDeadlineSeconds * 1000 * GAP_ROUND_DEADLINE_FRACTION
+								// Phase 2 has no live budget scope; the margin reads the run's
+								// policy budget less everything spent so far — phase 1 plus the
+								// gap rounds already run — so it actually tightens each round.
+								const gapPolicy = (run as { paidPolicy: ResolvedPolicy | null })
+									.paidPolicy
+								const thinBudget =
+									(gapPolicy?.budgetCents ?? 0) -
+										cheapSpentCents -
+										gapSpentCents <
+									SCRAPE_COST_CENTS * 2
+								if (thinDeadline || thinBudget) {
+									yield* Effect.logInfo('research.gap_rounds.stopped').pipe(
+										Effect.annotateLogs({
+											research_id: researchId,
+											round: gapRound,
+											reason: thinDeadline
+												? 'deadline_margin'
+												: 'budget_margin',
+										}),
+									)
+									break
 								}
-								if (perFieldHashes.length > 0) {
-									yield* linkRunSources(perFieldHashes)
-									const perFieldAnchorFirst = [...scrapeCorpus].sort(
-										(a, b) =>
-											(anchorHashes.has(a.urlHash) ? 0 : 1) -
-											(anchorHashes.has(b.urlHash) ? 0 : 1),
+								const roundHashes: string[] = []
+								// Fetch the cited pages first: cheap certainty about sources
+								// the run already leans on.
+								yield* Effect.forEach(
+									citedUnscraped,
+									citedUrl =>
+										Effect.gen(function* () {
+											// Mark the attempt (fetched, empty, or errored) so a page that
+											// yields nothing is not re-fetched next round; charge only a real
+											// fetch against the gap budget.
+											citedAttempted.add(urlHashForScrape(citedUrl))
+											if (isUnsupportedScrapeUrl(citedUrl)) return
+											gapSpentCents += SCRAPE_COST_CENTS
+											const cited = yield* gapScrape.scrape({
+												url: citedUrl,
+												formats: ['markdown'],
+											})
+											if (
+												cited.markdown !== undefined &&
+												cited.markdown.trim().length > 0
+											) {
+												const citedHash = urlHashForScrape(cited.url)
+												roundHashes.push(citedHash)
+												scrapeCorpus.push({
+													urlHash: citedHash,
+													text: cited.markdown,
+													host: domainHost(cited.resolvedUrl ?? cited.url),
+												})
+											}
+										}).pipe(
+											// Let a pure interruption (cancel/deploy) unwind the run instead of
+											// being logged as a skip while the loop keeps spending.
+											Effect.catchCause(cause =>
+												Cause.hasInterruptsOnly(cause)
+													? Effect.failCause(cause)
+													: Effect.logInfo(
+															'research.gap_rounds.cited_scrape_skipped',
+														).pipe(
+															Effect.annotateLogs({
+																research_id: researchId,
+																url: citedUrl,
+																cause: Cause.pretty(cause),
+															}),
+														),
+											),
+										),
+									{ concurrency: GAP_ROUND_CONCURRENCY },
+								)
+								// Cited pages fetched: re-judge the kept fields against them
+								// right away — the point of fetching is that a wrong-company
+								// page can now void the field it sourced, no LLM call needed.
+								if (roundHashes.length > 0 && entityTargets) {
+									const gapCorpusByHash = new Map(
+										scrapeCorpus.map(
+											page =>
+												[
+													page.urlHash,
+													{ text: page.text, host: page.host },
+												] as const,
+										),
 									)
-									const refreshed = yield* extractStructuredFindings(
-										researchText,
-										[
-											evidenceText,
-											...seededEvidenceParts,
-											...groundedPageTexts(entityTargets, scrapeCorpus),
-										].join('\n'),
-										groundedPageTexts(entityTargets, perFieldAnchorFirst),
-									)
-									tokensOut += refreshed.outputTokens
-									const merged = mergePerFieldSearch(
+									const recheck = guardEntitySources(
 										findings,
-										refreshed.findings,
+										entityTargets,
+										sourceId => gapCorpusByHash.get(urlHashForScrape(sourceId)),
 									)
-									findings = merged.findings
-									yield* Effect.annotateCurrentSpan({
-										'research.per_field_search.fired': perFieldFired,
-										'research.per_field_search.filled': merged.filled,
-									})
-									if (merged.filled > 0) {
-										yield* Effect.logInfo('research.per_field_search').pipe(
+									findings = recheck.findings
+									if (recheck.droppedOffEntity > 0) {
+										if (entityMatch === 'strong') entityMatch = 'weak'
+										yield* Effect.logWarning(
+											'research.gap_rounds.cited_voided',
+										).pipe(
 											Effect.annotateLogs({
 												research_id: researchId,
-												fired: perFieldFired,
-												filled: merged.filled,
+												dropped: recheck.droppedOffEntity,
 											}),
 										)
 									}
 								}
+								// Nothing missing: the cited fetches were the whole round —
+								// link them and let the next round's top check close the loop.
+								if (perFieldMissing.length === 0) {
+									if (roundHashes.length > 0) yield* linkRunSources(roundHashes)
+									continue
+								}
+								const perFieldFired = perFieldMissing.length
+								yield* Effect.forEach(
+									perFieldMissing,
+									field =>
+										Effect.gen(function* () {
+											gapSpentCents += SEARCH_COST_CENTS
+											const searched = yield* gapSearch
+												.search({
+													query: perFieldSearchQuery(
+														perFieldTargetName,
+														hintLocation,
+														field,
+													),
+													limit: 3,
+													location: hintLocation,
+												})
+												.pipe(
+													// Let a pure interruption (cancel/deploy) unwind the run instead of
+													// being swallowed as an empty result while the loop keeps spending.
+													Effect.catchCause(cause =>
+														Cause.hasInterruptsOnly(cause)
+															? Effect.failCause(cause)
+															: Effect.succeed(null),
+													),
+												)
+											for (const item of searched?.items ?? []) {
+												const host = domainHost(item.url)
+												if (host !== undefined) searchResultHosts.add(host)
+												if (item.content && item.content.trim().length > 0) {
+													const hash = urlHashForScrape(item.url)
+													roundHashes.push(hash)
+													scrapeCorpus.push({
+														urlHash: hash,
+														text: item.content,
+														host,
+													})
+												}
+											}
+										}),
+									{ concurrency: GAP_ROUND_CONCURRENCY },
+								)
+								// Nothing new reached the evidence — more rounds would only
+								// repeat the same searches, so the remaining gaps are treated
+								// as absent and the quality signal reports the thinness.
+								if (roundHashes.length === 0) break
+								yield* linkRunSources(roundHashes)
+								const perFieldAnchorFirst = [...scrapeCorpus].sort(
+									(a, b) =>
+										(anchorHashes.has(a.urlHash) ? 0 : 1) -
+										(anchorHashes.has(b.urlHash) ? 0 : 1),
+								)
+								const refreshed = yield* extractStructuredFindings(
+									researchText,
+									[
+										evidenceText,
+										...seededEvidenceParts,
+										...groundedPageTexts(entityTargets, scrapeCorpus),
+									].join('\n'),
+									labelledGroundedPages(entityTargets, perFieldAnchorFirst),
+								)
+								tokensOut += refreshed.outputTokens
+								const merged = mergePerFieldSearch(findings, refreshed.findings)
+								findings = merged.findings
+								yield* Effect.annotateCurrentSpan({
+									'research.gap_rounds.round': gapRound,
+									'research.per_field_search.fired': perFieldFired,
+									'research.per_field_search.filled': merged.filled,
+								})
+								yield* Effect.logInfo('research.gap_rounds.closed').pipe(
+									Effect.annotateLogs({
+										research_id: researchId,
+										round: gapRound,
+										cited_fetched: citedUnscraped.length,
+										fired: perFieldFired,
+										filled: merged.filled,
+									}),
+								)
+								// A round that filled nothing and resolved no cited page has
+								// stopped closing gaps — stop before burning the remaining
+								// rounds on the same result.
+								if (merged.filled === 0 && citedUnscraped.length === 0) break
 							}
 						}
 						// Published role mailboxes (info@, sales@, hola@): read verbatim
@@ -3241,6 +3932,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 
 					// ── Phase 3: Brief generation ──
 					const briefLang = context?.hints?.language ?? 'en'
+					// The brief labels itself: a company keeps one running set of notes, and
+					// each run's brief is added to the end of it, so the brief has to say which
+					// company and date it is about. The writer model puts that heading in the
+					// run's own language, which is why the wording is asked for here rather
+					// than composed later by the code that appends it.
+					const briefDate = DateTime.formatIsoDateUtc(DateTime.nowUnsafe())
 					const briefMd = yield* Effect.gen(function* () {
 						yield* publishEvent(researchId, 'tool.called', {
 							tool: 'llm.generateText',
@@ -3249,10 +3946,15 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						})
 
 						const briefResponse = yield* writerLlm.generateText({
-							prompt: `Write a concise human-readable research brief in ${briefLang}, summarizing ONLY the structured findings below. Do not add any fact, number, name, or contact detail that is not present in the findings.\n\n${JSON.stringify(findings)}`,
+							prompt: `Write a concise human-readable research brief in ${briefLang}, summarizing ONLY the structured findings below. Begin with a single markdown heading line (starting "## ") naming the company and the date ${briefDate}, worded in ${briefLang}. Do not add any fact, number, name, or contact detail that is not present in the findings. When the findings carry news or dated events, give recent developments (roughly the last 12 months) a short section of their own.\n\n${JSON.stringify(findings)}`,
 						})
 
 						tokensOut += briefResponse.usage.outputTokens.total ?? 0
+
+						// The writer model is an open-weights model that often prefixes the
+						// brief with a `<think>` block; strip it so the human-facing brief
+						// never shows the model's reasoning.
+						const briefText = stripReasoning(briefResponse.text)
 
 						yield* Ref.update(toolLog, log => [
 							...log,
@@ -3260,11 +3962,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								timestamp: DateTime.nowUnsafe().toString(),
 								type: 'result' as const,
 								tool: 'llm.generateText',
-								output: { phase: 3, briefLength: briefResponse.text.length },
+								output: { phase: 3, briefLength: briefText.length },
 							},
 						])
 
-						return briefResponse.text
+						return briefText
 					}).pipe(
 						Effect.withSpan('research.phase3', {
 							attributes: {
@@ -3306,7 +4008,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						yield* publishEvent(researchId, 'run.no_reliable_data', {
 							sourceCount: sources?.n ?? 0,
 						})
-						yield* stampRunCostFromLedger(sql, researchId, cheapSpentCents)
+						yield* stampRunCostFromLedger(
+							sql,
+							researchId,
+							cheapSpentCents + gapSpentCents,
+						)
 						const parentGroupId = (run as { parentId: string | null }).parentId
 						if (parentGroupId) yield* rollupParentLocked(parentGroupId)
 						return
@@ -3338,7 +4044,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						yield* publishEvent(researchId, 'run.no_reliable_data', {
 							reason: 'no_results',
 						})
-						yield* stampRunCostFromLedger(sql, researchId, cheapSpentCents)
+						yield* stampRunCostFromLedger(
+							sql,
+							researchId,
+							cheapSpentCents + gapSpentCents,
+						)
 						const parentGroupId = (run as { parentId: string | null }).parentId
 						if (parentGroupId) yield* rollupParentLocked(parentGroupId)
 						return
@@ -3351,13 +4061,52 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					const runCountry =
 						parseCountryAlpha2(readEnrichmentCountry(findings)) ?? null
 
+					// Quality signal: derive a compact block plus a low-confidence flag so an
+					// automation can gate on `status` without inspecting the run. First-party
+					// sources are those on the company's own domain — the ones most trusted
+					// to speak for it.
+					const sourceUrls = yield* sql<{ url: string }>`
+						SELECT DISTINCT s.url
+						FROM research_run_sources rs JOIN sources s ON s.id = rs.source_id
+						WHERE rs.research_id = ${researchId}
+					`
+					const targetDomains = entityTargets?.domains ?? []
+					const sourcesFirstParty = sourceUrls.filter(row => {
+						const host = hostOf(row.url)
+						return host !== null && isFirstPartyHost(host, targetDomains)
+					}).length
+					const fill =
+						schemaName === 'company_enrichment_v1'
+							? enrichmentFill(findings)
+							: { filled: 0, total: 0 }
+					const quality = computeRunQuality({
+						schemaName,
+						entityMatch,
+						rounds: runRounds,
+						sourcesTotal: sources?.n ?? 0,
+						sourcesFirstParty,
+						fieldsGrounded: fill.filled,
+						fieldsTotal: fill.total,
+					})
+					const findingsWithQuality = {
+						...withRegistryFlag(findings as Record<string, unknown>),
+						quality,
+					}
+					// A thin result flips to a distinct terminal status an automation can
+					// gate on; the group rollup still treats it as a success (see
+					// rollupParentStatus), so a fan-out isn't failed by one weak leaf.
+					const finalStatus = quality.low_confidence
+						? 'succeeded_low_confidence'
+						: 'succeeded'
+
 					yield* sql`
 						UPDATE research_runs
-						SET status = 'succeeded',
+						SET status = ${finalStatus},
 							phase = 3,
-							findings = ${JSON.stringify(withRegistryFlag(findings as Record<string, unknown>))},
+							findings = ${JSON.stringify(findingsWithQuality)},
 							country = ${runCountry},
 							brief_md = ${briefMd},
+							entity_match = ${entityMatch},
 							tokens_in = ${tokensIn},
 							tokens_out = ${tokensOut},
 							tool_log = ${JSON.stringify(finalToolLog)},
@@ -3367,32 +4116,43 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					`
 
 					// Stamp the run's cost before the parent group rolls up below.
-					yield* stampRunCostFromLedger(sql, researchId, cheapSpentCents)
+					yield* stampRunCostFromLedger(
+						sql,
+						researchId,
+						cheapSpentCents + gapSpentCents,
+					)
 
 					// ── Write to research_cache so identical requests can skip the fiber ──
-					const cacheKey = computeResearchCacheKey({
-						userId,
-						query: (run as { query: string }).query,
-						schemaName,
-						schemaVersion: schemaVersionFor(schemaName),
-						subjects: context?.subjects,
-						hints: context?.hints,
-						templateFingerprint,
-					})
-					const ttlDays = researchCacheTtlDaysFor(schemaName)
-					yield* sql`
-						INSERT INTO research_cache (
-							key_hash, organization_id, user_id, research_id, cached_at, expires_at
-						) VALUES (
-							${cacheKey}, ${(run as { organizationId: string }).organizationId}, ${userId}, ${researchId},
-							now(), now() + (${`${ttlDays} days`})::interval
-						)
-						ON CONFLICT (organization_id, key_hash) DO UPDATE SET
-							research_id = EXCLUDED.research_id,
-							user_id     = EXCLUDED.user_id,
-							cached_at   = EXCLUDED.cached_at,
-							expires_at  = EXCLUDED.expires_at
-					`.pipe(Effect.ignore)
+					// Only a full 'succeeded' run is cached: a low-confidence result is
+					// thin enough that serving it as a silent cache hit would deny an
+					// identical repeat the fresh attempt (discovery + gap rounds) that
+					// might do better, and cloneCacheHitRun only clones 'succeeded' rows
+					// anyway, so caching a low-confidence run leaves a dead entry.
+					if (finalStatus === 'succeeded') {
+						const cacheKey = computeResearchCacheKey({
+							userId,
+							query: (run as { query: string }).query,
+							schemaName,
+							schemaVersion: schemaVersionFor(schemaName),
+							subjects: context?.subjects,
+							hints: context?.hints,
+							templateFingerprint,
+						})
+						const ttlDays = researchCacheTtlDaysFor(schemaName)
+						yield* sql`
+							INSERT INTO research_cache (
+								key_hash, organization_id, user_id, research_id, cached_at, expires_at
+							) VALUES (
+								${cacheKey}, ${(run as { organizationId: string }).organizationId}, ${userId}, ${researchId},
+								now(), now() + (${`${ttlDays} days`})::interval
+							)
+							ON CONFLICT (organization_id, key_hash) DO UPDATE SET
+								research_id = EXCLUDED.research_id,
+								user_id     = EXCLUDED.user_id,
+								cached_at   = EXCLUDED.cached_at,
+								expires_at  = EXCLUDED.expires_at
+						`.pipe(Effect.ignore)
+					}
 
 					// Merge findings onto parent group row if this is a leaf
 					const parentId = (run as { parentId: string | null }).parentId
@@ -3633,8 +4393,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							const selectorMax = selectorMaxCompanies
 
 							// Resolve targets from a safe subset of company columns — never
-							// raw SQL, so the filter can't inject.
-							const filter = selector.filter as {
+							// raw SQL, so the filter can't inject. Default to an empty filter
+							// if one is somehow missing, so a malformed selector reaching this
+							// far degrades to "match nothing extra" instead of crashing on
+							// `filter.status` (callers are validated at the API boundary).
+							const filter = (selector.filter ?? {}) as {
 								status?: string
 								industry?: string
 								country?: string

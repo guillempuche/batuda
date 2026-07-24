@@ -72,6 +72,109 @@ describe('CompanyEnrichmentV1Schema', () => {
 		})
 	})
 
+	describe('when the model emits a fit verdict', () => {
+		it('should decode the verdict, disqualifiers, per-criterion checks, and hook', () => {
+			// GIVEN a "no fit" result of the kind that used to appear only in the brief
+			// and was lost from the structured output
+			const payload = {
+				enrichment: {
+					industry: {
+						value: 'Freight & logistics',
+						source_id: 'src-1',
+						confidence: null,
+					},
+				},
+				verdict: 'no_fit',
+				verdict_rationale:
+					'Holds a valid brokerage authority but operates 100% asset-based.',
+				disqualifiers: [
+					{
+						rule: 'asset-based carrier, not a freight broker',
+						evidence_quote: 'our fleet of 40 trucks',
+						source_id: 'src-1',
+					},
+				],
+				fit_checks: [
+					{
+						criterion: 'freight broker, not asset carrier',
+						result: 'fail',
+						evidence_quote: 'our fleet of 40 trucks',
+						source_id: 'src-1',
+					},
+					{ criterion: 'US-based operations', result: 'pass' },
+				],
+				hook: 'Mixed authority — worth a broker-services angle.',
+			}
+
+			// WHEN it is decoded
+			const decoded = decode(payload)
+
+			// THEN the judgement survives in the structured output
+			expect(decoded.verdict).toBe('no_fit')
+			expect(decoded.disqualifiers?.[0]?.rule).toBe(
+				'asset-based carrier, not a freight broker',
+			)
+			expect(decoded.disqualifiers?.[0]?.source_id).toBe('src-1')
+			expect(decoded.fit_checks?.[0]?.result).toBe('fail')
+			expect(decoded.fit_checks?.[1]?.result).toBe('pass')
+			expect(decoded.hook).toBe(
+				'Mixed authority — worth a broker-services angle.',
+			)
+		})
+
+		it('should reject a verdict outside the fixed set', () => {
+			// GIVEN a verdict the schema does not define
+			const payload = { enrichment: {}, verdict: 'maybe' }
+			// WHEN decoded
+			// THEN it fails rather than storing a free-text judgement
+			expect(() => decode(payload)).toThrow()
+		})
+	})
+
+	describe('when the sources disagree on a field', () => {
+		it('should decode each losing reading with its source, not a pain_points note', () => {
+			// GIVEN a head-count the sources disagree on — one entry per reading the
+			// field did not take, each tied to the page that stated it
+			const payload = {
+				enrichment: {
+					pain_points: {
+						value: 'Manual load booking across several systems',
+						source_id: 'src-1',
+						confidence: null,
+					},
+				},
+				conflicts: [
+					{
+						field: 'size_range',
+						value: '11-50',
+						source_id: 'https://indeed.com/cmp/acme',
+						note: 'Older snapshot than the careers page',
+					},
+					{
+						field: 'size_range',
+						value: '201-500',
+						source_id: 'https://www.zoominfo.com/c/acme/1',
+					},
+				],
+			}
+
+			// WHEN it is decoded
+			const decoded = decode(payload)
+
+			// THEN each reading keeps its value and source so the UI can link them,
+			// and pain_points stays a real pain
+			expect(decoded.conflicts?.[0]?.field).toBe('size_range')
+			expect(decoded.conflicts?.[0]?.value).toBe('11-50')
+			expect(decoded.conflicts?.[0]?.source_id).toBe(
+				'https://indeed.com/cmp/acme',
+			)
+			expect(decoded.conflicts?.[1]?.value).toBe('201-500')
+			expect(decoded.enrichment.pain_points?.value).toBe(
+				'Manual load booking across several systems',
+			)
+		})
+	})
+
 	describe('when the model emits "NaN" for coordinates it could not determine', () => {
 		it('should decode without error instead of failing the run', () => {
 			// GIVEN the exact shape that failed in production: unable to produce
@@ -142,7 +245,6 @@ describe('CompanyEnrichmentV1Schema', () => {
 					size_range: null,
 					pain_points: null,
 					current_tools: null,
-					products_fit: null,
 					tags: null,
 					location: null,
 					country: null,

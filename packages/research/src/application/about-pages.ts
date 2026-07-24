@@ -12,6 +12,7 @@
  */
 
 import { domainHost } from './entity-guard'
+import { pathOf } from './source-key'
 
 // Path fragments that mark a page worth fetching, in three bands by what it usually
 // carries: people first (leaders and their titles), then the about/location pages,
@@ -62,15 +63,6 @@ const NON_PAGE_SEGMENTS = new Set([
 	'media',
 ])
 
-// The lowercased path of a URL, or undefined when it doesn't parse.
-const pathOf = (url: string): string | undefined => {
-	try {
-		return new URL(url).pathname.toLowerCase()
-	} catch {
-		return undefined
-	}
-}
-
 // Which band a path falls in, or 3 (not a candidate) when no hint matches or it sits
 // under a blog/news section.
 const bandOf = (path: string): number => {
@@ -98,8 +90,9 @@ export const aboutPageCandidates = (
 		// on the target's host and isn't what we're after here.
 		if (domainHost(link) !== host) continue
 		const path = pathOf(link)
-		// Skip the homepage itself; it's already been fetched.
-		if (path === undefined || path === '/' || path === '') continue
+		// Skip the homepage itself; it's already been fetched. (pathOf returns
+		// null on an unparseable URL, and '/' for a bare host.)
+		if (path === null || path === '/') continue
 		const band = bandOf(path)
 		if (band === 3) continue
 		// Drop the fragment so "/team" and "/team#ceo" aren't both fetched.

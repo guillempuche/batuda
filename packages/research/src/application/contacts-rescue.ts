@@ -13,13 +13,12 @@
  *
  * The recovered contacts flow through the same guard chain as the broad ones
  * (citations, per-contact entity binding, source tier), so nothing here ships
- * unguarded — this module only defines the focused schema, its prompt, the merge,
- * and the "should we bother" test; the run wires them into the guard chain.
+ * unguarded — this module only defines the focused schema, its prompt, and the
+ * merge; the run wires them into the guard chain.
  */
 
 import { Schema } from 'effect'
 
-import { hasTitle } from './extraction-fill'
 import { Citation, Sourced } from './schemas/_shared'
 
 // The narrow schema the focused pass fills: people only, each with a title and the
@@ -35,35 +34,6 @@ const RescueContact = Schema.Struct({
 export const ContactsRescueSchema = Schema.Struct({
 	contacts: Schema.Array(RescueContact),
 })
-
-// Below this many contacts, the broad pass is treated as having under-delivered and
-// the focused pass runs. One-or-none is the signal a company that publishes a team
-// still came back essentially empty.
-const RESCUE_BELOW_CONTACTS = 2
-
-const contactsOf = (findings: unknown): ReadonlyArray<unknown> => {
-	if (findings === null || typeof findings !== 'object') return []
-	const contacts = (findings as { contacts?: unknown }).contacts
-	return Array.isArray(contacts) ? contacts : []
-}
-
-const isNamed = (contact: unknown): boolean =>
-	contact !== null &&
-	typeof contact === 'object' &&
-	typeof (contact as { name?: unknown }).name === 'string' &&
-	(contact as { name: string }).name.trim() !== ''
-
-/**
- * Whether the broad findings are thin enough on people to justify a focused pass:
- * fewer than a team's worth of named people, or any named person returned without a
- * title. A titleless contact is as much a miss as a missing one — the whole point is
- * a decision-maker the CRM can act on — and the focused pass recovers the title the
- * broad pass left off.
- */
-export const needsContactRescue = (findings: unknown): boolean => {
-	const named = contactsOf(findings).filter(isNamed)
-	return named.length < RESCUE_BELOW_CONTACTS || named.some(c => !hasTitle(c))
-}
 
 export interface ContactsRescueTarget {
 	readonly name: string

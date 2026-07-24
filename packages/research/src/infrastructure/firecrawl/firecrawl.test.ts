@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { SearchInput } from '../../application/ports'
 import { ProviderError, UnsupportedSite } from '../../domain/errors'
+import { makeFirecrawlMap } from './map'
 import { makeFirecrawlScrape } from './scrape'
 import { makeFirecrawlSearch } from './search'
 
@@ -148,6 +149,66 @@ const runSearch = (
 	)
 	return { exit, log }
 }
+
+const runMap = (status: number, body: unknown) => {
+	const log: CallLog = { count: 0, last: undefined }
+	const client = countingClient(log, status, body)
+	const exit = runWithVirtualClock(() =>
+		Effect.gen(function* () {
+			const provider = yield* makeFirecrawlMap(0)
+			return yield* provider.map({ url: 'https://acme.es', limit: 50 })
+		}).pipe(
+			Effect.provideService(HttpClient.HttpClient, client),
+			Effect.provide(
+				ConfigProvider.layer(
+					ConfigProvider.fromEnv({ env: { RESEARCH_API_KEY_MAP: 'fc_k' } }),
+				),
+			),
+		),
+	)
+	return { exit, log }
+}
+
+describe('firecrawl map', () => {
+	describe('when the API returns links in either shape', () => {
+		it('should normalize bare strings and {url} objects to page URLs', async () => {
+			// GIVEN a map response mixing both shapes the API has used
+			const { exit, log } = runMap(200, {
+				links: [
+					'https://acme.es/equipo',
+					{ url: 'https://acme.es/sobre-nosotros' },
+				],
+			})
+
+			// WHEN it settles — THEN both arrive as plain URLs
+			const settled = await exit
+			expect(Exit.isSuccess(settled)).toBe(true)
+			if (Exit.isSuccess(settled)) {
+				expect(settled.value).toEqual([
+					'https://acme.es/equipo',
+					'https://acme.es/sobre-nosotros',
+				])
+			}
+			// AND the request carried the site and the cap
+			expect(bodyJson(log.last)).toMatchObject({
+				url: 'https://acme.es',
+				limit: 50,
+			})
+		})
+	})
+
+	describe('when the API rejects the request', () => {
+		it('should fail fast without retrying on an auth-style 4xx', async () => {
+			// GIVEN an unauthorized rejection
+			const { exit, log } = runMap(401, { error: 'unauthorized' })
+
+			// WHEN it settles — THEN one attempt, and the error is not recoverable
+			const err = errorOf(await exit)
+			expect(err?.recoverable).toBe(false)
+			expect(log.count).toBe(1)
+		})
+	})
+})
 
 describe('makeFirecrawlScrape', () => {
 	it('should map a 2xx response to a ScrapedPage with cost units', async () => {
