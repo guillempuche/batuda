@@ -24,7 +24,11 @@ export { SessionContext, SessionMiddleware } from './middleware/session'
 export { AuthGroup } from './routes/auth'
 export { CalcomWebhookGroup } from './routes/calcom-webhook'
 export { CalendarGroup, Slot } from './routes/calendar'
-export { CompaniesGroup, CompanyDetail } from './routes/companies'
+export {
+	CompaniesGroup,
+	CompanyDetail,
+	CompanyResearchRun,
+} from './routes/companies'
 export {
 	ContactListItem,
 	ContactSummary,
@@ -50,7 +54,7 @@ export {
 	RecordingSummary,
 	RecordingsGroup,
 } from './routes/recordings'
-export { ResearchGroup } from './routes/research'
+export { ContextInput, ResearchGroup } from './routes/research'
 export {
 	PendingProposal,
 	ResearchPolicy,
