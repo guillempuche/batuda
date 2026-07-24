@@ -245,6 +245,37 @@ describe('MCP instruction tools against live Postgres', () => {
 				error: expect.stringContaining('target_user_id'),
 			})
 		})
+
+		it('should refuse to transfer a template still used in a stack', async () => {
+			// GIVEN a template the member has put in one of their own stacks —
+			// handing it away would make it vanish from that stack at resolution
+			const label = `xfer-inuse-${randomUUID().slice(0, 8)}`
+			const templateName = `${MARKER}${label}`
+			const templateId = await createPersonalTemplate(memberId, label)
+			const created = (await callTool(memberId, 'manage_instructions', {
+				action: 'create_stack',
+				agent: 'research',
+				scope: 'personal',
+				name: `${MARKER}s-${randomUUID().slice(0, 8)}`,
+				templates: [templateName],
+			})) as { outcome: string }
+			expect(created.outcome).toBe('created')
+
+			// WHEN the member tries to transfer it to the owner
+			const moved = (await callTool(memberId, 'manage_instructions', {
+				action: 'transfer_template',
+				id: templateId,
+				target_user_id: ownerId,
+			})) as { outcome: string }
+
+			// THEN it is refused as in_use and ownership is untouched
+			expect(moved.outcome).toBe('in_use')
+			const row = await pool.query<{ owner_user_id: string }>(
+				'SELECT owner_user_id FROM instruction_templates WHERE id = $1',
+				[templateId],
+			)
+			expect(row.rows[0]?.owner_user_id).toBe(memberId)
+		})
 	})
 
 	describe('when an agent lists instruction templates', () => {

@@ -154,15 +154,27 @@ export const transferTemplateToUser = (
 
 export type DeleteTemplateResult = 'deleted' | 'in_use' | 'not_found'
 
+// Whether any stack still lists this template. A personal template only ever
+// sits in its owner's stacks (RLS keeps others from adding it), so this answers
+// "is the owner using it" for both the delete guard and the transfer guard.
+export const templateInUse = (id: string): Eff<boolean> =>
+	Effect.map(
+		Effect.flatMap(
+			SqlClient.SqlClient,
+			sql =>
+				sql<{ one: number }>`
+				SELECT 1 AS one FROM instruction_stack_items WHERE template_id = ${id} LIMIT 1
+			`,
+		),
+		rows => rows[0] !== undefined,
+	)
+
 export const deleteTemplate = (id: string): Eff<DeleteTemplateResult> =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
 		// A template referenced by any stack can't be deleted (FK RESTRICT);
 		// pre-check so the caller gets a clean reason instead of a driver error.
-		const refs = yield* sql<{ one: number }>`
-			SELECT 1 AS one FROM instruction_stack_items WHERE template_id = ${id} LIMIT 1
-		`
-		if (refs[0]) return 'in_use'
+		if (yield* templateInUse(id)) return 'in_use'
 		const deleted = yield* sql<{ id: string }>`
 			DELETE FROM instruction_templates WHERE id = ${id} RETURNING id
 		`
