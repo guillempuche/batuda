@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 
 import { expect, test } from '@playwright/test'
 
+import { DATABASE_URL } from './helpers/database-url'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 // Asserts /settings/organization/spend renders aggregated paid-research
@@ -14,11 +15,6 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 //   apps/internal/src/routes/settings/organization/spend.tsx
 //     (settings-spend-{total,by-provider,by-user,by-tool,
 //      range-month,range-30d,range-all})
-
-const DATABASE_URL =
-	process.env['E2E_DATABASE_URL'] ??
-	process.env['DATABASE_URL'] ??
-	'postgresql://batuda:batuda@localhost:5433/batuda'
 
 const psql = (sqlText: string): string =>
 	execSync(`psql "${DATABASE_URL}" -tA -c "${sqlText.replace(/"/g, '\\"')}"`, {

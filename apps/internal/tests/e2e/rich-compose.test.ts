@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process'
 
 import { expect, test } from '@playwright/test'
 
+import { DATABASE_URL } from './helpers/database-url'
 import {
 	clearCatcher,
 	getMessage,
@@ -22,11 +23,6 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 // Selectors verified against:
 //   apps/internal/src/components/emails/compose-form.tsx
 //     (compose-{form,to,subject,send})
-
-const DATABASE_URL =
-	process.env['E2E_DATABASE_URL'] ??
-	process.env['DATABASE_URL'] ??
-	'postgresql://batuda:batuda@localhost:5433/batuda'
 
 const psql = (sqlText: string): string =>
 	execSync(`psql "${DATABASE_URL}" -tA -c "${sqlText.replace(/"/g, '\\"')}"`, {

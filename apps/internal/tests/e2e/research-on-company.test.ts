@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 
 import { expect, test } from '@playwright/test'
 
+import { DATABASE_URL } from './helpers/database-url'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 // Asserts the Research tab on /companies/$slug surfaces existing runs
@@ -21,11 +22,6 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 //     (research-proposed-updates, research-pending-paid-actions)
 //   apps/internal/src/components/research/research-dialog.tsx
 //     (research-dialog, research-dialog-{query,schema,submit,cancel})
-
-const DATABASE_URL =
-	process.env['E2E_DATABASE_URL'] ??
-	process.env['DATABASE_URL'] ??
-	'postgresql://batuda:batuda@localhost:5433/batuda'
 
 const COMPANY_SLUG = 'cal-pep-fonda'
 

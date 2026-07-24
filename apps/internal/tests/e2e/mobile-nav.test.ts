@@ -2,14 +2,11 @@ import { execSync } from 'node:child_process'
 
 import { expect, test } from '@playwright/test'
 
+import { DATABASE_URL } from './helpers/database-url'
+
 // The mobile bottom belt folds the sections into four grouped slots so it
 // never overflows as sections are added. Verifies the belt stays within the
 // viewport and that Research is reachable through the "Records" group.
-
-const DATABASE_URL =
-	process.env['E2E_DATABASE_URL'] ??
-	process.env['DATABASE_URL'] ??
-	'postgresql://batuda:batuda@localhost:5433/batuda'
 
 // The floating email-draft dock is fixed above the bottom belt; a seeded
 // draft would sit over the nav knobs and swallow the tap. Clear drafts so the

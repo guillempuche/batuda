@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process'
 
 import { expect, test } from '@playwright/test'
 
+import { DATABASE_URL } from './helpers/database-url'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 // Inbox-listing path. The seed leaves Alice with two inboxes on Taller
@@ -14,11 +15,6 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 //   apps/internal/src/routes/emails/index.tsx
 //     (thread-row-{id}, inbox-filter-trigger, inbox-filter-option,
 //      data-inbox-email)
-
-const DATABASE_URL =
-	process.env['E2E_DATABASE_URL'] ??
-	process.env['DATABASE_URL'] ??
-	'postgresql://batuda:batuda@localhost:5433/batuda'
 
 const psql = (sqlText: string): string =>
 	execSync(`psql "${DATABASE_URL}" -tA -c "${sqlText.replace(/"/g, '\\"')}"`, {

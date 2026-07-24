@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process'
 
 import { expect, test } from '@playwright/test'
 
+import { DATABASE_URL } from './helpers/database-url'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 import { injectViaSmtp } from './helpers/smtp-inject'
 
@@ -11,11 +12,6 @@ import { injectViaSmtp } from './helpers/smtp-inject'
 // inbound `email_messages` row. Playwright e2e doesn't run in CI, so this is a
 // local check. Prereq: `pnpm cli services up && pnpm cli db reset && pnpm cli
 // seed`, then `pnpm dev` so the worker is live before running this spec.
-
-const DATABASE_URL =
-	process.env['E2E_DATABASE_URL'] ??
-	process.env['DATABASE_URL'] ??
-	'postgresql://batuda:batuda@localhost:5433/batuda'
 
 const psql = (sqlText: string): string =>
 	execSync(`psql "${DATABASE_URL}" -tA -c "${sqlText.replace(/"/g, '\\"')}"`, {
