@@ -399,12 +399,10 @@ export const ResearchLive = HttpApiBuilder.group(
 								entity: 'research',
 								id: _.params.id,
 							})
-						// The SQL client camelCases JSONB keys on read, so the stored
-						// `proposed_updates` surfaces here as `proposedUpdates`.
 						const findings = (run as { findings: unknown }).findings as {
-							proposedUpdates?: unknown[]
+							proposed_updates?: unknown[]
 						}
-						return findings?.proposedUpdates ?? []
+						return findings?.proposed_updates ?? []
 					}).pipe(
 						Effect.catch(e =>
 							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),

@@ -243,7 +243,7 @@ interface RunResult {
 	readonly errorMessage: string | null
 	readonly sourceCount: number
 	readonly findings: {
-		proposedUpdates?: unknown[]
+		proposed_updates?: unknown[]
 	} | null
 }
 
@@ -389,7 +389,7 @@ describe('ResearchService entity grounding gate', () => {
 				result.status,
 				`unexpected status: ${result.errorMessage ?? '(none)'}`,
 			).toBe('succeeded')
-			expect(result.findings?.proposedUpdates).toHaveLength(1)
+			expect(result.findings?.proposed_updates).toHaveLength(1)
 		}, 30_000)
 	})
 

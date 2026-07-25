@@ -116,18 +116,18 @@ describe('outcomeFromRun', () => {
 		})
 	})
 
-	describe('when the DB client camelCased the findings keys', () => {
-		it('should still read the snake_case fields', () => {
-			// GIVEN findings as the CLI's snakeToCamel client returns them
+	describe('when the findings carry a size band', () => {
+		it('should read it under the name the schema defines', () => {
+			// GIVEN findings that include the size band
 			const outcome = outcomeFromRun({
 				status: 'succeeded',
 				findings: {
-					enrichment: { industry: 'transport', sizeRange: '26-50' },
+					enrichment: { industry: 'transport', size_range: '26-50' },
 				},
 				fetchedUrls: ['https://www.acme.es/about'],
 			})
 
-			// WHEN adapted — THEN sizeRange→size_range resolves and the fetch grounds it
+			// WHEN adapted — THEN the field resolves and the fetched page grounds it
 			expect(outcome.fields.industry).toBe('transport')
 			expect(outcome.fields.size_range).toBe('26-50')
 			expect(outcome.reachedDomains).toEqual(['acme.es'])
@@ -135,23 +135,16 @@ describe('outcomeFromRun', () => {
 	})
 
 	describe('when the pipeline confirmed the target in the official register', () => {
-		it('should carry registryConfirmed through, in snake or camel case', () => {
+		it('should carry registryConfirmed through', () => {
 			// GIVEN a run that fetched no site but stamped the registry-confirmation flag
-			const snake = outcomeFromRun({
+			const outcome = outcomeFromRun({
 				status: 'no_reliable_data',
 				findings: { registry_confirmed: true, error: 'no site fetched' },
 				fetchedUrls: [],
 			})
-			// AND the CLI's camelCasing client can deliver the same flag camelCased
-			const camel = outcomeFromRun({
-				status: 'succeeded',
-				findings: { registryConfirmed: true, enrichment: { country: 'ES' } },
-				fetchedUrls: [],
-			})
 
-			// WHEN adapted — THEN both surface the reached-via-registry signal
-			expect(snake.registryConfirmed).toBe(true)
-			expect(camel.registryConfirmed).toBe(true)
+			// WHEN adapted — THEN it surfaces the reached-via-registry signal
+			expect(outcome.registryConfirmed).toBe(true)
 		})
 	})
 

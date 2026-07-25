@@ -14,14 +14,12 @@ import { cloneCacheHitRun } from '@batuda/research'
 import { PgLive } from '../db/client.js'
 
 // Regression coverage for #276: reusing an identical research query as a
-// `cache_hit` clone must keep `findings` byte-identical to the source run. The
-// bug read findings through the SQL client — which camelCases every jsonb key on
-// read — and re-serialized them, so `proposed_updates` silently became
-// `proposedUpdates` and downstream readers of the documented snake_case keys got
-// `undefined`. `cloneCacheHitRun` now copies findings src → clone inside Postgres
-// so it never round-trips through JS. These run as `app_user` with
-// `app.current_org_id` set, exactly like a request handler (see middleware/org.ts),
-// so the research_runs RLS policy engages just as it does at runtime.
+// `cache_hit` clone must keep `findings` byte-identical to the source run.
+// `cloneCacheHitRun` copies findings src → clone inside Postgres so the stored
+// value never round-trips through JS and cannot be reshaped on the way. These
+// run as `app_user` with `app.current_org_id` set, exactly like a request
+// handler (see middleware/org.ts), so the research_runs RLS policy engages just
+// as it does at runtime.
 //
 // Prereq: `pnpm cli services up` so Postgres is reachable; the integration
 // runner builds + seeds `batuda_it`.
@@ -32,7 +30,7 @@ const ORG_ID = `it-276-org-${randomUUID()}`
 const USER_ID = `it-276-user-${randomUUID()}`
 
 // The exact snake_case shape from the issue: a top-level list plus a deeply
-// nested key, both of which the buggy read camelCased.
+// nested key, so the assertions cover both the outer and the nested level.
 const SNAKE_FINDINGS = {
 	proposed_updates: [
 		{
@@ -145,7 +143,7 @@ describe('cloneCacheHitRun', () => {
 			expect(cmp.kind).toBe('cache_hit')
 			expect(cmp.eq).toBe(true)
 
-			// The stored keys are snake_case, never the camelCased shape the bug produced.
+			// The stored keys survive the clone exactly as written.
 			const findings = JSON.parse(cmp.cloneText) as Record<string, unknown>
 			expect(findings).toHaveProperty('proposed_updates')
 			expect(findings).not.toHaveProperty('proposedUpdates')
@@ -158,47 +156,66 @@ describe('cloneCacheHitRun', () => {
 	})
 })
 
-// The gotcha the resume-path fix (research-service.ts) turns on: a plain
-// `SELECT findings` through the SQL client camelCases every nested jsonb key,
-// while `SELECT findings::text` returns the raw bytes unchanged.
+// What every reader of a run's findings depends on: a plain `SELECT findings`
+// hands back the keys that were stored, and a list whose first entry is empty
+// reads back instead of failing the query.
 describe('reading findings through the SQL client', () => {
 	describe('when the stored findings use snake_case keys', () => {
-		it('should camelCase a plain SELECT but preserve snake_case via ::text', async () => {
+		it('should hand back the stored keys unchanged', async () => {
+			// GIVEN findings stored with snake_case keys
+			// WHEN they are read back with a plain SELECT
 			const result = await Effect.runPromise(
 				Effect.gen(function* () {
 					const sql = yield* SqlClient.SqlClient
 					return yield* Effect.gen(function* () {
 						yield* enterOrgScope
 						const id = yield* seedSourceRun(JSON.stringify(SNAKE_FINDINGS))
-						// A plain select — the client parses + camelCases the jsonb.
 						const [plain] = yield* sql<{
 							findings: Record<string, unknown>
 						}>`SELECT findings FROM research_runs WHERE id = ${id}`
-						// A ::text select — the value comes back as raw JSON text.
-						const [raw] = yield* sql<{
-							findings: string
-						}>`SELECT findings::text AS findings FROM research_runs WHERE id = ${id}`
-						return {
-							plain: plain?.findings ?? null,
-							rawText: raw?.findings ?? null,
-						}
+						return plain?.findings ?? null
 					}).pipe(sql.withTransaction)
 				}).pipe(Effect.provide(PgLive)),
 			)
 
-			// GIVEN snake_case findings, WHEN read plainly THEN keys are camelCased
-			expect(result.plain).not.toBeNull()
-			expect(result.plain).toHaveProperty('proposedUpdates')
-			expect(result.plain).not.toHaveProperty('proposed_updates')
+			// THEN the keys survive the round trip, nested ones included
+			expect(result).not.toBeNull()
+			expect(result).toHaveProperty('proposed_updates')
+			expect(result).not.toHaveProperty('proposedUpdates')
+			const country = (
+				result as { enrichment: { country?: Record<string, unknown> } }
+			).enrichment.country
+			expect(country).toHaveProperty('source_id')
+			expect(country).not.toHaveProperty('sourceId')
+		})
+	})
 
-			// WHEN read as ::text THEN the raw snake_case bytes survive
-			expect(result.rawText).not.toBeNull()
-			const parsed = JSON.parse(result.rawText as string) as Record<
-				string,
-				unknown
-			>
-			expect(parsed).toHaveProperty('proposed_updates')
-			expect(parsed).not.toHaveProperty('proposedUpdates')
+	describe('when a stored list starts with an empty entry', () => {
+		it('should read the run back instead of failing', async () => {
+			// GIVEN findings holding a list that starts with an empty entry — what a
+			// group run stores when its first child finishes without any findings
+			const findings = { leaf_results: [null, { schema_name: 'freeform_v1' }] }
+
+			// WHEN the run is read back
+			const result = await Effect.runPromise(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* Effect.gen(function* () {
+						yield* enterOrgScope
+						const id = yield* seedSourceRun(JSON.stringify(findings))
+						const [row] = yield* sql<{
+							findings: { leaf_results: ReadonlyArray<unknown> }
+						}>`SELECT findings FROM research_runs WHERE id = ${id}`
+						return row?.findings ?? null
+					}).pipe(sql.withTransaction)
+				}).pipe(Effect.provide(PgLive)),
+			)
+
+			// THEN the read succeeds and the list arrives intact, empty entry first
+			expect(result).not.toBeNull()
+			expect(result?.leaf_results).toHaveLength(2)
+			expect(result?.leaf_results[0]).toBeNull()
+			expect(result?.leaf_results[1]).toEqual({ schema_name: 'freeform_v1' })
 		})
 	})
 })

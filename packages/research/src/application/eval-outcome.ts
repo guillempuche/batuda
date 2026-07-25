@@ -56,27 +56,6 @@ const enrichmentOf = (
 		: undefined
 }
 
-const camelToSnake = (key: string): string =>
-	key.replace(/([A-Z])/g, '_$1').toLowerCase()
-
-/**
- * Rewrite every object key back to the schema's snake_case. Some Postgres clients
- * (the CLI's) camelCase all result keys — including the ones INSIDE the findings
- * JSONB — so `size_range` arrives as `sizeRange`; this makes the field reads below
- * indifferent to which client fetched the run. A no-op for already-snake_case keys.
- */
-const toSnakeKeys = (node: unknown): unknown => {
-	if (Array.isArray(node)) return node.map(toSnakeKeys)
-	if (node !== null && typeof node === 'object') {
-		const out: Record<string, unknown> = {}
-		for (const [key, value] of Object.entries(node)) {
-			out[camelToSnake(key)] = toSnakeKeys(value)
-		}
-		return out
-	}
-	return node
-}
-
 /** Normalize a finished run into the shape the scorer consumes. */
 export const outcomeFromRun = (input: {
 	readonly status: string
@@ -84,7 +63,7 @@ export const outcomeFromRun = (input: {
 	/** URLs of the sources the run fetched (from `research_run_sources`). */
 	readonly fetchedUrls: ReadonlyArray<string>
 }): RunOutcome => {
-	const findings = toSnakeKeys(input.findings)
+	const findings = input.findings
 	const enrichment = enrichmentOf(findings)
 	const fields: Partial<Record<ScorableField, string | null>> = {}
 	if (enrichment !== undefined) {

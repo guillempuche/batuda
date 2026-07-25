@@ -265,12 +265,10 @@ export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 				Effect.gen(function* () {
 					const run = yield* svc.get(id)
 					if (!run) return []
-					// The SQL client camelCases JSONB keys on read, so the stored
-					// `proposed_updates` surfaces here as `proposedUpdates`.
 					const findings = (run as { findings: unknown }).findings as {
-						proposedUpdates?: unknown[]
+						proposed_updates?: unknown[]
 					} | null
-					return findings?.proposedUpdates ?? []
+					return findings?.proposed_updates ?? []
 				}).pipe(redactDbErrors, Effect.map(toItems)),
 			resolve_research_proposed_update: ({
 				id,
