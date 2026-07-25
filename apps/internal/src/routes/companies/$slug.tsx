@@ -41,7 +41,7 @@ import type {
 	CompanyDetail as CompanyDetailResponse,
 	ContactListItem,
 } from '@batuda/controllers'
-import type { Interaction, Task } from '@batuda/domain'
+import type { Task } from '@batuda/domain'
 import { Sidebar, Stack, Switcher } from '@batuda/ui'
 import {
 	PriButton,
@@ -55,7 +55,6 @@ import {
 	companyAtomFor,
 	companyTasksAtomFor,
 	contactsAtomFor,
-	interactionsAtomFor,
 	timelineAtomFor,
 } from '#/atoms/company-atoms'
 import { emailsSearchAtom } from '#/atoms/emails-atoms'
@@ -112,6 +111,7 @@ import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { PriorityDot } from '#/components/shared/priority-dot'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { SrOnly } from '#/components/shared/sr-only'
+import type { CompanyStatus } from '#/components/shared/status-badge'
 import {
 	asCompanyStatus,
 	StatusBadge,
@@ -236,19 +236,17 @@ type TaskEntry = {
 type DetailPayload = {
 	readonly company: (typeof CompanyDetailResponse)['Type']
 	readonly contacts: PaginatedList<(typeof ContactListItem)['Type']>
-	readonly interactions: PaginatedList<Interaction>
 	readonly tasks: PaginatedList<Task>
 }
 
 /**
- * Server-only: fetch the company row and all four relations in parallel.
- * Dynamically imports the server client so Vite excludes it from the
- * client bundle; forwards the Better-Auth cookie via
+ * Server-only: fetch the company row plus its contacts and tasks in
+ * parallel. Dynamically imports the server client so Vite excludes it from
+ * the client bundle; forwards the Better-Auth cookie via
  * `getRequestHeader('cookie')`.
  *
- * Uses `Effect.all` with `concurrency: 4` for the relations so they
- * share a single Better-Auth session roundtrip but run in parallel on
- * the server.
+ * The relations go through a single `Effect.all` so they share one
+ * Better-Auth session roundtrip but still run in parallel on the server.
  */
 async function loadDetailOnServer(slug: string): Promise<DetailPayload> {
 	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
@@ -265,19 +263,17 @@ async function loadDetailOnServer(slug: string): Promise<DetailPayload> {
 			return {
 				company,
 				contacts: emptyPage,
-				interactions: emptyPage,
 				tasks: emptyPage,
 			} as DetailPayload
 		}
-		const [contacts, interactions, tasks] = yield* Effect.all(
+		const [contacts, tasks] = yield* Effect.all(
 			[
 				client.contacts.list({ query: { companyId } }),
-				client.interactions.list({ query: { companyId, limit: 20 } }),
 				client.tasks.list({ query: { companyId } }),
 			],
-			{ concurrency: 3 },
+			{ concurrency: 2 },
 		)
-		return { company, contacts, interactions, tasks } as DetailPayload
+		return { company, contacts, tasks } as DetailPayload
 	})
 	return Effect.runPromise(program)
 }
@@ -361,10 +357,6 @@ export const Route = createFileRoute('/companies/$slug')({
 					dehydrateAtom(
 						contactsAtomFor(companyId),
 						AsyncResult.success(payload.contacts),
-					),
-					dehydrateAtom(
-						interactionsAtomFor(companyId),
-						AsyncResult.success(payload.interactions),
 					),
 					dehydrateAtom(
 						companyTasksAtomFor(companyId),
@@ -492,10 +484,6 @@ function DetailBody({
 	useSetDocumentTitle(topBarTitle)
 
 	const contactsAtom = useMemo(() => contactsAtomFor(company.id), [company.id])
-	const interactionsAtom = useMemo(
-		() => interactionsAtomFor(company.id),
-		[company.id],
-	)
 	const timelineAtom = useMemo(() => timelineAtomFor(company.id), [company.id])
 	const tasksAtom = useMemo(() => companyTasksAtomFor(company.id), [company.id])
 	const companyPagesAtom = useMemo(
@@ -524,7 +512,6 @@ function DetailBody({
 	const researchResult = useAtomValue(companyResearchAtom)
 	const refreshResearch = useAtomRefresh(companyResearchAtom)
 
-	const refreshInteractions = useAtomRefresh(interactionsAtom)
 	const refreshTimeline = useAtomRefresh(timelineAtom)
 	const refreshContacts = useAtomRefresh(contactsAtom)
 	const refreshTasks = useAtomRefresh(tasksAtom)
@@ -870,7 +857,6 @@ function DetailBody({
 			companyId: company.id,
 			companyName: company.name,
 			onSubmitted: () => {
-				refreshInteractions()
 				refreshTimeline()
 				refreshCompany()
 			},
@@ -879,7 +865,6 @@ function DetailBody({
 		openQuickCapture,
 		company.id,
 		company.name,
-		refreshInteractions,
 		refreshTimeline,
 		refreshCompany,
 	])
@@ -1236,30 +1221,16 @@ function DetailBody({
 														/>
 													) : (
 														<TimelineList>
-															{visibleTimeline.map(row => {
-																const isStage = row.kind === 'stage_changed'
-																const stageFrom = asCompanyStatus(
-																	String(row.payload?.['from'] ?? 'prospect'),
-																)
-																const stageTo = asCompanyStatus(
-																	String(row.payload?.['to'] ?? 'prospect'),
-																)
-																const entry: TimelineEntryData = {
-																	id: row.id,
-																	channel: row.channel,
-																	subject: isStage ? t`Stage changed` : null,
-																	summary: isStage
-																		? `${i18n._(statusLabels[stageFrom])} → ${i18n._(statusLabels[stageTo])}`
-																		: row.summary,
-																	outcome: null,
-																	nextAction: null,
-																	date: row.date,
-																	threadId: null,
-																}
-																return (
-																	<TimelineEntry key={row.id} entry={entry} />
-																)
-															})}
+															{visibleTimeline.map(row => (
+																<TimelineEntry
+																	key={row.id}
+																	entry={toTimelineEntry(row, {
+																		stageChangedLabel: t`Stage changed`,
+																		describeStageChange: (from, to) =>
+																			`${i18n._(statusLabels[from])} → ${i18n._(statusLabels[to])}`,
+																	})}
+																/>
+															))}
 														</TimelineList>
 													)}
 												</TimelinePanelInner>
@@ -1825,13 +1796,67 @@ const CHANNEL_ICON: Record<string, typeof Mail> = {
 	bluesky: AtSign,
 }
 
+const textOrNull = (value: unknown): string | null =>
+	typeof value === 'string' && value.trim().length > 0 ? value : null
+
+// Most of what makes an activity row worth reading — the email's subject, how
+// a call ended, what was promised next — sits in its `payload`, not in
+// `summary`, which many kinds leave empty. A row built from `summary` alone
+// shows up as a bare channel name and nothing else.
+function toTimelineEntry(
+	row: TimelineRow,
+	labels: {
+		readonly stageChangedLabel: string
+		readonly describeStageChange: (
+			from: CompanyStatus,
+			to: CompanyStatus,
+		) => string
+	},
+): TimelineEntryData {
+	const payload = row.payload ?? {}
+
+	if (row.kind === 'stage_changed') {
+		return {
+			id: row.id,
+			channel: row.channel,
+			subject: labels.stageChangedLabel,
+			summary: labels.describeStageChange(
+				asCompanyStatus(String(payload['from'] ?? 'prospect')),
+				asCompanyStatus(String(payload['to'] ?? 'prospect')),
+			),
+			outcome: null,
+			nextAction: null,
+			date: row.date,
+			threadId: null,
+		}
+	}
+
+	return {
+		id: row.id,
+		channel: row.channel,
+		subject: textOrNull(payload['subject']),
+		summary: row.summary,
+		outcome: textOrNull(payload['outcome']),
+		nextAction: textOrNull(payload['nextAction']),
+		date: row.date,
+		// Rows don't carry the thread they belong to, so an email entry can't
+		// link through to the conversation yet.
+		threadId: null,
+	}
+}
+
 function timelineKindToChannel(kind: string, fallback: string | null): string {
 	switch (kind) {
 		case 'email_sent':
 		case 'email_received':
+		case 'email_bounced':
 			return 'email'
 		case 'call_logged':
 			return fallback ?? 'phone'
+		// The row names its own channel, so the icon can match the medium — a
+		// visit gets a pin, WhatsApp a speech bubble — with no case per channel.
+		case 'interaction_logged':
+			return fallback ?? 'other'
 		case 'document_created':
 			return 'document'
 		case 'proposal_sent':
@@ -1839,11 +1864,17 @@ function timelineKindToChannel(kind: string, fallback: string | null): string {
 		case 'proposal_responded':
 			return 'proposal'
 		case 'research_run':
+		case 'research_applied':
 			return 'research'
 		case 'meeting_scheduled':
-		case 'meeting_completed':
+		case 'meeting_rescheduled':
 		case 'meeting_cancelled':
+		case 'meeting_rsvp':
 			return 'event'
+		case 'task_created':
+		case 'task_updated':
+		case 'task_completed':
+			return 'task'
 		case 'system_event':
 		case 'stage_changed':
 			return 'system'
