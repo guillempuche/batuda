@@ -21,6 +21,7 @@ export {
 } from './errors'
 export { CurrentOrg, OrgMiddleware } from './middleware/org'
 export { SessionContext, SessionMiddleware } from './middleware/session'
+export { PaginatedList } from './pagination'
 export { AuthGroup } from './routes/auth'
 export { CalcomWebhookGroup } from './routes/calcom-webhook'
 export { CalendarGroup, Slot } from './routes/calendar'

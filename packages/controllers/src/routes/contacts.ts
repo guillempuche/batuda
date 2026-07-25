@@ -5,6 +5,7 @@ import { Contact, ContactChannel } from '@batuda/domain'
 
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
+import { PaginatedList } from '../pagination'
 
 // A reachable channel supplied in bulk (agent/import path). `kind` is open
 // (email, phone, linkedin, x, website, bluesky, …); only the email channel
@@ -83,8 +84,10 @@ export const ContactsGroup = HttpApiGroup.make('contacts')
 		HttpApiEndpoint.get('list', '/contacts', {
 			query: {
 				companyId: Schema.optional(Schema.String),
+				limit: Schema.optional(Schema.NumberFromString),
+				offset: Schema.optional(Schema.NumberFromString),
 			},
-			success: Schema.Array(ContactListItem),
+			success: PaginatedList(ContactListItem),
 		}),
 	)
 	.add(

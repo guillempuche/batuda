@@ -5,6 +5,7 @@ import { SqlClient } from 'effect/unstable/sql'
 import { CompanyResearchRun, CurrentOrg, NotFound } from '@batuda/controllers'
 import { Company, Contact, Interaction } from '@batuda/domain'
 
+import { resolvePageTotal } from '../lib/sql-pagination'
 import { researchProvenance } from './research-provenance'
 
 export interface CompanyFilters {
@@ -96,16 +97,29 @@ export class CompanyService extends Context.Service<CompanyService>()(
 							}
 						})()
 
-						const rows = yield* sql`
-							SELECT * FROM companies
+						const limit = filters.limit ?? 20
+						const offset = filters.offset ?? 0
+						const rawRows = yield* sql<{ readonly total: string | number }>`
+							SELECT *, COUNT(*) OVER () AS total FROM companies
 							WHERE ${sql.and(conditions)}
 							ORDER BY ${orderBy}
-							LIMIT ${filters.limit ?? 20} OFFSET ${filters.offset ?? 0}
+							LIMIT ${limit} OFFSET ${offset}
 						`
-						// Decode to the domain shape so the API encodes dates as ISO strings.
-						return yield* Schema.decodeUnknownEffect(Schema.Array(Company))(
-							rows,
+
+						const total = yield* resolvePageTotal(
+							rawRows,
+							offset,
+							() => sql<{ readonly count: string | number }>`
+								SELECT count(*) AS count FROM companies
+								WHERE ${sql.and(conditions)}
+							`,
 						)
+
+						// Decode to the domain shape so the API encodes dates as ISO strings.
+						const items = yield* Schema.decodeUnknownEffect(
+							Schema.Array(Company),
+						)(rawRows)
+						return { items, total, limit, offset }
 					}),
 
 				findBySlug: (slug: string) =>

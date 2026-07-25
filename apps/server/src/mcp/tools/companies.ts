@@ -225,7 +225,7 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 						maxLng: params.max_lng,
 						limit: params.limit,
 					})
-					return toItems(companies)
+					return toItems(companies.items)
 				}).pipe(Effect.orDie),
 			get_company: ({ id_or_slug }) =>
 				service.getWithRelations(id_or_slug).pipe(

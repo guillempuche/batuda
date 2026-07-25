@@ -6,6 +6,7 @@ import { SqlClient } from 'effect/unstable/sql'
 import { BatudaApi, CurrentOrg, NotFound } from '@batuda/controllers'
 import { Document } from '@batuda/domain'
 
+import { resolvePageTotal } from '../lib/sql-pagination'
 import {
 	DocumentCreated,
 	TimelineActivityService,
@@ -24,13 +25,27 @@ export const DocumentsLive = HttpApiBuilder.group(
 			return handlers
 				.handle('list', _ =>
 					Effect.gen(function* () {
+						const limit = _.query.limit ?? 100
+						const offset = _.query.offset ?? 0
 						const conditions: Array<Statement.Fragment> = []
 						if (_.query.companyId)
 							conditions.push(sql`company_id = ${_.query.companyId}`)
 						if (_.query.type) conditions.push(sql`type = ${_.query.type}`)
-						const rows =
-							yield* sql`SELECT * FROM documents WHERE ${sql.and(conditions)}`
-						return yield* decodeDocuments(rows)
+						const rows = yield* sql<{ readonly total: string | number }>`
+							SELECT *, COUNT(*) OVER () AS total FROM documents
+							WHERE ${sql.and(conditions)}
+							LIMIT ${limit} OFFSET ${offset}
+						`
+						const total = yield* resolvePageTotal(
+							rows,
+							offset,
+							() => sql<{ readonly count: string | number }>`
+								SELECT count(*) AS count FROM documents
+								WHERE ${sql.and(conditions)}
+							`,
+						)
+						const items = yield* decodeDocuments(rows)
+						return { items, total, limit, offset }
 					}).pipe(Effect.orDie),
 				)
 				.handle('get', _ =>

@@ -112,7 +112,7 @@ export function ConversationsTab({
 	const calendar = useMemo<ReadonlyArray<CalendarRow>>(
 		() =>
 			AsyncResult.isSuccess(calendarResult)
-				? narrowCalendar(calendarResult.value)
+				? narrowCalendar(calendarResult.value.items)
 				: [],
 		[calendarResult],
 	)

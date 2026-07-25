@@ -31,6 +31,8 @@ import { EmailDraft, Inbox, InboxFooter } from '@batuda/domain'
 import { renderBlocks, type StagedAttachmentRef } from '@batuda/email/render'
 import type { EmailBlocks } from '@batuda/email/schema'
 
+import { resolvePageTotal } from '../lib/sql-pagination'
+
 // Standard 8-4-4-4-12 hex UUID. Used to guard service entry points that
 // take a `threadId` / `companyId` / `messageId` — placeholder strings
 // from the frontend (e.g. compose-form's `__unused__`) would otherwise
@@ -1717,16 +1719,27 @@ export class EmailService extends Context.Service<EmailService>()(
 						if (filters?.status)
 							conditions.push(sql`status = ${filters.status}`)
 
-						const rows = yield* sql`
-							SELECT * FROM email_messages
+						const limit = filters?.limit ?? 50
+						const offset = filters?.offset ?? 0
+						const rows = yield* sql<{ readonly total: string | number }>`
+							SELECT *, COUNT(*) OVER () AS total FROM email_messages
 							WHERE ${sql.and(conditions)}
 							ORDER BY status_updated_at DESC
-							LIMIT ${filters?.limit ?? 50}
-							OFFSET ${filters?.offset ?? 0}
+							LIMIT ${limit}
+							OFFSET ${offset}
 						`
-						return yield* decodeMessages(
+						const total = yield* resolvePageTotal(
+							rows,
+							offset,
+							() => sql<{ readonly count: string | number }>`
+								SELECT count(*) AS count FROM email_messages
+								WHERE ${sql.and(conditions)}
+							`,
+						)
+						const items = yield* decodeMessages(
 							rows.map(r => projectAttachmentsForWire(r)),
 						)
+						return { items, total, limit, offset }
 					}).pipe(Effect.orDie),
 
 				// `messageId` may be either the local UUID PK or the RFC Message-ID;
@@ -2327,7 +2340,7 @@ export class EmailService extends Context.Service<EmailService>()(
 						)
 					}),
 
-				listDrafts: (inboxId?: string) =>
+				listDrafts: (inboxId?: string, limit = 100, offset = 0) =>
 					Effect.gen(function* () {
 						const list = yield* drafts.list(inboxId)
 						// Sort on the raw Date before decoding — DateTime.Utc has no
@@ -2335,7 +2348,12 @@ export class EmailService extends Context.Service<EmailService>()(
 						const shaped = list
 							.map(draftRowToProviderShape)
 							.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
-						return yield* decodeDrafts(shaped).pipe(Effect.orDie)
+						// Drafts arrive as one batch from the provider, so the page is
+						// taken here rather than in a query.
+						const items = yield* decodeDrafts(
+							shaped.slice(offset, offset + limit),
+						).pipe(Effect.orDie)
+						return { items, total: shaped.length, limit, offset }
 					}),
 
 				sendDraft: (inboxId: string, draftId: string) =>

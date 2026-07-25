@@ -225,7 +225,10 @@ export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 						limit: filters.limit,
 						offset: filters.offset,
 					})
-					.pipe(redactDbErrors, Effect.map(toItems)),
+					.pipe(
+						redactDbErrors,
+						Effect.map(page => toItems(page.items)),
+					),
 			cancel_research: ({ id }) =>
 				Effect.gen(function* () {
 					const res = yield* svc.cancel(id)

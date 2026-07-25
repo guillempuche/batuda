@@ -20,6 +20,7 @@ import {
 } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
+import { PaginatedList } from '../pagination'
 
 const Recipients = Schema.Union([Schema.String, Schema.Array(Schema.String)])
 
@@ -257,7 +258,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 				limit: Schema.optional(Schema.NumberFromString),
 				offset: Schema.optional(Schema.NumberFromString),
 			},
-			success: Schema.Array(EmailMessageRecord),
+			success: PaginatedList(EmailMessageRecord),
 		}),
 	)
 	.add(
@@ -457,8 +458,10 @@ export const EmailGroup = HttpApiGroup.make('email')
 		HttpApiEndpoint.get('listDrafts', '/email/drafts', {
 			query: {
 				inboxId: Schema.optional(Schema.String),
+				limit: Schema.optional(Schema.NumberFromString),
+				offset: Schema.optional(Schema.NumberFromString),
 			},
-			success: Schema.Array(EmailDraft.json),
+			success: PaginatedList(EmailDraft.json),
 		}),
 	)
 	.add(

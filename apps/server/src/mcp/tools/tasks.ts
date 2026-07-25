@@ -316,7 +316,10 @@ export const TaskHandlersLive = TaskTools.toLayer(
 							offset: params.offset ?? 0,
 						},
 					)
-					.pipe(Effect.orDie, Effect.map(toItems)),
+					.pipe(
+						Effect.orDie,
+						Effect.map(page => toItems(page.items)),
+					),
 
 			search_tasks: params =>
 				taskService
@@ -332,7 +335,10 @@ export const TaskHandlersLive = TaskTools.toLayer(
 						},
 						{ sort: 'due', limit: params.limit ?? 25, offset: 0 },
 					)
-					.pipe(Effect.orDie, Effect.map(toItems)),
+					.pipe(
+						Effect.orDie,
+						Effect.map(page => toItems(page.items)),
+					),
 
 			update_task: params =>
 				Effect.gen(function* () {

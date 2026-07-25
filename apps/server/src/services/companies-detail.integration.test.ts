@@ -67,7 +67,8 @@ const searchWith = (filters: Record<string, unknown>) =>
 	runtime.runPromise(
 		Effect.gen(function* () {
 			const svc = yield* CompanyService
-			return yield* svc.search(filters)
+			const page = yield* svc.search(filters)
+			return page.items
 		}).pipe(
 			Effect.provideService(CurrentOrg, { id: ORG, name: 'd', slug: 'd' }),
 		),

@@ -158,7 +158,7 @@ export function ProposalsPanel({ companyId }: { readonly companyId: string }) {
 	const result = useAtomValue(proposalsAtom)
 	const refresh = useAtomRefresh(proposalsAtom)
 	const proposals = AsyncResult.isSuccess(result)
-		? narrowProposals(result.value)
+		? narrowProposals(result.value.items)
 		: []
 	const [editing, setEditing] = useState<ProposalRow | 'new' | null>(null)
 

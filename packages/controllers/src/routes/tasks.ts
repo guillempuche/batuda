@@ -16,6 +16,7 @@ import {
 import { BadRequest, Conflict, NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
+import { PaginatedList } from '../pagination'
 
 // bulkComplete reports how many of the requested ids it actually closed.
 export const BulkCompleteResult = Schema.Struct({
@@ -101,7 +102,7 @@ export const TasksGroup = HttpApiGroup.make('tasks')
 				limit: Schema.optional(Schema.NumberFromString),
 				offset: Schema.optional(Schema.NumberFromString),
 			},
-			success: Schema.Array(Task.json),
+			success: PaginatedList(Task.json),
 		}),
 	)
 	.add(

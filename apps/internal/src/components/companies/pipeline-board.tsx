@@ -308,7 +308,8 @@ function BoardColumn({
 	const result = useAtomValue(atom)
 
 	const serverCards = useMemo(
-		() => (AsyncResult.isSuccess(result) ? narrowCards(result.value) : []),
+		() =>
+			AsyncResult.isSuccess(result) ? narrowCards(result.value.items) : [],
 		[result],
 	)
 

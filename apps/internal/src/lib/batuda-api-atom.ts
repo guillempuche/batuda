@@ -62,7 +62,7 @@ function deriveDevApiOrigin(): string | null {
  * spec in `@batuda/controllers`. Both are fully typed from the spec:
  *
  *   BatudaApiAtom.query('companies', 'list', { query: { status: 'meeting' } })
- *   // → Atom<AsyncResult.AsyncResult<ReadonlyArray<Company>, BatudaError>>
+ *   // → Atom<AsyncResult.AsyncResult<PaginatedList<Company>, BatudaError>>
  *
  * See `docs/repos/effect/packages/effect/src/unstable/reactivity/AtomHttpApi.ts:145`
  * for the constructor signature.

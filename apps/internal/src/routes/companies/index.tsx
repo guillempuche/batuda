@@ -164,19 +164,22 @@ function CompaniesListPage() {
 	)
 	const result = useAtomValue(atom)
 	const refreshCompanies = useAtomRefresh(atom)
+	const loadedPage = AsyncResult.isSuccess(result) ? result.value : undefined
 
 	const companies = useMemo<ReadonlyArray<CompanyRow>>(
-		() => (AsyncResult.isSuccess(result) ? narrowCompanies(result.value) : []),
-		[result],
+		() => (loadedPage ? narrowCompanies(loadedPage.items) : []),
+		[loadedPage],
 	)
 	const isLoading = AsyncResult.isInitial(result)
 	const isFailure = AsyncResult.isFailure(result)
-	// The count and the pipeline total describe the loaded list. Until the
-	// list actually loads, an empty array would read as "0 companies" — a
-	// failed or still-loading fetch must not look like an empty pipeline.
-	const hasResult = AsyncResult.isSuccess(result)
-	// A full window came back, so there is probably another page to load.
-	const hasMore = companies.length >= visibleLimit
+	// Until the list actually loads there is no count to show — a failed or
+	// still-loading fetch must not read as "0 companies", an empty pipeline.
+	const hasResult = loadedPage !== undefined
+	// How many companies match the filters in total, not just the ones
+	// fetched so far: `companies` stops at `visibleLimit`, so its length
+	// would under-report for any org with more than one page of them.
+	const total = loadedPage?.total ?? 0
+	const hasMore = companies.length < total
 
 	// ── Search input (debounced URL write) ──────────────────────
 	const [searchInput, setSearchInput] = useState(search.query ?? '')
@@ -242,10 +245,10 @@ function CompaniesListPage() {
 
 	const activeFilters = hasActiveFilters(search)
 	const countLabel = activeFilters
-		? t`${companies.length} companies with filters applied`
-		: companies.length === 1
+		? t`${total} companies with filters applied`
+		: total === 1
 			? t`1 company`
-			: t`${companies.length} companies`
+			: t`${total} companies`
 
 	const countryItems = [
 		{ value: ALL, label: t`All countries` },
@@ -286,7 +289,7 @@ function CompaniesListPage() {
 				{...(hasResult
 					? {
 							subtitle: countLabel,
-							kpi: { value: companies.length, label: t`In pipeline` },
+							kpi: { value: total, label: t`In pipeline` },
 						}
 					: {})}
 			/>

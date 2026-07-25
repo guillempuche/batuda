@@ -121,6 +121,7 @@ import { useQuickCapture } from '#/context/quick-capture-context'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import { dlgNoId } from '#/lib/dlg-search'
+import type { PaginatedList } from '#/lib/paginated-list'
 import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import { useTabSearchParam } from '#/lib/tab-search'
@@ -228,9 +229,9 @@ type TaskEntry = {
 
 type DetailPayload = {
 	readonly company: (typeof CompanyDetailResponse)['Type']
-	readonly contacts: ReadonlyArray<(typeof ContactListItem)['Type']>
-	readonly interactions: ReadonlyArray<Interaction>
-	readonly tasks: ReadonlyArray<Task>
+	readonly contacts: PaginatedList<(typeof ContactListItem)['Type']>
+	readonly interactions: PaginatedList<Interaction>
+	readonly tasks: PaginatedList<Task>
 }
 
 /**
@@ -254,11 +255,12 @@ async function loadDetailOnServer(slug: string): Promise<DetailPayload> {
 		const company = yield* client.companies.get({ params: { slug } })
 		const companyId = extractCompanyId(company)
 		if (companyId === null) {
+			const emptyPage = { items: [], total: 0, limit: 0, offset: 0 }
 			return {
 				company,
-				contacts: [],
-				interactions: [],
-				tasks: [],
+				contacts: emptyPage,
+				interactions: emptyPage,
+				tasks: emptyPage,
 			} as DetailPayload
 		}
 		const [contacts, interactions, tasks] = yield* Effect.all(
@@ -627,26 +629,28 @@ function DetailBody({
 	const contacts = useMemo<ReadonlyArray<ContactRow>>(
 		() =>
 			AsyncResult.isSuccess(contactsResult)
-				? narrowContacts(contactsResult.value)
+				? narrowContacts(contactsResult.value.items)
 				: [],
 		[contactsResult],
 	)
 	const timelineEntries = useMemo<ReadonlyArray<TimelineRow>>(
 		() =>
 			AsyncResult.isSuccess(timelineResult)
-				? narrowTimeline(timelineResult.value)
+				? narrowTimeline(timelineResult.value.items)
 				: [],
 		[timelineResult],
 	)
 	const tasks = useMemo<ReadonlyArray<TaskEntry>>(
 		() =>
-			AsyncResult.isSuccess(tasksResult) ? narrowTasks(tasksResult.value) : [],
+			AsyncResult.isSuccess(tasksResult)
+				? narrowTasks(tasksResult.value.items)
+				: [],
 		[tasksResult],
 	)
 	const researchRuns = useMemo<ReadonlyArray<ResearchRunRow>>(
 		() =>
 			AsyncResult.isSuccess(researchResult)
-				? narrowResearch(researchResult.value)
+				? narrowResearch(researchResult.value.items)
 				: [],
 		[researchResult],
 	)
@@ -677,7 +681,7 @@ function DetailBody({
 	const companyPages = useMemo<ReadonlyArray<PageEntry>>(() => {
 		if (!AsyncResult.isSuccess(pagesResult)) return []
 		const out: Array<PageEntry> = []
-		for (const row of pagesResult.value as ReadonlyArray<unknown>) {
+		for (const row of pagesResult.value.items as ReadonlyArray<unknown>) {
 			if (!row || typeof row !== 'object') continue
 			const r = row as Record<string, unknown>
 			if (typeof r['id'] !== 'string') continue

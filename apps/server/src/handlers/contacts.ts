@@ -6,6 +6,7 @@ import { SqlClient } from 'effect/unstable/sql'
 import { BatudaApi, CurrentOrg } from '@batuda/controllers'
 import { Contact, ContactChannel } from '@batuda/domain'
 
+import { resolvePageTotal } from '../lib/sql-pagination'
 import {
 	addChannel,
 	channelsOf,
@@ -28,6 +29,8 @@ export const ContactsLive = HttpApiBuilder.group(
 			return handlers
 				.handle('list', _ =>
 					Effect.gen(function* () {
+						const limit = _.query.limit ?? 100
+						const offset = _.query.offset ?? 0
 						const conditions: Array<Statement.Fragment> = []
 						if (_.query.companyId)
 							conditions.push(sql`c.company_id = ${_.query.companyId}`)
@@ -55,14 +58,24 @@ export const ContactsLive = HttpApiBuilder.group(
 								FROM research_links rl
 								JOIN research_runs r ON r.id = rl.research_id
 								WHERE rl.subject_table = 'contacts' AND rl.subject_id = c.id
-							), '[]'::json) AS provenance
+							), '[]'::json) AS provenance,
+							COUNT(*) OVER () AS total
 							FROM contacts c
 							WHERE ${sql.and(conditions)}
 							ORDER BY c.name
+							LIMIT ${limit} OFFSET ${offset}
 						`
+						const total = yield* resolvePageTotal(
+							rows as ReadonlyArray<{ readonly total: string | number }>,
+							offset,
+							() => sql<{ readonly count: string | number }>`
+								SELECT count(*) AS count FROM contacts c
+								WHERE ${sql.and(conditions)}
+							`,
+						)
 						// Decode each contact's own columns; `channels` and `provenance`
 						// are already JSON from the aggregates, so keep them as-is.
-						return yield* Effect.forEach(rows, row =>
+						const items = yield* Effect.forEach(rows, row =>
 							decodeContact(row).pipe(
 								Effect.map(c => ({
 									...c,
@@ -75,6 +88,7 @@ export const ContactsLive = HttpApiBuilder.group(
 								})),
 							),
 						)
+						return { items, total, limit, offset }
 					}).pipe(Effect.orDie),
 				)
 				.handle('create', _ =>

@@ -19,6 +19,7 @@ import { ErrorState } from '#/components/shared/error-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { dehydrateAtom } from '#/lib/atom-hydration'
+import type { PaginatedList } from '#/lib/paginated-list'
 import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import {
@@ -48,7 +49,7 @@ const validateSearch = validateSearchWith({
 
 async function loadPagesOnServer(
 	search: PagesSearch,
-): Promise<{ pages: ReadonlyArray<(typeof PageSummary)['Type']> }> {
+): Promise<{ pages: PaginatedList<(typeof PageSummary)['Type']> }> {
 	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
 		import('effect'),
 		import('#/lib/batuda-api-server'),
@@ -96,7 +97,8 @@ function PagesListPage() {
 	const refreshPages = useAtomRefresh(atom)
 
 	const pages = useMemo<ReadonlyArray<PageRow>>(
-		() => (AsyncResult.isSuccess(result) ? narrowPages(result.value) : []),
+		() =>
+			AsyncResult.isSuccess(result) ? narrowPages(result.value.items) : [],
 		[result],
 	)
 	const isLoading = AsyncResult.isInitial(result)

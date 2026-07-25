@@ -5,6 +5,7 @@ import { SqlClient } from 'effect/unstable/sql'
 import { BadRequest, Conflict, CurrentOrg, NotFound } from '@batuda/controllers'
 import { Task } from '@batuda/domain'
 
+import { resolvePageTotal } from '../lib/sql-pagination'
 import {
 	TaskCompleted,
 	TaskCreated,
@@ -207,13 +208,24 @@ export class TaskService extends Context.Service<TaskService>()('TaskService', {
 						page.sort === 'recent'
 							? sql`COALESCE(due_at, created_at) DESC`
 							: sql`due_at ASC NULLS LAST, created_at ASC`
-					const rows = yield* sql`
-							SELECT * FROM tasks
+					const rows = yield* sql<{ readonly total: string | number }>`
+							SELECT *, COUNT(*) OVER () AS total FROM tasks
 							WHERE ${sql.and(conditions)}
 							ORDER BY ${order}
 							LIMIT ${page.limit} OFFSET ${page.offset}
 						`
-					return yield* decodeTasks(rows).pipe(Effect.orDie)
+
+					const total = yield* resolvePageTotal(
+						rows,
+						page.offset,
+						() => sql<{ readonly count: string | number }>`
+							SELECT count(*) AS count FROM tasks
+							WHERE ${sql.and(conditions)}
+						`,
+					).pipe(Effect.orDie)
+
+					const items = yield* decodeTasks(rows).pipe(Effect.orDie)
+					return { items, total, limit: page.limit, offset: page.offset }
 				}),
 
 			complete: (id: string, actor: TaskActor) =>

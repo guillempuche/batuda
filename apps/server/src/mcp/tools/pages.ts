@@ -168,7 +168,7 @@ export const PageHandlersLive = PageTools.toLayer(
 						status: params.status,
 						lang: params.lang,
 					})
-					return toItems(pages)
+					return toItems(pages.items)
 				}).pipe(Effect.orDie),
 			get_page: ({ id_or_slug, lang }) =>
 				Effect.gen(function* () {

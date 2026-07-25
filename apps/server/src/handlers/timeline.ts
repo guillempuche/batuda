@@ -6,6 +6,8 @@ import { SqlClient } from 'effect/unstable/sql'
 import { BatudaApi } from '@batuda/controllers'
 import { TimelineActivity } from '@batuda/domain'
 
+import { resolvePageTotal } from '../lib/sql-pagination'
+
 const decodeActivities = Schema.decodeUnknownEffect(
 	Schema.Array(TimelineActivity),
 )
@@ -33,15 +35,25 @@ export const TimelineLive = HttpApiBuilder.group(
 						}
 					}
 					const limit = Math.min(_.query.limit ?? 50, 200)
+					const offset = _.query.offset ?? 0
 					const whereClause =
 						conditions.length > 0 ? sql`WHERE ${sql.and(conditions)}` : sql``
-					const rows = yield* sql`
-						SELECT * FROM timeline_activity
+					const rows = yield* sql<{ readonly total: string | number }>`
+						SELECT *, COUNT(*) OVER () AS total FROM timeline_activity
 						${whereClause}
 						ORDER BY occurred_at DESC
-						LIMIT ${limit}
+						LIMIT ${limit} OFFSET ${offset}
 					`
-					return yield* decodeActivities(rows)
+					const total = yield* resolvePageTotal(
+						rows,
+						offset,
+						() => sql<{ readonly count: string | number }>`
+							SELECT count(*) AS count FROM timeline_activity
+							${whereClause}
+						`,
+					)
+					const items = yield* decodeActivities(rows)
+					return { items, total, limit, offset }
 				}).pipe(Effect.orDie),
 			)
 		}),

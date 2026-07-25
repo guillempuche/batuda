@@ -93,7 +93,7 @@ export function QuickCaptureDialog() {
 	const companiesResult = useAtomValue(companiesAtom)
 	const companyOptions = useMemo<ReadonlyArray<CompanyOption>>(() => {
 		if (!AsyncResult.isSuccess(companiesResult)) return []
-		const rows = companiesResult.value as ReadonlyArray<unknown>
+		const rows = companiesResult.value.items as ReadonlyArray<unknown>
 		const result: Array<CompanyOption> = []
 		for (const row of rows) {
 			if (row && typeof row === 'object') {

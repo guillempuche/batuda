@@ -573,7 +573,9 @@ function SuppressionGuard({
 	const contactsResult = useAtomValue(contactsAtomFor(companyId))
 	const contacts = useMemo(
 		() =>
-			AsyncResult.isSuccess(contactsResult) ? contactsResult.value : undefined,
+			AsyncResult.isSuccess(contactsResult)
+				? contactsResult.value.items
+				: undefined,
 		[contactsResult],
 	)
 

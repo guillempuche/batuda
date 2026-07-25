@@ -11,6 +11,7 @@ import { TiptapDocument } from '@batuda/ui/blocks'
 import { NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
+import { PaginatedList } from '../pagination'
 
 // Listing projection: page metadata without the Tiptap `content`/`meta` blobs,
 // so a company's page index stays light.
@@ -53,8 +54,10 @@ export const PagesGroup = HttpApiGroup.make('pages')
 				companyId: Schema.optional(Schema.String),
 				status: Schema.optional(Schema.String),
 				lang: Schema.optional(Schema.String),
+				limit: Schema.optional(Schema.NumberFromString),
+				offset: Schema.optional(Schema.NumberFromString),
 			},
-			success: Schema.Array(PageSummary),
+			success: PaginatedList(PageSummary),
 		}),
 	)
 	.add(

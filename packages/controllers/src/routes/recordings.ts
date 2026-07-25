@@ -10,6 +10,7 @@ import { CallRecording, DbNumber } from '@batuda/domain'
 import { BadRequest, Conflict, NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
+import { PaginatedList } from '../pagination'
 
 // List projection: recording metadata joined with its interaction's date,
 // contact, and summary. Dates encode to ISO strings on the wire.
@@ -64,7 +65,7 @@ export const RecordingsGroup = HttpApiGroup.make('recordings')
 				limit: Schema.optional(Schema.NumberFromString),
 				offset: Schema.optional(Schema.NumberFromString),
 			},
-			success: Schema.Array(RecordingSummary),
+			success: PaginatedList(RecordingSummary),
 		}),
 	)
 	.add(

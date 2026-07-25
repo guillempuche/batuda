@@ -191,7 +191,7 @@ function ThreadDetailPage() {
 	const companiesById = useMemo<Map<string, CompanyLookup>>(() => {
 		if (!AsyncResult.isSuccess(companiesResult)) return new Map()
 		const map = new Map<string, CompanyLookup>()
-		for (const row of companiesResult.value as ReadonlyArray<unknown>) {
+		for (const row of companiesResult.value.items as ReadonlyArray<unknown>) {
 			if (!row || typeof row !== 'object') continue
 			const r = row as Record<string, unknown>
 			if (

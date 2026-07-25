@@ -82,7 +82,9 @@ export function DocumentsPanel({ companyId }: { readonly companyId: string }) {
 	)
 	const result = useAtomValue(docsAtom)
 	const refresh = useAtomRefresh(docsAtom)
-	const docs = AsyncResult.isSuccess(result) ? narrowDocs(result.value) : []
+	const docs = AsyncResult.isSuccess(result)
+		? narrowDocs(result.value.items)
+		: []
 	const [dialog, setDialog] = useState<DialogState>({ mode: 'closed' })
 
 	const typeLabel = (type: string) => {

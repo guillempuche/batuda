@@ -10,6 +10,7 @@ import { Proposal } from '@batuda/domain'
 import { NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
+import { PaginatedList } from '../pagination'
 
 const CreateProposalInput = Schema.Struct({
 	companyId: Schema.String,
@@ -39,8 +40,10 @@ export const ProposalsGroup = HttpApiGroup.make('proposals')
 		HttpApiEndpoint.get('list', '/proposals', {
 			query: {
 				companyId: Schema.optional(Schema.String),
+				limit: Schema.optional(Schema.NumberFromString),
+				offset: Schema.optional(Schema.NumberFromString),
 			},
-			success: Schema.Array(Proposal.json),
+			success: PaginatedList(Proposal.json),
 		}),
 	)
 	.add(

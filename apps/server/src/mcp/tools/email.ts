@@ -872,7 +872,10 @@ export const EmailHandlersLive = EmailTools.toLayer(
 						}),
 						...(params.limit !== undefined && { limit: params.limit }),
 					})
-					.pipe(Effect.orDie, Effect.map(toItems)),
+					.pipe(
+						Effect.orDie,
+						Effect.map(page => toItems(page.items)),
+					),
 			get_email_message: ({ message_id }) =>
 				svc.getMessage(message_id).pipe(Effect.orDie),
 			download_email_attachment: ({ message_id, attachment_id }) =>
@@ -1080,7 +1083,10 @@ export const EmailHandlersLive = EmailTools.toLayer(
 				}
 			},
 			list_email_drafts: params =>
-				svc.listDrafts(params.inbox_id).pipe(Effect.orDie, Effect.map(toItems)),
+				svc.listDrafts(params.inbox_id).pipe(
+					Effect.orDie,
+					Effect.map(page => toItems(page.items)),
+				),
 			get_email_draft: ({ inbox_id, draft_id }) =>
 				svc.getDraft(inbox_id, draft_id).pipe(Effect.orDie),
 			list_inbox_footers: params =>
