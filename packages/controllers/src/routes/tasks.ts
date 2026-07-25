@@ -129,9 +129,10 @@ export const TasksGroup = HttpApiGroup.make('tasks')
 				todayStart: Schema.optional(Schema.String),
 				todayEnd: Schema.optional(Schema.String),
 				weekEnd: Schema.optional(Schema.String),
-				// `due` leads with the soonest deadline; `recent` leads with the
-				// latest date on the task — its due date, or when it was created.
-				sort: Schema.optional(Schema.Literals(['recent', 'due'])),
+				// `due` leads with the soonest deadline; `recent` with the latest
+				// date on the task — its due date, or when it was created; and
+				// `completed` with the most recently finished.
+				sort: Schema.optional(Schema.Literals(['recent', 'due', 'completed'])),
 				limit: Schema.optional(Schema.NumberFromString),
 				offset: Schema.optional(Schema.NumberFromString),
 			},
