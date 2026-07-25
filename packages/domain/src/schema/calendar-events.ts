@@ -63,3 +63,19 @@ export class CalendarEvent extends Model.Class<CalendarEvent>('CalendarEvent')({
 	createdAt: Model.DateTimeInsertFromDate,
 	updatedAt: Model.DateTimeUpdateFromDate,
 }) {}
+
+// Someone invited to an event. `contactId` is null when the address matches
+// nobody we know — which is exactly the person worth looking up before the
+// meeting, so the wire carries the null rather than dropping the row.
+export class CalendarEventAttendee extends Model.Class<CalendarEventAttendee>(
+	'CalendarEventAttendee',
+)({
+	id: Model.GeneratedByDb(Schema.String),
+	email: Schema.String,
+	name: Schema.NullOr(Schema.String),
+	contactId: Schema.NullOr(Schema.String),
+	companyId: Schema.NullOr(Schema.String),
+	rsvp: Schema.String,
+	// values: needs-action | accepted | declined | tentative
+	isOrganizer: Schema.Boolean,
+}) {}

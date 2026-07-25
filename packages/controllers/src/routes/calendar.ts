@@ -6,7 +6,11 @@ import {
 } from 'effect/unstable/httpapi'
 
 import { CalendarLocationType } from '@batuda/calendar'
-import { CalendarEvent, CalendarEventType } from '@batuda/domain'
+import {
+	CalendarEvent,
+	CalendarEventAttendee,
+	CalendarEventType,
+} from '@batuda/domain'
 
 import { BadRequest, Conflict, Forbidden, NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
@@ -18,6 +22,14 @@ import { PaginatedList } from '../pagination'
 export const Slot = Schema.Struct({
 	start: Schema.DateTimeUtcFromString,
 	end: Schema.DateTimeUtcFromString,
+})
+
+// An event plus the people invited to it. Preparing for a meeting starts with
+// who will be in the room, so both the list and the detail endpoint carry the
+// guests alongside the event's own columns.
+export const CalendarEventWithAttendees = Schema.Struct({
+	...CalendarEvent.json.fields,
+	attendees: Schema.Array(CalendarEventAttendee.json),
 })
 
 // ── Input schemas ──
@@ -73,13 +85,13 @@ export const CalendarGroup = HttpApiGroup.make('calendar')
 				limit: Schema.optional(Schema.NumberFromString),
 				offset: Schema.optional(Schema.NumberFromString),
 			},
-			success: PaginatedList(CalendarEvent.json),
+			success: PaginatedList(CalendarEventWithAttendees),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.get('getEvent', '/calendar/events/:id', {
 			params: { id: Schema.String },
-			success: CalendarEvent.json,
+			success: CalendarEventWithAttendees,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)

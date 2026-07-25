@@ -376,7 +376,9 @@ export class CalendarService extends Context.Service<CalendarService>()(
 							metadata: args.metadata ? JSON.stringify(args.metadata) : null,
 							rawIcs: null,
 						})}
-					ON CONFLICT (ical_uid) DO UPDATE SET
+					-- The same invitation can reach two orgs, so an event is unique
+					-- per org and the conflict target names both columns.
+					ON CONFLICT (organization_id, ical_uid) DO UPDATE SET
 						ical_sequence = EXCLUDED.ical_sequence,
 						provider_booking_id = EXCLUDED.provider_booking_id,
 						provider = EXCLUDED.provider,
@@ -796,7 +798,9 @@ export class CalendarService extends Context.Service<CalendarService>()(
 								}),
 								rawIcs,
 							})}
-							ON CONFLICT (ical_uid) DO UPDATE SET
+							-- The same invitation can reach two orgs, so an event is
+							-- unique per org and the conflict target names both columns.
+							ON CONFLICT (organization_id, ical_uid) DO UPDATE SET
 								ical_sequence = EXCLUDED.ical_sequence,
 								start_at = EXCLUDED.start_at,
 								end_at = EXCLUDED.end_at,

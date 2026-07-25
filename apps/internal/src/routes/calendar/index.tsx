@@ -7,7 +7,6 @@ import { CalendarPlus, Check, CircleHelp, X } from 'lucide-react'
 import { lazy, Suspense, useCallback, useMemo } from 'react'
 import styled from 'styled-components'
 
-import type { CalendarEvent, CalendarEventType, Company } from '@batuda/domain'
 import { PriButton, PriDialog } from '@batuda/ui/pri'
 
 import {
@@ -21,7 +20,6 @@ import { EmptyState } from '#/components/shared/empty-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { dlgWithId } from '#/lib/dlg-search'
-import type { PaginatedList } from '#/lib/paginated-list'
 import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import { useDlg } from '#/lib/use-dlg'
@@ -61,11 +59,9 @@ type CompanyLookup = {
 
 const ScheduleGrid = lazy(() => import('#/components/calendar/schedule-grid'))
 
-async function loadCalendarOnServer(): Promise<{
-	events: PaginatedList<CalendarEvent>
-	eventTypes: ReadonlyArray<CalendarEventType>
-	companies: PaginatedList<Company>
-}> {
+// The shape is taken from the API client rather than written out here, so a
+// change to what the endpoint returns can't leave a stale copy behind.
+async function loadCalendarOnServer() {
 	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
 		import('effect'),
 		import('#/lib/batuda-api-server'),

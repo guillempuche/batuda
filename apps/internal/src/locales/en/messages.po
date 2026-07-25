@@ -59,7 +59,7 @@ msgstr "(no summary)"
 msgid "{0, plural, one {# template} other {# templates}}"
 msgstr "{0, plural, one {# template} other {# templates}}"
 
-#. placeholder {0}: ev.attendeeCount
+#. placeholder {0}: ev.attendees.length
 #: src/components/companies/upcoming-meetings-card.tsx
 msgid "{0} attendees"
 msgstr "{0} attendees"
@@ -1560,6 +1560,10 @@ msgstr "Decision maker"
 #: src/routes/calendar/index.tsx
 msgid "Decline"
 msgstr "Decline"
+
+#: src/components/companies/upcoming-meetings-card.tsx
+msgid "declined"
+msgstr "declined"
 
 #: src/components/instructions/stack-list.tsx
 #: src/routes/emails/inboxes.tsx
@@ -3082,6 +3086,10 @@ msgstr "none scheduled"
 msgid "Normal priority"
 msgstr "Normal priority"
 
+#: src/components/companies/upcoming-meetings-card.tsx
+msgid "Not a contact on file yet"
+msgstr "Not a contact on file yet"
+
 #: src/components/companies/company-fit-section.tsx
 msgid "Not a fit"
 msgstr "Not a fit"
@@ -3277,6 +3285,10 @@ msgstr "Organization removed"
 #: src/routes/settings/mcp/connections.tsx
 msgid "Organizations"
 msgstr "Organizations"
+
+#: src/components/companies/upcoming-meetings-card.tsx
+msgid "organizer"
+msgstr "organizer"
 
 #: src/components/shared/channel-icon.tsx
 msgid "Other"
@@ -4508,6 +4520,7 @@ msgid "Tags filter (comma-separated)"
 msgstr "Tags filter (comma-separated)"
 
 #: src/components/companies/conversations-tab.tsx
+#: src/components/shared/channel-icon.tsx
 msgid "Task"
 msgstr "Task"
 
@@ -4540,6 +4553,10 @@ msgstr "Template deleted"
 #: src/routes/settings/profile/templates.tsx
 msgid "Templates"
 msgstr "Templates"
+
+#: src/components/companies/upcoming-meetings-card.tsx
+msgid "tentative"
+msgstr "tentative"
 
 #: src/routes/calendar/index.tsx
 msgid "Tentative"
