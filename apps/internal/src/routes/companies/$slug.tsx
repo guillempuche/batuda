@@ -1687,8 +1687,8 @@ function fitCheckList(raw: unknown): ReadonlyArray<FitCheck> | null {
 		out.push({
 			criterion: e['criterion'],
 			result: e['result'],
-			evidenceQuote: optionalText(e, 'evidenceQuote'),
-			sourceId: optionalText(e, 'sourceId'),
+			evidenceQuote: optionalText(e, 'evidence_quote'),
+			sourceId: optionalText(e, 'source_id'),
 		})
 	}
 	return out
@@ -1705,7 +1705,7 @@ function fitConflictList(raw: unknown): ReadonlyArray<FitConflict> | null {
 		out.push({
 			field: e['field'],
 			value: e['value'],
-			sourceId: optionalText(e, 'sourceId'),
+			sourceId: optionalText(e, 'source_id'),
 			note: optionalText(e, 'note'),
 		})
 	}

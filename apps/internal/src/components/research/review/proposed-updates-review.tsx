@@ -403,13 +403,13 @@ function narrowRunContext(raw: unknown): RunContext {
 	if (Array.isArray(r['sources'])) {
 		for (const item of r['sources']) {
 			if (!item || typeof item !== 'object') continue
-			const s = item as Record<string, unknown>
-			const id =
-				typeof s['id'] === 'string'
-					? s['id']
-					: typeof s['sourceId'] === 'string'
-						? s['sourceId']
-						: null
+			// Each entry is the run's record of visiting a page, with the page
+			// itself nested inside; the address and title a citation links to live
+			// on the page, not on the visit.
+			const source = (item as Record<string, unknown>)['source']
+			if (!source || typeof source !== 'object') continue
+			const s = source as Record<string, unknown>
+			const id = typeof s['id'] === 'string' ? s['id'] : null
 			const url = typeof s['url'] === 'string' ? s['url'] : null
 			if (id !== null && url !== null) {
 				sourceById.set(id, {
@@ -427,7 +427,7 @@ function narrowRunContext(raw: unknown): RunContext {
 		completedAt: dateToIsoOrNull(r['completedAt']),
 		sourceById,
 		discoveredExisting: narrowDiscoveredExisting(
-			findings['discoveredExisting'],
+			findings['discovered_existing'],
 		),
 	}
 }
@@ -441,13 +441,13 @@ function narrowDiscoveredExisting(
 		if (!item || typeof item !== 'object') continue
 		const d = item as Record<string, unknown>
 		if (
-			typeof d['subjectTable'] === 'string' &&
-			typeof d['subjectId'] === 'string' &&
+			typeof d['subject_table'] === 'string' &&
+			typeof d['subject_id'] === 'string' &&
 			typeof d['name'] === 'string'
 		) {
 			out.push({
-				subjectTable: d['subjectTable'],
-				subjectId: d['subjectId'],
+				subject_table: d['subject_table'],
+				subject_id: d['subject_id'],
 				name: d['name'],
 			})
 		}

@@ -108,9 +108,10 @@ export class Company extends Model.Class<Company>('Company')({
 	// fitVerdict values: strong_fit | possible_fit | weak_fit | no_fit
 	// fitChecks[].result values: pass | fail | unknown
 	//
-	// The json keys are camelCase because the Postgres client camelCases every key
-	// it reads, including the ones inside a jsonb value — writing them that way
-	// already is what makes a stored shape survive the round trip unchanged.
+	// The fit checks and conflicts are kept word for word as the research run
+	// wrote them, so their inner names are the ones the research schema defines.
+	// The provenance map is built entry by entry instead, so it carries this
+	// app's own names.
 	accountBrief: Schema.NullOr(Schema.String),
 	briefUpdatedBy: Schema.NullOr(Schema.String),
 	briefUpdatedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
@@ -132,8 +133,8 @@ export class Company extends Model.Class<Company>('Company')({
 			Schema.Struct({
 				criterion: Schema.String,
 				result: Schema.String,
-				evidenceQuote: Schema.optionalKey(Schema.String),
-				sourceId: Schema.optionalKey(Schema.String),
+				evidence_quote: Schema.optionalKey(Schema.String),
+				source_id: Schema.optionalKey(Schema.String),
 			}),
 		),
 	),
@@ -142,7 +143,7 @@ export class Company extends Model.Class<Company>('Company')({
 			Schema.Struct({
 				field: Schema.String,
 				value: Schema.String,
-				sourceId: Schema.optionalKey(Schema.String),
+				source_id: Schema.optionalKey(Schema.String),
 				note: Schema.optionalKey(Schema.String),
 			}),
 		),

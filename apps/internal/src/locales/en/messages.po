@@ -74,8 +74,8 @@ msgstr "{0} attendees"
 msgid "{0} calls"
 msgstr "{0} calls"
 
-#. placeholder {0}: quality.fieldsGrounded ?? 0
-#. placeholder {1}: quality.sourcesMatched ?? 0
+#. placeholder {0}: quality.fields_grounded ?? 0
+#. placeholder {1}: quality.sources_matched ?? 0
 #. placeholder {2}: quality.rounds ?? 0
 #: src/components/research/findings/company-enrichment-view.tsx
 msgid "{0} fields grounded · {1} own-domain sources · {2} rounds"
