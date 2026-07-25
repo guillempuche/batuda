@@ -11,6 +11,7 @@ import {
 	addChannel,
 	channelsOf,
 	clearEmailSuppression,
+	contactChannelsJson,
 	deleteChannel,
 	patchChannel,
 	writeChannels,
@@ -40,11 +41,7 @@ export const ContactsLive = HttpApiBuilder.group(
 						// security limits the linked runs to the caller's org; how the
 						// trail is worded is left to the presentation layer.
 						const rows = yield* sql`
-							SELECT c.*, COALESCE(
-								(SELECT json_agg(ch ORDER BY ch.is_primary DESC, ch.kind)
-								 FROM contact_channels ch WHERE ch.contact_id = c.id),
-								'[]'::json
-							) AS channels,
+							SELECT c.*, ${contactChannelsJson(sql)} AS channels,
 							COALESCE((
 								SELECT json_agg(json_build_object(
 									'runId', rl.research_id,

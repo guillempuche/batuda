@@ -12,6 +12,7 @@ import { Contact, ContactChannel } from '@batuda/domain'
 import {
 	channelsOf,
 	clearEmailSuppression,
+	contactChannelsJson,
 	writeChannels,
 } from '../../services/contact-channels'
 import { ListResult, toItems } from './_result'
@@ -107,11 +108,7 @@ export const ContactHandlersLive = ContactTools.toLayer(
 			list_contacts: ({ company_id }) =>
 				Effect.gen(function* () {
 					const rows = yield* sql`
-						SELECT c.*, COALESCE(
-							(SELECT json_agg(ch ORDER BY ch.is_primary DESC, ch.kind)
-							 FROM contact_channels ch WHERE ch.contact_id = c.id),
-							'[]'::json
-						) AS channels
+						SELECT c.*, ${contactChannelsJson(sql)} AS channels
 						FROM contacts c
 						WHERE c.company_id = ${company_id}
 						ORDER BY c.name

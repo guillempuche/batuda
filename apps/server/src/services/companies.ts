@@ -6,6 +6,7 @@ import { CompanyResearchRun, CurrentOrg, NotFound } from '@batuda/controllers'
 import { Company, Contact, Interaction } from '@batuda/domain'
 
 import { resolvePageTotal } from '../lib/sql-pagination'
+import { contactChannelsJson } from './contact-channels'
 import { researchProvenance } from './research-provenance'
 
 export interface CompanyFilters {
@@ -222,11 +223,7 @@ export class CompanyService extends Context.Service<CompanyService>()(
 						const companyId = companyRow['id']
 
 						const contactRows = yield* sql`
-							SELECT c.*, COALESCE(
-								(SELECT json_agg(ch ORDER BY ch.is_primary DESC, ch.kind)
-								 FROM contact_channels ch WHERE ch.contact_id = c.id),
-								'[]'::json
-							) AS channels
+							SELECT c.*, ${contactChannelsJson(sql)} AS channels
 							FROM contacts c
 							WHERE c.company_id = ${companyId}
 							  AND c.organization_id = ${currentOrg.id}
