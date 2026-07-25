@@ -54,6 +54,11 @@ msgstr "(sense assumpte)"
 msgid "(no summary)"
 msgstr "(sense resum)"
 
+#. placeholder {0}: counts[shelf]
+#: src/routes/tasks/index.tsx
+msgid "{0, plural, one {# task} other {# tasks}}"
+msgstr "{0, plural, one {# tasca} other {# tasques}}"
+
 #. placeholder {0}: stack.templateIds.length
 #: src/components/instructions/stack-list.tsx
 msgid "{0, plural, one {# template} other {# templates}}"
@@ -106,6 +111,12 @@ msgstr "{0} passos fets"
 #: src/routes/emails/index.tsx
 msgid "{0} thread could not be updated."
 msgstr "No s'han pogut actualitzar {0} fils."
+
+#. placeholder {0}: t(shelfCopy(selectedShelf).label)
+#. placeholder {1}: visibleTasks.length
+#: src/routes/tasks/index.tsx
+msgid "{0}: showing {1} of {shelfTotal} tasks."
+msgstr "{0}: es mostren {1} de {shelfTotal} tasques."
 
 #: src/routes/settings/organization/members.tsx
 msgid "{addedEmail} is now a member. They've been emailed."
@@ -1217,6 +1228,10 @@ msgstr "No s'ha pogut carregar el tauler"
 msgid "Could not load the review queue."
 msgstr "No s'ha pogut carregar la cua de revisió."
 
+#: src/routes/tasks/index.tsx
+msgid "Could not load these tasks"
+msgstr "No s'han pogut carregar aquestes tasques"
+
 #: src/routes/companies/$slug.tsx
 msgid "Could not load this company"
 msgstr "No s'ha pogut carregar aquesta empresa"
@@ -1421,6 +1436,10 @@ msgstr "No s'ha pogut canviar"
 #: src/routes/settings/profile/index.tsx
 msgid "Couldn't update your preference. Try again."
 msgstr "No he pogut desar la teva preferència. Prova-ho de nou."
+
+#: src/routes/tasks/index.tsx
+msgid "count loading"
+msgstr "carregant el recompte"
 
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
@@ -2044,6 +2063,10 @@ msgstr "Filtra les converses"
 msgid "Filter emails"
 msgstr "Filtra correus"
 
+#: src/routes/tasks/index.tsx
+msgid "Filter tasks by shelf"
+msgstr "Filtra les tasques per prestatge"
+
 #: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/research-dialog.tsx
 #: src/components/research/research-dialog.tsx
@@ -2471,6 +2494,10 @@ msgstr "Carregant l'execució…"
 msgid "Loading runs…"
 msgstr "S'estan carregant les execucions…"
 
+#: src/routes/tasks/index.tsx
+msgid "Loading tasks…"
+msgstr "S'estan carregant les tasques…"
+
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Loading the review queue"
 msgstr "S'està carregant la cua de revisió"
@@ -2623,8 +2650,8 @@ msgid "Match device"
 msgstr "Segons el dispositiu"
 
 #: src/routes/companies/index.tsx
-msgid "Matching"
-msgstr "Coincidents"
+msgid "Matching companies"
+msgstr "Empreses coincidents"
 
 #: src/components/research/findings/competitor-scan-view.tsx
 msgid "Maturity"
@@ -4570,6 +4597,11 @@ msgstr "Títol de la tasca"
 msgid "Tasks"
 msgstr "Tasques"
 
+#. placeholder {0}: visibleTasks.length
+#: src/routes/tasks/index.tsx
+msgid "tasks — showing {0} of {shelfTotal}"
+msgstr "tasques: es mostren {0} de {shelfTotal}"
+
 #: src/components/research/findings/prospect-scan-view.tsx
 msgid "Tax ID"
 msgstr "NIF"
@@ -4684,6 +4716,10 @@ msgstr "El llibre de comptes està net."
 #: src/routes/pages/index.tsx
 msgid "The list could not be fetched. Check that the session is valid, then try again."
 msgstr "No s'ha pogut carregar la llista. Comprova que la sessió sigui vàlida i torna-ho a provar."
+
+#: src/routes/tasks/index.tsx
+msgid "The list could not be fetched. Check the connection, then try again."
+msgstr "No s'ha pogut obtenir la llista. Comprova la connexió i torna-ho a provar."
 
 #: src/routes/emails/inboxes.tsx
 msgid "The mailbox is ready."

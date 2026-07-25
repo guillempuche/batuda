@@ -251,7 +251,7 @@ function CompaniesListPage() {
 			: t`${total} companies`
 	// This counts every match, closed and dead companies included, so the label
 	// avoids "pipeline" — that word belongs to the dashboard's active-only count.
-	const countKpiLabel = activeFilters ? t`Matching` : t`All companies`
+	const countKpiLabel = activeFilters ? t`Matching companies` : t`All companies`
 
 	const countryItems = [
 		{ value: ALL, label: t`All countries` },
