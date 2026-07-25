@@ -139,11 +139,10 @@ export const parseBounce = (mail: ParsedMail): ParsedBounce | null => {
 // persisted by the regular inbound path so users see "Mail Delivery
 // Subsystem" as a normal entry in the inbox list.
 //
-// Org isolation: the email_messages match is org-scoped, and the channel
-// update narrows to this org explicitly (contact_channels carries
-// organization_id); timeline_activity has no org column, gated transitively
-// by the contacts it references. Only recipients of an email *we sent from
-// this org* get touched.
+// Org isolation: every statement here names this org explicitly — the
+// email_messages match, the contact_channels update, and the timeline_activity
+// insert, which writes the org onto each row. Only recipients of an email
+// *we sent from this org* get touched.
 export const applyBounce = (args: {
 	readonly organizationId: string
 	readonly bounce: ParsedBounce
@@ -223,10 +222,10 @@ export const applyBounce = (args: {
 		if (updatedContacts.length > 0) {
 			yield* sql`
 				INSERT INTO timeline_activity (
-					kind, entity_type, entity_id, company_id, contact_id,
+					organization_id, kind, entity_type, entity_id, company_id, contact_id,
 					channel, direction, occurred_at, payload
 				)
-				SELECT 'email_bounced', 'email_message', ${originalId}::uuid,
+				SELECT ${organizationId}, 'email_bounced', 'email_message', ${originalId}::uuid,
 				       c.company_id, c.id,
 				       'email', 'outbound', now(), ${payload}::jsonb
 				FROM contacts c
@@ -235,11 +234,11 @@ export const applyBounce = (args: {
 		} else {
 			yield* sql`
 				INSERT INTO timeline_activity (
-					kind, entity_type, entity_id,
+					organization_id, kind, entity_type, entity_id,
 					channel, direction, occurred_at, payload
 				)
 				VALUES (
-					'email_bounced', 'email_message', ${originalId}::uuid,
+					${organizationId}, 'email_bounced', 'email_message', ${originalId}::uuid,
 					'email', 'outbound', now(), ${payload}::jsonb
 				)
 			`
