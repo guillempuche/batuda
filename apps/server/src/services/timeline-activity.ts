@@ -14,6 +14,9 @@ export class EmailSent extends Data.TaggedClass('EmailSent')<{
 	readonly contactId: string | null
 	readonly subject: string | null
 	readonly summary: string | null
+	// The conversation this message belongs to, so the history entry can
+	// open it.
+	readonly threadLinkId: string | null
 	readonly actorUserId: string | null
 	readonly occurredAt: Date
 }> {}
@@ -282,7 +285,7 @@ const rowBase = (event: TimelineEvent): TimelineRowBase => {
 				actorUserId: event.actorUserId,
 				occurredAt: event.occurredAt,
 				summary: event.summary,
-				payload: { subject: event.subject },
+				payload: { subject: event.subject, threadLinkId: event.threadLinkId },
 			}
 		case 'EmailReceived':
 			return {
