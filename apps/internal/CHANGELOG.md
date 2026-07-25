@@ -3,6 +3,53 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-25 (internal-v2026.7.25)
+
+### Features
+
+* add a match count to the list endpoints ([a6ed26f](https://github.com/guillempuche/batuda/commit/a6ed26f9292a2a63ebc0e4e93725565601dfb6a9))
+* **controllers:** carry a company's research history on its detail ([d908a5e](https://github.com/guillempuche/batuda/commit/d908a5e19e1c3273eb19b0ed387116bae7e52e8d))
+* **domain:** store a company's brief, provenance and fit ([dd9f12f](https://github.com/guillempuche/batuda/commit/dd9f12fed71bf5b143d0fb7a07a8496f2291a04c))
+* **internal:** add a rich-text markdown editor to templates ([2caad8f](https://github.com/guillempuche/batuda/commit/2caad8ff7e2fdb525032cf73915f9a85e5c27a49))
+* **internal:** make dialogs URL-navigable via a dlg search param ([754226e](https://github.com/guillempuche/batuda/commit/754226ec996e399db705a729de7df41341037fa5))
+* **internal:** manage named instruction stacks in settings ([64e8c49](https://github.com/guillempuche/batuda/commit/64e8c49c0d34c0c8070293df1567c6e57b007062))
+* **internal:** show a company's brief, fit, and low-confidence runs ([590f922](https://github.com/guillempuche/batuda/commit/590f9222137b1babc65be8857dbf913db098a7b7))
+* **research:** ground findings to the right company and fill the gaps ([33f6563](https://github.com/guillempuche/batuda/commit/33f6563cbd57fb6e7ba40a6458926e3992d37353))
+* support multiple named instruction stacks per org and user ([f111b3d](https://github.com/guillempuche/batuda/commit/f111b3d33d2f658a9c3721759d0fea53896c5bf6))
+* **ui:** add mobile dialog sheets and a destructive button ([80cf0c0](https://github.com/guillempuche/batuda/commit/80cf0c081c8f50ea89aae9d534924b96d7eb92ad))
+
+### Bug Fixes
+
+* **instructions:** refuse to transfer a template still used in a stack ([4ea4d50](https://github.com/guillempuche/batuda/commit/4ea4d5057b42e9c99f222c2774d5d852d796b838))
+* **internal:** count active companies from the whole pipeline ([7bcf46e](https://github.com/guillempuche/batuda/commit/7bcf46ef4076f9463367b26084a4d25419129660)), closes [#322](https://github.com/guillempuche/batuda/issues/322)
+* **internal:** flag bounced-email contacts and block sending to them ([256879b](https://github.com/guillempuche/batuda/commit/256879b1f3480886617f714dd038d3fff28a1769))
+* **internal:** give the companies list and board the same header ([601bd74](https://github.com/guillempuche/batuda/commit/601bd742bd3c2e4584b040dc1ed092dc1462a96d))
+* **internal:** give the pipeline board columns equal width ([5da7105](https://github.com/guillempuche/batuda/commit/5da7105d2b6c6f2d0a91bfe54dba875535ae9def))
+* **internal:** keep a proposal's outcome visible after the page settles ([e53bab9](https://github.com/guillempuche/batuda/commit/e53bab99f16b81b90187e902c23c76e327b98835)), closes [#308](https://github.com/guillempuche/batuda/issues/308)
+* **internal:** keep the companies list from overflowing and stretching ([7f279a9](https://github.com/guillempuche/batuda/commit/7f279a94b0c99bfcda1fa4fc95314c21246ba229))
+* **internal:** mark the empty-state title as a heading ([2dab02b](https://github.com/guillempuche/batuda/commit/2dab02b5d8de6ed4ea29e4c2b4e93dea45f7ca77))
+* **internal:** stop a failed company load reading as empty pipeline ([183a218](https://github.com/guillempuche/batuda/commit/183a218068aa9c5181bcbf14f92b22b0a0542da2))
+* **internal:** strengthen template dialog accessibility ([435c502](https://github.com/guillempuche/batuda/commit/435c5025bb41235aa0d3038c539926c9bfc8322e))
+* **research:** keep open-web searches anchored to the target company ([7aa5d00](https://github.com/guillempuche/batuda/commit/7aa5d00a1f5bfdfe30d4e0df5894549f225b0a88))
+* **ui:** respect prefers-reduced-motion in dialog transitions ([5da8b54](https://github.com/guillempuche/batuda/commit/5da8b54a1ba8758f817c495863295c073e0210cd))
+* validate the stack a run picks and report stack write failures ([f714b79](https://github.com/guillempuche/batuda/commit/f714b791dfecd7e84e0521f00b392cd0cc1e693e))
+
+### Tests
+
+* **internal:** fix the failing end-to-end tests and tag a smoke subset ([381fa9c](https://github.com/guillempuche/batuda/commit/381fa9cebfbbe546baeba4d9ad63b2a842d6f6de))
+* **internal:** run e2e against the checkout's own app and database ([ff0bacb](https://github.com/guillempuche/batuda/commit/ff0bacb4245e11fbdbbeca0f5a13da9c563806e7))
+* **internal:** stop the quick-capture smoke test racing hydration ([95632ec](https://github.com/guillempuche/batuda/commit/95632ec0543a883737502768723dd5161b0de0a4))
+
+### CI/CD
+
+* **release:** ui v2026.7.22 ([ffc3330](https://github.com/guillempuche/batuda/commit/ffc333012bde23f2f0daeb96761c23aa6ae9c63d))
+* run the end-to-end suite automatically in CI and pre-push ([38c4295](https://github.com/guillempuche/batuda/commit/38c4295f0237bf98bd949f24667c153f613017ad))
+
+### Chores
+
+* **internal:** reconcile i18n catalogs after rebasing onto main ([d624c04](https://github.com/guillempuche/batuda/commit/d624c045af62986493700b3a928cdc019bff62a6))
+* pin the [@tiptap](https://github.com/tiptap) packages to 3.28 for markdown support ([f7bfbd1](https://github.com/guillempuche/batuda/commit/f7bfbd1ce8350190f29baab361e022c066735640))
+
 ## 2026-07-22 (internal-v2026.7.22)
 
 ### Features
