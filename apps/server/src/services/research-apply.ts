@@ -67,11 +67,22 @@ export const CONTACT_FIELDS = new Set([
 const snakeToCamel = (s: string) =>
 	s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
 
-// Where one applied value came from: the page it was read from, how sure the run
-// was of it, and the date it was true as of. Kept beside the value it explains so
-// a reader can ask "where did this come from?" of any single fact on the row.
+// What the run cited for one value: which page it read the value on, how sure it
+// was, and the date the value was true as of. The page is named by the run's own
+// id for it, which only means something inside that run.
+export type FieldCitation = {
+	readonly sourceId: string
+	readonly confidence?: number
+	readonly asOf?: string
+}
+
+// Where one applied value came from, as the company row keeps it: the page's own
+// address rather than the run's private id for it, plus the run that read it.
+// Stored beside the value it explains, so a reader can ask "where did this come
+// from?" of any single fact on the row.
 export type FieldSource = {
 	readonly sourceUrl: string
+	readonly runId: string
 	readonly confidence?: number
 	readonly asOf?: string
 }
@@ -82,7 +93,7 @@ export type FieldSource = {
 // what says where that value came from. A plain value has neither.
 const readSourced = (
 	value: unknown,
-): { readonly value: unknown; readonly source?: FieldSource } => {
+): { readonly value: unknown; readonly citation?: FieldCitation } => {
 	if (
 		value === null ||
 		typeof value !== 'object' ||
@@ -92,15 +103,15 @@ const readSourced = (
 	)
 		return { value }
 	const wrapper = value as Record<string, unknown>
-	const sourceUrl = wrapper['source_id']
-	if (typeof sourceUrl !== 'string' || sourceUrl === '')
+	const sourceId = wrapper['source_id']
+	if (typeof sourceId !== 'string' || sourceId === '')
 		return { value: wrapper['value'] }
 	const confidence = wrapper['confidence']
 	const asOf = wrapper['as_of']
 	return {
 		value: wrapper['value'],
-		source: {
-			sourceUrl,
+		citation: {
+			sourceId,
 			...(typeof confidence === 'number' ? { confidence } : {}),
 			...(typeof asOf === 'string' ? { asOf } : {}),
 		},
@@ -108,28 +119,65 @@ const readSourced = (
 }
 
 /**
+ * Swap each cited page id for the page's real address, and stamp the run that
+ * cited it. A citation naming a page this run never fetched is dropped: a stored
+ * note about where a fact came from has to point somewhere a reader can open.
+ */
+const resolveFieldSources = (
+	sql: SqlClient.SqlClient,
+	runId: string,
+	citations: Record<string, FieldCitation>,
+) =>
+	Effect.gen(function* () {
+		const entries = Object.entries(citations)
+		if (entries.length === 0) return {} as Record<string, FieldSource>
+		const citedIds = [...new Set(entries.map(([, cited]) => cited.sourceId))]
+		const rows = yield* sql<{ id: string; url: string }>`
+			SELECT s.id, s.url
+			FROM research_run_sources rs
+			JOIN sources s ON s.id = rs.source_id
+			WHERE rs.research_id = ${runId} AND s.id IN ${sql.in(citedIds)}
+		`
+		const urlById = new Map(rows.map(row => [row.id, row.url]))
+		const out: Record<string, FieldSource> = {}
+		for (const [field, cited] of entries) {
+			const sourceUrl = urlById.get(cited.sourceId)
+			if (sourceUrl === undefined) continue
+			out[field] = {
+				sourceUrl,
+				runId,
+				...(cited.confidence !== undefined
+					? { confidence: cited.confidence }
+					: {}),
+				...(cited.asOf !== undefined ? { asOf: cited.asOf } : {}),
+			}
+		}
+		return out
+	})
+
+/**
  * Keep only the proposal fields that map to a writable column on the target
  * table, normalizing snake_case keys to the camelCase the SQL client expects,
- * and collect where each kept value came from.
+ * and collect the page each kept value was cited to.
  */
 export const allowlistFields = (
 	table: 'companies' | 'contacts',
 	fields: Record<string, unknown>,
 ): {
 	readonly fields: Record<string, unknown>
-	readonly sources: Record<string, FieldSource>
+	readonly citations: Record<string, FieldCitation>
 } => {
 	const allowed = table === 'companies' ? COMPANY_FIELDS : CONTACT_FIELDS
 	const out: Record<string, unknown> = {}
-	const sources: Record<string, FieldSource> = {}
+	const citations: Record<string, FieldCitation> = {}
 	for (const [key, value] of Object.entries(fields)) {
 		const camel = snakeToCamel(key)
 		if (!allowed.has(camel)) continue
 		const read = readSourced(value)
 		out[camel] = read.value
-		if (read.source !== undefined) sources[camel] = read.source
+		if (read.citation !== undefined) citations[camel] = read.citation
 	}
-	return { fields: out, sources }
+	return { fields: out, citations }
 }
 
 export type Validated =
@@ -701,10 +749,12 @@ export const resolveResearchProposedUpdate = (
 				reason: validated.reason,
 			} satisfies ResolveOutcome
 
-		const { fields, sources } = allowlistFields(
+		const { fields, citations: fieldCitations } = allowlistFields(
 			validated.table,
 			validated.fields,
 		)
+		const sources = yield* resolveFieldSources(sql, runId, fieldCitations)
+
 		// Persist the run's country onto its own target company as the run's
 		// findings are applied. `country` is not an allowlisted proposal field —
 		// it comes from the run, not the model's per-field suggestions.
