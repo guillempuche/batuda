@@ -163,7 +163,14 @@ const config = defineConfig(({ command }) => {
 			// magic-link button onClick stops attaching, sign-in form
 			// submits get dropped, etc. Symmetric source load + symmetric
 			// transform fixes the mismatch at the root.
-			conditions: ['development', 'module', 'import', 'default'],
+			//
+			// `browser` is listed because naming any condition here replaces
+			// Vite's own client-side list rather than adding to it, and that
+			// list normally carries `browser`. A package that ships separate
+			// browser and Node builds — `@react-email/render` does — would
+			// otherwise hand the browser its Node build, which reaches for
+			// Node-only globals and throws as soon as it runs.
+			conditions: ['development', 'module', 'browser', 'import', 'default'],
 		},
 		ssr: {
 			// Bundle through Vite for SSR so the React-using deps go through
