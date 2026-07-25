@@ -5,7 +5,6 @@ import { AlertTriangle, Plus, Send, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 
-import { EmailEditor } from '@batuda/email/editor'
 import type { EmailBlocks } from '@batuda/email/schema'
 import { PriButton, PriInput, PriSelect } from '@batuda/ui/pri'
 
@@ -24,6 +23,7 @@ import {
 	primaryEmailChannel,
 } from '#/components/contacts/display-channels'
 import { AttachmentPicker } from '#/components/emails/attachment-picker'
+import { EmailEditor } from '#/components/emails/email-editor'
 import { type Draft, useComposeEmail } from '#/context/compose-email-context'
 import type { StagedAttachment } from '#/lib/email-attachments'
 
