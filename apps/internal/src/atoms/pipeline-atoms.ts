@@ -28,17 +28,21 @@ export const companiesListAtom = BatudaApiAtom.query('companies', 'list', {
 
 /**
  * All open tasks (not completed). The dashboard buckets these into
- * overdue / today / this-week, and the Tasks page renders the same set
- * grouped by due date.
+ * overdue / today / this-week.
  *
  * `completed: 'false'` is a string on purpose — the server parses it
  * from the URL via `Schema.optional(Schema.String)` (see
  * `packages/controllers/src/routes/tasks.ts`). Passing a boolean would
  * fail the schema.
+ *
+ * The limit is spelled out because leaving it off means 50, not "all", and the
+ * dashboard has no "load more" — anything past the cut vanishes from the date
+ * groups, and since the furthest-out dates come back first, the most overdue
+ * are the first to go (promote to a paginated fetch as the count nears 500).
  */
 export const openTasksAtom = BatudaApiAtom.query('tasks', 'list', {
-	query: { completed: 'false' },
-	serializationKey: 'tasks:open',
+	query: { completed: 'false', limit: 500 },
+	serializationKey: 'tasks:open:500',
 })
 
 /**

@@ -83,7 +83,7 @@ async function loadPipelineDataOnServer(): Promise<PipelineData> {
 		const [companies, openTasks] = yield* Effect.all(
 			[
 				client.companies.list({ query: { limit: 500 } }),
-				client.tasks.list({ query: { completed: 'false' } }),
+				client.tasks.list({ query: { completed: 'false', limit: 500 } }),
 			],
 			{ concurrency: 2 },
 		)
@@ -190,6 +190,12 @@ function PipelinePage() {
 				: [],
 		[openTasksResult],
 	)
+
+	// Counting the rows in hand would under-report as soon as someone has more
+	// open tasks than one page holds, so the total comes from the server.
+	const openTaskCount = AsyncResult.isSuccess(openTasksResult)
+		? openTasksResult.value.total
+		: 0
 
 	const isLoading =
 		AsyncResult.isInitial(companiesResult) ||
@@ -301,7 +307,7 @@ function PipelinePage() {
 
 			<KpiRow>
 				<KpiCounter value={activeCompanyCount} label={t`Active companies`} />
-				<KpiCounter value={openTasks.length} label={t`Open tasks`} />
+				<KpiCounter value={openTaskCount} label={t`Open tasks`} />
 				<KpiCounter
 					value={snapshot?.overdueTaskCount ?? overdueTasksCount}
 					label={t`Overdue`}
