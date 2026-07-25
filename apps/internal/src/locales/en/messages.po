@@ -54,6 +54,11 @@ msgstr "(no subject)"
 msgid "(no summary)"
 msgstr "(no summary)"
 
+#. placeholder {0}: counts[shelf]
+#: src/routes/tasks/index.tsx
+msgid "{0, plural, one {# task} other {# tasks}}"
+msgstr "{0, plural, one {# task} other {# tasks}}"
+
 #. placeholder {0}: stack.templateIds.length
 #: src/components/instructions/stack-list.tsx
 msgid "{0, plural, one {# template} other {# templates}}"
@@ -106,6 +111,12 @@ msgstr "{0} steps run"
 #: src/routes/emails/index.tsx
 msgid "{0} thread could not be updated."
 msgstr "{0} thread could not be updated."
+
+#. placeholder {0}: t(shelfCopy(selectedShelf).label)
+#. placeholder {1}: visibleTasks.length
+#: src/routes/tasks/index.tsx
+msgid "{0}: showing {1} of {shelfTotal} tasks."
+msgstr "{0}: showing {1} of {shelfTotal} tasks."
 
 #: src/routes/settings/organization/members.tsx
 msgid "{addedEmail} is now a member. They've been emailed."
@@ -1217,6 +1228,10 @@ msgstr "Could not load the board"
 msgid "Could not load the review queue."
 msgstr "Could not load the review queue."
 
+#: src/routes/tasks/index.tsx
+msgid "Could not load these tasks"
+msgstr "Could not load these tasks"
+
 #: src/routes/companies/$slug.tsx
 msgid "Could not load this company"
 msgstr "Could not load this company"
@@ -1421,6 +1436,10 @@ msgstr "Couldn't switch"
 #: src/routes/settings/profile/index.tsx
 msgid "Couldn't update your preference. Try again."
 msgstr "Couldn't update your preference. Try again."
+
+#: src/routes/tasks/index.tsx
+msgid "count loading"
+msgstr "count loading"
 
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
@@ -2044,6 +2063,10 @@ msgstr "Filter conversations"
 msgid "Filter emails"
 msgstr "Filter emails"
 
+#: src/routes/tasks/index.tsx
+msgid "Filter tasks by shelf"
+msgstr "Filter tasks by shelf"
+
 #: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/research-dialog.tsx
 #: src/components/research/research-dialog.tsx
@@ -2471,6 +2494,10 @@ msgstr "Loading run…"
 msgid "Loading runs…"
 msgstr "Loading runs…"
 
+#: src/routes/tasks/index.tsx
+msgid "Loading tasks…"
+msgstr "Loading tasks…"
+
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Loading the review queue"
 msgstr "Loading the review queue"
@@ -2623,8 +2650,8 @@ msgid "Match device"
 msgstr "Match device"
 
 #: src/routes/companies/index.tsx
-msgid "Matching"
-msgstr "Matching"
+msgid "Matching companies"
+msgstr "Matching companies"
 
 #: src/components/research/findings/competitor-scan-view.tsx
 msgid "Maturity"
@@ -4570,6 +4597,11 @@ msgstr "Task title"
 msgid "Tasks"
 msgstr "Tasks"
 
+#. placeholder {0}: visibleTasks.length
+#: src/routes/tasks/index.tsx
+msgid "tasks — showing {0} of {shelfTotal}"
+msgstr "tasks — showing {0} of {shelfTotal}"
+
 #: src/components/research/findings/prospect-scan-view.tsx
 msgid "Tax ID"
 msgstr "Tax ID"
@@ -4684,6 +4716,10 @@ msgstr "The ledger is clean."
 #: src/routes/pages/index.tsx
 msgid "The list could not be fetched. Check that the session is valid, then try again."
 msgstr "The list could not be fetched. Check that the session is valid, then try again."
+
+#: src/routes/tasks/index.tsx
+msgid "The list could not be fetched. Check the connection, then try again."
+msgstr "The list could not be fetched. Check the connection, then try again."
 
 #: src/routes/emails/inboxes.tsx
 msgid "The mailbox is ready."

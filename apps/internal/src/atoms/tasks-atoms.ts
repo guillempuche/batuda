@@ -67,10 +67,11 @@ export function dayBoundaries(dayKey: string): {
 	}
 }
 
-// The soonest deadline leads every shelf still waiting to be worked. Nothing
-// is pending on the undated and the finished ones, so those read latest-first.
+// The soonest deadline leads every shelf still waiting to be worked. Finished
+// work reads by when it was finished, and undated work has no deadline to lead
+// with, so it falls back to the latest date the task carries.
 const sortForShelf = (shelf: TaskShelf) =>
-	shelf === 'noDue' || shelf === 'doneRecent' ? 'recent' : 'due'
+	shelf === 'doneRecent' ? 'completed' : shelf === 'noDue' ? 'recent' : 'due'
 
 const shelfCache = new Map<string, ReturnType<typeof makeShelfAtom>>()
 

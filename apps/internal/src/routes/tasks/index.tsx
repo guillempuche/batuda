@@ -1,7 +1,7 @@
 import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
-import { Trans, useLingui } from '@lingui/react/macro'
+import { Plural, Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute } from '@tanstack/react-router'
 import { DateTime, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
@@ -28,8 +28,10 @@ import {
 	updateTaskAtom,
 } from '#/atoms/tasks-atoms'
 import { EmptyState } from '#/components/shared/empty-state'
+import { ErrorState } from '#/components/shared/error-state'
 import { KpiCounter } from '#/components/shared/kpi-counter'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
+import { SrOnly } from '#/components/shared/sr-only'
 import {
 	TaskItem,
 	type TaskItemData,
@@ -222,9 +224,11 @@ export const Route = createFileRoute('/tasks/')({
 function TasksPage() {
 	const { t } = useLingui()
 	const [selectedShelf, setSelectedShelf] = useState<TaskShelf>('today')
-	// Fixed for as long as the page is open. Reading the clock on every render
-	// would hand every render a different atom to fetch.
-	const [dayKey] = useState(() => localDayKey())
+	// Which day it is where the reader sits. Held in state rather than read on
+	// every render, which would hand every render a different atom to fetch —
+	// but a tab left open overnight would then keep filing work under
+	// yesterday, so it is re-read whenever the window comes back to the front.
+	const [dayKey, setDayKey] = useState(() => localDayKey())
 	const [visibleLimit, setVisibleLimit] = useState(TASKS_PAGE_SIZE)
 	// Moving to another shelf starts again at its first page.
 	useEffect(() => {
@@ -306,10 +310,25 @@ function TasksPage() {
 		[],
 	)
 	const quickAddRef = useRef<HTMLInputElement | null>(null)
+	// The last version of the task the pane is showing.
+	const lastOpenTask = useRef<TaskRow | null>(null)
 
+	// Asking for another page means a fresh request, so the rows in hand would
+	// otherwise blank out mid-scroll and take the reader's place in the list
+	// with them. Holding the last page of *this* shelf keeps them on screen
+	// until the longer one arrives; moving to a different shelf drops them,
+	// because showing one shelf's work under another's name would be a lie.
+	const lastPage = useRef<
+		{ shelf: TaskShelf; page: PaginatedList<unknown> } | undefined
+	>(undefined)
+	if (AsyncResult.isSuccess(tasksResult)) {
+		lastPage.current = { shelf: selectedShelf, page: tasksResult.value }
+	}
 	const loadedShelf = AsyncResult.isSuccess(tasksResult)
 		? tasksResult.value
-		: undefined
+		: lastPage.current?.shelf === selectedShelf
+			? lastPage.current.page
+			: undefined
 	const visibleTasks = useMemo<ReadonlyArray<TaskRow>>(
 		() => (loadedShelf ? narrowTasks(loadedShelf.items) : []),
 		[loadedShelf],
@@ -324,6 +343,14 @@ function TasksPage() {
 		: EMPTY_COUNTS
 	const openCount = OPEN_SHELVES.reduce((sum, shelf) => sum + counts[shelf], 0)
 
+	// Only the arrival of rows is announced here. While they are on their way
+	// the spinner says "loading" out loud, and a failure is read out by the
+	// error message itself — repeating either would say it twice.
+	const shelfAnnouncement = AsyncResult.isSuccess(tasksResult)
+		? t`${t(shelfCopy(selectedShelf).label)}: showing ${visibleTasks.length} of ${shelfTotal} tasks.`
+		: ''
+
+	const companiesLoaded = AsyncResult.isSuccess(companiesResult)
 	const companiesById = useMemo<Map<string, CompanyLookup>>(() => {
 		if (!AsyncResult.isSuccess(companiesResult)) return new Map()
 		const map = new Map<string, CompanyLookup>()
@@ -356,7 +383,10 @@ function TasksPage() {
 	// Refresh when the window regains focus — catches webhook-driven
 	// edits (an agent updated a task in another tab or via MCP).
 	useEffect(() => {
-		const onFocus = () => refreshAll()
+		const onFocus = () => {
+			setDayKey(localDayKey())
+			refreshAll()
+		}
 		window.addEventListener('focus', onFocus)
 		return () => window.removeEventListener('focus', onFocus)
 	}, [refreshAll])
@@ -460,18 +490,24 @@ function TasksPage() {
 				task.companyId !== null
 					? (companiesById.get(task.companyId) ?? null)
 					: null
+			// "Personal" means the task belongs to nobody in particular — only
+			// true once the companies are in hand. While they are still on their
+			// way the name is left blank rather than mislabelling real accounts.
+			const companyName =
+				company?.name ??
+				(task.companyId === null || companiesLoaded ? t`Personal` : '')
 			return {
 				id: task.id,
 				title: task.title,
 				dueAt: task.dueAt,
 				companyId: task.companyId ?? '',
-				companyName: company?.name ?? t`Personal`,
+				companyName,
 				priority: task.priority,
 				source: task.source,
 				...(company?.slug !== undefined ? { companySlug: company.slug } : {}),
 			}
 		},
-		[companiesById, t],
+		[companiesById, companiesLoaded, t],
 	)
 
 	// ── Keyboard shortcuts (j/k, x, s, /, c, g o, g t, e) ──
@@ -553,21 +589,30 @@ function TasksPage() {
 		moveTaskSelection,
 	])
 
-	const isLoading =
-		AsyncResult.isInitial(tasksResult) || AsyncResult.isInitial(companiesResult)
+	// Only the list waits for its rows: blanking the whole page on every shelf
+	// switch would make the shelf buttons vanish under the pointer and send the
+	// keyboard back to the top of the page.
+	const isShelfPending = AsyncResult.isInitial(tasksResult) && !loadedShelf
+	const hasShelfFailed = AsyncResult.isFailure(tasksResult)
 
-	if (isLoading) {
-		return (
-			<Page>
-				<LoadingSpinner />
-			</Page>
-		)
-	}
+	const countsReady = AsyncResult.isSuccess(countsResult)
 
-	const selectedTask =
+	// Acting on a task from its own detail pane — snoozing it, cancelling it,
+	// ticking it off — usually moves it to another shelf. Keeping the last
+	// version of the open task means the pane stays put and shows the result
+	// instead of vanishing mid-interaction.
+	const onScreen =
 		selectedTaskId !== null
 			? (visibleTasks.find(r => r.id === selectedTaskId) ?? null)
 			: null
+	if (onScreen !== null) lastOpenTask.current = onScreen
+	const selectedTask =
+		selectedTaskId === null
+			? null
+			: (onScreen ??
+				(lastOpenTask.current?.id === selectedTaskId
+					? lastOpenTask.current
+					: null))
 
 	return (
 		<Page>
@@ -588,24 +633,50 @@ function TasksPage() {
 				</KpiRow>
 			</Intro>
 
+			{/* The list changes without the keyboard moving anywhere, so anyone not
+			 * looking at the screen gets no sign of it. This line sits outside the
+			 * column that swaps, because a spoken message that disappears along
+			 * with the list it describes is often never read out. */}
+			<SrOnly role='status' aria-live='polite'>
+				{shelfAnnouncement}
+			</SrOnly>
+
 			<Layout>
-				<Rail data-testid='tasks-view-rail'>
+				<Rail
+					as='div'
+					role='group'
+					aria-label={t`Filter tasks by shelf`}
+					aria-busy={!countsReady}
+					data-testid='tasks-view-rail'
+				>
 					{SHELVES.map(({ shelf, testId, label }) => (
 						<RailButton
 							key={shelf}
 							$active={selectedShelf === shelf}
 							type='button'
+							aria-pressed={selectedShelf === shelf}
 							onClick={() => setSelectedShelf(shelf)}
 							data-testid={testId}
 						>
 							{t(label)}
-							<Count>{counts[shelf]}</Count>
+							{/* The badge shows 0 until the real counts arrive so the buttons
+							 * keep their width, but reading "0" out loud would be wrong —
+							 * the number is only spoken once it is true. */}
+							<Count aria-hidden>{counts[shelf]}</Count>
+							<SrOnly>
+								{countsReady ? (
+									<Plural value={counts[shelf]} one='# task' other='# tasks' />
+								) : (
+									t`count loading`
+								)}
+							</SrOnly>
 						</RailButton>
 					))}
 					<RailDivider aria-hidden />
 					<RailButton
 						$active={false}
 						type='button'
+						aria-haspopup='dialog'
 						onClick={() => openDlg({ kind: 'recent-changes' })}
 						data-testid='tasks-recent-changes-open'
 					>
@@ -621,7 +692,19 @@ function TasksPage() {
 						placeholder={t`Quick add: "Call Acme tomorrow #high"`}
 					/>
 
-					{visibleTasks.length === 0 ? (
+					{isShelfPending ? (
+						<LoadingSpinner label={t`Loading tasks…`} />
+					) : hasShelfFailed ? (
+						// A shelf that failed to load must not read as a shelf with
+						// nothing on it — "the ledger is clean" would be a lie about
+						// work that is still waiting.
+						<ErrorState
+							data-testid='tasks-error'
+							title={t`Could not load these tasks`}
+							description={t`The list could not be fetched. Check the connection, then try again.`}
+							onRetry={refreshAll}
+						/>
+					) : visibleTasks.length === 0 ? (
 						<EmptyState
 							title={t(shelfCopy(selectedShelf).emptyTitle)}
 							description={t(shelfCopy(selectedShelf).emptyDescription)}
@@ -668,6 +751,7 @@ function TasksPage() {
 										data-testid='tasks-load-more'
 									>
 										<span>{t`Load more`}</span>
+										<SrOnly>{t`tasks — showing ${visibleTasks.length} of ${shelfTotal}`}</SrOnly>
 									</PriButton>
 								</LoadMoreWrap>
 							)}
