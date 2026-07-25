@@ -862,6 +862,103 @@ export const getPresetData = (
 		},
 	]
 
+	// Enough work spread across the inbox rail that every shelf has something
+	// on it and one of them needs a second page to show everything. The dates
+	// hang off SEED_REFERENCE so two runs produce identical data, which also
+	// means the shelves read against the seed's own "today" — to browse them as
+	// today's work, seed with a fresh reference:
+	//   SEED_REFERENCE_DATE="$(date -u +%FT%TZ)" pnpm cli seed
+	const DAY = 86_400_000
+	const fromReference = (offsetMs: number) =>
+		new Date(SEED_REFERENCE.getTime() + offsetMs)
+	// A fixed time of day, so a seed run at 23:50 doesn't push "today" onto
+	// tomorrow. Mid-morning to late-afternoon UTC keeps these on the same
+	// calendar date across the timezones the app is read in.
+	const onReferenceDay = (dayOffset: number, hourUtc: number) => {
+		const date = new Date(SEED_REFERENCE.getTime() + dayOffset * DAY)
+		date.setUTCHours(hourUtc, 0, 0, 0)
+		return date
+	}
+	// The backlog spreads over every company except the two the minimal preset
+	// keeps, so those two are left with their hand-written tasks alone.
+	const backlogCompanies = [...companyMap.entries()]
+		.filter(([slug]) => !MINIMAL_COMPANY_SLUGS.has(slug))
+		.map(([, id]) => id)
+	const spreadCompany = (index: number) =>
+		backlogCompanies[index % backlogCompanies.length]!
+
+	const shelfSpread: ReadonlyArray<{
+		companyId: string
+		contactId: string | null
+		type: string
+		title: string
+		status?: string
+		dueAt?: Date
+		snoozedUntil?: Date
+		completedAt?: Date
+	}> = [
+		// Behind: due between yesterday and a month ago.
+		...Array.from({ length: 12 }, (_, i) => ({
+			companyId: spreadCompany(i),
+			contactId: null,
+			type: 'followup',
+			title: `Chase the pending quote (${i + 1})`,
+			dueAt: onReferenceDay(-(i + 1) * 2, 10),
+		})),
+		// Due today, spread across working hours so no timezone reads them as
+		// belonging to the day before or after.
+		...Array.from({ length: 8 }, (_, i) => ({
+			companyId: spreadCompany(i + 12),
+			contactId: null,
+			type: 'call',
+			title: `Call back about the trial (${i + 1})`,
+			dueAt: onReferenceDay(0, 9 + i),
+		})),
+		// The rest of the week.
+		...Array.from({ length: 10 }, (_, i) => ({
+			companyId: spreadCompany(i + 20),
+			contactId: null,
+			type: 'email',
+			title: `Send the revised proposal (${i + 1})`,
+			dueAt: onReferenceDay((i % 6) + 1, 10),
+		})),
+		// Beyond the week — deliberately more than one page holds, so the
+		// "Load more" button has something to fetch.
+		...Array.from({ length: 55 }, (_, i) => ({
+			companyId: spreadCompany(i + 30),
+			contactId: null,
+			type: 'other',
+			title: `Review the account plan (${i + 1})`,
+			dueAt: onReferenceDay(i + 8, 10),
+		})),
+		// Nobody has put a date on these.
+		...Array.from({ length: 8 }, (_, i) => ({
+			companyId: spreadCompany(i + 85),
+			contactId: null,
+			type: 'other',
+			title: `Research their expansion plans (${i + 1})`,
+		})),
+		// Sleeping until later in the week.
+		...Array.from({ length: 3 }, (_, i) => ({
+			companyId: spreadCompany(i + 93),
+			contactId: null,
+			type: 'followup',
+			title: `Revisit after their busy season (${i + 1})`,
+			dueAt: onReferenceDay(0, 11),
+			snoozedUntil: fromReference((i + 3) * DAY),
+		})),
+		// Finished within the last week, which is as far back as the rail looks.
+		...Array.from({ length: 5 }, (_, i) => ({
+			companyId: spreadCompany(i + 96),
+			contactId: null,
+			type: 'call',
+			title: `Walked them through the handover (${i + 1})`,
+			status: 'done' as const,
+			dueAt: onReferenceDay(-(i + 1), 10),
+			completedAt: onReferenceDay(-(i + 1), 11),
+		})),
+	]
+
 	// `normalizeRows` writes explicit NULL for missing keys, bypassing Postgres column defaults.
 	const withTaskDefaults = <
 		T extends { status?: string; source?: string; priority?: string },
@@ -898,6 +995,9 @@ export const getPresetData = (
 	return {
 		contacts: allContacts,
 		interactions: allInteractions,
-		tasks: allTasks.map(withTaskDefaults),
+		tasks: [
+			...allTasks.map(withTaskDefaults),
+			...shelfSpread.map(withTaskDefaults),
+		],
 	}
 }
