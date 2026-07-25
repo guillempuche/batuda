@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-25 (internal-v2026.7.25-1)
+
+### Bug Fixes
+
+* **internal:** give the browser its browser build of the email renderer ([63f2876](https://github.com/guillempuche/batuda/commit/63f287610658cf6af0bd1d55d0d724068c4eb9a2))
+
+### CI/CD
+
+* **release:** ui v2026.7.25 ([782c3bb](https://github.com/guillempuche/batuda/commit/782c3bb38a2cae1aee41b056d6c24cfd471b84b5))
+
 ## 2026-07-25 (internal-v2026.7.25)
 
 ### Features
