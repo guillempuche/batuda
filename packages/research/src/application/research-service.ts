@@ -958,10 +958,9 @@ export interface ResolvedInstructions {
 
 // Clone a succeeded run as a `cache_hit` so an identical query skips the fiber.
 // The findings / brief / token columns are copied straight from the source row to
-// the clone inside Postgres (INSERT … SELECT), so `findings` is never read into
-// JS — where the SQL client would camelCase every nested key and change the stored
-// shape. Returns null when the cached run is gone or no longer succeeded, so the
-// caller runs a fresh query instead.
+// the clone inside Postgres (INSERT … SELECT), so the stored value never makes a
+// round trip through JS. Returns null when the cached run is gone or no longer
+// succeeded, so the caller runs a fresh query instead.
 export const cloneCacheHitRun = (params: {
 	readonly sql: SqlClient.SqlClient
 	readonly cachedId: string
@@ -1367,22 +1366,18 @@ export class ResearchService extends Context.Service<ResearchService>()(
 			// run.
 			const runFollowup = (researchId: string, run: Record<string, unknown>) =>
 				Effect.gen(function* () {
-					// Read the context as raw text so its keys keep the snake_case they
-					// were stored with; the SQL client would otherwise camelCase every
-					// nested key and hide the paid action.
-					const [ctxRow] = yield* sql<{ context: string | null }>`
-						SELECT context::text AS context FROM research_runs WHERE id = ${researchId}
+					const [ctxRow] = yield* sql<{
+						context: {
+							paid_action?: {
+								tool?: unknown
+								args?: unknown
+								origin_run_id?: unknown
+							}
+						} | null
+					}>`
+						SELECT context FROM research_runs WHERE id = ${researchId}
 					`
-					const paidContext = (
-						ctxRow?.context ? JSON.parse(ctxRow.context) : null
-					) as {
-						paid_action?: {
-							tool?: unknown
-							args?: unknown
-							origin_run_id?: unknown
-						}
-					} | null
-					const paidAction = paidContext?.paid_action
+					const paidAction = ctxRow?.context?.paid_action
 					const originId =
 						typeof paidAction?.origin_run_id === 'string'
 							? paidAction.origin_run_id
@@ -1636,15 +1631,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						0) as number
 					const cachedResearchText = (run as { researchText?: string | null })
 						.researchText
-					// Read findings as raw text so a resumed run keeps the snake_case keys
-					// it was stored with; a plain SELECT would camelCase every nested key
-					// and change the findings shape when it is re-persisted on success.
-					const [findingsRow] = yield* sql<{ findings: string | null }>`
-						SELECT findings::text AS findings FROM research_runs WHERE id = ${researchId}
+					const [findingsRow] = yield* sql<{
+						findings: Record<string, unknown> | null
+					}>`
+						SELECT findings FROM research_runs WHERE id = ${researchId}
 					`
-					const existingFindings = (
-						findingsRow?.findings ? JSON.parse(findingsRow.findings) : null
-					) as Record<string, unknown> | null
+					const existingFindings = findingsRow?.findings ?? null
 					const existingFindingsHasValue =
 						existingFindings !== null &&
 						typeof existingFindings === 'object' &&
@@ -1798,13 +1790,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						subjects.length > 0
 							? `\n\nSubject data (frozen snapshot):\n${JSON.stringify(subjectsForPrompt(subjects), null, 2)}`
 							: ''
-					// The stored hints round-trip through the camelCasing row transform,
-					// so read `recencyDays`, not the request's `recency_days`.
 					const hints = context?.hints as
-						| { language?: string; recencyDays?: number; location?: string }
+						| { language?: string; recency_days?: number; location?: string }
 						| undefined
 					const hintsContext = hints
-						? `\n\nHints: language=${hints.language ?? 'en'}, recency=${hints.recencyDays ?? 'any'}, location=${hints.location ?? 'any'}`
+						? `\n\nHints: language=${hints.language ?? 'en'}, recency=${hints.recency_days ?? 'any'}, location=${hints.location ?? 'any'}`
 						: ''
 					const systemPrompt = buildResearchSystemPrompt({
 						schemaName,
@@ -2546,7 +2536,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											const hintCountry = parseCountryAlpha2(hints?.location)
 											const prospectCriteria = prospectCriteriaFromHints(
 												hints as
-													| { minEmployees?: number; maxEmployees?: number }
+													| { min_employees?: number; max_employees?: number }
 													| undefined,
 												hintCountry ? [hintCountry] : [],
 											)
@@ -5096,23 +5086,20 @@ export class ResearchService extends Context.Service<ResearchService>()(
 				approvePaidAction: (runId: string, paId: string, userId: string) =>
 					Effect.gen(function* () {
 						const [origin] = yield* sql<{
-							findings: string | null
-							context: string | null
+							findings: {
+								pending_paid_actions?: Array<Record<string, unknown>>
+							} | null
+							context: { subjects?: unknown } | null
 							organizationId: string
 							paidPolicy: string | null
 							createdBy: string | null
 						}>`
-							SELECT findings::text AS findings, context::text AS context,
+							SELECT findings, context,
 								organization_id, paid_policy::text AS paid_policy, created_by
 							FROM research_runs WHERE id = ${runId}
 						`
 						if (!origin) return { status: 'run_not_found' as const }
-						const findings = (
-							origin.findings ? JSON.parse(origin.findings) : null
-						) as {
-							pending_paid_actions?: Array<Record<string, unknown>>
-						} | null
-						const actions = findings?.pending_paid_actions ?? []
+						const actions = origin.findings?.pending_paid_actions ?? []
 						const index = actions.findIndex(a => a['id'] === paId)
 						if (index === -1) return { status: 'action_not_found' as const }
 						const action = actions[index] as Record<string, unknown>
@@ -5143,11 +5130,8 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								typeof rawArgs['domain'] === 'string' &&
 								rawArgs['domain'].trim() !== ''
 							if (!hasName && !hasDomain) {
-								const context = (
-									origin.context ? JSON.parse(origin.context) : null
-								) as { subjects?: unknown } | null
-								const subjects = Array.isArray(context?.subjects)
-									? context.subjects
+								const subjects = Array.isArray(origin.context?.subjects)
+									? origin.context.subjects
 									: []
 								const companies = subjects.filter(
 									(s): s is { table: string; id: string } =>
@@ -5231,16 +5215,15 @@ export class ResearchService extends Context.Service<ResearchService>()(
 				/** Skip a pending paid action: record the decision, spend nothing. */
 				skipPaidAction: (runId: string, paId: string) =>
 					Effect.gen(function* () {
-						const [origin] = yield* sql<{ findings: string | null }>`
-							SELECT findings::text AS findings FROM research_runs WHERE id = ${runId}
+						const [origin] = yield* sql<{
+							findings: {
+								pending_paid_actions?: Array<Record<string, unknown>>
+							} | null
+						}>`
+							SELECT findings FROM research_runs WHERE id = ${runId}
 						`
 						if (!origin) return { status: 'run_not_found' as const }
-						const findings = (
-							origin.findings ? JSON.parse(origin.findings) : null
-						) as {
-							pending_paid_actions?: Array<Record<string, unknown>>
-						} | null
-						const actions = findings?.pending_paid_actions ?? []
+						const actions = origin.findings?.pending_paid_actions ?? []
 						const index = actions.findIndex(a => a['id'] === paId)
 						if (index === -1) return { status: 'action_not_found' as const }
 						yield* sql`

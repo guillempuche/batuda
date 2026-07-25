@@ -177,11 +177,12 @@ describe('filterProspectsByCriteria', () => {
 })
 
 describe('prospectCriteriaFromHints', () => {
-	describe('when the hints carry an employee band, either casing', () => {
-		it('should read min and max from the camelCased keys', () => {
-			// GIVEN hints as they round-trip back camelCased
+	describe('when the hints carry an employee band', () => {
+		it('should read min and max under the names the request sent', () => {
+			// GIVEN hints as the request wrote them, which is how they are stored
+			// WHEN the criteria are derived
 			const criteria = prospectCriteriaFromHints(
-				{ minEmployees: 50, maxEmployees: 250 },
+				{ min_employees: 50, max_employees: 250 },
 				['ES'],
 			)
 
@@ -189,20 +190,6 @@ describe('prospectCriteriaFromHints', () => {
 			expect(criteria.minEmployees).toBe(50)
 			expect(criteria.maxEmployees).toBe(250)
 			expect(criteria.countries).toEqual(['ES'])
-		})
-	})
-
-	describe('when the hints carry an employee band in snake_case', () => {
-		it('should read min and max from the snake_cased keys', () => {
-			// GIVEN hints as they arrive on the request, before any camelCasing
-			const criteria = prospectCriteriaFromHints(
-				{ min_employees: 50, max_employees: 250 },
-				['ES'],
-			)
-
-			// THEN the band is read from the request's own spelling
-			expect(criteria.minEmployees).toBe(50)
-			expect(criteria.maxEmployees).toBe(250)
 		})
 	})
 

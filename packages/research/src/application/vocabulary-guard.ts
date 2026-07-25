@@ -238,8 +238,9 @@ export const mapCountry = (raw: string): string | null => {
 const MAPPERS: Record<string, (raw: string) => string | null> = {
 	industry: mapIndustry,
 	country: mapCountry,
-	// Match the size key in either casing: findings may carry it snake_cased
-	// (`size_range`) or camelCased (`sizeRange`).
+	// The size band is named twice because it is reached two ways: a run's own
+	// findings spell it as the research schema does, while a proposed CRM change
+	// spells it the way the company record does.
 	size_range: mapSizeRange,
 	sizeRange: mapSizeRange,
 }

@@ -391,14 +391,12 @@ describe('ResearchService grounding', () => {
 			).toBe('succeeded')
 			expect(outcome.sourceCount).toBeGreaterThanOrEqual(1)
 
-			// The SQL client camelCases jsonb keys on read, so proposed_updates /
-			// subject_id come back as proposedUpdates / subjectId.
 			const proposals = (
 				outcome.findings as {
-					proposedUpdates?: Array<{ subjectId: string }>
+					proposed_updates?: Array<{ subject_id: string }>
 				} | null
-			)?.proposedUpdates
-			expect(proposals?.map(p => p.subjectId)).toEqual([realContactId])
+			)?.proposed_updates
+			expect(proposals?.map(p => p.subject_id)).toEqual([realContactId])
 		}, 30_000)
 	})
 })

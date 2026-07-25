@@ -44,8 +44,8 @@ import {
 	withSeedIds,
 } from './shared'
 
-// Findings keys stay snake_case here; Pg camelizes jsonb on read,
-// so the React layer sees camelCase end-to-end.
+// Findings keys are written exactly as the research schemas define them, which
+// is also how every reader gets them back.
 
 export type ResolvedTestUser = { readonly id: string } | null
 

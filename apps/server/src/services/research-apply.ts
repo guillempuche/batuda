@@ -545,13 +545,22 @@ export const resolveResearchProposedUpdate = (
 				)
 
 		const rows = yield* sql<{
-			findings: string | null
-			context: string | null
+			findings: {
+				proposed_updates?: Array<Record<string, unknown>>
+				discovered_existing?: Array<{
+					subject_table?: string
+					subject_id?: string
+					name?: string
+				}>
+				verdict?: unknown
+				fit_checks?: unknown
+				conflicts?: unknown
+			} | null
+			context: { subjects?: Array<{ table?: string; id?: string }> } | null
 			country: string | null
 			briefMd: string | null
 		}>`
-			SELECT findings::text AS findings, context::text AS context, country,
-				brief_md AS "briefMd"
+			SELECT findings, context, country, brief_md AS "briefMd"
 			FROM research_runs
 			WHERE id = ${runId} AND organization_id = ${org.id}
 			LIMIT 1
@@ -559,21 +568,7 @@ export const resolveResearchProposedUpdate = (
 		const run = rows[0]
 		if (!run) return { outcome: 'run_not_found' } satisfies ResolveOutcome
 
-		// Read the raw JSONB text and parse it, so the proposal keeps its stored
-		// snake_case shape. The SQL client camelCases result keys — including
-		// nested JSONB object keys — which would otherwise rename
-		// `proposed_updates` to `proposedUpdates` and hide every proposal.
-		const findings = (run.findings ? JSON.parse(run.findings) : null) as {
-			proposed_updates?: Array<Record<string, unknown>>
-			discovered_existing?: Array<{
-				subject_table?: string
-				subject_id?: string
-				name?: string
-			}>
-			verdict?: unknown
-			fit_checks?: unknown
-			conflicts?: unknown
-		} | null
+		const findings = run.findings
 		const proposals = findings?.proposed_updates ?? []
 		const discoveredExisting = findings?.discovered_existing ?? []
 
@@ -581,11 +576,8 @@ export const resolveResearchProposedUpdate = (
 		// that company, so it is stamped only onto that company's update, never onto
 		// another company the run merely mentioned (a competitor in a different
 		// country would otherwise be mis-tagged).
-		const context = (run.context ? JSON.parse(run.context) : null) as {
-			subjects?: Array<{ table?: string; id?: string }>
-		} | null
 		const targetCompanyIds = new Set(
-			(context?.subjects ?? [])
+			(run.context?.subjects ?? [])
 				.filter(s => s?.table === 'companies' && typeof s?.id === 'string')
 				.map(s => s.id as string),
 		)

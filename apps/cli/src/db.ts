@@ -14,10 +14,14 @@ const snakeToCamel = (s: string) =>
 const camelToSnake = (s: string) =>
 	s.replace(/[A-Z]/g, c => `_${c.toLowerCase()}`)
 
+// Column names are converted between the database's `snake_case` and the
+// `camelCase` the app writes; `transformJson: false` keeps that conversion out
+// of the contents of a JSON column, so stored keys read back exactly as written.
 export const PgLive = PgClient.layerConfig({
 	url: Config.redacted('DATABASE_URL'),
 	transformResultNames: Config.succeed(snakeToCamel),
 	transformQueryNames: Config.succeed(camelToSnake),
+	transformJson: Config.succeed(false),
 })
 
 /**

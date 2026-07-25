@@ -134,15 +134,11 @@ export const prospectCriteriaFromHints = (
 		| {
 				min_employees?: number
 				max_employees?: number
-				minEmployees?: number
-				maxEmployees?: number
 		  }
 		| undefined,
 	countries: ReadonlyArray<string>,
 ): ProspectCriteria => ({
-	// The stored hints round-trip through a camelCasing transform, so a value may
-	// arrive under either spelling.
-	minEmployees: hints?.minEmployees ?? hints?.min_employees,
-	maxEmployees: hints?.maxEmployees ?? hints?.max_employees,
+	minEmployees: hints?.min_employees,
+	maxEmployees: hints?.max_employees,
 	countries,
 })
