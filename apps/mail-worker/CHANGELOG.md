@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-25 (mail-worker-v2026.7.25)
+
+### Features
+
+* add a match count to the list endpoints ([a6ed26f](https://github.com/guillempuche/batuda/commit/a6ed26f9292a2a63ebc0e4e93725565601dfb6a9))
+* **controllers:** carry a company's research history on its detail ([d908a5e](https://github.com/guillempuche/batuda/commit/d908a5e19e1c3273eb19b0ed387116bae7e52e8d))
+* **domain:** store a company's brief, provenance and fit ([dd9f12f](https://github.com/guillempuche/batuda/commit/dd9f12fed71bf5b143d0fb7a07a8496f2291a04c))
+* support multiple named instruction stacks per org and user ([f111b3d](https://github.com/guillempuche/batuda/commit/f111b3d33d2f658a9c3721759d0fea53896c5bf6))
+* **ui:** add mobile dialog sheets and a destructive button ([80cf0c0](https://github.com/guillempuche/batuda/commit/80cf0c081c8f50ea89aae9d534924b96d7eb92ad))
+
+### Bug Fixes
+
+* **ui:** respect prefers-reduced-motion in dialog transitions ([5da8b54](https://github.com/guillempuche/batuda/commit/5da8b54a1ba8758f817c495863295c073e0210cd))
+
+### CI/CD
+
+* **release:** ui v2026.7.25 ([782c3bb](https://github.com/guillempuche/batuda/commit/782c3bb38a2cae1aee41b056d6c24cfd471b84b5))
+
+### Chores
+
+* pin the [@tiptap](https://github.com/tiptap) packages to 3.28 for markdown support ([f7bfbd1](https://github.com/guillempuche/batuda/commit/f7bfbd1ce8350190f29baab361e022c066735640))
+
 ## 2026-07-22 (mail-worker-v2026.7.22)
 
 ### Features
