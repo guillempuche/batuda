@@ -65,11 +65,15 @@ test.describe('calendar on company page', () => {
 				'video', 'organizer@taller.cat', '${companyId}'
 			)`,
 		)
+		// Two attendees, one of them without a name, so the card has to read
+		// the real rows: a count derived from anything else cannot say "2".
 		psql(
 			`INSERT INTO calendar_event_attendees (
 				id, organization_id, event_id, email, name, rsvp
 			) VALUES (
 				gen_random_uuid(), '${orgId}', '${upcomingId}', 'pep@calpepfonda.cat', 'Pep Casals', 'accepted'
+			), (
+				gen_random_uuid(), '${orgId}', '${upcomingId}', 'nuria@calpepfonda.cat', NULL, 'tentative'
 			)`,
 		)
 
@@ -119,10 +123,14 @@ test.describe('calendar on company page', () => {
 			await expect(card).toBeVisible()
 			const rows = card.locator('[data-testid^="company-upcoming-meeting-"]')
 			await expect(rows.first()).toBeVisible()
-			// AND the row carries the title + an attendee count + a relative
-			// time (full assertion against text would be brittle as time
-			// passes; a non-empty row is the contract under test)
-			await expect(rows.first()).toContainText(/attendee/)
+			// AND the row names the people invited and counts them exactly.
+			// Two were seeded, so a count that ignores the real rows cannot
+			// pass. The one with no name falls back to their address.
+			await expect(rows.first()).toContainText('2 attendees')
+			await expect(rows.first()).toContainText('Pep Casals')
+			await expect(rows.first()).toContainText('nuria@calpepfonda.cat')
+			// AND someone who has not replied for certain is marked as such
+			await expect(rows.first()).toContainText('tentative')
 		})
 	})
 

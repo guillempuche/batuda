@@ -19,8 +19,18 @@ type EventRow = {
 	readonly title: string
 	readonly startAt: string
 	readonly endAt: string
-	readonly attendeeCount: number
+	readonly attendees: ReadonlyArray<AttendeeRow>
 	readonly url: string | null
+}
+
+type AttendeeRow = {
+	readonly id: string
+	readonly label: string
+	readonly rsvp: string
+	readonly isOrganizer: boolean
+	// False when the address matches no contact on file — the person you most
+	// need to read up on before the meeting.
+	readonly isKnown: boolean
 }
 
 const EMPTY: ReadonlyArray<EventRow> = []
@@ -93,15 +103,50 @@ export function UpcomingMeetingsCard({
 							<Title>{ev.title}</Title>
 							<Meta>
 								<RelativeDate value={ev.startAt} fallback={t`unknown`} />
-								<Dot>·</Dot>
-								<AttendeeCount>
-									{ev.attendeeCount === 1 ? (
-										<Trans>1 attendee</Trans>
-									) : (
-										<Trans>{ev.attendeeCount} attendees</Trans>
-									)}
-								</AttendeeCount>
+								{ev.attendees.length > 0 ? (
+									<>
+										<Dot>·</Dot>
+										<AttendeeCount>
+											{ev.attendees.length === 1 ? (
+												<Trans>1 attendee</Trans>
+											) : (
+												<Trans>{ev.attendees.length} attendees</Trans>
+											)}
+										</AttendeeCount>
+									</>
+								) : null}
 							</Meta>
+							{ev.attendees.length > 0 ? (
+								<Attendees>
+									{ev.attendees.map(person => (
+										<Attendee
+											key={person.id}
+											$known={person.isKnown}
+											title={
+												person.isKnown
+													? undefined
+													: t`Not a contact on file yet`
+											}
+										>
+											{person.label}
+											{person.isOrganizer ? (
+												<AttendeeNote>
+													<Trans>organizer</Trans>
+												</AttendeeNote>
+											) : null}
+											{person.rsvp === 'declined' ? (
+												<AttendeeNote>
+													<Trans>declined</Trans>
+												</AttendeeNote>
+											) : person.rsvp === 'tentative' ? (
+												<AttendeeNote>
+													<Trans>tentative</Trans>
+												</AttendeeNote>
+											) : null}
+										</Attendee>
+									))}
+								</Attendees>
+							) : null}
 						</RowMain>
 						{ev.url !== null ? (
 							<OpenLink href={ev.url} target='_blank' rel='noreferrer'>
@@ -126,6 +171,26 @@ function dateToIsoOrNull(value: unknown): string | null {
 	return null
 }
 
+function narrowAttendees(value: unknown): ReadonlyArray<AttendeeRow> {
+	if (!Array.isArray(value)) return []
+	const out: Array<AttendeeRow> = []
+	for (const row of value) {
+		if (!row || typeof row !== 'object') continue
+		const r = row as Record<string, unknown>
+		const email = typeof r['email'] === 'string' ? r['email'] : null
+		if (email === null) continue
+		const name = typeof r['name'] === 'string' ? r['name'].trim() : ''
+		out.push({
+			id: typeof r['id'] === 'string' ? r['id'] : email,
+			label: name.length > 0 ? name : email,
+			rsvp: typeof r['rsvp'] === 'string' ? r['rsvp'] : 'needs-action',
+			isOrganizer: r['isOrganizer'] === true,
+			isKnown: typeof r['contactId'] === 'string',
+		})
+	}
+	return out
+}
+
 function narrowEvents(rows: ReadonlyArray<unknown>): ReadonlyArray<EventRow> {
 	const out: Array<EventRow> = []
 	for (const row of rows) {
@@ -137,7 +202,10 @@ function narrowEvents(rows: ReadonlyArray<unknown>): ReadonlyArray<EventRow> {
 		if (startAt === null) continue
 		const endAt = dateToIsoOrNull(r['endAt'])
 		if (endAt === null) continue
-		const attendees = Array.isArray(r['attendees']) ? r['attendees'] : []
+		// A meeting that was called off is not upcoming. The Conversations tab
+		// already drops these, so without this the same meeting shows in one
+		// place and not the other.
+		if (r['status'] === 'cancelled') continue
 		const meta = (r['metadata'] ?? null) as Record<string, unknown> | null
 		const url =
 			typeof meta?.['cal_com_url'] === 'string'
@@ -150,7 +218,7 @@ function narrowEvents(rows: ReadonlyArray<unknown>): ReadonlyArray<EventRow> {
 			title: r['title'],
 			startAt,
 			endAt,
-			attendeeCount: Math.max(1, attendees.length),
+			attendees: narrowAttendees(r['attendees']),
 			url,
 		})
 	}
@@ -234,6 +302,36 @@ const Dot = styled.span`
 
 const AttendeeCount = styled.span`
 	font-variant-numeric: tabular-nums;
+`
+
+const Attendees = styled.ul`
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-2xs);
+	margin: var(--space-3xs) 0 0;
+	padding: 0;
+	list-style: none;
+	font-size: var(--typescale-body-small-size);
+	line-height: var(--typescale-body-small-line);
+`
+
+// An attendee we hold no contact for is dashed rather than solid: it reads as
+// provisional, and it is the cue to look them up before the meeting.
+const Attendee = styled.li<{ readonly $known: boolean }>`
+	display: inline-flex;
+	align-items: baseline;
+	gap: var(--space-3xs);
+	padding: 0 var(--space-2xs);
+	border-radius: var(--shape-3xs);
+	border: 1px ${p => (p.$known ? 'solid' : 'dashed')}
+		var(--color-outline-variant);
+	color: ${p =>
+		p.$known ? 'var(--color-on-surface)' : 'var(--color-on-surface-variant)'};
+`
+
+const AttendeeNote = styled.span`
+	font-size: 0.85em;
+	color: var(--color-on-surface-variant);
 `
 
 const OpenLink = styled.a`

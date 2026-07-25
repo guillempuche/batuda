@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+
 import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
 
@@ -85,3 +87,50 @@ describe('decodeCalcomWebhookEnvelope', () => {
 // routing, denorm-bump correctness) live outside this file. The calendar
 // multi-org slice is its own plan; cover those branches when a real bug
 // surfaces or when the calendar slice lands its own integration tests.
+
+// The statements below are read from the source rather than executed. Both
+// matter: running them proves what the database accepts, reading them proves
+// this file still asks for it. Naming the wrong column here stops every booking
+// and emailed invitation from saving, and the ingest path is stubbed wherever
+// it is otherwise tested, so nothing else would notice.
+const calendarSource = readFileSync(
+	new URL('./calendar.ts', import.meta.url),
+	'utf8',
+)
+
+describe('calendar_events upserts in this file', () => {
+	describe('when an invitation is stored or updated', () => {
+		it('should match on the organization together with the invitation id', () => {
+			// GIVEN every upsert this file runs against calendar_events
+			// WHEN their conflict targets are read out of the source
+			// THEN each names both columns, because the table treats an
+			//      invitation as unique only within one organization and
+			//      Postgres refuses a target that doesn't match an index
+			const targets = [
+				...calendarSource.matchAll(/ON CONFLICT \(([^)]*ical_uid[^)]*)\)/g),
+			].map(match => match[1]?.replace(/\s+/g, ' ').trim())
+
+			expect(targets.length).toBeGreaterThan(0)
+			for (const target of targets) {
+				expect(target).toBe('organization_id, ical_uid')
+			}
+		})
+
+		it('should keep an out-of-order copy from overwriting a newer one', () => {
+			// GIVEN the same upserts
+			// WHEN their update guards are read
+			// THEN each still refuses a copy older than what is stored, so a
+			//      late-arriving invitation cannot undo a reschedule
+			const guards = [
+				...calendarSource.matchAll(
+					/ON CONFLICT \([^)]*ical_uid[^)]*\)[\s\S]*?WHERE\s+calendar_events\.ical_sequence\s*<=\s*EXCLUDED\.ical_sequence/g,
+				),
+			]
+			const targets = [
+				...calendarSource.matchAll(/ON CONFLICT \([^)]*ical_uid[^)]*\)/g),
+			]
+
+			expect(guards.length).toBe(targets.length)
+		})
+	})
+})

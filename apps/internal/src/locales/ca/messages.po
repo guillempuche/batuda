@@ -64,7 +64,7 @@ msgstr "{0, plural, one {# tasca} other {# tasques}}"
 msgid "{0, plural, one {# template} other {# templates}}"
 msgstr "{0, plural, one {# plantilla} other {# plantilles}}"
 
-#. placeholder {0}: ev.attendeeCount
+#. placeholder {0}: ev.attendees.length
 #: src/components/companies/upcoming-meetings-card.tsx
 msgid "{0} attendees"
 msgstr "{0} assistents"
@@ -1584,6 +1584,10 @@ msgstr "Responsable de decisió"
 #: src/routes/calendar/index.tsx
 msgid "Decline"
 msgstr "Rebutja"
+
+#: src/components/companies/upcoming-meetings-card.tsx
+msgid "declined"
+msgstr "ha declinat"
 
 #: src/components/instructions/stack-list.tsx
 #: src/routes/emails/inboxes.tsx
@@ -3143,6 +3147,10 @@ msgstr "cap planificat"
 msgid "Normal priority"
 msgstr "Prioritat normal"
 
+#: src/components/companies/upcoming-meetings-card.tsx
+msgid "Not a contact on file yet"
+msgstr "Encara no és un contacte registrat"
+
 #: src/components/companies/company-fit-section.tsx
 msgid "Not a fit"
 msgstr "No encaixa"
@@ -3354,6 +3362,10 @@ msgstr "Organització eliminada"
 #: src/routes/settings/mcp/connections.tsx
 msgid "Organizations"
 msgstr "Organitzacions"
+
+#: src/components/companies/upcoming-meetings-card.tsx
+msgid "organizer"
+msgstr "organitza"
 
 #: src/components/shared/channel-icon.tsx
 msgid "Other"
@@ -4585,6 +4597,7 @@ msgid "Tags filter (comma-separated)"
 msgstr "Filtre d'etiquetes (separades per comes)"
 
 #: src/components/companies/conversations-tab.tsx
+#: src/components/shared/channel-icon.tsx
 msgid "Task"
 msgstr "Tasca"
 
@@ -4622,6 +4635,10 @@ msgstr "Plantilla eliminada"
 #: src/routes/settings/profile/templates.tsx
 msgid "Templates"
 msgstr "Plantilles"
+
+#: src/components/companies/upcoming-meetings-card.tsx
+msgid "tentative"
+msgstr "provisional"
 
 #: src/routes/calendar/index.tsx
 msgid "Tentative"

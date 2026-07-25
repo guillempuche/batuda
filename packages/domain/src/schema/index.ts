@@ -2,6 +2,7 @@ export { DbNumber } from './_common'
 export { ApiKey, ApiKeyId } from './api-keys'
 export {
 	CalendarEvent,
+	CalendarEventAttendee,
 	CalendarEventId,
 	CalendarEventType,
 	CalendarEventTypeId,
