@@ -16,12 +16,20 @@ import { useCallback, useMemo } from 'react'
  * the dialog; closing drops the key with `replace` so Back does not reopen it
  * and the URL goes clean. `dlg` is read from the live location because removing
  * the last search param can leave the route match's validated search stale.
+ *
+ * `open(next, { replace: true })` swaps the current entry instead of pushing.
+ * Use it when an open dialog moves from one row to the next: a keyboard walk
+ * down a list would otherwise leave a history entry per keystroke, so Back
+ * would retrace the walk instead of closing the dialog.
  */
 export function useDlg<S extends Schema.Top>(
 	schema: S,
 ): {
 	readonly dlg: S['Type'] | undefined
-	readonly open: (next: S['Type']) => void
+	readonly open: (
+		next: S['Type'],
+		options?: { readonly replace?: boolean },
+	) => void
 	readonly close: () => void
 } {
 	const rawDlg = useLocation({
@@ -41,10 +49,15 @@ export function useDlg<S extends Schema.Top>(
 	)
 
 	const navigate = useNavigate()
+	// Opening and closing a dialog leaves the page where it was. Without this the
+	// router treats each one as a fresh navigation and jumps to the top, so on a
+	// phone you would lose your place in the list every time.
 	const open = useCallback(
-		(next: S['Type']) => {
+		(next: S['Type'], options?: { readonly replace?: boolean }) => {
 			void navigate({
 				search: (prev: Record<string, unknown>) => ({ ...prev, dlg: next }),
+				resetScroll: false,
+				...(options?.replace === true ? { replace: true } : {}),
 			} as never)
 		},
 		[navigate],
@@ -53,6 +66,7 @@ export function useDlg<S extends Schema.Top>(
 		void navigate({
 			search: ({ dlg: _drop, ...rest }: Record<string, unknown>) => rest,
 			replace: true,
+			resetScroll: false,
 		} as never)
 	}, [navigate])
 

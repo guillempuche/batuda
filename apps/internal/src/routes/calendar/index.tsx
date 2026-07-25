@@ -4,7 +4,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { DateTime } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { CalendarPlus, Check, CircleHelp, X } from 'lucide-react'
-import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useMemo } from 'react'
 import styled from 'styled-components'
 
 import type { CalendarEvent, CalendarEventType, Company } from '@batuda/domain'
@@ -20,8 +20,11 @@ import { createTaskAtom } from '#/atoms/tasks-atoms'
 import { EmptyState } from '#/components/shared/empty-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { dehydrateAtom } from '#/lib/atom-hydration'
+import { dlgWithId } from '#/lib/dlg-search'
 import type { PaginatedList } from '#/lib/paginated-list'
+import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
+import { useDlg } from '#/lib/use-dlg'
 import {
 	agedPaperSurface,
 	brushedMetalPlate,
@@ -83,7 +86,12 @@ async function loadCalendarOnServer(): Promise<{
 	return Effect.runPromise(program)
 }
 
+// The open event lives in `?dlg=`, so a meeting can be linked to directly and
+// Back closes it instead of leaving the page.
+const calendarDlgSchema = dlgWithId('event')
+
 export const Route = createFileRoute('/calendar/')({
+	validateSearch: validateSearchWith({ dlg: calendarDlgSchema }),
 	loader: async () => {
 		if (!import.meta.env.SSR) {
 			return { dehydrated: [] as const }
@@ -130,11 +138,16 @@ function CalendarPage() {
 			.filter((c): c is CompanyLookup => c !== null)
 	}, [companiesResult])
 
-	const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
+	const { dlg, open: openDlg, close: closeDlg } = useDlg(calendarDlgSchema)
 	const selectedEvent = useMemo(
-		() => events.find(e => e.id === selectedEventId) ?? null,
-		[events, selectedEventId],
+		() => (dlg ? (events.find(e => e.id === dlg.id) ?? null) : null),
+		[events, dlg],
 	)
+
+	// A link to an event the loaded range doesn't cover is left alone rather than
+	// cleared: this page holds a window around today, not every event, so a link
+	// to a meeting further out is good even when it can't be shown yet. Erasing
+	// it would destroy the address the reader was given.
 
 	const handleCreateFollowUp = useCallback(
 		(event: CalendarEventRow) => {
@@ -150,9 +163,9 @@ function CalendarPage() {
 					...companyIdProps,
 				},
 			})
-			setSelectedEventId(null)
+			closeDlg()
 		},
-		[createTask],
+		[createTask, closeDlg],
 	)
 
 	// Respond to an email-sourced or booking invitation in-place. The
@@ -201,7 +214,7 @@ function CalendarPage() {
 					>
 						<ScheduleGrid
 							events={events}
-							onEventClick={id => setSelectedEventId(id)}
+							onEventClick={id => openDlg({ kind: 'event', id })}
 						/>
 					</Suspense>
 				)}
@@ -215,7 +228,7 @@ function CalendarPage() {
 							? (companies.find(c => c.id === selectedEvent.companyId) ?? null)
 							: null
 					}
-					onClose={() => setSelectedEventId(null)}
+					onClose={closeDlg}
 					onCreateFollowUp={() => handleCreateFollowUp(selectedEvent)}
 					onRsvp={rsvp => handleRsvp(selectedEvent.id, rsvp)}
 					rsvpPending={rsvpPending}

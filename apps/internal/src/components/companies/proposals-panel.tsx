@@ -2,7 +2,7 @@ import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { DateTime } from 'effect'
+import { DateTime, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { FileSignature, Plus, X } from 'lucide-react'
 import { type FormEvent, useMemo, useRef, useState } from 'react'
@@ -18,8 +18,19 @@ import {
 
 import { RelativeDate } from '#/components/shared/relative-date'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
+import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
 import { formatMoneyCents } from '#/lib/format-money'
+import { useDlg } from '#/lib/use-dlg'
 import { stenciledTitle } from '#/lib/workshop-mixins'
+
+// Prefixed because the company page this panel sits on carries one `?dlg=` for
+// all of its dialogs. Only the id travels in the URL — a proposal holds nested
+// line items, which have no business in a query string.
+export const proposalsDlgMembers = [
+	dlgWithId('proposal-edit'),
+	dlgNoId('proposal-new'),
+] as const
+const proposalsDlgSchema = Schema.Union(proposalsDlgMembers)
 
 type ProposalRow = {
 	readonly id: string
@@ -160,7 +171,15 @@ export function ProposalsPanel({ companyId }: { readonly companyId: string }) {
 	const proposals = AsyncResult.isSuccess(result)
 		? narrowProposals(result.value.items)
 		: []
-	const [editing, setEditing] = useState<ProposalRow | 'new' | null>(null)
+
+	const { dlg, open: openDlg, close: closeDlg } = useDlg(proposalsDlgSchema)
+	// The dialog's target is rebuilt from the loaded list, so a link reopens the
+	// same proposal; one that has since gone leaves the dialog closed.
+	const editing = useMemo<ProposalRow | 'new' | null>(() => {
+		if (dlg === undefined) return null
+		if (dlg.kind === 'proposal-new') return 'new'
+		return proposals.find(p => p.id === dlg.id) ?? null
+	}, [dlg, proposals])
 
 	const statusLabel = (status: string) => {
 		const found = STATUSES.find(s => s.value === status)
@@ -174,7 +193,7 @@ export function ProposalsPanel({ companyId }: { readonly companyId: string }) {
 					type='button'
 					$variant='outlined'
 					data-testid='company-add-proposal'
-					onClick={() => setEditing('new')}
+					onClick={() => openDlg({ kind: 'proposal-new' })}
 				>
 					<Plus size={14} aria-hidden />
 					<Trans>New proposal</Trans>
@@ -193,7 +212,7 @@ export function ProposalsPanel({ companyId }: { readonly companyId: string }) {
 							key={p.id}
 							type='button'
 							data-testid={`proposal-row-${p.id}`}
-							onClick={() => setEditing(p)}
+							onClick={() => openDlg({ kind: 'proposal-edit', id: p.id })}
 						>
 							<RowMain>
 								<RowTitle>{p.title}</RowTitle>
@@ -215,10 +234,10 @@ export function ProposalsPanel({ companyId }: { readonly companyId: string }) {
 			<ProposalDialog
 				companyId={companyId}
 				target={editing}
-				onClose={() => setEditing(null)}
+				onClose={closeDlg}
 				onSaved={() => {
 					refresh()
-					setEditing(null)
+					closeDlg()
 				}}
 			/>
 		</>

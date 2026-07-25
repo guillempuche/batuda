@@ -2,7 +2,7 @@ import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { DateTime } from 'effect'
+import { DateTime, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { FileText, Pencil, Plus, X } from 'lucide-react'
 import { type FormEvent, useMemo, useRef, useState } from 'react'
@@ -19,7 +19,19 @@ import {
 import { MarkdownView } from '#/components/markdown/markdown-view'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
+import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
+import { useDlg } from '#/lib/use-dlg'
 import { stenciledTitle } from '#/lib/workshop-mixins'
+
+// Prefixed because the company page this panel sits on carries one `?dlg=` for
+// all of its dialogs: two kinds sharing a name would leave the second
+// unreachable.
+export const documentsDlgMembers = [
+	dlgWithId('doc-view'),
+	dlgWithId('doc-edit'),
+	dlgNoId('doc-add'),
+] as const
+const documentsDlgSchema = Schema.Union(documentsDlgMembers)
 
 type DocRow = {
 	readonly id: string
@@ -85,7 +97,20 @@ export function DocumentsPanel({ companyId }: { readonly companyId: string }) {
 	const docs = AsyncResult.isSuccess(result)
 		? narrowDocs(result.value.items)
 		: []
-	const [dialog, setDialog] = useState<DialogState>({ mode: 'closed' })
+
+	const { dlg, open: openDlg, close: closeDlg } = useDlg(documentsDlgSchema)
+	// Only the id travels in the URL; the row is rebuilt from the loaded list, so
+	// a link reopens the same document, and one that has since gone leaves the
+	// dialog closed.
+	const dialog = useMemo<DialogState>(() => {
+		if (dlg === undefined) return { mode: 'closed' }
+		if (dlg.kind === 'doc-add') return { mode: 'add' }
+		const doc = docs.find(d => d.id === dlg.id)
+		if (doc === undefined) return { mode: 'closed' }
+		return dlg.kind === 'doc-view'
+			? { mode: 'view', doc }
+			: { mode: 'edit', doc }
+	}, [dlg, docs])
 
 	const typeLabel = (type: string) => {
 		const found = DOC_TYPES.find(dt => dt.value === type)
@@ -99,7 +124,7 @@ export function DocumentsPanel({ companyId }: { readonly companyId: string }) {
 					type='button'
 					$variant='outlined'
 					data-testid='company-add-document'
-					onClick={() => setDialog({ mode: 'add' })}
+					onClick={() => openDlg({ kind: 'doc-add' })}
 				>
 					<Plus size={14} aria-hidden />
 					<Trans>Add document</Trans>
@@ -117,7 +142,7 @@ export function DocumentsPanel({ companyId }: { readonly companyId: string }) {
 						<Row key={doc.id} data-testid={`document-row-${doc.id}`}>
 							<RowButton
 								type='button'
-								onClick={() => setDialog({ mode: 'view', doc })}
+								onClick={() => openDlg({ kind: 'doc-view', id: doc.id })}
 							>
 								<RowTitle>{doc.title ?? typeLabel(doc.type)}</RowTitle>
 								<RowMeta>
@@ -129,7 +154,7 @@ export function DocumentsPanel({ companyId }: { readonly companyId: string }) {
 								type='button'
 								aria-label={t`Edit document`}
 								data-testid={`document-edit-${doc.id}`}
-								onClick={() => setDialog({ mode: 'edit', doc })}
+								onClick={() => openDlg({ kind: 'doc-edit', id: doc.id })}
 							>
 								<Pencil size={14} aria-hidden />
 							</EditButton>
@@ -141,12 +166,16 @@ export function DocumentsPanel({ companyId }: { readonly companyId: string }) {
 			<DocumentDialog
 				state={dialog}
 				companyId={companyId}
-				onClose={() => setDialog({ mode: 'closed' })}
+				onClose={closeDlg}
 				onSaved={() => {
 					refresh()
-					setDialog({ mode: 'closed' })
+					closeDlg()
 				}}
-				onEdit={doc => setDialog({ mode: 'edit', doc })}
+				// Reading and editing the same document are one step, so Back leaves
+				// the document instead of returning to the read view.
+				onEdit={doc =>
+					openDlg({ kind: 'doc-edit', id: doc.id }, { replace: true })
+				}
 			/>
 		</>
 	)
