@@ -229,5 +229,40 @@ export const persistInboundMessage = (args: {
 			`
 		}
 
+		// Put the reply on the company's history, so the timeline shows what
+		// they answered and not only what we sent. Skipped when the sender
+		// matched no company: the history is read one company at a time, and
+		// a thread that starts unmatched is never re-homed, so nobody could
+		// ever reach such a row. The message itself is still stored.
+		if (companyId) {
+			yield* sql`
+				INSERT INTO timeline_activity (
+					organization_id, kind, entity_type, entity_id, company_id, contact_id,
+					channel, direction, occurred_at, summary, payload
+				)
+				VALUES (
+					${args.organizationId}, 'email_received', 'email_message',
+					${messageDbId}::uuid, ${companyId}, ${contactId},
+					'email', 'inbound', ${args.parsed.receivedAt},
+					${args.parsed.textPreview},
+					${JSON.stringify({
+						subject: args.parsed.subject,
+						classification: 'normal',
+					})}::jsonb
+				)
+			`
+
+			// The company page reads these dates as stored values rather than
+			// working them out on the fly, so an arriving reply has to move
+			// them here or the page keeps showing the older outbound date.
+			yield* sql`
+				UPDATE companies SET
+					last_email_at = GREATEST(last_email_at, ${args.parsed.receivedAt}),
+					last_contacted_at = GREATEST(last_contacted_at, ${args.parsed.receivedAt}),
+					updated_at = now()
+				WHERE id = ${companyId}
+			`
+		}
+
 		return { messageId: messageDbId }
 	})
