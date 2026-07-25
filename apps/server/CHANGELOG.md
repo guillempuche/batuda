@@ -3,6 +3,33 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-25 (server-v2026.7.25)
+
+### Features
+
+* add a match count to the list endpoints ([a6ed26f](https://github.com/guillempuche/batuda/commit/a6ed26f9292a2a63ebc0e4e93725565601dfb6a9))
+* **controllers:** carry a company's research history on its detail ([d908a5e](https://github.com/guillempuche/batuda/commit/d908a5e19e1c3273eb19b0ed387116bae7e52e8d))
+* **domain:** store a company's brief, provenance and fit ([dd9f12f](https://github.com/guillempuche/batuda/commit/dd9f12fed71bf5b143d0fb7a07a8496f2291a04c))
+* **research:** ground findings to the right company and fill the gaps ([33f6563](https://github.com/guillempuche/batuda/commit/33f6563cbd57fb6e7ba40a6458926e3992d37353))
+* **server:** apply research provenance and a company's shared brief ([93eebd3](https://github.com/guillempuche/batuda/commit/93eebd370e7b8471f702ed287c3eafa5a629d392))
+* support multiple named instruction stacks per org and user ([f111b3d](https://github.com/guillempuche/batuda/commit/f111b3d33d2f658a9c3721759d0fea53896c5bf6))
+* **ui:** add mobile dialog sheets and a destructive button ([80cf0c0](https://github.com/guillempuche/batuda/commit/80cf0c081c8f50ea89aae9d534924b96d7eb92ad))
+
+### Bug Fixes
+
+* **instructions:** refuse to transfer a template still used in a stack ([4ea4d50](https://github.com/guillempuche/batuda/commit/4ea4d5057b42e9c99f222c2774d5d852d796b838))
+* **research:** keep open-web searches anchored to the target company ([7aa5d00](https://github.com/guillempuche/batuda/commit/7aa5d00a1f5bfdfe30d4e0df5894549f225b0a88))
+* **ui:** respect prefers-reduced-motion in dialog transitions ([5da8b54](https://github.com/guillempuche/batuda/commit/5da8b54a1ba8758f817c495863295c073e0210cd))
+* validate the stack a run picks and report stack write failures ([f714b79](https://github.com/guillempuche/batuda/commit/f714b791dfecd7e84e0521f00b392cd0cc1e693e))
+
+### CI/CD
+
+* **release:** ui v2026.7.22 ([ffc3330](https://github.com/guillempuche/batuda/commit/ffc333012bde23f2f0daeb96761c23aa6ae9c63d))
+
+### Chores
+
+* pin the [@tiptap](https://github.com/tiptap) packages to 3.28 for markdown support ([f7bfbd1](https://github.com/guillempuche/batuda/commit/f7bfbd1ce8350190f29baab361e022c066735640))
+
 ## 2026-07-22 (server-v2026.7.22)
 
 ### Features
