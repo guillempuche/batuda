@@ -66,6 +66,13 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Cloudflare rejects the batuda.co worker past a fixed compressed size,
+      # and it does so at deploy time — on a release tag, once the tag is
+      # already pushed. Catching it here points at the pull request that added
+      # the weight instead. Measures what Build produced, so it runs after it.
+      - name: Check worker bundle size
+        run: node scripts/check-bundle-size.mjs
+
       # The TanStack Start Vite plugin (run by Build) is the single source of
       # truth for apps/internal/src/routeTree.gen.ts. If Build regenerated a
       # different tree, the committed one is stale — fail so it gets committed.
