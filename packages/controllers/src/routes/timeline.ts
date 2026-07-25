@@ -5,6 +5,7 @@ import { TimelineActivity } from '@batuda/domain'
 
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
+import { PaginatedList } from '../pagination'
 
 export const TimelineGroup = HttpApiGroup.make('timeline')
 	.add(
@@ -16,8 +17,9 @@ export const TimelineGroup = HttpApiGroup.make('timeline')
 				kind: Schema.optional(Schema.String),
 				since: Schema.optional(Schema.String),
 				limit: Schema.optional(Schema.NumberFromString),
+				offset: Schema.optional(Schema.NumberFromString),
 			},
-			success: Schema.Array(TimelineActivity.json),
+			success: PaginatedList(TimelineActivity.json),
 		}),
 	)
 	.middleware(SessionMiddleware)

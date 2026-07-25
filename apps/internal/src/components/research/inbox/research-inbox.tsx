@@ -136,12 +136,16 @@ export function ResearchInbox() {
 
 	const proposals = useMemo<ReadonlyArray<PendingProposal>>(
 		() =>
-			AsyncResult.isSuccess(proposalsResult) ? [...proposalsResult.value] : [],
+			AsyncResult.isSuccess(proposalsResult)
+				? [...proposalsResult.value.items]
+				: [],
 		[proposalsResult],
 	)
 	const runs = useMemo(
 		() =>
-			AsyncResult.isSuccess(runsResult) ? narrowResearch(runsResult.value) : [],
+			AsyncResult.isSuccess(runsResult)
+				? narrowResearch(runsResult.value.items)
+				: [],
 		[runsResult],
 	)
 	const paidSpendCents = useMemo(

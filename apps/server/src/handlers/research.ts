@@ -371,7 +371,7 @@ export const ResearchLive = HttpApiBuilder.group(
 						// Org scope is enforced by RLS; the boolean filter arrives as a
 						// query string, so map it back to a tri-state (unset = either).
 						const mc = _.query.machine_checkable
-						const rows = yield* svc.listPendingProposals({
+						const page = yield* svc.listPendingProposals({
 							subjectTable: _.query.subject_table,
 							status: _.query.status,
 							minConfidence: _.query.min_confidence,
@@ -380,7 +380,15 @@ export const ResearchLive = HttpApiBuilder.group(
 							limit: _.query.limit,
 							offset: _.query.offset,
 						})
-						return yield* decodePendingProposals(rows).pipe(Effect.orDie)
+						const items = yield* decodePendingProposals(page.items).pipe(
+							Effect.orDie,
+						)
+						return {
+							items,
+							total: page.total,
+							limit: page.limit,
+							offset: page.offset,
+						}
 					}).pipe(Effect.orDie),
 				)
 				.handle('listProposedUpdates', _ =>

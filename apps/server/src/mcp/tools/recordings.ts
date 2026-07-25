@@ -78,7 +78,10 @@ export const RecordingHandlersLive = RecordingTools.toLayer(
 						params.limit ?? 50,
 						params.offset ?? 0,
 					)
-					.pipe(Effect.map(toItems), Effect.orDie),
+					.pipe(
+						Effect.map(page => toItems(page.items)),
+						Effect.orDie,
+					),
 			get_call_recording: ({ recording_id, include_playback_url }) =>
 				Effect.gen(function* () {
 					const recording = yield* svc.getById(recording_id).pipe(Effect.orDie)

@@ -73,7 +73,7 @@ const autoApply = (research: string, threshold: number) =>
 			machineCheckable: true,
 			minConfidence: threshold,
 		})
-		const deliverable = eligible.filter(
+		const deliverable = eligible.items.filter(
 			(p): p is typeof p & { proposedUpdateId: string } =>
 				p.verification === 'deliverable' && p.proposedUpdateId !== null,
 		)

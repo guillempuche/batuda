@@ -28,6 +28,7 @@ import { TaskItem } from '#/components/shared/task-item'
 import { useQuickCapture } from '#/context/quick-capture-context'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
+import type { PaginatedList } from '#/lib/paginated-list'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import { rulerUnderRule, stenciledTitle } from '#/lib/workshop-mixins'
 
@@ -60,8 +61,8 @@ type DashboardTask = {
 }
 
 type PipelineData = {
-	readonly companies: ReadonlyArray<Company>
-	readonly openTasks: ReadonlyArray<Task>
+	readonly companies: PaginatedList<Company>
+	readonly openTasks: PaginatedList<Task>
 }
 
 /**
@@ -177,14 +178,14 @@ function PipelinePage() {
 	const companies = useMemo<ReadonlyArray<DashboardCompany>>(
 		() =>
 			AsyncResult.isSuccess(companiesResult)
-				? narrowCompanies(companiesResult.value)
+				? narrowCompanies(companiesResult.value.items)
 				: [],
 		[companiesResult],
 	)
 	const openTasks = useMemo<ReadonlyArray<DashboardTask>>(
 		() =>
 			AsyncResult.isSuccess(openTasksResult)
-				? narrowTasks(openTasksResult.value)
+				? narrowTasks(openTasksResult.value.items)
 				: [],
 		[openTasksResult],
 	)

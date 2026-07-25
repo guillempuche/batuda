@@ -10,6 +10,7 @@ import { Document } from '@batuda/domain'
 import { NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
+import { PaginatedList } from '../pagination'
 
 // Listing projection: everything but the full markdown `content`, so a company
 // index stays cheap.
@@ -40,8 +41,10 @@ export const DocumentsGroup = HttpApiGroup.make('documents')
 			query: {
 				companyId: Schema.optional(Schema.String),
 				type: Schema.optional(Schema.String),
+				limit: Schema.optional(Schema.NumberFromString),
+				offset: Schema.optional(Schema.NumberFromString),
 			},
-			success: Schema.Array(Document.json),
+			success: PaginatedList(Document.json),
 		}),
 	)
 	.add(

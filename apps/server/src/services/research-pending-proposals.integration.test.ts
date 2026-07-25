@@ -62,7 +62,8 @@ const listScoped = (filters: Filters = {}) =>
 			Effect.gen(function* () {
 				yield* sql`SET LOCAL ROLE app_user`
 				yield* sql`SELECT set_config('app.current_org_id', ${ORG}, true)`
-				return yield* queryPendingProposals(sql, filters)
+				const page = yield* queryPendingProposals(sql, filters)
+				return page.items
 			}),
 		)
 	}).pipe(Effect.provide(PgLive), Effect.orDie, Effect.runPromise)

@@ -15,6 +15,7 @@ import {
 } from '@batuda/controllers'
 import { CalendarEvent, CalendarEventType } from '@batuda/domain'
 
+import { resolvePageTotal } from '../lib/sql-pagination'
 import { dispatchRsvpReply } from '../services/calendar-rsvp-dispatch.js'
 
 const decodeEventTypes = Schema.decodeUnknownEffect(
@@ -115,13 +116,24 @@ export const CalendarLive = HttpApiBuilder.group(
 						if (_.query.status) conditions.push(sql`status = ${_.query.status}`)
 						const limit = _.query.limit ?? 100
 						const offset = _.query.offset ?? 0
-						const rows = yield* sql`
-							SELECT * FROM calendar_events
-							${conditions.length > 0 ? sql`WHERE ${sql.and(conditions)}` : sql``}
+						const whereClause =
+							conditions.length > 0 ? sql`WHERE ${sql.and(conditions)}` : sql``
+						const rows = yield* sql<{ readonly total: string | number }>`
+							SELECT *, COUNT(*) OVER () AS total FROM calendar_events
+							${whereClause}
 							ORDER BY start_at ASC
 							LIMIT ${limit} OFFSET ${offset}
 						`
-						return yield* decodeEvents(rows)
+						const total = yield* resolvePageTotal(
+							rows,
+							offset,
+							() => sql<{ readonly count: string | number }>`
+								SELECT count(*) AS count FROM calendar_events
+								${whereClause}
+							`,
+						)
+						const items = yield* decodeEvents(rows)
+						return { items, total, limit, offset }
 					}).pipe(Effect.orDie),
 				)
 				.handle('getEvent', _ =>

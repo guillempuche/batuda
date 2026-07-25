@@ -11,6 +11,7 @@ import { CalendarEvent, CalendarEventType } from '@batuda/domain'
 import { BadRequest, Conflict, Forbidden, NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
+import { PaginatedList } from '../pagination'
 
 // A free slot returned by the availability lookup. The provider hands back
 // Date objects; on the wire they encode to ISO strings.
@@ -72,7 +73,7 @@ export const CalendarGroup = HttpApiGroup.make('calendar')
 				limit: Schema.optional(Schema.NumberFromString),
 				offset: Schema.optional(Schema.NumberFromString),
 			},
-			success: Schema.Array(CalendarEvent.json),
+			success: PaginatedList(CalendarEvent.json),
 		}),
 	)
 	.add(

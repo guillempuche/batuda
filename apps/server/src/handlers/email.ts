@@ -321,7 +321,9 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 						.pipe(Effect.orDie),
 				)
 				.handle('listDrafts', _ =>
-					svc.listDrafts(_.query.inboxId).pipe(Effect.orDie),
+					svc
+						.listDrafts(_.query.inboxId, _.query.limit, _.query.offset)
+						.pipe(Effect.orDie),
 				)
 				.handle('getDraft', _ =>
 					svc.getDraft(_.query.inboxId, _.params.draftId).pipe(Effect.orDie),

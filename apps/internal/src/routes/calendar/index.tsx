@@ -20,6 +20,7 @@ import { createTaskAtom } from '#/atoms/tasks-atoms'
 import { EmptyState } from '#/components/shared/empty-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { dehydrateAtom } from '#/lib/atom-hydration'
+import type { PaginatedList } from '#/lib/paginated-list'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import {
 	agedPaperSurface,
@@ -58,9 +59,9 @@ type CompanyLookup = {
 const ScheduleGrid = lazy(() => import('#/components/calendar/schedule-grid'))
 
 async function loadCalendarOnServer(): Promise<{
-	events: ReadonlyArray<CalendarEvent>
+	events: PaginatedList<CalendarEvent>
 	eventTypes: ReadonlyArray<CalendarEventType>
-	companies: ReadonlyArray<Company>
+	companies: PaginatedList<Company>
 }> {
 	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
 		import('effect'),
@@ -119,12 +120,12 @@ function CalendarPage() {
 
 	const events = useMemo<ReadonlyArray<CalendarEventRow>>(() => {
 		if (!AsyncResult.isSuccess(eventsResult)) return []
-		return (eventsResult.value as ReadonlyArray<unknown>).map(toEventRow)
+		return (eventsResult.value.items as ReadonlyArray<unknown>).map(toEventRow)
 	}, [eventsResult])
 
 	const companies = useMemo<ReadonlyArray<CompanyLookup>>(() => {
 		if (!AsyncResult.isSuccess(companiesResult)) return []
-		return (companiesResult.value as ReadonlyArray<unknown>)
+		return (companiesResult.value.items as ReadonlyArray<unknown>)
 			.map(toCompanyLookup)
 			.filter((c): c is CompanyLookup => c !== null)
 	}, [companiesResult])

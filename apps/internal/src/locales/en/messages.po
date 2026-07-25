@@ -69,16 +69,6 @@ msgstr "{0} attendees"
 msgid "{0} calls"
 msgstr "{0} calls"
 
-#. placeholder {0}: companies.length
-#: src/routes/companies/index.tsx
-msgid "{0} companies"
-msgstr "{0} companies"
-
-#. placeholder {0}: companies.length
-#: src/routes/companies/index.tsx
-msgid "{0} companies with filters applied"
-msgstr "{0} companies with filters applied"
-
 #. placeholder {0}: quality.fieldsGrounded ?? 0
 #. placeholder {1}: quality.sourcesMatched ?? 0
 #. placeholder {2}: quality.rounds ?? 0
@@ -136,6 +126,14 @@ msgstr "{selectedCount} threads selected"
 #: src/routes/settings/organization/policy.tsx
 msgid "{threshold}%"
 msgstr "{threshold}%"
+
+#: src/routes/companies/index.tsx
+msgid "{total} companies"
+msgstr "{total} companies"
+
+#: src/routes/companies/index.tsx
+msgid "{total} companies with filters applied"
+msgstr "{total} companies with filters applied"
 
 #: src/routes/emails/index.tsx
 msgid "{total} threads"

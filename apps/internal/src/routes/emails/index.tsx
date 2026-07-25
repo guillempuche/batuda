@@ -79,6 +79,7 @@ import { RelativeDate } from '#/components/shared/relative-date'
 import { SkeletonRows } from '#/components/shared/skeleton-row'
 import { useComposeEmail } from '#/context/compose-email-context'
 import { dehydrateAtom } from '#/lib/atom-hydration'
+import type { PaginatedList } from '#/lib/paginated-list'
 import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import {
@@ -118,13 +119,6 @@ type InboxOption = {
 	readonly email: string
 	readonly displayName: string | null
 	readonly purpose: 'human' | 'agent' | 'shared'
-}
-
-type ListEnvelope = {
-	readonly items: ReadonlyArray<unknown>
-	readonly total: number
-	readonly limit: number
-	readonly offset: number
 }
 
 type CompanyLookup = {
@@ -283,7 +277,7 @@ function EmailsIndexPage() {
 		new Map(),
 	)
 
-	const envelope = useMemo<ListEnvelope | null>(
+	const envelope = useMemo<PaginatedList<unknown> | null>(
 		() => (AsyncResult.isSuccess(result) ? narrowEnvelope(result.value) : null),
 		[result],
 	)
@@ -353,7 +347,7 @@ function EmailsIndexPage() {
 	const companiesById = useMemo<Map<string, CompanyLookup>>(() => {
 		if (!AsyncResult.isSuccess(companiesResult)) return new Map()
 		const map = new Map<string, CompanyLookup>()
-		for (const row of companiesResult.value as ReadonlyArray<unknown>) {
+		for (const row of companiesResult.value.items as ReadonlyArray<unknown>) {
 			if (!row || typeof row !== 'object') continue
 			const r = row as Record<string, unknown>
 			if (
@@ -1568,7 +1562,7 @@ function hasActiveFilters(search: EmailsSearch & { page?: number }): boolean {
 	)
 }
 
-function narrowEnvelope(value: unknown): ListEnvelope | null {
+function narrowEnvelope(value: unknown): PaginatedList<unknown> | null {
 	if (!value || typeof value !== 'object') return null
 	const v = value as Record<string, unknown>
 	if (!Array.isArray(v['items'])) return null

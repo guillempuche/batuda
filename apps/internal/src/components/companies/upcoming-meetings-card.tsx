@@ -41,7 +41,8 @@ export function UpcomingMeetingsCard({
 	)
 
 	const events = useMemo<ReadonlyArray<EventRow>>(
-		() => (AsyncResult.isSuccess(result) ? narrowEvents(result.value) : EMPTY),
+		() =>
+			AsyncResult.isSuccess(result) ? narrowEvents(result.value.items) : EMPTY,
 		[result],
 	)
 

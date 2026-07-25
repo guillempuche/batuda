@@ -38,7 +38,9 @@ export function ResearchRuns() {
 	const dialogOpen = dlg !== undefined
 	const result = useAtomValue(researchRunsAtom())
 	const refreshRuns = useAtomRefresh(researchRunsAtom())
-	const runs = AsyncResult.isSuccess(result) ? narrowResearch(result.value) : []
+	const runs = AsyncResult.isSuccess(result)
+		? narrowResearch(result.value.items)
+		: []
 
 	return (
 		<Wrap>

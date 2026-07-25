@@ -8,6 +8,7 @@ import {
 import { ConfirmRequired, InsufficientBudget, NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
+import { PaginatedList } from '../pagination'
 import {
 	BulkResolveResult,
 	PendingProposal,
@@ -127,7 +128,7 @@ export const ResearchGroup = HttpApiGroup.make('research')
 				limit: Schema.optional(Schema.NumberFromString),
 				offset: Schema.optional(Schema.NumberFromString),
 			},
-			success: Schema.Array(ResearchRunSummary),
+			success: PaginatedList(ResearchRunSummary),
 		}),
 	)
 	// GET /research/:id — full row with findings + sources
@@ -225,7 +226,7 @@ export const ResearchGroup = HttpApiGroup.make('research')
 				limit: Schema.optional(Schema.NumberFromString),
 				offset: Schema.optional(Schema.NumberFromString),
 			},
-			success: Schema.Array(PendingProposal),
+			success: PaginatedList(PendingProposal),
 		}),
 	)
 	// Proposed update workflow

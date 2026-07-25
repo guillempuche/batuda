@@ -205,7 +205,11 @@ describe('TaskService.create', () => {
 	})
 })
 
-const listWith = (org: string, filters: TaskFilters) => {
+const listWith = (
+	org: string,
+	filters: TaskFilters,
+	pageOverrides: Partial<TaskPage> = {},
+) => {
 	const deps = Layer.mergeAll(
 		TaskService.layer,
 		Layer.succeed(CurrentOrg, { id: org, name: 'fixture', slug: 'fixture' }),
@@ -215,7 +219,12 @@ const listWith = (org: string, filters: TaskFilters) => {
 		Layer.provideMerge(TimelineActivityService.layer),
 		Layer.provideMerge(PgLive),
 	)
-	const page: TaskPage = { sort: 'due', limit: 100, offset: 0 }
+	const page: TaskPage = {
+		sort: 'due',
+		limit: 100,
+		offset: 0,
+		...pageOverrides,
+	}
 
 	return Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
@@ -256,10 +265,12 @@ describe('TaskService.list', () => {
 			})
 
 			// WHEN listing that assignee's open work
-			const rows = (await listWith(tallerOrgId, {
-				assigneeId: assignee,
-				completed: false,
-			})) as ReadonlyArray<{ status: string }>
+			const rows = (
+				await listWith(tallerOrgId, {
+					assigneeId: assignee,
+					completed: false,
+				})
+			).items as ReadonlyArray<{ status: string }>
 
 			// THEN only the open task returns — a cancelled task is not "open work"
 			expect(rows.map(r => r.status)).toEqual(['open'])
@@ -284,13 +295,96 @@ describe('TaskService.list', () => {
 			})
 
 			// WHEN listing completed tasks for that assignee
-			const rows = (await listWith(tallerOrgId, {
-				assigneeId: assignee,
-				completed: true,
-			})) as ReadonlyArray<{ status: string }>
+			const rows = (
+				await listWith(tallerOrgId, {
+					assigneeId: assignee,
+					completed: true,
+				})
+			).items as ReadonlyArray<{ status: string }>
 
 			// THEN only the done task returns
 			expect(rows.map(r => r.status)).toEqual(['done'])
+		})
+	})
+
+	describe('when reporting how many tasks match', () => {
+		it('should count every match, not just the ones on the page', async () => {
+			// GIVEN three tasks for a unique assignee
+			const assignee = `page-fixture-${randomUUID()}`
+			for (const title of ['first', 'second', 'third']) {
+				await createWith(tallerOrgId, tallerOrgId, {
+					type: 'follow_up',
+					title: `${FIXTURE_TITLE} ${title}`,
+					status: 'open',
+					assigneeId: assignee,
+				})
+			}
+
+			// WHEN asking for a page that holds only one of them
+			const page = await listWith(
+				tallerOrgId,
+				{ assigneeId: assignee },
+				{ limit: 1, offset: 0 },
+			)
+
+			// THEN the page carries one task but reports all three as matching
+			expect(page.items).toHaveLength(1)
+			expect(page.total).toBe(3)
+			expect(page.limit).toBe(1)
+			expect(page.offset).toBe(0)
+		})
+
+		it('should still report the total for a page past the last match', async () => {
+			// GIVEN two tasks for a unique assignee
+			const assignee = `page-fixture-${randomUUID()}`
+			for (const title of ['first', 'second']) {
+				await createWith(tallerOrgId, tallerOrgId, {
+					type: 'follow_up',
+					title: `${FIXTURE_TITLE} ${title}`,
+					status: 'open',
+					assigneeId: assignee,
+				})
+			}
+
+			// WHEN asking for a page that starts beyond them
+			const page = await listWith(
+				tallerOrgId,
+				{ assigneeId: assignee },
+				{ limit: 10, offset: 50 },
+			)
+
+			// THEN the page is empty but still reports both as matching, so
+			// "past the end" stays distinguishable from "nothing matches"
+			expect(page.items).toHaveLength(0)
+			expect(page.total).toBe(2)
+		})
+
+		it('should report nothing matching when the filters exclude everything', async () => {
+			// GIVEN an assignee with no tasks at all
+			const assignee = `page-fixture-${randomUUID()}`
+
+			// WHEN listing their work
+			const page = await listWith(tallerOrgId, { assigneeId: assignee })
+
+			// THEN both the page and the total are empty
+			expect(page.items).toHaveLength(0)
+			expect(page.total).toBe(0)
+		})
+
+		it('should report nothing matching for a page past an empty result', async () => {
+			// GIVEN an assignee with no tasks at all
+			const assignee = `page-fixture-${randomUUID()}`
+
+			// WHEN asking for a page beyond the (empty) result
+			const page = await listWith(
+				tallerOrgId,
+				{ assigneeId: assignee },
+				{ limit: 10, offset: 50 },
+			)
+
+			// THEN the separate count agrees there is genuinely nothing
+			expect(page.items).toHaveLength(0)
+			expect(page.total).toBe(0)
 		})
 	})
 })

@@ -12,6 +12,7 @@ import {
 	RecordingSummary,
 } from '@batuda/controllers'
 
+import { resolvePageTotal } from '../lib/sql-pagination'
 import { StorageProvider } from './storage-provider.js'
 import {
 	InteractionLogged,
@@ -247,7 +248,7 @@ export class RecordingService extends Context.Service<RecordingService>()(
 
 			const listForCompany = (companyId: string, limit = 50, offset = 0) =>
 				Effect.gen(function* () {
-					const rows = yield* sql`
+					const rows = yield* sql<{ readonly total: string | number }>`
 						SELECT
 							cr.id,
 							cr.interaction_id,
@@ -260,7 +261,8 @@ export class RecordingService extends Context.Service<RecordingService>()(
 							cr.updated_at,
 							i.date AS interaction_date,
 							i.contact_id,
-							i.summary
+							i.summary,
+							COUNT(*) OVER () AS total
 						FROM call_recordings cr
 						INNER JOIN interactions i ON i.id = cr.interaction_id
 						WHERE i.company_id = ${companyId}
@@ -269,7 +271,19 @@ export class RecordingService extends Context.Service<RecordingService>()(
 						LIMIT ${limit}
 						OFFSET ${offset}
 					`
-					return yield* decodeSummaries(rows).pipe(Effect.orDie)
+					const total = yield* resolvePageTotal(
+						rows,
+						offset,
+						() => sql<{ readonly count: string | number }>`
+							SELECT count(*) AS count
+							FROM call_recordings cr
+							INNER JOIN interactions i ON i.id = cr.interaction_id
+							WHERE i.company_id = ${companyId}
+							  AND cr.deleted_at IS NULL
+						`,
+					).pipe(Effect.orDie)
+					const items = yield* decodeSummaries(rows).pipe(Effect.orDie)
+					return { items, total, limit, offset }
 				})
 
 			const getById = (recordingId: string) =>

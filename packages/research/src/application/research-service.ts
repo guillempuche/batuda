@@ -495,6 +495,28 @@ export const clampPagination = (
 	}
 }
 
+// How many rows match in total, for a page that carries its own
+// `COUNT(*) OVER ()` column. An empty page that starts partway in says nothing
+// about the total — the filters may match nothing, or the page may simply start
+// past the last match — so `countMatching` is asked only in that one case to
+// tell those two apart.
+const resolvePageTotal = <E, R>(
+	rows: ReadonlyArray<{ readonly total: string | number }>,
+	offset: number,
+	countMatching: () => Effect.Effect<
+		ReadonlyArray<{ readonly count: string | number }>,
+		E,
+		R
+	>,
+): Effect.Effect<number, E, R> => {
+	const first = rows[0]
+	if (first !== undefined) return Effect.succeed(Number(first.total))
+	if (offset === 0) return Effect.succeed(0)
+	return countMatching().pipe(
+		Effect.map(countRows => Number(countRows[0]?.count ?? 0)),
+	)
+}
+
 // Roll the run's real spend onto its own row. paid_cost_cents comes from the
 // paid-spend ledger and is authoritative — the run's connection bypasses
 // row-level security and a research_id belongs to one run, so the sum sees
@@ -581,7 +603,7 @@ export const queryPendingProposals = (
 		// (enrichment); normalize to 0–100 so the reviewer's minimum-confidence
 		// filter compares like with like. The CASE guards keep a stray non-array
 		// `proposed_updates`/`channels` from breaking the row expansion.
-		return yield* sql<PendingProposalRow>`
+		const matching = sql`
 			WITH pending AS (
 				SELECT
 					r.id AS research_id,
@@ -644,10 +666,25 @@ export const queryPendingProposals = (
 			LEFT JOIN contacts ct
 				ON p.subject_table = 'contacts' AND ct.id::text = p.subject_id
 			WHERE ${sql.and(conditions)}
-			ORDER BY run_created_at DESC
+		`
+
+		const rows = yield* sql<
+			PendingProposalRow & { readonly total: string | number }
+		>`
+			SELECT sub.*, COUNT(*) OVER () AS total
+			FROM (${matching}) sub
+			ORDER BY sub.run_created_at DESC
 			LIMIT ${limit}
 			OFFSET ${offset}
 		`
+		const total = yield* resolvePageTotal(
+			rows,
+			offset,
+			() => sql<{ readonly count: string | number }>`
+				SELECT count(*) AS count FROM (${matching}) sub
+			`,
+		)
+		return { items: rows, total, limit, offset }
 	})
 
 // Outcome of a cancel attempt, decided from whether a queued/running row
@@ -4710,17 +4747,30 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							filters.offset,
 						)
 
-						const rows = yield* sql`
+						const rows = yield* sql<{ readonly total: string | number }>`
 							SELECT r.id, r.kind, r.query, r.mode, r.schema_name,
 								r.status, r.cost_cents, r.paid_cost_cents,
-								r.created_by, r.created_at, r.completed_at
+								r.created_by, r.created_at, r.completed_at,
+								COUNT(*) OVER () AS total
 							FROM research_runs r
 							WHERE ${sql.and(conditions)}
 							ORDER BY r.created_at DESC
 							LIMIT ${limit}
 							OFFSET ${offset}
 						`
-						return yield* decodeResearchRunSummaries(rows).pipe(Effect.orDie)
+						const total = yield* resolvePageTotal(
+							rows,
+							offset,
+							() => sql<{ readonly count: string | number }>`
+								SELECT count(*) AS count
+								FROM research_runs r
+								WHERE ${sql.and(conditions)}
+							`,
+						).pipe(Effect.orDie)
+						const items = yield* decodeResearchRunSummaries(rows).pipe(
+							Effect.orDie,
+						)
+						return { items, total, limit, offset }
 					}),
 
 				/** Pending proposed updates across the org, for the review inbox. */

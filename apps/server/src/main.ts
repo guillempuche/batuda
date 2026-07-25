@@ -260,7 +260,7 @@ const ResearchEventSinkLive = Layer.effect(
 										AUTO_APPLY_CONFIDENCE_FLOOR,
 									),
 								})
-								const deliverable = eligible.filter(
+								const deliverable = eligible.items.filter(
 									(p): p is typeof p & { proposedUpdateId: string } =>
 										p.verification === 'deliverable' &&
 										p.proposedUpdateId !== null,

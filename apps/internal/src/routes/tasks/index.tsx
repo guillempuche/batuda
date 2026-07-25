@@ -34,6 +34,7 @@ import {
 import { useQuickCapture } from '#/context/quick-capture-context'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
+import type { PaginatedList } from '#/lib/paginated-list'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import {
 	agedPaperSurface,
@@ -81,8 +82,8 @@ type SmartView =
 const completeTaskAtom = BatudaApiAtom.mutation('tasks', 'complete')
 
 async function loadTasksOnServer(): Promise<{
-	tasks: ReadonlyArray<Task>
-	companies: ReadonlyArray<Company>
+	tasks: PaginatedList<Task>
+	companies: PaginatedList<Company>
 }> {
 	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
 		import('effect'),
@@ -153,13 +154,15 @@ function TasksPage() {
 
 	const openTasks = useMemo<ReadonlyArray<TaskRow>>(
 		() =>
-			AsyncResult.isSuccess(tasksResult) ? narrowTasks(tasksResult.value) : [],
+			AsyncResult.isSuccess(tasksResult)
+				? narrowTasks(tasksResult.value.items)
+				: [],
 		[tasksResult],
 	)
 	const snoozedTasks = useMemo<ReadonlyArray<TaskRow>>(
 		() =>
 			AsyncResult.isSuccess(snoozedResult)
-				? narrowTasks(snoozedResult.value).filter(
+				? narrowTasks(snoozedResult.value.items).filter(
 						t =>
 							t.snoozedUntil !== null &&
 							Date.parse(t.snoozedUntil) > Date.now(),
@@ -170,7 +173,7 @@ function TasksPage() {
 	const doneTasks = useMemo<ReadonlyArray<TaskRow>>(() => {
 		if (!AsyncResult.isSuccess(doneResult)) return []
 		const cutoff = Date.now() - 7 * 86400_000
-		return narrowTasks(doneResult.value).filter(
+		return narrowTasks(doneResult.value.items).filter(
 			t => t.completedAt !== null && Date.parse(t.completedAt) >= cutoff,
 		)
 	}, [doneResult])
@@ -178,7 +181,7 @@ function TasksPage() {
 	const companiesById = useMemo<Map<string, CompanyLookup>>(() => {
 		if (!AsyncResult.isSuccess(companiesResult)) return new Map()
 		const map = new Map<string, CompanyLookup>()
-		for (const row of companiesResult.value as ReadonlyArray<unknown>) {
+		for (const row of companiesResult.value.items as ReadonlyArray<unknown>) {
 			if (!row || typeof row !== 'object') continue
 			const r = row as Record<string, unknown>
 			if (
