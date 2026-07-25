@@ -51,6 +51,17 @@ test.describe('instruction stacks', () => {
 			// only once a row is on screen — otherwise the baseline reads zero.
 			await expect(page.getByTestId('stack-row').first()).toBeVisible()
 			const stacksBefore = await page.getByTestId('stack-row').count()
+			// Remember which stack currently holds the default so it can be put back
+			// afterwards — the default is a single seat, and the first test in this
+			// file expects the seeded stack to still hold it.
+			const defaultBefore =
+				(await page
+					.getByTestId('stack-row')
+					.filter({ hasText: 'Default' })
+					.first()
+					.locator('span')
+					.first()
+					.textContent()) ?? ''
 
 			// GIVEN the stack editor is open
 			await page.getByTestId('new-stack').click()
@@ -74,6 +85,14 @@ test.describe('instruction stacks', () => {
 			await page.getByLabel(`Make ${name} the default`).click()
 			await expect(created).toContainText('Default')
 			await expect(page.getByLabel(`Make ${name} the default`)).toHaveCount(0)
+
+			// Hand the default back and remove what this test made, so running the
+			// file twice in a row still starts from the seeded arrangement.
+			await page.getByLabel(`Make ${defaultBefore.trim()} the default`).click()
+			await expect(created).not.toContainText('Default')
+			await created.getByLabel(`Delete ${name}`).click()
+			await page.getByTestId('stack-delete-confirm-button').click()
+			await expect(page.getByTestId('stack-row')).toHaveCount(stacksBefore)
 		})
 
 		test('should keep the save disabled until a name and a template are picked', async ({
