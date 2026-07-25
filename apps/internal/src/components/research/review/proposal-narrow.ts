@@ -39,9 +39,18 @@ export type ReviewProposal = {
 
 // Field keys rendered specially (or hidden), so they don't repeat in the
 // generic scalar-diff table: `name` heads the row, `channels` render as
-// trust-badged contact points, `companyId` is an internal link the reviewer
-// doesn't act on.
-const SPECIAL_FIELDS = new Set(['name', 'channels', 'companyId'])
+// trust-badged contact points, the owning company is an internal link the
+// reviewer doesn't act on. The model writes these names itself, so the same
+// reference turns up spelled either way and both are listed.
+const SPECIAL_FIELDS = new Set(['name', 'channels', 'company_id', 'companyId'])
+
+// Turns a field name into something a reviewer reads: "is_decision_maker"
+// becomes "Is decision maker". The words come from the data rather than a fixed
+// phrase, so there is nothing to translate — only the spelling to tidy up.
+const fieldLabel = (key: string): string => {
+	const words = key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/_/g, ' ')
+	return words.charAt(0).toUpperCase() + words.slice(1).toLowerCase()
+}
 
 export function narrowProposedUpdates(
 	rows: ReadonlyArray<unknown>,
@@ -60,10 +69,12 @@ export function narrowProposedUpdates(
 			status: typeof r['status'] === 'string' ? r['status'] : 'pending',
 			operation: typeof r['operation'] === 'string' ? r['operation'] : 'update',
 			subjectTable:
-				typeof r['subjectTable'] === 'string' ? r['subjectTable'] : null,
-			subjectId: typeof r['subjectId'] === 'string' ? r['subjectId'] : null,
+				typeof r['subject_table'] === 'string' ? r['subject_table'] : null,
+			subjectId: typeof r['subject_id'] === 'string' ? r['subject_id'] : null,
 			expectedVersion:
-				typeof r['expectedVersion'] === 'number' ? r['expectedVersion'] : null,
+				typeof r['expected_version'] === 'number'
+					? r['expected_version']
+					: null,
 			reason: typeof r['reason'] === 'string' ? r['reason'] : null,
 			name: typeof fields['name'] === 'string' ? fields['name'] : null,
 			channels: narrowChannels(fields['channels']),
@@ -90,7 +101,7 @@ function narrowChannels(raw: unknown): ReadonlyArray<ReviewChannel> {
 			confidence: normalizeConfidence(
 				typeof c['confidence'] === 'number' ? c['confidence'] : null,
 			),
-			isPrimary: c['isPrimary'] === true,
+			isPrimary: c['is_primary'] === true,
 		})
 	}
 	return out
@@ -103,7 +114,10 @@ function narrowScalarFields(
 	for (const [key, value] of Object.entries(fields)) {
 		if (SPECIAL_FIELDS.has(key)) continue
 		if (value === null || value === undefined) continue
-		out.push([key, typeof value === 'string' ? value : JSON.stringify(value)])
+		out.push([
+			fieldLabel(key),
+			typeof value === 'string' ? value : JSON.stringify(value),
+		])
 	}
 	return out
 }
@@ -116,9 +130,9 @@ function narrowCitations(
 	for (const item of raw) {
 		if (!item || typeof item !== 'object') continue
 		const c = item as Record<string, unknown>
-		if (typeof c['sourceId'] !== 'string') continue
+		if (typeof c['source_id'] !== 'string') continue
 		out.push({
-			sourceId: c['sourceId'],
+			sourceId: c['source_id'],
 			quote: typeof c['quote'] === 'string' ? c['quote'] : null,
 		})
 	}

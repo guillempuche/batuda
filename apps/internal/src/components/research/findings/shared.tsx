@@ -26,25 +26,24 @@ import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
  * competitor-scan, contact-discovery, prospect-scan) each render their
  * own typed entities above these common sections; the freeform view
  * uses them too. Citation rendering is identical across schemas — they
- * all share the `{sourceId, quote?, confidence?}` shape.
+ * all share the `{source_id, quote?, confidence?}` shape.
  *
- * Findings are stored as JSONB with snake_case keys (the LLM agent
- * fills in the schema verbatim). The Pg client's transformResultNames
- * walks JSONB recursively (transformJson defaults to true), so by the
- * time the wire response leaves the server every key is camelCase —
- * including nested keys inside `findings`. The frontend types here
- * mirror that wire shape.
+ * A run's findings are the research schema filled in by the model, and
+ * they reach the browser under the very names that schema defines. The
+ * types here are a hand-written mirror of those names: the findings
+ * arrive untyped, so a name that does not match renders as a blank
+ * section instead of failing loudly.
  */
 
 export type Citation = {
-	readonly sourceId: string
+	readonly source_id: string
 	readonly quote?: string
 	readonly confidence?: number
 }
 
 export type ProposedUpdate = {
-	readonly subjectTable: string
-	readonly subjectId?: string
+	readonly subject_table: string
+	readonly subject_id?: string
 	readonly fields?: Readonly<Record<string, unknown>>
 	readonly reason?: string
 	readonly citations?: ReadonlyArray<Citation>
@@ -57,20 +56,20 @@ export type PendingPaidAction = {
 	readonly status?: string
 	readonly tool: string
 	readonly args?: Readonly<Record<string, unknown>>
-	readonly estimatedCents?: number
+	readonly estimated_cents?: number
 	readonly reason?: string
 }
 
 export type DiscoveredExisting = {
-	readonly subjectTable: string
-	readonly subjectId: string
+	readonly subject_table: string
+	readonly subject_id: string
 	readonly name: string
 }
 
 export type CommonFindings = {
-	readonly proposedUpdates?: ReadonlyArray<ProposedUpdate>
-	readonly pendingPaidActions?: ReadonlyArray<PendingPaidAction>
-	readonly discoveredExisting?: ReadonlyArray<DiscoveredExisting>
+	readonly proposed_updates?: ReadonlyArray<ProposedUpdate>
+	readonly pending_paid_actions?: ReadonlyArray<PendingPaidAction>
+	readonly discovered_existing?: ReadonlyArray<DiscoveredExisting>
 }
 
 export function stableKey(parts: ReadonlyArray<string>): string {
@@ -96,8 +95,8 @@ export function CitationList({
 				// one at a glance (the low % plus a warning mark).
 				const low = confidence !== null && confidence < DEFAULT_TRUST_THRESHOLD
 				return (
-					<CitationLi key={stableKey(['cit', c.sourceId, c.quote ?? ''])}>
-						<CitationKey>{c.sourceId}</CitationKey>
+					<CitationLi key={stableKey(['cit', c.source_id, c.quote ?? ''])}>
+						<CitationKey>{c.source_id}</CitationKey>
 						{c.quote !== undefined ? (
 							<CitationQuote>“{c.quote}”</CitationQuote>
 						) : null}
@@ -188,9 +187,9 @@ function PaidActionRow({ action }: { readonly action: PendingPaidAction }) {
 		<ListItem>
 			<RowHead>
 				<Pill>{action.tool}</Pill>
-				{action.estimatedCents !== undefined ? (
+				{action.estimated_cents !== undefined ? (
 					<Cost>
-						{formatMoneyCents(action.estimatedCents, { locale: i18n.locale })}
+						{formatMoneyCents(action.estimated_cents, { locale: i18n.locale })}
 					</Cost>
 				) : null}
 				{action.status !== undefined && action.status !== 'pending' ? (
@@ -251,10 +250,10 @@ export function DiscoveredExistingSection({
 			</SectionTitle>
 			<DiscoveredList>
 				{matches.map(m => (
-					<DiscoveredRow key={stableKey([m.subjectTable, m.subjectId])}>
-						<Pill>{m.subjectTable}</Pill>
+					<DiscoveredRow key={stableKey([m.subject_table, m.subject_id])}>
+						<Pill>{m.subject_table}</Pill>
 						<DiscoveredName>{m.name}</DiscoveredName>
-						<SubjectId>{m.subjectId}</SubjectId>
+						<SubjectId>{m.subject_id}</SubjectId>
 					</DiscoveredRow>
 				))}
 			</DiscoveredList>
@@ -270,7 +269,7 @@ export function CommonSections({
 	// Proposed updates and already-in-CRM matches are shown by the actionable
 	// review on the run page, so the read-only findings block only keeps the
 	// pending paid actions.
-	const paid = findings?.pendingPaidActions ?? []
+	const paid = findings?.pending_paid_actions ?? []
 	if (paid.length === 0) {
 		return null
 	}

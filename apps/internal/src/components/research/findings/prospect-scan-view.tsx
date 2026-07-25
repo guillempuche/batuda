@@ -30,18 +30,18 @@ import {
 
 /**
  * Renders a `prospect_scan_v1` research finding. Each prospect carries
- * a `whyRelevant` rationale + optional industry/country/taxId +
+ * a `why_relevant` rationale + optional industry/country/tax_id +
  * pain-indicator tags + citations.
  */
 
 type ProspectEntry = {
 	readonly name: string
 	readonly website?: string
-	readonly taxId?: string
+	readonly tax_id?: string
 	readonly industry?: string
 	readonly country?: string
-	readonly whyRelevant: string
-	readonly painIndicators?: ReadonlyArray<string>
+	readonly why_relevant: string
+	readonly pain_indicators?: ReadonlyArray<string>
 	readonly citations?: ReadonlyArray<Citation>
 }
 
@@ -65,7 +65,7 @@ export function ProspectScanView({
 					</SectionTitle>
 					<List>
 						{prospects.map(p => (
-							<ListItem key={`${p.name}|${p.taxId ?? p.website ?? ''}`}>
+							<ListItem key={`${p.name}|${p.tax_id ?? p.website ?? ''}`}>
 								<RowHead>
 									<Pill>{p.name}</Pill>
 									{p.website !== undefined ? (
@@ -74,7 +74,7 @@ export function ProspectScanView({
 										</a>
 									) : null}
 								</RowHead>
-								<Reason>{p.whyRelevant}</Reason>
+								<Reason>{p.why_relevant}</Reason>
 								<FieldsTable>
 									{p.industry !== undefined ? (
 										<FieldRow>
@@ -92,23 +92,23 @@ export function ProspectScanView({
 											<FieldValue>{p.country}</FieldValue>
 										</FieldRow>
 									) : null}
-									{p.taxId !== undefined ? (
+									{p.tax_id !== undefined ? (
 										<FieldRow>
 											<FieldKey>
 												<Trans>Tax ID</Trans>
 											</FieldKey>
-											<FieldValue>{p.taxId}</FieldValue>
+											<FieldValue>{p.tax_id}</FieldValue>
 										</FieldRow>
 									) : null}
-									{p.painIndicators !== undefined &&
-									p.painIndicators.length > 0 ? (
+									{p.pain_indicators !== undefined &&
+									p.pain_indicators.length > 0 ? (
 										<FieldRow>
 											<FieldKey>
 												<Trans>Pain indicators</Trans>
 											</FieldKey>
 											<FieldValue>
 												<TagList>
-													{p.painIndicators.map(t => (
+													{p.pain_indicators.map(t => (
 														<Tag key={t}>{t}</Tag>
 													))}
 												</TagList>

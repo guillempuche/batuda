@@ -24,20 +24,15 @@ import {
 
 /**
  * Renders a `company_enrichment_v1` research finding. Surfaces the
- * enrichment object (industry, sizeRange, painPoints, etc.) as a
+ * enrichment object (industry, size_range, pain_points, etc.) as a
  * typed field table, then competitor + contact arrays as their own
  * sections, finally the cross-cutting common sections.
- *
- * The schema stores keys as snake_case in the JSONB column, but the
- * Pg client recursively camelizes JSONB on read, so the wire shape is
- * camelCase end-to-end (see ./shared.tsx).
  */
 
-// Wire shape of a per-field Sourced value (camelCased from the stored
-// { value, source_id, quote?, confidence? }): the value plus the source backing it.
+// A per-field value paired with the source backing it, as stored.
 type SourcedString = {
 	readonly value: string
-	readonly sourceId: string
+	readonly source_id: string
 	readonly quote?: string
 	readonly confidence?: number
 }
@@ -48,7 +43,7 @@ const sourcedToCitations = (
 	field != null
 		? [
 				{
-					sourceId: field.sourceId,
+					source_id: field.source_id,
 					...(field.quote !== undefined ? { quote: field.quote } : {}),
 					...(field.confidence !== undefined
 						? { confidence: field.confidence }
@@ -59,27 +54,29 @@ const sourcedToCitations = (
 
 type EnrichmentBlock = {
 	readonly industry?: SourcedString
-	readonly sizeRange?: SourcedString
-	readonly painPoints?: SourcedString
-	readonly currentTools?: SourcedString
+	readonly size_range?: SourcedString
+	readonly pain_points?: SourcedString
+	readonly current_tools?: SourcedString
 	readonly tags?: ReadonlyArray<string>
 	readonly location?: SourcedString
 	readonly country?: SourcedString
 }
 
 // An evidence-backed row (a fit check or a disqualifier): the source URL and,
-// where present, the quote that decides it, camelCased from the stored shape.
+// where present, the quote that decides it.
 type EvidenceRef = {
-	readonly evidenceQuote?: string
-	readonly sourceId?: string
+	readonly evidence_quote?: string
+	readonly source_id?: string
 }
 
 const evidenceToCitations = (e: EvidenceRef): ReadonlyArray<Citation> =>
-	e.sourceId !== undefined
+	e.source_id !== undefined
 		? [
 				{
-					sourceId: e.sourceId,
-					...(e.evidenceQuote !== undefined ? { quote: e.evidenceQuote } : {}),
+					source_id: e.source_id,
+					...(e.evidence_quote !== undefined
+						? { quote: e.evidence_quote }
+						: {}),
 				},
 			]
 		: []
@@ -94,18 +91,18 @@ type Disqualifier = EvidenceRef & { readonly rule: string }
 type ConflictEntry = {
 	readonly field: string
 	readonly value: string
-	readonly sourceId?: string
+	readonly source_id?: string
 	readonly note?: string
 }
 
-// The run's quality signal (camelCased): how well the run grounded, and whether
-// it is thin enough that an automation should not act on it unreviewed.
+// The run's quality signal: how well the run grounded, and whether it is thin
+// enough that an automation should not act on it unreviewed.
 type QualityBlock = {
 	readonly rounds?: number
-	readonly sourcesMatched?: number
-	readonly fieldsGrounded?: number
-	readonly groundingRatio?: number
-	readonly lowConfidence?: boolean
+	readonly sources_matched?: number
+	readonly fields_grounded?: number
+	readonly grounding_ratio?: number
+	readonly low_confidence?: boolean
 }
 
 type CompetitorEntry = {
@@ -125,8 +122,8 @@ type ContactEntry = {
 type CompanyEnrichmentFindings = CommonFindings & {
 	readonly enrichment?: EnrichmentBlock
 	readonly verdict?: string
-	readonly verdictRationale?: string
-	readonly fitChecks?: ReadonlyArray<FitCheck>
+	readonly verdict_rationale?: string
+	readonly fit_checks?: ReadonlyArray<FitCheck>
 	readonly disqualifiers?: ReadonlyArray<Disqualifier>
 	readonly hook?: string
 	readonly conflicts?: ReadonlyArray<ConflictEntry>
@@ -166,19 +163,19 @@ function CheckResult({ result }: { readonly result: string }) {
 const ENRICHMENT_FIELDS: ReadonlyArray<{
 	readonly key:
 		| 'industry'
-		| 'sizeRange'
+		| 'size_range'
 		| 'country'
 		| 'location'
-		| 'painPoints'
-		| 'currentTools'
+		| 'pain_points'
+		| 'current_tools'
 	readonly label: ReactNode
 }> = [
 	{ key: 'industry', label: <Trans>Industry</Trans> },
-	{ key: 'sizeRange', label: <Trans>Size</Trans> },
+	{ key: 'size_range', label: <Trans>Size</Trans> },
 	{ key: 'country', label: <Trans>Country</Trans> },
 	{ key: 'location', label: <Trans>Location</Trans> },
-	{ key: 'painPoints', label: <Trans>Pain points</Trans> },
-	{ key: 'currentTools', label: <Trans>Current tools</Trans> },
+	{ key: 'pain_points', label: <Trans>Pain points</Trans> },
+	{ key: 'current_tools', label: <Trans>Current tools</Trans> },
 ]
 
 export function CompanyEnrichmentView({
@@ -190,8 +187,8 @@ export function CompanyEnrichmentView({
 	const competitors = findings?.competitors ?? []
 	const contacts = findings?.contacts ?? []
 	const verdict = findings?.verdict
-	const verdictRationale = findings?.verdictRationale
-	const fitChecks = findings?.fitChecks ?? []
+	const verdictRationale = findings?.verdict_rationale
+	const fitChecks = findings?.fit_checks ?? []
 	const disqualifiers = findings?.disqualifiers ?? []
 	const hook = findings?.hook
 	const conflicts = findings?.conflicts ?? []
@@ -257,7 +254,9 @@ export function CompanyEnrichmentView({
 									{c.value}
 									<CitationList
 										citations={
-											c.sourceId !== undefined ? [{ sourceId: c.sourceId }] : []
+											c.source_id !== undefined
+												? [{ source_id: c.source_id }]
+												: []
 										}
 									/>
 									{c.note !== undefined ? <Reason>{c.note}</Reason> : null}
@@ -383,8 +382,8 @@ export function CompanyEnrichmentView({
 					</SectionTitle>
 					<Reason>
 						<Trans>
-							{quality.fieldsGrounded ?? 0} fields grounded ·{' '}
-							{quality.sourcesMatched ?? 0} own-domain sources ·{' '}
+							{quality.fields_grounded ?? 0} fields grounded ·{' '}
+							{quality.sources_matched ?? 0} own-domain sources ·{' '}
 							{quality.rounds ?? 0} rounds
 						</Trans>
 					</Reason>
