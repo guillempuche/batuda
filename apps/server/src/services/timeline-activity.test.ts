@@ -33,6 +33,7 @@ const emailSent = () =>
 		contactId: 'ct-1',
 		subject: 'Hello',
 		summary: null,
+		threadLinkId: null,
 		actorUserId: null,
 		occurredAt: at,
 	})

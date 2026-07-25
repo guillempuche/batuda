@@ -145,6 +145,7 @@ describe('TimelineActivityService.record cadence denorm', () => {
 					contactId: null,
 					subject: 'cadence',
 					summary: null,
+					threadLinkId: null,
 					actorUserId: null,
 					occurredAt,
 				})

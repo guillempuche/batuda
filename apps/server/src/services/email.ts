@@ -837,17 +837,22 @@ export class EmailService extends Context.Service<EmailService>()(
 							let inReplyTo: string | null
 							let referencesArr: string[]
 
+							// Both branches below supply this so the history entry can
+							// link back to the conversation this message belongs to.
+							let threadLinkId: string | null
+
 							if (args.existingThreadLink) {
 								// Reply: reuse the link's root id, append it to References.
 								externalThreadId = args.existingThreadLink.externalThreadId
 								inReplyTo = args.existingThreadLink.externalThreadId
 								referencesArr = [args.existingThreadLink.externalThreadId]
+								threadLinkId = args.existingThreadLink.id
 							} else {
 								// Brand-new thread: provider's threadId IS the root msg id.
 								externalThreadId = args.result.threadId
 								inReplyTo = null
 								referencesArr = []
-								yield* sql`
+								const linkRows = yield* sql<{ id: string }>`
 									INSERT INTO email_thread_links ${sql.insert({
 										organizationId: currentOrg.id,
 										externalThreadId,
@@ -857,7 +862,9 @@ export class EmailService extends Context.Service<EmailService>()(
 										subject: args.subject,
 										status: 'open',
 									})}
+									RETURNING id
 								`
+								threadLinkId = linkRows[0]?.id ?? null
 							}
 
 							const sentAt = DateTime.toDateUtc(DateTime.nowUnsafe())
@@ -923,6 +930,7 @@ export class EmailService extends Context.Service<EmailService>()(
 										contactId: args.contactId,
 										subject: args.subject,
 										summary: null,
+										threadLinkId,
 										actorUserId: null,
 										occurredAt: sentAt,
 									}),

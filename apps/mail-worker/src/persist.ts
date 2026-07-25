@@ -150,13 +150,17 @@ export const persistInboundMessage = (args: {
 		// `(organization_id, external_thread_id)` index. The DO UPDATE
 		// clause deliberately leaves `company_id`/`contact_id` alone —
 		// the first message on a thread sets the link, later messages
-		// from a different sender don't re-home the whole thread.
-		yield* sql`
+		// from a different sender don't re-home the whole thread. The id comes
+		// back so the history entry can point at the conversation this message
+		// belongs to.
+		const threadLinks = yield* sql<{ id: string }>`
 			INSERT INTO email_thread_links (organization_id, inbox_id, external_thread_id, company_id, contact_id, updated_at)
 			VALUES (${args.organizationId}, ${args.inboxId}, ${externalThreadId}, ${companyId}, ${contactId}, now())
 			ON CONFLICT (organization_id, external_thread_id)
 			DO UPDATE SET updated_at = now()
+			RETURNING id
 		`
+		const threadLinkId = threadLinks[0]?.id ?? null
 
 		// `idx_email_messages_imap_dedupe` makes the (inbox_id,
 		// uidvalidity, uid) tuple unique, so re-fetches of the same UID
@@ -248,6 +252,7 @@ export const persistInboundMessage = (args: {
 					${JSON.stringify({
 						subject: args.parsed.subject,
 						classification: 'normal',
+						threadLinkId,
 					})}::jsonb
 				)
 			`

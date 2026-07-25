@@ -1839,9 +1839,8 @@ function toTimelineEntry(
 		outcome: textOrNull(payload['outcome']),
 		nextAction: textOrNull(payload['nextAction']),
 		date: row.date,
-		// Rows don't carry the thread they belong to, so an email entry can't
-		// link through to the conversation yet.
-		threadId: null,
+		// Only email rows carry this, so only those link through to a conversation.
+		threadId: textOrNull(payload['threadLinkId']),
 	}
 }
 
