@@ -31,6 +31,7 @@ export function StackEditor({
 	orgDefaultTemplateIds,
 	hasExistingDefault,
 	onDone,
+	onRead,
 }: {
 	readonly agent: string
 	readonly scope: 'org' | 'personal'
@@ -42,6 +43,9 @@ export function StackEditor({
 	// pre-ticks the default box so the common case needs no extra click.
 	readonly hasExistingDefault: boolean
 	readonly onDone: () => void
+	// Opening a template for reading from the picker; it layers over this editor
+	// rather than replacing it, so a half-written stack survives the detour.
+	readonly onRead?: ((id: string) => void) | undefined
 }) {
 	const { t } = useLingui()
 	const toast = usePriToast()
@@ -237,7 +241,12 @@ export function StackEditor({
 				</OrgBlock>
 			) : null}
 
-			<StackPicker options={options} selectedIds={ids} onChange={setIds} />
+			<StackPicker
+				options={options}
+				selectedIds={ids}
+				onChange={setIds}
+				onRead={onRead}
+			/>
 			{ids.length === 0 ? (
 				<Hint>
 					<Trans>Add at least one template before saving.</Trans>

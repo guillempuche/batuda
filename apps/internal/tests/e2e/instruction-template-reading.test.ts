@@ -2,20 +2,23 @@ import { expect, test } from '@playwright/test'
 
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
-// Reading an instruction template, and the `?dlg=` addressing that carries it.
+// Reading an instruction template, and the `?read=` address that carries it.
 // Standing guidance steers every agent run, so a member can read any template
 // the list returns — the organization's as well as their own — while editing
-// stays with the owner. The dialog lives in the URL, so it survives a refresh
-// and Back steps out of it.
+// stays with the owner. Reading has its own key rather than sharing `?dlg=`
+// with the editors, so it can open over a half-written stack without
+// discarding it.
 // Selectors verified against:
 //   apps/internal/src/routes/settings/profile/templates.tsx
-//     (template-row, template-view-{id})
+//     (template-row, template-view-{id}, new-stack)
 //   apps/internal/src/routes/settings/organization/templates.tsx
 //     (org-template-row, org-template-view-{id}, org-template-view-dialog)
 //   apps/internal/src/components/instructions/template-view-dialog.tsx
 //     (template-view-dialog, -body, -edit)
 //   apps/internal/src/components/instructions/template-editor-dialog.tsx
 //     (template-editor-dialog, template-editor-name)
+//   apps/internal/src/components/instructions/stack-picker.tsx (stack-read-{id})
+//   apps/internal/src/components/instructions/stack-editor.tsx (stack-name)
 
 test.beforeEach(async ({ page }) => {
 	await page.goto('/', { waitUntil: 'commit' })
@@ -114,7 +117,7 @@ test.describe('reading an instruction template', () => {
 
 			// GIVEN the address of the open template
 			const shared = page.url()
-			expect(decodeURIComponent(shared)).toContain('"kind":"view"')
+			expect(shared).toContain('read=')
 
 			// WHEN that address is loaded fresh
 			await page.goto(shared, { waitUntil: 'networkidle' })
@@ -130,7 +133,7 @@ test.describe('reading an instruction template', () => {
 
 			// THEN the dialog closes and the address is clean again
 			await expect(page.getByTestId('template-view-dialog')).toBeHidden()
-			expect(page.url()).not.toContain('dlg=')
+			expect(page.url()).not.toContain('read=')
 		})
 	})
 
@@ -138,18 +141,11 @@ test.describe('reading an instruction template', () => {
 		test('should settle on the list rather than an empty dialog', async ({
 			page,
 		}) => {
-			// GIVEN a link to a template id that is not in the organization
-			const missing = encodeURIComponent(
-				JSON.stringify({
-					kind: 'view',
-					id: '00000000-0000-4000-8000-000000000000',
-				}),
+			// WHEN a link to a template id that is not in the organization is opened
+			await page.goto(
+				'/settings/profile/templates?read=00000000-0000-4000-8000-000000000000',
+				{ waitUntil: 'networkidle' },
 			)
-
-			// WHEN it is opened
-			await page.goto(`/settings/profile/templates?dlg=${missing}`, {
-				waitUntil: 'networkidle',
-			})
 
 			// THEN the page drops the dead link and shows the list
 			await expect(page.getByTestId('template-row').first()).toBeVisible()
@@ -188,7 +184,44 @@ test.describe('reading an instruction template', () => {
 			// THEN the template opens for reading, with no editor to save from
 			await expect(page.getByTestId('template-view-dialog')).toBeVisible()
 			await expect(page.getByTestId('template-editor-dialog')).toBeHidden()
-			expect(decodeURIComponent(page.url())).toContain('"kind":"view"')
+			expect(page.url()).toContain('read=')
+		})
+	})
+
+	test.describe('when a reader checks a template while building a stack', () => {
+		test('should show it without losing the half-written stack', async ({
+			page,
+		}) => {
+			const name = `e2e-draft-${Date.now()}`
+			await page.goto('/settings/profile/templates', {
+				waitUntil: 'networkidle',
+			})
+
+			// GIVEN a stack part-way through being written
+			await page.getByTestId('new-stack').click()
+			await expect(page.getByTestId('stack-editor')).toBeVisible()
+			await page.getByTestId('stack-name').fill(name)
+			await page.locator('[data-testid^="stack-add-"]').first().click()
+			const picked = page.locator('[data-testid^="stack-read-"]').first()
+			await expect(picked).toBeVisible()
+
+			// WHEN one of its templates is opened for reading
+			await picked.click()
+
+			// THEN the guidance is on screen
+			await expect(page.getByTestId('template-view-dialog')).toBeVisible()
+			await expect(
+				page.getByTestId('template-view-dialog-body'),
+			).not.toBeEmpty()
+
+			// AND the stack being written is still there, name and all
+			await expect(page.getByTestId('stack-editor')).toBeVisible()
+			await expect(page.getByTestId('stack-name')).toHaveValue(name)
+
+			// AND closing the reader leaves the draft untouched
+			await page.keyboard.press('Escape')
+			await expect(page.getByTestId('template-view-dialog')).toBeHidden()
+			await expect(page.getByTestId('stack-name')).toHaveValue(name)
 		})
 	})
 

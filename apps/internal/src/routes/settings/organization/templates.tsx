@@ -58,13 +58,13 @@ import { authClient } from '#/lib/auth-client'
 import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
 import { validateSearchWith } from '#/lib/search-schema'
 import { useDlg } from '#/lib/use-dlg'
+import { useReadParam } from '#/lib/use-read-param'
 
 // As on the personal templates page, the dialogs live in `?dlg=` so they are
-// deep-linkable and Back closes them. `view` is the only one a regular member
-// reaches; the rest belong to the admin half of the page, which is the only
-// place that offers them.
+// deep-linkable and Back closes them. Every one of them belongs to the admin
+// half of the page; a regular member only reads, which carries its own `?read=`
+// key.
 const orgTemplatesDlgSchema = Schema.Union([
-	dlgWithId('view'),
 	dlgNoId('create'),
 	dlgWithId('edit'),
 	dlgNoId('new-stack'),
@@ -72,7 +72,10 @@ const orgTemplatesDlgSchema = Schema.Union([
 ])
 
 export const Route = createFileRoute('/settings/organization/templates')({
-	validateSearch: validateSearchWith({ dlg: orgTemplatesDlgSchema }),
+	validateSearch: validateSearchWith({
+		dlg: orgTemplatesDlgSchema,
+		read: Schema.NonEmptyString,
+	}),
 	head: () => ({ meta: [{ title: 'Org instruction templates — Batuda' }] }),
 	component: OrgTemplatesPage,
 })
@@ -101,10 +104,10 @@ function OrgTemplatesPage() {
 	// member get the same dialog — an admin opens it from the row they manage, a
 	// regular member from the list they can only read.
 	const { dlg, open: openDlg, close: closeDlg } = useDlg(orgTemplatesDlgSchema)
-	const openView = (row: TemplateShape) => openDlg({ kind: 'view', id: row.id })
+	const { readId, openRead, closeRead } = useReadParam()
 	const viewingRow =
-		dlg?.kind === 'view'
-			? (orgTemplates.find(row => row.id === dlg.id) ?? null)
+		readId !== undefined
+			? (orgTemplates.find(row => row.id === readId) ?? null)
 			: null
 
 	// Settle the link once the list has loaded. A template that is gone drops its
@@ -116,14 +119,35 @@ function OrgTemplatesPage() {
 		dlg?.kind === 'edit'
 			? (orgTemplates.find(row => row.id === dlg.id) ?? null)
 			: null
+	// A regular member never renders the admin half, so one of its links would
+	// otherwise sit in the address bar opening nothing, with no way to clear it.
+	const adminOnlyDialog =
+		dlg?.kind === 'create' || dlg?.kind === 'new-stack' || dlg?.kind === 'stack'
 	useEffect(() => {
+		if (!isAdmin && adminOnlyDialog) {
+			closeDlg()
+			return
+		}
 		if (!templatesLoaded) return
-		if (dlg?.kind === 'view' && viewingRow === null) closeDlg()
+		if (readId !== undefined && viewingRow === null) closeRead()
 		if (dlg?.kind !== 'edit') return
 		if (editTarget === null) closeDlg()
-		else if (!isAdmin)
-			openDlg({ kind: 'view', id: editTarget.id }, { replace: true })
-	}, [dlg, templatesLoaded, viewingRow, editTarget, isAdmin, openDlg, closeDlg])
+		else if (!isAdmin) {
+			closeDlg()
+			openRead(editTarget.id)
+		}
+	}, [
+		dlg,
+		templatesLoaded,
+		readId,
+		viewingRow,
+		editTarget,
+		isAdmin,
+		adminOnlyDialog,
+		openRead,
+		closeRead,
+		closeDlg,
+	])
 
 	return (
 		<Page>
@@ -151,7 +175,7 @@ function OrgTemplatesPage() {
 				<OrgTemplateAdmin
 					orgTemplates={orgTemplates}
 					refreshTemplates={refreshTemplates}
-					onView={openView}
+					onRead={openRead}
 				/>
 			) : (
 				<>
@@ -170,7 +194,7 @@ function OrgTemplatesPage() {
 											type='button'
 											aria-label={t`Read ${row.name}`}
 											data-testid={`org-template-view-${row.id}`}
-											onClick={() => openView(row)}
+											onClick={() => openRead(row.id)}
 										>
 											{row.name}
 										</TemplateNameButton>
@@ -194,15 +218,18 @@ function OrgTemplatesPage() {
 				open={viewingRow !== null}
 				name={viewingRow?.name ?? ''}
 				body={viewingRow?.body ?? ''}
+				updatedAt={viewingRow?.updatedAt ?? null}
 				canEdit={isAdmin}
+				orgOwned
 				// Stepping from reading to editing swaps one dialog for the other, so
 				// Back leaves the template rather than dropping you back into reading
 				// what you just finished editing.
 				onEdit={() => {
-					if (viewingRow !== null)
-						openDlg({ kind: 'edit', id: viewingRow.id }, { replace: true })
+					if (viewingRow === null) return
+					closeRead()
+					openDlg({ kind: 'edit', id: viewingRow.id })
 				}}
-				onClose={closeDlg}
+				onClose={closeRead}
 				testId='org-template-view-dialog'
 			/>
 		</Page>
@@ -273,12 +300,12 @@ function OrgStacksViewer() {
 function OrgTemplateAdmin({
 	orgTemplates,
 	refreshTemplates,
-	onView,
+	onRead,
 }: {
 	readonly orgTemplates: ReadonlyArray<TemplateShape>
 	readonly refreshTemplates: () => void
 	// Reading is owned by the page above so both member and admin share one dialog.
-	readonly onView: (row: TemplateShape) => void
+	readonly onRead: (id: string) => void
 }) {
 	const { t } = useLingui()
 	const toast = usePriToast()
@@ -473,7 +500,7 @@ function OrgTemplateAdmin({
 									type='button'
 									aria-label={t`Read ${row.name}`}
 									data-testid={`org-template-view-${row.id}`}
-									onClick={() => onView(row)}
+									onClick={() => onRead(row.id)}
 								>
 									{row.name}
 								</TemplateNameButton>
@@ -559,6 +586,7 @@ function OrgTemplateAdmin({
 								orgDefaultTemplateIds={[]}
 								hasExistingDefault={hasOrgDefault}
 								onDone={stackSaved}
+								onRead={onRead}
 							/>
 						) : (
 							<Actions>

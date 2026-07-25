@@ -61,13 +61,14 @@ import { authClient } from '#/lib/auth-client'
 import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
 import { validateSearchWith } from '#/lib/search-schema'
 import { useDlg } from '#/lib/use-dlg'
+import { useReadParam } from '#/lib/use-read-param'
 import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
 
-// The view/create/edit surfaces live in the `?dlg=` param so they are
-// deep-linkable and the browser Back button closes them — `create`/`new-stack`
-// open on their own, `view`/`edit`/`stack` target a row by id.
+// The writing surfaces live in the `?dlg=` param so they are deep-linkable and
+// the browser Back button closes them — `create`/`new-stack` open on their own,
+// `edit`/`stack` target a row by id. Reading carries its own `?read=` key so it
+// can open over any of them.
 const templatesDlgSchema = Schema.Union([
-	dlgWithId('view'),
 	dlgNoId('create'),
 	dlgWithId('edit'),
 	dlgNoId('new-stack'),
@@ -75,7 +76,10 @@ const templatesDlgSchema = Schema.Union([
 ])
 
 export const Route = createFileRoute('/settings/profile/templates')({
-	validateSearch: validateSearchWith({ dlg: templatesDlgSchema }),
+	validateSearch: validateSearchWith({
+		dlg: templatesDlgSchema,
+		read: Schema.NonEmptyString,
+	}),
 	head: () => ({ meta: [{ title: 'Instruction templates — Batuda' }] }),
 	component: TemplatesPage,
 })
@@ -156,6 +160,7 @@ function TemplatesPage() {
 	)
 
 	const { dlg, open: openDlg, close: closeDlg } = useDlg(templatesDlgSchema)
+	const { readId, openRead, closeRead } = useReadParam()
 	const [confirmTarget, setConfirmTarget] = useState<{
 		readonly id: string
 		readonly name: string
@@ -194,8 +199,8 @@ function TemplatesPage() {
 		dlg?.kind === 'create' || (dlg?.kind === 'edit' && editingRow !== null)
 
 	const viewingRow =
-		dlg?.kind === 'view'
-			? (templates.find(row => row.id === dlg.id) ?? null)
+		readId !== undefined
+			? (templates.find(row => row.id === readId) ?? null)
 			: null
 
 	// The stack editor mounts for a create (`new-stack`) or an edit (`stack`)
@@ -220,14 +225,11 @@ function TemplatesPage() {
 			: null
 	useEffect(() => {
 		if (dlg?.kind === 'edit' && templatesLoaded && editingRow === null) {
-			if (readableInstead !== null) {
-				openDlg({ kind: 'view', id: readableInstead.id }, { replace: true })
-			} else {
-				closeDlg()
-			}
-		}
-		if (dlg?.kind === 'view' && templatesLoaded && viewingRow === null) {
 			closeDlg()
+			if (readableInstead !== null) openRead(readableInstead.id)
+		}
+		if (readId !== undefined && templatesLoaded && viewingRow === null) {
+			closeRead()
 		}
 		if (dlg?.kind === 'stack' && stacksLoaded && editingStack === null) {
 			closeDlg()
@@ -237,15 +239,16 @@ function TemplatesPage() {
 		templatesLoaded,
 		editingRow,
 		readableInstead,
+		readId,
 		viewingRow,
 		stacksLoaded,
 		editingStack,
-		openDlg,
+		openRead,
+		closeRead,
 		closeDlg,
 	])
 
 	const openCreate = () => openDlg({ kind: 'create' })
-	const openView = (row: TemplateShape) => openDlg({ kind: 'view', id: row.id })
 	const openEdit = (row: TemplateShape) => openDlg({ kind: 'edit', id: row.id })
 	const openNewStack = () => openDlg({ kind: 'new-stack' })
 	const openEditStack = (s: StackShape) => openDlg({ kind: 'stack', id: s.id })
@@ -414,7 +417,7 @@ function TemplatesPage() {
 										type='button'
 										aria-label={t`Read ${row.name}`}
 										data-testid={`template-view-${row.id}`}
-										onClick={() => openView(row)}
+										onClick={() => openRead(row.id)}
 									>
 										{row.name}
 									</TemplateNameButton>
@@ -547,6 +550,7 @@ function TemplatesPage() {
 								orgDefaultTemplateIds={orgDefaultTemplateIds}
 								hasExistingDefault={hasPersonalDefault}
 								onDone={stackSaved}
+								onRead={openRead}
 							/>
 						) : (
 							<Actions>
@@ -569,19 +573,22 @@ function TemplatesPage() {
 				open={viewingRow !== null}
 				name={viewingRow?.name ?? ''}
 				body={viewingRow?.body ?? ''}
+				updatedAt={viewingRow?.updatedAt ?? null}
 				canEdit={
 					viewingRow !== null &&
 					viewingRow.ownerUserId !== null &&
 					viewingRow.ownerUserId === myUserId
 				}
+				orgOwned={viewingRow?.ownerUserId === null}
 				// Stepping from reading to editing swaps one dialog for the other, so
 				// Back leaves the template rather than dropping you back into reading
 				// what you just finished editing.
 				onEdit={() => {
-					if (viewingRow !== null)
-						openDlg({ kind: 'edit', id: viewingRow.id }, { replace: true })
+					if (viewingRow === null) return
+					closeRead()
+					openDlg({ kind: 'edit', id: viewingRow.id })
 				}}
-				onClose={closeDlg}
+				onClose={closeRead}
 				testId='template-view-dialog'
 			/>
 
