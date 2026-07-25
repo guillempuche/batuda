@@ -55,8 +55,9 @@ export interface TaskDayBoundaries {
 }
 
 // `recent` surfaces newest-first for the web inbox; `due` surfaces the most
-// overdue first for an agent picking the next thing to act on.
-export type TaskSort = 'recent' | 'due'
+// overdue first for an agent picking the next thing to act on; `completed`
+// orders finished work by when it was actually finished.
+export type TaskSort = 'recent' | 'due' | 'completed'
 
 export interface TaskPage {
 	readonly sort: TaskSort
@@ -137,7 +138,10 @@ export class TaskService extends Context.Service<TaskService>()('TaskService', {
 				case 'noDue':
 					return sql`${waiting} AND due_at IS NULL`
 				case 'snoozed':
-					return sql`status = 'open' AND snoozed_until > now()`
+					// Any unfinished task can be put to sleep, not only an untouched
+					// one — a blocked or in-progress task still belongs here.
+					return sql`status NOT IN ('done', 'cancelled')
+						AND snoozed_until > now()`
 				case 'doneRecent':
 					return sql`status = 'done'
 						AND completed_at >= now() - interval '7 days'`
@@ -167,11 +171,18 @@ export class TaskService extends Context.Service<TaskService>()('TaskService', {
 				conditions.push(sql`due_at <= ${filters.dueBefore}`)
 			if (filters.overdueOnly)
 				conditions.push(sql`due_at < now() AND status = 'open'`)
-			if (filters.shelf && filters.boundaries)
-				conditions.push(shelfCondition(filters.shelf, filters.boundaries))
+			// A shelf needs the day edges to mean anything, so the two travel
+			// together or not at all.
+			const shelf =
+				filters.shelf && filters.boundaries
+					? shelfCondition(filters.shelf, filters.boundaries)
+					: undefined
+			if (shelf) conditions.push(shelf)
 			// Snoozed rows hide by default; includeSnoozed surfaces them. A shelf
-			// already says where sleeping tasks belong, so it opts out.
-			if (filters.includeSnoozed !== true && filters.shelf === undefined)
+			// already says where sleeping tasks belong, so it opts out — but only
+			// when one actually applied, or asking for a shelf without the day
+			// edges would drop every filter at once.
+			if (filters.includeSnoozed !== true && shelf === undefined)
 				conditions.push(sql`(snoozed_until IS NULL OR snoozed_until <= now())`)
 			// `completed=false` excludes cancelled as well as done — a cancelled
 			// task is not open work. Shared by both transports so the meaning of

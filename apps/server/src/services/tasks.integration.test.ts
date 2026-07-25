@@ -393,6 +393,44 @@ describe('TaskService.list', () => {
 		})
 	})
 
+	describe('when a shelf is asked for without the day it refers to', () => {
+		it('should go on hiding sleeping tasks rather than returning everything', async () => {
+			// GIVEN one awake and one sleeping task for a unique assignee
+			const assignee = `shelf-fixture-${randomUUID()}`
+			await createWith(tallerOrgId, tallerOrgId, {
+				type: 'follow_up',
+				title: `${FIXTURE_TITLE} awake`,
+				status: 'open',
+				assigneeId: assignee,
+				dueAt: new Date(),
+			})
+			await createWith(tallerOrgId, tallerOrgId, {
+				type: 'follow_up',
+				title: `${FIXTURE_TITLE} sleeping`,
+				status: 'open',
+				assigneeId: assignee,
+				dueAt: new Date(),
+				snoozedUntil: new Date(Date.now() + 3 * DAY_MS),
+			})
+
+			// WHEN a shelf is named but the day edges it needs are missing, so no
+			// shelf can actually be applied
+			const page = await listWith(tallerOrgId, {
+				assigneeId: assignee,
+				shelf: 'today',
+			})
+
+			// THEN the ordinary rule that hides sleeping work still holds — naming
+			// a shelf must not switch every other filter off
+			expect(page.total).toBe(1)
+			expect(
+				(page.items as ReadonlyArray<{ title: string }>).map(r =>
+					r.title.split(' ').pop(),
+				),
+			).toEqual(['awake'])
+		})
+	})
+
 	describe('when listing one shelf of the inbox', () => {
 		it('should return only the tasks nobody has dated for noDue', async () => {
 			// GIVEN one dated and one undated task for a unique assignee
@@ -740,6 +778,38 @@ describe('TaskService.counts', () => {
 			// THEN nothing about the inbox changes
 			const after = await countsWith(tallerOrgId, boundaries)
 			expect(after).toEqual(before)
+		})
+	})
+
+	describe('when a sleeping task is not simply untouched', () => {
+		it('should still count it as snoozed once work has started on it', async () => {
+			// GIVEN the counts before anything is added
+			const boundaries = boundariesAround(Date.now())
+			const before = await countsWith(tallerOrgId, boundaries)
+
+			// WHEN a task someone already started is put to sleep
+			await createWith(tallerOrgId, tallerOrgId, {
+				type: 'follow_up',
+				title: `${FIXTURE_TITLE} started then snoozed`,
+				status: 'in_progress',
+				dueAt: new Date(Date.parse(boundaries.todayStart) + 3600_000),
+				snoozedUntil: new Date(Date.now() + 3 * DAY_MS),
+			})
+
+			// THEN it sits on the sleeping shelf rather than falling off all of them
+			const after = await countsWith(tallerOrgId, boundaries)
+			expect(after.snoozed).toBe(before.snoozed + 1)
+			const shelves = [
+				'overdue',
+				'today',
+				'thisWeek',
+				'later',
+				'noDue',
+				'doneRecent',
+			] as const
+			for (const shelf of shelves) {
+				expect(after[shelf]).toBe(before[shelf])
+			}
 		})
 	})
 
