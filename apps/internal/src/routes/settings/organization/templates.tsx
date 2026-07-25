@@ -1,9 +1,10 @@
 import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute } from '@tanstack/react-router'
+import { Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { ArrowLeft, Pencil, Plus, ScrollText, Trash2 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
 import type { Agent } from '@batuda/instructions/domain'
@@ -33,7 +34,7 @@ import {
 	SectionTitle,
 	Subtitle,
 	TemplateList,
-	TemplateName,
+	TemplateNameButton,
 	TemplateRowItem,
 } from '#/components/instructions/instruction-page-chrome'
 import {
@@ -51,15 +52,33 @@ import {
 	type TemplateDraft,
 	TemplateEditorDialog,
 } from '#/components/instructions/template-editor-dialog'
+import { TemplateViewDialog } from '#/components/instructions/template-view-dialog'
 import { ErrorState } from '#/components/shared/error-state'
 import { authClient } from '#/lib/auth-client'
+import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
+import { validateSearchWith } from '#/lib/search-schema'
+import { useDlg } from '#/lib/use-dlg'
+
+// As on the personal templates page, the dialogs live in `?dlg=` so they are
+// deep-linkable and Back closes them. `view` is the only one a regular member
+// reaches; the rest belong to the admin half of the page, which is the only
+// place that offers them.
+const orgTemplatesDlgSchema = Schema.Union([
+	dlgWithId('view'),
+	dlgNoId('create'),
+	dlgWithId('edit'),
+	dlgNoId('new-stack'),
+	dlgWithId('stack'),
+])
 
 export const Route = createFileRoute('/settings/organization/templates')({
+	validateSearch: validateSearchWith({ dlg: orgTemplatesDlgSchema }),
 	head: () => ({ meta: [{ title: 'Org instruction templates — Batuda' }] }),
 	component: OrgTemplatesPage,
 })
 
 function OrgTemplatesPage() {
+	const { t } = useLingui()
 	const activeMember = authClient.useActiveMember()
 	const role = activeMember.data?.role ?? null
 	const isAdmin = role === 'owner' || role === 'admin'
@@ -77,6 +96,34 @@ function OrgTemplatesPage() {
 				: [],
 		[templatesResult],
 	)
+
+	// Reading is handled here rather than in the admin half so both kinds of
+	// member get the same dialog — an admin opens it from the row they manage, a
+	// regular member from the list they can only read.
+	const { dlg, open: openDlg, close: closeDlg } = useDlg(orgTemplatesDlgSchema)
+	const openView = (row: TemplateShape) => openDlg({ kind: 'view', id: row.id })
+	const viewingRow =
+		dlg?.kind === 'view'
+			? (orgTemplates.find(row => row.id === dlg.id) ?? null)
+			: null
+
+	// Settle the link once the list has loaded. A template that is gone drops its
+	// link rather than leaving an empty dialog open. An edit link handed to
+	// someone who may only read falls back to reading, so a shared address shows
+	// them the template instead of nothing at all.
+	const templatesLoaded = AsyncResult.isSuccess(templatesResult)
+	const editTarget =
+		dlg?.kind === 'edit'
+			? (orgTemplates.find(row => row.id === dlg.id) ?? null)
+			: null
+	useEffect(() => {
+		if (!templatesLoaded) return
+		if (dlg?.kind === 'view' && viewingRow === null) closeDlg()
+		if (dlg?.kind !== 'edit') return
+		if (editTarget === null) closeDlg()
+		else if (!isAdmin)
+			openDlg({ kind: 'view', id: editTarget.id }, { replace: true })
+	}, [dlg, templatesLoaded, viewingRow, editTarget, isAdmin, openDlg, closeDlg])
 
 	return (
 		<Page>
@@ -104,21 +151,29 @@ function OrgTemplatesPage() {
 				<OrgTemplateAdmin
 					orgTemplates={orgTemplates}
 					refreshTemplates={refreshTemplates}
+					onView={openView}
 				/>
 			) : (
 				<>
 					<Section>
 						<Hint role='note'>
 							<Trans>
-								Your organization's admins manage these templates. You can use
-								any of them in your own stacks or per run.
+								Your organization's admins manage these templates. You can read
+								any of them, and use them in your own stacks or per run.
 							</Trans>
 						</Hint>
 						{orgTemplates.length > 0 ? (
 							<TemplateList>
 								{orgTemplates.map(row => (
 									<TemplateRowItem key={row.id} data-testid='org-template-row'>
-										<TemplateName>{row.name}</TemplateName>
+										<TemplateNameButton
+											type='button'
+											aria-label={t`Read ${row.name}`}
+											data-testid={`org-template-view-${row.id}`}
+											onClick={() => openView(row)}
+										>
+											{row.name}
+										</TemplateNameButton>
 										<OwnerBadge>
 											<Trans>Org</Trans>
 										</OwnerBadge>
@@ -134,6 +189,22 @@ function OrgTemplatesPage() {
 					<OrgStacksViewer />
 				</>
 			)}
+
+			<TemplateViewDialog
+				open={viewingRow !== null}
+				name={viewingRow?.name ?? ''}
+				body={viewingRow?.body ?? ''}
+				canEdit={isAdmin}
+				// Stepping from reading to editing swaps one dialog for the other, so
+				// Back leaves the template rather than dropping you back into reading
+				// what you just finished editing.
+				onEdit={() => {
+					if (viewingRow !== null)
+						openDlg({ kind: 'edit', id: viewingRow.id }, { replace: true })
+				}}
+				onClose={closeDlg}
+				testId='org-template-view-dialog'
+			/>
 		</Page>
 	)
 }
@@ -202,9 +273,12 @@ function OrgStacksViewer() {
 function OrgTemplateAdmin({
 	orgTemplates,
 	refreshTemplates,
+	onView,
 }: {
 	readonly orgTemplates: ReadonlyArray<TemplateShape>
 	readonly refreshTemplates: () => void
+	// Reading is owned by the page above so both member and admin share one dialog.
+	readonly onView: (row: TemplateShape) => void
 }) {
 	const { t } = useLingui()
 	const toast = usePriToast()
@@ -241,36 +315,65 @@ function OrgTemplateAdmin({
 		[orgTemplates],
 	)
 
-	const [dialogOpen, setDialogOpen] = useState(false)
-	const [editing, setEditing] = useState<TemplateDraft | null>(null)
+	// The confirmations stay local: they are a passing step in something the user
+	// is already doing, not a place worth linking someone to.
 	const [confirmTarget, setConfirmTarget] = useState<{
 		readonly id: string
 		readonly name: string
 	} | null>(null)
 	const [deleting, setDeleting] = useState(false)
-	// Local master-detail: null = closed, or a create/edit target for the editor.
-	const [stackEditing, setStackEditing] = useState<
-		| { readonly mode: 'new' }
-		| { readonly mode: 'edit'; readonly stack: StackShape }
-		| null
-	>(null)
 	const [confirmStack, setConfirmStack] = useState<StackShape | null>(null)
 	const [deletingStack, setDeletingStack] = useState(false)
 
-	// Switching surface drops any open editor for the previous surface.
+	const { dlg, open: openDlg, close: closeDlg } = useDlg(orgTemplatesDlgSchema)
+
+	// Both editors resolve their target from the loaded list, so a link to an
+	// open row reopens the right one after a refresh.
+	const editingRow =
+		dlg?.kind === 'edit'
+			? (orgTemplates.find(row => row.id === dlg.id) ?? null)
+			: null
+	// Held steady while the editor is open. The editor resets its unsaved-changes
+	// guard and any error message whenever this value changes, so rebuilding it
+	// on every render would quietly drop a draft and hide failed saves.
+	const editingId = editingRow?.id ?? null
+	// biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the template being edited, not the row object the list rebuilds on every refresh
+	const editing: TemplateDraft | null = useMemo(
+		() =>
+			editingRow
+				? { id: editingRow.id, name: editingRow.name, body: editingRow.body }
+				: null,
+		[editingId],
+	)
+	const dialogOpen =
+		dlg?.kind === 'create' || (dlg?.kind === 'edit' && editingRow !== null)
+
+	const editingStack =
+		dlg?.kind === 'stack'
+			? (orgStacks.find(s => s.id === dlg.id) ?? null)
+			: null
+	const stackEditorOpen =
+		dlg?.kind === 'new-stack' ||
+		(dlg?.kind === 'stack' && editingStack !== null)
+
+	// A link to a stack that is gone — deleted, or belonging to another surface —
+	// drops itself once the list has loaded. Templates are handled by the page
+	// above, which is the half that knows whether they arrived.
+	const stacksLoaded = AsyncResult.isSuccess(stacksResult)
+	useEffect(() => {
+		if (dlg?.kind === 'stack' && stacksLoaded && editingStack === null) {
+			closeDlg()
+		}
+	}, [dlg, stacksLoaded, editingStack, closeDlg])
+
+	// Switching surface drops any open stack editor for the previous surface.
 	const selectAgent = (next: Agent) => {
 		setAgent(next)
-		setStackEditing(null)
+		if (dlg?.kind === 'new-stack' || dlg?.kind === 'stack') closeDlg()
 	}
 
-	const openCreate = () => {
-		setEditing(null)
-		setDialogOpen(true)
-	}
-	const openEdit = (row: TemplateShape) => {
-		setEditing({ id: row.id, name: row.name, body: row.body })
-		setDialogOpen(true)
-	}
+	const openCreate = () => openDlg({ kind: 'create' })
+	const openEdit = (row: TemplateShape) => openDlg({ kind: 'edit', id: row.id })
 
 	const confirmDelete = async () => {
 		const target = confirmTarget
@@ -336,7 +439,7 @@ function OrgTemplateAdmin({
 	}
 
 	const stackSaved = () => {
-		setStackEditing(null)
+		closeDlg()
 		refreshStacks()
 	}
 
@@ -366,7 +469,14 @@ function OrgTemplateAdmin({
 					<TemplateList>
 						{orgTemplates.map(row => (
 							<TemplateRowItem key={row.id} data-testid='org-template-row'>
-								<TemplateName>{row.name}</TemplateName>
+								<TemplateNameButton
+									type='button'
+									aria-label={t`Read ${row.name}`}
+									data-testid={`org-template-view-${row.id}`}
+									onClick={() => onView(row)}
+								>
+									{row.name}
+								</TemplateNameButton>
 								<OwnerBadge>
 									<Trans>Org</Trans>
 								</OwnerBadge>
@@ -428,7 +538,7 @@ function OrgTemplateAdmin({
 						{orgStacks.length > 0 ? (
 							<StackList
 								stacks={orgStacks}
-								onEdit={s => setStackEditing({ mode: 'edit', stack: s })}
+								onEdit={s => openDlg({ kind: 'stack', id: s.id })}
 								onSetDefault={s => {
 									void setDefault(s)
 								}}
@@ -440,11 +550,11 @@ function OrgTemplateAdmin({
 							</Empty>
 						)}
 
-						{stackEditing !== null ? (
+						{stackEditorOpen ? (
 							<StackEditor
 								agent={agent}
 								scope='org'
-								stack={stackEditing.mode === 'edit' ? stackEditing.stack : null}
+								stack={editingStack}
 								options={stackOptions}
 								orgDefaultTemplateIds={[]}
 								hasExistingDefault={hasOrgDefault}
@@ -456,7 +566,7 @@ function OrgTemplateAdmin({
 									type='button'
 									$variant='filled'
 									data-testid='org-stack-new'
-									onClick={() => setStackEditing({ mode: 'new' })}
+									onClick={() => openDlg({ kind: 'new-stack' })}
 								>
 									<Plus size={16} aria-hidden />
 									<Trans>New org template stack</Trans>
@@ -469,7 +579,9 @@ function OrgTemplateAdmin({
 
 			<TemplateEditorDialog
 				open={dialogOpen}
-				onOpenChange={setDialogOpen}
+				onOpenChange={next => {
+					if (!next) closeDlg()
+				}}
 				editing={editing}
 				scope='org'
 				onSaved={() => {

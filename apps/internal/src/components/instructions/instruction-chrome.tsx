@@ -36,6 +36,12 @@ export const InstructionIconButton = styled.button`
 	justify-content: center;
 	width: 1.6rem;
 	height: 1.6rem;
+
+	/* Bigger tap target on touch, matching the dialog close controls. */
+	@media (pointer: coarse) {
+		width: 2.5rem;
+		height: 2.5rem;
+	}
 	padding: 0;
 	border: 1px solid color-mix(in oklab, var(--color-on-surface) 14%, transparent);
 	border-radius: var(--shape-2xs);
