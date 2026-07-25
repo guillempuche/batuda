@@ -6,6 +6,7 @@ import { SqlClient } from 'effect/unstable/sql'
 import { CurrentOrg, SessionContext, Slot } from '@batuda/controllers'
 import { CalendarEvent, CalendarEventType } from '@batuda/domain'
 
+import { withAttendees } from '../../lib/calendar-attendees'
 import { CalendarService } from '../../services/calendar'
 import { dispatchForwardInvitation } from '../../services/calendar-forward-dispatch'
 import { dispatchRsvpReply } from '../../services/calendar-rsvp-dispatch'
@@ -426,7 +427,7 @@ export const CalendarHandlersLive = CalendarTools.toLayer(
 						ORDER BY start_at ASC
 						LIMIT ${limit}
 					`
-					return toItems(yield* decodeEvents(rows))
+					return toItems(yield* withAttendees(sql, yield* decodeEvents(rows)))
 				}).pipe(Effect.orDie),
 			list_event_types: params =>
 				Effect.gen(function* () {
@@ -446,7 +447,10 @@ export const CalendarHandlersLive = CalendarTools.toLayer(
 						yield* sql`SELECT * FROM calendar_events WHERE id = ${id} LIMIT 1`
 					if (rows.length === 0)
 						return yield* Effect.die(`Calendar event ${id} not found`)
-					return yield* decodeEvent(rows[0])
+					const [event] = yield* withAttendees(sql, [
+						yield* decodeEvent(rows[0]),
+					])
+					return event!
 				}).pipe(Effect.orDie),
 			create_internal_block: params =>
 				svc

@@ -13,12 +13,9 @@ import {
 	NotFound,
 	SessionContext,
 } from '@batuda/controllers'
-import {
-	CalendarEvent,
-	CalendarEventAttendee,
-	CalendarEventType,
-} from '@batuda/domain'
+import { CalendarEvent, CalendarEventType } from '@batuda/domain'
 
+import { withAttendees } from '../lib/calendar-attendees'
 import { resolvePageTotal } from '../lib/sql-pagination'
 import { dispatchRsvpReply } from '../services/calendar-rsvp-dispatch.js'
 
@@ -27,9 +24,6 @@ const decodeEventTypes = Schema.decodeUnknownEffect(
 )
 const decodeEvent = Schema.decodeUnknownEffect(CalendarEvent)
 const decodeEvents = Schema.decodeUnknownEffect(Schema.Array(CalendarEvent))
-const decodeAttendees = Schema.decodeUnknownEffect(
-	Schema.Array(CalendarEventAttendee),
-)
 // The provider hands back Date slots; read them into DateTime.Utc so the
 // `Slot` wire schema re-encodes them as ISO strings.
 const SlotRow = Schema.Struct({
@@ -51,37 +45,6 @@ type EventRow = {
 
 const cacheKey = (eventTypeId: string, from: string, to: string) =>
 	`${eventTypeId}|${from}|${to}`
-
-// Attendees for a whole page of events in one query, grouped in memory, so a
-// page of meetings doesn't turn into a query per meeting. The organizer sorts
-// first so the caller can show who called the meeting without scanning.
-const attendeesByEvent = (
-	sql: SqlClient.SqlClient,
-	eventIds: ReadonlyArray<string>,
-) =>
-	Effect.gen(function* () {
-		const grouped = new Map<string, Array<CalendarEventAttendee>>()
-		if (eventIds.length === 0) return grouped
-
-		// Result keys arrive camelCased whatever the column spelling, hence
-		// `eventId` rather than `event_id`.
-		const rows = yield* sql<{ readonly eventId: string }>`
-			SELECT id, event_id, email, name, contact_id, company_id, rsvp, is_organizer
-			FROM calendar_event_attendees
-			WHERE event_id = ANY(${eventIds as unknown as string[]})
-			ORDER BY is_organizer DESC, email ASC
-		`
-		// The decoded attendee carries no event of its own, so the raw row at
-		// the same position supplies which meeting it belongs to.
-		const decoded = yield* decodeAttendees(rows)
-		for (const [index, attendee] of decoded.entries()) {
-			const eventId = rows[index]!.eventId
-			const bucket = grouped.get(eventId)
-			if (bucket) bucket.push(attendee)
-			else grouped.set(eventId, [attendee])
-		}
-		return grouped
-	})
 
 export const CalendarLive = HttpApiBuilder.group(
 	BatudaApi,
@@ -170,20 +133,8 @@ export const CalendarLive = HttpApiBuilder.group(
 								${whereClause}
 							`,
 						)
-						const items = yield* decodeEvents(rows)
-						const attendees = yield* attendeesByEvent(
-							sql,
-							items.map(event => event.id),
-						)
-						return {
-							items: items.map(event => ({
-								...event,
-								attendees: attendees.get(event.id) ?? [],
-							})),
-							total,
-							limit,
-							offset,
-						}
+						const items = yield* withAttendees(sql, yield* decodeEvents(rows))
+						return { items, total, limit, offset }
 					}).pipe(Effect.orDie),
 				)
 				.handle('getEvent', _ =>
@@ -196,9 +147,10 @@ export const CalendarLive = HttpApiBuilder.group(
 								entity: 'calendar_event',
 								id: _.params.id,
 							})
-						const event = yield* decodeEvent(rows[0])
-						const attendees = yield* attendeesByEvent(sql, [event.id])
-						return { ...event, attendees: attendees.get(event.id) ?? [] }
+						const [event] = yield* withAttendees(sql, [
+							yield* decodeEvent(rows[0]),
+						])
+						return event!
 					}).pipe(
 						Effect.catch(e =>
 							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),

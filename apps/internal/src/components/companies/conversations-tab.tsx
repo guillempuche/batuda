@@ -10,6 +10,7 @@ import styled from 'styled-components'
 import { PriButton } from '@batuda/ui/pri'
 
 import { calendarEventsByCompanyAtom } from '#/atoms/calendar-atoms'
+import { channelLabelFor } from '#/components/shared/channel-icon'
 import { RelativeDate } from '#/components/shared/relative-date'
 import {
 	agedPaperSurface,
@@ -95,7 +96,7 @@ export function ConversationsTab({
 	readonly tasks: ReadonlyArray<TaskRow>
 	readonly onCompose: () => void
 }) {
-	const { t } = useLingui()
+	const { i18n, t } = useLingui()
 	const [enabled, setEnabled] = useState<ReadonlySet<ConvKind>>(
 		() => new Set<ConvKind>(ALL_KINDS),
 	)
@@ -166,6 +167,13 @@ export function ConversationsTab({
 	const NO_SUBJECT = t`(no subject)`
 	const FALLBACK_DATE = t`unknown`
 
+	// An interaction row can be a call, a visit or a proposal, so it takes its
+	// channel as the label instead of the catch-all "Interaction".
+	const rowLabel = (item: UnifiedRow): string =>
+		item.kind === 'interaction'
+			? i18n._(channelLabelFor(item.row.channel))
+			: KIND_LABEL[item.kind]
+
 	const titleFor = (item: UnifiedRow): string => {
 		switch (item.kind) {
 			case 'interaction':
@@ -219,7 +227,7 @@ export function ConversationsTab({
 						const body = (
 							<>
 								<RowMain>
-									<RowKind>{KIND_LABEL[item.kind]}</RowKind>
+									<RowKind>{rowLabel(item)}</RowKind>
 									<RowTitle>{titleFor(item)}</RowTitle>
 									{subtitle ? <RowSubtitle>{subtitle}</RowSubtitle> : null}
 								</RowMain>
@@ -282,7 +290,8 @@ function narrowCalendar(
 function rowSubtitle(item: UnifiedRow): string | null {
 	switch (item.kind) {
 		case 'interaction':
-			return item.row.channel
+			// The channel already shows as the row's label.
+			return null
 		case 'email':
 			return `${item.row.messageCount} · ${item.row.status}`
 		case 'calendar':
