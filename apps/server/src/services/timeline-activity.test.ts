@@ -6,6 +6,7 @@ import {
 	EmailReceived,
 	EmailSent,
 	InteractionLogged,
+	kindForInteractionChannel,
 	MeetingCancelled,
 	MeetingRescheduled,
 	MeetingRsvp,
@@ -646,5 +647,68 @@ describe('mapEventToInteraction', () => {
 				}),
 			),
 		).toBeNull()
+	})
+})
+
+describe('kindForInteractionChannel', () => {
+	describe('when the touchpoint was a phone call', () => {
+		it('should mark it as a call', () => {
+			// GIVEN the two spellings the interaction row uses for a call
+			// WHEN each is classified
+			// THEN both keep the call-specific kind
+			expect(kindForInteractionChannel('phone')).toBe('call_logged')
+			expect(kindForInteractionChannel('call')).toBe('call_logged')
+		})
+	})
+
+	describe('when the touchpoint came through any other channel', () => {
+		it('should mark it as a logged interaction, whatever the channel', () => {
+			// GIVEN every other channel someone can pick when logging a touchpoint
+			// WHEN each is classified
+			// THEN all share one kind — which channel it was is kept on the row
+			//      itself, so supporting a new one needs no new kind here
+			for (const channel of [
+				'email',
+				'visit',
+				'linkedin',
+				'instagram',
+				'whatsapp',
+				'event',
+				'other',
+			]) {
+				expect(kindForInteractionChannel(channel)).toBe('interaction_logged')
+			}
+		})
+
+		it('should still classify a channel it has never seen', () => {
+			// GIVEN a channel added to the product later, or an empty string
+			// WHEN it is classified
+			// THEN it lands in the history rather than a bucket the page hides
+			expect(kindForInteractionChannel('telegram')).toBe('interaction_logged')
+			expect(kindForInteractionChannel('')).toBe('interaction_logged')
+		})
+	})
+
+	describe('when classifying any channel at all', () => {
+		it('should never route a hand-logged touchpoint to the hidden bucket', () => {
+			// GIVEN the bucket the company page hides by default, meant for
+			//       bookkeeping the app does to itself
+			// WHEN any channel someone could log is classified
+			// THEN none of them land there — a note written by hand is not noise
+			for (const channel of [
+				'phone',
+				'call',
+				'email',
+				'visit',
+				'linkedin',
+				'instagram',
+				'whatsapp',
+				'event',
+				'other',
+				'',
+			]) {
+				expect(kindForInteractionChannel(channel)).not.toBe('system_event')
+			}
+		})
 	})
 })

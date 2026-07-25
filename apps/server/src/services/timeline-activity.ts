@@ -2,6 +2,11 @@ import { Context, Data, DateTime, Effect, Layer } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
+import type {
+	TimelineDirection,
+	TimelineEntityType,
+	TimelineKind,
+} from '@batuda/domain'
 
 export class EmailSent extends Data.TaggedClass('EmailSent')<{
 	readonly emailMessageId: string
@@ -241,39 +246,9 @@ export const needsNextMeetingRecompute = (event: TimelineEvent): boolean =>
 	event._tag === 'MeetingRescheduled' ||
 	event._tag === 'MeetingCancelled'
 
-type TimelineKind =
-	| 'email_sent'
-	| 'email_received'
-	| 'call_logged'
-	| 'document_created'
-	| 'proposal_sent'
-	| 'proposal_viewed'
-	| 'proposal_responded'
-	| 'research_run'
-	| 'research_applied'
-	| 'system_event'
-	| 'stage_changed'
-	| 'meeting_scheduled'
-	| 'meeting_rescheduled'
-	| 'meeting_cancelled'
-	| 'meeting_rsvp'
-	| 'task_created'
-	| 'task_updated'
-	| 'task_completed'
-
-type TimelineEntityType =
-	| 'email_message'
-	| 'interaction'
-	| 'call_recording'
-	| 'document'
-	| 'proposal'
-	| 'research_run'
-	| 'system'
-	| 'calendar_event'
-	| 'task'
-
-type TimelineDirection = 'inbound' | 'outbound'
-
+// The shared schema holds the one list of allowed kinds and entity types: a
+// row written with a value it doesn't know fails to decode for everyone
+// reading that company's history.
 interface TimelineRowBase {
 	kind: TimelineKind
 	entityType: TimelineEntityType
@@ -287,10 +262,12 @@ interface TimelineRowBase {
 	payload: Record<string, unknown>
 }
 
-const kindForInteractionChannel = (channel: string): TimelineKind => {
-	if (channel === 'phone' || channel === 'call') return 'call_logged'
-	return 'system_event'
-}
+// Only calls get a kind of their own; every other channel is named in the
+// row's `channel` column, so adding one never needs a new kind here.
+export const kindForInteractionChannel = (channel: string): TimelineKind =>
+	channel === 'phone' || channel === 'call'
+		? 'call_logged'
+		: 'interaction_logged'
 
 const rowBase = (event: TimelineEvent): TimelineRowBase => {
 	switch (event._tag) {

@@ -8,7 +8,13 @@ export const TimelineActivityId = Schema.String.pipe(
 export const TimelineKind = Schema.Literals([
 	'email_sent',
 	'email_received',
+	// A message we sent came back undelivered.
+	'email_bounced',
 	'call_logged',
+	// A touchpoint logged by hand on any channel other than the phone — a
+	// visit, a WhatsApp message, a chat at an event. Which one it was lives
+	// in `channel`, so a new channel never needs a new kind here.
+	'interaction_logged',
 	'document_created',
 	'proposal_sent',
 	'proposal_viewed',

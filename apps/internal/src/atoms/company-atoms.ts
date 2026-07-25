@@ -23,10 +23,6 @@ import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 
 const companyCache = new Map<string, ReturnType<typeof makeCompanyAtom>>()
 const contactsCache = new Map<string, ReturnType<typeof makeContactsAtom>>()
-const interactionsCache = new Map<
-	string,
-	ReturnType<typeof makeInteractionsAtom>
->()
 const companyTasksCache = new Map<
 	string,
 	ReturnType<typeof makeCompanyTasksAtom>
@@ -44,13 +40,6 @@ function makeContactsAtom(companyId: string) {
 	return BatudaApiAtom.query('contacts', 'list', {
 		query: { companyId },
 		serializationKey: `contacts:${companyId}`,
-	})
-}
-
-function makeInteractionsAtom(companyId: string) {
-	return BatudaApiAtom.query('interactions', 'list', {
-		query: { companyId, limit: 20 },
-		serializationKey: `interactions:${companyId}`,
 	})
 }
 
@@ -89,21 +78,6 @@ export function contactsAtomFor(companyId: string) {
 	if (existing !== undefined) return existing
 	const atom = makeContactsAtom(companyId)
 	contactsCache.set(companyId, atom)
-	return atom
-}
-
-/**
- * Interactions-by-company atom (one per companyId, limit 20). Hydrated
- * alongside the company atom so the always-visible timeline has data on
- * first paint. After logging a new interaction via Quick Capture, call
- * `useAtomRefresh` on this atom + the company atom (the server updates
- * `lastContactedAt` + `nextAction` in the same transaction).
- */
-export function interactionsAtomFor(companyId: string) {
-	const existing = interactionsCache.get(companyId)
-	if (existing !== undefined) return existing
-	const atom = makeInteractionsAtom(companyId)
-	interactionsCache.set(companyId, atom)
 	return atom
 }
 

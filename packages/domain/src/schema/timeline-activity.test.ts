@@ -62,6 +62,28 @@ describe('TimelineKind', () => {
 		}
 	})
 
+	it('should accept a hand-logged interaction on any channel', () => {
+		// GIVEN a touchpoint recorded by hand through something other than the
+		// phone — the channel itself is carried separately on the row
+		// WHEN the kind is decoded
+		// THEN it round-trips, so a logged visit or WhatsApp message reaches
+		// the company history under a kind of its own
+		expect(Schema.decodeUnknownSync(TimelineKind)('interaction_logged')).toBe(
+			'interaction_logged',
+		)
+	})
+
+	it('should accept a bounced email', () => {
+		// GIVEN the kind the mail worker writes when a message we sent comes
+		// back undelivered
+		// WHEN it is decoded
+		// THEN it round-trips — without it the row fails to decode and takes
+		// the whole company timeline down with it
+		expect(Schema.decodeUnknownSync(TimelineKind)('email_bounced')).toBe(
+			'email_bounced',
+		)
+	})
+
 	it('should reject unknown kinds like "meeting_ended"', () => {
 		// GIVEN 'meeting_ended' (close to a real kind but not modelled — the
 		// existing 'meeting_cancelled' covers the end-of-life case)

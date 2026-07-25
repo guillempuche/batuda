@@ -7,6 +7,7 @@ import {
 	Circle,
 	FileSignature,
 	FileText,
+	ListTodo,
 	Mail,
 	MapPin,
 	MessageCircle,
@@ -37,6 +38,7 @@ export type InteractionChannel =
 	| 'document'
 	| 'proposal'
 	| 'research'
+	| 'task'
 	| 'system'
 	| 'other'
 
@@ -54,6 +56,7 @@ const channelIcons: Record<
 	document: FileText,
 	proposal: FileSignature,
 	research: Search,
+	task: ListTodo,
 	system: Settings,
 	other: Circle,
 }
@@ -69,6 +72,7 @@ const channelLabels: Record<InteractionChannel, MessageDescriptor> = {
 	document: msg`Document`,
 	proposal: msg`Proposal`,
 	research: msg`Research`,
+	task: msg`Task`,
 	system: msg`System`,
 	other: msg`Other`,
 }
