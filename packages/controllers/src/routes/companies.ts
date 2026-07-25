@@ -23,8 +23,8 @@ export const CompanyResearchRun = Schema.Struct({
 	),
 })
 
-// Company detail: the company plus its contacts (each with the raw json_agg
-// `channels` blob the client parses) and recent interactions.
+// Company detail: the company plus its contacts (each with the `channels` JSON
+// array the client parses) and recent interactions.
 export const CompanyDetail = Schema.Struct({
 	...Company.json.fields,
 	contacts: Schema.Array(

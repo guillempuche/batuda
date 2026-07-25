@@ -19,10 +19,10 @@ const channel = (over: Partial<Record<string, unknown>> = {}) => ({
 })
 
 describe('narrowChannels', () => {
-	describe('when given the json_agg channel array', () => {
-		it('should map the camelCased json_agg keys to a typed channel', () => {
-			// GIVEN one email channel with the camelCased keys PgLive emits
-			// inside the json_agg blob (isPrimary, statusReason)
+	describe('when given the channel array the API sends', () => {
+		it('should map the keys the API sends to a typed channel', () => {
+			// GIVEN one email channel keyed the way the API sends it
+			// (isPrimary, statusReason)
 			// WHEN narrowed
 			// THEN it reads them into the typed channel fields
 			const [c] = narrowChannels([
@@ -45,6 +45,26 @@ describe('narrowChannels', () => {
 				status: 'bounced',
 				statusReason: 'Permanent',
 			})
+		})
+
+		it('should not read the primary flag or bounce reason from column names', () => {
+			// GIVEN a channel keyed by the table's own column names
+			// (is_primary, status_reason) instead of the ones the API sends
+			// WHEN narrowed
+			// THEN neither is picked up: no channel counts as primary and the
+			// bounce reason is gone from the badge
+			const [c] = narrowChannels([
+				{
+					id: 'x',
+					kind: 'email',
+					value: 'pep@calpepfonda.cat',
+					is_primary: true,
+					status: 'bounced',
+					status_reason: 'Permanent',
+				},
+			])
+			expect(c?.isPrimary).toBe(false)
+			expect(c?.statusReason).toBeNull()
 		})
 
 		it('should read a stored confidence score', () => {

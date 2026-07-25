@@ -52,9 +52,9 @@ const PatchChannelInput = Schema.Struct({
 	is_primary: Schema.optional(Schema.Boolean),
 })
 
-// A contact plus its reachable channels. `channels` stays open (`Unknown`) here
-// because the list query builds it with `json_agg`, whose JSON keeps the raw
-// snake_case column names — the send path reads it by key, not by decoding.
+// A contact plus its reachable channels. `channels` stays open (`Unknown`):
+// the server names each key in the JSON it sends, and the send path reads
+// those keys directly instead of decoding the array.
 export const ContactSummary = Schema.Struct({
 	...Contact.json.fields,
 	channels: Schema.Array(Schema.Unknown),

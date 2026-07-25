@@ -65,6 +65,30 @@ export const writeChannels = (
 		{ discard: true },
 	)
 
+/**
+ * The channels of the contact aliased `c` in the surrounding query, primary
+ * first, as one JSON array column. Each key is named here rather than handing
+ * over the whole database row, so one place decides what callers receive and a
+ * channel's internal bookkeeping — owning organization, bounce counts,
+ * timestamps — stays out of the response.
+ */
+export const contactChannelsJson = (sql: Sql) =>
+	sql`
+		COALESCE((
+			SELECT json_agg(json_build_object(
+				'id', ch.id,
+				'kind', ch.kind,
+				'value', ch.value,
+				'verification', ch.verification,
+				'confidence', ch.confidence,
+				'isPrimary', ch.is_primary,
+				'status', ch.status,
+				'statusReason', ch.status_reason
+			) ORDER BY ch.is_primary DESC, ch.kind)
+			FROM contact_channels ch WHERE ch.contact_id = c.id
+		), '[]'::json)
+	`
+
 /** Every channel for a contact, primary first. */
 export const channelsOf = (sql: Sql, contactId: string) =>
 	sql`

@@ -1,6 +1,6 @@
 // Pure helpers for rendering a contact's channels. Channels are the single
-// source of truth for reachable addresses; the API ships them as a json_agg
-// array that the narrower turns into a typed list.
+// source of truth for reachable addresses; the API ships them as a JSON array
+// that the narrower turns into a typed list.
 
 export type EmailChannelStatus = 'unknown' | 'valid' | 'bounced' | 'complained'
 
@@ -21,7 +21,7 @@ const asEmailStatus = (value: unknown): EmailChannelStatus =>
 		? value
 		: 'unknown'
 
-/** Parse the json_agg'd channels into a typed list (already primary-first from SQL). */
+/** Parse the channels JSON into a typed list (already primary-first from the API). */
 export function narrowChannels(raw: unknown): ReadonlyArray<DisplayChannel> {
 	if (!Array.isArray(raw)) return []
 	const out: Array<DisplayChannel> = []
@@ -38,11 +38,9 @@ export function narrowChannels(raw: unknown): ReadonlyArray<DisplayChannel> {
 			verification:
 				typeof r['verification'] === 'string' ? r['verification'] : null,
 			confidence: typeof r['confidence'] === 'number' ? r['confidence'] : null,
-			// The API carries these channels as a json_agg blob, and the database
-			// layer camelCases the keys inside it too — so read `isPrimary` /
-			// `statusReason`, not the raw `is_primary` / `status_reason` column
-			// names. The snake_case form comes back empty and silently hides every
-			// contact's suppression reason on the company page.
+			// The API chooses the key names it sends, and they differ from the
+			// columns behind them: reading `is_primary` or `status_reason` here
+			// finds nothing.
 			isPrimary: r['isPrimary'] === true,
 			status: asEmailStatus(r['status']),
 			statusReason:
