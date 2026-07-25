@@ -2,6 +2,8 @@ import { useLocation, useNavigate } from '@tanstack/react-router'
 import { Option, Schema } from 'effect'
 import { useCallback, useMemo } from 'react'
 
+import { returnFocusToPage } from './return-focus-to-page'
+
 /**
  * URL-addressable dialog state via the `?dlg=` search param, shared by every
  * route that opens a dialog (see `dlg-search.ts` for the struct vocabulary).
@@ -68,6 +70,7 @@ export function useDlg<S extends Schema.Top>(
 			replace: true,
 			resetScroll: false,
 		} as never)
+		returnFocusToPage()
 	}, [navigate])
 
 	return { dlg, open, close }

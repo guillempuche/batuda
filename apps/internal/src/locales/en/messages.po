@@ -1113,6 +1113,7 @@ msgstr "Copied"
 msgid "Copied {label}"
 msgstr "Copied {label}"
 
+#: src/components/instructions/template-view-dialog.tsx
 #: src/routes/settings/api-keys/index.tsx
 msgid "Copy"
 msgstr "Copy"
@@ -1361,6 +1362,10 @@ msgstr "Couldn't connect"
 #: src/components/primitives/pri-copy-button.tsx
 msgid "Couldn't copy"
 msgstr "Couldn't copy"
+
+#: src/components/instructions/template-view-dialog.tsx
+msgid "Couldn't copy the instructions"
+msgstr "Couldn't copy the instructions"
 
 #: src/routes/settings/organization/templates.tsx
 #: src/routes/settings/profile/templates.tsx
@@ -1679,6 +1684,7 @@ msgstr "Dismiss"
 msgid "Display name"
 msgstr "Display name"
 
+#: src/components/companies/documents-panel.tsx
 #: src/components/companies/documents-panel.tsx
 #: src/components/shared/channel-icon.tsx
 msgid "Document"
@@ -2305,6 +2311,10 @@ msgstr "Instruction templates"
 msgid "Instructions"
 msgstr "Instructions"
 
+#: src/components/instructions/template-view-dialog.tsx
+msgid "Instructions copied"
+msgstr "Instructions copied"
+
 #: src/components/research/research-dialog.tsx
 msgid "Instructions stack"
 msgstr "Instructions stack"
@@ -2375,6 +2385,10 @@ msgstr "Last activity"
 #: src/components/companies/cadence-card.tsx
 msgid "Last call"
 msgstr "Last call"
+
+#: src/components/instructions/template-view-dialog.tsx
+msgid "Last changed"
+msgstr "Last changed"
 
 #: src/components/shared/company-card.tsx
 #: src/routes/companies/$slug.tsx
@@ -3674,7 +3688,9 @@ msgstr "Re-run with this domain"
 msgid "Re-running…"
 msgstr "Re-running…"
 
+#. placeholder {0}: o.name
 #. placeholder {0}: row.name
+#: src/components/instructions/stack-picker.tsx
 #: src/routes/settings/organization/templates.tsx
 #: src/routes/settings/organization/templates.tsx
 #: src/routes/settings/profile/templates.tsx
@@ -5201,6 +5217,10 @@ msgstr "Your organization has no default yet."
 #: src/routes/settings/profile/templates.tsx
 msgid "Your organization has no default yet. Make a stack your default to steer every run."
 msgstr "Your organization has no default yet. Make a stack your default to steer every run."
+
+#: src/components/instructions/template-view-dialog.tsx
+msgid "Your organization looks after this one."
+msgstr "Your organization looks after this one."
 
 #: src/routes/settings/organization/templates.tsx
 msgid "Your organization's admins manage these templates. You can read any of them, and use them in your own stacks or per run."

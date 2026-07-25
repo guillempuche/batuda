@@ -8,6 +8,9 @@ export type TemplateShape = {
 	readonly name: string
 	readonly body: string
 	readonly ownerUserId: string | null
+	// When the guidance last changed — worth knowing for a template you follow
+	// but don't maintain.
+	readonly updatedAt: string | null
 }
 
 function str(r: Record<string, unknown>, key: string): string | null {
@@ -28,6 +31,7 @@ export function narrowTemplates(value: unknown): ReadonlyArray<TemplateShape> {
 			name,
 			body: str(r, 'body') ?? '',
 			ownerUserId: str(r, 'ownerUserId'),
+			updatedAt: str(r, 'updatedAt'),
 		})
 	}
 	return out

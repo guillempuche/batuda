@@ -17,7 +17,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { useLingui } from '@lingui/react/macro'
 import { ClientOnly } from '@tanstack/react-router'
-import { GripVertical, Plus, X } from 'lucide-react'
+import { Eye, GripVertical, Plus, X } from 'lucide-react'
 import styled from 'styled-components'
 
 import { brushedMetalPlate } from '#/lib/workshop-mixins'
@@ -38,10 +38,14 @@ export function StackPicker({
 	options,
 	selectedIds,
 	onChange,
+	onRead,
 }: {
 	readonly options: ReadonlyArray<StackOption>
 	readonly selectedIds: ReadonlyArray<string>
 	readonly onChange: (ids: ReadonlyArray<string>) => void
+	// Choosing which guidance to group is the moment you most need to see what
+	// each one says, so a row can be opened for reading from right here.
+	readonly onRead?: ((id: string) => void) | undefined
 }) {
 	const { t } = useLingui()
 	const byId = new Map(options.map(o => [o.id, o]))
@@ -112,7 +116,11 @@ export function StackPicker({
 										name={o.name}
 										ownerLabel={ownerLabel(o)}
 										dragLabel={t`Drag ${o.name} to reorder`}
+										readLabel={t`Read ${o.name}`}
 										removeLabel={t`Remove ${o.name}`}
+										onRead={
+											onRead === undefined ? undefined : () => onRead(o.id)
+										}
 										onRemove={() => remove(o.id)}
 									/>
 								))}
@@ -152,7 +160,9 @@ function SortableRow({
 	name,
 	ownerLabel,
 	dragLabel,
+	readLabel,
 	removeLabel,
+	onRead,
 	onRemove,
 }: {
 	readonly id: string
@@ -160,7 +170,9 @@ function SortableRow({
 	readonly name: string
 	readonly ownerLabel: string
 	readonly dragLabel: string
+	readonly readLabel: string
 	readonly removeLabel: string
+	readonly onRead?: (() => void) | undefined
 	readonly onRemove: () => void
 }) {
 	const {
@@ -196,6 +208,16 @@ function SortableRow({
 			<Position aria-hidden>{position}</Position>
 			<RowName>{name}</RowName>
 			<RowBadge>{ownerLabel}</RowBadge>
+			{onRead === undefined ? null : (
+				<InstructionIconButton
+					type='button'
+					data-testid={`stack-read-${id}`}
+					aria-label={readLabel}
+					onClick={onRead}
+				>
+					<Eye size={14} aria-hidden />
+				</InstructionIconButton>
+			)}
 			<InstructionIconButton
 				type='button'
 				data-testid={`stack-remove-${id}`}

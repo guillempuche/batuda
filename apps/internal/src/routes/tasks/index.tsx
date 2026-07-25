@@ -114,6 +114,10 @@ const tasksDlgSchema = Schema.Union([
 	dlgNoId('recent-changes'),
 ])
 
+// How long the address waits behind a keyboard walk before it names the task
+// the pane is on.
+const ADDRESS_CATCH_UP_MS = 200
+
 export const Route = createFileRoute('/tasks/')({
 	validateSearch: validateSearchWith({ dlg: tasksDlgSchema }),
 	loader: async () => {
@@ -160,18 +164,56 @@ function TasksPage() {
 
 	const [selectedView, setSelectedView] = useState<SmartView>('today')
 	const { dlg, open: openDlg, close: closeDlg } = useDlg(tasksDlgSchema)
-	const selectedTaskId = dlg?.kind === 'task' ? dlg.id : null
 	const undoOpen = dlg?.kind === 'recent-changes'
-	// Opening a task is a step the reader can take back. Walking the open pane
-	// down the list with j/k is not — one entry per keystroke would turn Back
-	// into an undo of every key pressed, so those moves overwrite instead.
+
+	// While j/k are moving the open pane down the list, the task under the cursor
+	// is held here and the address catches up once the keys stop. Holding a key
+	// repeats it dozens of times a second, and browsers cap how often a page may
+	// rewrite its address — so a long press would otherwise be refused outright.
+	const [movingToId, setMovingToId] = useState<string | null>(null)
+	const moveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+	const selectedTaskId = movingToId ?? (dlg?.kind === 'task' ? dlg.id : null)
+
+	// Opening a task is a step the reader can take back. Moving the pane between
+	// rows is not — one entry per keystroke would turn Back into an undo of every
+	// key pressed, so those moves overwrite instead.
 	const openTask = useCallback(
 		(id: string) => openDlg({ kind: 'task', id }),
 		[openDlg],
 	)
 	const moveTaskSelection = useCallback(
-		(id: string) => openDlg({ kind: 'task', id }, { replace: true }),
+		(id: string) => {
+			setMovingToId(id)
+			if (moveTimer.current !== null) clearTimeout(moveTimer.current)
+			moveTimer.current = setTimeout(() => {
+				moveTimer.current = null
+				openDlg({ kind: 'task', id }, { replace: true })
+			}, ADDRESS_CATCH_UP_MS)
+		},
 		[openDlg],
+	)
+	// Closing the pane also drops any move still waiting to be written, so a key
+	// pressed a moment earlier can't bring the pane back after it has gone.
+	const closeTaskPane = useCallback(() => {
+		if (moveTimer.current !== null) {
+			clearTimeout(moveTimer.current)
+			moveTimer.current = null
+		}
+		setMovingToId(null)
+		closeDlg()
+	}, [closeDlg])
+	// Once the address names the same task, drop the held one so the address is
+	// the single answer again.
+	useEffect(() => {
+		if (movingToId !== null && dlg?.kind === 'task' && dlg.id === movingToId) {
+			setMovingToId(null)
+		}
+	}, [dlg, movingToId])
+	useEffect(
+		() => () => {
+			if (moveTimer.current !== null) clearTimeout(moveTimer.current)
+		},
+		[],
 	)
 	const quickAddRef = useRef<HTMLInputElement | null>(null)
 
@@ -266,13 +308,13 @@ function TasksPage() {
 				// the list, and there is nothing left to do with a task you just ticked
 				// off. Finished tasks stay readable for a week, so it will not close
 				// itself.
-				if (taskId === selectedTaskId) closeDlg()
+				if (taskId === selectedTaskId) closeTaskPane()
 			} else {
 				await reopenTask({ params: { id: taskId } } as never)
 			}
 			refreshAll()
 		},
-		[completeTask, reopenTask, refreshAll, selectedTaskId, closeDlg],
+		[completeTask, reopenTask, refreshAll, selectedTaskId, closeTaskPane],
 	)
 
 	const handleCancel = useCallback(
@@ -621,7 +663,7 @@ function TasksPage() {
 							? (companiesById.get(selectedTask.companyId) ?? null)
 							: null
 					}
-					onClose={closeDlg}
+					onClose={closeTaskPane}
 					onSnooze={() => void handleSnooze(selectedTask.id)}
 					onCancel={() => void handleCancel(selectedTask.id)}
 					onToggle={next => void handleToggle(selectedTask.id, next)}

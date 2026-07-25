@@ -1113,6 +1113,7 @@ msgstr "Copiada"
 msgid "Copied {label}"
 msgstr "S'ha copiat {label}"
 
+#: src/components/instructions/template-view-dialog.tsx
 #: src/routes/settings/api-keys/index.tsx
 msgid "Copy"
 msgstr "Copia"
@@ -1361,6 +1362,10 @@ msgstr "No s'ha pogut connectar"
 #: src/components/primitives/pri-copy-button.tsx
 msgid "Couldn't copy"
 msgstr "No s'ha pogut copiar"
+
+#: src/components/instructions/template-view-dialog.tsx
+msgid "Couldn't copy the instructions"
+msgstr "No s'han pogut copiar les instruccions"
 
 #: src/routes/settings/organization/templates.tsx
 #: src/routes/settings/profile/templates.tsx
@@ -1679,6 +1684,7 @@ msgstr "Descarta"
 msgid "Display name"
 msgstr "Nom a mostrar"
 
+#: src/components/companies/documents-panel.tsx
 #: src/components/companies/documents-panel.tsx
 #: src/components/shared/channel-icon.tsx
 msgid "Document"
@@ -2305,6 +2311,10 @@ msgstr "Plantilles d'instruccions"
 msgid "Instructions"
 msgstr "Instruccions"
 
+#: src/components/instructions/template-view-dialog.tsx
+msgid "Instructions copied"
+msgstr "Instruccions copiades"
+
 #: src/components/research/research-dialog.tsx
 msgid "Instructions stack"
 msgstr "Pila d'instruccions"
@@ -2375,6 +2385,10 @@ msgstr "Última activitat"
 #: src/components/companies/cadence-card.tsx
 msgid "Last call"
 msgstr "Última trucada"
+
+#: src/components/instructions/template-view-dialog.tsx
+msgid "Last changed"
+msgstr "Última modificació"
 
 #: src/components/shared/company-card.tsx
 #: src/routes/companies/$slug.tsx
@@ -3674,7 +3688,9 @@ msgstr "Torna a executar amb aquest domini"
 msgid "Re-running…"
 msgstr "Reexecutant…"
 
+#. placeholder {0}: o.name
 #. placeholder {0}: row.name
+#: src/components/instructions/stack-picker.tsx
 #: src/routes/settings/organization/templates.tsx
 #: src/routes/settings/organization/templates.tsx
 #: src/routes/settings/profile/templates.tsx
@@ -5201,6 +5217,10 @@ msgstr "La teva organització encara no té cap valor per defecte."
 #: src/routes/settings/profile/templates.tsx
 msgid "Your organization has no default yet. Make a stack your default to steer every run."
 msgstr "La teva organització encara no té cap predeterminada. Marca una pila com a predeterminada per guiar totes les execucions."
+
+#: src/components/instructions/template-view-dialog.tsx
+msgid "Your organization looks after this one."
+msgstr "D'aquesta se n'ocupa la teva organització."
 
 #: src/routes/settings/organization/templates.tsx
 msgid "Your organization's admins manage these templates. You can read any of them, and use them in your own stacks or per run."

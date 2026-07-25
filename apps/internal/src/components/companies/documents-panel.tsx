@@ -280,7 +280,12 @@ function DocumentDialog({
 
 					{state.mode === 'view' ? (
 						<>
-							<ViewBody data-testid='document-view'>
+							<ViewBody
+								data-testid='document-view'
+								role='region'
+								aria-label={t`Document`}
+								tabIndex={0}
+							>
 								<MarkdownView source={state.doc.content} />
 							</ViewBody>
 							<Footer>
@@ -473,10 +478,17 @@ const CloseButton = styled.button`
 	cursor: pointer;
 `
 
+// A document longer than the dialog scrolls here, and the region takes keyboard
+// focus so it can be read without a mouse.
 const ViewBody = styled.div`
 	margin-top: var(--space-sm);
 	max-height: 60vh;
 	overflow-y: auto;
+
+	&:focus-visible {
+		outline: none;
+		box-shadow: var(--glow-active);
+	}
 `
 
 const Form = styled.form`
