@@ -26,7 +26,6 @@ import type { ComponentType } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import styled, { css } from 'styled-components'
 
-import { EmailEditor } from '@batuda/email/editor'
 import type { EmailBlocks } from '@batuda/email/schema'
 import {
 	PriButton,
@@ -57,6 +56,7 @@ import {
 	type InboxDraft,
 	inboxDraftAtom,
 } from '#/atoms/inbox-draft-atoms'
+import { EmailEditor } from '#/components/emails/email-editor'
 import { EmptyState } from '#/components/shared/empty-state'
 import { ErrorState } from '#/components/shared/error-state'
 import { RelativeDate } from '#/components/shared/relative-date'
