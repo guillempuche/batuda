@@ -21,7 +21,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { CurrentOrg } from '@batuda/controllers'
 
 import { PgLive } from '../db/client'
-import { type TaskFilters, type TaskPage, TaskService } from './tasks'
+import {
+	type TaskDayBoundaries,
+	type TaskFilters,
+	type TaskPage,
+	TaskService,
+} from './tasks'
 import { TimelineActivityService } from './timeline-activity'
 
 const DATABASE_URL =
@@ -385,6 +390,376 @@ describe('TaskService.list', () => {
 			// THEN the separate count agrees there is genuinely nothing
 			expect(page.items).toHaveLength(0)
 			expect(page.total).toBe(0)
+		})
+	})
+
+	describe('when listing one shelf of the inbox', () => {
+		it('should return only the tasks nobody has dated for noDue', async () => {
+			// GIVEN one dated and one undated task for a unique assignee
+			const assignee = `shelf-fixture-${randomUUID()}`
+			const boundaries = boundariesAround(Date.now())
+			await createWith(tallerOrgId, tallerOrgId, {
+				type: 'follow_up',
+				title: `${FIXTURE_TITLE} dated`,
+				status: 'open',
+				assigneeId: assignee,
+				dueAt: new Date(),
+			})
+			await createWith(tallerOrgId, tallerOrgId, {
+				type: 'follow_up',
+				title: `${FIXTURE_TITLE} undated`,
+				status: 'open',
+				assigneeId: assignee,
+			})
+
+			// WHEN asking for the shelf of undated work
+			const rows = (
+				await listWith(tallerOrgId, {
+					assigneeId: assignee,
+					shelf: 'noDue',
+					boundaries,
+				})
+			).items as ReadonlyArray<{ dueAt: unknown }>
+
+			// THEN only the undated task comes back
+			expect(rows).toHaveLength(1)
+			expect(rows[0]?.dueAt).toBeNull()
+		})
+
+		it('should keep a task due earlier today on today rather than overdue', async () => {
+			// GIVEN a task that was due this morning, with the day already underway
+			const assignee = `shelf-fixture-${randomUUID()}`
+			const boundaries = boundariesAround(Date.now())
+			await createWith(tallerOrgId, tallerOrgId, {
+				type: 'follow_up',
+				title: `${FIXTURE_TITLE} this morning`,
+				status: 'open',
+				assigneeId: assignee,
+				dueAt: new Date(Date.parse(boundaries.todayStart) + 3600_000),
+			})
+
+			// WHEN asking for each of the two shelves it could fall on
+			const today = await listWith(tallerOrgId, {
+				assigneeId: assignee,
+				shelf: 'today',
+				boundaries,
+			})
+			const overdue = await listWith(tallerOrgId, {
+				assigneeId: assignee,
+				shelf: 'overdue',
+				boundaries,
+			})
+
+			// THEN the day it is due decides, so an hour late is not yet late
+			expect(today.total).toBe(1)
+			expect(overdue.total).toBe(0)
+		})
+
+		it('should report the same size the rail counts for that shelf', async () => {
+			// GIVEN one task on each shelf, so none of them is trivially empty
+			const boundaries = boundariesAround(Date.now())
+			const day = Date.parse(boundaries.todayStart)
+			for (const [label, data] of [
+				['overdue', { dueAt: new Date(day - DAY_MS) }],
+				['today', { dueAt: new Date(day + 3600_000) }],
+				[
+					'thisWeek',
+					{ dueAt: new Date(Date.parse(boundaries.todayEnd) + 2 * DAY_MS) },
+				],
+				['later', { dueAt: new Date(Date.parse(boundaries.weekEnd) + DAY_MS) }],
+				['noDue', {}],
+				[
+					'snoozed',
+					{
+						dueAt: new Date(day + 3600_000),
+						snoozedUntil: new Date(Date.now() + 3 * DAY_MS),
+					},
+				],
+			] as const) {
+				await createWith(tallerOrgId, tallerOrgId, {
+					type: 'follow_up',
+					title: `${FIXTURE_TITLE} ${label}`,
+					status: 'open',
+					...data,
+				})
+			}
+			await createWith(tallerOrgId, tallerOrgId, {
+				type: 'follow_up',
+				title: `${FIXTURE_TITLE} doneRecent`,
+				status: 'done',
+				completedAt: new Date(),
+			})
+
+			// WHEN each shelf is counted and then listed
+			const counts = await countsWith(tallerOrgId, boundaries)
+			const shelves = [
+				'overdue',
+				'today',
+				'thisWeek',
+				'later',
+				'noDue',
+				'snoozed',
+				'doneRecent',
+			] as const
+
+			// THEN the number on the rail matches the rows behind it, every time
+			for (const shelf of shelves) {
+				const page = await listWith(
+					tallerOrgId,
+					{ shelf, boundaries },
+					{ limit: 1 },
+				)
+				expect(counts[shelf]).toBeGreaterThan(0)
+				expect(page.total).toBe(counts[shelf])
+			}
+		})
+	})
+
+	describe('when ordering the page', () => {
+		it('should put the soonest deadline first for sort=due', async () => {
+			// GIVEN three tasks dated out of order
+			const assignee = `sort-fixture-${randomUUID()}`
+			const now = Date.now()
+			for (const [label, offset] of [
+				['middle', 2 * DAY_MS],
+				['last', 5 * DAY_MS],
+				['first', 1 * DAY_MS],
+			] as const) {
+				await createWith(tallerOrgId, tallerOrgId, {
+					type: 'follow_up',
+					title: `${FIXTURE_TITLE} ${label}`,
+					status: 'open',
+					assigneeId: assignee,
+					dueAt: new Date(now + offset),
+				})
+			}
+
+			// WHEN listing them soonest-first
+			const rows = (
+				await listWith(tallerOrgId, { assigneeId: assignee }, { sort: 'due' })
+			).items as ReadonlyArray<{ title: string }>
+
+			// THEN the nearest deadline leads and the furthest trails
+			expect(rows.map(r => r.title.split(' ').pop())).toEqual([
+				'first',
+				'middle',
+				'last',
+			])
+		})
+
+		it('should put the furthest deadline first for sort=recent', async () => {
+			// GIVEN three tasks dated out of order
+			const assignee = `sort-fixture-${randomUUID()}`
+			const now = Date.now()
+			for (const [label, offset] of [
+				['middle', 2 * DAY_MS],
+				['last', 5 * DAY_MS],
+				['first', 1 * DAY_MS],
+			] as const) {
+				await createWith(tallerOrgId, tallerOrgId, {
+					type: 'follow_up',
+					title: `${FIXTURE_TITLE} ${label}`,
+					status: 'open',
+					assigneeId: assignee,
+					dueAt: new Date(now + offset),
+				})
+			}
+
+			// WHEN listing them newest-first
+			const rows = (
+				await listWith(
+					tallerOrgId,
+					{ assigneeId: assignee },
+					{ sort: 'recent' },
+				)
+			).items as ReadonlyArray<{ title: string }>
+
+			// THEN the order is the exact reverse of the soonest-first one
+			expect(rows.map(r => r.title.split(' ').pop())).toEqual([
+				'last',
+				'middle',
+				'first',
+			])
+		})
+	})
+})
+
+const countsWith = (org: string, boundaries: TaskDayBoundaries) => {
+	const deps = Layer.mergeAll(
+		TaskService.layer,
+		Layer.succeed(CurrentOrg, { id: org, name: 'fixture', slug: 'fixture' }),
+	).pipe(
+		Layer.provideMerge(TimelineActivityService.layer),
+		Layer.provideMerge(PgLive),
+	)
+
+	return Effect.gen(function* () {
+		const sql = yield* SqlClient.SqlClient
+		const tasks = yield* TaskService
+		return yield* sql.withTransaction(
+			Effect.gen(function* () {
+				yield* sql`SET LOCAL ROLE app_user`
+				yield* sql`SELECT set_config('app.current_org_id', ${org}, true)`
+				return yield* tasks.counts(boundaries)
+			}),
+		)
+	}).pipe(Effect.provide(deps), Effect.runPromise)
+}
+
+const DAY_MS = 86_400_000
+
+// The day and week edges a browser would send, taken from the machine running
+// the test.
+const boundariesAround = (reference: number): TaskDayBoundaries => {
+	const start = new Date(reference)
+	start.setHours(0, 0, 0, 0)
+	const end = new Date(reference)
+	end.setHours(23, 59, 59, 999)
+	return {
+		todayStart: start.toISOString(),
+		todayEnd: end.toISOString(),
+		weekEnd: new Date(end.getTime() + 7 * DAY_MS).toISOString(),
+	}
+}
+
+// Counts cover the whole organization and the seeded org already holds tasks,
+// so each test compares before/after instead of pinning an absolute number.
+describe('TaskService.counts', () => {
+	describe('when a task sits in each stretch of time', () => {
+		it('should add it to the shelf its due date falls in', async () => {
+			// GIVEN the counts before anything is added
+			const boundaries = boundariesAround(Date.now())
+			const before = await countsWith(tallerOrgId, boundaries)
+
+			// WHEN one task lands in each dated shelf, plus one with no date
+			const dueDates: ReadonlyArray<[string, Date]> = [
+				['overdue', new Date(Date.parse(boundaries.todayStart) - DAY_MS)],
+				['today', new Date(Date.parse(boundaries.todayStart) + 3600_000)],
+				['thisWeek', new Date(Date.parse(boundaries.todayEnd) + 2 * DAY_MS)],
+				['later', new Date(Date.parse(boundaries.weekEnd) + DAY_MS)],
+			]
+			for (const [shelf, dueAt] of dueDates) {
+				await createWith(tallerOrgId, tallerOrgId, {
+					type: 'follow_up',
+					title: `${FIXTURE_TITLE} ${shelf}`,
+					status: 'open',
+					dueAt,
+				})
+			}
+			await createWith(tallerOrgId, tallerOrgId, {
+				type: 'follow_up',
+				title: `${FIXTURE_TITLE} noDue`,
+				status: 'open',
+			})
+
+			// THEN each shelf grew by exactly one
+			const after = await countsWith(tallerOrgId, boundaries)
+			expect(after.overdue).toBe(before.overdue + 1)
+			expect(after.today).toBe(before.today + 1)
+			expect(after.thisWeek).toBe(before.thisWeek + 1)
+			expect(after.later).toBe(before.later + 1)
+			expect(after.noDue).toBe(before.noDue + 1)
+		})
+	})
+
+	describe('when a task is due at the very start of today', () => {
+		it('should count it as today rather than overdue', async () => {
+			// GIVEN the counts before anything is added
+			const boundaries = boundariesAround(Date.now())
+			const before = await countsWith(tallerOrgId, boundaries)
+
+			// WHEN a task falls exactly on the boundary between the two shelves
+			await createWith(tallerOrgId, tallerOrgId, {
+				type: 'follow_up',
+				title: `${FIXTURE_TITLE} boundary`,
+				status: 'open',
+				dueAt: new Date(boundaries.todayStart),
+			})
+
+			// THEN the day it is due wins, so nothing reads as already late
+			const after = await countsWith(tallerOrgId, boundaries)
+			expect(after.today).toBe(before.today + 1)
+			expect(after.overdue).toBe(before.overdue)
+		})
+	})
+
+	describe('when a task is not waiting to be worked', () => {
+		it('should keep a sleeping task off its date shelf', async () => {
+			// GIVEN the counts before anything is added
+			const boundaries = boundariesAround(Date.now())
+			const before = await countsWith(tallerOrgId, boundaries)
+
+			// WHEN a task due today is snoozed into next week
+			await createWith(tallerOrgId, tallerOrgId, {
+				type: 'follow_up',
+				title: `${FIXTURE_TITLE} snoozed`,
+				status: 'open',
+				dueAt: new Date(Date.parse(boundaries.todayStart) + 3600_000),
+				snoozedUntil: new Date(Date.now() + 3 * DAY_MS),
+			})
+
+			// THEN it shows up as sleeping instead of as today's work
+			const after = await countsWith(tallerOrgId, boundaries)
+			expect(after.snoozed).toBe(before.snoozed + 1)
+			expect(after.today).toBe(before.today)
+		})
+
+		it('should keep a finished task off its date shelf', async () => {
+			// GIVEN the counts before anything is added
+			const boundaries = boundariesAround(Date.now())
+			const before = await countsWith(tallerOrgId, boundaries)
+
+			// WHEN a task due today is already done
+			await createWith(tallerOrgId, tallerOrgId, {
+				type: 'follow_up',
+				title: `${FIXTURE_TITLE} finished`,
+				status: 'done',
+				completedAt: new Date(),
+				dueAt: new Date(Date.parse(boundaries.todayStart) + 3600_000),
+			})
+
+			// THEN it counts as recently finished, not as today's work
+			const after = await countsWith(tallerOrgId, boundaries)
+			expect(after.doneRecent).toBe(before.doneRecent + 1)
+			expect(after.today).toBe(before.today)
+		})
+
+		it('should leave a cancelled task off every shelf', async () => {
+			// GIVEN the counts before anything is added
+			const boundaries = boundariesAround(Date.now())
+			const before = await countsWith(tallerOrgId, boundaries)
+
+			// WHEN a task due today is cancelled instead of worked
+			await createWith(tallerOrgId, tallerOrgId, {
+				type: 'follow_up',
+				title: `${FIXTURE_TITLE} cancelled`,
+				status: 'cancelled',
+				dueAt: new Date(Date.parse(boundaries.todayStart) + 3600_000),
+			})
+
+			// THEN nothing about the inbox changes
+			const after = await countsWith(tallerOrgId, boundaries)
+			expect(after).toEqual(before)
+		})
+	})
+
+	describe('when another organization holds the tasks', () => {
+		it('should count only the ones the active org can see', async () => {
+			// GIVEN a task due today in the taller org
+			const boundaries = boundariesAround(Date.now())
+			const before = await countsWith(restaurantOrgId, boundaries)
+			await createWith(tallerOrgId, tallerOrgId, {
+				type: 'follow_up',
+				title: `${FIXTURE_TITLE} isolation`,
+				status: 'open',
+				dueAt: new Date(Date.parse(boundaries.todayStart) + 3600_000),
+			})
+
+			// WHEN the other org counts its own shelves
+			const after = await countsWith(restaurantOrgId, boundaries)
+
+			// THEN it sees none of the neighbour's work
+			expect(after).toEqual(before)
 		})
 	})
 })

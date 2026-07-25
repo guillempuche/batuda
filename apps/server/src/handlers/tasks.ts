@@ -34,15 +34,35 @@ export const TasksLive = HttpApiBuilder.group(BatudaApi, 'tasks', handlers =>
 									: _.query.completed === 'false'
 										? false
 										: undefined,
+							shelf: _.query.shelf,
+							// A shelf only means something once the caller says where
+							// its own day starts and ends.
+							boundaries:
+								_.query.todayStart && _.query.todayEnd && _.query.weekEnd
+									? {
+											todayStart: _.query.todayStart,
+											todayEnd: _.query.todayEnd,
+											weekEnd: _.query.weekEnd,
+										}
+									: undefined,
 							search: _.query.search,
 						},
 						{
-							sort: 'recent',
+							sort: _.query.sort ?? 'recent',
 							limit: _.query.limit ?? 50,
 							offset: _.query.offset ?? 0,
 						},
 					)
 				}).pipe(Effect.orDie),
+			)
+			.handle('counts', _ =>
+				taskService
+					.counts({
+						todayStart: _.query.todayStart,
+						todayEnd: _.query.todayEnd,
+						weekEnd: _.query.weekEnd,
+					})
+					.pipe(Effect.orDie),
 			)
 			.handle('get', _ => taskService.get(_.params.id))
 			.handle('create', _ =>

@@ -29,7 +29,29 @@ export interface TaskFilters {
 	readonly overdueOnly?: boolean | undefined
 	readonly includeSnoozed?: boolean | undefined
 	readonly completed?: boolean | undefined
+	readonly shelf?: TaskShelfName | undefined
+	readonly boundaries?: TaskDayBoundaries | undefined
 	readonly search?: string | undefined
+}
+
+// A task belongs to exactly one shelf, so the same name serves the list and
+// the count.
+export type TaskShelfName =
+	| 'overdue'
+	| 'today'
+	| 'thisWeek'
+	| 'later'
+	| 'noDue'
+	| 'snoozed'
+	| 'doneRecent'
+
+// The edges of the reader's own day and week, as instants. They come from the
+// browser because the server has no idea which timezone the reader is in, and
+// "today" is a different stretch of time in each one.
+export interface TaskDayBoundaries {
+	readonly todayStart: string
+	readonly todayEnd: string
+	readonly weekEnd: string
 }
 
 // `recent` surfaces newest-first for the web inbox; `due` surfaces the most
@@ -89,6 +111,39 @@ export class TaskService extends Context.Service<TaskService>()('TaskService', {
 		const sql = yield* SqlClient.SqlClient
 		const timeline = yield* TimelineActivityService
 
+		// Work still in play: nobody has finished it, nobody has called it off,
+		// and it is not sleeping until a later date.
+		const waiting = sql`status NOT IN ('done', 'cancelled')
+			AND (snoozed_until IS NULL OR snoozed_until <= now())`
+
+		// Where one shelf begins and ends. Listing a shelf and counting it both
+		// come through here, so a number on the rail and the rows underneath it
+		// can never describe different sets of tasks.
+		const shelfCondition = (
+			shelf: TaskShelfName,
+			boundaries: TaskDayBoundaries,
+		): Statement.Fragment => {
+			switch (shelf) {
+				case 'overdue':
+					return sql`${waiting} AND due_at < ${boundaries.todayStart}`
+				case 'today':
+					return sql`${waiting} AND due_at >= ${boundaries.todayStart}
+						AND due_at <= ${boundaries.todayEnd}`
+				case 'thisWeek':
+					return sql`${waiting} AND due_at > ${boundaries.todayEnd}
+						AND due_at <= ${boundaries.weekEnd}`
+				case 'later':
+					return sql`${waiting} AND due_at > ${boundaries.weekEnd}`
+				case 'noDue':
+					return sql`${waiting} AND due_at IS NULL`
+				case 'snoozed':
+					return sql`status = 'open' AND snoozed_until > now()`
+				case 'doneRecent':
+					return sql`status = 'done'
+						AND completed_at >= now() - interval '7 days'`
+			}
+		}
+
 		const conditionsFor = (
 			orgId: string,
 			filters: TaskFilters,
@@ -112,8 +167,11 @@ export class TaskService extends Context.Service<TaskService>()('TaskService', {
 				conditions.push(sql`due_at <= ${filters.dueBefore}`)
 			if (filters.overdueOnly)
 				conditions.push(sql`due_at < now() AND status = 'open'`)
-			// Snoozed rows hide by default; includeSnoozed surfaces them.
-			if (filters.includeSnoozed !== true)
+			if (filters.shelf && filters.boundaries)
+				conditions.push(shelfCondition(filters.shelf, filters.boundaries))
+			// Snoozed rows hide by default; includeSnoozed surfaces them. A shelf
+			// already says where sleeping tasks belong, so it opts out.
+			if (filters.includeSnoozed !== true && filters.shelf === undefined)
 				conditions.push(sql`(snoozed_until IS NULL OR snoozed_until <= now())`)
 			// `completed=false` excludes cancelled as well as done — a cancelled
 			// task is not open work. Shared by both transports so the meaning of
@@ -226,6 +284,37 @@ export class TaskService extends Context.Service<TaskService>()('TaskService', {
 
 					const items = yield* decodeTasks(rows).pipe(Effect.orDie)
 					return { items, total, limit: page.limit, offset: page.offset }
+				}),
+
+			// Every shelf sized in one pass, so the rail can show real totals
+			// without fetching the tasks behind them.
+			counts: (boundaries: TaskDayBoundaries) =>
+				Effect.gen(function* () {
+					const currentOrg = yield* CurrentOrg
+					const tally = (shelf: TaskShelfName) =>
+						sql`count(*) FILTER (WHERE ${shelfCondition(shelf, boundaries)})`
+					const rows = yield* sql<Record<TaskShelfName, string | number>>`
+						SELECT
+							${tally('overdue')} AS "overdue",
+							${tally('today')} AS "today",
+							${tally('thisWeek')} AS "thisWeek",
+							${tally('later')} AS "later",
+							${tally('noDue')} AS "noDue",
+							${tally('snoozed')} AS "snoozed",
+							${tally('doneRecent')} AS "doneRecent"
+						FROM tasks
+						WHERE organization_id = ${currentOrg.id}
+					`
+					const row = rows[0]
+					return {
+						overdue: Number(row?.overdue ?? 0),
+						today: Number(row?.today ?? 0),
+						thisWeek: Number(row?.thisWeek ?? 0),
+						later: Number(row?.later ?? 0),
+						noDue: Number(row?.noDue ?? 0),
+						snoozed: Number(row?.snoozed ?? 0),
+						doneRecent: Number(row?.doneRecent ?? 0),
+					}
 				}),
 
 			complete: (id: string, actor: TaskActor) =>
