@@ -26,10 +26,17 @@ export function useTabSearchParam<T extends string>(
 			: fallback
 
 	const navigate = useNavigate()
+	// Leaving a tab closes whatever dialog it was showing. A dialog belongs to the
+	// tab it opened from, and its panel stops rendering on the way out, so keeping
+	// the key would strand it in the address bar and spring it open again on the
+	// way back.
 	const setTab = useCallback(
 		(next: T) => {
 			void navigate({
-				search: (prev: Record<string, unknown>) => ({ ...prev, tab: next }),
+				search: ({ dlg: _drop, ...prev }: Record<string, unknown>) => ({
+					...prev,
+					tab: next,
+				}),
 			} as never)
 		},
 		[navigate],

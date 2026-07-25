@@ -1,7 +1,7 @@
 import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute } from '@tanstack/react-router'
-import { DateTime } from 'effect'
+import { DateTime, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { Clock, History, Plus } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -34,8 +34,11 @@ import {
 import { useQuickCapture } from '#/context/quick-capture-context'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
+import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
 import type { PaginatedList } from '#/lib/paginated-list'
+import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
+import { useDlg } from '#/lib/use-dlg'
 import {
 	agedPaperSurface,
 	brushedMetalPlate,
@@ -104,7 +107,15 @@ async function loadTasksOnServer(): Promise<{
 	return Effect.runPromise(program)
 }
 
+// The open task and the recent-changes list live in `?dlg=`, so a task can be
+// linked to and Back steps out of it.
+const tasksDlgSchema = Schema.Union([
+	dlgWithId('task'),
+	dlgNoId('recent-changes'),
+])
+
 export const Route = createFileRoute('/tasks/')({
+	validateSearch: validateSearchWith({ dlg: tasksDlgSchema }),
 	loader: async () => {
 		if (!import.meta.env.SSR) {
 			return { dehydrated: [] as const }
@@ -148,8 +159,20 @@ function TasksPage() {
 	const { open: openQuickCapture } = useQuickCapture()
 
 	const [selectedView, setSelectedView] = useState<SmartView>('today')
-	const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
-	const [undoOpen, setUndoOpen] = useState(false)
+	const { dlg, open: openDlg, close: closeDlg } = useDlg(tasksDlgSchema)
+	const selectedTaskId = dlg?.kind === 'task' ? dlg.id : null
+	const undoOpen = dlg?.kind === 'recent-changes'
+	// Opening a task is a step the reader can take back. Walking the open pane
+	// down the list with j/k is not — one entry per keystroke would turn Back
+	// into an undo of every key pressed, so those moves overwrite instead.
+	const openTask = useCallback(
+		(id: string) => openDlg({ kind: 'task', id }),
+		[openDlg],
+	)
+	const moveTaskSelection = useCallback(
+		(id: string) => openDlg({ kind: 'task', id }, { replace: true }),
+		[openDlg],
+	)
 	const quickAddRef = useRef<HTMLInputElement | null>(null)
 
 	const openTasks = useMemo<ReadonlyArray<TaskRow>>(
@@ -239,12 +262,17 @@ function TasksPage() {
 		async (taskId: string, nextCompleted: boolean) => {
 			if (nextCompleted) {
 				await completeTask({ params: { id: taskId } } as never)
+				// Finishing the task you have open closes it: the detail pane covers
+				// the list, and there is nothing left to do with a task you just ticked
+				// off. Finished tasks stay readable for a week, so it will not close
+				// itself.
+				if (taskId === selectedTaskId) closeDlg()
 			} else {
 				await reopenTask({ params: { id: taskId } } as never)
 			}
 			refreshAll()
 		},
-		[completeTask, reopenTask, refreshAll],
+		[completeTask, reopenTask, refreshAll, selectedTaskId, closeDlg],
 	)
 
 	const handleCancel = useCallback(
@@ -390,14 +418,14 @@ function TasksPage() {
 				ev.preventDefault()
 				const nextIdx = Math.min(visibleTasks.length - 1, currentIdx + 1)
 				const next = visibleTasks[nextIdx]
-				if (next) setSelectedTaskId(next.id)
+				if (next) moveTaskSelection(next.id)
 				return
 			}
 			if (ev.key === 'k') {
 				ev.preventDefault()
 				const prevIdx = Math.max(0, currentIdx - 1)
 				const prev = visibleTasks[prevIdx]
-				if (prev) setSelectedTaskId(prev.id)
+				if (prev) moveTaskSelection(prev.id)
 				return
 			}
 			if (ev.key === 'x' && selectedTaskId !== null) {
@@ -413,7 +441,14 @@ function TasksPage() {
 		}
 		document.addEventListener('keydown', onKey)
 		return () => document.removeEventListener('keydown', onKey)
-	}, [gPrimed, visibleTasks, selectedTaskId, handleToggle, handleSnooze])
+	}, [
+		gPrimed,
+		visibleTasks,
+		selectedTaskId,
+		handleToggle,
+		handleSnooze,
+		moveTaskSelection,
+	])
 
 	const isLoading =
 		AsyncResult.isInitial(tasksResult) || AsyncResult.isInitial(companiesResult)
@@ -426,10 +461,14 @@ function TasksPage() {
 		)
 	}
 
+	// A link may name a task the current view doesn't show — a snoozed or
+	// already-finished one — so the other lists are searched before giving up.
 	const selectedTask =
 		selectedTaskId !== null
 			? (visibleTasks.find(r => r.id === selectedTaskId) ??
 				openTasks.find(r => r.id === selectedTaskId) ??
+				snoozedTasks.find(r => r.id === selectedTaskId) ??
+				doneTasks.find(r => r.id === selectedTaskId) ??
 				null)
 			: null
 
@@ -521,7 +560,7 @@ function TasksPage() {
 					<RailButton
 						$active={false}
 						type='button'
-						onClick={() => setUndoOpen(true)}
+						onClick={() => openDlg({ kind: 'recent-changes' })}
 						data-testid='tasks-recent-changes-open'
 					>
 						<History size={12} aria-hidden />
@@ -564,7 +603,7 @@ function TasksPage() {
 										onToggle={next => void handleToggle(task.id, next)}
 										onEditTitle={next => handleEditTitle(task.id, next)}
 										onEditDue={next => handleReschedule(task.id, next)}
-										onOpenDetail={() => setSelectedTaskId(task.id)}
+										onOpenDetail={() => openTask(task.id)}
 										{...logInteractionProps}
 									/>
 								)
@@ -582,7 +621,7 @@ function TasksPage() {
 							? (companiesById.get(selectedTask.companyId) ?? null)
 							: null
 					}
-					onClose={() => setSelectedTaskId(null)}
+					onClose={closeDlg}
 					onSnooze={() => void handleSnooze(selectedTask.id)}
 					onCancel={() => void handleCancel(selectedTask.id)}
 					onToggle={next => void handleToggle(selectedTask.id, next)}
@@ -591,7 +630,10 @@ function TasksPage() {
 
 			<UndoDialog
 				open={undoOpen}
-				onOpenChange={setUndoOpen}
+				onOpenChange={next => {
+					if (next) openDlg({ kind: 'recent-changes' })
+					else closeDlg()
+				}}
 				tasks={openTasks}
 			/>
 		</Page>

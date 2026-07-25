@@ -72,11 +72,17 @@ import {
 } from '#/components/companies/company-fit-section'
 import { CompanyOwnerControl } from '#/components/companies/company-owner-control'
 import { ConversationsTab } from '#/components/companies/conversations-tab'
-import { DocumentsPanel } from '#/components/companies/documents-panel'
+import {
+	DocumentsPanel,
+	documentsDlgMembers,
+} from '#/components/companies/documents-panel'
 import { FollowupDialog } from '#/components/companies/followup-dialog'
 import { NextActionCard } from '#/components/companies/next-action-card'
 import { OpenTasksCard } from '#/components/companies/open-tasks-card'
-import { ProposalsPanel } from '#/components/companies/proposals-panel'
+import {
+	ProposalsPanel,
+	proposalsDlgMembers,
+} from '#/components/companies/proposals-panel'
 import { ResearchSummaryCard } from '#/components/companies/research-summary-card'
 import { UpcomingMeetingsCard } from '#/components/companies/upcoming-meetings-card'
 import { WherePanel } from '#/components/companies/where-panel'
@@ -120,7 +126,7 @@ import { useComposeEmail } from '#/context/compose-email-context'
 import { useQuickCapture } from '#/context/quick-capture-context'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
-import { dlgNoId } from '#/lib/dlg-search'
+import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
 import type { PaginatedList } from '#/lib/paginated-list'
 import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
@@ -291,10 +297,23 @@ function extractCompanyName(raw: unknown): string | null {
 const COMPANY_TABS = ['overview', 'conversations', 'people', 'files'] as const
 type CompanyTab = (typeof COMPANY_TABS)[number]
 
-// The "Run research" dialog lives in `?dlg=research` so it is deep-linkable and
-// Back closes it. The company id comes from the route, so the dialog carries no
-// id of its own.
-const companyDlgSchema = dlgNoId('research')
+// A research run, a contact, a document and a proposal all open through the one
+// `?dlg=` param this page carries, so each kind is named for the thing it opens
+// — two sharing a name would leave the second silently unreachable. Research
+// needs no id, since the company comes from the route; the rest name a row that
+// the panel owning them looks up in its own loaded list.
+const contactDlgMembers = [
+	dlgNoId('contact-new'),
+	dlgWithId('contact-edit'),
+	dlgWithId('channels'),
+] as const
+
+const companyDlgSchema = Schema.Union([
+	dlgNoId('research'),
+	...contactDlgMembers,
+	...documentsDlgMembers,
+	...proposalsDlgMembers,
+])
 
 const validateSearch = validateSearchWith({
 	tab: Schema.Literals(COMPANY_TABS),
@@ -654,23 +673,44 @@ function DetailBody({
 				: [],
 		[researchResult],
 	)
-	const {
-		dlg: researchDlg,
-		open: openResearchDlg,
-		close: closeResearchDlg,
-	} = useDlg(companyDlgSchema)
-	const researchDialogOpen = researchDlg !== undefined
-	const [manageChannelsContactId, setManageChannelsContactId] = useState<
-		string | null
-	>(null)
+
+	// One `?dlg=` param serves every dialog on this page, so each one below asks
+	// for its own kind rather than for "something is open".
+	const { dlg, open: openDlg, close: closeDlg } = useDlg(companyDlgSchema)
+	const researchDialogOpen = dlg?.kind === 'research'
+
 	// Re-derived from the live list so the dialog reflects channel edits live.
 	const manageChannelsContact =
-		contacts.find(c => c.id === manageChannelsContactId) ?? null
-	// null contact = add; an EditableContact = edit. Closed when not open.
-	const [contactDialog, setContactDialog] = useState<{
-		readonly open: boolean
-		readonly contact: EditableContact | null
-	}>({ open: false, contact: null })
+		dlg?.kind === 'channels'
+			? (contacts.find(c => c.id === dlg.id) ?? null)
+			: null
+
+	// Adding a contact names no row; editing one rebuilds the editable fields
+	// from the loaded list, so a link reopens the same contact after a refresh.
+	const editingContactRow =
+		dlg?.kind === 'contact-edit'
+			? (contacts.find(c => c.id === dlg.id) ?? null)
+			: null
+	// Held steady while the dialog is open: the form seeds itself from this value,
+	// so handing it a fresh object on every render would wipe out whatever the
+	// user had typed each time one of this page's other lists finished loading.
+	const editingContactId = editingContactRow?.id ?? null
+	// biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the contact being edited, not the row object the list rebuilds on every refresh
+	const editingContact: EditableContact | null = useMemo(
+		() =>
+			editingContactRow !== null
+				? {
+						id: editingContactRow.id,
+						name: editingContactRow.name,
+						role: editingContactRow.role,
+						isDecisionMaker: editingContactRow.isDecisionMaker,
+					}
+				: null,
+		[editingContactId],
+	)
+	const contactDialogOpen =
+		dlg?.kind === 'contact-new' || editingContact !== null
+
 	type PageEntry = {
 		readonly id: string
 		readonly title: string
@@ -1231,7 +1271,7 @@ function DetailBody({
 									<ResearchSummaryCard
 										runs={researchRuns}
 										lastEnrichedAt={company.lastEnrichedAt}
-										onRunNew={() => openResearchDlg({ kind: 'research' })}
+										onRunNew={() => openDlg({ kind: 'research' })}
 									/>
 									<WherePanel company={company} compact />
 									<AccountBriefSection
@@ -1256,7 +1296,7 @@ function DetailBody({
 								type='button'
 								$variant='outlined'
 								data-testid='company-add-contact'
-								onClick={() => setContactDialog({ open: true, contact: null })}
+								onClick={() => openDlg({ kind: 'contact-new' })}
 							>
 								<Plus size={14} aria-hidden />
 								<Trans>Add contact</Trans>
@@ -1414,15 +1454,7 @@ function DetailBody({
 												type='button'
 												data-testid={`contact-edit-${contact.id}`}
 												onClick={() =>
-													setContactDialog({
-														open: true,
-														contact: {
-															id: contact.id,
-															name: contact.name,
-															role: contact.role,
-															isDecisionMaker: contact.isDecisionMaker,
-														},
-													})
+													openDlg({ kind: 'contact-edit', id: contact.id })
 												}
 											>
 												<Pencil size={14} aria-hidden />
@@ -1432,7 +1464,9 @@ function DetailBody({
 											</ContactLinkButton>
 											<ContactLinkButton
 												type='button'
-												onClick={() => setManageChannelsContactId(contact.id)}
+												onClick={() =>
+													openDlg({ kind: 'channels', id: contact.id })
+												}
 											>
 												<Settings2 size={14} aria-hidden />
 												<span>
@@ -1541,7 +1575,7 @@ function DetailBody({
 			<ResearchDialog
 				open={researchDialogOpen}
 				onOpenChange={next => {
-					if (!next) closeResearchDlg()
+					if (!next) closeDlg()
 				}}
 				companyId={company.id}
 				onCreated={() => {
@@ -1552,15 +1586,15 @@ function DetailBody({
 				contactId={manageChannelsContact?.id ?? null}
 				contactName={manageChannelsContact?.name ?? ''}
 				channels={manageChannelsContact?.channels ?? []}
-				onClose={() => setManageChannelsContactId(null)}
+				onClose={closeDlg}
 				onChanged={refreshContacts}
 			/>
 
 			<ContactEditDialog
-				open={contactDialog.open}
+				open={contactDialogOpen}
 				companyId={company.id}
-				contact={contactDialog.contact}
-				onClose={() => setContactDialog({ open: false, contact: null })}
+				contact={editingContact}
+				onClose={closeDlg}
 				onSaved={refreshContacts}
 			/>
 
