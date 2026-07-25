@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-25 (ui-v2026.7.25)
+
+### Features
+
+* **ui:** add mobile dialog sheets and a destructive button ([80cf0c0](https://github.com/guillempuche/batuda/commit/80cf0c081c8f50ea89aae9d534924b96d7eb92ad))
+
+### Bug Fixes
+
+* **ui:** respect prefers-reduced-motion in dialog transitions ([5da8b54](https://github.com/guillempuche/batuda/commit/5da8b54a1ba8758f817c495863295c073e0210cd))
+
+### Chores
+
+* pin the [@tiptap](https://github.com/tiptap) packages to 3.28 for markdown support ([f7bfbd1](https://github.com/guillempuche/batuda/commit/f7bfbd1ce8350190f29baab361e022c066735640))
+
 ## 2026-07-22 (ui-v2026.7.22)
 
 ### Features
