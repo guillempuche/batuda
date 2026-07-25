@@ -1,4 +1,6 @@
 import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute } from '@tanstack/react-router'
 import { DateTime, Schema } from 'effect'
@@ -7,19 +9,22 @@ import { Clock, History, Plus } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 
-import type { Company, Task } from '@batuda/domain'
+import type { Company } from '@batuda/domain'
 import { PriButton, PriDialog, PriInput } from '@batuda/ui/pri'
 
-import { companiesListAtom, openTasksAtom } from '#/atoms/pipeline-atoms'
+import { companiesListAtom } from '#/atoms/pipeline-atoms'
 import {
 	cancelTaskAtom,
 	createTaskAtom,
-	doneTasksAtom,
+	localDayKey,
 	reopenTaskAtom,
 	rescheduleTaskAtom,
-	snoozedTasksAtom,
 	snoozeTaskAtom,
+	TASKS_PAGE_SIZE,
+	type TaskShelf,
+	taskCountsAtom,
 	taskEventsAtomFor,
+	tasksShelfAtom,
 	updateTaskAtom,
 } from '#/atoms/tasks-atoms'
 import { EmptyState } from '#/components/shared/empty-state'
@@ -47,11 +52,13 @@ import {
 } from '#/lib/workshop-mixins'
 
 /**
- * Task inbox — extends `openTasksAtom` (dashboard) with a smart-view rail
- * (today / overdue / this week / later / no due / snoozed / done 7d),
- * inline edit on title + due, and a right-pane detail editor backed by
- * `task_events`. Mutations go through `@batuda/controllers` typed atoms
- * so optimistic concurrency (`If-Match`) is cheap to enable later.
+ * Task inbox — a rail of shelves (today / overdue / this week / later / no
+ * due / snoozed / done 7d), inline edit on title + due, and a right-pane
+ * detail editor backed by `task_events`. The server decides which shelf a
+ * task sits on and how big each shelf is, so a rail count and the rows
+ * underneath it always describe the same set. Mutations go through
+ * `@batuda/controllers` typed atoms so optimistic concurrency (`If-Match`)
+ * is cheap to enable later.
  */
 type TaskRow = {
 	readonly id: string
@@ -73,21 +80,100 @@ type CompanyLookup = {
 	readonly name: string
 }
 
-type SmartView =
-	| 'today'
-	| 'overdue'
-	| 'this-week'
-	| 'later'
-	| 'no-due'
-	| 'snoozed'
-	| 'done'
+// The rail, in the order it reads top to bottom, with the copy each shelf
+// shows when it is empty. Every string is a `msg` descriptor at module scope
+// so `lingui extract` can find it: passing `t` into a helper shadows the
+// macro, and the string then ships in English whatever the reader's language.
+const SHELVES: ReadonlyArray<{
+	readonly shelf: TaskShelf
+	readonly testId: string
+	readonly label: MessageDescriptor
+	readonly emptyTitle: MessageDescriptor
+	readonly emptyDescription: MessageDescriptor
+}> = [
+	{
+		shelf: 'today',
+		testId: 'tasks-view-today',
+		label: msg`Today`,
+		emptyTitle: msg`All under control`,
+		emptyDescription: msg`No pending tasks today. Time to prospect or take a walk.`,
+	},
+	{
+		shelf: 'overdue',
+		testId: 'tasks-view-overdue',
+		label: msg`Overdue`,
+		emptyTitle: msg`Nothing overdue`,
+		emptyDescription: msg`The ledger is clean.`,
+	},
+	{
+		shelf: 'thisWeek',
+		testId: 'tasks-view-this-week',
+		label: msg`This week`,
+		emptyTitle: msg`No tasks this week`,
+		emptyDescription: msg`The week is clear — good time to plan.`,
+	},
+	{
+		shelf: 'later',
+		testId: 'tasks-view-later',
+		label: msg`Later`,
+		emptyTitle: msg`Nothing later in the queue`,
+		emptyDescription: msg`No tasks scheduled beyond this week.`,
+	},
+	{
+		shelf: 'noDue',
+		testId: 'tasks-view-no-due',
+		label: msg`No due date`,
+		emptyTitle: msg`Every task has a date`,
+		emptyDescription: msg`Every open task has a due date assigned.`,
+	},
+	{
+		shelf: 'snoozed',
+		testId: 'tasks-view-snoozed',
+		label: msg`Snoozed`,
+		emptyTitle: msg`Nothing snoozed`,
+		emptyDescription: msg`No tasks are sleeping.`,
+	},
+	{
+		shelf: 'doneRecent',
+		testId: 'tasks-view-done',
+		label: msg`Done 7d`,
+		emptyTitle: msg`Nothing completed recently`,
+		emptyDescription: msg`No tasks completed in the last 7 days.`,
+	},
+]
+
+const shelfCopy = (shelf: TaskShelf) =>
+	SHELVES.find(entry => entry.shelf === shelf) ?? SHELVES[0]!
+
+// What the rail shows before the real sizes arrive. Zeroes rather than blanks
+// keep the buttons from resizing under the pointer as the counts land.
+const EMPTY_COUNTS: Record<TaskShelf, number> = {
+	overdue: 0,
+	today: 0,
+	thisWeek: 0,
+	later: 0,
+	noDue: 0,
+	snoozed: 0,
+	doneRecent: 0,
+}
+
+// Everything still waiting, wherever it sits on the rail.
+const OPEN_SHELVES: ReadonlyArray<TaskShelf> = [
+	'overdue',
+	'today',
+	'thisWeek',
+	'later',
+	'noDue',
+]
 
 const completeTaskAtom = BatudaApiAtom.mutation('tasks', 'complete')
 
-async function loadTasksOnServer(): Promise<{
-	tasks: PaginatedList<Task>
-	companies: PaginatedList<Company>
-}> {
+/**
+ * Only the companies are fetched ahead of time. Which tasks are due "today"
+ * depends on where the reader is in the world, and the server has no way to
+ * know that, so the shelves are left for the browser to ask for.
+ */
+async function loadCompaniesOnServer(): Promise<PaginatedList<Company>> {
 	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
 		import('effect'),
 		import('#/lib/batuda-api-server'),
@@ -95,14 +181,7 @@ async function loadTasksOnServer(): Promise<{
 	])
 	const program = Effect.gen(function* () {
 		const client = yield* makeBatudaApiServer(cookie ?? undefined)
-		const [tasks, companies] = yield* Effect.all(
-			[
-				client.tasks.list({ query: { completed: 'false' } }),
-				client.companies.list({ query: { limit: 500 } }),
-			],
-			{ concurrency: 2 },
-		)
-		return { tasks, companies }
+		return yield* client.companies.list({ query: { limit: 500 } })
 	})
 	return Effect.runPromise(program)
 }
@@ -125,10 +204,9 @@ export const Route = createFileRoute('/tasks/')({
 			return { dehydrated: [] as const }
 		}
 		try {
-			const { tasks, companies } = await loadTasksOnServer()
+			const companies = await loadCompaniesOnServer()
 			return {
 				dehydrated: [
-					dehydrateAtom(openTasksAtom, AsyncResult.success(tasks)),
 					dehydrateAtom(companiesListAtom, AsyncResult.success(companies)),
 				] as const,
 			}
@@ -143,13 +221,26 @@ export const Route = createFileRoute('/tasks/')({
 
 function TasksPage() {
 	const { t } = useLingui()
-	const tasksResult = useAtomValue(openTasksAtom)
-	const snoozedResult = useAtomValue(snoozedTasksAtom)
-	const doneResult = useAtomValue(doneTasksAtom)
+	const [selectedShelf, setSelectedShelf] = useState<TaskShelf>('today')
+	// Fixed for as long as the page is open. Reading the clock on every render
+	// would hand every render a different atom to fetch.
+	const [dayKey] = useState(() => localDayKey())
+	const [visibleLimit, setVisibleLimit] = useState(TASKS_PAGE_SIZE)
+	// Moving to another shelf starts again at its first page.
+	useEffect(() => {
+		setVisibleLimit(TASKS_PAGE_SIZE)
+	}, [selectedShelf])
+
+	const shelfAtom = useMemo(
+		() => tasksShelfAtom(selectedShelf, dayKey, visibleLimit),
+		[selectedShelf, dayKey, visibleLimit],
+	)
+	const countsAtom = useMemo(() => taskCountsAtom(dayKey), [dayKey])
+	const tasksResult = useAtomValue(shelfAtom)
+	const countsResult = useAtomValue(countsAtom)
 	const companiesResult = useAtomValue(companiesListAtom)
-	const refreshTasks = useAtomRefresh(openTasksAtom)
-	const refreshSnoozed = useAtomRefresh(snoozedTasksAtom)
-	const refreshDone = useAtomRefresh(doneTasksAtom)
+	const refreshTasks = useAtomRefresh(shelfAtom)
+	const refreshCounts = useAtomRefresh(countsAtom)
 	const refreshCompanies = useAtomRefresh(companiesListAtom)
 	const completeTask = useAtomSet(completeTaskAtom, { mode: 'promiseExit' })
 	const reopenTask = useAtomSet(reopenTaskAtom, { mode: 'promiseExit' })
@@ -162,7 +253,6 @@ function TasksPage() {
 	const createTask = useAtomSet(createTaskAtom, { mode: 'promiseExit' })
 	const { open: openQuickCapture } = useQuickCapture()
 
-	const [selectedView, setSelectedView] = useState<SmartView>('today')
 	const { dlg, open: openDlg, close: closeDlg } = useDlg(tasksDlgSchema)
 	const undoOpen = dlg?.kind === 'recent-changes'
 
@@ -217,31 +307,22 @@ function TasksPage() {
 	)
 	const quickAddRef = useRef<HTMLInputElement | null>(null)
 
-	const openTasks = useMemo<ReadonlyArray<TaskRow>>(
-		() =>
-			AsyncResult.isSuccess(tasksResult)
-				? narrowTasks(tasksResult.value.items)
-				: [],
-		[tasksResult],
+	const loadedShelf = AsyncResult.isSuccess(tasksResult)
+		? tasksResult.value
+		: undefined
+	const visibleTasks = useMemo<ReadonlyArray<TaskRow>>(
+		() => (loadedShelf ? narrowTasks(loadedShelf.items) : []),
+		[loadedShelf],
 	)
-	const snoozedTasks = useMemo<ReadonlyArray<TaskRow>>(
-		() =>
-			AsyncResult.isSuccess(snoozedResult)
-				? narrowTasks(snoozedResult.value.items).filter(
-						t =>
-							t.snoozedUntil !== null &&
-							Date.parse(t.snoozedUntil) > Date.now(),
-					)
-				: [],
-		[snoozedResult],
-	)
-	const doneTasks = useMemo<ReadonlyArray<TaskRow>>(() => {
-		if (!AsyncResult.isSuccess(doneResult)) return []
-		const cutoff = Date.now() - 7 * 86400_000
-		return narrowTasks(doneResult.value.items).filter(
-			t => t.completedAt !== null && Date.parse(t.completedAt) >= cutoff,
-		)
-	}, [doneResult])
+	// How many the shelf holds altogether, which is what the rail promises —
+	// the rows in hand stop at whatever has been asked for so far.
+	const shelfTotal = loadedShelf?.total ?? 0
+	const hasMore = visibleTasks.length < shelfTotal
+
+	const counts = AsyncResult.isSuccess(countsResult)
+		? countsResult.value
+		: EMPTY_COUNTS
+	const openCount = OPEN_SHELVES.reduce((sum, shelf) => sum + counts[shelf], 0)
 
 	const companiesById = useMemo<Map<string, CompanyLookup>>(() => {
 		if (!AsyncResult.isSuccess(companiesResult)) return new Map()
@@ -264,33 +345,13 @@ function TasksPage() {
 		return map
 	}, [companiesResult])
 
-	const buckets = useMemo(() => bucketise(openTasks), [openTasks])
-
-	const visibleTasks = useMemo<ReadonlyArray<TaskRow>>(() => {
-		switch (selectedView) {
-			case 'today':
-				return buckets.today
-			case 'overdue':
-				return buckets.overdue
-			case 'this-week':
-				return buckets.thisWeek
-			case 'later':
-				return buckets.later
-			case 'no-due':
-				return buckets.noDue
-			case 'snoozed':
-				return snoozedTasks
-			case 'done':
-				return doneTasks
-		}
-	}, [selectedView, buckets, snoozedTasks, doneTasks])
-
+	// Any edit can move a task between shelves, so the sizes on the rail are
+	// refreshed alongside the list itself.
 	const refreshAll = useCallback(() => {
 		refreshTasks()
-		refreshSnoozed()
-		refreshDone()
+		refreshCounts()
 		refreshCompanies()
-	}, [refreshTasks, refreshSnoozed, refreshDone, refreshCompanies])
+	}, [refreshTasks, refreshCounts, refreshCompanies])
 
 	// Refresh when the window regains focus — catches webhook-driven
 	// edits (an agent updated a task in another tab or via MCP).
@@ -441,13 +502,13 @@ function TasksPage() {
 			}
 			if (gPrimed && ev.key === 'o') {
 				ev.preventDefault()
-				setSelectedView('overdue')
+				setSelectedShelf('overdue')
 				setGPrimed(false)
 				return
 			}
 			if (gPrimed && ev.key === 't') {
 				ev.preventDefault()
-				setSelectedView('today')
+				setSelectedShelf('today')
 				setGPrimed(false)
 				return
 			}
@@ -503,15 +564,9 @@ function TasksPage() {
 		)
 	}
 
-	// A link may name a task the current view doesn't show — a snoozed or
-	// already-finished one — so the other lists are searched before giving up.
 	const selectedTask =
 		selectedTaskId !== null
-			? (visibleTasks.find(r => r.id === selectedTaskId) ??
-				openTasks.find(r => r.id === selectedTaskId) ??
-				snoozedTasks.find(r => r.id === selectedTaskId) ??
-				doneTasks.find(r => r.id === selectedTaskId) ??
-				null)
+			? (visibleTasks.find(r => r.id === selectedTaskId) ?? null)
 			: null
 
 	return (
@@ -526,78 +581,27 @@ function TasksPage() {
 					</Subtitle>
 				</IntroText>
 				<KpiRow>
-					<KpiCounter value={openTasks.length} label={t`Open`} />
-					{buckets.overdue.length > 0 && (
-						<KpiCounter value={buckets.overdue.length} label={t`Overdue`} />
+					<KpiCounter value={openCount} label={t`Open`} />
+					{counts.overdue > 0 && (
+						<KpiCounter value={counts.overdue} label={t`Overdue`} />
 					)}
 				</KpiRow>
 			</Intro>
 
 			<Layout>
 				<Rail data-testid='tasks-view-rail'>
-					<RailButton
-						$active={selectedView === 'today'}
-						type='button'
-						onClick={() => setSelectedView('today')}
-						data-testid='tasks-view-today'
-					>
-						<Trans>Today</Trans>
-						<Count>{buckets.today.length}</Count>
-					</RailButton>
-					<RailButton
-						$active={selectedView === 'overdue'}
-						type='button'
-						onClick={() => setSelectedView('overdue')}
-						data-testid='tasks-view-overdue'
-					>
-						<Trans>Overdue</Trans>
-						<Count>{buckets.overdue.length}</Count>
-					</RailButton>
-					<RailButton
-						$active={selectedView === 'this-week'}
-						type='button'
-						onClick={() => setSelectedView('this-week')}
-						data-testid='tasks-view-this-week'
-					>
-						<Trans>This week</Trans>
-						<Count>{buckets.thisWeek.length}</Count>
-					</RailButton>
-					<RailButton
-						$active={selectedView === 'later'}
-						type='button'
-						onClick={() => setSelectedView('later')}
-						data-testid='tasks-view-later'
-					>
-						<Trans>Later</Trans>
-						<Count>{buckets.later.length}</Count>
-					</RailButton>
-					<RailButton
-						$active={selectedView === 'no-due'}
-						type='button'
-						onClick={() => setSelectedView('no-due')}
-						data-testid='tasks-view-no-due'
-					>
-						<Trans>No due date</Trans>
-						<Count>{buckets.noDue.length}</Count>
-					</RailButton>
-					<RailButton
-						$active={selectedView === 'snoozed'}
-						type='button'
-						onClick={() => setSelectedView('snoozed')}
-						data-testid='tasks-view-snoozed'
-					>
-						<Trans>Snoozed</Trans>
-						<Count>{snoozedTasks.length}</Count>
-					</RailButton>
-					<RailButton
-						$active={selectedView === 'done'}
-						type='button'
-						onClick={() => setSelectedView('done')}
-						data-testid='tasks-view-done'
-					>
-						<Trans>Done 7d</Trans>
-						<Count>{doneTasks.length}</Count>
-					</RailButton>
+					{SHELVES.map(({ shelf, testId, label }) => (
+						<RailButton
+							key={shelf}
+							$active={selectedShelf === shelf}
+							type='button'
+							onClick={() => setSelectedShelf(shelf)}
+							data-testid={testId}
+						>
+							{t(label)}
+							<Count>{counts[shelf]}</Count>
+						</RailButton>
+					))}
 					<RailDivider aria-hidden />
 					<RailButton
 						$active={false}
@@ -619,38 +623,55 @@ function TasksPage() {
 
 					{visibleTasks.length === 0 ? (
 						<EmptyState
-							title={emptyTitle(selectedView, t)}
-							description={emptyDescription(selectedView, t)}
+							title={t(shelfCopy(selectedShelf).emptyTitle)}
+							description={t(shelfCopy(selectedShelf).emptyDescription)}
 						/>
 					) : (
-						<Stack>
-							{visibleTasks.map(task => {
-								const companyId = task.companyId
-								const logInteractionProps =
-									companyId !== null
-										? {
-												onLogInteraction: () => handleLogInteraction(companyId),
+						<>
+							<Stack>
+								{visibleTasks.map(task => {
+									const companyId = task.companyId
+									const logInteractionProps =
+										companyId !== null
+											? {
+													onLogInteraction: () =>
+														handleLogInteraction(companyId),
+												}
+											: {}
+									return (
+										<TaskItem
+											key={task.id}
+											task={toTaskItemData(task)}
+											completed={task.status === 'done'}
+											overdue={
+												selectedShelf === 'overdue' ||
+												(task.dueAt !== null &&
+													Date.parse(task.dueAt) < startOfDay(Date.now()))
 											}
-										: {}
-								return (
-									<TaskItem
-										key={task.id}
-										task={toTaskItemData(task)}
-										completed={task.status === 'done'}
-										overdue={
-											selectedView === 'overdue' ||
-											(task.dueAt !== null &&
-												Date.parse(task.dueAt) < startOfDay(Date.now()))
+											onToggle={next => void handleToggle(task.id, next)}
+											onEditTitle={next => handleEditTitle(task.id, next)}
+											onEditDue={next => handleReschedule(task.id, next)}
+											onOpenDetail={() => openTask(task.id)}
+											{...logInteractionProps}
+										/>
+									)
+								})}
+							</Stack>
+							{hasMore && (
+								<LoadMoreWrap>
+									<PriButton
+										type='button'
+										$variant='outlined'
+										onClick={() =>
+											setVisibleLimit(shown => shown + TASKS_PAGE_SIZE)
 										}
-										onToggle={next => void handleToggle(task.id, next)}
-										onEditTitle={next => handleEditTitle(task.id, next)}
-										onEditDue={next => handleReschedule(task.id, next)}
-										onOpenDetail={() => openTask(task.id)}
-										{...logInteractionProps}
-									/>
-								)
-							})}
-						</Stack>
+										data-testid='tasks-load-more'
+									>
+										<span>{t`Load more`}</span>
+									</PriButton>
+								</LoadMoreWrap>
+							)}
+						</>
 					)}
 				</Column>
 			</Layout>
@@ -676,7 +697,7 @@ function TasksPage() {
 					if (next) openDlg({ kind: 'recent-changes' })
 					else closeDlg()
 				}}
-				tasks={openTasks}
+				tasks={visibleTasks}
 			/>
 		</Page>
 	)
@@ -873,9 +894,8 @@ function UndoDialog({
 	tasks: ReadonlyArray<TaskRow>
 }) {
 	const { t } = useLingui()
-	// Pull the latest `updated_at` from the already-loaded task list.
-	// A full cross-task event feed endpoint is out of scope for PR #4;
-	// per-task audit lives in the detail pane.
+	// Pull the latest `updated_at` from the tasks already on screen — there is
+	// no cross-task event feed; per-task audit lives in the detail pane.
 	const recent = useMemo(() => {
 		const withUpdate = tasks.filter(
 			(r): r is TaskRow & { updatedAt: string } => r.updatedAt !== null,
@@ -895,7 +915,8 @@ function UndoDialog({
 					</PriDialog.Title>
 					<PriDialog.Description>
 						<Trans>
-							The 20 most recently edited open tasks. Click one to reopen it.
+							The 20 most recently edited tasks on this shelf. Click one to
+							reopen it.
 						</Trans>
 					</PriDialog.Description>
 					{recent.length === 0 ? (
@@ -938,44 +959,6 @@ function startOfDay(ms: number): number {
 	const d = new Date(ms)
 	d.setHours(0, 0, 0, 0)
 	return d.getTime()
-}
-
-function isSameDay(a: number, b: number): boolean {
-	const da = new Date(a)
-	const db = new Date(b)
-	return (
-		da.getFullYear() === db.getFullYear() &&
-		da.getMonth() === db.getMonth() &&
-		da.getDate() === db.getDate()
-	)
-}
-
-function bucketise(tasks: ReadonlyArray<TaskRow>) {
-	const now = Date.now()
-	const sevenDaysOut = now + 7 * 86400_000
-	const overdue: TaskRow[] = []
-	const today: TaskRow[] = []
-	const thisWeek: TaskRow[] = []
-	const later: TaskRow[] = []
-	const noDue: TaskRow[] = []
-	for (const task of tasks) {
-		if (task.dueAt === null) {
-			noDue.push(task)
-			continue
-		}
-		const dueMs = Date.parse(task.dueAt)
-		if (dueMs < startOfDay(now)) overdue.push(task)
-		else if (isSameDay(dueMs, now)) today.push(task)
-		else if (dueMs < sevenDaysOut) thisWeek.push(task)
-		else later.push(task)
-	}
-	const byDue = (a: TaskRow, b: TaskRow) =>
-		Date.parse(a.dueAt ?? '') - Date.parse(b.dueAt ?? '')
-	overdue.sort(byDue)
-	today.sort(byDue)
-	thisWeek.sort(byDue)
-	later.sort(byDue)
-	return { overdue, today, thisWeek, later, noDue }
 }
 
 function narrowTasks(rows: ReadonlyArray<unknown>): ReadonlyArray<TaskRow> {
@@ -1153,47 +1136,6 @@ function atNineAm(daysFromNow: number): Date {
 	return d
 }
 
-function emptyTitle(view: SmartView, t: (s: TemplateStringsArray) => string) {
-	switch (view) {
-		case 'today':
-			return t`All under control`
-		case 'overdue':
-			return t`Nothing overdue`
-		case 'this-week':
-			return t`No tasks this week`
-		case 'later':
-			return t`Nothing later in the queue`
-		case 'no-due':
-			return t`Every task has a date`
-		case 'snoozed':
-			return t`Nothing snoozed`
-		case 'done':
-			return t`Nothing completed recently`
-	}
-}
-
-function emptyDescription(
-	view: SmartView,
-	t: (s: TemplateStringsArray) => string,
-) {
-	switch (view) {
-		case 'today':
-			return t`No pending tasks today. Time to prospect or take a walk.`
-		case 'overdue':
-			return t`The ledger is clean.`
-		case 'this-week':
-			return t`The week is clear — good time to plan.`
-		case 'later':
-			return t`No tasks scheduled beyond this week.`
-		case 'no-due':
-			return t`Every open task has a due date assigned.`
-		case 'snoozed':
-			return t`No tasks are sleeping.`
-		case 'done':
-			return t`No tasks completed in the last 7 days.`
-	}
-}
-
 // ── Styles ────────────────────────────────────────────────────────
 
 const Page = styled.div.withConfig({ displayName: 'TasksPage' })`
@@ -1317,6 +1259,12 @@ const Stack = styled.div.withConfig({ displayName: 'TasksStack' })`
 	display: flex;
 	flex-direction: column;
 	gap: 0;
+`
+
+const LoadMoreWrap = styled.div.withConfig({ displayName: 'TasksLoadMore' })`
+	display: flex;
+	justify-content: center;
+	padding: var(--space-md) 0;
 `
 
 const QuickAddRow = styled.form.withConfig({ displayName: 'TasksQuickAddRow' })`

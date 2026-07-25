@@ -389,6 +389,10 @@ msgid "All"
 msgstr "Tots"
 
 #: src/routes/companies/index.tsx
+msgid "All companies"
+msgstr "Totes les empreses"
+
+#: src/routes/companies/index.tsx
 msgid "All countries"
 msgstr "Tots els països"
 
@@ -418,6 +422,7 @@ msgid "All time"
 msgstr "Tot el temps"
 
 #: src/routes/index.tsx
+#: src/routes/tasks/index.tsx
 msgid "All under control"
 msgstr "Tot sota control"
 
@@ -1947,6 +1952,14 @@ msgstr "Error"
 msgid "Event"
 msgstr "Esdeveniment"
 
+#: src/routes/tasks/index.tsx
+msgid "Every open task has a due date assigned."
+msgstr "Totes les tasques obertes tenen data de venciment."
+
+#: src/routes/tasks/index.tsx
+msgid "Every task has a date"
+msgstr "Totes les tasques tenen data"
+
 #: src/components/emails/compose-window.tsx
 msgid "Exit full screen"
 msgstr "Surt de pantalla completa"
@@ -2236,10 +2249,6 @@ msgstr "Port IMAP"
 msgid "IMAP security"
 msgstr "Seguretat IMAP"
 
-#: src/routes/companies/index.tsx
-msgid "In pipeline"
-msgstr "Al pipeline"
-
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/routes/emails/index.tsx
 msgid "Inbound"
@@ -2405,7 +2414,7 @@ msgstr "Última visita"
 
 #: src/routes/tasks/index.tsx
 msgid "Later"
-msgstr "Més tard"
+msgstr "Més endavant"
 
 #: src/components/research/research-dialog.tsx
 msgid "Layered after the stack, in order."
@@ -2438,6 +2447,7 @@ msgid "Load {0} more"
 msgstr "Carrega'n {0} més"
 
 #: src/routes/companies/index.tsx
+#: src/routes/tasks/index.tsx
 msgid "Load more"
 msgstr "Carrega'n més"
 
@@ -2611,6 +2621,10 @@ msgstr "Resum de mercat"
 #: src/components/profile/theme-select.tsx
 msgid "Match device"
 msgstr "Segons el dispositiu"
+
+#: src/routes/companies/index.tsx
+msgid "Matching"
+msgstr "Coincidents"
 
 #: src/components/research/findings/competitor-scan-view.tsx
 msgid "Maturity"
@@ -2933,7 +2947,7 @@ msgstr "sense data de venciment"
 
 #: src/routes/tasks/index.tsx
 msgid "No due date"
-msgstr "Sense data de venciment"
+msgstr "Sense data"
 
 #: src/components/research/findings/company-enrichment-view.tsx
 msgid "No fit"
@@ -3000,6 +3014,10 @@ msgstr "Encara no hi ha pàgines"
 msgid "No paid calls in this range."
 msgstr "No hi ha crides de pagament en aquest interval."
 
+#: src/routes/tasks/index.tsx
+msgid "No pending tasks today. Time to prospect or take a walk."
+msgstr "Avui no hi ha tasques pendents. És hora de prospectar o de fer un tomb."
+
 #: src/routes/emails/inboxes.tsx
 msgid "No primary inbox set."
 msgstr "No hi ha cap bústia principal."
@@ -3046,9 +3064,25 @@ msgstr "No hi ha troballes estructurades."
 msgid "No tags yet"
 msgstr "Encara sense etiquetes"
 
+#: src/routes/tasks/index.tsx
+msgid "No tasks are sleeping."
+msgstr "No hi ha cap tasca adormida."
+
+#: src/routes/tasks/index.tsx
+msgid "No tasks completed in the last 7 days."
+msgstr "Cap tasca completada els darrers 7 dies."
+
 #: src/routes/index.tsx
 msgid "No tasks for today"
 msgstr "Cap tasca per a avui"
+
+#: src/routes/tasks/index.tsx
+msgid "No tasks scheduled beyond this week."
+msgstr "No hi ha tasques programades més enllà d'aquesta setmana."
+
+#: src/routes/tasks/index.tsx
+msgid "No tasks this week"
+msgstr "Cap tasca aquesta setmana"
 
 #: src/components/instructions/stack-picker.tsx
 msgid "No templates added yet."
@@ -3105,6 +3139,22 @@ msgstr "Notes (opcional)"
 #: src/routes/tasks/index.tsx
 msgid "Nothing changed yet."
 msgstr "Encara no ha canviat res."
+
+#: src/routes/tasks/index.tsx
+msgid "Nothing completed recently"
+msgstr "Res completat recentment"
+
+#: src/routes/tasks/index.tsx
+msgid "Nothing later in the queue"
+msgstr "Res més endavant a la cua"
+
+#: src/routes/tasks/index.tsx
+msgid "Nothing overdue"
+msgstr "Res endarrerit"
+
+#: src/routes/tasks/index.tsx
+msgid "Nothing snoozed"
+msgstr "Res ajornat"
 
 #: src/components/research/proposal-outcome.tsx
 msgid "Nothing to apply"
@@ -4290,7 +4340,7 @@ msgstr "Posposa 1d"
 
 #: src/routes/tasks/index.tsx
 msgid "Snoozed"
-msgstr "Posposades"
+msgstr "Ajornades"
 
 #: src/routes/emails/$threadId.tsx
 msgid "someone"
@@ -4586,8 +4636,8 @@ msgid "That link is no longer valid. Request a fresh one below."
 msgstr "L'enllaç ja no és vàlid. Demana'n un de nou a sota."
 
 #: src/routes/tasks/index.tsx
-msgid "The 20 most recently edited open tasks. Click one to reopen it."
-msgstr "Les 20 tasques obertes editades més recentment. Fes-hi clic per reobrir-ne una."
+msgid "The 20 most recently edited tasks on this shelf. Click one to reopen it."
+msgstr "Les 20 tasques editades més recentment d'aquest prestatge. Fes clic en una per reobrir-la."
 
 #: src/routes/companies/$slug.tsx
 msgid "The activity for this company could not be fetched. Check that the session is valid, then try again."
@@ -4625,6 +4675,10 @@ msgstr "El geocodificador no ha trobat cap coincidència. Prova d'editar el camp
 #: src/routes/emails/inboxes.tsx
 msgid "The inboxes could not be fetched. Check that the session is valid, then try again."
 msgstr "No s'han pogut carregar les safates. Comprova que la sessió sigui vàlida i torna-ho a provar."
+
+#: src/routes/tasks/index.tsx
+msgid "The ledger is clean."
+msgstr "El llibre de comptes està net."
 
 #: src/routes/companies/index.tsx
 #: src/routes/pages/index.tsx
@@ -4694,6 +4748,10 @@ msgstr "Les dues contrasenyes no coincideixen."
 #: src/routes/reset-password.tsx
 msgid "The two passwords don't match."
 msgstr "Les dues contrasenyes no coincideixen."
+
+#: src/routes/tasks/index.tsx
+msgid "The week is clear — good time to plan."
+msgstr "La setmana és lliure: bon moment per planificar."
 
 #: src/routes/tasks/index.tsx
 msgid "The workshop ledger — tear off one strip at a time."
