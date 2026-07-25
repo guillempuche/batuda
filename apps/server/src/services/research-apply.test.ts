@@ -55,23 +55,23 @@ describe('allowlistFields', () => {
 	})
 
 	describe('when a value arrives wrapped with the page it came from', () => {
-		it('should write the plain value and keep the source beside it', () => {
+		it('should write the plain value and keep its citation beside it', () => {
 			// GIVEN one sourced value and one bare one
-			const { fields, sources } = allowlistFields('companies', {
+			const { fields, citations } = allowlistFields('companies', {
 				industry: {
 					value: 'transport',
-					source_id: 'https://acme.es/about',
+					source_id: 'src-acme-about',
 					confidence: 0.9,
 					as_of: '2026-07-01',
 				},
 				location: 'Sitges',
 			})
 
-			// THEN the column gets the value, and the source is recorded under it
+			// THEN the column gets the value, and the cited page is kept under it
 			expect(fields).toEqual({ industry: 'transport', location: 'Sitges' })
-			expect(sources).toEqual({
+			expect(citations).toEqual({
 				industry: {
-					sourceUrl: 'https://acme.es/about',
+					sourceId: 'src-acme-about',
 					confidence: 0.9,
 					asOf: '2026-07-01',
 				},
@@ -82,26 +82,26 @@ describe('allowlistFields', () => {
 	describe('when a wrapped value names no usable page', () => {
 		it('should still write the value, with nothing claimed about its source', () => {
 			// GIVEN a wrapper whose source id is empty
-			const { fields, sources } = allowlistFields('companies', {
+			const { fields, citations } = allowlistFields('companies', {
 				industry: { value: 'transport', source_id: '' },
 			})
 
 			// THEN the value lands and no source is invented for it
 			expect(fields).toEqual({ industry: 'transport' })
-			expect(sources).toEqual({})
+			expect(citations).toEqual({})
 		})
 	})
 
 	describe('when a dropped field carries a source', () => {
 		it('should record no source for it, since nothing was written', () => {
 			// GIVEN a non-writable column arriving with provenance
-			const { fields, sources } = allowlistFields('companies', {
+			const { fields, citations } = allowlistFields('companies', {
 				id: { value: 'nope', source_id: 'https://acme.es' },
 			})
 
 			// THEN neither the value nor its source survives
 			expect(fields).toEqual({})
-			expect(sources).toEqual({})
+			expect(citations).toEqual({})
 		})
 	})
 })

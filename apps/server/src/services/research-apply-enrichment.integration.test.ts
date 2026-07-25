@@ -25,6 +25,9 @@ applyTestEnv()
 const DATABASE_URL = process.env['DATABASE_URL'] as string
 const runtime = ManagedRuntime.make(PgLive)
 const ORG = `enrich-org-${randomUUID()}`
+// The run each stored provenance entry credits; these cases exercise how the
+// entries merge, so one run id for all of them is enough.
+const RUN_ID = randomUUID()
 
 // A second runtime carrying the company service, so a test can edit a company
 // the way a person does in the app rather than by writing SQL behind its back.
@@ -57,7 +60,7 @@ type CompanyRow = {
 	account_brief: string | null
 	brief_updated_by: string | null
 	last_enriched_at: Date | null
-	field_provenance: Record<string, { sourceUrl: string }> | null
+	field_provenance: Record<string, { sourceUrl: string; runId: string }> | null
 	industry: string | null
 	fit_verdict: string | null
 	fit_checks: unknown
@@ -127,7 +130,11 @@ describe('occUpdate, on the enrichment it records for a company', () => {
 				{
 					...noRunFacts,
 					provenance: {
-						industry: { sourceUrl: 'https://acme.es/about', confidence: 0.9 },
+						industry: {
+							sourceUrl: 'https://acme.es/about',
+							runId: RUN_ID,
+							confidence: 0.9,
+						},
 					},
 				},
 			)
@@ -139,7 +146,9 @@ describe('occUpdate, on the enrichment it records for a company', () => {
 				{ phone: '+34 900 000 000' },
 				{
 					...noRunFacts,
-					provenance: { phone: { sourceUrl: 'https://acme.es/contact' } },
+					provenance: {
+						phone: { sourceUrl: 'https://acme.es/contact', runId: RUN_ID },
+					},
 				},
 			)
 
@@ -164,7 +173,9 @@ describe('occUpdate, on the enrichment it records for a company', () => {
 				{ industry: 'retail' },
 				{
 					...noRunFacts,
-					provenance: { industry: { sourceUrl: 'https://acme.es/about' } },
+					provenance: {
+						industry: { sourceUrl: 'https://acme.es/about', runId: RUN_ID },
+					},
 				},
 			)
 
@@ -259,7 +270,9 @@ describe('occUpdate, on the enrichment it records for a company', () => {
 				0,
 				{ industry: 'transport' },
 				{
-					provenance: { industry: { sourceUrl: 'https://rival.es' } },
+					provenance: {
+						industry: { sourceUrl: 'https://rival.es', runId: RUN_ID },
+					},
 					isRunTarget: false,
 					fitVerdict: 'strong_fit',
 					fitChecks: [{ criterion: 'x', result: 'pass' }],
@@ -296,7 +309,9 @@ describe('occUpdate, on the enrichment it records for a company', () => {
 				0,
 				{ industry: 'transport' },
 				{
-					provenance: { industry: { sourceUrl: 'https://stale.es' } },
+					provenance: {
+						industry: { sourceUrl: 'https://stale.es', runId: RUN_ID },
+					},
 					isRunTarget: true,
 					fitVerdict: 'no_fit',
 					fitChecks: null,
@@ -333,7 +348,9 @@ describe('occUpdate, on the enrichment it records for a company', () => {
 				0,
 				{ industry: 'transport' },
 				{
-					provenance: { industry: { sourceUrl: 'https://acme.es' } },
+					provenance: {
+						industry: { sourceUrl: 'https://acme.es', runId: RUN_ID },
+					},
 					isRunTarget: true,
 					fitVerdict: 'strong_fit',
 					fitChecks: null,
