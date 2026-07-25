@@ -24,6 +24,30 @@ export const BulkCompleteResult = Schema.Struct({
 	ids: Schema.Array(Schema.String),
 })
 
+// The shelves the task inbox sorts work onto — a task belongs to exactly one.
+export const TaskShelf = Schema.Literals([
+	'overdue',
+	'today',
+	'thisWeek',
+	'later',
+	'noDue',
+	'snoozed',
+	'doneRecent',
+])
+
+// How many tasks sit in each shelf of the inbox. Counted over the whole
+// organization, so a shelf shows its real size even when the screen only
+// holds its first page.
+export const TaskCounts = Schema.Struct({
+	overdue: Schema.Number,
+	today: Schema.Number,
+	thisWeek: Schema.Number,
+	later: Schema.Number,
+	noDue: Schema.Number,
+	snoozed: Schema.Number,
+	doneRecent: Schema.Number,
+})
+
 // ── Input schemas ──
 
 export const CreateTaskInput = Schema.Struct({
@@ -95,14 +119,35 @@ export const TasksGroup = HttpApiGroup.make('tasks')
 				dueFrom: Schema.optional(Schema.String),
 				dueTo: Schema.optional(Schema.String),
 				search: Schema.optional(Schema.String),
-				// Legacy alias kept until the Forja tasks inbox is rewritten in PR #4
-				// (§7 of the calendar plan). `completed=true` → status='done';
-				// `completed=false` → status NOT IN ('done','cancelled').
+				// Status alias for callers that only care whether work is finished.
+				// `completed=true` → status='done'; `completed=false` → status NOT
+				// IN ('done','cancelled').
 				completed: Schema.optional(Schema.String),
+				// One shelf of the inbox. Needs the day edges below to know where
+				// "today" starts and ends for whoever is asking.
+				shelf: Schema.optional(TaskShelf),
+				todayStart: Schema.optional(Schema.String),
+				todayEnd: Schema.optional(Schema.String),
+				weekEnd: Schema.optional(Schema.String),
+				// `due` leads with the soonest deadline; `recent` leads with the
+				// latest date on the task — its due date, or when it was created.
+				sort: Schema.optional(Schema.Literals(['recent', 'due'])),
 				limit: Schema.optional(Schema.NumberFromString),
 				offset: Schema.optional(Schema.NumberFromString),
 			},
 			success: PaginatedList(Task.json),
+		}),
+	)
+	.add(
+		HttpApiEndpoint.get('counts', '/tasks/counts', {
+			// The caller sends the edges of its own day and week, because only it
+			// knows which timezone the person reading the screen is in.
+			query: {
+				todayStart: Schema.String,
+				todayEnd: Schema.String,
+				weekEnd: Schema.String,
+			},
+			success: TaskCounts,
 		}),
 	)
 	.add(
