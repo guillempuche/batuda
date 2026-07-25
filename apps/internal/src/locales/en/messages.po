@@ -389,6 +389,10 @@ msgid "All"
 msgstr "All"
 
 #: src/routes/companies/index.tsx
+msgid "All companies"
+msgstr "All companies"
+
+#: src/routes/companies/index.tsx
 msgid "All countries"
 msgstr "All countries"
 
@@ -418,6 +422,7 @@ msgid "All time"
 msgstr "All time"
 
 #: src/routes/index.tsx
+#: src/routes/tasks/index.tsx
 msgid "All under control"
 msgstr "All under control"
 
@@ -1947,6 +1952,14 @@ msgstr "Error"
 msgid "Event"
 msgstr "Event"
 
+#: src/routes/tasks/index.tsx
+msgid "Every open task has a due date assigned."
+msgstr "Every open task has a due date assigned."
+
+#: src/routes/tasks/index.tsx
+msgid "Every task has a date"
+msgstr "Every task has a date"
+
 #: src/components/emails/compose-window.tsx
 msgid "Exit full screen"
 msgstr "Exit full screen"
@@ -2236,10 +2249,6 @@ msgstr "IMAP port"
 msgid "IMAP security"
 msgstr "IMAP security"
 
-#: src/routes/companies/index.tsx
-msgid "In pipeline"
-msgstr "In pipeline"
-
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/routes/emails/index.tsx
 msgid "Inbound"
@@ -2438,6 +2447,7 @@ msgid "Load {0} more"
 msgstr "Load {0} more"
 
 #: src/routes/companies/index.tsx
+#: src/routes/tasks/index.tsx
 msgid "Load more"
 msgstr "Load more"
 
@@ -2611,6 +2621,10 @@ msgstr "Market summary"
 #: src/components/profile/theme-select.tsx
 msgid "Match device"
 msgstr "Match device"
+
+#: src/routes/companies/index.tsx
+msgid "Matching"
+msgstr "Matching"
 
 #: src/components/research/findings/competitor-scan-view.tsx
 msgid "Maturity"
@@ -3000,6 +3014,10 @@ msgstr "No pages yet"
 msgid "No paid calls in this range."
 msgstr "No paid calls in this range."
 
+#: src/routes/tasks/index.tsx
+msgid "No pending tasks today. Time to prospect or take a walk."
+msgstr "No pending tasks today. Time to prospect or take a walk."
+
 #: src/routes/emails/inboxes.tsx
 msgid "No primary inbox set."
 msgstr "No primary inbox set."
@@ -3046,9 +3064,25 @@ msgstr "No structured findings."
 msgid "No tags yet"
 msgstr "No tags yet"
 
+#: src/routes/tasks/index.tsx
+msgid "No tasks are sleeping."
+msgstr "No tasks are sleeping."
+
+#: src/routes/tasks/index.tsx
+msgid "No tasks completed in the last 7 days."
+msgstr "No tasks completed in the last 7 days."
+
 #: src/routes/index.tsx
 msgid "No tasks for today"
 msgstr "No tasks for today"
+
+#: src/routes/tasks/index.tsx
+msgid "No tasks scheduled beyond this week."
+msgstr "No tasks scheduled beyond this week."
+
+#: src/routes/tasks/index.tsx
+msgid "No tasks this week"
+msgstr "No tasks this week"
 
 #: src/components/instructions/stack-picker.tsx
 msgid "No templates added yet."
@@ -3105,6 +3139,22 @@ msgstr "Notes (optional)"
 #: src/routes/tasks/index.tsx
 msgid "Nothing changed yet."
 msgstr "Nothing changed yet."
+
+#: src/routes/tasks/index.tsx
+msgid "Nothing completed recently"
+msgstr "Nothing completed recently"
+
+#: src/routes/tasks/index.tsx
+msgid "Nothing later in the queue"
+msgstr "Nothing later in the queue"
+
+#: src/routes/tasks/index.tsx
+msgid "Nothing overdue"
+msgstr "Nothing overdue"
+
+#: src/routes/tasks/index.tsx
+msgid "Nothing snoozed"
+msgstr "Nothing snoozed"
 
 #: src/components/research/proposal-outcome.tsx
 msgid "Nothing to apply"
@@ -4586,8 +4636,8 @@ msgid "That link is no longer valid. Request a fresh one below."
 msgstr "That link is no longer valid. Request a fresh one below."
 
 #: src/routes/tasks/index.tsx
-msgid "The 20 most recently edited open tasks. Click one to reopen it."
-msgstr "The 20 most recently edited open tasks. Click one to reopen it."
+msgid "The 20 most recently edited tasks on this shelf. Click one to reopen it."
+msgstr "The 20 most recently edited tasks on this shelf. Click one to reopen it."
 
 #: src/routes/companies/$slug.tsx
 msgid "The activity for this company could not be fetched. Check that the session is valid, then try again."
@@ -4625,6 +4675,10 @@ msgstr "The geocoder did not return a match. Try editing the location field."
 #: src/routes/emails/inboxes.tsx
 msgid "The inboxes could not be fetched. Check that the session is valid, then try again."
 msgstr "The inboxes could not be fetched. Check that the session is valid, then try again."
+
+#: src/routes/tasks/index.tsx
+msgid "The ledger is clean."
+msgstr "The ledger is clean."
 
 #: src/routes/companies/index.tsx
 #: src/routes/pages/index.tsx
@@ -4694,6 +4748,10 @@ msgstr "The two password fields don't match."
 #: src/routes/reset-password.tsx
 msgid "The two passwords don't match."
 msgstr "The two passwords don't match."
+
+#: src/routes/tasks/index.tsx
+msgid "The week is clear — good time to plan."
+msgstr "The week is clear — good time to plan."
 
 #: src/routes/tasks/index.tsx
 msgid "The workshop ledger — tear off one strip at a time."

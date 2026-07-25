@@ -1,32 +1,129 @@
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 
 /**
- * Dedicated atom registry for the tasks inbox (§7 of the calendar plan).
+ * Dedicated atom registry for the tasks inbox.
  *
- * `openTasksAtom` + `companiesListAtom` still live in
- * `pipeline-atoms.ts` because the dashboard and the tasks page both read
- * them — they MUST share identity so SSR hydration doesn't refetch.
+ * `companiesListAtom` still lives in `pipeline-atoms.ts` because the
+ * dashboard and the tasks page both read it — they MUST share identity so
+ * SSR hydration doesn't refetch.
  *
  * Everything here is tasks-inbox-only:
- *   - Smart-view queries that never fire on the dashboard (snoozed,
- *     done-recently).
+ *   - One query per shelf of the rail, plus the counts behind their labels.
  *   - Id-keyed event feed for the right-pane audit log.
  *   - Module-level mutation setters for the inline/row actions.
  */
 
-export const snoozedTasksAtom = BatudaApiAtom.query('tasks', 'list', {
-	query: { includeSnoozed: 'true', status: 'open' },
-})
+/** The shelves the inbox rail sorts work onto. */
+export type TaskShelf =
+	| 'overdue'
+	| 'today'
+	| 'thisWeek'
+	| 'later'
+	| 'noDue'
+	| 'snoozed'
+	| 'doneRecent'
 
 /**
- * Completed in the last 7 days. The server filter is `status=done`; the
- * 7-day window is applied client-side by bucket logic so the atom stays
- * a stable cache key (an atom that re-keys on `now()` would refetch on
- * every tick). 7-day cutoff is enforced in the bucket selector.
+ * How many tasks one shelf shows before asking, and how many more each
+ * "Load more" adds.
  */
-export const doneTasksAtom = BatudaApiAtom.query('tasks', 'list', {
-	query: { status: 'done', limit: 100 },
-})
+export const TASKS_PAGE_SIZE = 50
+
+/**
+ * Which day it is where the reader is, as `2026-07-25`.
+ *
+ * Everything below keys on the day rather than the moment. An atom keyed on
+ * the current instant would be a different atom on every render and refetch
+ * forever, and the shelves only change at midnight anyway.
+ */
+export function localDayKey(reference: Date = new Date()): string {
+	const month = String(reference.getMonth() + 1).padStart(2, '0')
+	const day = String(reference.getDate()).padStart(2, '0')
+	return `${reference.getFullYear()}-${month}-${day}`
+}
+
+/**
+ * The stretch of time a day key stands for, in the reader's own timezone.
+ * `weekEnd` is the next seven days from tonight, not the end of the calendar
+ * week, so "this week" always covers the same amount of ground.
+ *
+ * These are computed from a plain local `Date` on purpose: "today" is a
+ * different span of hours in every timezone, and the server has no way to
+ * know which one the person reading the screen is in.
+ */
+export function dayBoundaries(dayKey: string): {
+	readonly todayStart: string
+	readonly todayEnd: string
+	readonly weekEnd: string
+} {
+	const start = new Date(`${dayKey}T00:00:00`)
+	const end = new Date(start)
+	end.setHours(23, 59, 59, 999)
+	const weekEnd = new Date(end.getTime() + 7 * 86400_000)
+	return {
+		todayStart: start.toISOString(),
+		todayEnd: end.toISOString(),
+		weekEnd: weekEnd.toISOString(),
+	}
+}
+
+// The soonest deadline leads every shelf still waiting to be worked. Nothing
+// is pending on the undated and the finished ones, so those read latest-first.
+const sortForShelf = (shelf: TaskShelf) =>
+	shelf === 'noDue' || shelf === 'doneRecent' ? 'recent' : 'due'
+
+const shelfCache = new Map<string, ReturnType<typeof makeShelfAtom>>()
+
+function makeShelfAtom(shelf: TaskShelf, dayKey: string, limit: number) {
+	return BatudaApiAtom.query('tasks', 'list', {
+		query: {
+			shelf,
+			...dayBoundaries(dayKey),
+			sort: sortForShelf(shelf),
+			limit,
+		},
+		serializationKey: `tasks:shelf:${shelf}:${dayKey}:${limit}`,
+	})
+}
+
+/**
+ * One page of a single shelf. The server decides which tasks belong on it, so
+ * the page reports how many there are in total even while showing far fewer.
+ */
+export function tasksShelfAtom(
+	shelf: TaskShelf,
+	dayKey: string,
+	limit: number = TASKS_PAGE_SIZE,
+) {
+	const key = `${shelf}::${dayKey}::${limit}`
+	const existing = shelfCache.get(key)
+	if (existing !== undefined) return existing
+	const atom = makeShelfAtom(shelf, dayKey, limit)
+	shelfCache.set(key, atom)
+	return atom
+}
+
+const countsCache = new Map<string, ReturnType<typeof makeTaskCountsAtom>>()
+
+function makeTaskCountsAtom(dayKey: string) {
+	return BatudaApiAtom.query('tasks', 'counts', {
+		query: dayBoundaries(dayKey),
+		serializationKey: `tasks:counts:${dayKey}`,
+	})
+}
+
+/**
+ * How big every shelf is, in one request — what the rail shows beside each
+ * name. Counted over the whole organization, so the numbers stay honest no
+ * matter how little of a shelf is on screen.
+ */
+export function taskCountsAtom(dayKey: string) {
+	const existing = countsCache.get(dayKey)
+	if (existing !== undefined) return existing
+	const atom = makeTaskCountsAtom(dayKey)
+	countsCache.set(dayKey, atom)
+	return atom
+}
 
 export const updateTaskAtom = BatudaApiAtom.mutation('tasks', 'update')
 export const reopenTaskAtom = BatudaApiAtom.mutation('tasks', 'reopen')
