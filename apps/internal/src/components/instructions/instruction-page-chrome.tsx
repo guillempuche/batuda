@@ -119,6 +119,35 @@ export const TemplateName = styled.span`
 	white-space: nowrap;
 `
 
+// The name is what a reader reaches for, so it is the button that opens the
+// template rather than a small icon off to the side.
+export const TemplateNameButton = styled.button`
+	flex: 1 1 auto;
+	min-width: 0;
+	padding: var(--space-2xs) var(--space-3xs);
+	margin-inline-start: calc(var(--space-3xs) * -1);
+	background: none;
+	border: none;
+	border-radius: var(--shape-2xs);
+	text-align: left;
+	cursor: pointer;
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-medium-size);
+	color: var(--color-on-surface);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+
+	&:hover {
+		background: color-mix(in oklab, var(--color-primary) 6%, transparent);
+	}
+
+	&:focus-visible {
+		outline: none;
+		box-shadow: var(--glow-active);
+	}
+`
+
 export const RowActions = styled.div`
 	display: inline-flex;
 	gap: var(--space-2xs);

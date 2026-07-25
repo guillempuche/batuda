@@ -36,7 +36,7 @@ import {
 	SectionTitle,
 	Subtitle,
 	TemplateList,
-	TemplateName,
+	TemplateNameButton,
 	TemplateRowItem,
 } from '#/components/instructions/instruction-page-chrome'
 import {
@@ -55,6 +55,7 @@ import {
 	type TemplateDraft,
 	TemplateEditorDialog,
 } from '#/components/instructions/template-editor-dialog'
+import { TemplateViewDialog } from '#/components/instructions/template-view-dialog'
 import { ErrorState } from '#/components/shared/error-state'
 import { authClient } from '#/lib/auth-client'
 import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
@@ -62,10 +63,11 @@ import { validateSearchWith } from '#/lib/search-schema'
 import { useDlg } from '#/lib/use-dlg'
 import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
 
-// The create/edit surfaces live in the `?dlg=` param so they are deep-linkable
-// and the browser Back button closes them — `create`/`new-stack` open on their
-// own, `edit`/`stack` target a row by id.
+// The view/create/edit surfaces live in the `?dlg=` param so they are
+// deep-linkable and the browser Back button closes them — `create`/`new-stack`
+// open on their own, `view`/`edit`/`stack` target a row by id.
 const templatesDlgSchema = Schema.Union([
+	dlgWithId('view'),
 	dlgNoId('create'),
 	dlgWithId('edit'),
 	dlgNoId('new-stack'),
@@ -162,17 +164,39 @@ function TemplatesPage() {
 	const [confirmStack, setConfirmStack] = useState<StackShape | null>(null)
 	const [deletingStack, setDeletingStack] = useState(false)
 
-	// The edit dialog resolves its target from the loaded list, so a deep link
-	// (?dlg=edit&id=…) reopens the right template on refresh.
+	// The edit dialog resolves its target from the loaded list, so a link to an
+	// open template reopens the right one on refresh. The list also carries the
+	// organization's templates, which this page can only read — an edit link
+	// naming one is turned into a read below rather than opening an editor whose
+	// Save could never work.
 	const editingRow =
 		dlg?.kind === 'edit'
-			? (templates.find(row => row.id === dlg.id) ?? null)
+			? (templates.find(
+					row =>
+						row.id === dlg.id &&
+						row.ownerUserId !== null &&
+						row.ownerUserId === myUserId,
+				) ?? null)
 			: null
-	const editing: TemplateDraft | null = editingRow
-		? { id: editingRow.id, name: editingRow.name, body: editingRow.body }
-		: null
+	// Held steady while the editor is open. The editor resets its unsaved-changes
+	// guard and any error message whenever this value changes, so rebuilding it
+	// on every render would quietly drop a draft and hide failed saves.
+	const editingId = editingRow?.id ?? null
+	// biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the template being edited, not the row object the list rebuilds on every refresh
+	const editing: TemplateDraft | null = useMemo(
+		() =>
+			editingRow
+				? { id: editingRow.id, name: editingRow.name, body: editingRow.body }
+				: null,
+		[editingId],
+	)
 	const dialogOpen =
 		dlg?.kind === 'create' || (dlg?.kind === 'edit' && editingRow !== null)
+
+	const viewingRow =
+		dlg?.kind === 'view'
+			? (templates.find(row => row.id === dlg.id) ?? null)
+			: null
 
 	// The stack editor mounts for a create (`new-stack`) or an edit (`stack`)
 	// whose target is loaded. Resolving from the loaded list keeps a deep link
@@ -185,19 +209,43 @@ function TemplatesPage() {
 		dlg?.kind === 'new-stack' ||
 		(dlg?.kind === 'stack' && editingStack !== null)
 
-	// A deep link to a row that no longer exists drops itself once the list loads.
+	// A link to a row that is gone drops itself once the list loads. An edit link
+	// naming a template this page can't change becomes a read of it, so a shared
+	// address still shows the template.
 	const templatesLoaded = AsyncResult.isSuccess(templatesResult)
 	const stacksLoaded = AsyncResult.isSuccess(stacksResult)
+	const readableInstead =
+		dlg?.kind === 'edit' && editingRow === null
+			? (templates.find(row => row.id === dlg.id) ?? null)
+			: null
 	useEffect(() => {
 		if (dlg?.kind === 'edit' && templatesLoaded && editingRow === null) {
+			if (readableInstead !== null) {
+				openDlg({ kind: 'view', id: readableInstead.id }, { replace: true })
+			} else {
+				closeDlg()
+			}
+		}
+		if (dlg?.kind === 'view' && templatesLoaded && viewingRow === null) {
 			closeDlg()
 		}
 		if (dlg?.kind === 'stack' && stacksLoaded && editingStack === null) {
 			closeDlg()
 		}
-	}, [dlg, templatesLoaded, editingRow, stacksLoaded, editingStack, closeDlg])
+	}, [
+		dlg,
+		templatesLoaded,
+		editingRow,
+		readableInstead,
+		viewingRow,
+		stacksLoaded,
+		editingStack,
+		openDlg,
+		closeDlg,
+	])
 
 	const openCreate = () => openDlg({ kind: 'create' })
+	const openView = (row: TemplateShape) => openDlg({ kind: 'view', id: row.id })
 	const openEdit = (row: TemplateShape) => openDlg({ kind: 'edit', id: row.id })
 	const openNewStack = () => openDlg({ kind: 'new-stack' })
 	const openEditStack = (s: StackShape) => openDlg({ kind: 'stack', id: s.id })
@@ -360,7 +408,16 @@ function TemplatesPage() {
 								row.ownerUserId !== null && row.ownerUserId === myUserId
 							return (
 								<TemplateRowItem key={row.id} data-testid='template-row'>
-									<TemplateName>{row.name}</TemplateName>
+									{/* Any template on this page can be read, the org's as well
+									    as your own; only its owner can change it. */}
+									<TemplateNameButton
+										type='button'
+										aria-label={t`Read ${row.name}`}
+										data-testid={`template-view-${row.id}`}
+										onClick={() => openView(row)}
+									>
+										{row.name}
+									</TemplateNameButton>
 									<OwnerBadge>
 										{row.ownerUserId === null ? (
 											<Trans>Org</Trans>
@@ -368,26 +425,28 @@ function TemplatesPage() {
 											<Trans>Mine</Trans>
 										)}
 									</OwnerBadge>
-									{mine ? (
-										<RowActions>
-											<InstructionIconButton
-												type='button'
-												aria-label={t`Edit ${row.name}`}
-												onClick={() => openEdit(row)}
-											>
-												<Pencil size={14} aria-hidden />
-											</InstructionIconButton>
-											<InstructionIconButton
-												type='button'
-												aria-label={t`Delete ${row.name}`}
-												onClick={() =>
-													setConfirmTarget({ id: row.id, name: row.name })
-												}
-											>
-												<Trash2 size={14} aria-hidden />
-											</InstructionIconButton>
-										</RowActions>
-									) : null}
+									<RowActions>
+										{mine ? (
+											<>
+												<InstructionIconButton
+													type='button'
+													aria-label={t`Edit ${row.name}`}
+													onClick={() => openEdit(row)}
+												>
+													<Pencil size={14} aria-hidden />
+												</InstructionIconButton>
+												<InstructionIconButton
+													type='button'
+													aria-label={t`Delete ${row.name}`}
+													onClick={() =>
+														setConfirmTarget({ id: row.id, name: row.name })
+													}
+												>
+													<Trash2 size={14} aria-hidden />
+												</InstructionIconButton>
+											</>
+										) : null}
+									</RowActions>
 								</TemplateRowItem>
 							)
 						})}
@@ -505,6 +564,26 @@ function TemplatesPage() {
 					</>
 				)}
 			</Section>
+
+			<TemplateViewDialog
+				open={viewingRow !== null}
+				name={viewingRow?.name ?? ''}
+				body={viewingRow?.body ?? ''}
+				canEdit={
+					viewingRow !== null &&
+					viewingRow.ownerUserId !== null &&
+					viewingRow.ownerUserId === myUserId
+				}
+				// Stepping from reading to editing swaps one dialog for the other, so
+				// Back leaves the template rather than dropping you back into reading
+				// what you just finished editing.
+				onEdit={() => {
+					if (viewingRow !== null)
+						openDlg({ kind: 'edit', id: viewingRow.id }, { replace: true })
+				}}
+				onClose={closeDlg}
+				testId='template-view-dialog'
+			/>
 
 			<TemplateEditorDialog
 				open={dialogOpen}

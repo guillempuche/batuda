@@ -869,6 +869,7 @@ msgstr "Client"
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/instructions/template-editor-dialog.tsx
+#: src/components/instructions/template-view-dialog.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/components/research/research-dialog.tsx
 #: src/routes/calendar/index.tsx
@@ -1785,6 +1786,7 @@ msgstr "p. ex. vip, càlid"
 
 #: src/components/companies/account-brief-section.tsx
 #: src/components/companies/documents-panel.tsx
+#: src/components/instructions/template-view-dialog.tsx
 #: src/routes/companies/$slug.tsx
 #: src/routes/emails/inboxes.tsx
 msgid "Edit"
@@ -2299,6 +2301,7 @@ msgstr "Plantilles d'instruccions"
 
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/components/instructions/template-editor-dialog.tsx
+#: src/components/instructions/template-view-dialog.tsx
 msgid "Instructions"
 msgstr "Instruccions"
 
@@ -3671,6 +3674,13 @@ msgstr "Torna a executar amb aquest domini"
 msgid "Re-running…"
 msgstr "Reexecutant…"
 
+#. placeholder {0}: row.name
+#: src/routes/settings/organization/templates.tsx
+#: src/routes/settings/organization/templates.tsx
+#: src/routes/settings/profile/templates.tsx
+msgid "Read {0}"
+msgstr "Llegeix {0}"
+
 #: src/routes/emails/index.tsx
 msgid "Read state update failed"
 msgstr "Ha fallat l'actualització de l'estat de lectura"
@@ -4748,6 +4758,10 @@ msgstr "Això farà recerca sobre {0} empreses, fins a uns {1} en dades de pagam
 msgid "This stack no longer exists."
 msgstr "Aquesta pila ja no existeix."
 
+#: src/components/instructions/template-view-dialog.tsx
+msgid "This template is empty, so it adds nothing to a run. Ask whoever looks after it to fill it in."
+msgstr "Aquesta plantilla és buida, així que no aporta res a cap execució. Demana a qui se n'ocupa que l'ompli."
+
 #: src/components/research/findings/shared.tsx
 msgid "This tool isn't available, so it can only be skipped."
 msgstr "Aquesta eina no està disponible, així que només es pot ometre."
@@ -5189,8 +5203,8 @@ msgid "Your organization has no default yet. Make a stack your default to steer 
 msgstr "La teva organització encara no té cap predeterminada. Marca una pila com a predeterminada per guiar totes les execucions."
 
 #: src/routes/settings/organization/templates.tsx
-msgid "Your organization's admins manage these templates. You can use any of them in your own stacks or per run."
-msgstr "Els administradors de la teva organització gestionen aquestes plantilles. Pots fer servir-ne qualsevol en les teves piles o per execució."
+msgid "Your organization's admins manage these templates. You can read any of them, and use them in your own stacks or per run."
+msgstr "Els administradors de la teva organització gestionen aquestes plantilles. Pots llegir-ne qualsevol i fer-les servir en les teves piles o per execució."
 
 #: src/routes/settings/organization/members.tsx
 msgid "Your session has expired. Sign in again to continue."

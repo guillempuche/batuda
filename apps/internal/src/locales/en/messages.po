@@ -869,6 +869,7 @@ msgstr "Client"
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/instructions/template-editor-dialog.tsx
+#: src/components/instructions/template-view-dialog.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/components/research/research-dialog.tsx
 #: src/routes/calendar/index.tsx
@@ -1785,6 +1786,7 @@ msgstr "e.g. vip, warm"
 
 #: src/components/companies/account-brief-section.tsx
 #: src/components/companies/documents-panel.tsx
+#: src/components/instructions/template-view-dialog.tsx
 #: src/routes/companies/$slug.tsx
 #: src/routes/emails/inboxes.tsx
 msgid "Edit"
@@ -2299,6 +2301,7 @@ msgstr "Instruction templates"
 
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/components/instructions/template-editor-dialog.tsx
+#: src/components/instructions/template-view-dialog.tsx
 msgid "Instructions"
 msgstr "Instructions"
 
@@ -3671,6 +3674,13 @@ msgstr "Re-run with this domain"
 msgid "Re-running…"
 msgstr "Re-running…"
 
+#. placeholder {0}: row.name
+#: src/routes/settings/organization/templates.tsx
+#: src/routes/settings/organization/templates.tsx
+#: src/routes/settings/profile/templates.tsx
+msgid "Read {0}"
+msgstr "Read {0}"
+
 #: src/routes/emails/index.tsx
 msgid "Read state update failed"
 msgstr "Read state update failed"
@@ -4748,6 +4758,10 @@ msgstr "This runs research on {0} companies, up to about {1} in paid data. Start
 msgid "This stack no longer exists."
 msgstr "This stack no longer exists."
 
+#: src/components/instructions/template-view-dialog.tsx
+msgid "This template is empty, so it adds nothing to a run. Ask whoever looks after it to fill it in."
+msgstr "This template is empty, so it adds nothing to a run. Ask whoever looks after it to fill it in."
+
 #: src/components/research/findings/shared.tsx
 msgid "This tool isn't available, so it can only be skipped."
 msgstr "This tool isn't available, so it can only be skipped."
@@ -5189,8 +5203,8 @@ msgid "Your organization has no default yet. Make a stack your default to steer 
 msgstr "Your organization has no default yet. Make a stack your default to steer every run."
 
 #: src/routes/settings/organization/templates.tsx
-msgid "Your organization's admins manage these templates. You can use any of them in your own stacks or per run."
-msgstr "Your organization's admins manage these templates. You can use any of them in your own stacks or per run."
+msgid "Your organization's admins manage these templates. You can read any of them, and use them in your own stacks or per run."
+msgstr "Your organization's admins manage these templates. You can read any of them, and use them in your own stacks or per run."
 
 #: src/routes/settings/organization/members.tsx
 msgid "Your session has expired. Sign in again to continue."
