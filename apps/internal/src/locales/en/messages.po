@@ -376,6 +376,10 @@ msgstr "Added as a verified lead"
 msgid "Adding…"
 msgstr "Adding…"
 
+#: src/components/research/run-labels.ts
+msgid "Address"
+msgstr "Address"
+
 #: src/routes/settings/organization/members.tsx
 #: src/routes/settings/organization/members.tsx
 msgid "Admin"
@@ -1468,6 +1472,7 @@ msgstr "count loading"
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/findings/prospect-scan-view.tsx
+#: src/components/research/run-labels.ts
 #: src/routes/companies/index.tsx
 msgid "Country"
 msgstr "Country"
@@ -1579,6 +1584,7 @@ msgstr "Current password is incorrect."
 
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
+#: src/components/research/run-labels.ts
 msgid "Current tools"
 msgstr "Current tools"
 
@@ -1926,6 +1932,7 @@ msgstr "Editor"
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/findings/contact-discovery-view.tsx
+#: src/components/research/run-labels.ts
 #: src/components/shared/channel-icon.tsx
 #: src/routes/companies/$slug.tsx
 #: src/routes/emails/inboxes.tsx
@@ -2340,6 +2347,7 @@ msgstr "Inboxes"
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/findings/prospect-scan-view.tsx
+#: src/components/research/run-labels.ts
 #: src/routes/companies/index.tsx
 msgid "Industry"
 msgstr "Industry"
@@ -2472,6 +2480,10 @@ msgstr "Last meet"
 msgid "Later"
 msgstr "Later"
 
+#: src/components/research/run-labels.ts
+msgid "Latitude"
+msgstr "Latitude"
+
 #: src/components/research/research-dialog.tsx
 msgid "Layered after the stack, in order."
 msgstr "Layered after the stack, in order."
@@ -2485,6 +2497,7 @@ msgid "Line items"
 msgstr "Line items"
 
 #: src/components/research/findings/contact-discovery-view.tsx
+#: src/components/research/run-labels.ts
 #: src/components/shared/channel-icon.tsx
 msgid "LinkedIn"
 msgstr "LinkedIn"
@@ -2568,6 +2581,7 @@ msgstr "Locating…"
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/research-dialog.tsx
+#: src/components/research/run-labels.ts
 #: src/routes/calendar/index.tsx
 msgid "Location"
 msgstr "Location"
@@ -2594,6 +2608,10 @@ msgstr "Log interaction"
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Logging…"
 msgstr "Logging…"
+
+#: src/components/research/run-labels.ts
+msgid "Longitude"
+msgstr "Longitude"
 
 #: src/components/research/inbox/paid-action-queue.tsx
 msgid "Lookup approved — the run is picking it up."
@@ -3207,6 +3225,10 @@ msgstr "Not seeing it? Check your spam folder. If you're sure the email is right
 msgid "Note"
 msgstr "Note"
 
+#: src/components/research/run-labels.ts
+msgid "Notes"
+msgstr "Notes"
+
 #: src/components/companies/proposals-panel.tsx
 msgid "Notes (optional)"
 msgstr "Notes (optional)"
@@ -3530,6 +3552,7 @@ msgstr "Pain indicators"
 
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
+#: src/components/research/run-labels.ts
 msgid "Pain points"
 msgstr "Pain points"
 
@@ -3610,6 +3633,7 @@ msgstr "Personal"
 
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/findings/contact-discovery-view.tsx
+#: src/components/research/run-labels.ts
 msgid "Phone"
 msgstr "Phone"
 
@@ -3722,6 +3746,10 @@ msgstr "Private inbox"
 #: src/components/companies/about-section.tsx
 msgid "Products fit"
 msgstr "Products fit"
+
+#: src/components/research/run-labels.ts
+msgid "Products that fit"
+msgstr "Products that fit"
 
 #: src/routes/settings/profile/index.tsx
 msgid "Profile"
@@ -4082,6 +4110,7 @@ msgstr "Review what the research agent found and decide what enters the CRM."
 msgid "Risky"
 msgstr "Risky"
 
+#: src/components/research/run-labels.ts
 #: src/routes/settings/organization/members.tsx
 msgid "Role"
 msgstr "Role"
@@ -4414,6 +4443,7 @@ msgstr "Signing out…"
 
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
+#: src/components/research/run-labels.ts
 msgid "Size"
 msgstr "Size"
 
@@ -4657,6 +4687,7 @@ msgstr "System"
 
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
+#: src/components/research/run-labels.ts
 msgid "Tags"
 msgstr "Tags"
 
@@ -4688,6 +4719,7 @@ msgid "tasks — showing {0} of {shelfTotal}"
 msgstr "tasks — showing {0} of {shelfTotal}"
 
 #: src/components/research/findings/prospect-scan-view.tsx
+#: src/components/research/run-labels.ts
 msgid "Tax ID"
 msgstr "Tax ID"
 
@@ -5268,6 +5300,10 @@ msgstr "Weak fit"
 #: src/components/research/findings/competitor-scan-view.tsx
 msgid "Weaknesses"
 msgstr "Weaknesses"
+
+#: src/components/research/run-labels.ts
+msgid "Website"
+msgstr "Website"
 
 #: src/routes/emails/index.tsx
 #: src/routes/emails/index.tsx

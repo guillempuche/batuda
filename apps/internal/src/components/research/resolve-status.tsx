@@ -1,4 +1,5 @@
 import { Trans, useLingui } from '@lingui/react/macro'
+import { useEffect, useRef } from 'react'
 import styled from 'styled-components'
 
 import type { ResolveDecision } from '#/hooks/use-proposal-resolution'
@@ -23,11 +24,35 @@ export function ResolveStatus({
 	readonly testId: string
 }) {
 	const { t } = useLingui()
+	const undoRef = useRef<HTMLButtonElement>(null)
+	const wrapRef = useRef<HTMLDivElement>(null)
+
+	// Pressing apply or reject removes the button that was pressed, which left
+	// the keyboard back at the top of the document — from there, reaching the next
+	// row meant tabbing past the whole toolbar and every row above it. Taking the
+	// change back is what follows from the press, so that is where the keyboard
+	// goes; it also puts the one control that stops the write within reach of
+	// someone who cannot see that it appeared.
+	//
+	// Once the change is on its way that button goes too, which would drop the
+	// keyboard a second time — so the row itself takes over, but only while the
+	// reader is still standing here. Pulling focus back to a row they have already
+	// left would be worse than losing it.
+	useEffect(() => {
+		if (undoable) {
+			undoRef.current?.focus()
+			return
+		}
+		const wrap = wrapRef.current
+		if (wrap?.contains(document.activeElement)) wrap.focus()
+	}, [undoable])
+
 	return (
-		<Wrap data-testid={testId}>
+		<Wrap ref={wrapRef} tabIndex={-1} data-testid={testId}>
 			<Label>{decision === 'apply' ? t`Applying…` : t`Rejecting…`}</Label>
 			{undoable ? (
 				<UndoButton
+					ref={undoRef}
 					type='button'
 					onClick={onUndo}
 					data-testid={`${testId}-undo`}
@@ -51,6 +76,14 @@ const Wrap = styled.div.withConfig({ displayName: 'ResolveStatusWrap' })`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
+
+	/* Takes the keyboard when the take-back control goes away, so it shows a mark
+	   there rather than appearing to land nowhere. */
+	&:focus-visible {
+		outline: none;
+		box-shadow: var(--glow-active);
+		border-radius: var(--shape-2xs);
+	}
 `
 
 const Label = styled.span.withConfig({ displayName: 'ResolveStatusLabel' })`
