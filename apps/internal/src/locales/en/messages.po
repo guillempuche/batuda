@@ -1263,14 +1263,31 @@ msgstr "Could not load companies"
 msgid "Could not load contacts"
 msgstr "Could not load contacts"
 
+#: src/components/companies/conversations-tab.tsx
+msgid "Could not load emails"
+msgstr "Could not load emails"
+
 #: src/routes/emails/inboxes.tsx
 msgid "Could not load inboxes"
 msgstr "Could not load inboxes"
+
+#: src/components/companies/conversations-tab.tsx
+#: src/components/companies/upcoming-meetings-card.tsx
+msgid "Could not load meetings"
+msgstr "Could not load meetings"
 
 #: src/routes/companies/$slug.tsx
 #: src/routes/pages/index.tsx
 msgid "Could not load pages"
 msgstr "Could not load pages"
+
+#: src/routes/companies/$slug.tsx
+msgid "Could not load research"
+msgstr "Could not load research"
+
+#: src/routes/companies/$slug.tsx
+msgid "Could not load tasks"
+msgstr "Could not load tasks"
 
 #: src/components/companies/pipeline-board.tsx
 msgid "Could not load the board"
@@ -2004,6 +2021,10 @@ msgstr "Email via Batuda"
 #: src/routes/emails/index.tsx
 msgid "Emails"
 msgstr "Emails"
+
+#: src/components/companies/conversations-tab.tsx
+msgid "Emails are missing from this list. Everything else below is still accurate."
+msgstr "Emails are missing from this list. Everything else below is still accurate."
 
 #: src/routes/companies/$slug.tsx
 msgid "Emails, calls, documents, and proposals will appear here as they happen."
@@ -2803,6 +2824,10 @@ msgstr "Meeting prep"
 #: src/routes/companies/$slug.tsx
 msgid "Meeting stage — set the next action (agenda, follow-up)."
 msgstr "Meeting stage — set the next action (agenda, follow-up)."
+
+#: src/components/companies/conversations-tab.tsx
+msgid "Meetings are missing from this list. Everything else below is still accurate."
+msgstr "Meetings are missing from this list. Everything else below is still accurate."
 
 #: src/routes/calendar/index.tsx
 msgid "Meetings from bookings, email invitations, and internal blocks."
@@ -4943,6 +4968,10 @@ msgstr "The pages I found were about a different company, so I didn't save anyth
 msgid "The people at this company could not be fetched. Check that the session is valid, then try again."
 msgstr "The people at this company could not be fetched. Check that the session is valid, then try again."
 
+#: src/routes/companies/$slug.tsx
+msgid "The research runs for this company could not be fetched. Check that the session is valid, then try again."
+msgstr "The research runs for this company could not be fetched. Check that the session is valid, then try again."
+
 #: src/components/research/run-detail.tsx
 msgid "The run arrived in a form this page cannot read. Go back to the run list and open it again; report it if it keeps happening."
 msgstr "The run arrived in a form this page cannot read. Go back to the run list and open it again; report it if it keeps happening."
@@ -4950,6 +4979,10 @@ msgstr "The run arrived in a form this page cannot read. Go back to the run list
 #: src/components/research/findings/freeform-view.tsx
 msgid "The run finished without proposed updates or paid actions."
 msgstr "The run finished without proposed updates or paid actions."
+
+#: src/routes/companies/$slug.tsx
+msgid "The tasks for this company could not be fetched. Check that the session is valid, then try again."
+msgstr "The tasks for this company could not be fetched. Check that the session is valid, then try again."
 
 #: src/routes/emails/$threadId.tsx
 msgid "The thread exists but the provider returned no messages."
@@ -5023,6 +5056,10 @@ msgstr "This company can't be displayed"
 #: src/routes/settings/mcp/connections.tsx
 msgid "This connection is unbound. Bind an org to use it."
 msgstr "This connection is unbound. Bind an org to use it."
+
+#: src/components/companies/upcoming-meetings-card.tsx
+msgid "This is not the same as having none. Try again to see what is scheduled."
+msgstr "This is not the same as having none. Try again to see what is scheduled."
 
 #: src/routes/settings/api-keys/index.tsx
 msgid "This is the only time the full key is shown. Store it somewhere safe — I can't show it again."
@@ -5229,6 +5266,7 @@ msgstr "Untitled key"
 msgid "Unverified"
 msgstr "Unverified"
 
+#: src/components/companies/upcoming-meetings-card.tsx
 #: src/components/companies/upcoming-meetings-card.tsx
 #: src/components/companies/upcoming-meetings-card.tsx
 #: src/components/companies/upcoming-meetings-card.tsx

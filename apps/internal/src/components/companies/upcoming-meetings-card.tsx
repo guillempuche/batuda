@@ -1,4 +1,4 @@
-import { useAtomValue } from '@effect/atom-react'
+import { useAtomRefresh, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { DateTime } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
@@ -7,6 +7,7 @@ import { useMemo } from 'react'
 import styled from 'styled-components'
 
 import { calendarEventsByCompanyAtom } from '#/atoms/calendar-atoms'
+import { ErrorState } from '#/components/shared/error-state'
 import { RelativeDate } from '#/components/shared/relative-date'
 import {
 	brushedMetalPlate,
@@ -48,9 +49,12 @@ export function UpcomingMeetingsCard({
 	// that an event whose start crossed `now` since the page loaded will
 	// linger until the next reload. Acceptable for a lightweight card.
 	const from = useMemo(() => new Date().toISOString().slice(0, 10), [])
-	const result = useAtomValue(
-		calendarEventsByCompanyAtom({ companyId, from, limit: 3 }),
+	const eventsAtom = useMemo(
+		() => calendarEventsByCompanyAtom({ companyId, from, limit: 3 }),
+		[companyId, from],
 	)
+	const result = useAtomValue(eventsAtom)
+	const refresh = useAtomRefresh(eventsAtom)
 
 	const events = useMemo<ReadonlyArray<EventRow>>(
 		() =>
@@ -70,6 +74,28 @@ export function UpcomingMeetingsCard({
 				<Loading>
 					<Trans>Loading…</Trans>
 				</Loading>
+			</Panel>
+		)
+	}
+
+	// Saying "no upcoming meetings" when the request failed tells someone
+	// preparing for a meeting that there isn't one.
+	if (AsyncResult.isFailure(result)) {
+		return (
+			<Panel data-testid='company-upcoming-meetings-card'>
+				<Header>
+					<Heading>
+						<Calendar size={14} aria-hidden />
+						<Trans>Upcoming meetings</Trans>
+					</Heading>
+				</Header>
+				<ErrorState
+					data-testid='company-upcoming-meetings-error'
+					variant='inline'
+					title={t`Could not load meetings`}
+					description={t`This is not the same as having none. Try again to see what is scheduled.`}
+					onRetry={refresh}
+				/>
 			</Panel>
 		)
 	}
@@ -212,8 +238,7 @@ function narrowEvents(rows: ReadonlyArray<unknown>): ReadonlyArray<EventRow> {
 		const endAt = dateToIsoOrNull(r['endAt'])
 		if (endAt === null) continue
 		// A meeting that was called off is not upcoming. The Conversations tab
-		// already drops these, so without this the same meeting shows in one
-		// place and not the other.
+		// keeps it, because what was cancelled is part of the account's history.
 		if (r['status'] === 'cancelled') continue
 		const meta = (r['metadata'] ?? null) as Record<string, unknown> | null
 		const url =

@@ -1,4 +1,4 @@
-import { useAtomValue } from '@effect/atom-react'
+import { useAtomRefresh, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Link } from '@tanstack/react-router'
 import { DateTime } from 'effect'
@@ -11,6 +11,7 @@ import { PriButton } from '@batuda/ui/pri'
 
 import { calendarEventsByCompanyAtom } from '#/atoms/calendar-atoms'
 import { channelLabelFor } from '#/components/shared/channel-icon'
+import { ErrorState } from '#/components/shared/error-state'
 import { RelativeDate } from '#/components/shared/relative-date'
 import {
 	agedPaperSurface,
@@ -18,6 +19,25 @@ import {
 	rulerUnderRule,
 	stenciledTitle,
 } from '#/lib/workshop-mixins'
+
+/**
+ * The meetings feeding this tab. The tab body and the tab's badge both ask for
+ * them this way, so they share one request rather than making two.
+ */
+export function companyConversationsCalendarAtom(companyId: string) {
+	return calendarEventsByCompanyAtom({ companyId, limit: 50 })
+}
+
+/**
+ * How many meetings this tab will actually list. Counting the rows the tab keeps
+ * — rather than everything the server sent — stops the badge promising a meeting
+ * that is too malformed to show.
+ */
+export function countCompanyConversationMeetings(
+	rows: ReadonlyArray<unknown>,
+): number {
+	return narrowCalendar(rows).length
+}
 
 export type InteractionRow = {
 	readonly id: string
@@ -74,25 +94,26 @@ const ALL_KINDS: ReadonlyArray<ConvKind> = [
 /**
  * Conversations tab — a single date-desc feed that merges interactions,
  * email threads, upcoming calendar events, and tasks for one company.
- * Replaces the four separate tabs (Emails, Tasks, Calendar) plus the
- * timeline-on-overview surface for users who want a chronological view.
  *
  * Filter chips toggle which kinds are visible; the timeline lives on
- * the Overview, this tab is the chronological deep-dive.
- *
- * URL persistence of the chip set is a Slice-5 polish step; today the
- * filter is component-local.
+ * the Overview, this tab is the chronological deep-dive. The chip set is
+ * component-local, not part of the URL.
  */
 export function ConversationsTab({
 	companyId,
 	interactions,
 	threads,
+	threadsFailed,
+	onRetryThreads,
 	tasks,
 	onCompose,
 }: {
 	readonly companyId: string
 	readonly interactions: ReadonlyArray<InteractionRow>
 	readonly threads: ReadonlyArray<ThreadRow>
+	/** True when the email feed could not be fetched, so its rows are missing. */
+	readonly threadsFailed: boolean
+	readonly onRetryThreads: () => void
 	readonly tasks: ReadonlyArray<TaskRow>
 	readonly onCompose: () => void
 }) {
@@ -106,10 +127,14 @@ export function ConversationsTab({
 	// matches what the dashboard's UpcomingMeetingsCard already does
 	// for its own slice of calendar data.
 	const calendarAtom = useMemo(
-		() => calendarEventsByCompanyAtom({ companyId, limit: 50 }),
+		() => companyConversationsCalendarAtom(companyId),
 		[companyId],
 	)
 	const calendarResult = useAtomValue(calendarAtom)
+	const refreshCalendar = useAtomRefresh(calendarAtom)
+	// This list merges four feeds, so one of them failing just makes the list
+	// shorter. Without saying so, a calendar outage reads as "no meetings".
+	const calendarFailed = AsyncResult.isFailure(calendarResult)
 	const calendar = useMemo<ReadonlyArray<CalendarRow>>(
 		() =>
 			AsyncResult.isSuccess(calendarResult)
@@ -216,10 +241,30 @@ export function ConversationsTab({
 					</span>
 				</PriButton>
 			</Toolbar>
+			{threadsFailed ? (
+				<ErrorState
+					data-testid='company-conversations-emails-error'
+					variant='inline'
+					title={t`Could not load emails`}
+					description={t`Emails are missing from this list. Everything else below is still accurate.`}
+					onRetry={onRetryThreads}
+				/>
+			) : null}
+			{calendarFailed ? (
+				<ErrorState
+					data-testid='company-conversations-calendar-error'
+					variant='inline'
+					title={t`Could not load meetings`}
+					description={t`Meetings are missing from this list. Everything else below is still accurate.`}
+					onRetry={refreshCalendar}
+				/>
+			) : null}
 			{visible.length === 0 ? (
-				<Empty>
-					<Trans>No conversations yet.</Trans>
-				</Empty>
+				threadsFailed || calendarFailed ? null : (
+					<Empty>
+						<Trans>No conversations yet.</Trans>
+					</Empty>
+				)
 			) : (
 				<List>
 					{visible.map(item => {
