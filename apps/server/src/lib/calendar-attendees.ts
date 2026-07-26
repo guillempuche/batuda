@@ -23,7 +23,8 @@ const attendeesByEvent = (
 		// Result keys arrive camelCased whatever the column spelling, hence
 		// `eventId` rather than `event_id`.
 		const rows = yield* sql<{ readonly eventId: string }>`
-			SELECT id, event_id, email, name, contact_id, company_id, rsvp, is_organizer
+			SELECT id, event_id, email, name, contact_id, company_id, rsvp, is_organizer,
+				match_status, match_candidates
 			FROM calendar_event_attendees
 			WHERE event_id = ANY(${eventIds as unknown as string[]})
 			ORDER BY is_organizer DESC, email ASC
