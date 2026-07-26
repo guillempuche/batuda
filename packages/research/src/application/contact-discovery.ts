@@ -11,7 +11,7 @@
  * transport with no budget plumbing of its own.
  */
 
-import { Config, Context, Effect, Layer } from 'effect'
+import { Config, Context, Effect, Layer, Ref } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { isRegistryCountry, type RegistryCountry } from '../domain/country'
@@ -179,6 +179,10 @@ export type DiscoverContactsOutcome =
 			readonly status: 'ok'
 			readonly researchId: string
 			readonly contacts: ReadonlyArray<DiscoveredContact>
+			// Set when the month's spending ran out partway through, so addresses
+			// left unchecked are known to be unchecked for want of money rather
+			// than because checking them said nothing.
+			readonly verificationStopped?: 'monthly_cap_reached' | undefined
 	  }
 	| { readonly status: 'no_reliable_contact'; readonly researchId: string }
 	| { readonly status: 'budget_exceeded'; readonly researchId: string }
@@ -315,6 +319,11 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 						}).pipe(Layer.provide(Layer.succeed(SqlClient.SqlClient)(sql)))
 					}
 
+					// Raised the moment the company's month runs out mid-verification,
+					// so the answer can say the addresses left over went unchecked for
+					// want of money.
+					const verificationStopped = yield* Ref.make(false)
+
 					const core = Effect.gen(function* () {
 						const budget = yield* Budget
 
@@ -396,10 +405,17 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 											verdict: 'unknown' as VerificationVerdict,
 											confidence: undefined as number | undefined,
 										}),
+									// The company's month is spent, so no address after this
+									// one can be checked either. Remember why, or every
+									// remaining address comes back looking merely unverifiable
+									// and nobody learns the money ran out.
 									MonthlyCapExceeded: () =>
-										Effect.succeed({
-											verdict: 'unknown' as VerificationVerdict,
-											confidence: undefined as number | undefined,
+										Effect.gen(function* () {
+											yield* Ref.set(verificationStopped, true)
+											return {
+												verdict: 'unknown' as VerificationVerdict,
+												confidence: undefined as number | undefined,
+											}
 										}),
 								}),
 							)
@@ -494,9 +510,17 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 							.filter((c): c is DiscoveredContact => c !== null)
 							.sort(compareContacts)
 
+						const stopped = yield* Ref.get(verificationStopped)
 						return contacts.length === 0
 							? ({ status: 'no_reliable_contact', researchId } as const)
-							: ({ status: 'ok', researchId, contacts } as const)
+							: ({
+									status: 'ok',
+									researchId,
+									contacts,
+									...(stopped
+										? { verificationStopped: 'monthly_cap_reached' as const }
+										: {}),
+								} as const)
 					})
 
 					return yield* core.pipe(

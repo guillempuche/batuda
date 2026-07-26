@@ -18,7 +18,7 @@ import { redactDbErrors } from './_research-shared'
 
 const DiscoverContacts = Tool.make('discover_contacts', {
 	description:
-		'Find verified decision-maker email contacts for a company. Returns ranked candidates, each with a deliverability verdict (email_verification) and is_decision_maker flag — or an explicit no_reliable_contact result, never an unverified blast list. Result is one of: {status:"ok", contacts:[...]}, {status:"no_reliable_contact"}, {status:"budget_exceeded"}, or {status:"cancelled"}. Paid lookups are metered against the research budget; spend above the auto-approve threshold asks for confirmation first.',
+		'Find verified decision-maker email contacts for a company. Returns ranked candidates, each with a deliverability verdict (email_verification) and is_decision_maker flag — or an explicit no_reliable_contact result, never an unverified blast list. Result is one of: {status:"ok", contacts:[...]}, {status:"no_reliable_contact"}, {status:"budget_exceeded"}, or {status:"cancelled"}. An "ok" result may also carry verificationStopped:"monthly_cap_reached", meaning the organization spent its monthly research budget partway through: the contacts are real, but any email_verification of "unknown" was left unchecked for lack of budget rather than checked and found doubtful — say so rather than presenting those addresses as verified. Paid lookups are metered against the research budget; spend above the auto-approve threshold asks for confirmation first.',
 	parameters: Schema.Struct({
 		company_name: Schema.String,
 		domain: Schema.String.annotate({

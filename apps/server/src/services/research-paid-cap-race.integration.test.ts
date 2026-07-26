@@ -1,5 +1,5 @@
-// Live-DB integration test for the monthly ceiling on what one person's
-// research runs may spend on metered calls.
+// Live-DB integration test for the monthly ceiling on what one company's
+// research runs may spend on metered calls, shared by everyone in it.
 //
 // The ceiling is only meaningful if it holds when several paid calls land at
 // once, which is the normal case: a run fans out its contact lookups. Deciding
@@ -82,9 +82,9 @@ const chargeConcurrently = (ORG: string, userId: string, researchId: string) =>
 						// the monthly ceiling is what is under test.
 						paidBudgetCents: 10_000,
 						autoApprovePaidCents: 10_000,
-						paidMonthlyCapCents: CAP_CENTS,
 						autoApplyMinConfidence: null,
 					} as never,
+					// The ceiling under test is the company's own, seeded per case.
 					defaultCapCents: 2000,
 					systemCeiling: 10_000,
 				}),
