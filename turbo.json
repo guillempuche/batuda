@@ -7,17 +7,9 @@
 			"inputs": ["$TURBO_DEFAULT$", ".env*"],
 			"outputs": ["dist/**/*"]
 		},
-		"check-deps": {
-			"outputs": [],
-			"cache": true
-		},
 		"check-types": {
 			"dependsOn": ["^check-types"],
 			"outputs": []
-		},
-		"lint": {
-			"outputs": [],
-			"cache": true
 		},
 		"dev": {
 			"persistent": true,
@@ -25,13 +17,7 @@
 		},
 		"test": {
 			"dependsOn": ["^build"],
-			"inputs": [
-				"$TURBO_DEFAULT$",
-				"src/**/*",
-				"test/**/*",
-				"**/*.test.*",
-				"**/*.spec.*"
-			],
+			"inputs": ["$TURBO_DEFAULT$", "src/**/*", "test/**/*", "**/*.test.*"],
 			"outputs": ["coverage/**/*"],
 			"cache": true
 		},
