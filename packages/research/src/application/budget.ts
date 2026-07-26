@@ -92,6 +92,41 @@ const chargeWithinCap = (input: ChargeWithinCapInput) =>
 		// above must stay a typed error so callers can catch and degrade on it.
 	}).pipe(input.sql.withTransaction, Effect.catchTag('SqlError', Effect.die))
 
+/**
+ * What is left of a company's monthly allowance for paid vendor calls.
+ *
+ * Reads the same figures a charge does, so anything quoting a cost up front
+ * quotes what a charge would really allow rather than a ceiling the month has
+ * already used up.
+ */
+export const monthlyRemainingCents = (
+	sql: SqlClient.SqlClient,
+	input: {
+		readonly organizationId: string
+		readonly defaultCapCents: number
+		readonly systemCeiling: number
+	},
+) =>
+	Effect.gen(function* () {
+		const capRows = yield* sql<{ paidMonthlyCapCents: number }>`
+			SELECT paid_monthly_cap_cents
+			FROM organization_research_policy
+			WHERE organization_id = ${input.organizationId}
+			LIMIT 1
+		`
+		const cap = Math.min(
+			capRows[0]?.paidMonthlyCapCents ?? input.defaultCapCents,
+			input.systemCeiling,
+		)
+		const spentRows = yield* sql<{ spent: number }>`
+			SELECT COALESCE(SUM(amount_cents), 0)::int AS spent
+			FROM research_paid_spend
+			WHERE organization_id = ${input.organizationId}
+			  AND at >= date_trunc('month', now())
+		`
+		return Math.max(0, cap - (spentRows[0]?.spent ?? 0))
+	}).pipe(Effect.catchTag('SqlError', Effect.die))
+
 // One tier's running total: what it was given, what it has spent, what is left.
 interface TierState {
 	readonly budget: number

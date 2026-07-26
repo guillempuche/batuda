@@ -35,7 +35,7 @@ import type { ReasonCode, ResolvedPolicy } from '../domain/types'
 import { aboutPageCandidates } from './about-pages'
 import { canAffordAnotherRound, runAgentResearchLoop } from './agent-loop'
 import { filterApplicableProposals } from './applicability-guard'
-import { makeBudgetLayer } from './budget'
+import { makeBudgetLayer, monthlyRemainingCents } from './budget'
 import {
 	groundedCitationTest,
 	validateFindingCitations,
@@ -4478,9 +4478,20 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// company, so a caller that hasn't set `confirm` gets the
 							// scale back first and re-submits with `confirm: true` once the
 							// count is acceptable. Nothing has been written yet, so
-							// returning here leaves no partial group behind. The estimate
-							// is the paid-data ceiling summed across the fan-out.
+							// returning here leaves no partial group behind.
+							//
+							// The figure quoted covers both what a run may spend: the
+							// searching and page-fetching every company gets, plus paid
+							// vendor data — the latter only as far as the company's month
+							// still allows, since that is where charging would stop anyway.
+							// Quoting the paid ceiling alone named a number many times what
+							// could actually be spent, while leaving out the larger half.
 							if (targets.length > 0 && input.confirm !== true) {
+								const paidLeft = yield* monthlyRemainingCents(sql, {
+									organizationId,
+									defaultCapCents: defaultMonthlyCapCents,
+									systemCeiling: monthlyCapHardCeilingCents,
+								})
 								yield* Effect.logInfo(
 									'research.selector.confirm_required',
 								).pipe(
@@ -4492,7 +4503,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								return {
 									status: 'confirm_required' as const,
 									subjectCount: targets.length,
-									estimatedCostCents: targets.length * policy.paidBudgetCents,
+									estimatedCostCents:
+										targets.length * policy.budgetCents +
+										Math.min(targets.length * policy.paidBudgetCents, paidLeft),
 								}
 							}
 

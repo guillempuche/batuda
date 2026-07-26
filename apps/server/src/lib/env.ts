@@ -234,9 +234,6 @@ export class EnvVars extends Context.Service<EnvVars>()('EnvVars', {
 		const RESEARCH_MAX_CONCURRENCY_FANOUT = yield* Config.int(
 			'RESEARCH_MAX_CONCURRENCY_FANOUT',
 		).pipe(Config.withDefault(3))
-		const RESEARCH_CONFIRM_THRESHOLD_FANOUT = yield* Config.int(
-			'RESEARCH_CONFIRM_THRESHOLD_FANOUT',
-		).pipe(Config.withDefault(10))
 
 		return {
 			DATABASE_URL,
@@ -269,7 +266,6 @@ export class EnvVars extends Context.Service<EnvVars>()('EnvVars', {
 			RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS,
 			RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL,
 			RESEARCH_MAX_CONCURRENCY_FANOUT,
-			RESEARCH_CONFIRM_THRESHOLD_FANOUT,
 		} as const
 	}),
 }) {

@@ -462,9 +462,11 @@ describe('selector fan-out', () => {
 			expect(result.id).toBeUndefined()
 			// AND it reports how many companies the fan-out would cover
 			expect(result.subjectCount).toBe(2)
-			// AND it carries a non-negative estimated cost for the batch
-			expect(typeof result.estimatedCostCents).toBe('number')
-			expect(result.estimatedCostCents).toBeGreaterThanOrEqual(0)
+			// AND the figure quoted covers both halves of what the batch may
+			// spend: 100c of searching per company, plus paid vendor data as far
+			// as the month still allows (2 x 500c, under a 2000c ceiling). Quoting
+			// the paid half alone would say 1000c and leave out the searching
+			expect(result.estimatedCostCents).toBe(2 * 100 + 2 * 500)
 		})
 	})
 })
