@@ -1,9 +1,8 @@
 // Live-DB integration test for the run-cost rollup: stampRunCostFromLedger
-// writes paid_cost_cents from the research_paid_spend ledger (the fix for runs
-// that always reported $0) and cost_cents from the caller's cheap-tier tally.
-// Driven through the real exported helper, not hand-copied SQL, and run as the
-// DB owner (no SET LOCAL ROLE app_user) to mirror the research run fibre's
-// RLS-bypassing connection.
+// writes paid_cost_cents from the research_paid_spend ledger, and the cost,
+// tokens and breakdowns from what the caller measured. Driven through the real
+// exported helper, not hand-copied SQL, and run as the DB owner (no SET LOCAL
+// ROLE app_user) to mirror the research run fibre's RLS-bypassing connection.
 //
 // Prereq: `pnpm cli services up` — this suite's own globalSetup builds and
 // migrates the disposable batuda_it database it runs against.
@@ -53,11 +52,11 @@ const seedPaidSpend = async (
 	)
 }
 
-const stamp = (researchId: string, cheapCents: number): Promise<void> =>
+const stamp = (researchId: string, costCents: number): Promise<void> =>
 	runtime.runPromise(
 		Effect.gen(function* () {
 			const sql = yield* SqlClient.SqlClient
-			yield* stampRunCostFromLedger(sql, researchId, cheapCents)
+			yield* stampRunCostFromLedger(sql, researchId, costCents)
 		}),
 	)
 
@@ -97,10 +96,10 @@ describe('stamping a research run cost from the paid-spend ledger', () => {
 			await seedPaidSpend(researchId, 5)
 			for (let i = 0; i < 6; i += 1) await seedPaidSpend(researchId, 1)
 
-			// WHEN the run is finalized with a 30¢ cheap-tier tally
+			// WHEN the run is finalized with a 30¢ measured cost
 			await stamp(researchId, 30)
 
-			// THEN paid_cost_cents equals the ledger sum and cost_cents the tally
+			// THEN paid_cost_cents equals the ledger sum, cost_cents the measure
 			const { costCents, paidCostCents } = await readCost(researchId)
 			expect(paidCostCents).toBe(11)
 			expect(costCents).toBe(30)
@@ -108,14 +107,14 @@ describe('stamping a research run cost from the paid-spend ledger', () => {
 	})
 
 	describe('when the run charged nothing', () => {
-		it('should leave paid_cost_cents at 0 while still recording the cheap tally', async () => {
+		it('should leave paid_cost_cents at 0 while still recording what the run measured', async () => {
 			// GIVEN a run with no paid-spend rows
 			const researchId = await seedRun()
 
-			// WHEN it is finalized with a 7¢ cheap-tier tally
+			// WHEN it is finalized with a 7¢ measured cost
 			await stamp(researchId, 7)
 
-			// THEN the paid column is 0 and the cheap column carries the tally
+			// THEN the paid column is 0 and cost_cents carries what the run measured
 			const { costCents, paidCostCents } = await readCost(researchId)
 			expect(paidCostCents).toBe(0)
 			expect(costCents).toBe(7)
@@ -136,6 +135,63 @@ describe('stamping a research run cost from the paid-spend ledger', () => {
 			const { costCents, paidCostCents } = await readCost(researchId)
 			expect(paidCostCents).toBe(4)
 			expect(costCents).toBe(12)
+		})
+	})
+
+	describe('when a later stamp knows less than an earlier one', () => {
+		it('should keep the recorded cost rather than wipe it', async () => {
+			// GIVEN a finished run that recorded 47¢
+			const researchId = await seedRun()
+			await stamp(researchId, 47)
+
+			// WHEN a path that cannot know what was spent stamps it — cancelling a
+			// run and the run finishing can land in either order
+			await stamp(researchId, 0)
+
+			// THEN what the run really cost survives
+			expect((await readCost(researchId)).costCents).toBe(47)
+
+			// AND a later, higher figure still lands
+			await stamp(researchId, 61)
+			expect((await readCost(researchId)).costCents).toBe(61)
+		})
+	})
+
+	describe('when the run records what it used getting there', () => {
+		it('should store the tokens and a breakdown per kind of work', async () => {
+			// GIVEN a run that priced model calls and provider credits
+			const researchId = await seedRun()
+			await runtime.runPromise(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					yield* stampRunCostFromLedger(sql, researchId, 9, {
+						tokensIn: 1200,
+						tokensOut: 340,
+						costByBucket: { llm_agent: 4.5, search: 2.5 },
+						unitsByProvider: { firecrawl_search: 7 },
+					})
+				}),
+			)
+
+			// WHEN the row is read back
+			const r = await pool.query<{
+				tokens_in: number
+				tokens_out: number
+				cost_breakdown: unknown
+				quota_breakdown: unknown
+			}>(
+				`SELECT tokens_in, tokens_out, cost_breakdown, quota_breakdown
+				 FROM research_runs WHERE id = $1`,
+				[researchId],
+			)
+			const row = r.rows[0]
+
+			// THEN both totals and both breakdowns survive, each keyed by the kind
+			// of work it describes
+			expect(row?.tokens_in).toBe(1200)
+			expect(row?.tokens_out).toBe(340)
+			expect(row?.cost_breakdown).toEqual({ llm_agent: 4.5, search: 2.5 })
+			expect(row?.quota_breakdown).toEqual({ firecrawl_search: 7 })
 		})
 	})
 })

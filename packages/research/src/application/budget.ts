@@ -1,4 +1,4 @@
-import { Effect, Layer, Ref } from 'effect'
+import { Effect, Exit, Layer, Ref } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import {
@@ -31,8 +31,12 @@ const chargeWithinCap = (input: ChargeWithinCapInput) =>
 		const { sql } = input
 		const cap = Math.min(input.userCap, input.systemCeiling)
 
-		// Single transaction: advisory lock → check → insert.
-		// pg_advisory_xact_lock serializes concurrent fibers for the same user.
+		// The lock, the sum and the insert are one transaction: a lock lasts only as
+		// long as the transaction holding it, and separate statements can each land
+		// on a different connection from the pool — so without one wrapping all
+		// three, two charges for the same person could both read the same monthly
+		// total and both go through, past the cap. Nested inside a caller's own
+		// transaction, the lock instead lasts until that one ends.
 		yield* sql`SELECT pg_advisory_xact_lock(hashtext('research_monthly_cap:' || ${input.userId}))`
 
 		const rows = yield* sql<{ spent: number }>`
@@ -70,7 +74,30 @@ const chargeWithinCap = (input: ChargeWithinCapInput) =>
 		return inserted.length > 0
 		// Only unexpected DB failures become defects here — MonthlyCapExceeded
 		// above must stay a typed error so callers can catch and degrade on it.
-	}).pipe(Effect.catchTag('SqlError', Effect.die))
+	}).pipe(input.sql.withTransaction, Effect.catchTag('SqlError', Effect.die))
+
+// One tier's running total: what it was given, what it has spent, what is left.
+interface TierState {
+	readonly budget: number
+	readonly spent: number
+	readonly remaining: number
+}
+
+// The outcome of trying to take an amount off the cheap tier, decided in the
+// same step that takes it: whether the money was set aside, and what was left at
+// that moment — the figure a refusal reports back.
+interface CheapCharge {
+	readonly ok: boolean
+	readonly remaining: number
+}
+
+// Why a paid charge was allowed or refused, decided in one step: the run is out
+// of money, the charge needs a person's approval first, or the money is set
+// aside and the vendor can be billed.
+type PaidReservation =
+	| { readonly _tag: 'exceeded'; readonly remaining: number }
+	| { readonly _tag: 'approval' }
+	| { readonly _tag: 'reserved' }
 
 // ── Budget Layer factory ──
 
@@ -95,12 +122,12 @@ export const makeBudgetLayer = (config: BudgetConfig) =>
 		Budget,
 		Effect.gen(function* () {
 			const sql = yield* SqlClient.SqlClient
-			const cheapRef = yield* Ref.make({
+			const cheapRef = yield* Ref.make<TierState>({
 				budget: config.policy.budgetCents,
 				spent: 0,
 				remaining: config.policy.budgetCents,
 			})
-			const paidRef = yield* Ref.make({
+			const paidRef = yield* Ref.make<TierState>({
 				budget: config.policy.paidBudgetCents,
 				spent: 0,
 				remaining: config.policy.paidBudgetCents,
@@ -122,21 +149,30 @@ export const makeBudgetLayer = (config: BudgetConfig) =>
 					}),
 
 				chargeCheap: (provider: string, cents: number) =>
-					Effect.gen(function* () {
-						const state = yield* Ref.get(cheapRef)
-						if (state.remaining < cents) {
-							return yield* new BudgetExceeded({
-								tier: 'cheap',
-								needed: cents,
-								remaining: state.remaining,
-							})
-						}
-						yield* Ref.update(cheapRef, s => ({
-							...s,
-							spent: s.spent + cents,
-							remaining: s.remaining - cents,
-						}))
-					}).pipe(
+					// Check and deduct in one indivisible step. Several tool calls run at
+					// once, so reading what is left and then subtracting as two steps lets
+					// two of them both see enough and both spend it.
+					Ref.modify(cheapRef, (s): readonly [CheapCharge, TierState] =>
+						s.remaining < cents
+							? [{ ok: false as const, remaining: s.remaining }, s]
+							: [
+									{ ok: true as const, remaining: s.remaining - cents },
+									{
+										...s,
+										spent: s.spent + cents,
+										remaining: s.remaining - cents,
+									},
+								],
+					).pipe(
+						Effect.flatMap(charge =>
+							charge.ok
+								? Effect.void
+								: new BudgetExceeded({
+										tier: 'cheap',
+										needed: cents,
+										remaining: charge.remaining,
+									}),
+						),
 						Effect.tap(() =>
 							Effect.logDebug('budget.chargeCheap').pipe(
 								Effect.annotateLogs({ provider, cents }),
@@ -151,29 +187,59 @@ export const makeBudgetLayer = (config: BudgetConfig) =>
 					idempotencyKey?: string,
 				) =>
 					Effect.gen(function* () {
-						const state = yield* Ref.get(paidRef)
-						if (state.remaining < cents) {
+						// Set the money aside in one indivisible step that also decides both
+						// refusals. Several paid tool calls can run at once, so deciding and
+						// then deducting as two steps lets two of them clear the same limit
+						// and both spend past it — which holds for the approval limit too.
+						//
+						// Stopping at the auto-approve limit hands back an approval gate the
+						// agent surfaces as a pending paid action for the user to approve,
+						// rather than charging. Only when enforced (the in-run agent
+						// budget) — the standalone tool gates interactively and an approved
+						// follow-up must charge.
+						const reservation = yield* Ref.modify(
+							paidRef,
+							(s): readonly [PaidReservation, TierState] => {
+								if (s.remaining < cents)
+									return [
+										{ _tag: 'exceeded' as const, remaining: s.remaining },
+										s,
+									]
+								if (
+									config.enforceAutoApprove &&
+									s.spent + cents > config.policy.autoApprovePaidCents
+								)
+									return [{ _tag: 'approval' as const }, s]
+								return [
+									{ _tag: 'reserved' as const },
+									{
+										...s,
+										spent: s.spent + cents,
+										remaining: s.remaining - cents,
+									},
+								]
+							},
+						)
+						if (reservation._tag === 'exceeded')
 							return yield* new BudgetExceeded({
 								tier: 'paid-run',
 								needed: cents,
-								remaining: state.remaining,
+								remaining: reservation.remaining,
 							})
-						}
-
-						// Stop before spending past the caller's auto-approve limit:
-						// hand back an approval gate the agent surfaces as a pending
-						// paid action for the user to approve, rather than charging.
-						// Only when enforced (the in-run agent budget) — the standalone
-						// tool gates interactively and an approved follow-up must charge.
-						if (
-							config.enforceAutoApprove &&
-							state.spent + cents > config.policy.autoApprovePaidCents
-						) {
+						if (reservation._tag === 'approval')
 							return yield* new ApprovalRequired({
 								tool,
 								estimatedCents: cents,
 							})
-						}
+
+						// Hand the money back when the charge does not land: the cap refused
+						// it, the database failed, or the run was cancelled mid-charge — an
+						// interrupted charge must not leave the run looking as if it spent.
+						const release = Ref.update(paidRef, s => ({
+							...s,
+							spent: s.spent - cents,
+							remaining: s.remaining + cents,
+						}))
 
 						const charged = yield* chargeWithinCap({
 							sql,
@@ -191,17 +257,16 @@ export const makeBudgetLayer = (config: BudgetConfig) =>
 							autoApproved: true,
 							userCap: config.policy.paidMonthlyCapCents,
 							systemCeiling: config.systemCeiling,
-						})
+						}).pipe(
+							Effect.onExit(exit =>
+								Exit.isSuccess(exit) ? Effect.void : release,
+							),
+						)
 
-						// A retried idempotency key is a DB no-op — skip counting the
-						// same real-world charge against this run's budget twice.
-						if (charged) {
-							yield* Ref.update(paidRef, s => ({
-								...s,
-								spent: s.spent + cents,
-								remaining: s.remaining - cents,
-							}))
-						}
+						// A retried idempotency key is a DB no-op — the same real-world
+						// charge is already counted against this run, so give the reserved
+						// money back rather than counting it twice.
+						if (!charged) yield* release
 					}).pipe(
 						Effect.tap(() =>
 							Effect.logDebug('budget.chargePaid').pipe(
