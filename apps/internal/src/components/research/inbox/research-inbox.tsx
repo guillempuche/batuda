@@ -15,6 +15,12 @@ import {
 	resolveProposalsBatchAtom,
 } from '#/atoms/research-atoms'
 import {
+	fieldChanges,
+	humanizeFieldKey,
+	proposedChannels,
+} from '#/components/research/field-diff'
+import { PaidActionQueue } from '#/components/research/inbox/paid-action-queue'
+import {
 	isEnteredOutcome,
 	type ProposalOutcome,
 	trustTier,
@@ -30,6 +36,7 @@ import {
 import { narrowResearch } from '#/components/research/run-shapes'
 import { TrustBadge } from '#/components/research/trust-badge'
 import { ErrorState } from '#/components/shared/error-state'
+import { SrOnly } from '#/components/shared/sr-only'
 import {
 	type ResolveDecision,
 	type ResolveOutcome,
@@ -106,8 +113,26 @@ export function ResearchInbox() {
 	const navigate = useNavigate()
 	const [discoveryOpen, setDiscoveryOpen] = useResearchDlg()
 
-	const proposalsResult = useAtomValue(inboxPendingProposalsAtom())
-	const refreshProposals = useAtomRefresh(inboxPendingProposalsAtom())
+	const [subject, setSubject] = useState<SubjectFilter>('all')
+	const [search, setSearch] = useState('')
+	const [minConfidence, setMinConfidence] = useState(0)
+	const [machineOnly, setMachineOnly] = useState(false)
+
+	// Filtering happens where the rows live. Sifting a fetched page in the browser
+	// only ever searched the newest hundred, so a matching change beyond that was
+	// invisible and the queue could read as empty while work was waiting.
+	const proposalsAtom = useMemo(
+		() =>
+			pendingProposalsAtom({
+				limit: INBOX_PROPOSAL_LIMIT,
+				...(subject === 'all' ? {} : { subjectTable: subject }),
+				...(minConfidence > 0 ? { minConfidence } : {}),
+				...(machineOnly ? { machineCheckable: true } : {}),
+			}),
+		[subject, minConfidence, machineOnly],
+	)
+	const proposalsResult = useAtomValue(proposalsAtom)
+	const refreshProposals = useAtomRefresh(proposalsAtom)
 	const runsAtom = useMemo(
 		() => researchListAtom({ limit: INBOX_PROPOSAL_LIMIT }),
 		[],
@@ -128,10 +153,6 @@ export function ResearchInbox() {
 	const { results, pending, sending, resolve, undo, setResults } =
 		useProposalResolution()
 
-	const [subject, setSubject] = useState<SubjectFilter>('all')
-	const [search, setSearch] = useState('')
-	const [minConfidence, setMinConfidence] = useState(0)
-	const [machineOnly, setMachineOnly] = useState(false)
 	// Whether the "apply all verified" button is waiting on its confirm step.
 	const [confirmingBatch, setConfirmingBatch] = useState(false)
 	const [batchBusy, setBatchBusy] = useState(false)
@@ -156,26 +177,18 @@ export function ResearchInbox() {
 		[spendResult],
 	)
 
+	// Subject, confidence and verifiable-only are applied where the rows live, so
+	// only the free-text search narrows what has been fetched — there is no
+	// server-side search to defer it to.
 	const visible = useMemo(() => {
 		const term = search.trim().toLowerCase()
+		if (term.length === 0) return proposals
 		return proposals.filter(p => {
-			if (subject !== 'all' && p.subjectTable !== subject) return false
-			if (machineOnly && !p.machineCheckable) return false
-			// A minimum keeps only rows scored at least that high; an unscored row
-			// (no channel confidence) can't clear a positive bar, so it drops out.
-			if (
-				minConfidence > 0 &&
-				(p.confidence === null || p.confidence < minConfidence)
-			)
-				return false
-			if (term.length > 0) {
-				const haystack =
-					`${p.subjectName ?? ''} ${p.runQuery} ${p.reason ?? ''}`.toLowerCase()
-				if (!haystack.includes(term)) return false
-			}
-			return true
+			const haystack =
+				`${p.subjectName ?? ''} ${p.runQuery} ${p.reason ?? ''}`.toLowerCase()
+			return haystack.includes(term)
 		})
-	}, [proposals, subject, machineOnly, minConfidence, search])
+	}, [proposals, search])
 
 	const trustworthy = useMemo(
 		() => visible.filter(p => tierOf(p) === 'trustworthy'),
@@ -205,7 +218,14 @@ export function ResearchInbox() {
 			isEnteredOutcome(r.outcome as ProposalOutcome) ||
 			r.outcome === 'rejected',
 	).length
-	const pendingCount = Math.max(0, proposals.length - resolvedCount)
+	// The count comes back with the rows, so the tile states the real figure
+	// instead of "100+" whenever a page happened to fill up.
+	const totalPending = AsyncResult.isSuccess(proposalsResult)
+		? proposalsResult.value.total
+		: proposals.length
+	const pendingCount = Math.max(0, totalPending - resolvedCount)
+	// More are waiting than were fetched, so say so rather than quietly ending.
+	const notShown = Math.max(0, totalPending - proposals.length)
 	const recentRuns = runs.length
 
 	const isLoading = AsyncResult.isInitial(proposalsResult)
@@ -305,9 +325,7 @@ export function ResearchInbox() {
 					</TileLabel>
 				</Tile>
 				<Tile>
-					<TileValue>
-						{pendingCount >= INBOX_PROPOSAL_LIMIT ? '100+' : pendingCount}
-					</TileValue>
+					<TileValue>{pendingCount}</TileValue>
 					<TileLabel>
 						<Trans>Pending review</Trans>
 					</TileLabel>
@@ -471,6 +489,8 @@ export function ResearchInbox() {
 						</Section>
 					) : null}
 
+					<PaidActionQueue />
+
 					<ProposalSection
 						testId='research-inbox-trustworthy'
 						title={t`Ready to apply`}
@@ -496,6 +516,12 @@ export function ResearchInbox() {
 						onResolve={resolveOne}
 						onUndo={undo}
 					/>
+
+					{notShown > 0 ? (
+						<Truncated data-testid='research-inbox-truncated'>
+							{t`Showing ${proposals.length} of ${totalPending}. Narrow the filters to reach the rest.`}
+						</Truncated>
+					) : null}
 
 					{trustworthy.length === 0 &&
 					needsReview.length === 0 &&
@@ -619,6 +645,7 @@ function ProposalRow({
 				{proposal.reason !== null ? (
 					<RowReason>{proposal.reason}</RowReason>
 				) : null}
+				<ProposedValues proposal={proposal} />
 				<RowBadges>
 					<TrustBadge
 						verification={proposal.verification}
@@ -693,6 +720,63 @@ function ProposalRow({
 				)}
 			</RowActions>
 		</Row>
+	)
+}
+
+// How many values a row shows before it stops; the rest are on the run's page.
+const INLINE_FIELD_LIMIT = 4
+
+/**
+ * What this change would actually write. Without it the row asks for a yes or a
+ * no on a value the reader cannot see — the reason line says why the run
+ * believes something, never what it would put in the record.
+ */
+function ProposedValues({ proposal }: { readonly proposal: PendingProposal }) {
+	const { t } = useLingui()
+	const changes = fieldChanges(proposal.fields, proposal.subjectCurrent)
+	const channels = proposedChannels(proposal.fields)
+	if (changes.length === 0 && channels.length === 0) return null
+	const shown = changes.slice(0, INLINE_FIELD_LIMIT)
+	const hidden = changes.length - shown.length
+
+	return (
+		<Values data-testid='research-inbox-values'>
+			{channels.map(channel => (
+				<ValueLine key={`${channel.kind}:${channel.value}`}>
+					<ValueKey>{humanizeFieldKey(channel.kind)}</ValueKey>
+					<ValueNew>{channel.value}</ValueNew>
+				</ValueLine>
+			))}
+			{shown.map(change => (
+				<ValueLine key={change.key}>
+					<ValueKey>{humanizeFieldKey(change.key)}</ValueKey>
+					{change.unchanged ? (
+						<ValueSame>{t`already ${change.to}`}</ValueSame>
+					) : (
+						<>
+							{/* The line through the old value and the arrow are both
+							    visual only, so which value is which is spoken outright —
+							    otherwise the row reads as two values in a row with nothing
+							    to say one replaces the other. */}
+							{change.from !== null ? (
+								<>
+									<SrOnly>{t`currently`}</SrOnly>
+									<ValueOld>{change.from}</ValueOld>
+									<ValueArrow aria-hidden>→</ValueArrow>
+									<SrOnly>{t`would become`}</SrOnly>
+								</>
+							) : (
+								<SrOnly>{t`nothing on file, would add`}</SrOnly>
+							)}
+							<ValueNew>{change.to}</ValueNew>
+						</>
+					)}
+				</ValueLine>
+			))}
+			{hidden > 0 ? (
+				<ValueMore>{t`and ${hidden} more on the run`}</ValueMore>
+			) : null}
+		</Values>
 	)
 }
 
@@ -1120,4 +1204,63 @@ const SkeletonRow = styled.div`
 	@media (prefers-reduced-motion: reduce) {
 		animation: none;
 	}
+`
+
+const Values = styled.div`
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3xs);
+`
+
+const ValueLine = styled.div`
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: var(--space-3xs) var(--space-2xs);
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+	min-width: 0;
+`
+
+const ValueKey = styled.span`
+	font-family: var(--font-display);
+	font-size: var(--typescale-label-small-size);
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--color-on-surface-variant);
+`
+
+const ValueOld = styled.span`
+	color: var(--color-on-surface-variant);
+	text-decoration: line-through;
+	word-break: break-word;
+`
+
+const ValueArrow = styled.span`
+	color: var(--color-on-surface-variant);
+`
+
+const ValueNew = styled.span`
+	color: var(--color-on-surface);
+	word-break: break-word;
+`
+
+const ValueSame = styled.span`
+	color: var(--color-on-surface-variant);
+	font-style: italic;
+`
+
+const ValueMore = styled.span`
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+	font-style: italic;
+	color: var(--color-on-surface-variant);
+`
+
+const Truncated = styled.p`
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+	font-style: italic;
+	color: var(--color-on-surface-variant);
+	margin: 0;
 `
