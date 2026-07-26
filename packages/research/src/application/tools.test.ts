@@ -1127,3 +1127,80 @@ describe('researchToolkitWireFormat', () => {
 		})
 	})
 })
+
+describe('what a tool call charges the run', () => {
+	// A run decides whether it can keep going from a flat, predictable figure
+	// charged before each call. Providers bill unevenly — one Firecrawl search
+	// can consume several credits — so what a call really cost is recorded
+	// separately and must never reach this decision: a run's reach would then
+	// swing with a vendor's pricing.
+	const chargingToolkit = (charged: Array<readonly [string, number]>) => {
+		const budget = Layer.succeed(Budget)(
+			Budget.of({
+				chargeCheap: (provider, cents) =>
+					Effect.sync(() => {
+						charged.push([provider, cents])
+					}),
+				chargePaid: () => Effect.void,
+				snapshot: () =>
+					Effect.succeed({
+						cheapBudget: 1000,
+						cheapSpent: 0,
+						cheapRemaining: 1000,
+						paidBudget: 1000,
+						paidSpent: 0,
+						paidRemaining: 1000,
+					}),
+			}),
+		)
+		// A provider that reports a hefty real cost for one call.
+		const expensiveSearch = Layer.succeed(SearchProvider)(
+			SearchProvider.of({
+				search: () => Effect.succeed(new SearchResult({ items: [], units: 7 })),
+			}),
+		)
+		return researchToolkitLayer.pipe(
+			Layer.provide(
+				Layer.mergeAll(
+					budget,
+					stubRunContext,
+					expensiveSearch,
+					StubScrapeProvider,
+					StubRegistryEsProvider,
+					Layer.succeed(ContactDiscovery)({
+						discover: () =>
+							Effect.succeed({
+								status: 'no_reliable_contact' as const,
+								researchId: 'test-run',
+							}),
+					}),
+				),
+			),
+		)
+	}
+
+	describe('when the provider reports a call cost several credits', () => {
+		it('should still charge the flat figure the run plans against', async () => {
+			// GIVEN a search whose provider reports seven credits for one call
+			const charged: Array<readonly [string, number]> = []
+
+			// WHEN the tool runs
+			await Effect.runPromise(
+				Effect.gen(function* () {
+					const toolkit = yield* researchToolkit
+					const stream = yield* toolkit.handle('web_search', {
+						query: 'acme',
+						limit: null,
+						recency_days: null,
+						location: null,
+					})
+					yield* Stream.runDrain(stream)
+				}).pipe(Effect.provide(chargingToolkit(charged)), Effect.orDie),
+			)
+
+			// THEN one flat charge is made, not seven — a run gets the same number
+			// of searches whatever a vendor happens to bill
+			expect(charged).toEqual([['search', 1]])
+		})
+	})
+})

@@ -367,7 +367,9 @@ const formatGroups = (
 						s.groundingAccuracy,
 					)}  prec ${pct(s.fieldPrecision)}  recall ${pct(
 						s.fieldRecall,
-					)}  wrong ${pct(s.wrongCompanyRate)}  empty ${pct(s.emptyRate)}`,
+					)}  wrong ${pct(s.wrongCompanyRate)}  empty ${pct(
+						s.emptyRate,
+					)}  cost ${cents(s.costPerRun)}`,
 			),
 	].join('\n')
 
