@@ -136,10 +136,6 @@ const Wrap = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-lg);
-	padding: var(--space-lg);
-	max-width: 60rem;
-	margin: 0 auto;
-	width: 100%;
 `
 
 const HeaderRow = styled.div`
@@ -156,9 +152,10 @@ const HeaderText = styled.div`
 	gap: var(--space-3xs);
 `
 
-const PageTitle = styled.h1`
+const PageTitle = styled.h2`
 	${stenciledTitle}
-	font-size: var(--typescale-headline-small-size);
+	font-size: var(--typescale-headline-large-size);
+	line-height: var(--typescale-headline-large-line);
 	margin: 0;
 `
 

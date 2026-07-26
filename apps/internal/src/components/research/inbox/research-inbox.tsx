@@ -28,6 +28,7 @@ import {
 } from '#/components/research/proposal-logic'
 import { OutcomeBadge } from '#/components/research/proposal-outcome'
 import { ResearchDialog } from '#/components/research/research-dialog'
+import { Money, ResolveStatus } from '#/components/research/resolve-status'
 import {
 	operationLabel,
 	statusLabel,
@@ -70,8 +71,6 @@ const ATTENTION_STATUSES = new Set([
 	'succeeded_low_confidence',
 ])
 
-type SubjectFilter = 'all' | 'companies' | 'contacts'
-
 function rowKey(p: PendingProposal): string {
 	return `${p.researchId}::${p.proposedUpdateId ?? ''}`
 }
@@ -113,7 +112,6 @@ export function ResearchInbox() {
 	const navigate = useNavigate()
 	const [discoveryOpen, setDiscoveryOpen] = useResearchDlg()
 
-	const [subject, setSubject] = useState<SubjectFilter>('all')
 	const [search, setSearch] = useState('')
 	const [minConfidence, setMinConfidence] = useState(0)
 	const [machineOnly, setMachineOnly] = useState(false)
@@ -125,11 +123,10 @@ export function ResearchInbox() {
 		() =>
 			pendingProposalsAtom({
 				limit: INBOX_PROPOSAL_LIMIT,
-				...(subject === 'all' ? {} : { subjectTable: subject }),
 				...(minConfidence > 0 ? { minConfidence } : {}),
 				...(machineOnly ? { machineCheckable: true } : {}),
 			}),
-		[subject, minConfidence, machineOnly],
+		[minConfidence, machineOnly],
 	)
 	const proposalsResult = useAtomValue(proposalsAtom)
 	const refreshProposals = useAtomRefresh(proposalsAtom)
@@ -347,32 +344,6 @@ export function ResearchInbox() {
 			</Counters>
 
 			<Toolbar>
-				<Segmented role='group' aria-label={t`Filter by subject`}>
-					<SegButton
-						type='button'
-						aria-pressed={subject === 'all'}
-						$active={subject === 'all'}
-						onClick={() => setSubject('all')}
-					>
-						<Trans>All</Trans>
-					</SegButton>
-					<SegButton
-						type='button'
-						aria-pressed={subject === 'companies'}
-						$active={subject === 'companies'}
-						onClick={() => setSubject('companies')}
-					>
-						<Trans>Companies</Trans>
-					</SegButton>
-					<SegButton
-						type='button'
-						aria-pressed={subject === 'contacts'}
-						$active={subject === 'contacts'}
-						onClick={() => setSubject('contacts')}
-					>
-						<Trans>Contacts</Trans>
-					</SegButton>
-				</Segmented>
 				<Filters>
 					<PriInput
 						type='search'
@@ -653,12 +624,12 @@ function ProposalRow({
 						machineCheckable={proposal.machineCheckable}
 					/>
 					{runTotalCents > 0 ? (
-						<RowCost
+						<Money
 							data-testid='research-inbox-row-cost'
 							title={t`What this run has cost so far`}
 						>
 							{formatMoneyCents(runTotalCents, { locale: i18n.locale })}
-						</RowCost>
+						</Money>
 					) : null}
 					<OpenRunLink
 						id={proposal.researchId}
@@ -676,24 +647,19 @@ function ProposalRow({
 						reason={result.reason}
 					/>
 				) : pending !== undefined ? (
-					<PendingResolve data-testid='research-inbox-pending'>
-						<PendingLabel>
-							{pending === 'apply' ? t`Applying…` : t`Rejecting…`}
-						</PendingLabel>
-						<UndoButton
-							type='button'
-							onClick={onUndo}
-							data-testid='research-inbox-undo'
-						>
-							<Trans>Undo</Trans>
-						</UndoButton>
-					</PendingResolve>
+					<ResolveStatus
+						decision={pending}
+						undoable
+						onUndo={onUndo}
+						testId='research-inbox-pending'
+					/>
 				) : sending !== undefined ? (
-					<PendingResolve data-testid='research-inbox-sending'>
-						<PendingLabel>
-							{sending === 'apply' ? t`Applying…` : t`Rejecting…`}
-						</PendingLabel>
-					</PendingResolve>
+					<ResolveStatus
+						decision={sending}
+						undoable={false}
+						onUndo={onUndo}
+						testId='research-inbox-sending'
+					/>
 				) : (
 					<>
 						<PriButton
@@ -934,35 +900,6 @@ const ToggleLabel = styled.label`
 	cursor: pointer;
 `
 
-const Segmented = styled.div`
-	display: inline-flex;
-	gap: var(--space-2xs);
-	flex: 1;
-`
-
-const SegButton = styled.button.withConfig({
-	shouldForwardProp: prop => prop !== '$active',
-})<{ $active: boolean }>`
-	font-family: var(--font-display);
-	font-size: var(--typescale-label-small-size);
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
-	padding: var(--space-2xs) var(--space-sm);
-	border-radius: var(--shape-2xs);
-	border: 1px solid
-		${p =>
-			p.$active
-				? 'var(--color-primary)'
-				: 'color-mix(in oklab, var(--color-on-surface) 12%, transparent)'};
-	background: ${p =>
-		p.$active
-			? 'color-mix(in oklab, var(--color-primary) 16%, transparent)'
-			: 'transparent'};
-	color: ${p =>
-		p.$active ? 'var(--color-primary)' : 'var(--color-on-surface-variant)'};
-	cursor: pointer;
-`
-
 const RefreshLink = styled.button`
 	/* Small text made these under the 24px a pointer needs, and Undo is the only
 	   thing that stops a change being written. */
@@ -1052,12 +989,6 @@ const RowQuery = styled.span`
 	color: var(--color-on-surface);
 `
 
-const RowCost = styled.span`
-	font-family: var(--font-display);
-	font-size: var(--typescale-label-small-size);
-	color: var(--color-on-surface-variant);
-`
-
 const RowReason = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
@@ -1089,46 +1020,6 @@ const ConfirmBatch = styled.div`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
-`
-
-const PendingResolve = styled.div`
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-2xs);
-`
-
-const PendingLabel = styled.span`
-	font-family: var(--font-body);
-	font-size: var(--typescale-body-small-size);
-	font-style: italic;
-	color: var(--color-on-surface-variant);
-`
-
-const UndoButton = styled.button`
-	/* Small text made these under the 24px a pointer needs, and Undo is the only
-	   thing that stops a change being written. */
-	min-height: 1.5rem;
-	min-width: 1.5rem;
-	padding-inline: var(--space-2xs);
-	font-family: var(--font-display);
-	font-size: var(--typescale-label-small-size);
-	letter-spacing: 0.04em;
-	text-transform: uppercase;
-	color: var(--color-primary);
-	background: none;
-	border: none;
-	cursor: pointer;
-	padding: var(--space-3xs) var(--space-2xs);
-
-	&:hover {
-		text-decoration: underline;
-	}
-
-	&:focus-visible {
-		outline: none;
-		box-shadow: var(--glow-active);
-		border-radius: var(--shape-2xs);
-	}
 `
 
 // Styling `Link` directly with styled-components erases TanStack's typed
