@@ -11,9 +11,9 @@ Deployed at `batuda.co`. Tenant marketing sites live in their own repos (e.g. th
 
 - **TanStack Start** — SSR framework (file-based routing, server functions)
 - **TanStack Router** — type-safe client routing
-- **Tailwind CSS v4** — utility-first CSS, configured via `@theme` bridging MD3 tokens
-- **styled-components** — CSS-in-JS for dynamic/stateful styles (transient props, runtime interpolation)
-- **BaseUI** — headless, accessible components (styled with Tailwind classes + styled-components)
+- **Tailwind CSS v4** — in the build pipeline for its `@theme` breakpoint declarations; utility classes are not used in app code
+- **styled-components** — CSS-in-JS, the styling tool for both visuals and layout (transient props, runtime interpolation)
+- **BaseUI** — headless, accessible components (styled with styled-components)
 - **Motion + Motion Plus** — animations (`motion/react` for layout/transitions, `motion-plus/react` for premium components)
 - **react-leaflet + Leaflet** — interactive map showing a company's location
 - **Tiptap** — rich text editor for documents and proposals
@@ -76,7 +76,7 @@ Deployed to Cloudflare Workers via `@cloudflare/vite-plugin` + `wrangler` (confi
 **Note:** Tokens are defined in `packages/ui/src/tokens.css` and imported by `apps/internal` via the workspace link; tenant marketing repos consume the same tokens via the published `@batuda/ui` npm package. The values below document the full token set.
 
 All spacing, typography, and color values come from CSS custom properties defined in
-`packages/ui/src/tokens.css`. Tailwind's `@theme` bridges these tokens to utility classes. Never hardcode values — use Tailwind utilities or `var(--token)` in styled-components.
+`packages/ui/src/tokens.css`. Never hardcode values — use `var(--token)` in styled-components.
 
 ### Typography — MD3 type scale
 
@@ -163,7 +163,7 @@ All spacing, typography, and color values come from CSS custom properties define
 
 ### Tailwind setup
 
-Tailwind v4 is used for **layout utilities only** (flex, grid, gap, positioning, responsive breakpoints). All visual tokens (colors, typography, spacing, shape, elevation) come from the MD3 CSS custom properties in `tokens.css` — referenced via `var()` in styled-components or Tailwind's arbitrary value syntax.
+Tailwind v4 is in the build pipeline, but **no app code uses Tailwind classes** — there is not a single `className` in `apps/internal/src` or `packages/ui/src`. What it is there for is the `@theme` block below, which declares the canonical breakpoints that `tokens.css` refers to. Styling is done with styled-components (see [Styling conventions](#styling-conventions--styled-components)).
 
 ```css
 /* packages/ui/src/tailwind.css */
@@ -172,10 +172,8 @@ Tailwind v4 is used for **layout utilities only** (flex, grid, gap, positioning,
 
 @theme {
   /* Only breakpoints — everything else uses the token system directly */
-  --breakpoint-sm: 640px;
   --breakpoint-md: 768px;
   --breakpoint-lg: 1024px;
-  --breakpoint-xl: 1280px;
 }
 ```
 
@@ -186,27 +184,7 @@ Each app imports this file as its CSS entry point:
 @import '@batuda/ui/tailwind.css';
 ```
 
-### Using tokens with Tailwind
-
-Tailwind handles layout structure. Tokens handle all visual properties via styled-components + `var()`:
-
-```tsx
-import styled from 'styled-components'
-
-const Card = styled.div`
-  background: var(--color-surface);
-  border-radius: var(--shape-md);
-  padding: var(--space-sm);
-  box-shadow: var(--elevation-1);
-`
-
-// Tailwind for grid layout, styled-components for card visuals
-<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[var(--space-sm)]">
-  <Card>{children}</Card>
-</div>
-```
-
-For Tailwind spacing in layout, use arbitrary values with token references: `gap-[var(--space-sm)]`, `p-[var(--page-gutter)]`.
+Adding Tailwind utility classes to a component would make that file the only one of its kind in the codebase, so reach for styled-components instead.
 
 ### Color tokens — Mediterranean industrial
 
@@ -392,7 +370,7 @@ will block on missing strings).
 
 ## BaseUI components
 
-BaseUI provides headless, accessible components. Style them with styled-components using MD3 tokens, and use Tailwind for layout when composing them.
+BaseUI provides headless, accessible components. Style them with styled-components using MD3 tokens — layout included, the same as anywhere else.
 
 ### Usage pattern
 
@@ -658,16 +636,7 @@ Attribution to OpenStreetMap contributors is required and is rendered by the `Ti
 
 ## Breakpoints
 
-Mobile-first. Breakpoints are defined in `@theme` (sm: 640px, md: 768px, lg: 1024px, xl: 1280px). Use Tailwind's responsive prefixes for layout:
-
-```html
-<!-- Tailwind for responsive layout -->
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[var(--space-sm)]">
-  ...
-</div>
-```
-
-Or `@media` in styled-components for responsive visual changes:
+Mobile-first. The canonical breakpoints are declared once in `@theme` (md: 768px, lg: 1024px) and referenced from `tokens.css`. Use `@media` in styled-components:
 
 ```tsx
 const PipelineGrid = styled.div`
@@ -735,9 +704,9 @@ All `.tsx` and `.ts` files are covered by the root `biome.json`. Run `pnpm check
 
 ---
 
-## Styling conventions — styled-components + Tailwind
+## Styling conventions — styled-components
 
-**styled-components** is the primary styling tool — all visual styles (colors, typography, spacing, shape, elevation) use MD3 tokens via `var()`. **Tailwind** is used for structural layout only (flex, grid, positioning, responsive breakpoints).
+**styled-components** is the styling tool, for visual properties *and* layout alike — colors, typography, spacing, shape and elevation all use MD3 tokens via `var()`, and flex/grid/positioning live in the same styled component. Responsive changes use `@media`. Tailwind is installed but unused in component code (see [Tailwind setup](#tailwind-setup)).
 
 ### When to use what
 
@@ -745,9 +714,8 @@ All `.tsx` and `.ts` files are covered by the root `biome.json`. Run `pnpm check
 | ----------------------------------------------------------------- | ------------------------------------------ |
 | Visual properties (colors, typography, spacing, borders, shadows) | styled-components with `var(--token)`      |
 | Data-driven dynamic values (e.g. `--color-status-${status}`)      | styled-components with `$` transient props |
-| Layout structure (flex, grid, columns)                            | Tailwind classes                           |
-| Responsive layout changes                                         | Tailwind `sm:`, `md:`, `lg:` prefixes      |
-| Quick layout one-offs (centering, hiding)                         | Tailwind classes                           |
+| Layout structure (flex, grid, columns)                            | styled-components                          |
+| Responsive layout changes                                         | `@media` in styled-components              |
 | Animation targets                                                 | styled-components or Motion `style` prop   |
 
 ### Examples
@@ -779,30 +747,36 @@ function CompanyCard({ company }: { company: Company }) {
 }
 ```
 
-**Tailwind for layout structure:**
+**styled-components for layout too:**
 
 ```tsx
-// Grid layout via Tailwind, card visuals via styled-components
-<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[var(--space-sm)]">
-  {companies.map(c => <CompanyCard key={c.id} company={c} />)}
-</div>
+// Grid layout and card visuals both live in styled-components
+const CompanyGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-sm);
 
-// Flex layout
-<div className="flex items-center justify-between">
-  <Title>{name}</Title>
-  <StatusBadge $status={status} />
-</div>
+  @media (min-width: 768px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+`
+
+const CardHead = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+`
 ```
 
 ### Rules
 
 1. **Tokens always.** Use `var(--token)` — never hardcode hex, px, or font values.
 2. **styled-components for visuals.** Colors, typography, spacing, borders, shadows — all via styled-components with tokens.
-3. **Tailwind for layout.** Grid, flex, positioning, responsive breakpoints, visibility.
+3. **styled-components for layout.** Grid, flex, positioning and visibility too, with `@media` for responsive changes. Tailwind classes are not used anywhere in app code.
 4. **Co-locate styles.** Styled components live in the same `.tsx` file as the React component.
 5. **Transient props.** Use `$` prefix for styling-only props in styled-components.
 6. **No `!important`.** Fix specificity properly.
-7. **SSR.** styled-components handles SSR via `ServerStyleSheet`. Tailwind is static CSS — no SSR concern.
+7. **SSR.** styled-components handles SSR via `ServerStyleSheet`.
 
 ---
 
