@@ -5,6 +5,7 @@ import styled from 'styled-components'
 
 import { PriButton } from '@batuda/ui/pri'
 
+import { statusLabel } from '#/components/research/run-labels'
 import type { ResearchRunRow } from '#/components/research/run-shapes'
 import { RelativeDate } from '#/components/shared/relative-date'
 import {
@@ -23,7 +24,7 @@ export function ResearchSummaryCard({
 	readonly lastEnrichedAt: string | null
 	readonly onRunNew: () => void
 }) {
-	const { t } = useLingui()
+	const { t, i18n } = useLingui()
 	const latest = runs[0] ?? null
 
 	return (
@@ -68,7 +69,14 @@ export function ResearchSummaryCard({
 					<LatestRow>
 						<Query title={latest.query}>{latest.query}</Query>
 						<Meta>
-							<Status>{latest.status}</Status>
+							<Status>
+								{(() => {
+									// The stored word was shown as-is, so this read
+									// "succeeded_low_confidence" on a company's own page.
+									const label = statusLabel(latest.status)
+									return label ? i18n._(label) : latest.status
+								})()}
+							</Status>
 							<Dot>·</Dot>
 							<RelativeDate value={latest.createdAt} fallback={t`unknown`} />
 						</Meta>

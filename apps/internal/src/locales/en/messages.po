@@ -319,10 +319,6 @@ msgstr "Add attachment"
 msgid "Add Cc / Bcc"
 msgstr "Add Cc / Bcc"
 
-#: src/components/research/run-labels.ts
-msgid "Add channel"
-msgstr "Add channel"
-
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/routes/companies/$slug.tsx
 msgid "Add contact"
@@ -2736,10 +2732,6 @@ msgstr "Member"
 msgid "Members"
 msgstr "Members"
 
-#: src/components/research/run-labels.ts
-msgid "Merge"
-msgstr "Merge"
-
 #: src/components/research/proposal-outcome.tsx
 msgid "Merged into existing"
 msgstr "Merged into existing"
@@ -3556,7 +3548,6 @@ msgstr "Paste an app password — I'll show you where to get one"
 msgid "Pause syncing"
 msgstr "Pause syncing"
 
-#: src/components/research/run-labels.ts
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
 msgid "Paused"

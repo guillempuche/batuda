@@ -11,7 +11,6 @@ import type { Tone } from './proposal-logic'
 const STATUS_LABEL: Record<string, MessageDescriptor> = {
 	queued: msg`Queued`,
 	running: msg`Running`,
-	paused: msg`Paused`,
 	succeeded: msg`Succeeded`,
 	succeeded_low_confidence: msg`Needs review`,
 	failed: msg`Failed`,
@@ -28,7 +27,6 @@ export function statusLabel(status: string): MessageDescriptor | null {
 const STATUS_TONE: Record<string, Tone> = {
 	queued: 'neutral',
 	running: 'info',
-	paused: 'caution',
 	succeeded: 'positive',
 	succeeded_low_confidence: 'caution',
 	failed: 'negative',
@@ -45,8 +43,6 @@ export function statusTone(status: string): Tone {
 const OPERATION_LABEL: Record<string, MessageDescriptor> = {
 	create: msg`New`,
 	update: msg`Update`,
-	add_channel: msg`Add channel`,
-	merge: msg`Merge`,
 }
 
 /** Localized label for a proposal operation, or null for an unknown token. */
