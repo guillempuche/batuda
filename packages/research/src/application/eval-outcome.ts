@@ -13,6 +13,7 @@
 
 import {
 	type RunOutcome,
+	type RunUsage,
 	SCORABLE_FIELDS,
 	type ScorableField,
 	type TerminalStatus,
@@ -62,6 +63,8 @@ export const outcomeFromRun = (input: {
 	readonly findings: unknown
 	/** URLs of the sources the run fetched (from `research_run_sources`). */
 	readonly fetchedUrls: ReadonlyArray<string>
+	/** What the run was billed, read off its own row; absent when not read back. */
+	readonly usage?: RunUsage
 }): RunOutcome => {
 	const findings = input.findings
 	const enrichment = enrichmentOf(findings)
@@ -108,5 +111,6 @@ export const outcomeFromRun = (input: {
 		fields,
 		contacts,
 		registryConfirmed,
+		...(input.usage !== undefined ? { usage: input.usage } : {}),
 	}
 }

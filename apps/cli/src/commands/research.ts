@@ -45,6 +45,7 @@ import {
 	ResearchService,
 	type ResolvedInstructions,
 	type RunScore,
+	type RunUsage,
 	researchToolkitWireFormat,
 	type SystemDefaults,
 	scoreContactRun,
@@ -192,8 +193,29 @@ const systemDefaults = Effect.gen(function* () {
 interface FinishedRun {
 	readonly status?: string
 	readonly findings?: unknown
+	// What the run was billed and what it consumed, from its own columns.
+	readonly costCents?: number
+	readonly paidCostCents?: number
+	readonly tokensIn?: number
+	readonly tokensOut?: number
+	readonly quotaBreakdown?: Record<string, number> | null
 	// The run's final entity verdict, from its own column (not the findings JSON).
 	readonly entityMatch?: string | null
+}
+
+// What the run recorded spending, taken from the row rather than tallied here,
+// so the report shows what was actually stored against the run. Credits are
+// summed across providers: a pass may cascade between them, and the question the
+// report answers is what one run consumed in total.
+const usageOf = (run: FinishedRun): RunUsage => {
+	const credits = Object.values(run.quotaBreakdown ?? {})
+	return {
+		costCents: run.costCents ?? 0,
+		paidCostCents: run.paidCostCents ?? 0,
+		tokensIn: run.tokensIn ?? 0,
+		tokensOut: run.tokensOut ?? 0,
+		creditsUsed: credits.reduce((total, n) => total + n, 0),
+	}
 }
 
 // Poll get() until the dispatch consumer drives the run to a terminal status, or
@@ -270,6 +292,7 @@ const driveOne = (
 			status: run?.status ?? 'failed',
 			findings: run?.findings,
 			fetchedUrls: sourceRows.map(row => row.url),
+			...(run ? { usage: usageOf(run) } : {}),
 		})
 		return scoreRun(golden, outcome)
 	})
@@ -304,6 +327,12 @@ const formatCompanyRuns = (
 const pct = (value: number | null): string =>
 	value === null ? 'n/a' : `${Math.round(value * 100)}%`
 
+// Money reads in cents to the penny; tokens and credits are whole things.
+const cents = (value: number | null): string =>
+	value === null ? 'n/a' : `${value.toFixed(1)}c`
+const count = (value: number | null): string =>
+	value === null ? 'n/a' : String(Math.round(value))
+
 const formatSummary = (summary: EvalSummary): string =>
 	[
 		'',
@@ -314,6 +343,11 @@ const formatSummary = (summary: EvalSummary): string =>
 		`Titled-contact recall:  ${pct(summary.contactRecall)}`,
 		`Wrong-company rate:     ${pct(summary.wrongCompanyRate)}`,
 		`Empty rate:             ${pct(summary.emptyRate)}`,
+		`Cost per run:           ${cents(summary.costPerRun)}`,
+		`Cost per grounded run:  ${cents(summary.costPerGroundedRun)}`,
+		`  of which metered:     ${cents(summary.paidCostPerRun)}`,
+		`Tokens per run:         ${count(summary.tokensPerRun)}`,
+		`Credits per run:        ${count(summary.creditsPerRun)}`,
 	].join('\n')
 
 // One compact line per group (a bucket, a country), so a segment that regressed

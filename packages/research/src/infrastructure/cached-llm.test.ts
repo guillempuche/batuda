@@ -1,9 +1,13 @@
+import { Effect, Stream } from 'effect'
 import { LanguageModel } from 'effect/unstable/ai'
+import { SqlClient } from 'effect/unstable/sql'
 import { describe, expect, it } from 'vitest'
 
+import { makeUsageMeter, UsageMeter } from '../application/usage-meter'
 import {
 	computeLlmCacheKey,
 	isLlmCacheable,
+	makeCachedLanguageModel,
 	rehydrateCachedResponse,
 	stableStringifyForCache,
 } from './cached-llm'
@@ -241,4 +245,94 @@ describe('llm cache layers (integration)', () => {
 	it.todo(
 		'should record the model that answered on the cache row while keying the row under the tier primary model',
 	)
+})
+
+describe('counting what a model call consumed', () => {
+	// The cache sits in front of the provider, so what a run is billed depends on
+	// whether a call reached one. A fake provider makes that observable without a
+	// network call; the store is stubbed to always miss, so `invoke` takes the
+	// path that reaches the provider.
+	// `rows` is what a lookup finds: nothing (so the call reaches the provider),
+	// or a stored answer (so it is served from the cache).
+	const storeHolding = (rows: ReadonlyArray<{ response: unknown }>) => {
+		const query = () => Effect.succeed(rows)
+		return Object.assign(query, {
+			withTransaction: <A, E, R>(effect: Effect.Effect<A, E, R>) => effect,
+		}) as unknown as SqlClient.SqlClient
+	}
+	const alwaysMissingStore = storeHolding([])
+
+	const responseUsing = (inputTokens: number, outputTokens: number) =>
+		new LanguageModel.GenerateTextResponse([
+			{
+				type: 'finish' as const,
+				reason: 'stop' as const,
+				usage: {
+					inputTokens: { total: inputTokens },
+					outputTokens: { total: outputTokens },
+				},
+			},
+		] as never)
+
+	const runOneCall = (options: { readonly reachesProvider: boolean }) => {
+		const answer = responseUsing(2000, 1000)
+		const store = options.reachesProvider
+			? alwaysMissingStore
+			: storeHolding([{ response: { content: answer.content } }])
+		return Effect.gen(function* () {
+			const meter = yield* makeUsageMeter
+			const inner = {
+				generateText: () => Effect.succeed(answer),
+				generateObject: () => Effect.succeed(answer),
+				streamText: () => Stream.empty,
+			} as unknown as LanguageModel.Service
+			const cached = yield* makeCachedLanguageModel(
+				inner,
+				'agent',
+				'a-model',
+				'a-model',
+				{ inCentsPer1k: 0.01, outCentsPer1k: 0.03 },
+			).pipe(Effect.provideService(SqlClient.SqlClient, store))
+			yield* (
+				cached.generateText({ prompt: 'hello' } as never) as Effect.Effect<
+					unknown,
+					never,
+					never
+				>
+			).pipe(Effect.provideService(UsageMeter, meter))
+			return yield* meter.snapshot()
+		}).pipe(Effect.provideService(SqlClient.SqlClient, store))
+	}
+
+	describe('when the call reached the provider', () => {
+		it('should count its tokens and charge the slot rate', async () => {
+			// GIVEN a slot charging 0.01c per thousand read and 0.03c per thousand
+			// written, and a call that read 2000 and wrote 1000
+			// WHEN the call runs
+			const snapshot = await Effect.runPromise(
+				runOneCall({ reachesProvider: true }),
+			)
+
+			// THEN the tokens are counted and billed: 0.02c + 0.03c
+			expect(snapshot.tokensIn).toBe(2000)
+			expect(snapshot.tokensOut).toBe(1000)
+			expect(snapshot.costByBucket['llm_agent']).toBeCloseTo(0.05, 6)
+		})
+	})
+
+	describe('when the answer came from the cache', () => {
+		it('should count nothing', async () => {
+			// GIVEN a stored answer for the same call, so the provider is never reached
+			// WHEN it runs
+			const snapshot = await Effect.runPromise(
+				runOneCall({ reachesProvider: false }),
+			)
+
+			// THEN nothing is counted — a reused answer bills no one, so counting it
+			// would inflate every run that hits the cache
+			expect(snapshot.tokensIn).toBe(0)
+			expect(snapshot.costCents).toBe(0)
+			expect(snapshot.costByBucket).toEqual({})
+		})
+	})
 })
