@@ -1038,6 +1038,29 @@ describe('McpOAuthService.listConnections', () => {
 		})
 	})
 
+	describe('a connection cut off from one of its orgs', () => {
+		it('should leave that org out of the list', async () => {
+			// GIVEN a connection authorized for both orgs, then cut off from taller
+			await seedConsentedClient(multiOrgUserId, CLIENT_ID, 'mcp-oauth-test')
+			await setSelections(multiOrgUserId, [taller.id, restaurant.id])
+			await setRevocations(multiOrgUserId, [taller.id])
+
+			// WHEN listConnections runs
+			const connections = await runtime.runPromise(
+				Effect.gen(function* () {
+					const service = yield* McpOAuthService
+					return yield* service.listConnections(multiOrgUserId)
+				}),
+			)
+
+			// THEN only the org it can still reach is shown. The choice behind the
+			// revoked one is deliberately kept so it can be put back, so listing
+			// every choice would tell someone the connection still reaches data it
+			// cannot touch
+			expect(connections[0]?.organizationIds).toEqual([restaurant.id])
+		})
+	})
+
 	describe('a consented client bound to multiple orgs', () => {
 		it('should return the connection with every bound org', async () => {
 			// GIVEN a consented client authorized for both taller and restaurant
