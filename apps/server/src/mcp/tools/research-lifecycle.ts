@@ -8,6 +8,7 @@ import {
 	ResearchRunSummary,
 	SessionContext,
 } from '@batuda/controllers'
+import { RESEARCH_SUBJECT_TABLES, ResearchSubjectTable } from '@batuda/domain'
 import { ResearchService } from '@batuda/research'
 
 import { CompanyService } from '../../services/companies'
@@ -61,11 +62,12 @@ const CancelResearch = Tool.make('cancel_research', {
 	.annotate(Tool.OpenWorld, false)
 
 const AttachResearch = Tool.make('attach_research', {
-	description:
-		'Post-hoc link a research run to a CRM subject (companies|contacts). Inserts a finding row in research_links; re-attaching the same pair is a no-op.',
+	// The allowed subjects are read off the same list the parameter is built
+	// from, so the sentence an agent reads cannot drift from what it accepts.
+	description: `Post-hoc link a research run to a CRM subject (${RESEARCH_SUBJECT_TABLES.join('|')}). Inserts a finding row in research_links; re-attaching the same pair is a no-op.`,
 	parameters: Schema.Struct({
 		id: Schema.String,
-		subject_table: Schema.Literals(['companies', 'contacts']),
+		subject_table: ResearchSubjectTable,
 		subject_id: Uuid,
 	}),
 	success: Schema.Union([

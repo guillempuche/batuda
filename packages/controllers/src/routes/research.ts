@@ -5,6 +5,8 @@ import {
 	HttpApiSchema,
 } from 'effect/unstable/httpapi'
 
+import { ResearchSubjectTable } from '@batuda/domain'
+
 import {
 	ConfirmRequired,
 	InsufficientBudget,
@@ -31,7 +33,7 @@ import {
 // ── Input schemas ──
 
 const SubjectRef = Schema.Struct({
-	table: Schema.Literals(['companies', 'contacts']),
+	table: ResearchSubjectTable,
 	id: Schema.String,
 })
 
@@ -93,7 +95,7 @@ const UpdatePolicyInput = Schema.Struct({
 })
 
 const AttachInput = Schema.Struct({
-	subject_table: Schema.Literals(['companies', 'contacts']),
+	subject_table: ResearchSubjectTable,
 	subject_id: Schema.String,
 })
 
