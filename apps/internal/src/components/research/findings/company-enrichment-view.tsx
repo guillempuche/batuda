@@ -1,4 +1,4 @@
-import { Trans } from '@lingui/react/macro'
+import { Plural, Trans } from '@lingui/react/macro'
 import type { ReactNode } from 'react'
 
 import { SafeLink } from '#/components/research/safe-link'
@@ -14,6 +14,7 @@ import {
 	List,
 	ListItem,
 	Pill,
+	QualityList,
 	Reason,
 	RowHead,
 	Section,
@@ -381,13 +382,29 @@ export function CompanyEnrichmentView({
 					<SectionTitle>
 						<Trans>Quality</Trans>
 					</SectionTitle>
-					<Reason>
-						<Trans>
-							{quality.fields_grounded ?? 0} fields grounded ·{' '}
-							{quality.sources_matched ?? 0} own-domain sources ·{' '}
-							{quality.rounds ?? 0} rounds
-						</Trans>
-					</Reason>
+					<QualityList>
+						<li>
+							<Plural
+								value={quality.fields_grounded ?? 0}
+								one='# fact backed by a source'
+								other='# facts backed by a source'
+							/>
+						</li>
+						<li>
+							<Plural
+								value={quality.sources_matched ?? 0}
+								one="# page on the company's own site"
+								other="# pages on the company's own site"
+							/>
+						</li>
+						<li>
+							<Plural
+								value={quality.rounds ?? 0}
+								one='# pass over the evidence'
+								other='# passes over the evidence'
+							/>
+						</li>
+					</QualityList>
 				</Section>
 			) : null}
 

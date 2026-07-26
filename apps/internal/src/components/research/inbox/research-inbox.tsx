@@ -155,6 +155,10 @@ export function ResearchInbox() {
 	// Whether the "apply all verified" button is waiting on its confirm step.
 	const [confirmingBatch, setConfirmingBatch] = useState(false)
 	const [batchBusy, setBatchBusy] = useState(false)
+	// What the last bulk apply did, said out loud. Writing several records at once
+	// finished in silence: the rows quietly turned into badges, which tells a
+	// reader watching the screen but nobody listening to it.
+	const [batchOutcome, setBatchOutcome] = useState<string | null>(null)
 
 	const proposals = useMemo<ReadonlyArray<PendingProposal>>(
 		() =>
@@ -239,7 +243,8 @@ export function ResearchInbox() {
 		? t`Loading the changes waiting for review.`
 		: isFailure
 			? t`The list of changes could not be loaded.`
-			: t`${trustworthy.length} ready to apply, ${needsReview.length} need reading, ${attention.length} runs need attention.`
+			: (batchOutcome ??
+				t`${trustworthy.length} ready to apply, ${needsReview.length} need reading, ${attention.length} runs need attention.`)
 
 	function resolveOne(p: PendingProposal, decision: ResolveDecision): void {
 		if (p.proposedUpdateId === null) return
@@ -265,6 +270,7 @@ export function ResearchInbox() {
 			}))
 		if (items.length === 0) return
 		setBatchBusy(true)
+		setBatchOutcome(t`Applying ${items.length} changes…`)
 		const exit = await resolveBatch({ payload: { items } })
 		setBatchBusy(false)
 		if (exit._tag === 'Success') {
@@ -278,8 +284,20 @@ export function ResearchInbox() {
 				}
 				return next
 			})
+			// Say how it actually went. Some of a batch can come back as a clash or
+			// as unusable, and those are still waiting for someone.
+			const entered = exit.value.results.filter(r =>
+				isEnteredOutcome(r.outcome as ProposalOutcome),
+			).length
+			const leftover = exit.value.results.length - entered
+			setBatchOutcome(
+				leftover === 0
+					? t`${entered} changes entered the records.`
+					: t`${entered} entered the records, ${leftover} still need you.`,
+			)
 		} else {
 			toast.add({ title: t`Could not apply the batch.`, type: 'error' })
+			setBatchOutcome(t`The changes could not be applied.`)
 		}
 	}
 
@@ -424,6 +442,9 @@ export function ResearchInbox() {
 					type='button'
 					onClick={() => {
 						setResults({})
+						// Last batch's news is stale once the queue is re-read, so the
+						// spoken summary goes back to describing what is waiting.
+						setBatchOutcome(null)
 						refreshProposals()
 					}}
 				>

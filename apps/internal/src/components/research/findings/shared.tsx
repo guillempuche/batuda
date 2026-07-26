@@ -485,3 +485,18 @@ const DiscoveredName = styled.span`
 	font-size: var(--typescale-body-medium-size);
 	color: var(--color-on-surface);
 `
+
+// Counts read one per line, so each can agree with its own number — several
+// welded into one sentence could not be made to agree in any language, nor
+// reordered by whoever translates it.
+export const QualityList = styled.ul`
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3xs);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+	color: var(--color-on-surface-variant);
+`
