@@ -36,7 +36,6 @@ import {
 } from './research-content'
 import {
 	normalizeRows,
-	SEED_REFERENCE,
 	type SeedCtx,
 	seedCompanyId,
 	seedContactId,
@@ -3834,99 +3833,4 @@ export const seedResearchRuns = (
 				)
 			}
 		}
-	})
-
-export const seedProviderQuotas = (
-	{ sql }: SeedCtx,
-	testUser: ResolvedTestUser,
-) =>
-	Effect.gen(function* () {
-		if (!testUser) return
-		yield* Effect.logInfo('Seeding provider quotas & usage...')
-		// The quota check counts only the current month
-		// (date_trunc('month', now()) in provider-quota.ts), so the warn
-		// state is only reachable from a row anchored to *this* month.
-		// Computed at seed time so it stays current whenever the seed runs.
-		const now = SEED_REFERENCE
-		const currentPeriodStart = `${now.getUTCFullYear()}-${String(
-			now.getUTCMonth() + 1,
-		).padStart(2, '0')}-01`
-		yield* sql`INSERT INTO provider_quotas ${sql.insert(
-			normalizeRows([
-				{
-					userId: testUser.id,
-					provider: 'firecrawl',
-					billingModel: 'monthly_plan',
-					syncMode: 'api',
-					quotaTotal: 500,
-					quotaUnit: 'credits',
-					periodMonths: 1,
-					periodAnchor: '2026-04-01',
-					centsPerUnit: 0,
-					warnAtPct: 80,
-				},
-				{
-					userId: testUser.id,
-					provider: 'exa',
-					billingModel: 'monthly_plan',
-					syncMode: 'api',
-					quotaTotal: 1000,
-					quotaUnit: 'searches',
-					periodMonths: 1,
-					periodAnchor: '2026-04-01',
-					centsPerUnit: 0,
-					warnAtPct: 80,
-				},
-				{
-					userId: testUser.id,
-					provider: 'einforma',
-					billingModel: 'pay_per_call',
-					syncMode: 'manual',
-					quotaTotal: 10,
-					quotaUnit: 'reports',
-					periodMonths: 1,
-					periodAnchor: '2026-04-01',
-					centsPerUnit: 150,
-					warnAtPct: 90,
-				},
-			]),
-		)}`
-		yield* sql`INSERT INTO provider_usage ${sql.insert(
-			normalizeRows([
-				{
-					userId: testUser.id,
-					provider: 'firecrawl',
-					periodStart: '2026-04-01',
-					unitsConsumed: 387,
-				},
-				{
-					userId: testUser.id,
-					provider: 'exa',
-					periodStart: '2026-04-01',
-					unitsConsumed: 142,
-				},
-				{
-					userId: testUser.id,
-					provider: 'exa',
-					periodStart: '2026-03-01',
-					unitsConsumed: 890,
-				},
-				{
-					userId: testUser.id,
-					provider: 'einforma',
-					periodStart: '2026-04-01',
-					unitsConsumed: 1,
-				},
-				// LOCAL-DEV: current-month firecrawl usage at 460/500 = 92%,
-				// past the 80% warn threshold, so the quota-warning state is
-				// reachable (the older periods top out at ~77% this month).
-				{
-					userId: testUser.id,
-					provider: 'firecrawl',
-					periodStart: currentPeriodStart,
-					unitsConsumed: 460,
-				},
-			]),
-		)}`
-		yield* Effect.logInfo('  3 quotas, 5 usage rows')
 	})

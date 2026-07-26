@@ -19,11 +19,7 @@ import { seedPersonaActivity } from './seed/personas'
 import { pinTimestamps } from './seed/pin-timestamps'
 import { seedProposals } from './seed/proposals'
 import { seedRecordings } from './seed/recordings'
-import {
-	seedProviderQuotas,
-	seedResearchPolicy,
-	seedResearchRuns,
-} from './seed/research'
+import { seedResearchPolicy, seedResearchRuns } from './seed/research'
 import { seedReset } from './seed/reset'
 import type { Preset, SeedCtx, StampFn } from './seed/shared'
 
@@ -115,7 +111,6 @@ export const seed = (preset: Preset) =>
 					yield* seedProposals(ctx, companyMap, contactMap, insertedProducts)
 					yield* seedPages(ctx, companyMap)
 					yield* seedResearchRuns(ctx, testUser, companyMap)
-					yield* seedProviderQuotas(ctx, testUser)
 					yield* seedRecordings(ctx, companyMap)
 					yield* linkRunProvenance(ctx, instructionTemplateIds)
 				}
