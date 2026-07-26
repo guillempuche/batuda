@@ -104,10 +104,6 @@ msgstr "{0} assistents"
 msgid "{0} calls"
 msgstr "{0} crides"
 
-#: src/components/research/findings/company-enrichment-view.tsx
-#~ msgid "{0} fields grounded · {1} own-domain sources · {2} rounds"
-#~ msgstr "{0} camps documentats · {1} fonts del domini propi · {2} rondes"
-
 #. placeholder {0}: thread.messageCount
 #: src/routes/emails/index.tsx
 msgid "{0} msgs"
@@ -1201,6 +1197,10 @@ msgstr "Copia el slug"
 #: src/routes/settings/api-keys/index.tsx
 msgid "Copy your key now"
 msgstr "Copia la teva clau ara"
+
+#: src/components/companies/upcoming-meetings-card.tsx
+msgid "Could be more than one person on file"
+msgstr "Podria ser més d'una persona de les que tens fitxades"
 
 #: src/routes/settings/organization/members.tsx
 msgid "Could not add {trimmed}. Please try again."
@@ -5031,6 +5031,10 @@ msgstr "El taller ha rebutjat el canvi. Torna-ho a provar."
 #: src/routes/settings/organization/index.tsx
 msgid "The workspace your CRM data lives in."
 msgstr "L'espai de treball on viuen les dades del CRM."
+
+#: src/components/companies/upcoming-meetings-card.tsx
+msgid "Their company is on file, they are not"
+msgstr "Tens fitxada la seva empresa, però no la persona"
 
 #. placeholder {0}: formatMoneyCents(totalCents, { locale: i18n.locale })
 #: src/components/research/inbox/paid-action-queue.tsx
