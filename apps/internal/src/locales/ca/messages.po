@@ -1263,14 +1263,31 @@ msgstr "No s'han pogut carregar les empreses"
 msgid "Could not load contacts"
 msgstr "No s'han pogut carregar els contactes"
 
+#: src/components/companies/conversations-tab.tsx
+msgid "Could not load emails"
+msgstr "No s'han pogut carregar els correus"
+
 #: src/routes/emails/inboxes.tsx
 msgid "Could not load inboxes"
 msgstr "No s'han pogut carregar les safates"
+
+#: src/components/companies/conversations-tab.tsx
+#: src/components/companies/upcoming-meetings-card.tsx
+msgid "Could not load meetings"
+msgstr "No s'han pogut carregar les reunions"
 
 #: src/routes/companies/$slug.tsx
 #: src/routes/pages/index.tsx
 msgid "Could not load pages"
 msgstr "No s'han pogut carregar les pàgines"
+
+#: src/routes/companies/$slug.tsx
+msgid "Could not load research"
+msgstr "No s'ha pogut carregar la recerca"
+
+#: src/routes/companies/$slug.tsx
+msgid "Could not load tasks"
+msgstr "No s'han pogut carregar les tasques"
 
 #: src/components/companies/pipeline-board.tsx
 msgid "Could not load the board"
@@ -2004,6 +2021,10 @@ msgstr "Correu via Batuda"
 #: src/routes/emails/index.tsx
 msgid "Emails"
 msgstr "Correus"
+
+#: src/components/companies/conversations-tab.tsx
+msgid "Emails are missing from this list. Everything else below is still accurate."
+msgstr "Falten els correus d'aquesta llista. La resta del que hi ha a sota continua sent correcte."
 
 #: src/routes/companies/$slug.tsx
 msgid "Emails, calls, documents, and proposals will appear here as they happen."
@@ -2803,6 +2824,10 @@ msgstr "Preparació de reunió"
 #: src/routes/companies/$slug.tsx
 msgid "Meeting stage — set the next action (agenda, follow-up)."
 msgstr "Etapa de reunió — defineix la següent acció (agenda, seguiment)."
+
+#: src/components/companies/conversations-tab.tsx
+msgid "Meetings are missing from this list. Everything else below is still accurate."
+msgstr "Falten les reunions d'aquesta llista. La resta del que hi ha a sota continua sent correcte."
 
 #: src/routes/calendar/index.tsx
 msgid "Meetings from bookings, email invitations, and internal blocks."
@@ -4943,6 +4968,10 @@ msgstr "Les pàgines que he trobat eren d'una altra empresa, així que no he des
 msgid "The people at this company could not be fetched. Check that the session is valid, then try again."
 msgstr "No s'han pogut recuperar les persones d'aquesta empresa. Comprova que la sessió sigui vàlida i torna-ho a provar."
 
+#: src/routes/companies/$slug.tsx
+msgid "The research runs for this company could not be fetched. Check that the session is valid, then try again."
+msgstr "No s'han pogut recuperar les recerques d'aquesta empresa. Comprova que la sessió sigui vàlida i torna-ho a provar."
+
 #: src/components/research/run-detail.tsx
 msgid "The run arrived in a form this page cannot read. Go back to the run list and open it again; report it if it keeps happening."
 msgstr "L'execució ha arribat en un format que aquesta pàgina no pot llegir. Torna a la llista d'execucions i obre-la de nou; informa-ho si continua passant."
@@ -4950,6 +4979,10 @@ msgstr "L'execució ha arribat en un format que aquesta pàgina no pot llegir. T
 #: src/components/research/findings/freeform-view.tsx
 msgid "The run finished without proposed updates or paid actions."
 msgstr "L'execució ha acabat sense actualitzacions proposades ni accions de pagament."
+
+#: src/routes/companies/$slug.tsx
+msgid "The tasks for this company could not be fetched. Check that the session is valid, then try again."
+msgstr "No s'han pogut recuperar les tasques d'aquesta empresa. Comprova que la sessió sigui vàlida i torna-ho a provar."
 
 #: src/routes/emails/$threadId.tsx
 msgid "The thread exists but the provider returned no messages."
@@ -5023,6 +5056,10 @@ msgstr "Aquesta empresa no es pot mostrar"
 #: src/routes/settings/mcp/connections.tsx
 msgid "This connection is unbound. Bind an org to use it."
 msgstr "Aquesta connexió no està vinculada. Vincula una organització per fer-la servir."
+
+#: src/components/companies/upcoming-meetings-card.tsx
+msgid "This is not the same as having none. Try again to see what is scheduled."
+msgstr "Això no vol dir que no n'hi hagi cap. Torna-ho a provar per veure què hi ha programat."
 
 #: src/routes/settings/api-keys/index.tsx
 msgid "This is the only time the full key is shown. Store it somewhere safe — I can't show it again."
@@ -5229,6 +5266,7 @@ msgstr "Clau sense títol"
 msgid "Unverified"
 msgstr "Sense verificar"
 
+#: src/components/companies/upcoming-meetings-card.tsx
 #: src/components/companies/upcoming-meetings-card.tsx
 #: src/components/companies/upcoming-meetings-card.tsx
 #: src/components/companies/upcoming-meetings-card.tsx

@@ -70,7 +70,11 @@ import {
 	type FitConflict,
 } from '#/components/companies/company-fit-section'
 import { CompanyOwnerControl } from '#/components/companies/company-owner-control'
-import { ConversationsTab } from '#/components/companies/conversations-tab'
+import {
+	ConversationsTab,
+	companyConversationsCalendarAtom,
+	countCompanyConversationMeetings,
+} from '#/components/companies/conversations-tab'
 import {
 	DocumentsPanel,
 	documentsDlgMembers,
@@ -522,6 +526,7 @@ function DetailBody({
 	const refreshContacts = useAtomRefresh(contactsAtom)
 	const refreshTasks = useAtomRefresh(tasksAtom)
 	const refreshPages = useAtomRefresh(companyPagesAtom)
+	const refreshEmails = useAtomRefresh(companyEmailsAtom)
 
 	// Each of these lists falls back to empty whenever it has not succeeded, so
 	// without telling the three states apart a panel says "nothing here" both
@@ -529,6 +534,9 @@ function DetailBody({
 	const contactsFailed = AsyncResult.isFailure(contactsResult)
 	const timelineFailed = AsyncResult.isFailure(timelineResult)
 	const pagesFailed = AsyncResult.isFailure(pagesResult)
+	const tasksFailed = AsyncResult.isFailure(tasksResult)
+	const emailsFailed = AsyncResult.isFailure(emailsResult)
+	const researchFailed = AsyncResult.isFailure(researchResult)
 	const contactsLoading = AsyncResult.isInitial(contactsResult)
 	const timelineLoading = AsyncResult.isInitial(timelineResult)
 	const pagesLoading = AsyncResult.isInitial(pagesResult)
@@ -787,12 +795,36 @@ function DetailBody({
 		[timelineEntries],
 	)
 
-	// Sum of every kind feeding the Conversations tab so the badge tells
-	// the user "this many things to look at" at a glance. Calendar
-	// events live inside ConversationsTab itself so they're not counted
-	// here — the badge is a lower bound.
+	// Tab badges count what is on file, not what this page managed to fetch: a
+	// company with more people than one page holds would otherwise advertise the
+	// page size as its headcount.
+	const contactsTotal = AsyncResult.isSuccess(contactsResult)
+		? contactsResult.value.total
+		: contacts.length
+	const companyPagesTotal = AsyncResult.isSuccess(pagesResult)
+		? pagesResult.value.total
+		: companyPages.length
+
+	// The meetings shown in the Conversations tab, read through the same request
+	// the tab itself makes, so counting them here costs nothing extra.
+	const conversationMeetingsAtom = useMemo(
+		() => companyConversationsCalendarAtom(company.id),
+		[company.id],
+	)
+	const conversationMeetingsResult = useAtomValue(conversationMeetingsAtom)
+	const conversationMeetingCount = AsyncResult.isSuccess(
+		conversationMeetingsResult,
+	)
+		? countCompanyConversationMeetings(conversationMeetingsResult.value.items)
+		: 0
+
+	// Sum of every kind feeding the Conversations tab, meetings included, so the
+	// badge and the list it labels describe the same set of things.
 	const conversationsCount =
-		conversationInteractions.length + companyThreads.length + tasks.length
+		conversationInteractions.length +
+		companyThreads.length +
+		tasks.length +
+		conversationMeetingCount
 
 	const openTasks = useMemo(
 		() =>
@@ -1146,10 +1178,10 @@ function DetailBody({
 						<Trans>Conversations</Trans> ({conversationsCount})
 					</PriTabs.Tab>
 					<PriTabs.Tab value='people' data-testid='company-people-tab'>
-						<Trans>People</Trans> ({contacts.length})
+						<Trans>People</Trans> ({contactsTotal})
 					</PriTabs.Tab>
 					<PriTabs.Tab value='files' data-testid='company-files-tab'>
-						<Trans>Files</Trans> ({companyPages.length})
+						<Trans>Files</Trans> ({companyPagesTotal})
 					</PriTabs.Tab>
 					<PriTabs.Indicator />
 				</PriTabs.List>
@@ -1179,7 +1211,17 @@ function DetailBody({
 								$gap='md'
 							>
 								<Stack $gap='md'>
-									<OpenTasksCard tasks={openTasks} />
+									{tasksFailed ? (
+										<ErrorState
+											data-testid='company-tasks-error'
+											variant='inline'
+											title={t`Could not load tasks`}
+											description={t`The tasks for this company could not be fetched. Check that the session is valid, then try again.`}
+											onRetry={refreshTasks}
+										/>
+									) : (
+										<OpenTasksCard tasks={openTasks} />
+									)}
 									<OverviewTimeline data-testid='company-overview-timeline'>
 										<PriCollapsible.Root defaultOpen>
 											<TimelineTrigger>
@@ -1246,11 +1288,21 @@ function DetailBody({
 									</OverviewTimeline>
 								</Stack>
 								<Stack $gap='md'>
-									<ResearchSummaryCard
-										runs={researchRuns}
-										lastEnrichedAt={company.lastEnrichedAt}
-										onRunNew={() => openDlg({ kind: 'research' })}
-									/>
+									{researchFailed ? (
+										<ErrorState
+											data-testid='company-research-error'
+											variant='inline'
+											title={t`Could not load research`}
+											description={t`The research runs for this company could not be fetched. Check that the session is valid, then try again.`}
+											onRetry={refreshResearch}
+										/>
+									) : (
+										<ResearchSummaryCard
+											runs={researchRuns}
+											lastEnrichedAt={company.lastEnrichedAt}
+											onRunNew={() => openDlg({ kind: 'research' })}
+										/>
+									)}
 									<WherePanel company={company} compact />
 									<AccountBriefSection
 										company={company}
@@ -1505,6 +1557,8 @@ function DetailBody({
 							companyId={company.id}
 							interactions={conversationInteractions}
 							threads={companyThreads}
+							threadsFailed={emailsFailed}
+							onRetryThreads={refreshEmails}
 							tasks={tasks}
 							onCompose={handleComposeEmail}
 						/>

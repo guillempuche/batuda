@@ -19,8 +19,7 @@ export type OpenTaskRow = {
 /**
  * Open-tasks card — top 3 open tasks for this company, oldest-due
  * first. The card surfaces the "what's next" signal on the Overview so
- * the user doesn't have to switch tabs to see it. Adding tasks goes
- * through the dedicated create flow in Slice 3 (no UI exposed yet).
+ * the user doesn't have to switch tabs to see it.
  */
 export function OpenTasksCard({
 	tasks,
@@ -30,6 +29,10 @@ export function OpenTasksCard({
 	const { t } = useLingui()
 	const top = tasks.slice(0, 3)
 	const remaining = tasks.length - top.length
+	// A date that has passed is called out rather than sitting quietly among
+	// dates still ahead. The reader's own clock decides that, so the emphasis the
+	// server printed is allowed to differ from what they end up seeing.
+	const now = Date.now()
 
 	return (
 		<Card data-testid='company-open-tasks-card'>
@@ -49,7 +52,10 @@ export function OpenTasksCard({
 					{top.map(task => (
 						<Row key={task.id} data-testid={`company-open-task-${task.id}`}>
 							<Title>{task.title}</Title>
-							<Meta>
+							<Meta
+								$overdue={task.dueAt !== null && Date.parse(task.dueAt) < now}
+								suppressHydrationWarning
+							>
 								<RelativeDate value={task.dueAt} fallback={t`no due date`} />
 							</Meta>
 						</Row>
@@ -133,14 +139,24 @@ const Title = styled.span`
 	min-width: 0;
 `
 
-const Meta = styled.span`
+const Meta = styled.span.withConfig({
+	displayName: 'OpenTasksCardMeta',
+	shouldForwardProp: prop => !prop.startsWith('$'),
+})<{ $overdue: boolean }>`
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
 	font-weight: var(--font-weight-bold);
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
-	color: var(--color-on-surface-variant);
+	color: ${p =>
+		p.$overdue ? 'var(--color-error)' : 'var(--color-on-surface-variant)'};
 	flex-shrink: 0;
+
+	/* The nested relative date carries its own muted colour, so the overdue
+	   emphasis has to reach it too or the text stays grey. */
+	& time {
+		color: inherit;
+	}
 `
 
 const More = styled.li`
