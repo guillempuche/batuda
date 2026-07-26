@@ -180,19 +180,31 @@ For the full command reference (login flow, navigation, interaction, network ins
 
 A click on an element below the fold does nothing and still prints `✓ Done`, which looks identical to a broken handler — scroll it into view first. Before reporting any button as broken, verify the click actually landed; see the interaction section of `references/agent-browser.md` for the recipe.
 
+**Wait after loading `/login` before filling anything.** Without a pause the password field is often not in the DOM yet, so `fill` reports `✗ Element not found`, the submit click posts an empty form, and the next `find testid "org-switcher"` also misses — three failures that together read exactly like broken auth. It is a hydration race, not a bug in the app. The same applies after `pnpm dev` restarts: the session cookie is gone, so a page you had open lands back on `/login?returnTo=…` and every subsequent `find` fails until you sign in again.
+
 Quick login test:
 
 ```bash
 agent-browser open "$WEB/login"                               # $WEB from the pre-flight
+agent-browser wait 3000                                       # let the form hydrate — see above
 agent-browser fill "input[name='email']" "admin@taller.cat"
 agent-browser fill "input[name='password']" "batuda-dev-2026"
 agent-browser wait 500                                        # let controlled inputs commit first
 agent-browser click "button[type='submit']"
-agent-browser wait 3000
+agent-browser wait 5000
 agent-browser find testid "org-switcher" click                # org-scoped pages error
+agent-browser wait 1500
 agent-browser find testid "org-switcher-option-taller" click  # without an active org
-agent-browser wait 3000
+agent-browser wait 5000
 agent-browser snapshot
+```
+
+To force one feed to fail while the rest of a page keeps working — the only honest way to see an error branch — revoke the read grant on that one table and put it back afterwards:
+
+```bash
+docker exec batuda-db psql -U batuda -d <db> -c "REVOKE SELECT ON calendar_events FROM app_user, app_service;"
+# ... check the page shows its failure state, then ...
+docker exec batuda-db psql -U batuda -d <db> -c "GRANT SELECT ON calendar_events TO app_user, app_service;"
 ```
 
 ## Watch several worktrees at once

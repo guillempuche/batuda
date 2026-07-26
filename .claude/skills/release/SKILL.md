@@ -83,6 +83,10 @@ git diff --name-only "$last_tag"..HEAD -- apps/server/src/db/migrations/
 
 Each migration must be **backward-compatible with the still-running version** (expand-contract): the old instance keeps serving during the rollout, so dropping/renaming a column it still reads breaks it mid-deploy. CI already enforces this — `scripts/check-migration-safety.mjs` fails any PR that adds a non-backward-compatible migration unless it carries an `expand-contract:` marker — so a clean PR has already passed the gate. Drop the old shape only in a **later** release, once no running version reads it.
 
+The gate also matches `DROP CONSTRAINT`, which catches the common trick of dropping a constraint before re-adding it just to make a migration re-runnable. When all you want is a `CHECK` on a new column, attach it to the column instead — `ADD COLUMN IF NOT EXISTS status text CHECK (status IN (…))` is idempotent on its own and needs no marker. Reach for the marker when the change really is destructive, and write down why it is safe.
+
+Two other things the gate will not catch. Migration ids must be unique, and the numbers are assigned by hand — so a branch that sat while `main` moved can collide, and `db migrate` then fails with `Found duplicate migration id's`. Rebase before finalizing and renumber to the next free id. And a `UNIQUE` constraint that includes a nullable column stops deduplicating the rows where that column is null, because Postgres treats nulls as distinct; add `NULLS NOT DISTINCT` when the null case still has to be unique.
+
 ## Step 5: Execute Release
 
 ```bash
