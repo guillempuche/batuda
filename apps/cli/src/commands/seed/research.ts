@@ -3614,11 +3614,8 @@ export const seedResearchRuns = (
 								quotaUnits: 1,
 								quotaUnit: 'lookups',
 								args: JSON.stringify({}),
-								resultHash: null,
-								resultData: null,
 								sourceId: null,
 								autoApproved: true,
-								approvedBy: null,
 							},
 							{
 								organizationId: tallerOrgId,
@@ -3631,11 +3628,8 @@ export const seedResearchRuns = (
 								quotaUnits: 1,
 								quotaUnit: 'requests',
 								args: JSON.stringify({}),
-								resultHash: null,
-								resultData: null,
 								sourceId: null,
 								autoApproved: true,
-								approvedBy: null,
 							},
 						],
 						r => String(r.idempotencyKey),
@@ -3728,11 +3722,8 @@ export const seedResearchRuns = (
 						quotaUnits: p.quotaUnits ?? null,
 						quotaUnit: p.quotaUnit ?? null,
 						args: JSON.stringify({}),
-						resultHash: null,
-						resultData: null,
 						sourceId: p.sourceId ?? null,
 						autoApproved: p.autoApproved,
-						approvedBy: p.autoApproved ? null : testUser.id,
 					})
 				}
 			}
