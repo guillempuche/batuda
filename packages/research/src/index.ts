@@ -3,7 +3,11 @@
 // and are selected at boot-time via env vars.
 
 // ── Application (services) ─────────────────────────────────────────────────
-export { type BudgetConfig, makeBudgetLayer } from './application/budget'
+export {
+	type BudgetConfig,
+	makeBudgetLayer,
+	monthlyRemainingCents,
+} from './application/budget'
 // ── Application (contact discovery) ────────────────────────────────────────
 export {
 	type ContactChannel,

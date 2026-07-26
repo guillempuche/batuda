@@ -49,7 +49,6 @@ export const TEST_ENV: Record<string, string> = {
 	RESEARCH_MAX_LOOP_PROMPT_TOKENS: '24000',
 	RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL: '3',
 	RESEARCH_MAX_CONCURRENCY_FANOUT: '3',
-	RESEARCH_CONFIRM_THRESHOLD_FANOUT: '10',
 }
 
 export const applyTestEnv = (): void => {
