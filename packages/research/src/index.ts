@@ -95,7 +95,6 @@ export {
 	ExtractLanguageModel,
 	MapProvider,
 	MxResolver,
-	ProviderQuota,
 	RegistryRouter,
 	ReportRouter,
 	ResearchEventSink,
@@ -104,10 +103,6 @@ export {
 	SearchProvider,
 	WriterLanguageModel,
 } from './application/ports'
-export {
-	makeProviderQuotaLayer,
-	type ProviderQuotaConfig,
-} from './application/provider-quota'
 export {
 	type CreateResearchInput,
 	cloneCacheHitRun,
@@ -155,7 +150,6 @@ export {
 	NoRegistry,
 	noRegistryResult,
 	ProviderError,
-	QuotaExhausted,
 } from './domain/errors'
 export type {
 	BudgetSnapshot,

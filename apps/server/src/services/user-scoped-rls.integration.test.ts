@@ -1,7 +1,6 @@
 // Live-DB integration test for the RLS policies added in
-// 0003_user_scoped_rls.ts. Verifies that user_research_policy,
-// provider_quotas, and provider_usage each enforce row visibility on
-// `app.current_user_id` for the app_user role.
+// 0003_user_scoped_rls.ts. Verifies that user_research_policy enforces row
+// visibility on `app.current_user_id` for the app_user role.
 //
 // Prereq: `pnpm cli services up` so Postgres is reachable on
 // $DATABASE_URL, and `pnpm cli db reset && pnpm cli db migrate` so the
@@ -26,7 +25,7 @@ const BOB = `rls-bob-${randomUUID()}`
 
 let pool: pg.Pool
 
-// Seeds one row per (user_id) in each user-scoped table. Runs as the
+// Seeds one row per (user_id) in the user-scoped table. Runs as the
 // DATABASE_URL owner, which has BYPASSRLS on Neon and is superuser on
 // local docker — either way, the FORCE RLS policies don't gate inserts
 // at seed time.
@@ -37,20 +36,6 @@ const seedRow = async (
 	await client.query(
 		`INSERT INTO user_research_policy (user_id) VALUES ($1)
 		 ON CONFLICT (user_id) DO NOTHING`,
-		[userId],
-	)
-	await client.query(
-		`INSERT INTO provider_quotas
-		   (user_id, provider, billing_model, quota_total, quota_unit)
-		 VALUES ($1, 'brave-search', 'pay_per_call', 1000, 'request')
-		 ON CONFLICT (user_id, provider) DO NOTHING`,
-		[userId],
-	)
-	await client.query(
-		`INSERT INTO provider_usage
-		   (user_id, provider, period_start, units_consumed)
-		 VALUES ($1, 'brave-search', '2026-05-01', 10)
-		 ON CONFLICT (user_id, provider, period_start) DO NOTHING`,
 		[userId],
 	)
 }
@@ -64,14 +49,6 @@ beforeAll(async () => {
 afterAll(async () => {
 	// Run as connection owner (no role switch) so RLS doesn't gate the
 	// cleanup DELETEs.
-	await pool.query(
-		`DELETE FROM provider_usage WHERE user_id = ANY($1::text[])`,
-		[[ALICE, BOB]],
-	)
-	await pool.query(
-		`DELETE FROM provider_quotas WHERE user_id = ANY($1::text[])`,
-		[[ALICE, BOB]],
-	)
 	await pool.query(
 		`DELETE FROM user_research_policy WHERE user_id = ANY($1::text[])`,
 		[[ALICE, BOB]],
@@ -151,42 +128,8 @@ describe('RLS: user-scoped research tables', () => {
 			}))
 	})
 
-	describe('provider_quotas', () => {
-		it("should expose only the current user's rows", () =>
-			asAppUser(ALICE, async client => {
-				// GIVEN both users have one provider_quotas row each
-				// WHEN selecting under alice's GUC
-				const rows = await client.query<{ user_id: string }>(
-					'SELECT user_id FROM provider_quotas',
-				)
-
-				// THEN every visible row belongs to alice
-				expect(rows.rows.every(r => r.user_id === ALICE)).toBe(true)
-				// AND alice's row is present
-				expect(rows.rows.map(r => r.user_id)).toContain(ALICE)
-				// [apps/server/src/db/migrations/0003_user_scoped_rls.ts — user_isolation_provider_quotas USING]
-			}))
-	})
-
-	describe('provider_usage', () => {
-		it("should expose only the current user's rows", () =>
-			asAppUser(ALICE, async client => {
-				// GIVEN both users have one provider_usage row each
-				// WHEN selecting under alice's GUC
-				const rows = await client.query<{ user_id: string }>(
-					'SELECT user_id FROM provider_usage',
-				)
-
-				// THEN every visible row belongs to alice
-				expect(rows.rows.every(r => r.user_id === ALICE)).toBe(true)
-				// AND alice's row is present
-				expect(rows.rows.map(r => r.user_id)).toContain(ALICE)
-				// [apps/server/src/db/migrations/0003_user_scoped_rls.ts — user_isolation_provider_usage USING]
-			}))
-	})
-
 	describe('when app.current_user_id is unset', () => {
-		it('should return zero rows from every user-scoped table (fail-closed)', async () => {
+		it('should return zero rows from the user-scoped table (fail-closed)', async () => {
 			const client = await pool.connect()
 			try {
 				await client.query('BEGIN')
@@ -195,15 +138,11 @@ describe('RLS: user-scoped research tables', () => {
 				// returns NULL with missing_ok=true, so the predicate is NULL,
 				// which RLS treats as failure (fail-closed)
 
-				// WHEN selecting from each user-scoped table
+				// WHEN selecting from the user-scoped table
 				const policy = await client.query('SELECT 1 FROM user_research_policy')
-				const quotas = await client.query('SELECT 1 FROM provider_quotas')
-				const usage = await client.query('SELECT 1 FROM provider_usage')
 
-				// THEN all three are empty
+				// THEN it is empty
 				expect(policy.rows).toHaveLength(0)
-				expect(quotas.rows).toHaveLength(0)
-				expect(usage.rows).toHaveLength(0)
 				// [apps/server/src/db/migrations/0003_user_scoped_rls.ts — current_setting(…, true) NULL → predicate false]
 			} finally {
 				await client.query('ROLLBACK')
@@ -220,7 +159,7 @@ describe('RLS: user-scoped research tables', () => {
 				await client.query(`SET LOCAL ROLE app_service`)
 				// GIVEN role=app_service, which has BYPASSRLS
 
-				// WHEN selecting from each user-scoped table
+				// WHEN selecting from the user-scoped table
 				const rows = await client.query<{ user_id: string }>(
 					'SELECT user_id FROM user_research_policy WHERE user_id = ANY($1::text[])',
 					[[ALICE, BOB]],

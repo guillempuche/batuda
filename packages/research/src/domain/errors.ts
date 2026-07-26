@@ -34,16 +34,6 @@ export class MonthlyCapExceeded extends Schema.TaggedErrorClass<MonthlyCapExceed
 	},
 ) {}
 
-/** Provider quota (native units) exhausted. Recoverable: try alternative. */
-export class QuotaExhausted extends Schema.TaggedErrorClass<QuotaExhausted>()(
-	'QuotaExhausted',
-	{
-		provider: Schema.String,
-		unit: Schema.String,
-		remaining: Schema.Number,
-	},
-) {}
-
 /**
  * A paid call whose cost is over the user's auto-approve limit. Raised in-run
  * instead of spending; the model records it under findings.pending_paid_actions

@@ -285,23 +285,3 @@ export interface BudgetService {
 export class Budget extends Context.Service<Budget, BudgetService>()(
 	'research/Budget',
 ) {}
-
-// ── Provider Quota ──
-
-export class ProviderQuota extends Context.Service<
-	ProviderQuota,
-	{
-		readonly check: (
-			provider: string,
-			units: number,
-		) => Effect.Effect<void, import('../domain/errors').QuotaExhausted>
-		readonly consume: (
-			provider: string,
-			units: number,
-		) => Effect.Effect<void, import('../domain/errors').QuotaExhausted>
-		readonly remaining: (
-			provider: string,
-		) => Effect.Effect<{ total: number; used: number; unit: string }>
-		readonly sync: (provider: string) => Effect.Effect<void, ProviderError>
-	}
->()('research/ProviderQuota') {}
