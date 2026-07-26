@@ -393,19 +393,14 @@ function toEventRow(raw: unknown): CalendarEventRow {
 		title: String(r['title'] ?? ''),
 		source: (r['source'] as CalendarEventRow['source']) ?? 'internal',
 		status: (r['status'] as CalendarEventRow['status']) ?? 'confirmed',
-		startAt: toIsoString(r['start_at'] ?? r['startAt']),
-		endAt: toIsoString(r['end_at'] ?? r['endAt']),
-		companyId: (r['company_id'] ?? r['companyId'] ?? null) as string | null,
-		contactId: (r['contact_id'] ?? r['contactId'] ?? null) as string | null,
-		locationType: (r['location_type'] ??
-			r['locationType']) as CalendarEventRow['locationType'],
-		locationValue: (r['location_value'] ?? r['locationValue'] ?? null) as
-			| string
-			| null,
-		videoCallUrl: (r['video_call_url'] ?? r['videoCallUrl'] ?? null) as
-			| string
-			| null,
-		organizerEmail: String(r['organizer_email'] ?? r['organizerEmail'] ?? ''),
+		startAt: toIsoString(r['startAt']),
+		endAt: toIsoString(r['endAt']),
+		companyId: (r['companyId'] ?? null) as string | null,
+		contactId: (r['contactId'] ?? null) as string | null,
+		locationType: r['locationType'] as CalendarEventRow['locationType'],
+		locationValue: (r['locationValue'] ?? null) as string | null,
+		videoCallUrl: (r['videoCallUrl'] ?? null) as string | null,
+		organizerEmail: String(r['organizerEmail'] ?? ''),
 	}
 }
 
