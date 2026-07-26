@@ -3170,17 +3170,19 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										? registrySnapshot['name']
 										: (run as { query: string }).query
 								yield* Effect.gen(function* () {
-									// Charged under this run's registry key. If the agent later looks
-									// the same company up by the same name, that call is free (it
-									// hashes to this key); a lookup by tax id or a different spelling
-									// is charged again, so the register costs at most a small, budget-
-									// capped handful per run rather than exactly once.
-									yield* budget.chargePaid(
+									// Paid for under this run's own key for this company and
+									// spelling. The agent looking the same company up the same way
+									// later costs nothing and does not reach the register again; a
+									// lookup by tax id or a different spelling is a different
+									// purchase, so the register costs a small, limit-capped handful
+									// per run.
+									const paid = yield* budget.chargePaid(
 										'registry',
 										REGISTRY_LOOKUP_COST_CENTS,
 										'registry_lookup',
 										`${researchId}:registry:${registryCountry}:${registryQuery}`,
 									)
+									if (!paid) return
 									const record = yield* registry.lookup({
 										country: registryCountry,
 										query: registryQuery,

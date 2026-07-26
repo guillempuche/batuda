@@ -26,7 +26,11 @@ import {
 } from 'effect/unstable/ai'
 
 import { AcceptedCountry } from '../domain/country'
-import { approvalRequiredResult, noRegistryResult } from '../domain/errors'
+import {
+	alreadyLookedUpResult,
+	approvalRequiredResult,
+	noRegistryResult,
+} from '../domain/errors'
 import { ScrapedPage } from '../domain/types'
 import { ContactDiscovery } from './contact-discovery'
 import {
@@ -441,12 +445,18 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 					// Deterministic key: a resumed run re-charging the same lookup is
 					// a DB no-op, so a crash mid-run never double-charges for it.
 					const idempotencyKey = `${researchId}:registry:${country}:${params.tax_id ?? params.query ?? ''}`
-					yield* budget.chargePaid(
+					const paid = yield* budget.chargePaid(
 						'registry',
 						REGISTRY_LOOKUP_COST_CENTS,
 						'registry_lookup',
 						idempotencyKey,
 					)
+					// The register charges per lookup, so a repeat of one this run
+					// already bought would be paid for twice for the same answer.
+					if (!paid)
+						return alreadyLookedUpResult(
+							`${params.tax_id ?? params.query ?? ''} (${country})`,
+						)
 					return yield* registry.lookup({
 						country,
 						query: params.query ?? undefined,

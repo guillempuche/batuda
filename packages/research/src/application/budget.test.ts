@@ -131,10 +131,17 @@ describe('the paid purse', () => {
 				Effect.forEach(
 					Array.from({ length: 20 }),
 					() =>
-						budget.chargePaid('hunter', 10, 'discover_contacts').pipe(
-							Effect.as('funded' as const),
-							Effect.catch(() => Effect.succeed('refused' as const)),
-						),
+						budget
+							.chargePaid(
+								'hunter',
+								10,
+								'discover_contacts',
+								`key-${crypto.randomUUID()}`,
+							)
+							.pipe(
+								Effect.as('funded' as const),
+								Effect.catch(() => Effect.succeed('refused' as const)),
+							),
 					{ concurrency: 'unbounded' },
 				).pipe(
 					Effect.flatMap(outcomes =>
@@ -158,7 +165,12 @@ describe('the paid purse', () => {
 				budget =>
 					Effect.gen(function* () {
 						// WHEN a charge is made against it
-						yield* budget.chargePaid('hunter', 40, 'discover_contacts')
+						yield* budget.chargePaid(
+							'hunter',
+							40,
+							'discover_contacts',
+							`key-${crypto.randomUUID()}`,
+						)
 						return yield* budget.snapshot()
 					}),
 				{ charge: Effect.succeed([]) },
@@ -177,7 +189,12 @@ describe('the paid purse', () => {
 				Effect.gen(function* () {
 					const budget = yield* Budget
 					const fiber = yield* Effect.forkChild(
-						budget.chargePaid('hunter', 40, 'discover_contacts'),
+						budget.chargePaid(
+							'hunter',
+							40,
+							'discover_contacts',
+							`key-${crypto.randomUUID()}`,
+						),
 					)
 					yield* Effect.yieldNow
 
@@ -203,13 +220,20 @@ describe('the paid purse', () => {
 					Effect.forEach(
 						[60, 60],
 						cents =>
-							budget.chargePaid('hunter', cents, 'discover_contacts').pipe(
-								Effect.as('charged' as const),
-								Effect.catchTag('ApprovalRequired', () =>
-									Effect.succeed('needs approval' as const),
+							budget
+								.chargePaid(
+									'hunter',
+									cents,
+									'discover_contacts',
+									`key-${crypto.randomUUID()}`,
+								)
+								.pipe(
+									Effect.as('charged' as const),
+									Effect.catchTag('ApprovalRequired', () =>
+										Effect.succeed('needs approval' as const),
+									),
+									Effect.catch(() => Effect.succeed('refused' as const)),
 								),
-								Effect.catch(() => Effect.succeed('refused' as const)),
-							),
 						{ concurrency: 'unbounded' },
 					),
 				{

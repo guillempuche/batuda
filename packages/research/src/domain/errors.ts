@@ -71,6 +71,17 @@ export class NoRegistry extends Schema.TaggedErrorClass<NoRegistry>()(
 ) {}
 
 /** The no_registry outcome rendered as a plain result value. */
+/**
+ * This run already bought this exact lookup, and the answer is earlier in the
+ * run's own transcript. A routing outcome, not a failure: buying it again would
+ * be paying a second time for something already in hand.
+ */
+export const alreadyLookedUpResult = (subject: string) => ({
+	status: 'already_looked_up' as const,
+	subject,
+	message: `This run already looked up ${subject}. Its result is earlier in this transcript — use it rather than looking it up again.`,
+})
+
 export const noRegistryResult = (country: string) => ({
 	status: 'no_registry' as const,
 	country,

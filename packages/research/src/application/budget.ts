@@ -170,7 +170,7 @@ export const makeBudgetLayer = (config: BudgetConfig) =>
 					provider: string,
 					cents: number,
 					tool: string,
-					idempotencyKey?: string,
+					idempotencyKey: string,
 				) =>
 					Effect.gen(function* () {
 						// Set the money aside in one indivisible step that also decides both
@@ -236,9 +236,7 @@ export const makeBudgetLayer = (config: BudgetConfig) =>
 							provider,
 							// The calling tool's name, so a spend breakdown by tool is real.
 							tool,
-							idempotencyKey:
-								idempotencyKey ??
-								`${config.researchId}:${provider}:${Date.now()}`,
+							idempotencyKey,
 							args: {},
 							autoApproved: true,
 							userCap: config.policy.paidMonthlyCapCents,
@@ -249,10 +247,12 @@ export const makeBudgetLayer = (config: BudgetConfig) =>
 							),
 						)
 
-						// A retried idempotency key is a DB no-op — the same real-world
-						// charge is already counted against this run, so give the reserved
-						// money back rather than counting it twice.
+						// A repeat of a call this run already paid for is a no-op in the
+						// record, so give the reserved money back rather than counting the
+						// same charge twice — and tell the caller, so it does not buy the
+						// same answer from the vendor a second time.
 						if (!charged) yield* release
+						return charged
 					}).pipe(
 						Effect.tap(() =>
 							Effect.logDebug('budget.chargePaid').pipe(
