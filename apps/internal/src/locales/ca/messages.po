@@ -376,6 +376,10 @@ msgstr "Afegit com a oportunitat verificada"
 msgid "Adding…"
 msgstr "S'està afegint…"
 
+#: src/components/research/run-labels.ts
+msgid "Address"
+msgstr "Adreça"
+
 #: src/routes/settings/organization/members.tsx
 #: src/routes/settings/organization/members.tsx
 msgid "Admin"
@@ -1468,6 +1472,7 @@ msgstr "carregant el recompte"
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/findings/prospect-scan-view.tsx
+#: src/components/research/run-labels.ts
 #: src/routes/companies/index.tsx
 msgid "Country"
 msgstr "País"
@@ -1579,6 +1584,7 @@ msgstr "La contrasenya actual no és correcta."
 
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
+#: src/components/research/run-labels.ts
 msgid "Current tools"
 msgstr "Eines actuals"
 
@@ -1926,6 +1932,7 @@ msgstr "Editor"
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/findings/contact-discovery-view.tsx
+#: src/components/research/run-labels.ts
 #: src/components/shared/channel-icon.tsx
 #: src/routes/companies/$slug.tsx
 #: src/routes/emails/inboxes.tsx
@@ -2340,6 +2347,7 @@ msgstr "Bústies"
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/findings/prospect-scan-view.tsx
+#: src/components/research/run-labels.ts
 #: src/routes/companies/index.tsx
 msgid "Industry"
 msgstr "Sector"
@@ -2472,6 +2480,10 @@ msgstr "Última visita"
 msgid "Later"
 msgstr "Més endavant"
 
+#: src/components/research/run-labels.ts
+msgid "Latitude"
+msgstr "Latitud"
+
 #: src/components/research/research-dialog.tsx
 msgid "Layered after the stack, in order."
 msgstr "S'apliquen després de la pila, en ordre."
@@ -2485,6 +2497,7 @@ msgid "Line items"
 msgstr "Línies"
 
 #: src/components/research/findings/contact-discovery-view.tsx
+#: src/components/research/run-labels.ts
 #: src/components/shared/channel-icon.tsx
 msgid "LinkedIn"
 msgstr "LinkedIn"
@@ -2568,6 +2581,7 @@ msgstr "Localitzant…"
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/research-dialog.tsx
+#: src/components/research/run-labels.ts
 #: src/routes/calendar/index.tsx
 msgid "Location"
 msgstr "Ubicació"
@@ -2594,6 +2608,10 @@ msgstr "Registra interacció"
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Logging…"
 msgstr "Registrant…"
+
+#: src/components/research/run-labels.ts
+msgid "Longitude"
+msgstr "Longitud"
 
 #: src/components/research/inbox/paid-action-queue.tsx
 msgid "Lookup approved — the run is picking it up."
@@ -3207,6 +3225,10 @@ msgstr "No el veus? Mira la carpeta de correu brossa. Si estàs segur que el cor
 msgid "Note"
 msgstr "Nota"
 
+#: src/components/research/run-labels.ts
+msgid "Notes"
+msgstr "Notes"
+
 #: src/components/companies/proposals-panel.tsx
 msgid "Notes (optional)"
 msgstr "Notes (opcional)"
@@ -3530,6 +3552,7 @@ msgstr "Indicadors de dolor"
 
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
+#: src/components/research/run-labels.ts
 msgid "Pain points"
 msgstr "Punts febles"
 
@@ -3610,6 +3633,7 @@ msgstr "Personal"
 
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/findings/contact-discovery-view.tsx
+#: src/components/research/run-labels.ts
 msgid "Phone"
 msgstr "Telèfon"
 
@@ -3722,6 +3746,10 @@ msgstr "Bústia privada"
 #: src/components/companies/about-section.tsx
 msgid "Products fit"
 msgstr "Encaix de productes"
+
+#: src/components/research/run-labels.ts
+msgid "Products that fit"
+msgstr "Productes que encaixen"
 
 #: src/routes/settings/profile/index.tsx
 msgid "Profile"
@@ -4082,6 +4110,7 @@ msgstr "Revisa què ha trobat l'agent de recerca i decideix què entra al CRM."
 msgid "Risky"
 msgstr "Arriscat"
 
+#: src/components/research/run-labels.ts
 #: src/routes/settings/organization/members.tsx
 msgid "Role"
 msgstr "Rol"
@@ -4414,6 +4443,7 @@ msgstr "Tancant sessió…"
 
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
+#: src/components/research/run-labels.ts
 msgid "Size"
 msgstr "Mida"
 
@@ -4657,6 +4687,7 @@ msgstr "Sistema"
 
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
+#: src/components/research/run-labels.ts
 msgid "Tags"
 msgstr "Etiquetes"
 
@@ -4688,6 +4719,7 @@ msgid "tasks — showing {0} of {shelfTotal}"
 msgstr "tasques: es mostren {0} de {shelfTotal}"
 
 #: src/components/research/findings/prospect-scan-view.tsx
+#: src/components/research/run-labels.ts
 msgid "Tax ID"
 msgstr "NIF"
 
@@ -5268,6 +5300,10 @@ msgstr "Encaix feble"
 #: src/components/research/findings/competitor-scan-view.tsx
 msgid "Weaknesses"
 msgstr "Punts febles"
+
+#: src/components/research/run-labels.ts
+msgid "Website"
+msgstr "Lloc web"
 
 #: src/routes/emails/index.tsx
 #: src/routes/emails/index.tsx

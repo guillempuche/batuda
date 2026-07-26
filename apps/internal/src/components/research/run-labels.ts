@@ -59,3 +59,37 @@ const SUBJECT_TABLE_LABEL: Record<string, MessageDescriptor> = {
 export function subjectTableLabel(table: string): MessageDescriptor | null {
 	return SUBJECT_TABLE_LABEL[table] ?? null
 }
+
+// Proper names for the record fields a change can write, so a reader never sees
+// the name the database uses. Both spellings of a field are accepted, because a
+// change may name it either way round and both are honoured when it is applied.
+const FIELD_LABEL: Record<string, MessageDescriptor> = {
+	industry: msg`Industry`,
+	size_range: msg`Size`,
+	country: msg`Country`,
+	location: msg`Location`,
+	address: msg`Address`,
+	website: msg`Website`,
+	pain_points: msg`Pain points`,
+	current_tools: msg`Current tools`,
+	tax_id: msg`Tax ID`,
+	role: msg`Role`,
+	email: msg`Email`,
+	phone: msg`Phone`,
+	linkedin: msg`LinkedIn`,
+	notes: msg`Notes`,
+	tags: msg`Tags`,
+	products_fit: msg`Products that fit`,
+	latitude: msg`Latitude`,
+	longitude: msg`Longitude`,
+}
+
+/** The same field name written the other way round, to look up one spelling. */
+function toSnake(key: string): string {
+	return key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase()
+}
+
+/** Proper name for a record field, or null when the field has none yet. */
+export function fieldLabel(key: string): MessageDescriptor | null {
+	return FIELD_LABEL[key] ?? FIELD_LABEL[toSnake(key)] ?? null
+}

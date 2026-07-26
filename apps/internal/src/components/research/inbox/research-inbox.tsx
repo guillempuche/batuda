@@ -1,4 +1,5 @@
 import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
+import type { MessageDescriptor } from '@lingui/core'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
@@ -30,6 +31,7 @@ import { OutcomeBadge } from '#/components/research/proposal-outcome'
 import { ResearchDialog } from '#/components/research/research-dialog'
 import { Money, ResolveStatus } from '#/components/research/resolve-status'
 import {
+	fieldLabel,
 	operationLabel,
 	statusLabel,
 	subjectTableLabel,
@@ -704,6 +706,16 @@ function ProposalRow({
 	)
 }
 
+/**
+ * A field's proper name when it has one, otherwise its wire spelling read as
+ * words — so a field nobody has named yet still reads sensibly instead of
+ * showing the name the database uses.
+ */
+function fieldName(key: string, i18n: { _: (d: MessageDescriptor) => string }) {
+	const label = fieldLabel(key)
+	return label === null ? humanizeFieldKey(key) : i18n._(label)
+}
+
 // How many values a row shows before it stops; the rest are on the run's page.
 const INLINE_FIELD_LIMIT = 4
 
@@ -713,7 +725,7 @@ const INLINE_FIELD_LIMIT = 4
  * believes something, never what it would put in the record.
  */
 function ProposedValues({ proposal }: { readonly proposal: PendingProposal }) {
-	const { t } = useLingui()
+	const { t, i18n } = useLingui()
 	const changes = fieldChanges(proposal.fields, proposal.subjectCurrent)
 	const channels = proposedChannels(proposal.fields)
 	if (changes.length === 0 && channels.length === 0) return null
@@ -724,13 +736,13 @@ function ProposedValues({ proposal }: { readonly proposal: PendingProposal }) {
 		<Values data-testid='research-inbox-values'>
 			{channels.map(channel => (
 				<ValueLine key={`${channel.kind}:${channel.value}`}>
-					<ValueKey>{humanizeFieldKey(channel.kind)}</ValueKey>
+					<ValueKey>{fieldName(channel.kind, i18n)}</ValueKey>
 					<ValueNew>{channel.value}</ValueNew>
 				</ValueLine>
 			))}
 			{shown.map(change => (
 				<ValueLine key={change.key}>
-					<ValueKey>{humanizeFieldKey(change.key)}</ValueKey>
+					<ValueKey>{fieldName(change.key, i18n)}</ValueKey>
 					{change.unchanged ? (
 						<ValueSame>{t`already ${change.to}`}</ValueSame>
 					) : (
