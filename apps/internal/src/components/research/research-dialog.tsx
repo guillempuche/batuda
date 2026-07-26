@@ -29,6 +29,7 @@ import {
 	type StackOption,
 	StackPicker,
 } from '#/components/instructions/stack-picker'
+import { STATUS_ORDER, statusLabels } from '#/components/shared/status-badge'
 import { formatMoneyCents } from '#/lib/format-money'
 import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
 
@@ -75,16 +76,10 @@ const SCHEMA_CARDS: ReadonlyArray<SchemaCard> = [
 const QUERY_MAX_LENGTH = 2000
 const FILTER_MAX_LENGTH = 120
 
-// The pipeline stages a company moves through; a discovery run can fan out
-// across the ones already in a stage instead of finding net-new companies.
-const STATUS_OPTIONS: ReadonlyArray<string> = [
-	'prospect',
-	'contacted',
-	'responded',
-	'meeting',
-	'proposal',
-	'client',
-]
+// Stages come from the one list the rest of the app shares. Keeping a private
+// copy here left out "closed" and "dead", so companies in those stages could
+// never be covered by a run at all — and it showed the reader the raw stored
+// words rather than their proper names.
 
 export function ResearchDialog({
 	open,
@@ -360,10 +355,11 @@ export function ResearchDialog({
 						</Field>
 
 						<Field>
-							<Label as='div'>
+							<Label as='div' id='research-kind-label'>
 								<Trans>What kind of research?</Trans>
 							</Label>
 							<SchemaGrid
+								aria-labelledby='research-kind-label'
 								value={schema}
 								onValueChange={value => {
 									if (typeof value === 'string') {
@@ -445,9 +441,9 @@ export function ResearchDialog({
 											onChange={e => setFilterStatus(e.target.value)}
 										>
 											<option value=''>{t`Find net-new`}</option>
-											{STATUS_OPTIONS.map(s => (
-												<option key={s} value={s}>
-													{s}
+											{STATUS_ORDER.map(stage => (
+												<option key={stage} value={stage}>
+													{i18n._(statusLabels[stage])}
 												</option>
 											))}
 										</SelectInput>

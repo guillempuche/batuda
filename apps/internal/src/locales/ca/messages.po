@@ -319,10 +319,6 @@ msgstr "Afegeix adjunt"
 msgid "Add Cc / Bcc"
 msgstr "Afegeix Cc / Bcc"
 
-#: src/components/research/run-labels.ts
-msgid "Add channel"
-msgstr "Afegeix canal"
-
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/routes/companies/$slug.tsx
 msgid "Add contact"
@@ -2736,10 +2732,6 @@ msgstr "Membre"
 msgid "Members"
 msgstr "Membres"
 
-#: src/components/research/run-labels.ts
-msgid "Merge"
-msgstr "Fusiona"
-
 #: src/components/research/proposal-outcome.tsx
 msgid "Merged into existing"
 msgstr "Fusionat amb un existent"
@@ -3556,7 +3548,6 @@ msgstr "Enganxa una contrasenya d'aplicació; jo et mostraré on aconseguir-ne u
 msgid "Pause syncing"
 msgstr "Atura la sincronització"
 
-#: src/components/research/run-labels.ts
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
 msgid "Paused"

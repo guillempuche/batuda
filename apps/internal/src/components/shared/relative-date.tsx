@@ -1,14 +1,26 @@
+import { useLingui } from '@lingui/react/macro'
 import styled from 'styled-components'
 
 /**
- * Relative date formatter using `Intl.RelativeTimeFormat` in English.
+ * Relative date formatter, in the reader's own language.
  * Accepts a `Date`, an ISO string, or a Unix timestamp. Renders
  * semantically as a `<time>` element with the ISO `datetime` attribute
  * so screen readers and copy-paste actions get the absolute value.
  *
  * Examples: "today", "yesterday", "3 days ago", "2 weeks ago", "in 5 days".
  */
-const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
+// Built per locale rather than once at load: a single shared formatter fixed
+// every date on every screen to one language, so a reader working in another
+// language saw English dates beside otherwise translated text.
+const formatterCache = new Map<string, Intl.RelativeTimeFormat>()
+
+function relativeFormatter(locale: string): Intl.RelativeTimeFormat {
+	const cached = formatterCache.get(locale)
+	if (cached !== undefined) return cached
+	const made = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' })
+	formatterCache.set(locale, made)
+	return made
+}
 
 type RelativeDateInput = Date | string | number | null | undefined
 
@@ -19,6 +31,8 @@ export function RelativeDate({
 	value: RelativeDateInput
 	fallback?: string
 }) {
+	const { i18n } = useLingui()
+	const locale = i18n.locale
 	if (value === null || value === undefined || value === '') {
 		return <Muted>{fallback}</Muted>
 	}
@@ -28,7 +42,7 @@ export function RelativeDate({
 		return <Muted>{fallback}</Muted>
 	}
 
-	const label = formatRelative(date)
+	const label = formatRelative(date, locale)
 	return (
 		// The server sits in UTC and the reader's browser does not, so the
 		// spelled-out time and the "5 months ago" wording are both allowed to
@@ -37,14 +51,15 @@ export function RelativeDate({
 		<Time
 			suppressHydrationWarning
 			dateTime={date.toISOString()}
-			title={date.toLocaleString('en')}
+			title={date.toLocaleString(locale)}
 		>
 			{label}
 		</Time>
 	)
 }
 
-function formatRelative(date: Date): string {
+function formatRelative(date: Date, locale: string): string {
+	const rtf = relativeFormatter(locale)
 	const diffMs = date.getTime() - Date.now()
 	const diffSec = Math.round(diffMs / 1000)
 
