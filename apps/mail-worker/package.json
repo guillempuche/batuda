@@ -12,7 +12,6 @@
 	},
 	"dependencies": {
 		"@aws-sdk/client-s3": "^3.1026.0",
-		"@batuda/controllers": "workspace:*",
 		"@batuda/domain": "workspace:*",
 		"@batuda/email": "workspace:*",
 		"@batuda/observability": "workspace:*",

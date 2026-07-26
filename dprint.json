@@ -9,7 +9,6 @@
 	"excludes": [
 		"node_modules",
 		"dist",
-		".output",
 		".wrangler",
 		".cache",
 		".turbo",
