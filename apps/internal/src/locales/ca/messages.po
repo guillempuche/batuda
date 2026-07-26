@@ -533,8 +533,14 @@ msgid "Applying…"
 msgstr "Aplicant…"
 
 #: src/components/research/findings/shared.tsx
+#: src/components/research/inbox/paid-action-queue.tsx
 msgid "Approve"
 msgstr "Aprova"
+
+#. placeholder {0}: action.tool
+#: src/components/research/inbox/paid-action-queue.tsx
+msgid "Approve {0}"
+msgstr "Aprova {0}"
 
 #: src/routes/emails/$threadId.tsx
 #: src/routes/emails/index.tsx
@@ -1373,6 +1379,10 @@ msgstr "No s'han pogut actualitzar els canals"
 #: src/components/research/findings/shared.tsx
 msgid "Could not update the paid action"
 msgstr "No s'ha pogut actualitzar l'acció de pagament"
+
+#: src/components/research/inbox/paid-action-queue.tsx
+msgid "Could not update this lookup."
+msgstr "No s'ha pogut actualitzar aquesta cerca."
 
 #: src/routes/companies/$slug.tsx
 msgid "Could not update verification"
@@ -2570,6 +2580,14 @@ msgstr "Registra interacció"
 msgid "Logging…"
 msgstr "Registrant…"
 
+#: src/components/research/inbox/paid-action-queue.tsx
+msgid "Lookup approved — the run is picking it up."
+msgstr "Cerca aprovada: l'execució se n'ocupa."
+
+#: src/components/research/inbox/paid-action-queue.tsx
+msgid "Lookup skipped. Nothing was spent."
+msgstr "Cerca omesa. No s'ha gastat res."
+
 #: src/routes/companies/$slug.tsx
 msgid "Low"
 msgstr "Baixa"
@@ -3279,6 +3297,7 @@ msgstr "Obre Instagram"
 msgid "Open LinkedIn"
 msgstr "Obre LinkedIn"
 
+#: src/components/research/inbox/paid-action-queue.tsx
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Open run"
 msgstr "Obre l'execució"
@@ -3304,6 +3323,10 @@ msgstr "Tasques obertes"
 #: src/routes/settings/organization/index.tsx
 msgid "Open the org spend dashboard"
 msgstr "Obre el panell de despesa de l'organització"
+
+#: src/components/research/inbox/paid-action-queue.tsx
+msgid "Open the run asking for this lookup"
+msgstr "Obre l'execució que demana aquesta cerca"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Open the setup guide, opens in a new tab"
@@ -3465,6 +3488,10 @@ msgstr "Acció de pagament omesa"
 #: src/routes/settings/organization/policy.tsx
 msgid "Paid calls at or below this run without asking."
 msgstr "Les crides de pagament iguals o inferiors a aquest import s'executen sense preguntar."
+
+#: src/components/research/inbox/paid-action-queue.tsx
+msgid "Paid lookups waiting for your OK"
+msgstr "Cerques de pagament que esperen el teu vistiplau"
 
 #: src/routes/settings/organization/policy.tsx
 msgid "Paid provider calls allowed within one run."
@@ -3838,6 +3865,10 @@ msgstr "El destinatari ha marcat el missatge com a brossa"
 #: src/components/research/proposal-outcome.tsx
 msgid "Record changed since research"
 msgstr "El registre ha canviat des de la recerca"
+
+#: src/components/research/inbox/paid-action-queue.tsx
+msgid "Recorded before these could be decided — open the run."
+msgstr "Desada abans que es poguessin decidir: obre l'execució."
 
 #: src/components/layout/nav-items.ts
 msgid "Records"
@@ -4333,6 +4364,11 @@ msgstr "Mostra la contrasenya"
 msgid "Show system events"
 msgstr "Mostra esdeveniments del sistema"
 
+#. placeholder {0}: proposals.length
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Showing {0} of {totalPending}. Narrow the filters to reach the rest."
+msgstr "Es mostren {0} de {totalPending}. Afina els filtres per arribar a la resta."
+
 #: src/routes/emails/index.tsx
 msgid "Showing {firstRow}–{lastRow} of {total}"
 msgstr "Mostrant {firstRow}–{lastRow} de {total}"
@@ -4371,8 +4407,14 @@ msgid "Size"
 msgstr "Mida"
 
 #: src/components/research/findings/shared.tsx
+#: src/components/research/inbox/paid-action-queue.tsx
 msgid "Skip"
 msgstr "Omet"
+
+#. placeholder {0}: action.tool
+#: src/components/research/inbox/paid-action-queue.tsx
+msgid "Skip {0}"
+msgstr "Omet {0}"
 
 #: src/routes/pages/$id.tsx
 #: src/routes/pages/index.tsx
@@ -4404,6 +4446,10 @@ msgstr "Ajornades"
 #: src/routes/emails/$threadId.tsx
 msgid "someone"
 msgstr "algú"
+
+#: src/components/research/inbox/paid-action-queue.tsx
+msgid "Someone had already decided this one."
+msgstr "Algú ja havia decidit aquesta."
 
 #: src/components/research/run-detail.tsx
 msgid "Something went wrong while running this research."
@@ -4704,6 +4750,10 @@ msgstr "L'enllaç ha caducat. Demana'n un de nou a sota."
 msgid "That link is no longer valid. Request a fresh one below."
 msgstr "L'enllaç ja no és vàlid. Demana'n un de nou a sota."
 
+#: src/components/research/inbox/paid-action-queue.tsx
+msgid "That lookup isn't available, so it can only be skipped."
+msgstr "Aquesta cerca no està disponible, així que només es pot ometre."
+
 #: src/components/research/research-dialog.tsx
 msgid "That set of instructions is no longer available. Pick another and try again."
 msgstr "Aquest conjunt d'instruccions ja no està disponible. Tria'n un altre i torna-ho a provar."
@@ -4841,6 +4891,11 @@ msgstr "El taller ha rebutjat el canvi. Torna-ho a provar."
 #: src/routes/settings/organization/index.tsx
 msgid "The workspace your CRM data lives in."
 msgstr "L'espai de treball on viuen les dades del CRM."
+
+#. placeholder {0}: formatMoneyCents(totalCents, { locale: i18n.locale })
+#: src/components/research/inbox/paid-action-queue.tsx
+msgid "These cost money, so nothing runs until you say so. About {0} in total."
+msgstr "Costen diners, així que no es fa res fins que ho diguis. Uns {0} en total."
 
 #: src/routes/settings/organization/members.tsx
 msgid "They join straight away and get an email telling them so. It carries no password and no link to sign in with."
@@ -5273,6 +5328,10 @@ msgstr "Qui"
 #: src/routes/emails/inboxes.tsx
 msgid "Who's your email provider?"
 msgstr "Quin és el teu proveïdor de correu?"
+
+#: src/components/research/inbox/paid-action-queue.tsx
+msgid "Working…"
+msgstr "S'està fent…"
 
 #: src/routes/index.tsx
 msgid "Workshop floor — live counters on the bench."

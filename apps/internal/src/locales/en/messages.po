@@ -533,8 +533,14 @@ msgid "Applying…"
 msgstr "Applying…"
 
 #: src/components/research/findings/shared.tsx
+#: src/components/research/inbox/paid-action-queue.tsx
 msgid "Approve"
 msgstr "Approve"
+
+#. placeholder {0}: action.tool
+#: src/components/research/inbox/paid-action-queue.tsx
+msgid "Approve {0}"
+msgstr "Approve {0}"
 
 #: src/routes/emails/$threadId.tsx
 #: src/routes/emails/index.tsx
@@ -1373,6 +1379,10 @@ msgstr "Could not update channels"
 #: src/components/research/findings/shared.tsx
 msgid "Could not update the paid action"
 msgstr "Could not update the paid action"
+
+#: src/components/research/inbox/paid-action-queue.tsx
+msgid "Could not update this lookup."
+msgstr "Could not update this lookup."
 
 #: src/routes/companies/$slug.tsx
 msgid "Could not update verification"
@@ -2570,6 +2580,14 @@ msgstr "Log interaction"
 msgid "Logging…"
 msgstr "Logging…"
 
+#: src/components/research/inbox/paid-action-queue.tsx
+msgid "Lookup approved — the run is picking it up."
+msgstr "Lookup approved — the run is picking it up."
+
+#: src/components/research/inbox/paid-action-queue.tsx
+msgid "Lookup skipped. Nothing was spent."
+msgstr "Lookup skipped. Nothing was spent."
+
 #: src/routes/companies/$slug.tsx
 msgid "Low"
 msgstr "Low"
@@ -3279,6 +3297,7 @@ msgstr "Open Instagram"
 msgid "Open LinkedIn"
 msgstr "Open LinkedIn"
 
+#: src/components/research/inbox/paid-action-queue.tsx
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Open run"
 msgstr "Open run"
@@ -3304,6 +3323,10 @@ msgstr "Open tasks"
 #: src/routes/settings/organization/index.tsx
 msgid "Open the org spend dashboard"
 msgstr "Open the org spend dashboard"
+
+#: src/components/research/inbox/paid-action-queue.tsx
+msgid "Open the run asking for this lookup"
+msgstr "Open the run asking for this lookup"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Open the setup guide, opens in a new tab"
@@ -3465,6 +3488,10 @@ msgstr "Paid action skipped"
 #: src/routes/settings/organization/policy.tsx
 msgid "Paid calls at or below this run without asking."
 msgstr "Paid calls at or below this run without asking."
+
+#: src/components/research/inbox/paid-action-queue.tsx
+msgid "Paid lookups waiting for your OK"
+msgstr "Paid lookups waiting for your OK"
 
 #: src/routes/settings/organization/policy.tsx
 msgid "Paid provider calls allowed within one run."
@@ -3838,6 +3865,10 @@ msgstr "Recipient marked as spam"
 #: src/components/research/proposal-outcome.tsx
 msgid "Record changed since research"
 msgstr "Record changed since research"
+
+#: src/components/research/inbox/paid-action-queue.tsx
+msgid "Recorded before these could be decided — open the run."
+msgstr "Recorded before these could be decided — open the run."
 
 #: src/components/layout/nav-items.ts
 msgid "Records"
@@ -4333,6 +4364,11 @@ msgstr "Show password"
 msgid "Show system events"
 msgstr "Show system events"
 
+#. placeholder {0}: proposals.length
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Showing {0} of {totalPending}. Narrow the filters to reach the rest."
+msgstr "Showing {0} of {totalPending}. Narrow the filters to reach the rest."
+
 #: src/routes/emails/index.tsx
 msgid "Showing {firstRow}–{lastRow} of {total}"
 msgstr "Showing {firstRow}–{lastRow} of {total}"
@@ -4371,8 +4407,14 @@ msgid "Size"
 msgstr "Size"
 
 #: src/components/research/findings/shared.tsx
+#: src/components/research/inbox/paid-action-queue.tsx
 msgid "Skip"
 msgstr "Skip"
+
+#. placeholder {0}: action.tool
+#: src/components/research/inbox/paid-action-queue.tsx
+msgid "Skip {0}"
+msgstr "Skip {0}"
 
 #: src/routes/pages/$id.tsx
 #: src/routes/pages/index.tsx
@@ -4404,6 +4446,10 @@ msgstr "Snoozed"
 #: src/routes/emails/$threadId.tsx
 msgid "someone"
 msgstr "someone"
+
+#: src/components/research/inbox/paid-action-queue.tsx
+msgid "Someone had already decided this one."
+msgstr "Someone had already decided this one."
 
 #: src/components/research/run-detail.tsx
 msgid "Something went wrong while running this research."
@@ -4704,6 +4750,10 @@ msgstr "That link expired. Request a fresh one below."
 msgid "That link is no longer valid. Request a fresh one below."
 msgstr "That link is no longer valid. Request a fresh one below."
 
+#: src/components/research/inbox/paid-action-queue.tsx
+msgid "That lookup isn't available, so it can only be skipped."
+msgstr "That lookup isn't available, so it can only be skipped."
+
 #: src/components/research/research-dialog.tsx
 msgid "That set of instructions is no longer available. Pick another and try again."
 msgstr "That set of instructions is no longer available. Pick another and try again."
@@ -4841,6 +4891,11 @@ msgstr "The workshop rejected the change. Try again."
 #: src/routes/settings/organization/index.tsx
 msgid "The workspace your CRM data lives in."
 msgstr "The workspace your CRM data lives in."
+
+#. placeholder {0}: formatMoneyCents(totalCents, { locale: i18n.locale })
+#: src/components/research/inbox/paid-action-queue.tsx
+msgid "These cost money, so nothing runs until you say so. About {0} in total."
+msgstr "These cost money, so nothing runs until you say so. About {0} in total."
 
 #: src/routes/settings/organization/members.tsx
 msgid "They join straight away and get an email telling them so. It carries no password and no link to sign in with."
@@ -5273,6 +5328,10 @@ msgstr "Who"
 #: src/routes/emails/inboxes.tsx
 msgid "Who's your email provider?"
 msgstr "Who's your email provider?"
+
+#: src/components/research/inbox/paid-action-queue.tsx
+msgid "Working…"
+msgstr "Working…"
 
 #: src/routes/index.tsx
 msgid "Workshop floor — live counters on the bench."

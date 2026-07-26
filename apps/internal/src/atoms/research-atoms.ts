@@ -199,6 +199,41 @@ export function pendingProposalsAtom(params: PendingProposalsParams = {}) {
 	return atom
 }
 
+/**
+ * One paid lookup waiting on a decision, anywhere in the org. A run parks these
+ * and stops before spending, so this is the only place they surface together.
+ */
+export type PendingPaidAction = {
+	readonly researchId: string
+	readonly runQuery: string
+	readonly runStatus: string
+	readonly runCreatedAt: unknown
+	readonly actionId: string | null
+	readonly tool: string
+	readonly args: unknown
+	readonly estimatedCents: number | null
+	readonly reason: string | null
+	readonly subjectTable: string | null
+	readonly subjectId: string | null
+	readonly subjectName: string | null
+}
+
+let pendingPaidActionsAtomCache:
+	| ReturnType<typeof makePendingPaidActionsAtom>
+	| undefined
+
+function makePendingPaidActionsAtom(limit: number) {
+	return BatudaApiAtom.query('research', 'listPendingPaidActions', {
+		query: { limit },
+		serializationKey: `research:pending-paid-actions:${limit}`,
+	})
+}
+
+export function pendingPaidActionsAtom(limit: number) {
+	pendingPaidActionsAtomCache ??= makePendingPaidActionsAtom(limit)
+	return pendingPaidActionsAtomCache
+}
+
 const eventsCache = new Map<string, ReturnType<typeof makeEventsAtom>>()
 
 function makeEventsAtom(researchId: string) {
