@@ -1,4 +1,3 @@
-import { useAtomRefresh, useAtomValue } from '@effect/atom-react'
 import { useLingui } from '@lingui/react/macro'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { DateTime, Schema } from 'effect'
@@ -20,6 +19,7 @@ import { CompaniesHeader } from '#/components/companies/companies-header'
 import { CompanyCard } from '#/components/shared/company-card'
 import { EmptyState } from '#/components/shared/empty-state'
 import { ErrorState } from '#/components/shared/error-state'
+import { InfiniteListFooter } from '#/components/shared/infinite-list-footer'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import {
 	type CompanyStatus,
@@ -27,6 +27,7 @@ import {
 	StatusBadge,
 } from '#/components/shared/status-badge'
 import { useQuickCapture } from '#/context/quick-capture-context'
+import { useInfiniteList } from '#/hooks/use-infinite-list'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { useOrgMembers } from '#/lib/org-members'
 import { validateSearchWith } from '#/lib/search-schema'
@@ -149,37 +150,29 @@ function CompaniesListPage() {
 	const { open: openQuickCapture } = useQuickCapture()
 	const { members, meUserId } = useOrgMembers()
 
-	// "Load more" grows the fetched window; reset it whenever the filters change.
+	// The list grows as the reader reaches the end of it; the filters identify
+	// which list that is, so changing them starts over at the first page.
 	const searchKey = canonicalSearchKey(search)
-	const [visibleLimit, setVisibleLimit] = useState(COMPANIES_PAGE_SIZE)
-	useEffect(() => {
-		setVisibleLimit(COMPANIES_PAGE_SIZE)
-	}, [searchKey])
-
-	const atom = useMemo(
-		() => companiesSearchAtom(search, visibleLimit),
-		// searchKey + visibleLimit fully identify the atom; `search` is unstable.
-		// biome-ignore lint/correctness/useExhaustiveDependencies: keyed by searchKey
-		[searchKey, visibleLimit],
-	)
-	const result = useAtomValue(atom)
-	const refreshCompanies = useAtomRefresh(atom)
-	const loadedPage = AsyncResult.isSuccess(result) ? result.value : undefined
+	const list = useInfiniteList({
+		resetKey: searchKey,
+		pageSize: COMPANIES_PAGE_SIZE,
+		atomFor: limit => companiesSearchAtom(search, limit),
+	})
 
 	const companies = useMemo<ReadonlyArray<CompanyRow>>(
-		() => (loadedPage ? narrowCompanies(loadedPage.items) : []),
-		[loadedPage],
+		() => narrowCompanies(list.items),
+		[list.items],
 	)
-	const isLoading = AsyncResult.isInitial(result)
-	const isFailure = AsyncResult.isFailure(result)
+	const isLoading = list.isLoadingFirstPage
+	const isFailure = list.isError
+	const refreshCompanies = list.refresh
 	// Until the list actually loads there is no count to show — a failed or
 	// still-loading fetch must not read as "0 companies", an empty pipeline.
-	const hasResult = loadedPage !== undefined
-	// How many companies match the filters in total, not just the ones
-	// fetched so far: `companies` stops at `visibleLimit`, so its length
-	// would under-report for any org with more than one page of them.
-	const total = loadedPage?.total ?? 0
-	const hasMore = companies.length < total
+	const hasResult = !isLoading && !isFailure
+	// How many companies match the filters in total, not just the ones fetched
+	// so far: `companies` stops at the window loaded, so its length would
+	// under-report for any org with more than one page of them.
+	const total = list.total
 
 	// ── Search input (debounced URL write) ──────────────────────
 	const [searchInput, setSearchInput] = useState(search.query ?? '')
@@ -451,18 +444,7 @@ function CompaniesListPage() {
 							))}
 						</Grid>
 					</LayoutGroup>
-					{hasMore && (
-						<LoadMoreWrap>
-							<PriButton
-								type='button'
-								$variant='outlined'
-								onClick={() => setVisibleLimit(l => l + COMPANIES_PAGE_SIZE)}
-								data-testid='companies-load-more'
-							>
-								<span>{t`Load more`}</span>
-							</PriButton>
-						</LoadMoreWrap>
-					)}
+					<InfiniteListFooter list={list} testId='companies' />
 				</>
 			)}
 		</Page>
@@ -782,12 +764,4 @@ const DropdownRow = styled.div.withConfig({
 	flex-wrap: wrap;
 	align-items: center;
 	gap: var(--space-2xs);
-`
-
-const LoadMoreWrap = styled.div.withConfig({
-	displayName: 'CompaniesListLoadMore',
-})`
-	display: flex;
-	justify-content: center;
-	padding: var(--space-md) 0;
 `

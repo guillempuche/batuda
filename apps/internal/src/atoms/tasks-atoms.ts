@@ -1,3 +1,5 @@
+import { Atom } from 'effect/unstable/reactivity'
+
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 
 /**
@@ -76,15 +78,20 @@ const sortForShelf = (shelf: TaskShelf) =>
 const shelfCache = new Map<string, ReturnType<typeof makeShelfAtom>>()
 
 function makeShelfAtom(shelf: TaskShelf, dayKey: string, limit: number) {
-	return BatudaApiAtom.query('tasks', 'list', {
-		query: {
-			shelf,
-			...dayBoundaries(dayKey),
-			sort: sortForShelf(shelf),
-			limit,
-		},
-		serializationKey: `tasks:shelf:${shelf}:${dayKey}:${limit}`,
-	})
+	// Held even while nothing is showing it, so opening a task and coming back
+	// puts the same rows straight back on screen instead of refetching them and
+	// collapsing the shelf to a single page in between.
+	return Atom.keepAlive(
+		BatudaApiAtom.query('tasks', 'list', {
+			query: {
+				shelf,
+				...dayBoundaries(dayKey),
+				sort: sortForShelf(shelf),
+				limit,
+			},
+			serializationKey: `tasks:shelf:${shelf}:${dayKey}:${limit}`,
+		}),
+	)
 }
 
 /**

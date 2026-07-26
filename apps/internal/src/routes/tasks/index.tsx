@@ -29,6 +29,7 @@ import {
 } from '#/atoms/tasks-atoms'
 import { EmptyState } from '#/components/shared/empty-state'
 import { ErrorState } from '#/components/shared/error-state'
+import { InfiniteListFooter } from '#/components/shared/infinite-list-footer'
 import { KpiCounter } from '#/components/shared/kpi-counter'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { SrOnly } from '#/components/shared/sr-only'
@@ -39,6 +40,7 @@ import {
 	type TaskSourceLabel,
 } from '#/components/shared/task-item'
 import { useQuickCapture } from '#/context/quick-capture-context'
+import { useInfiniteList } from '#/hooks/use-infinite-list'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
@@ -229,21 +231,19 @@ function TasksPage() {
 	// but a tab left open overnight would then keep filing work under
 	// yesterday, so it is re-read whenever the window comes back to the front.
 	const [dayKey, setDayKey] = useState(() => localDayKey())
-	const [visibleLimit, setVisibleLimit] = useState(TASKS_PAGE_SIZE)
-	// Moving to another shelf starts again at its first page.
-	useEffect(() => {
-		setVisibleLimit(TASKS_PAGE_SIZE)
-	}, [selectedShelf])
 
-	const shelfAtom = useMemo(
-		() => tasksShelfAtom(selectedShelf, dayKey, visibleLimit),
-		[selectedShelf, dayKey, visibleLimit],
-	)
+	// The shelf grows as the reader reaches the end of it. Moving to another
+	// shelf starts again at its first page, because the rows in hand belong to
+	// work the reader is no longer looking at.
+	const shelfList = useInfiniteList({
+		resetKey: `${selectedShelf}::${dayKey}`,
+		pageSize: TASKS_PAGE_SIZE,
+		atomFor: limit => tasksShelfAtom(selectedShelf, dayKey, limit),
+	})
 	const countsAtom = useMemo(() => taskCountsAtom(dayKey), [dayKey])
-	const tasksResult = useAtomValue(shelfAtom)
 	const countsResult = useAtomValue(countsAtom)
 	const companiesResult = useAtomValue(companiesListAtom)
-	const refreshTasks = useAtomRefresh(shelfAtom)
+	const refreshTasks = shelfList.refresh
 	const refreshCounts = useAtomRefresh(countsAtom)
 	const refreshCompanies = useAtomRefresh(companiesListAtom)
 	const completeTask = useAtomSet(completeTaskAtom, { mode: 'promiseExit' })
@@ -313,30 +313,13 @@ function TasksPage() {
 	// The last version of the task the pane is showing.
 	const lastOpenTask = useRef<TaskRow | null>(null)
 
-	// Asking for another page means a fresh request, so the rows in hand would
-	// otherwise blank out mid-scroll and take the reader's place in the list
-	// with them. Holding the last page of *this* shelf keeps them on screen
-	// until the longer one arrives; moving to a different shelf drops them,
-	// because showing one shelf's work under another's name would be a lie.
-	const lastPage = useRef<
-		{ shelf: TaskShelf; page: PaginatedList<unknown> } | undefined
-	>(undefined)
-	if (AsyncResult.isSuccess(tasksResult)) {
-		lastPage.current = { shelf: selectedShelf, page: tasksResult.value }
-	}
-	const loadedShelf = AsyncResult.isSuccess(tasksResult)
-		? tasksResult.value
-		: lastPage.current?.shelf === selectedShelf
-			? lastPage.current.page
-			: undefined
 	const visibleTasks = useMemo<ReadonlyArray<TaskRow>>(
-		() => (loadedShelf ? narrowTasks(loadedShelf.items) : []),
-		[loadedShelf],
+		() => narrowTasks(shelfList.items),
+		[shelfList.items],
 	)
 	// How many the shelf holds altogether, which is what the rail promises —
 	// the rows in hand stop at whatever has been asked for so far.
-	const shelfTotal = loadedShelf?.total ?? 0
-	const hasMore = visibleTasks.length < shelfTotal
+	const shelfTotal = shelfList.total
 
 	const counts = AsyncResult.isSuccess(countsResult)
 		? countsResult.value
@@ -346,9 +329,10 @@ function TasksPage() {
 	// Only the arrival of rows is announced here. While they are on their way
 	// the spinner says "loading" out loud, and a failure is read out by the
 	// error message itself — repeating either would say it twice.
-	const shelfAnnouncement = AsyncResult.isSuccess(tasksResult)
-		? t`${t(shelfCopy(selectedShelf).label)}: showing ${visibleTasks.length} of ${shelfTotal} tasks.`
-		: ''
+	const shelfAnnouncement =
+		!shelfList.isLoadingFirstPage && !shelfList.isError
+			? t`${t(shelfCopy(selectedShelf).label)}: showing ${visibleTasks.length} of ${shelfTotal} tasks.`
+			: ''
 
 	const companiesLoaded = AsyncResult.isSuccess(companiesResult)
 	const companiesById = useMemo<Map<string, CompanyLookup>>(() => {
@@ -592,8 +576,8 @@ function TasksPage() {
 	// Only the list waits for its rows: blanking the whole page on every shelf
 	// switch would make the shelf buttons vanish under the pointer and send the
 	// keyboard back to the top of the page.
-	const isShelfPending = AsyncResult.isInitial(tasksResult) && !loadedShelf
-	const hasShelfFailed = AsyncResult.isFailure(tasksResult)
+	const isShelfPending = shelfList.isLoadingFirstPage
+	const hasShelfFailed = shelfList.isError
 
 	const countsReady = AsyncResult.isSuccess(countsResult)
 
@@ -740,21 +724,11 @@ function TasksPage() {
 									)
 								})}
 							</Stack>
-							{hasMore && (
-								<LoadMoreWrap>
-									<PriButton
-										type='button'
-										$variant='outlined'
-										onClick={() =>
-											setVisibleLimit(shown => shown + TASKS_PAGE_SIZE)
-										}
-										data-testid='tasks-load-more'
-									>
-										<span>{t`Load more`}</span>
-										<SrOnly>{t`tasks — showing ${visibleTasks.length} of ${shelfTotal}`}</SrOnly>
-									</PriButton>
-								</LoadMoreWrap>
-							)}
+							<InfiniteListFooter
+								list={shelfList}
+								testId='tasks'
+								announce={false}
+							/>
 						</>
 					)}
 				</Column>
@@ -1329,12 +1303,6 @@ const Stack = styled.div.withConfig({ displayName: 'TasksStack' })`
 	display: flex;
 	flex-direction: column;
 	gap: 0;
-`
-
-const LoadMoreWrap = styled.div.withConfig({ displayName: 'TasksLoadMore' })`
-	display: flex;
-	justify-content: center;
-	padding: var(--space-md) 0;
 `
 
 const QuickAddRow = styled.form.withConfig({ displayName: 'TasksQuickAddRow' })`

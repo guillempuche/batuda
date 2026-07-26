@@ -29,6 +29,7 @@ import {
 } from '#/atoms/companies-atoms'
 import { pipelineAtom } from '#/atoms/pipeline-atoms'
 import { ErrorState } from '#/components/shared/error-state'
+import { InfiniteListFooter } from '#/components/shared/infinite-list-footer'
 import { PriorityDot } from '#/components/shared/priority-dot'
 import {
 	type CompanyStatus,
@@ -37,6 +38,7 @@ import {
 	statusLabels,
 } from '#/components/shared/status-badge'
 import { useBulkSelection } from '#/hooks/use-bulk-selection'
+import { useInfiniteList } from '#/hooks/use-infinite-list'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import { CompanyOwnerControl } from './company-owner-control'
 
@@ -294,24 +296,20 @@ function BoardColumn({
 	readonly onRegisterIds: (status: string, ids: ReadonlyArray<string>) => void
 }) {
 	const { t } = useLingui()
-	const [colLimit, setColLimit] = useState(COMPANIES_PAGE_SIZE)
 	const columnSearch = useMemo<CompaniesSearch>(
 		() => ({ ...search, status }),
 		[search, status],
 	)
-	const searchKey = canonicalSearchKey(columnSearch)
-	const atom = useMemo(
-		// biome-ignore lint/correctness/useExhaustiveDependencies: keyed by searchKey + limit + refreshNonce
-		() => companiesSearchAtom(columnSearch, colLimit),
-		[searchKey, colLimit, refreshNonce],
-	)
-	const result = useAtomValue(atom)
+	// A refresh has to start the column over at its first page, so it takes part
+	// in identifying the list, just as the filters do.
+	const columnKey = `${canonicalSearchKey(columnSearch)}::${refreshNonce}`
+	const list = useInfiniteList({
+		resetKey: columnKey,
+		pageSize: COMPANIES_PAGE_SIZE,
+		atomFor: limit => companiesSearchAtom(columnSearch, limit),
+	})
 
-	const serverCards = useMemo(
-		() =>
-			AsyncResult.isSuccess(result) ? narrowCards(result.value.items) : [],
-		[result],
-	)
+	const serverCards = useMemo(() => narrowCards(list.items), [list.items])
 
 	// Apply optimistic moves: drop cards that moved OUT of this stage, add cards
 	// that moved IN (rendered from the data captured at move time).
@@ -340,7 +338,6 @@ function BoardColumn({
 
 	const { setNodeRef, isOver } = useDroppable({ id: status })
 	const loaded = cards.length
-	const hasMore = loaded < total
 
 	return (
 		<Column
@@ -353,28 +350,24 @@ function BoardColumn({
 				<ColumnCount data-testid={`board-count-${status}`}>{total}</ColumnCount>
 			</ColumnHeader>
 			<ColumnBody>
-				{loaded === 0 ? (
-					<ColumnEmpty>{t`Empty`}</ColumnEmpty>
-				) : (
-					cards.map(card => (
-						<DraggableCard
-							key={card.id}
-							card={card}
-							selected={selection.isSelected(card.id)}
-							onToggleSelect={() => selection.toggle(card.id)}
-							onMove={onMove}
-						/>
-					))
-				)}
-				{hasMore && (
-					<LoadMore
-						type='button'
-						onClick={() => setColLimit(l => l + COMPANIES_PAGE_SIZE)}
-						data-testid={`board-load-more-${status}`}
-					>
-						{t`Load ${total - loaded} more`}
-					</LoadMore>
-				)}
+				{/* A column still loading has nothing in it yet either, but saying so
+				    would be wrong — it reads as "no work at this stage". */}
+				{loaded === 0
+					? !list.isLoadingFirstPage && <ColumnEmpty>{t`Empty`}</ColumnEmpty>
+					: cards.map(card => (
+							<DraggableCard
+								key={card.id}
+								card={card}
+								selected={selection.isSelected(card.id)}
+								onToggleSelect={() => selection.toggle(card.id)}
+								onMove={onMove}
+							/>
+						))}
+				<InfiniteListFooter
+					list={list}
+					testId={`board-${status}`}
+					announce={false}
+				/>
 			</ColumnBody>
 		</Column>
 	)
@@ -722,24 +715,4 @@ const MoveTrigger = styled(PriButton).withConfig({
 	gap: var(--space-3xs);
 	padding: var(--space-3xs) var(--space-2xs);
 	font-size: var(--typescale-label-small-size);
-`
-
-const LoadMore = styled.button.withConfig({
-	displayName: 'PipelineBoardLoadMore',
-})`
-	padding: var(--space-2xs);
-	border: 1px dashed var(--color-outline);
-	border-radius: var(--shape-2xs);
-	background: transparent;
-	font-family: var(--font-display);
-	font-size: var(--typescale-label-small-size);
-	letter-spacing: 0.04em;
-	text-transform: uppercase;
-	color: var(--color-on-surface-variant);
-	cursor: pointer;
-
-	&:hover {
-		border-color: var(--color-primary);
-		color: var(--color-primary);
-	}
 `
