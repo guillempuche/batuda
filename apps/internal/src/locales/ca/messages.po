@@ -174,6 +174,10 @@ msgstr "{total} empreses"
 msgid "{total} companies with filters applied"
 msgstr "{total} empreses amb filtres aplicats"
 
+#: src/routes/documents/index.tsx
+msgid "{total} documents"
+msgstr "{total} documents"
+
 #: src/routes/emails/index.tsx
 msgid "{total} threads"
 msgstr "{total} fils"
@@ -786,6 +790,7 @@ msgid "Call"
 msgstr "Trucada"
 
 #: src/components/companies/documents-panel.tsx
+#: src/components/documents/document-kinds.ts
 msgid "Call notes"
 msgstr "Notes de trucada"
 
@@ -1309,6 +1314,10 @@ msgstr "No s'han pogut carregar aquestes tasques"
 msgid "Could not load this company"
 msgstr "No s'ha pogut carregar aquesta empresa"
 
+#: src/routes/documents/$id.tsx
+msgid "Could not load this document"
+msgstr "No s'ha pogut carregar aquest document"
+
 #: src/routes/pages/$id.tsx
 msgid "Could not load this page"
 msgstr "No s'ha pogut carregar aquesta pàgina"
@@ -1804,10 +1813,15 @@ msgstr "Nom a mostrar"
 #: src/components/companies/documents-panel.tsx
 #: src/components/companies/documents-panel.tsx
 #: src/components/shared/channel-icon.tsx
+#: src/routes/documents/$id.tsx
 msgid "Document"
 msgstr "Document"
 
+#: src/components/documents/subject-documents.tsx
+#: src/components/layout/nav-items.ts
 #: src/routes/companies/$slug.tsx
+#: src/routes/documents/index.tsx
+#: src/routes/documents/index.tsx
 msgid "Documents"
 msgstr "Documents"
 
@@ -2070,6 +2084,10 @@ msgstr "Error"
 msgid "Event"
 msgstr "Esdeveniment"
 
+#: src/routes/documents/index.tsx
+msgid "Every kind"
+msgstr "Tots els tipus"
+
 #: src/routes/tasks/index.tsx
 msgid "Every open task has a due date assigned."
 msgstr "Totes les tasques obertes tenen data de venciment."
@@ -2265,6 +2283,7 @@ msgid "Gathering evidence."
 msgstr "Recollint proves."
 
 #: src/components/companies/documents-panel.tsx
+#: src/components/documents/document-kinds.ts
 msgid "General"
 msgstr "General"
 
@@ -2584,10 +2603,6 @@ msgstr "Les actualitzacions en directe s'han aturat. Potser l'execució encara t
 msgid "Live updates paused. This run may still be working — refresh to check its latest status."
 msgstr "Actualitzacions en directe pausades. Aquesta execució encara pot estar treballant — actualitza per veure el seu estat més recent."
 
-#: src/components/companies/pipeline-board.tsx
-#~ msgid "Load {0} more"
-#~ msgstr "Carrega'n {0} més"
-
 #: src/components/shared/infinite-list-footer.tsx
 msgid "Load more"
 msgstr "Carrega'n més"
@@ -2816,10 +2831,12 @@ msgid "Meeting booked"
 msgstr "Reunió programada"
 
 #: src/components/companies/documents-panel.tsx
+#: src/components/documents/document-kinds.ts
 msgid "Meeting notes"
 msgstr "Notes de reunió"
 
 #: src/components/companies/documents-panel.tsx
+#: src/components/documents/document-kinds.ts
 msgid "Meeting prep"
 msgstr "Preparació de reunió"
 
@@ -3308,10 +3325,6 @@ msgstr "Nota"
 msgid "Notes"
 msgstr "Notes"
 
-#: src/components/companies/proposals-panel.tsx
-msgid "Notes (optional)"
-msgstr "Notes (opcional)"
-
 #: src/routes/tasks/index.tsx
 msgid "Nothing changed yet."
 msgstr "Encara no ha canviat res."
@@ -3352,6 +3365,10 @@ msgstr "Ara mateix no hi ha res per revisar."
 msgid "Nothing to show in this range."
 msgstr "Res a mostrar en aquest interval."
 
+#: src/routes/documents/index.tsx
+msgid "Nothing written down matches that."
+msgstr "No hi ha res escrit que hi coincideixi."
+
 #: src/components/primitives/pri-rich-text.tsx
 msgid "Numbered list"
 msgstr "Llista numerada"
@@ -3391,6 +3408,10 @@ msgstr "Obre {0}"
 #: src/routes/calendar/index.tsx
 msgid "Open company"
 msgstr "Obre l'empresa"
+
+#: src/components/companies/documents-panel.tsx
+msgid "Open full page"
+msgstr "Obre la pàgina completa"
 
 #: src/components/companies/upcoming-meetings-card.tsx
 msgid "Open in Cal.com"
@@ -3439,6 +3460,11 @@ msgstr "Tasques obertes"
 #: src/routes/settings/organization/index.tsx
 msgid "Open the org spend dashboard"
 msgstr "Obre el panell de despesa de l'organització"
+
+#: src/components/companies/documents-panel.tsx
+#: src/routes/documents/$id.tsx
+msgid "Open the page"
+msgstr "Obre la pàgina"
 
 #: src/components/research/inbox/paid-action-queue.tsx
 msgid "Open the run asking for this lookup"
@@ -4107,6 +4133,7 @@ msgstr "Demana un enllaç nou"
 
 #: src/components/companies/documents-panel.tsx
 #: src/components/companies/research-summary-card.tsx
+#: src/components/documents/document-kinds.ts
 #: src/components/instructions/agent-selector.tsx
 #: src/components/layout/nav-items.ts
 #: src/components/research/inbox/research-inbox.tsx
@@ -4320,6 +4347,10 @@ msgstr "Cerca a la cua de revisió"
 #: src/routes/emails/index.tsx
 msgid "Search threads"
 msgstr "Cerca fils"
+
+#: src/routes/documents/index.tsx
+msgid "Search titles and text"
+msgstr "Cerca en títols i text"
 
 #: src/components/research/run-progress.tsx
 msgid "Searching and reasoning"
@@ -4801,10 +4832,6 @@ msgstr "Títol de la tasca"
 msgid "Tasks"
 msgstr "Tasques"
 
-#: src/routes/tasks/index.tsx
-#~ msgid "tasks — showing {0} of {shelfTotal}"
-#~ msgstr "tasques: es mostren {0} de {shelfTotal}"
-
 #: src/components/research/findings/prospect-scan-view.tsx
 #: src/components/research/run-labels.ts
 msgid "Tax ID"
@@ -5070,6 +5097,14 @@ msgstr "Aquesta empresa no es pot mostrar"
 msgid "This connection is unbound. Bind an org to use it."
 msgstr "Aquesta connexió no està vinculada. Vincula una organització per fer-la servir."
 
+#: src/components/companies/documents-panel.tsx
+msgid "This document is a web page. It opens in a new tab."
+msgstr "Aquest document és una pàgina web. S'obre en una pestanya nova."
+
+#: src/routes/documents/$id.tsx
+msgid "This document is a web page. It opens in a tab of its own, exactly as it was saved."
+msgstr "Aquest document és una pàgina web. S'obre en una pestanya pròpia, tal com es va desar."
+
 #: src/components/companies/upcoming-meetings-card.tsx
 msgid "This is not the same as having none. Try again to see what is scheduled."
 msgstr "Això no vol dir que no n'hi hagi cap. Torna-ho a provar per veure què hi ha programat."
@@ -5274,6 +5309,10 @@ msgstr "Canvis sense desar"
 msgid "Untitled"
 msgstr "Sense títol"
 
+#: src/routes/documents/$id.tsx
+msgid "Untitled document"
+msgstr "Document sense títol"
+
 #: src/routes/settings/api-keys/index.tsx
 msgid "Untitled key"
 msgstr "Clau sense títol"
@@ -5397,6 +5436,7 @@ msgid "Visit"
 msgstr "Visita"
 
 #: src/components/companies/documents-panel.tsx
+#: src/components/documents/document-kinds.ts
 msgid "Visit notes"
 msgstr "Notes de visita"
 

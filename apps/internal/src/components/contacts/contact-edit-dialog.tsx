@@ -6,6 +6,7 @@ import styled from 'styled-components'
 
 import { PriButton, PriDialog, PriInput, usePriToast } from '@batuda/ui/pri'
 
+import { SubjectDocuments } from '#/components/documents/subject-documents'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import { stenciledTitle } from '#/lib/workshop-mixins'
 
@@ -174,6 +175,9 @@ export function ContactEditDialog({
 							/>
 						</Footer>
 					</Form>
+					{contact === null ? null : (
+						<SubjectDocuments subjectTable='contacts' subjectId={contact.id} />
+					)}
 				</PriDialog.Popup>
 			</PriDialog.Portal>
 		</PriDialog.Root>

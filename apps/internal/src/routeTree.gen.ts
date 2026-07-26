@@ -19,6 +19,7 @@ import { Route as ResearchIndexRouteImport } from './routes/research/index'
 import { Route as ProfileIndexRouteImport } from './routes/profile/index'
 import { Route as PagesIndexRouteImport } from './routes/pages/index'
 import { Route as EmailsIndexRouteImport } from './routes/emails/index'
+import { Route as DocumentsIndexRouteImport } from './routes/documents/index'
 import { Route as CompaniesIndexRouteImport } from './routes/companies/index'
 import { Route as CalendarIndexRouteImport } from './routes/calendar/index'
 import { Route as ResearchRunsRouteImport } from './routes/research/runs'
@@ -27,6 +28,7 @@ import { Route as PagesIdRouteImport } from './routes/pages/$id'
 import { Route as OauthConsentRouteImport } from './routes/oauth/consent'
 import { Route as EmailsInboxesRouteImport } from './routes/emails/inboxes'
 import { Route as EmailsThreadIdRouteImport } from './routes/emails/$threadId'
+import { Route as DocumentsIdRouteImport } from './routes/documents/$id'
 import { Route as CompaniesBoardRouteImport } from './routes/companies/board'
 import { Route as CompaniesSlugRouteImport } from './routes/companies/$slug'
 import { Route as SettingsProfileIndexRouteImport } from './routes/settings/profile/index'
@@ -90,6 +92,11 @@ const EmailsIndexRoute = EmailsIndexRouteImport.update({
   path: '/emails/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DocumentsIndexRoute = DocumentsIndexRouteImport.update({
+  id: '/documents/',
+  path: '/documents/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CompaniesIndexRoute = CompaniesIndexRouteImport.update({
   id: '/companies/',
   path: '/companies/',
@@ -128,6 +135,11 @@ const EmailsInboxesRoute = EmailsInboxesRouteImport.update({
 const EmailsThreadIdRoute = EmailsThreadIdRouteImport.update({
   id: '/emails/$threadId',
   path: '/emails/$threadId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocumentsIdRoute = DocumentsIdRouteImport.update({
+  id: '/documents/$id',
+  path: '/documents/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CompaniesBoardRoute = CompaniesBoardRouteImport.update({
@@ -204,6 +216,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/companies/board': typeof CompaniesBoardRoute
+  '/documents/$id': typeof DocumentsIdRoute
   '/emails/$threadId': typeof EmailsThreadIdRoute
   '/emails/inboxes': typeof EmailsInboxesRoute
   '/oauth/consent': typeof OauthConsentRoute
@@ -212,6 +225,7 @@ export interface FileRoutesByFullPath {
   '/research/runs': typeof ResearchRunsRoute
   '/calendar/': typeof CalendarIndexRoute
   '/companies/': typeof CompaniesIndexRoute
+  '/documents/': typeof DocumentsIndexRoute
   '/emails/': typeof EmailsIndexRoute
   '/pages/': typeof PagesIndexRoute
   '/profile/': typeof ProfileIndexRoute
@@ -236,6 +250,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/companies/board': typeof CompaniesBoardRoute
+  '/documents/$id': typeof DocumentsIdRoute
   '/emails/$threadId': typeof EmailsThreadIdRoute
   '/emails/inboxes': typeof EmailsInboxesRoute
   '/oauth/consent': typeof OauthConsentRoute
@@ -244,6 +259,7 @@ export interface FileRoutesByTo {
   '/research/runs': typeof ResearchRunsRoute
   '/calendar': typeof CalendarIndexRoute
   '/companies': typeof CompaniesIndexRoute
+  '/documents': typeof DocumentsIndexRoute
   '/emails': typeof EmailsIndexRoute
   '/pages': typeof PagesIndexRoute
   '/profile': typeof ProfileIndexRoute
@@ -269,6 +285,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/companies/board': typeof CompaniesBoardRoute
+  '/documents/$id': typeof DocumentsIdRoute
   '/emails/$threadId': typeof EmailsThreadIdRoute
   '/emails/inboxes': typeof EmailsInboxesRoute
   '/oauth/consent': typeof OauthConsentRoute
@@ -277,6 +294,7 @@ export interface FileRoutesById {
   '/research/runs': typeof ResearchRunsRoute
   '/calendar/': typeof CalendarIndexRoute
   '/companies/': typeof CompaniesIndexRoute
+  '/documents/': typeof DocumentsIndexRoute
   '/emails/': typeof EmailsIndexRoute
   '/pages/': typeof PagesIndexRoute
   '/profile/': typeof ProfileIndexRoute
@@ -303,6 +321,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/companies/$slug'
     | '/companies/board'
+    | '/documents/$id'
     | '/emails/$threadId'
     | '/emails/inboxes'
     | '/oauth/consent'
@@ -311,6 +330,7 @@ export interface FileRouteTypes {
     | '/research/runs'
     | '/calendar/'
     | '/companies/'
+    | '/documents/'
     | '/emails/'
     | '/pages/'
     | '/profile/'
@@ -335,6 +355,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/companies/$slug'
     | '/companies/board'
+    | '/documents/$id'
     | '/emails/$threadId'
     | '/emails/inboxes'
     | '/oauth/consent'
@@ -343,6 +364,7 @@ export interface FileRouteTypes {
     | '/research/runs'
     | '/calendar'
     | '/companies'
+    | '/documents'
     | '/emails'
     | '/pages'
     | '/profile'
@@ -367,6 +389,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/companies/$slug'
     | '/companies/board'
+    | '/documents/$id'
     | '/emails/$threadId'
     | '/emails/inboxes'
     | '/oauth/consent'
@@ -375,6 +398,7 @@ export interface FileRouteTypes {
     | '/research/runs'
     | '/calendar/'
     | '/companies/'
+    | '/documents/'
     | '/emails/'
     | '/pages/'
     | '/profile/'
@@ -400,6 +424,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   CompaniesSlugRoute: typeof CompaniesSlugRoute
   CompaniesBoardRoute: typeof CompaniesBoardRoute
+  DocumentsIdRoute: typeof DocumentsIdRoute
   EmailsThreadIdRoute: typeof EmailsThreadIdRoute
   EmailsInboxesRoute: typeof EmailsInboxesRoute
   OauthConsentRoute: typeof OauthConsentRoute
@@ -408,6 +433,7 @@ export interface RootRouteChildren {
   ResearchRunsRoute: typeof ResearchRunsRoute
   CalendarIndexRoute: typeof CalendarIndexRoute
   CompaniesIndexRoute: typeof CompaniesIndexRoute
+  DocumentsIndexRoute: typeof DocumentsIndexRoute
   EmailsIndexRoute: typeof EmailsIndexRoute
   PagesIndexRoute: typeof PagesIndexRoute
   ProfileIndexRoute: typeof ProfileIndexRoute
@@ -498,6 +524,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EmailsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/documents/': {
+      id: '/documents/'
+      path: '/documents'
+      fullPath: '/documents/'
+      preLoaderRoute: typeof DocumentsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/companies/': {
       id: '/companies/'
       path: '/companies'
@@ -552,6 +585,13 @@ declare module '@tanstack/react-router' {
       path: '/emails/$threadId'
       fullPath: '/emails/$threadId'
       preLoaderRoute: typeof EmailsThreadIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/documents/$id': {
+      id: '/documents/$id'
+      path: '/documents/$id'
+      fullPath: '/documents/$id'
+      preLoaderRoute: typeof DocumentsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/companies/board': {
@@ -648,6 +688,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   CompaniesSlugRoute: CompaniesSlugRoute,
   CompaniesBoardRoute: CompaniesBoardRoute,
+  DocumentsIdRoute: DocumentsIdRoute,
   EmailsThreadIdRoute: EmailsThreadIdRoute,
   EmailsInboxesRoute: EmailsInboxesRoute,
   OauthConsentRoute: OauthConsentRoute,
@@ -656,6 +697,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResearchRunsRoute: ResearchRunsRoute,
   CalendarIndexRoute: CalendarIndexRoute,
   CompaniesIndexRoute: CompaniesIndexRoute,
+  DocumentsIndexRoute: DocumentsIndexRoute,
   EmailsIndexRoute: EmailsIndexRoute,
   PagesIndexRoute: PagesIndexRoute,
   ProfileIndexRoute: ProfileIndexRoute,

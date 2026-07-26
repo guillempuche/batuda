@@ -27,6 +27,7 @@ import {
 	tasksShelfAtom,
 	updateTaskAtom,
 } from '#/atoms/tasks-atoms'
+import { SubjectDocuments } from '#/components/documents/subject-documents'
 import { EmptyState } from '#/components/shared/empty-state'
 import { ErrorState } from '#/components/shared/error-state'
 import { InfiniteListFooter } from '#/components/shared/infinite-list-footer'
@@ -910,6 +911,8 @@ function DetailPane({
 							<Trans>Cancel</Trans>
 						</PriButton>
 					</ActionRow>
+
+					<SubjectDocuments subjectTable='tasks' subjectId={task.id} />
 
 					<EventsHeader>
 						<Trans>Audit log</Trans>

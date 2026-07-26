@@ -5,6 +5,7 @@ import {
 	Calendar,
 	CheckSquare,
 	FileText,
+	FileType,
 	FolderOpen,
 	Gauge,
 	Mail,
@@ -65,6 +66,13 @@ export const navItems: ReadonlyArray<NavItem> = [
 		icon: Mail,
 		color: 'var(--color-status-contacted)',
 		testId: 'emails',
+	},
+	{
+		label: msg`Documents`,
+		path: '/documents',
+		icon: FileType,
+		color: 'var(--color-status-proposal)',
+		testId: 'documents',
 	},
 	{
 		label: msg`Pages`,
@@ -137,6 +145,7 @@ export const navGroups: ReadonlyArray<NavGroup> = [
 		items: [
 			itemByPath('/companies'),
 			itemByPath('/research'),
+			itemByPath('/documents'),
 			itemByPath('/pages'),
 		],
 	},
