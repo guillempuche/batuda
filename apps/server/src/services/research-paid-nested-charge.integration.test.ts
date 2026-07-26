@@ -33,6 +33,9 @@ const DATABASE_URL = process.env['DATABASE_URL'] as string
 const runtime = ManagedRuntime.make(PgLive)
 
 const ORG = `nested-org-${randomUUID()}`
+// Its own company, with room to spare: this one is about a record surviving,
+// not about the ceiling, so it must not inherit the other's spending.
+const ROOMY_ORG = `nested-org-roomy-${randomUUID()}`
 const CHARGE_CENTS = 5
 const CONCURRENT = 4
 // A ceiling only two of the four purchases fit under, so the other two refuse
@@ -78,9 +81,9 @@ const chargeInsideRequestTransaction = (
 							budgetCents: 1000,
 							paidBudgetCents: 10_000,
 							autoApprovePaidCents: 10_000,
-							paidMonthlyCapCents: CAP_CENTS,
 							autoApplyMinConfidence: null,
 						} as never,
+						defaultCapCents: 2000,
 						systemCeiling: 10_000,
 					}),
 				),
@@ -99,23 +102,33 @@ const ledgerRows = async (userId: string): Promise<number> => {
 	return Number(r.rows[0]?.n ?? -1)
 }
 
-const seedRun = async (): Promise<string> => {
+const seedRun = async (org = ORG): Promise<string> => {
 	const r = await pool.query<{ id: string }>(
 		`INSERT INTO research_runs (organization_id, query, status, created_by)
 		 VALUES ($1, 'nested charge', 'succeeded', 'nested-user') RETURNING id`,
-		[ORG],
+		[org],
 	)
 	return r.rows[0]?.id ?? ''
 }
 
-beforeAll(() => {
+beforeAll(async () => {
 	pool = new pg.Pool({ connectionString: DATABASE_URL })
+	await pool.query(
+		`INSERT INTO organization_research_policy (organization_id, paid_monthly_cap_cents)
+		 VALUES ($1, $2), ($3, 10000)`,
+		[ORG, CAP_CENTS, ROOMY_ORG],
+	)
 })
 
 afterAll(async () => {
-	await pool.query(`DELETE FROM research_runs WHERE organization_id = $1`, [
-		ORG,
-	])
+	await pool.query(
+		`DELETE FROM research_runs WHERE organization_id = ANY($1::text[])`,
+		[[ORG, ROOMY_ORG]],
+	)
+	await pool.query(
+		`DELETE FROM organization_research_policy WHERE organization_id = ANY($1::text[])`,
+		[[ORG, ROOMY_ORG]],
+	)
 	await runtime.dispose()
 	await pool.end()
 })
@@ -143,7 +156,7 @@ describe('paid charges made while the caller holds a transaction', () => {
 		it('should still keep the records of what was already bought', async () => {
 			// GIVEN a request that opens a transaction and then fails
 			const userId = `nested-user-${randomUUID()}`
-			const researchId = await seedRun()
+			const researchId = await seedRun(ROOMY_ORG)
 
 			// WHEN purchases are made and the request's transaction is rolled back
 			await runtime
@@ -164,16 +177,16 @@ describe('paid charges made while the caller holds a transaction', () => {
 						}).pipe(
 							Effect.provide(
 								makeBudgetLayer({
-									organizationId: ORG,
+									organizationId: ROOMY_ORG,
 									userId,
 									researchId,
 									policy: {
 										budgetCents: 1000,
 										paidBudgetCents: 10_000,
 										autoApprovePaidCents: 10_000,
-										paidMonthlyCapCents: 10_000,
 										autoApplyMinConfidence: null,
 									} as never,
+									defaultCapCents: 2000,
 									systemCeiling: 10_000,
 								}),
 							),

@@ -163,7 +163,7 @@ function ResearchPolicyPage() {
 							/>
 							<MoneyField
 								label={t`Monthly paid cap`}
-								hint={t`Hard limit on paid research spend each month.`}
+								hint={t`Most this organization can spend on paid research each month, shared by everyone in it.`}
 								value={monthlyCap}
 								onChange={setMonthlyCap}
 								testId='research-policy-monthly-cap'

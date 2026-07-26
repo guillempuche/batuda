@@ -1171,6 +1171,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 			const monthlyCapHardCeilingCents = yield* Config.int(
 				'RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS',
 			).pipe(Config.withDefault(10000))
+			// What a company may spend on paid calls in a month before it has set a
+			// figure of its own.
+			const defaultMonthlyCapCents = yield* Config.int(
+				'RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS',
+			).pipe(Config.withDefault(3000))
 			// Most companies one selector run may fan out across, so a broad filter
 			// can't spawn an unbounded number of leaf runs.
 			const selectorMaxCompanies = yield* Config.int(
@@ -1458,6 +1463,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						userId: createdBy,
 						researchId,
 						policy,
+						defaultCapCents: defaultMonthlyCapCents,
 						systemCeiling: monthlyCapHardCeilingCents,
 					}).pipe(Layer.provide(Layer.succeed(SqlClient.SqlClient)(sql)))
 
@@ -2859,6 +2865,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							userId,
 							researchId,
 							policy,
+							defaultCapCents: defaultMonthlyCapCents,
 							systemCeiling: monthlyCapHardCeilingCents,
 							// A run's own paid tool calls can't spend past the user's
 							// auto-approve limit without an approval gate — the agent turns
@@ -5224,20 +5231,34 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					}),
 
 				/** Get user's research policy. */
-				getPolicy: (userId: string) =>
+				getPolicy: (userId: string, organizationId: string) =>
 					Effect.gen(function* () {
 						const [row] = yield* sql`
 							SELECT * FROM user_research_policy WHERE user_id = ${userId}
 						`
 						if (row === undefined) return null
+						// The monthly ceiling is the company's, not this person's, so it
+						// is read from the company and shown alongside their own limits.
+						const [orgRow] = yield* sql<{ paidMonthlyCapCents: number }>`
+							SELECT paid_monthly_cap_cents
+							FROM organization_research_policy
+							WHERE organization_id = ${organizationId}
+						`
 						// Decode so the row's `updated_at` Date becomes a wire-safe
 						// DateTime.Utc; a decode failure is a server bug → die.
-						return yield* decodeResearchPolicy(row).pipe(Effect.orDie)
+						return yield* decodeResearchPolicy({
+							...(row as Record<string, unknown>),
+							paidMonthlyCapCents: Math.min(
+								orgRow?.paidMonthlyCapCents ?? defaultMonthlyCapCents,
+								monthlyCapHardCeilingCents,
+							),
+						}).pipe(Effect.orDie)
 					}),
 
 				/** Update user's research policy. */
 				updatePolicy: (
 					userId: string,
+					organizationId: string,
 					fields: {
 						budgetCents?: number | undefined
 						paidBudgetCents?: number | undefined
@@ -5247,14 +5268,24 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					},
 				) =>
 					Effect.gen(function* () {
+						// The monthly ceiling is the company's, so it is written there and
+						// applies to everyone in it, while the rest stay this person's own.
+						if (fields.paidMonthlyCapCents !== undefined) {
+							yield* sql`
+								INSERT INTO organization_research_policy (organization_id, paid_monthly_cap_cents, updated_at)
+								VALUES (${organizationId}, ${fields.paidMonthlyCapCents}, now())
+								ON CONFLICT (organization_id) DO UPDATE SET
+									paid_monthly_cap_cents = ${fields.paidMonthlyCapCents},
+									updated_at = now()
+							`
+						}
 						const [row] = yield* sql`
-							INSERT INTO user_research_policy (user_id, budget_cents, paid_budget_cents, auto_approve_paid_cents, paid_monthly_cap_cents, auto_apply_min_confidence, updated_at)
+							INSERT INTO user_research_policy (user_id, budget_cents, paid_budget_cents, auto_approve_paid_cents, auto_apply_min_confidence, updated_at)
 							VALUES (
 								${userId},
 								${fields.budgetCents ?? 100},
 								${fields.paidBudgetCents ?? 500},
 								${fields.autoApprovePaidCents ?? 200},
-								${fields.paidMonthlyCapCents ?? 2000},
 								${fields.autoApplyMinConfidence ?? null},
 								now()
 							)
@@ -5262,7 +5293,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								budget_cents = COALESCE(${fields.budgetCents ?? null}, user_research_policy.budget_cents),
 								paid_budget_cents = COALESCE(${fields.paidBudgetCents ?? null}, user_research_policy.paid_budget_cents),
 								auto_approve_paid_cents = COALESCE(${fields.autoApprovePaidCents ?? null}, user_research_policy.auto_approve_paid_cents),
-								paid_monthly_cap_cents = COALESCE(${fields.paidMonthlyCapCents ?? null}, user_research_policy.paid_monthly_cap_cents),
 								-- Nullable on purpose: passing null turns auto-apply off, so a
 								-- provided value (even null) is honored while an omitted one keeps
 								-- the current setting.

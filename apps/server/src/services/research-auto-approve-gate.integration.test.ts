@@ -73,6 +73,7 @@ const chargeThenObserve = (
 				userId: USER,
 				researchId,
 				policy,
+				defaultCapCents: 2000,
 				systemCeiling: BASE_DEFAULTS.hardCeiling,
 				enforceAutoApprove,
 			}).pipe(Layer.provide(Layer.succeed(SqlClient.SqlClient)(sql)))

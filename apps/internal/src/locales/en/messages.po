@@ -2185,10 +2185,6 @@ msgstr "Go to connections"
 msgid "Go to sign in"
 msgstr "Go to sign in"
 
-#: src/routes/settings/organization/policy.tsx
-msgid "Hard limit on paid research spend each month."
-msgstr "Hard limit on paid research spend each month."
-
 #: src/components/primitives/pri-rich-text.tsx
 msgid "Heading 1"
 msgstr "Heading 1"
@@ -2755,6 +2751,10 @@ msgstr "Minimum confidence to auto-apply"
 #: src/routes/settings/organization/policy.tsx
 msgid "Monthly paid cap"
 msgstr "Monthly paid cap"
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Most this organization can spend on paid research each month, shared by everyone in it."
+msgstr "Most this organization can spend on paid research each month, shared by everyone in it."
 
 #: src/components/companies/pipeline-board.tsx
 msgid "Move"

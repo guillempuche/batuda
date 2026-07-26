@@ -850,3 +850,45 @@ export const researchEvalContacts = (opts: {
 			makeOtlpObservability({ serviceName: 'batuda-research-eval-contacts' }),
 		),
 	)
+
+/**
+ * Read or set what one company may spend at paid research vendors in a calendar
+ * month, shared by everyone in it.
+ *
+ * A company with no figure of its own spends up to the one shipped in
+ * configuration. Setting a figure here is how a company that needs more gets it;
+ * the system ceiling still applies, so a company can never be given unlimited
+ * spending by this alone.
+ */
+export const researchCap = (input: {
+	readonly org: string
+	readonly cents: number | undefined
+}) =>
+	Effect.gen(function* () {
+		const sql = yield* SqlClient.SqlClient
+		if (input.cents === undefined) {
+			const rows = yield* sql<{ paidMonthlyCapCents: number }>`
+				SELECT paid_monthly_cap_cents
+				FROM organization_research_policy
+				WHERE organization_id = ${input.org}
+			`
+			const row = rows[0]
+			yield* Console.log(
+				row === undefined
+					? `${input.org}: no figure set — spends up to the one shipped in configuration`
+					: `${input.org}: ${row.paidMonthlyCapCents}¢ per month`,
+			)
+			return
+		}
+		yield* sql`
+			INSERT INTO organization_research_policy (organization_id, paid_monthly_cap_cents, updated_at)
+			VALUES (${input.org}, ${input.cents}, now())
+			ON CONFLICT (organization_id) DO UPDATE SET
+				paid_monthly_cap_cents = ${input.cents},
+				updated_at = now()
+		`
+		yield* Console.log(`${input.org}: ${input.cents}¢ per month`)
+		yield* Console.log(
+			'The system ceiling still applies, so a higher figure than that is capped at it.',
+		)
+	}).pipe(Effect.provide(SqlLive))

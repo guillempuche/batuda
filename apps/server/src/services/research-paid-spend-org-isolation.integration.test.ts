@@ -25,9 +25,10 @@ const runtime = ManagedRuntime.make(PgLive)
 const ORG_A = `ps-orgA-${randomUUID()}`
 const ORG_B = `ps-orgB-${randomUUID()}`
 const USER = `ps-u1-${randomUUID()}`
-// Isolated from USER so its monthly spend total starts at zero regardless
-// of what other cases in this file have already charged this month.
 const MONTHLY_CAP_USER = `ps-cap-${randomUUID()}`
+// Its own company, so its monthly total starts at zero whatever the other
+// cases in this file have already charged: the ceiling counts the company.
+const ORG_CAPPED = `ps-orgCap-${randomUUID()}`
 
 // Generous enough that the monthly cap never rejects a 50-cent test charge.
 const SYSTEM_DEFAULTS = {
@@ -84,6 +85,7 @@ const charge = (
 				userId: USER,
 				researchId,
 				policy,
+				defaultCapCents: SYSTEM_DEFAULTS.paidMonthlyCapCents,
 				systemCeiling: SYSTEM_DEFAULTS.hardCeiling,
 			}).pipe(Layer.provide(Layer.succeed(SqlClient.SqlClient)(sql)))
 
@@ -127,6 +129,7 @@ const chargeThenObserve = (
 				userId,
 				researchId,
 				policy,
+				defaultCapCents: systemDefaults.paidMonthlyCapCents,
 				systemCeiling: systemDefaults.hardCeiling,
 			}).pipe(Layer.provide(Layer.succeed(SqlClient.SqlClient)(sql)))
 
@@ -268,10 +271,10 @@ describe('recording paid research spend', () => {
 	describe('when a charge exceeds the monthly cap', () => {
 		it('should fail with a typed error instead of crashing', async () => {
 			// GIVEN a research run and a cap far below one charge
-			const researchId = await seedRun(ORG_A)
+			const researchId = await seedRun(ORG_CAPPED)
 			// WHEN the charge is attempted
 			const outcome = await chargeThenObserve(
-				ORG_A,
+				ORG_CAPPED,
 				researchId,
 				MONTHLY_CAP_USER,
 				LOW_MONTHLY_CAP_DEFAULTS,

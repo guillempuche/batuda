@@ -453,7 +453,8 @@ export const ResearchLive = HttpApiBuilder.group(
 				.handle('getPolicy', _ =>
 					Effect.gen(function* () {
 						const { userId } = yield* SessionContext
-						const policy = yield* svc.getPolicy(userId)
+						const org = yield* CurrentOrg
+						const policy = yield* svc.getPolicy(userId, org.id)
 						// No saved row yet → the effective limits are the system
 						// defaults; there's no timestamp, so updatedAt is null. Same
 						// shape as a decoded row so the response type stays uniform.
@@ -472,7 +473,8 @@ export const ResearchLive = HttpApiBuilder.group(
 				.handle('updatePolicy', _ =>
 					Effect.gen(function* () {
 						const { userId } = yield* SessionContext
-						return yield* svc.updatePolicy(userId, {
+						const org = yield* CurrentOrg
+						return yield* svc.updatePolicy(userId, org.id, {
 							budgetCents: _.payload.budget_cents,
 							paidBudgetCents: _.payload.paid_budget_cents,
 							autoApprovePaidCents: _.payload.auto_approve_paid_cents,

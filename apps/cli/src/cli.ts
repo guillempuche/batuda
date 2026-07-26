@@ -28,6 +28,7 @@ import { dbMigrate, dbReset } from './commands/db'
 import { doctor } from './commands/doctor'
 import { emailInject } from './commands/email'
 import {
+	researchCap,
 	researchEval,
 	researchEvalContacts,
 	researchEvalInvariance,
@@ -964,6 +965,29 @@ const researchProbeCommand = Command.make(
 	),
 )
 
+const researchCapCommand = Command.make(
+	'cap',
+	{
+		org: Flag.string('org').pipe(
+			Flag.withDescription('Organization id the ceiling belongs to'),
+		),
+		cents: Flag.integer('cents').pipe(
+			Flag.withDescription(
+				'New ceiling in cents per calendar month; omit to read the current one',
+			),
+			Flag.optional,
+		),
+	},
+	({ org, cents }) => researchCap({ org, cents: Option.getOrUndefined(cents) }),
+).pipe(
+	Command.withShortDescription(
+		"Read or set a company's monthly paid-research ceiling",
+	),
+	Command.withDescription(
+		'What one company may spend at paid research vendors in a calendar month, shared by everyone in it. A company with no figure of its own spends up to the one shipped in configuration; give a company its own figure when it needs more. The system-wide hard ceiling still applies on top, so this alone can never authorise unlimited spending.',
+	),
+)
+
 const researchEvalCommand = Command.make(
 	'eval',
 	{
@@ -1125,6 +1149,7 @@ const researchEvalInvarianceCommand = Command.make(
 const researchCommand = Command.make('research').pipe(
 	Command.withDescription('Research context tools'),
 	Command.withSubcommands([
+		researchCapCommand,
 		researchProbeCommand,
 		researchEvalCommand,
 		researchEvalContactsCommand,
