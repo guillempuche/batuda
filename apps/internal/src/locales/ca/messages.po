@@ -389,7 +389,6 @@ msgstr "Agent IA"
 msgid "AI assistants you've connected over MCP. Each may act in one or more of your organizations; the assistant picks which per request."
 msgstr "Assistents d'IA que has connectat per MCP. Cadascun pot actuar en una o més de les teves organitzacions; l'assistent tria quina en cada petició."
 
-#: src/components/research/inbox/research-inbox.tsx
 #: src/routes/companies/index.tsx
 #: src/routes/emails/index.tsx
 msgid "All"
@@ -520,10 +519,7 @@ msgid "Applying a discovered contact merges it into a matching record if one alr
 msgstr "En aplicar un contacte descobert, es fusiona amb un registre coincident si ja existeix."
 
 #: src/components/research/inbox/research-inbox.tsx
-#: src/components/research/inbox/research-inbox.tsx
-#: src/components/research/inbox/research-inbox.tsx
-#: src/components/research/review/proposed-updates-review.tsx
-#: src/components/research/review/proposed-updates-review.tsx
+#: src/components/research/resolve-status.tsx
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Applying…"
 msgstr "Aplicant…"
@@ -956,7 +952,6 @@ msgid "Comms"
 msgstr "Comunicació"
 
 #: src/components/layout/nav-items.ts
-#: src/components/research/inbox/research-inbox.tsx
 #: src/routes/companies/index.tsx
 msgid "Companies"
 msgstr "Empreses"
@@ -1094,7 +1089,6 @@ msgid "Contacted — set the next action (a follow-up date)."
 msgstr "Contactat — defineix la següent acció (una data de seguiment)."
 
 #: src/components/research/findings/company-enrichment-view.tsx
-#: src/components/research/inbox/research-inbox.tsx
 msgid "Contacts"
 msgstr "Contactes"
 
@@ -2064,10 +2058,6 @@ msgstr "Filtra per safata"
 #: src/routes/emails/index.tsx
 msgid "Filter by status"
 msgstr "Filtra per estat"
-
-#: src/components/research/inbox/research-inbox.tsx
-msgid "Filter by subject"
-msgstr "Filtra per subjecte"
 
 #: src/routes/companies/index.tsx
 msgid "Filter companies"
@@ -3893,10 +3883,7 @@ msgstr "Rebutja {subjectLabel}"
 msgid "Rejected"
 msgstr "Rebutjat"
 
-#: src/components/research/inbox/research-inbox.tsx
-#: src/components/research/inbox/research-inbox.tsx
-#: src/components/research/review/proposed-updates-review.tsx
-#: src/components/research/review/proposed-updates-review.tsx
+#: src/components/research/resolve-status.tsx
 msgid "Rejecting…"
 msgstr "S'està rebutjant…"
 
@@ -5060,8 +5047,7 @@ msgstr "Sense assignar"
 msgid "Undeliverable"
 msgstr "No es pot lliurar"
 
-#: src/components/research/inbox/research-inbox.tsx
-#: src/components/research/review/proposed-updates-review.tsx
+#: src/components/research/resolve-status.tsx
 msgid "Undo"
 msgstr "Desfés"
 

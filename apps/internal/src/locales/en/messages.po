@@ -389,7 +389,6 @@ msgstr "AI agent"
 msgid "AI assistants you've connected over MCP. Each may act in one or more of your organizations; the assistant picks which per request."
 msgstr "AI assistants you've connected over MCP. Each may act in one or more of your organizations; the assistant picks which per request."
 
-#: src/components/research/inbox/research-inbox.tsx
 #: src/routes/companies/index.tsx
 #: src/routes/emails/index.tsx
 msgid "All"
@@ -520,10 +519,7 @@ msgid "Applying a discovered contact merges it into a matching record if one alr
 msgstr "Applying a discovered contact merges it into a matching record if one already exists."
 
 #: src/components/research/inbox/research-inbox.tsx
-#: src/components/research/inbox/research-inbox.tsx
-#: src/components/research/inbox/research-inbox.tsx
-#: src/components/research/review/proposed-updates-review.tsx
-#: src/components/research/review/proposed-updates-review.tsx
+#: src/components/research/resolve-status.tsx
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Applying…"
 msgstr "Applying…"
@@ -956,7 +952,6 @@ msgid "Comms"
 msgstr "Comms"
 
 #: src/components/layout/nav-items.ts
-#: src/components/research/inbox/research-inbox.tsx
 #: src/routes/companies/index.tsx
 msgid "Companies"
 msgstr "Companies"
@@ -1094,7 +1089,6 @@ msgid "Contacted — set the next action (a follow-up date)."
 msgstr "Contacted — set the next action (a follow-up date)."
 
 #: src/components/research/findings/company-enrichment-view.tsx
-#: src/components/research/inbox/research-inbox.tsx
 msgid "Contacts"
 msgstr "Contacts"
 
@@ -2064,10 +2058,6 @@ msgstr "Filter by inbox"
 #: src/routes/emails/index.tsx
 msgid "Filter by status"
 msgstr "Filter by status"
-
-#: src/components/research/inbox/research-inbox.tsx
-msgid "Filter by subject"
-msgstr "Filter by subject"
 
 #: src/routes/companies/index.tsx
 msgid "Filter companies"
@@ -3893,10 +3883,7 @@ msgstr "Reject {subjectLabel}"
 msgid "Rejected"
 msgstr "Rejected"
 
-#: src/components/research/inbox/research-inbox.tsx
-#: src/components/research/inbox/research-inbox.tsx
-#: src/components/research/review/proposed-updates-review.tsx
-#: src/components/research/review/proposed-updates-review.tsx
+#: src/components/research/resolve-status.tsx
 msgid "Rejecting…"
 msgstr "Rejecting…"
 
@@ -5060,8 +5047,7 @@ msgstr "Unassigned"
 msgid "Undeliverable"
 msgstr "Undeliverable"
 
-#: src/components/research/inbox/research-inbox.tsx
-#: src/components/research/review/proposed-updates-review.tsx
+#: src/components/research/resolve-status.tsx
 msgid "Undo"
 msgstr "Undo"
 

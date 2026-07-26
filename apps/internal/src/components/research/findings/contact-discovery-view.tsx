@@ -129,8 +129,10 @@ const DecisionMakerBadge = styled.span`
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
-	background: color-mix(in oklab, var(--color-primary) 60%, white);
-	color: var(--color-on-primary);
+	/* Container tokens rather than a mix toward white: in a dark theme the accent
+	   is already pale, so lightening it further left the text on top unreadable. */
+	background: var(--color-primary-container);
+	color: var(--color-on-primary-container);
 	padding: var(--space-3xs) var(--space-2xs);
 	border-radius: var(--shape-3xs);
 `

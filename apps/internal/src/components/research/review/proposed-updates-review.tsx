@@ -29,6 +29,7 @@ import {
 	Provenance,
 	type ProvenanceSource,
 } from '#/components/research/provenance'
+import { ResolveStatus } from '#/components/research/resolve-status'
 import {
 	narrowProposedUpdates,
 	type ReviewProposal,
@@ -340,24 +341,19 @@ function ProposalCard({
 						reason={shownOutcome.reason}
 					/>
 				) : pending !== undefined ? (
-					<PendingResolve data-testid='research-review-pending'>
-						<PendingLabel>
-							{pending === 'apply' ? t`Applying…` : t`Rejecting…`}
-						</PendingLabel>
-						<UndoButton
-							type='button'
-							onClick={onUndo}
-							data-testid='research-review-undo'
-						>
-							<Trans>Undo</Trans>
-						</UndoButton>
-					</PendingResolve>
+					<ResolveStatus
+						decision={pending}
+						undoable
+						onUndo={onUndo}
+						testId='research-review-pending'
+					/>
 				) : sending !== undefined ? (
-					<PendingResolve data-testid='research-review-sending'>
-						<PendingLabel>
-							{sending === 'apply' ? t`Applying…` : t`Rejecting…`}
-						</PendingLabel>
-					</PendingResolve>
+					<ResolveStatus
+						decision={sending}
+						undoable={false}
+						onUndo={onUndo}
+						testId='research-review-sending'
+					/>
 				) : (
 					<>
 						<PriButton
@@ -615,44 +611,4 @@ const CardActions = styled.div`
 	align-items: center;
 	gap: var(--space-2xs);
 	margin-top: var(--space-3xs);
-`
-
-const PendingResolve = styled.div`
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-2xs);
-`
-
-const PendingLabel = styled.span`
-	font-family: var(--font-body);
-	font-size: var(--typescale-body-small-size);
-	font-style: italic;
-	color: var(--color-on-surface-variant);
-`
-
-const UndoButton = styled.button`
-	/* Small text made these under the 24px a pointer needs, and Undo is the only
-	   thing that stops a change being written. */
-	min-height: 1.5rem;
-	min-width: 1.5rem;
-	padding-inline: var(--space-2xs);
-	font-family: var(--font-display);
-	font-size: var(--typescale-label-small-size);
-	letter-spacing: 0.04em;
-	text-transform: uppercase;
-	color: var(--color-primary);
-	background: none;
-	border: none;
-	cursor: pointer;
-	padding: var(--space-3xs) var(--space-2xs);
-
-	&:hover {
-		text-decoration: underline;
-	}
-
-	&:focus-visible {
-		outline: none;
-		box-shadow: var(--glow-active);
-		border-radius: var(--shape-2xs);
-	}
 `

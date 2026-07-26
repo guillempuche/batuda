@@ -511,7 +511,9 @@ const Pre = styled.pre`
 	font-size: var(--typescale-body-small-size);
 	white-space: pre-wrap;
 	word-wrap: break-word;
-	background: color-mix(in oklab, var(--color-surface) 60%, black 6%);
+	/* A surface token rather than a mix toward black: darkening the surface again
+	   made this near-invisible against the plate it sits on in a dark theme. */
+	background: var(--color-surface-container-lowest);
 	padding: var(--space-sm);
 	border-radius: var(--shape-2xs);
 	margin: 0;
