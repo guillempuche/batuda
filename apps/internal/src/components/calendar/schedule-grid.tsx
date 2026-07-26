@@ -153,8 +153,6 @@ function scheduleXLocale(linguiLocale: string): string {
 			return 'en-US'
 		case 'ca':
 			return 'ca-ES'
-		case 'es':
-			return 'es-ES'
 		default:
 			return linguiLocale.includes('-') ? linguiLocale : 'en-US'
 	}

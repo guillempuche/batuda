@@ -7,18 +7,6 @@ export const instructionTemplatesAtom = BatudaApiAtom.query(
 	{},
 )
 
-const detailCache = new Map<string, ReturnType<typeof makeDetailAtom>>()
-function makeDetailAtom(id: string) {
-	return BatudaApiAtom.query('instructions', 'getTemplate', { params: { id } })
-}
-export function instructionTemplateAtom(id: string) {
-	const existing = detailCache.get(id)
-	if (existing !== undefined) return existing
-	const atom = makeDetailAtom(id)
-	detailCache.set(id, atom)
-	return atom
-}
-
 const stacksCache = new Map<string, ReturnType<typeof makeStacksAtom>>()
 function makeStacksAtom(agent: string) {
 	return BatudaApiAtom.query('instructions', 'listStacks', { query: { agent } })
@@ -61,10 +49,6 @@ export const updateTemplateAtom = BatudaApiAtom.mutation(
 export const deleteTemplateAtom = BatudaApiAtom.mutation(
 	'instructions',
 	'deleteTemplate',
-)
-export const transferTemplateAtom = BatudaApiAtom.mutation(
-	'instructions',
-	'transferTemplate',
 )
 export const createStackAtom = BatudaApiAtom.mutation(
 	'instructions',

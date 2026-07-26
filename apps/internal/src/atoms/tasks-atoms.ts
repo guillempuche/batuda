@@ -132,10 +132,6 @@ export const cancelTaskAtom = BatudaApiAtom.mutation('tasks', 'cancel')
 export const snoozeTaskAtom = BatudaApiAtom.mutation('tasks', 'snooze')
 export const rescheduleTaskAtom = BatudaApiAtom.mutation('tasks', 'reschedule')
 export const createTaskAtom = BatudaApiAtom.mutation('tasks', 'create')
-export const bulkCompleteTasksAtom = BatudaApiAtom.mutation(
-	'tasks',
-	'bulkComplete',
-)
 
 const taskEventsCache = new Map<string, ReturnType<typeof makeTaskEventsAtom>>()
 function makeTaskEventsAtom(taskId: string) {
@@ -146,17 +142,5 @@ export function taskEventsAtomFor(taskId: string) {
 	if (existing !== undefined) return existing
 	const atom = makeTaskEventsAtom(taskId)
 	taskEventsCache.set(taskId, atom)
-	return atom
-}
-
-const taskDetailCache = new Map<string, ReturnType<typeof makeTaskDetailAtom>>()
-function makeTaskDetailAtom(taskId: string) {
-	return BatudaApiAtom.query('tasks', 'get', { params: { id: taskId } })
-}
-export function taskDetailAtomFor(taskId: string) {
-	const existing = taskDetailCache.get(taskId)
-	if (existing !== undefined) return existing
-	const atom = makeTaskDetailAtom(taskId)
-	taskDetailCache.set(taskId, atom)
 	return atom
 }

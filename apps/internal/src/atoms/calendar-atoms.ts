@@ -1,26 +1,17 @@
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 
 /**
- * Calendar atom registry (§6 of the calendar plan).
+ * Calendar atom registry.
  *
- * Events are fetched once for a wide window on first paint (current
- * month ± a fortnight on each side). Schedule-X owns the visible-range
- * navigation in-memory; we refetch when the user jumps more than a
- * month forward/backward via a `calendarRangeAtom` held on the page,
- * not by re-keying the module-level atom (that would refetch on every
- * view switch).
+ * Moving between weeks and months is handled in the browser, so the whole
+ * set is fetched once rather than re-fetched on every view switch.
  */
-export const calendarEventTypesAtom = BatudaApiAtom.query(
-	'calendar',
-	'listEventTypes',
-	{ query: { active: 'true' }, serializationKey: 'calendar:event-types' },
-)
 
 /**
- * Upcoming + recent events. `from` and `to` are absent on purpose — the
- * server returns a sensible default window (next 60d + past 30d) so
- * first paint always has context. A dedicated page-level atom re-runs
- * the query with explicit range when the user navigates outside it.
+ * Every event the cap allows, oldest first. No date range is asked for, so
+ * this is the earliest events on file rather than a window around today —
+ * once an organisation has more than the cap, the newest meetings fall off
+ * the end.
  */
 export const calendarEventsAtom = BatudaApiAtom.query(
 	'calendar',
