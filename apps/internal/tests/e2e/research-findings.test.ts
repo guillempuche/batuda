@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 
 import { DATABASE_URL } from './helpers/database-url'
+import { waitForInteractive } from './helpers/hydration'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 // A run's findings are the research schema filled in by the model, and they
@@ -142,6 +143,10 @@ test.describe('research findings', () => {
 
 			// WHEN the company page is opened and the fit panel expanded
 			await page.goto('/companies/cal-pep-fonda', { waitUntil: 'networkidle' })
+			// The trigger opens the panel from a plain onClick, so a click that
+			// lands before the browser has taken the page over does nothing and
+			// leaves no trace.
+			await waitForInteractive(page, 'company-fit-trigger')
 			await page.getByTestId('company-fit-trigger').click()
 
 			// THEN the criterion and its evidence both render — the quote is the

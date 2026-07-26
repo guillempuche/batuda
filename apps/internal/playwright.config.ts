@@ -120,6 +120,13 @@ const worktreeHost = (() => {
 const BASE_URL =
 	process.env['E2E_BASE_URL'] ?? `https://${worktreeHost}${portlessPortSuffix}`
 
+// Specs that build their own request context — signing in as a second person,
+// calling the API directly — cannot read this constant, so they fall back to
+// `E2E_BASE_URL`. Publishing it here means that fallback resolves to the origin
+// the browser is actually using, instead of the main checkout's address, which
+// nothing answers on in a worktree or on CI.
+process.env['E2E_BASE_URL'] = BASE_URL
+
 const STORAGE_STATE = 'tests/e2e/.auth/alice.json'
 
 export default defineConfig({
