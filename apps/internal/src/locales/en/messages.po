@@ -54,6 +54,21 @@ msgstr "(no subject)"
 msgid "(no summary)"
 msgstr "(no summary)"
 
+#. placeholder {0}: quality.fields_grounded ?? 0
+#: src/components/research/findings/company-enrichment-view.tsx
+msgid "{0, plural, one {# fact backed by a source} other {# facts backed by a source}}"
+msgstr "{0, plural, one {# fact backed by a source} other {# facts backed by a source}}"
+
+#. placeholder {0}: quality.sources_matched ?? 0
+#: src/components/research/findings/company-enrichment-view.tsx
+msgid "{0, plural, one {# page on the company's own site} other {# pages on the company's own site}}"
+msgstr "{0, plural, one {# page on the company's own site} other {# pages on the company's own site}}"
+
+#. placeholder {0}: quality.rounds ?? 0
+#: src/components/research/findings/company-enrichment-view.tsx
+msgid "{0, plural, one {# pass over the evidence} other {# passes over the evidence}}"
+msgstr "{0, plural, one {# pass over the evidence} other {# passes over the evidence}}"
+
 #. placeholder {0}: progress.sourceCount
 #: src/components/research/run-progress.tsx
 msgid "{0, plural, one {# source} other {# sources}}"
@@ -89,12 +104,9 @@ msgstr "{0} attendees"
 msgid "{0} calls"
 msgstr "{0} calls"
 
-#. placeholder {0}: quality.fields_grounded ?? 0
-#. placeholder {1}: quality.sources_matched ?? 0
-#. placeholder {2}: quality.rounds ?? 0
 #: src/components/research/findings/company-enrichment-view.tsx
-msgid "{0} fields grounded · {1} own-domain sources · {2} rounds"
-msgstr "{0} fields grounded · {1} own-domain sources · {2} rounds"
+#~ msgid "{0} fields grounded · {1} own-domain sources · {2} rounds"
+#~ msgstr "{0} fields grounded · {1} own-domain sources · {2} rounds"
 
 #. placeholder {0}: thread.messageCount
 #: src/routes/emails/index.tsx
@@ -133,6 +145,14 @@ msgstr "{0}: showing {1} of {shelfTotal} tasks."
 #: src/routes/settings/organization/members.tsx
 msgid "{addedEmail} is now a member. They've been emailed."
 msgstr "{addedEmail} is now a member. They've been emailed."
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "{entered} changes entered the records."
+msgstr "{entered} changes entered the records."
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "{entered} entered the records, {leftover} still need you."
+msgstr "{entered} entered the records, {leftover} still need you."
 
 #: src/components/layout/nav-group-knob.tsx
 msgid "{groupLabel} sections"
@@ -538,6 +558,11 @@ msgstr "Apply all verified ({verifiedToApply})"
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Apply field updates ({0})"
 msgstr "Apply field updates ({0})"
+
+#. placeholder {0}: items.length
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Applying {0} changes…"
+msgstr "Applying {0} changes…"
 
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Applying a discovered contact merges it into a matching record if one already exists."
@@ -4832,6 +4857,10 @@ msgstr "The board could not be fetched. Check that the session is valid, then tr
 #: src/routes/companies/$slug.tsx
 msgid "The change didn't go through. Try again."
 msgstr "The change didn't go through. Try again."
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "The changes could not be applied."
+msgstr "The changes could not be applied."
 
 #: src/routes/companies/$slug.tsx
 msgid "The company could not be fetched. Check that the session is valid, then try again."

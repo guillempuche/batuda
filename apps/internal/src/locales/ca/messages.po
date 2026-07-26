@@ -54,6 +54,21 @@ msgstr "(sense assumpte)"
 msgid "(no summary)"
 msgstr "(sense resum)"
 
+#. placeholder {0}: quality.fields_grounded ?? 0
+#: src/components/research/findings/company-enrichment-view.tsx
+msgid "{0, plural, one {# fact backed by a source} other {# facts backed by a source}}"
+msgstr "{0, plural, one {# fet amb font} other {# fets amb font}}"
+
+#. placeholder {0}: quality.sources_matched ?? 0
+#: src/components/research/findings/company-enrichment-view.tsx
+msgid "{0, plural, one {# page on the company's own site} other {# pages on the company's own site}}"
+msgstr "{0, plural, one {# pàgina del web de l'empresa} other {# pàgines del web de l'empresa}}"
+
+#. placeholder {0}: quality.rounds ?? 0
+#: src/components/research/findings/company-enrichment-view.tsx
+msgid "{0, plural, one {# pass over the evidence} other {# passes over the evidence}}"
+msgstr "{0, plural, one {# passada sobre les proves} other {# passades sobre les proves}}"
+
 #. placeholder {0}: progress.sourceCount
 #: src/components/research/run-progress.tsx
 msgid "{0, plural, one {# source} other {# sources}}"
@@ -89,12 +104,9 @@ msgstr "{0} assistents"
 msgid "{0} calls"
 msgstr "{0} crides"
 
-#. placeholder {0}: quality.fields_grounded ?? 0
-#. placeholder {1}: quality.sources_matched ?? 0
-#. placeholder {2}: quality.rounds ?? 0
 #: src/components/research/findings/company-enrichment-view.tsx
-msgid "{0} fields grounded · {1} own-domain sources · {2} rounds"
-msgstr "{0} camps documentats · {1} fonts del domini propi · {2} rondes"
+#~ msgid "{0} fields grounded · {1} own-domain sources · {2} rounds"
+#~ msgstr "{0} camps documentats · {1} fonts del domini propi · {2} rondes"
 
 #. placeholder {0}: thread.messageCount
 #: src/routes/emails/index.tsx
@@ -133,6 +145,14 @@ msgstr "{0}: es mostren {1} de {shelfTotal} tasques."
 #: src/routes/settings/organization/members.tsx
 msgid "{addedEmail} is now a member. They've been emailed."
 msgstr "{addedEmail} ja és membre. Se li ha enviat un correu."
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "{entered} changes entered the records."
+msgstr "{entered} canvis han entrat als registres."
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "{entered} entered the records, {leftover} still need you."
+msgstr "{entered} han entrat als registres, {leftover} encara et necessiten."
 
 #: src/components/layout/nav-group-knob.tsx
 msgid "{groupLabel} sections"
@@ -538,6 +558,11 @@ msgstr "Aplica tot el verificat ({verifiedToApply})"
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Apply field updates ({0})"
 msgstr "Aplica actualitzacions de camps ({0})"
+
+#. placeholder {0}: items.length
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Applying {0} changes…"
+msgstr "S'estan aplicant {0} canvis…"
 
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Applying a discovered contact merges it into a matching record if one already exists."
@@ -4832,6 +4857,10 @@ msgstr "No s'ha pogut carregar el tauler. Comprova que la sessió sigui vàlida 
 #: src/routes/companies/$slug.tsx
 msgid "The change didn't go through. Try again."
 msgstr "El canvi no s'ha completat. Torna-ho a provar."
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "The changes could not be applied."
+msgstr "No s'han pogut aplicar els canvis."
 
 #: src/routes/companies/$slug.tsx
 msgid "The company could not be fetched. Check that the session is valid, then try again."
