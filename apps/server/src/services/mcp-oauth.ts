@@ -250,13 +250,22 @@ export class McpOAuthService extends Context.Service<McpOAuthService>()(
 								        c."createdAt"         AS "createdAt",
 								        COALESCE(
 								          array_agg(sel.organization_id ORDER BY sel.organization_id)
-								          FILTER (WHERE sel.organization_id IS NOT NULL),
+								          FILTER (WHERE sel.organization_id IS NOT NULL
+									            AND rev.organization_id IS NULL),
 								          ARRAY[]::text[]
 								        )                    AS "organizationIds"
 								 FROM "oauthConsent" c
 								 JOIN "oauthClient" oc ON oc."clientId" = c."clientId"
 								 LEFT JOIN mcp_oauth_org_membership sel
 								   ON sel.user_id = c."userId" AND sel.client_id = c."clientId"
+								 -- An organization the connection has been cut off from is left
+								 -- out: the choice behind it is kept so it can be put back, but
+								 -- showing it would claim the connection still reaches data it
+								 -- can no longer touch.
+								 LEFT JOIN mcp_oauth_revocation rev
+								   ON rev.user_id = sel.user_id
+								  AND rev.client_id = sel.client_id
+								  AND rev.organization_id = sel.organization_id
 								 WHERE c."userId" = $1
 								 GROUP BY c."clientId", oc.name, oc."redirectUris", c."createdAt"
 								 ORDER BY c."createdAt" DESC`,
