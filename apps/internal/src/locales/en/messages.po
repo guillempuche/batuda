@@ -104,10 +104,6 @@ msgstr "{0} attendees"
 msgid "{0} calls"
 msgstr "{0} calls"
 
-#: src/components/research/findings/company-enrichment-view.tsx
-#~ msgid "{0} fields grounded · {1} own-domain sources · {2} rounds"
-#~ msgstr "{0} fields grounded · {1} own-domain sources · {2} rounds"
-
 #. placeholder {0}: thread.messageCount
 #: src/routes/emails/index.tsx
 msgid "{0} msgs"
@@ -1201,6 +1197,10 @@ msgstr "Copy slug"
 #: src/routes/settings/api-keys/index.tsx
 msgid "Copy your key now"
 msgstr "Copy your key now"
+
+#: src/components/companies/upcoming-meetings-card.tsx
+msgid "Could be more than one person on file"
+msgstr "Could be more than one person on file"
 
 #: src/routes/settings/organization/members.tsx
 msgid "Could not add {trimmed}. Please try again."
@@ -5031,6 +5031,10 @@ msgstr "The workshop rejected the change. Try again."
 #: src/routes/settings/organization/index.tsx
 msgid "The workspace your CRM data lives in."
 msgstr "The workspace your CRM data lives in."
+
+#: src/components/companies/upcoming-meetings-card.tsx
+msgid "Their company is on file, they are not"
+msgstr "Their company is on file, they are not"
 
 #. placeholder {0}: formatMoneyCents(totalCents, { locale: i18n.locale })
 #: src/components/research/inbox/paid-action-queue.tsx

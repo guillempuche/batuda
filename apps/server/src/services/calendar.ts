@@ -238,6 +238,10 @@ export class CalendarService extends Context.Service<CalendarService>()(
 					})
 					.pipe(
 						Effect.map(match => {
+							// Every branch records what was decided, not just who was found.
+							// "Nobody we hold", "the company but not the person" and "several
+							// people it could be" are three different things to a reader
+							// preparing for the meeting, and collapse into one without this.
 							if (
 								match instanceof MatchedContact ||
 								match instanceof CreatedContact
@@ -245,31 +249,42 @@ export class CalendarService extends Context.Service<CalendarService>()(
 								return {
 									contactId: match.contactId,
 									companyId: match.companyId,
-									matchNote: null as string | null,
+									matchStatus: 'matched' as string | null,
+									matchCandidates: null as unknown,
 								}
 							}
 							if (match instanceof MatchedCompanyOnly) {
 								return {
 									contactId: null,
 									companyId: match.companyId,
-									matchNote: 'company_only',
+									matchStatus: 'company_only',
+									matchCandidates: null as unknown,
 								}
 							}
 							if (match instanceof Ambiguous) {
 								return {
 									contactId: null,
 									companyId: null,
-									matchNote: 'ambiguous',
+									matchStatus: 'ambiguous',
+									// Keeping who they were lets the choice be offered later
+									// rather than guessed at now.
+									matchCandidates: match.candidates as unknown,
 								}
 							}
 							if (match instanceof NoMatch) {
 								return {
 									contactId: null,
 									companyId: null,
-									matchNote: 'no_match',
+									matchStatus: 'no_match',
+									matchCandidates: null as unknown,
 								}
 							}
-							return { contactId: null, companyId: null, matchNote: null }
+							return {
+								contactId: null,
+								companyId: null,
+								matchStatus: null,
+								matchCandidates: null as unknown,
+							}
 						}),
 					)
 
@@ -296,6 +311,11 @@ export class CalendarService extends Context.Service<CalendarService>()(
 								companyId: resolved.companyId,
 								rsvp: attendee.rsvp,
 								isOrganizer: attendee.isOrganizer,
+								matchStatus: resolved.matchStatus,
+								matchCandidates:
+									resolved.matchCandidates === null
+										? null
+										: JSON.stringify(resolved.matchCandidates),
 							})}
 							ON CONFLICT (event_id, email) DO UPDATE SET
 								name = EXCLUDED.name,
@@ -303,6 +323,8 @@ export class CalendarService extends Context.Service<CalendarService>()(
 								company_id = EXCLUDED.company_id,
 								rsvp = EXCLUDED.rsvp,
 								is_organizer = EXCLUDED.is_organizer,
+								match_status = EXCLUDED.match_status,
+								match_candidates = EXCLUDED.match_candidates,
 								updated_at = now()
 						`
 					}
@@ -781,6 +803,7 @@ export class CalendarService extends Context.Service<CalendarService>()(
 								eventTypeId: null,
 								startAt: vevent.startAt,
 								endAt: vevent.endAt,
+								allDay: vevent.allDay,
 								status: finalStatus,
 								title: vevent.title,
 								locationType: vevent.locationType,
@@ -804,6 +827,7 @@ export class CalendarService extends Context.Service<CalendarService>()(
 								ical_sequence = EXCLUDED.ical_sequence,
 								start_at = EXCLUDED.start_at,
 								end_at = EXCLUDED.end_at,
+								all_day = EXCLUDED.all_day,
 								status = EXCLUDED.status,
 								title = EXCLUDED.title,
 								location_type = EXCLUDED.location_type,

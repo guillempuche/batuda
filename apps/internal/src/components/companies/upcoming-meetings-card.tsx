@@ -34,6 +34,9 @@ type AttendeeRow = {
 	// False when the address matches no contact on file — the person you most
 	// need to read up on before the meeting.
 	readonly isKnown: boolean
+	// Why they are not known, when they are not: nobody on file, the company but
+	// not the person, or several people it could be. Null before anyone judged.
+	readonly matchStatus: string | null
 }
 
 const EMPTY: ReadonlyArray<EventRow> = []
@@ -150,11 +153,11 @@ export function UpcomingMeetingsCard({
 										<Attendee
 											key={person.id}
 											$known={person.isKnown}
-											title={
-												person.isKnown
-													? undefined
-													: t`Not a contact on file yet`
-											}
+											title={unknownReason(person, {
+												ambiguous: t`Could be more than one person on file`,
+												companyOnly: t`Their company is on file, they are not`,
+												noMatch: t`Not a contact on file yet`,
+											})}
 										>
 											{person.label}
 											{person.isOrganizer ? (
@@ -198,6 +201,25 @@ export function UpcomingMeetingsCard({
 	)
 }
 
+/**
+ * Why an attendee could not be tied to somebody on file. The three answers call
+ * for different preparation — look the person up, ask who is coming, or pick
+ * between the people it might be — so they do not share one label.
+ */
+function unknownReason(
+	person: AttendeeRow,
+	labels: {
+		readonly ambiguous: string
+		readonly companyOnly: string
+		readonly noMatch: string
+	},
+): string | undefined {
+	if (person.isKnown) return undefined
+	if (person.matchStatus === 'ambiguous') return labels.ambiguous
+	if (person.matchStatus === 'company_only') return labels.companyOnly
+	return labels.noMatch
+}
+
 // Typed date fields decode to DateTime.Utc on the wire; fall back to their
 // string form for anything already an ISO string.
 function dateToIsoOrNull(value: unknown): string | null {
@@ -221,6 +243,8 @@ function narrowAttendees(value: unknown): ReadonlyArray<AttendeeRow> {
 			rsvp: typeof r['rsvp'] === 'string' ? r['rsvp'] : 'needs-action',
 			isOrganizer: r['isOrganizer'] === true,
 			isKnown: typeof r['contactId'] === 'string',
+			matchStatus:
+				typeof r['matchStatus'] === 'string' ? r['matchStatus'] : null,
 		})
 	}
 	return out

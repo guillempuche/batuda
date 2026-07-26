@@ -46,6 +46,9 @@ export class CalendarEvent extends Model.Class<CalendarEvent>('CalendarEvent')({
 
 	startAt: Schema.DateTimeUtcFromDate,
 	endAt: Schema.DateTimeUtcFromDate,
+	// Covers whole days rather than a slot within one, so it carries no
+	// meaningful clock time and ends at midnight.
+	allDay: Schema.Boolean,
 	status: Schema.String,
 	// values: confirmed | tentative | cancelled
 	title: Schema.String,
@@ -78,4 +81,10 @@ export class CalendarEventAttendee extends Model.Class<CalendarEventAttendee>(
 	rsvp: Schema.String,
 	// values: needs-action | accepted | declined | tentative
 	isOrganizer: Schema.Boolean,
+	// What was decided when this address was compared against the people on
+	// file. Null on a row nothing has judged.
+	// values: matched | company_only | ambiguous | no_match
+	matchStatus: Schema.NullOr(Schema.String),
+	// Who the possibilities were, when more than one person could have been meant.
+	matchCandidates: Schema.NullOr(Schema.Unknown),
 }) {}
