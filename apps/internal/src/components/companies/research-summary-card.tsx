@@ -1,13 +1,16 @@
+import type { MessageDescriptor } from '@lingui/core'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Link } from '@tanstack/react-router'
 import { Microscope, Plus } from 'lucide-react'
 import styled from 'styled-components'
 
+import { isSucceededResearchStatus } from '@batuda/domain'
 import { PriButton } from '@batuda/ui/pri'
 
 import { statusLabel } from '#/components/research/run-labels'
 import type { ResearchRunRow } from '#/components/research/run-shapes'
 import { RelativeDate } from '#/components/shared/relative-date'
+import { formatMoneyCents } from '#/lib/format-money'
 import {
 	agedPaperSurface,
 	rulerUnderRule,
@@ -24,8 +27,15 @@ export function ResearchSummaryCard({
 	readonly lastEnrichedAt: string | null
 	readonly onRunNew: () => void
 }) {
-	const { t, i18n } = useLingui()
+	const { t } = useLingui()
 	const latest = runs[0] ?? null
+	// While the newest run carries nothing usable — still working, or failed — the
+	// last one that did find something stands in beside it, so the card does not
+	// read as if research never worked for this company.
+	const fallbackRunWithFindings =
+		latest !== null && !isSucceededResearchStatus(latest.status)
+			? (runs.find(run => isSucceededResearchStatus(run.status)) ?? null)
+			: null
 
 	return (
 		<Card data-testid='company-research-summary-card'>
@@ -61,30 +71,68 @@ export function ResearchSummaryCard({
 					<Trans>No research yet.</Trans>
 				</Empty>
 			) : (
-				<Link
-					to='/research/$id'
-					params={{ id: latest.id }}
-					data-testid={`company-research-summary-row-${latest.id}`}
-				>
-					<LatestRow>
-						<Query title={latest.query}>{latest.query}</Query>
-						<Meta>
-							<Status>
-								{(() => {
-									// The stored word was shown as-is, so this read
-									// "succeeded_low_confidence" on a company's own page.
-									const label = statusLabel(latest.status)
-									return label ? i18n._(label) : latest.status
-								})()}
-							</Status>
-							<Dot>·</Dot>
-							<RelativeDate value={latest.createdAt} fallback={t`unknown`} />
-						</Meta>
-					</LatestRow>
-				</Link>
+				<>
+					<RunRow run={latest} />
+					{fallbackRunWithFindings !== null ? (
+						<RunRow
+							run={fallbackRunWithFindings}
+							label={t`Last run with findings`}
+						/>
+					) : null}
+				</>
 			)}
 		</Card>
 	)
+}
+
+function RunRow({
+	run,
+	label,
+}: {
+	readonly run: ResearchRunRow
+	readonly label?: string | undefined
+}) {
+	const { i18n, t } = useLingui()
+	return (
+		<Link
+			to='/research/$id'
+			params={{ id: run.id }}
+			data-testid={`company-research-summary-row-${run.id}`}
+		>
+			<LatestRow>
+				{label !== undefined ? <FallbackLabel>{label}</FallbackLabel> : null}
+				<Query title={run.query}>{run.query}</Query>
+				<Meta>
+					<Status>{runStatusText(run.status, i18n)}</Status>
+					<Dot>·</Dot>
+					<RelativeDate value={run.createdAt} fallback={t`unknown`} />
+					{/* A run still queued has spent nothing, and printing a zero there
+					    reads as "this was free" rather than "not yet billed". */}
+					{run.costCents > 0 ? (
+						<>
+							<Dot>·</Dot>
+							<span>
+								{formatMoneyCents(run.costCents, { locale: i18n.locale })}
+							</span>
+						</>
+					) : null}
+				</Meta>
+			</LatestRow>
+		</Link>
+	)
+}
+
+/**
+ * The run's state in the reader's own language. The stored word is shown only
+ * when it is one the vocabulary does not know, so a reader never faces a raw
+ * value like "succeeded_low_confidence".
+ */
+function runStatusText(
+	status: string,
+	i18n: { _: (descriptor: MessageDescriptor) => string },
+): string {
+	const label = statusLabel(status)
+	return label ? i18n._(label) : status
 }
 
 const Card = styled.section`
@@ -130,6 +178,15 @@ const LatestRow = styled.div`
 		outline: none;
 		box-shadow: var(--glow-active);
 	}
+`
+
+const FallbackLabel = styled.span`
+	font-family: var(--font-display);
+	font-size: var(--typescale-label-small-size);
+	font-weight: var(--font-weight-bold);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--color-on-surface-variant);
 `
 
 const Query = styled.span`

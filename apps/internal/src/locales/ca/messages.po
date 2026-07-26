@@ -602,6 +602,10 @@ msgstr "Arxivat"
 msgid "Archived — not pursuing"
 msgstr "Arxivat — no el continuo"
 
+#: src/components/companies/company-fit-section.tsx
+msgid "as of"
+msgstr "a data de"
+
 #: src/components/companies/company-owner-control.tsx
 msgid "Assign to me"
 msgstr "Assigna-me'l"
@@ -1813,6 +1817,7 @@ msgstr "Arrossega {0} per reordenar"
 msgid "Drag a lead across stages, or use its Move menu."
 msgstr "Arrossega un lead entre etapes, o fes servir el seu menú Mou."
 
+#: src/components/companies/next-action-card.tsx
 #: src/components/shared/task-item.tsx
 #: src/routes/tasks/index.tsx
 msgid "Due"
@@ -2489,6 +2494,7 @@ msgid "Last activity"
 msgstr "Última activitat"
 
 #: src/components/companies/cadence-card.tsx
+#: src/routes/companies/$slug.tsx
 msgid "Last call"
 msgstr "Última trucada"
 
@@ -2502,12 +2508,18 @@ msgid "Last contact"
 msgstr "Últim contacte"
 
 #: src/components/companies/cadence-card.tsx
+#: src/routes/companies/$slug.tsx
 msgid "Last email"
 msgstr "Últim email"
 
 #: src/components/companies/cadence-card.tsx
+#: src/routes/companies/$slug.tsx
 msgid "Last meet"
 msgstr "Última visita"
+
+#: src/components/companies/research-summary-card.tsx
+msgid "Last run with findings"
+msgstr "Última execució amb resultats"
 
 #: src/routes/tasks/index.tsx
 msgid "Later"
@@ -2912,6 +2924,9 @@ msgstr "En negociació"
 #: src/components/companies/cadence-card.tsx
 #: src/components/companies/cadence-card.tsx
 #: src/components/companies/cadence-card.tsx
+#: src/routes/companies/$slug.tsx
+#: src/routes/companies/$slug.tsx
+#: src/routes/companies/$slug.tsx
 #: src/routes/companies/$slug.tsx
 msgid "never"
 msgstr "mai"
@@ -3498,6 +3513,7 @@ msgstr "Resultat"
 msgid "Outcome: {0}"
 msgstr "Resultat: {0}"
 
+#: src/components/companies/next-action-card.tsx
 #: src/routes/index.tsx
 #: src/routes/tasks/index.tsx
 #: src/routes/tasks/index.tsx

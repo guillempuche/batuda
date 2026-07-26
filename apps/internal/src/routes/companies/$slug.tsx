@@ -210,6 +210,12 @@ type ContactRow = {
 	readonly email: string | null
 	readonly emailStatus: EmailChannelStatus
 	readonly emailStatusReason: string | null
+	readonly notes: string | null
+	// When this person in particular was last reached — the company-wide dates
+	// say a touch happened, not who it was with.
+	readonly lastEmailAt: string | null
+	readonly lastCallAt: string | null
+	readonly lastMeetingAt: string | null
 	// Research runs this contact was sourced from, newest first.
 	readonly provenance: ReadonlyArray<ContactProvenance>
 }
@@ -1154,6 +1160,7 @@ function DetailBody({
 							<Switcher $threshold='48rem' $gap='md'>
 								<NextActionCard
 									value={company.nextAction}
+									dueAt={company.nextActionAt}
 									onSave={next => saveField('nextAction', next)}
 								/>
 								<CadenceCard
@@ -1445,6 +1452,40 @@ function DetailBody({
 												</span>
 											</ContactLinkButton>
 										</ContactLinks>
+										{contact.lastEmailAt !== null ||
+										contact.lastCallAt !== null ||
+										contact.lastMeetingAt !== null ? (
+											<ContactCadence
+												data-testid={`contact-cadence-${contact.id}`}
+											>
+												<ContactCadenceItem>
+													<Trans>Last email</Trans>{' '}
+													<RelativeDate
+														value={contact.lastEmailAt}
+														fallback={t`never`}
+													/>
+												</ContactCadenceItem>
+												<ContactCadenceItem>
+													<Trans>Last call</Trans>{' '}
+													<RelativeDate
+														value={contact.lastCallAt}
+														fallback={t`never`}
+													/>
+												</ContactCadenceItem>
+												<ContactCadenceItem>
+													<Trans>Last meet</Trans>{' '}
+													<RelativeDate
+														value={contact.lastMeetingAt}
+														fallback={t`never`}
+													/>
+												</ContactCadenceItem>
+											</ContactCadence>
+										) : null}
+										{contact.notes !== null && contact.notes.trim() !== '' ? (
+											<ContactNotes data-testid={`contact-notes-${contact.id}`}>
+												{contact.notes}
+											</ContactNotes>
+										) : null}
 										{contact.provenance.length > 0 ? (
 											<Provenance
 												date={contact.provenance[0]?.runCompletedAt ?? null}
@@ -1753,6 +1794,10 @@ function narrowContacts(
 			email: primaryEmail?.value ?? null,
 			emailStatus: primaryEmail?.status ?? 'unknown',
 			emailStatusReason: primaryEmail?.statusReason ?? null,
+			notes: typeof r['notes'] === 'string' ? r['notes'] : null,
+			lastEmailAt: dateToIsoOrNull(r['lastEmailAt']),
+			lastCallAt: dateToIsoOrNull(r['lastCallAt']),
+			lastMeetingAt: dateToIsoOrNull(r['lastMeetingAt']),
 			provenance: narrowContactProvenance(r['provenance']),
 		})
 	}
@@ -2214,6 +2259,38 @@ const ContactList = styled.ul.withConfig({
 		display: grid;
 		grid-template-columns: 1fr 1fr;
 	}
+`
+
+const ContactCadence = styled.div.withConfig({
+	displayName: 'CompanyDetailContactCadence',
+})`
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-2xs) var(--space-sm);
+	font-family: var(--font-body);
+	font-size: var(--typescale-label-small-size);
+	line-height: var(--typescale-label-small-line);
+	color: var(--color-on-surface-variant);
+`
+
+const ContactCadenceItem = styled.span.withConfig({
+	displayName: 'CompanyDetailContactCadenceItem',
+})`
+	display: inline-flex;
+	align-items: baseline;
+	gap: var(--space-3xs);
+	white-space: nowrap;
+`
+
+const ContactNotes = styled.p.withConfig({
+	displayName: 'CompanyDetailContactNotes',
+})`
+	margin: 0;
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+	line-height: var(--typescale-body-small-line);
+	color: var(--color-on-surface-variant);
+	white-space: pre-wrap;
 `
 
 const ContactCard = styled.li.withConfig({

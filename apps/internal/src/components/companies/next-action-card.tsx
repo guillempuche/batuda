@@ -3,6 +3,7 @@ import { Compass } from 'lucide-react'
 import styled from 'styled-components'
 
 import { EditableField } from '#/components/shared/editable-field'
+import { RelativeDate } from '#/components/shared/relative-date'
 import {
 	agedPaperSurface,
 	rulerUnderRule,
@@ -17,12 +18,18 @@ import {
  */
 export function NextActionCard({
 	value,
+	dueAt,
 	onSave,
 }: {
 	readonly value: string | null
+	readonly dueAt: string | null
 	readonly onSave: (next: string | null) => Promise<void>
 }) {
 	const { t } = useLingui()
+	// Late is called out rather than sitting quietly among dates still ahead. The
+	// reader's own clock decides that, so the wording the server printed is
+	// allowed to differ from what they end up seeing.
+	const overdue = dueAt !== null && Date.parse(dueAt) < Date.now()
 	return (
 		<Card data-testid='company-next-action-card'>
 			<Header>
@@ -30,6 +37,16 @@ export function NextActionCard({
 					<Compass size={14} aria-hidden />
 					<Trans>Next action</Trans>
 				</Heading>
+				{dueAt !== null ? (
+					<Due
+						$overdue={overdue}
+						data-testid='company-next-action-due'
+						suppressHydrationWarning
+					>
+						{overdue ? <Trans>Overdue</Trans> : <Trans>Due</Trans>}{' '}
+						<RelativeDate value={dueAt} />
+					</Due>
+				) : null}
 			</Header>
 			<Body>
 				<EditableField
@@ -53,7 +70,31 @@ const Card = styled.section`
 
 const Header = styled.header`
 	${rulerUnderRule}
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--space-sm);
 	padding-bottom: var(--space-2xs);
+`
+
+const Due = styled.span.withConfig({
+	displayName: 'NextActionCardDue',
+	shouldForwardProp: prop => !prop.startsWith('$'),
+})<{ $overdue: boolean }>`
+	flex-shrink: 0;
+	font-family: var(--font-body);
+	font-size: var(--typescale-label-medium-size);
+	line-height: var(--typescale-label-medium-line);
+	color: ${p =>
+		p.$overdue ? 'var(--color-error)' : 'var(--color-on-surface-variant)'};
+	font-weight: ${p => (p.$overdue ? 600 : 400)};
+
+	/* The nested relative date carries its own muted colour, so the overdue
+	   emphasis has to reach it too or only the label turns red. */
+	& time {
+		color: inherit;
+		font-weight: inherit;
+	}
 `
 
 const Heading = styled.h3`
