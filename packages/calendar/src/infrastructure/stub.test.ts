@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { BookingProvider } from '../application/ports/booking-provider'
 import type { IcsParser } from '../application/ports/ics-parser'
-import { makeStubBookingProvider, makeStubIcsParser } from './stub'
+import { makeIcsParser, makeStubBookingProvider } from './stub'
 
 const fixturePath = (name: string) =>
 	fileURLToPath(new URL(`./__fixtures__/ics/${name}`, import.meta.url))
@@ -29,7 +29,7 @@ const runParser = <A, E>(
 ) =>
 	Effect.runPromise(
 		Effect.gen(function* () {
-			const parser = yield* makeStubIcsParser
+			const parser = yield* makeIcsParser
 			return yield* make(parser)
 		}),
 	)
@@ -647,5 +647,161 @@ describe('stub IcsParser — edge cases', () => {
 		expect(event.metadata['additional_video_urls']).toEqual([
 			expect.stringMatching(/^https:\/\/xiroi\.zoom\.us\/j\/12345/),
 		])
+	})
+})
+
+describe('stub IcsParser — time zones and whole-day entries', () => {
+	const vcalendar = (...lines: ReadonlyArray<string>) =>
+		[
+			'BEGIN:VCALENDAR',
+			'VERSION:2.0',
+			'METHOD:REQUEST',
+			'BEGIN:VEVENT',
+			...lines,
+			'END:VEVENT',
+			'END:VCALENDAR',
+			'',
+		].join('\r\n')
+
+	describe('when DTSTART names a time zone', () => {
+		it('should resolve the clock time against that zone in summer', async () => {
+			// GIVEN a 09:00 Madrid invitation in July, when Madrid runs at UTC+2
+			// WHEN parse runs
+			// THEN the stored instant is 07:00Z, not 09:00Z, and nothing is flagged
+			// as guessed because the sender said which zone applied
+			const parsed = await runParser(parser =>
+				parser.parse(
+					encoded(
+						vcalendar(
+							'UID:tzid-summer@x.com',
+							'DTSTART;TZID=Europe/Madrid:20260715T090000',
+							'DTEND;TZID=Europe/Madrid:20260715T100000',
+							'SUMMARY:Madrid summer',
+						),
+					),
+				),
+			)
+			const event = parsed.events[0]
+			if (!event) throw new Error('expected one event')
+			expect(event.startAt.toISOString()).toBe('2026-07-15T07:00:00.000Z')
+			expect(event.endAt.toISOString()).toBe('2026-07-15T08:00:00.000Z')
+			expect(event.metadata['timezone']).toBeUndefined()
+		})
+
+		it('should resolve the clock time against that zone in winter', async () => {
+			// GIVEN the same 09:00 Madrid invitation in January, at UTC+1
+			// WHEN parse runs
+			// THEN the offset follows the season rather than being fixed, so the
+			// instant is 08:00Z
+			const parsed = await runParser(parser =>
+				parser.parse(
+					encoded(
+						vcalendar(
+							'UID:tzid-winter@x.com',
+							'DTSTART;TZID=Europe/Madrid:20260115T090000',
+							'DTEND;TZID=Europe/Madrid:20260115T100000',
+							'SUMMARY:Madrid winter',
+						),
+					),
+				),
+			)
+			const event = parsed.events[0]
+			if (!event) throw new Error('expected one event')
+			expect(event.startAt.toISOString()).toBe('2026-01-15T08:00:00.000Z')
+		})
+
+		it('should fall back to reading the time as UTC when the zone is unknown', async () => {
+			// GIVEN a zone name no timezone table knows
+			// WHEN parse runs
+			// THEN the event still parses rather than being dropped, and the
+			// breadcrumb records that the time was assumed
+			const parsed = await runParser(parser =>
+				parser.parse(
+					encoded(
+						vcalendar(
+							'UID:tzid-unknown@x.com',
+							'DTSTART;TZID=Mars/Olympus_Mons:20260715T090000',
+							'DTEND;TZID=Mars/Olympus_Mons:20260715T100000',
+							'SUMMARY:Unknown zone',
+						),
+					),
+				),
+			)
+			const event = parsed.events[0]
+			if (!event) throw new Error('expected one event')
+			expect(event.startAt.toISOString()).toBe('2026-07-15T09:00:00.000Z')
+			expect(event.metadata['timezone']).toBe('floating_assumed_utc')
+		})
+	})
+
+	describe('when the invitation covers whole days', () => {
+		it('should keep a whole-day event and span it midnight to midnight', async () => {
+			// GIVEN a whole-day invitation, whose closing date names the morning
+			// after it finishes per RFC 5545
+			// WHEN parse runs
+			// THEN the event survives instead of being dropped for having no clock
+			// time, and is marked as covering whole days
+			const parsed = await runParser(parser =>
+				parser.parse(
+					encoded(
+						vcalendar(
+							'UID:all-day@x.com',
+							'DTSTART;VALUE=DATE:20260801',
+							'DTEND;VALUE=DATE:20260802',
+							'SUMMARY:Company holiday',
+						),
+					),
+				),
+			)
+			const event = parsed.events[0]
+			if (!event) throw new Error('expected one event')
+			expect(event.allDay).toBe(true)
+			expect(event.startAt.toISOString()).toBe('2026-08-01T00:00:00.000Z')
+			expect(event.endAt.toISOString()).toBe('2026-08-02T00:00:00.000Z')
+		})
+
+		it('should read a whole-day event with no closing date as one day', async () => {
+			// GIVEN a whole-day invitation carrying only DTSTART
+			// WHEN parse runs
+			// THEN one day is assumed rather than the event being discarded for
+			// having neither a closing date nor a duration
+			const parsed = await runParser(parser =>
+				parser.parse(
+					encoded(
+						vcalendar(
+							'UID:all-day-open@x.com',
+							'DTSTART;VALUE=DATE:20260801',
+							'SUMMARY:Single day',
+						),
+					),
+				),
+			)
+			const event = parsed.events[0]
+			if (!event) throw new Error('expected one event')
+			expect(event.allDay).toBe(true)
+			expect(event.endAt.getTime() - event.startAt.getTime()).toBe(86400000)
+		})
+
+		it('should not mark an ordinary timed event as covering whole days', async () => {
+			// GIVEN a normal invitation with clock times
+			// WHEN parse runs
+			// THEN allDay stays false, so the whole-day treatment cannot leak into
+			// every event
+			const parsed = await runParser(parser =>
+				parser.parse(
+					encoded(
+						vcalendar(
+							'UID:timed@x.com',
+							'DTSTART:20260801T090000Z',
+							'DTEND:20260801T100000Z',
+							'SUMMARY:Ordinary meeting',
+						),
+					),
+				),
+			)
+			const event = parsed.events[0]
+			if (!event) throw new Error('expected one event')
+			expect(event.allDay).toBe(false)
+		})
 	})
 })

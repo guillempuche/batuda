@@ -54,8 +54,8 @@ export {
 	IcsParserLive,
 } from './infrastructure/live'
 export {
+	IcsParserLayer,
+	makeIcsParser,
 	makeStubBookingProvider,
-	makeStubIcsParser,
 	StubBookingProviderLayer,
-	StubIcsParserLayer,
 } from './infrastructure/stub'
