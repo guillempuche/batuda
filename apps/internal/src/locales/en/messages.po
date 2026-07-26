@@ -142,6 +142,10 @@ msgstr "{0}: showing {1} of {shelfTotal} tasks."
 msgid "{addedEmail} is now a member. They've been emailed."
 msgstr "{addedEmail} is now a member. They've been emailed."
 
+#: src/routes/settings/mcp/connections.tsx
+msgid "{confirmLabel}'s assistant stops reaching this organization on its next request. It keeps working in any other organization they belong to, and they can't undo this themselves."
+msgstr "{confirmLabel}'s assistant stops reaching this organization on its next request. It keeps working in any other organization they belong to, and they can't undo this themselves."
+
 #: src/components/research/inbox/research-inbox.tsx
 msgid "{entered} changes entered the records."
 msgstr "{entered} changes entered the records."
@@ -281,6 +285,7 @@ msgid "Across companies in stage"
 msgstr "Across companies in stage"
 
 #: src/routes/emails/inboxes.tsx
+#: src/routes/settings/mcp/connections.tsx
 msgid "Actions"
 msgstr "Actions"
 
@@ -610,6 +615,10 @@ msgstr "as of"
 msgid "Assign to me"
 msgstr "Assign to me"
 
+#: src/routes/settings/mcp/connections.tsx
+msgid "Assistant"
+msgstr "Assistant"
+
 #: src/components/emails/attachment-picker.tsx
 msgid "Attach"
 msgstr "Attach"
@@ -818,6 +827,7 @@ msgstr "Calls"
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/settings/api-keys/index.tsx
+#: src/routes/settings/mcp/connections.tsx
 #: src/routes/tasks/index.tsx
 msgid "Cancel"
 msgstr "Cancel"
@@ -1118,6 +1128,11 @@ msgstr "Connected {0}"
 msgid "Connecting…"
 msgstr "Connecting…"
 
+#: src/routes/settings/mcp/connections.tsx
+#: src/routes/settings/mcp/connections.tsx
+msgid "Connection revoked"
+msgstr "Connection revoked"
+
 #: src/routes/emails/inboxes.tsx
 msgid "Connection tested"
 msgstr "Connection tested"
@@ -1302,6 +1317,10 @@ msgstr "Could not load tasks"
 msgid "Could not load the board"
 msgstr "Could not load the board"
 
+#: src/routes/settings/mcp/connections.tsx
+msgid "Could not load the organization's connections."
+msgstr "Could not load the organization's connections."
+
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Could not load the review queue."
 msgstr "Could not load the review queue."
@@ -1372,6 +1391,11 @@ msgstr "Could not remove {email}. Please try again."
 msgid "Could not resolve this proposal."
 msgstr "Could not resolve this proposal."
 
+#: src/routes/settings/mcp/connections.tsx
+#: src/routes/settings/mcp/connections.tsx
+msgid "Could not revoke"
+msgstr "Could not revoke"
+
 #: src/routes/companies/$slug.tsx
 msgid "Could not save"
 msgstr "Could not save"
@@ -1441,10 +1465,6 @@ msgstr "Could not switch organization. Please try again."
 #: src/routes/emails/inboxes.tsx
 msgid "Could not toggle the inbox state."
 msgstr "Could not toggle the inbox state."
-
-#: src/routes/settings/mcp/connections.tsx
-msgid "Could not update"
-msgstr "Could not update"
 
 #: src/components/contacts/manage-channels-dialog.tsx
 msgid "Could not update channels"
@@ -1650,6 +1670,10 @@ msgstr "Current tools"
 #: src/components/research/inbox/research-inbox.tsx
 msgid "currently"
 msgstr "currently"
+
+#: src/routes/settings/mcp/connections.tsx
+msgid "Cut off this connection?"
+msgstr "Cut off this connection?"
 
 #: src/components/profile/theme-select.tsx
 msgid "Dark"
@@ -2084,6 +2108,10 @@ msgstr "Error"
 msgid "Event"
 msgstr "Event"
 
+#: src/routes/settings/mcp/connections.tsx
+msgid "Every assistant that can reach this organization's data right now. Names come from the assistant itself, so treat them as labels rather than proof."
+msgstr "Every assistant that can reach this organization's data right now. Names come from the assistant itself, so treat them as labels rather than proof."
+
 #: src/routes/documents/index.tsx
 msgid "Every kind"
 msgstr "Every kind"
@@ -2095,6 +2123,10 @@ msgstr "Every open task has a due date assigned."
 #: src/routes/tasks/index.tsx
 msgid "Every task has a date"
 msgstr "Every task has a date"
+
+#: src/routes/settings/mcp/connections.tsx
+msgid "Everyone's connections"
+msgstr "Everyone's connections"
 
 #: src/components/emails/compose-window.tsx
 msgid "Exit full screen"
@@ -2488,6 +2520,10 @@ msgstr "Interaction logged"
 msgid "Invalid"
 msgstr "Invalid"
 
+#: src/routes/settings/mcp/connections.tsx
+msgid "It can no longer reach this organization."
+msgstr "It can no longer reach this organization."
+
 #: src/routes/login.tsx
 msgid "It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it? Check spam."
 msgstr "It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it? Check spam."
@@ -2570,6 +2606,10 @@ msgstr "Last meet"
 #: src/components/companies/research-summary-card.tsx
 msgid "Last run with findings"
 msgstr "Last run with findings"
+
+#: src/routes/settings/mcp/connections.tsx
+msgid "Last used"
+msgstr "Last used"
 
 #. placeholder {0}: formatDate(row.lastUsedAt)
 #: src/routes/settings/api-keys/index.tsx
@@ -2663,6 +2703,7 @@ msgstr "Loading your research budget…"
 #: src/components/shared/loading-spinner.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/settings/api-keys/index.tsx
+#: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/organization/index.tsx
 #: src/routes/settings/organization/members.tsx
@@ -2868,6 +2909,7 @@ msgstr "Meetings are missing from this list. Everything else below is still accu
 msgid "Meetings from bookings, email invitations, and internal blocks."
 msgstr "Meetings from bookings, email invitations, and internal blocks."
 
+#: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/organization/members.tsx
 #: src/routes/settings/organization/members.tsx
 msgid "Member"
@@ -3000,6 +3042,7 @@ msgid "Never expires"
 msgstr "Never expires"
 
 #: src/routes/settings/api-keys/index.tsx
+#: src/routes/settings/mcp/connections.tsx
 msgid "Never used"
 msgstr "Never used"
 
@@ -3353,6 +3396,10 @@ msgstr "Nothing changed yet."
 msgid "Nothing completed recently"
 msgstr "Nothing completed recently"
 
+#: src/routes/settings/mcp/connections.tsx
+msgid "Nothing is connected to this organization yet."
+msgstr "Nothing is connected to this organization yet."
+
 #: src/routes/tasks/index.tsx
 msgid "Nothing later in the queue"
 msgstr "Nothing later in the queue"
@@ -3548,10 +3595,6 @@ msgstr "Org templates"
 #: src/routes/settings/profile/index.tsx
 msgid "Organization"
 msgstr "Organization"
-
-#: src/routes/settings/mcp/connections.tsx
-msgid "Organization removed"
-msgstr "Organization removed"
 
 #: src/components/layout/org-switcher.tsx
 #: src/routes/oauth/consent.tsx
@@ -4091,10 +4134,8 @@ msgstr "Remove \"{0}\" from the stacks that use it first, then delete it."
 
 #. placeholder {0}: att.filename
 #. placeholder {0}: o.name
-#. placeholder {0}: orgNameById.get(orgId) ?? orgId
 #: src/components/emails/attachment-picker.tsx
 #: src/components/instructions/stack-picker.tsx
-#: src/routes/settings/mcp/connections.tsx
 msgid "Remove {0}"
 msgstr "Remove {0}"
 
@@ -4232,6 +4273,16 @@ msgstr "Reusable, standing guidance your agents follow — what you sell, who yo
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Review what the research agent found and decide what enters the CRM."
 msgstr "Review what the research agent found and decide what enters the CRM."
+
+#: src/routes/settings/mcp/connections.tsx
+#: src/routes/settings/mcp/connections.tsx
+msgid "Revoke"
+msgstr "Revoke"
+
+#. placeholder {0}: orgNameById.get(orgId) ?? orgId
+#: src/routes/settings/mcp/connections.tsx
+msgid "Revoke {0}"
+msgstr "Revoke {0}"
 
 #: src/components/research/trust-badge.tsx
 msgid "Risky"
@@ -4426,10 +4477,6 @@ msgstr "Send email"
 #: src/routes/forgot-password.tsx
 msgid "Send reset link"
 msgstr "Send reset link"
-
-#: src/routes/settings/mcp/connections.tsx
-msgid "Send X-Batuda-Organization-Id with each request to pick."
-msgstr "Send X-Batuda-Organization-Id with each request to pick."
 
 #: src/components/emails/compose-form.tsx
 #: src/routes/forgot-password.tsx
@@ -4636,6 +4683,8 @@ msgid "Something went wrong. Start the connection again from your assistant."
 msgstr "Something went wrong. Start the connection again from your assistant."
 
 #: src/routes/reset-password.tsx
+#: src/routes/settings/mcp/connections.tsx
+#: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/profile/index.tsx
 #: src/routes/settings/profile/index.tsx
 msgid "Something went wrong. Try again."
@@ -5109,13 +5158,13 @@ msgstr "They responded — set the next action to keep it warm."
 msgid "They sign in at the sign-in page with this address and ask for their own link, so nothing sent here can expire."
 msgstr "They sign in at the sign-in page with this address and ask for their own link, so nothing sent here can expire."
 
+#: src/routes/settings/mcp/connections.tsx
+msgid "This assistant can no longer reach this organization."
+msgstr "This assistant can no longer reach this organization."
+
 #: src/routes/companies/$slug.tsx
 msgid "This company can't be displayed"
 msgstr "This company can't be displayed"
-
-#: src/routes/settings/mcp/connections.tsx
-msgid "This connection is unbound. Bind an org to use it."
-msgstr "This connection is unbound. Bind an org to use it."
 
 #: src/components/companies/documents-panel.tsx
 msgid "This document is a web page. It opens in a new tab."
@@ -5313,6 +5362,7 @@ msgstr "Unknown user"
 msgid "Unlinked"
 msgstr "Unlinked"
 
+#: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/connections.tsx
 msgid "Unnamed client"
 msgstr "Unnamed client"
@@ -5602,10 +5652,6 @@ msgstr "You don't have permission to see this page."
 #: src/components/profile/set-password-nudge.tsx
 msgid "You got in from a link in your email."
 msgstr "You got in from a link in your email."
-
-#: src/routes/settings/mcp/connections.tsx
-msgid "You may not be a member of that organization. Try again."
-msgstr "You may not be a member of that organization. Try again."
 
 #: src/routes/settings/profile/index.tsx
 msgid "You sign in from email links. I won't bring it up again."

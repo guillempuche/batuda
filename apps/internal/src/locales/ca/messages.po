@@ -142,6 +142,10 @@ msgstr "{0}: es mostren {1} de {shelfTotal} tasques."
 msgid "{addedEmail} is now a member. They've been emailed."
 msgstr "{addedEmail} ja és membre. Se li ha enviat un correu."
 
+#: src/routes/settings/mcp/connections.tsx
+msgid "{confirmLabel}'s assistant stops reaching this organization on its next request. It keeps working in any other organization they belong to, and they can't undo this themselves."
+msgstr "L'assistent de {confirmLabel} deixarà d'accedir a aquesta organització a la següent petició. Continuarà funcionant a qualsevol altra organització de la qual formi part, i no ho podrà desfer pel seu compte."
+
 #: src/components/research/inbox/research-inbox.tsx
 msgid "{entered} changes entered the records."
 msgstr "{entered} canvis han entrat als registres."
@@ -281,6 +285,7 @@ msgid "Across companies in stage"
 msgstr "A través d'empreses en l'etapa"
 
 #: src/routes/emails/inboxes.tsx
+#: src/routes/settings/mcp/connections.tsx
 msgid "Actions"
 msgstr "Accions"
 
@@ -610,6 +615,10 @@ msgstr "a data de"
 msgid "Assign to me"
 msgstr "Assigna-me'l"
 
+#: src/routes/settings/mcp/connections.tsx
+msgid "Assistant"
+msgstr "Assistent"
+
 #: src/components/emails/attachment-picker.tsx
 msgid "Attach"
 msgstr "Adjunta"
@@ -818,6 +827,7 @@ msgstr "Crides"
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/settings/api-keys/index.tsx
+#: src/routes/settings/mcp/connections.tsx
 #: src/routes/tasks/index.tsx
 msgid "Cancel"
 msgstr "Cancel·la"
@@ -1118,6 +1128,11 @@ msgstr "Connectat {0}"
 msgid "Connecting…"
 msgstr "Connectant…"
 
+#: src/routes/settings/mcp/connections.tsx
+#: src/routes/settings/mcp/connections.tsx
+msgid "Connection revoked"
+msgstr "Connexió revocada"
+
 #: src/routes/emails/inboxes.tsx
 msgid "Connection tested"
 msgstr "Connexió provada"
@@ -1302,6 +1317,10 @@ msgstr "No s'han pogut carregar les tasques"
 msgid "Could not load the board"
 msgstr "No s'ha pogut carregar el tauler"
 
+#: src/routes/settings/mcp/connections.tsx
+msgid "Could not load the organization's connections."
+msgstr "No s'han pogut carregar les connexions de l'organització."
+
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Could not load the review queue."
 msgstr "No s'ha pogut carregar la cua de revisió."
@@ -1372,6 +1391,11 @@ msgstr "No s'ha pogut eliminar {email}. Torna-ho a provar."
 msgid "Could not resolve this proposal."
 msgstr "No s'ha pogut resoldre aquesta proposta."
 
+#: src/routes/settings/mcp/connections.tsx
+#: src/routes/settings/mcp/connections.tsx
+msgid "Could not revoke"
+msgstr "No s'ha pogut revocar"
+
 #: src/routes/companies/$slug.tsx
 msgid "Could not save"
 msgstr "No s'ha pogut desar"
@@ -1441,10 +1465,6 @@ msgstr "No s'ha pogut canviar d'organització. Torna-ho a provar."
 #: src/routes/emails/inboxes.tsx
 msgid "Could not toggle the inbox state."
 msgstr "No s'ha pogut canviar l'estat de la safata."
-
-#: src/routes/settings/mcp/connections.tsx
-msgid "Could not update"
-msgstr "No s'ha pogut actualitzar"
 
 #: src/components/contacts/manage-channels-dialog.tsx
 msgid "Could not update channels"
@@ -1650,6 +1670,10 @@ msgstr "Eines actuals"
 #: src/components/research/inbox/research-inbox.tsx
 msgid "currently"
 msgstr "actualment"
+
+#: src/routes/settings/mcp/connections.tsx
+msgid "Cut off this connection?"
+msgstr "Vols tallar aquesta connexió?"
 
 #: src/components/profile/theme-select.tsx
 msgid "Dark"
@@ -2084,6 +2108,10 @@ msgstr "Error"
 msgid "Event"
 msgstr "Esdeveniment"
 
+#: src/routes/settings/mcp/connections.tsx
+msgid "Every assistant that can reach this organization's data right now. Names come from the assistant itself, so treat them as labels rather than proof."
+msgstr "Tots els assistents que ara mateix poden accedir a les dades d'aquesta organització. Els noms els diu el mateix assistent, així que tracta'ls com a etiquetes, no com a prova."
+
 #: src/routes/documents/index.tsx
 msgid "Every kind"
 msgstr "Tots els tipus"
@@ -2095,6 +2123,10 @@ msgstr "Totes les tasques obertes tenen data de venciment."
 #: src/routes/tasks/index.tsx
 msgid "Every task has a date"
 msgstr "Totes les tasques tenen data"
+
+#: src/routes/settings/mcp/connections.tsx
+msgid "Everyone's connections"
+msgstr "Connexions de tothom"
 
 #: src/components/emails/compose-window.tsx
 msgid "Exit full screen"
@@ -2488,6 +2520,10 @@ msgstr "Interacció registrada"
 msgid "Invalid"
 msgstr "No vàlid"
 
+#: src/routes/settings/mcp/connections.tsx
+msgid "It can no longer reach this organization."
+msgstr "Ja no pot accedir a aquesta organització."
+
 #: src/routes/login.tsx
 msgid "It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it? Check spam."
 msgstr "Caduca en {MAGIC_LINK_EXPIRY_MINUTES} minuts. No el veus? Mira el correu brossa."
@@ -2570,6 +2606,10 @@ msgstr "Última visita"
 #: src/components/companies/research-summary-card.tsx
 msgid "Last run with findings"
 msgstr "Última execució amb resultats"
+
+#: src/routes/settings/mcp/connections.tsx
+msgid "Last used"
+msgstr "Últim ús"
 
 #. placeholder {0}: formatDate(row.lastUsedAt)
 #: src/routes/settings/api-keys/index.tsx
@@ -2663,6 +2703,7 @@ msgstr "Carregant el teu pressupost de recerca…"
 #: src/components/shared/loading-spinner.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/settings/api-keys/index.tsx
+#: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/organization/index.tsx
 #: src/routes/settings/organization/members.tsx
@@ -2868,6 +2909,7 @@ msgstr "Falten les reunions d'aquesta llista. La resta del que hi ha a sota cont
 msgid "Meetings from bookings, email invitations, and internal blocks."
 msgstr "Reunions des de reserves, invitacions per correu i blocs interns."
 
+#: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/organization/members.tsx
 #: src/routes/settings/organization/members.tsx
 msgid "Member"
@@ -3000,6 +3042,7 @@ msgid "Never expires"
 msgstr "No caduca mai"
 
 #: src/routes/settings/api-keys/index.tsx
+#: src/routes/settings/mcp/connections.tsx
 msgid "Never used"
 msgstr "Mai utilitzada"
 
@@ -3353,6 +3396,10 @@ msgstr "Encara no ha canviat res."
 msgid "Nothing completed recently"
 msgstr "Res completat recentment"
 
+#: src/routes/settings/mcp/connections.tsx
+msgid "Nothing is connected to this organization yet."
+msgstr "Encara no hi ha res connectat a aquesta organització."
+
 #: src/routes/tasks/index.tsx
 msgid "Nothing later in the queue"
 msgstr "Res més endavant a la cua"
@@ -3548,10 +3595,6 @@ msgstr "Plantilles de l'organització"
 #: src/routes/settings/profile/index.tsx
 msgid "Organization"
 msgstr "Organització"
-
-#: src/routes/settings/mcp/connections.tsx
-msgid "Organization removed"
-msgstr "Organització eliminada"
 
 #: src/components/layout/org-switcher.tsx
 #: src/routes/oauth/consent.tsx
@@ -4091,10 +4134,8 @@ msgstr "Treu «{0}» de les piles que la fan servir abans d'eliminar-la."
 
 #. placeholder {0}: att.filename
 #. placeholder {0}: o.name
-#. placeholder {0}: orgNameById.get(orgId) ?? orgId
 #: src/components/emails/attachment-picker.tsx
 #: src/components/instructions/stack-picker.tsx
-#: src/routes/settings/mcp/connections.tsx
 msgid "Remove {0}"
 msgstr "Elimina {0}"
 
@@ -4232,6 +4273,16 @@ msgstr "Orientació reutilitzable i permanent que segueixen els teus agents: qu�
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Review what the research agent found and decide what enters the CRM."
 msgstr "Revisa què ha trobat l'agent de recerca i decideix què entra al CRM."
+
+#: src/routes/settings/mcp/connections.tsx
+#: src/routes/settings/mcp/connections.tsx
+msgid "Revoke"
+msgstr "Revoca"
+
+#. placeholder {0}: orgNameById.get(orgId) ?? orgId
+#: src/routes/settings/mcp/connections.tsx
+msgid "Revoke {0}"
+msgstr "Revoca {0}"
 
 #: src/components/research/trust-badge.tsx
 msgid "Risky"
@@ -4426,10 +4477,6 @@ msgstr "Envia correu"
 #: src/routes/forgot-password.tsx
 msgid "Send reset link"
 msgstr "Envia l'enllaç"
-
-#: src/routes/settings/mcp/connections.tsx
-msgid "Send X-Batuda-Organization-Id with each request to pick."
-msgstr "Envia X-Batuda-Organization-Id amb cada petició per triar."
 
 #: src/components/emails/compose-form.tsx
 #: src/routes/forgot-password.tsx
@@ -4636,6 +4683,8 @@ msgid "Something went wrong. Start the connection again from your assistant."
 msgstr "Alguna cosa ha anat malament. Torna a iniciar la connexió des del teu assistent."
 
 #: src/routes/reset-password.tsx
+#: src/routes/settings/mcp/connections.tsx
+#: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/profile/index.tsx
 #: src/routes/settings/profile/index.tsx
 msgid "Something went wrong. Try again."
@@ -5109,13 +5158,13 @@ msgstr "Han respost — defineix la següent acció per mantenir-ho actiu."
 msgid "They sign in at the sign-in page with this address and ask for their own link, so nothing sent here can expire."
 msgstr "La persona inicia la sessió a la pàgina d'inici de sessió amb aquesta adreça i demana el seu propi enllaç, de manera que res del que s'enviï des d'aquí no pot caducar."
 
+#: src/routes/settings/mcp/connections.tsx
+msgid "This assistant can no longer reach this organization."
+msgstr "Aquest assistent ja no pot accedir a aquesta organització."
+
 #: src/routes/companies/$slug.tsx
 msgid "This company can't be displayed"
 msgstr "Aquesta empresa no es pot mostrar"
-
-#: src/routes/settings/mcp/connections.tsx
-msgid "This connection is unbound. Bind an org to use it."
-msgstr "Aquesta connexió no està vinculada. Vincula una organització per fer-la servir."
 
 #: src/components/companies/documents-panel.tsx
 msgid "This document is a web page. It opens in a new tab."
@@ -5313,6 +5362,7 @@ msgstr "Usuari desconegut"
 msgid "Unlinked"
 msgstr "Sense enllaçar"
 
+#: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/connections.tsx
 msgid "Unnamed client"
 msgstr "Client sense nom"
@@ -5602,10 +5652,6 @@ msgstr "No tens permís per veure aquesta pàgina."
 #: src/components/profile/set-password-nudge.tsx
 msgid "You got in from a link in your email."
 msgstr "Has entrat des d'un enllaç al teu correu."
-
-#: src/routes/settings/mcp/connections.tsx
-msgid "You may not be a member of that organization. Try again."
-msgstr "Potser no ets membre d'aquesta organització. Torna-ho a provar."
 
 #: src/routes/settings/profile/index.tsx
 msgid "You sign in from email links. I won't bring it up again."
