@@ -133,6 +133,12 @@ export interface SiteMapInput {
 	readonly limit?: number | undefined
 }
 
+/** Page URLs a site map turned up, and what the provider charged for them. */
+export interface SiteMapResult {
+	readonly links: ReadonlyArray<string>
+	readonly units: number
+}
+
 export class MapProvider extends Context.Service<
 	MapProvider,
 	{
@@ -143,7 +149,7 @@ export class MapProvider extends Context.Service<
 		 */
 		readonly map: (
 			input: SiteMapInput,
-		) => Effect.Effect<ReadonlyArray<string>, ProviderError>
+		) => Effect.Effect<SiteMapResult, ProviderError>
 	}
 >()('research/MapProvider') {}
 

@@ -171,6 +171,22 @@ const runMap = (status: number, body: unknown) => {
 
 describe('firecrawl map', () => {
 	describe('when the API returns links in either shape', () => {
+		it('should bill the credits the API says walking the site cost', async () => {
+			// GIVEN a map response reporting the credits it consumed
+			const { exit } = runMap(200, {
+				creditsUsed: 4,
+				links: ['https://acme.es/equipo'],
+			})
+
+			// WHEN it settles
+			const settled = await exit
+
+			// THEN that figure is what the run is charged, not a flat one — walking
+			// a site costs more the more of it there is
+			expect(Exit.isSuccess(settled)).toBe(true)
+			if (Exit.isSuccess(settled)) expect(settled.value.units).toBe(4)
+		})
+
 		it('should normalize bare strings and {url} objects to page URLs', async () => {
 			// GIVEN a map response mixing both shapes the API has used
 			const { exit, log } = runMap(200, {
@@ -184,7 +200,7 @@ describe('firecrawl map', () => {
 			const settled = await exit
 			expect(Exit.isSuccess(settled)).toBe(true)
 			if (Exit.isSuccess(settled)) {
-				expect(settled.value).toEqual([
+				expect(settled.value.links).toEqual([
 					'https://acme.es/equipo',
 					'https://acme.es/sobre-nosotros',
 				])

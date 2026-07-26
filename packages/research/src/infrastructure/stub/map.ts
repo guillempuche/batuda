@@ -19,14 +19,15 @@ export const StubMapProviderInstance = MapProvider.of({
 				return `https://${input.url}`
 			}
 		})()
-		return Effect.succeed(
-			[
+		return Effect.succeed({
+			links: [
 				`${origin}/`,
 				`${origin}/about`,
 				`${origin}/team`,
 				`${origin}/contact`,
 			].slice(0, input.limit ?? 4),
-		)
+			units: 0,
+		})
 	},
 })
 

@@ -186,12 +186,30 @@ export const makeCachedLanguageModel = (
 				WHERE key_hash = ${keyHash}
 			`.pipe(Effect.ignore)
 
+		// Count and price a call that reached the provider. The meter belongs to
+		// whichever run is making the call; a call outside a run goes uncounted.
+		const meterCall = (response: unknown) =>
+			Effect.gen(function* () {
+				const meter = yield* Effect.serviceOption(UsageMeter)
+				if (Option.isNone(meter)) return
+				const { tokensIn, tokensOut } = tokensFromResponse(response)
+				yield* meter.value.recordLlm({
+					tier,
+					model: answeredModel,
+					tokensIn,
+					tokensOut,
+					microcents: priceLlmMicrocents(tokensIn, tokensOut, rate),
+				})
+			})
+
 		const invoke = <A>(
 			method: 'text' | 'object',
 			options: unknown,
 			call: Effect.Effect<A, unknown, unknown>,
 		): Effect.Effect<A, unknown, unknown> => {
-			if (!isLlmCacheable(options)) return call
+			// A call that is never cached still reaches the provider and is still
+			// billed, so it is counted the same as any other.
+			if (!isLlmCacheable(options)) return call.pipe(Effect.tap(meterCall))
 
 			const keyHash = computeLlmCacheKey(tier, model, method, options)
 			const baseAttrs = {
@@ -230,20 +248,9 @@ export const makeCachedLanguageModel = (
 				const response = yield* call
 				yield* writeRow(keyHash, options, response)
 				yield* Cache.set(memCache, keyHash, response)
-				// Only this path reached a provider, so this is the one place a model
-				// call is counted and priced. The meter belongs to whichever run is
-				// making the call; a call outside a run simply goes uncounted.
-				const meter = yield* Effect.serviceOption(UsageMeter)
-				if (Option.isSome(meter)) {
-					const { tokensIn, tokensOut } = tokensFromResponse(response)
-					yield* meter.value.recordLlm({
-						tier,
-						model: answeredModel,
-						tokensIn,
-						tokensOut,
-						microcents: priceLlmMicrocents(tokensIn, tokensOut, rate),
-					})
-				}
+				// An answer served from either cache never reaches the provider, so
+				// only this path counts against what the run spent.
+				yield* meterCall(response)
 				return response
 			})
 		}
