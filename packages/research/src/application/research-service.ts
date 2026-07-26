@@ -138,6 +138,7 @@ import {
 	researchToolkit,
 	researchToolkitLayer,
 } from './tools'
+import { makeUsageMeter, UsageMeter } from './usage-meter'
 import { verifyValueProvenance } from './value-guard'
 import { constrainVocabulary } from './vocabulary-guard'
 import { guardCompanyWebsites } from './website-guard'
@@ -518,20 +519,45 @@ const resolvePageTotal = <E, R>(
 	)
 }
 
-// Roll the run's real spend onto its own row. paid_cost_cents comes from the
-// paid-spend ledger and is authoritative — the run's connection bypasses
-// row-level security and a research_id belongs to one run, so the sum sees
-// every paid row for it. cost_cents holds the cheap search/scrape/model tally
-// the caller measured. Both columns start at 0 and nothing else fills them, so
-// without this a run that spent money still shows up as free.
+/**
+ * Write down what a run cost, and what it used getting there.
+ *
+ * paid_cost_cents comes from the paid-spend ledger and is authoritative — the
+ * run's connection bypasses row-level security and a research_id belongs to one
+ * run, so the sum sees every paid row for it. cost_cents and paid_cost_cents
+ * both start at 0 and nothing else fills them, so without this a run that spent
+ * money still shows up as free.
+ *
+ * The cost and the token counts only ever go up. Cancelling a run and the run
+ * itself finishing can land in either order, and the cancel path knows nothing
+ * about what was spent — so a lower figure arriving later leaves the recorded
+ * one alone rather than wiping it. A caller with nothing new to say passes
+ * nothing and only the paid total is refreshed.
+ */
 export const stampRunCostFromLedger = (
 	sql: SqlClient.SqlClient,
 	researchId: string,
-	cheapCents: number,
+	costCents: number,
+	usage?: {
+		readonly tokensIn: number
+		readonly tokensOut: number
+		readonly costByBucket: Record<string, number>
+		readonly unitsByProvider: Record<string, number>
+	},
 ) =>
 	sql`
 		UPDATE research_runs
-		SET cost_cents = ${cheapCents},
+		SET cost_cents = GREATEST(cost_cents, ${costCents}),
+			tokens_in = GREATEST(tokens_in, ${usage?.tokensIn ?? 0}),
+			tokens_out = GREATEST(tokens_out, ${usage?.tokensOut ?? 0}),
+			cost_breakdown = COALESCE(
+				${usage ? JSON.stringify(usage.costByBucket) : null}::jsonb,
+				cost_breakdown
+			),
+			quota_breakdown = COALESCE(
+				${usage ? JSON.stringify(usage.unitsByProvider) : null}::jsonb,
+				quota_breakdown
+			),
 			paid_cost_cents = COALESCE(
 				(SELECT SUM(amount_cents)::int FROM research_paid_spend
 					WHERE research_id = ${researchId}),
@@ -1002,7 +1028,8 @@ export const cloneCacheHitRun = (params: {
 				'succeeded',
 				${JSON.stringify(input.context ?? {})}::jsonb,
 				src.findings, src.brief_md,
-				src.tokens_in, src.tokens_out,
+				-- A reused answer ran no model, so it consumed nothing.
+				0, 0,
 				0, 0,
 				${input.idempotencyKey ?? null},
 				${userId},
@@ -1643,6 +1670,25 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						Object.keys(existingFindings).length > 0 &&
 						!('error' in existingFindings)
 
+					// What this run has really cost. A resumed run carries the earlier
+					// attempt's totals forward, so finishing adds to them instead of
+					// replacing them with only what this attempt spent.
+					const meter = yield* UsageMeter
+					yield* meter.seed(
+						(run as { costCents?: number | null }).costCents ?? 0,
+						(run as { tokensIn?: number | null }).tokensIn ?? 0,
+						(run as { tokensOut?: number | null }).tokensOut ?? 0,
+					)
+					const stampRunUsage = Effect.gen(function* () {
+						const usage = yield* meter.snapshot()
+						yield* stampRunCostFromLedger(
+							sql,
+							researchId,
+							usage.costCents,
+							usage,
+						)
+					})
+
 					// Snapshot subjects if anchored
 					const subjects = context?.subjects
 						? yield* snapshotSubjects(context.subjects)
@@ -1777,7 +1823,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							})
 							// Stamp this run's cost before the group rolls up, so the parent
 							// sums a child that already knows what it spent.
-							yield* stampRunCostFromLedger(sql, researchId, cheapSpentCents)
+							yield* stampRunUsage
 							const parentGroupId = (run as { parentId: string | null })
 								.parentId
 							if (parentGroupId) yield* rollupParentLocked(parentGroupId)
@@ -1856,14 +1902,15 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// budget; undefined on every other path (which extracts in phase 2).
 					let retryFindings: unknown
 					let retryExtractTokens = 0
-					// The cheap search/scrape/model spend this run tallied, read off the
-					// budget once phase 1 ends and stamped onto the run as cost_cents. Stays
-					// 0 on a resume that skips phase 1 — the budget only counts this attempt.
+					// What the run's spending limit was charged for cheap work in phase 1,
+					// read off the budget once phase 1 ends. Feeds the gap rounds' check
+					// that there is still room for another one. Stays 0 on a resume that
+					// skips phase 1 — the budget only counts this attempt.
 					let cheapSpentCents = 0
-					// Cheap spend the phase-2 gap rounds add on top: they run outside the
+					// What the phase-2 gap rounds charge on top: they run outside the
 					// phase-1 Budget scope, so they tally their own scrape/search cost here
-					// to keep both the mid-loop budget-margin check and the run's stamped
-					// cost_cents honest. Stays 0 when no gap round runs.
+					// to keep that same check honest as the rounds go on. Stays 0 when no
+					// gap round runs.
 					let gapSpentCents = 0
 
 					// Phase-2 extraction + every grounding guard, shared so both the
@@ -3594,8 +3641,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								SET phase = 1,
 									research_text = ${researchText},
 									entity_match = ${entityMatch},
-									tokens_in = ${tokensIn},
-									tokens_out = ${tokensOut},
 									updated_at = now()
 								WHERE id = ${researchId} AND status = 'running'
 							`
@@ -3964,7 +4009,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							UPDATE research_runs
 							SET phase = 2,
 								findings = ${JSON.stringify(findings)},
-								tokens_out = ${tokensOut},
 								updated_at = now()
 							WHERE id = ${researchId} AND status = 'running'
 						`
@@ -4048,11 +4092,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						yield* publishEvent(researchId, 'run.no_reliable_data', {
 							sourceCount: sources?.n ?? 0,
 						})
-						yield* stampRunCostFromLedger(
-							sql,
-							researchId,
-							cheapSpentCents + gapSpentCents,
-						)
+						yield* stampRunUsage
 						const parentGroupId = (run as { parentId: string | null }).parentId
 						if (parentGroupId) yield* rollupParentLocked(parentGroupId)
 						return
@@ -4084,11 +4124,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						yield* publishEvent(researchId, 'run.no_reliable_data', {
 							reason: 'no_results',
 						})
-						yield* stampRunCostFromLedger(
-							sql,
-							researchId,
-							cheapSpentCents + gapSpentCents,
-						)
+						yield* stampRunUsage
 						const parentGroupId = (run as { parentId: string | null }).parentId
 						if (parentGroupId) yield* rollupParentLocked(parentGroupId)
 						return
@@ -4147,8 +4183,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							country = ${runCountry},
 							brief_md = ${briefMd},
 							entity_match = ${entityMatch},
-							tokens_in = ${tokensIn},
-							tokens_out = ${tokensOut},
 							tool_log = ${JSON.stringify(finalToolLog)},
 							completed_at = now(),
 							updated_at = now()
@@ -4156,11 +4190,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					`
 
 					// Stamp the run's cost before the parent group rolls up below.
-					yield* stampRunCostFromLedger(
-						sql,
-						researchId,
-						cheapSpentCents + gapSpentCents,
-					)
+					yield* stampRunUsage
 
 					// ── Write to research_cache so identical requests can skip the fiber ──
 					// Only a full 'succeeded' run is cached: a low-confidence result is
@@ -4245,13 +4275,20 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								yield* publishEvent(researchId, 'run.failed', {
 									error: detail,
 								})
-								// Record any paid spend before the group rolls up, but only
+								// Record what the run spent before the group rolls up, but only
 								// when this actually flipped the run to failed — an error after
-								// the run already succeeded leaves that row's real cost_cents
-								// alone. The cheap tally isn't reachable here (the budget went
-								// out of scope with the run body), so cost_cents is best-effort
-								// 0; the paid ledger is authoritative regardless.
-								if (failedRun) yield* stampRunCostFromLedger(sql, researchId, 0)
+								// the run already succeeded leaves that row's figures alone. A
+								// run that dies partway still spent real money getting there, so
+								// what it measured is written down rather than lost.
+								if (failedRun) {
+									const usage = yield* (yield* UsageMeter).snapshot()
+									yield* stampRunCostFromLedger(
+										sql,
+										researchId,
+										usage.costCents,
+										usage,
+									)
+								}
 								// If this leaf belongs to a group, roll the parent up now so
 								// an all-failed group resolves instead of hanging in 'running'.
 								const [failedParent] = yield* sql<{
@@ -4270,6 +4307,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						user_id: userId,
 						event: 'research.fiber',
 					}),
+					// One record of spend per run, wrapping everything the run does, so
+					// every phase adds into the same tally.
+					Effect.provideServiceEffect(UsageMeter, makeUsageMeter),
 				)
 
 			// ── Dispatch ──

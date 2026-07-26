@@ -9,8 +9,9 @@
  * `domain/country.ts`.
  */
 
-import { Config, Effect, Layer, Schema } from 'effect'
+import { Config, Effect, Layer, Option, Schema } from 'effect'
 
+import { priceUnitsMicrocents } from '../application/cost-rates'
 import {
 	EmailVerifier,
 	type EmailVerifyInput,
@@ -28,6 +29,7 @@ import {
 	SearchProvider,
 	type SiteMapInput,
 } from '../application/ports'
+import { UsageMeter } from '../application/usage-meter'
 import {
 	isRegistryCountry,
 	REGISTRY_COUNTRIES,
@@ -47,7 +49,7 @@ import type {
 	ScrapedPage,
 	SearchResult,
 } from '../domain/types'
-import { providerListConfig } from './_config'
+import { keyForSlot, providerListConfig } from './_config'
 import { withFallback, withFallbackUntil } from './_fallback'
 import {
 	disabledError,
@@ -91,6 +93,48 @@ type ScrapeVendor = (typeof SCRAPE_VENDORS)[number]
 type MapVendor = (typeof MAP_VENDORS)[number]
 type EnrichVendor = (typeof ENRICH_VENDORS)[number]
 type VerifyVendor = (typeof VERIFY_VENDORS)[number]
+
+// ── What a provider slot charges ──
+
+// Cents per credit for one slot. Required with no fallback, and per slot,
+// because a search cascade can bill two different vendors for one query and they
+// do not charge the same. A stub slot bills nobody, so it is free.
+const slotUnitRate = (isStub: boolean, envPrefix: string, slot: number) =>
+	isStub
+		? Effect.succeed(0)
+		: Config.finite(keyForSlot(`${envPrefix}_PRICE_CENTS_PER_UNIT`, slot))
+
+/**
+ * Record what a search or page fetch really cost, priced at that slot's rate.
+ *
+ * Wrapped around the vendor itself rather than around the cache above it, so a
+ * cached answer costs nothing without a special case, and a query that cascades
+ * to a second vendor records both — each provider bills for its own attempt.
+ */
+const withUnitMetering =
+	<Input, Output extends { readonly units: number }, E>(
+		call: (input: Input) => Effect.Effect<Output, E>,
+		provider: string,
+		port: 'search' | 'scrape',
+		centsPerUnit: number,
+	) =>
+	(input: Input): Effect.Effect<Output, E> =>
+		call(input).pipe(
+			Effect.tap(result =>
+				Effect.serviceOption(UsageMeter).pipe(
+					Effect.flatMap(meter =>
+						Option.isSome(meter)
+							? meter.value.recordUnits({
+									provider,
+									port,
+									units: result.units,
+									microcents: priceUnitsMicrocents(result.units, centsPerUnit),
+								})
+							: Effect.void,
+					),
+				),
+			),
+		)
 
 // ── Per-capability instance factories ──
 
@@ -235,7 +279,24 @@ const searchLayer = Layer.effect(
 		)
 		yield* Effect.logInfo(`research.search: ${vendors.join(',')}`)
 		const instances = yield* Effect.all(
-			vendors.map((vendor, slot) => searchInstance(vendor, slot)),
+			vendors.map((vendor, slot) =>
+				Effect.gen(function* () {
+					const instance = yield* searchInstance(vendor, slot)
+					const centsPerUnit = yield* slotUnitRate(
+						vendor === 'stub',
+						'RESEARCH_PROVIDER_SEARCH',
+						slot,
+					)
+					return SearchProvider.of({
+						search: withUnitMetering(
+							instance.search,
+							vendor,
+							'search',
+							centsPerUnit,
+						),
+					})
+				}),
+			),
 		)
 		if (instances.length === 1) return instances[0]!
 		// Search cascades on an empty result too, not only on error: a firecrawl
@@ -264,7 +325,24 @@ const scrapeLayer = Layer.effect(
 		)
 		yield* Effect.logInfo(`research.scrape: ${vendors.join(',')}`)
 		const instances = yield* Effect.all(
-			vendors.map((vendor, slot) => scrapeInstance(vendor, slot)),
+			vendors.map((vendor, slot) =>
+				Effect.gen(function* () {
+					const instance = yield* scrapeInstance(vendor, slot)
+					const centsPerUnit = yield* slotUnitRate(
+						vendor === 'stub',
+						'RESEARCH_PROVIDER_SCRAPE',
+						slot,
+					)
+					return ScrapeProvider.of({
+						scrape: withUnitMetering(
+							instance.scrape,
+							vendor,
+							'scrape',
+							centsPerUnit,
+						),
+					})
+				}),
+			),
 		)
 		if (instances.length === 1) return instances[0]!
 		const scrape = withFallback(

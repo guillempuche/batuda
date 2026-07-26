@@ -23,6 +23,9 @@ import { Cache, Duration, Effect, Option } from 'effect'
 import { LanguageModel } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
+import { type LlmRate, priceLlmMicrocents } from '../application/cost-rates'
+import { UsageMeter } from '../application/usage-meter'
+
 export type LlmTier = 'agent' | 'extract' | 'writer'
 
 const sha256Hex = (input: string): string =>
@@ -131,6 +134,9 @@ export const makeCachedLanguageModel = (
 	// Model recorded on the cache row: the one that actually produced the bytes —
 	// a fallback vendor's model when the primary was down. Defaults to `model`.
 	answeredModel: string = model,
+	// What this slot charges. Only a call that reaches the provider is priced, so
+	// an answer served from the cache costs nothing without any special case.
+	rate: LlmRate = { inCentsPer1k: 0, outCentsPer1k: 0 },
 ): Effect.Effect<LanguageModel.Service, never, SqlClient.SqlClient> =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
@@ -224,6 +230,20 @@ export const makeCachedLanguageModel = (
 				const response = yield* call
 				yield* writeRow(keyHash, options, response)
 				yield* Cache.set(memCache, keyHash, response)
+				// Only this path reached a provider, so this is the one place a model
+				// call is counted and priced. The meter belongs to whichever run is
+				// making the call; a call outside a run simply goes uncounted.
+				const meter = yield* Effect.serviceOption(UsageMeter)
+				if (Option.isSome(meter)) {
+					const { tokensIn, tokensOut } = tokensFromResponse(response)
+					yield* meter.value.recordLlm({
+						tier,
+						model: answeredModel,
+						tokensIn,
+						tokensOut,
+						microcents: priceLlmMicrocents(tokensIn, tokensOut, rate),
+					})
+				}
 				return response
 			})
 		}

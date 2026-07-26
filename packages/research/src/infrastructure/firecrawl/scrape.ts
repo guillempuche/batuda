@@ -30,6 +30,9 @@ const SCRAPE_URL = 'https://api.firecrawl.dev/v2/scrape'
 
 // Subset of the Firecrawl scrape response we read. Unknown fields are ignored.
 const ScrapeResponse = Schema.Struct({
+	// The credits Firecrawl says this fetch consumed. Optional because the field
+	// is not on every response shape; a fetch that stays quiet counts as one.
+	creditsUsed: Schema.optional(Schema.Number),
 	data: Schema.Struct({
 		markdown: Schema.optional(Schema.String),
 		html: Schema.optional(Schema.String),
@@ -165,7 +168,8 @@ export const makeFirecrawlScrape = (slot: number) =>
 							title: body.data.metadata?.title,
 							language: body.data.metadata?.language,
 							contentHash: sha256Hex(markdown),
-							units: 1,
+							// The credits Firecrawl charged, not a flat one per fetch.
+							units: body.creditsUsed ?? 1,
 						})
 					}),
 				),

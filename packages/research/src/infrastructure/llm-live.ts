@@ -76,6 +76,23 @@ const DEFAULT_TIMEOUT_SEC: Record<LlmTier, number> = {
 	writer: 90,
 }
 
+// What this slot charges, per thousand tokens each way. Required with no
+// fallback, and read per slot, because the same model costs different amounts at
+// different vendors — so a fallback slot is priced at whoever answered. A stub
+// slot bills nobody, so it is free.
+const slotRate = (vendor: LlmVendor, envPrefix: string, slot: number) =>
+	vendor === 'stub'
+		? Effect.succeed({ inCentsPer1k: 0, outCentsPer1k: 0 })
+		: Effect.gen(function* () {
+				const inCentsPer1k = yield* Config.finite(
+					keyForSlot(`${envPrefix}_PRICE_IN_CENTS_PER_1K`, slot),
+				)
+				const outCentsPer1k = yield* Config.finite(
+					keyForSlot(`${envPrefix}_PRICE_OUT_CENTS_PER_1K`, slot),
+				)
+				return { inCentsPer1k, outCentsPer1k }
+			})
+
 const buildSlot = (
 	vendor: LlmVendor,
 	envPrefix: string,
@@ -149,7 +166,8 @@ const buildTierLayer = <Self>(
 						timeout,
 						tier,
 					)
-					return { service, model: slotModel }
+					const rate = yield* slotRate(vendor, envPrefix, i)
+					return { service, model: slotModel, rate }
 				}),
 			)
 			// Cache each slot on its own so the row records the model that actually
@@ -159,8 +177,8 @@ const buildTierLayer = <Self>(
 			return Layer.effect(
 				Tag,
 				Effect.map(
-					Effect.forEach(slots, ({ service, model: answered }) =>
-						makeCachedLanguageModel(service, tier, model, answered),
+					Effect.forEach(slots, ({ service, model: answered, rate }) =>
+						makeCachedLanguageModel(service, tier, model, answered, rate),
 					),
 					withFallbackLanguageModel,
 				),
