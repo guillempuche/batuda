@@ -274,7 +274,10 @@ describe('counting what a model call consumed', () => {
 			},
 		] as never)
 
-	const runOneCall = (options: { readonly reachesProvider: boolean }) => {
+	const runOneCall = (options: {
+		readonly reachesProvider: boolean
+		readonly cacheable?: boolean
+	}) => {
 		const answer = responseUsing(2000, 1000)
 		const store = options.reachesProvider
 			? alwaysMissingStore
@@ -294,11 +297,10 @@ describe('counting what a model call consumed', () => {
 				{ inCentsPer1k: 0.01, outCentsPer1k: 0.03 },
 			).pipe(Effect.provideService(SqlClient.SqlClient, store))
 			yield* (
-				cached.generateText({ prompt: 'hello' } as never) as Effect.Effect<
-					unknown,
-					never,
-					never
-				>
+				cached.generateText({
+					prompt: 'hello',
+					...(options.cacheable === false ? { cacheable: false } : {}),
+				} as never) as Effect.Effect<unknown, never, never>
 			).pipe(Effect.provideService(UsageMeter, meter))
 			return yield* meter.snapshot()
 		}).pipe(Effect.provideService(SqlClient.SqlClient, store))
@@ -314,6 +316,23 @@ describe('counting what a model call consumed', () => {
 			)
 
 			// THEN the tokens are counted and billed: 0.02c + 0.03c
+			expect(snapshot.tokensIn).toBe(2000)
+			expect(snapshot.tokensOut).toBe(1000)
+			expect(snapshot.costByBucket['llm_agent']).toBeCloseTo(0.05, 6)
+		})
+	})
+
+	describe('when the call is one that is never stored', () => {
+		it('should still count what it consumed', async () => {
+			// GIVEN a call marked as not worth storing — it still reaches the
+			// provider and the provider still bills for it
+			// WHEN it runs
+			const snapshot = await Effect.runPromise(
+				runOneCall({ reachesProvider: true, cacheable: false }),
+			)
+
+			// THEN it is counted like any other call that reached the provider;
+			// skipping it would leave real spending out of the run's total
 			expect(snapshot.tokensIn).toBe(2000)
 			expect(snapshot.tokensOut).toBe(1000)
 			expect(snapshot.costByBucket['llm_agent']).toBeCloseTo(0.05, 6)

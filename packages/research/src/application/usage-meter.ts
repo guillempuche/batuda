@@ -35,7 +35,7 @@ export interface LlmUsage {
 // figure it returned, not the flat one the budget was charged.
 export interface UnitUsage {
 	readonly provider: string
-	readonly port: 'search' | 'scrape'
+	readonly port: 'search' | 'scrape' | 'map'
 	readonly units: number
 	readonly microcents: number
 }

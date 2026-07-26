@@ -28,6 +28,7 @@ import {
 	type SearchInput,
 	SearchProvider,
 	type SiteMapInput,
+	type SiteMapResult,
 } from '../application/ports'
 import { UsageMeter } from '../application/usage-meter'
 import {
@@ -115,7 +116,7 @@ const withUnitMetering =
 	<Input, Output extends { readonly units: number }, E>(
 		call: (input: Input) => Effect.Effect<Output, E>,
 		provider: string,
-		port: 'search' | 'scrape',
+		port: 'search' | 'scrape' | 'map',
 		centsPerUnit: number,
 	) =>
 	(input: Input): Effect.Effect<Output, E> =>
@@ -369,15 +370,25 @@ const mapLayer = Layer.effect(
 		)
 		yield* Effect.logInfo(`research.map: ${vendors.join(',')}`)
 		const instances = yield* Effect.all(
-			vendors.map((vendor, slot) => mapInstance(vendor, slot)),
+			vendors.map((vendor, slot) =>
+				Effect.gen(function* () {
+					const instance = yield* mapInstance(vendor, slot)
+					const centsPerUnit = yield* slotUnitRate(
+						vendor === 'stub' || vendor === 'none',
+						'RESEARCH_PROVIDER_MAP',
+						slot,
+					)
+					return MapProvider.of({
+						map: withUnitMetering(instance.map, vendor, 'map', centsPerUnit),
+					})
+				}),
+			),
 		)
 		if (instances.length === 1) return instances[0]!
 		const map = withFallback(
 			instances,
-			(
-				svc,
-				input: SiteMapInput,
-			): Effect.Effect<ReadonlyArray<string>, ProviderError> => svc.map(input),
+			(svc, input: SiteMapInput): Effect.Effect<SiteMapResult, ProviderError> =>
+				svc.map(input),
 		)
 		return MapProvider.of({ map })
 	}),

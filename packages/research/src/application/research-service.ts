@@ -3052,7 +3052,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										// the homepage-linked seeds never wastes a discovery slot.
 										const seeded = new Set(seededAnchorHashes)
 										const discovered = aboutPageCandidates(
-											mapped.filter(url => !seeded.has(urlHashForScrape(url))),
+											mapped.links.filter(
+												url => !seeded.has(urlHashForScrape(url)),
+											),
 											seedHost,
 											MAX_DISCOVERY_PAGES,
 										)
@@ -3060,7 +3062,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											yield* Effect.logInfo('research.discovery.mapped').pipe(
 												Effect.annotateLogs({
 													research_id: researchId,
-													mapped: mapped.length,
+													mapped: mapped.links.length,
 													fetching: discovered.length,
 												}),
 											)

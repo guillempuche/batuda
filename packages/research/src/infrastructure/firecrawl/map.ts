@@ -29,6 +29,7 @@ const MAP_URL = 'https://api.firecrawl.dev/v2/map'
 // The API has answered with both bare URL strings and {url} objects across
 // versions; accept either so a format change doesn't break discovery.
 const MapResponse = Schema.Struct({
+	creditsUsed: Schema.optional(Schema.Number),
 	links: Schema.optional(
 		Schema.Array(
 			Schema.Union([Schema.String, Schema.Struct({ url: Schema.String })]),
@@ -98,9 +99,14 @@ export const makeFirecrawlMap = (slot: number) =>
 									}),
 							),
 						)
-						return (body.links ?? []).map(link =>
-							typeof link === 'string' ? link : link.url,
-						)
+						return {
+							links: (body.links ?? []).map(link =>
+								typeof link === 'string' ? link : link.url,
+							),
+							// Bill what Firecrawl says it charged; walking a site is not a
+							// flat-price call.
+							units: body.creditsUsed ?? 1,
+						}
 					}),
 				),
 		})
