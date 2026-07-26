@@ -91,7 +91,7 @@ type ResearchRunDetail = {
 }
 
 export function RunDetail({ researchId }: { readonly researchId: string }) {
-	const { t } = useLingui()
+	const { t, i18n } = useLingui()
 	const result = useAtomValue(researchDetailAtom(researchId))
 	const refreshRun = useAtomRefresh(researchDetailAtom(researchId))
 
@@ -103,6 +103,8 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 	// never reports progress. Listening to it returned nothing and then announced
 	// itself as stalled, on a page that showed no sign of the runs doing the work.
 	const isBatch = run?.kind === 'group'
+	// The raw token was being shown, so a reader saw "succeeded_low_confidence".
+	const runStatusLabel = run !== null ? statusLabel(run.status) : null
 	const { progress, failed, stalled, retry } = useResearchEvents(researchId, {
 		enabled: isRunning && !isBatch,
 	})
@@ -156,7 +158,7 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 							$status={run.status}
 							data-testid={`research-run-status-${run.id}`}
 						>
-							{run.status}
+							{runStatusLabel ? i18n._(runStatusLabel) : run.status}
 						</StatusText>
 						{run.schemaName !== null ? (
 							<SchemaText>{run.schemaName}</SchemaText>
@@ -387,7 +389,9 @@ function narrowRun(raw: unknown): ResearchRunDetail | null {
 	}
 }
 
-const Panel = styled.aside`
+// A section, not an aside: this holds the page's own content, and landmark
+// navigation announced the entire run as something off to the side.
+const Panel = styled.section`
 	${brushedMetalPlate}
 	display: flex;
 	flex-direction: column;
@@ -404,7 +408,7 @@ const Header = styled.header`
 	padding-bottom: var(--space-xs);
 `
 
-const Heading = styled.h3`
+const Heading = styled.h2`
 	${stenciledTitle}
 	font-size: var(--typescale-title-large-size);
 	line-height: var(--typescale-title-large-line);
@@ -480,7 +484,7 @@ const Section = styled.section`
 	gap: var(--space-sm);
 `
 
-const SectionTitle = styled.h4`
+const SectionTitle = styled.h3`
 	${stenciledTitle}
 	font-size: var(--typescale-title-medium-size);
 	line-height: var(--typescale-title-medium-line);
