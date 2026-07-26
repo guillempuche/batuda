@@ -25,6 +25,14 @@ export const TimelineLive = HttpApiBuilder.group(
 						conditions.push(sql`company_id = ${_.query.companyId}`)
 					if (_.query.contactId)
 						conditions.push(sql`contact_id = ${_.query.contactId}`)
+					// Both together, or neither: an entity id means nothing without
+					// the kind of record it belongs to, and ids are only unique
+					// within their own table.
+					if (_.query.entityType && _.query.entityId) {
+						conditions.push(
+							sql`entity_type = ${_.query.entityType} AND entity_id = ${_.query.entityId}`,
+						)
+					}
 					if (_.query.channel)
 						conditions.push(sql`channel = ${_.query.channel}`)
 					if (_.query.kind) conditions.push(sql`kind = ${_.query.kind}`)

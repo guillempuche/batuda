@@ -3,7 +3,7 @@ import { Tool, Toolkit } from 'effect/unstable/ai'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { TimelineActivity } from '@batuda/domain'
+import { TimelineActivity, TimelineEntityType } from '@batuda/domain'
 
 import { ListResult, toItems } from './_result'
 
@@ -13,10 +13,12 @@ const decodeActivities = Schema.decodeUnknownEffect(
 
 const ListTimeline = Tool.make('list_timeline', {
 	description:
-		'List timeline activity for a company or contact. Covers emails, calls, meetings, documents, proposals, research runs. Filter by channel, kind, since (ISO 8601). Max 200 rows.',
+		'List timeline activity. company_id or contact_id gives a company or person their whole history; entity_type + entity_id gives one record its own — the events about a single task, proposal or meeting. Covers emails, calls, meetings, documents, proposals, research runs. Filter by channel, kind, since (ISO 8601). Max 200 rows.',
 	parameters: Schema.Struct({
 		company_id: Schema.optional(Schema.String),
 		contact_id: Schema.optional(Schema.String),
+		entity_type: Schema.optional(TimelineEntityType),
+		entity_id: Schema.optional(Schema.String),
 		channel: Schema.optional(Schema.String),
 		kind: Schema.optional(Schema.String),
 		since: Schema.optional(Schema.String),
@@ -42,6 +44,13 @@ export const TimelineHandlersLive = TimelineTools.toLayer(
 						conditions.push(sql`company_id = ${params.company_id}`)
 					if (params.contact_id)
 						conditions.push(sql`contact_id = ${params.contact_id}`)
+					// Both together, or neither: an id means nothing without the
+					// kind of record it belongs to.
+					if (params.entity_type && params.entity_id) {
+						conditions.push(
+							sql`entity_type = ${params.entity_type} AND entity_id = ${params.entity_id}`,
+						)
+					}
 					if (params.channel) conditions.push(sql`channel = ${params.channel}`)
 					if (params.kind) conditions.push(sql`kind = ${params.kind}`)
 					if (params.since) {
