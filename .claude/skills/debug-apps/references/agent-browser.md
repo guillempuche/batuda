@@ -101,6 +101,18 @@ agent-browser eval "window.__c"        # 0 → the click never landed, retry wit
 
 The same caution applies to `network unroute`: a request fired immediately after it can still be aborted by the rule being torn down. An aborted request shows in `network requests` with **no status code** — if you see that, wait a beat and repeat the action rather than assuming the feature is broken.
 
+## Occluded window: scroll-driven features never fire
+
+A **headed** window sitting behind another window (or off-screen) stops producing frames, and Chrome then stops delivering `requestAnimationFrame` **and** `IntersectionObserver` callbacks — including the initial callback an observer always fires for a newly observed target. Anything driven by them looks broken while the DOM insists everything is fine: infinite scroll never loads the next page, lazy images never swap in, scroll-spy never highlights, a transition never advances. `document.visibilityState` still reports `"visible"` and `document.hasFocus()` still returns true, so neither is the tell.
+
+Check the browser before you blame the code — a dead rAF settles it in one call:
+
+```bash
+agent-browser eval "(() => new Promise(res => { requestAnimationFrame(() => res('rAF alive')); setTimeout(() => res('rAF DEAD — occluded'), 2000) }))()"
+```
+
+If it reports DEAD, re-fronting may not revive it: on the infinite-scroll work `pnpm cli worktree watch` re-opened the window and rAF stayed dead, and a fresh `AGENT_BROWSER_HEADED=0` session was dead too. Don't burn the session on it — verify through the path that needs no frames. Dispatch the trigger in-page with `eval` (`element.click()` produces a real bubbling event that React handles) and assert the resulting DOM, then state in the PR which behavior you observed directly and which you couldn't. Note that `agent-browser click` on the same button reported `✓ Done` while a click counter stayed at 0, so an occluded window can look exactly like the silent-click trap above — check rAF first to tell them apart.
+
 ## Find elements by role/text
 
 ```bash
