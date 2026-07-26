@@ -1,5 +1,7 @@
 import { Schema, SchemaGetter } from 'effect'
 
+import { ResearchSubjectTable } from '@batuda/domain'
+
 /**
  * Building blocks shared across the structured research output schemas, so each
  * shape is defined once instead of copied into every file.
@@ -95,13 +97,13 @@ export const Sourced = <Value extends Schema.Top>(value: Value) =>
 	Schema.Struct({ value, ...Citation.fields })
 
 export const DiscoveredExisting = Schema.Struct({
-	subject_table: Schema.Literals(['companies', 'contacts']),
+	subject_table: ResearchSubjectTable,
 	subject_id: Schema.String,
 	name: Schema.String,
 })
 
 export const ProposedUpdate = Schema.Struct({
-	subject_table: Schema.Literals(['companies', 'contacts']),
+	subject_table: ResearchSubjectTable,
 	// 'create' inserts a newly discovered row (contacts only); the default,
 	// 'update', applies the fields to an existing row. A create carries the new
 	// row's data in `fields` and omits subject_id/expected_version (there is no
