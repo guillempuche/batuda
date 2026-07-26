@@ -188,19 +188,25 @@ const ListUpcoming = Tool.make('list_upcoming_meetings', {
 	.annotate(Tool.Destructive, false)
 	.annotate(Tool.OpenWorld, false)
 
-const ListEventTypes = Tool.make('list_event_types', {
+const ManageEventTypes = Tool.make('manage_event_types', {
 	description:
-		'List configured calendar event types (e.g., discovery / demo / onsite-visit). Agents use this to discover which durations exist before calling schedule_meeting. active=false rows are included by default — pass active=true to filter.',
+		'Work with the configured calendar event types (discovery / demo / onsite-visit and the like). action=list returns them so an agent can see which durations exist before calling schedule_meeting — inactive ones are included unless active=true is passed. action=sync pulls the latest list from the calendar provider (title, duration_minutes, locations) and updates the local rows, so a change of title or duration shows up without a redeploy; it is safe to call on boot and on demand.',
 	parameters: Schema.Struct({
+		action: Schema.Literals(['list', 'sync']),
+		// Narrows the list; ignored when syncing.
 		active: Schema.optional(Schema.Boolean),
 	}),
-	success: ListResult(CalendarEventType.json),
+	// list returns the event types, sync reports how many it refreshed.
+	success: Schema.Union([
+		ListResult(CalendarEventType.json),
+		Schema.Struct({ synced: Schema.Number }),
+	]),
 	dependencies: REQUEST_DEPENDENCIES,
 })
-	.annotate(Tool.Title, 'List Event Types')
-	.annotate(Tool.Readonly, true)
+	.annotate(Tool.Title, 'Manage Event Types')
 	.annotate(Tool.Destructive, false)
-	.annotate(Tool.OpenWorld, false)
+	// Syncing reaches out to the calendar provider.
+	.annotate(Tool.OpenWorld, true)
 
 const GetCalendarEvent = Tool.make('get_calendar_event', {
 	description:
@@ -243,15 +249,6 @@ const CreateInternalBlock = Tool.make('create_internal_block', {
 
 // ── Provider sync ───────────────────────────────────────────────
 
-const SyncEventTypes = Tool.make('sync_event_types', {
-	description:
-		'Pull the latest event-type list from the calendar provider (title, duration_minutes, locations) and update local rows by (provider, provider_event_type_id). Safe to call on every boot + on demand; title/duration changes show up without a redeploy.',
-	success: Schema.Struct({ synced: Schema.Number }),
-})
-	.annotate(Tool.Title, 'Sync Event Types')
-	.annotate(Tool.Destructive, false)
-	.annotate(Tool.OpenWorld, true)
-
 export const CalendarTools = Toolkit.make(
 	FindAvailability,
 	ScheduleMeeting,
@@ -261,10 +258,9 @@ export const CalendarTools = Toolkit.make(
 	RsvpPendingInvitations,
 	ForwardInvitation,
 	ListUpcoming,
-	ListEventTypes,
+	ManageEventTypes,
 	GetCalendarEvent,
 	CreateInternalBlock,
-	SyncEventTypes,
 )
 
 export const CalendarHandlersLive = CalendarTools.toLayer(
@@ -429,8 +425,9 @@ export const CalendarHandlersLive = CalendarTools.toLayer(
 					`
 					return toItems(yield* withAttendees(sql, yield* decodeEvents(rows)))
 				}).pipe(Effect.orDie),
-			list_event_types: params =>
+			manage_event_types: params =>
 				Effect.gen(function* () {
+					if (params.action === 'sync') return yield* svc.syncEventTypes()
 					const conditions: Array<Statement.Fragment> = []
 					if (params.active === true) conditions.push(sql`active = true`)
 					if (params.active === false) conditions.push(sql`active = false`)
@@ -469,7 +466,6 @@ export const CalendarHandlersLive = CalendarTools.toLayer(
 								: null,
 					})
 					.pipe(Effect.flatMap(decodeEvent), Effect.orDie),
-			sync_event_types: () => svc.syncEventTypes().pipe(Effect.orDie),
 		}
 	}),
 )
