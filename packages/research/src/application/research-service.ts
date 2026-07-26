@@ -167,7 +167,9 @@ const decodeResearchRunSummaries = Schema.decodeUnknownEffect(
 
 // The user_research_policy row; `userId` is dropped on decode (internal, not
 // part of the wire shape). `updatedAt` is always present on a real row.
-const ResearchPolicyRow = Schema.Struct({
+// `paidMonthlyCapCents` is the company's ceiling and lives on the company's
+// table, so a caller has to add it to the row before decoding.
+export const ResearchPolicyRow = Schema.Struct({
 	budgetCents: Schema.Number,
 	paidBudgetCents: Schema.Number,
 	autoApprovePaidCents: Schema.Number,
@@ -5530,7 +5532,20 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							return yield* Effect.die(
 								new Error('user_research_policy upsert returned no row'),
 							)
-						return yield* decodeResearchPolicy(row).pipe(Effect.orDie)
+						// The monthly ceiling is the company's, not this person's, so it is
+						// read from the company and returned alongside their own limits.
+						const [savedOrgRow] = yield* sql<{ paidMonthlyCapCents: number }>`
+							SELECT paid_monthly_cap_cents
+							FROM organization_research_policy
+							WHERE organization_id = ${organizationId}
+						`
+						return yield* decodeResearchPolicy({
+							...(row as Record<string, unknown>),
+							paidMonthlyCapCents: Math.min(
+								savedOrgRow?.paidMonthlyCapCents ?? defaultMonthlyCapCents,
+								monthlyCapHardCeilingCents,
+							),
+						}).pipe(Effect.orDie)
 					}),
 
 				/** Mark orphaned running + queued rows as failed. */
