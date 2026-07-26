@@ -14,6 +14,8 @@ import styled from 'styled-components'
 
 import { PriCollapsible } from '@batuda/ui/pri'
 
+import { normalizeConfidence } from '#/components/research/proposal-logic'
+import { RelativeDate } from '#/components/shared/relative-date'
 import { agedPaperSurface, stenciledTitle } from '#/lib/workshop-mixins'
 
 export type FitCheck = {
@@ -171,23 +173,46 @@ export function CompanyFitSection({
 								<Trans>Where each fact came from</Trans>
 							</GroupTitle>
 							<List>
-								{provenance.map(([field, source]) => (
-									<ProvenanceRow key={field} data-testid='company-field-source'>
-										<Criterion>{field}</Criterion>
-										<SourceLink
-											href={source.sourceUrl}
-											target='_blank'
-											rel='noreferrer noopener'
+								{provenance.map(([field, source]) => {
+									// The model reports a 0–1 fraction while enrichment providers
+									// report 0–100, so both are put on the same scale before being
+									// shown as a percentage.
+									const sureness = normalizeConfidence(source.confidence)
+									return (
+										<ProvenanceRow
+											key={field}
+											data-testid='company-field-source'
 										>
-											{hostOf(source.sourceUrl)}
-										</SourceLink>
-										<RunLinkWrap>
-											<Link to='/research/$id' params={{ id: source.runId }}>
-												<Trans>run</Trans>
-											</Link>
-										</RunLinkWrap>
-									</ProvenanceRow>
-								))}
+											<Criterion>{field}</Criterion>
+											<SourceLink
+												href={source.sourceUrl}
+												target='_blank'
+												rel='noreferrer noopener'
+											>
+												{hostOf(source.sourceUrl)}
+											</SourceLink>
+											<RunLinkWrap>
+												<Link to='/research/$id' params={{ id: source.runId }}>
+													<Trans>run</Trans>
+												</Link>
+											</RunLinkWrap>
+											{/* How sure the run was, and how old the fact is: one read
+											    a year ago should not look like one confirmed this
+											    morning. */}
+											{sureness !== null ? (
+												<Qualifier data-testid='company-field-source-confidence'>
+													{`${sureness}%`}
+												</Qualifier>
+											) : null}
+											{source.asOf !== undefined ? (
+												<Qualifier data-testid='company-field-source-as-of'>
+													<Trans>as of</Trans>{' '}
+													<RelativeDate value={source.asOf} />
+												</Qualifier>
+											) : null}
+										</ProvenanceRow>
+									)
+								})}
 							</List>
 						</Group>
 					) : null}
@@ -326,6 +351,15 @@ const ProvenanceRow = styled.li`
 	flex-wrap: wrap;
 	align-items: baseline;
 	gap: var(--space-2xs);
+`
+
+const Qualifier = styled.span`
+	display: inline-flex;
+	align-items: baseline;
+	gap: var(--space-3xs);
+	font-size: var(--typescale-label-small-size);
+	color: var(--color-on-surface-variant);
+	white-space: nowrap;
 `
 
 const Criterion = styled.span`

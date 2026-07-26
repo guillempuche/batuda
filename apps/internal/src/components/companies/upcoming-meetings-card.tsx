@@ -21,6 +21,8 @@ type EventRow = {
 	readonly endAt: string
 	readonly attendees: ReadonlyArray<AttendeeRow>
 	readonly url: string | null
+	// What the invitation itself says the meeting is about.
+	readonly agenda: string | null
 }
 
 type AttendeeRow = {
@@ -147,6 +149,13 @@ export function UpcomingMeetingsCard({
 									))}
 								</Attendees>
 							) : null}
+							{ev.agenda !== null ? (
+								<Agenda
+									data-testid={`company-upcoming-meeting-agenda-${ev.id}`}
+								>
+									{ev.agenda}
+								</Agenda>
+							) : null}
 						</RowMain>
 						{ev.url !== null ? (
 							<OpenLink href={ev.url} target='_blank' rel='noreferrer'>
@@ -213,6 +222,7 @@ function narrowEvents(rows: ReadonlyArray<unknown>): ReadonlyArray<EventRow> {
 				: typeof r['videoCallUrl'] === 'string'
 					? (r['videoCallUrl'] as string)
 					: null
+		const description = meta?.['description']
 		out.push({
 			id: r['id'],
 			title: r['title'],
@@ -220,6 +230,10 @@ function narrowEvents(rows: ReadonlyArray<unknown>): ReadonlyArray<EventRow> {
 			endAt,
 			attendees: narrowAttendees(r['attendees']),
 			url,
+			agenda:
+				typeof description === 'string' && description.trim() !== ''
+					? description
+					: null,
 		})
 	}
 	return out
@@ -332,6 +346,21 @@ const Attendee = styled.li<{ readonly $known: boolean }>`
 const AttendeeNote = styled.span`
 	font-size: 0.85em;
 	color: var(--color-on-surface-variant);
+`
+
+// Invitation descriptions run long and often repeat the joining details, so only
+// the first few lines show rather than pushing the next meeting off the card.
+const Agenda = styled.p`
+	margin: 0;
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+	line-height: var(--typescale-body-small-line);
+	color: var(--color-on-surface-variant);
+	white-space: pre-wrap;
+	overflow: hidden;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 3;
 `
 
 const OpenLink = styled.a`
