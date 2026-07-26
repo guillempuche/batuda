@@ -1,6 +1,7 @@
 import { Trans } from '@lingui/react/macro'
 import styled from 'styled-components'
 
+import { displayValue } from '#/components/research/field-diff'
 import { SafeLink } from '#/components/research/safe-link'
 import {
 	type Citation,
@@ -57,53 +58,63 @@ export function ContactDiscoveryView({
 						<Trans>Contacts found</Trans>
 					</SectionTitle>
 					<List>
-						{contacts.map(c => (
-							<ListItem key={`${c.name}|${c.email ?? c.linkedin ?? ''}`}>
-								<RowHead>
-									<Pill>{c.name}</Pill>
-									{c.role !== undefined ? <Reason>{c.role}</Reason> : null}
-									{c.is_decision_maker === true ? (
-										<DecisionMakerBadge>
-											<Trans>Decision maker</Trans>
-										</DecisionMakerBadge>
-									) : null}
-								</RowHead>
-								<FieldsTable>
-									{c.email !== undefined ? (
-										<FieldRow>
-											<FieldKey>
-												<Trans>Email</Trans>
-											</FieldKey>
-											<FieldValue>
-												<SafeLink href={`mailto:${c.email}`}>
-													{c.email}
-												</SafeLink>
-											</FieldValue>
-										</FieldRow>
-									) : null}
-									{c.phone !== undefined ? (
-										<FieldRow>
-											<FieldKey>
-												<Trans>Phone</Trans>
-											</FieldKey>
-											<FieldValue>{c.phone}</FieldValue>
-										</FieldRow>
-									) : null}
-									{c.linkedin !== undefined ? (
-										<FieldRow>
-											<FieldKey>
-												<Trans>LinkedIn</Trans>
-											</FieldKey>
-											<FieldValue>
-												<SafeLink href={c.linkedin}>{c.linkedin}</SafeLink>
-											</FieldValue>
-										</FieldRow>
-									) : null}
-								</FieldsTable>
-								{c.notes !== undefined ? <Reason>{c.notes}</Reason> : null}
-								<CitationList citations={c.citations} />
-							</ListItem>
-						))}
+						{contacts.map(c => {
+							// A value can arrive on its own or wrapped together with the page
+							// it was read from. Rendering the wrapper puts an object where
+							// text belongs, which takes the whole page down, so every value
+							// is read out before it is shown.
+							const name = displayValue(c.name) ?? ''
+							const role = displayValue(c.role)
+							const email = displayValue(c.email)
+							const phone = displayValue(c.phone)
+							const linkedin = displayValue(c.linkedin)
+							const notes = displayValue(c.notes)
+							return (
+								<ListItem key={`${name}|${email ?? linkedin ?? ''}`}>
+									<RowHead>
+										<Pill>{name}</Pill>
+										{role !== null ? <Reason>{role}</Reason> : null}
+										{c.is_decision_maker === true ? (
+											<DecisionMakerBadge>
+												<Trans>Decision maker</Trans>
+											</DecisionMakerBadge>
+										) : null}
+									</RowHead>
+									<FieldsTable>
+										{email !== null ? (
+											<FieldRow>
+												<FieldKey>
+													<Trans>Email</Trans>
+												</FieldKey>
+												<FieldValue>
+													<SafeLink href={`mailto:${email}`}>{email}</SafeLink>
+												</FieldValue>
+											</FieldRow>
+										) : null}
+										{phone !== null ? (
+											<FieldRow>
+												<FieldKey>
+													<Trans>Phone</Trans>
+												</FieldKey>
+												<FieldValue>{phone}</FieldValue>
+											</FieldRow>
+										) : null}
+										{linkedin !== null ? (
+											<FieldRow>
+												<FieldKey>
+													<Trans>LinkedIn</Trans>
+												</FieldKey>
+												<FieldValue>
+													<SafeLink href={linkedin}>{linkedin}</SafeLink>
+												</FieldValue>
+											</FieldRow>
+										) : null}
+									</FieldsTable>
+									{notes !== null ? <Reason>{notes}</Reason> : null}
+									<CitationList citations={c.citations} />
+								</ListItem>
+							)
+						})}
 					</List>
 				</Section>
 			) : null}
