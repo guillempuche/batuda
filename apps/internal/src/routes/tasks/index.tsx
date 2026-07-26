@@ -1056,40 +1056,30 @@ function narrowTasks(rows: ReadonlyArray<unknown>): ReadonlyArray<TaskRow> {
 		const source = isSource(r['source']) ? r['source'] : 'user'
 		out.push({
 			id: r['id'],
-			companyId:
-				typeof r['company_id'] === 'string'
-					? r['company_id']
-					: typeof r['companyId'] === 'string'
-						? r['companyId']
-						: null,
+			companyId: typeof r['companyId'] === 'string' ? r['companyId'] : null,
 			type: typeof r['type'] === 'string' ? r['type'] : 'other',
 			title: r['title'],
 			status: typeof r['status'] === 'string' ? r['status'] : 'open',
 			priority,
 			source,
-			dueAt: pickString(r, 'due_at', 'dueAt'),
-			snoozedUntil: pickString(r, 'snoozed_until', 'snoozedUntil'),
-			completedAt: pickString(r, 'completed_at', 'completedAt'),
-			updatedAt: pickString(r, 'updated_at', 'updatedAt'),
+			dueAt: readIsoString(r, 'dueAt'),
+			snoozedUntil: readIsoString(r, 'snoozedUntil'),
+			completedAt: readIsoString(r, 'completedAt'),
+			updatedAt: readIsoString(r, 'updatedAt'),
 		})
 	}
 	return out
 }
 
-// Reads the snake- or camel-case form of a field. Typed date fields (dueAt,
-// updatedAt, the event `at`, …) decode to DateTime.Utc on the wire, so convert
-// those back to an ISO string alongside the plain-string form.
-function pickString(
+// A date field can reach this page as a date value or as plain text, so both
+// shapes are read back as one ISO string.
+function readIsoString(
 	r: Record<string, unknown>,
-	snake: string,
-	camel: string,
+	field: string,
 ): string | null {
-	const snakeV = r[snake]
-	if (typeof snakeV === 'string') return snakeV
-	if (DateTime.isDateTime(snakeV)) return DateTime.formatIso(snakeV)
-	const camelV = r[camel]
-	if (typeof camelV === 'string') return camelV
-	if (DateTime.isDateTime(camelV)) return DateTime.formatIso(camelV)
+	const value = r[field]
+	if (typeof value === 'string') return value
+	if (DateTime.isDateTime(value)) return DateTime.formatIso(value)
 	return null
 }
 
@@ -1115,14 +1105,10 @@ function narrowEvents(
 		if (!row || typeof row !== 'object') continue
 		const r = row as Record<string, unknown>
 		if (typeof r['id'] !== 'string') continue
-		const at = pickString(r, 'at', 'at')
+		const at = readIsoString(r, 'at')
 		if (at === null) continue
 		const actorKind =
-			typeof r['actor_kind'] === 'string'
-				? r['actor_kind']
-				: typeof r['actorKind'] === 'string'
-					? r['actorKind']
-					: 'user'
+			typeof r['actorKind'] === 'string' ? r['actorKind'] : 'user'
 		out.push({
 			id: r['id'],
 			at,
