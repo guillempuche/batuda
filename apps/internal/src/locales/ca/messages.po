@@ -436,6 +436,11 @@ msgstr "Tot sota control"
 msgid "Allow"
 msgstr "Permet"
 
+#. placeholder {0}: change.to
+#: src/components/research/inbox/research-inbox.tsx
+msgid "already {0}"
+msgstr "ja hi diu {0}"
+
 #: src/components/research/findings/shared.tsx
 msgid "Already in CRM"
 msgstr "Ja al CRM"
@@ -456,6 +461,10 @@ msgstr "Un assistent d'IA vol connectar-se al teu compte de Batuda per MCP i act
 #: src/routes/settings/organization/templates.tsx
 msgid "An org stack runs for every member who hasn't set their own. The one marked default applies to a run that names none. Only org templates can go in an org stack."
 msgstr "Una pila de l'organització s'aplica a tots els membres que no n'han definit una de pròpia. La marcada per defecte s'aplica quan una execució no n'anomena cap. En una pila de l'organització només hi poden anar plantilles de l'organització."
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "and {hidden} more on the run"
+msgstr "i {hidden} més a l'execució"
 
 #: src/components/research/research-dialog.tsx
 msgid "Any"
@@ -1560,6 +1569,10 @@ msgstr "La contrasenya actual no és correcta."
 #: src/components/research/findings/company-enrichment-view.tsx
 msgid "Current tools"
 msgstr "Eines actuals"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "currently"
+msgstr "actualment"
 
 #: src/components/profile/theme-select.tsx
 msgid "Dark"
@@ -3193,6 +3206,10 @@ msgstr "Res completat recentment"
 #: src/routes/tasks/index.tsx
 msgid "Nothing later in the queue"
 msgstr "Res més endavant a la cua"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "nothing on file, would add"
+msgstr "no hi ha res, s'afegiria"
 
 #: src/routes/tasks/index.tsx
 msgid "Nothing overdue"
@@ -5313,6 +5330,10 @@ msgstr "S'està fent…"
 #: src/routes/index.tsx
 msgid "Workshop floor — live counters on the bench."
 msgstr "Planta del taller — comptadors en viu al banc."
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "would become"
+msgstr "passaria a ser"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Write footer…"
