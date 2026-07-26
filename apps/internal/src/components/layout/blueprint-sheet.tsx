@@ -32,6 +32,13 @@ type ViewportRef = RefObject<HTMLDivElement | null>
 
 const ViewportRefContext = createContext<ViewportRef | null>(null)
 
+/**
+ * The name the router files this scroller's position under. Phones scroll the
+ * page itself, which the router already tracks on its own, so only the desktop
+ * scroller carries it.
+ */
+export const SHEET_SCROLL_ID = 'blueprint-sheet'
+
 export function useBlueprintViewportRef(): ViewportRef {
 	const ctx = useContext(ViewportRefContext)
 	if (!ctx) {
@@ -40,6 +47,16 @@ export function useBlueprintViewportRef(): ViewportRef {
 		)
 	}
 	return ctx
+}
+
+/**
+ * The same viewport, or null when there is no sheet around the caller.
+ * Something that merely watches the scrolling — and can fall back to the page
+ * itself — can use this and still render outside a sheet, in a test or a
+ * standalone screen.
+ */
+export function useOptionalBlueprintViewportRef(): ViewportRef | null {
+	return useContext(ViewportRefContext)
 }
 
 export function BlueprintSheet({ children }: { children: React.ReactNode }) {
@@ -66,7 +83,13 @@ export function BlueprintSheet({ children }: { children: React.ReactNode }) {
 					<Vignette />
 					{isDesktopScroll ? (
 						<PriScrollArea.Root>
-							<PriScrollArea.Viewport ref={viewportRef}>
+							{/* Naming the scroller lets the router remember how far down it
+							    was on the way back, instead of guessing at it by position
+							    in the tree — which moves whenever the layout does. */}
+							<PriScrollArea.Viewport
+								ref={viewportRef}
+								data-scroll-restoration-id={SHEET_SCROLL_ID}
+							>
 								<Content>{children}</Content>
 							</PriScrollArea.Viewport>
 							<PriScrollArea.Scrollbar orientation='vertical'>

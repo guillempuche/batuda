@@ -1276,6 +1276,10 @@ msgstr "No s'han pogut carregar les safates"
 msgid "Could not load meetings"
 msgstr "No s'han pogut carregar les reunions"
 
+#: src/components/shared/infinite-list-footer.tsx
+msgid "Could not load more. The rows already here are still current."
+msgstr "No s'han pogut carregar més files. Les que ja hi ha continuen sent vàlides."
+
 #: src/routes/companies/$slug.tsx
 #: src/routes/pages/index.tsx
 msgid "Could not load pages"
@@ -2580,13 +2584,11 @@ msgstr "Les actualitzacions en directe s'han aturat. Potser l'execució encara t
 msgid "Live updates paused. This run may still be working — refresh to check its latest status."
 msgstr "Actualitzacions en directe pausades. Aquesta execució encara pot estar treballant — actualitza per veure el seu estat més recent."
 
-#. placeholder {0}: total - loaded
 #: src/components/companies/pipeline-board.tsx
-msgid "Load {0} more"
-msgstr "Carrega'n {0} més"
+#~ msgid "Load {0} more"
+#~ msgstr "Carrega'n {0} més"
 
-#: src/routes/companies/index.tsx
-#: src/routes/tasks/index.tsx
+#: src/components/shared/infinite-list-footer.tsx
 msgid "Load more"
 msgstr "Carrega'n més"
 
@@ -4491,6 +4493,10 @@ msgstr "Es mostren {0} de {totalPending}. Afina els filtres per arribar a la res
 msgid "Showing {firstRow}–{lastRow} of {total}"
 msgstr "Mostrant {firstRow}–{lastRow} de {total}"
 
+#: src/components/shared/infinite-list-footer.tsx
+msgid "Showing {loadedCount} of {totalCount}"
+msgstr "Es mostren {loadedCount} de {totalCount}"
+
 #: src/routes/login.tsx
 msgid "Sign in"
 msgstr "Inicia sessió"
@@ -4795,10 +4801,9 @@ msgstr "Títol de la tasca"
 msgid "Tasks"
 msgstr "Tasques"
 
-#. placeholder {0}: visibleTasks.length
 #: src/routes/tasks/index.tsx
-msgid "tasks — showing {0} of {shelfTotal}"
-msgstr "tasques: es mostren {0} de {shelfTotal}"
+#~ msgid "tasks — showing {0} of {shelfTotal}"
+#~ msgstr "tasques: es mostren {0} de {shelfTotal}"
 
 #: src/components/research/findings/prospect-scan-view.tsx
 #: src/components/research/run-labels.ts
@@ -5183,6 +5188,10 @@ msgstr "Total"
 #: src/components/research/findings/competitor-scan-view.tsx
 msgid "Total competitors"
 msgstr "Total competidors"
+
+#: src/components/shared/infinite-list-footer.tsx
+msgid "Try again"
+msgstr "Torna-ho a provar"
 
 #: src/routes/companies/index.tsx
 #: src/routes/emails/index.tsx

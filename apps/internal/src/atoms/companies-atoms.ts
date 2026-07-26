@@ -1,3 +1,5 @@
+import { Atom } from 'effect/unstable/reactivity'
+
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 
 /**
@@ -40,10 +42,15 @@ const cache = new Map<string, ReturnType<typeof makeCompaniesSearchAtom>>()
 export const COMPANIES_PAGE_SIZE = 60
 
 function makeCompaniesSearchAtom(search: CompaniesSearch, limit: number) {
-	return BatudaApiAtom.query('companies', 'list', {
-		query: { ...search, limit },
-		serializationKey: `companies:search:${canonicalSearchKey(search)}::${limit}`,
-	})
+	// Held even while nothing is showing it, so stepping into a company and
+	// coming back puts the same rows straight back on screen instead of
+	// refetching them and collapsing the list to a single page in between.
+	return Atom.keepAlive(
+		BatudaApiAtom.query('companies', 'list', {
+			query: { ...search, limit },
+			serializationKey: `companies:search:${canonicalSearchKey(search)}::${limit}`,
+		}),
+	)
 }
 
 /**

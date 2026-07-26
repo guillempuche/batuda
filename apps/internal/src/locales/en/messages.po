@@ -1276,6 +1276,10 @@ msgstr "Could not load inboxes"
 msgid "Could not load meetings"
 msgstr "Could not load meetings"
 
+#: src/components/shared/infinite-list-footer.tsx
+msgid "Could not load more. The rows already here are still current."
+msgstr "Could not load more. The rows already here are still current."
+
 #: src/routes/companies/$slug.tsx
 #: src/routes/pages/index.tsx
 msgid "Could not load pages"
@@ -2580,13 +2584,11 @@ msgstr "Live updates have stopped. The run may still be working."
 msgid "Live updates paused. This run may still be working — refresh to check its latest status."
 msgstr "Live updates paused. This run may still be working — refresh to check its latest status."
 
-#. placeholder {0}: total - loaded
 #: src/components/companies/pipeline-board.tsx
-msgid "Load {0} more"
-msgstr "Load {0} more"
+#~ msgid "Load {0} more"
+#~ msgstr "Load {0} more"
 
-#: src/routes/companies/index.tsx
-#: src/routes/tasks/index.tsx
+#: src/components/shared/infinite-list-footer.tsx
 msgid "Load more"
 msgstr "Load more"
 
@@ -4491,6 +4493,10 @@ msgstr "Showing {0} of {totalPending}. Narrow the filters to reach the rest."
 msgid "Showing {firstRow}–{lastRow} of {total}"
 msgstr "Showing {firstRow}–{lastRow} of {total}"
 
+#: src/components/shared/infinite-list-footer.tsx
+msgid "Showing {loadedCount} of {totalCount}"
+msgstr "Showing {loadedCount} of {totalCount}"
+
 #: src/routes/login.tsx
 msgid "Sign in"
 msgstr "Sign in"
@@ -4795,10 +4801,9 @@ msgstr "Task title"
 msgid "Tasks"
 msgstr "Tasks"
 
-#. placeholder {0}: visibleTasks.length
 #: src/routes/tasks/index.tsx
-msgid "tasks — showing {0} of {shelfTotal}"
-msgstr "tasks — showing {0} of {shelfTotal}"
+#~ msgid "tasks — showing {0} of {shelfTotal}"
+#~ msgstr "tasks — showing {0} of {shelfTotal}"
 
 #: src/components/research/findings/prospect-scan-view.tsx
 #: src/components/research/run-labels.ts
@@ -5183,6 +5188,10 @@ msgstr "Total"
 #: src/components/research/findings/competitor-scan-view.tsx
 msgid "Total competitors"
 msgstr "Total competitors"
+
+#: src/components/shared/infinite-list-footer.tsx
+msgid "Try again"
+msgstr "Try again"
 
 #: src/routes/companies/index.tsx
 #: src/routes/emails/index.tsx
