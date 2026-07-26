@@ -17,7 +17,6 @@ const toolRound = (n: number): LoopRound => ({
 	renderedResults: [`[scrape_page] page ${n}`],
 	promptChars: 100,
 	inputTokens: 10,
-	outputTokens: 5,
 })
 const finalRound = (text: string): LoopRound => ({
 	text,
@@ -26,7 +25,6 @@ const finalRound = (text: string): LoopRound => ({
 	renderedResults: [],
 	promptChars: 50,
 	inputTokens: 8,
-	outputTokens: 20,
 })
 
 const snapshot = (
@@ -73,8 +71,6 @@ describe('runAgentResearchLoop', () => {
 			expect(result.researchText).toContain('done')
 			// AND every scraped source is attributed, de-duplicated
 			expect(result.scrapedUrlHashes).toEqual(['hash-1', 'hash-2'])
-			expect(result.tokensIn).toBe(28)
-			expect(result.tokensOut).toBe(30)
 		})
 	})
 
@@ -131,26 +127,6 @@ describe('runAgentResearchLoop', () => {
 			// THEN it stopped on context after the second round (2 × 100 ≥ 150)
 			expect(result.stopReason).toBe('context')
 			expect(result.rounds).toBe(2)
-		})
-	})
-
-	describe('when a prior run is resumed', () => {
-		it('should add this loop onto the carried token totals', async () => {
-			// GIVEN token counts carried across a resume
-			// WHEN a single final round runs
-			const result = await Effect.runPromise(
-				runAgentResearchLoop({
-					maxSteps: 10,
-					runRound: scriptedRounds([finalRound('ok')]),
-					budgetSnapshot: Effect.succeed(snapshot(100, 100)),
-					priorTokensIn: 100,
-					priorTokensOut: 200,
-				}),
-			)
-
-			// THEN the loop's own usage adds onto the prior totals
-			expect(result.tokensIn).toBe(108)
-			expect(result.tokensOut).toBe(220)
 		})
 	})
 

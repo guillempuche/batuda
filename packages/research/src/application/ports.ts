@@ -266,7 +266,6 @@ export class ResearchEventSink extends Context.Service<
 // ── Budget ──
 
 export interface BudgetService {
-	readonly init: (cheapCents: number, paidCents: number) => Effect.Effect<void>
 	readonly chargeCheap: (
 		provider: string,
 		cents: number,

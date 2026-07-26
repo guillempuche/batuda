@@ -38,7 +38,6 @@ import {
 // generous enough that nothing is ever refused.
 const stubBudget = Layer.succeed(Budget)(
 	Budget.of({
-		init: () => Effect.void,
 		chargeCheap: () => Effect.void,
 		chargePaid: () => Effect.void,
 		snapshot: () =>

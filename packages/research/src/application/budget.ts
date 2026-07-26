@@ -134,20 +134,6 @@ export const makeBudgetLayer = (config: BudgetConfig) =>
 			})
 
 			return Budget.of({
-				init: (cheapCents: number, paidCents: number) =>
-					Effect.gen(function* () {
-						yield* Ref.set(cheapRef, {
-							budget: cheapCents,
-							spent: 0,
-							remaining: cheapCents,
-						})
-						yield* Ref.set(paidRef, {
-							budget: paidCents,
-							spent: 0,
-							remaining: paidCents,
-						})
-					}),
-
 				chargeCheap: (provider: string, cents: number) =>
 					// Check and deduct in one indivisible step. Several tool calls run at
 					// once, so reading what is left and then subtracting as two steps lets

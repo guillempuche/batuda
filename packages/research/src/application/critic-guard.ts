@@ -49,7 +49,6 @@ export const CRITIC_UNSURE_CONFIDENCE = 0.3
 
 export interface CriticJudgeResult {
 	readonly verdicts: ReadonlyArray<CriticVerdict>
-	readonly outputTokens: number
 }
 
 // The injected model-backed check: rules on a batch of field claims in one call.
@@ -65,7 +64,6 @@ export interface FieldCritiqueResult {
 	readonly dropped: number
 	/** Fields the judge was unsure about — kept, but marked low-confidence. */
 	readonly flagged: number
-	readonly outputTokens: number
 }
 
 export interface CriticTarget {
@@ -208,10 +206,9 @@ export const critiqueFieldSupport = <E, R>(
 				criticised: 0,
 				dropped: 0,
 				flagged: 0,
-				outputTokens: 0,
 			}
 		}
-		const { verdicts, outputTokens } = yield* judge(claims)
+		const { verdicts } = yield* judge(claims)
 		const {
 			findings: applied,
 			dropped,
@@ -222,7 +219,6 @@ export const critiqueFieldSupport = <E, R>(
 			criticised: claims.length,
 			dropped,
 			flagged,
-			outputTokens,
 		}
 	})
 

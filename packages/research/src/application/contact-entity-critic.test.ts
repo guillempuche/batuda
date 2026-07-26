@@ -173,7 +173,7 @@ describe('critiqueContactEntities', () => {
 			// GIVEN a finding with only a quote-less contact
 			const findings = { contacts: [{ name: 'Ada', role: sourced('CEO') }] }
 			const judge = vi.fn<ContactEntityJudge>(() =>
-				Effect.succeed({ verdicts: [], outputTokens: 5 }),
+				Effect.succeed({ verdicts: [] }),
 			)
 
 			// WHEN critiqued
@@ -187,13 +187,12 @@ describe('critiqueContactEntities', () => {
 				findings,
 				criticised: 0,
 				dropped: 0,
-				outputTokens: 0,
 			})
 		})
 	})
 
 	describe('when the judge flags an outsider', () => {
-		it('should drop that contact and thread the judge token count', async () => {
+		it("should drop that contact and keep the company's own staff", async () => {
 			// GIVEN a real staffer and a testimonial client, both quoted
 			const findings = {
 				contacts: [
@@ -210,7 +209,6 @@ describe('critiqueContactEntities', () => {
 								? ('outsider' as const)
 								: ('own_staff' as const),
 					})),
-					outputTokens: 12,
 				})
 
 			// WHEN critiqued
@@ -218,10 +216,9 @@ describe('critiqueContactEntities', () => {
 				critiqueContactEntities(findings, judge),
 			)
 
-			// THEN only the client is dropped, tokens are surfaced
+			// THEN only the client is dropped, and both were judged
 			expect(result.criticised).toBe(2)
 			expect(result.dropped).toBe(1)
-			expect(result.outputTokens).toBe(12)
 			expect(
 				(result.findings as { contacts: Array<{ name: string }> }).contacts.map(
 					c => c.name,
@@ -236,8 +233,7 @@ describe('critiqueContactEntities', () => {
 			const findings = {
 				contacts: [{ name: 'Ada', role: sourced('CEO', 'Ada, CEO') }],
 			}
-			const judge: ContactEntityJudge = () =>
-				Effect.succeed({ verdicts: [], outputTokens: 0 })
+			const judge: ContactEntityJudge = () => Effect.succeed({ verdicts: [] })
 
 			// WHEN critiqued
 			const result = await Effect.runPromise(

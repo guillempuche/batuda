@@ -162,7 +162,7 @@ describe('applyCriticVerdicts', () => {
 
 describe('critiqueFieldSupport', () => {
 	describe('when the judge clearly rejects one field', () => {
-		it('should blank it, keep the rest, and thread the judge tokens', async () => {
+		it('should blank it, keep the rest, and count it as dropped', async () => {
 			// GIVEN a supported industry, an unsupported size, and a quote-less
 			// location (which is never sent to the judge)
 			const findings = {
@@ -179,7 +179,6 @@ describe('critiqueFieldSupport', () => {
 						verdict:
 							c.id === 'enrichment.location' ? 'unsupported' : 'supported',
 					})),
-					outputTokens: 42,
 				})
 
 			// WHEN critiqued
@@ -196,7 +195,6 @@ describe('critiqueFieldSupport', () => {
 			expect(result.criticised).toBe(2)
 			expect(result.dropped).toBe(1)
 			expect(result.flagged).toBe(0)
-			expect(result.outputTokens).toBe(42)
 		})
 	})
 
@@ -215,7 +213,6 @@ describe('critiqueFieldSupport', () => {
 						id: c.id,
 						verdict: c.id === 'enrichment.location' ? 'unsure' : 'supported',
 					})),
-					outputTokens: 7,
 				})
 
 			// WHEN critiqued
@@ -233,7 +230,6 @@ describe('critiqueFieldSupport', () => {
 			expect(e['industry']).toEqual(sourced('retail', 'a shop'))
 			expect(result.dropped).toBe(0)
 			expect(result.flagged).toBe(1)
-			expect(result.outputTokens).toBe(7)
 		})
 	})
 
@@ -241,9 +237,7 @@ describe('critiqueFieldSupport', () => {
 		it('should return findings unchanged and never call the judge', async () => {
 			// GIVEN findings with nothing to critique
 			const findings = { competitors: [{ name: 'Rival' }] }
-			const judge = vi.fn<CriticJudge>(() =>
-				Effect.succeed({ verdicts: [], outputTokens: 0 }),
-			)
+			const judge = vi.fn<CriticJudge>(() => Effect.succeed({ verdicts: [] }))
 
 			// WHEN critiqued
 			const result = await Effect.runPromise(
@@ -253,7 +247,6 @@ describe('critiqueFieldSupport', () => {
 			// THEN the judge was never invoked and nothing changed
 			expect(judge).not.toHaveBeenCalled()
 			expect(result.findings).toBe(findings)
-			expect(result.outputTokens).toBe(0)
 		})
 	})
 })
