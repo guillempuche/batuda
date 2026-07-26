@@ -1,7 +1,13 @@
 /**
- * Deterministic in-memory `BookingProvider` + `IcsParser` for local dev and
- * tests. Zero network, zero cal.com account, zero `yarn dx`. Backed by a
- * `Ref` store so state survives across calls inside the same Layer.
+ * Two things live here.
+ *
+ * The `BookingProvider` is a deterministic in-memory stand-in for local dev and
+ * tests — zero network, zero cal.com account — backed by a `Ref` store so state
+ * survives across calls inside the same Layer. Real bookings go through the
+ * cal.com adapter instead.
+ *
+ * The `IcsParser` is not a stand-in: it is the only reader of emailed
+ * invitations anywhere, in every environment.
  */
 
 import { Effect, Layer, Ref } from 'effect'
@@ -235,9 +241,10 @@ export const StubBookingProviderLayer = Layer.effect(
 // ── IcsParser — RFC 5545 subset ────────────────────────────────────────────
 //
 // Zero-dep parser sized for the shapes we actually receive from Zoom / Teams /
-// Meet / Outlook / Google Calendar invites. RRULE expansion is intentionally
-// left to downstream (master-instance upsert only); anything beyond that —
-// VTIMEZONE definitions, VTODO, floating-time conversion — degrades into a
+// Meet / Outlook / Google Calendar invites. A named time zone is converted to a
+// real moment; a clock time with no zone at all is read as UTC and says so in
+// `metadata.timezone`. Repeating events are stored as the one instance that
+// arrived. Anything further — VTIMEZONE definitions, VTODO — degrades into a
 // `metadata.*` breadcrumb rather than a hard failure so one odd sender
 // doesn't block the inbound-email path.
 
@@ -282,17 +289,124 @@ const parsePartstatToRsvp = (partstat: string): CalendarAttendeeRsvp => {
 	}
 }
 
+/**
+ * How far a named place's clock is ahead of UTC at one moment. Read from the
+ * system's own timezone tables, so the twice-yearly clock change is accounted
+ * for instead of assumed away.
+ */
+const zoneOffsetMs = (at: Date, timeZone: string): number => {
+	const parts = new Intl.DateTimeFormat('en-US', {
+		timeZone,
+		hour12: false,
+		year: 'numeric',
+		month: '2-digit',
+		day: '2-digit',
+		hour: '2-digit',
+		minute: '2-digit',
+		second: '2-digit',
+	}).formatToParts(at)
+	const partValue = (type: string): number =>
+		Number(parts.find(part => part.type === type)?.value ?? Number.NaN)
+	const asUtc = Date.UTC(
+		partValue('year'),
+		partValue('month') - 1,
+		partValue('day'),
+		// Midnight can come back as hour 24 in this format.
+		partValue('hour') % 24,
+		partValue('minute'),
+		partValue('second'),
+	)
+	return asUtc - at.getTime()
+}
+
+/**
+ * The moment a clock time in a named place actually happened.
+ *
+ * The offset itself depends on the moment, so the first guess treats the clock
+ * time as UTC and the second corrects it using that place's offset then. Two
+ * passes settle every case except a time inside the hour a clock change skips,
+ * which has no real moment anyway.
+ */
+const wallTimeToUtc = (
+	wall: {
+		readonly year: number
+		readonly month: number
+		readonly day: number
+		readonly hour: number
+		readonly minute: number
+		readonly second: number
+	},
+	timeZone: string,
+): Date | null => {
+	const guess = Date.UTC(
+		wall.year,
+		wall.month - 1,
+		wall.day,
+		wall.hour,
+		wall.minute,
+		wall.second,
+	)
+	if (Number.isNaN(guess)) return null
+	try {
+		let instant = guess
+		for (let pass = 0; pass < 2; pass++) {
+			const offset = zoneOffsetMs(new Date(instant), timeZone)
+			if (Number.isNaN(offset)) return null
+			instant = guess - offset
+		}
+		const resolved = new Date(instant)
+		return Number.isNaN(resolved.getTime()) ? null : resolved
+	} catch {
+		// An unknown zone name makes Intl throw; the caller falls back to
+		// reading the time as UTC and says so.
+		return null
+	}
+}
+
+// `TZID=Europe/Madrid` among a property's parameters.
+const tzidOf = (params: string): string | null =>
+	params.match(/;TZID=([^;:]+)/)?.[1]?.trim() || null
+
 const parseIcsDate = (
 	value: string,
-): { date: Date; floating: boolean } | null => {
+	params = '',
+): { date: Date; floating: boolean; allDay: boolean } | null => {
+	// An invitation for a whole day carries a bare date and no time at all.
+	if (/VALUE=DATE(?:;|$)/.test(params) || /^\d{8}$/.test(value)) {
+		const day = value.match(/^(\d{4})(\d{2})(\d{2})$/)
+		if (!day) return null
+		const parsed = new Date(`${day[1]}-${day[2]}-${day[3]}T00:00:00Z`)
+		if (Number.isNaN(parsed.getTime())) return null
+		return { date: parsed, floating: false, allDay: true }
+	}
 	// Accepts both floating-time `YYYYMMDDTHHmmss` and UTC `YYYYMMDDTHHmmssZ`.
 	const match = value.match(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z)?/)
 	if (!match) return null
 	const [, y, mo, d, h, mi, s] = match
+	if (match[7] !== 'Z') {
+		// A clock time with a named place attached is a real moment, so it is
+		// converted rather than guessed at.
+		const timeZone = tzidOf(params)
+		if (timeZone !== null) {
+			const resolved = wallTimeToUtc(
+				{
+					year: Number(y),
+					month: Number(mo),
+					day: Number(d),
+					hour: Number(h),
+					minute: Number(mi),
+					second: Number(s),
+				},
+				timeZone,
+			)
+			if (resolved !== null)
+				return { date: resolved, floating: false, allDay: false }
+		}
+	}
 	const iso = `${y}-${mo}-${d}T${h}:${mi}:${s}Z`
 	const parsed = new Date(iso)
 	if (Number.isNaN(parsed.getTime())) return null
-	return { date: parsed, floating: match[7] !== 'Z' }
+	return { date: parsed, floating: match[7] !== 'Z', allDay: false }
 }
 
 // RFC 5545 §3.3.6: `PnDTnHnMnS` where any segment is optional. Used when a
@@ -386,19 +500,28 @@ const parseVEvent = (block: string): ParsedVEvent | null => {
 		return m?.[1]?.trim() ?? null
 	}
 	const uid = lineOf('UID')
-	const dtStartRaw = block.match(/^DTSTART(?:;[^:\r\n]*)?:(\S+)/m)?.[1]
-	const dtEndRaw = block.match(/^DTEND(?:;[^:\r\n]*)?:(\S+)/m)?.[1]
+	// The parameters before the colon carry the sender's time zone and whether
+	// this is a whole-day entry, so they are kept rather than skipped over.
+	const dtStartMatch = block.match(/^DTSTART((?:;[^:\r\n]*)?):(\S+)/m)
+	const dtEndMatch = block.match(/^DTEND((?:;[^:\r\n]*)?):(\S+)/m)
+	const dtStartRaw = dtStartMatch?.[2]
+	const dtEndRaw = dtEndMatch?.[2]
 	if (!uid || !dtStartRaw) return null
 
-	const startParsed = parseIcsDate(dtStartRaw)
+	const startParsed = parseIcsDate(dtStartRaw, dtStartMatch?.[1] ?? '')
 	if (!startParsed) return null
 	const startAt = startParsed.date
+	const allDay = startParsed.allDay
 
 	let endAt: Date | null = null
 	if (dtEndRaw) {
-		const endParsed = parseIcsDate(dtEndRaw)
+		const endParsed = parseIcsDate(dtEndRaw, dtEndMatch?.[1] ?? '')
 		if (endParsed) endAt = endParsed.date
 	}
+	// A whole-day invitation names the morning after it finishes, so a single
+	// day arrives as two dates a day apart. Without a closing date at all, one
+	// day is the only sensible reading.
+	if (allDay && !endAt) endAt = new Date(startAt.getTime() + 86400000)
 	// DTEND missing → fall back to DURATION (RFC 5545 allows either, not both).
 	if (!endAt) {
 		const durationRaw = lineOf('DURATION')
@@ -473,6 +596,7 @@ const parseVEvent = (block: string): ParsedVEvent | null => {
 		icalSequence,
 		startAt,
 		endAt,
+		allDay,
 		title,
 		status: 'confirmed',
 		organizerEmail,
@@ -484,7 +608,7 @@ const parseVEvent = (block: string): ParsedVEvent | null => {
 	}
 }
 
-export const makeStubIcsParser = Effect.succeed(
+export const makeIcsParser = Effect.succeed(
 	IcsParser.of({
 		parse: (raw: Uint8Array) =>
 			Effect.gen(function* () {
@@ -539,4 +663,4 @@ export const makeStubIcsParser = Effect.succeed(
 	}),
 )
 
-export const StubIcsParserLayer = Layer.effect(IcsParser, makeStubIcsParser)
+export const IcsParserLayer = Layer.effect(IcsParser, makeIcsParser)

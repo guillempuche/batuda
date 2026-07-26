@@ -25,6 +25,12 @@ export interface ParsedVEvent {
 	readonly icalSequence: number
 	readonly startAt: Date
 	readonly endAt: Date
+	/**
+	 * A whole-day entry, which carries dates and no clock times. The closing
+	 * date is stored as the moment the day ends, so a single day spans midnight
+	 * to midnight.
+	 */
+	readonly allDay: boolean
 	readonly title: string
 	readonly status: CalendarEventStatus
 	readonly organizerEmail: string

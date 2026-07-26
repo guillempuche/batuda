@@ -74,8 +74,8 @@ describe('BookingProviderLive env dispatch', () => {
 	it('should fail when CALENDAR_PROVIDER is absent', async () => {
 		// GIVEN an env snapshot that does not set CALENDAR_PROVIDER
 		// WHEN the layer attempts to build
-		// THEN the boot fails — the variable is required (no silent default,
-		// per memory `feedback_explicit_env_vars`)
+		// THEN the boot fails — a variable that decides behaviour is required
+		// outright, so nothing starts up quietly guessing which one applies
 		const exit = await withEnv({}, p => p.listEventTypes())
 		expect(exit._tag).toBe('Failure')
 	})
