@@ -3,7 +3,7 @@ import { RadioGroup } from '@base-ui/react/radio-group'
 import { useAtomSet, useAtomValue } from '@effect/atom-react'
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
-import { Trans, useLingui } from '@lingui/react/macro'
+import { Plural, Trans, useLingui } from '@lingui/react/macro'
 import { Link } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { Check, ChevronsUpDown, X } from 'lucide-react'
@@ -592,7 +592,11 @@ export function ResearchDialog({
 										{submitting ? (
 											<Trans>Starting…</Trans>
 										) : (
-											<Trans>Start {pendingConfirm.subjectCount} runs</Trans>
+											<Plural
+												value={pendingConfirm.subjectCount}
+												one='Start # run'
+												other='Start # runs'
+											/>
 										)}
 									</PriButton>
 									<PriButton

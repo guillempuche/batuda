@@ -1,4 +1,4 @@
-import { Trans, useLingui } from '@lingui/react/macro'
+import { Plural, Trans, useLingui } from '@lingui/react/macro'
 import type { ReactNode } from 'react'
 import styled from 'styled-components'
 
@@ -32,12 +32,20 @@ export function RunProgress({
 					) : null}
 					{progress.toolCalls > 0 ? (
 						<MetaItem>
-							<Trans>{progress.toolCalls} steps run</Trans>
+							<Plural
+								value={progress.toolCalls}
+								one='# step run'
+								other='# steps run'
+							/>
 						</MetaItem>
 					) : null}
 					{progress.sourceCount !== null ? (
 						<MetaItem>
-							<Trans>{progress.sourceCount} sources</Trans>
+							<Plural
+								value={progress.sourceCount}
+								one='# source'
+								other='# sources'
+							/>
 						</MetaItem>
 					) : null}
 				</Meta>

@@ -54,6 +54,16 @@ msgstr "(no subject)"
 msgid "(no summary)"
 msgstr "(no summary)"
 
+#. placeholder {0}: progress.sourceCount
+#: src/components/research/run-progress.tsx
+msgid "{0, plural, one {# source} other {# sources}}"
+msgstr "{0, plural, one {# source} other {# sources}}"
+
+#. placeholder {0}: progress.toolCalls
+#: src/components/research/run-progress.tsx
+msgid "{0, plural, one {# step run} other {# steps run}}"
+msgstr "{0, plural, one {# step run} other {# steps run}}"
+
 #. placeholder {0}: counts[shelf]
 #: src/routes/tasks/index.tsx
 msgid "{0, plural, one {# task} other {# tasks}}"
@@ -63,6 +73,11 @@ msgstr "{0, plural, one {# task} other {# tasks}}"
 #: src/components/instructions/stack-list.tsx
 msgid "{0, plural, one {# template} other {# templates}}"
 msgstr "{0, plural, one {# template} other {# templates}}"
+
+#. placeholder {0}: pendingConfirm.subjectCount
+#: src/components/research/research-dialog.tsx
+msgid "{0, plural, one {Start # run} other {Start # runs}}"
+msgstr "{0, plural, one {Start # run} other {Start # runs}}"
 
 #. placeholder {0}: ev.attendees.length
 #: src/components/companies/upcoming-meetings-card.tsx
@@ -91,20 +106,17 @@ msgstr "{0} msgs"
 msgid "{0} no longer allows password sign-in for mail apps, so it can't be connected here yet — it needs an OAuth sign-in. Pick another provider or use Generic IMAP."
 msgstr "{0} no longer allows password sign-in for mail apps, so it can't be connected here yet — it needs an OAuth sign-in. Pick another provider or use Generic IMAP."
 
+#. placeholder {0}: trustworthy.length
+#. placeholder {1}: needsReview.length
+#. placeholder {2}: attention.length
+#: src/components/research/inbox/research-inbox.tsx
+msgid "{0} ready to apply, {1} need reading, {2} runs need attention."
+msgstr "{0} ready to apply, {1} need reading, {2} runs need attention."
+
 #. placeholder {0}: selection.selectedCount
 #: src/components/companies/pipeline-board.tsx
 msgid "{0} selected"
 msgstr "{0} selected"
-
-#. placeholder {0}: progress.sourceCount
-#: src/components/research/run-progress.tsx
-msgid "{0} sources"
-msgstr "{0} sources"
-
-#. placeholder {0}: progress.toolCalls
-#: src/components/research/run-progress.tsx
-msgid "{0} steps run"
-msgstr "{0} steps run"
 
 #. placeholder {0}: failedIds.length
 #: src/routes/emails/index.tsx
@@ -2520,6 +2532,10 @@ msgid "Loading tasks…"
 msgstr "Loading tasks…"
 
 #: src/components/research/inbox/research-inbox.tsx
+msgid "Loading the changes waiting for review."
+msgstr "Loading the changes waiting for review."
+
+#: src/components/research/inbox/research-inbox.tsx
 msgid "Loading the review queue"
 msgstr "Loading the review queue"
 
@@ -4549,11 +4565,6 @@ msgstr "Standing guidance your research agent follows on every run."
 msgid "Start"
 msgstr "Start"
 
-#. placeholder {0}: pendingConfirm.subjectCount
-#: src/components/research/research-dialog.tsx
-msgid "Start {0} runs"
-msgstr "Start {0} runs"
-
 #: src/routes/emails/inboxes.tsx
 msgid "Start sending and receiving"
 msgstr "Start sending and receiving"
@@ -4806,6 +4817,10 @@ msgstr "The list could not be fetched. Check that the session is valid, then try
 #: src/routes/tasks/index.tsx
 msgid "The list could not be fetched. Check the connection, then try again."
 msgstr "The list could not be fetched. Check the connection, then try again."
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "The list of changes could not be loaded."
+msgstr "The list of changes could not be loaded."
 
 #: src/routes/emails/inboxes.tsx
 msgid "The mailbox is ready."
