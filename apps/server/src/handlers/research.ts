@@ -7,8 +7,10 @@ import {
 	ConfirmRequired,
 	CurrentOrg,
 	NotFound,
+	PendingPaidAction,
 	PendingProposal,
 	SessionContext,
+	UnknownStack,
 } from '@batuda/controllers'
 import { isTerminalResearchStatus } from '@batuda/domain'
 import { resolveInstructions, resolveStackRef } from '@batuda/instructions'
@@ -38,6 +40,15 @@ const decodePendingProposals = Schema.decodeUnknownEffect(
 	Schema.Array(PendingProposalRow),
 )
 
+// Same raw-Date handling for the waiting paid lookups.
+const PendingPaidActionRow = Schema.Struct({
+	...PendingPaidAction.fields,
+	runCreatedAt: Schema.DateTimeUtcFromDate,
+})
+const decodePendingPaidActions = Schema.decodeUnknownEffect(
+	Schema.Array(PendingPaidActionRow),
+)
+
 export const ResearchLive = HttpApiBuilder.group(
 	BatudaApi,
 	'research',
@@ -54,7 +65,9 @@ export const ResearchLive = HttpApiBuilder.group(
 			const timeline = yield* TimelineActivityService
 
 			// Shared apply/reject path: run the resolver, then surface a missing run
-			// or proposal as a 404 and let any DB fault die as a defect.
+			// as a 404 and let any DB fault die as a defect. A proposal that is no
+			// longer pending is not an error — someone else already resolved it — so
+			// it comes back as a plain outcome, the same way the bulk endpoint does.
 			const resolveProposal = (
 				id: string,
 				puId: string,
@@ -69,11 +82,7 @@ export const ResearchLive = HttpApiBuilder.group(
 					Effect.flatMap(result =>
 						result.outcome === 'run_not_found'
 							? Effect.fail(new NotFound({ entity: 'research', id }))
-							: result.outcome === 'proposal_not_found'
-								? Effect.fail(
-										new NotFound({ entity: 'proposed-update', id: puId }),
-									)
-								: Effect.succeed(result),
+							: Effect.succeed(result),
 					),
 					Effect.catch(e =>
 						e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
@@ -110,7 +119,10 @@ export const ResearchLive = HttpApiBuilder.group(
 						const stackId = _.payload.stack_id
 						if (stackId !== undefined) {
 							const picked = yield* resolveStackRef('research', stackId)
-							if (!picked.ok) return { error: 'unknown_stack', stack: stackId }
+							// Refused, not reported in a success body: a caller that
+							// cannot tell this apart from a started run reports the run
+							// as under way when nothing was ever queued.
+							if (!picked.ok) return yield* new UnknownStack({ stack: stackId })
 						}
 						const instructions = yield* resolveInstructions({
 							organizationId: currentOrg.id,
@@ -138,7 +150,9 @@ export const ResearchLive = HttpApiBuilder.group(
 						return result
 					}).pipe(
 						Effect.catch(e =>
-							e._tag === 'ConfirmRequired' ? Effect.fail(e) : Effect.die(e),
+							e._tag === 'ConfirmRequired' || e._tag === 'UnknownStack'
+								? Effect.fail(e)
+								: Effect.die(e),
 						),
 					),
 				)
@@ -264,7 +278,9 @@ export const ResearchLive = HttpApiBuilder.group(
 								entity: 'research',
 								id: _.params.id,
 							})
-						return { status: 'cancelled' }
+						// A run that has already finished cannot be cancelled, so pass the
+						// real outcome through instead of always claiming a cancellation.
+						return { outcome: res.outcome }
 					}).pipe(
 						Effect.catch(e =>
 							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
@@ -321,7 +337,15 @@ export const ResearchLive = HttpApiBuilder.group(
 							return yield* Effect.fail(
 								new NotFound({ entity: 'research', id: _.params.id }),
 							)
-						return result
+						// An action someone already decided, or one naming a lookup that
+						// does not exist, spends nothing and changes nothing — the caller
+						// has to tell that apart from a real approval.
+						return {
+							outcome: result.status,
+							...(result.status === 'approved'
+								? { followupRunId: result.followup_run_id }
+								: {}),
+						}
 					}).pipe(
 						Effect.catch(e =>
 							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
@@ -338,7 +362,7 @@ export const ResearchLive = HttpApiBuilder.group(
 							return yield* Effect.fail(
 								new NotFound({ entity: 'research', id: _.params.id }),
 							)
-						return result
+						return { outcome: result.status }
 					}).pipe(
 						Effect.catch(e =>
 							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
@@ -365,6 +389,25 @@ export const ResearchLive = HttpApiBuilder.group(
 							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
 						),
 					),
+				)
+				.handle('listPendingPaidActions', _ =>
+					Effect.gen(function* () {
+						// Org scope is enforced by RLS, like the run list.
+						const page = yield* svc.listPendingPaidActions({
+							researchId: _.query.research_id,
+							limit: _.query.limit,
+							offset: _.query.offset,
+						})
+						const items = yield* decodePendingPaidActions(page.items).pipe(
+							Effect.orDie,
+						)
+						return {
+							items,
+							total: page.total,
+							limit: page.limit,
+							offset: page.offset,
+						}
+					}).pipe(Effect.orDie),
 				)
 				.handle('listPendingProposals', _ =>
 					Effect.gen(function* () {

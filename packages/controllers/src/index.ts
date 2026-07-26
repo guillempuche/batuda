@@ -18,6 +18,7 @@ export {
 	StorageError,
 	StorageErrorOperation,
 	Unauthorized,
+	UnknownStack,
 } from './errors'
 export { CurrentOrg, OrgMiddleware } from './middleware/org'
 export { SessionContext, SessionMiddleware } from './middleware/session'
@@ -57,10 +58,12 @@ export {
 } from './routes/recordings'
 export { ContextInput, ResearchGroup } from './routes/research'
 export {
+	PendingPaidAction,
 	PendingProposal,
 	ResearchPolicy,
 	ResearchRunDetail,
 	ResearchRunSummary,
+	ResearchSpendBucket,
 } from './routes/research-schemas'
 export { BulkCompleteResult, TasksGroup } from './routes/tasks'
 export { TimelineGroup } from './routes/timeline'

@@ -3053,6 +3053,28 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 						],
 					},
 				}),
+				// Two addresses that disagree, with the bad one listed first: one
+				// deliverable address still reaches the person, so this belongs in
+				// "Ready to apply" and the best verdict has to win over the first.
+				proposal({
+					key: 'trusted-mixed-verdicts',
+					citation: {
+						sourceId: 'src_firecrawl_001',
+						quote: 'Sílvia Roig, reserves de grups',
+						confidence: 0.9,
+					},
+					subjectTable: 'contacts',
+					operation: 'create',
+					reason: 'Group-bookings contact; old address still on the page',
+					fields: {
+						name: 'Sílvia Roig',
+						company_id: CAL_PEP_ID,
+						channels: [
+							channel('email', 'grups@calpepfonda.es', 'undeliverable', 0.35),
+							channel('email', 'silvia@calpepfonda.cat', 'deliverable', 0.94),
+						],
+					},
+				}),
 				proposal({
 					key: 'trusted-percent',
 					citation: {

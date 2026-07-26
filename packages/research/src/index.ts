@@ -111,6 +111,7 @@ export {
 	type CreateResearchInput,
 	cloneCacheHitRun,
 	type PendingProposalRow,
+	queryPendingPaidActions,
 	queryPendingProposals,
 	type ResearchEvent,
 	type ResearchEventType,
