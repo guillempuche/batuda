@@ -228,6 +228,17 @@ export function ResearchInbox() {
 	const isLoading = AsyncResult.isInitial(proposalsResult)
 	const isFailure = AsyncResult.isFailure(proposalsResult)
 
+	// Read out what the queue currently holds. A sighted reader watches the list
+	// change when they search or filter; a listener got silence, with no way to
+	// tell "nothing matches" from "still loading". The region is always on the
+	// page so a change to its wording is announced — one added at the same moment
+	// as its text is not.
+	const liveSummary = isLoading
+		? t`Loading the changes waiting for review.`
+		: isFailure
+			? t`The list of changes could not be loaded.`
+			: t`${trustworthy.length} ready to apply, ${needsReview.length} need reading, ${attention.length} runs need attention.`
+
 	function resolveOne(p: PendingProposal, decision: ResolveDecision): void {
 		if (p.proposedUpdateId === null) return
 		resolve(rowKey(p), p.researchId, p.proposedUpdateId, decision, () =>
@@ -311,6 +322,10 @@ export function ResearchInbox() {
 					</RunsLink>
 				</IntroActions>
 			</IntroRow>
+
+			<SrOnly role='status' data-testid='research-inbox-live'>
+				{liveSummary}
+			</SrOnly>
 
 			<Counters data-testid='research-inbox-counters'>
 				<Tile>

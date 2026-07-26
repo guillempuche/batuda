@@ -54,6 +54,16 @@ msgstr "(sense assumpte)"
 msgid "(no summary)"
 msgstr "(sense resum)"
 
+#. placeholder {0}: progress.sourceCount
+#: src/components/research/run-progress.tsx
+msgid "{0, plural, one {# source} other {# sources}}"
+msgstr "{0, plural, one {# font} other {# fonts}}"
+
+#. placeholder {0}: progress.toolCalls
+#: src/components/research/run-progress.tsx
+msgid "{0, plural, one {# step run} other {# steps run}}"
+msgstr "{0, plural, one {# pas fet} other {# passos fets}}"
+
 #. placeholder {0}: counts[shelf]
 #: src/routes/tasks/index.tsx
 msgid "{0, plural, one {# task} other {# tasks}}"
@@ -63,6 +73,11 @@ msgstr "{0, plural, one {# tasca} other {# tasques}}"
 #: src/components/instructions/stack-list.tsx
 msgid "{0, plural, one {# template} other {# templates}}"
 msgstr "{0, plural, one {# plantilla} other {# plantilles}}"
+
+#. placeholder {0}: pendingConfirm.subjectCount
+#: src/components/research/research-dialog.tsx
+msgid "{0, plural, one {Start # run} other {Start # runs}}"
+msgstr "{0, plural, one {Inicia # execució} other {Inicia # execucions}}"
 
 #. placeholder {0}: ev.attendees.length
 #: src/components/companies/upcoming-meetings-card.tsx
@@ -91,20 +106,17 @@ msgstr "{0} missatges"
 msgid "{0} no longer allows password sign-in for mail apps, so it can't be connected here yet — it needs an OAuth sign-in. Pick another provider or use Generic IMAP."
 msgstr "{0} ja no permet iniciar la sessió amb contrasenya a les aplicacions de correu, així que de moment no es pot connectar aquí: necessita un inici de sessió OAuth. Tria un altre proveïdor o fes servir IMAP genèric."
 
+#. placeholder {0}: trustworthy.length
+#. placeholder {1}: needsReview.length
+#. placeholder {2}: attention.length
+#: src/components/research/inbox/research-inbox.tsx
+msgid "{0} ready to apply, {1} need reading, {2} runs need attention."
+msgstr "{0} a punt d’aplicar, {1} per llegir, {2} execucions requereixen atenció."
+
 #. placeholder {0}: selection.selectedCount
 #: src/components/companies/pipeline-board.tsx
 msgid "{0} selected"
 msgstr "{0} seleccionats"
-
-#. placeholder {0}: progress.sourceCount
-#: src/components/research/run-progress.tsx
-msgid "{0} sources"
-msgstr "{0} fonts"
-
-#. placeholder {0}: progress.toolCalls
-#: src/components/research/run-progress.tsx
-msgid "{0} steps run"
-msgstr "{0} passos fets"
 
 #. placeholder {0}: failedIds.length
 #: src/routes/emails/index.tsx
@@ -2520,6 +2532,10 @@ msgid "Loading tasks…"
 msgstr "S'estan carregant les tasques…"
 
 #: src/components/research/inbox/research-inbox.tsx
+msgid "Loading the changes waiting for review."
+msgstr "S'estan carregant els canvis pendents de revisió."
+
+#: src/components/research/inbox/research-inbox.tsx
 msgid "Loading the review queue"
 msgstr "S'està carregant la cua de revisió"
 
@@ -4549,11 +4565,6 @@ msgstr "Orientació permanent que el teu agent de recerca segueix en cada recerc
 msgid "Start"
 msgstr "Inicia"
 
-#. placeholder {0}: pendingConfirm.subjectCount
-#: src/components/research/research-dialog.tsx
-msgid "Start {0} runs"
-msgstr "Inicia {0} execucions"
-
 #: src/routes/emails/inboxes.tsx
 msgid "Start sending and receiving"
 msgstr "Comença a enviar i rebre"
@@ -4806,6 +4817,10 @@ msgstr "No s'ha pogut carregar la llista. Comprova que la sessió sigui vàlida 
 #: src/routes/tasks/index.tsx
 msgid "The list could not be fetched. Check the connection, then try again."
 msgstr "No s'ha pogut obtenir la llista. Comprova la connexió i torna-ho a provar."
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "The list of changes could not be loaded."
+msgstr "No s'ha pogut carregar la llista de canvis."
 
 #: src/routes/emails/inboxes.tsx
 msgid "The mailbox is ready."
