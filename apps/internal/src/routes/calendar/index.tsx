@@ -9,11 +9,7 @@ import styled from 'styled-components'
 
 import { PriButton, PriDialog } from '@batuda/ui/pri'
 
-import {
-	calendarEventsAtom,
-	calendarEventTypesAtom,
-	rsvpEventAtom,
-} from '#/atoms/calendar-atoms'
+import { calendarEventsAtom, rsvpEventAtom } from '#/atoms/calendar-atoms'
 import { companiesListAtom } from '#/atoms/pipeline-atoms'
 import { createTaskAtom } from '#/atoms/tasks-atoms'
 import { EmptyState } from '#/components/shared/empty-state'
@@ -30,11 +26,11 @@ import {
 } from '#/lib/workshop-mixins'
 
 /**
- * Mobile-first calendar surface (plan §6). Schedule-X is client-only
- * because it pulls Temporal polyfills and Preact signals that break SSR
- * — we render a skeleton during hydration and swap the interactive grid
- * in via a dynamic import. The server loader still fetches the event
- * list so SEO + first-paint text are meaningful.
+ * Mobile-first calendar surface. Schedule-X is client-only because it pulls
+ * Temporal polyfills and Preact signals that break SSR — we render a skeleton
+ * during hydration and swap the interactive grid in via a dynamic import. The
+ * server loader still fetches the event list so SEO + first-paint text are
+ * meaningful.
  */
 type CalendarEventRow = {
 	readonly id: string
@@ -69,15 +65,14 @@ async function loadCalendarOnServer() {
 	])
 	const program = Effect.gen(function* () {
 		const client = yield* makeBatudaApiServer(cookie ?? undefined)
-		const [events, eventTypes, companies] = yield* Effect.all(
+		const [events, companies] = yield* Effect.all(
 			[
 				client.calendar.listEvents({ query: { limit: 500 } }),
-				client.calendar.listEventTypes({ query: { active: 'true' } }),
 				client.companies.list({ query: { limit: 500 } }),
 			],
-			{ concurrency: 3 },
+			{ concurrency: 2 },
 		)
-		return { events, eventTypes, companies }
+		return { events, companies }
 	})
 	return Effect.runPromise(program)
 }
@@ -93,14 +88,10 @@ export const Route = createFileRoute('/calendar/')({
 			return { dehydrated: [] as const }
 		}
 		try {
-			const { events, eventTypes, companies } = await loadCalendarOnServer()
+			const { events, companies } = await loadCalendarOnServer()
 			return {
 				dehydrated: [
 					dehydrateAtom(calendarEventsAtom, AsyncResult.success(events)),
-					dehydrateAtom(
-						calendarEventTypesAtom,
-						AsyncResult.success(eventTypes),
-					),
 					dehydrateAtom(companiesListAtom, AsyncResult.success(companies)),
 				] as const,
 			}
@@ -140,10 +131,10 @@ function CalendarPage() {
 		[events, dlg],
 	)
 
-	// A link to an event the loaded range doesn't cover is left alone rather than
-	// cleared: this page holds a window around today, not every event, so a link
-	// to a meeting further out is good even when it can't be shown yet. Erasing
-	// it would destroy the address the reader was given.
+	// A link to an event this page didn't load is left alone rather than cleared:
+	// only a capped slice of events is held, so a link to a meeting outside it is
+	// still good even when it can't be shown yet. Erasing it would destroy the
+	// address the reader was given.
 
 	const handleCreateFollowUp = useCallback(
 		(event: CalendarEventRow) => {

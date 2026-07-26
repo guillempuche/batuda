@@ -97,9 +97,6 @@ export function threadAtomFor(threadId: string) {
 
 // Module-scoped mutation atoms — a single writable setter instance is
 // shared across every component that fires the same mutation.
-export const sendEmailAtom = BatudaApiAtom.mutation('email', 'send')
-export const replyEmailAtom = BatudaApiAtom.mutation('email', 'reply')
-
 export const updateThreadStatusAtom = BatudaApiAtom.mutation(
 	'email',
 	'updateThreadStatus',
@@ -134,9 +131,6 @@ export const createDraftAtom = BatudaApiAtom.mutation('email', 'createDraft')
 export const updateDraftAtom = BatudaApiAtom.mutation('email', 'updateDraft')
 export const deleteDraftAtom = BatudaApiAtom.mutation('email', 'deleteDraft')
 export const sendDraftAtom = BatudaApiAtom.mutation('email', 'sendDraft')
-export const listDraftsAtom = BatudaApiAtom.query('email', 'listDrafts', {
-	query: {},
-})
 
 // ── Footers ──
 export const createFooterAtom = BatudaApiAtom.mutation('email', 'createFooter')
