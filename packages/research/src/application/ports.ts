@@ -276,13 +276,19 @@ export interface BudgetService {
 		provider: string,
 		cents: number,
 	) => Effect.Effect<void, BudgetExceeded>
+	/**
+	 * Take the price of one paid vendor call off the run's paid tier and record
+	 * it. Answers whether this call was the one that paid: `false` means the same
+	 * call was already paid for in this run, so calling the vendor again would be
+	 * money spent twice for an answer already in hand.
+	 */
 	readonly chargePaid: (
 		provider: string,
 		cents: number,
 		tool: string,
-		idempotencyKey?: string,
+		idempotencyKey: string,
 	) => Effect.Effect<
-		void,
+		boolean,
 		BudgetExceeded | MonthlyCapExceeded | ApprovalRequired
 	>
 	readonly snapshot: () => Effect.Effect<BudgetSnapshot>

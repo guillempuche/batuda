@@ -39,7 +39,7 @@ import {
 const stubBudget = Layer.succeed(Budget)(
 	Budget.of({
 		chargeCheap: () => Effect.void,
-		chargePaid: () => Effect.void,
+		chargePaid: () => Effect.succeed(true),
 		snapshot: () =>
 			Effect.succeed({
 				cheapBudget: 1000,
@@ -1141,7 +1141,7 @@ describe('what a tool call charges the run', () => {
 					Effect.sync(() => {
 						charged.push([provider, cents])
 					}),
-				chargePaid: () => Effect.void,
+				chargePaid: () => Effect.succeed(true),
 				snapshot: () =>
 					Effect.succeed({
 						cheapBudget: 1000,
@@ -1202,5 +1202,78 @@ describe('what a tool call charges the run', () => {
 			// of searches whatever a vendor happens to bill
 			expect(charged).toEqual([['search', 1]])
 		})
+	})
+})
+
+describe('looking the same company up twice in one run', () => {
+	// The national register charges per lookup, so the second identical lookup
+	// must never reach it. The budget answers whether this call was the one that
+	// paid; here the second charge reports that it was not.
+	it('should answer from what the run already bought, without asking again', async () => {
+		// GIVEN a run that has already paid for this lookup, and a register that
+		// records every time it is asked
+		let asked = 0
+		const paidOnce = Layer.succeed(Budget)(
+			Budget.of({
+				chargeCheap: () => Effect.void,
+				chargePaid: () => Effect.succeed(false),
+				snapshot: () =>
+					Effect.succeed({
+						cheapBudget: 1000,
+						cheapSpent: 0,
+						cheapRemaining: 1000,
+						paidBudget: 1000,
+						paidSpent: 0,
+						paidRemaining: 1000,
+					}),
+			}),
+		)
+		const ports = Layer.mergeAll(
+			Layer.succeed(RegistryRouter)(
+				RegistryRouter.of({
+					lookup: () => {
+						asked++
+						return Effect.succeed(
+							new RegistryRecord({
+								legalName: 'Acme SL',
+								sourceUrl: 'https://registry.example/acme',
+								units: 0,
+							}),
+						)
+					},
+				}),
+			),
+			StubSearchProvider,
+			StubScrapeProvider,
+			paidOnce,
+			stubRunContext,
+			Layer.succeed(ContactDiscovery)({
+				discover: () =>
+					Effect.succeed({
+						status: 'no_reliable_contact' as const,
+						researchId: 'test-run',
+					}),
+			}),
+		)
+
+		// WHEN the tool runs
+		const results = await Effect.runPromise(
+			Effect.gen(function* () {
+				const toolkit = yield* researchToolkit
+				const stream = yield* toolkit.handle('registry_lookup', {
+					country: 'ES',
+					query: 'Acme SL',
+					tax_id: null,
+				})
+				return yield* Stream.runCollect(stream)
+			}).pipe(Effect.provide(researchToolkitLayer.pipe(Layer.provide(ports)))),
+		)
+
+		// THEN the register is never asked, and the model is told the answer is
+		// already in its transcript rather than being handed a failure
+		expect(asked).toBe(0)
+		expect(JSON.stringify(results[results.length - 1])).toContain(
+			'already_looked_up',
+		)
 	})
 })
