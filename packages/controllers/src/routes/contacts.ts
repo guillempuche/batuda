@@ -24,7 +24,6 @@ const CreateContactInput = Schema.Struct({
 	name: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
 	role: Schema.optional(Schema.String),
 	isDecisionMaker: Schema.optional(Schema.Boolean),
-	notes: Schema.optional(Schema.String),
 	metadata: Schema.optional(Schema.Unknown),
 	channels: Schema.optional(Schema.Array(ChannelInput)),
 })
@@ -33,7 +32,6 @@ const UpdateContactInput = Schema.Struct({
 	name: Schema.optional(Schema.String),
 	role: Schema.optional(Schema.String),
 	isDecisionMaker: Schema.optional(Schema.Boolean),
-	notes: Schema.optional(Schema.String),
 	metadata: Schema.optional(Schema.Unknown),
 	channels: Schema.optional(Schema.Array(ChannelInput)),
 })

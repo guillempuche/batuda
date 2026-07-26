@@ -8,14 +8,9 @@ import { FileSignature, Plus, X } from 'lucide-react'
 import { type FormEvent, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 
-import {
-	PriButton,
-	PriDialog,
-	PriInput,
-	PriTextarea,
-	usePriToast,
-} from '@batuda/ui/pri'
+import { PriButton, PriDialog, PriInput, usePriToast } from '@batuda/ui/pri'
 
+import { SubjectDocuments } from '#/components/documents/subject-documents'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
@@ -38,7 +33,6 @@ type ProposalRow = {
 	readonly status: string
 	readonly totalValue: string | null
 	readonly currency: string | null
-	readonly notes: string | null
 	readonly expiresAt: string | null
 	readonly updatedAt: string | null
 	readonly lineItems: unknown
@@ -134,7 +128,6 @@ function narrowProposals(
 			status: typeof r['status'] === 'string' ? r['status'] : 'draft',
 			totalValue: typeof r['totalValue'] === 'string' ? r['totalValue'] : null,
 			currency: typeof r['currency'] === 'string' ? r['currency'] : null,
-			notes: typeof r['notes'] === 'string' ? r['notes'] : null,
 			expiresAt: dateToIsoOrNull(r['expiresAt']),
 			updatedAt: dateToIsoOrNull(r['updatedAt']),
 			lineItems: r['lineItems'] ?? null,
@@ -269,7 +262,6 @@ function ProposalDialog({
 	const [status, setStatus] = useState('draft')
 	const [currency, setCurrency] = useState('EUR')
 	const [expiresAt, setExpiresAt] = useState('')
-	const [notes, setNotes] = useState('')
 	const [lineItems, setLineItems] = useState<ReadonlyArray<LineItem>>([])
 	const [busy, setBusy] = useState(false)
 
@@ -281,7 +273,6 @@ function ProposalDialog({
 		setStatus(editing?.status ?? 'draft')
 		setCurrency(editing?.currency ?? 'EUR')
 		setExpiresAt(editing?.expiresAt ? editing.expiresAt.slice(0, 10) : '')
-		setNotes(editing?.notes ?? '')
 		setLineItems(editing ? narrowLineItems(editing.lineItems) : [])
 		setBusy(false)
 	}
@@ -323,7 +314,6 @@ function ProposalDialog({
 						status,
 						lineItems: cleanItems,
 						...(totalValue ? { totalValue } : {}),
-						notes,
 					},
 				} as never)
 			: await create({
@@ -334,7 +324,6 @@ function ProposalDialog({
 						currency,
 						...(totalValue ? { totalValue } : {}),
 						...(expiresAt ? { expiresAt } : {}),
-						...(notes.trim() ? { notes } : {}),
 					},
 				} as never)
 		setBusy(false)
@@ -494,18 +483,12 @@ function ProposalDialog({
 								/>
 							</Field>
 						)}
-						<Field>
-							<Label htmlFor='proposal-notes'>
-								<Trans>Notes (optional)</Trans>
-							</Label>
-							<PriTextarea
-								id='proposal-notes'
-								data-testid='proposal-notes'
-								value={notes}
-								rows={4}
-								onChange={e => setNotes(e.target.value)}
+						{editing === null ? null : (
+							<SubjectDocuments
+								subjectTable='proposals'
+								subjectId={editing.id}
 							/>
-						</Field>
+						)}
 						<Footer>
 							<PriButton
 								type='submit'

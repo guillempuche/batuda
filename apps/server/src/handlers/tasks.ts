@@ -74,7 +74,6 @@ export const TasksLive = HttpApiBuilder.group(BatudaApi, 'tasks', handlers =>
 							contact_id: _.payload.contactId ?? null,
 							type: _.payload.type,
 							title: _.payload.title,
-							notes: _.payload.notes ?? null,
 							status: _.payload.status ?? 'open',
 							source: _.payload.source ?? 'user',
 							priority: _.payload.priority ?? 'normal',
@@ -109,7 +108,6 @@ export const TasksLive = HttpApiBuilder.group(BatudaApi, 'tasks', handlers =>
 						_.params.id,
 						{
 							title: _.payload.title,
-							notes: _.payload.notes,
 							status: _.payload.status,
 							priority: _.payload.priority,
 							assigneeId: _.payload.assigneeId,

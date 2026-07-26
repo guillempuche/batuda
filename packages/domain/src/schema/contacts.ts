@@ -13,7 +13,6 @@ export class Contact extends Model.Class<Contact>('Contact')({
 	role: Schema.NullOr(Schema.String),
 	isDecisionMaker: Schema.NullOr(Schema.Boolean),
 
-	notes: Schema.NullOr(Schema.String),
 	metadata: Schema.NullOr(Schema.Unknown),
 
 	lastEmailAt: Schema.NullOr(Schema.DateTimeUtcFromDate),

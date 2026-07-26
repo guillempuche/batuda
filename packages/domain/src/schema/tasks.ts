@@ -33,7 +33,6 @@ export class Task extends Model.Class<Task>('Task')({
 	type: Schema.String,
 	// values: call | visit | email | proposal | followup | other
 	title: Schema.String,
-	notes: Schema.NullOr(Schema.String),
 
 	status: TaskStatus,
 	source: TaskSource,

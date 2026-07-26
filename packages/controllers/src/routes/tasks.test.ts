@@ -125,12 +125,11 @@ describe('UpdateTaskInput', () => {
 	})
 
 	it('should accept null to clear nullable fields', () => {
-		// GIVEN explicit null for `notes`, `assigneeId`, `dueAt`, `snoozedUntil`
+		// GIVEN explicit null for `assigneeId`, `dueAt`, `snoozedUntil`
 		// WHEN decode runs
 		// THEN each null round-trips (so the server can distinguish "clear" from
 		// "leave as-is" using schema-level NullOr)
 		const out = decode(UpdateTaskInput, {
-			notes: null,
 			assigneeId: null,
 			dueAt: null,
 			snoozedUntil: null,
@@ -138,7 +137,6 @@ describe('UpdateTaskInput', () => {
 			contactId: null,
 			metadata: null,
 		})
-		expect(out.notes).toBeNull()
 		expect(out.assigneeId).toBeNull()
 		expect(out.dueAt).toBeNull()
 		expect(out.snoozedUntil).toBeNull()

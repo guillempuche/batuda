@@ -49,7 +49,6 @@ const CreateTask = Tool.make('create_task', {
 		type: Schema.String,
 		company_id: Schema.optional(Schema.NullOr(Schema.String)),
 		contact_id: Schema.optional(Schema.NullOr(Schema.String)),
-		notes: Schema.optional(Schema.NullOr(Schema.String)),
 		due_at: Schema.optional(Schema.NullOr(Schema.String)),
 		priority: Schema.optional(TaskPriority),
 		source: Schema.optional(TaskSource),
@@ -98,7 +97,7 @@ const ListTasks = Tool.make('list_tasks', {
 
 const SearchTasks = Tool.make('search_tasks', {
 	description:
-		'Full-text-ish search by ILIKE against title/notes. Accepts the same filters as list_tasks; `query` is the substring to match. Returns at most `limit` rows (default 25).',
+		'Substring search over a task title and the documents filed against it. Accepts the same filters as list_tasks; `query` is the substring to match. Returns at most `limit` rows (default 25).',
 	parameters: Schema.Struct({
 		query: Schema.String,
 		company_id: Schema.optional(Schema.String),
@@ -126,7 +125,6 @@ const UpdateTask = Tool.make('update_task', {
 		id: Schema.String,
 		title: Schema.optional(Schema.String),
 		type: Schema.optional(Schema.String),
-		notes: Schema.optional(Schema.NullOr(Schema.String)),
 		priority: Schema.optional(TaskPriority),
 		due_at: Schema.optional(Schema.NullOr(Schema.String)),
 		assignee_id: Schema.optional(Schema.NullOr(Schema.String)),
@@ -274,7 +272,6 @@ export const TaskHandlersLive = TaskTools.toLayer(
 							type: params.type,
 							companyId: params.company_id ?? null,
 							contactId: params.contact_id ?? null,
-							notes: params.notes ?? null,
 							dueAt: asDate(params.due_at ?? null),
 							priority: params.priority ?? 'normal',
 							source: params.source ?? 'agent',
@@ -346,7 +343,6 @@ export const TaskHandlersLive = TaskTools.toLayer(
 					const fields: Record<string, unknown> = {}
 					if (params.title !== undefined) fields['title'] = params.title
 					if (params.type !== undefined) fields['type'] = params.type
-					if (params.notes !== undefined) fields['notes'] = params.notes
 					if (params.priority !== undefined)
 						fields['priority'] = params.priority
 					if (params.due_at !== undefined)

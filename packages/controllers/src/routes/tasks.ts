@@ -55,7 +55,6 @@ export const CreateTaskInput = Schema.Struct({
 	contactId: Schema.optional(Schema.String),
 	type: Schema.String,
 	title: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
-	notes: Schema.optional(Schema.String),
 	status: Schema.optional(TaskStatus),
 	priority: Schema.optional(TaskPriority),
 	source: Schema.optional(TaskSource),
@@ -72,7 +71,6 @@ export const CreateTaskInput = Schema.Struct({
 // current row and records the change in `task_events`.
 export const UpdateTaskInput = Schema.Struct({
 	title: Schema.optional(Schema.String),
-	notes: Schema.optional(Schema.NullOr(Schema.String)),
 	status: Schema.optional(TaskStatus),
 	priority: Schema.optional(TaskPriority),
 	assigneeId: Schema.optional(Schema.NullOr(Schema.String)),

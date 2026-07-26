@@ -57,12 +57,7 @@ export const COMPANY_FIELDS = new Set([
 // Reachable addresses (email/phone/whatsapp/linkedin/instagram) live on
 // contact_channels, not on `contacts`, so they are not settable here; only
 // the row's own columns remain.
-export const CONTACT_FIELDS = new Set([
-	'name',
-	'role',
-	'isDecisionMaker',
-	'notes',
-])
+export const CONTACT_FIELDS = new Set(['name', 'role', 'isDecisionMaker'])
 
 const snakeToCamel = (s: string) =>
 	s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
@@ -345,7 +340,7 @@ const jsonOrNull = (value: unknown): string | null =>
 //   - provenance is MERGED, never replaced — a run that fills only the phone
 //     must not erase where an earlier run found the industry;
 //   - the brief is seeded while nobody has edited it and appended once somebody
-//     has, so research can extend a person's notes but never overwrite them.
+//     has, so research can extend the brief but never overwrite it.
 // Both decisions read the row as it is at write time, inside the same statement
 // that checks the version, so a concurrent edit cannot slip between the two.
 export const occUpdate = (
