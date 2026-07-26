@@ -1849,12 +1849,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						segments,
 					})
 
-					// Prior-run token tally carried across resumes
-					const priorTokensIn =
-						(run as { tokensIn?: number | null }).tokensIn ?? 0
-					const priorTokensOut =
-						(run as { tokensOut?: number | null }).tokensOut ?? 0
-
 					// ── Phase 1: LLM research pass ──
 					// Wall-clock epoch for the gap rounds' stop-with-margin check —
 					// aligned with the whole-run deadline, which starts with the run body.
@@ -1867,8 +1861,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// How many reflect-loop rounds phase 1 ran, for the run's quality
 					// signal; stays 0 on a resume that skips phase 1.
 					let runRounds = 0
-					let tokensIn = priorTokensIn
-					let tokensOut = priorTokensOut
 					// Full scraped page content gathered this run — the corpus the value
 					// guard checks findings against. Kept separate from the model-facing
 					// transcript (capped per page); empty on a resume that skips phase 1.
@@ -1901,7 +1893,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// Findings the discovery-scan retry path extracts under the shared
 					// budget; undefined on every other path (which extracts in phase 2).
 					let retryFindings: unknown
-					let retryExtractTokens = 0
 					// What the run's spending limit was charged for cheap work in phase 1,
 					// read off the budget once phase 1 ends. Feeds the gap rounds' check
 					// that there is still room for another one. Stays 0 on a resume that
@@ -1915,8 +1906,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 
 					// Phase-2 extraction + every grounding guard, shared so both the
 					// normal path and the discovery-scan retry run the same logic. Returns
-					// cleaned findings and the model's output tokens; the caller writes the
-					// single phase-2 checkpoint.
+					// the cleaned findings; the caller writes the single phase-2 checkpoint.
 					const extractStructuredFindings = (
 						transcript: string,
 						evidenceCorpus: string,
@@ -1986,7 +1976,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								}),
 							})
 							let result = withProposalIds(structuredResponse.value as unknown)
-							let rescueOutputTokens = 0
 							// Only company_enrichment fills a profile and runs the focused rescue
 							// passes below; the scan and freeform schemas have no profile to
 							// measure or recover.
@@ -2040,7 +2029,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									.pipe(
 										Effect.map(r => ({
 											contacts: (r.value as { contacts?: unknown }).contacts,
-											tokens: r.usage.outputTokens.total ?? 0,
 										})),
 										Effect.catchCause(cause =>
 											Cause.hasInterruptsOnly(cause)
@@ -2052,11 +2040,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 															research_id: researchId,
 															cause: Cause.pretty(cause),
 														}),
-														Effect.as({ contacts: undefined, tokens: 0 }),
+														Effect.as({ contacts: undefined }),
 													),
 										),
 									)
-								rescueOutputTokens += rescue.tokens
 								if (
 									Array.isArray(rescue.contacts) &&
 									rescue.contacts.length > 0
@@ -2099,13 +2086,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									.pipe(
 										Effect.map(r => ({
 											enrichment: r.value as unknown,
-											tokens: r.usage.outputTokens.total ?? 0,
 										})),
 										Effect.catchCause(() =>
-											Effect.succeed({ enrichment: undefined, tokens: 0 }),
+											Effect.succeed({ enrichment: undefined }),
 										),
 									)
-								rescueOutputTokens += fRescue.tokens
 								const fMerged = mergeFirmographics(result, fRescue.enrichment)
 								if (fMerged.filled > 0) {
 									result = fMerged.findings
@@ -2134,13 +2119,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									.pipe(
 										Effect.map(r => ({
 											enrichment: r.value as unknown,
-											tokens: r.usage.outputTokens.total ?? 0,
 										})),
 										Effect.catchCause(() =>
-											Effect.succeed({ enrichment: undefined, tokens: 0 }),
+											Effect.succeed({ enrichment: undefined }),
 										),
 									)
-								rescueOutputTokens += sRescue.tokens
 								const sMerged = mergeFirmographics(result, sRescue.enrichment)
 								if (sMerged.filled > 0) {
 									result = sMerged.findings
@@ -2659,13 +2642,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														.pipe(
 															Effect.map(response => ({
 																verdicts: response.value.verdicts,
-																outputTokens:
-																	response.usage.outputTokens.total ?? 0,
 															})),
 															Effect.catchCause(() =>
 																Effect.succeed({
 																	verdicts: [],
-																	outputTokens: 0,
 																}),
 															),
 														),
@@ -2680,10 +2660,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													}),
 												)
 											}
-											return {
-												findings: check.findings,
-												outputTokens: check.outputTokens,
-											}
+											return { findings: check.findings }
 										}),
 								},
 								{
@@ -2707,13 +2684,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														.pipe(
 															Effect.map(response => ({
 																verdicts: response.value.verdicts,
-																outputTokens:
-																	response.usage.outputTokens.total ?? 0,
 															})),
 															Effect.catchCause(() =>
 																Effect.succeed({
 																	verdicts: [],
-																	outputTokens: 0,
 																}),
 															),
 														),
@@ -2730,10 +2704,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													}),
 												)
 											}
-											return {
-												findings: check.findings,
-												outputTokens: check.outputTokens,
-											}
+											return { findings: check.findings }
 										}),
 								},
 								{
@@ -2834,10 +2805,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							}
 							return {
 								findings: result as unknown,
-								outputTokens:
-									(structuredResponse.usage.outputTokens.total ?? 0) +
-									rescueOutputTokens +
-									critics.outputTokens,
 								entityFieldsDropped,
 							}
 						}).pipe(
@@ -3278,11 +3245,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// pass and a refined retry run here, under the SAME budget + toolkit:
 							// re-providing the layer would build a fresh MemoMap and reset the
 							// per-run spend, letting one run silently pay twice.
-							const runPass = (
-								basePrompt: string,
-								carryTokensIn: number,
-								carryTokensOut: number,
-							) =>
+							const runPass = (basePrompt: string) =>
 								Effect.gen(function* () {
 									let prompt: Prompt.Prompt = Prompt.make(basePrompt)
 									const runRound = (round: number) =>
@@ -3407,7 +3370,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												renderedResults,
 												promptChars: JSON.stringify(response.content).length,
 												inputTokens: response.usage.inputTokens.total ?? 0,
-												outputTokens: response.usage.outputTokens.total ?? 0,
 											}
 										})
 									// When the model stops early without the evidence confirming the
@@ -3464,15 +3426,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										runRound,
 										shouldContinueAfterFinal,
 										budgetSnapshot: budget.snapshot(),
-										priorTokensIn: carryTokensIn,
-										priorTokensOut: carryTokensOut,
 									})
 								})
 
 							let loop = yield* runPass(
 								`${systemPrompt}\n\n${query}${anchorInstruction}`,
-								priorTokensIn,
-								priorTokensOut,
 							)
 
 							// A non-anchored discovery scan (prospect / competitor) that comes
@@ -3483,7 +3441,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// structured findings; the retry reuses this pass's budget.
 							let findings: unknown
 							let refined = false
-							let extractOutputTokens = 0
 							if (isRetryEligible(schemaName) && entityTargets === null) {
 								yield* linkRunSources(loop.scrapedUrlHashes)
 								let extracted = yield* extractStructuredFindings(
@@ -3495,7 +3452,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									scrapeCorpus.map(page => page.text),
 								)
 								findings = extracted.findings
-								extractOutputTokens += extracted.outputTokens
 								if (
 									isDiscoveryScanEmpty(schemaName, findings) &&
 									canAffordAnotherRound(yield* budget.snapshot())
@@ -3512,8 +3468,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									})
 									const retryLoop = yield* runPass(
 										`${systemPrompt}\n\n${query}\n\n${REFINE_HINT}`,
-										0,
-										0,
 									)
 									loop = {
 										researchText: [loop.researchText, retryLoop.researchText]
@@ -3528,8 +3482,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												...retryLoop.scrapedUrlHashes,
 											]),
 										],
-										tokensIn: loop.tokensIn + retryLoop.tokensIn,
-										tokensOut: loop.tokensOut + retryLoop.tokensOut,
 										rounds: loop.rounds + retryLoop.rounds,
 										stopReason: retryLoop.stopReason,
 									}
@@ -3543,7 +3495,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										scrapeCorpus.map(page => page.text),
 									)
 									findings = extracted.findings
-									extractOutputTokens += extracted.outputTokens
 								}
 							}
 
@@ -3554,7 +3505,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								loop,
 								findings,
 								refined,
-								extractOutputTokens,
 								cheapCents,
 							}
 						}).pipe(
@@ -3582,10 +3532,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							.filter(part => part.length > 0)
 							.join('\n\n')
 						evidenceText = loopResult.evidenceText
-						tokensIn = loopResult.tokensIn
-						tokensOut = loopResult.tokensOut
 						retryFindings = phaseOutcome.findings
-						retryExtractTokens = phaseOutcome.extractOutputTokens
 						cheapSpentCents = phaseOutcome.cheapCents
 
 						// Entity grounding gate: from the fetched evidence alone (never the
@@ -3678,9 +3625,8 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					} else {
 						if (retryFindings !== undefined) {
 							// The discovery-scan retry path already ran extraction under the
-							// shared budget — reuse those findings and their token cost.
+							// shared budget — reuse those findings.
 							findings = retryFindings
-							tokensOut += retryExtractTokens
 						} else {
 							// Fill the phase-2 page budget with the company's own
 							// (anchor-seeded) pages first, so if the budget truncates it drops
@@ -3701,7 +3647,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								labelledGroundedPages(entityTargets, anchorFirstCorpus),
 							)
 							findings = extracted.findings
-							tokensOut += extracted.outputTokens
 							// A company field dropped for coming from a person page or a social
 							// post means the strong whole-corpus match was partly built on a
 							// source that can't speak for the company. Downgrade the verdict so
@@ -3924,7 +3869,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									].join('\n'),
 									labelledGroundedPages(entityTargets, perFieldAnchorFirst),
 								)
-								tokensOut += refreshed.outputTokens
 								const merged = mergePerFieldSearch(findings, refreshed.findings)
 								findings = merged.findings
 								yield* Effect.annotateCurrentSpan({
@@ -4032,8 +3976,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						const briefResponse = yield* writerLlm.generateText({
 							prompt: `Write a concise human-readable research brief in ${briefLang}, summarizing ONLY the structured findings below. Begin with a single markdown heading line (starting "## ") naming the company and the date ${briefDate}, worded in ${briefLang}. Do not add any fact, number, name, or contact detail that is not present in the findings. When the findings carry news or dated events, give recent developments (roughly the last 12 months) a short section of their own.\n\n${JSON.stringify(findings)}`,
 						})
-
-						tokensOut += briefResponse.usage.outputTokens.total ?? 0
 
 						// The writer model is an open-weights model that often prefixes the
 						// brief with a `<think>` block; strip it so the human-facing brief
@@ -4230,9 +4172,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						yield* mergeToParent(parentId, findings)
 					}
 
+					const finalUsage = yield* meter.snapshot()
 					yield* publishEvent(researchId, 'run.succeeded', {
-						tokensIn,
-						tokensOut,
+						tokensIn: finalUsage.tokensIn,
+						tokensOut: finalUsage.tokensOut,
 					})
 				}).pipe(
 					// One span covering the whole run, so every phase/tool span nests

@@ -93,26 +93,6 @@ describe('runGuardChain', () => {
 			}).pipe(Effect.runPromise))
 	})
 
-	describe('when some links spend model tokens', () => {
-		it('should sum only what was reported, treating the rest as free', () =>
-			Effect.gen(function* () {
-				// GIVEN one silent link and two that report a spend
-				const spending = (outputTokens: number): GuardLink => ({
-					name: `critic-${outputTokens}`,
-					run: findings => Effect.succeed({ findings, outputTokens }),
-				})
-
-				// WHEN the chain runs
-				const result = yield* runGuardChain(
-					[appending('free'), spending(120), spending(30)],
-					[],
-				)
-
-				// THEN the total covers the reporting links only
-				expect(result.outputTokens).toBe(150)
-			}).pipe(Effect.runPromise))
-	})
-
 	describe('when the chain is empty', () => {
 		it('should hand back the findings untouched, with nothing reported', () =>
 			Effect.gen(function* () {
@@ -125,7 +105,6 @@ describe('runGuardChain', () => {
 				// THEN the findings pass straight through
 				expect(result.findings).toBe(findings)
 				expect(result.spanCounts).toEqual({})
-				expect(result.outputTokens).toBe(0)
 			}).pipe(Effect.runPromise))
 	})
 })

@@ -30,8 +30,12 @@ export interface LoopRound {
 	readonly renderedResults: ReadonlyArray<string>
 	/** How much this round adds to the running prompt, to bound context growth. */
 	readonly promptChars: number
+	/**
+	 * How big the whole prompt is this round, as the provider counted it: the
+	 * size reached so far, not just what this round added. 0 when the provider
+	 * reports no usage.
+	 */
 	readonly inputTokens: number
-	readonly outputTokens: number
 }
 
 export type LoopStopReason = 'model-final' | 'step-cap' | 'budget' | 'context'
@@ -46,8 +50,6 @@ export interface AgentLoopResult {
 	 */
 	readonly evidenceText: string
 	readonly scrapedUrlHashes: ReadonlyArray<string>
-	readonly tokensIn: number
-	readonly tokensOut: number
 	readonly rounds: number
 	readonly stopReason: LoopStopReason
 }
@@ -86,10 +88,8 @@ export interface RunAgentResearchLoopParams<E, R> {
 	readonly shouldContinueAfterFinal?:
 		| (() => Effect.Effect<boolean, E, R>)
 		| undefined
-	/** Carried across a resume so token totals and text survive a restart. */
+	/** Carried across a resume so the transcript survives a restart. */
 	readonly priorText?: string | undefined
-	readonly priorTokensIn?: number | undefined
-	readonly priorTokensOut?: number | undefined
 }
 
 // A failing round (e.g. the model provider erroring after its retries) is not
@@ -105,8 +105,6 @@ export const runAgentResearchLoop = <E, R>(
 		// evidence can't be poisoned by a value the model merely asserted.
 		const evidenceParts: string[] = []
 		const urlHashes = new Set<string>()
-		let tokensIn = params.priorTokensIn ?? 0
-		let tokensOut = params.priorTokensOut ?? 0
 		let round = 0
 		let totalPromptChars = 0
 		let stopReason: LoopStopReason = 'model-final'
@@ -114,8 +112,6 @@ export const runAgentResearchLoop = <E, R>(
 		while (true) {
 			round++
 			const result = yield* params.runRound(round)
-			tokensIn += result.inputTokens
-			tokensOut += result.outputTokens
 			totalPromptChars += result.promptChars
 			if (result.text.length > 0) transcript.push(result.text)
 			for (const rendered of result.renderedResults) {
@@ -177,8 +173,6 @@ export const runAgentResearchLoop = <E, R>(
 			researchText: stripReasoning(transcript.join('\n\n')),
 			evidenceText: evidenceParts.join('\n\n'),
 			scrapedUrlHashes: Array.from(urlHashes),
-			tokensIn,
-			tokensOut,
 			rounds: round,
 			stopReason,
 		}

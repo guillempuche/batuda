@@ -42,7 +42,6 @@ export interface ContactVerdict {
 
 export interface ContactJudgeResult {
 	readonly verdicts: ReadonlyArray<ContactVerdict>
-	readonly outputTokens: number
 }
 
 // The injected model-backed check: rules on a batch of contacts in one call.
@@ -56,7 +55,6 @@ export interface ContactCritiqueResult {
 	readonly criticised: number
 	/** Contacts the judge clearly ruled outsiders and this dropped. */
 	readonly dropped: number
-	readonly outputTokens: number
 }
 
 export interface ContactCriticTarget {
@@ -170,9 +168,9 @@ export const critiqueContactEntities = <E, R>(
 		// No named, quoted contacts (a scan/freeform schema, or people the guards
 		// already stripped) → don't spend a model call.
 		if (claims.length === 0) {
-			return { findings, criticised: 0, dropped: 0, outputTokens: 0 }
+			return { findings, criticised: 0, dropped: 0 }
 		}
-		const { verdicts, outputTokens } = yield* judge(claims)
+		const { verdicts } = yield* judge(claims)
 		const { findings: applied, dropped } = applyContactVerdicts(
 			findings,
 			verdicts,
@@ -181,7 +179,6 @@ export const critiqueContactEntities = <E, R>(
 			findings: applied,
 			criticised: claims.length,
 			dropped,
-			outputTokens,
 		}
 	})
 
