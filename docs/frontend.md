@@ -39,7 +39,7 @@ Same `moduleResolution: bundler` as the server — no `.js` in imports, `import 
 `apps/internal/vite.config.ts` — Vite with TanStack Start:
 
 - `tanstackStart()` from `@tanstack/react-start/plugin/vite` — SSR framework
-- `nitro()` from `nitro/vite` — server framework underlying TanStack Start. Dev-only `/auth/*` and `/v1/*` HTTPS proxy rules live in `nitro({ routeRules })` (NOT Vite's `server.proxy`; Nitro's pre-middleware short-circuits document requests before Vite's proxy runs).
+- `cloudflare()` from `@cloudflare/vite-plugin` — builds and serves the app on Workers. Dev-only `/auth/*`, `/v1/*`, `/openapi.json` and `/docs` proxy rules live in Vite's `server.proxy`, mirroring the forwarding that `src/worker.ts` performs in production so dev parity holds.
 - `tailwindcss()` from `@tailwindcss/vite` — Tailwind v4 Vite plugin
 - `viteReact()` with `@swc/plugin-styled-components` (stable `componentId` for SSR ↔ CSR matching) and `@lingui/swc-plugin` (compiles macros)
 - `lingui()` plugin for catalog handling

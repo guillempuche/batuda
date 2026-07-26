@@ -636,10 +636,19 @@ message_participants — flat index of From/To/Cc/Bcc per message
 
 All email tables enable RLS with policy `organization_id = current_setting('app.current_org_id')`. `message_participants` uses a subquery policy via its joined `email_messages` row.
 
-Relations: see `PLAN.md` § Entity relationships summary.
+Relations across the CRM tables:
 
 ```
+companies ──< contacts
+companies ──< interactions >── contacts
+companies ──< tasks        >── contacts
+companies ──< proposals    >── contacts
+companies ──< documents    >── interactions
 companies ──< pages (nullable — generic pages have no company)
+webhook_endpoints (standalone)
+api_keys (standalone)
+products (standalone, referenced by proposals.line_items jsonb)
+
 pages: UNIQUE(slug, lang) — each language version is a separate row
 ```
 
