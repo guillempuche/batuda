@@ -8,15 +8,17 @@ import { randomUUID } from 'node:crypto'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-// SQL-contract test for the documents INSERT that
+// SQL-contract test for the pair of writes that
 // `apps/server/src/handlers/documents.ts` and
-// `apps/server/src/mcp/tools/documents.ts` both run from their create
-// paths. Mirrors the post-fix shape (organization_id stamped from
-// CurrentOrg) using raw `pg` with `app.current_org_id` set on the
-// session, so the org_isolation_documents RLS policy engages exactly
-// as it does at runtime. Also pins the pre-fix shape as a failure
-// case so a future hand-edit that drops the column from the INSERT
-// immediately fails the suite.
+// `apps/server/src/mcp/tools/documents.ts` both run when a document is
+// created: the row itself, then the link saying which record it is filed
+// under. Uses raw `pg` with `app.current_org_id` set on the session, so the
+// org_isolation_documents and org_isolation_document_links policies engage
+// exactly as they do at runtime.
+//
+// Two failure shapes are pinned alongside the passing one, because both are
+// silent if the guard ever goes: an INSERT that forgets organization_id, and
+// a link that claims to belong to another organisation.
 //
 // Prereq: `pnpm cli services up` so Postgres is reachable.
 
@@ -24,7 +26,7 @@ const DATABASE_URL =
 	process.env['DATABASE_URL'] ??
 	'postgresql://batuda:batuda@localhost:5433/batuda'
 
-describe('documents INSERT — RLS contract', () => {
+describe('documents create — RLS contract', () => {
 	let pool: pg.Pool
 	let orgId: string
 	const seededDocumentIds: string[] = []
@@ -49,6 +51,7 @@ describe('documents INSERT — RLS contract', () => {
 
 	afterAll(async () => {
 		for (const id of seededDocumentIds) {
+			// The link goes with the document through its foreign key.
 			await pool.query(`DELETE FROM documents WHERE id = $1::uuid`, [id])
 		}
 		for (const id of seededCompanyIds) {
@@ -90,69 +93,130 @@ describe('documents INSERT — RLS contract', () => {
 		return id
 	}
 
-	describe('when the create INSERT includes organization_id', () => {
-		it('should pass the org_isolation_documents WITH CHECK clause as app_user', async () => {
+	describe('when a document and its first filing are written together', () => {
+		it('should store both and report where the document is filed', async () => {
 			// GIVEN app.current_org_id = taller.id and SET ROLE app_user
-			// WHEN INSERT INTO documents runs with organization_id=taller.id
-			//      (mirrors handlers/documents.ts + tools/documents.ts post-fix shape)
-			// THEN the policy approves the row
-			// [handlers/documents.ts + tools/documents.ts — create handler INSERT shape]
+			// WHEN the create path inserts the document then its link
+			// THEN both policies approve, and the document is reachable through
+			//      the record it was filed under — which is the only way a
+			//      document is found now that it carries no company column
 			const id = randomUUID()
 			seededDocumentIds.push(id)
 
-			const inserted = await withOrgScope(async client => {
+			const filed = await withOrgScope(async client => {
 				const companyId = await seedCompany(client)
+				await client.query(
+					`INSERT INTO documents (id, organization_id, type, content)
+					 VALUES ($1::uuid, $2, 'general', 'Test content')`,
+					[id, orgId],
+				)
+				await client.query(
+					`INSERT INTO document_links (organization_id, document_id, subject_table, subject_id)
+					 VALUES ($1, $2::uuid, 'companies', $3::uuid)`,
+					[orgId, id, companyId],
+				)
 				const result = await client.query<{
 					id: string
-					organization_id: string
 					type: string
+					subject_table: string
+					subject_id: string
 				}>(
-					`INSERT INTO documents (
-						id,
-						organization_id,
-						company_id, type, content
-					) VALUES (
-						$1::uuid,
-						$2,
-						$3::uuid, 'note', 'Test content'
-					)
-					RETURNING id, organization_id, type`,
-					[id, orgId, companyId],
+					`SELECT d.id, d.type, dl.subject_table, dl.subject_id
+					 FROM documents d
+					 JOIN document_links dl ON dl.document_id = d.id
+					 WHERE d.id = $1::uuid`,
+					[id],
 				)
-				return result.rows[0]
+				return { row: result.rows[0], companyId }
 			})
 
-			expect(inserted?.id).toBe(id)
-			expect(inserted?.organization_id).toBe(orgId)
-			expect(inserted?.type).toBe('note')
+			expect(filed.row?.id).toBe(id)
+			expect(filed.row?.type).toBe('general')
+			expect(filed.row?.subject_table).toBe('companies')
+			expect(filed.row?.subject_id).toBe(filed.companyId)
+		})
+
+		it('should refuse a second filing of the same pair without failing', async () => {
+			// GIVEN a document already filed against a company
+			// WHEN the same pair is written again, as re-filing does
+			// THEN the primary key absorbs it: one link, no error
+			const id = randomUUID()
+			seededDocumentIds.push(id)
+
+			const count = await withOrgScope(async client => {
+				const companyId = await seedCompany(client)
+				await client.query(
+					`INSERT INTO documents (id, organization_id, type, content)
+					 VALUES ($1::uuid, $2, 'general', 'Test content')`,
+					[id, orgId],
+				)
+				for (let attempt = 0; attempt < 2; attempt += 1) {
+					await client.query(
+						`INSERT INTO document_links (organization_id, document_id, subject_table, subject_id)
+						 VALUES ($1, $2::uuid, 'companies', $3::uuid)
+						 ON CONFLICT DO NOTHING`,
+						[orgId, id, companyId],
+					)
+				}
+				const result = await client.query<{ count: string }>(
+					`SELECT count(*)::text AS count FROM document_links WHERE document_id = $1::uuid`,
+					[id],
+				)
+				return result.rows[0]?.count
+			})
+
+			expect(count).toBe('1')
 		})
 	})
 
-	describe('when the INSERT omits organization_id (the pre-fix shape)', () => {
+	describe('when the document INSERT omits organization_id', () => {
 		it('should fail because the column is NOT NULL', async () => {
-			// GIVEN the pre-fix INSERT — no organization_id column in the list
+			// GIVEN an INSERT with no organization_id column in the list
 			// WHEN it runs as app_user with app.current_org_id set
-			// THEN the INSERT fails because organization_id is NOT NULL with no default
-			// [handlers/documents.ts + tools/documents.ts (pre-fix) — INSERT omitted org_id]
+			// THEN it fails: the column is NOT NULL with no default, so a row
+			//      that no policy could ever match never lands
 			const id = randomUUID()
 
 			await expect(
 				withOrgScope(async client => {
-					const companyId = await seedCompany(client)
 					await client.query(
-						`INSERT INTO documents (
-							id,
-							company_id, type, content
-						) VALUES (
-							$1::uuid,
-							$2::uuid, 'note', 'Bug Repro'
-						)`,
-						[id, companyId],
+						`INSERT INTO documents (id, type, content)
+						 VALUES ($1::uuid, 'general', 'Bug Repro')`,
+						[id],
 					)
 				}),
 			).rejects.toThrow(
 				/null value in column "organization_id"|row.level security/i,
 			)
+		})
+	})
+
+	describe('when a filing claims to belong to another organisation', () => {
+		it('should be refused by the link policy', async () => {
+			// GIVEN a document in this organisation
+			// WHEN a link is written carrying somebody else's organisation id —
+			//      the shape a bug or a crafted call would produce, since
+			//      subject_id has no foreign key to vouch for it
+			// THEN the WITH CHECK clause rejects it, so the link table cannot
+			//      become a way to reach across organisations
+			const id = randomUUID()
+			seededDocumentIds.push(id)
+
+			await expect(
+				withOrgScope(async client => {
+					const companyId = await seedCompany(client)
+					await client.query(
+						`INSERT INTO documents (id, organization_id, type, content)
+						 VALUES ($1::uuid, $2, 'general', 'Test content')`,
+						[id, orgId],
+					)
+					await client.query(
+						`INSERT INTO document_links (organization_id, document_id, subject_table, subject_id)
+						 VALUES ($1, $2::uuid, 'companies', $3::uuid)`,
+						['some-other-org', id, companyId],
+					)
+				}),
+			).rejects.toThrow(/row.level security/i)
 		})
 	})
 })

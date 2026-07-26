@@ -26,7 +26,15 @@ export {
 	EmailStatus,
 } from './contact-channels'
 export { Contact, ContactId } from './contacts'
-export { Document, DocumentId } from './documents'
+export {
+	DOCUMENT_FORMATS,
+	DOCUMENT_TYPES,
+	Document,
+	DocumentFormat,
+	DocumentId,
+	DocumentSubject,
+	DocumentType,
+} from './documents'
 export { EmailDraft, EmailDraftId } from './email-drafts'
 export {
 	EmailDirection,
@@ -62,6 +70,12 @@ export {
 	SUCCEEDED_RESEARCH_STATUSES,
 	TERMINAL_RESEARCH_STATUSES,
 } from './research-runs'
+export {
+	DOCUMENT_SUBJECT_TABLES,
+	DocumentSubjectTable,
+	RESEARCH_SUBJECT_TABLES,
+	ResearchSubjectTable,
+} from './subject-tables'
 export { TaskActorKind, TaskEvent, TaskEventId } from './task-events'
 export {
 	Task,

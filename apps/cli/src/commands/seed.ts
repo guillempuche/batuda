@@ -107,7 +107,7 @@ export const seed = (preset: Preset) =>
 				yield* seedMcpOAuth(ctx)
 
 				if (preset === 'full') {
-					yield* seedDocuments(ctx, companyMap, insertedInteractions)
+					yield* seedDocuments(ctx, companyMap, contactMap)
 					yield* seedProposals(ctx, companyMap, contactMap, insertedProducts)
 					yield* seedPages(ctx, companyMap)
 					yield* seedResearchRuns(ctx, testUser, companyMap)
