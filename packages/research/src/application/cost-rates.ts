@@ -9,6 +9,14 @@
  *
  * Amounts are carried in millionths of a cent: one call can be worth a few
  * thousandths of a cent, which whole cents would record as nothing at all.
+ *
+ * A rate is only ever as good as the figure someone put in. The Groq, Brave and
+ * Firecrawl rates in production were read off those vendors' own published
+ * prices; the two Nebius Token Factory rates and the Fireworks one are informed
+ * estimates, because neither vendor states a per-model price where it could be
+ * read directly. Treat a cost that looks surprising as a question about the rate
+ * before it is treated as a question about the run — and correct the rate at its
+ * source, since nothing here can tell a good figure from a bad one.
  */
 
 const MICROCENTS_PER_CENT = 1_000_000
