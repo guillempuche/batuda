@@ -1,13 +1,15 @@
 import { Effect } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 
-import { BatudaApi, SessionContext } from '@batuda/controllers'
+import { BatudaApi, CurrentOrg, SessionContext } from '@batuda/controllers'
 
 import { McpOAuthService } from '../services/mcp-oauth'
 
 // Org binding for the caller's OAuth MCP connections. Session-auth'd (any
-// signed-in user); McpOAuthService validates membership and writes through
-// Better Auth's owner pool, so no request-scoped app_user touches the table.
+// signed-in user) and McpOAuthService validates membership on every write.
+// Choosing orgs writes through Better Auth's owner pool; revoking writes on
+// the request connection instead, so the database can check it against the
+// organization the request is already acting in.
 export const McpOAuthLive = HttpApiBuilder.group(
 	BatudaApi,
 	'mcpOAuth',
@@ -29,6 +31,30 @@ export const McpOAuthLive = HttpApiBuilder.group(
 					Effect.gen(function* () {
 						const { userId } = yield* SessionContext
 						return yield* service.listConnections(userId)
+					}),
+				)
+				.handle('revokeConnection', _ =>
+					Effect.gen(function* () {
+						const org = yield* CurrentOrg
+						const { userId } = yield* SessionContext
+						// Omitting `userId` means "my own connection"; the org always
+						// comes from the session's active organization, never the body.
+						const targetUserId = _.payload.userId ?? userId
+						yield* service.revokeConnection(
+							org.id,
+							userId,
+							targetUserId,
+							_.payload.clientId,
+						)
+						yield* Effect.logInfo('MCP connection revoked').pipe(
+							Effect.annotateLogs({
+								event: 'mcp.connection.revoked',
+								orgId: org.id,
+								actorUserId: userId,
+								targetUserId,
+								clientId: _.payload.clientId,
+							}),
+						)
 					}),
 				)
 		}),

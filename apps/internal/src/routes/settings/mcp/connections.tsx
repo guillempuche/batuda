@@ -20,9 +20,9 @@ import {
 /**
  * The AI assistants (ChatGPT, Claude.ai, …) a member has connected over MCP.
  * Each connection may act in one or more organizations. Single-org users have
- * their lone org auto-bound at consent time. Multi-org users pick one or more
- * at consent time and can revise here; per-request org selection happens via
- * the X-Batuda-Organization-Id header the MCP client sends.
+ * their lone org auto-bound at consent time; multi-org users pick one or more
+ * there. This page only takes access away again; per-request org selection
+ * happens via the X-Batuda-Organization-Id header the MCP client sends.
  */
 
 type Connection = {
@@ -72,8 +72,8 @@ function ConnectionsPage() {
 
 	const listResult = useAtomValue(connectionsAtom)
 	const refreshList = useAtomRefresh(connectionsAtom)
-	const selectOrgs = useAtomSet(
-		BatudaApiAtom.mutation('mcpOAuth', 'selectOrgs'),
+	const revokeConnection = useAtomSet(
+		BatudaApiAtom.mutation('mcpOAuth', 'revokeConnection'),
 		{
 			mode: 'promiseExit',
 		},
@@ -86,9 +86,15 @@ function ConnectionsPage() {
 		return map
 	}, [orgs.data])
 
-	// The connection currently being saved, so its remove button can disable
-	// until the save finishes and a second remove can't race it.
-	const [savingId, setSavingId] = useState<string | null>(null)
+	// Cutting a connection off is recorded against the organization you are
+	// currently working in, so only that organization's chip offers it. The
+	// others are shown for context — switch organization to manage them.
+	const activeOrg = authClient.useActiveOrganization()
+	const activeOrgId = activeOrg.data?.id ?? null
+
+	// The connection currently being revoked, so its button can disable until
+	// the call finishes and a second click can't race it.
+	const [revokingId, setRevokingId] = useState<string | null>(null)
 
 	const rows = useMemo<ReadonlyArray<Connection>>(
 		() =>
@@ -100,41 +106,34 @@ function ConnectionsPage() {
 	const isLoading = AsyncResult.isInitial(listResult)
 	const isFailure = AsyncResult.isFailure(listResult)
 
-	// Remove a single org from a connection's authorized set. Saves the
-	// remaining orgs (empty = unbind entirely). No-op on the last org is
-	// allowed — an unbound connection still works for single-org users via
-	// auto-resolution; for multi-org users the /mcp path will reject until
-	// they re-bind. Toast explains the per-request hint.
-	const handleRemoveOrg = async (
-		clientId: string,
-		organizationId: string,
-		currentOrgIds: ReadonlyArray<string>,
-	) => {
-		setSavingId(`${clientId}:${organizationId}`)
+	// Cut this connection off from the organization being worked in. Which
+	// organization that is comes from the session, never from here — which is
+	// also why only the active organization's chip offers the button. The
+	// assistant stops reaching this organization's data on its very next
+	// request; if the same assistant is connected to another organization, it
+	// keeps working there.
+	const handleRevoke = async (clientId: string) => {
+		setRevokingId(clientId)
 		try {
-			const next = currentOrgIds.filter(id => id !== organizationId)
-			const exit = await selectOrgs({
-				payload: { clientId, organizationIds: next },
+			const exit = await revokeConnection({
+				payload: { clientId },
 			} as never)
 			if (exit._tag === 'Success') {
 				toastManager.add({
-					title: t`Organization removed`,
-					description:
-						next.length === 0
-							? t`This connection is unbound. Bind an org to use it.`
-							: t`Send X-Batuda-Organization-Id with each request to pick.`,
+					title: t`Connection revoked`,
+					description: t`This assistant can no longer reach this organization.`,
 					type: 'success',
 				})
 				refreshList()
 				return
 			}
 			toastManager.add({
-				title: t`Could not update`,
-				description: t`You may not be a member of that organization. Try again.`,
+				title: t`Could not revoke`,
+				description: t`Something went wrong. Try again.`,
 				type: 'error',
 			})
 		} finally {
-			setSavingId(null)
+			setRevokingId(null)
 		}
 	}
 
@@ -218,22 +217,20 @@ function ConnectionsPage() {
 													<OrgChipName>
 														{orgNameById.get(orgId) ?? orgId}
 													</OrgChipName>
-													<PriButton
-														type='button'
-														$variant='text'
-														aria-label={t`Remove ${orgNameById.get(orgId) ?? orgId}`}
-														data-testid='mcp-connection-org-remove'
-														disabled={savingId === `${row.clientId}:${orgId}`}
-														onClick={() => {
-															void handleRemoveOrg(
-																row.clientId,
-																orgId,
-																row.organizationIds,
-															)
-														}}
-													>
-														<X size={12} aria-hidden />
-													</PriButton>
+													{orgId === activeOrgId ? (
+														<PriButton
+															type='button'
+															$variant='text'
+															aria-label={t`Revoke ${orgNameById.get(orgId) ?? orgId}`}
+															data-testid='mcp-connection-org-revoke'
+															disabled={revokingId === row.clientId}
+															onClick={() => {
+																void handleRevoke(row.clientId)
+															}}
+														>
+															<X size={12} aria-hidden />
+														</PriButton>
+													) : null}
 												</OrgChip>
 											))}
 										</OrgChips>

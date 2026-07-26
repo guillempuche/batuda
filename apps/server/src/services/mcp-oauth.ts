@@ -1,9 +1,14 @@
 import { Context, Effect, Layer } from 'effect'
+import { SqlClient } from 'effect/unstable/sql'
 import type { PoolClient } from 'pg'
 
-import { Forbidden } from '@batuda/controllers'
+import { BadRequest, Forbidden, NotFound } from '@batuda/controllers'
 
 import { Auth } from '../lib/auth'
+
+// Who may cut off someone else's assistant. An owner or an admin acts for the
+// whole organization; everyone else may only manage their own connections.
+const MANAGING_ROLES: ReadonlySet<string> = new Set(['owner', 'admin'])
 
 // A user's MCP OAuth connection: an OAuth client they've consented to, the
 // orgs its access tokens may act in (empty until chosen), and the host of
@@ -53,6 +58,10 @@ export class McpOAuthService extends Context.Service<McpOAuthService>()(
 	{
 		make: Effect.gen(function* () {
 			const auth = yield* Auth
+			// Revoking runs on the ordinary request connection, not the owner
+			// pool: it needs the active organization the request already set, so
+			// the database itself can refuse a write aimed at a different one.
+			const sql = yield* SqlClient.SqlClient
 
 			// Run `fn` in one transaction on the owner pool, scoped to the
 			// app_mcp_resolver role with this user's id in `app.current_user_id`.
@@ -88,31 +97,33 @@ export class McpOAuthService extends Context.Service<McpOAuthService>()(
 				}).pipe(Effect.orDie)
 
 			return {
-				// Set the set of organizations a connection may act in. The full
-				// target list is applied atomically: rows for orgs in the list are
-				// upserted, rows for orgs not in the list are deleted. Every org in
-				// the list must be a live membership — a single missing one rejects
-				// the whole call and writes nothing, so a partial submission can't
-				// widen what the connection can later reach. The /mcp path re-checks
-				// membership too, so a later departure can't be exploited even if a
-				// stale row lingers.
+				// Record the organizations a connection may act in, as chosen when
+				// the assistant is approved. The full target list is applied
+				// atomically: rows for orgs in the list are upserted, rows for orgs
+				// not in the list are deleted. Every org in the list must be a live
+				// membership — a single missing one rejects the whole call and
+				// writes nothing, so a partial submission can't widen what the
+				// connection can later reach. The /mcp path re-checks membership
+				// too, so a later departure can't be exploited even if a stale row
+				// lingers.
+				//
+				// Taking an organization away is NOT done here — see
+				// `revokeConnection`. This call only ever grants.
 				selectOrgs: (
 					userId: string,
 					clientId: string,
 					organizationIds: ReadonlyArray<string>,
-				): Effect.Effect<void, Forbidden> =>
+				): Effect.Effect<void, Forbidden | BadRequest> =>
 					Effect.gen(function* () {
-						// An empty list is a valid "unbind everything" — no membership
-						// check needed, just delete the caller's rows for this client.
+						// An empty list is a mistake, not a way to remove access: no
+						// chosen org reads as "nobody has chosen yet", which grants
+						// every org the person belongs to. Taking access away is
+						// `revokeConnection`.
 						if (organizationIds.length === 0) {
-							yield* withResolverTx(userId, async client => {
-								await client.query(
-									`DELETE FROM mcp_oauth_org_membership
-									 WHERE user_id = $1 AND client_id = $2`,
-									[userId, clientId],
-								)
+							return yield* new BadRequest({
+								message:
+									'Select at least one organization; use revoke to remove access.',
 							})
-							return
 						}
 						const ok = yield* withResolverTx(userId, async client => {
 							// Verify membership for every requested org in one read.
@@ -146,12 +157,81 @@ export class McpOAuthService extends Context.Service<McpOAuthService>()(
 								   AND organization_id <> ALL($3::text[])`,
 								[userId, clientId, organizationIds as string[]],
 							)
+							// Approving the connection for an org again lifts a block
+							// this same person placed on it. A block placed by an owner
+							// is left alone, so nobody can re-admit themselves to an org
+							// they were removed from.
+							await client.query(
+								`DELETE FROM mcp_oauth_revocation
+								 WHERE user_id = $1 AND client_id = $2
+								   AND organization_id = ANY($3::text[])
+								   AND revoked_by_user_id = $1`,
+								[userId, clientId, organizationIds as string[]],
+							)
 							return true
 						})
 						if (!ok)
 							return yield* new Forbidden({
 								message: 'Not a member of every requested organization',
 							})
+					}),
+
+				// Cut a connection off from one organization. Everyone may do this
+				// to their own connections; only an owner or an admin may do it to
+				// someone else's, and only within the organization the request is
+				// already acting in.
+				//
+				// This records a block rather than deleting the person's choice, and
+				// the /mcp path reads blocks alongside choices on every call, so the
+				// connection is stopped from its very next request. Nothing has to
+				// expire or be called back for it to take effect.
+				revokeConnection: (
+					orgId: string,
+					actorUserId: string,
+					targetUserId: string,
+					clientId: string,
+				): Effect.Effect<void, Forbidden | NotFound> =>
+					Effect.gen(function* () {
+						if (targetUserId !== actorUserId) {
+							// The active organization already confines `member`, so the
+							// user id alone identifies the row. A missing row means the
+							// actor isn't in this org at all, which fails the same way as
+							// the wrong role.
+							const actor = yield* sql<{ role: string | null }>`
+								SELECT role FROM member WHERE "userId" = ${actorUserId} LIMIT 1
+							`.pipe(Effect.orDie)
+							const role = actor[0]?.role ?? null
+							if (role === null || !MANAGING_ROLES.has(role)) {
+								return yield* new Forbidden({
+									message:
+										'Only an owner or an admin can revoke another member’s connection.',
+								})
+							}
+						}
+
+						// The person whose connection this is must belong to the
+						// organization being revoked from, or there is nothing here to
+						// cut off.
+						const target = yield* sql<{ userId: string }>`
+							SELECT "userId" FROM member WHERE "userId" = ${targetUserId} LIMIT 1
+						`.pipe(Effect.orDie)
+						if (target.length === 0) {
+							return yield* new NotFound({
+								entity: 'mcpConnection',
+								id: clientId,
+							})
+						}
+
+						// Re-revoking is not an error — it refreshes who cut it off and
+						// when, which is what an owner overriding a member's own block
+						// should do.
+						yield* sql`
+							INSERT INTO mcp_oauth_revocation
+								(user_id, client_id, organization_id, revoked_at, revoked_by_user_id)
+							VALUES (${targetUserId}, ${clientId}, ${orgId}, now(), ${actorUserId})
+							ON CONFLICT (user_id, client_id, organization_id)
+							DO UPDATE SET revoked_at = now(), revoked_by_user_id = ${actorUserId}
+						`.pipe(Effect.orDie)
 					}),
 
 				// The caller's connections: OAuth clients they've consented to,

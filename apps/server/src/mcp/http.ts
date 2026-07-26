@@ -296,24 +296,34 @@ const McpAuthMiddleware = HttpRouter.middleware(
 						// reads to this user even if a WHERE slips. enterUserScope
 						// returns plain values and commits before we enter org scope
 						// below — it must not nest inside enterScope.
-						const { orgIds, selectedOrgIds } = yield* enterUserScope(
-							sql,
-							userId,
-						)(
-							Effect.gen(function* () {
-								const memberships = yield* sql<{ organizationId: string }>`
+						const { orgIds, selectedOrgIds, revokedOrgIds } =
+							yield* enterUserScope(
+								sql,
+								userId,
+							)(
+								Effect.gen(function* () {
+									const memberships = yield* sql<{ organizationId: string }>`
 								SELECT "organizationId" FROM member WHERE "userId" = ${userId}
 							`
-								const selection = yield* sql<{ organizationId: string }>`
+									const selection = yield* sql<{ organizationId: string }>`
 								SELECT organization_id FROM mcp_oauth_org_membership
 								WHERE user_id = ${userId} AND client_id = ${clientId}
 							`
-								return {
-									orgIds: memberships.map(m => m.organizationId),
-									selectedOrgIds: selection.map(s => s.organizationId),
-								}
-							}),
-						)
+									// Orgs this connection has been cut off from. Read on every
+									// request, which is what makes cutting one off take effect
+									// immediately: the access token itself is self-contained
+									// and cannot be called back once handed out.
+									const revoked = yield* sql<{ organizationId: string }>`
+								SELECT organization_id FROM mcp_oauth_revocation
+								WHERE user_id = ${userId} AND client_id = ${clientId}
+							`
+									return {
+										orgIds: memberships.map(m => m.organizationId),
+										selectedOrgIds: selection.map(s => s.organizationId),
+										revokedOrgIds: revoked.map(r => r.organizationId),
+									}
+								}),
+							)
 						if (orgIds.length === 0) {
 							return yield* rejectAuth(
 								'token_user_no_org',
@@ -327,18 +337,26 @@ const McpAuthMiddleware = HttpRouter.middleware(
 						// The orgs this connection is explicitly authorized to act in,
 						// narrowed to live memberships: a stale row (user left the org)
 						// is dropped so the token can't reach an org the user no longer
-						// belongs to. An unbound connection (no selection rows at all)
-						// falls back to the user's live orgs — single-org users get
-						// auto-resolution without ever visiting the connections page.
-						// But a connection that HAS a selection where every row is stale
-						// is rejected, not widened: the user deliberately scoped this
-						// connection, and silently widening it to orgs they never chose
-						// would be a privilege escalation.
+						// belongs to. A connection nobody has touched yet falls back to
+						// the user's live orgs — single-org users get auto-resolution
+						// without ever visiting the connections page. But a connection
+						// that HAS a selection where every row is stale is rejected, not
+						// widened: the user deliberately scoped this connection, and
+						// silently widening it to orgs they never chose would be a
+						// privilege escalation.
+						//
+						// Untouched counts revocations too: a connection cut off from the
+						// last org it was allowed in must not read as one nobody has
+						// chosen for, or it would be handed every org the person belongs
+						// to — the exact opposite of what was asked for.
 						const liveSelectedOrgIds = selectedOrgIds.filter(id =>
 							orgIds.includes(id),
 						)
-						const isUnbound = selectedOrgIds.length === 0
-						const allowedOrgIds = isUnbound ? orgIds : liveSelectedOrgIds
+						const isUntouched =
+							selectedOrgIds.length === 0 && revokedOrgIds.length === 0
+						const allowedOrgIds = (
+							isUntouched ? orgIds : liveSelectedOrgIds
+						).filter(id => !revokedOrgIds.includes(id))
 						if (allowedOrgIds.length === 0) {
 							return yield* rejectAuth(
 								'no_authorized_org',
