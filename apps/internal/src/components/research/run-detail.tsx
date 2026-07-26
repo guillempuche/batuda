@@ -2,6 +2,7 @@ import { useAtomRefresh, useAtomValue } from '@effect/atom-react'
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
+import { Link } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { RefreshCw } from 'lucide-react'
 import type { ComponentType } from 'react'
@@ -19,6 +20,7 @@ import { PriButton } from '@batuda/ui/pri'
 
 import { researchDetailAtom } from '#/atoms/research-atoms'
 import { MarkdownView } from '#/components/markdown/markdown-view'
+import { Badge } from '#/components/research/badge'
 import { CompanyEnrichmentView } from '#/components/research/findings/company-enrichment-view'
 import { CompetitorScanView } from '#/components/research/findings/competitor-scan-view'
 import { ContactDiscoveryView } from '#/components/research/findings/contact-discovery-view'
@@ -27,6 +29,7 @@ import { ProspectScanView } from '#/components/research/findings/prospect-scan-v
 import { ResearchRunIdProvider } from '#/components/research/research-run-context'
 import { ProposedUpdatesReview } from '#/components/research/review/proposed-updates-review'
 import { RunActions } from '#/components/research/run-actions'
+import { statusLabel, statusTone } from '#/components/research/run-labels'
 import { RunProgress } from '#/components/research/run-progress'
 import { TargetCorrection } from '#/components/research/target-correction'
 import { ErrorState } from '#/components/shared/error-state'
@@ -59,11 +62,25 @@ const REASON_LABEL: Record<ReasonCode, MessageDescriptor> = {
 	internal_error: msg`Something went wrong while running this research.`,
 }
 
+/** One run in a batch, as listed on the batch that started it. */
+type ChildRun = {
+	readonly id: string
+	readonly query: string
+	readonly status: string
+}
+
 type ResearchRunDetail = {
 	readonly id: string
 	readonly query: string
 	readonly schemaName: string | null
 	readonly status: string
+	// A batch fans work out to one run per company; `children` are those runs.
+	readonly kind: string
+	readonly children: ReadonlyArray<ChildRun>
+	// How thorough the run was, and the instruction templates that shaped it,
+	// both carried so running it again repeats the same run.
+	readonly mode: string | null
+	readonly templateIds: ReadonlyArray<string>
 	readonly templateNames: readonly string[]
 	readonly briefMd: string | null
 	readonly findings: unknown
@@ -82,11 +99,18 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 	// an early return) knows whether the run is still in flight.
 	const run = AsyncResult.isSuccess(result) ? narrowRun(result.value) : null
 	const isRunning = run?.status === 'running' || run?.status === 'queued'
-	const { progress, failed, stalled } = useResearchEvents(researchId, {
-		enabled: isRunning,
+	// A batch hands its work to one run per company and does none itself, so it
+	// never reports progress. Listening to it returned nothing and then announced
+	// itself as stalled, on a page that showed no sign of the runs doing the work.
+	const isBatch = run?.kind === 'group'
+	const { progress, failed, stalled, retry } = useResearchEvents(researchId, {
+		enabled: isRunning && !isBatch,
 	})
 
-	if (AsyncResult.isInitial(result) || AsyncResult.isWaiting(result)) {
+	// Only a first load has nothing to show. Treating a refresh as "loading" threw
+	// the whole panel away and rebuilt it, which cut short the few seconds a
+	// reader has to take back a change they just approved.
+	if (AsyncResult.isInitial(result)) {
 		return (
 			<Panel data-testid='research-run-detail'>
 				<Loading>
@@ -142,11 +166,11 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 					<RunActions run={run} />
 				</Header>
 
-				{isRunning && !failed && !stalled ? (
+				{isRunning && !isBatch && !failed && !stalled ? (
 					<RunProgress progress={progress} />
 				) : null}
 
-				{isRunning && (failed || stalled) ? (
+				{isRunning && !isBatch && (failed || stalled) ? (
 					<StalledNotice role='status' data-testid='research-run-stalled'>
 						<span>
 							<Trans>
@@ -158,7 +182,10 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 							type='button'
 							$variant='outlined'
 							data-testid='research-run-refresh'
-							onClick={() => refreshRun()}
+							onClick={() => {
+								retry()
+								refreshRun()
+							}}
 						>
 							<RefreshCw size={14} aria-hidden />
 							<Trans>Refresh</Trans>
@@ -200,6 +227,8 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 					</Section>
 				) : null}
 
+				{run.children.length > 0 ? <BatchRuns runs={run.children} /> : null}
+
 				{isRunning ? null : <ProposedUpdatesReview researchId={run.id} />}
 
 				<Section data-testid='research-run-findings'>
@@ -210,6 +239,39 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 				</Section>
 			</Panel>
 		</ResearchRunIdProvider>
+	)
+}
+
+/**
+ * The runs a batch handed its work to. Without this a batch showed nothing at
+ * all — no progress, no findings, and no way to reach any of the runs it
+ * started, which is where all of the actual results live.
+ */
+function BatchRuns({ runs }: { readonly runs: ReadonlyArray<ChildRun> }) {
+	const { i18n } = useLingui()
+	return (
+		<Section data-testid='research-run-children'>
+			<SectionTitle>
+				<Trans>Runs in this batch</Trans>
+			</SectionTitle>
+			<ChildList>
+				{runs.map(child => {
+					const label = statusLabel(child.status)
+					return (
+						<ChildRow key={child.id}>
+							<ChildLinkChrome>
+								<Link to='/research/$id' params={{ id: child.id }}>
+									{child.query === '' ? child.id : child.query}
+								</Link>
+							</ChildLinkChrome>
+							<Badge $tone={statusTone(child.status)}>
+								{label ? i18n._(label) : child.status}
+							</Badge>
+						</ChildRow>
+					)
+				})}
+			</ChildList>
+		</Section>
 	)
 }
 
@@ -276,6 +338,22 @@ function FailureReason({ reasonCode }: { readonly reasonCode: ReasonCode }) {
 	return <span>{i18n._(REASON_LABEL[reasonCode])}</span>
 }
 
+function narrowChildren(raw: unknown): ReadonlyArray<ChildRun> {
+	if (!Array.isArray(raw)) return []
+	const out: Array<ChildRun> = []
+	for (const row of raw) {
+		if (!row || typeof row !== 'object') continue
+		const r = row as Record<string, unknown>
+		if (typeof r['id'] !== 'string') continue
+		out.push({
+			id: r['id'],
+			query: typeof r['query'] === 'string' ? r['query'] : '',
+			status: typeof r['status'] === 'string' ? r['status'] : 'queued',
+		})
+	}
+	return out
+}
+
 function narrowRun(raw: unknown): ResearchRunDetail | null {
 	if (!raw || typeof raw !== 'object') return null
 	const r = raw as Record<string, unknown>
@@ -287,6 +365,12 @@ function narrowRun(raw: unknown): ResearchRunDetail | null {
 		query: r['query'],
 		schemaName: typeof r['schemaName'] === 'string' ? r['schemaName'] : null,
 		status: r['status'],
+		kind: typeof r['kind'] === 'string' ? r['kind'] : 'leaf',
+		children: narrowChildren(r['children']),
+		mode: typeof r['mode'] === 'string' ? r['mode'] : null,
+		templateIds: Array.isArray(r['templateIds'])
+			? r['templateIds'].filter((x): x is string => typeof x === 'string')
+			: [],
 		templateNames: Array.isArray(r['templateNames'])
 			? r['templateNames'].filter((x): x is string => typeof x === 'string')
 			: [],
@@ -427,4 +511,39 @@ const Pre = styled.pre`
 	padding: var(--space-sm);
 	border-radius: var(--shape-2xs);
 	margin: 0;
+`
+
+const ChildList = styled.div`
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2xs);
+`
+
+const ChildRow = styled.div`
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-sm);
+	padding: var(--space-2xs) var(--space-xs);
+	border: 1px solid var(--color-outline-variant);
+	border-radius: var(--shape-2xs);
+`
+
+// Styling `Link` directly erases TanStack's typed `params` inference, so the
+// chrome lives on a wrapper and the real Link stays plain.
+const ChildLinkChrome = styled.span`
+	min-width: 0;
+
+	& > a {
+		font-family: var(--font-body);
+		font-size: var(--typescale-body-small-size);
+		color: var(--color-primary);
+		text-decoration: underline;
+	}
+
+	& > a:focus-visible {
+		outline: none;
+		box-shadow: var(--glow-active);
+		border-radius: var(--shape-3xs);
+	}
 `

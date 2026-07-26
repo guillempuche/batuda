@@ -2,6 +2,8 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { Link2 } from 'lucide-react'
 import styled from 'styled-components'
 
+import { safeHref } from '#/components/research/safe-link'
+
 /**
  * "Sourced from research on {date}" trail with links to the source pages a
  * finding came from — so a stored value is traceable back to the run and the
@@ -45,16 +47,25 @@ export function Provenance({
 			</Label>
 			{uniqueSources.length > 0 ? (
 				<SourceList>
-					{uniqueSources.map(source => (
-						<SourceLink
-							key={source.url}
-							href={source.url}
-							target='_blank'
-							rel='noopener noreferrer'
-						>
-							{source.title ?? hostOf(source.url)}
-						</SourceLink>
-					))}
+					{uniqueSources.map(source => {
+						// The address comes from a page the run read, so it is only made
+						// clickable when it is an ordinary web address.
+						const href = safeHref(source.url)
+						return href === null ? (
+							<SourceText key={source.url}>
+								{source.title ?? hostOf(source.url)}
+							</SourceText>
+						) : (
+							<SourceLink
+								key={source.url}
+								href={href}
+								target='_blank'
+								rel='noopener noreferrer'
+							>
+								{source.title ?? hostOf(source.url)}
+							</SourceLink>
+						)
+					})}
 				</SourceList>
 			) : null}
 		</Wrap>
@@ -111,4 +122,10 @@ const SourceLink = styled.a`
 	&:hover {
 		text-decoration-thickness: 2px;
 	}
+`
+
+const SourceText = styled.span`
+	font-size: var(--typescale-body-small-size);
+	color: var(--color-on-surface-variant);
+	word-break: break-word;
 `

@@ -37,7 +37,7 @@ export function TargetCorrection({
 		const exit = await rerun({
 			params: { id: researchId },
 			payload: { domain: domain.trim() },
-		} as never)
+		})
 
 		if (exit._tag === 'Success') {
 			const value = exit.value as Record<string, unknown> | null

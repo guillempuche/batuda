@@ -1,6 +1,7 @@
 import { Trans } from '@lingui/react/macro'
 import type { ReactNode } from 'react'
 
+import { SafeLink } from '#/components/research/safe-link'
 import {
 	type Citation,
 	CitationList,
@@ -316,9 +317,7 @@ export function CompanyEnrichmentView({
 								<RowHead>
 									<Pill>{c.name}</Pill>
 									{c.website !== undefined ? (
-										<a href={c.website} target='_blank' rel='noreferrer'>
-											{c.website}
-										</a>
+										<SafeLink href={c.website}>{c.website}</SafeLink>
 									) : null}
 								</RowHead>
 								{c.why !== undefined ? <Reason>{c.why}</Reason> : null}
@@ -352,7 +351,9 @@ export function CompanyEnrichmentView({
 												<Trans>Email</Trans>
 											</FieldKey>
 											<FieldValue>
-												<a href={`mailto:${c.email.value}`}>{c.email.value}</a>
+												<SafeLink href={`mailto:${c.email.value}`}>
+													{c.email.value}
+												</SafeLink>
 												<CitationList citations={sourcedToCitations(c.email)} />
 											</FieldValue>
 										</FieldRow>

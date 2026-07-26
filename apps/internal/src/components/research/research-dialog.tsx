@@ -228,12 +228,21 @@ export function ResearchDialog({
 					...(templateIds.length > 0 ? { template_ids: templateIds } : {}),
 					...(confirm ? { confirm: true } : {}),
 				},
-			} as never)
+			})
 
 			if (exit._tag === 'Success') {
 				const value = exit.value as Record<string, unknown> | null
 				const newId = typeof value?.['id'] === 'string' ? value['id'] : null
-				if (newId !== null && onCreated) onCreated(newId)
+				// A reply with no run to open means nothing was queued. Closing here
+				// would leave the reader believing their research had started.
+				if (newId === null) {
+					setErrorMessage(
+						t`Could not start the research run. Please try again.`,
+					)
+					setSubmitting(false)
+					return
+				}
+				if (onCreated) onCreated(newId)
 				onOpenChange(false)
 				return
 			}
@@ -257,10 +266,15 @@ export function ResearchDialog({
 				return
 			}
 			const budgetErr = taggedFailure(exit.cause, 'InsufficientBudget')
+			// A saved set of instructions that has since been deleted, or belongs to
+			// someone else, is refused outright rather than quietly swapped.
+			const stackErr = taggedFailure(exit.cause, 'UnknownStack')
 			setErrorMessage(
 				budgetErr
 					? t`Not enough research budget for this run. Raise the budget or narrow the search.`
-					: t`Could not start the research run. Please try again.`,
+					: stackErr
+						? t`That set of instructions is no longer available. Pick another and try again.`
+						: t`Could not start the research run. Please try again.`,
 			)
 			setSubmitting(false)
 		},

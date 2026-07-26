@@ -525,6 +525,8 @@ msgstr "En aplicar un contacte descobert, es fusiona amb un registre coincident 
 
 #: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/review/proposed-updates-review.tsx
 #: src/components/research/review/proposed-updates-review.tsx
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Applying…"
@@ -1348,6 +1350,7 @@ msgid "Could not start the re-run. Please try again."
 msgstr "No he pogut iniciar la reexecució. Torna-ho a provar."
 
 #: src/components/research/research-dialog.tsx
+#: src/components/research/research-dialog.tsx
 msgid "Could not start the research run. Please try again."
 msgstr "No s'ha pogut iniciar la recerca. Torna-ho a provar."
 
@@ -1628,6 +1631,10 @@ msgstr "Elimina {0}"
 msgid "Delete failed"
 msgstr "Error en eliminar"
 
+#: src/components/research/run-actions.tsx
+msgid "Delete for good"
+msgstr "Elimina-la definitivament"
+
 #. placeholder {0}: row.email
 #: src/routes/emails/inboxes.tsx
 msgid "Delete inbox {0}? Stored messages stay; the connection stops."
@@ -1666,6 +1673,7 @@ msgid "Deleted"
 msgstr "Eliminada"
 
 #: src/components/instructions/template-delete-confirm.tsx
+#: src/components/research/run-actions.tsx
 #: src/routes/settings/api-keys/index.tsx
 #: src/routes/settings/api-keys/index.tsx
 msgid "Deleting…"
@@ -2379,6 +2387,10 @@ msgstr "Uneix-te a la videotrucada"
 msgid "Keep editing"
 msgstr "Continua editant"
 
+#: src/components/research/run-actions.tsx
+msgid "Keep it"
+msgstr "Conserva-la"
+
 #: src/routes/settings/organization/spend.tsx
 msgid "Key"
 msgstr "Clau"
@@ -3069,7 +3081,6 @@ msgstr "Sense URI de redirecció"
 msgid "No reliable data"
 msgstr "Sense dades fiables"
 
-#: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/run-detail.tsx
 msgid "No reliable data found"
 msgstr "No s'han trobat dades fiables"
@@ -3861,6 +3872,8 @@ msgid "Rejected"
 msgstr "Rebutjat"
 
 #: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/review/proposed-updates-review.tsx
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Rejecting…"
 msgstr "S'està rebutjant…"
@@ -4047,7 +4060,10 @@ msgstr "Torna a executar"
 msgid "Run cancelled"
 msgstr "Execució cancel·lada"
 
-#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/run-actions.tsx
+msgid "Run deleted"
+msgstr "Execució eliminada"
+
 #: src/components/research/run-detail.tsx
 msgid "Run failed"
 msgstr "Execució fallida"
@@ -4067,6 +4083,10 @@ msgstr "Execució no trobada"
 #: src/components/research/run-labels.ts
 msgid "Running"
 msgstr "En execució"
+
+#: src/components/research/run-detail.tsx
+msgid "Runs in this batch"
+msgstr "Execucions d'aquest lot"
 
 #: src/components/companies/about-section.tsx
 msgid "Sales context"
@@ -4684,6 +4704,10 @@ msgstr "L'enllaç ha caducat. Demana'n un de nou a sota."
 msgid "That link is no longer valid. Request a fresh one below."
 msgstr "L'enllaç ja no és vàlid. Demana'n un de nou a sota."
 
+#: src/components/research/research-dialog.tsx
+msgid "That set of instructions is no longer available. Pick another and try again."
+msgstr "Aquest conjunt d'instruccions ja no està disponible. Tria'n un altre i torna-ho a provar."
+
 #: src/routes/tasks/index.tsx
 msgid "The 20 most recently edited tasks on this shelf. Click one to reopen it."
 msgstr "Les 20 tasques editades més recentment d'aquest prestatge. Fes clic en una per reobrir-la."
@@ -5209,6 +5233,10 @@ msgstr "Quin tipus de recerca?"
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "What needs to happen?"
 msgstr "Què cal fer?"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "What this run has cost so far"
+msgstr "El que ha costat aquesta execució fins ara"
 
 #: src/components/companies/followup-dialog.tsx
 msgid "What to follow up on"

@@ -36,6 +36,10 @@ export function useProposalResolution(options?: {
 	const [results, setResults] = useState<Record<string, ResolveOutcome>>({})
 	// Rows whose write is still held back inside the undo window.
 	const [pending, setPending] = useState<Record<string, ResolveDecision>>({})
+	// Rows whose write has already left for the server. Kept apart from `pending`
+	// because taking it back is no longer possible: offering to undo here would
+	// clear the row on screen while the change still lands.
+	const [sending, setSending] = useState<Record<string, ResolveDecision>>({})
 	const held = useRef(
 		new Map<
 			string,
@@ -56,8 +60,15 @@ export function useProposalResolution(options?: {
 			decision: ResolveDecision,
 			onError: () => void,
 		) => {
-			// The write is on its way now — past the point where Undo could stop it.
+			// The write is on its way now — past the point where Undo could stop it,
+			// so the row moves out of the undoable set and says so on screen.
 			held.current.delete(key)
+			setPending(prev => {
+				const next = { ...prev }
+				delete next[key]
+				return next
+			})
+			setSending(prev => ({ ...prev, [key]: decision }))
 			const run = decision === 'apply' ? apply : reject
 			const exit = await run({ params: { id: researchId, puId } })
 			// The write has landed. Re-read the stored proposals now, before the
@@ -67,7 +78,7 @@ export function useProposalResolution(options?: {
 			// The reviewer may have left while the write was in flight; it still
 			// landed, so only the on-screen updates below are skipped.
 			if (!mounted.current) return
-			setPending(prev => {
+			setSending(prev => {
 				const next = { ...prev }
 				delete next[key]
 				return next
@@ -106,10 +117,12 @@ export function useProposalResolution(options?: {
 
 	const undo = useCallback((key: string) => {
 		const entry = held.current.get(key)
-		if (entry !== undefined) {
-			clearTimeout(entry.timer)
-			held.current.delete(key)
-		}
+		// Nothing held means the write already left. Clearing the row here would
+		// tell the reader it was taken back while the change still lands, so the
+		// row is left alone to finish and report its real outcome.
+		if (entry === undefined) return
+		clearTimeout(entry.timer)
+		held.current.delete(key)
 		setPending(prev => {
 			const next = { ...prev }
 			delete next[key]
@@ -131,5 +144,5 @@ export function useProposalResolution(options?: {
 		}
 	}, [])
 
-	return { results, pending, resolve, undo, setResults }
+	return { results, pending, sending, resolve, undo, setResults }
 }

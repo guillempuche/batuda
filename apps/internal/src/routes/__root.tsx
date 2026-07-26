@@ -10,7 +10,7 @@ import {
 	useMatches,
 } from '@tanstack/react-router'
 import { LayoutGroup } from 'motion/react'
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 
 import { PriToast } from '@batuda/ui/pri'
 
@@ -180,20 +180,29 @@ export const Route = createRootRoute({
 })
 
 function RootComponent() {
-	// Collect dehydrated atom values from every matched route's loader
-	// data. Routes without loaders (or without a `dehydrated` field)
-	// contribute nothing. Order matches the route hierarchy top-down;
-	// HydrationBoundary is idempotent so duplicates from nested routes are
-	// harmless.
+	// Collect the page-load data snapshots from every matched route's loader
+	// data. Routes without loaders (or without a `dehydrated` field) contribute
+	// nothing. Order matches the route hierarchy top-down.
 	const matches = useMatches()
 	const location = useLocation()
 	const { lang, themePreference, theme } = Route.useLoaderData()
-	const dehydrated = matches.flatMap(m => {
+	const collected = matches.flatMap(m => {
 		const data = m.loaderData as
 			| { dehydrated?: ReadonlyArray<DehydratedAtomValue> }
 			| undefined
 		return data?.dehydrated ?? []
 	})
+	// A snapshot is where a screen starts, not what it currently holds. Handing
+	// the same one over again on a later render puts the page back to how it
+	// looked on load — a change the reader had already approved would reappear
+	// waiting for them, and re-approving it fails as a duplicate. So the list is
+	// held to one identity per set of snapshots, and only a loader that actually
+	// ran again (which stamps a new time) produces a new one worth applying.
+	// Deliberately keyed on the snapshots themselves rather than the matches:
+	// opening a dialog changes the matches without changing the data.
+	const signature = collected.map(d => `${d.key}@${d.dehydratedAt}`).join('|')
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the signature is the identity of `collected`; depending on the array itself would defeat the point.
+	const dehydrated = useMemo(() => collected, [signature])
 
 	// The sign-in pages render standalone — no sidebar, no top bar, no Quick
 	// Capture dialog — because they run before there is an account or an

@@ -1,6 +1,7 @@
 import { Trans } from '@lingui/react/macro'
 import styled from 'styled-components'
 
+import { SafeLink } from '#/components/research/safe-link'
 import {
 	type Citation,
 	CitationList,
@@ -74,7 +75,9 @@ export function ContactDiscoveryView({
 												<Trans>Email</Trans>
 											</FieldKey>
 											<FieldValue>
-												<a href={`mailto:${c.email}`}>{c.email}</a>
+												<SafeLink href={`mailto:${c.email}`}>
+													{c.email}
+												</SafeLink>
 											</FieldValue>
 										</FieldRow>
 									) : null}
@@ -92,9 +95,7 @@ export function ContactDiscoveryView({
 												<Trans>LinkedIn</Trans>
 											</FieldKey>
 											<FieldValue>
-												<a href={c.linkedin} target='_blank' rel='noreferrer'>
-													{c.linkedin}
-												</a>
+												<SafeLink href={c.linkedin}>{c.linkedin}</SafeLink>
 											</FieldValue>
 										</FieldRow>
 									) : null}
