@@ -173,7 +173,6 @@ export class ResolvedPolicy extends Schema.Class<ResolvedPolicy>(
 	budgetCents: Schema.Number,
 	paidBudgetCents: Schema.Number,
 	autoApprovePaidCents: Schema.Number,
-	paidMonthlyCapCents: Schema.Number,
 	// The 0–100 confidence at or above which an eligible finding applies without
 	// review; null keeps everything waiting for a human.
 	autoApplyMinConfidence: Schema.NullOr(Schema.Number),

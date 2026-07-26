@@ -143,6 +143,9 @@ const ResearchLive = ResearchService.layer.pipe(
 const runtime = ManagedRuntime.make(ResearchLive)
 const DATABASE_URL = process.env['DATABASE_URL'] as string
 const ORG = `paid-org-${randomUUID()}`
+// Its own company, so a ceiling set low enough to refuse one call does not
+// also refuse every other case's: the ceiling counts the whole company.
+const ORG_CAPPED = `paid-org-capped-${randomUUID()}`
 const TERMINAL = new Set([
 	'succeeded',
 	'failed',
@@ -166,12 +169,13 @@ const seedOrigin = async (
 	actions: Array<Record<string, unknown>>,
 	paidPolicy: Record<string, unknown> = policy({}),
 	context: Record<string, unknown> | null = null,
+	org: string = ORG,
 ): Promise<string> => {
 	const r = await pool.query<{ id: string }>(
 		`INSERT INTO research_runs (organization_id, query, status, created_by, findings, paid_policy, context)
 		 VALUES ($1, 'origin', 'succeeded', $2, $3::jsonb, $4::jsonb, $5::jsonb) RETURNING id`,
 		[
-			ORG,
+			org,
 			user,
 			JSON.stringify({ pending_paid_actions: actions }),
 			JSON.stringify(paidPolicy),
@@ -255,14 +259,27 @@ const originFindings = async (
 	return r.rows[0]!.findings
 }
 
-beforeAll(() => {
+beforeAll(async () => {
 	pool = new pg.Pool({ connectionString: DATABASE_URL })
+	// A ceiling below a single registry lookup, so the one case that needs a
+	// refusal gets one without starving the rest.
+	await pool.query(
+		`INSERT INTO organization_research_policy (organization_id, paid_monthly_cap_cents)
+		 VALUES ($1, 10)`,
+		[ORG_CAPPED],
+	)
 })
 
 afterAll(async () => {
+	for (const org of [ORG, ORG_CAPPED]) {
+		await pool.query(
+			`DELETE FROM research_runs WHERE organization_id = $1 OR parent_id IN (SELECT id FROM research_runs WHERE organization_id = $1)`,
+			[org],
+		)
+	}
 	await pool.query(
-		`DELETE FROM research_runs WHERE organization_id = $1 OR parent_id IN (SELECT id FROM research_runs WHERE organization_id = $1)`,
-		[ORG],
+		`DELETE FROM organization_research_policy WHERE organization_id = $1`,
+		[ORG_CAPPED],
 	)
 	await pool.query(
 		`DELETE FROM research_paid_spend WHERE organization_id = $1`,
@@ -560,7 +577,9 @@ describe('paid-action follow-up', () => {
 						args: { country: 'ES' },
 					},
 				],
-				policy({ paidMonthlyCapCents: 10 }),
+				policy({}),
+				null,
+				ORG_CAPPED,
 			)
 
 			// WHEN it is approved and the follow-up runs

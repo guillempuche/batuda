@@ -310,6 +310,7 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 							userId: input.userId,
 							researchId,
 							policy,
+							defaultCapCents: input.systemDefaults.paidMonthlyCapCents,
 							systemCeiling: input.systemDefaults.hardCeiling,
 						}).pipe(Layer.provide(Layer.succeed(SqlClient.SqlClient)(sql)))
 					}

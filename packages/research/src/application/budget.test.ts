@@ -15,7 +15,6 @@ const POLICY = new ResolvedPolicy({
 	budgetCents: 100,
 	paidBudgetCents: 100,
 	autoApprovePaidCents: 100,
-	paidMonthlyCapCents: 10_000,
 	autoApplyMinConfidence: null,
 })
 
@@ -23,6 +22,11 @@ const POLICY = new ResolvedPolicy({
 // it is handed. `charge` decides what the real one would have answered: that the
 // row landed, that it was a repeat of one already recorded, or that the write
 // never finishes.
+//
+// Each of the four statements a charge makes gets its own answer, because they
+// mean different things: the company's own ceiling, this month's total so far,
+// and whether the row landed. Answering them all alike would let a test about
+// the ceiling silently read the wrong number.
 //
 // The default write pauses before answering, the way a real database call does.
 // That pause is the whole point: it is the window in which a second paid call
@@ -33,13 +37,26 @@ const budgetLayer = (
 		readonly charge?: Effect.Effect<ReadonlyArray<{ id: string }>, never, never>
 		readonly enforceAutoApprove?: boolean
 		readonly policy?: Partial<ResolvedPolicy>
+		readonly orgCapCents?: number
+		readonly spentThisMonth?: number
 	} = {},
 ) => {
 	const ledgerWrite =
 		options.charge ??
 		Effect.yieldNow.pipe(Effect.as([{ id: 'spend-1' }] as const))
-	const fakeSql = ((..._args: ReadonlyArray<unknown>) =>
-		ledgerWrite) as unknown as SqlClient.SqlClient
+	const fakeSql = ((strings: ReadonlyArray<string>) => {
+		const text = strings.join(' ')
+		if (text.includes('organization_research_policy'))
+			return Effect.succeed(
+				options.orgCapCents === undefined
+					? []
+					: [{ paidMonthlyCapCents: options.orgCapCents }],
+			)
+		if (text.includes('SUM(amount_cents)'))
+			return Effect.succeed([{ spent: options.spentThisMonth ?? 0 }])
+		if (text.includes('pg_advisory_xact_lock')) return Effect.succeed([])
+		return ledgerWrite
+	}) as unknown as SqlClient.SqlClient
 	Object.assign(fakeSql, {
 		withTransaction: <A, E, R>(effect: Effect.Effect<A, E, R>) => effect,
 	})
@@ -48,6 +65,7 @@ const budgetLayer = (
 		userId: 'user-1',
 		researchId: 'run-1',
 		policy: new ResolvedPolicy({ ...POLICY, ...options.policy }),
+		defaultCapCents: 2000,
 		systemCeiling: 10_000,
 		...(options.enforceAutoApprove !== undefined
 			? { enforceAutoApprove: options.enforceAutoApprove }
@@ -245,6 +263,60 @@ describe('the paid purse', () => {
 			// THEN the second is held for approval instead of slipping past the limit
 			expect(result.filter(o => o === 'charged').length).toBe(1)
 			expect(result).toContain('needs approval')
+		})
+	})
+})
+
+describe('what a company may spend on paid calls in a month', () => {
+	describe('when the company has set no figure of its own', () => {
+		it('should allow up to the figure shipped in configuration', async () => {
+			// GIVEN no row for this company, and 1990c already spent this month
+			// against a shipped figure of 2000c
+			// WHEN a 20c call is charged
+			const outcome = await withBudget(
+				budget =>
+					budget
+						.chargePaid('hunter', 20, 'discover_contacts', 'k1')
+						.pipe(Effect.flip),
+				{ spentThisMonth: 1990 },
+			)
+
+			// THEN it is refused, and says what the ceiling was
+			expect(outcome._tag).toBe('MonthlyCapExceeded')
+			expect((outcome as { capCents: number }).capCents).toBe(2000)
+		})
+	})
+
+	describe('when the company has been given a larger figure', () => {
+		it('should allow up to that figure instead', async () => {
+			// GIVEN this company is allowed 5000c and has spent 1990c
+			// WHEN the same 20c call is charged
+			const paid = await withBudget(
+				budget => budget.chargePaid('hunter', 20, 'discover_contacts', 'k1'),
+				{ orgCapCents: 5000, spentThisMonth: 1990 },
+			)
+
+			// THEN it goes through — the company's own figure is what counts
+			expect(paid).toBe(true)
+		})
+	})
+
+	describe('when a company is given more than the system allows', () => {
+		it('should still stop at the system ceiling', async () => {
+			// GIVEN a company figure far above the system ceiling of 10000c, and
+			// 9990c already spent
+			// WHEN a 20c call is charged
+			const outcome = await withBudget(
+				budget =>
+					budget
+						.chargePaid('hunter', 20, 'discover_contacts', 'k1')
+						.pipe(Effect.flip),
+				{ orgCapCents: 999_999, spentThisMonth: 9990 },
+			)
+
+			// THEN the system ceiling is what refuses it, so one setting can never
+			// authorise unlimited spending
+			expect((outcome as { capCents: number }).capCents).toBe(10_000)
 		})
 	})
 })

@@ -9,7 +9,7 @@ import {
 import type { BudgetSnapshot, ResolvedPolicy } from '../domain/types'
 import { Budget } from './ports'
 
-// ── Monthly paid spend: check-and-debit serialized per user ──
+// ── Monthly paid spend: check-and-debit serialized per organization ──
 
 interface ChargeWithinCapInput {
 	readonly sql: SqlClient.SqlClient
@@ -22,27 +22,43 @@ interface ChargeWithinCapInput {
 	readonly idempotencyKey: string
 	readonly args: unknown
 	readonly autoApproved: boolean
-	readonly userCap: number
+	// What a company may spend on paid calls this month when it has set no
+	// figure of its own.
+	readonly defaultCapCents: number
 	readonly systemCeiling: number
 }
 
 const chargeWithinCap = (input: ChargeWithinCapInput) =>
 	Effect.gen(function* () {
 		const { sql } = input
-		const cap = Math.min(input.userCap, input.systemCeiling)
 
 		// The lock, the sum and the insert are one transaction: a lock lasts only as
 		// long as the transaction holding it, and separate statements can each land
 		// on a different connection from the pool — so without one wrapping all
-		// three, two charges for the same person could both read the same monthly
-		// total and both go through, past the cap. Nested inside a caller's own
-		// transaction, the lock instead lasts until that one ends.
-		yield* sql`SELECT pg_advisory_xact_lock(hashtext('research_monthly_cap:' || ${input.userId}))`
+		// three, two charges for the same company could both read the same monthly
+		// total and both go through, past the ceiling. Callers must not already
+		// hold a transaction of their own, or the charges share it and stop taking
+		// turns.
+		yield* sql`SELECT pg_advisory_xact_lock(hashtext('research_monthly_cap:' || ${input.organizationId}))`
+
+		// The company's own ceiling when it has set one, still bounded by the
+		// system ceiling so one setting cannot authorise unlimited spending.
+		// Read inside the lock so a change lands on the next charge.
+		const capRows = yield* sql<{ paidMonthlyCapCents: number }>`
+			SELECT paid_monthly_cap_cents
+			FROM organization_research_policy
+			WHERE organization_id = ${input.organizationId}
+			LIMIT 1
+		`
+		const cap = Math.min(
+			capRows[0]?.paidMonthlyCapCents ?? input.defaultCapCents,
+			input.systemCeiling,
+		)
 
 		const rows = yield* sql<{ spent: number }>`
 			SELECT COALESCE(SUM(amount_cents), 0)::int AS spent
 			FROM research_paid_spend
-			WHERE user_id = ${input.userId}
+			WHERE organization_id = ${input.organizationId}
 			  AND at >= date_trunc('month', now())
 		`
 		const spent = rows[0]?.spent ?? 0
@@ -106,6 +122,8 @@ export interface BudgetConfig {
 	readonly userId: string
 	readonly researchId: string
 	readonly policy: ResolvedPolicy
+	// What the company may spend this month when it has set no figure of its own.
+	readonly defaultCapCents: number
 	readonly systemCeiling: number
 	// When true, a paid charge that would push this run's paid spend past the
 	// caller's auto-approve limit is refused with ApprovalRequired instead of
@@ -239,7 +257,7 @@ export const makeBudgetLayer = (config: BudgetConfig) =>
 							idempotencyKey,
 							args: {},
 							autoApproved: true,
-							userCap: config.policy.paidMonthlyCapCents,
+							defaultCapCents: config.defaultCapCents,
 							systemCeiling: config.systemCeiling,
 						}).pipe(
 							Effect.onExit(exit =>

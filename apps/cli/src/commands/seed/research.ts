@@ -61,7 +61,6 @@ export const seedResearchPolicy = ({ sql }: SeedCtx) =>
 					budgetCents: 100,
 					paidBudgetCents: 500,
 					autoApprovePaidCents: 200,
-					paidMonthlyCapCents: 2000,
 				},
 			])} ON CONFLICT (user_id) DO NOTHING`
 			yield* Effect.logInfo(`  policy: user ${testUser.id}`)
@@ -70,6 +69,18 @@ export const seedResearchPolicy = ({ sql }: SeedCtx) =>
 				'  (skipped — auth user not found, run seed auth first)',
 			)
 		}
+		// What each company may spend at paid vendors in a month, shared by
+		// everyone in it.
+		const orgs = yield* sql<{ id: string }>`SELECT id FROM organization`
+		for (const org of orgs) {
+			yield* sql`
+				INSERT INTO organization_research_policy (organization_id, paid_monthly_cap_cents)
+				VALUES (${org.id}, 3000)
+				ON CONFLICT (organization_id) DO NOTHING
+			`
+		}
+		yield* Effect.logInfo(`  monthly cap: ${orgs.length} organizations`)
+
 		return testUser ?? null
 	})
 

@@ -2185,10 +2185,6 @@ msgstr "Ves a connexions"
 msgid "Go to sign in"
 msgstr "Ves a iniciar sessió"
 
-#: src/routes/settings/organization/policy.tsx
-msgid "Hard limit on paid research spend each month."
-msgstr "Límit màxim de despesa de recerca de pagament cada mes."
-
 #: src/components/primitives/pri-rich-text.tsx
 msgid "Heading 1"
 msgstr "Encapçalament 1"
@@ -2755,6 +2751,10 @@ msgstr "Confiança mínima per aplicar automàticament"
 #: src/routes/settings/organization/policy.tsx
 msgid "Monthly paid cap"
 msgstr "Límit mensual de pagament"
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Most this organization can spend on paid research each month, shared by everyone in it."
+msgstr "Màxim que aquesta organització pot gastar en recerca de pagament cada mes, compartit entre tothom."
 
 #: src/components/companies/pipeline-board.tsx
 msgid "Move"

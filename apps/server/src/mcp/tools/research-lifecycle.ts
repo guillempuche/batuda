@@ -152,7 +152,7 @@ const ResolveResearchProposedUpdate = Tool.make(
 
 const ResearchPolicy = Tool.make('research_policy', {
 	description:
-		"Get or update the calling user's research budget policy. action=get returns the active limits (per-run free budget, per-run paid budget, paid-action auto-approve threshold, monthly paid cap) or system defaults if none set. action=set upserts the provided fields; unspecified fields keep their current value at the DB level (or default if no row exists). Cents-denominated.",
+		"Get or update research budget limits. action=get returns the active limits: three per-run limits belonging to the calling user (free budget, paid budget, paid-action auto-approve threshold) plus paid_monthly_cap_cents, which is the ORGANIZATION's ceiling on paid research spend for the calendar month and applies to everyone in it. action=set upserts the provided fields; unspecified fields keep their current value. Cents-denominated.",
 	parameters: Schema.Struct({
 		action: PolicyAction,
 		budget_cents: Schema.optional(Schema.Number),
@@ -292,13 +292,14 @@ export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 			research_policy: params =>
 				Effect.gen(function* () {
 					const { userId } = yield* SessionContext
+					const org = yield* CurrentOrg
 					if (params.action === 'get') {
-						const policy = yield* svc.getPolicy(userId)
+						const policy = yield* svc.getPolicy(userId, org.id)
 						// A missing policy row must still come back as an object — the
 						// MCP contract rejects a bare `null` as structured output.
 						return { policy: policy ?? null }
 					}
-					return yield* svc.updatePolicy(userId, {
+					return yield* svc.updatePolicy(userId, org.id, {
 						budgetCents: params.budget_cents,
 						paidBudgetCents: params.paid_budget_cents,
 						autoApprovePaidCents: params.auto_approve_paid_cents,
