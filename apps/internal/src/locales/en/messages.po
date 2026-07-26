@@ -436,6 +436,11 @@ msgstr "All under control"
 msgid "Allow"
 msgstr "Allow"
 
+#. placeholder {0}: change.to
+#: src/components/research/inbox/research-inbox.tsx
+msgid "already {0}"
+msgstr "already {0}"
+
 #: src/components/research/findings/shared.tsx
 msgid "Already in CRM"
 msgstr "Already in CRM"
@@ -456,6 +461,10 @@ msgstr "An AI assistant wants to connect to your Batuda account over MCP and act
 #: src/routes/settings/organization/templates.tsx
 msgid "An org stack runs for every member who hasn't set their own. The one marked default applies to a run that names none. Only org templates can go in an org stack."
 msgstr "An org stack runs for every member who hasn't set their own. The one marked default applies to a run that names none. Only org templates can go in an org stack."
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "and {hidden} more on the run"
+msgstr "and {hidden} more on the run"
 
 #: src/components/research/research-dialog.tsx
 msgid "Any"
@@ -1560,6 +1569,10 @@ msgstr "Current password is incorrect."
 #: src/components/research/findings/company-enrichment-view.tsx
 msgid "Current tools"
 msgstr "Current tools"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "currently"
+msgstr "currently"
 
 #: src/components/profile/theme-select.tsx
 msgid "Dark"
@@ -3193,6 +3206,10 @@ msgstr "Nothing completed recently"
 #: src/routes/tasks/index.tsx
 msgid "Nothing later in the queue"
 msgstr "Nothing later in the queue"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "nothing on file, would add"
+msgstr "nothing on file, would add"
 
 #: src/routes/tasks/index.tsx
 msgid "Nothing overdue"
@@ -5313,6 +5330,10 @@ msgstr "Working…"
 #: src/routes/index.tsx
 msgid "Workshop floor — live counters on the bench."
 msgstr "Workshop floor — live counters on the bench."
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "would become"
+msgstr "would become"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Write footer…"
