@@ -89,7 +89,7 @@ export function ResearchRuns() {
 									<Link
 										to='/research/$id'
 										params={{ id: run.id }}
-										aria-label={run.query}
+										aria-label={run.query || run.id}
 									/>
 								</RowLinkOverlay>
 								<RowMain>
@@ -211,6 +211,9 @@ const RowLinkOverlay = styled.div`
 		inset: 0;
 	}
 
+	/* The row draws its own mark when the link inside it takes focus (see the
+	   :focus-within rule on Row), so the link's default outline is stood down —
+	   deliberately, and only because something visible replaces it. */
 	a:focus-visible {
 		outline: none;
 	}

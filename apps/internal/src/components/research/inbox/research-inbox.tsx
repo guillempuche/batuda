@@ -964,6 +964,11 @@ const SegButton = styled.button.withConfig({
 `
 
 const RefreshLink = styled.button`
+	/* Small text made these under the 24px a pointer needs, and Undo is the only
+	   thing that stops a change being written. */
+	min-height: 1.5rem;
+	min-width: 1.5rem;
+	padding-inline: var(--space-2xs);
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.06em;
@@ -1100,6 +1105,11 @@ const PendingLabel = styled.span`
 `
 
 const UndoButton = styled.button`
+	/* Small text made these under the 24px a pointer needs, and Undo is the only
+	   thing that stops a change being written. */
+	min-height: 1.5rem;
+	min-width: 1.5rem;
+	padding-inline: var(--space-2xs);
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.04em;

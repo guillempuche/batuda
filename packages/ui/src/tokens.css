@@ -404,9 +404,13 @@
 		transparent 3px
 	);
 
-	/* Warm amber focus/active glow — used by nav active state,
-	   focus rings on metal surfaces, and stencil highlights. */
-	--glow-active: 0 0 0 3px rgba(245, 158, 11, 0.35);
+	/* Warm amber focus/active ring — used by nav active state, focus rings on
+	   metal surfaces, and stencil highlights. Solid rather than translucent: at
+	   35% alpha it washed out to little over 1:1 against both plain and metal
+	   surfaces, so a keyboard user tabbing a list could not tell where they were.
+	   The second, surface-coloured ring sits underneath as a gap, so the mark
+	   reads on a dark plate as well as a pale one. */
+	--glow-active: 0 0 0 1px var(--color-surface), 0 0 0 3px #a1620f;
 }
 
 /* ============================================================
@@ -423,6 +427,10 @@
 :root[data-theme="dark"],
 :root[data-theme="dark-hc"] {
 	color-scheme: dark;
+
+	/* The light theme's ring is a deep amber, which all but disappears on these
+	   surfaces, so the dark themes mark focus with a pale one instead. */
+	--glow-active: 0 0 0 1px var(--color-surface), 0 0 0 3px #f7c69b;
 
 	/* --- Ground — the workshop lit by one lamp instead of daylight.
 	   The ramp climbs with elevation, the reverse of the light theme. --- */
@@ -610,7 +618,7 @@
 	--color-tape-edge: #8a8276;
 
 	/* A solid ring rather than a soft halo — a blur is unreadable here. */
-	--glow-active: 0 0 0 3px #ffc9a6;
+	--glow-active: 0 0 0 1px var(--color-surface), 0 0 0 3px #ffc9a6;
 	--color-highlight-amber: rgba(255, 201, 166, 0.3);
 	--color-highlight-amber-strong: rgba(255, 201, 166, 0.45);
 }
