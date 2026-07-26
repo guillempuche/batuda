@@ -5,18 +5,28 @@ import {
 	HttpApiSchema,
 } from 'effect/unstable/httpapi'
 
-import { Forbidden } from '../errors'
+import { BadRequest, Forbidden, NotFound } from '../errors'
+import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 
 // ── Input ──
 
 export const SelectOrgsInput = Schema.Struct({
 	clientId: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
-	// The full set of organizations this connection may act in. An empty
-	// array unbinds the connection (no membership check); a non-empty array
-	// is applied atomically — every org must be a live membership or the
-	// whole call rejects and writes nothing.
+	// The organizations this connection may act in, applied atomically —
+	// every org must be a live membership or the whole call rejects and
+	// writes nothing. Must not be empty: removing access goes through
+	// `revokeConnection`, which records the removal rather than erasing the
+	// choice.
 	organizationIds: Schema.Array(Schema.String),
+})
+
+// Cut a connection off from the acting organization. `userId` names whose
+// connection to revoke — omitted, it is the caller's own; supplied, only an
+// owner or admin of the org may do it.
+export const RevokeConnectionInput = Schema.Struct({
+	clientId: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
+	userId: Schema.optional(Schema.String),
 })
 
 // ── View ──
@@ -49,13 +59,31 @@ export const McpOAuthGroup = HttpApiGroup.make('mcpOAuth')
 		HttpApiEndpoint.post('selectOrgs', '/mcp-oauth/select-orgs', {
 			payload: SelectOrgsInput,
 			success: Schema.Void,
-			error: Forbidden.pipe(HttpApiSchema.status(403)),
+			error: [
+				Forbidden.pipe(HttpApiSchema.status(403)),
+				BadRequest.pipe(HttpApiSchema.status(400)),
+			],
 		}),
 	)
 	.add(
 		HttpApiEndpoint.get('listConnections', '/mcp-oauth/connections', {
 			success: Schema.Array(McpConnectionView),
 		}),
+	)
+	.add(
+		// Org-scoped, unlike its siblings: cutting a connection off is always
+		// about one organization, and the write needs `app.current_org_id` set
+		// for the revocation table's WITH CHECK to hold. OrgMiddleware is
+		// attached to this endpoint alone — at group level it would 403 the
+		// members who come here to pick an org in the first place.
+		HttpApiEndpoint.post('revokeConnection', '/mcp-oauth/revoke', {
+			payload: RevokeConnectionInput,
+			success: Schema.Void,
+			error: [
+				Forbidden.pipe(HttpApiSchema.status(403)),
+				NotFound.pipe(HttpApiSchema.status(404)),
+			],
+		}).middleware(OrgMiddleware),
 	)
 	.middleware(SessionMiddleware)
 	.prefix('/v1')

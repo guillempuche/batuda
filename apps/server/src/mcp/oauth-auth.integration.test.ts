@@ -48,6 +48,7 @@ let restaurant: Org
 let singleOrgUserId: string
 let multiOrgUserId: string
 let nonMemberUserId: string
+let adminUserId: string
 
 const orgBySlug = async (slug: string): Promise<Org> => {
 	const result = await pool.query<Org>(
@@ -192,7 +193,7 @@ const resolveBearer = (token: string, hint?: string): Promise<BearerOutcome> =>
 			// Mirror the middleware: read memberships + the per-client authorized
 			// org set under the resolver role so the suite exercises the same
 			// RLS-scoped path.
-			const { orgIds, selectedOrgIds } = yield* enterUserScope(
+			const { orgIds, selectedOrgIds, revokedOrgIds } = yield* enterUserScope(
 				sql,
 				userId,
 			)(
@@ -204,23 +205,33 @@ const resolveBearer = (token: string, hint?: string): Promise<BearerOutcome> =>
 						SELECT organization_id FROM mcp_oauth_org_membership
 						WHERE user_id = ${userId} AND client_id = ${clientId}
 					`
+					const revoked = yield* sql<{ organizationId: string }>`
+						SELECT organization_id FROM mcp_oauth_revocation
+						WHERE user_id = ${userId} AND client_id = ${clientId}
+					`
 					return {
 						orgIds: memberships.map(m => m.organizationId),
 						selectedOrgIds: selection.map(s => s.organizationId),
+						revokedOrgIds: revoked.map(r => r.organizationId),
 					}
 				}),
 			)
 			if (orgIds.length === 0)
 				return { kind: 'forbidden', code: -32002 } satisfies BearerOutcome
 			// Mirror the middleware: narrow the selection to live memberships.
-			// An unbound connection (no selection) falls back to live orgs;
-			// a bound connection where every row is stale is rejected, not
-			// widened — silently widening would be a privilege escalation.
+			// A connection nobody has touched falls back to live orgs; a bound
+			// connection where every row is stale is rejected, not widened —
+			// silently widening would be a privilege escalation. Untouched
+			// counts revocations too, so cutting off the last authorized org
+			// denies the connection instead of handing it every org.
 			const liveSelectedOrgIds = selectedOrgIds.filter(id =>
 				orgIds.includes(id),
 			)
-			const isUnbound = selectedOrgIds.length === 0
-			const allowedOrgIds = isUnbound ? orgIds : liveSelectedOrgIds
+			const isUntouched =
+				selectedOrgIds.length === 0 && revokedOrgIds.length === 0
+			const allowedOrgIds = (isUntouched ? orgIds : liveSelectedOrgIds).filter(
+				id => !revokedOrgIds.includes(id),
+			)
 			if (allowedOrgIds.length === 0)
 				return { kind: 'forbidden', code: -32002 } satisfies BearerOutcome
 			// Mirror the middleware: a valid hint always wins; without a hint,
@@ -272,6 +283,28 @@ const setSelections = async (
 	}
 }
 
+// Record that a connection has been cut off from these orgs, without going
+// through the service — `revokedBy` defaults to the connection's own owner so
+// callers must opt in to staging an owner-issued block.
+const setRevocations = async (
+	userId: string,
+	organizationIds: ReadonlyArray<string>,
+	revokedBy: string = userId,
+) => {
+	await pool.query(
+		'DELETE FROM mcp_oauth_revocation WHERE user_id = $1 AND client_id = $2',
+		[userId, CLIENT_ID],
+	)
+	if (organizationIds.length > 0) {
+		await pool.query(
+			`INSERT INTO mcp_oauth_revocation
+				(user_id, client_id, organization_id, revoked_at, revoked_by_user_id)
+			 SELECT $1, $2, org_id, now(), $4 FROM unnest($3::text[]) AS t(org_id)`,
+			[userId, CLIENT_ID, organizationIds as string[], revokedBy],
+		)
+	}
+}
+
 const seedConsentedClient = async (
 	userId: string,
 	clientId: string,
@@ -289,7 +322,12 @@ const seedConsentedClient = async (
 	)
 }
 
-const fixtureUserIds = () => [singleOrgUserId, multiOrgUserId, nonMemberUserId]
+const fixtureUserIds = () => [
+	singleOrgUserId,
+	multiOrgUserId,
+	nonMemberUserId,
+	adminUserId,
+]
 
 const deleteFixtureRows = async () => {
 	const ids = fixtureUserIds()
@@ -297,6 +335,9 @@ const deleteFixtureRows = async () => {
 		'DELETE FROM mcp_oauth_org_membership WHERE user_id = ANY($1)',
 		[ids],
 	)
+	await pool.query('DELETE FROM mcp_oauth_revocation WHERE user_id = ANY($1)', [
+		ids,
+	])
 	await pool.query('DELETE FROM "oauthConsent" WHERE "userId" = ANY($1)', [ids])
 	await pool.query(`DELETE FROM "oauthClient" WHERE name = 'mcp-oauth-test'`)
 }
@@ -312,6 +353,10 @@ const cleanup = async () => {
 	await pool.query('DELETE FROM companies WHERE slug = $1', [FIXTURE_SLUG])
 	await pool.query(
 		`DELETE FROM mcp_oauth_org_membership WHERE user_id IN (SELECT id FROM "user" WHERE email LIKE $1)`,
+		[USER_EMAIL_LIKE],
+	)
+	await pool.query(
+		`DELETE FROM mcp_oauth_revocation WHERE user_id IN (SELECT id FROM "user" WHERE email LIKE $1)`,
 		[USER_EMAIL_LIKE],
 	)
 	await pool.query(
@@ -342,9 +387,17 @@ beforeAll(async () => {
 	singleOrgUserId = await createUser('single')
 	multiOrgUserId = await createUser('multi')
 	nonMemberUserId = await createUser('none')
+	adminUserId = await createUser('admin')
 	await addMember(singleOrgUserId, taller.id)
 	await addMember(multiOrgUserId, taller.id)
 	await addMember(multiOrgUserId, restaurant.id)
+	await addMember(adminUserId, taller.id)
+	// Promote after the fact: addMember always joins as a plain member, and the
+	// revoke tests need one person who can act for the whole organization.
+	await pool.query(
+		`UPDATE member SET role = 'admin' WHERE "userId" = $1 AND "organizationId" = $2`,
+		[adminUserId, taller.id],
+	)
 }, 60_000)
 
 afterEach(async () => {
@@ -494,6 +547,68 @@ describe('OAuth Bearer org resolution', () => {
 			const outcome = await resolveBearer(token)
 
 			// THEN it refuses (no org entered) with the select-an-org code
+			expect(outcome).toEqual({ kind: 'forbidden', code: -32002 })
+		})
+	})
+
+	describe('a multi-org user whose last selected org was revoked', () => {
+		it('should refuse rather than fall back to every org they belong to', async () => {
+			// GIVEN the multi-org user's connection has no org left selected and
+			// a block recorded for restaurant
+			await setSelections(multiOrgUserId, [])
+			await setRevocations(multiOrgUserId, [restaurant.id])
+			const token = await mintToken({ sub: multiOrgUserId })
+
+			// WHEN the Bearer path resolves
+			const outcome = await resolveBearer(token)
+
+			// THEN it refuses — the block keeps this from reading as "nobody has
+			// chosen yet", which would hand the connection every org the user
+			// belongs to instead of closing it
+			expect(outcome).toEqual({ kind: 'forbidden', code: -32002 })
+		})
+	})
+
+	describe('a multi-org user revoked from one org but not the other', () => {
+		it('should keep working in the org that was left alone', async () => {
+			// GIVEN both orgs authorized, then taller cut off
+			await setSelections(multiOrgUserId, [taller.id, restaurant.id])
+			await setRevocations(multiOrgUserId, [taller.id])
+			const token = await mintToken({ sub: multiOrgUserId })
+
+			// WHEN the Bearer path resolves with no hint
+			const outcome = await resolveBearer(token)
+
+			// THEN restaurant is the only one left, so it auto-picks it
+			expect(outcome).toEqual({ kind: 'scoped', orgIds: [restaurant.id] })
+		})
+
+		it('should refuse a hint pointing at the revoked org', async () => {
+			// GIVEN both orgs authorized, then taller cut off
+			await setSelections(multiOrgUserId, [taller.id, restaurant.id])
+			await setRevocations(multiOrgUserId, [taller.id])
+			const token = await mintToken({ sub: multiOrgUserId })
+
+			// WHEN the assistant explicitly asks for the revoked org
+			const outcome = await resolveBearer(token, taller.id)
+
+			// THEN it is refused — a hint can only pick among what is allowed
+			expect(outcome).toEqual({ kind: 'forbidden', code: -32002 })
+		})
+	})
+
+	describe('a single-org user whose only org was revoked', () => {
+		it('should refuse instead of auto-picking that org', async () => {
+			// GIVEN the single-org user never picked an org (auto-resolution) and
+			// was then cut off from it
+			await setSelections(singleOrgUserId, [])
+			await setRevocations(singleOrgUserId, [taller.id])
+			const token = await mintToken({ sub: singleOrgUserId })
+
+			// WHEN the Bearer path resolves
+			const outcome = await resolveBearer(token)
+
+			// THEN auto-resolution does not resurrect the connection
 			expect(outcome).toEqual({ kind: 'forbidden', code: -32002 })
 		})
 	})
@@ -650,23 +765,29 @@ describe('McpOAuthService.selectOrgs', () => {
 			expect(rows.rows.map(r => r.organization_id)).toEqual([restaurant.id])
 		})
 
-		it('should accept an empty list and unbind the connection', async () => {
+		it('should reject an empty list and leave the binding untouched', async () => {
 			// GIVEN the single-org user has a binding to taller
 			await setSelections(singleOrgUserId, [taller.id])
 			// WHEN selectOrgs is called with an empty list
-			await runtime.runPromise(
+			const error = await runtime.runPromise(
 				Effect.gen(function* () {
 					const service = yield* McpOAuthService
-					yield* service.selectOrgs(singleOrgUserId, CLIENT_ID, [])
+					return yield* Effect.flip(
+						service.selectOrgs(singleOrgUserId, CLIENT_ID, []),
+					)
 				}),
 			)
 
-			// THEN no membership rows remain for this (user, client)
-			const rows = await pool.query(
-				'SELECT 1 FROM mcp_oauth_org_membership WHERE user_id = $1 AND client_id = $2',
+			// THEN it is BadRequest — an empty list would read downstream as
+			// "nobody has chosen yet" and widen the connection to every org the
+			// user belongs to, so removal goes through revokeConnection instead
+			expect(error._tag).toBe('BadRequest')
+			// AND the existing binding is still there
+			const rows = await pool.query<{ organization_id: string }>(
+				'SELECT organization_id FROM mcp_oauth_org_membership WHERE user_id = $1 AND client_id = $2',
 				[singleOrgUserId, CLIENT_ID],
 			)
-			expect(rows.rowCount).toBe(0)
+			expect(rows.rows.map(r => r.organization_id)).toEqual([taller.id])
 		})
 	})
 
@@ -715,6 +836,166 @@ describe('McpOAuthService.selectOrgs', () => {
 				[singleOrgUserId, CLIENT_ID],
 			)
 			expect(rows.rowCount).toBe(0)
+		})
+	})
+})
+
+// Revoking runs on the ordinary request connection, so these drive it through
+// enterOrgScope exactly as the HTTP handler does — which is also what puts the
+// active organization in place for the table's WITH CHECK.
+const revokeScoped = (
+	org: Org,
+	actorUserId: string,
+	targetUserId: string,
+	clientId: string,
+) =>
+	Effect.gen(function* () {
+		const sql = yield* SqlClient.SqlClient
+		const service = yield* McpOAuthService
+		return yield* enterOrgScope(sql, { org, userId: actorUserId })(
+			service.revokeConnection(org.id, actorUserId, targetUserId, clientId),
+		)
+	})
+
+const revokeAs = (
+	org: Org,
+	actorUserId: string,
+	targetUserId: string,
+	clientId: string = CLIENT_ID,
+) => runtime.runPromise(revokeScoped(org, actorUserId, targetUserId, clientId))
+
+// The failure the caller expects, rather than a rejected promise.
+const revokeAsError = (
+	org: Org,
+	actorUserId: string,
+	targetUserId: string,
+	clientId: string = CLIENT_ID,
+) =>
+	runtime.runPromise(
+		Effect.flip(revokeScoped(org, actorUserId, targetUserId, clientId)),
+	)
+
+const readRevocations = async (userId: string) => {
+	const rows = await pool.query<{
+		organization_id: string
+		revoked_by_user_id: string
+	}>(
+		`SELECT organization_id, revoked_by_user_id FROM mcp_oauth_revocation
+		 WHERE user_id = $1 AND client_id = $2 ORDER BY organization_id`,
+		[userId, CLIENT_ID],
+	)
+	return rows.rows
+}
+
+describe('McpOAuthService.revokeConnection', () => {
+	describe('a member revoking their own connection', () => {
+		it('should record the block against the acting organization', async () => {
+			// GIVEN the single-org user's connection is authorized for taller
+			await setSelections(singleOrgUserId, [taller.id])
+
+			// WHEN they revoke it themselves
+			await revokeAs(taller, singleOrgUserId, singleOrgUserId)
+
+			// THEN the block names them as the one who raised it
+			expect(await readRevocations(singleOrgUserId)).toEqual([
+				{ organization_id: taller.id, revoked_by_user_id: singleOrgUserId },
+			])
+		})
+
+		it('should leave the original choice in place', async () => {
+			// GIVEN an authorized connection
+			await setSelections(singleOrgUserId, [taller.id])
+
+			// WHEN it is revoked
+			await revokeAs(taller, singleOrgUserId, singleOrgUserId)
+
+			// THEN the selection row survives — the block is what denies access,
+			// so deleting the choice would be both redundant and lossy
+			const rows = await pool.query<{ organization_id: string }>(
+				'SELECT organization_id FROM mcp_oauth_org_membership WHERE user_id = $1 AND client_id = $2',
+				[singleOrgUserId, CLIENT_ID],
+			)
+			expect(rows.rows.map(r => r.organization_id)).toEqual([taller.id])
+		})
+	})
+
+	describe('an admin revoking another member’s connection', () => {
+		it('should record the block against the admin', async () => {
+			// GIVEN the single-org user's connection is authorized for taller
+			await setSelections(singleOrgUserId, [taller.id])
+
+			// WHEN an admin of taller revokes it
+			await revokeAs(taller, adminUserId, singleOrgUserId)
+
+			// THEN the block is attributed to the admin, which is what stops the
+			// member from lifting it later
+			expect(await readRevocations(singleOrgUserId)).toEqual([
+				{ organization_id: taller.id, revoked_by_user_id: adminUserId },
+			])
+		})
+	})
+
+	describe('a plain member revoking someone else’s connection', () => {
+		it('should fail with Forbidden and write nothing', async () => {
+			// GIVEN the single-org user's connection is authorized for taller
+			await setSelections(singleOrgUserId, [taller.id])
+
+			// WHEN another plain member of taller tries to revoke it
+			const error = await revokeAsError(taller, multiOrgUserId, singleOrgUserId)
+
+			// THEN it is refused and no block is recorded
+			expect(error._tag).toBe('Forbidden')
+			expect(await readRevocations(singleOrgUserId)).toEqual([])
+		})
+	})
+
+	describe('revoking for someone who is not in the organization', () => {
+		it('should fail with NotFound', async () => {
+			// WHEN an admin revokes for a user who belongs to no organization
+			const error = await revokeAsError(taller, adminUserId, nonMemberUserId)
+
+			// THEN there is nothing to cut off
+			expect(error._tag).toBe('NotFound')
+			expect(await readRevocations(nonMemberUserId)).toEqual([])
+		})
+	})
+
+	describe('re-approving the connection afterwards', () => {
+		it('should lift a block the same person raised', async () => {
+			// GIVEN the single-org user revoked their own connection
+			await setSelections(singleOrgUserId, [taller.id])
+			await revokeAs(taller, singleOrgUserId, singleOrgUserId)
+
+			// WHEN they approve the connection for that org again
+			await runtime.runPromise(
+				Effect.gen(function* () {
+					const service = yield* McpOAuthService
+					yield* service.selectOrgs(singleOrgUserId, CLIENT_ID, [taller.id])
+				}),
+			)
+
+			// THEN the block is gone — an accidental self-revoke is recoverable
+			expect(await readRevocations(singleOrgUserId)).toEqual([])
+		})
+
+		it('should NOT lift a block an admin raised', async () => {
+			// GIVEN an admin cut the single-org user's connection off
+			await setSelections(singleOrgUserId, [taller.id])
+			await revokeAs(taller, adminUserId, singleOrgUserId)
+
+			// WHEN the member re-approves the connection for that org
+			await runtime.runPromise(
+				Effect.gen(function* () {
+					const service = yield* McpOAuthService
+					yield* service.selectOrgs(singleOrgUserId, CLIENT_ID, [taller.id])
+				}),
+			)
+
+			// THEN the admin's block stands, so nobody can re-admit themselves to
+			// an organization they were removed from
+			expect(await readRevocations(singleOrgUserId)).toEqual([
+				{ organization_id: taller.id, revoked_by_user_id: adminUserId },
+			])
 		})
 	})
 })
