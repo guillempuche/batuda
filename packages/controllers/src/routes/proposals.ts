@@ -22,7 +22,6 @@ const CreateProposalInput = Schema.Struct({
 	// An ISO date string (e.g. "2026-08-01"), passed straight to the timestamptz
 	// column — a decoded DateTime object doesn't serialize into the SQL insert.
 	expiresAt: Schema.optional(Schema.String),
-	notes: Schema.optional(Schema.String),
 	metadata: Schema.optional(Schema.Unknown),
 })
 
@@ -31,7 +30,6 @@ const UpdateProposalInput = Schema.Struct({
 	title: Schema.optional(Schema.String),
 	lineItems: Schema.optional(Schema.Unknown),
 	totalValue: Schema.optional(Schema.String),
-	notes: Schema.optional(Schema.String),
 	metadata: Schema.optional(Schema.Unknown),
 })
 

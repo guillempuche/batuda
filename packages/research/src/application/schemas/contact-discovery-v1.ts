@@ -31,7 +31,6 @@ export const ContactDiscoveryV1Schema = Schema.Struct({
 					}),
 				),
 			),
-			notes: Schema.optionalKey(Schema.String),
 			citations: Schema.Array(Citation),
 		}),
 	),

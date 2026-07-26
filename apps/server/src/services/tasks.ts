@@ -78,7 +78,6 @@ export interface TaskActor {
 // keeps the status ⇔ completed_at invariant.
 export interface TaskUpdateInput {
 	readonly title?: string | undefined
-	readonly notes?: string | null | undefined
 	readonly status?: string | undefined
 	readonly priority?: string | undefined
 	readonly assigneeId?: string | null | undefined
@@ -192,7 +191,22 @@ export class TaskService extends Context.Service<TaskService>()('TaskService', {
 				conditions.push(sql`status NOT IN ('done', 'cancelled')`)
 			if (filters.search) {
 				const needle = `%${filters.search.replace(/[\\%_]/g, match => `\\${match}`)}%`
-				conditions.push(sql`(title ILIKE ${needle} OR notes ILIKE ${needle})`)
+				// The words a task carries used to sit in a box on the row itself.
+				// They are documents now, so a search that only read the row would
+				// quietly stop finding half of what it used to.
+				conditions.push(sql`(
+					title ILIKE ${needle}
+					OR EXISTS (
+						SELECT 1 FROM document_links dl
+						JOIN documents d ON d.id = dl.document_id
+						WHERE dl.subject_table = 'tasks' AND dl.subject_id = tasks.id
+							AND (
+								d.title ILIKE ${needle}
+								OR d.content ILIKE ${needle}
+								OR d.search_text ILIKE ${needle}
+							)
+					)
+				)`)
 			}
 			return conditions
 		}
@@ -516,7 +530,6 @@ export class TaskService extends Context.Service<TaskService>()('TaskService', {
 
 					const updates: Record<string, unknown> = {}
 					if (input.title !== undefined) updates['title'] = input.title
-					if (input.notes !== undefined) updates['notes'] = input.notes
 					if (input.status !== undefined) updates['status'] = input.status
 					if (input.priority !== undefined) updates['priority'] = input.priority
 					if (input.assigneeId !== undefined)

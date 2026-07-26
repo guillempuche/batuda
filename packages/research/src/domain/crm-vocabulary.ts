@@ -57,5 +57,4 @@ export const SNAPSHOT_CONTACT_FIELDS = [
 	'name',
 	'role',
 	'isDecisionMaker',
-	'notes',
 ] as const

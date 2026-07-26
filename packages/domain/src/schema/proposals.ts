@@ -21,7 +21,6 @@ export class Proposal extends Model.Class<Proposal>('Proposal')({
 	sentAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
 	expiresAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
 	respondedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
-	notes: Schema.NullOr(Schema.String),
 	metadata: Schema.NullOr(Schema.Unknown),
 
 	createdAt: Model.DateTimeInsertFromDate,

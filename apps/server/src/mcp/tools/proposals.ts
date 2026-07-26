@@ -57,7 +57,6 @@ const CreateProposal = Tool.make('create_proposal', {
 		total_value: Schema.optional(Schema.String),
 		currency: Schema.optional(Schema.String),
 		expires_at: Schema.optional(Schema.String),
-		notes: Schema.optional(Schema.String),
 		metadata: Schema.optional(Schema.Unknown),
 	}),
 	success: Proposal.json,
@@ -76,7 +75,6 @@ const UpdateProposal = Tool.make('update_proposal', {
 		title: Schema.optional(Schema.String),
 		line_items: Schema.optional(Schema.Unknown),
 		total_value: Schema.optional(Schema.String),
-		notes: Schema.optional(Schema.String),
 		metadata: Schema.optional(Schema.Unknown),
 	}),
 	success: Schema.NullOr(Proposal.json),
@@ -121,7 +119,6 @@ export const ProposalHandlersLive = ProposalTools.toLayer(
 					if (params.currency !== undefined) row['currency'] = params.currency
 					if (params.expires_at !== undefined)
 						row['expiresAt'] = params.expires_at
-					if (params.notes !== undefined) row['notes'] = params.notes
 					if (params.metadata !== undefined) row['metadata'] = params.metadata
 					const rows =
 						yield* sql`INSERT INTO proposals ${sql.insert(row)} RETURNING *`
@@ -152,7 +149,6 @@ export const ProposalHandlersLive = ProposalTools.toLayer(
 					if (rest.line_items !== undefined) data['lineItems'] = rest.line_items
 					if (rest.total_value !== undefined)
 						data['totalValue'] = rest.total_value
-					if (rest.notes !== undefined) data['notes'] = rest.notes
 					if (rest.metadata !== undefined) data['metadata'] = rest.metadata
 					// Stamp the send/first-response moments on the transition into each.
 					if (rest.status === 'sent' && before?.status !== 'sent') {

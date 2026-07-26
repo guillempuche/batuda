@@ -188,13 +188,14 @@ describe('verifyValueProvenance', () => {
 
 	describe('when several proposals mix supported and invented values', () => {
 		it('should drop only the unsupported ones', () => {
-			// GIVEN a supported phone, an invented email, and a fuzzy-only proposal
+			// GIVEN a supported phone, an invented email, and a free-text field
+			// nothing in the page can confirm either way
 			const corpus = 'Phone: 936 123 456. Email: info@acme.es'
 			const findings = {
 				proposed_updates: [
 					{ subject_id: 'a', fields: { phone: '936123456' } },
 					{ subject_id: 'b', fields: { email: 'fake@nowhere.io' } },
-					{ subject_id: 'c', fields: { notes: 'friendly' } },
+					{ subject_id: 'c', fields: { role: 'friendly sort' } },
 				],
 			}
 

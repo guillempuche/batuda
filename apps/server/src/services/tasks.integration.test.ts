@@ -1152,7 +1152,7 @@ describe('TaskService.update', () => {
 		// GIVEN an open task
 		const id = await seedTask({ status: 'open' })
 
-		// WHEN its notes are updated through the service (title stays the
+		// WHEN its priority is changed through the service (the title stays the
 		// fixture so afterAll still cleans it up)
 		await runScoped(
 			tallerOrgId,
@@ -1160,18 +1160,18 @@ describe('TaskService.update', () => {
 				const tasks = yield* TaskService
 				return yield* tasks.update(
 					id,
-					{ notes: 'consolidation-test-note' },
+					{ priority: 'high' },
 					{ id: null, kind: 'user' },
 				)
 			}),
 		)
 
 		// THEN the committed row reflects the change
-		const after = await pool.query<{ notes: string | null }>(
-			`SELECT notes FROM tasks WHERE id = $1`,
+		const after = await pool.query<{ priority: string | null }>(
+			`SELECT priority FROM tasks WHERE id = $1`,
 			[id],
 		)
-		expect(after.rows[0]?.notes).toBe('consolidation-test-note')
+		expect(after.rows[0]?.priority).toBe('high')
 		// [apps/server/src/services/tasks.ts — update]
 	})
 

@@ -42,7 +42,6 @@ export const seedProposals = (
 								totalValue: '1578.00',
 								sentAt: new Date('2026-02-22'),
 								respondedAt: new Date('2026-02-25'),
-								notes: 'Accepted by phone. Project start March 1st.',
 							},
 							{
 								companyId: companyMap.get('ferros-baix-llobregat')!,
@@ -60,7 +59,6 @@ export const seedProposals = (
 								totalValue: '1500.00',
 								sentAt: null,
 								respondedAt: null,
-								notes: 'Pending on-site meeting to finalise details.',
 							},
 							{
 								companyId: companyMap.get('hostal-pirineu')!,
@@ -84,7 +82,6 @@ export const seedProposals = (
 								totalValue: '1578.00',
 								sentAt: new Date('2026-04-06'),
 								expiresAt: new Date('2026-05-06'),
-								notes: 'Sent after the on-site visit. Waiting for reply.',
 							},
 							{
 								companyId: companyMap.get('bright-lane-boutique')!,
@@ -114,7 +111,6 @@ export const seedProposals = (
 								totalValue: '4390.00',
 								sentAt: new Date('2026-04-01'),
 								expiresAt: new Date('2026-04-30'),
-								notes: 'Sarah opened the proposal link on April 3rd.',
 							},
 							{
 								companyId: companyMap.get('tancaments-garraf')!,
@@ -156,7 +152,6 @@ export const seedProposals = (
 								totalValue: '4184.00',
 								sentAt: new Date('2026-04-08'),
 								expiresAt: new Date('2026-05-08'),
-								notes: 'Ramon wants to reduce scope. Negotiating line items.',
 							},
 							{
 								companyId: companyMap.get('park-stone-design')!,
@@ -174,7 +169,6 @@ export const seedProposals = (
 								totalValue: '990.00',
 								sentAt: new Date('2026-02-18'),
 								respondedAt: new Date('2026-02-20'),
-								notes: 'Already had a web provider. Polite decline.',
 							},
 							{
 								companyId: companyMap.get('coastal-freight')!,
@@ -193,7 +187,6 @@ export const seedProposals = (
 								currency: 'USD',
 								sentAt: new Date('2026-02-01'),
 								expiresAt: new Date('2026-03-01'),
-								notes: 'Tom never responded. Proposal expired.',
 							},
 						],
 						(_, index) => String(index),

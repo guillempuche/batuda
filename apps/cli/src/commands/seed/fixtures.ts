@@ -482,7 +482,6 @@ export const getPresetData = (
 			emailStatus: 'valid' as const,
 			emailStatusReason: 'SMTP verified',
 			emailStatusUpdatedAt: new Date('2026-03-20'),
-			notes: 'Prefereix trucades al matí, abans de les 10h.',
 		},
 		{
 			companyId: companyMap.get('tancaments-garraf')!,
@@ -513,8 +512,6 @@ export const getPresetData = (
 			name: 'Desconegut',
 			role: null,
 			isDecisionMaker: false,
-			notes:
-				'No contact info found — company discovered via Google Maps scrape.',
 		},
 		{
 			companyId: companyMap.get('distribuciones-martinez')!,
@@ -535,7 +532,6 @@ export const getPresetData = (
 			email: 'ana.lopez@dismartinez.es',
 			emailStatus: 'unknown' as const,
 			emailSoftBounceCount: 2,
-			notes: 'Only responds on LinkedIn, rarely checks email.',
 		},
 		{
 			companyId: companyMap.get('taller-mecanic-jove')!,
@@ -543,7 +539,6 @@ export const getPresetData = (
 			role: 'Propietari',
 			isDecisionMaker: true,
 			instagram: '@marcjove_tallerjove',
-			notes: 'Instagram only — no email or phone provided.',
 		},
 	]
 
@@ -737,7 +732,6 @@ export const getPresetData = (
 			contactId: contactMap.get('Jordi Puig'),
 			type: 'visit',
 			title: 'Reunió presencial a la fàbrica',
-			notes: 'Portar portàtil per demo. Preguntar pels volums de factures.',
 			dueAt: new Date('2026-04-05'),
 		},
 		{
@@ -745,7 +739,6 @@ export const getPresetData = (
 			contactId: contactMap.get('Sarah Mitchell'),
 			type: 'call',
 			title: 'Ecommerce demo videocall',
-			notes: 'Show retail template + Instagram Shop integration.',
 			dueAt: new Date('2026-04-03'),
 		},
 		{
@@ -753,7 +746,6 @@ export const getPresetData = (
 			contactId: contactMap.get('Arnau Ribas'),
 			type: 'email',
 			title: 'Enviar demo reserves online',
-			notes: 'Incloure link a la demo amb dades de prova.',
 			dueAt: new Date('2026-04-02'),
 		},
 		{
@@ -761,7 +753,6 @@ export const getPresetData = (
 			contactId: contactMap.get('Tom Parker'),
 			type: 'email',
 			title: 'Send automation info pack',
-			notes: 'PDF with logistics use cases + pricing.',
 			dueAt: new Date('2026-04-01'),
 		},
 		{
@@ -769,7 +760,6 @@ export const getPresetData = (
 			contactId: contactMap.get('Pep Casals'),
 			type: 'followup',
 			title: 'Revisió mensual amb Cal Pep',
-			notes: 'Revisar mètriques web i reserves del mes.',
 			dueAt: new Date('2026-04-15'),
 		},
 		{
@@ -777,7 +767,6 @@ export const getPresetData = (
 			contactId: contactMap.get('Ramon Vila'),
 			type: 'proposal',
 			title: 'Enviar proposta automatització Tancaments Garraf',
-			notes: 'Incloure integració Google Sheets + facturació.',
 			dueAt: new Date('2026-04-10'),
 		},
 		{
@@ -785,7 +774,6 @@ export const getPresetData = (
 			contactId: contactMap.get('Pep Casals'),
 			type: 'call',
 			title: 'Trucada onboarding Cal Pep',
-			notes: 'Fet — vam configurar el calendari de reserves.',
 			dueAt: new Date('2026-03-05'),
 			// `status='done'` and `completedAt` must be set together (DB CHECK).
 			status: 'done',
@@ -796,7 +784,6 @@ export const getPresetData = (
 			contactId: contactMap.get('Marta Soler'),
 			type: 'email',
 			title: 'Enviar cas pràctic facturació automàtica',
-			notes: "Hauria d'haver sortit fa dues setmanes.",
 			dueAt: new Date('2026-03-20'),
 		},
 		{
@@ -804,7 +791,6 @@ export const getPresetData = (
 			contactId: null,
 			type: 'other',
 			title: 'Investigar competència logística a Alzira',
-			notes: 'Buscar si tenen proveïdor IT actual.',
 		},
 		{
 			companyId: companyMap.get('ceramiques-emporda')!,
@@ -822,7 +808,6 @@ export const getPresetData = (
 			contactId: null,
 			type: 'other',
 			title: 'Draft a follow-up email for Cal Pep',
-			notes: 'Auto-suggested after the last visit.',
 			source: 'agent',
 			priority: 'high',
 			status: 'in_progress',
