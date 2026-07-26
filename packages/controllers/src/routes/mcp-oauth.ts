@@ -45,6 +45,26 @@ export const McpConnectionView = Schema.Struct({
 	redirectHost: Schema.NullOr(Schema.String),
 })
 
+// One connection as an owner or admin sees it: whose it is, what tool last
+// used it, and when. The tool name is self-reported by that tool, so it tells
+// connections apart rather than proving anything about the caller.
+export const OrgMcpConnectionView = Schema.Struct({
+	clientId: Schema.String,
+	userId: Schema.String,
+	memberName: Schema.NullOr(Schema.String),
+	memberEmail: Schema.String,
+	name: Schema.NullOr(Schema.String),
+	createdAt: Schema.String,
+	redirectHost: Schema.NullOr(Schema.String),
+	client: Schema.NullOr(
+		Schema.Struct({
+			name: Schema.NullOr(Schema.String),
+			version: Schema.NullOr(Schema.String),
+		}),
+	),
+	lastUsedAt: Schema.NullOr(Schema.String),
+})
+
 // ── Route group ──
 //
 // Org binding for OAuth MCP connections (ChatGPT, Claude.ai). A connection is a
@@ -83,6 +103,15 @@ export const McpOAuthGroup = HttpApiGroup.make('mcpOAuth')
 				Forbidden.pipe(HttpApiSchema.status(403)),
 				NotFound.pipe(HttpApiSchema.status(404)),
 			],
+		}).middleware(OrgMiddleware),
+	)
+	.add(
+		// Org-scoped for the same reason as revoke: it answers what can reach
+		// THIS organization, and which organization that is comes from the
+		// session, never from anything the caller passes in.
+		HttpApiEndpoint.get('listOrgConnections', '/mcp-oauth/org-connections', {
+			success: Schema.Array(OrgMcpConnectionView),
+			error: Forbidden.pipe(HttpApiSchema.status(403)),
 		}).middleware(OrgMiddleware),
 	)
 	.middleware(SessionMiddleware)

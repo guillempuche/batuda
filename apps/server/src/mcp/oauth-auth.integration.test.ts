@@ -305,6 +305,23 @@ const setRevocations = async (
 	}
 }
 
+// Stage the note of which tool last used a connection, as a request would.
+const recordSeen = async (
+	org: Org,
+	userId: string,
+	clientId: string,
+	clientName: string,
+) => {
+	await pool.query(
+		`INSERT INTO mcp_client_seen
+			(organization_id, principal_kind, principal_id, user_id, client_name, last_seen_at)
+		 VALUES ($1, 'oauth', $2, $3, $4, now())
+		 ON CONFLICT (organization_id, principal_kind, principal_id, user_id)
+		 DO UPDATE SET client_name = EXCLUDED.client_name, last_seen_at = now()`,
+		[org.id, clientId, userId, clientName],
+	)
+}
+
 const seedConsentedClient = async (
 	userId: string,
 	clientId: string,
@@ -338,6 +355,7 @@ const deleteFixtureRows = async () => {
 	await pool.query('DELETE FROM mcp_oauth_revocation WHERE user_id = ANY($1)', [
 		ids,
 	])
+	await pool.query('DELETE FROM mcp_client_seen WHERE user_id = ANY($1)', [ids])
 	await pool.query('DELETE FROM "oauthConsent" WHERE "userId" = ANY($1)', [ids])
 	await pool.query(`DELETE FROM "oauthClient" WHERE name = 'mcp-oauth-test'`)
 }
@@ -886,6 +904,102 @@ const readRevocations = async (userId: string) => {
 	)
 	return rows.rows
 }
+
+const listOrgAs = (org: Org, actorUserId: string) =>
+	runtime.runPromise(
+		Effect.gen(function* () {
+			const sql = yield* SqlClient.SqlClient
+			const service = yield* McpOAuthService
+			return yield* enterOrgScope(sql, { org, userId: actorUserId })(
+				service.listOrgConnections(org.id, actorUserId),
+			)
+		}),
+	)
+
+const listOrgAsError = (org: Org, actorUserId: string) =>
+	runtime.runPromise(
+		Effect.gen(function* () {
+			const sql = yield* SqlClient.SqlClient
+			const service = yield* McpOAuthService
+			return yield* enterOrgScope(sql, { org, userId: actorUserId })(
+				Effect.flip(service.listOrgConnections(org.id, actorUserId)),
+			)
+		}),
+	)
+
+describe('McpOAuthService.listOrgConnections', () => {
+	describe('a plain member asking', () => {
+		it('should be refused', async () => {
+			// GIVEN a member of taller who is neither owner nor admin
+			// WHEN they ask what can reach the organization
+			const error = await listOrgAsError(taller, singleOrgUserId)
+
+			// THEN it is refused — hiding the page would not be enough on its own
+			expect(error._tag).toBe('Forbidden')
+		})
+	})
+
+	describe('an admin asking', () => {
+		it('should include another member’s connection with its tool', async () => {
+			// GIVEN a colleague's connection scoped to taller, last used from a
+			// known tool
+			await seedConsentedClient(singleOrgUserId, CLIENT_ID, 'mcp-oauth-test')
+			await setSelections(singleOrgUserId, [taller.id])
+			await recordSeen(taller, singleOrgUserId, CLIENT_ID, 'ChatGPT')
+
+			// WHEN an admin of taller asks
+			const rows = await listOrgAs(taller, adminUserId)
+
+			// THEN the colleague's connection is listed, named, and attributed
+			const row = rows.find(r => r.userId === singleOrgUserId)
+			expect(row).toBeDefined()
+			expect(row?.clientId).toBe(CLIENT_ID)
+			expect(row?.client?.name).toBe('ChatGPT')
+			expect(row?.lastUsedAt).not.toBeNull()
+		})
+
+		it('should include a connection nobody has scoped yet', async () => {
+			// GIVEN a connection with no organization chosen, which falls back to
+			// every organization its owner belongs to — so it does reach this one
+			await seedConsentedClient(singleOrgUserId, CLIENT_ID, 'mcp-oauth-test')
+			await setSelections(singleOrgUserId, [])
+
+			// WHEN an admin asks
+			const rows = await listOrgAs(taller, adminUserId)
+
+			// THEN it is shown, because it can in fact reach this organization
+			expect(rows.some(r => r.userId === singleOrgUserId)).toBe(true)
+		})
+
+		it('should leave out a connection that was cut off', async () => {
+			// GIVEN a colleague's connection that an admin already revoked
+			await seedConsentedClient(singleOrgUserId, CLIENT_ID, 'mcp-oauth-test')
+			await setSelections(singleOrgUserId, [taller.id])
+			await setRevocations(singleOrgUserId, [taller.id], adminUserId)
+
+			// WHEN an admin asks
+			const rows = await listOrgAs(taller, adminUserId)
+
+			// THEN it is gone — the page lists what can reach the data, not what
+			// once could
+			expect(rows.some(r => r.userId === singleOrgUserId)).toBe(false)
+		})
+
+		it('should not show a connection belonging to another organization', async () => {
+			// GIVEN a connection scoped only to restaurant
+			await seedConsentedClient(multiOrgUserId, CLIENT_ID, 'mcp-oauth-test')
+			await setSelections(multiOrgUserId, [restaurant.id])
+
+			// WHEN an admin of taller asks
+			const rows = await listOrgAs(taller, adminUserId)
+
+			// THEN taller's admin sees nothing of it. This read runs on the pool
+			// that bypasses row-level security, so the organization predicate is
+			// the only thing keeping the two apart
+			expect(rows.some(r => r.userId === multiOrgUserId)).toBe(false)
+		})
+	})
+})
 
 describe('McpOAuthService.revokeConnection', () => {
 	describe('a member revoking their own connection', () => {

@@ -31,6 +31,38 @@ interface ConnectionRow {
 	readonly redirectUris: unknown
 }
 
+// One connection as an owner or an admin sees it: whose it is, what tool last
+// used it, and when. Unlike the personal list this spans every member of the
+// organization.
+export interface OrgMcpConnection {
+	readonly clientId: string
+	readonly userId: string
+	readonly memberName: string | null
+	readonly memberEmail: string
+	readonly name: string | null
+	readonly createdAt: string
+	readonly redirectHost: string | null
+	readonly client: {
+		readonly name: string | null
+		readonly version: string | null
+	} | null
+	readonly lastUsedAt: string | null
+}
+
+interface OrgConnectionRow {
+	readonly clientId: string
+	readonly userId: string
+	readonly createdAt: string | Date
+	readonly name: string | null
+	readonly redirectUris: unknown
+	readonly memberName: string | null
+	readonly memberEmail: string
+	// Whether its owner picked this organization for it, and whether they
+	// picked any organization at all — together these say if it reaches here.
+	readonly boundHere: boolean
+	readonly hasAnySelection: boolean
+}
+
 // The host of a client's first registered redirect URI, or null if it has none
 // / they're unparseable. Surfaced on the connections page as provenance.
 const firstRedirectHost = (redirectUris: unknown): string | null => {
@@ -174,6 +206,132 @@ export class McpOAuthService extends Context.Service<McpOAuthService>()(
 							return yield* new Forbidden({
 								message: 'Not a member of every requested organization',
 							})
+					}),
+
+				// Every assistant connection that can currently reach this
+				// organization's data, whoever set it up. Owners and admins use it to
+				// answer "what can get at our CRM right now?" — a question the
+				// per-person list cannot answer.
+				//
+				// Two reads rather than one join: the consent records are only
+				// readable on Better Auth's own database pool (the ordinary request
+				// role has no grant on them at all), while the tool and block records
+				// are organization-scoped and read as the request role, so each stays
+				// behind the strongest isolation it has. The two reads are not one
+				// transaction, so a change landing between them shows up in one and
+				// not the other until the page is loaded again.
+				listOrgConnections: (
+					orgId: string,
+					actorUserId: string,
+				): Effect.Effect<ReadonlyArray<OrgMcpConnection>, Forbidden> =>
+					Effect.gen(function* () {
+						// The active organization already confines `member`, so the user
+						// id alone finds this person's role. No row at all means they are
+						// not in this organization, refused like the wrong role.
+						const actor = yield* sql<{ role: string | null }>`
+							SELECT role FROM member WHERE "userId" = ${actorUserId} LIMIT 1
+						`.pipe(Effect.orDie)
+						const role = actor[0]?.role ?? null
+						if (role === null || !MANAGING_ROLES.has(role)) {
+							return yield* new Forbidden({
+								message:
+									'Only an owner or an admin can see the organization’s connections.',
+							})
+						}
+
+						const rows = yield* Effect.tryPromise(() =>
+							auth.pool.query<OrgConnectionRow>(
+								`SELECT c."clientId"        AS "clientId",
+								        c."userId"          AS "userId",
+								        c."createdAt"       AS "createdAt",
+								        oc.name             AS name,
+								        oc."redirectUris"   AS "redirectUris",
+								        u.name              AS "memberName",
+								        u.email             AS "memberEmail",
+								        (sel.organization_id IS NOT NULL) AS "boundHere",
+								        EXISTS (
+								          SELECT 1 FROM mcp_oauth_org_membership any_sel
+								          WHERE any_sel.user_id = c."userId"
+								            AND any_sel.client_id = c."clientId"
+								        )                   AS "hasAnySelection"
+								 FROM "oauthConsent" c
+								 JOIN "oauthClient" oc ON oc."clientId" = c."clientId"
+								 JOIN member m ON m."userId" = c."userId"
+								                AND m."organizationId" = $1
+								 JOIN "user" u ON u.id = c."userId"
+								 LEFT JOIN mcp_oauth_org_membership sel
+								   ON sel.user_id = c."userId"
+								  AND sel.client_id = c."clientId"
+								  AND sel.organization_id = $1
+								 ORDER BY u.email, c."createdAt" DESC`,
+								[orgId],
+							),
+						).pipe(
+							Effect.orDie,
+							Effect.map(r => r.rows),
+						)
+
+						// Blocks and tool names live on organization-scoped tables, so
+						// these run as the request role and the database confines them
+						// to this organization on their own.
+						const revoked = yield* sql<{
+							userId: string
+							clientId: string
+						}>`
+							SELECT user_id AS "userId", client_id AS "clientId"
+							FROM mcp_oauth_revocation
+						`.pipe(Effect.orDie)
+						const revokedKeys = new Set(
+							revoked.map(r => `${r.userId}:${r.clientId}`),
+						)
+
+						const seen = yield* sql<{
+							principalId: string
+							userId: string
+							clientName: string | null
+							clientVersion: string | null
+							lastSeenAt: Date | null
+						}>`
+							SELECT principal_id AS "principalId", user_id AS "userId",
+							       client_name AS "clientName",
+							       client_version AS "clientVersion",
+							       last_seen_at AS "lastSeenAt"
+							FROM mcp_client_seen WHERE principal_kind = 'oauth'
+						`.pipe(Effect.orDie)
+						const seenByKey = new Map(
+							seen.map(s => [`${s.userId}:${s.principalId}`, s]),
+						)
+
+						return (
+							rows
+								// Mirror how a request is judged: a connection scoped to this
+								// organization counts, and so does one nobody has scoped at
+								// all, because that falls back to every organization its owner
+								// belongs to. A block always wins.
+								.filter(
+									row =>
+										!revokedKeys.has(`${row.userId}:${row.clientId}`) &&
+										(row.boundHere || !row.hasAnySelection),
+								)
+								.map(row => {
+									const tool = seenByKey.get(`${row.userId}:${row.clientId}`)
+									return {
+										clientId: row.clientId,
+										userId: row.userId,
+										memberName: row.memberName,
+										memberEmail: row.memberEmail,
+										name: row.name,
+										createdAt: new Date(row.createdAt).toISOString(),
+										redirectHost: firstRedirectHost(row.redirectUris),
+										client: tool
+											? { name: tool.clientName, version: tool.clientVersion }
+											: null,
+										lastUsedAt: tool?.lastSeenAt
+											? new Date(tool.lastSeenAt).toISOString()
+											: null,
+									}
+								})
+						)
 					}),
 
 				// Cut a connection off from one organization. Everyone may do this

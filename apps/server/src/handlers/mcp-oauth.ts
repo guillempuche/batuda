@@ -33,6 +33,13 @@ export const McpOAuthLive = HttpApiBuilder.group(
 						return yield* service.listConnections(userId)
 					}),
 				)
+				.handle('listOrgConnections', _ =>
+					Effect.gen(function* () {
+						const org = yield* CurrentOrg
+						const { userId } = yield* SessionContext
+						return yield* service.listOrgConnections(org.id, userId)
+					}),
+				)
 				.handle('revokeConnection', _ =>
 					Effect.gen(function* () {
 						const org = yield* CurrentOrg

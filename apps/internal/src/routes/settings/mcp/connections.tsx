@@ -6,8 +6,9 @@ import { ArrowLeft, Plug, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import styled from 'styled-components'
 
-import { PriButton, usePriToast } from '@batuda/ui/pri'
+import { PriButton, PriDialog, usePriToast } from '@batuda/ui/pri'
 
+import { PriTable } from '#/components/primitives/pri-table'
 import { ErrorState } from '#/components/shared/error-state'
 import { authClient } from '#/lib/auth-client'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
@@ -33,7 +34,29 @@ type Connection = {
 	readonly redirectHost: string | null
 }
 
-const connectionsAtom = BatudaApiAtom.query('mcpOAuth', 'listConnections', {})
+const connectionsAtom = BatudaApiAtom.query('mcpOAuth', 'listConnections', {
+	reactivityKeys: ['mcpConnections'],
+})
+
+const orgConnectionsAtom = BatudaApiAtom.query(
+	'mcpOAuth',
+	'listOrgConnections',
+	{ reactivityKeys: ['mcpConnections'] },
+)
+
+type OrgConnection = {
+	readonly clientId: string
+	readonly userId: string
+	readonly memberName: string | null
+	readonly memberEmail: string
+	readonly name: string | null
+	readonly redirectHost: string | null
+	readonly client: {
+		readonly name: string | null
+		readonly version: string | null
+	} | null
+	readonly lastUsedAt: string | null
+}
 
 export const Route = createFileRoute('/settings/mcp/connections')({
 	head: () => ({ meta: [{ title: 'MCP connections — Batuda' }] }),
@@ -92,6 +115,12 @@ function ConnectionsPage() {
 	const activeOrg = authClient.useActiveOrganization()
 	const activeOrgId = activeOrg.data?.id ?? null
 
+	// Only owners and admins get the organization-wide view. Hiding it is a
+	// courtesy; the server refuses the call for anyone else regardless.
+	const activeMember = authClient.useActiveMember()
+	const myRole = activeMember.data?.role ?? null
+	const canManage = myRole === 'owner' || myRole === 'admin'
+
 	// The connection currently being revoked, so its button can disable until
 	// the call finishes and a second click can't race it.
 	const [revokingId, setRevokingId] = useState<string | null>(null)
@@ -115,8 +144,12 @@ function ConnectionsPage() {
 	const handleRevoke = async (clientId: string) => {
 		setRevokingId(clientId)
 		try {
+			// Both lists on this page share a reactivity key, so a successful
+			// revoke refreshes each of them — including the organization-wide table
+			// below, which would otherwise keep showing a connection just cut off.
 			const exit = await revokeConnection({
 				payload: { clientId },
+				reactivityKeys: ['mcpConnections'],
 			} as never)
 			if (exit._tag === 'Success') {
 				toastManager.add({
@@ -124,7 +157,6 @@ function ConnectionsPage() {
 					description: t`This assistant can no longer reach this organization.`,
 					type: 'success',
 				})
-				refreshList()
 				return
 			}
 			toastManager.add({
@@ -241,8 +273,267 @@ function ConnectionsPage() {
 					</ConnList>
 				)}
 			</ListSection>
+
+			{canManage ? <OrgConnectionsSection /> : null}
 		</Page>
 	)
+}
+
+// Every assistant that can reach this organization right now, whoever set it
+// up. Only mounted for owners and admins, so it never has to handle the
+// refusal the server sends anyone else.
+function OrgConnectionsSection() {
+	const { t } = useLingui()
+	const toastManager = usePriToast()
+
+	const listResult = useAtomValue(orgConnectionsAtom)
+	const refreshList = useAtomRefresh(orgConnectionsAtom)
+	const revokeConnection = useAtomSet(
+		BatudaApiAtom.mutation('mcpOAuth', 'revokeConnection'),
+		{ mode: 'promiseExit' },
+	)
+
+	// The row awaiting confirmation, and the one whose revoke is in flight so a
+	// second click can't race it.
+	const [confirmTarget, setConfirmTarget] = useState<OrgConnection | null>(null)
+	const [revokingId, setRevokingId] = useState<string | null>(null)
+
+	const rows = useMemo<ReadonlyArray<OrgConnection>>(
+		() =>
+			AsyncResult.isSuccess(listResult)
+				? narrowOrgConnections(listResult.value)
+				: [],
+		[listResult],
+	)
+	const isLoading = AsyncResult.isInitial(listResult)
+	const isFailure = AsyncResult.isFailure(listResult)
+
+	const confirmRevoke = async () => {
+		const target = confirmTarget
+		if (!target || revokingId !== null) return
+		setRevokingId(`${target.userId}:${target.clientId}`)
+		try {
+			// The shared reactivity key refreshes both lists on this page, so the
+			// member's own list above cannot keep showing what was just cut off.
+			const exit = await revokeConnection({
+				payload: { clientId: target.clientId, userId: target.userId },
+				reactivityKeys: ['mcpConnections'],
+			} as never)
+			if (exit._tag === 'Success') {
+				toastManager.add({
+					title: t`Connection revoked`,
+					description: t`It can no longer reach this organization.`,
+					type: 'success',
+				})
+				return
+			}
+			toastManager.add({
+				title: t`Could not revoke`,
+				description: t`Something went wrong. Try again.`,
+				type: 'error',
+			})
+		} finally {
+			// Always clear, or the dialog latches open: its dismissal is blocked
+			// while a revoke is in flight.
+			setRevokingId(null)
+			setConfirmTarget(null)
+		}
+	}
+
+	const confirmLabel = confirmTarget
+		? (confirmTarget.memberName ?? confirmTarget.memberEmail)
+		: ''
+
+	return (
+		<ListSection>
+			<SectionTitle>
+				<Trans>Everyone's connections</Trans>
+			</SectionTitle>
+			<SectionLead>
+				<Trans>
+					Every assistant that can reach this organization's data right now.
+					Names come from the assistant itself, so treat them as labels rather
+					than proof.
+				</Trans>
+			</SectionLead>
+
+			{isLoading ? (
+				<Empty>
+					<Trans>Loading…</Trans>
+				</Empty>
+			) : isFailure ? (
+				<ErrorState
+					variant='inline'
+					data-testid='mcp-org-connections-error'
+					title={t`Could not load the organization's connections.`}
+					onRetry={refreshList}
+				/>
+			) : rows.length === 0 ? (
+				<Empty data-testid='mcp-org-connections-empty'>
+					<Trans>Nothing is connected to this organization yet.</Trans>
+				</Empty>
+			) : (
+				<PriTable.Root data-testid='mcp-org-connections'>
+					<PriTable.Head>
+						<PriTable.Row>
+							<PriTable.ColumnHeader $flex='grow'>
+								<Trans>Member</Trans>
+							</PriTable.ColumnHeader>
+							<PriTable.ColumnHeader $flex='grow'>
+								<Trans>Assistant</Trans>
+							</PriTable.ColumnHeader>
+							<PriTable.ColumnHeader $flex='shrink'>
+								<Trans>Last used</Trans>
+							</PriTable.ColumnHeader>
+							<PriTable.ColumnHeader $flex='shrink'>
+								<span className='sr-only'>
+									<Trans>Actions</Trans>
+								</span>
+							</PriTable.ColumnHeader>
+						</PriTable.Row>
+					</PriTable.Head>
+					<PriTable.Body>
+						{rows.map(row => {
+							const rowId = `${row.userId}:${row.clientId}`
+							const toolLabel = row.client
+								? [row.client.name, row.client.version]
+										.filter(part => part !== null)
+										.join(' ')
+								: null
+							return (
+								<PriTable.Row key={rowId} data-testid='mcp-org-connection-row'>
+									<PriTable.Cell $flex='grow'>
+										<MemberName>{row.memberName ?? row.memberEmail}</MemberName>
+										<ConnMeta>{row.memberEmail}</ConnMeta>
+									</PriTable.Cell>
+									<PriTable.Cell $flex='grow'>
+										{connectionTitle(
+											row.name,
+											row.redirectHost,
+											t`Unnamed client`,
+										)}
+										{toolLabel ? <ConnMeta>{toolLabel}</ConnMeta> : null}
+									</PriTable.Cell>
+									<PriTable.Cell $flex='shrink'>
+										{row.lastUsedAt ? (
+											formatDate(row.lastUsedAt)
+										) : (
+											<Trans>Never used</Trans>
+										)}
+									</PriTable.Cell>
+									<PriTable.Cell $flex='shrink'>
+										<PriButton
+											type='button'
+											$variant='outlined'
+											disabled={revokingId === rowId}
+											data-testid={`mcp-org-connection-revoke-${rowId}`}
+											onClick={() => {
+												setConfirmTarget(row)
+											}}
+										>
+											<Trans>Revoke</Trans>
+										</PriButton>
+									</PriTable.Cell>
+								</PriTable.Row>
+							)
+						})}
+					</PriTable.Body>
+				</PriTable.Root>
+			)}
+
+			<PriDialog.Root
+				open={confirmTarget !== null}
+				onOpenChange={(nextOpen: boolean) => {
+					// Hold the dialog open while the revoke is in flight so the row
+					// can't vanish mid-request.
+					if (!nextOpen && revokingId === null) setConfirmTarget(null)
+				}}
+			>
+				<PriDialog.Portal>
+					<PriDialog.Backdrop />
+					<PriDialog.Popup data-testid='mcp-org-revoke-dialog'>
+						<PriDialog.Title>
+							<Trans>Cut off this connection?</Trans>
+						</PriDialog.Title>
+						<PriDialog.Description>
+							<Trans>
+								{confirmLabel}'s assistant stops reaching this organization on
+								its next request. It keeps working in any other organization
+								they belong to, and they can't undo this themselves.
+							</Trans>
+						</PriDialog.Description>
+						<ConfirmActions>
+							<PriDialog.Close
+								render={props => (
+									<PriButton
+										type='button'
+										$variant='text'
+										disabled={revokingId !== null}
+										data-testid='mcp-org-revoke-cancel'
+										{...props}
+									>
+										<Trans>Cancel</Trans>
+									</PriButton>
+								)}
+							/>
+							<PriButton
+								type='button'
+								$variant='filled'
+								disabled={revokingId !== null}
+								data-testid='mcp-org-revoke-confirm'
+								onClick={() => {
+									void confirmRevoke()
+								}}
+							>
+								<Trans>Revoke</Trans>
+							</PriButton>
+						</ConfirmActions>
+					</PriDialog.Popup>
+				</PriDialog.Portal>
+			</PriDialog.Root>
+		</ListSection>
+	)
+}
+
+function narrowOrgConnections(
+	rows: ReadonlyArray<unknown>,
+): ReadonlyArray<OrgConnection> {
+	const out: Array<OrgConnection> = []
+	for (const row of rows) {
+		if (!row || typeof row !== 'object') continue
+		const r = row as Record<string, unknown>
+		const clientId = typeof r['clientId'] === 'string' ? r['clientId'] : null
+		const userId = typeof r['userId'] === 'string' ? r['userId'] : null
+		const memberEmail =
+			typeof r['memberEmail'] === 'string' ? r['memberEmail'] : null
+		if (clientId === null || userId === null || memberEmail === null) continue
+		const client = r['client']
+		out.push({
+			clientId,
+			userId,
+			memberEmail,
+			memberName: typeof r['memberName'] === 'string' ? r['memberName'] : null,
+			name: typeof r['name'] === 'string' ? r['name'] : null,
+			redirectHost:
+				typeof r['redirectHost'] === 'string' ? r['redirectHost'] : null,
+			lastUsedAt: typeof r['lastUsedAt'] === 'string' ? r['lastUsedAt'] : null,
+			client:
+				client && typeof client === 'object'
+					? {
+							name:
+								typeof (client as Record<string, unknown>)['name'] === 'string'
+									? ((client as Record<string, unknown>)['name'] as string)
+									: null,
+							version:
+								typeof (client as Record<string, unknown>)['version'] ===
+								'string'
+									? ((client as Record<string, unknown>)['version'] as string)
+									: null,
+						}
+					: null,
+		})
+	}
+	return out
 }
 
 function narrowConnections(
@@ -450,4 +741,29 @@ const UnboundTag = styled.span.withConfig({ displayName: 'McpConnUnbound' })`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	font-style: italic;
+`
+
+// ── The organization-wide section ──
+
+const SectionLead = styled.p.withConfig({ displayName: 'McpConnSectionLead' })`
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-medium-size);
+	line-height: var(--typescale-body-medium-line);
+	color: var(--color-on-surface-variant);
+	margin: 0;
+`
+
+const MemberName = styled.span.withConfig({ displayName: 'McpConnMemberName' })`
+	display: block;
+	font-weight: var(--typescale-label-medium-weight);
+	color: var(--color-on-surface);
+`
+
+const ConfirmActions = styled.div.withConfig({
+	displayName: 'McpConnConfirmActions',
+})`
+	display: flex;
+	justify-content: flex-end;
+	gap: var(--space-sm);
+	flex-wrap: wrap;
 `
