@@ -11,6 +11,7 @@ import {
 } from '@batuda/research'
 
 import { EnvVars } from '../../lib/env'
+import { detachFromTransaction } from '../../middleware/org'
 import { redactDbErrors } from './_research-shared'
 
 // ── discover_contacts ──
@@ -73,14 +74,24 @@ export const ResearchContactsHandlersLive = ResearchContactsTools.toLayer(
 						if (confirm === 'no') return { status: 'cancelled' as const }
 					}
 
-					return yield* contactDiscovery.discover({
-						companyName: params.company_name,
-						domain: params.domain,
-						country: params.country,
-						userId,
-						organizationId: orgId,
-						systemDefaults,
-					})
+					// Run outside the request's own database transaction. Discovery
+					// buys data from outside vendors, and each purchase is recorded as
+					// it happens: kept inside the request, those records would be
+					// thrown away if the request later failed, while the vendors had
+					// already charged for the calls — and the month's spending would
+					// forget money that was really spent. Several purchases also run at
+					// once, and only a transaction of their own keeps each one's record
+					// separate and the monthly limit honest.
+					return yield* contactDiscovery
+						.discover({
+							companyName: params.company_name,
+							domain: params.domain,
+							country: params.country,
+							userId,
+							organizationId: orgId,
+							systemDefaults,
+						})
+						.pipe(detachFromTransaction(sql))
 				}).pipe(redactDbErrors),
 		}
 	}),
