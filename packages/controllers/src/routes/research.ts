@@ -5,18 +5,27 @@ import {
 	HttpApiSchema,
 } from 'effect/unstable/httpapi'
 
-import { ConfirmRequired, InsufficientBudget, NotFound } from '../errors'
+import {
+	ConfirmRequired,
+	InsufficientBudget,
+	NotFound,
+	UnknownStack,
+} from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 import { PaginatedList } from '../pagination'
 import {
 	BulkResolveResult,
+	CancelResult,
+	PaidActionResult,
+	PendingPaidAction,
 	PendingProposal,
 	ProposedUpdateResult,
 	ResearchEvents,
 	ResearchPolicy,
 	ResearchRunDetail,
 	ResearchRunSummary,
+	ResearchSpendBucket,
 } from './research-schemas'
 
 // ── Input schemas ──
@@ -113,6 +122,7 @@ export const ResearchGroup = HttpApiGroup.make('research')
 			error: [
 				InsufficientBudget.pipe(HttpApiSchema.status(409)),
 				ConfirmRequired.pipe(HttpApiSchema.status(409)),
+				UnknownStack.pipe(HttpApiSchema.status(422)),
 			],
 		}),
 	)
@@ -152,7 +162,7 @@ export const ResearchGroup = HttpApiGroup.make('research')
 	.add(
 		HttpApiEndpoint.post('cancel', '/research/:id/cancel', {
 			params: { id: Schema.String },
-			success: Schema.Unknown,
+			success: CancelResult,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
@@ -198,7 +208,7 @@ export const ResearchGroup = HttpApiGroup.make('research')
 			'/research/:id/paid-actions/:paId/approve',
 			{
 				params: { id: Schema.String, paId: Schema.String },
-				success: Schema.Unknown,
+				success: PaidActionResult,
 				error: NotFound.pipe(HttpApiSchema.status(404)),
 			},
 		),
@@ -209,10 +219,23 @@ export const ResearchGroup = HttpApiGroup.make('research')
 			'/research/:id/paid-actions/:paId/skip',
 			{
 				params: { id: Schema.String, paId: Schema.String },
-				success: Schema.Unknown,
+				success: PaidActionResult,
 				error: NotFound.pipe(HttpApiSchema.status(404)),
 			},
 		),
+	)
+	// Every paid lookup in the org still waiting on a decision. A run parks these
+	// and stops before spending, so without this list nothing surfaces one until
+	// somebody opens that run. Static path wins over /research/:id.
+	.add(
+		HttpApiEndpoint.get('listPendingPaidActions', '/research/paid-actions', {
+			query: {
+				research_id: Schema.optional(Schema.String),
+				limit: Schema.optional(Schema.NumberFromString),
+				offset: Schema.optional(Schema.NumberFromString),
+			},
+			success: PaginatedList(PendingPaidAction),
+		}),
 	)
 	// Cross-run review inbox: every pending proposed update in the org, not
 	// scoped to one run. Static path wins over /research/:id, like /preferences.
@@ -293,7 +316,7 @@ export const ResearchGroup = HttpApiGroup.make('research')
 				range: Schema.optional(Schema.String),
 				groupBy: Schema.optional(Schema.String),
 			},
-			success: Schema.Array(Schema.Unknown),
+			success: Schema.Array(ResearchSpendBucket),
 		}),
 	)
 	.middleware(SessionMiddleware)

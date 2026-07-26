@@ -137,3 +137,15 @@ export class ConfirmRequired extends Schema.TaggedErrorClass<ConfirmRequired>()(
 		subjectCount: Schema.Number,
 	},
 ) {}
+
+/**
+ * A run asked for a saved set of instructions that cannot be used — deleted, or
+ * belonging to someone else. Starting the run anyway would silently apply
+ * different instructions than the caller asked for, so it is refused outright.
+ */
+export class UnknownStack extends Schema.TaggedErrorClass<UnknownStack>()(
+	'UnknownStack',
+	{
+		stack: Schema.String,
+	},
+) {}

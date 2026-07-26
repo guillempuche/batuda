@@ -61,10 +61,15 @@ export type ResearchPolicy = typeof ResearchPolicy.Type
 
 /**
  * One pending proposed update in the cross-run review inbox: the run + subject
- * it belongs to, plus the trust signals a reviewer sorts by. `confidence` is a
- * 0–100 score (or null when the proposal carries none); `verification` is the
- * email deliverability verdict; `machineCheckable` is true when the value is an
- * email or phone the system can verify rather than free text.
+ * it belongs to, the values it would write, and the trust signals a reviewer
+ * sorts by. `confidence` is a 0–100 score (or null when the proposal carries
+ * none); `verification` is the best email deliverability verdict among its
+ * channels; `machineCheckable` is true when the value is an email or phone the
+ * system can verify rather than free text.
+ *
+ * `fields` carries the proposed values and `subjectCurrent` what the record
+ * holds today for those same keys, so a caller can show a before-and-after
+ * without a request per row. Both are plain JSON, so they stay `Unknown`.
  */
 export const PendingProposal = Schema.Struct({
 	researchId: Schema.String,
@@ -73,6 +78,7 @@ export const PendingProposal = Schema.Struct({
 	runQuery: Schema.String,
 	runCreatedAt: Schema.DateTimeUtcFromString,
 	runCostCents: Schema.Number,
+	runPaidCostCents: Schema.Number,
 	proposedUpdateId: Schema.NullOr(Schema.String),
 	subjectTable: Schema.NullOr(Schema.String),
 	subjectId: Schema.NullOr(Schema.String),
@@ -82,13 +88,46 @@ export const PendingProposal = Schema.Struct({
 	confidence: Schema.NullOr(Schema.Number),
 	verification: Schema.NullOr(Schema.String),
 	machineCheckable: Schema.Boolean,
+	fields: Schema.Unknown,
+	citations: Schema.Array(Schema.Unknown),
+	subjectCurrent: Schema.NullOr(Schema.Unknown),
 })
 export type PendingProposal = typeof PendingProposal.Type
 
 /**
+ * The outcome of asking to cancel a run. `already_terminal` means the run was
+ * finished — or cancelled — by the time the request arrived, so nothing changed
+ * and a caller must not report it as a cancellation.
+ */
+export const CancelResult = Schema.Struct({
+	outcome: Schema.Literals(['cancelled', 'already_terminal']),
+})
+export type CancelResult = typeof CancelResult.Type
+
+/**
+ * The outcome of deciding a pending paid action. `approved` carries the
+ * follow-up run that will do the paid work; `skipped` spends nothing;
+ * `not_pending` means someone else already decided it; `unsupported_tool` means
+ * the run named a lookup that does not exist, so it can only ever be skipped.
+ * The last two change nothing, so a caller must not report them as an approval.
+ */
+export const PaidActionResult = Schema.Struct({
+	outcome: Schema.Literals([
+		'approved',
+		'skipped',
+		'not_pending',
+		'unsupported_tool',
+	]),
+	followupRunId: Schema.optional(Schema.String),
+})
+export type PaidActionResult = typeof PaidActionResult.Type
+
+/**
  * The result of applying or rejecting one proposed update. `applied`/`created`
  * carry the row version; `duplicate` names the existing row the change merged
- * onto; `invalid` explains why; the rest carry only the outcome.
+ * onto; `invalid` explains why; `proposal_not_found` means someone already
+ * resolved it, which is a harmless no-op rather than a failure and carries the
+ * same name the bulk response uses.
  */
 export const ProposedUpdateResult = Schema.Struct({
 	outcome: Schema.Literals([
@@ -99,6 +138,7 @@ export const ProposedUpdateResult = Schema.Struct({
 		'conflict',
 		'invalid',
 		'no_applicable_fields',
+		'proposal_not_found',
 	]),
 	subject_table: Schema.optional(Schema.String),
 	subject_id: Schema.optional(Schema.String),
@@ -106,6 +146,43 @@ export const ProposedUpdateResult = Schema.Struct({
 	reason: Schema.optional(Schema.String),
 })
 export type ProposedUpdateResult = typeof ProposedUpdateResult.Type
+
+/**
+ * One paid lookup a run stopped short of paying for, waiting on a person to
+ * approve or skip it. `estimatedCents` is what it is expected to cost in whole
+ * cents, or null when the run made no estimate. `actionId` is null on a run
+ * recorded before these were individually identified — such a one can be seen
+ * but not decided. `subjectName` is filled only when the run was about exactly
+ * one company or person. `args` is the lookup's own input, so it stays `Unknown`.
+ */
+export const PendingPaidAction = Schema.Struct({
+	researchId: Schema.String,
+	runQuery: Schema.String,
+	runStatus: Schema.String,
+	runCreatedAt: Schema.DateTimeUtcFromString,
+	actionId: Schema.NullOr(Schema.String),
+	tool: Schema.String,
+	args: Schema.Unknown,
+	estimatedCents: Schema.NullOr(Schema.Number),
+	reason: Schema.NullOr(Schema.String),
+	subjectTable: Schema.NullOr(Schema.String),
+	subjectId: Schema.NullOr(Schema.String),
+	subjectName: Schema.NullOr(Schema.String),
+})
+export type PendingPaidAction = typeof PendingPaidAction.Type
+
+/**
+ * One bucket of paid research spend: what it was grouped by (`key` — a provider,
+ * a person or a tool, depending on the request), the whole cents it came to, and
+ * how many charged calls made it up. Typed rather than left as free-form JSON so
+ * a renamed column fails loudly instead of quietly reading as zero spend.
+ */
+export const ResearchSpendBucket = Schema.Struct({
+	key: Schema.NullOr(Schema.String),
+	amountCents: Schema.Number,
+	calls: Schema.Number,
+})
+export type ResearchSpendBucket = typeof ResearchSpendBucket.Type
 
 /**
  * The live-progress contract: a 30-second JSON long-poll (not a raw event

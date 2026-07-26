@@ -584,9 +584,20 @@ export interface PendingProposalRow {
 	readonly confidence: number | null
 	readonly verification: string | null
 	readonly machineCheckable: boolean
-	// The run's total spend so far, in cents; the same value repeats on every
-	// proposal that came from the same run.
+	// The run's cheap spend so far (search, scraping, model calls), in cents; the
+	// same value repeats on every proposal from that run, so it belongs to the
+	// run rather than to this one proposal.
 	readonly runCostCents: number
+	// What the run paid outside providers, in cents — a tally of its own, not a
+	// slice of the one above, so a cheap-looking run may still have spent money.
+	readonly runPaidCostCents: number
+	// The values this proposal would write, keyed by column.
+	readonly fields: Record<string, unknown>
+	// The pages each value came from.
+	readonly citations: ReadonlyArray<unknown>
+	// What the record holds today for those same columns; null for a proposal
+	// that would create a new row, and absent per-key when the column is unset.
+	readonly subjectCurrent: Record<string, unknown> | null
 }
 
 /**
@@ -639,11 +650,19 @@ export const queryPendingProposals = (
 					r.query AS run_query,
 					r.created_at AS run_created_at,
 					r.cost_cents AS run_cost_cents,
+					r.paid_cost_cents AS run_paid_cost_cents,
 					pu->>'id' AS proposed_update_id,
 					pu->>'subject_table' AS subject_table,
 					pu->>'subject_id' AS subject_id,
 					COALESCE(pu->>'operation', 'update') AS operation,
 					pu->>'reason' AS reason,
+					-- The values the run wants to write and the pages they came from
+					-- travel with the row, so deciding on a proposal needs no further
+					-- lookup of its own.
+					CASE WHEN jsonb_typeof(pu->'fields') = 'object'
+						THEN pu->'fields' ELSE '{}'::jsonb END AS fields,
+					CASE WHEN jsonb_typeof(pu->'citations') = 'array'
+						THEN pu->'citations' ELSE '[]'::jsonb END AS citations,
 					(
 						SELECT max(
 							CASE
@@ -660,6 +679,10 @@ export const queryPendingProposals = (
 								THEN pu->'fields'->'channels' ELSE '[]'::jsonb END
 						) ch
 					)::int AS confidence,
+					-- A proposal is only as good as its best email address: an
+					-- undeliverable address sitting next to a deliverable one still
+					-- reaches the person, so the verdicts are ranked and the strongest
+					-- one wins, rather than whichever channel happens to be listed first.
 					(
 						SELECT ch->>'verification'
 						FROM jsonb_array_elements(
@@ -667,6 +690,14 @@ export const queryPendingProposals = (
 								THEN pu->'fields'->'channels' ELSE '[]'::jsonb END
 						) ch
 						WHERE ch->>'kind' = 'email'
+						ORDER BY CASE ch->>'verification'
+							WHEN 'deliverable' THEN 0
+							WHEN 'risky' THEN 1
+							WHEN 'catch_all' THEN 2
+							WHEN 'unknown' THEN 3
+							WHEN 'undeliverable' THEN 4
+							ELSE 5
+						END
 						LIMIT 1
 					) AS verification,
 					jsonb_path_exists(
@@ -686,7 +717,35 @@ export const queryPendingProposals = (
 				p.*,
 				-- Resolve the subject's current name from its table and id; these
 				-- joins are org-scoped by row-level security like the rest of the query.
-				COALESCE(c.name, ct.name) AS subject_name
+				-- A proposal that would create a brand-new row has no id to look up, so
+				-- its name comes from the values the run proposes instead of being blank.
+				COALESCE(c.name, ct.name, p.fields->>'name') AS subject_name,
+				-- What the record holds today for exactly the fields this proposal would
+				-- write — enough to tell an addition apart from an overwrite — and
+				-- nothing else about the row. A proposal may name a field either way
+				-- round ("size_range" or "sizeRange") and both are accepted on apply, so
+				-- both spellings are looked up against the record's snake_case columns
+				-- and keyed back to the spelling the proposal used.
+				(
+					SELECT jsonb_object_agg(picked.key_out, picked.val)
+					FROM (
+						SELECT
+							k AS key_out,
+							COALESCE(
+								to_jsonb(c) -> k,
+								to_jsonb(ct) -> k,
+								to_jsonb(c) -> s.snake,
+								to_jsonb(ct) -> s.snake
+							) AS val
+						FROM jsonb_object_keys(p.fields) k,
+							LATERAL (
+								SELECT lower(
+									regexp_replace(k, '([a-z0-9])([A-Z])', '\\1_\\2', 'g')
+								) AS snake
+							) s
+					) picked
+					WHERE picked.val IS NOT NULL
+				) AS subject_current
 			FROM pending p
 			LEFT JOIN companies c
 				ON p.subject_table = 'companies' AND c.id::text = p.subject_id
@@ -697,6 +756,118 @@ export const queryPendingProposals = (
 
 		const rows = yield* sql<
 			PendingProposalRow & { readonly total: string | number }
+		>`
+			SELECT sub.*, COUNT(*) OVER () AS total
+			FROM (${matching}) sub
+			ORDER BY sub.run_created_at DESC
+			LIMIT ${limit}
+			OFFSET ${offset}
+		`
+		const total = yield* resolvePageTotal(
+			rows,
+			offset,
+			() => sql<{ readonly count: string | number }>`
+				SELECT count(*) AS count FROM (${matching}) sub
+			`,
+		)
+		return { items: rows, total, limit, offset }
+	})
+
+export interface PendingPaidActionRow {
+	readonly researchId: string
+	readonly runQuery: string
+	readonly runStatus: string
+	readonly runCreatedAt: Date
+	readonly actionId: string | null
+	// The lookup the run wants to pay for, as the run named it. A name matching no
+	// real lookup can only be skipped.
+	readonly tool: string
+	readonly args: Record<string, unknown>
+	// What the lookup is expected to cost, in whole cents; null when the run made
+	// no estimate.
+	readonly estimatedCents: number | null
+	readonly reason: string | null
+	// The company or person the run was about, when it was about exactly one, so a
+	// decision can be made without opening the run.
+	readonly subjectTable: string | null
+	readonly subjectId: string | null
+	readonly subjectName: string | null
+}
+
+/**
+ * Paid lookups across every run in the org that are waiting for a person to
+ * approve or skip them. A run stores these inside its own findings and stops
+ * short of spending, so without a list like this one nothing surfaces a run
+ * holding an unspent decision — it waits until somebody happens to open it.
+ * Org scope is enforced by row-level security, like the run list.
+ */
+export const queryPendingPaidActions = (
+	sql: SqlClient.SqlClient,
+	filters: {
+		researchId?: string | undefined
+		limit?: number | undefined
+		offset?: number | undefined
+	},
+) =>
+	Effect.gen(function* () {
+		const conditions: Array<import('effect/unstable/sql').Statement.Fragment> =
+			[]
+		if (filters.researchId)
+			conditions.push(sql`research_id = ${filters.researchId}`)
+
+		const { limit, offset } = clampPagination(filters.limit, filters.offset)
+
+		// An action written before the id stamp has no id and cannot be resolved,
+		// but it still shows, so a run that is stuck waiting is at least visible.
+		// An absent status counts as pending: that is the shape a run writes first.
+		const matching = sql`
+			WITH waiting AS (
+				SELECT
+					r.id AS research_id,
+					r.query AS run_query,
+					r.status AS run_status,
+					r.created_at AS run_created_at,
+					pa->>'id' AS action_id,
+					COALESCE(pa->>'tool', '') AS tool,
+					CASE WHEN jsonb_typeof(pa->'args') = 'object'
+						THEN pa->'args' ELSE '{}'::jsonb END AS args,
+					CASE WHEN jsonb_typeof(pa->'estimated_cents') = 'number'
+						THEN (pa->>'estimated_cents')::int END AS estimated_cents,
+					pa->>'reason' AS reason,
+					-- A run anchored to exactly one company or person names it here.
+					-- The count guard is what keeps a run about several of them from
+					-- picking one at random and presenting it as the subject.
+					(
+						SELECT min(rl.subject_table) FROM research_links rl
+						WHERE rl.research_id = r.id
+						HAVING count(*) = 1
+					) AS subject_table,
+					(
+						SELECT min(rl.subject_id::text) FROM research_links rl
+						WHERE rl.research_id = r.id
+						HAVING count(*) = 1
+					) AS subject_id
+				FROM research_runs r,
+					LATERAL jsonb_array_elements(
+						CASE WHEN jsonb_typeof(r.findings->'pending_paid_actions') = 'array'
+							THEN r.findings->'pending_paid_actions' ELSE '[]'::jsonb END
+					) pa
+				WHERE r.status != 'deleted'
+					AND COALESCE(pa->>'status', 'pending') = 'pending'
+			)
+			SELECT
+				w.*,
+				COALESCE(c.name, ct.name) AS subject_name
+			FROM waiting w
+			LEFT JOIN companies c
+				ON w.subject_table = 'companies' AND c.id::text = w.subject_id
+			LEFT JOIN contacts ct
+				ON w.subject_table = 'contacts' AND ct.id::text = w.subject_id
+			${conditions.length > 0 ? sql`WHERE ${sql.and(conditions)}` : sql``}
+		`
+
+		const rows = yield* sql<
+			PendingPaidActionRow & { readonly total: string | number }
 		>`
 			SELECT sub.*, COUNT(*) OVER () AS total
 			FROM (${matching}) sub
@@ -4742,8 +4913,20 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						> = [sql`r.status != 'deleted'`]
 						if (filters.createdBy)
 							conditions.push(sql`r.created_by = ${filters.createdBy}`)
-						if (filters.status)
-							conditions.push(sql`r.status = ${filters.status}`)
+						// A comma-separated status asks for several at once — "everything
+						// that needs a human", say — and answering that here saves the
+						// caller from paging through runs and sifting them by hand.
+						if (filters.status) {
+							const requestedStatuses = filters.status
+								.split(',')
+								.map(s => s.trim())
+								.filter(s => s !== '')
+							if (requestedStatuses.length > 1) {
+								conditions.push(sql`r.status = ANY(${requestedStatuses})`)
+							} else if (requestedStatuses.length === 1) {
+								conditions.push(sql`r.status = ${requestedStatuses[0]}`)
+							}
+						}
 						if (filters.since)
 							conditions.push(sql`r.created_at >= ${filters.since}`)
 
@@ -4798,6 +4981,13 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					offset?: number | undefined
 				}) => queryPendingProposals(sql, filters),
 
+				/** Paid lookups across the org still waiting on a person's decision. */
+				listPendingPaidActions: (filters: {
+					researchId?: string | undefined
+					limit?: number | undefined
+					offset?: number | undefined
+				}) => queryPendingPaidActions(sql, filters),
+
 				/** Get all runs linked to a subject row. */
 				bySubject: (table: string, id: string) =>
 					Effect.gen(function* () {
@@ -4843,7 +5033,13 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									? sql`tool`
 									: sql`provider`
 
-						return yield* sql`
+						// Column names arrive camelCased by the SQL client, so the row
+						// type names them the way a reader receives them.
+						return yield* sql<{
+							readonly key: string | null
+							readonly amountCents: number
+							readonly calls: number
+						}>`
 							SELECT ${keyFragment} AS key,
 								SUM(amount_cents)::int AS amount_cents,
 								COUNT(*)::int AS calls
