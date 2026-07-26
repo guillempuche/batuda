@@ -2064,6 +2064,10 @@ msgstr "Plantilles addicionals per a aquesta execució"
 msgid "Extracting findings"
 msgstr "Extraient conclusions"
 
+#: src/components/research/run-progress.tsx
+msgid "Extracting findings."
+msgstr "Extraient conclusions."
+
 #: src/components/research/findings/company-enrichment-view.tsx
 msgid "Fail"
 msgstr "No compleix"
@@ -2200,6 +2204,10 @@ msgstr "Pantalla completa"
 #: src/components/research/run-progress.tsx
 msgid "Gathering evidence"
 msgstr "Recollint proves"
+
+#: src/components/research/run-progress.tsx
+msgid "Gathering evidence."
+msgstr "Recollint proves."
 
 #: src/components/companies/documents-panel.tsx
 msgid "General"
@@ -2505,6 +2513,10 @@ msgstr "LinkedIn"
 #: src/components/companies/companies-header.tsx
 msgid "List"
 msgstr "Llista"
+
+#: src/components/research/run-detail.tsx
+msgid "Live updates have stopped. The run may still be working."
+msgstr "Les actualitzacions en directe s'han aturat. Potser l'execució encara treballa."
 
 #: src/components/research/run-detail.tsx
 msgid "Live updates paused. This run may still be working — refresh to check its latest status."
@@ -4600,6 +4612,10 @@ msgid "Start sending and receiving"
 msgstr "Comença a enviar i rebre"
 
 #: src/components/research/run-progress.tsx
+msgid "Starting the run."
+msgstr "Iniciant l'execució."
+
+#: src/components/research/run-progress.tsx
 msgid "Starting the run…"
 msgstr "Iniciant l'execució…"
 
@@ -4995,6 +5011,10 @@ msgstr "Aquesta execució no es pot mostrar."
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "This run found no changes to review."
 msgstr "Aquesta execució no ha trobat cap canvi per revisar."
+
+#: src/components/research/run-detail.tsx
+msgid "This run has finished."
+msgstr "Aquesta execució ha acabat."
 
 #. placeholder {0}: pendingConfirm.subjectCount
 #. placeholder {1}: formatMoneyCents(pendingConfirm.estimatedCostCents, { locale: i18n.locale, })
@@ -5397,6 +5417,10 @@ msgstr "Escriu el teu missatge…"
 #: src/components/research/run-progress.tsx
 msgid "Writing the brief"
 msgstr "Redactant l'informe"
+
+#: src/components/research/run-progress.tsx
+msgid "Writing the brief."
+msgstr "Escrivint el resum."
 
 #: src/components/companies/account-brief-section.tsx
 msgid "Written by research. Editing it makes it yours."

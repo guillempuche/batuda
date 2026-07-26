@@ -2064,6 +2064,10 @@ msgstr "Extra templates for this run"
 msgid "Extracting findings"
 msgstr "Extracting findings"
 
+#: src/components/research/run-progress.tsx
+msgid "Extracting findings."
+msgstr "Extracting findings."
+
 #: src/components/research/findings/company-enrichment-view.tsx
 msgid "Fail"
 msgstr "Fail"
@@ -2200,6 +2204,10 @@ msgstr "Full screen"
 #: src/components/research/run-progress.tsx
 msgid "Gathering evidence"
 msgstr "Gathering evidence"
+
+#: src/components/research/run-progress.tsx
+msgid "Gathering evidence."
+msgstr "Gathering evidence."
 
 #: src/components/companies/documents-panel.tsx
 msgid "General"
@@ -2505,6 +2513,10 @@ msgstr "LinkedIn"
 #: src/components/companies/companies-header.tsx
 msgid "List"
 msgstr "List"
+
+#: src/components/research/run-detail.tsx
+msgid "Live updates have stopped. The run may still be working."
+msgstr "Live updates have stopped. The run may still be working."
 
 #: src/components/research/run-detail.tsx
 msgid "Live updates paused. This run may still be working — refresh to check its latest status."
@@ -4600,6 +4612,10 @@ msgid "Start sending and receiving"
 msgstr "Start sending and receiving"
 
 #: src/components/research/run-progress.tsx
+msgid "Starting the run."
+msgstr "Starting the run."
+
+#: src/components/research/run-progress.tsx
 msgid "Starting the run…"
 msgstr "Starting the run…"
 
@@ -4995,6 +5011,10 @@ msgstr "This run can't be displayed."
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "This run found no changes to review."
 msgstr "This run found no changes to review."
+
+#: src/components/research/run-detail.tsx
+msgid "This run has finished."
+msgstr "This run has finished."
 
 #. placeholder {0}: pendingConfirm.subjectCount
 #. placeholder {1}: formatMoneyCents(pendingConfirm.estimatedCostCents, { locale: i18n.locale, })
@@ -5397,6 +5417,10 @@ msgstr "Write your message…"
 #: src/components/research/run-progress.tsx
 msgid "Writing the brief"
 msgstr "Writing the brief"
+
+#: src/components/research/run-progress.tsx
+msgid "Writing the brief."
+msgstr "Writing the brief."
 
 #: src/components/companies/account-brief-section.tsx
 msgid "Written by research. Editing it makes it yours."

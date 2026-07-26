@@ -30,9 +30,10 @@ import { ResearchRunIdProvider } from '#/components/research/research-run-contex
 import { ProposedUpdatesReview } from '#/components/research/review/proposed-updates-review'
 import { RunActions } from '#/components/research/run-actions'
 import { statusLabel, statusTone } from '#/components/research/run-labels'
-import { RunProgress } from '#/components/research/run-progress'
+import { phaseMessage, RunProgress } from '#/components/research/run-progress'
 import { TargetCorrection } from '#/components/research/target-correction'
 import { ErrorState } from '#/components/shared/error-state'
+import { SrOnly } from '#/components/shared/sr-only'
 import { useResearchEvents } from '#/hooks/use-research-events'
 import {
 	brushedMetalPlate,
@@ -105,9 +106,25 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 	const isBatch = run?.kind === 'group'
 	// The raw token was being shown, so a reader saw "succeeded_low_confidence".
 	const runStatusLabel = run !== null ? statusLabel(run.status) : null
-	const { progress, failed, stalled, retry } = useResearchEvents(researchId, {
-		enabled: isRunning && !isBatch,
-	})
+	const { progress, done, failed, stalled, retry } = useResearchEvents(
+		researchId,
+		{ enabled: isRunning && !isBatch },
+	)
+
+	// One short sentence about where the run is, said only when it changes. The
+	// progress panel itself is silent: announcing it re-read every figure in it on
+	// every poll. This lives outside the panel so it is still on the page when the
+	// run finishes, which is the moment most worth hearing about — a region that
+	// appears at the same time as its text is not announced at all.
+	const runLive = isBatch
+		? null
+		: done
+			? t`This run has finished.`
+			: stalled || failed
+				? t`Live updates have stopped. The run may still be working.`
+				: isRunning
+					? i18n._(phaseMessage(progress.phase))
+					: null
 
 	// Only a first load has nothing to show. Treating a refresh as "loading" threw
 	// the whole panel away and rebuilt it, which cut short the few seconds a
@@ -151,6 +168,12 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 	return (
 		<ResearchRunIdProvider value={run.id}>
 			<Panel data-testid='research-run-detail'>
+				{runLive !== null ? (
+					<SrOnly role='status' data-testid='research-run-live'>
+						{runLive}
+					</SrOnly>
+				) : null}
+
 				<Header>
 					<Heading>{run.query}</Heading>
 					<HeaderMeta>

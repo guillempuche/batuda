@@ -1,3 +1,5 @@
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
 import { Plural, Trans, useLingui } from '@lingui/react/macro'
 import type { ReactNode } from 'react'
 import styled from 'styled-components'
@@ -9,6 +11,12 @@ import type { ResearchProgress } from '#/components/research/event-shapes'
  * which of the three phases the agent is in (gather → extract → write), the
  * step count, and how many sources it has pulled — so a paid, minutes-long
  * job doesn't look frozen.
+ *
+ * Read silently on purpose. Announcing this panel meant re-reading every figure
+ * in it each time a poll returned — "gathering evidence, step 1 of 3, searching
+ * and reasoning, 7 steps run, 4 sources", over and over, interrupting whatever
+ * the reader was on. The page announces the phase alone, when it changes, from a
+ * region that outlives this panel; see `phaseMessage`.
  */
 export function RunProgress({
 	progress,
@@ -17,7 +25,7 @@ export function RunProgress({
 }) {
 	const { t } = useLingui()
 	return (
-		<Wrap data-testid='research-run-progress' role='status' aria-live='polite'>
+		<Wrap data-testid='research-run-progress'>
 			<Pulse aria-hidden />
 			<Body>
 				<Line>
@@ -150,3 +158,20 @@ const Meta = styled.div`
 `
 
 const MetaItem = styled.span``
+
+/**
+ * The phase as one short sentence, for the page's spoken summary. Kept beside
+ * the visual labels so the two cannot drift apart.
+ */
+export function phaseMessage(phase: number | null): MessageDescriptor {
+	switch (phase) {
+		case 1:
+			return msg`Gathering evidence.`
+		case 2:
+			return msg`Extracting findings.`
+		case 3:
+			return msg`Writing the brief.`
+		default:
+			return msg`Starting the run.`
+	}
+}
