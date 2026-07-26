@@ -4923,6 +4923,10 @@ msgstr "The geocoder did not return a match. Try editing the location field."
 msgid "The inboxes could not be fetched. Check that the session is valid, then try again."
 msgstr "The inboxes could not be fetched. Check that the session is valid, then try again."
 
+#: src/routes/calendar/index.tsx
+msgid "The invitation gave no time zone, so this time may be wrong. Confirm it with the organizer."
+msgstr "The invitation gave no time zone, so this time may be wrong. Confirm it with the organizer."
+
 #: src/routes/tasks/index.tsx
 msgid "The ledger is clean."
 msgstr "The ledger is clean."

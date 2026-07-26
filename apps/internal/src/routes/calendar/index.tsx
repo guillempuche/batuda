@@ -45,6 +45,9 @@ type CalendarEventRow = {
 	readonly locationValue: string | null
 	readonly videoCallUrl: string | null
 	readonly organizerEmail: string
+	// True when the invitation carried a clock time but no time zone, so the
+	// time on screen is a guess rather than what the sender stated.
+	readonly timeIsAssumed: boolean
 }
 
 type CompanyLookup = {
@@ -261,13 +264,18 @@ function EventDetailDialog({
 							<DetailLabel>
 								<Trans>When</Trans>
 							</DetailLabel>
-							<DetailValue>
-								{start.toLocaleString('en', {
-									dateStyle: 'medium',
-									timeStyle: 'short',
-								})}
-								{' – '}
-								{end.toLocaleTimeString('en', { timeStyle: 'short' })}
+							{/* The server sits in UTC and the reader's browser does not, so
+							the spelled-out time is allowed to differ between the two. */}
+							<DetailValue suppressHydrationWarning>
+								{formatEventRange(start, end)}
+								{event.timeIsAssumed ? (
+									<AssumedTime data-testid='calendar-event-assumed-time'>
+										<Trans>
+											The invitation gave no time zone, so this time may be
+											wrong. Confirm it with the organizer.
+										</Trans>
+									</AssumedTime>
+								) : null}
 							</DetailValue>
 						</DetailField>
 						<DetailField>
@@ -375,6 +383,36 @@ function EventDetailDialog({
 	)
 }
 
+/**
+ * When a meeting runs, in the reader's own time zone. A meeting that spans days
+ * repeats the date at the end, so a three-day event cannot read as ending the
+ * afternoon it began, and the zone is named because nothing else on this screen
+ * says which clock these times belong to.
+ */
+function formatEventRange(start: Date, end: Date): string {
+	// `timeZoneName` cannot be combined with the `dateStyle`/`timeStyle`
+	// shorthands, so each date and time field is asked for on its own.
+	const dateOptions = {
+		month: 'short',
+		day: 'numeric',
+		year: 'numeric',
+	} as const
+	const timeOptions = { hour: 'numeric', minute: '2-digit' } as const
+
+	const sameDay = start.toDateString() === end.toDateString()
+	const startLabel = start.toLocaleString('en', {
+		...dateOptions,
+		...timeOptions,
+	})
+	const endLabel = end.toLocaleString('en', {
+		...(sameDay ? {} : dateOptions),
+		...timeOptions,
+		timeZoneName: 'short',
+	})
+
+	return `${startLabel} – ${endLabel}`
+}
+
 // ── Row → domain adapters ──────────────────────────────────────────
 
 // Typed date fields decode to DateTime.Utc on the wire; convert those to an
@@ -401,7 +439,17 @@ function toEventRow(raw: unknown): CalendarEventRow {
 		locationValue: (r['locationValue'] ?? null) as string | null,
 		videoCallUrl: (r['videoCallUrl'] ?? null) as string | null,
 		organizerEmail: String(r['organizerEmail'] ?? ''),
+		timeIsAssumed: hasAssumedTimeZone(r['metadata']),
 	}
+}
+
+// The parser leaves a note behind when an invitation's time carried no zone and
+// was read as UTC, which is what makes a 09:00 Madrid meeting show up at 11:00.
+function hasAssumedTimeZone(metadata: unknown): boolean {
+	if (!metadata || typeof metadata !== 'object') return false
+	return (
+		(metadata as Record<string, unknown>)['timezone'] === 'floating_assumed_utc'
+	)
 }
 
 function toCompanyLookup(raw: unknown): CompanyLookup | null {
@@ -495,6 +543,15 @@ const DetailValue = styled.dd.withConfig({
 	margin: 0;
 	color: var(--color-on-surface);
 	font-size: var(--typescale-body-medium-size);
+`
+
+const AssumedTime = styled.p.withConfig({
+	displayName: 'CalendarAssumedTime',
+})`
+	margin: var(--space-2xs) 0 0;
+	font-size: var(--typescale-label-small-size);
+	line-height: var(--typescale-label-small-line);
+	color: var(--color-error);
 `
 
 const VideoLink = styled.a.withConfig({ displayName: 'CalendarVideoLink' })`

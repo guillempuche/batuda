@@ -4923,6 +4923,10 @@ msgstr "El geocodificador no ha trobat cap coincidència. Prova d'editar el camp
 msgid "The inboxes could not be fetched. Check that the session is valid, then try again."
 msgstr "No s'han pogut carregar les safates. Comprova que la sessió sigui vàlida i torna-ho a provar."
 
+#: src/routes/calendar/index.tsx
+msgid "The invitation gave no time zone, so this time may be wrong. Confirm it with the organizer."
+msgstr "La invitació no indicava cap fus horari, així que aquesta hora pot ser incorrecta. Confirma-la amb qui organitza."
+
 #: src/routes/tasks/index.tsx
 msgid "The ledger is clean."
 msgstr "El llibre de comptes està net."
