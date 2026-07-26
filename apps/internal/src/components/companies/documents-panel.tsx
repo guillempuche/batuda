@@ -2,12 +2,14 @@ import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
+import { Link } from '@tanstack/react-router'
 import { DateTime, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { FileText, Pencil, Plus, X } from 'lucide-react'
 import { type FormEvent, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 
+import type { DocumentSubjectTable } from '@batuda/domain'
 import {
 	PriButton,
 	PriDialog,
@@ -36,12 +38,13 @@ const documentsDlgSchema = Schema.Union(documentsDlgMembers)
 type DocRow = {
 	readonly id: string
 	readonly type: string
+	readonly format: string
 	readonly title: string | null
-	readonly content: string
+	readonly snippet: string
 	readonly updatedAt: string | null
 }
 
-// The document kinds the picker offers; `type` is free text server-side.
+// The document kinds the picker offers, matching the list the server accepts.
 const DOC_TYPES: ReadonlyArray<{
 	readonly value: string
 	readonly label: MessageDescriptor
@@ -71,12 +74,28 @@ function narrowDocs(rows: ReadonlyArray<unknown>): ReadonlyArray<DocRow> {
 		out.push({
 			id: r['id'],
 			type: typeof r['type'] === 'string' ? r['type'] : 'general',
+			format: r['format'] === 'html' ? 'html' : 'markdown',
 			title: typeof r['title'] === 'string' ? r['title'] : null,
-			content: typeof r['content'] === 'string' ? r['content'] : '',
+			snippet: typeof r['snippet'] === 'string' ? r['snippet'] : '',
 			updatedAt: dateToIsoOrNull(r['updatedAt']),
 		})
 	}
 	return out
+}
+
+type DocBody = {
+	readonly content: string
+	readonly htmlUrl: string | null
+}
+
+function narrowBody(value: unknown): DocBody | null {
+	if (!value || typeof value !== 'object') return null
+	const r = value as Record<string, unknown>
+	if (typeof r['content'] !== 'string') return null
+	return {
+		content: r['content'],
+		htmlUrl: typeof r['htmlUrl'] === 'string' ? r['htmlUrl'] : null,
+	}
 }
 
 type DialogState =
@@ -85,12 +104,26 @@ type DialogState =
 	| { readonly mode: 'edit'; readonly doc: DocRow }
 	| { readonly mode: 'add' }
 
-/** List, read, create, and edit a company's documents (markdown), on the Files tab. */
-export function DocumentsPanel({ companyId }: { readonly companyId: string }) {
+/**
+ * List, read, write and delete the documents filed against one record.
+ *
+ * The record is whatever it is handed — a company, a person, a task, an offer,
+ * a meeting — so the same panel serves every surface that keeps notes.
+ */
+export function DocumentsPanel({
+	subjectTable,
+	subjectId,
+}: {
+	readonly subjectTable: DocumentSubjectTable
+	readonly subjectId: string
+}) {
 	const { i18n, t } = useLingui()
 	const docsAtom = useMemo(
-		() => BatudaApiAtom.query('documents', 'list', { query: { companyId } }),
-		[companyId],
+		() =>
+			BatudaApiAtom.query('documents', 'list', {
+				query: { subjectTable, subjectId },
+			}),
+		[subjectTable, subjectId],
 	)
 	const result = useAtomValue(docsAtom)
 	const refresh = useAtomRefresh(docsAtom)
@@ -163,37 +196,73 @@ export function DocumentsPanel({ companyId }: { readonly companyId: string }) {
 				</List>
 			)}
 
-			<DocumentDialog
-				state={dialog}
-				companyId={companyId}
-				onClose={closeDlg}
-				onSaved={() => {
-					refresh()
-					closeDlg()
-				}}
-				// Reading and editing the same document are one step, so Back leaves
-				// the document instead of returning to the read view.
-				onEdit={doc =>
-					openDlg({ kind: 'doc-edit', id: doc.id }, { replace: true })
-				}
-			/>
+			{dialog.mode === 'closed' ? null : (
+				<DocumentDialogHost
+					state={dialog}
+					subjectTable={subjectTable}
+					subjectId={subjectId}
+					onClose={closeDlg}
+					onSaved={() => {
+						refresh()
+						closeDlg()
+					}}
+					// Reading and editing the same document are one step, so Back
+					// leaves the document instead of returning to the read view.
+					onEdit={doc =>
+						openDlg({ kind: 'doc-edit', id: doc.id }, { replace: true })
+					}
+				/>
+			)}
 		</>
 	)
 }
 
-function DocumentDialog({
-	state,
-	companyId,
-	onClose,
-	onSaved,
-	onEdit,
-}: {
-	readonly state: DialogState
-	readonly companyId: string
+// The host is only rendered while a dialog is open, so everything below it can
+// count on there being something to show.
+type OpenDialogState = Exclude<DialogState, { readonly mode: 'closed' }>
+
+type DialogProps = {
+	readonly state: OpenDialogState
+	readonly subjectTable: DocumentSubjectTable
+	readonly subjectId: string
 	readonly onClose: () => void
 	readonly onSaved: () => void
 	readonly onEdit: (doc: DocRow) => void
-}) {
+}
+
+/**
+ * Fetches the body only when there is a document to read.
+ *
+ * The list carries a snippet, not the whole document, so reading or editing one
+ * needs a second request — but writing a new one does not, and a component that
+ * always asked would fetch on every open of the Add dialog for nothing.
+ */
+function DocumentDialogHost(props: DialogProps) {
+	if (props.state.mode === 'add') {
+		return <DocumentDialog {...props} body={{ content: '', htmlUrl: null }} />
+	}
+	return <DocumentDialogWithBody {...props} id={props.state.doc.id} />
+}
+
+function DocumentDialogWithBody(props: DialogProps & { readonly id: string }) {
+	const bodyAtom = useMemo(
+		() => BatudaApiAtom.query('documents', 'get', { params: { id: props.id } }),
+		[props.id],
+	)
+	const result = useAtomValue(bodyAtom)
+	const body = AsyncResult.isSuccess(result) ? narrowBody(result.value) : null
+	return <DocumentDialog {...props} body={body} />
+}
+
+function DocumentDialog({
+	state,
+	subjectTable,
+	subjectId,
+	body,
+	onClose,
+	onSaved,
+	onEdit,
+}: DialogProps & { readonly body: DocBody | null }) {
 	const { i18n, t } = useLingui()
 	const toast = usePriToast()
 	const create = useAtomSet(BatudaApiAtom.mutation('documents', 'create'), {
@@ -204,23 +273,28 @@ function DocumentDialog({
 	})
 
 	const editing = state.mode === 'edit' ? state.doc : null
+
 	const [title, setTitle] = useState('')
 	const [type, setType] = useState('general')
 	const [content, setContent] = useState('')
 	const [busy, setBusy] = useState(false)
 
-	// Re-seed the form each time the dialog opens for a different doc/mode.
-	const formKey = state.mode === 'edit' ? state.doc.id : state.mode
+	// Re-seed the form each time the dialog opens for a different doc/mode, and
+	// again once the body has arrived for the one being edited — until then the
+	// box would hold nothing, and saving would wipe the document.
+	const formKey =
+		state.mode === 'edit'
+			? `${state.doc.id}:${body === null ? 'loading' : 'ready'}`
+			: state.mode
 	const seededKey = useRef<string | null>(null)
 	if (seededKey.current !== formKey) {
 		seededKey.current = formKey
 		setTitle(editing?.title ?? '')
 		setType(editing?.type ?? 'general')
-		setContent(editing?.content ?? '')
+		setContent(body?.content ?? '')
 		setBusy(false)
 	}
 
-	const open = state.mode !== 'closed'
 	const isForm = state.mode === 'add' || state.mode === 'edit'
 
 	const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -238,7 +312,8 @@ function DocumentDialog({
 				} as never)
 			: await create({
 					payload: {
-						companyId,
+						subjectTable,
+						subjectId,
 						type,
 						...(trimmedTitle ? { title: trimmedTitle } : {}),
 						content,
@@ -253,7 +328,7 @@ function DocumentDialog({
 	}
 
 	return (
-		<PriDialog.Root open={open} onOpenChange={next => !next && onClose()}>
+		<PriDialog.Root open onOpenChange={next => !next && onClose()}>
 			<PriDialog.Portal>
 				<PriDialog.Backdrop />
 				<PriDialog.Popup data-testid='document-dialog'>
@@ -286,16 +361,59 @@ function DocumentDialog({
 								aria-label={t`Document`}
 								tabIndex={0}
 							>
-								<MarkdownView source={state.doc.content} />
+								{state.doc.format === 'html' ? (
+									// A web page opens in its own tab, exactly as it was
+									// saved. Showing it here would mean stripping it down
+									// to something safe to put beside the rest of the app,
+									// and a stripped page is not what someone opening a
+									// report wants to see.
+									<HtmlNotice>
+										<Trans>
+											This document is a web page. It opens in a new tab.
+										</Trans>
+										<PriButton
+											type='button'
+											$variant='filled'
+											data-testid='document-open-original'
+											disabled={body?.htmlUrl == null}
+											onClick={() => {
+												if (body?.htmlUrl != null) {
+													window.open(
+														body.htmlUrl,
+														'_blank',
+														'noopener,noreferrer',
+													)
+												}
+											}}
+										>
+											<Trans>Open the page</Trans>
+										</PriButton>
+									</HtmlNotice>
+								) : (
+									<MarkdownView source={body?.content ?? state.doc.snippet} />
+								)}
 							</ViewBody>
 							<Footer>
-								<PriButton
-									type='button'
-									$variant='filled'
-									onClick={() => onEdit(state.doc)}
-								>
-									<Trans>Edit</Trans>
-								</PriButton>
+								{state.doc.format === 'html' ? null : (
+									<PriButton
+										type='button'
+										$variant='filled'
+										onClick={() => onEdit(state.doc)}
+									>
+										<Trans>Edit</Trans>
+									</PriButton>
+								)}
+								{/* This popup is for a quick look. The page behind the
+								    link is the one that can be sent to somebody. */}
+								<FullPageLink>
+									<Link
+										to='/documents/$id'
+										params={{ id: state.doc.id }}
+										data-testid='document-open-full-page'
+									>
+										<Trans>Open full page</Trans>
+									</Link>
+								</FullPageLink>
 							</Footer>
 						</>
 					) : isForm ? (
@@ -527,4 +645,25 @@ const Footer = styled.div`
 	gap: var(--space-sm);
 	justify-content: flex-end;
 	margin-top: var(--space-sm);
+`
+
+const HtmlNotice = styled.div`
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: var(--space-md);
+	color: var(--color-text-muted);
+	font-size: var(--font-size-sm);
+`
+
+// Styling wraps the link rather than the router's own component, whose typed
+// route parameters do not survive being wrapped.
+const FullPageLink = styled.span`
+	align-self: center;
+
+	a {
+		color: var(--color-primary);
+		font-size: var(--font-size-sm);
+		text-decoration: underline;
+	}
 `

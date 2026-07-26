@@ -12,6 +12,7 @@ import { PriButton, PriDialog } from '@batuda/ui/pri'
 import { calendarEventsAtom, rsvpEventAtom } from '#/atoms/calendar-atoms'
 import { companiesListAtom } from '#/atoms/pipeline-atoms'
 import { createTaskAtom } from '#/atoms/tasks-atoms'
+import { SubjectDocuments } from '#/components/documents/subject-documents'
 import { EmptyState } from '#/components/shared/empty-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { dehydrateAtom } from '#/lib/atom-hydration'
@@ -349,6 +350,11 @@ function EventDetailDialog({
 							</RsvpButtons>
 						</RsvpRow>
 					) : null}
+
+					<SubjectDocuments
+						subjectTable='calendar_events'
+						subjectId={event.id}
+					/>
 
 					<ActionRow>
 						<PriButton

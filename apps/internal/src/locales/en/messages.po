@@ -174,6 +174,10 @@ msgstr "{total} companies"
 msgid "{total} companies with filters applied"
 msgstr "{total} companies with filters applied"
 
+#: src/routes/documents/index.tsx
+msgid "{total} documents"
+msgstr "{total} documents"
+
 #: src/routes/emails/index.tsx
 msgid "{total} threads"
 msgstr "{total} threads"
@@ -786,6 +790,7 @@ msgid "Call"
 msgstr "Call"
 
 #: src/components/companies/documents-panel.tsx
+#: src/components/documents/document-kinds.ts
 msgid "Call notes"
 msgstr "Call notes"
 
@@ -1309,6 +1314,10 @@ msgstr "Could not load these tasks"
 msgid "Could not load this company"
 msgstr "Could not load this company"
 
+#: src/routes/documents/$id.tsx
+msgid "Could not load this document"
+msgstr "Could not load this document"
+
 #: src/routes/pages/$id.tsx
 msgid "Could not load this page"
 msgstr "Could not load this page"
@@ -1804,10 +1813,15 @@ msgstr "Display name"
 #: src/components/companies/documents-panel.tsx
 #: src/components/companies/documents-panel.tsx
 #: src/components/shared/channel-icon.tsx
+#: src/routes/documents/$id.tsx
 msgid "Document"
 msgstr "Document"
 
+#: src/components/documents/subject-documents.tsx
+#: src/components/layout/nav-items.ts
 #: src/routes/companies/$slug.tsx
+#: src/routes/documents/index.tsx
+#: src/routes/documents/index.tsx
 msgid "Documents"
 msgstr "Documents"
 
@@ -2070,6 +2084,10 @@ msgstr "Error"
 msgid "Event"
 msgstr "Event"
 
+#: src/routes/documents/index.tsx
+msgid "Every kind"
+msgstr "Every kind"
+
 #: src/routes/tasks/index.tsx
 msgid "Every open task has a due date assigned."
 msgstr "Every open task has a due date assigned."
@@ -2265,6 +2283,7 @@ msgid "Gathering evidence."
 msgstr "Gathering evidence."
 
 #: src/components/companies/documents-panel.tsx
+#: src/components/documents/document-kinds.ts
 msgid "General"
 msgstr "General"
 
@@ -2584,10 +2603,6 @@ msgstr "Live updates have stopped. The run may still be working."
 msgid "Live updates paused. This run may still be working — refresh to check its latest status."
 msgstr "Live updates paused. This run may still be working — refresh to check its latest status."
 
-#: src/components/companies/pipeline-board.tsx
-#~ msgid "Load {0} more"
-#~ msgstr "Load {0} more"
-
 #: src/components/shared/infinite-list-footer.tsx
 msgid "Load more"
 msgstr "Load more"
@@ -2816,10 +2831,12 @@ msgid "Meeting booked"
 msgstr "Meeting booked"
 
 #: src/components/companies/documents-panel.tsx
+#: src/components/documents/document-kinds.ts
 msgid "Meeting notes"
 msgstr "Meeting notes"
 
 #: src/components/companies/documents-panel.tsx
+#: src/components/documents/document-kinds.ts
 msgid "Meeting prep"
 msgstr "Meeting prep"
 
@@ -3308,10 +3325,6 @@ msgstr "Note"
 msgid "Notes"
 msgstr "Notes"
 
-#: src/components/companies/proposals-panel.tsx
-msgid "Notes (optional)"
-msgstr "Notes (optional)"
-
 #: src/routes/tasks/index.tsx
 msgid "Nothing changed yet."
 msgstr "Nothing changed yet."
@@ -3352,6 +3365,10 @@ msgstr "Nothing to review right now."
 msgid "Nothing to show in this range."
 msgstr "Nothing to show in this range."
 
+#: src/routes/documents/index.tsx
+msgid "Nothing written down matches that."
+msgstr "Nothing written down matches that."
+
 #: src/components/primitives/pri-rich-text.tsx
 msgid "Numbered list"
 msgstr "Numbered list"
@@ -3391,6 +3408,10 @@ msgstr "Open {0}"
 #: src/routes/calendar/index.tsx
 msgid "Open company"
 msgstr "Open company"
+
+#: src/components/companies/documents-panel.tsx
+msgid "Open full page"
+msgstr "Open full page"
 
 #: src/components/companies/upcoming-meetings-card.tsx
 msgid "Open in Cal.com"
@@ -3439,6 +3460,11 @@ msgstr "Open tasks"
 #: src/routes/settings/organization/index.tsx
 msgid "Open the org spend dashboard"
 msgstr "Open the org spend dashboard"
+
+#: src/components/companies/documents-panel.tsx
+#: src/routes/documents/$id.tsx
+msgid "Open the page"
+msgstr "Open the page"
 
 #: src/components/research/inbox/paid-action-queue.tsx
 msgid "Open the run asking for this lookup"
@@ -4107,6 +4133,7 @@ msgstr "Request a new link"
 
 #: src/components/companies/documents-panel.tsx
 #: src/components/companies/research-summary-card.tsx
+#: src/components/documents/document-kinds.ts
 #: src/components/instructions/agent-selector.tsx
 #: src/components/layout/nav-items.ts
 #: src/components/research/inbox/research-inbox.tsx
@@ -4320,6 +4347,10 @@ msgstr "Search the review queue"
 #: src/routes/emails/index.tsx
 msgid "Search threads"
 msgstr "Search threads"
+
+#: src/routes/documents/index.tsx
+msgid "Search titles and text"
+msgstr "Search titles and text"
 
 #: src/components/research/run-progress.tsx
 msgid "Searching and reasoning"
@@ -4801,10 +4832,6 @@ msgstr "Task title"
 msgid "Tasks"
 msgstr "Tasks"
 
-#: src/routes/tasks/index.tsx
-#~ msgid "tasks — showing {0} of {shelfTotal}"
-#~ msgstr "tasks — showing {0} of {shelfTotal}"
-
 #: src/components/research/findings/prospect-scan-view.tsx
 #: src/components/research/run-labels.ts
 msgid "Tax ID"
@@ -5070,6 +5097,14 @@ msgstr "This company can't be displayed"
 msgid "This connection is unbound. Bind an org to use it."
 msgstr "This connection is unbound. Bind an org to use it."
 
+#: src/components/companies/documents-panel.tsx
+msgid "This document is a web page. It opens in a new tab."
+msgstr "This document is a web page. It opens in a new tab."
+
+#: src/routes/documents/$id.tsx
+msgid "This document is a web page. It opens in a tab of its own, exactly as it was saved."
+msgstr "This document is a web page. It opens in a tab of its own, exactly as it was saved."
+
 #: src/components/companies/upcoming-meetings-card.tsx
 msgid "This is not the same as having none. Try again to see what is scheduled."
 msgstr "This is not the same as having none. Try again to see what is scheduled."
@@ -5274,6 +5309,10 @@ msgstr "Unsaved changes"
 msgid "Untitled"
 msgstr "Untitled"
 
+#: src/routes/documents/$id.tsx
+msgid "Untitled document"
+msgstr "Untitled document"
+
 #: src/routes/settings/api-keys/index.tsx
 msgid "Untitled key"
 msgstr "Untitled key"
@@ -5397,6 +5436,7 @@ msgid "Visit"
 msgstr "Visit"
 
 #: src/components/companies/documents-panel.tsx
+#: src/components/documents/document-kinds.ts
 msgid "Visit notes"
 msgstr "Visit notes"
 

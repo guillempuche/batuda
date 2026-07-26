@@ -1625,7 +1625,10 @@ function DetailBody({
 								<FilesGroupTitle>
 									<Trans>Documents</Trans>
 								</FilesGroupTitle>
-								<DocumentsPanel companyId={company.id} />
+								<DocumentsPanel
+									subjectTable='companies'
+									subjectId={company.id}
+								/>
 							</FilesGroup>
 							<FilesGroup>
 								<FilesGroupTitle>
