@@ -15,6 +15,7 @@ import { SessionContext } from '@batuda/controllers'
 import { Auth } from '../lib/auth'
 import { EnvVars } from '../lib/env'
 import { enterOrgScope, enterUserScope } from '../middleware/org'
+import { clientIdentityOf, recordClientSeen } from './client-seen'
 import { CurrentUser } from './current-user'
 import { McpToolsLive } from './server'
 
@@ -105,6 +106,10 @@ const McpAuthMiddleware = HttpRouter.middleware(
 						readonly email: string
 						readonly name: string | null
 						readonly isAgent: boolean
+						// Which key or connection this is, so the tool using it can be
+						// recorded against it. Absent on the browser path, which is a
+						// person in a tab rather than a machine connection.
+						readonly credentialId?: string | undefined
 					},
 				) =>
 					// Tag the request span with how the caller authenticated and the
@@ -117,7 +122,32 @@ const McpAuthMiddleware = HttpRouter.middleware(
 						'mcp.principal_is_agent': principal.isAgent,
 					}).pipe(
 						Effect.andThen(
-							httpEffect.pipe(
+							Effect.gen(function* () {
+								// Read the body only now, once the credential has checked
+								// out, so an unauthenticated caller can never make the
+								// server hold a whole request in memory before its 401.
+								// Reading it here is safe: the request keeps the body it
+								// read, so the handler below sees that same value instead
+								// of re-reading a stream already consumed.
+								if (
+									authMethod !== 'cookie' &&
+									principal.credentialId !== undefined
+								) {
+									const body = yield* req.json.pipe(
+										Effect.orElseSucceed(() => null),
+									)
+									yield* recordClientSeen(sql, {
+										orgId: org.id,
+										principalKind:
+											authMethod === 'api_key' ? 'api_key' : 'oauth',
+										principalId: principal.credentialId,
+										userId: principal.userId,
+										client: clientIdentityOf(body),
+										userAgent: headers.get('user-agent'),
+									})
+								}
+								return yield* httpEffect
+							}).pipe(
 								Effect.provideService(CurrentUser, {
 									userId: principal.userId,
 									email: principal.email,
@@ -219,6 +249,7 @@ const McpAuthMiddleware = HttpRouter.middleware(
 						email: creator.email,
 						name: creator.name,
 						isAgent: true,
+						credentialId: verified.key.id,
 					})
 				}
 
@@ -407,6 +438,7 @@ const McpAuthMiddleware = HttpRouter.middleware(
 							email: user.email,
 							name: user.name,
 							isAgent: false,
+							credentialId: clientId,
 						})
 						// payload undefined → opaque/session bearer → fall through.
 					}

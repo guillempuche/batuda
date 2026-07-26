@@ -34,6 +34,8 @@ export interface RedactedApiKey {
 	readonly createdAt: string
 	readonly enabled: boolean
 	readonly createdBy: Creator | null
+	// When this key was last used to reach the CRM; null until its first use.
+	readonly lastUsedAt: string | null
 }
 
 interface KeyRow {
@@ -45,6 +47,7 @@ interface KeyRow {
 	readonly createdAt: string | Date
 	readonly enabled: boolean
 	readonly metadata: string | null
+	readonly lastRequest: string | Date | null
 }
 
 const isoOrNull = (value: string | Date | null): string | null =>
@@ -77,10 +80,13 @@ const toRedacted = (
 	createdAt: new Date(row.createdAt).toISOString(),
 	enabled: row.enabled,
 	createdBy,
+	lastUsedAt: isoOrNull(row.lastRequest),
 })
 
+// Better Auth stamps `lastRequest` every time it checks a key, so every key —
+// however old — already carries an accurate last-used time.
 const SELECT_COLS =
-	'id, name, start, prefix, "expiresAt", "createdAt", enabled, metadata'
+	'id, name, start, prefix, "expiresAt", "createdAt", enabled, metadata, "lastRequest"'
 
 // API keys are owned by a per-org agent user (`isAgent`) and carry the org in
 // their Better Auth `metadata`; the MCP transport reads that to scope the
@@ -218,11 +224,13 @@ export class ApiKeyService extends Context.Service<ApiKeyService>()(
 					Effect.gen(function* () {
 						const agentId = yield* findAgentId(orgId)
 						if (!agentId) return []
+						// Disabled and expired keys are listed too, flagged rather than
+						// hidden: a key that quietly disappears leaves someone staring
+						// at an agent that stopped working with nothing to explain it.
 						const rows = yield* Effect.tryPromise(() =>
 							auth.pool.query<KeyRow>(
 								`SELECT ${SELECT_COLS} FROM apikey
-								 WHERE "referenceId" = $1 AND enabled = true
-								   AND ("expiresAt" IS NULL OR "expiresAt" > now())
+								 WHERE "referenceId" = $1
 								 ORDER BY "createdAt" DESC`,
 								[agentId],
 							),
