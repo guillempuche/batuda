@@ -2105,8 +2105,14 @@ msgid "Expand"
 msgstr "Desplega"
 
 #: src/components/companies/proposals-panel.tsx
+#: src/routes/settings/api-keys/index.tsx
 msgid "Expired"
 msgstr "Caducada"
+
+#. placeholder {0}: formatDate(row.expiresAt)
+#: src/routes/settings/api-keys/index.tsx
+msgid "Expired {0}"
+msgstr "Caducada {0}"
 
 #: src/components/companies/proposals-panel.tsx
 msgid "Expires (optional)"
@@ -2565,6 +2571,16 @@ msgstr "Última visita"
 msgid "Last run with findings"
 msgstr "Última execució amb resultats"
 
+#. placeholder {0}: formatDate(row.lastUsedAt)
+#: src/routes/settings/api-keys/index.tsx
+msgid "Last used {0}"
+msgstr "Utilitzada per última vegada {0}"
+
+#. placeholder {0}: formatDate(row.lastUsedAt)
+#: src/routes/settings/api-keys/index.tsx
+msgid "Last used {0} from {toolLabel}"
+msgstr "Utilitzada per última vegada {0} des de {toolLabel}"
+
 #: src/routes/tasks/index.tsx
 msgid "Later"
 msgstr "Més endavant"
@@ -2982,6 +2998,10 @@ msgstr "Mai"
 #: src/routes/settings/api-keys/index.tsx
 msgid "Never expires"
 msgstr "No caduca mai"
+
+#: src/routes/settings/api-keys/index.tsx
+msgid "Never used"
+msgstr "Mai utilitzada"
 
 #: src/components/research/run-labels.ts
 msgid "New"

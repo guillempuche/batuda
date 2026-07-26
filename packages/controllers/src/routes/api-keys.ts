@@ -37,6 +37,18 @@ export const ApiKeyView = Schema.Struct({
 			email: Schema.String,
 		}),
 	),
+	// When the key was last used, so a live key reads differently from one
+	// nobody has touched. Null until its first call.
+	lastUsedAt: Schema.NullOr(Schema.String),
+	// The tool that last used it, as the tool announced itself ("Claude Code",
+	// "Cursor"). Self-reported, so it is a label to tell keys apart, not proof
+	// of who is calling. Null until a tool has connected with it.
+	client: Schema.NullOr(
+		Schema.Struct({
+			name: Schema.NullOr(Schema.String),
+			version: Schema.NullOr(Schema.String),
+		}),
+	),
 })
 
 // Create response — the only place the plaintext `key` is ever returned.

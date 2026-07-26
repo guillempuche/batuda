@@ -43,6 +43,11 @@ type ApiKeyRow = {
 		readonly name: string | null
 		readonly email: string
 	} | null
+	readonly lastUsedAt: string | null
+	readonly client: {
+		readonly name: string | null
+		readonly version: string | null
+	} | null
 }
 
 // The one-time create response — the only place the plaintext `key` exists.
@@ -297,6 +302,15 @@ function ApiKeysPage() {
 							const isDeleting = deletingId === row.id
 							const creatorName =
 								row.createdBy?.name ?? row.createdBy?.email ?? null
+							const isExpired =
+								row.expiresAt !== null &&
+								new Date(row.expiresAt).getTime() <= Date.now()
+							// The tool that last used the key, as it announced itself.
+							const toolLabel = row.client
+								? [row.client.name, row.client.version]
+										.filter(part => part !== null)
+										.join(' ')
+								: null
 							return (
 								<KeyRow key={row.id} data-testid='api-key-row'>
 									<KeyInfo>
@@ -315,18 +329,43 @@ function ApiKeysPage() {
 													<Trans>by {creatorName}</Trans>
 												</MetaItem>
 											) : null}
+											<MetaItem data-testid='api-key-last-used'>
+												{row.lastUsedAt ? (
+													toolLabel ? (
+														<Trans>
+															Last used {formatDate(row.lastUsedAt)} from{' '}
+															{toolLabel}
+														</Trans>
+													) : (
+														<Trans>
+															Last used {formatDate(row.lastUsedAt)}
+														</Trans>
+													)
+												) : (
+													<Trans>Never used</Trans>
+												)}
+											</MetaItem>
 											<MetaItem>
 												{row.expiresAt ? (
-													<Trans>Expires {formatDate(row.expiresAt)}</Trans>
+													isExpired ? (
+														<Trans>Expired {formatDate(row.expiresAt)}</Trans>
+													) : (
+														<Trans>Expires {formatDate(row.expiresAt)}</Trans>
+													)
 												) : (
 													<Trans>Never expires</Trans>
 												)}
 											</MetaItem>
 											{row.enabled ? null : (
-												<DisabledTag>
+												<DisabledTag data-testid='api-key-disabled'>
 													<Trans>Disabled</Trans>
 												</DisabledTag>
 											)}
+											{isExpired ? (
+												<DisabledTag data-testid='api-key-expired'>
+													<Trans>Expired</Trans>
+												</DisabledTag>
+											) : null}
 										</KeyMeta>
 									</KeyInfo>
 									<PriButton
@@ -477,9 +516,22 @@ function narrowKeys(rows: ReadonlyArray<unknown>): ReadonlyArray<ApiKeyRow> {
 			expiresAt: typeof r['expiresAt'] === 'string' ? r['expiresAt'] : null,
 			enabled: r['enabled'] !== false,
 			createdBy: narrowCreatedBy(r['createdBy']),
+			lastUsedAt: typeof r['lastUsedAt'] === 'string' ? r['lastUsedAt'] : null,
+			client: narrowClient(r['client']),
 		})
 	}
 	return out
+}
+
+function narrowClient(
+	value: unknown,
+): { readonly name: string | null; readonly version: string | null } | null {
+	if (!value || typeof value !== 'object') return null
+	const v = value as Record<string, unknown>
+	const name = typeof v['name'] === 'string' ? v['name'] : null
+	const version = typeof v['version'] === 'string' ? v['version'] : null
+	if (name === null && version === null) return null
+	return { name, version }
 }
 
 function narrowCreatedBy(
