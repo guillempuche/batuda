@@ -4245,10 +4245,15 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								}
 								// If this leaf belongs to a group, roll the parent up now so
 								// an all-failed group resolves instead of hanging in 'running'.
+								// A follow-up is excluded on purpose: its parent is the origin
+								// run, which already finished, and recomputing it from a
+								// follow-up's outcome would mark a succeeded run failed and
+								// wipe what it recorded spending.
 								const [failedParent] = yield* sql<{
 									parentId: string | null
-								}>`SELECT parent_id FROM research_runs WHERE id = ${researchId}`
-								if (failedParent?.parentId)
+									kind: string
+								}>`SELECT parent_id, kind FROM research_runs WHERE id = ${researchId}`
+								if (failedParent?.parentId && failedParent.kind !== 'followup')
 									yield* rollupParentLocked(failedParent.parentId)
 							})
 						}
@@ -5079,6 +5084,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 
 				approvePaidAction: (runId: string, paId: string, userId: string) =>
 					Effect.gen(function* () {
+						// Approving the same request twice at once would otherwise start
+						// two follow-up runs, each buying the same thing and each charged
+						// for it, because both would read the request as still waiting
+						// before either marked it approved. Taking turns per run means the
+						// second one reads the first's answer and hands it back instead.
+						yield* sql`SELECT pg_advisory_xact_lock(hashtext(${runId}))`
 						const [origin] = yield* sql<{
 							findings: {
 								pending_paid_actions?: Array<Record<string, unknown>>
@@ -5204,7 +5215,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							userId: origin.createdBy ?? userId,
 						})
 						return { status: 'approved' as const, followup_run_id: followupId }
-					}),
+					}).pipe(sql.withTransaction),
 
 				/** Skip a pending paid action: record the decision, spend nothing. */
 				skipPaidAction: (runId: string, paId: string) =>

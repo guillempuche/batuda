@@ -291,6 +291,52 @@ afterAll(async () => {
 })
 
 describe('paid-action follow-up', () => {
+	// Approvals are made to take turns per run, so two arriving together cannot
+	// both read the request as still waiting and both act on it. Forcing that
+	// overlap from here is not reliable — the case below holds the invariant
+	// (one request, one follow-up, however many approvals arrive) rather than
+	// reproducing the collision.
+	describe('when the same request is approved many times at once', () => {
+		it('should start one follow-up, not one each', async () => {
+			// GIVEN an origin run with one pending registry lookup
+			const user = `u-race-${randomUUID()}`
+			const origin = await seedOrigin(user, [
+				{
+					id: 'pa1',
+					status: 'pending',
+					tool: 'registry_lookup',
+					args: { country: 'ES' },
+				},
+			])
+
+			// WHEN several approvals land at the same moment
+			const answers = await Promise.all(
+				Array.from({ length: 8 }, () => approve(origin, 'pa1', user)),
+			)
+
+			// THEN they all name the same follow-up. Any two that both read the
+			// request as still waiting would each buy the lookup and each be
+			// charged for it, from one person's single approval
+			const ids = new Set(
+				answers.map(a =>
+					a.status === 'approved' ? a.followup_run_id : a.status,
+				),
+			)
+			expect(ids.size).toBe(1)
+			const firstId = [...ids][0] as string
+
+			const followups = await pool.query<{ n: string }>(
+				`SELECT count(*)::text AS n FROM research_runs WHERE parent_id = $1`,
+				[origin],
+			)
+			expect(Number(followups.rows[0]?.n)).toBe(1)
+
+			// AND the follow-up is left finished, so its lookup cannot land in the
+			// middle of another case and be counted there
+			await pollRun(firstId)
+		}, 60_000)
+	})
+
 	describe('when a registry lookup is approved', () => {
 		it('should run a follow-up that charges once and merges the result back', async () => {
 			// GIVEN an origin run with one pending registry lookup
