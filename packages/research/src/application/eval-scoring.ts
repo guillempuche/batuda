@@ -93,6 +93,8 @@ export interface GoldenExpectation {
  */
 export interface RunOutcome {
 	readonly status: TerminalStatus
+	/** What the run was billed and what it consumed; absent when not read back. */
+	readonly usage?: RunUsage
 	/**
 	 * Hosts of the sources the run fetched — the pages it actually reached. The run
 	 * reaching the target's own site is what proves it researched the right company;
@@ -116,8 +118,23 @@ export interface RunOutcome {
 	readonly registryConfirmed?: boolean
 }
 
+// What one run was billed, and what it consumed getting there — read back from
+// the run's own row, so it is what was recorded rather than a live tally.
+export interface RunUsage {
+	/** Everything the run was billed, in whole cents. */
+	readonly costCents: number
+	/** Of that, what the metered per-call lookups cost. */
+	readonly paidCostCents: number
+	readonly tokensIn: number
+	readonly tokensOut: number
+	/** Provider credits consumed, totalled across every provider. */
+	readonly creditsUsed: number
+}
+
 export interface RunScore {
 	readonly id: string
+	/** What this run cost, carried through so a pass can be totalled and compared. */
+	readonly usage?: RunUsage
 	readonly grounded: boolean
 	readonly wrongCompany: boolean
 	readonly empty: boolean
@@ -149,6 +166,16 @@ export interface EvalSummary {
 	/** Micro-averaged known people recovered *with a title* ÷ known people, across all
 	 * runs; null when no golden row listed expected contacts. */
 	readonly contactRecall: number | null
+	/** What one run cost on average, in cents; null when no run reported a cost. */
+	readonly costPerRun: number | null
+	/** What one usable run cost — the total spread over the runs that grounded,
+	 * so the runs that found nothing are counted as waste rather than ignored. */
+	readonly costPerGroundedRun: number | null
+	/** Of the average run cost, what the metered per-call lookups accounted for. */
+	readonly paidCostPerRun: number | null
+	readonly tokensPerRun: number | null
+	/** Provider credits one run consumed on average. */
+	readonly creditsPerRun: number | null
 }
 
 /**
@@ -460,6 +487,7 @@ export const scoreRun = (
 		fieldsCorrect,
 		contactsExpected: expectedContacts.length,
 		contactsFound,
+		...(outcome.usage !== undefined ? { usage: outcome.usage } : {}),
 		...(expected.bucket !== undefined ? { bucket: expected.bucket } : {}),
 		...(expected.fields.country !== undefined
 			? { country: expected.fields.country }
@@ -481,6 +509,11 @@ export const summarizeScores = (
 			fieldPrecision: null,
 			fieldRecall: null,
 			contactRecall: null,
+			costPerRun: null,
+			costPerGroundedRun: null,
+			paidCostPerRun: null,
+			tokensPerRun: null,
+			creditsPerRun: null,
 		}
 	}
 
@@ -492,6 +525,14 @@ export const summarizeScores = (
 	let totalCorrect = 0
 	let totalContactsExpected = 0
 	let totalContactsFound = 0
+	// Only runs that reported a cost count toward the averages, so a pass that
+	// never read them back shows no figure rather than a misleadingly low one.
+	let runsWithUsage = 0
+	let totalCostCents = 0
+	let totalPaidCostCents = 0
+	let totalTokensIn = 0
+	let totalTokensOut = 0
+	let totalCredits = 0
 	for (const score of scores) {
 		if (score.grounded) grounded++
 		if (score.wrongCompany) wrong++
@@ -501,6 +542,14 @@ export const summarizeScores = (
 		totalCorrect += score.fieldsCorrect
 		totalContactsExpected += score.contactsExpected
 		totalContactsFound += score.contactsFound
+		if (score.usage !== undefined) {
+			runsWithUsage++
+			totalCostCents += score.usage.costCents
+			totalPaidCostCents += score.usage.paidCostCents
+			totalTokensIn += score.usage.tokensIn
+			totalTokensOut += score.usage.tokensOut
+			totalCredits += score.usage.creditsUsed
+		}
 	}
 
 	return {
@@ -514,6 +563,16 @@ export const summarizeScores = (
 			totalContactsExpected === 0
 				? null
 				: totalContactsFound / totalContactsExpected,
+		costPerRun: runsWithUsage === 0 ? null : totalCostCents / runsWithUsage,
+		costPerGroundedRun:
+			runsWithUsage === 0 || grounded === 0 ? null : totalCostCents / grounded,
+		paidCostPerRun:
+			runsWithUsage === 0 ? null : totalPaidCostCents / runsWithUsage,
+		tokensPerRun:
+			runsWithUsage === 0
+				? null
+				: (totalTokensIn + totalTokensOut) / runsWithUsage,
+		creditsPerRun: runsWithUsage === 0 ? null : totalCredits / runsWithUsage,
 	}
 }
 

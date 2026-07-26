@@ -158,6 +158,11 @@ describe('evalSummaryAttributes', () => {
 				fieldPrecision: 0.75,
 				fieldRecall: 0.5,
 				contactRecall: 0.6,
+				costPerRun: 84,
+				costPerGroundedRun: 168,
+				paidCostPerRun: 29,
+				tokensPerRun: 42_000,
+				creditsPerRun: 12,
 			})
 
 			// WHEN flattened — THEN each top-line rate is present
@@ -166,6 +171,8 @@ describe('evalSummaryAttributes', () => {
 			expect(attrs['eval.field_precision']).toBe(0.75)
 			expect(attrs['eval.field_recall']).toBe(0.5)
 			expect(attrs['eval.contact_recall']).toBe(0.6)
+			expect(attrs['eval.cost_cents_per_run']).toBe(84)
+			expect(attrs['eval.credits_per_run']).toBe(12)
 		})
 	})
 
@@ -180,11 +187,17 @@ describe('evalSummaryAttributes', () => {
 				fieldPrecision: null,
 				fieldRecall: 0,
 				contactRecall: null,
+				costPerRun: null,
+				costPerGroundedRun: null,
+				paidCostPerRun: null,
+				tokensPerRun: null,
+				creditsPerRun: null,
 			})
 
 			// WHEN flattened — THEN each null rate is left off, not charted as zero
 			expect('eval.field_precision' in attrs).toBe(false)
 			expect('eval.contact_recall' in attrs).toBe(false)
+			expect('eval.cost_cents_per_run' in attrs).toBe(false)
 			expect(attrs['eval.field_recall']).toBe(0)
 		})
 	})

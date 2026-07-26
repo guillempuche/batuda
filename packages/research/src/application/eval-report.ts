@@ -171,5 +171,20 @@ export const evalSummaryAttributes = (
 	if (summary.contactRecall !== null) {
 		attributes['eval.contact_recall'] = summary.contactRecall
 	}
+	if (summary.costPerRun !== null) {
+		attributes['eval.cost_cents_per_run'] = summary.costPerRun
+	}
+	if (summary.costPerGroundedRun !== null) {
+		attributes['eval.cost_cents_per_grounded_run'] = summary.costPerGroundedRun
+	}
+	if (summary.paidCostPerRun !== null) {
+		attributes['eval.paid_cost_cents_per_run'] = summary.paidCostPerRun
+	}
+	if (summary.tokensPerRun !== null) {
+		attributes['eval.tokens_per_run'] = summary.tokensPerRun
+	}
+	if (summary.creditsPerRun !== null) {
+		attributes['eval.credits_per_run'] = summary.creditsPerRun
+	}
 	return attributes
 }

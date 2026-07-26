@@ -496,7 +496,8 @@ describe('summarizeScores', () => {
 			// GIVEN an empty run set
 			const summary = summarizeScores([])
 
-			// WHEN summarized — THEN nothing is asserted as a rate; precision/recall null
+			// WHEN summarized — THEN nothing is asserted as a rate; every figure that
+			// would need a run to divide by stays null rather than reading as zero
 			expect(summary).toEqual({
 				runs: 0,
 				groundingAccuracy: 0,
@@ -505,6 +506,11 @@ describe('summarizeScores', () => {
 				fieldPrecision: null,
 				fieldRecall: null,
 				contactRecall: null,
+				costPerRun: null,
+				costPerGroundedRun: null,
+				paidCostPerRun: null,
+				tokensPerRun: null,
+				creditsPerRun: null,
 			})
 		})
 	})
@@ -524,6 +530,46 @@ describe('summarizeScores', () => {
 			expect(summary.groundingAccuracy).toBe(0.5)
 			expect(summary.wrongCompanyRate).toBe(0.25)
 			expect(summary.emptyRate).toBe(0.25)
+		})
+	})
+
+	describe('when the runs recorded what they cost', () => {
+		it('should average over the runs, and per usable run over the grounded ones', () => {
+			// GIVEN four runs costing 100¢ in total, of which two grounded
+			const spend = (costCents: number, creditsUsed: number) => ({
+				costCents,
+				paidCostCents: 0,
+				tokensIn: 1000,
+				tokensOut: 500,
+				creditsUsed,
+			})
+			const summary = summarizeScores([
+				score({ grounded: true, usage: spend(40, 7) }),
+				score({ grounded: true, usage: spend(30, 7) }),
+				score({ grounded: false, usage: spend(20, 3) }),
+				score({ grounded: false, empty: true, usage: spend(10, 3) }),
+			])
+
+			// WHEN summarized
+			// THEN the per-run figure spreads over all four, while the per-usable-run
+			// one spreads over the two that grounded — so runs that found nothing
+			// count as waste rather than disappearing
+			expect(summary.costPerRun).toBe(25)
+			expect(summary.costPerGroundedRun).toBe(50)
+			expect(summary.tokensPerRun).toBe(1500)
+			expect(summary.creditsPerRun).toBe(5)
+		})
+	})
+
+	describe('when no run recorded what it cost', () => {
+		it('should report no cost rather than zero', () => {
+			// GIVEN runs scored without any cost read back
+			const summary = summarizeScores([score({}), score({})])
+
+			// WHEN summarized
+			// THEN the figures are absent — a zero would read as a free pass
+			expect(summary.costPerRun).toBeNull()
+			expect(summary.creditsPerRun).toBeNull()
 		})
 	})
 

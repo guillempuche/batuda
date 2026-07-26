@@ -64,6 +64,7 @@ export {
 	type GoldenExpectation,
 	type RunOutcome,
 	type RunScore,
+	type RunUsage,
 	SCORABLE_FIELDS,
 	type ScorableField,
 	scoreRun,
