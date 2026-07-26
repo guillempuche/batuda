@@ -316,13 +316,19 @@ const SmtpSecurity = Schema.Literals(['tls', 'starttls', 'plain'])
 
 const ListEmailInboxes = Tool.make('list_email_inboxes', {
 	description:
-		'List inbox rows visible to the calling member in the active organization. Each row carries purpose (human/agent/shared), ownerUserId, isDefault, active flag, IMAP/SMTP transport hosts, and grant_status. Filter by purpose, active flag, or owner. Private inboxes belonging to other members are hidden automatically.',
+		'List the mailboxes visible to the calling member in the active organization. Each row carries purpose (human/agent/shared), ownerUserId, isDefault, active flag, IMAP/SMTP transport hosts, and grant_status. Filter by purpose, active flag, or owner. Private mailboxes belonging to other members are hidden automatically. The response also reports whether the caller has a primary mailbox set (hasDefault plus its id and address), so a composer can check before send_email whether to prompt the user to connect one first.',
 	parameters: Schema.Struct({
 		purpose: Schema.optional(InboxPurpose),
 		active: Schema.optional(Schema.Boolean),
 		owner_user_id: Schema.optional(Schema.String),
 	}),
-	success: ListResult(Inbox.json),
+	success: Schema.Struct({
+		items: Schema.Array(Inbox.json),
+		hasDefault: Schema.Boolean,
+		primary: Schema.NullOr(
+			Schema.Struct({ inboxId: Schema.String, email: Schema.String }),
+		),
+	}),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Email Inboxes')
@@ -332,7 +338,7 @@ const ListEmailInboxes = Tool.make('list_email_inboxes', {
 
 const ListEmailProviderPresets = Tool.make('list_email_provider_presets', {
 	description:
-		'List the built-in mailbox presets (Infomaniak, Fastmail, iCloud Mail, Yahoo Mail, Gmail Workspace, Microsoft 365, Proton Bridge, Generic IMAP). Each entry pre-fills IMAP and SMTP host/port/security, plus appPasswordUrl (where the user generates an app-specific password for a 2FA account) and passwordAuthSupported (false for Gmail and Microsoft 365, which no longer allow password sign-in and need OAuth). create_email_inbox callers only need to add credentials. Static — safe to cache.',
+		'List the built-in mailbox presets (Infomaniak, Fastmail, iCloud Mail, Yahoo Mail, Gmail Workspace, Microsoft 365, Proton Bridge, Generic IMAP). Each entry pre-fills IMAP and SMTP host/port/security, plus appPasswordUrl (where the user generates an app-specific password for a 2FA account) and passwordAuthSupported (false for Gmail and Microsoft 365, which no longer allow password sign-in and need OAuth). manage_email_inbox callers only need to add credentials. Static — safe to cache.',
 	success: ListResult(Schema.Unknown),
 })
 	.annotate(Tool.Title, 'List Email Provider Presets')
@@ -340,120 +346,46 @@ const ListEmailProviderPresets = Tool.make('list_email_provider_presets', {
 	.annotate(Tool.Destructive, false)
 	.annotate(Tool.OpenWorld, false)
 
-const GetEmailInboxStatus = Tool.make('get_email_inbox_status', {
+const ManageEmailInbox = Tool.make('manage_email_inbox', {
 	description:
-		'Return the calling member’s primary inbox in the active organization, if any. Use before send_email/create_email_draft to confirm the user has a default inbox set; if hasDefault=false the UI should prompt them to connect a mailbox first.',
-	success: Schema.Struct({
-		hasDefault: Schema.Boolean,
-		primary: Schema.NullOr(
-			Schema.Struct({
-				inboxId: Schema.String,
-				email: Schema.String,
-			}),
-		),
-	}),
-	dependencies: REQUEST_DEPENDENCIES,
-})
-	.annotate(Tool.Title, 'Get Email Inbox Status')
-	.annotate(Tool.Readonly, true)
-	.annotate(Tool.Destructive, false)
-	.annotate(Tool.OpenWorld, false)
-
-const CreateEmailInbox = Tool.make('create_email_inbox', {
-	description:
-		'Connect a new mailbox to the calling member. Requires full IMAP + SMTP transport details (use list_email_provider_presets to pre-fill these for known providers) and a password / app-password — Batuda is a generic IMAP/SMTP client, not a hosted mail provider. If the account has two-factor authentication enabled, its normal login password is rejected: the user must generate a provider app-specific password (see appPasswordUrl on the matching preset) and pass that instead. Gmail and Microsoft 365 no longer allow password sign-in at all (passwordAuthSupported=false) and will fail until an OAuth connector exists. Credentials are encrypted at rest. `purpose=human` defaults ownership to the caller; `purpose=shared` clears any owner_user_id and rejects is_private=true. Setting is_default atomically clears the previous default in the same (owner, purpose) bucket.',
+		"Manage the mailboxes connected to the active organization. action=create connects a new one and needs the full IMAP + SMTP details plus a password (use list_email_provider_presets to pre-fill hosts and ports for a known provider) — Batuda is a generic IMAP/SMTP client, not a hosted mail provider, so if the account has two-factor authentication its normal login password is rejected and a provider app-specific password is required (see appPasswordUrl on the matching preset); Gmail and Microsoft 365 no longer allow password sign-in at all (passwordAuthSupported=false). action=update changes only the fields you pass on an existing id, re-encrypting the password if one is given, and active=false hides the mailbox from composers and stops syncing while keeping historical threads. action=test re-runs a real IMAP LOGIN and SMTP check against the stored credentials and refreshes grant_status — use it after changing a password. action=delete soft-deletes: it sets active=false and is_default=false, preserving messages, and update with active=true restores it. action=set_primary promotes one of your own human mailboxes to be your default From identity, clearing the previous one; it rejects shared, inactive, and other members' mailboxes. Credentials are encrypted at rest. purpose=human defaults ownership to the caller; purpose=shared clears any owner_user_id and rejects is_private=true.",
 	parameters: Schema.Struct({
-		email: Schema.String,
-		password: Schema.String,
-		username: Schema.optional(Schema.String),
-		display_name: Schema.optional(Schema.String),
-		purpose: InboxPurpose,
-		owner_user_id: Schema.optional(Schema.String),
-		is_default: Schema.optional(Schema.Boolean),
-		is_private: Schema.optional(Schema.Boolean),
-		imap_host: Schema.String,
-		imap_port: Schema.Number,
-		imap_security: ImapSecurity,
-		smtp_host: Schema.String,
-		smtp_port: Schema.Number,
-		smtp_security: SmtpSecurity,
-	}),
-	success: Inbox.json,
-	dependencies: REQUEST_DEPENDENCIES,
-})
-	.annotate(Tool.Title, 'Create Email Inbox')
-	.annotate(Tool.Destructive, false)
-	.annotate(Tool.OpenWorld, true)
-
-const UpdateEmailInbox = Tool.make('update_email_inbox', {
-	description:
-		'Update fields on an existing inbox in the active organization — display name, purpose, ownership, default flag, privacy, transport configuration, or credentials. Pass only the fields to change; password (if provided) is re-encrypted with a per-row HKDF subkey. Flipping `active=false` hides the inbox from composers and stops the IMAP worker, but preserves historical thread links.',
-	parameters: Schema.Struct({
-		id: Schema.String,
-		display_name: Schema.optional(Schema.NullOr(Schema.String)),
-		purpose: Schema.optional(InboxPurpose),
-		owner_user_id: Schema.optional(Schema.NullOr(Schema.String)),
-		is_default: Schema.optional(Schema.Boolean),
-		is_private: Schema.optional(Schema.Boolean),
-		active: Schema.optional(Schema.Boolean),
+		action: Schema.Literals([
+			'create',
+			'update',
+			'test',
+			'delete',
+			'set_primary',
+		]),
+		// Required by every action except create, which mints the row.
+		id: Schema.optional(Schema.String),
+		// Required to create; on update, any of these may be passed alone.
+		email: Schema.optional(Schema.String),
+		password: Schema.optional(Schema.String),
 		imap_host: Schema.optional(Schema.String),
 		imap_port: Schema.optional(Schema.Number),
 		imap_security: Schema.optional(ImapSecurity),
 		smtp_host: Schema.optional(Schema.String),
 		smtp_port: Schema.optional(Schema.Number),
 		smtp_security: Schema.optional(SmtpSecurity),
+		purpose: Schema.optional(InboxPurpose),
 		username: Schema.optional(Schema.String),
-		password: Schema.optional(Schema.String),
+		display_name: Schema.optional(Schema.NullOr(Schema.String)),
+		owner_user_id: Schema.optional(Schema.NullOr(Schema.String)),
+		is_default: Schema.optional(Schema.Boolean),
+		is_private: Schema.optional(Schema.Boolean),
+		active: Schema.optional(Schema.Boolean),
 	}),
+	// Every action answers with the mailbox row it acted on, including delete,
+	// which soft-deletes and hands back the deactivated row.
 	success: Inbox.json,
 	dependencies: REQUEST_DEPENDENCIES,
 })
-	.annotate(Tool.Title, 'Update Email Inbox')
-	.annotate(Tool.Destructive, false)
-	.annotate(Tool.Idempotent, true)
-	.annotate(Tool.OpenWorld, false)
-
-const TestEmailInbox = Tool.make('test_email_inbox', {
-	description:
-		'Re-probe a stored inbox: decrypts the saved credentials and runs a real IMAP LOGIN + SMTP check against the configured hosts, then updates grant_status / grant_last_error / grant_last_seen_at and returns the refreshed inbox row. Use after changing a password (for example switching to an app-specific password) to confirm the mailbox now connects.',
-	parameters: Schema.Struct({
-		id: Schema.String,
-	}),
-	success: Inbox.json,
-	dependencies: REQUEST_DEPENDENCIES,
-})
-	.annotate(Tool.Title, 'Test Email Inbox')
-	.annotate(Tool.Destructive, false)
-	.annotate(Tool.Idempotent, true)
-	.annotate(Tool.OpenWorld, true)
-
-const DeleteEmailInbox = Tool.make('delete_email_inbox', {
-	description:
-		'Soft-delete an inbox: sets active=false and is_default=false so the IMAP worker stops syncing it and composers stop offering it, while preserving historical messages and thread links. The row is not removed; use update_email_inbox with active=true to restore.',
-	parameters: Schema.Struct({
-		id: Schema.String,
-	}),
-	success: Inbox.json,
-	dependencies: REQUEST_DEPENDENCIES,
-})
-	.annotate(Tool.Title, 'Delete Email Inbox')
+	.annotate(Tool.Title, 'Manage Email Inbox')
+	// One action deletes and two reach out to the mail servers, so the whole
+	// tool carries the widest behaviour of its actions.
 	.annotate(Tool.Destructive, true)
-	.annotate(Tool.Idempotent, true)
-	.annotate(Tool.OpenWorld, false)
-
-const SetPrimaryEmailInbox = Tool.make('set_primary_email_inbox', {
-	description:
-		'Promote one of the calling member’s human inboxes to is_default=true (their primary From identity in the active organization). Clears the previous primary in the same (owner, purpose) bucket. Rejects shared inboxes, inactive inboxes, and inboxes owned by another member.',
-	parameters: Schema.Struct({
-		id: Schema.String,
-	}),
-	success: Inbox.json,
-	dependencies: REQUEST_DEPENDENCIES,
-})
-	.annotate(Tool.Title, 'Set Primary Email Inbox')
-	.annotate(Tool.Destructive, false)
-	.annotate(Tool.Idempotent, true)
-	.annotate(Tool.OpenWorld, false)
+	.annotate(Tool.OpenWorld, true)
 
 // ── Draft tools ─────────────────────────────────────────────────
 
@@ -535,47 +467,25 @@ const DiscardStagedEmailAttachment = Tool.make(
 
 // ── Footer tools ────────────────────────────────────────────────
 
-const ListInboxFooters = Tool.make('list_inbox_footers', {
-	description:
-		'List all footers configured for an inbox. The default footer is automatically appended to outbound emails unless skipFooter is set.',
-	parameters: Schema.Struct({
-		inbox_id: Schema.String,
-	}),
-	success: ListResult(InboxFooter.json),
-	dependencies: REQUEST_DEPENDENCIES,
-})
-	.annotate(Tool.Title, 'List Inbox Footers')
-	.annotate(Tool.Readonly, true)
-	.annotate(Tool.Destructive, false)
-	.annotate(Tool.OpenWorld, false)
-
-const GetInboxFooter = Tool.make('get_inbox_footer', {
-	description:
-		'Get a single inbox footer by id. Returns name, body_json (block tree), is_default, and timestamps. Org-scope is enforced by RLS — a footer belonging to another org returns NotFound.',
-	parameters: Schema.Struct({
-		id: Schema.String,
-	}),
-	success: InboxFooter.json,
-	dependencies: REQUEST_DEPENDENCIES,
-})
-	.annotate(Tool.Title, 'Get Inbox Footer')
-	.annotate(Tool.Readonly, true)
-	.annotate(Tool.Destructive, false)
-	.annotate(Tool.OpenWorld, false)
-
 const ManageInboxFooter = Tool.make('manage_inbox_footer', {
 	description:
-		'Manage an inbox footer (the block tree appended to outbound emails). action=create adds a footer (body_json is the EmailBlocks shape used by send_email; is_default=true makes it the auto-appended default, one per inbox); update changes name/body_json/is_default on footer_id (is_default=true atomically clears the prior default); delete permanently removes footer_id.',
+		"Manage the footers appended to an inbox's outbound emails. action=list returns every footer on inbox_id; get returns one footer by footer_id (one belonging to another organization reads as not found); create adds a footer (body_json is the EmailBlocks shape used by send_email, and is_default=true makes it the one appended automatically, at most one per inbox); update changes name/body_json/is_default on footer_id, where is_default=true atomically clears the previous default; delete permanently removes footer_id.",
 	parameters: Schema.Struct({
-		action: Schema.Literals(['create', 'update', 'delete']),
+		action: Schema.Literals(['list', 'get', 'create', 'update', 'delete']),
+		// Required by list; on create it says which inbox the footer belongs to.
 		inbox_id: Schema.optional(Schema.String),
 		footer_id: Schema.optional(Schema.String),
 		name: Schema.optional(Schema.String),
 		body_json: Schema.optional(EmailBlocks),
 		is_default: Schema.optional(Schema.Boolean),
 	}),
-	// create / update return the footer; delete returns the deleted marker.
-	success: Schema.Union([InboxFooter.json, DeletedResult]),
+	// list returns the collection, get / create / update a single footer, and
+	// delete the tagged marker.
+	success: Schema.Union([
+		ListResult(InboxFooter.json),
+		InboxFooter.json,
+		DeletedResult,
+	]),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Manage Inbox Footer')
@@ -601,17 +511,10 @@ export const EmailTools = Toolkit.make(
 	GetEmailMessage,
 	ListEmailInboxes,
 	ListEmailProviderPresets,
-	GetEmailInboxStatus,
-	CreateEmailInbox,
-	UpdateEmailInbox,
-	TestEmailInbox,
-	DeleteEmailInbox,
-	SetPrimaryEmailInbox,
+	ManageEmailInbox,
 	ManageEmailDraft,
 	ListEmailDrafts,
 	GetEmailDraft,
-	ListInboxFooters,
-	GetInboxFooter,
 	ManageInboxFooter,
 )
 
@@ -909,107 +812,145 @@ export const EmailHandlersLive = EmailTools.toLayer(
 					Effect.orDie,
 				),
 			list_email_inboxes: params =>
-				svc
-					.listLocalInboxes({
+				Effect.gen(function* () {
+					const inboxes = yield* svc.listLocalInboxes({
 						...(params.purpose !== undefined && { purpose: params.purpose }),
 						...(params.active !== undefined && { active: params.active }),
 						...(params.owner_user_id !== undefined && {
 							ownerUserId: params.owner_user_id,
 						}),
 					})
-					.pipe(Effect.map(toItems)),
+					// Carried alongside the list so a composer can tell in one call
+					// whether the member still needs to connect a mailbox.
+					const status = yield* svc.inboxStatus()
+					return { ...toItems(inboxes), ...status }
+				}),
 			list_email_provider_presets: () =>
 				svc.listProviderPresets().pipe(Effect.map(toItems)),
-			get_email_inbox_status: () => svc.inboxStatus(),
-			create_email_inbox: params =>
-				svc
-					.createInbox({
-						email: params.email,
-						password: params.password,
-						username: params.username ?? params.email,
-						purpose: params.purpose,
-						imapHost: params.imap_host,
-						imapPort: params.imap_port,
+			manage_email_inbox: params => {
+				// Fields the schema cannot mark required for one action alone.
+				const needsId = (): Effect.Effect<string> =>
+					params.id === undefined
+						? dieMissing(`id is required to ${params.action} a mailbox`)
+						: Effect.succeed(params.id)
+
+				// Everything create and update share, passed only when supplied so
+				// update leaves untouched fields alone.
+				const transport = {
+					...(params.is_default !== undefined && {
+						isDefault: params.is_default,
+					}),
+					...(params.is_private !== undefined && {
+						isPrivate: params.is_private,
+					}),
+					...(params.imap_host !== undefined && { imapHost: params.imap_host }),
+					...(params.imap_port !== undefined && { imapPort: params.imap_port }),
+					...(params.imap_security !== undefined && {
 						imapSecurity: params.imap_security,
-						smtpHost: params.smtp_host,
-						smtpPort: params.smtp_port,
+					}),
+					...(params.smtp_host !== undefined && { smtpHost: params.smtp_host }),
+					...(params.smtp_port !== undefined && { smtpPort: params.smtp_port }),
+					...(params.smtp_security !== undefined && {
 						smtpSecurity: params.smtp_security,
-						...(params.display_name !== undefined && {
-							displayName: params.display_name,
-						}),
-						...(params.owner_user_id !== undefined && {
-							ownerUserId: params.owner_user_id,
-						}),
-						...(params.is_default !== undefined && {
-							isDefault: params.is_default,
-						}),
-						...(params.is_private !== undefined && {
-							isPrivate: params.is_private,
-						}),
-					})
-					.pipe(Effect.orDie),
-			update_email_inbox: params =>
-				svc
-					.updateInbox(params.id, {
-						...(params.display_name !== undefined && {
-							displayName: params.display_name,
-						}),
-						...(params.purpose !== undefined && {
-							purpose: params.purpose,
-						}),
-						...(params.owner_user_id !== undefined && {
-							ownerUserId: params.owner_user_id,
-						}),
-						...(params.is_default !== undefined && {
-							isDefault: params.is_default,
-						}),
-						...(params.is_private !== undefined && {
-							isPrivate: params.is_private,
-						}),
-						...(params.active !== undefined && {
-							active: params.active,
-						}),
-						...(params.imap_host !== undefined && {
-							imapHost: params.imap_host,
-						}),
-						...(params.imap_port !== undefined && {
-							imapPort: params.imap_port,
-						}),
-						...(params.imap_security !== undefined && {
-							imapSecurity: params.imap_security,
-						}),
-						...(params.smtp_host !== undefined && {
-							smtpHost: params.smtp_host,
-						}),
-						...(params.smtp_port !== undefined && {
-							smtpPort: params.smtp_port,
-						}),
-						...(params.smtp_security !== undefined && {
-							smtpSecurity: params.smtp_security,
-						}),
-						...(params.username !== undefined && {
-							username: params.username,
-						}),
-						...(params.password !== undefined && {
-							password: params.password,
-						}),
-					})
-					.pipe(
-						Effect.catchTag('NotFound', e => Effect.die(e)),
-						Effect.orDie,
-					),
-			test_email_inbox: params =>
-				svc.testInbox(params.id).pipe(
-					Effect.catchTag('NotFound', e => Effect.die(e)),
-					Effect.orDie,
-				),
-			delete_email_inbox: params =>
-				svc.deleteInbox(params.id).pipe(
-					Effect.catchTag('NotFound', e => Effect.die(e)),
-					Effect.orDie,
-				),
-			set_primary_email_inbox: params =>
-				svc.setPrimaryInbox(params.id).pipe(Effect.orDie),
+					}),
+					...(params.username !== undefined && { username: params.username }),
+					...(params.password !== undefined && { password: params.password }),
+				}
+
+				switch (params.action) {
+					case 'create': {
+						// Connecting a mailbox needs the whole transport up front —
+						// there is nothing stored yet to fall back on.
+						const {
+							email,
+							password,
+							purpose,
+							imap_host,
+							imap_port,
+							imap_security,
+							smtp_host,
+							smtp_port,
+							smtp_security,
+						} = params
+						if (
+							email === undefined ||
+							password === undefined ||
+							purpose === undefined ||
+							imap_host === undefined ||
+							imap_port === undefined ||
+							imap_security === undefined ||
+							smtp_host === undefined ||
+							smtp_port === undefined ||
+							smtp_security === undefined
+						)
+							return dieMissing(
+								'create needs email, password, purpose and the full imap_* and smtp_* transport details',
+							)
+						return svc
+							.createInbox({
+								...transport,
+								// Null means "clear it", which only makes sense against a
+								// mailbox that already exists.
+								...(typeof params.display_name === 'string' && {
+									displayName: params.display_name,
+								}),
+								...(typeof params.owner_user_id === 'string' && {
+									ownerUserId: params.owner_user_id,
+								}),
+								email,
+								password,
+								purpose,
+								username: params.username ?? email,
+								imapHost: imap_host,
+								imapPort: imap_port,
+								imapSecurity: imap_security,
+								smtpHost: smtp_host,
+								smtpPort: smtp_port,
+								smtpSecurity: smtp_security,
+							})
+							.pipe(Effect.orDie)
+					}
+					case 'update':
+						return needsId().pipe(
+							Effect.flatMap(id =>
+								svc.updateInbox(id, {
+									...transport,
+									// Null clears these two, which only an existing mailbox
+									// can be asked to do.
+									...(params.display_name !== undefined && {
+										displayName: params.display_name,
+									}),
+									...(params.owner_user_id !== undefined && {
+										ownerUserId: params.owner_user_id,
+									}),
+									...(params.purpose !== undefined && {
+										purpose: params.purpose,
+									}),
+									...(params.active !== undefined && { active: params.active }),
+								}),
+							),
+							Effect.catchTag('NotFound', e => Effect.die(e)),
+							Effect.orDie,
+						)
+					case 'test':
+						return needsId().pipe(
+							Effect.flatMap(id => svc.testInbox(id)),
+							Effect.catchTag('NotFound', e => Effect.die(e)),
+							Effect.orDie,
+						)
+					case 'delete':
+						return needsId().pipe(
+							Effect.flatMap(id => svc.deleteInbox(id)),
+							Effect.catchTag('NotFound', e => Effect.die(e)),
+							Effect.orDie,
+						)
+					case 'set_primary':
+						return needsId().pipe(
+							Effect.flatMap(id => svc.setPrimaryInbox(id)),
+							Effect.orDie,
+						)
+				}
+			},
 			manage_email_draft: params => {
 				// Shared body fields apply to both create and update; in_reply_to and
 				// the CRM-link object are create-only.
@@ -1089,11 +1030,16 @@ export const EmailHandlersLive = EmailTools.toLayer(
 				),
 			get_email_draft: ({ inbox_id, draft_id }) =>
 				svc.getDraft(inbox_id, draft_id).pipe(Effect.orDie),
-			list_inbox_footers: params =>
-				svc.listFooters(params.inbox_id).pipe(Effect.map(toItems)),
-			get_inbox_footer: ({ id }) => svc.getFooter(id).pipe(Effect.orDie),
 			manage_inbox_footer: params => {
 				switch (params.action) {
+					case 'list':
+						if (params.inbox_id === undefined)
+							return dieMissing('inbox_id is required to list footers')
+						return svc.listFooters(params.inbox_id).pipe(Effect.map(toItems))
+					case 'get':
+						if (params.footer_id === undefined)
+							return dieMissing('footer_id is required to get a footer')
+						return svc.getFooter(params.footer_id).pipe(Effect.orDie)
 					case 'create':
 						if (
 							params.inbox_id === undefined ||
