@@ -5,67 +5,124 @@ import {
 	HttpApiSchema,
 } from 'effect/unstable/httpapi'
 
-import { Document } from '@batuda/domain'
+import { Document, DocumentSubject, DocumentSubjectTable } from '@batuda/domain'
 
 import { NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 import { PaginatedList } from '../pagination'
 
-// Listing projection: everything but the full markdown `content`, so a company
-// index stays cheap.
+// A document plus the records it is filed under. The subjects live in their own
+// table, so they ride alongside the row rather than in it.
+export const DocumentDetail = Schema.Struct({
+	...Document.json.fields,
+	subjects: Schema.Array(DocumentSubject),
+	// Where an HTML document actually opens: a short-lived link to the stored
+	// page, on the storage address rather than this one, so a page somebody else
+	// wrote never loads beside the signed-in session. Null for markdown, whose
+	// body is right here in `content`.
+	htmlUrl: Schema.NullOr(Schema.String),
+})
+
+// Listing projection: everything but the full markdown `content`, so a long
+// list stays cheap; `snippet` is the opening of it, enough for a row to show
+// what the document says. Taken by leaving `content` out rather than by listing
+// what to keep, so a field added to a document shows up here on its own.
+const { content: _content, ...summaryFields } = Document.json.fields
 export const DocumentSummary = Schema.Struct({
-	id: Document.json.fields.id,
-	companyId: Document.json.fields.companyId,
-	type: Document.json.fields.type,
-	title: Document.json.fields.title,
-	createdAt: Document.json.fields.createdAt,
+	...summaryFields,
+	snippet: Schema.String,
+	subjects: Schema.Array(DocumentSubject),
 })
 
 const CreateDocumentInput = Schema.Struct({
-	companyId: Schema.String,
-	interactionId: Schema.optional(Schema.String),
-	type: Schema.String,
+	// Every document starts filed somewhere; attach adds the rest later.
+	subjectTable: DocumentSubjectTable,
+	subjectId: Schema.String,
+	type: Document.json.fields.type,
+	// Markdown unless said otherwise. HTML is stored as sent and opens in its
+	// own tab; it is replaced whole rather than edited.
+	format: Schema.optional(Document.json.fields.format),
 	title: Schema.optional(Schema.String),
 	content: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
 })
 
 const UpdateDocumentInput = Schema.Struct({
+	type: Schema.optional(Document.json.fields.type),
 	title: Schema.optional(Schema.String),
+	// Replaces the body, in whatever format the document already is.
 	content: Schema.optional(Schema.String),
+})
+
+const LinkInput = Schema.Struct({
+	subjectTable: DocumentSubjectTable,
+	subjectId: Schema.String,
 })
 
 export const DocumentsGroup = HttpApiGroup.make('documents')
 	.add(
 		HttpApiEndpoint.get('list', '/documents', {
 			query: {
-				companyId: Schema.optional(Schema.String),
-				type: Schema.optional(Schema.String),
+				subjectTable: Schema.optional(DocumentSubjectTable),
+				subjectId: Schema.optional(Schema.String),
+				type: Schema.optional(Document.json.fields.type),
+				// Substring match over title and content.
+				q: Schema.optional(Schema.String),
 				limit: Schema.optional(Schema.NumberFromString),
 				offset: Schema.optional(Schema.NumberFromString),
 			},
-			success: PaginatedList(Document.json),
+			success: PaginatedList(DocumentSummary),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.get('get', '/documents/:id', {
 			params: { id: Schema.String },
-			success: Document.json,
+			success: DocumentDetail,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.post('create', '/documents', {
 			payload: CreateDocumentInput,
-			success: Document.json,
+			success: DocumentDetail,
 		}),
 	)
 	.add(
 		HttpApiEndpoint.patch('update', '/documents/:id', {
 			params: { id: Schema.String },
 			payload: UpdateDocumentInput,
-			success: Schema.NullOr(Document.json),
+			success: Schema.NullOr(DocumentDetail),
 		}),
+	)
+	.add(
+		HttpApiEndpoint.delete('remove', '/documents/:id', {
+			params: { id: Schema.String },
+			success: Schema.Void,
+		}),
+	)
+	.add(
+		// File an existing document under one more record. Filing it where it
+		// already sits changes nothing rather than failing.
+		HttpApiEndpoint.post('attach', '/documents/:id/subjects', {
+			params: { id: Schema.String },
+			payload: LinkInput,
+			success: Schema.Void,
+			error: NotFound.pipe(HttpApiSchema.status(404)),
+		}),
+	)
+	.add(
+		HttpApiEndpoint.delete(
+			'detach',
+			'/documents/:id/subjects/:subjectTable/:subjectId',
+			{
+				params: {
+					id: Schema.String,
+					subjectTable: DocumentSubjectTable,
+					subjectId: Schema.String,
+				},
+				success: Schema.Void,
+			},
+		),
 	)
 	.middleware(SessionMiddleware)
 	.middleware(OrgMiddleware)

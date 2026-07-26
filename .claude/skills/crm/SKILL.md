@@ -17,7 +17,7 @@ Fetch only what is needed. Prefer summaries over full profiles.
 | --------------------------- | ----------------------------------------------------- |
 | `search_companies(filters)` | Summaries only, no full profiles                      |
 | `get_company(id_or_slug)`   | Full profile + last 5 interactions (no documents)     |
-| `get_documents(company_id)` | List (id, type, title) — no content                   |
+| `get_documents(subject)`    | Summaries + a snippet — no full body                  |
 | `get_document(id)`          | Full markdown content                                 |
 | `get_pipeline()`            | Counts only                                           |
 | `get_next_steps(limit)`     | Due tasks + overdue `next_action_at`                  |
@@ -71,16 +71,18 @@ For the full `log_interaction` example and workflow, consult `references/interac
 
 `documents.content` is full markdown. Write structured, scannable content — no AI filler phrases.
 
-Types: `research`, `prenote`, `postnote`, `call_notes`, `visit_notes`, `general`.
+Types: `research`, `prenote`, `postnote`, `call_notes`, `visit_notes`, `general`. Nothing else is accepted.
 
-Link to interactions via `interaction_id` when applicable (`prenote`, `postnote`, `call_notes`, `visit_notes`).
+Every document is filed against a CRM record — `subject_table` (`companies`, `contacts`, `tasks`, `proposals`, `calendar_events`) plus `subject_id`. File it against what it is about: a meeting prep note goes on the `calendar_events` row so it appears when someone opens that meeting. `attach_document` files the same document in a second place.
 
 When researching a new company:
 
-1. `create_company(...)` with known fields
-2. `create_document({ type: "research", content: <scraped + structured markdown> })`
+1. `create_companies(...)` with known fields
+2. `create_document({ subject_table: "companies", subject_id: <id>, type: "research", content: <scraped + structured markdown> })`
 
-For type descriptions and research workflow details, consult `references/documents.md`.
+A company's standing summary is `companies.account_brief`, not a document.
+
+For type descriptions and filing details, consult `references/documents.md`.
 
 ## Tasks
 

@@ -22,8 +22,12 @@ export const CompanyResearchPrompt = McpServer.prompt({
 			const data = rawData as Record<string, unknown>
 			const sql = yield* SqlClient.SqlClient
 			const companyId = data['id'] as string
-			const docs =
-				yield* sql`SELECT id, type, title FROM documents WHERE company_id = ${companyId}`
+			const docs = yield* sql`
+				SELECT d.id, d.type, d.title FROM documents d
+				JOIN document_links dl ON dl.document_id = d.id
+				WHERE dl.subject_table = 'companies' AND dl.subject_id = ${companyId}
+				ORDER BY d.updated_at DESC
+			`
 			const tasks =
 				yield* sql`SELECT * FROM tasks WHERE company_id = ${companyId} AND completed_at IS NULL ORDER BY due_at`
 

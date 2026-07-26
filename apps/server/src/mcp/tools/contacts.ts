@@ -15,6 +15,7 @@ import {
 	contactChannelsJson,
 	writeChannels,
 } from '../../services/contact-channels'
+import { unlinkSubject } from '../../services/documents'
 import { ListResult, toItems } from './_result'
 
 const decodeContact = Schema.decodeUnknownEffect(Contact)
@@ -49,7 +50,6 @@ const CreateContact = Tool.make('create_contact', {
 		company_id: Schema.String,
 		name: Schema.String,
 		role: Schema.optional(Schema.String),
-		notes: Schema.optional(Schema.String),
 		channels: Schema.optional(Schema.Array(ChannelInput)),
 	}),
 	success: ContactWithChannels,
@@ -66,7 +66,6 @@ const UpdateContact = Tool.make('update_contact', {
 		id: Schema.String,
 		name: Schema.optional(Schema.String),
 		role: Schema.optional(Schema.String),
-		notes: Schema.optional(Schema.String),
 		channels: Schema.optional(Schema.Array(ChannelInput)),
 		clear_email_suppression: Schema.optional(Schema.Boolean),
 	}),
@@ -164,6 +163,9 @@ export const ContactHandlersLive = ContactTools.toLayer(
 
 			delete_contact: ({ id }) =>
 				Effect.gen(function* () {
+					// No foreign key clears these, so they would outlive the person
+					// and point at nobody.
+					yield* unlinkSubject(sql, 'contacts', id)
 					yield* sql`DELETE FROM contacts WHERE id = ${id}`
 					return { status: 'deleted' as const }
 				}).pipe(Effect.orDie),

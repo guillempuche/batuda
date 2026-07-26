@@ -16,6 +16,7 @@ import {
 	patchChannel,
 	writeChannels,
 } from '../services/contact-channels'
+import { unlinkSubject } from '../services/documents'
 
 const decodeContact = Schema.decodeUnknownEffect(Contact)
 const decodeChannel = Schema.decodeUnknownEffect(ContactChannel)
@@ -135,6 +136,9 @@ export const ContactsLive = HttpApiBuilder.group(
 				)
 				.handle('remove', _ =>
 					Effect.gen(function* () {
+						// No foreign key clears these, so they would outlive the
+						// person and point at nobody.
+						yield* unlinkSubject(sql, 'contacts', _.params.id)
 						yield* sql`DELETE FROM contacts WHERE id = ${_.params.id}`
 						yield* Effect.logInfo('Contact removed').pipe(
 							Effect.annotateLogs({
