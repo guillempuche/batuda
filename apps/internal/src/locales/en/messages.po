@@ -525,6 +525,8 @@ msgstr "Applying a discovered contact merges it into a matching record if one al
 
 #: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/review/proposed-updates-review.tsx
 #: src/components/research/review/proposed-updates-review.tsx
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Applying…"
@@ -1348,6 +1350,7 @@ msgid "Could not start the re-run. Please try again."
 msgstr "Could not start the re-run. Please try again."
 
 #: src/components/research/research-dialog.tsx
+#: src/components/research/research-dialog.tsx
 msgid "Could not start the research run. Please try again."
 msgstr "Could not start the research run. Please try again."
 
@@ -1628,6 +1631,10 @@ msgstr "Delete {0}"
 msgid "Delete failed"
 msgstr "Delete failed"
 
+#: src/components/research/run-actions.tsx
+msgid "Delete for good"
+msgstr "Delete for good"
+
 #. placeholder {0}: row.email
 #: src/routes/emails/inboxes.tsx
 msgid "Delete inbox {0}? Stored messages stay; the connection stops."
@@ -1666,6 +1673,7 @@ msgid "Deleted"
 msgstr "Deleted"
 
 #: src/components/instructions/template-delete-confirm.tsx
+#: src/components/research/run-actions.tsx
 #: src/routes/settings/api-keys/index.tsx
 #: src/routes/settings/api-keys/index.tsx
 msgid "Deleting…"
@@ -2379,6 +2387,10 @@ msgstr "Join video call"
 msgid "Keep editing"
 msgstr "Keep editing"
 
+#: src/components/research/run-actions.tsx
+msgid "Keep it"
+msgstr "Keep it"
+
 #: src/routes/settings/organization/spend.tsx
 msgid "Key"
 msgstr "Key"
@@ -3069,7 +3081,6 @@ msgstr "No redirect URI"
 msgid "No reliable data"
 msgstr "No reliable data"
 
-#: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/run-detail.tsx
 msgid "No reliable data found"
 msgstr "No reliable data found"
@@ -3861,6 +3872,8 @@ msgid "Rejected"
 msgstr "Rejected"
 
 #: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/review/proposed-updates-review.tsx
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Rejecting…"
 msgstr "Rejecting…"
@@ -4047,7 +4060,10 @@ msgstr "Run again"
 msgid "Run cancelled"
 msgstr "Run cancelled"
 
-#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/run-actions.tsx
+msgid "Run deleted"
+msgstr "Run deleted"
+
 #: src/components/research/run-detail.tsx
 msgid "Run failed"
 msgstr "Run failed"
@@ -4067,6 +4083,10 @@ msgstr "Run not found"
 #: src/components/research/run-labels.ts
 msgid "Running"
 msgstr "Running"
+
+#: src/components/research/run-detail.tsx
+msgid "Runs in this batch"
+msgstr "Runs in this batch"
 
 #: src/components/companies/about-section.tsx
 msgid "Sales context"
@@ -4684,6 +4704,10 @@ msgstr "That link expired. Request a fresh one below."
 msgid "That link is no longer valid. Request a fresh one below."
 msgstr "That link is no longer valid. Request a fresh one below."
 
+#: src/components/research/research-dialog.tsx
+msgid "That set of instructions is no longer available. Pick another and try again."
+msgstr "That set of instructions is no longer available. Pick another and try again."
+
 #: src/routes/tasks/index.tsx
 msgid "The 20 most recently edited tasks on this shelf. Click one to reopen it."
 msgstr "The 20 most recently edited tasks on this shelf. Click one to reopen it."
@@ -5209,6 +5233,10 @@ msgstr "What kind of research?"
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "What needs to happen?"
 msgstr "What needs to happen?"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "What this run has cost so far"
+msgstr "What this run has cost so far"
 
 #: src/components/companies/followup-dialog.tsx
 msgid "What to follow up on"

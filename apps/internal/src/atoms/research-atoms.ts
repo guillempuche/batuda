@@ -119,6 +119,9 @@ export type PendingProposal = {
 	readonly runQuery: string
 	readonly runCreatedAt: unknown
 	readonly runCostCents: number
+	// Paid lookups are tallied apart from the cheap work; both belong to the run,
+	// not to this one proposal.
+	readonly runPaidCostCents: number
 	readonly proposedUpdateId: string | null
 	readonly subjectTable: string | null
 	readonly subjectId: string | null
@@ -128,6 +131,15 @@ export type PendingProposal = {
 	readonly confidence: number | null
 	readonly verification: string | null
 	readonly machineCheckable: boolean
+	// The values this change would write, and the pages they were read from. Both
+	// arrive as plain JSON of no fixed shape, so a reader narrows them itself
+	// rather than trusting a shape nothing enforces.
+	readonly fields: unknown
+	readonly citations: ReadonlyArray<unknown>
+	// What the record holds today for those same fields, so a reader can see what
+	// a value replaces. Null when the change would create a new record, and a
+	// field is absent when the record has nothing there yet.
+	readonly subjectCurrent: unknown
 }
 
 export type PendingProposalsParams = {

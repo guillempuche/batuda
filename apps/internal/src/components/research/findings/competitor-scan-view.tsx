@@ -1,5 +1,6 @@
 import { Trans } from '@lingui/react/macro'
 
+import { SafeLink } from '#/components/research/safe-link'
 import {
 	type Citation,
 	CitationList,
@@ -110,9 +111,7 @@ export function CompetitorScanView({
 								<RowHead>
 									<Pill>{c.name}</Pill>
 									{c.website !== undefined ? (
-										<a href={c.website} target='_blank' rel='noreferrer'>
-											{c.website}
-										</a>
+										<SafeLink href={c.website}>{c.website}</SafeLink>
 									) : null}
 								</RowHead>
 								{c.description !== undefined ? (

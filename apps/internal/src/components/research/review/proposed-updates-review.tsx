@@ -66,6 +66,7 @@ export function ProposedUpdatesReview({
 	const {
 		results,
 		pending: pendingResolve,
+		sending: sendingResolve,
 		resolve,
 		undo,
 		setResults,
@@ -104,7 +105,8 @@ export function ProposedUpdatesReview({
 		p =>
 			p.status === 'pending' &&
 			results[p.id] === undefined &&
-			pendingResolve[p.id] === undefined,
+			pendingResolve[p.id] === undefined &&
+			sendingResolve[p.id] === undefined,
 	)
 	const verifiedPending = pending.filter(
 		p => trustTier(strongestChannelTrust(p.channels)) === 'trustworthy',
@@ -237,6 +239,7 @@ export function ProposedUpdatesReview({
 						proposal={proposal}
 						result={results[proposal.id]}
 						pending={pendingResolve[proposal.id]}
+						sending={sendingResolve[proposal.id]}
 						completedAt={context.completedAt}
 						sources={sourcesFor(proposal, context.sourceById)}
 						onResolve={resolveOne}
@@ -252,6 +255,7 @@ function ProposalCard({
 	proposal,
 	result,
 	pending,
+	sending,
 	completedAt,
 	sources,
 	onResolve,
@@ -260,6 +264,7 @@ function ProposalCard({
 	readonly proposal: ReviewProposal
 	readonly result: ResolveOutcome | undefined
 	readonly pending: ResolveDecision | undefined
+	readonly sending: ResolveDecision | undefined
 	readonly completedAt: string | null
 	readonly sources: ReadonlyArray<ProvenanceSource>
 	readonly onResolve: (p: ReviewProposal, decision: ResolveDecision) => void
@@ -346,6 +351,12 @@ function ProposalCard({
 						>
 							<Trans>Undo</Trans>
 						</UndoButton>
+					</PendingResolve>
+				) : sending !== undefined ? (
+					<PendingResolve data-testid='research-review-sending'>
+						<PendingLabel>
+							{sending === 'apply' ? t`Applying…` : t`Rejecting…`}
+						</PendingLabel>
 					</PendingResolve>
 				) : (
 					<>

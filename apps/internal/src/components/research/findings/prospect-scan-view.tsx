@@ -6,6 +6,7 @@ import { useState } from 'react'
 
 import { PriButton, usePriToast } from '@batuda/ui/pri'
 
+import { SafeLink } from '#/components/research/safe-link'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import {
 	type Citation,
@@ -69,9 +70,7 @@ export function ProspectScanView({
 								<RowHead>
 									<Pill>{p.name}</Pill>
 									{p.website !== undefined ? (
-										<a href={p.website} target='_blank' rel='noreferrer'>
-											{p.website}
-										</a>
+										<SafeLink href={p.website}>{p.website}</SafeLink>
 									) : null}
 								</RowHead>
 								<Reason>{p.why_relevant}</Reason>
@@ -159,7 +158,7 @@ function AddAsLeadButton({ prospect }: { readonly prospect: ProspectEntry }) {
 				...(prospect.country ? { country: prospect.country } : {}),
 				...(prospect.website ? { website: prospect.website } : {}),
 			},
-		} as never)
+		})
 		if (exit._tag !== 'Success') {
 			setBusy(false)
 			toast.add({ title: t`Could not add as a lead`, type: 'error' })
@@ -172,7 +171,7 @@ function AddAsLeadButton({ prospect }: { readonly prospect: ProspectEntry }) {
 			await verifyCompany({
 				params: { id },
 				payload: { verified: true },
-			} as never)
+			})
 		}
 		toast.add({ title: t`Added as a verified lead`, type: 'success' })
 		void navigate({ to: '/companies/$slug', params: { slug: newSlug } })

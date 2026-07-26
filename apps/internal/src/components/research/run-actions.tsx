@@ -37,6 +37,24 @@ function subjectsOf(context: unknown): ReadonlyArray<Subject> {
 	return out
 }
 
+/**
+ * The parts of a run's stored setup that a repeat run can be started from: the
+ * companies it was pointed at, the filter that chose them, and the search hints.
+ */
+function reusableContext(
+	context: unknown,
+): Record<string, unknown> | undefined {
+	if (!context || typeof context !== 'object') return undefined
+	const c = context as Record<string, unknown>
+	const out: Record<string, unknown> = {}
+	const subjects = subjectsOf(context)
+	if (subjects.length > 0) out['subjects'] = subjects
+	if (c['selector'] && typeof c['selector'] === 'object')
+		out['selector'] = c['selector']
+	if (c['hints'] && typeof c['hints'] === 'object') out['hints'] = c['hints']
+	return Object.keys(out).length > 0 ? out : undefined
+}
+
 /** Cancel a live run, re-run a finished one, or delete it — the run-detail toolbar. */
 export function RunActions({
 	run,
@@ -47,6 +65,8 @@ export function RunActions({
 		readonly schemaName: string | null
 		readonly status: string
 		readonly context: unknown
+		readonly mode: string | null
+		readonly templateIds: ReadonlyArray<string>
 	}
 }) {
 	const { t } = useLingui()
@@ -57,12 +77,16 @@ export function RunActions({
 	const create = useAtomSet(createResearchAtom, { mode: 'promiseExit' })
 	const refreshRun = useAtomRefresh(researchDetailAtom(run.id))
 	const [busy, setBusy] = useState<null | 'cancel' | 'delete' | 'rerun'>(null)
+	// Deleting takes the run, its findings and anything still waiting on review
+	// with it, and there is no way back — so it asks first. The reversible
+	// bulk-apply already works this way.
+	const [confirmingDelete, setConfirmingDelete] = useState(false)
 
 	const isActive = run.status === 'running' || run.status === 'queued'
 
 	const onCancel = async () => {
 		setBusy('cancel')
-		const exit = await cancel({ params: { id: run.id } } as never)
+		const exit = await cancel({ params: { id: run.id } })
 		setBusy(null)
 		if (exit._tag === 'Success') {
 			refreshRun()
@@ -74,9 +98,11 @@ export function RunActions({
 
 	const onDelete = async () => {
 		setBusy('delete')
-		const exit = await del({ params: { id: run.id } } as never)
+		const exit = await del({ params: { id: run.id } })
 		setBusy(null)
+		setConfirmingDelete(false)
 		if (exit._tag === 'Success') {
+			toast.add({ title: t`Run deleted`, type: 'success' })
 			void navigate({ to: '/research/runs' })
 		} else {
 			toast.add({ title: t`Could not delete the run`, type: 'error' })
@@ -85,14 +111,23 @@ export function RunActions({
 
 	const onRerun = async () => {
 		setBusy('rerun')
-		const subjects = subjectsOf(run.context)
+		// Repeat the whole setup, not just the question. Sending only the question
+		// and its subjects quietly dropped how thorough the run was, the
+		// instructions that shaped it, and — on a batch — the filter that chose
+		// which companies to cover, so the second run was not comparable with the
+		// first and a batch collapsed into a single run about nothing.
+		const context = reusableContext(run.context)
 		const exit = await create({
 			payload: {
 				query: run.query,
 				...(run.schemaName ? { schema_name: run.schemaName } : {}),
-				...(subjects.length > 0 ? { context: { subjects } } : {}),
+				...(run.mode ? { mode: run.mode } : {}),
+				...(context === undefined ? {} : { context }),
+				...(run.templateIds.length > 0
+					? { template_ids: run.templateIds }
+					: {}),
 			},
-		} as never)
+		})
 		setBusy(null)
 		if (exit._tag === 'Success') {
 			const value = exit.value as Record<string, unknown> | null
@@ -128,16 +163,40 @@ export function RunActions({
 					<Trans>Run again</Trans>
 				</PriButton>
 			)}
-			<PriButton
-				type='button'
-				$variant='text'
-				data-testid='run-delete'
-				disabled={busy !== null}
-				onClick={() => void onDelete()}
-			>
-				<Trash2 size={14} aria-hidden />
-				<Trans>Delete</Trans>
-			</PriButton>
+			{confirmingDelete ? (
+				<>
+					<PriButton
+						type='button'
+						$variant='filled'
+						data-testid='run-delete-confirm'
+						disabled={busy !== null}
+						onClick={() => void onDelete()}
+					>
+						<Trash2 size={14} aria-hidden />
+						{busy === 'delete' ? t`Deleting…` : t`Delete for good`}
+					</PriButton>
+					<PriButton
+						type='button'
+						$variant='text'
+						data-testid='run-delete-cancel'
+						disabled={busy !== null}
+						onClick={() => setConfirmingDelete(false)}
+					>
+						<Trans>Keep it</Trans>
+					</PriButton>
+				</>
+			) : (
+				<PriButton
+					type='button'
+					$variant='text'
+					data-testid='run-delete'
+					disabled={busy !== null}
+					onClick={() => setConfirmingDelete(true)}
+				>
+					<Trash2 size={14} aria-hidden />
+					<Trans>Delete</Trans>
+				</PriButton>
+			)}
 		</Actions>
 	)
 }

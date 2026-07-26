@@ -1,6 +1,6 @@
 import { useAtomRefresh, useAtomValue } from '@effect/atom-react'
 import { AsyncResult } from 'effect/unstable/reactivity'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { researchDetailAtom, researchEventsAtom } from '#/atoms/research-atoms'
 import {
@@ -46,6 +46,18 @@ export function useResearchEvents(
 	// The page uses this to swap the endless progress bar for a manual refresh.
 	const [stalled, setStalled] = useState(false)
 
+	/**
+	 * Start listening again after the loop gave up, or after a poll failed. The
+	 * counters reset, so a run that was simply slow to start streaming gets a
+	 * fresh set of attempts rather than staying silent for the life of the page.
+	 */
+	const retry = useCallback(() => {
+		emptyPollsRef.current = 0
+		setStalled(false)
+		setFailed(false)
+		refreshEvents()
+	}, [refreshEvents])
+
 	// biome-ignore lint/correctness/useExhaustiveDependencies: `result` is the poll signal — the loop re-runs each time a poll resolves.
 	useEffect(() => {
 		if (!enabled) return
@@ -54,6 +66,13 @@ export function useResearchEvents(
 			return
 		}
 		if (!AsyncResult.isSuccess(result)) return
+		// Asking for the next poll re-renders with the previous answer still in
+		// hand, before the new one arrives. That is not an answer, so it must not
+		// count as an empty round — counting it burned two attempts per poll and
+		// the loop gave up about ten seconds into any run that had yet to start
+		// streaming. It also armed the retry timer while a request was still open,
+		// cutting off a long poll that was waiting to collect events.
+		if (result.waiting) return
 
 		const value = result.value
 		const fresh = narrowEvents(value.events).filter(
@@ -103,5 +122,5 @@ export function useResearchEvents(
 
 	const progress = useMemo(() => deriveProgress(events), [events])
 
-	return { progress, events, done, failed, stalled }
+	return { progress, events, done, failed, stalled, retry }
 }

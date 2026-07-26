@@ -167,7 +167,7 @@ function PaidActionRow({ action }: { readonly action: PendingPaidAction }) {
 		const call = decision === 'approve' ? approve : skip
 		const exit = await call({
 			params: { id: runId, paId: action.id },
-		} as never)
+		})
 		setBusy(false)
 		if (exit._tag === 'Success') {
 			refreshRun()

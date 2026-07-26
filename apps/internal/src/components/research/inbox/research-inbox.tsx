@@ -15,6 +15,7 @@ import {
 	resolveProposalsBatchAtom,
 } from '#/atoms/research-atoms'
 import {
+	isEnteredOutcome,
 	type ProposalOutcome,
 	trustTier,
 	verdictRank,
@@ -23,6 +24,7 @@ import { OutcomeBadge } from '#/components/research/proposal-outcome'
 import { ResearchDialog } from '#/components/research/research-dialog'
 import {
 	operationLabel,
+	statusLabel,
 	subjectTableLabel,
 } from '#/components/research/run-labels'
 import { narrowResearch } from '#/components/research/run-shapes'
@@ -123,7 +125,7 @@ export function ResearchInbox() {
 	const resolveBatch = useAtomSet(resolveProposalsBatchAtom, {
 		mode: 'promiseExit',
 	})
-	const { results, pending, resolve, undo, setResults } =
+	const { results, pending, sending, resolve, undo, setResults } =
 		useProposalResolution()
 
 	const [subject, setSubject] = useState<SubjectFilter>('all')
@@ -195,7 +197,14 @@ export function ResearchInbox() {
 		[runs],
 	)
 
-	const resolvedCount = Object.keys(results).length
+	// A change that came back as a conflict or as invalid is still waiting for
+	// someone, so counting every reply as dealt with made the queue look shorter
+	// than it is.
+	const resolvedCount = Object.values(results).filter(
+		r =>
+			isEnteredOutcome(r.outcome as ProposalOutcome) ||
+			r.outcome === 'rejected',
+	).length
 	const pendingCount = Math.max(0, proposals.length - resolvedCount)
 	const recentRuns = runs.length
 
@@ -216,7 +225,8 @@ export function ResearchInbox() {
 				p =>
 					p.proposedUpdateId !== null &&
 					results[rowKey(p)] === undefined &&
-					pending[rowKey(p)] === undefined,
+					pending[rowKey(p)] === undefined &&
+					sending[rowKey(p)] === undefined,
 			)
 			.map(p => ({
 				research_id: p.researchId,
@@ -249,7 +259,8 @@ export function ResearchInbox() {
 		p =>
 			p.proposedUpdateId !== null &&
 			results[rowKey(p)] === undefined &&
-			pending[rowKey(p)] === undefined,
+			pending[rowKey(p)] === undefined &&
+			sending[rowKey(p)] === undefined,
 	).length
 
 	return (
@@ -435,24 +446,27 @@ export function ResearchInbox() {
 								<Trans>Attention needed</Trans>
 							</SectionTitle>
 							<Rows>
-								{attention.map(run => (
-									<AttentionRow key={run.id}>
-										<RowMain>
-											<RowQuery>{run.query}</RowQuery>
-											<RowMeta>
-												{run.status === 'no_reliable_data' ? (
-													<Trans>No reliable data found</Trans>
-												) : (
-													<Trans>Run failed</Trans>
-												)}
-											</RowMeta>
-										</RowMain>
-										<OpenRunLink id={run.id} label={t`Open run: ${run.query}`}>
-											<Trans>Open</Trans>
-											<ArrowRight size={14} aria-hidden />
-										</OpenRunLink>
-									</AttentionRow>
-								))}
+								{attention.map(run => {
+									// Each status says its own name. Treating everything that is
+									// not "no reliable data" as a failure reported a run that
+									// succeeded but wants a second look as broken.
+									const label = statusLabel(run.status)
+									return (
+										<AttentionRow key={run.id}>
+											<RowMain>
+												<RowQuery>{run.query}</RowQuery>
+												<RowMeta>{label ? i18n._(label) : run.status}</RowMeta>
+											</RowMain>
+											<OpenRunLink
+												id={run.id}
+												label={t`Open run: ${run.query}`}
+											>
+												<Trans>Open</Trans>
+												<ArrowRight size={14} aria-hidden />
+											</OpenRunLink>
+										</AttentionRow>
+									)
+								})}
 							</Rows>
 						</Section>
 					) : null}
@@ -464,6 +478,8 @@ export function ResearchInbox() {
 						proposals={trustworthy}
 						results={results}
 						pending={pending}
+						sending={sending}
+						batchBusy={batchBusy}
 						onResolve={resolveOne}
 						onUndo={undo}
 					/>
@@ -475,6 +491,8 @@ export function ResearchInbox() {
 						proposals={needsReview}
 						results={results}
 						pending={pending}
+						sending={sending}
+						batchBusy={batchBusy}
 						onResolve={resolveOne}
 						onUndo={undo}
 					/>
@@ -507,6 +525,8 @@ function ProposalSection({
 	proposals,
 	results,
 	pending,
+	sending,
+	batchBusy,
 	onResolve,
 	onUndo,
 }: {
@@ -516,6 +536,9 @@ function ProposalSection({
 	readonly proposals: ReadonlyArray<PendingProposal>
 	readonly results: Record<string, ResolveOutcome>
 	readonly pending: Record<string, ResolveDecision>
+	readonly sending: Record<string, ResolveDecision>
+	/** A bulk apply is in flight, so single rows must not be resolved alongside it. */
+	readonly batchBusy: boolean
 	readonly onResolve: (p: PendingProposal, decision: ResolveDecision) => void
 	readonly onUndo: (key: string) => void
 }) {
@@ -525,12 +548,18 @@ function ProposalSection({
 			<SectionTitle>{title}</SectionTitle>
 			<SectionHint>{hint}</SectionHint>
 			<Rows>
-				{proposals.map(p => (
+				{proposals.map((p, index) => (
 					<ProposalRow
-						key={rowKey(p)}
+						// A proposal recorded before these carried their own id has none,
+						// and two such from the same run cannot be told apart, so position
+						// is the only thing left to separate them.
+						// biome-ignore lint/suspicious/noArrayIndexKey: the index only breaks ties behind a real key; without it two id-less proposals from one run collide and React drops a row.
+						key={`${rowKey(p)}#${index}`}
 						proposal={p}
 						result={results[rowKey(p)]}
 						pending={pending[rowKey(p)]}
+						sending={sending[rowKey(p)]}
+						batchBusy={batchBusy}
 						onResolve={onResolve}
 						onUndo={() => onUndo(rowKey(p))}
 					/>
@@ -544,12 +573,16 @@ function ProposalRow({
 	proposal,
 	result,
 	pending,
+	sending,
+	batchBusy,
 	onResolve,
 	onUndo,
 }: {
 	readonly proposal: PendingProposal
 	readonly result: ResolveOutcome | undefined
 	readonly pending: ResolveDecision | undefined
+	readonly sending: ResolveDecision | undefined
+	readonly batchBusy: boolean
 	readonly onResolve: (p: PendingProposal, decision: ResolveDecision) => void
 	readonly onUndo: () => void
 }) {
@@ -570,6 +603,9 @@ function ProposalRow({
 					: proposal.subjectTable
 			: proposal.runQuery)
 	const opLabel = operationLabel(proposal.operation)
+	// Cheap work and paid lookups are tallied separately, so a run whose whole
+	// cost was a paid lookup reads as free unless both are counted.
+	const runTotalCents = proposal.runCostCents + proposal.runPaidCostCents
 
 	return (
 		<Row data-testid='research-inbox-row'>
@@ -589,11 +625,12 @@ function ProposalRow({
 						confidence={proposal.confidence}
 						machineCheckable={proposal.machineCheckable}
 					/>
-					{proposal.runCostCents > 0 ? (
-						<RowCost data-testid='research-inbox-row-cost'>
-							{formatMoneyCents(proposal.runCostCents, {
-								locale: i18n.locale,
-							})}
+					{runTotalCents > 0 ? (
+						<RowCost
+							data-testid='research-inbox-row-cost'
+							title={t`What this run has cost so far`}
+						>
+							{formatMoneyCents(runTotalCents, { locale: i18n.locale })}
 						</RowCost>
 					) : null}
 					<OpenRunLink
@@ -624,13 +661,19 @@ function ProposalRow({
 							<Trans>Undo</Trans>
 						</UndoButton>
 					</PendingResolve>
+				) : sending !== undefined ? (
+					<PendingResolve data-testid='research-inbox-sending'>
+						<PendingLabel>
+							{sending === 'apply' ? t`Applying…` : t`Rejecting…`}
+						</PendingLabel>
+					</PendingResolve>
 				) : (
 					<>
 						<PriButton
 							type='button'
 							$variant='filled'
 							aria-label={t`Apply ${subjectLabel}`}
-							disabled={proposal.proposedUpdateId === null}
+							disabled={proposal.proposedUpdateId === null || batchBusy}
 							onClick={() => onResolve(proposal, 'apply')}
 							data-testid='research-inbox-apply'
 						>
@@ -640,7 +683,7 @@ function ProposalRow({
 							type='button'
 							$variant='outlined'
 							aria-label={t`Reject ${subjectLabel}`}
-							disabled={proposal.proposedUpdateId === null}
+							disabled={proposal.proposedUpdateId === null || batchBusy}
 							onClick={() => onResolve(proposal, 'reject')}
 							data-testid='research-inbox-reject'
 						>

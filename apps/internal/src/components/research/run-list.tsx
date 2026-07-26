@@ -107,7 +107,9 @@ export function ResearchRuns() {
 								</RowMain>
 								<RowSide>
 									<Cost>
-										{formatMoneyCents(run.costCents, { locale: i18n.locale })}
+										{formatMoneyCents(run.costCents + run.paidCostCents, {
+											locale: i18n.locale,
+										})}
 									</Cost>
 									<RelativeDate value={run.createdAt} />
 								</RowSide>
