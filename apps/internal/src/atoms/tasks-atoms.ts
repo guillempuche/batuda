@@ -1,6 +1,12 @@
 import { Atom } from 'effect/unstable/reactivity'
 
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
+import {
+	firstPage,
+	type ListPage,
+	listPageKey,
+	listPageQuery,
+} from '#/lib/list-page'
 
 /**
  * Dedicated atom registry for the tasks inbox.
@@ -77,39 +83,41 @@ const sortForShelf = (shelf: TaskShelf) =>
 
 const shelfCache = new Map<string, ReturnType<typeof makeShelfAtom>>()
 
-function makeShelfAtom(shelf: TaskShelf, dayKey: string, limit: number) {
-	// Held even while nothing is showing it, so opening a task and coming back
-	// puts the same rows straight back on screen instead of refetching them and
-	// collapsing the shelf to a single page in between.
-	return Atom.keepAlive(
-		BatudaApiAtom.query('tasks', 'list', {
-			query: {
-				shelf,
-				...dayBoundaries(dayKey),
-				sort: sortForShelf(shelf),
-				limit,
-				// Counted on purpose: the shelf says how many tasks sit on it, which
-				// is the whole point of a shelf and is not knowable from one page.
-				count: 'exact' as const,
-			},
-			serializationKey: `tasks:shelf:${shelf}:${dayKey}:${limit}:exact`,
-		}),
-	)
+/** The slice both the screen and any loader ask for first. */
+export const TASKS_FIRST_PAGE = firstPage(TASKS_PAGE_SIZE, 'exact')
+
+function makeShelfAtom(shelf: TaskShelf, dayKey: string, page: ListPage) {
+	const atom = BatudaApiAtom.query('tasks', 'list', {
+		query: {
+			shelf,
+			...dayBoundaries(dayKey),
+			sort: sortForShelf(shelf),
+			// The first slice is counted because the shelf states how many tasks
+			// sit on it, which is the whole point of a shelf.
+			...listPageQuery(page),
+		},
+		serializationKey: `tasks:shelf:${shelf}:${dayKey}:${listPageKey(page)}`,
+	})
+	// The first slice is held even while nothing is showing it, so opening a
+	// task and coming back paints immediately. Later slices are kept by the
+	// list itself and need no pinning.
+	return page.offset === 0 ? Atom.keepAlive(atom) : atom
 }
 
 /**
- * One page of a single shelf. The server decides which tasks belong on it, so
- * the page reports how many there are in total even while showing far fewer.
+ * One slice of a single shelf. The server decides which tasks belong on it, so
+ * the first slice reports how many there are in total even while showing far
+ * fewer.
  */
 export function tasksShelfAtom(
 	shelf: TaskShelf,
 	dayKey: string,
-	limit: number = TASKS_PAGE_SIZE,
+	page: ListPage = TASKS_FIRST_PAGE,
 ) {
-	const key = `${shelf}::${dayKey}::${limit}`
+	const key = `${shelf}::${dayKey}::${listPageKey(page)}`
 	const existing = shelfCache.get(key)
 	if (existing !== undefined) return existing
-	const atom = makeShelfAtom(shelf, dayKey, limit)
+	const atom = makeShelfAtom(shelf, dayKey, page)
 	shelfCache.set(key, atom)
 	return atom
 }

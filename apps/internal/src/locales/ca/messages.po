@@ -4591,6 +4591,10 @@ msgid "Showing {firstRow}–{lastRow} of {total}"
 msgstr "Mostrant {firstRow}–{lastRow} de {total}"
 
 #: src/components/shared/infinite-list-footer.tsx
+msgid "Showing {loadedCount}"
+msgstr "Es mostren {loadedCount}"
+
+#: src/components/shared/infinite-list-footer.tsx
 msgid "Showing {loadedCount} of {totalCount}"
 msgstr "Es mostren {loadedCount} de {totalCount}"
 

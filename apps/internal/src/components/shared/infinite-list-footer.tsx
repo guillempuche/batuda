@@ -45,7 +45,7 @@ export function InfiniteListFooter({
 	const sentinelRef = useRef<HTMLDivElement>(null)
 	const viewportRef = useOptionalBlueprintViewportRef()
 
-	const { hasMore, isLoadingMore, loadMoreFailed, loadMore, refresh } = list
+	const { hasMore, isLoadingMore, loadMoreFailed, loadMore, retry } = list
 	const loadedCount = list.items.length
 	// Named rather than read inline so the announcement reaches translators with
 	// two named blanks to place, instead of one named and one numbered.
@@ -85,10 +85,13 @@ export function InfiniteListFooter({
 	return (
 		<Footer>
 			<Sentinel ref={sentinelRef} aria-hidden />
+			{/* After a failure this re-asks for the slice that failed rather than
+			    starting the list over, so a fault on the last step does not cost
+			    the reader everything they have already scrolled through. */}
 			<PriButton
 				type='button'
 				$variant='outlined'
-				onClick={loadMoreFailed ? refresh : loadMore}
+				onClick={loadMoreFailed ? retry : loadMore}
 				disabled={isLoadingMore}
 				data-testid={`${testId}-load-more`}
 			>
@@ -100,12 +103,17 @@ export function InfiniteListFooter({
 				</FailureNote>
 			)}
 			{/* Scrolling more rows into view says nothing on its own to somebody
-			    who cannot see them arrive, so count them out loud instead. */}
-			{announce && (
-				<SrOnly aria-live='polite'>
-					{t`Showing ${loadedCount} of ${totalCount}`}
-				</SrOnly>
-			)}
+			    who cannot see them arrive, so count them out loud instead. A list
+			    that never asked how many there are says only how far it has got,
+			    rather than counting up to a blank. */}
+			{announce &&
+				(totalCount === undefined ? (
+					<SrOnly aria-live='polite'>{t`Showing ${loadedCount}`}</SrOnly>
+				) : (
+					<SrOnly aria-live='polite'>
+						{t`Showing ${loadedCount} of ${totalCount}`}
+					</SrOnly>
+				))}
 		</Footer>
 	)
 }

@@ -1,6 +1,12 @@
 import { Atom } from 'effect/unstable/reactivity'
 
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
+import {
+	firstPage,
+	type ListPage,
+	listPageKey,
+	listPageQuery,
+} from '#/lib/list-page'
 
 /**
  * Shape of the validated `/companies` search params. Mirrors the query
@@ -34,29 +40,32 @@ export type CompaniesSearch = {
 const cache = new Map<string, ReturnType<typeof makeCompaniesSearchAtom>>()
 
 /**
- * Page size for the list + board "load more": the initial window and the number
- * of rows each "load more" adds. The growing window is part of the atom cache
- * key (see below), so each step fetches its own cached result and hydrates on
- * SSR for the first page.
+ * How many companies the list and each board column read at a time, and how
+ * many each "load more" adds.
  */
 export const COMPANIES_PAGE_SIZE = 60
 
-function makeCompaniesSearchAtom(search: CompaniesSearch, limit: number) {
-	// Held even while nothing is showing it, so stepping into a company and
-	// coming back puts the same rows straight back on screen instead of
-	// refetching them and collapsing the list to a single page in between.
-	return Atom.keepAlive(
-		BatudaApiAtom.query('companies', 'list', {
-			// Counted on purpose: the screen states how many companies match, and
-			// the footer counts out how far through them the reader has got.
-			query: { ...search, limit, count: 'exact' as const },
-			serializationKey: `companies:search:${canonicalSearchKey(search)}::${limit}:exact`,
-		}),
-	)
+/** The slice both the loader and the screen ask for first. */
+export const COMPANIES_FIRST_PAGE = firstPage(COMPANIES_PAGE_SIZE, 'exact')
+
+function makeCompaniesSearchAtom(search: CompaniesSearch, page: ListPage) {
+	const atom = BatudaApiAtom.query('companies', 'list', {
+		// The first slice is counted because the screen states how many
+		// companies match; later slices are not, since that number does not
+		// change as the reader moves down the list.
+		query: { ...search, ...listPageQuery(page) },
+		serializationKey: `companies:search:${canonicalSearchKey(search)}::${listPageKey(page)}`,
+	})
+	// The first slice is held even while nothing is showing it, so stepping
+	// into a company and coming back paints immediately instead of fetching
+	// again. Later slices are not: their rows are kept by the list itself, and
+	// holding every slice of every list ever scrolled would pin them all for
+	// the life of the tab.
+	return page.offset === 0 ? Atom.keepAlive(atom) : atom
 }
 
 /**
- * Return the (memoized) atom for the given search. Called from:
+ * Return the (memoized) atom for the given search and slice. Called from:
  *   - the route loader, which hydrates the atom with server-fetched data
  *   - the route component, which reads the atom via `useAtomValue`
  *
@@ -65,14 +74,14 @@ function makeCompaniesSearchAtom(search: CompaniesSearch, limit: number) {
  */
 export function companiesSearchAtom(
 	search: CompaniesSearch,
-	limit: number = COMPANIES_PAGE_SIZE,
+	page: ListPage = COMPANIES_FIRST_PAGE,
 ) {
-	// The visible window is part of the identity so "load more" (a larger limit)
-	// resolves to its own cached atom instead of mutating the current one.
-	const key = `${canonicalSearchKey(search)}::${limit}`
+	// The slice is part of the identity, so each one resolves to its own
+	// cached atom instead of overwriting the one before it.
+	const key = `${canonicalSearchKey(search)}::${listPageKey(page)}`
 	const existing = cache.get(key)
 	if (existing !== undefined) return existing
-	const atom = makeCompaniesSearchAtom(search, limit)
+	const atom = makeCompaniesSearchAtom(search, page)
 	cache.set(key, atom)
 	return atom
 }

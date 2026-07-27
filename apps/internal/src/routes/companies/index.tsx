@@ -10,6 +10,7 @@ import styled from 'styled-components'
 import { PriButton, PriInput, PriSelect } from '@batuda/ui/pri'
 
 import {
+	COMPANIES_FIRST_PAGE,
 	COMPANIES_PAGE_SIZE,
 	type CompaniesSearch,
 	canonicalSearchKey,
@@ -112,7 +113,7 @@ export const Route = createFileRoute('/companies/')({
 			return {
 				dehydrated: [
 					dehydrateAtom(
-						companiesSearchAtom(search, COMPANIES_PAGE_SIZE),
+						companiesSearchAtom(search, COMPANIES_FIRST_PAGE),
 						AsyncResult.success(companies),
 					),
 				] as const,
@@ -159,7 +160,8 @@ function CompaniesListPage() {
 	const list = useInfiniteList({
 		resetKey: searchKey,
 		pageSize: COMPANIES_PAGE_SIZE,
-		atomFor: limit => companiesSearchAtom(search, limit),
+		count: 'exact',
+		atomFor: page => companiesSearchAtom(search, page),
 	})
 
 	const companies = useMemo<ReadonlyArray<CompanyRow>>(
@@ -285,7 +287,7 @@ function CompaniesListPage() {
 				title={t`Companies`}
 				listHref='/companies'
 				boardHref={boardHref(boardSearch(search))}
-				{...(hasResult
+				{...(hasResult && total !== undefined
 					? {
 							subtitle: countLabel,
 							kpi: { value: total, label: countKpiLabel },
