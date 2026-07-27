@@ -5,7 +5,7 @@ import { SqlClient } from 'effect/unstable/sql'
 import { CurrentOrg } from '@batuda/controllers'
 import { Product } from '@batuda/domain'
 
-import { ListResult, toItems } from './_result'
+import { McpPageLimit, TruncatableResult, toTruncatable } from './_result'
 
 const REQUEST_DEPENDENCIES = [CurrentOrg]
 
@@ -14,8 +14,11 @@ const decodeProducts = Schema.decodeUnknownEffect(Schema.Array(Product))
 
 const ListProducts = Tool.make('list_products', {
 	description:
-		'List products in the organization, newest first. Each item is the full product record (default_price is a decimal string).',
-	success: ListResult(Product.json),
+		'List products in the organization, newest first. Each item is the full product record (default_price is a decimal string). Returns at most `limit` rows (default 100, max 500); `hasMore` says whether more exist than were returned.',
+	parameters: Schema.Struct({
+		limit: Schema.optional(McpPageLimit),
+	}),
+	success: TruncatableResult(Product.json),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Products')
@@ -76,11 +79,15 @@ export const ProductHandlersLive = ProductTools.toLayer(
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
 		return {
-			list_products: () =>
+			list_products: params =>
 				Effect.gen(function* () {
-					const rows =
-						yield* sql`SELECT * FROM products ORDER BY created_at DESC`
-					return toItems(yield* decodeProducts(rows))
+					const limit = params.limit ?? 100
+					const rows = yield* sql`
+						SELECT * FROM products
+						ORDER BY created_at DESC
+						LIMIT ${limit + 1}
+					`
+					return toTruncatable(yield* decodeProducts(rows), limit)
 				}).pipe(Effect.orDie),
 			create_product: params =>
 				Effect.gen(function* () {

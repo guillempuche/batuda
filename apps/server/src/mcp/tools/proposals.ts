@@ -9,7 +9,7 @@ import {
 	ProposalEvent,
 	TimelineActivityService,
 } from '../../services/timeline-activity'
-import { ListResult, toItems } from './_result'
+import { McpPageLimit, TruncatableResult, toTruncatable } from './_result'
 
 const REQUEST_DEPENDENCIES = [CurrentOrg]
 
@@ -34,11 +34,12 @@ const RESPONDED_STATUSES = new Set([
 
 const ListProposals = Tool.make('list_proposals', {
 	description:
-		'List proposals in the organization, optionally filtered by company_id. Returns id, company_id, contact_id, status, title, line_items, total_value, currency, sent_at, expires_at, responded_at, notes, metadata, created_at.',
+		'List proposals in the organization, optionally filtered by company_id. Returns id, company_id, contact_id, status, title, line_items, total_value, currency, sent_at, expires_at, responded_at, notes, metadata, created_at. At most `limit` rows (default 100, max 500); `hasMore` says whether more exist than were returned.',
 	parameters: Schema.Struct({
 		company_id: Schema.optional(Schema.String),
+		limit: Schema.optional(McpPageLimit),
 	}),
-	success: ListResult(Proposal.json),
+	success: TruncatableResult(Proposal.json),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Proposals')
@@ -96,12 +97,13 @@ export const ProposalHandlersLive = ProposalTools.toLayer(
 		const sql = yield* SqlClient.SqlClient
 		const timeline = yield* TimelineActivityService
 		return {
-			list_proposals: ({ company_id }) =>
+			list_proposals: params =>
 				Effect.gen(function* () {
-					const rows = company_id
-						? yield* sql`SELECT * FROM proposals WHERE company_id = ${company_id} ORDER BY created_at DESC`
-						: yield* sql`SELECT * FROM proposals ORDER BY created_at DESC`
-					return toItems(yield* decodeProposals(rows))
+					const limit = params.limit ?? 100
+					const rows = params.company_id
+						? yield* sql`SELECT * FROM proposals WHERE company_id = ${params.company_id} ORDER BY created_at DESC LIMIT ${limit + 1}`
+						: yield* sql`SELECT * FROM proposals ORDER BY created_at DESC LIMIT ${limit + 1}`
+					return toTruncatable(yield* decodeProposals(rows), limit)
 				}).pipe(Effect.orDie),
 			create_proposal: params =>
 				Effect.gen(function* () {

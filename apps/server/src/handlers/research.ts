@@ -442,7 +442,21 @@ export const ResearchLive = HttpApiBuilder.group(
 						const findings = (run as { findings: unknown }).findings as {
 							proposed_updates?: unknown[]
 						}
-						return findings?.proposed_updates ?? []
+						// The proposals come stored with the run, so the page is cut in
+						// memory. The count is free here, but it is still withheld
+						// unless asked for, so this list answers in the same shape as
+						// every other one.
+						const proposedUpdates = findings?.proposed_updates ?? []
+						const limit = _.query.limit ?? 100
+						const offset = _.query.offset ?? 0
+						const items = proposedUpdates.slice(offset, offset + limit)
+						return {
+							items,
+							total: _.query.count === 'exact' ? proposedUpdates.length : null,
+							limit,
+							offset,
+							hasMore: offset + items.length < proposedUpdates.length,
+						}
 					}).pipe(
 						Effect.catch(e =>
 							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),

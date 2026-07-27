@@ -1,6 +1,5 @@
 import { DateTime, Effect, Schema } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
-import { SqlClient } from 'effect/unstable/sql'
 
 import { BatudaApi, NotFound, SessionContext } from '@batuda/controllers'
 import { TaskEvent } from '@batuda/domain'
@@ -11,7 +10,6 @@ const decodeTaskEvents = Schema.decodeUnknownEffect(Schema.Array(TaskEvent))
 
 export const TasksLive = HttpApiBuilder.group(BatudaApi, 'tasks', handlers =>
 	Effect.gen(function* () {
-		const sql = yield* SqlClient.SqlClient
 		const taskService = yield* TaskService
 		return handlers
 			.handle('list', _ =>
@@ -184,16 +182,20 @@ export const TasksLive = HttpApiBuilder.group(BatudaApi, 'tasks', handlers =>
 			.handle('bulkComplete', _ => taskService.bulkComplete(_.payload.ids))
 			.handle('events', _ =>
 				Effect.gen(function* () {
-					const exists = yield* sql`
-						SELECT id FROM tasks WHERE id = ${_.params.id} LIMIT 1
-					`
-					if (exists.length === 0)
+					const page = yield* taskService.events(_.params.id, {
+						limit: _.query.limit ?? 100,
+						offset: _.query.offset ?? 0,
+						count: _.query.count ?? 'none',
+					})
+					if (page === undefined)
 						return yield* new NotFound({ entity: 'task', id: _.params.id })
-					const events = yield* sql`
-						SELECT * FROM task_events WHERE task_id = ${_.params.id}
-						ORDER BY at DESC LIMIT 100
-					`
-					return yield* decodeTaskEvents(events)
+					return {
+						items: yield* decodeTaskEvents(page.rows),
+						total: page.total,
+						limit: page.limit,
+						offset: page.offset,
+						hasMore: page.hasMore,
+					}
 				}).pipe(
 					Effect.catch(e =>
 						e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),

@@ -11,7 +11,13 @@ import { CalendarService } from '../../services/calendar'
 import { dispatchForwardInvitation } from '../../services/calendar-forward-dispatch'
 import { dispatchRsvpReply } from '../../services/calendar-rsvp-dispatch'
 import { EmailService } from '../../services/email'
-import { ListResult, toItems } from './_result'
+import {
+	ListResult,
+	McpPageLimit,
+	TruncatableResult,
+	toItems,
+	toTruncatable,
+} from './_result'
 
 const decodeEvent = Schema.decodeUnknownEffect(CalendarEvent)
 const decodeEvents = Schema.decodeUnknownEffect(Schema.Array(CalendarEvent))
@@ -139,12 +145,12 @@ const RespondToInvitation = Tool.make('respond_to_invitation', {
 
 const RsvpPendingInvitations = Tool.make('rsvp_pending_invitations', {
 	description:
-		'List every upcoming calendar event where the given attendee email still has rsvp="needs-action" and start_at > now(). Useful for the agent to proactively surface invitations the user has not replied to. Sorted by start_at ascending; excludes cancelled events.',
+		'List every upcoming calendar event where the given attendee email still has rsvp="needs-action" and start_at > now(). Useful for the agent to proactively surface invitations the user has not replied to. Sorted by start_at ascending; excludes cancelled events. `hasMore` says whether more matched than were returned — read it before saying how many there are.',
 	parameters: Schema.Struct({
 		attendee_email: Schema.String,
-		limit: Schema.optional(Schema.Number),
+		limit: Schema.optional(McpPageLimit),
 	}),
-	success: ListResult(PendingInvitation),
+	success: TruncatableResult(PendingInvitation),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Pending Invitations')
@@ -178,7 +184,7 @@ const ListUpcoming = Tool.make('list_upcoming_meetings', {
 		company_id: Schema.optional(Schema.String),
 		contact_id: Schema.optional(Schema.String),
 		source: Schema.optional(Schema.Literals(['booking', 'email', 'internal'])),
-		limit: Schema.optional(Schema.Number),
+		limit: Schema.optional(McpPageLimit),
 	}),
 	success: ListResult(CalendarEvent.json),
 	dependencies: REQUEST_DEPENDENCIES,
@@ -350,27 +356,26 @@ export const CalendarHandlersLive = CalendarTools.toLayer(
 					Effect.orDie,
 				),
 			rsvp_pending_invitations: params =>
-				svc
-					.listPendingInvitations({
+				Effect.gen(function* () {
+					const limit = params.limit ?? 25
+					// One more than asked for, so an unanswered invitation left off the
+					// end is reported rather than passed over in silence.
+					const rows = yield* svc.listPendingInvitations({
 						attendeeEmail: params.attendee_email,
-						limit: params.limit ?? 25,
+						limit: limit + 1,
 					})
-					.pipe(
-						// Decode each event, then re-attach its joined RSVP.
-						Effect.flatMap(rows =>
-							Effect.forEach(rows, row =>
-								decodeEvent(row).pipe(
-									Effect.map(event => ({
-										...event,
-										attendeeRsvp: (row as { readonly attendeeRsvp: string })
-											.attendeeRsvp,
-									})),
-								),
-							),
+					// Decode each event, then re-attach its joined RSVP.
+					const events = yield* Effect.forEach(rows, row =>
+						decodeEvent(row).pipe(
+							Effect.map(event => ({
+								...event,
+								attendeeRsvp: (row as { readonly attendeeRsvp: string })
+									.attendeeRsvp,
+							})),
 						),
-						Effect.map(toItems),
-						Effect.orDie,
-					),
+					)
+					return toTruncatable(events, limit)
+				}).pipe(Effect.orDie),
 			forward_invitation: params =>
 				dispatchForwardInvitation({
 					calendarEventId: params.calendar_event_id,

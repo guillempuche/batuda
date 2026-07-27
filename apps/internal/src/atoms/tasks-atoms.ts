@@ -145,7 +145,10 @@ export const createTaskAtom = BatudaApiAtom.mutation('tasks', 'create')
 
 const taskEventsCache = new Map<string, ReturnType<typeof makeTaskEventsAtom>>()
 function makeTaskEventsAtom(taskId: string) {
-	return BatudaApiAtom.query('tasks', 'events', { params: { id: taskId } })
+	return BatudaApiAtom.query('tasks', 'events', {
+		params: { id: taskId },
+		query: { limit: 100 },
+	})
 }
 export function taskEventsAtomFor(taskId: string) {
 	const existing = taskEventsCache.get(taskId)

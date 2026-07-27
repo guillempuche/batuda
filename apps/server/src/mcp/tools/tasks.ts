@@ -6,7 +6,13 @@ import { BulkCompleteResult, CurrentOrg } from '@batuda/controllers'
 import { Task, TaskEvent } from '@batuda/domain'
 
 import { TaskService } from '../../services/tasks'
-import { ListResult, toItems } from './_result'
+import {
+	McpPageLimit,
+	McpPageOffset,
+	PageResult,
+	TruncatableResult,
+	toPage,
+} from './_result'
 
 const decodeTask = Schema.decodeUnknownEffect(Task)
 const decodeTaskEvents = Schema.decodeUnknownEffect(Schema.Array(TaskEvent))
@@ -70,7 +76,7 @@ const CreateTask = Tool.make('create_task', {
 
 const ListTasks = Tool.make('list_tasks', {
 	description:
-		'List tasks with filters. `completed=true` maps to status=done; `completed=false` returns open work (excludes done AND cancelled). Prefer status/statuses/overdue_only/include_snoozed for richer queries. Results sort by due_at ASC NULLS LAST, then created_at ASC. Default limit 25.',
+		'List tasks with filters. `completed=true` maps to status=done; `completed=false` returns open work (excludes done AND cancelled). Prefer status/statuses/overdue_only/include_snoozed for richer queries. Results sort by due_at ASC NULLS LAST, then created_at ASC. Default limit 25. `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true.',
 	parameters: Schema.Struct({
 		company_id: Schema.optional(Schema.String),
 		contact_id: Schema.optional(Schema.String),
@@ -84,10 +90,10 @@ const ListTasks = Tool.make('list_tasks', {
 		overdue_only: Schema.optional(Schema.Boolean),
 		include_snoozed: Schema.optional(Schema.Boolean),
 		completed: Schema.optional(Schema.Boolean),
-		limit: Schema.optional(Schema.Number),
-		offset: Schema.optional(Schema.Number),
+		limit: Schema.optional(McpPageLimit),
+		offset: Schema.optional(McpPageOffset),
 	}),
-	success: ListResult(Task.json),
+	success: PageResult(Task.json),
 	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'List Tasks')
@@ -97,7 +103,7 @@ const ListTasks = Tool.make('list_tasks', {
 
 const SearchTasks = Tool.make('search_tasks', {
 	description:
-		'Substring search over a task title and the documents filed against it. Accepts the same filters as list_tasks; `query` is the substring to match. Returns at most `limit` rows (default 25).',
+		'Substring search over a task title and the documents filed against it. Accepts the same filters as list_tasks; `query` is the substring to match. Returns at most `limit` rows (default 25, max 500) starting at `offset`, `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true.',
 	parameters: Schema.Struct({
 		query: Schema.String,
 		company_id: Schema.optional(Schema.String),
@@ -106,9 +112,10 @@ const SearchTasks = Tool.make('search_tasks', {
 		overdue_only: Schema.optional(Schema.Boolean),
 		include_snoozed: Schema.optional(Schema.Boolean),
 		source: Schema.optional(TaskSource),
-		limit: Schema.optional(Schema.Number),
+		limit: Schema.optional(McpPageLimit),
+		offset: Schema.optional(McpPageOffset),
 	}),
-	success: ListResult(Task.json),
+	success: PageResult(Task.json),
 	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'Search Tasks')
@@ -225,9 +232,12 @@ const GetTask = Tool.make('get_task', {
 
 const GetTaskEvents = Tool.make('get_task_events', {
 	description:
-		'List audit events recorded for a task (created/updated/completed/cancelled/snoozed/rescheduled). Returns up to the 100 most recent events sorted by occurrence time descending.',
-	parameters: Schema.Struct({ id: Schema.String }),
-	success: ListResult(TaskEvent.json),
+		'List audit events recorded for a task (created/updated/completed/cancelled/snoozed/rescheduled), most recent first. Returns at most `limit` events (default 100, max 500); `hasMore` says whether the task has more history than was returned.',
+	parameters: Schema.Struct({
+		id: Schema.String,
+		limit: Schema.optional(McpPageLimit),
+	}),
+	success: TruncatableResult(TaskEvent.json),
 	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'Get Task Events')
@@ -316,10 +326,7 @@ export const TaskHandlersLive = TaskTools.toLayer(
 							count: 'none',
 						},
 					)
-					.pipe(
-						Effect.orDie,
-						Effect.map(page => toItems(page.items)),
-					),
+					.pipe(Effect.orDie, Effect.map(toPage)),
 
 			search_tasks: params =>
 				taskService
@@ -336,14 +343,11 @@ export const TaskHandlersLive = TaskTools.toLayer(
 						{
 							sort: 'due',
 							limit: params.limit ?? 25,
-							offset: 0,
+							offset: params.offset ?? 0,
 							count: 'none',
 						},
 					)
-					.pipe(
-						Effect.orDie,
-						Effect.map(page => toItems(page.items)),
-					),
+					.pipe(Effect.orDie, Effect.map(toPage)),
 
 			update_task: params =>
 				Effect.gen(function* () {
@@ -408,16 +412,20 @@ export const TaskHandlersLive = TaskTools.toLayer(
 					Effect.orDie,
 				),
 
-			get_task_events: ({ id }) =>
+			get_task_events: ({ id, limit }) =>
 				Effect.gen(function* () {
-					const exists =
-						yield* sql`SELECT id FROM tasks WHERE id = ${id} LIMIT 1`
-					if (exists.length === 0) return toItems([])
-					const events = yield* sql`
-						SELECT * FROM task_events WHERE task_id = ${id}
-						ORDER BY at DESC LIMIT 100
-					`
-					return toItems(yield* decodeTaskEvents(events))
+					const page = yield* taskService.events(id, {
+						limit: limit ?? 100,
+						offset: 0,
+						count: 'none',
+					})
+					// A task nobody can find has no history to show, so the answer is
+					// an empty list rather than an error the assistant has to handle.
+					if (page === undefined) return { items: [], hasMore: false }
+					return {
+						items: yield* decodeTaskEvents(page.rows),
+						hasMore: page.hasMore,
+					}
 				}).pipe(Effect.orDie),
 
 			reopen_task: ({ id }) =>
