@@ -241,7 +241,7 @@ function TasksPage() {
 	// shelf starts again at its first page, because the rows in hand belong to
 	// work the reader is no longer looking at.
 	const shelfList = useInfiniteList({
-		resetKey: `${selectedShelf}::${dayKey}`,
+		resetKey: `tasks:${selectedShelf}::${dayKey}`,
 		pageSize: TASKS_PAGE_SIZE,
 		count: 'exact',
 		atomFor: page => tasksShelfAtom(selectedShelf, dayKey, page),

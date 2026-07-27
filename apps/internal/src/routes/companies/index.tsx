@@ -158,7 +158,7 @@ function CompaniesListPage() {
 	// which list that is, so changing them starts over at the first page.
 	const searchKey = canonicalSearchKey(search)
 	const list = useInfiniteList({
-		resetKey: searchKey,
+		resetKey: `companies:${searchKey}`,
 		pageSize: COMPANIES_PAGE_SIZE,
 		count: 'exact',
 		atomFor: page => companiesSearchAtom(search, page),

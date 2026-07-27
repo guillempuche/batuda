@@ -2,12 +2,13 @@ import { createFileRoute } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
 
 import {
-	INBOX_PROPOSAL_LIMIT,
+	INBOX_FIRST_PAGE,
 	inboxPendingProposalsAtom,
 	ResearchInbox,
 	researchDlgSchema,
 } from '#/components/research/inbox/research-inbox'
 import { dehydrateAtom } from '#/lib/atom-hydration'
+import { listPageQuery } from '#/lib/list-page'
 import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 
@@ -28,7 +29,7 @@ async function loadPendingProposalsOnServer() {
 		// browser refetches on arrival and the queue's tile reads the page size
 		// instead of how many are really waiting.
 		return yield* client.research.listPendingProposals({
-			query: { limit: INBOX_PROPOSAL_LIMIT, count: 'exact' as const },
+			query: listPageQuery(INBOX_FIRST_PAGE),
 		})
 	})
 	return await Effect.runPromise(program)

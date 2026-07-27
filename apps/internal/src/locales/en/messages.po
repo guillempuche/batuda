@@ -4580,6 +4580,11 @@ msgstr "Show password"
 msgid "Show system events"
 msgstr "Show system events"
 
+#. placeholder {0}: attention.length
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Showing {0} of {attentionTotal}. Open all runs to see the rest."
+msgstr "Showing {0} of {attentionTotal}. Open all runs to see the rest."
+
 #. placeholder {0}: proposals.length
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Showing {0} of {totalPending}. Narrow the filters to reach the rest."

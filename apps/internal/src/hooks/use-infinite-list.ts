@@ -78,6 +78,12 @@ export function useInfiniteList<T, E>(options: {
 	 * Identifies *which* list this is — the filters, the shelf, the column.
 	 * When it changes the list starts over, because the rows in hand belong to
 	 * one the reader is no longer looking at.
+	 *
+	 * Must begin with a name for the screen, because where each reader has got
+	 * to is remembered under this key for the whole visit. Two screens with no
+	 * filters set both describe themselves as "nothing selected", and without a
+	 * name in front they would hand each other their place — one opening
+	 * halfway down a list it has never read, and skipping everything above it.
 	 */
 	readonly resetKey: string
 	/** Rows in the first slice, and rows added by each subsequent ask. */
