@@ -14,7 +14,10 @@ export const seedProposals = (
 	Effect.gen(function* () {
 		yield* Effect.logInfo('Seeding proposals...')
 		const productMap = new Map(insertedProducts.map(p => [p.slug, p.id]))
-		yield* sql`INSERT INTO proposals ${sql.insert(
+		const insertedProposals = yield* sql<{
+			id: string
+			title: string
+		}>`INSERT INTO proposals ${sql.insert(
 			normalizeRows(
 				stamp(
 					withSeedIds(
@@ -193,5 +196,7 @@ export const seedProposals = (
 					),
 				),
 			),
-		)}`
+		)} RETURNING id, title`
+		// Handed back so documents can be filed against an offer.
+		return insertedProposals
 	})

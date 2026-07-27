@@ -303,4 +303,6 @@ export const seedCalendar = (
 		yield* Effect.logInfo(
 			`  ${insertedCalendarEvents.length} events, ${attendeeRows.length} attendees, ${taskEventRows.length} task events`,
 		)
+		// Handed back so documents can be filed against a meeting.
+		return insertedCalendarEvents
 	})
