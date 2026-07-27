@@ -185,10 +185,13 @@ export const ResearchSpendBucket = Schema.Struct({
 export type ResearchSpendBucket = typeof ResearchSpendBucket.Type
 
 /**
- * The live-progress contract: a 30-second JSON long-poll (not a raw event
- * stream). `status` is the run's latest status, `events` are the progress
+ * The web app's live-progress contract: a 30-second JSON long-poll (not a raw
+ * event stream). `status` is the run's latest status, `events` are the progress
  * events observed in this poll window, and `done` is true once a terminal event
  * arrived. The client re-polls until `done`.
+ *
+ * These events are not replayed, so they only ever cover what happened while
+ * someone was watching. A count of the work done so far lives on the run itself.
  */
 export const ResearchEvents = Schema.Struct({
 	status: Schema.String,

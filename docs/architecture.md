@@ -364,13 +364,13 @@ One entry point, three shapes of request:
 
 ### The run flow
 
-A run is dispatched, not run inline. `start_research` commits a run row as `queued` inside the request transaction and returns immediately; a consumer daemon drains the queue and runs each as a fiber on its own connection. The fiber has three phases: a tool-calling loop (search, read, registry, CRM lookup — accumulating findings and archiving each source), a structured-output pass that validates the findings against the run's schema, and a brief pass that renders a human-readable markdown summary. Tool calls stream to the web app over SSE as they happen; findings, sources, and the tool log persist at the end.
+A run is dispatched, not run inline. `start_research` commits a run row as `queued` inside the request transaction and returns immediately; a consumer daemon drains the queue and runs each as a fiber on its own connection. The fiber has three phases: a tool-calling loop (search, read, registry, CRM lookup — accumulating findings and archiving each source), a structured-output pass that validates the findings against the run's schema, and a brief pass that renders a human-readable markdown summary. Tool calls stream to the web app over SSE as they happen, and the fiber writes a count of the rounds it has got through to the run row as it goes, so any client — an MCP caller included — can read live progress without a stream; findings, sources, and the tool log persist at the end.
 
 The first phase starts from the target's own site where there is one: the run maps that domain and reads its own pages before anything a search engine offers, because a company is the best source on itself. The second phase does not settle for what the first pass happened to find — fields still empty afterwards earn further rounds of targeted search and scraping, each round re-running the guards, until the fields fill or the run's budget or deadline stops it.
 
 A run says how far it got rather than reporting a flat success. `succeeded` means the findings are grounded and confident; `succeeded_low_confidence` means real findings came back but thin enough to want a person's eye, and the web app surfaces those for review; `no_reliable_data` is the honest answer when nothing could be grounded, which is preferred to shipping a confident guess; `failed` and `cancelled` cover a run that broke or was stopped.
 
-Because those fibers live in the server process, a deploy interrupts in-flight runs. A running fiber refreshes a heartbeat while it works, and a periodic sweep fails any run whose heartbeat has gone stale — so an orphaned run is reclaimed within about a minute, while a legitimately long run keeps beating and is never mistaken for dead. Reclaim only marks a run `failed`; a paid run is never silently re-run.
+Because those fibers live in the server process, a deploy interrupts in-flight runs. A running fiber refreshes a heartbeat and its progress count while it works, and a periodic sweep fails any run whose heartbeat has gone stale — so an orphaned run is reclaimed within about a minute, while a legitimately long run keeps beating and is never mistaken for dead. Reclaim only marks a run `failed`; a paid run is never silently re-run.
 
 At a glance:
 
@@ -395,6 +395,7 @@ At a glance:
       render a markdown summary, headed with the company and the date
 
   tool calls stream to the web app over SSE as they happen
+  rounds done are written to the run row throughout (readable by any client)
   findings + sources + tool log persist
   status = succeeded | succeeded_low_confidence | no_reliable_data
          | failed | cancelled
