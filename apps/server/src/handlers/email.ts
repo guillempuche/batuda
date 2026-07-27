@@ -163,6 +163,9 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 						...(_.query.offset !== undefined && {
 							offset: _.query.offset,
 						}),
+						...(_.query.count !== undefined && {
+							count: _.query.count,
+						}),
 					}),
 				)
 				.handle('getMessage', _ =>
@@ -323,7 +326,12 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 				)
 				.handle('listDrafts', _ =>
 					svc
-						.listDrafts(_.query.inboxId, _.query.limit, _.query.offset)
+						.listDrafts(
+							_.query.inboxId,
+							_.query.limit,
+							_.query.offset,
+							_.query.count,
+						)
 						.pipe(Effect.orDie),
 				)
 				.handle('getDraft', _ =>

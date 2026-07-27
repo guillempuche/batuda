@@ -1742,6 +1742,7 @@ export class EmailService extends Context.Service<EmailService>()(
 					status?: string
 					limit?: number
 					offset?: number
+					count?: CountMode
 				}) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg

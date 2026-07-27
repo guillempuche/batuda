@@ -86,8 +86,11 @@ async function loadCompaniesOnServer(search: CompaniesSearch) {
 	])
 	const program = Effect.gen(function* () {
 		const client = yield* makeBatudaApiServer(cookie ?? undefined)
+		// Matches `companiesSearchAtom` exactly, counting included — the browser
+		// picks this answer up by the shape of the question, so a difference
+		// here means the page silently refetches and shows no count meanwhile.
 		return yield* client.companies.list({
-			query: { ...search, limit: COMPANIES_PAGE_SIZE },
+			query: { ...search, limit: COMPANIES_PAGE_SIZE, count: 'exact' as const },
 		})
 	})
 	const companies = await Effect.runPromise(program)
