@@ -392,6 +392,31 @@ export const CreateCompanyInput = Schema.Struct({
 })
 ```
 
+### How a list endpoint answers
+
+Every endpoint that returns more than one row answers with the same envelope, built by `PaginatedList` in `packages/controllers/src/pagination.ts`.
+
+```typescript
+{ items, total, limit, offset, hasMore }
+```
+
+Spread `pageQuery` into the endpoint's `query` block to accept the three parameters that go with it: `limit`, `offset` and `count`.
+
+```typescript
+HttpApiEndpoint.get('list', '/companies', {
+  query: { status: Schema.optional(Schema.String), ...pageQuery },
+  success: PaginatedList(Company.json),
+})
+```
+
+No request may ask for more than `MAX_PAGE_LIMIT` rows, and asking for more is refused with a 400 rather than quietly shrunk — a caller that receives fewer rows than it asked for, with no way to tell, reports them as the whole answer.
+
+`hasMore` says whether asking again would bring anything, and is always filled in. It costs one spare row: the query asks for `limit + 1` and `takePage` (in `apps/server/src/lib/sql-pagination.ts`) drops the extra before anything else sees it. Run `takePage` before decoding, or the caller is handed one row more than it asked for and nothing catches it.
+
+`total` is only computed when the caller passes `count=exact`, and is `null` otherwise — which means "not counted", not "none matched". Counting means looking at every matching row, so ask for it only where a screen states a number. A list that simply keeps scrolling reads `hasMore` and never pays for a count.
+
+An agent tool that takes a `limit` must return `hasMore` too, through `PageResult` or `TruncatableResult` in `apps/server/src/mcp/tools/_result.ts`. Without it an assistant reads twenty-five rows, cannot tell a short list from a long one cut short, and answers "you have twenty-five" when three hundred match. A test in `_annotations.test.ts` fails if a tool forgets. Those results carry no `total`: a field that is usually absent has to describe itself as "a number or nothing", which some model providers refuse to read.
+
 ---
 
 ## MCP server (Effect AI)
