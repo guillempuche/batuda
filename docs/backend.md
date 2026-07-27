@@ -632,7 +632,41 @@ Key files:
 
 ### Cross-origin policy
 
-The web app and the API are different origins. In dev, portless serves the app at `https://batuda.localhost` and the API at `https://api.batuda.localhost` — binding 443 when it can, otherwise a non-privileged port like `:1355`, which it prints on startup; in prod the app (Cloudflare Workers, `batuda.co`) and API (Unikraft, `api.batuda.co`) split the same way. The browser fetches `/auth/*` same-origin (the Vite dev proxy / Worker forwards them to the API, so the session cookie lands on the app host) and `/v1/*` cross-origin to the API host. CORS is a global `HttpRouter.middleware` in `src/main.ts` via `HttpMiddleware.cors({ allowedOrigins, credentials: true, ... })`; `allowedOrigins` comes from the **required** `ALLOWED_ORIGINS` env — comma-separated **literal** origins matched exactly, with no wildcards (any `*` fails boot) and no dev fallback (boot fails if unset). The same array is fed to Better-Auth as `trustedOrigins` (`src/lib/auth.ts`) so CORS and CSRF agree, and `credentials: true` lets the browser attach the `__Secure-batuda.session_token` cookie on `credentials: 'include'` fetches. A git-worktree dev stack needs no per-worktree origin config: the server derives the worktree's `<branch>.batuda.localhost` origin from `PORTLESS_URL` and merges it into the trusted set (see the `worktrees` skill).
+The web app and the API are different origins. In dev, portless serves the app at `https://batuda.localhost` and the API at `https://api.batuda.localhost` — binding 443 when it can, otherwise a non-privileged port like `:1355`, which it prints on startup; in prod the app (Cloudflare Workers, `batuda.co`) and API (Unikraft, `api.batuda.co`) split the same way. The browser fetches `/auth/*` same-origin (the Vite dev proxy / Worker forwards them to the API, so the session cookie lands on the app host) and `/v1/*` cross-origin to the API host — that is what `apiBaseUrl()` (`apps/internal/src/lib/api-base.ts`) returns in prod. Dev is the exception: there it returns the app's own origin, so a `/v1/*` call goes through the Vite proxy instead. Both the dev proxy and the Worker (`apps/internal/src/worker.ts`) forward `/v1/*` as well as `/auth/*`, so a relative `/v1/…` works in either.
+
+**A URL baked into an `<a href>` has to respect that split.** SSR renders the markup, so the URL is chosen on the server and then used by the browser: in dev `apiBaseUrl()` is a loopback address that would ship inside the HTML and be refused (the browser will not send a `Secure` cookie there), while a relative path resolves against the page's own origin, whose `/v1/*` the dev server forwards. In prod it is the real API origin, reached directly like every other call. `downloadUrlFor` (`apps/internal/src/lib/email-attachments.ts`) and `documentOpenUrl` (`apps/internal/src/lib/document-links.ts`) are the two places that do this, and both pick the base the same way. Such a link works on the session cookie alone: a top-level navigation sends no `Origin`, so CORS does not apply, and nothing on `/v1/*` checks `Origin`, `Referer` or a CSRF token.
+
+CORS is a global `HttpRouter.middleware` in `src/main.ts` via `HttpMiddleware.cors({ allowedOrigins, credentials: true, ... })`; `allowedOrigins` comes from the **required** `ALLOWED_ORIGINS` env — comma-separated **literal** origins matched exactly, with no wildcards (any `*` fails boot) and no dev fallback (boot fails if unset). The same array is fed to Better-Auth as `trustedOrigins` (`src/lib/auth.ts`) so CORS and CSRF agree, and `credentials: true` lets the browser attach the `__Secure-batuda.session_token` cookie on `credentials: 'include'` fetches. A git-worktree dev stack needs no per-worktree origin config: the server derives the worktree's `<branch>.batuda.localhost` origin from `PORTLESS_URL` and merges it into the trusted set (see the `worktrees` skill).
+
+### Object storage and who can read a stored file
+
+Some things are too big, or too file-shaped, to sit in a database column: call recordings, the research scrape cache, and the body of a document saved as a web page. Those go to object storage — MinIO locally, Cloudflare R2 in production (`STORAGE_ENDPOINT`, `STORAGE_BUCKET` in `config.production.json`; the two keys arrive as deploy secrets). One provider-agnostic port, `StorageProvider` (`apps/server/src/services/storage-provider.ts`), with `S3StorageProviderLive` as the only adapter today.
+
+**The bucket is private.** Nothing in it is reachable without a credential, so every read is either a presigned URL or bytes the server streams itself.
+
+A document makes the trade-off visible, because it has both kinds of body:
+
+- **Markdown** stays in `documents.content`. It is small, edited in place, and has to be searchable.
+- **A web page** goes to storage under `documents/<org>/<document>.html`, and the row keeps only the key plus `search_text` — the page's plain words, so a search still reaches it. `content` is empty, and the `documents_body_matches_format` constraint keeps the two shapes from mixing. `search_text` is never shown to anyone; what a reader opens is the stored page.
+
+Storing a page rather than rendering it is a deliberate boundary. The HTML was written by an agent or scraped from somewhere, and serving it from the app's own address would put markup nobody vetted next to the signed-in session. From the storage address the browser treats it as the separate place it is.
+
+**Two link shapes, for two kinds of caller:**
+
+|                | `GET /v1/documents/:id/open`                           | A presigned URL                                                                                        |
+| -------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| Lives for      | ever — the address never changes                       | `HTML_URL_TTL_SECONDS`, 10 minutes                                                                     |
+| Checked        | on every open, by session + organisation               | once, when it is minted                                                                                |
+| Who can use it | a signed-in member of the owning organisation          | anyone holding it, until it expires                                                                    |
+| Used by        | the web app, and anything a person pastes or bookmarks | the agent tools (`get_document`'s `bodyUrl`), which authenticate with a key and have no browser cookie |
+
+`/open` answers a `302` to a freshly minted presigned URL, with `Cache-Control: no-store` — a remembered redirect would send the next visit to a link that has already expired. It answers `404` for a markdown document, which has no stored file.
+
+**A presigned URL cannot be made permanent.** The signing scheme R2 implements caps validity at seven days, so a link that never dies is not reachable by lengthening the window — and every extra hour widens the blast radius of one that leaks. That is why the permanent address is a checked endpoint rather than a longer signature.
+
+**Writes and deletes touch both places.** Creating a page writes the bytes *before* the row, because a stored file with no row is invisible and costs a little space, while a row pointing at a file that was never written is a document that opens to nothing. Editing one rewrites the stored file and refreshes `search_text`; putting new HTML on the row instead would leave the page serving the old bytes with no error. Deleting one removes the file too, best-effort — an unreachable file is worth less than a document somebody cannot get rid of. All three live in `apps/server/src/services/documents.ts`, so the HTTP handler and the agent tools share one copy of the rules rather than each keeping its own.
+
+Not handled, deliberately: nothing reclaims a file orphaned by a crash between the storage write and the row insert. The write order makes that the cheap failure, and a sweep is its own job.
 
 ### Invite-only signup
 
