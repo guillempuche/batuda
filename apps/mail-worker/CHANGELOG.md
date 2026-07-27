@@ -3,6 +3,31 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-27 (mail-worker-v2026.7.27)
+
+### Features
+
+* **calendar:** keep what an invitation says about days and attendees ([c2acac7](https://github.com/guillempuche/batuda/commit/c2acac7d96f5d0b0cdd95e893f44f3ae95a8676b))
+* let a document belong to a meeting, a person or a task ([9372f96](https://github.com/guillempuche/batuda/commit/9372f96f4c2bb515d74fd3f36e4a36085dfe2ad8))
+* let an email in the history open the conversation it belongs to ([d3c7a8a](https://github.com/guillempuche/batuda/commit/d3c7a8a486a2c46815f7907d87485e03d52b4a50))
+* retire the three separate notes boxes into documents ([d194f75](https://github.com/guillempuche/batuda/commit/d194f75fd4135b810b3376be827e3cee34903cd9))
+
+### Bug Fixes
+
+* **db:** read stored json by the names it was stored with ([c9f2d7a](https://github.com/guillempuche/batuda/commit/c9f2d7ae80b95e5df00a8fd0af499d4b4e00ad9b))
+* **internal:** read research findings by their stored names ([3be10aa](https://github.com/guillempuche/batuda/commit/3be10aa2e951a30d4a576c5aa4fb2792b95ea180))
+* keep hand-logged touchpoints in the company history ([d8a653c](https://github.com/guillempuche/batuda/commit/d8a653cdedd0bec0cc31e436e1de4837e6b94589))
+* **mail-worker:** record received mail and bounces on company history ([3082682](https://github.com/guillempuche/batuda/commit/3082682eda48657de13c23422b3f9817abb35969))
+* save calendar invitations and show who is attending ([6ad893d](https://github.com/guillempuche/batuda/commit/6ad893dc5bcb5cbb6e979291f299f91ac5266e60))
+
+### Refactoring
+
+* name the CRM rows a link can point at in one place ([fff48f2](https://github.com/guillempuche/batuda/commit/fff48f2c3a5906abf925d5d97aa7d778c2502234))
+
+### Chores
+
+* remove dependencies and build settings nothing uses ([44d9d28](https://github.com/guillempuche/batuda/commit/44d9d28002545f104f5b455af095ed09ebd1a165))
+
 ## 2026-07-25 (mail-worker-v2026.7.25)
 
 ### Features
