@@ -1,6 +1,11 @@
 import { Context, Effect, Layer, Schema } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
+import {
+	ATTENTION_RESEARCH_STATUSES,
+	TERMINAL_RESEARCH_STATUSES,
+} from '@batuda/domain'
+
 // The next-steps rows carry raw Date timestamps; read them into DateTime.Utc so
 // the wire schemas (NextSteps) re-encode them as ISO strings.
 const NextStepTaskRow = Schema.Struct({
@@ -24,6 +29,19 @@ const NextStepCompanyRow = Schema.Struct({
 })
 const decodeNextStepCompanies = Schema.decodeUnknownEffect(
 	Schema.Array(NextStepCompanyRow),
+)
+const NextStepResearchRunRow = Schema.Struct({
+	id: Schema.String,
+	query: Schema.String,
+	status: Schema.String,
+	completedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
+	pendingUpdateCount: Schema.Number,
+	companyId: Schema.NullOr(Schema.String),
+	companyName: Schema.NullOr(Schema.String),
+	companySlug: Schema.NullOr(Schema.String),
+})
+const decodeNextStepResearchRuns = Schema.decodeUnknownEffect(
+	Schema.Array(NextStepResearchRunRow),
 )
 
 export class PipelineService extends Context.Service<PipelineService>()(
@@ -68,10 +86,57 @@ export class PipelineService extends Context.Service<PipelineService>()(
 							LIMIT ${limit}
 						`
 
+						// Research a person still has to deal with: a run that wants to
+						// change CRM records, or one that ended in a state asking to be
+						// looked at. Someone who starts research and walks away has no
+						// other way to be told it finished, so it belongs on the same
+						// list as their tasks.
+						const researchAwaitingReview = yield* sql`
+							WITH finished AS (
+								SELECT r.id, r.query, r.status, r.completed_at,
+									(
+										SELECT count(*)::int
+										FROM jsonb_array_elements(
+											CASE WHEN jsonb_typeof(r.findings->'proposed_updates') = 'array'
+												THEN r.findings->'proposed_updates' ELSE '[]'::jsonb END
+										) pu
+										WHERE pu->>'status' = 'pending'
+									) AS pending_update_count
+								FROM research_runs r
+								WHERE r.status IN ${sql.in(TERMINAL_RESEARCH_STATUSES)}
+									-- A deleted run has ended too, but it stays hidden here as
+									-- it does everywhere else.
+									AND r.status != 'deleted'
+							)
+							SELECT f.id, f.query, f.status, f.completed_at, f.pending_update_count,
+								c.id AS company_id, c.name AS company_name, c.slug AS company_slug
+							FROM finished f
+							-- A run can point at several companies, or at none. Take one so
+							-- the run stays a single row, and keep the ones pointing at none:
+							-- a freeform or scan run belongs to no single company, and those
+							-- are exactly the runs nobody is watching.
+							LEFT JOIN LATERAL (
+								SELECT rl.subject_id
+								FROM research_links rl
+								WHERE rl.research_id = f.id
+									AND rl.subject_table = 'companies'
+									AND rl.link_kind = 'input'
+								LIMIT 1
+							) link ON true
+							LEFT JOIN companies c ON c.id = link.subject_id
+							WHERE f.pending_update_count > 0
+								OR f.status IN ${sql.in(ATTENTION_RESEARCH_STATUSES)}
+							ORDER BY f.completed_at DESC NULLS LAST
+							LIMIT ${limit}
+						`
+
 						return {
 							dueTasks: yield* decodeNextStepTasks(dueTasks),
 							overdueCompanies:
 								yield* decodeNextStepCompanies(overdueCompanies),
+							researchAwaitingReview: yield* decodeNextStepResearchRuns(
+								researchAwaitingReview,
+							),
 						}
 					}),
 

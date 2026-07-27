@@ -72,7 +72,11 @@ export class ResearchRunCompleted extends Data.TaggedClass(
 	readonly researchRunId: string
 	readonly companyId: string | null
 	readonly summary: string
-	readonly status: 'succeeded' | 'failed' | 'cancelled'
+	// Coming up empty is recorded like any other ending: it cost time and money,
+	// and it is still an answer the person who asked for it needs.
+	readonly status: 'succeeded' | 'failed' | 'cancelled' | 'no_reliable_data'
+	// Whoever asked for the run, so their own finished research can be found.
+	readonly actorUserId: string | null
 	readonly occurredAt: Date
 }> {}
 
@@ -362,7 +366,7 @@ const rowBase = (event: TimelineEvent): TimelineRowBase => {
 				contactId: null,
 				channel: null,
 				direction: null,
-				actorUserId: null,
+				actorUserId: event.actorUserId,
 				occurredAt: event.occurredAt,
 				summary: event.summary,
 				payload: { status: event.status },

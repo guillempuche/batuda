@@ -117,16 +117,21 @@ const ApiLive = HttpApiBuilder.layer(BatudaApi).pipe(
 )
 
 // Wire research event sink → WebhookService + TimelineActivityService
-// Lifecycle events (succeeded/failed/cancelled) land on the timeline so the
-// company activity view surfaces completed research alongside emails and
-// calls; cost rows stay in research_runs / research_paid_spend.
+// Every ending a run reports lands on the timeline so the company activity view
+// surfaces completed research alongside emails and calls — including a run that
+// found nothing usable, which is a result someone still needs to hear. Cost rows
+// stay in research_runs / research_paid_spend.
+// Keyed by the name the sink fires, which is the run's own ending with `run.`
+// swapped for `research.` — so an ending added to TERMINAL_RESEARCH_EVENTS needs
+// a line here too, or runs that end that way leave no trace.
 const TIMELINE_STATUS_FOR_EVENT: Record<
 	string,
-	'succeeded' | 'failed' | 'cancelled' | null
+	'succeeded' | 'failed' | 'cancelled' | 'no_reliable_data' | null
 > = {
 	'research.succeeded': 'succeeded',
 	'research.failed': 'failed',
 	'research.cancelled': 'cancelled',
+	'research.no_reliable_data': 'no_reliable_data',
 }
 
 // ResearchEventSink runs out-of-band of an HTTP request — research runs
@@ -204,6 +209,9 @@ const ResearchEventSinkLive = Layer.effect(
 									companyId: linked?.subjectId ?? null,
 									summary: run.briefMd ?? run.query,
 									status,
+									// The actor is whoever asked for the run, not the background
+									// worker that finished it.
+									actorUserId: run.createdBy ?? null,
 									occurredAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 								}),
 							)

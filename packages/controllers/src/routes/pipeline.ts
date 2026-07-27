@@ -32,9 +32,24 @@ const NextStepCompany = Schema.Struct({
 	nextActionAt: Schema.NullOr(Schema.DateTimeUtcFromString),
 })
 
+// A finished research run still waiting on a person: it has changes it wants to
+// make to the CRM, or it ended in a state that asks to be looked at. The company
+// is optional because a freeform or scan run is tied to no single one.
+const NextStepResearchRun = Schema.Struct({
+	id: Schema.String,
+	query: Schema.String,
+	status: Schema.String,
+	completedAt: Schema.NullOr(Schema.DateTimeUtcFromString),
+	pendingUpdateCount: Schema.Number,
+	companyId: Schema.NullOr(Schema.String),
+	companyName: Schema.NullOr(Schema.String),
+	companySlug: Schema.NullOr(Schema.String),
+})
+
 export const NextSteps = Schema.Struct({
 	dueTasks: Schema.Array(NextStepTask),
 	overdueCompanies: Schema.Array(NextStepCompany),
+	researchAwaitingReview: Schema.Array(NextStepResearchRun),
 })
 
 export const PipelineGroup = HttpApiGroup.make('pipeline')

@@ -1,8 +1,8 @@
-// Executes TimelineActivityService.record() against a real Postgres. The
-// company-cadence denorm is the one part the pure-helper unit tests can't
-// reach: last_*_at uses GREATEST (so a late, older event can't regress it),
-// while next_calendar_event_at recomputes from calendar_events (so it can
-// DECREASE — something GREATEST could never do).
+// Executes TimelineActivityService.record() against a real Postgres — the row
+// it writes and the company-cadence denorm are the parts the pure-helper unit
+// tests can't reach. last_*_at uses GREATEST (so a late, older event can't
+// regress it), while next_calendar_event_at recomputes from calendar_events (so
+// it can DECREASE — something GREATEST could never do).
 //
 // Prereq: `pnpm cli services up` and a seeded `taller` org.
 
@@ -23,6 +23,7 @@ import {
 	EmailSent,
 	MeetingCancelled,
 	MeetingScheduled,
+	ResearchRunCompleted,
 	TimelineActivityService,
 	type TimelineEvent,
 } from './timeline-activity'
@@ -132,7 +133,7 @@ const companyCadence = async (): Promise<{
 	return rows.rows[0]!
 }
 
-describe('TimelineActivityService.record cadence denorm', () => {
+describe('TimelineActivityService.record', () => {
 	describe('when emails are recorded out of order', () => {
 		it('should keep last_email_at at the newest (GREATEST, no regression)', async () => {
 			// GIVEN an email at T2 then a late-delivered email at an earlier T1
@@ -205,6 +206,69 @@ describe('TimelineActivityService.record cadence denorm', () => {
 			// [timeline-activity.ts — recomputeCompanyNextMeeting MIN(...)]
 			const cancelled = await companyCadence()
 			expect(cancelled.next_calendar_event_at).toBeNull()
+		})
+	})
+
+	describe('when a research run finishes', () => {
+		const timelineRow = async (researchRunId: string) => {
+			const result = await pool.query<{
+				kind: string
+				actor_user_id: string | null
+				payload: { status?: string }
+			}>(
+				`SELECT kind, actor_user_id, payload FROM timeline_activity
+				 WHERE entity_id = $1::uuid`,
+				[researchRunId],
+			)
+			return result.rows[0]
+		}
+
+		it('should record it against the person who asked for it', async () => {
+			// GIVEN a run someone started, which has just succeeded
+			const researchRunId = randomUUID()
+			const asker = `user-${randomUUID()}`
+
+			// WHEN its ending is recorded
+			await recordScoped(
+				new ResearchRunCompleted({
+					researchRunId,
+					companyId,
+					summary: 'found the company',
+					status: 'succeeded',
+					actorUserId: asker,
+					occurredAt: new Date(),
+				}),
+			)
+
+			// THEN the entry carries who asked, so their own finished research can
+			// be told apart from anyone else's
+			const row = await timelineRow(researchRunId)
+			expect(row?.actor_user_id).toBe(asker)
+			expect(row?.kind).toBe('research_run')
+		})
+
+		it('should record a run that found nothing usable', async () => {
+			// GIVEN a run that reached the end without usable findings — an outcome
+			// that cost time and money and that the person who asked needs to hear
+			const researchRunId = randomUUID()
+
+			// WHEN its ending is recorded
+			await recordScoped(
+				new ResearchRunCompleted({
+					researchRunId,
+					companyId,
+					summary: 'nothing usable',
+					status: 'no_reliable_data',
+					actorUserId: null,
+					occurredAt: new Date(),
+				}),
+			)
+
+			// THEN it lands on the timeline like any other ending, rather than
+			// leaving the run invisible unless someone goes looking for it
+			const row = await timelineRow(researchRunId)
+			expect(row?.kind).toBe('research_run')
+			expect(row?.payload.status).toBe('no_reliable_data')
 		})
 	})
 })
