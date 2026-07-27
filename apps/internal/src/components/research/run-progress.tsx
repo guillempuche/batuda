@@ -20,8 +20,12 @@ import type { ResearchProgress } from '#/components/research/event-shapes'
  */
 export function RunProgress({
 	progress,
+	steps,
 }: {
 	readonly progress: ResearchProgress
+	// Rounds the run itself reports, read off its row: the event stream would
+	// undercount a run that was already working when the page loaded.
+	readonly steps: number | null
 }) {
 	const { t } = useLingui()
 	return (
@@ -38,13 +42,9 @@ export function RunProgress({
 					{progress.activeTool !== null ? (
 						<MetaItem>{toolLabel(progress.activeTool)}</MetaItem>
 					) : null}
-					{progress.toolCalls > 0 ? (
+					{steps !== null && steps > 0 ? (
 						<MetaItem>
-							<Plural
-								value={progress.toolCalls}
-								one='# step run'
-								other='# steps run'
-							/>
+							<Plural value={steps} one='# step run' other='# steps run' />
 						</MetaItem>
 					) : null}
 					{progress.sourceCount !== null ? (

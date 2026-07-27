@@ -14,7 +14,6 @@ export type ResearchEventItem = {
 export type ResearchProgress = {
 	readonly phase: number | null
 	readonly activeTool: string | null
-	readonly toolCalls: number
 	readonly sourceCount: number | null
 }
 
@@ -40,30 +39,32 @@ export function narrowEvents(
 
 /**
  * Fold the events collected so far into a snapshot of where the run is: the
- * newest phase and active tool seen, how many tool calls have happened, and
- * the source count once the agent reports it.
+ * newest phase and active tool seen, and the source count once the agent
+ * reports it.
+ *
+ * How much work the run has got through is not counted here: these events carry
+ * only what arrived while this page was open — there is no replay — so a page
+ * opened partway into a run would count from one and disagree with the run's own
+ * tally. That number is read off the run itself.
  */
 export function deriveProgress(
 	events: ReadonlyArray<ResearchEventItem>,
 ): ResearchProgress {
 	let phase: number | null = null
 	let activeTool: string | null = null
-	let toolCalls = 0
 	let sourceCount: number | null = null
 
 	for (const event of events) {
 		const p = event.data['phase']
 		if (typeof p === 'number') phase = p
 		const tool = event.data['tool']
-		if (event.type === 'tool.called') {
-			toolCalls += 1
-			if (typeof tool === 'string') activeTool = tool
-		}
+		if (event.type === 'tool.called' && typeof tool === 'string')
+			activeTool = tool
 		const sources = event.data['sourceCount']
 		if (typeof sources === 'number') sourceCount = sources
 	}
 
-	return { phase, activeTool, toolCalls, sourceCount }
+	return { phase, activeTool, sourceCount }
 }
 
 export type PollDecision = 'stop' | 'poll-now' | 'poll-later'

@@ -24,9 +24,10 @@ describe('narrowEvents', () => {
 })
 
 describe('deriveProgress', () => {
-	it('should take the newest phase and active tool and count tool calls', () => {
+	it('should take the newest phase and active tool', () => {
 		// GIVEN a sequence of phase-1 then phase-2 tool calls
-		// THEN progress reflects the latest phase/tool and the call count
+		// WHEN the events are folded together
+		// THEN progress reflects only the latest phase and tool
 		const progress = deriveProgress([
 			{ type: 'run.started', timestamp: '', data: {} },
 			{
@@ -42,11 +43,11 @@ describe('deriveProgress', () => {
 		])
 		expect(progress.phase).toBe(2)
 		expect(progress.activeTool).toBe('llm.generateObject')
-		expect(progress.toolCalls).toBe(2)
 	})
 
 	it('should surface a reported source count and default the rest to null', () => {
 		// GIVEN an events stream that only reports a source count
+		// WHEN the events are folded together
 		// THEN sourceCount is set while phase/tool stay null
 		const progress = deriveProgress([
 			{ type: 'run.no_reliable_data', timestamp: '', data: { sourceCount: 3 } },
@@ -54,7 +55,6 @@ describe('deriveProgress', () => {
 		expect(progress.sourceCount).toBe(3)
 		expect(progress.phase).toBeNull()
 		expect(progress.activeTool).toBeNull()
-		expect(progress.toolCalls).toBe(0)
 	})
 })
 

@@ -68,6 +68,9 @@ export class ResearchRun extends Model.Class<ResearchRun>('ResearchRun')({
 
 	// Liveness beat, refreshed while the run is active; null before it starts.
 	heartbeatAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
+	// Rounds of work the run has got through; null until the first one. Climbs
+	// between checkpoints, so a stalled run reads differently from a working one.
+	progressSteps: Schema.NullOr(Schema.Number),
 	// How strongly the fetched evidence matched the researched entity
 	// (strong | weak | absent), or null when the run wasn't entity-gated.
 	entityMatch: Schema.NullOr(Schema.String),

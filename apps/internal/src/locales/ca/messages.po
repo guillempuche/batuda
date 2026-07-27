@@ -74,11 +74,6 @@ msgstr "{0, plural, one {# passada sobre les proves} other {# passades sobre les
 msgid "{0, plural, one {# source} other {# sources}}"
 msgstr "{0, plural, one {# font} other {# fonts}}"
 
-#. placeholder {0}: progress.toolCalls
-#: src/components/research/run-progress.tsx
-msgid "{0, plural, one {# step run} other {# steps run}}"
-msgstr "{0, plural, one {# pas fet} other {# passos fets}}"
-
 #. placeholder {0}: counts[shelf]
 #: src/routes/tasks/index.tsx
 msgid "{0, plural, one {# task} other {# tasks}}"
@@ -165,6 +160,10 @@ msgstr "{scoped} (per defecte)"
 #: src/routes/emails/index.tsx
 msgid "{selectedCount} threads selected"
 msgstr "{selectedCount} fils seleccionats"
+
+#: src/components/research/run-progress.tsx
+msgid "{steps, plural, one {# step run} other {# steps run}}"
+msgstr "{steps, plural, one {# pas fet} other {# passos fets}}"
 
 #: src/routes/settings/organization/policy.tsx
 msgid "{threshold}%"
