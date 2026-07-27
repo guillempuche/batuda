@@ -243,7 +243,8 @@ function TasksPage() {
 	const shelfList = useInfiniteList({
 		resetKey: `${selectedShelf}::${dayKey}`,
 		pageSize: TASKS_PAGE_SIZE,
-		atomFor: limit => tasksShelfAtom(selectedShelf, dayKey, limit),
+		count: 'exact',
+		atomFor: page => tasksShelfAtom(selectedShelf, dayKey, page),
 	})
 	const countsAtom = useMemo(() => taskCountsAtom(dayKey), [dayKey])
 	const countsResult = useAtomValue(countsAtom)
@@ -362,23 +363,28 @@ function TasksPage() {
 	}, [companiesResult])
 
 	// Any edit can move a task between shelves, so the sizes on the rail are
-	// refreshed alongside the list itself.
+	// refreshed alongside the list itself. Reading the list again starts it
+	// back at the top, which is right here: the reader just changed which
+	// shelf something belongs to, so the shelf is a different list now.
 	const refreshAll = useCallback(() => {
 		refreshTasks()
 		refreshCounts()
 		refreshCompanies()
 	}, [refreshTasks, refreshCounts, refreshCompanies])
 
-	// Refresh when the window regains focus — catches webhook-driven
-	// edits (an agent updated a task in another tab or via MCP).
+	// Coming back to the window refreshes the sizes on the rail but leaves the
+	// list where the reader left it. Re-reading it would send them back to the
+	// top of a shelf they had scrolled through, every time they switched away
+	// and back — too high a price for catching an edit made elsewhere.
 	useEffect(() => {
 		const onFocus = () => {
 			setDayKey(localDayKey())
-			refreshAll()
+			refreshCounts()
+			refreshCompanies()
 		}
 		window.addEventListener('focus', onFocus)
 		return () => window.removeEventListener('focus', onFocus)
-	}, [refreshAll])
+	}, [refreshCounts, refreshCompanies])
 
 	const handleToggle = useCallback(
 		async (taskId: string, nextCompleted: boolean) => {

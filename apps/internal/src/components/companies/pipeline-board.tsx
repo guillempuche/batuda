@@ -119,8 +119,20 @@ export function PipelineBoard({
 	const [moved, setMoved] = useState<ReadonlyMap<string, OptimisticMove>>(
 		() => new Map(),
 	)
-	// Bump to make every column re-read after a mutation reconciles server-side.
-	const [refreshNonce, setRefreshNonce] = useState(0)
+	// Which stages have to read the board again once a mutation has landed.
+	// Only the stages a card left and arrived at can have changed, so the other
+	// columns are left alone rather than all re-reading — and a reader who had
+	// scrolled one of them keeps their place.
+	// The tick rises with every mutation so moving the same card the same way
+	// twice still asks the affected columns to read again — naming the stages
+	// alone would look unchanged the second time.
+	const [stale, setStale] = useState<{
+		readonly tick: number
+		readonly stages: ReadonlySet<string>
+	}>(() => ({ tick: 0, stages: new Set() }))
+	const markStale = useCallback((...stages: ReadonlyArray<string>) => {
+		setStale(prev => ({ tick: prev.tick + 1, stages: new Set(stages) }))
+	}, [])
 	useEffect(() => {
 		setMoved(new Map())
 	}, [searchKey])
@@ -135,7 +147,7 @@ export function PipelineBoard({
 			} as never)
 			if (exit._tag === 'Success') {
 				refreshPipeline()
-				setRefreshNonce(n => n + 1)
+				markStale(card.status, toStatus)
 				return
 			}
 			setMoved(prev => {
@@ -198,9 +210,10 @@ export function PipelineBoard({
 				ids.map(id => updateCompany({ params: { id }, payload } as never)),
 			)
 			refreshPipeline()
-			setRefreshNonce(n => n + 1)
+			// A bulk edit can touch any stage, so every column re-reads.
+			markStale(...STATUS_ORDER)
 		},
-		[selection, updateCompany, refreshPipeline],
+		[selection, updateCompany, refreshPipeline, markStale],
 	)
 
 	if (AsyncResult.isFailure(pipelineResult)) {
@@ -259,7 +272,7 @@ export function PipelineBoard({
 							search={search}
 							total={statusCounts[status] ?? 0}
 							moved={moved}
-							refreshNonce={refreshNonce}
+							staleTick={stale.stages.has(status) ? stale.tick : 0}
 							selection={selection}
 							onMove={moveCard}
 							onRegisterIds={registerColumnIds}
@@ -281,7 +294,7 @@ function BoardColumn({
 	search,
 	total,
 	moved,
-	refreshNonce,
+	staleTick,
 	selection,
 	onMove,
 	onRegisterIds,
@@ -290,7 +303,7 @@ function BoardColumn({
 	readonly search: CompaniesSearch
 	readonly total: number
 	readonly moved: ReadonlyMap<string, OptimisticMove>
-	readonly refreshNonce: number
+	readonly staleTick: number
 	readonly selection: ReturnType<typeof useBulkSelection>
 	readonly onMove: (card: BoardCardData, toStatus: string) => void
 	readonly onRegisterIds: (status: string, ids: ReadonlyArray<string>) => void
@@ -300,14 +313,25 @@ function BoardColumn({
 		() => ({ ...search, status }),
 		[search, status],
 	)
-	// A refresh has to start the column over at its first page, so it takes part
-	// in identifying the list, just as the filters do.
-	const columnKey = `${canonicalSearchKey(columnSearch)}::${refreshNonce}`
 	const list = useInfiniteList({
-		resetKey: columnKey,
+		// Prefixed so a column cannot inherit the place the reader had reached
+		// on the companies list: filtering that list to one stage produces the
+		// very same filters this column reads, and the two are different screens.
+		resetKey: `board:${canonicalSearchKey(columnSearch)}`,
 		pageSize: COMPANIES_PAGE_SIZE,
-		atomFor: limit => companiesSearchAtom(columnSearch, limit),
+		count: 'exact',
+		atomFor: page => companiesSearchAtom(columnSearch, page),
 	})
+
+	// After a card moves, every column has to read the board again. Asking the
+	// list to start over is what actually refetches: naming the column
+	// differently would only reset which rows are held, and the answer already
+	// in hand would come straight back unchanged.
+	const refreshColumn = list.refresh
+	useEffect(() => {
+		if (staleTick === 0) return
+		refreshColumn()
+	}, [staleTick, refreshColumn])
 
 	const serverCards = useMemo(() => narrowCards(list.items), [list.items])
 
