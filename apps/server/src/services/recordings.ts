@@ -12,7 +12,13 @@ import {
 	RecordingSummary,
 } from '@batuda/controllers'
 
-import { resolvePageTotal } from '../lib/sql-pagination'
+import {
+	type CountMode,
+	probeLimit,
+	resolveTotal,
+	takePage,
+	totalColumn,
+} from '../lib/sql-pagination'
 import { StorageProvider } from './storage-provider.js'
 import {
 	InteractionLogged,
@@ -246,9 +252,15 @@ export class RecordingService extends Context.Service<RecordingService>()(
 					} satisfies IngestResult
 				})
 
-			const listForCompany = (companyId: string, limit = 50, offset = 0) =>
+			const listForCompany = (
+				companyId: string,
+				limit = 50,
+				offset = 0,
+				count: CountMode = 'none',
+			) =>
 				Effect.gen(function* () {
-					const rows = yield* sql<{ readonly total: string | number }>`
+					const page = { limit, offset, count }
+					const probed = yield* sql<{ readonly total?: string | number }>`
 						SELECT
 							cr.id,
 							cr.interaction_id,
@@ -261,19 +273,20 @@ export class RecordingService extends Context.Service<RecordingService>()(
 							cr.updated_at,
 							i.date AS interaction_date,
 							i.contact_id,
-							i.summary,
-							COUNT(*) OVER () AS total
+							i.summary
+							${totalColumn(sql, page.count)}
 						FROM call_recordings cr
 						INNER JOIN interactions i ON i.id = cr.interaction_id
 						WHERE i.company_id = ${companyId}
 						  AND cr.deleted_at IS NULL
 						ORDER BY i.date DESC
-						LIMIT ${limit}
-						OFFSET ${offset}
+						LIMIT ${probeLimit(page.limit)}
+						OFFSET ${page.offset}
 					`
-					const total = yield* resolvePageTotal(
+					const { rows, hasMore } = takePage(probed, page.limit)
+					const total = yield* resolveTotal(
+						page,
 						rows,
-						offset,
 						() => sql<{ readonly count: string | number }>`
 							SELECT count(*) AS count
 							FROM call_recordings cr
@@ -283,7 +296,7 @@ export class RecordingService extends Context.Service<RecordingService>()(
 						`,
 					).pipe(Effect.orDie)
 					const items = yield* decodeSummaries(rows).pipe(Effect.orDie)
-					return { items, total, limit, offset }
+					return { items, total, limit, offset, hasMore }
 				})
 
 			const getById = (recordingId: string) =>

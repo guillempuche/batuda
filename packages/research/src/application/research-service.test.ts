@@ -640,10 +640,10 @@ describe('clampPagination', () => {
 	})
 
 	describe('when the limit is above the ceiling', () => {
-		it('should cap an oversized limit at 100 so one call cannot pull the whole table', () => {
+		it('should cap an oversized limit at 500 so one call cannot pull the whole table', () => {
 			// GIVEN an absurdly large limit
 			// THEN it is capped at the page-size ceiling
-			expect(clampPagination(10_000_000, 0).limit).toBe(100)
+			expect(clampPagination(10_000_000, 0).limit).toBe(500)
 		})
 	})
 

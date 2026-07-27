@@ -20,7 +20,7 @@ import {
 } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
-import { PaginatedList } from '../pagination'
+import { PaginatedList, pageQuery } from '../pagination'
 
 const Recipients = Schema.Union([Schema.String, Schema.Array(Schema.String)])
 
@@ -66,13 +66,10 @@ export const EmailThreadListItem = Schema.Struct({
 })
 export type EmailThreadListItem = typeof EmailThreadListItem.Type
 
-// The paginated envelope returned by listThreads / list_email_threads.
-export const EmailThreadList = Schema.Struct({
-	items: Schema.Array(EmailThreadListItem),
-	total: Schema.Number,
-	limit: Schema.Number,
-	offset: Schema.Number,
-})
+// The paginated envelope returned by listThreads / list_email_threads. Built
+// from the shared one so there is a single description of what a page of a
+// list looks like, rather than two that can drift apart.
+export const EmailThreadList = PaginatedList(EmailThreadListItem)
 export type EmailThreadList = typeof EmailThreadList.Type
 
 // A full thread: the thread link's own columns plus the flattened message
@@ -208,8 +205,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 				status: Schema.optional(ThreadStatus),
 				purpose: Schema.optional(InboxPurpose),
 				query: Schema.optional(Schema.String),
-				limit: Schema.optional(Schema.NumberFromString),
-				offset: Schema.optional(Schema.NumberFromString),
+				...pageQuery,
 			},
 			success: EmailThreadList,
 		}),
@@ -255,8 +251,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 				contactId: Schema.optional(Schema.String),
 				companyId: Schema.optional(Schema.String),
 				status: Schema.optional(Schema.String),
-				limit: Schema.optional(Schema.NumberFromString),
-				offset: Schema.optional(Schema.NumberFromString),
+				...pageQuery,
 			},
 			success: PaginatedList(EmailMessageRecord),
 		}),
@@ -458,8 +453,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 		HttpApiEndpoint.get('listDrafts', '/email/drafts', {
 			query: {
 				inboxId: Schema.optional(Schema.String),
-				limit: Schema.optional(Schema.NumberFromString),
-				offset: Schema.optional(Schema.NumberFromString),
+				...pageQuery,
 			},
 			success: PaginatedList(EmailDraft.json),
 		}),

@@ -224,10 +224,13 @@ const listWith = (
 		Layer.provideMerge(TimelineActivityService.layer),
 		Layer.provideMerge(PgLive),
 	)
+	// These tests are about what the totals say, so they ask to be counted. A
+	// caller that does not ask gets null back, which is the point of the flag.
 	const page: TaskPage = {
 		sort: 'due',
 		limit: 100,
 		offset: 0,
+		count: 'exact',
 		...pageOverrides,
 	}
 

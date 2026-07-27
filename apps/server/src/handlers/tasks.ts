@@ -51,6 +51,7 @@ export const TasksLive = HttpApiBuilder.group(BatudaApi, 'tasks', handlers =>
 							sort: _.query.sort ?? 'recent',
 							limit: _.query.limit ?? 50,
 							offset: _.query.offset ?? 0,
+							count: _.query.count ?? 'none',
 						},
 					)
 				}).pipe(Effect.orDie),

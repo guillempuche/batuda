@@ -11,8 +11,10 @@ const detailCache = new Map<string, ReturnType<typeof makeDetailAtom>>()
 
 function makeListAtom(search: PagesSearch) {
 	return BatudaApiAtom.query('pages', 'list', {
-		query: search,
-		serializationKey: `pages:list:${canonicalKey(search)}`,
+		// Counted on purpose: both the Files tab's badge and the pages screen's
+		// own heading state how many there are, not how many were fetched.
+		query: { ...search, count: 'exact' as const },
+		serializationKey: `pages:list:${canonicalKey(search)}:exact`,
 	})
 }
 

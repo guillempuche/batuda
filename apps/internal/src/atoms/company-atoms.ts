@@ -38,8 +38,11 @@ function makeCompanyAtom(slug: string) {
 
 function makeContactsAtom(companyId: string) {
 	return BatudaApiAtom.query('contacts', 'list', {
-		query: { companyId },
-		serializationKey: `contacts:${companyId}`,
+		// Counted on purpose: the People tab's badge states the company's real
+		// headcount, which the rows on this page cannot tell you once there are
+		// more people than one page holds.
+		query: { companyId, count: 'exact' },
+		serializationKey: `contacts:${companyId}:exact`,
 	})
 }
 

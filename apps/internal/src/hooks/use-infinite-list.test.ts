@@ -13,6 +13,7 @@ const page = (
 	total,
 	limit: rowCount,
 	offset,
+	hasMore: offset + rowCount < total,
 })
 
 describe('readListState', () => {

@@ -125,8 +125,10 @@ function DocumentsPage() {
 					...(search.q ? { q: search.q } : {}),
 					...(type ? { type } : {}),
 					limit: 50,
+					// Counted on purpose: the heading states how many documents match.
+					count: 'exact' as const,
 				},
-				serializationKey: `documents:list:${search.q ?? ''}:${type ?? ''}`,
+				serializationKey: `documents:list:${search.q ?? ''}:${type ?? ''}:exact`,
 			}),
 		[search.q, type],
 	)

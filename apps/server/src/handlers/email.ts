@@ -113,6 +113,7 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 						...(_.query.query !== undefined && { query: _.query.query }),
 						...(_.query.limit !== undefined && { limit: _.query.limit }),
 						...(_.query.offset !== undefined && { offset: _.query.offset }),
+						...(_.query.count !== undefined && { count: _.query.count }),
 					}),
 				)
 				.handle('getThread', _ =>

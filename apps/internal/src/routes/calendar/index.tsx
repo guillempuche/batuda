@@ -72,7 +72,9 @@ async function loadCalendarOnServer() {
 		const [events, companies] = yield* Effect.all(
 			[
 				client.calendar.listEvents({ query: { limit: 500 } }),
-				client.companies.list({ query: { limit: 500 } }),
+				// Matches `companiesListAtom` exactly, so the browser reuses this
+				// answer instead of asking again.
+				client.companies.list({ query: { limit: 500, count: 'exact' } }),
 			],
 			{ concurrency: 2 },
 		)

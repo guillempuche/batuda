@@ -5,7 +5,13 @@ import { SqlClient } from 'effect/unstable/sql'
 import { BadRequest, Conflict, CurrentOrg, NotFound } from '@batuda/controllers'
 import { Task } from '@batuda/domain'
 
-import { resolvePageTotal } from '../lib/sql-pagination'
+import {
+	type CountMode,
+	probeLimit,
+	resolveTotal,
+	takePage,
+	totalColumn,
+} from '../lib/sql-pagination'
 import {
 	TaskCompleted,
 	TaskCreated,
@@ -63,6 +69,9 @@ export interface TaskPage {
 	readonly sort: TaskSort
 	readonly limit: number
 	readonly offset: number
+	// Required rather than defaulted, so a screen that shows a count cannot end
+	// up silently showing nothing because its caller forgot to ask for one.
+	readonly count: CountMode
 }
 
 // Who performed a write, recorded on the task_events audit trail. `kind`
@@ -291,16 +300,18 @@ export class TaskService extends Context.Service<TaskService>()('TaskService', {
 						page.sort === 'recent'
 							? sql`COALESCE(due_at, created_at) DESC`
 							: sql`due_at ASC NULLS LAST, created_at ASC`
-					const rows = yield* sql<{ readonly total: string | number }>`
-							SELECT *, COUNT(*) OVER () AS total FROM tasks
+					const probed = yield* sql<{ readonly total?: string | number }>`
+							SELECT *${totalColumn(sql, page.count)} FROM tasks
 							WHERE ${sql.and(conditions)}
 							ORDER BY ${order}
-							LIMIT ${page.limit} OFFSET ${page.offset}
+							LIMIT ${probeLimit(page.limit)} OFFSET ${page.offset}
 						`
 
-					const total = yield* resolvePageTotal(
+					const { rows, hasMore } = takePage(probed, page.limit)
+
+					const total = yield* resolveTotal(
+						page,
 						rows,
-						page.offset,
 						() => sql<{ readonly count: string | number }>`
 							SELECT count(*) AS count FROM tasks
 							WHERE ${sql.and(conditions)}
@@ -308,7 +319,13 @@ export class TaskService extends Context.Service<TaskService>()('TaskService', {
 					).pipe(Effect.orDie)
 
 					const items = yield* decodeTasks(rows).pipe(Effect.orDie)
-					return { items, total, limit: page.limit, offset: page.offset }
+					return {
+						items,
+						total,
+						limit: page.limit,
+						offset: page.offset,
+						hasMore,
+					}
 				}),
 
 			// Every shelf sized in one pass, so the rail can show real totals

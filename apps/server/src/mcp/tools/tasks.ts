@@ -311,6 +311,9 @@ export const TaskHandlersLive = TaskTools.toLayer(
 							sort: 'due',
 							limit: params.limit ?? 25,
 							offset: params.offset ?? 0,
+							// An agent reads `has_more` to decide whether to ask again, so
+							// it never needs the cost of counting the whole set.
+							count: 'none',
 						},
 					)
 					.pipe(
@@ -330,7 +333,12 @@ export const TaskHandlersLive = TaskTools.toLayer(
 							includeSnoozed: params.include_snoozed,
 							search: params.query,
 						},
-						{ sort: 'due', limit: params.limit ?? 25, offset: 0 },
+						{
+							sort: 'due',
+							limit: params.limit ?? 25,
+							offset: 0,
+							count: 'none',
+						},
 					)
 					.pipe(
 						Effect.orDie,

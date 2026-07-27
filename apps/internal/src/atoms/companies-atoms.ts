@@ -47,8 +47,10 @@ function makeCompaniesSearchAtom(search: CompaniesSearch, limit: number) {
 	// refetching them and collapsing the list to a single page in between.
 	return Atom.keepAlive(
 		BatudaApiAtom.query('companies', 'list', {
-			query: { ...search, limit },
-			serializationKey: `companies:search:${canonicalSearchKey(search)}::${limit}`,
+			// Counted on purpose: the screen states how many companies match, and
+			// the footer counts out how far through them the reader has got.
+			query: { ...search, limit, count: 'exact' as const },
+			serializationKey: `companies:search:${canonicalSearchKey(search)}::${limit}:exact`,
 		}),
 	)
 }

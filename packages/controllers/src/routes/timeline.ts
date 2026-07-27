@@ -5,7 +5,7 @@ import { TimelineActivity, TimelineEntityType } from '@batuda/domain'
 
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
-import { PaginatedList } from '../pagination'
+import { PaginatedList, pageQuery } from '../pagination'
 
 export const TimelineGroup = HttpApiGroup.make('timeline')
 	.add(
@@ -20,8 +20,7 @@ export const TimelineGroup = HttpApiGroup.make('timeline')
 				channel: Schema.optional(Schema.String),
 				kind: Schema.optional(Schema.String),
 				since: Schema.optional(Schema.String),
-				limit: Schema.optional(Schema.NumberFromString),
-				offset: Schema.optional(Schema.NumberFromString),
+				...pageQuery,
 			},
 			success: PaginatedList(TimelineActivity.json),
 		}),

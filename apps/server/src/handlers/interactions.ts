@@ -6,7 +6,13 @@ import { SqlClient } from 'effect/unstable/sql'
 import { BatudaApi } from '@batuda/controllers'
 import { Interaction } from '@batuda/domain'
 
-import { resolvePageTotal } from '../lib/sql-pagination'
+import {
+	pageOf,
+	probeLimit,
+	resolveTotal,
+	takePage,
+	totalColumn,
+} from '../lib/sql-pagination'
 import {
 	InteractionLogged,
 	TimelineActivityService,
@@ -25,27 +31,33 @@ export const InteractionsLive = HttpApiBuilder.group(
 			return handlers
 				.handle('list', _ =>
 					Effect.gen(function* () {
-						const limit = _.query.limit ?? 20
-						const offset = _.query.offset ?? 0
+						const page = pageOf(_.query, 20)
 						const conditions: Array<Statement.Fragment> = []
 						if (_.query.companyId)
 							conditions.push(sql`company_id = ${_.query.companyId}`)
-						const rows = yield* sql<{ readonly total: string | number }>`
-							SELECT *, COUNT(*) OVER () AS total FROM interactions
+						const probed = yield* sql<{ readonly total?: string | number }>`
+							SELECT *${totalColumn(sql, page.count)} FROM interactions
 							WHERE ${sql.and(conditions)}
 							ORDER BY date DESC
-							LIMIT ${limit} OFFSET ${offset}
+							LIMIT ${probeLimit(page.limit)} OFFSET ${page.offset}
 						`
-						const total = yield* resolvePageTotal(
+						const { rows, hasMore } = takePage(probed, page.limit)
+						const total = yield* resolveTotal(
+							page,
 							rows,
-							offset,
 							() => sql<{ readonly count: string | number }>`
 								SELECT count(*) AS count FROM interactions
 								WHERE ${sql.and(conditions)}
 							`,
 						)
 						const items = yield* decodeInteractions(rows)
-						return { items, total, limit, offset }
+						return {
+							items,
+							total,
+							limit: page.limit,
+							offset: page.offset,
+							hasMore,
+						}
 					}).pipe(Effect.orDie),
 				)
 				.handle('create', _ =>

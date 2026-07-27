@@ -15,6 +15,7 @@ export type EmailsSearch = {
 	readonly query?: string
 	readonly limit?: number
 	readonly offset?: number
+	readonly count?: 'exact' | 'none'
 }
 
 export const EMAILS_PAGE_SIZE = 100

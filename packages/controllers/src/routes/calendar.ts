@@ -15,7 +15,7 @@ import {
 import { BadRequest, Conflict, Forbidden, NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
-import { PaginatedList } from '../pagination'
+import { PaginatedList, pageQuery } from '../pagination'
 
 // A free slot returned by the availability lookup. The provider hands back
 // Date objects; on the wire they encode to ISO strings.
@@ -82,8 +82,7 @@ export const CalendarGroup = HttpApiGroup.make('calendar')
 				contactId: Schema.optional(Schema.String),
 				source: Schema.optional(Schema.String),
 				status: Schema.optional(Schema.String),
-				limit: Schema.optional(Schema.NumberFromString),
-				offset: Schema.optional(Schema.NumberFromString),
+				...pageQuery,
 			},
 			success: PaginatedList(CalendarEventWithAttendees),
 		}),

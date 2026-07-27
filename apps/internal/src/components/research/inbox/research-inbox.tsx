@@ -62,7 +62,9 @@ export const INBOX_PROPOSAL_LIMIT = 100
 
 /** The single atom the inbox reads (and the loader hydrates) for its queue. */
 export function inboxPendingProposalsAtom() {
-	return pendingProposalsAtom({ limit: INBOX_PROPOSAL_LIMIT })
+	// Counted on purpose: the inbox states how many are waiting and how many it
+	// could not fit on screen, and neither is knowable from the rows alone.
+	return pendingProposalsAtom({ limit: INBOX_PROPOSAL_LIMIT, count: 'exact' })
 }
 
 function rowKey(p: PendingProposal): string {
@@ -215,9 +217,10 @@ export function ResearchInbox() {
 	).length
 	// The count comes back with the rows, so the tile states the real figure
 	// instead of "100+" whenever a page happened to fill up.
-	const totalPending = AsyncResult.isSuccess(proposalsResult)
-		? proposalsResult.value.total
-		: proposals.length
+	const totalPending =
+		(AsyncResult.isSuccess(proposalsResult)
+			? proposalsResult.value.total
+			: null) ?? proposals.length
 	const pendingCount = Math.max(0, totalPending - resolvedCount)
 	// More are waiting than were fetched, so say so rather than quietly ending.
 	const notShown = Math.max(0, totalPending - proposals.length)

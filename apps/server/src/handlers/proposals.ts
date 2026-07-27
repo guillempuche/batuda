@@ -6,7 +6,13 @@ import { SqlClient } from 'effect/unstable/sql'
 import { BatudaApi, CurrentOrg, NotFound } from '@batuda/controllers'
 import { Proposal } from '@batuda/domain'
 
-import { resolvePageTotal } from '../lib/sql-pagination'
+import {
+	pageOf,
+	probeLimit,
+	resolveTotal,
+	takePage,
+	totalColumn,
+} from '../lib/sql-pagination'
 import {
 	ProposalEvent,
 	TimelineActivityService,
@@ -42,26 +48,32 @@ export const ProposalsLive = HttpApiBuilder.group(
 			return handlers
 				.handle('list', _ =>
 					Effect.gen(function* () {
-						const limit = _.query.limit ?? 100
-						const offset = _.query.offset ?? 0
+						const page = pageOf(_.query, 100)
 						const conditions: Array<Statement.Fragment> = []
 						if (_.query.companyId)
 							conditions.push(sql`company_id = ${_.query.companyId}`)
-						const rows = yield* sql<{ readonly total: string | number }>`
-							SELECT *, COUNT(*) OVER () AS total FROM proposals
+						const probed = yield* sql<{ readonly total?: string | number }>`
+							SELECT *${totalColumn(sql, page.count)} FROM proposals
 							WHERE ${sql.and(conditions)}
-							LIMIT ${limit} OFFSET ${offset}
+							LIMIT ${probeLimit(page.limit)} OFFSET ${page.offset}
 						`
-						const total = yield* resolvePageTotal(
+						const { rows, hasMore } = takePage(probed, page.limit)
+						const total = yield* resolveTotal(
+							page,
 							rows,
-							offset,
 							() => sql<{ readonly count: string | number }>`
 								SELECT count(*) AS count FROM proposals
 								WHERE ${sql.and(conditions)}
 							`,
 						)
 						const items = yield* decodeProposals(rows)
-						return { items, total, limit, offset }
+						return {
+							items,
+							total,
+							limit: page.limit,
+							offset: page.offset,
+							hasMore,
+						}
 					}).pipe(Effect.orDie),
 				)
 				.handle('get', _ =>

@@ -15,7 +15,7 @@ import {
 } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
-import { PaginatedList } from '../pagination'
+import { PaginatedList, pageQuery } from '../pagination'
 import {
 	BulkResolveResult,
 	CancelResult,
@@ -137,8 +137,7 @@ export const ResearchGroup = HttpApiGroup.make('research')
 				subject_table: Schema.optional(Schema.String),
 				subject_id: Schema.optional(Schema.String),
 				since: Schema.optional(Schema.String),
-				limit: Schema.optional(Schema.NumberFromString),
-				offset: Schema.optional(Schema.NumberFromString),
+				...pageQuery,
 			},
 			success: PaginatedList(ResearchRunSummary),
 		}),
@@ -233,8 +232,7 @@ export const ResearchGroup = HttpApiGroup.make('research')
 		HttpApiEndpoint.get('listPendingPaidActions', '/research/paid-actions', {
 			query: {
 				research_id: Schema.optional(Schema.String),
-				limit: Schema.optional(Schema.NumberFromString),
-				offset: Schema.optional(Schema.NumberFromString),
+				...pageQuery,
 			},
 			success: PaginatedList(PendingPaidAction),
 		}),
@@ -248,8 +246,7 @@ export const ResearchGroup = HttpApiGroup.make('research')
 				status: Schema.optional(Schema.String),
 				min_confidence: Schema.optional(Schema.NumberFromString),
 				machine_checkable: Schema.optional(Schema.String),
-				limit: Schema.optional(Schema.NumberFromString),
-				offset: Schema.optional(Schema.NumberFromString),
+				...pageQuery,
 			},
 			success: PaginatedList(PendingProposal),
 		}),

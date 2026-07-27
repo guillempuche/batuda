@@ -10,7 +10,7 @@ import { Company, Contact, Interaction } from '@batuda/domain'
 import { NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
-import { PaginatedList } from '../pagination'
+import { PaginatedList, pageQuery } from '../pagination'
 
 // One research run whose findings were applied to a company, with the pages its
 // citations point at — so a reader can trace a fact on the row back to the run
@@ -116,8 +116,7 @@ export const CompaniesGroup = HttpApiGroup.make('companies')
 				maxLat: Schema.optional(Schema.NumberFromString),
 				minLng: Schema.optional(Schema.NumberFromString),
 				maxLng: Schema.optional(Schema.NumberFromString),
-				limit: Schema.optional(Schema.NumberFromString),
-				offset: Schema.optional(Schema.NumberFromString),
+				...pageQuery,
 			},
 			success: PaginatedList(Company.json),
 		}),

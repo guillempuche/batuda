@@ -149,6 +149,7 @@ export type PendingProposalsParams = {
 	readonly machineCheckable?: boolean
 	readonly limit?: number
 	readonly offset?: number
+	readonly count?: 'exact' | 'none'
 }
 
 const pendingProposalsCache = new Map<
@@ -171,6 +172,7 @@ function makePendingProposalsAtom(params: PendingProposalsParams) {
 	}
 	if (params.limit !== undefined) query['limit'] = params.limit
 	if (params.offset !== undefined) query['offset'] = params.offset
+	if (params.count !== undefined) query['count'] = params.count
 	return BatudaApiAtom.query('research', 'listPendingProposals', {
 		query,
 		serializationKey: `research:pending-proposals:${pendingProposalsKey(params)}`,
@@ -187,6 +189,7 @@ function pendingProposalsKey(params: PendingProposalsParams): string {
 			: String(params.machineCheckable),
 		params.limit ?? '',
 		params.offset ?? '',
+		params.count ?? '',
 	].join('|')
 }
 

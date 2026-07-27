@@ -88,8 +88,11 @@ function makeShelfAtom(shelf: TaskShelf, dayKey: string, limit: number) {
 				...dayBoundaries(dayKey),
 				sort: sortForShelf(shelf),
 				limit,
+				// Counted on purpose: the shelf says how many tasks sit on it, which
+				// is the whole point of a shelf and is not knowable from one page.
+				count: 'exact' as const,
 			},
-			serializationKey: `tasks:shelf:${shelf}:${dayKey}:${limit}`,
+			serializationKey: `tasks:shelf:${shelf}:${dayKey}:${limit}:exact`,
 		}),
 	)
 }

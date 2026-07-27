@@ -16,7 +16,13 @@ import {
 import { CalendarEvent, CalendarEventType } from '@batuda/domain'
 
 import { withAttendees } from '../lib/calendar-attendees'
-import { resolvePageTotal } from '../lib/sql-pagination'
+import {
+	pageOf,
+	probeLimit,
+	resolveTotal,
+	takePage,
+	totalColumn,
+} from '../lib/sql-pagination'
 import { dispatchRsvpReply } from '../services/calendar-rsvp-dispatch.js'
 
 const decodeEventTypes = Schema.decodeUnknownEffect(
@@ -115,26 +121,32 @@ export const CalendarLive = HttpApiBuilder.group(
 							conditions.push(sql`contact_id = ${_.query.contactId}`)
 						if (_.query.source) conditions.push(sql`source = ${_.query.source}`)
 						if (_.query.status) conditions.push(sql`status = ${_.query.status}`)
-						const limit = _.query.limit ?? 100
-						const offset = _.query.offset ?? 0
+						const page = pageOf(_.query, 100)
 						const whereClause =
 							conditions.length > 0 ? sql`WHERE ${sql.and(conditions)}` : sql``
-						const rows = yield* sql<{ readonly total: string | number }>`
-							SELECT *, COUNT(*) OVER () AS total FROM calendar_events
+						const probed = yield* sql<{ readonly total?: string | number }>`
+							SELECT *${totalColumn(sql, page.count)} FROM calendar_events
 							${whereClause}
 							ORDER BY start_at ASC
-							LIMIT ${limit} OFFSET ${offset}
+							LIMIT ${probeLimit(page.limit)} OFFSET ${page.offset}
 						`
-						const total = yield* resolvePageTotal(
+						const { rows, hasMore } = takePage(probed, page.limit)
+						const total = yield* resolveTotal(
+							page,
 							rows,
-							offset,
 							() => sql<{ readonly count: string | number }>`
 								SELECT count(*) AS count FROM calendar_events
 								${whereClause}
 							`,
 						)
 						const items = yield* withAttendees(sql, yield* decodeEvents(rows))
-						return { items, total, limit, offset }
+						return {
+							items,
+							total,
+							limit: page.limit,
+							offset: page.offset,
+							hasMore,
+						}
 					}).pipe(Effect.orDie),
 				)
 				.handle('getEvent', _ =>

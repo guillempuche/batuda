@@ -172,6 +172,7 @@ export const ResearchLive = HttpApiBuilder.group(
 							since: _.query.since,
 							limit: _.query.limit,
 							offset: _.query.offset,
+							count: _.query.count,
 						})
 					}).pipe(Effect.orDie),
 				)
@@ -389,6 +390,7 @@ export const ResearchLive = HttpApiBuilder.group(
 							researchId: _.query.research_id,
 							limit: _.query.limit,
 							offset: _.query.offset,
+							count: _.query.count,
 						})
 						const items = yield* decodePendingPaidActions(page.items).pipe(
 							Effect.orDie,
@@ -398,6 +400,7 @@ export const ResearchLive = HttpApiBuilder.group(
 							total: page.total,
 							limit: page.limit,
 							offset: page.offset,
+							hasMore: page.hasMore,
 						}
 					}).pipe(Effect.orDie),
 				)
@@ -414,6 +417,7 @@ export const ResearchLive = HttpApiBuilder.group(
 								mc === 'true' ? true : mc === 'false' ? false : undefined,
 							limit: _.query.limit,
 							offset: _.query.offset,
+							count: _.query.count,
 						})
 						const items = yield* decodePendingProposals(page.items).pipe(
 							Effect.orDie,
@@ -423,6 +427,7 @@ export const ResearchLive = HttpApiBuilder.group(
 							total: page.total,
 							limit: page.limit,
 							offset: page.offset,
+							hasMore: page.hasMore,
 						}
 					}).pipe(Effect.orDie),
 				)
