@@ -82,6 +82,6 @@ Pages are draft by default. Always `publish_page` after review to make them publ
 
 Tasks are the action queue driven by `next_action` and `next_action_at` fields on interactions and companies.
 
-- `get_next_steps(limit)` returns tasks sorted by due date, including overdue items
+- `get_next_steps(limit)` returns tasks sorted by due date (including overdue items), companies with an overdue next action, and finished research awaiting review
 - After completing a task, always check if a new task should be created for the next step
 - Tasks connect to the pipeline: completing tasks often means updating company status or logging a new interaction

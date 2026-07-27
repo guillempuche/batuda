@@ -35,7 +35,7 @@ log_interaction({
 
 ## Next action workflow
 
-Always set `next_action` and `next_action_at` when known. This drives the daily task list via `get_next_steps`.
+Always set `next_action` and `next_action_at` when known. This drives the daily task list via `get_next_steps`, which also carries finished research awaiting review.
 
 After calling `log_interaction`, update the company's `next_action` and `next_action_at` if they changed. This ensures the pipeline dashboard and task queue reflect the latest state.
 

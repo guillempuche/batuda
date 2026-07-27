@@ -13,19 +13,19 @@ The MCP server is registered in `.mcp.json`. Run `/mcp` in Claude Code to verify
 
 Fetch only what is needed. Prefer summaries over full profiles.
 
-| Tool                        | Returns                                               |
-| --------------------------- | ----------------------------------------------------- |
-| `search_companies(filters)` | Summaries only, no full profiles                      |
-| `get_company(id_or_slug)`   | Full profile + last 5 interactions (no documents)     |
-| `get_documents(subject)`    | Summaries + a snippet — no full body                  |
-| `get_document(id)`          | Full markdown content                                 |
-| `get_pipeline()`            | Counts only                                           |
-| `get_next_steps(limit)`     | Due tasks + overdue `next_action_at`                  |
-| `create_page(...)`          | Create a prospect sales page (draft) with Tiptap JSON |
-| `update_page(...)`          | Update page content, title, or meta                   |
-| `publish_page(id)`          | Publish a draft page                                  |
-| `list_pages(filters)`       | List pages by company, status, or language            |
-| `get_page(id_or_slug_lang)` | Full page content by id or slug+lang                  |
+| Tool                        | Returns                                                   |
+| --------------------------- | --------------------------------------------------------- |
+| `search_companies(filters)` | Summaries only, no full profiles                          |
+| `get_company(id_or_slug)`   | Full profile + last 5 interactions (no documents)         |
+| `get_documents(subject)`    | Summaries + a snippet — no full body                      |
+| `get_document(id)`          | Full markdown content                                     |
+| `get_pipeline()`            | Counts only                                               |
+| `get_next_steps(limit)`     | Due tasks + overdue `next_action_at` + research to review |
+| `create_page(...)`          | Create a prospect sales page (draft) with Tiptap JSON     |
+| `update_page(...)`          | Update page content, title, or meta                       |
+| `publish_page(id)`          | Publish a draft page                                      |
+| `list_pages(filters)`       | List pages by company, status, or language                |
+| `get_page(id_or_slug_lang)` | Full page content by id or slug+lang                      |
 
 Always call `search_companies` before `get_company`. Fetch document content only when needed to read or rewrite it.
 
@@ -82,11 +82,20 @@ When researching a new company:
 
 A company's standing summary is `companies.account_brief`, not a document.
 
+To have the server do the research instead, `start_research` returns a run id and
+a `poll_after_ms`; wait that long, then `get_research`, and repeat while
+`poll_after_ms` keeps coming back. A run takes 2-5 minutes, so do not wait on it
+inside one reply — hand back the id, and pick it up on the next turn or from
+`get_next_steps`. `progressSteps` climbs while the run works; unchanged for
+several minutes means it is stuck, and `cancel_research` ends it.
+
 For type descriptions and filing details, consult `references/documents.md`.
 
 ## Tasks
 
-Tasks are the action queue. `get_next_steps` returns them sorted by due date. After completing a task, always check if a new task should be created for the next step.
+Tasks are the action queue. `get_next_steps` returns them sorted by due date, alongside companies with an overdue `next_action_at` and finished research awaiting review. After completing a task, always check if a new task should be created for the next step.
+
+`researchAwaitingReview` is how finished research gets noticed at all — a run takes 2-5 minutes, so whoever asked for it is rarely still waiting. Each entry carries `pendingUpdateCount` (CRM changes still undecided — read them with `list_research_proposed_updates`, decide each with `resolve_research_proposed_update`) and a `status`; `failed`, `no_reliable_data` or `succeeded_low_confidence` means the run itself needs a look.
 
 ## Pages
 
