@@ -342,6 +342,83 @@ describe('TaskService.list', () => {
 			expect(page.offset).toBe(0)
 		})
 
+		it('should say more follow without being asked to count', async () => {
+			// GIVEN three tasks for a unique assignee
+			const assignee = `page-fixture-${randomUUID()}`
+			for (const title of ['first', 'second', 'third']) {
+				await createWith(tallerOrgId, tallerOrgId, {
+					type: 'follow_up',
+					title,
+					status: 'open',
+					assigneeId: assignee,
+				})
+			}
+
+			// WHEN asking for a page that holds one of them, uncounted
+			const page = await listWith(
+				tallerOrgId,
+				{ assigneeId: assignee },
+				{ limit: 1, offset: 0, count: 'none' },
+			)
+
+			// THEN nothing is counted, and yet the page still knows more follow.
+			//      This is what lets a list that never asks for a total reach the
+			//      end of itself at all.
+			expect(page.total).toBeNull()
+			expect(page.items).toHaveLength(1)
+			expect(page.hasMore).toBe(true)
+		})
+
+		it('should not claim more when the page ends exactly on the last match', async () => {
+			// GIVEN two tasks for a unique assignee
+			const assignee = `page-fixture-${randomUUID()}`
+			for (const title of ['first', 'second']) {
+				await createWith(tallerOrgId, tallerOrgId, {
+					type: 'follow_up',
+					title,
+					status: 'open',
+					assigneeId: assignee,
+				})
+			}
+
+			// WHEN asking for exactly as many rows as there are
+			const page = await listWith(
+				tallerOrgId,
+				{ assigneeId: assignee },
+				{ limit: 2, offset: 0, count: 'none' },
+			)
+
+			// THEN the list ends here. Getting this wrong by one costs a wasted
+			// round trip that comes back empty, on every list, every time.
+			expect(page.items).toHaveLength(2)
+			expect(page.hasMore).toBe(false)
+		})
+
+		it('should hand back only the rows asked for when more exist', async () => {
+			// GIVEN three tasks for a unique assignee
+			const assignee = `page-fixture-${randomUUID()}`
+			for (const title of ['first', 'second', 'third']) {
+				await createWith(tallerOrgId, tallerOrgId, {
+					type: 'follow_up',
+					title,
+					status: 'open',
+					assigneeId: assignee,
+				})
+			}
+
+			// WHEN asking for two of them
+			const page = await listWith(
+				tallerOrgId,
+				{ assigneeId: assignee },
+				{ limit: 2, offset: 0, count: 'none' },
+			)
+
+			// THEN two come back, not the spare row fetched to answer "is there
+			// more" — that one is dropped before anybody sees it
+			expect(page.items).toHaveLength(2)
+			expect(page.hasMore).toBe(true)
+		})
+
 		it('should still report the total for a page past the last match', async () => {
 			// GIVEN two tasks for a unique assignee
 			const assignee = `page-fixture-${randomUUID()}`

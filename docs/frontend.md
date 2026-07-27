@@ -802,12 +802,13 @@ const CardHead = styled.div`
 ### Company detail (`/companies/$slug`)
 
 - Header: name, status chip, priority, location, website/linkedin/instagram links
-- Tabs: Profile | Interactions | Documents | Tasks | Proposals
-- **Profile tab:** all fields, contacts list, edit inline
-- **Interactions tab:** timeline, newest first, log new button
-- **Documents tab:** list by type (research, prenotes, postnotes), open in read/edit view
-- **Tasks tab:** open tasks sorted by due date, completed tasks collapsed
-- **Proposals tab:** proposal list with status
+- Tabs: Overview | Conversations | People | Files
+- **Overview tab:** all fields, activity timeline, open tasks, upcoming meetings
+- **Conversations tab:** emails, calls, meetings and logged interactions in one feed
+- **People tab:** the company's contacts; the tab badge counts everyone on file, not the rows fetched
+- **Files tab:** documents, offers and landing pages, each loading further rows as you reach the end of them
+
+Documents also have a screen of their own at `/documents`, and one page each at `/documents/$id`.
 
 ### Tasks (`/tasks`)
 
