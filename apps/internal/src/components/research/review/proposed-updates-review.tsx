@@ -79,7 +79,7 @@ export function ProposedUpdatesReview({
 	const proposals = useMemo<ReadonlyArray<ReviewProposal>>(
 		() =>
 			AsyncResult.isSuccess(proposalsResult)
-				? narrowProposedUpdates(proposalsResult.value)
+				? narrowProposedUpdates(proposalsResult.value.items)
 				: [],
 		[proposalsResult],
 	)

@@ -5,7 +5,7 @@ import { SqlClient } from 'effect/unstable/sql'
 
 import { TimelineActivity, TimelineEntityType } from '@batuda/domain'
 
-import { ListResult, toItems } from './_result'
+import { McpPageLimit, TruncatableResult, toTruncatable } from './_result'
 
 const decodeActivities = Schema.decodeUnknownEffect(
 	Schema.Array(TimelineActivity),
@@ -13,7 +13,7 @@ const decodeActivities = Schema.decodeUnknownEffect(
 
 const ListTimeline = Tool.make('list_timeline', {
 	description:
-		'List timeline activity. company_id or contact_id gives a company or person their whole history; entity_type + entity_id gives one record its own — the events about a single task, proposal or meeting. Covers emails, calls, meetings, documents, proposals, research runs. Filter by channel, kind, since (ISO 8601). Max 200 rows.',
+		'List timeline activity. company_id or contact_id gives a company or person their whole history; entity_type + entity_id gives one record its own — the events about a single task, proposal or meeting. Covers emails, calls, meetings, documents, proposals, research runs. Filter by channel, kind, since (ISO 8601). Returns at most `limit` rows (default 50, max 500); `hasMore` says whether more exist than were returned.',
 	parameters: Schema.Struct({
 		company_id: Schema.optional(Schema.String),
 		contact_id: Schema.optional(Schema.String),
@@ -22,9 +22,9 @@ const ListTimeline = Tool.make('list_timeline', {
 		channel: Schema.optional(Schema.String),
 		kind: Schema.optional(Schema.String),
 		since: Schema.optional(Schema.String),
-		limit: Schema.optional(Schema.Number),
+		limit: Schema.optional(McpPageLimit),
 	}),
-	success: ListResult(TimelineActivity.json),
+	success: TruncatableResult(TimelineActivity.json),
 })
 	.annotate(Tool.Title, 'List Timeline')
 	.annotate(Tool.Readonly, true)
@@ -59,16 +59,16 @@ export const TimelineHandlersLive = TimelineTools.toLayer(
 							conditions.push(sql`occurred_at >= ${since}`)
 						}
 					}
-					const limit = Math.min(params.limit ?? 50, 200)
+					const limit = params.limit ?? 50
 					const whereClause =
 						conditions.length > 0 ? sql`WHERE ${sql.and(conditions)}` : sql``
 					const rows = yield* sql`
 						SELECT * FROM timeline_activity
 						${whereClause}
 						ORDER BY occurred_at DESC
-						LIMIT ${limit}
+						LIMIT ${limit + 1}
 					`
-					return toItems(yield* decodeActivities(rows))
+					return toTruncatable(yield* decodeActivities(rows), limit)
 				}).pipe(Effect.orDie),
 		}
 	}),

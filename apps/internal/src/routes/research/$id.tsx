@@ -5,6 +5,7 @@ import { ArrowLeft } from 'lucide-react'
 import styled from 'styled-components'
 
 import {
+	RUN_PROPOSALS_PAGE_SIZE,
 	researchDetailAtom,
 	runProposedUpdatesAtom,
 } from '#/atoms/research-atoms'
@@ -30,6 +31,9 @@ async function loadRunOnServer(id: string) {
 		const run = yield* client.research.get({ params: { id } })
 		const proposals = yield* client.research.listProposedUpdates({
 			params: { id },
+			// Matches `runProposedUpdatesAtom` exactly, so the browser reuses this
+			// answer instead of asking again.
+			query: { limit: RUN_PROPOSALS_PAGE_SIZE },
 		})
 		return { run, proposals }
 	})

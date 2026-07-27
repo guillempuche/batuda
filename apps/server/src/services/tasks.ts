@@ -328,6 +328,42 @@ export class TaskService extends Context.Service<TaskService>()('TaskService', {
 					}
 				}),
 
+			// What has happened to one task, newest first. Shared by the web app
+			// and the agent tools so the history cannot come out two different
+			// lengths depending on which one asked.
+			events: (
+				taskId: string,
+				page: { limit: number; offset: number; count: CountMode },
+			) =>
+				Effect.gen(function* () {
+					const exists = yield* sql`
+						SELECT id FROM tasks WHERE id = ${taskId} LIMIT 1
+					`
+					if (exists.length === 0) return undefined
+					const probed = yield* sql<{ readonly total?: string | number }>`
+						SELECT *${totalColumn(sql, page.count)} FROM task_events
+						WHERE task_id = ${taskId}
+						ORDER BY at DESC
+						LIMIT ${probeLimit(page.limit)} OFFSET ${page.offset}
+					`
+					const { rows, hasMore } = takePage(probed, page.limit)
+					const total = yield* resolveTotal(
+						page,
+						rows,
+						() => sql<{ readonly count: string | number }>`
+							SELECT count(*) AS count FROM task_events
+							WHERE task_id = ${taskId}
+						`,
+					)
+					return {
+						rows,
+						total,
+						limit: page.limit,
+						offset: page.offset,
+						hasMore,
+					}
+				}),
+
 			// Every shelf sized in one pass, so the rail can show real totals
 			// without fetching the tasks behind them.
 			counts: (boundaries: TaskDayBoundaries) =>

@@ -258,7 +258,8 @@ export const ResearchGroup = HttpApiGroup.make('research')
 			'/research/:id/proposed-updates',
 			{
 				params: { id: Schema.String },
-				success: Schema.Array(Schema.Unknown),
+				query: { ...pageQuery },
+				success: PaginatedList(Schema.Unknown),
 				error: NotFound.pipe(HttpApiSchema.status(404)),
 			},
 		),

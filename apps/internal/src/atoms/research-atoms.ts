@@ -68,9 +68,16 @@ const runProposalsCache = new Map<
 	ReturnType<typeof makeRunProposalsAtom>
 >()
 
+/** How many of a run's proposed updates the review screen holds at once. */
+export const RUN_PROPOSALS_PAGE_SIZE = 100
+
 function makeRunProposalsAtom(researchId: string) {
 	return BatudaApiAtom.query('research', 'listProposedUpdates', {
 		params: { id: researchId },
+		// Uncounted: the review screen works through the proposals it has and
+		// never states how many there are, so paying to count them would buy
+		// nothing.
+		query: { limit: RUN_PROPOSALS_PAGE_SIZE },
 		serializationKey: `research:proposed-updates:${researchId}`,
 	})
 }

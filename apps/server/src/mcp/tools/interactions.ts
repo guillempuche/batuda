@@ -9,7 +9,7 @@ import {
 	InteractionLogged,
 	TimelineActivityService,
 } from '../../services/timeline-activity'
-import { ListResult, toItems } from './_result'
+import { McpPageLimit, TruncatableResult, toTruncatable } from './_result'
 
 const REQUEST_DEPENDENCIES = [CurrentOrg]
 
@@ -41,14 +41,14 @@ const LogInteraction = Tool.make('log_interaction', {
 
 const ListInteractions = Tool.make('list_interactions', {
 	description:
-		'List interactions for a company, newest first. Optionally filter by channel or type.',
+		'List interactions for a company, newest first. Optionally filter by channel or type. `hasMore` says whether more matched than were returned — read it before saying how many there are.',
 	parameters: Schema.Struct({
 		company_id: Schema.String,
 		channel: Schema.optional(Schema.String),
 		type: Schema.optional(Schema.String),
-		limit: Schema.optional(Schema.Number),
+		limit: Schema.optional(McpPageLimit),
 	}),
-	success: ListResult(Interaction.json),
+	success: TruncatableResult(Interaction.json),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Interactions')
@@ -125,8 +125,8 @@ export const InteractionHandlersLive = InteractionTools.toLayer(
 					if (params.type) conditions.push(sql`type = ${params.type}`)
 					const limit = params.limit ?? 20
 					const rows =
-						yield* sql`SELECT * FROM interactions WHERE ${sql.and(conditions)} ORDER BY date DESC LIMIT ${limit}`
-					return toItems(yield* decodeInteractions(rows))
+						yield* sql`SELECT * FROM interactions WHERE ${sql.and(conditions)} ORDER BY date DESC LIMIT ${limit + 1}`
+					return toTruncatable(yield* decodeInteractions(rows), limit)
 				}).pipe(Effect.orDie),
 		}
 	}),

@@ -16,7 +16,16 @@ import { Geocoder } from '../../services/geocoder'
 import { resolveResearchProposedUpdate } from '../../services/research-apply'
 import { TimelineActivityService } from '../../services/timeline-activity'
 import { redactDbErrors, Uuid } from './_research-shared'
-import { ListResult, toItems } from './_result'
+import {
+	ListResult,
+	McpPageLimit,
+	McpPageOffset,
+	PageResult,
+	TruncatableResult,
+	toItems,
+	toPage,
+	toTruncatable,
+} from './_result'
 
 const REQUEST_DEPENDENCIES = [SessionContext, CurrentOrg]
 
@@ -26,17 +35,17 @@ const PolicyAction = Schema.Literals(['get', 'set'])
 
 const ListResearch = Tool.make('list_research', {
 	description:
-		'List research runs in the organization, newest first. All filters are optional and combinable: subject_table + subject_id narrows to runs linked to a CRM row (companies|contacts); created_by filters by user; status filters by lifecycle state; since accepts an ISO datetime. Returns slim rows (id, kind, query, mode, schema_name, status, cost_cents, paid_cost_cents, created_by, created_at, completed_at).',
+		'List research runs in the organization, newest first. All filters are optional and combinable: subject_table + subject_id narrows to runs linked to a CRM row (companies|contacts); created_by filters by user; status filters by lifecycle state; since accepts an ISO datetime. Returns slim rows (id, kind, query, mode, schema_name, status, cost_cents, paid_cost_cents, created_by, created_at, completed_at). `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true.',
 	parameters: Schema.Struct({
 		created_by: Schema.optional(Schema.String),
 		status: Schema.optional(Schema.String),
 		subject_table: Schema.optional(Schema.String),
 		subject_id: Schema.optional(Uuid),
 		since: Schema.optional(Schema.String),
-		limit: Schema.optional(Schema.Number),
-		offset: Schema.optional(Schema.Number),
+		limit: Schema.optional(McpPageLimit),
+		offset: Schema.optional(McpPageOffset),
 	}),
-	success: ListResult(ResearchRunSummary),
+	success: PageResult(ResearchRunSummary),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Research')
@@ -120,11 +129,12 @@ const ListResearchProposedUpdates = Tool.make(
 	'list_research_proposed_updates',
 	{
 		description:
-			'List proposed CRM updates surfaced by a research run. Each row is a proposal awaiting human review (apply or reject) before mutating the target table.',
+			'List proposed CRM updates surfaced by a research run. Each row is a proposal awaiting human review (apply or reject) before mutating the target table. Returns at most `limit` rows (default 100, max 500); `hasMore` says whether the run proposed more than were returned.',
 		parameters: Schema.Struct({
 			id: Schema.String,
+			limit: Schema.optional(McpPageLimit),
 		}),
-		success: ListResult(Schema.Unknown),
+		success: TruncatableResult(Schema.Unknown),
 		dependencies: REQUEST_DEPENDENCIES,
 	},
 )
@@ -227,10 +237,7 @@ export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 						limit: filters.limit,
 						offset: filters.offset,
 					})
-					.pipe(
-						redactDbErrors,
-						Effect.map(page => toItems(page.items)),
-					),
+					.pipe(redactDbErrors, Effect.map(toPage)),
 			cancel_research: ({ id }) =>
 				Effect.gen(function* () {
 					const res = yield* svc.cancel(id)
@@ -263,15 +270,16 @@ export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 					}
 					return yield* svc.skipPaidAction(id, paid_action_id)
 				}).pipe(redactDbErrors),
-			list_research_proposed_updates: ({ id }) =>
+			list_research_proposed_updates: ({ id, limit }) =>
 				Effect.gen(function* () {
 					const run = yield* svc.get(id)
-					if (!run) return []
+					if (!run) return { items: [], hasMore: false }
 					const findings = (run as { findings: unknown }).findings as {
 						proposed_updates?: unknown[]
 					} | null
-					return findings?.proposed_updates ?? []
-				}).pipe(redactDbErrors, Effect.map(toItems)),
+					const proposedUpdates = findings?.proposed_updates ?? []
+					return toTruncatable(proposedUpdates, limit ?? 100)
+				}).pipe(redactDbErrors),
 			resolve_research_proposed_update: ({
 				id,
 				proposed_update_id,

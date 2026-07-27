@@ -15,7 +15,7 @@ import { recordStageChange } from '../../services/company-stage-change'
 import { Geocoder } from '../../services/geocoder'
 import { TimelineActivityService } from '../../services/timeline-activity'
 import { CurrentUser } from '../current-user'
-import { ListResult, toItems } from './_result'
+import { McpPageLimit, McpPageOffset, PageResult, toPage } from './_result'
 
 const REQUEST_DEPENDENCIES = [CurrentOrg, CurrentUser]
 
@@ -38,7 +38,7 @@ export const skippedCreateSlugs = (
 
 const SearchCompanies = Tool.make('search_companies', {
 	description:
-		'Filter companies by status, country (ISO 3166-1 alpha-2, e.g. US/ES/DE), industry, priority, search query, the research fit verdict (strong_fit / possible_fit / weak_fit / no_fit), a fit criterion the company passed (matched loosely against the criterion text), or a geographic bounding box. The box is any subset of min_lat/max_lat/min_lng/max_lng (decimal degrees); each bound is applied independently and only matches companies with stored coordinates. Returns summaries (including latitude/longitude) — call get_company for full details.',
+		'Filter companies by status, country (ISO 3166-1 alpha-2, e.g. US/ES/DE), industry, priority, search query, the research fit verdict (strong_fit / possible_fit / weak_fit / no_fit), a fit criterion the company passed (matched loosely against the criterion text), or a geographic bounding box. The box is any subset of min_lat/max_lat/min_lng/max_lng (decimal degrees); each bound is applied independently and only matches companies with stored coordinates. Returns summaries (including latitude/longitude) — call get_company for full details. `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true.',
 	parameters: Schema.Struct({
 		status: Schema.optional(Schema.String),
 		country: Schema.optional(Schema.String),
@@ -52,9 +52,10 @@ const SearchCompanies = Tool.make('search_companies', {
 		max_lat: Schema.optional(Schema.Number),
 		min_lng: Schema.optional(Schema.Number),
 		max_lng: Schema.optional(Schema.Number),
-		limit: Schema.optional(Schema.Number),
+		limit: Schema.optional(McpPageLimit),
+		offset: Schema.optional(McpPageOffset),
 	}),
-	success: ListResult(Company.json),
+	success: PageResult(Company.json),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Search Companies')
@@ -224,8 +225,9 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 						minLng: params.min_lng,
 						maxLng: params.max_lng,
 						limit: params.limit,
+						offset: params.offset,
 					})
-					return toItems(companies.items)
+					return toPage(companies)
 				}).pipe(Effect.orDie),
 			get_company: ({ id_or_slug }) =>
 				service.getWithRelations(id_or_slug).pipe(

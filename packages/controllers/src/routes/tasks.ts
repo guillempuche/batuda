@@ -226,7 +226,8 @@ export const TasksGroup = HttpApiGroup.make('tasks')
 	.add(
 		HttpApiEndpoint.get('events', '/tasks/:id/events', {
 			params: { id: Schema.String },
-			success: Schema.Array(TaskEvent.json),
+			query: { ...pageQuery },
+			success: PaginatedList(TaskEvent.json),
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)

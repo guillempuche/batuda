@@ -846,7 +846,7 @@ function DetailPane({
 	const events = useMemo<ReadonlyArray<TaskEventRow>>(
 		() =>
 			AsyncResult.isSuccess(eventsResult)
-				? narrowEvents(eventsResult.value)
+				? narrowEvents(eventsResult.value.items)
 				: [],
 		[eventsResult],
 	)

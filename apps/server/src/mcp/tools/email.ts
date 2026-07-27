@@ -6,7 +6,7 @@ import {
 	CurrentOrg,
 	EmailMessageRecord,
 	EmailThreadDetail,
-	EmailThreadList,
+	EmailThreadListItem,
 	SessionContext,
 } from '@batuda/controllers'
 import { EmailDraft, Inbox, InboxFooter } from '@batuda/domain'
@@ -17,7 +17,14 @@ import {
 	EmailAttachmentStaging,
 	type StagingRef,
 } from '../../services/email-attachment-staging'
-import { ListResult, toItems } from './_result'
+import {
+	ListResult,
+	McpPageLimit,
+	McpPageOffset,
+	PageResult,
+	toItems,
+	toPage,
+} from './_result'
 
 // Per-request services every email tool depends on. The MCP HTTP middleware
 // (apps/server/src/mcp/http.ts) provides both alongside CurrentUser, so
@@ -173,17 +180,17 @@ const StageEmailAttachment = Tool.make('stage_email_attachment', {
 
 const ListEmailThreads = Tool.make('list_email_threads', {
 	description:
-		'List email threads with filters. Returns an envelope {items, total, limit, offset}. Each item carries message_count, last_message_at, last_message_direction, last_inbound_at, is_unread, and the linked inbox {email, displayName, purpose}. Supports search by subject (query), status (open/closed/archived), and inbox purpose (human/agent/shared). Default limit is 100.',
+		'List email threads with filters. Returns an envelope {items, limit, offset, hasMore} — `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true. Each item carries message_count, last_message_at, last_message_direction, last_inbound_at, is_unread, and the linked inbox {email, displayName, purpose}. Supports search by subject (query), status (open/closed/archived), and inbox purpose (human/agent/shared). Default limit is 100, max 500.',
 	parameters: Schema.Struct({
 		inbox_id: Schema.optional(Schema.String),
 		company_id: Schema.optional(Schema.String),
 		status: Schema.optional(ThreadStatus),
 		purpose: Schema.optional(InboxPurpose),
 		query: Schema.optional(Schema.String),
-		limit: Schema.optional(Schema.Number),
-		offset: Schema.optional(Schema.Number),
+		limit: Schema.optional(McpPageLimit),
+		offset: Schema.optional(McpPageOffset),
 	}),
-	success: EmailThreadList,
+	success: PageResult(EmailThreadListItem),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Email Threads')
@@ -254,14 +261,15 @@ const MarkThreadUnread = Tool.make('mark_email_thread_unread', {
 
 const ListEmailMessages = Tool.make('list_email_messages', {
 	description:
-		'List per-message deliverability records (sent, delivered, bounced, complained, rejected). Filter by contact, company, or status. Use this to audit which sends failed and why.',
+		'List per-message deliverability records (sent, delivered, bounced, complained, rejected). Filter by contact, company, or status. Use this to audit which sends failed and why. `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true.',
 	parameters: Schema.Struct({
 		contact_id: Schema.optional(Schema.String),
 		company_id: Schema.optional(Schema.String),
 		status: Schema.optional(Schema.String),
-		limit: Schema.optional(Schema.Number),
+		limit: Schema.optional(McpPageLimit),
+		offset: Schema.optional(McpPageOffset),
 	}),
-	success: ListResult(EmailMessageRecord),
+	success: PageResult(EmailMessageRecord),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Email Messages')
@@ -418,11 +426,13 @@ const ManageEmailDraft = Tool.make('manage_email_draft', {
 
 const ListEmailDrafts = Tool.make('list_email_drafts', {
 	description:
-		'List drafts for a specific inbox. Returns draft metadata (no body). If inbox_id is omitted, lists across all active inboxes.',
+		'List drafts for a specific inbox. Returns draft metadata (no body). If inbox_id is omitted, lists across all active inboxes. `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true.',
 	parameters: Schema.Struct({
 		inbox_id: Schema.optional(Schema.String),
+		limit: Schema.optional(McpPageLimit),
+		offset: Schema.optional(McpPageOffset),
 	}),
-	success: ListResult(EmailDraft.json),
+	success: PageResult(EmailDraft.json),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Email Drafts')
@@ -774,11 +784,9 @@ export const EmailHandlersLive = EmailTools.toLayer(
 							status: params.status,
 						}),
 						...(params.limit !== undefined && { limit: params.limit }),
+						...(params.offset !== undefined && { offset: params.offset }),
 					})
-					.pipe(
-						Effect.orDie,
-						Effect.map(page => toItems(page.items)),
-					),
+					.pipe(Effect.orDie, Effect.map(toPage)),
 			get_email_message: ({ message_id }) =>
 				svc.getMessage(message_id).pipe(Effect.orDie),
 			download_email_attachment: ({ message_id, attachment_id }) =>
@@ -1024,10 +1032,9 @@ export const EmailHandlersLive = EmailTools.toLayer(
 				}
 			},
 			list_email_drafts: params =>
-				svc.listDrafts(params.inbox_id).pipe(
-					Effect.orDie,
-					Effect.map(page => toItems(page.items)),
-				),
+				svc
+					.listDrafts(params.inbox_id, params.limit, params.offset)
+					.pipe(Effect.orDie, Effect.map(toPage)),
 			get_email_draft: ({ inbox_id, draft_id }) =>
 				svc.getDraft(inbox_id, draft_id).pipe(Effect.orDie),
 			manage_inbox_footer: params => {

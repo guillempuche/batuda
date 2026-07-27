@@ -4,7 +4,7 @@ import { Tool, Toolkit } from 'effect/unstable/ai'
 import { RecordingDetail, RecordingSummary } from '@batuda/controllers'
 
 import { RecordingService } from '../../services/recordings'
-import { ListResult, toItems } from './_result'
+import { McpPageLimit, McpPageOffset, PageResult, toPage } from './_result'
 
 const PlaybackInfo = Schema.Struct({
 	url: Schema.String,
@@ -19,13 +19,13 @@ const RecordingWithPlayback = Schema.Struct({
 
 const ListCallRecordings = Tool.make('list_call_recordings', {
 	description:
-		'List call recordings for a company, newest first by interaction date. Returns metadata only (no audio bytes, no transcript yet — transcription ships in a later phase).',
+		'List call recordings for a company, newest first by interaction date. Returns metadata only (no audio bytes, no transcript yet — transcription ships in a later phase). `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true.',
 	parameters: Schema.Struct({
 		company_id: Schema.String,
-		limit: Schema.optional(Schema.Number),
-		offset: Schema.optional(Schema.Number),
+		limit: Schema.optional(McpPageLimit),
+		offset: Schema.optional(McpPageOffset),
 	}),
-	success: ListResult(RecordingSummary),
+	success: PageResult(RecordingSummary),
 })
 	.annotate(Tool.Title, 'List Call Recordings')
 	.annotate(Tool.Readonly, true)
@@ -78,10 +78,7 @@ export const RecordingHandlersLive = RecordingTools.toLayer(
 						params.limit ?? 50,
 						params.offset ?? 0,
 					)
-					.pipe(
-						Effect.map(page => toItems(page.items)),
-						Effect.orDie,
-					),
+					.pipe(Effect.map(toPage), Effect.orDie),
 			get_call_recording: ({ recording_id, include_playback_url }) =>
 				Effect.gen(function* () {
 					const recording = yield* svc.getById(recording_id).pipe(Effect.orDie)

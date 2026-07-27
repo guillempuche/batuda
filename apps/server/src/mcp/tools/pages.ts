@@ -6,7 +6,7 @@ import { Page } from '@batuda/domain'
 import { BlockNode, TiptapDocument } from '@batuda/ui/blocks'
 
 import { PageService } from '../../services/pages'
-import { ListResult, toItems } from './_result'
+import { McpPageLimit, McpPageOffset, PageResult, toPage } from './_result'
 
 // `publish_page` returns the published page, or a cancelled marker when the
 // user declines the confirmation elicitation.
@@ -63,13 +63,16 @@ const PublishPage = Tool.make('publish_page', {
 	.annotate(Tool.OpenWorld, false)
 
 const ListPages = Tool.make('list_pages', {
-	description: 'List pages filtered by company, status, or language.',
+	description:
+		'List pages filtered by company, status, or language. `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true.',
 	parameters: Schema.Struct({
 		company_id: Schema.optional(Schema.String),
 		status: Schema.optional(Schema.String),
 		lang: Schema.optional(Schema.String),
+		limit: Schema.optional(McpPageLimit),
+		offset: Schema.optional(McpPageOffset),
 	}),
-	success: ListResult(PageSummary),
+	success: PageResult(PageSummary),
 })
 	.annotate(Tool.Title, 'List Pages')
 	.annotate(Tool.Readonly, true)
@@ -167,8 +170,10 @@ export const PageHandlersLive = PageTools.toLayer(
 						companyId: params.company_id,
 						status: params.status,
 						lang: params.lang,
+						limit: params.limit,
+						offset: params.offset,
 					})
-					return toItems(pages.items)
+					return toPage(pages)
 				}).pipe(Effect.orDie),
 			get_page: ({ id_or_slug, lang }) =>
 				Effect.gen(function* () {
