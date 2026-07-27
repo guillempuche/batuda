@@ -1,6 +1,7 @@
 import { Effect, Schema } from 'effect'
 import type { SqlError } from 'effect/unstable/sql'
 
+import { isTerminalResearchStatus } from '@batuda/domain'
 import { SchemaNameSchema } from '@batuda/research'
 
 // A UUID-shaped identifier, validated at the MCP parameter boundary. Rejecting
@@ -20,6 +21,14 @@ export const ResearchQuery = Schema.String.check(
 	Schema.isMaxLength(8000),
 )
 
+// How long a caller is willing to wait, in whole seconds and at least one. A
+// negative or a not-a-number makes the wait expire before it begins, handing
+// back a run that had no chance to finish as if the research came back empty.
+export const MaxWaitSeconds = Schema.Number.check(
+	Schema.isInt(),
+	Schema.isGreaterThanOrEqualTo(1),
+)
+
 // Swap an infrastructure SqlError for a redacted defect so the MCP layer returns
 // a generic message instead of dumping the Postgres driver error — statement,
 // connection details, driver stack — to the client. The lifecycle/service calls
@@ -30,3 +39,23 @@ export const redactDbErrors = <A, R>(
 	effect: Effect.Effect<A, SqlError.SqlError, R>,
 ): Effect.Effect<A, never, R> =>
 	effect.pipe(Effect.catchTag('SqlError', () => Effect.die('internal error')))
+
+// A run waiting for a free slot starts the moment one of the few that run at
+// once frees up, so it is worth checking back sooner; a run already working
+// gets through a round in roughly half a minute.
+const POLL_AFTER_QUEUED_MS = 15_000
+const POLL_AFTER_RUNNING_MS = 20_000
+
+/**
+ * How long to leave a research run alone before asking about it again.
+ *
+ * A run takes minutes — far longer than a caller can hold a request open — so
+ * whoever started it has to come back and ask, and this says when. Nothing
+ * comes back once the run has ended, which is what tells them to stop asking.
+ */
+export const pollAfterMs = (status: string): number | undefined =>
+	isTerminalResearchStatus(status)
+		? undefined
+		: status === 'queued'
+			? POLL_AFTER_QUEUED_MS
+			: POLL_AFTER_RUNNING_MS

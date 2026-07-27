@@ -2,7 +2,11 @@ import { Cause, Effect, Exit, Schema } from 'effect'
 import { SqlError } from 'effect/unstable/sql'
 import { describe, expect, it } from 'vitest'
 
+import { TERMINAL_RESEARCH_STATUSES } from '@batuda/domain'
+
 import {
+	MaxWaitSeconds,
+	pollAfterMs,
 	ResearchQuery,
 	redactDbErrors,
 	SchemaNameParam,
@@ -135,6 +139,78 @@ describe('redactDbErrors', () => {
 			// THEN the success is preserved
 			expect(Exit.isSuccess(exit)).toBe(true)
 			if (Exit.isSuccess(exit)) expect(exit.value).toBe('ok')
+		})
+	})
+})
+
+describe('MaxWaitSeconds', () => {
+	describe('when the caller asks for a shorter wait', () => {
+		it('should accept a whole number of seconds', () => {
+			// GIVEN a caller whose own request times out sooner than the default
+			// WHEN it asks to wait four seconds
+			// THEN the value is taken
+			expect(accepts(MaxWaitSeconds, 4)).toBe(true)
+		})
+	})
+
+	describe('when the value could never be waited for', () => {
+		it('should reject anything that is not a whole second of waiting', () => {
+			// GIVEN a wait already in the past, no wait at all, a part-second, and
+			// two values that are no count of seconds
+			// WHEN each is offered
+			// THEN each is refused at the boundary, so the call cannot come straight
+			// back with a run that never had a chance to finish
+			for (const value of [-5, 0, 1.7, Number.NaN, Number.POSITIVE_INFINITY]) {
+				expect(accepts(MaxWaitSeconds, value)).toBe(false)
+			}
+		})
+	})
+})
+
+describe('pollAfterMs', () => {
+	describe('when the run has ended', () => {
+		it('should say nothing for every status that ends a run', () => {
+			// GIVEN each status a run can end on, including the ones that carry no
+			// findings and the one a deletion leaves behind
+			// WHEN the wait is asked for
+			// THEN none of them gets one, so a caller reading the absent field stops
+			// asking instead of checking a run that will never change again
+			for (const status of TERMINAL_RESEARCH_STATUSES) {
+				expect(pollAfterMs(status)).toBeUndefined()
+			}
+		})
+	})
+
+	describe('when the run has not started yet', () => {
+		it('should ask for a shorter wait than a working run', () => {
+			// GIVEN a run queued behind the few that run at once
+			// WHEN the wait is asked for
+			// THEN it is shorter than a working run's, because the only thing that
+			// has to happen is a slot coming free
+			const queued = pollAfterMs('queued')
+			const running = pollAfterMs('running')
+			expect(queued).toBe(15_000)
+			expect(running).toBe(20_000)
+			expect(queued).toBeLessThan(running as number)
+		})
+	})
+
+	describe('when the run is working', () => {
+		it('should ask for a wait on the order of one round of work', () => {
+			// GIVEN a run part-way through, where a round takes roughly half a minute
+			// WHEN the wait is asked for
+			// THEN it is close to that, so a caller asks about as often as there is
+			// something new to hear rather than burning turns on unchanged answers
+			expect(pollAfterMs('running')).toBe(20_000)
+		})
+
+		it('should treat an unfamiliar status as still working', () => {
+			// GIVEN a status this build does not know, which can only mean a run
+			// still doing something
+			// WHEN the wait is asked for
+			// THEN one comes back, so a caller keeps checking rather than walking
+			// away from a run that may still finish
+			expect(pollAfterMs('paused')).toBe(20_000)
 		})
 	})
 })
