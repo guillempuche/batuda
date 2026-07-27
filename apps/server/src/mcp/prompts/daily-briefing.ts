@@ -31,7 +31,7 @@ Daily CRM briefing:
 ## Pipeline
 ${JSON.stringify(data, null, 2)}
 
-## Next Steps & Overdue
+## Next Steps, Overdue & Research Awaiting Review
 ${JSON.stringify(next, null, 2)}
 
 ## Recent Interactions (3 days)
@@ -40,9 +40,10 @@ ${JSON.stringify(recent, null, 2)}
 Produce:
 1. Pipeline health (bottlenecks, status changes)
 2. Urgent: overdue tasks needing immediate action
-3. Today's priorities
-4. Companies at risk (stale, no recent contact)
-5. Quick wins
-6. Suggested schedule`
+3. Research awaiting review, from researchAwaitingReview — name the company each run is about, or quote its query when it belongs to no company; say how many changes are still undecided, and call out any that failed or came back unreliable
+4. Today's priorities
+5. Companies at risk (stale, no recent contact)
+6. Quick wins
+7. Suggested schedule`
 		}),
 })
