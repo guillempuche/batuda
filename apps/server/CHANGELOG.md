@@ -3,6 +3,69 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-27 (server-v2026.7.27)
+
+### Features
+
+* **calendar:** keep what an invitation says about days and attendees ([c2acac7](https://github.com/guillempuche/batuda/commit/c2acac7d96f5d0b0cdd95e893f44f3ae95a8676b))
+* **cli:** report cost, credits and tokens in the research eval ([6e58cda](https://github.com/guillempuche/batuda/commit/6e58cdaf1c14fcbc1031c4567cb95ceb7bb92ccb))
+* let a document be a whole web page, opened in its own tab ([1380a14](https://github.com/guillempuche/batuda/commit/1380a14301b3da467764bbfc0126ee92f866cedf))
+* let a document belong to a meeting, a person or a task ([9372f96](https://github.com/guillempuche/batuda/commit/9372f96f4c2bb515d74fd3f36e4a36085dfe2ad8))
+* let a task, a proposal or a meeting show its own history ([200142d](https://github.com/guillempuche/batuda/commit/200142df0c6aaccd0f782c68f59d50eb93f214e0))
+* let an email in the history open the conversation it belongs to ([d3c7a8a](https://github.com/guillempuche/batuda/commit/d3c7a8a486a2c46815f7907d87485e03d52b4a50))
+* let owners cut an AI assistant off from an organization ([f3b476f](https://github.com/guillempuche/batuda/commit/f3b476f362954bd3c321fa9c26e5357b8831ea69))
+* let owners see every assistant that can reach the organization ([a0f2f7e](https://github.com/guillempuche/batuda/commit/a0f2f7ec8243bd72a378b531af3a37340967be3c))
+* open a saved web page at an address that keeps working ([dda758f](https://github.com/guillempuche/batuda/commit/dda758f56532602c32b25af7a8b3bb87ef443fcb))
+* **research:** carry a change's values, sources and cost to whoever reviews it ([869ecfc](https://github.com/guillempuche/batuda/commit/869ecfc2421e61e38f67ffad88a5bb35787feca5))
+* **research:** hold the monthly research ceiling per organization ([02ea4df](https://github.com/guillempuche/batuda/commit/02ea4df0528e48044fa1327138135a305c11d8fb))
+* **research:** record what a run really spends ([32d2e94](https://github.com/guillempuche/batuda/commit/32d2e94276259a1a51baaf745e330d4988128ea7))
+* retire the three separate notes boxes into documents ([d194f75](https://github.com/guillempuche/batuda/commit/d194f75fd4135b810b3376be827e3cee34903cd9))
+* **server:** serve task inbox shelves and their sizes ([4b41b86](https://github.com/guillempuche/batuda/commit/4b41b86ee65ce6b908e667d9891281304795e39f))
+* **server:** set what each research provider charges ([5fe385c](https://github.com/guillempuche/batuda/commit/5fe385cd92e581fa5ec2c21afcfbdc86bb0c21d8))
+* show which tool last used each API key, and when ([65ffaf2](https://github.com/guillempuche/batuda/commit/65ffaf2a874a6bfc274d7252d34eb4d651ccbb35))
+
+### Bug Fixes
+
+* **calendar:** read invitation times as sent, and keep whole-day ones ([d991f25](https://github.com/guillempuche/batuda/commit/d991f258550e3555d13004814931dc52e5098a7f))
+* **crm:** record where each company field came from ([33611de](https://github.com/guillempuche/batuda/commit/33611de660a5878f76b88e8ca18ec6a0a5b67016))
+* **db:** read stored json by the names it was stored with ([c9f2d7a](https://github.com/guillempuche/batuda/commit/c9f2d7ae80b95e5df00a8fd0af499d4b4e00ad9b))
+* drop a revoked organization from the connections list ([aa5f272](https://github.com/guillempuche/batuda/commit/aa5f27253f55138389fc05af36eed7ca8afea798))
+* **internal:** read research findings by their stored names ([3be10aa](https://github.com/guillempuche/batuda/commit/3be10aa2e951a30d4a576c5aa4fb2792b95ea180))
+* keep hand-logged touchpoints in the company history ([d8a653c](https://github.com/guillempuche/batuda/commit/d8a653cdedd0bec0cc31e436e1de4837e6b94589))
+* name each history row for what it is and show agents the attendees ([c82f723](https://github.com/guillempuche/batuda/commit/c82f723dad38b2f1fff49fab90d4ea32e5c795dc))
+* **research:** approve a paid request once, and say when the money runs out ([19e511e](https://github.com/guillempuche/batuda/commit/19e511eeafffdd2738203b9fa7506bc65125ac4c))
+* **research:** count every call a run is billed for ([40c9b0e](https://github.com/guillempuche/batuda/commit/40c9b0ee0b983e7397d4a29657f2a776894fdf3d))
+* **research:** never buy the same registry lookup twice ([5328d99](https://github.com/guillempuche/batuda/commit/5328d99e1be7af12f61db6a1351f0ac495cc181f))
+* **research:** quote what a batch of research would really cost ([5367cc1](https://github.com/guillempuche/batuda/commit/5367cc1d29c2522d41dd0334d59398d2daa88f80))
+* **research:** save the spending limits instead of dropping them ([008c8c3](https://github.com/guillempuche/batuda/commit/008c8c3c958d8ae33e58c10057a90bbd21379477))
+* save calendar invitations and show who is attending ([6ad893d](https://github.com/guillempuche/batuda/commit/6ad893dc5bcb5cbb6e979291f299f91ac5266e60))
+* **server:** keep a record of every paid research call ([a6922d5](https://github.com/guillempuche/batuda/commit/a6922d56aaf732f5d0b99a5d249497cc99dbc520))
+* **server:** stop a half-specified shelf from unhiding hidden work ([9dcb658](https://github.com/guillempuche/batuda/commit/9dcb658d05642c80e09ae28c56ff5903a4349d87))
+* **server:** stop a meeting with people on it from failing to load ([267d066](https://github.com/guillempuche/batuda/commit/267d06651c9128ac82733ccc27574b3cc5a13307))
+* **ui:** make the keyboard focus mark visible, and name what it lands on ([6091b54](https://github.com/guillempuche/batuda/commit/6091b540d2dbc726b11cbaa00146f7489445dd5b))
+
+### Refactoring
+
+* name the CRM rows a link can point at in one place ([fff48f2](https://github.com/guillempuche/batuda/commit/fff48f2c3a5906abf925d5d97aa7d778c2502234))
+* **research:** drop the token counting the meter replaced ([41ffc91](https://github.com/guillempuche/batuda/commit/41ffc91fdd1d9f0ddba33a53986a9519bc561baa))
+* **research:** drop the unused provider credit allowance ([3c04bd7](https://github.com/guillempuche/batuda/commit/3c04bd7f880c1fa7cda62491fc50de293b10b416))
+* **server:** fold the mailbox and event-type tools into four ([4034193](https://github.com/guillempuche/batuda/commit/403419315c2505685b77384dca4a62823087128d))
+* **server:** name the keys a contact's channels ship with ([7500332](https://github.com/guillempuche/batuda/commit/7500332b6ac86545727f2de9040adb756b320127))
+
+### Tests
+
+* **research:** cover the monthly ceiling and the flat charge ([bf66238](https://github.com/guillempuche/batuda/commit/bf662381bb8db6f530510acf71486cab109ee265))
+
+### CI/CD
+
+* **release:** ui v2026.7.25 ([782c3bb](https://github.com/guillempuche/batuda/commit/782c3bb38a2cae1aee41b056d6c24cfd471b84b5))
+
+### Chores
+
+* remove dependencies and build settings nothing uses ([44d9d28](https://github.com/guillempuche/batuda/commit/44d9d28002545f104f5b455af095ed09ebd1a165))
+* renumber the new migrations behind the ones main added ([c1b2471](https://github.com/guillempuche/batuda/commit/c1b2471ea35e41f472050c7b5a6a877deba50fcc))
+* **server:** drop paid-research columns nothing read ([995baad](https://github.com/guillempuche/batuda/commit/995baadc5855a3a37cb68bfe73f1ed2d3141036a))
+
 ## 2026-07-25 (server-v2026.7.25)
 
 ### Features
