@@ -53,9 +53,13 @@ runs:
       env:
         WITH_MAIL: ${{ inputs.with-mail }}
       run: |
-        services="db storage storage-init"
+        services="db storage"
         if [ "$WITH_MAIL" = "true" ]; then services="$services mail-catcher"; fi
         docker compose -f docker/docker-compose.yml up -d --wait $services
+        # The bucket is created by a container that stops as soon as it's done, and
+        # `--wait` treats a stopped container as a failure — listing it above passed
+        # or failed on timing alone. `run` waits and reports whether it worked.
+        docker compose -f docker/docker-compose.yml run --rm --no-deps storage-init
 
     - name: Migrate + seed
       shell: bash
