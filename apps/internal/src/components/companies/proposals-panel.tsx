@@ -1,17 +1,19 @@
-import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
+import { useAtomSet } from '@effect/atom-react'
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { DateTime, Schema } from 'effect'
-import { AsyncResult } from 'effect/unstable/reactivity'
 import { FileSignature, Plus, X } from 'lucide-react'
 import { type FormEvent, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 
 import { PriButton, PriDialog, PriInput, usePriToast } from '@batuda/ui/pri'
 
+import { PROPOSALS_PAGE_SIZE, proposalsListAtom } from '#/atoms/company-atoms'
 import { SubjectDocuments } from '#/components/documents/subject-documents'
+import { InfiniteListFooter } from '#/components/shared/infinite-list-footer'
 import { RelativeDate } from '#/components/shared/relative-date'
+import { useInfiniteList } from '#/hooks/use-infinite-list'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
 import { formatMoneyCents } from '#/lib/format-money'
@@ -155,15 +157,14 @@ function formatTotal(
 /** List, create, and edit a company's proposals + move them through the pipeline. */
 export function ProposalsPanel({ companyId }: { readonly companyId: string }) {
 	const { i18n } = useLingui()
-	const proposalsAtom = useMemo(
-		() => BatudaApiAtom.query('proposals', 'list', { query: { companyId } }),
-		[companyId],
-	)
-	const result = useAtomValue(proposalsAtom)
-	const refresh = useAtomRefresh(proposalsAtom)
-	const proposals = AsyncResult.isSuccess(result)
-		? narrowProposals(result.value.items)
-		: []
+	const list = useInfiniteList({
+		resetKey: `proposals:${companyId}`,
+		pageSize: PROPOSALS_PAGE_SIZE,
+		count: 'exact',
+		atomFor: page => proposalsListAtom(companyId, page),
+	})
+	const refresh = list.refresh
+	const proposals = narrowProposals(list.items)
 
 	const { dlg, open: openDlg, close: closeDlg } = useDlg(proposalsDlgSchema)
 	// The dialog's target is rebuilt from the loaded list, so a link reopens the
@@ -194,10 +195,14 @@ export function ProposalsPanel({ companyId }: { readonly companyId: string }) {
 			</Head>
 
 			{proposals.length === 0 ? (
-				<Empty>
-					<FileSignature size={18} aria-hidden />
-					<Trans>No proposals yet.</Trans>
-				</Empty>
+				// Saying "none yet" while the first ones are still arriving would
+				// be wrong, so the panel waits before saying anything.
+				list.isLoadingFirstPage ? null : (
+					<Empty>
+						<FileSignature size={18} aria-hidden />
+						<Trans>No proposals yet.</Trans>
+					</Empty>
+				)
 			) : (
 				<List>
 					{proposals.map(p => (
@@ -223,6 +228,8 @@ export function ProposalsPanel({ companyId }: { readonly companyId: string }) {
 					))}
 				</List>
 			)}
+
+			<InfiniteListFooter list={list} testId='company-proposals' />
 
 			<ProposalDialog
 				companyId={companyId}

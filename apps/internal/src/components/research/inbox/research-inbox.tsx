@@ -7,7 +7,7 @@ import { ArrowRight, Microscope, Search } from 'lucide-react'
 import { type ReactNode, useCallback, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
-import { isAttentionResearchStatus } from '@batuda/domain'
+import { ATTENTION_RESEARCH_STATUSES } from '@batuda/domain'
 import { PriButton, PriInput, usePriToast } from '@batuda/ui/pri'
 
 import {
@@ -49,6 +49,7 @@ import {
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import { dlgNoId } from '#/lib/dlg-search'
 import { formatMoneyCents } from '#/lib/format-money'
+import { firstPage, type ListPage } from '#/lib/list-page'
 import { useDlg } from '#/lib/use-dlg'
 import {
 	agedPaperSurface,
@@ -57,15 +58,27 @@ import {
 	stenciledTitle,
 } from '#/lib/workshop-mixins'
 
-/** Page size for the cross-run proposal query — matches the loader's fetch. */
+/** How many waiting proposals the queue reads at a time. */
 export const INBOX_PROPOSAL_LIMIT = 100
 
+/** The slice both the loader and the screen ask for first. */
+export const INBOX_FIRST_PAGE = firstPage(INBOX_PROPOSAL_LIMIT, 'exact')
+
 /** The single atom the inbox reads (and the loader hydrates) for its queue. */
-export function inboxPendingProposalsAtom() {
+export function inboxPendingProposalsAtom(page: ListPage = INBOX_FIRST_PAGE) {
 	// Counted on purpose: the inbox states how many are waiting and how many it
 	// could not fit on screen, and neither is knowable from the rows alone.
-	return pendingProposalsAtom({ limit: INBOX_PROPOSAL_LIMIT, count: 'exact' })
+	return pendingProposalsAtom({
+		limit: page.limit,
+		offset: page.offset,
+		count: page.count,
+	})
 }
+
+// Asked for by name rather than sifted out of the newest runs here: sifting
+// locally can only ever find the ones that happened to be fetched, so the tile
+// counted a slice of the truth and called it the total.
+const ATTENTION_STATUS_FILTER = ATTENTION_RESEARCH_STATUSES.join(',')
 
 function rowKey(p: PendingProposal): string {
 	return `${p.researchId}::${p.proposedUpdateId ?? ''}`
@@ -127,7 +140,12 @@ export function ResearchInbox() {
 	const proposalsResult = useAtomValue(proposalsAtom)
 	const refreshProposals = useAtomRefresh(proposalsAtom)
 	const runsAtom = useMemo(
-		() => researchListAtom({ limit: INBOX_PROPOSAL_LIMIT }),
+		() =>
+			researchListAtom({
+				status: ATTENTION_STATUS_FILTER,
+				limit: INBOX_PROPOSAL_LIMIT,
+				count: 'exact',
+			}),
 		[],
 	)
 	const runsResult = useAtomValue(runsAtom)
@@ -202,10 +220,13 @@ export function ResearchInbox() {
 				}),
 		[visible],
 	)
-	const attention = useMemo(
-		() => runs.filter(r => isAttentionResearchStatus(r.status)),
-		[runs],
-	)
+	// The server was asked for exactly these statuses, so every run it sent back
+	// belongs here. `attentionTotal` is how many there really are, which the
+	// rows on one page cannot say once there are more than a page of them.
+	const attention = runs
+	const attentionTotal =
+		(AsyncResult.isSuccess(runsResult) ? runsResult.value.total : null) ??
+		runs.length
 
 	// A change that came back as a conflict or as invalid is still waiting for
 	// someone, so counting every reply as dealt with made the queue look shorter
@@ -239,7 +260,7 @@ export function ResearchInbox() {
 		: isFailure
 			? t`The list of changes could not be loaded.`
 			: (batchOutcome ??
-				t`${trustworthy.length} ready to apply, ${needsReview.length} need reading, ${attention.length} runs need attention.`)
+				t`${trustworthy.length} ready to apply, ${needsReview.length} need reading, ${attentionTotal} runs need attention.`)
 
 	function resolveOne(p: PendingProposal, decision: ResolveDecision): void {
 		if (p.proposedUpdateId === null) return
@@ -358,7 +379,7 @@ export function ResearchInbox() {
 					</TileLabel>
 				</Tile>
 				<Tile>
-					<TileValue>{attention.length}</TileValue>
+					<TileValue>{attentionTotal}</TileValue>
 					<TileLabel>
 						<Trans>Attention needed</Trans>
 					</TileLabel>

@@ -111,10 +111,9 @@ msgstr "{0} ja no permet iniciar la sessió amb contrasenya a les aplicacions de
 
 #. placeholder {0}: trustworthy.length
 #. placeholder {1}: needsReview.length
-#. placeholder {2}: attention.length
 #: src/components/research/inbox/research-inbox.tsx
-msgid "{0} ready to apply, {1} need reading, {2} runs need attention."
-msgstr "{0} a punt d’aplicar, {1} per llegir, {2} execucions requereixen atenció."
+msgid "{0} ready to apply, {1} need reading, {attentionTotal} runs need attention."
+msgstr "{0} a punt d’aplicar, {1} per llegir, {attentionTotal} execucions requereixen atenció."
 
 #. placeholder {0}: selection.selectedCount
 #: src/components/companies/pipeline-board.tsx

@@ -3,11 +3,12 @@ import { AsyncResult } from 'effect/unstable/reactivity'
 
 import {
 	ResearchRuns,
-	RUN_LIST_LIMIT,
+	RUN_LIST_FIRST_PAGE,
 	researchRunsAtom,
 	researchRunsDlgSchema,
 } from '#/components/research/run-list'
 import { dehydrateAtom } from '#/lib/atom-hydration'
+import { listPageQuery } from '#/lib/list-page'
 import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 
@@ -24,7 +25,10 @@ async function loadRunsOnServer() {
 	])
 	const program = Effect.gen(function* () {
 		const client = yield* makeBatudaApiServer(cookie ?? undefined)
-		return yield* client.research.list({ query: { limit: RUN_LIST_LIMIT } })
+		// Matches `researchRunsAtom` exactly, so the browser reuses this answer.
+		return yield* client.research.list({
+			query: listPageQuery(RUN_LIST_FIRST_PAGE),
+		})
 	})
 	return await Effect.runPromise(program)
 }
@@ -39,7 +43,10 @@ export const Route = createFileRoute('/research/runs')({
 			const runs = await loadRunsOnServer()
 			return {
 				dehydrated: [
-					dehydrateAtom(researchRunsAtom(), AsyncResult.success(runs)),
+					dehydrateAtom(
+						researchRunsAtom(RUN_LIST_FIRST_PAGE),
+						AsyncResult.success(runs),
+					),
 				] as const,
 			}
 		} catch (error) {

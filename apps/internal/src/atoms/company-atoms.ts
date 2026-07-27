@@ -1,4 +1,7 @@
+import { Atom } from 'effect/unstable/reactivity'
+
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
+import { type ListPage, listPageKey, listPageQuery } from '#/lib/list-page'
 
 /**
  * Id/slug-keyed atom factories for the Company Detail page.
@@ -109,5 +112,29 @@ export function timelineAtomFor(companyId: string) {
 	if (existing !== undefined) return existing
 	const atom = makeTimelineAtom(companyId)
 	timelineCache.set(companyId, atom)
+	return atom
+}
+
+/** How many of a company's offers the Files tab reads at a time. */
+export const PROPOSALS_PAGE_SIZE = 20
+
+const proposalsCache = new Map<string, ReturnType<typeof makeProposalsAtom>>()
+
+function makeProposalsAtom(companyId: string, page: ListPage) {
+	const atom = BatudaApiAtom.query('proposals', 'list', {
+		query: { companyId, ...listPageQuery(page) },
+		serializationKey: `proposals:${companyId}::${listPageKey(page)}`,
+	})
+	// Only the first slice is held, so coming back to a company paints its
+	// offers straight away without pinning every slice ever scrolled.
+	return page.offset === 0 ? Atom.keepAlive(atom) : atom
+}
+
+export function proposalsListAtom(companyId: string, page: ListPage) {
+	const key = `${companyId}::${listPageKey(page)}`
+	const existing = proposalsCache.get(key)
+	if (existing !== undefined) return existing
+	const atom = makeProposalsAtom(companyId, page)
+	proposalsCache.set(key, atom)
 	return atom
 }
