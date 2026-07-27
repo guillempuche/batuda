@@ -99,7 +99,11 @@ export const seed = (preset: Preset) =>
 				const { insertedInteractions, dataWithContacts } =
 					yield* seedInteractions(ctx, companyMap, contactMap)
 				const insertedTasks = yield* seedTasks(ctx, dataWithContacts)
-				yield* seedCalendar(ctx, companyMap, insertedTasks)
+				const insertedEvents = yield* seedCalendar(
+					ctx,
+					companyMap,
+					insertedTasks,
+				)
 				const testUser = yield* seedResearchPolicy(ctx)
 				const seededInboxes = yield* seedInboxes(ctx)
 				yield* seedDemoEmails(sql, seededInboxes)
@@ -107,8 +111,21 @@ export const seed = (preset: Preset) =>
 				yield* seedMcpOAuth(ctx)
 
 				if (preset === 'full') {
-					yield* seedDocuments(ctx, companyMap, contactMap)
-					yield* seedProposals(ctx, companyMap, contactMap, insertedProducts)
+					// Documents run after proposals so they can be filed against one;
+					// every other record they reach already exists by here.
+					const insertedProposals = yield* seedProposals(
+						ctx,
+						companyMap,
+						contactMap,
+						insertedProducts,
+					)
+					yield* seedDocuments(ctx, {
+						companies: companyMap,
+						contacts: contactMap,
+						tasks: new Map(insertedTasks.map(t => [t.title, t.id])),
+						proposals: new Map(insertedProposals.map(p => [p.title, p.id])),
+						calendar_events: new Map(insertedEvents.map(e => [e.title, e.id])),
+					})
 					yield* seedPages(ctx, companyMap)
 					yield* seedResearchRuns(ctx, testUser, companyMap)
 					yield* seedRecordings(ctx, companyMap)
