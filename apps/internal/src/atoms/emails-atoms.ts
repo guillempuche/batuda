@@ -37,6 +37,7 @@ function makeListAtom(search: EmailsSearch) {
 	}
 	if (search.limit !== undefined) query['limit'] = search.limit
 	if (search.offset !== undefined) query['offset'] = search.offset
+	if (search.count !== undefined) query['count'] = search.count
 	return BatudaApiAtom.query('email', 'listThreads', {
 		query,
 		serializationKey: `email:threads:${canonicalKey(search)}`,
@@ -67,6 +68,9 @@ export function canonicalKey(search: EmailsSearch): string {
 	}
 	if (search.limit !== undefined) entries.push(['limit', search.limit])
 	if (search.offset !== undefined) entries.push(['offset', search.offset])
+	// Two requests that differ only in whether they asked to be counted come
+	// back with different answers, so they cannot share a cache slot.
+	if (search.count !== undefined) entries.push(['count', search.count])
 	entries.sort(([a], [b]) => a.localeCompare(b))
 	return JSON.stringify(Object.fromEntries(entries))
 }

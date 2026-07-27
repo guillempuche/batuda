@@ -164,6 +164,7 @@ export const RecordingsLive = HttpApiBuilder.group(
 							_.query.companyId,
 							_.query.limit ?? 50,
 							_.query.offset ?? 0,
+							_.query.count ?? 'none',
 						)
 						.pipe(Effect.orDie),
 				)

@@ -24,8 +24,11 @@ async function loadPendingProposalsOnServer() {
 	])
 	const program = Effect.gen(function* () {
 		const client = yield* makeBatudaApiServer(cookie ?? undefined)
+		// Matches `inboxPendingProposalsAtom` exactly, counting included, or the
+		// browser refetches on arrival and the queue's tile reads the page size
+		// instead of how many are really waiting.
 		return yield* client.research.listPendingProposals({
-			query: { limit: INBOX_PROPOSAL_LIMIT },
+			query: { limit: INBOX_PROPOSAL_LIMIT, count: 'exact' as const },
 		})
 	})
 	return await Effect.runPromise(program)
