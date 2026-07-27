@@ -101,12 +101,17 @@ jobs:
       #
       # Bring up Postgres + MinIO from the same docker-compose file dev uses.
       # `--wait` blocks until `db` reports healthy (its pg_isready healthcheck)
-      # and `storage` is up; `storage-init` is a one-shot mc container that
-      # creates the bucket and exits 0. Running the database on the runner keeps
-      # every query on localhost instead of paying an internet round-trip to a
-      # remote host — the whole reason this phase used to run near 15 minutes.
+      # and `storage` is up. Running the database on the runner keeps every query
+      # on localhost instead of paying an internet round-trip to a remote host —
+      # the whole reason this phase used to run near 15 minutes.
+      #
+      # The bucket is created by a container that stops as soon as it's done, and
+      # `--wait` treats a stopped container as a failure — listing it above passed
+      # or failed on timing alone. `run` waits and reports whether it worked.
       - name: Start Postgres + MinIO via docker compose
-        run: docker compose -f docker/docker-compose.yml up -d --wait db storage storage-init
+        run: |
+          docker compose -f docker/docker-compose.yml up -d --wait db storage
+          docker compose -f docker/docker-compose.yml run --rm --no-deps storage-init
 
       # The local container above. Its `batuda` superuser owns the schema, and
       # integration tests SET ROLE into the app_user / app_service roles that the
