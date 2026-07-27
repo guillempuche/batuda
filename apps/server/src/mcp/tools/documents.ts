@@ -10,10 +10,15 @@ import {
 } from '@batuda/domain'
 
 import {
+	deleteStoredFile,
+	HTML_URL_TTL_SECONDS,
 	linkDocument,
+	rewriteStoredHtml,
+	storedFileFor,
 	subjectsForDocument,
 	unlinkDocument,
 } from '../../services/documents'
+import { StorageProvider } from '../../services/storage-provider'
 import {
 	DocumentCreated,
 	TimelineActivityService,
@@ -69,12 +74,14 @@ const GetDocuments = Tool.make('get_documents', {
 	.annotate(Tool.OpenWorld, false)
 
 const GetDocument = Tool.make('get_document', {
-	description: `Get a single document with its markdown body and the records it is filed against. A body longer than ${MAX_BODY_CHARS} characters comes back cut off, ending in "…[truncated]".`,
+	description: `Get a single document and the records it is filed against. A markdown document carries its body in \`content\`, cut off past ${MAX_BODY_CHARS} characters with a trailing "…[truncated]". A web page (format=html) has an empty \`content\` and a short-lived \`bodyUrl\` to fetch it from instead — that link is the only way to read one, and it expires.`,
 	parameters: Schema.Struct({
 		id: Schema.String,
 	}),
 	success: Schema.Struct({
 		...Document.json.fields,
+		// Null for markdown, whose body is right here in `content`.
+		bodyUrl: Schema.NullOr(Schema.String),
 		subjects: Schema.Array(
 			Schema.Struct({
 				subjectTable: DocumentSubjectTable,
@@ -181,6 +188,7 @@ export const DocumentTools = Toolkit.make(
 export const DocumentHandlersLive = DocumentTools.toLayer(
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
+		const storage = yield* StorageProvider
 		const timeline = yield* TimelineActivityService
 		const decodeSummaries = makeSummaryDecoder()
 		return {
@@ -233,9 +241,20 @@ export const DocumentHandlersLive = DocumentTools.toLayer(
 					if (!doc) return yield* Effect.die(`Document ${id} not found`)
 					const decoded = yield* decodeDocument(doc)
 					const subjects = yield* subjectsForDocument(sql, id)
+					// An agent authenticates with a key and has no browser session,
+					// so it gets a short-lived link straight to the stored page
+					// rather than the address a person opens.
+					const storageKey = yield* storedFileFor(sql, id)
+					const bodyUrl =
+						storageKey === null
+							? null
+							: yield* storage
+									.signedUrl(storageKey, HTML_URL_TTL_SECONDS)
+									.pipe(Effect.orDie)
 					return {
 						...decoded,
 						content: truncateLongBody(decoded.content),
+						bodyUrl,
 						subjects,
 					}
 				}).pipe(Effect.orDie),
@@ -305,8 +324,12 @@ export const DocumentHandlersLive = DocumentTools.toLayer(
 				}).pipe(Effect.orDie),
 			update_document: ({ id, ...fields }) =>
 				Effect.gen(function* () {
+					const storageKey = yield* storedFileFor(sql, id)
 					const data: Record<string, unknown> = {
 						...fields,
+						...(storageKey !== null && fields.content !== undefined
+							? yield* rewriteStoredHtml(storage, storageKey, fields.content)
+							: {}),
 						updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 					}
 					const rows =
@@ -316,8 +339,13 @@ export const DocumentHandlersLive = DocumentTools.toLayer(
 				}).pipe(Effect.orDie),
 			delete_document: ({ id }) =>
 				Effect.gen(function* () {
+					// Read where the bytes are before the row that names them goes.
+					const storageKey = yield* storedFileFor(sql, id)
 					// The filings go with the document through their foreign key.
 					yield* sql`DELETE FROM documents WHERE id = ${id}`
+					if (storageKey !== null) {
+						yield* deleteStoredFile(storage, id, storageKey)
+					}
 					return { status: 'deleted' as const }
 				}).pipe(Effect.orDie),
 			attach_document: params =>

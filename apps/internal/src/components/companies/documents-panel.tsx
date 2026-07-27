@@ -22,6 +22,7 @@ import { MarkdownView } from '#/components/markdown/markdown-view'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
+import { documentOpenUrl } from '#/lib/document-links'
 import { useDlg } from '#/lib/use-dlg'
 import { stenciledTitle } from '#/lib/workshop-mixins'
 
@@ -85,17 +86,12 @@ function narrowDocs(rows: ReadonlyArray<unknown>): ReadonlyArray<DocRow> {
 
 type DocBody = {
 	readonly content: string
-	readonly htmlUrl: string | null
 }
 
 function narrowBody(value: unknown): DocBody | null {
 	if (!value || typeof value !== 'object') return null
-	const r = value as Record<string, unknown>
-	if (typeof r['content'] !== 'string') return null
-	return {
-		content: r['content'],
-		htmlUrl: typeof r['htmlUrl'] === 'string' ? r['htmlUrl'] : null,
-	}
+	const content = (value as Record<string, unknown>)['content']
+	return typeof content === 'string' ? { content } : null
 }
 
 type DialogState =
@@ -239,7 +235,7 @@ type DialogProps = {
  */
 function DocumentDialogHost(props: DialogProps) {
 	if (props.state.mode === 'add') {
-		return <DocumentDialog {...props} body={{ content: '', htmlUrl: null }} />
+		return <DocumentDialog {...props} body={{ content: '' }} />
 	}
 	return <DocumentDialogWithBody {...props} id={props.state.doc.id} />
 }
@@ -371,23 +367,14 @@ function DocumentDialog({
 										<Trans>
 											This document is a web page. It opens in a new tab.
 										</Trans>
-										<PriButton
-											type='button'
-											$variant='filled'
+										<OpenPageLink
+											href={documentOpenUrl(state.doc.id)}
+											target='_blank'
+											rel='noreferrer'
 											data-testid='document-open-original'
-											disabled={body?.htmlUrl == null}
-											onClick={() => {
-												if (body?.htmlUrl != null) {
-													window.open(
-														body.htmlUrl,
-														'_blank',
-														'noopener,noreferrer',
-													)
-												}
-											}}
 										>
 											<Trans>Open the page</Trans>
-										</PriButton>
+										</OpenPageLink>
 									</HtmlNotice>
 								) : (
 									<MarkdownView source={body?.content ?? state.doc.snippet} />
@@ -666,4 +653,10 @@ const FullPageLink = styled.span`
 		font-size: var(--font-size-sm);
 		text-decoration: underline;
 	}
+`
+
+const OpenPageLink = styled.a`
+	color: var(--color-primary);
+	font-size: var(--font-size-sm);
+	text-decoration: underline;
 `
