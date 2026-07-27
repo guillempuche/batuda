@@ -2,19 +2,13 @@ import { useAtomSet } from '@effect/atom-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { applyProposalAtom, rejectProposalAtom } from '#/atoms/research-atoms'
+import { UNDO_WINDOW_MS } from '#/lib/undo-window'
 
 export type ResolveOutcome = {
 	readonly outcome: string
 	readonly reason: string | null
 }
 export type ResolveDecision = 'apply' | 'reject'
-
-// How long a reviewer can take back an apply/reject before it actually writes.
-// Long enough to be usable by someone who has to find the control first: a
-// listener hears the row change, moves to the button and presses it, which does
-// not happen in five seconds. There is no way to extend it once it starts, so
-// the window itself has to be generous.
-export const UNDO_WINDOW_MS = 20000
 
 /**
  * Shared apply/reject behavior for both proposal-review surfaces (the cross-run

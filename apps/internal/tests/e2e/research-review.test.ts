@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process'
 
 import { expect, test } from '@playwright/test'
 
+import { UNDO_WINDOW_MS } from '#/lib/undo-window'
 import { DATABASE_URL } from './helpers/database-url'
 import { waitForInteractive } from './helpers/hydration'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
@@ -19,6 +20,14 @@ const psql = (sqlText: string): string =>
 	execSync(`psql "${DATABASE_URL}" -tA -c "${sqlText.replace(/"/g, '\\"')}"`, {
 		encoding: 'utf8',
 	}).trim()
+
+// An apply is held back for the whole undo window before it is sent, so the
+// outcome cannot appear sooner. Derived from the screen's own constant, so
+// lengthening the window does not turn these tests red.
+const OUTCOME_TIMEOUT_MS = UNDO_WINDOW_MS + 10_000
+// That wait does not fit in the 30s every other test gets, so the two applying
+// tests ask for the wait plus a normal test's worth of time.
+const APPLY_TEST_TIMEOUT_MS = OUTCOME_TIMEOUT_MS + 30_000
 
 const RUN_ID = '9f000000-0000-4000-8000-0000000000e2'
 const PU_TRUSTWORTHY = 'aaaaaaaa-0000-4000-8000-0000000000e2'
@@ -180,6 +189,7 @@ test.describe('research review', () => {
 		test('should apply a single proposal and show its outcome', async ({
 			page,
 		}) => {
+			test.setTimeout(APPLY_TEST_TIMEOUT_MS)
 			// GIVEN the review screen, interactive so the click reaches a live
 			// handler rather than an inert server-rendered button
 			await page.goto(`/research/${RUN_ID}`, { waitUntil: 'networkidle' })
@@ -190,13 +200,13 @@ test.describe('research review', () => {
 			const badge = needsReviewCard.getByTestId('research-outcome-badge')
 
 			// WHEN the reviewer applies the needs-review proposal. Its write is held
-			// for a short undo window before it reaches the server, so the outcome
-			// lands a few seconds after the click.
+			// back for the whole undo window before it reaches the server, so the
+			// outcome cannot land until that has run out.
 			await needsReviewCard.getByTestId('research-review-apply').click()
 
 			// THEN it enters the CRM (created, or merged if it already existed) and
 			// the card shows the outcome the run now stores
-			await expect(badge).toBeVisible({ timeout: 15_000 })
+			await expect(badge).toBeVisible({ timeout: OUTCOME_TIMEOUT_MS })
 			await expect(badge).toHaveAttribute(
 				'data-outcome',
 				/created|duplicate|applied/,
@@ -206,6 +216,7 @@ test.describe('research review', () => {
 		test('should keep an applied proposal outcome after a reload', async ({
 			page,
 		}) => {
+			test.setTimeout(APPLY_TEST_TIMEOUT_MS)
 			// GIVEN a proposal that has just been applied and shows its outcome
 			await page.goto(`/research/${RUN_ID}`, { waitUntil: 'networkidle' })
 			await waitForInteractive(page, 'research-review-apply')
@@ -214,7 +225,7 @@ test.describe('research review', () => {
 				.filter({ hasText: 'Jordi Garcia' })
 			const badge = card.getByTestId('research-outcome-badge')
 			await card.getByTestId('research-review-apply').click()
-			await expect(badge).toBeVisible({ timeout: 15_000 })
+			await expect(badge).toBeVisible({ timeout: OUTCOME_TIMEOUT_MS })
 
 			// WHEN the page is reloaded, dropping every in-memory reply
 			await page.reload({ waitUntil: 'networkidle' })

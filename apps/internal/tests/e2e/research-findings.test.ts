@@ -4,7 +4,6 @@ import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 
 import { DATABASE_URL } from './helpers/database-url'
-import { waitForInteractive } from './helpers/hydration'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 // A run's findings are the research schema filled in by the model, and they
@@ -141,18 +140,16 @@ test.describe('research findings', () => {
 				).replace(/'/g, "''")}'::jsonb WHERE slug='cal-pep-fonda'`,
 			)
 
-			// WHEN the company page is opened and the fit panel expanded
+			// WHEN the company page is opened
 			await page.goto('/companies/cal-pep-fonda', { waitUntil: 'networkidle' })
-			// The trigger opens the panel from a plain onClick, so a click that
-			// lands before the browser has taken the page over does nothing and
-			// leaves no trace.
-			await waitForInteractive(page, 'company-fit-trigger')
-			await page.getByTestId('company-fit-trigger').click()
 
-			// THEN the criterion and its evidence both render — the quote is the
-			// part that silently disappears if the stored names are read wrongly
+			// THEN the fit panel is already open, because a company that has been
+			// judged shows its reasoning unasked — clicking the trigger would close
+			// it
 			const panel = page.getByTestId('company-fit-panel')
 			await expect(panel).toBeVisible()
+			// AND the criterion and its evidence both render — the quote is the
+			// part that silently disappears if the stored names are read wrongly
 			await expect(panel).toContainText('Takes bookings')
 			await expect(panel).toContainText('Reserva la teva taula')
 		})

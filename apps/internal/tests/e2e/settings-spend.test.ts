@@ -22,6 +22,8 @@ const psql = (sqlText: string): string =>
 	}).trim()
 
 const seededKeys: string[] = []
+// Who the seeded spend is charged to, and how its row is found on the page.
+let seededUserId = ''
 
 test.describe('org spend dashboard', () => {
 	test.beforeAll(() => {
@@ -34,6 +36,7 @@ test.describe('org spend dashboard', () => {
 		const userId = psql(
 			`SELECT id FROM "user" WHERE email='admin@taller.cat' LIMIT 1`,
 		)
+		seededUserId = userId
 		const researchId = psql(
 			`SELECT id FROM research_runs WHERE organization_id='${orgId}' LIMIT 1`,
 		)
@@ -109,10 +112,12 @@ test.describe('org spend dashboard', () => {
 			await expect(byProvider).toContainText('brave')
 			await expect(byProvider).toContainText('firecrawl')
 
-			// AND the user table includes Alice's row (3 calls — the three
-			// seeded rows above)
+			// AND the user table shows that person with money against them. Not a
+			// call count: this table totals everything the organisation ever spent
+			// per person, and the sample data charges the same person too.
 			const byUser = page.getByTestId('settings-spend-by-user')
-			await expect(byUser).toContainText(/3/)
+			await expect(byUser).toContainText(seededUserId)
+			await expect(byUser).toContainText(/€\d/)
 
 			// AND the tool table lists the two seeded tools
 			const byTool = page.getByTestId('settings-spend-by-tool')
