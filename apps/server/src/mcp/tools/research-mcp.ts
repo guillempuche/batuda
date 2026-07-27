@@ -23,6 +23,8 @@ import {
 	resolveInstructionOverride,
 } from './_instructions-shared'
 import {
+	MaxWaitSeconds,
+	pollAfterMs,
 	ResearchQuery,
 	redactDbErrors,
 	SchemaNameParam,
@@ -31,10 +33,12 @@ import {
 
 const REQUEST_DEPENDENCIES = [SessionContext, CurrentOrg]
 
-// The longest research_sync will block for findings before handing back a
-// still-running run to poll. Held under the MCP transport's ~1-minute hard cap
-// on a blocking call, so a longer wait would error instead of returning.
-const RESEARCH_SYNC_MAX_WAIT_SECONDS = 45
+// The longest research_sync waits for findings before handing back a
+// still-running run to check on. Only an answer already in the cache arrives
+// inside it — fresh research takes minutes — so a longer wait buys nothing and
+// holds a database connection open meanwhile. Nothing caps this from the
+// outside either: each client sets its own timeout, some only a few seconds.
+const RESEARCH_SYNC_MAX_WAIT_SECONDS = 10
 
 // A run plus `applied_instructions` (the instruction templates that shaped it).
 // Dates encode to ISO strings via ResearchRunDetail. `instructionSegments` is
@@ -45,6 +49,8 @@ const RunWithInstructions = Schema.Struct({
 	...ResearchRunDetail.fields,
 	instructionSegments: Schema.optional(Schema.Unknown),
 	applied_instructions: Schema.Array(Schema.String),
+	// Absent once the run has ended, which is how a caller knows to stop asking.
+	poll_after_ms: Schema.optional(Schema.Number),
 })
 const NotFoundResult = Schema.Struct({ error: Schema.String })
 
@@ -108,7 +114,7 @@ const ResearchSyncResult = Schema.Union([
 
 const StartResearch = Tool.make('start_research', {
 	description:
-		"Start a research run; returns {_tag:'started', id, status, applied_instructions} immediately — poll get_research for results. applied_instructions lists the instruction templates that shaped the run. The user's default research instructions apply automatically; pass `stack` (a named stack, by name or id) to run a specific saved stack, and/or `instructions` (template names or ids) to layer extra templates after it for this run. An unknown or ambiguous `stack`/`instructions` ref returns {_tag:'instruction_clarification'} with candidates instead of starting. A `context.selector` — shaped `{ table: \"companies\", filter: { status?, industry?, country?, tags? } }` — researches every matching company (one run each); without `confirm:true` it returns {_tag:'confirm_required', subject_count, estimated_cost_cents} first so you can preview the scale — re-submit with confirm:true to launch (or narrow the filter). A malformed context returns {_tag:'invalid_context', error} without starting a run. If the user states a new standing preference, save it with manage_instructions.",
+		"Start a research run; returns {_tag:'started', id, status, applied_instructions, poll_after_ms?} immediately — then call get_research for results. Fresh research takes 2-5 minutes, so status comes back 'queued' and poll_after_ms says how many milliseconds to wait before the first check; unless the same question was answered before, in which case status is already 'succeeded' and poll_after_ms is absent, meaning the findings are ready and there is nothing to wait for. applied_instructions lists the instruction templates that shaped the run. The user's default research instructions apply automatically; pass `stack` (a named stack, by name or id) to run a specific saved stack, and/or `instructions` (template names or ids) to layer extra templates after it for this run. An unknown or ambiguous `stack`/`instructions` ref returns {_tag:'instruction_clarification'} with candidates instead of starting. A `context.selector` — shaped `{ table: \"companies\", filter: { status?, industry?, country?, tags? } }` — researches every matching company (one run each); without `confirm:true` it returns {_tag:'confirm_required', subject_count, estimated_cost_cents} first so you can preview the scale — re-submit with confirm:true to launch (or narrow the filter). A malformed context returns {_tag:'invalid_context', error} without starting a run. If the user states a new standing preference, save it with manage_instructions.",
 	parameters: Schema.Struct({
 		query: ResearchQuery,
 		context: Schema.optional(Schema.Unknown),
@@ -123,6 +129,9 @@ const StartResearch = Tool.make('start_research', {
 			id: Schema.String,
 			status: Schema.String,
 			applied_instructions: Schema.Array(Schema.String),
+			// Absent when the answer came straight from the cache, since there is
+			// nothing left to wait for.
+			poll_after_ms: Schema.optional(Schema.Number),
 		}),
 		ConfirmRequired,
 		InstructionClarification,
@@ -138,7 +147,7 @@ const StartResearch = Tool.make('start_research', {
 
 const GetResearch = Tool.make('get_research', {
 	description:
-		"Get the current state of a research run. Returns status, findings (if complete), cost, sources, and applied_instructions — the instruction templates that shaped the run. The full instruction-template text is omitted by default to keep the response small; pass include:['instruction_segments'] to get it back.",
+		"Get the current state of a research run. Returns status, progressSteps, poll_after_ms, findings (if complete), cost, sources, and applied_instructions — the instruction templates that shaped the run. progressSteps counts the rounds of work the run has got through: null until the first round finishes, then climbing every 20-30 seconds while it works. Null or unchanged across two or three polls is normal; unchanged for several minutes means the run is stuck rather than slow, and cancel_research ends it. poll_after_ms is how many milliseconds to wait before calling this again; it is absent once the run has ended, which means stop calling. The full instruction-template text is omitted by default to keep the response small; pass include:['instruction_segments'] to get it back.",
 	parameters: Schema.Struct({
 		id: Uuid,
 		// Opt back into heavy fields dropped by default. Only the full instruction
@@ -159,14 +168,14 @@ const GetResearch = Tool.make('get_research', {
 
 const ResearchSync = Tool.make('research_sync', {
 	description:
-		"Run research and return full findings inline when it finishes quickly; best for short or cached research. Blocks up to ~45s (the transport's limit): a short/cached run returns completed findings; a longer one returns the run still 'running' for you to poll get_research — the run keeps going regardless and is never lost. The returned run includes applied_instructions — the instruction templates that shaped it. The user's default research instructions apply automatically; pass `stack` (a named stack, by name or id) to run a specific saved stack, and/or `instructions` (template names or ids) to layer extra templates after it for this run. An unknown or ambiguous `stack`/`instructions` ref returns {_tag:'instruction_clarification'} with candidates instead of running. A `context.selector` — shaped `{ table: \"companies\", filter: { status?, industry?, country?, tags? } }` — fans out one run per matching company; without `confirm:true` it returns {_tag:'confirm_required', subject_count, estimated_cost_cents} first. A malformed context returns {_tag:'invalid_context', error} without starting a run.",
+		"Run research and return full findings inline when it finishes quickly; best for a question likely asked before, since only a cached answer comes back inline. Waits up to ~10s: a cached run returns completed findings; anything else returns the run still going — status 'queued' or 'running' — with poll_after_ms, for you to call get_research after that many milliseconds. The run keeps going regardless and is never lost. Prefer start_research when you expect fresh research: a real run takes 2-5 minutes and will never finish inside this wait, so expect no findings and a null progressSteps here. Pass max_wait_seconds (whole seconds, 1-10; larger values are treated as 10) to wait less if your own request timeout is shorter. The returned run includes applied_instructions — the instruction templates that shaped it. The user's default research instructions apply automatically; pass `stack` (a named stack, by name or id) to run a specific saved stack, and/or `instructions` (template names or ids) to layer extra templates after it for this run. An unknown or ambiguous `stack`/`instructions` ref returns {_tag:'instruction_clarification'} with candidates instead of running. A `context.selector` — shaped `{ table: \"companies\", filter: { status?, industry?, country?, tags? } }` — fans out one run per matching company; without `confirm:true` it returns {_tag:'confirm_required', subject_count, estimated_cost_cents} first. A malformed context returns {_tag:'invalid_context', error} without starting a run.",
 	parameters: Schema.Struct({
 		query: ResearchQuery,
 		context: Schema.optional(Schema.Unknown),
 		schema_name: Schema.optional(SchemaNameParam),
 		stack: Schema.optional(Schema.String),
 		instructions: Schema.optional(InstructionsOverride),
-		max_wait_seconds: Schema.optional(Schema.Number),
+		max_wait_seconds: Schema.optional(MaxWaitSeconds),
 		confirm: Schema.optional(Schema.Boolean),
 	}),
 	success: ResearchSyncResult,
@@ -195,11 +204,15 @@ const withAppliedInstructions = (
 	includeSegments = false,
 ) => {
 	const names = run.templateNames
+	const nextPoll = pollAfterMs(run.status)
 	const withInstructions = {
 		...run,
 		applied_instructions: Array.isArray(names)
 			? names.filter((name): name is string => typeof name === 'string')
 			: [],
+		// Left off a run that has ended rather than sent as zero: a missing field
+		// reads as "nothing more is coming" without inviting one last check.
+		...(nextPoll === undefined ? {} : { poll_after_ms: nextPoll }),
 	}
 	if (includeSegments) return withInstructions
 	// Drop the heavy instruction text while keeping the run's typed shape — cast
@@ -282,11 +295,16 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 							estimated_cost_cents: result.estimatedCostCents,
 						}
 					}
+					// Read from the status the run really came back with, not assumed to
+					// be queued: a repeat question answers from the cache and arrives
+					// already finished, with nothing left to check on.
+					const nextPoll = pollAfterMs(result.status)
 					return {
 						_tag: 'started' as const,
 						id: result.id,
 						status: result.status,
 						applied_instructions: resolved.instructions.templateNames,
+						...(nextPoll === undefined ? {} : { poll_after_ms: nextPoll }),
 					}
 				}).pipe(redactDbErrors),
 
@@ -319,13 +337,13 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 					// Create the run in its OWN top-level transaction on a fresh
 					// pooled connection, detached from this request's transaction.
 					// The whole MCP request runs inside one transaction that commits
-					// only when the handler returns — but the poll below holds it open
-					// for up to ~45s. Without detaching, the run row would stay
-					// uncommitted the whole time: invisible to the dispatch worker
-					// (which runs the job on its own connection, so it never leaves the
-					// queue), and rolled back outright if a client/transport timeout
-					// interrupts the handler — silently losing the run. Committing it
-					// here makes it durable and pollable the instant create() returns.
+					// only when the handler returns — but the wait below holds it open.
+					// Without detaching, the run row would stay uncommitted the whole
+					// time: invisible to the dispatch worker (which runs the job on its
+					// own connection, so it never leaves the queue), and rolled back
+					// outright if the client gives up and the handler is interrupted —
+					// silently losing the run. Committing it here makes it durable and
+					// readable the instant create() returns.
 					const created = yield* svc
 						.create(
 							userId,
@@ -352,12 +370,11 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 					}
 					const { id } = created
 
-					// Block for the findings, but only up to a transport-safe bound:
-					// a blocking MCP call is hard-capped near a minute, and real
-					// enrichment runs outlast that, so a longer wait would just error.
-					// A short/cached run returns findings inline; a longer one comes
-					// back still 'running' for the caller to poll. The poll reads the
-					// worker's committed progress on this request's connection.
+					// Wait briefly, then hand the run back. An answer already in the
+					// cache arrives with its findings straight away; anything else is
+					// still going when the wait ends and comes back with a note of when
+					// to ask again. Each re-read picks up whatever the worker has
+					// committed so far.
 					const maxWaitMs =
 						Math.min(
 							params.max_wait_seconds ?? RESEARCH_SYNC_MAX_WAIT_SECONDS,
