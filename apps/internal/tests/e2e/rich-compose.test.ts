@@ -67,15 +67,19 @@ test.describe('compose with rich formatting', () => {
 			await page.keyboard.press('Enter')
 			await editor.pressSequentially('two')
 			// Bold "Hello" by selecting the word — double-click is a reliable
-			// browser primitive — then toggling Tiptap's stock Cmd+B. Toggling
-			// bold on an empty caret (stored marks) does not survive the typing
-			// that follows in headless Chromium.
+			// browser primitive — then toggling the editor's stock bold shortcut.
+			// Toggling bold on an empty caret (stored marks) does not survive the
+			// typing that follows in headless Chromium.
+			//
+			// The modifier must be the portable one: bold is Cmd+B on a Mac and
+			// Ctrl+B elsewhere, and naming one outright sends nothing on the other
+			// machine, so the mail simply goes out unbolded.
 			await editor
 				.locator('p')
 				.filter({ hasText: 'Hello world' })
 				.first()
 				.dblclick({ position: { x: 8, y: 10 } })
-			await page.keyboard.press('Meta+b')
+			await page.keyboard.press('ControlOrMeta+b')
 
 			await expect(page.getByTestId('compose-send')).toBeEnabled()
 			await page.getByTestId('compose-send').click()
