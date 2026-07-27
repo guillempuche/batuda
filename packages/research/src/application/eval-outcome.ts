@@ -28,8 +28,10 @@ const TERMINAL_STATUSES: ReadonlySet<string> = new Set<TerminalStatus>([
 	'cancelled',
 ])
 
-// The eval only adapts runs that have finished; a non-terminal status here means
-// something went wrong upstream, so treat it as a failed run rather than guessing.
+// The set above is what the scorer can mark, a shorter list than the statuses
+// that end a run. A deleted run stopped too but left no answer to mark, and a
+// run that never finished at all means something went wrong upstream: both count
+// as a failure rather than being guessed at.
 const toTerminalStatus = (status: string): TerminalStatus =>
 	TERMINAL_STATUSES.has(status) ? (status as TerminalStatus) : 'failed'
 

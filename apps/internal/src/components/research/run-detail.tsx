@@ -8,6 +8,7 @@ import { RefreshCw } from 'lucide-react'
 import type { ComponentType } from 'react'
 import styled from 'styled-components'
 
+import { isActiveResearchStatus } from '@batuda/domain'
 import type { SchemaName } from '@batuda/research'
 // Straight from the domain file rather than the package entry point: that entry
 // point also reaches the services that talk to the database and the outside
@@ -99,7 +100,7 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 	// Narrow up front so the live-progress hook (a Hook, so it can't sit behind
 	// an early return) knows whether the run is still in flight.
 	const run = AsyncResult.isSuccess(result) ? narrowRun(result.value) : null
-	const isRunning = run?.status === 'running' || run?.status === 'queued'
+	const isRunning = run !== null && isActiveResearchStatus(run.status)
 	// A batch hands its work to one run per company and does none itself, so it
 	// never reports progress. Listening to it returned nothing and then announced
 	// itself as stalled, on a page that showed no sign of the runs doing the work.

@@ -7,6 +7,7 @@ import { ArrowRight, Microscope, Search } from 'lucide-react'
 import { type ReactNode, useCallback, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
+import { isAttentionResearchStatus } from '@batuda/domain'
 import { PriButton, PriInput, usePriToast } from '@batuda/ui/pri'
 
 import {
@@ -63,15 +64,6 @@ export const INBOX_PROPOSAL_LIMIT = 100
 export function inboxPendingProposalsAtom() {
 	return pendingProposalsAtom({ limit: INBOX_PROPOSAL_LIMIT })
 }
-
-/** Run statuses that demand a human even without a pending proposal. A
- * low-confidence success is included: its whole purpose is that an automation
- * should not act on it unreviewed. */
-const ATTENTION_STATUSES = new Set([
-	'failed',
-	'no_reliable_data',
-	'succeeded_low_confidence',
-])
 
 function rowKey(p: PendingProposal): string {
 	return `${p.researchId}::${p.proposedUpdateId ?? ''}`
@@ -209,7 +201,7 @@ export function ResearchInbox() {
 		[visible],
 	)
 	const attention = useMemo(
-		() => runs.filter(r => ATTENTION_STATUSES.has(r.status)),
+		() => runs.filter(r => isAttentionResearchStatus(r.status)),
 		[runs],
 	)
 

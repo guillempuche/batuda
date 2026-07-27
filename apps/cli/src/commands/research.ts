@@ -13,6 +13,7 @@ import {
 import { FetchHttpClient } from 'effect/unstable/http'
 import { SqlClient } from 'effect/unstable/sql'
 
+import { isTerminalResearchStatus } from '@batuda/domain'
 import { makeOtlpObservability } from '@batuda/observability'
 import {
 	BlobStorage,
@@ -158,14 +159,6 @@ const researchLive = ResearchService.layer.pipe(
 	Layer.provideMerge(SqlLive),
 )
 
-const TERMINAL = new Set([
-	'succeeded',
-	'succeeded_low_confidence',
-	'failed',
-	'cancelled',
-	'no_reliable_data',
-])
-
 const systemDefaults = Effect.gen(function* () {
 	const readCents = (name: string, fallback: number) =>
 		Config.int(name).pipe(Config.withDefault(fallback))
@@ -228,7 +221,7 @@ const pollToTerminal = (runId: string, maxAttempts: number) =>
 			run = (yield* svc
 				.get(runId)
 				.pipe(Effect.orElseSucceed(() => null))) as FinishedRun | null
-			if (TERMINAL.has(run?.status ?? 'unknown')) return run
+			if (isTerminalResearchStatus(run?.status ?? 'unknown')) return run
 			yield* Effect.sleep('1 second')
 		}
 		return run

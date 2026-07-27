@@ -5,6 +5,7 @@ import { RefreshCw, Trash2, XCircle } from 'lucide-react'
 import { useState } from 'react'
 import styled from 'styled-components'
 
+import { isActiveResearchStatus } from '@batuda/domain'
 import { PriButton, usePriToast } from '@batuda/ui/pri'
 
 import {
@@ -82,7 +83,7 @@ export function RunActions({
 	// bulk-apply already works this way.
 	const [confirmingDelete, setConfirmingDelete] = useState(false)
 
-	const isActive = run.status === 'running' || run.status === 'queued'
+	const isActive = isActiveResearchStatus(run.status)
 
 	const onCancel = async () => {
 		setBusy('cancel')

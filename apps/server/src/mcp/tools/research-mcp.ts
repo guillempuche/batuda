@@ -8,6 +8,7 @@ import {
 	ResearchRunDetail,
 	SessionContext,
 } from '@batuda/controllers'
+import { isActiveResearchStatus } from '@batuda/domain'
 import {
 	type CreateResearchInput,
 	ResearchService,
@@ -367,9 +368,7 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 					let run = yield* svc.get(id)
 					while (
 						run &&
-						['queued', 'running'].includes(
-							(run as { status: string }).status,
-						) &&
+						isActiveResearchStatus((run as { status: string }).status) &&
 						Date.now() - startedAt < maxWaitMs
 					) {
 						yield* Effect.sleep('2 seconds')
