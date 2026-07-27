@@ -1,4 +1,12 @@
+import { Atom } from 'effect/unstable/reactivity'
+
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
+import {
+	firstPage,
+	type ListPage,
+	listPageKey,
+	listPageQuery,
+} from '#/lib/list-page'
 
 export type PagesSearch = {
 	readonly companyId?: string
@@ -9,13 +17,20 @@ export type PagesSearch = {
 const listCache = new Map<string, ReturnType<typeof makeListAtom>>()
 const detailCache = new Map<string, ReturnType<typeof makeDetailAtom>>()
 
-function makeListAtom(search: PagesSearch) {
-	return BatudaApiAtom.query('pages', 'list', {
-		// Counted on purpose: both the Files tab's badge and the pages screen's
-		// own heading state how many there are, not how many were fetched.
-		query: { ...search, count: 'exact' as const },
-		serializationKey: `pages:list:${canonicalKey(search)}:exact`,
+/** How many pages the pages screen and the Files tab read at a time. */
+export const PAGES_PAGE_SIZE = 60
+
+/** The slice both a loader and a screen ask for first. */
+export const PAGES_FIRST_PAGE = firstPage(PAGES_PAGE_SIZE, 'exact')
+
+function makeListAtom(search: PagesSearch, page: ListPage) {
+	const atom = BatudaApiAtom.query('pages', 'list', {
+		// The first slice is counted because both the Files tab's badge and the
+		// pages screen's own heading state how many there are.
+		query: { ...search, ...listPageQuery(page) },
+		serializationKey: `pages:list:${canonicalKey(search)}::${listPageKey(page)}`,
 	})
+	return page.offset === 0 ? Atom.keepAlive(atom) : atom
 }
 
 function makeDetailAtom(id: string) {
@@ -25,11 +40,14 @@ function makeDetailAtom(id: string) {
 	})
 }
 
-export function pagesSearchAtom(search: PagesSearch) {
-	const key = canonicalKey(search)
+export function pagesSearchAtom(
+	search: PagesSearch,
+	page: ListPage = PAGES_FIRST_PAGE,
+) {
+	const key = `${canonicalKey(search)}::${listPageKey(page)}`
 	const existing = listCache.get(key)
 	if (existing !== undefined) return existing
-	const atom = makeListAtom(search)
+	const atom = makeListAtom(search, page)
 	listCache.set(key, atom)
 	return atom
 }

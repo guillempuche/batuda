@@ -1,4 +1,4 @@
-import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
+import { useAtomSet, useAtomValue } from '@effect/atom-react'
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
@@ -18,8 +18,14 @@ import {
 	usePriToast,
 } from '@batuda/ui/pri'
 
+import {
+	documentsListAtom,
+	SUBJECT_DOCUMENTS_PAGE_SIZE,
+} from '#/atoms/documents-atoms'
 import { MarkdownView } from '#/components/markdown/markdown-view'
+import { InfiniteListFooter } from '#/components/shared/infinite-list-footer'
 import { RelativeDate } from '#/components/shared/relative-date'
+import { useInfiniteList } from '#/hooks/use-infinite-list'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
 import { documentOpenUrl } from '#/lib/document-links'
@@ -114,18 +120,14 @@ export function DocumentsPanel({
 	readonly subjectId: string
 }) {
 	const { i18n, t } = useLingui()
-	const docsAtom = useMemo(
-		() =>
-			BatudaApiAtom.query('documents', 'list', {
-				query: { subjectTable, subjectId },
-			}),
-		[subjectTable, subjectId],
-	)
-	const result = useAtomValue(docsAtom)
-	const refresh = useAtomRefresh(docsAtom)
-	const docs = AsyncResult.isSuccess(result)
-		? narrowDocs(result.value.items)
-		: []
+	const list = useInfiniteList({
+		resetKey: `documents:${subjectTable}:${subjectId}`,
+		pageSize: SUBJECT_DOCUMENTS_PAGE_SIZE,
+		count: 'exact',
+		atomFor: page => documentsListAtom({ subjectTable, subjectId }, page),
+	})
+	const refresh = list.refresh
+	const docs = narrowDocs(list.items)
 
 	const { dlg, open: openDlg, close: closeDlg } = useDlg(documentsDlgSchema)
 	// Only the id travels in the URL; the row is rebuilt from the loaded list, so
@@ -161,10 +163,14 @@ export function DocumentsPanel({
 			</Head>
 
 			{docs.length === 0 ? (
-				<Empty>
-					<FileText size={18} aria-hidden />
-					<Trans>No documents yet.</Trans>
-				</Empty>
+				// Saying "none yet" while the first ones are still arriving would
+				// be wrong, so the panel waits before saying anything.
+				list.isLoadingFirstPage ? null : (
+					<Empty>
+						<FileText size={18} aria-hidden />
+						<Trans>No documents yet.</Trans>
+					</Empty>
+				)
 			) : (
 				<List>
 					{docs.map(doc => (
@@ -191,6 +197,8 @@ export function DocumentsPanel({
 					))}
 				</List>
 			)}
+
+			<InfiniteListFooter list={list} testId='subject-documents' />
 
 			{dialog.mode === 'closed' ? null : (
 				<DocumentDialogHost

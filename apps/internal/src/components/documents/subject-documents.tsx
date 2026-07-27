@@ -1,13 +1,15 @@
-import { useAtomValue } from '@effect/atom-react'
 import { Trans } from '@lingui/react/macro'
 import { Link } from '@tanstack/react-router'
-import { AsyncResult } from 'effect/unstable/reactivity'
-import { useMemo } from 'react'
 import styled from 'styled-components'
 
 import type { DocumentSubjectTable } from '@batuda/domain'
 
-import { BatudaApiAtom } from '#/lib/batuda-api-atom'
+import {
+	documentsListAtom,
+	SUBJECT_DOCUMENTS_PAGE_SIZE,
+} from '#/atoms/documents-atoms'
+import { InfiniteListFooter } from '#/components/shared/infinite-list-footer'
+import { useInfiniteList } from '#/hooks/use-infinite-list'
 
 /**
  * What has been written about one record, for somewhere there is no room to
@@ -25,16 +27,12 @@ export function SubjectDocuments({
 	readonly subjectTable: DocumentSubjectTable
 	readonly subjectId: string
 }) {
-	const atom = useMemo(
-		() =>
-			BatudaApiAtom.query('documents', 'list', {
-				query: { subjectTable, subjectId, limit: 10 },
-				serializationKey: `documents:${subjectTable}:${subjectId}`,
-			}),
-		[subjectTable, subjectId],
-	)
-	const result = useAtomValue(atom)
-	const items = AsyncResult.isSuccess(result) ? result.value.items : []
+	const list = useInfiniteList({
+		resetKey: `subject-documents:${subjectTable}:${subjectId}`,
+		pageSize: SUBJECT_DOCUMENTS_PAGE_SIZE,
+		atomFor: page => documentsListAtom({ subjectTable, subjectId }, page),
+	})
+	const items = list.items
 
 	// Nothing written yet is the ordinary case here, and an empty heading in
 	// every popup is noise.
@@ -58,6 +56,7 @@ export function SubjectDocuments({
 					</li>
 				))}
 			</List>
+			<InfiniteListFooter list={list} testId='subject-documents-popup' />
 		</Section>
 	)
 }

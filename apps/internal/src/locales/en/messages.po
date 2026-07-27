@@ -111,10 +111,9 @@ msgstr "{0} no longer allows password sign-in for mail apps, so it can't be conn
 
 #. placeholder {0}: trustworthy.length
 #. placeholder {1}: needsReview.length
-#. placeholder {2}: attention.length
 #: src/components/research/inbox/research-inbox.tsx
-msgid "{0} ready to apply, {1} need reading, {2} runs need attention."
-msgstr "{0} ready to apply, {1} need reading, {2} runs need attention."
+msgid "{0} ready to apply, {1} need reading, {attentionTotal} runs need attention."
+msgstr "{0} ready to apply, {1} need reading, {attentionTotal} runs need attention."
 
 #. placeholder {0}: selection.selectedCount
 #: src/components/companies/pipeline-board.tsx

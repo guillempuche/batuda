@@ -1,9 +1,7 @@
-import { useAtomValue } from '@effect/atom-react'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { DateTime, Schema } from 'effect'
-import { AsyncResult } from 'effect/unstable/reactivity'
 import { FileText } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
@@ -11,10 +9,17 @@ import styled from 'styled-components'
 import { DOCUMENT_TYPES } from '@batuda/domain'
 import { PriInput } from '@batuda/ui/pri'
 
+import {
+	DOCUMENTS_PAGE_SIZE,
+	type DocumentsSearch,
+	documentsListAtom,
+	documentsSearchKey,
+} from '#/atoms/documents-atoms'
 import { DOCUMENT_KIND_LABELS } from '#/components/documents/document-kinds'
 import { useSetDocumentTitle } from '#/components/layout/top-bar-title'
+import { InfiniteListFooter } from '#/components/shared/infinite-list-footer'
 import { RelativeDate } from '#/components/shared/relative-date'
-import { BatudaApiAtom } from '#/lib/batuda-api-atom'
+import { useInfiniteList } from '#/hooks/use-infinite-list'
 import { validateSearchWith } from '#/lib/search-schema'
 import { stenciledTitle } from '#/lib/workshop-mixins'
 
@@ -118,25 +123,22 @@ function DocumentsPage() {
 	// A kind pasted into the address bar that nothing offers is ignored rather
 	// than sent on and rejected.
 	const type = DOCUMENT_TYPES.find(value => value === search.type)
-	const listAtom = useMemo(
-		() =>
-			BatudaApiAtom.query('documents', 'list', {
-				query: {
-					...(search.q ? { q: search.q } : {}),
-					...(type ? { type } : {}),
-					limit: 50,
-					// Counted on purpose: the heading states how many documents match.
-					count: 'exact' as const,
-				},
-				serializationKey: `documents:list:${search.q ?? ''}:${type ?? ''}:exact`,
-			}),
+	const documentsSearch = useMemo<DocumentsSearch>(
+		() => ({
+			...(search.q ? { q: search.q } : {}),
+			...(type ? { type } : {}),
+		}),
 		[search.q, type],
 	)
-	const result = useAtomValue(listAtom)
-	const docs = AsyncResult.isSuccess(result)
-		? narrowDocs(result.value.items)
-		: []
-	const total = AsyncResult.isSuccess(result) ? result.value.total : 0
+	const list = useInfiniteList({
+		resetKey: documentsSearchKey(documentsSearch),
+		pageSize: DOCUMENTS_PAGE_SIZE,
+		// Counted on purpose: the heading states how many documents match.
+		count: 'exact',
+		atomFor: page => documentsListAtom(documentsSearch, page),
+	})
+	const docs = narrowDocs(list.items)
+	const total = list.total
 
 	const typeLabel = (value: string) => {
 		const found = DOC_TYPE_OPTIONS.find(o => o.value === value)
@@ -179,10 +181,14 @@ function DocumentsPage() {
 			</Header>
 
 			{docs.length === 0 ? (
-				<Empty data-testid='documents-empty'>
-					<FileText size={18} aria-hidden />
-					<Trans>Nothing written down matches that.</Trans>
-				</Empty>
+				// Saying nothing matches while the first ones are still on their
+				// way would be wrong, so the page waits before saying so.
+				list.isLoadingFirstPage ? null : (
+					<Empty data-testid='documents-empty'>
+						<FileText size={18} aria-hidden />
+						<Trans>Nothing written down matches that.</Trans>
+					</Empty>
+				)
 			) : (
 				<>
 					<Count>
@@ -206,6 +212,7 @@ function DocumentsPage() {
 							</Row>
 						))}
 					</List>
+					<InfiniteListFooter list={list} testId='documents' />
 				</>
 			)}
 		</Page>

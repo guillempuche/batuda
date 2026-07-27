@@ -1,4 +1,3 @@
-import { useAtomRefresh, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { DateTime, Schema } from 'effect'
@@ -11,14 +10,19 @@ import type { PageSummary } from '@batuda/controllers'
 
 import {
 	canonicalKey,
+	PAGES_FIRST_PAGE,
+	PAGES_PAGE_SIZE,
 	type PagesSearch,
 	pagesSearchAtom,
 } from '#/atoms/pages-atoms'
 import { EmptyState } from '#/components/shared/empty-state'
 import { ErrorState } from '#/components/shared/error-state'
+import { InfiniteListFooter } from '#/components/shared/infinite-list-footer'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { RelativeDate } from '#/components/shared/relative-date'
+import { useInfiniteList } from '#/hooks/use-infinite-list'
 import { dehydrateAtom } from '#/lib/atom-hydration'
+import { listPageQuery } from '#/lib/list-page'
 import type { PaginatedList } from '#/lib/paginated-list'
 import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
@@ -60,7 +64,7 @@ async function loadPagesOnServer(
 		// Matches `pagesSearchAtom` exactly, so the browser reuses this answer
 		// instead of asking again.
 		return yield* client.pages.list({
-			query: { ...search, count: 'exact' as const },
+			query: { ...search, ...listPageQuery(PAGES_FIRST_PAGE) },
 		})
 	})
 	const pages = await Effect.runPromise(program)
@@ -78,7 +82,10 @@ export const Route = createFileRoute('/pages/')({
 			const { pages } = await loadPagesOnServer(search)
 			return {
 				dehydrated: [
-					dehydrateAtom(pagesSearchAtom(search), AsyncResult.success(pages)),
+					dehydrateAtom(
+						pagesSearchAtom(search, PAGES_FIRST_PAGE),
+						AsyncResult.success(pages),
+					),
 				] as const,
 			}
 		} catch (error) {
@@ -95,18 +102,20 @@ function PagesListPage() {
 	const search = Route.useSearch()
 	const navigate = useNavigate({ from: Route.fullPath })
 
-	const searchKey = canonicalKey(search)
-	const atom = useMemo(() => pagesSearchAtom(search), [searchKey])
-	const result = useAtomValue(atom)
-	const refreshPages = useAtomRefresh(atom)
+	const list = useInfiniteList({
+		resetKey: canonicalKey(search),
+		pageSize: PAGES_PAGE_SIZE,
+		count: 'exact',
+		atomFor: page => pagesSearchAtom(search, page),
+	})
+	const refreshPages = list.refresh
 
 	const pages = useMemo<ReadonlyArray<PageRow>>(
-		() =>
-			AsyncResult.isSuccess(result) ? narrowPages(result.value.items) : [],
-		[result],
+		() => narrowPages(list.items),
+		[list.items],
 	)
-	const isLoading = AsyncResult.isInitial(result)
-	const isFailure = AsyncResult.isFailure(result)
+	const isLoading = list.isLoadingFirstPage
+	const isFailure = list.isError
 
 	const [statusFilter, setStatusFilter] = useState(search.status ?? '')
 
@@ -213,6 +222,8 @@ function PagesListPage() {
 					</tbody>
 				</Table>
 			)}
+
+			<InfiniteListFooter list={list} testId='pages' />
 		</Page>
 	)
 }

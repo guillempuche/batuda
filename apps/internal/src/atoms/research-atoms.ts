@@ -1,4 +1,7 @@
+import { Atom } from 'effect/unstable/reactivity'
+
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
+import type { ListPage } from '#/lib/list-page'
 
 export type ResearchListParams = {
 	readonly subjectTable?: 'companies' | 'contacts'
@@ -6,6 +9,16 @@ export type ResearchListParams = {
 	readonly status?: string
 	readonly limit?: number
 	readonly offset?: number
+	readonly count?: 'exact' | 'none'
+}
+
+/** Turn a slice into the shape the research list atom takes. */
+export function researchListPage(page: ListPage): {
+	readonly limit: number
+	readonly offset: number
+	readonly count: 'exact' | 'none'
+} {
+	return { limit: page.limit, offset: page.offset, count: page.count }
 }
 
 const listCache = new Map<string, ReturnType<typeof makeListAtom>>()
@@ -21,10 +34,14 @@ function makeListAtom(params: ResearchListParams) {
 	if (params.status !== undefined) query['status'] = params.status
 	if (params.limit !== undefined) query['limit'] = params.limit
 	if (params.offset !== undefined) query['offset'] = params.offset
-	return BatudaApiAtom.query('research', 'list', {
+	if (params.count !== undefined) query['count'] = params.count
+	const atom = BatudaApiAtom.query('research', 'list', {
 		query,
 		serializationKey: `research:list:${listKey(params)}`,
 	})
+	// Only the first slice is held, so returning to the runs screen paints at
+	// once without pinning every slice the reader has scrolled through.
+	return (params.offset ?? 0) === 0 ? Atom.keepAlive(atom) : atom
 }
 
 function listKey(params: ResearchListParams): string {
@@ -34,6 +51,7 @@ function listKey(params: ResearchListParams): string {
 		params.status ?? '',
 		params.limit ?? '',
 		params.offset ?? '',
+		params.count ?? '',
 	].join('|')
 }
 
@@ -180,10 +198,11 @@ function makePendingProposalsAtom(params: PendingProposalsParams) {
 	if (params.limit !== undefined) query['limit'] = params.limit
 	if (params.offset !== undefined) query['offset'] = params.offset
 	if (params.count !== undefined) query['count'] = params.count
-	return BatudaApiAtom.query('research', 'listPendingProposals', {
+	const atom = BatudaApiAtom.query('research', 'listPendingProposals', {
 		query,
 		serializationKey: `research:pending-proposals:${pendingProposalsKey(params)}`,
 	})
+	return (params.offset ?? 0) === 0 ? Atom.keepAlive(atom) : atom
 }
 
 function pendingProposalsKey(params: PendingProposalsParams): string {

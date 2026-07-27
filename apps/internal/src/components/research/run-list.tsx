@@ -1,17 +1,18 @@
-import { useAtomRefresh, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { AsyncResult } from 'effect/unstable/reactivity'
 import { Search } from 'lucide-react'
 import styled from 'styled-components'
 
 import { PriButton } from '@batuda/ui/pri'
 
-import { researchListAtom } from '#/atoms/research-atoms'
+import { researchListAtom, researchListPage } from '#/atoms/research-atoms'
 import { ErrorState } from '#/components/shared/error-state'
+import { InfiniteListFooter } from '#/components/shared/infinite-list-footer'
 import { RelativeDate } from '#/components/shared/relative-date'
+import { useInfiniteList } from '#/hooks/use-infinite-list'
 import { dlgNoId } from '#/lib/dlg-search'
 import { formatMoneyCents } from '#/lib/format-money'
+import { firstPage, type ListPage } from '#/lib/list-page'
 import { useDlg } from '#/lib/use-dlg'
 import { stenciledTitle } from '#/lib/workshop-mixins'
 import { Badge } from './badge'
@@ -19,11 +20,15 @@ import { ResearchDialog } from './research-dialog'
 import { statusLabel, statusTone } from './run-labels'
 import { narrowResearch } from './run-shapes'
 
-export const RUN_LIST_LIMIT = 100
+/** How many runs the screen reads at a time, and each "load more" adds. */
+export const RUN_LIST_PAGE_SIZE = 100
+
+/** The slice both the route loader and the screen ask for first. */
+export const RUN_LIST_FIRST_PAGE = firstPage(RUN_LIST_PAGE_SIZE, 'none')
 
 /** The all-runs list atom, shared by the route loader (to hydrate) and page. */
-export function researchRunsAtom() {
-	return researchListAtom({ limit: RUN_LIST_LIMIT })
+export function researchRunsAtom(page: ListPage = RUN_LIST_FIRST_PAGE) {
+	return researchListAtom(researchListPage(page))
 }
 
 // The "Find companies" dialog lives in `?dlg=discovery` so it is deep-linkable
@@ -36,11 +41,13 @@ export function ResearchRuns() {
 	const navigate = useNavigate()
 	const { dlg, open, close } = useDlg(researchRunsDlgSchema)
 	const dialogOpen = dlg !== undefined
-	const result = useAtomValue(researchRunsAtom())
-	const refreshRuns = useAtomRefresh(researchRunsAtom())
-	const runs = AsyncResult.isSuccess(result)
-		? narrowResearch(result.value.items)
-		: []
+	const list = useInfiniteList({
+		resetKey: 'research-runs',
+		pageSize: RUN_LIST_PAGE_SIZE,
+		atomFor: page => researchRunsAtom(page),
+	})
+	const refreshRuns = list.refresh
+	const runs = narrowResearch(list.items)
 
 	return (
 		<Wrap>
@@ -64,11 +71,11 @@ export function ResearchRuns() {
 				</PriButton>
 			</HeaderRow>
 
-			{AsyncResult.isInitial(result) ? (
+			{list.isLoadingFirstPage ? (
 				<Empty role='status'>
 					<Trans>Loading runs…</Trans>
 				</Empty>
-			) : AsyncResult.isFailure(result) ? (
+			) : list.isError ? (
 				<ErrorState
 					variant='inline'
 					data-testid='research-runs-error'
@@ -118,6 +125,8 @@ export function ResearchRuns() {
 					})}
 				</List>
 			)}
+
+			<InfiniteListFooter list={list} testId='research-runs' />
 
 			<ResearchDialog
 				open={dialogOpen}
