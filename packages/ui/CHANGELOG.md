@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-27 (ui-v2026.7.27)
+
+### Bug Fixes
+
+* **ui:** make the keyboard focus mark visible, and name what it lands on ([6091b54](https://github.com/guillempuche/batuda/commit/6091b540d2dbc726b11cbaa00146f7489445dd5b))
+
 ## 2026-07-25 (ui-v2026.7.25)
 
 ### Features
