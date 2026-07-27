@@ -4613,6 +4613,11 @@ msgstr "Mostra la contrasenya"
 msgid "Show system events"
 msgstr "Mostra esdeveniments del sistema"
 
+#. placeholder {0}: attention.length
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Showing {0} of {attentionTotal}. Open all runs to see the rest."
+msgstr "Es mostren {0} de {attentionTotal}. Obre totes les execucions per veure la resta."
+
 #. placeholder {0}: proposals.length
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Showing {0} of {totalPending}. Narrow the filters to reach the rest."

@@ -131,7 +131,9 @@ export function ResearchInbox() {
 	const proposalsAtom = useMemo(
 		() =>
 			pendingProposalsAtom({
-				limit: INBOX_PROPOSAL_LIMIT,
+				limit: INBOX_FIRST_PAGE.limit,
+				offset: INBOX_FIRST_PAGE.offset,
+				count: INBOX_FIRST_PAGE.count,
 				...(minConfidence > 0 ? { minConfidence } : {}),
 				...(machineOnly ? { machineCheckable: true } : {}),
 			}),
@@ -149,6 +151,14 @@ export function ResearchInbox() {
 		[],
 	)
 	const runsResult = useAtomValue(runsAtom)
+	// Counted, not listed: the tile beside it only states how many runs there
+	// are, and the feed above is narrowed to the ones needing attention, so it
+	// can no longer answer that question.
+	const runCountAtom = useMemo(
+		() => researchListAtom({ limit: 1, count: 'exact' }),
+		[],
+	)
+	const runCountResult = useAtomValue(runCountAtom)
 	const spendAtom = useMemo(
 		() =>
 			BatudaApiAtom.query('research', 'spend', {
@@ -245,7 +255,10 @@ export function ResearchInbox() {
 	const pendingCount = Math.max(0, totalPending - resolvedCount)
 	// More are waiting than were fetched, so say so rather than quietly ending.
 	const notShown = Math.max(0, totalPending - proposals.length)
-	const recentRuns = runs.length
+	const recentRuns =
+		(AsyncResult.isSuccess(runCountResult)
+			? runCountResult.value.total
+			: null) ?? 0
 
 	const isLoading = AsyncResult.isInitial(proposalsResult)
 	const isFailure = AsyncResult.isFailure(proposalsResult)
@@ -511,6 +524,11 @@ export function ResearchInbox() {
 									)
 								})}
 							</Rows>
+							{attentionTotal > attention.length ? (
+								<Truncated data-testid='research-inbox-attention-truncated'>
+									{t`Showing ${attention.length} of ${attentionTotal}. Open all runs to see the rest.`}
+								</Truncated>
+							) : null}
 						</Section>
 					) : null}
 

@@ -103,7 +103,7 @@ function PagesListPage() {
 	const navigate = useNavigate({ from: Route.fullPath })
 
 	const list = useInfiniteList({
-		resetKey: canonicalKey(search),
+		resetKey: `pages:${canonicalKey(search)}`,
 		pageSize: PAGES_PAGE_SIZE,
 		count: 'exact',
 		atomFor: page => pagesSearchAtom(search, page),

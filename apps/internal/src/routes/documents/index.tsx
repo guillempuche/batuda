@@ -131,7 +131,7 @@ function DocumentsPage() {
 		[search.q, type],
 	)
 	const list = useInfiniteList({
-		resetKey: documentsSearchKey(documentsSearch),
+		resetKey: `documents-screen:${documentsSearchKey(documentsSearch)}`,
 		pageSize: DOCUMENTS_PAGE_SIZE,
 		// Counted on purpose: the heading states how many documents match.
 		count: 'exact',
