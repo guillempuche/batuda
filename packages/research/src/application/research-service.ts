@@ -2083,6 +2083,34 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// gap round runs.
 					let gapSpentCents = 0
 
+					// Rounds of work finished so far. Carried over from the row like the
+					// run's usage totals, so a run picked up again counts on from where
+					// the earlier attempt stopped instead of appearing to start over.
+					let progressSteps =
+						(run as { progressSteps?: number | null }).progressSteps ?? 0
+					// Publish the count so anyone watching the run sees it climb between
+					// checkpoints. Guarded on 'running' like every other write from inside
+					// the run, so a cancelled run is left alone.
+					const recordProgress = Effect.gen(function* () {
+						progressSteps++
+						yield* sql`
+							UPDATE research_runs
+							SET progress_steps = ${progressSteps}, updated_at = now()
+							WHERE id = ${researchId} AND status = 'running'
+						`
+					}).pipe(
+						Effect.catchCause(cause =>
+							Cause.hasInterruptsOnly(cause)
+								? Effect.failCause(cause)
+								: Effect.logWarning('research.progress.write_failed').pipe(
+										Effect.annotateLogs({
+											research_id: researchId,
+											cause: Cause.pretty(cause),
+										}),
+									),
+						),
+					)
+
 					// Phase-2 extraction + every grounding guard, shared so both the
 					// normal path and the discovery-scan retry run the same logic. Returns
 					// the cleaned findings; the caller writes the single phase-2 checkpoint.
@@ -3021,6 +3049,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								text_length: researchText.length,
 							}),
 						)
+						// Reusing the earlier attempt's gathering skips the per-round
+						// counting below, so tick once here rather than leave the count
+						// sitting where that attempt left it.
+						yield* recordProgress
 					} else {
 						const organizationId = (run as { organizationId: string })
 							.organizationId
@@ -3046,8 +3078,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							enforceAutoApprove: true,
 						}).pipe(Layer.provide(Layer.succeed(SqlClient.SqlClient)(sql)))
 
-						// One tool-log + SSE pair per round, so a multi-round run is
-						// visible in the run's toolLog and its live stream.
+						// One tool-log pair, one live-stream pair and one progress tick per
+						// round, so a multi-round run is visible in the run's toolLog, in
+						// its live stream, and on its row.
 						const emitRound = (
 							round: number,
 							textLength: number,
@@ -3065,7 +3098,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										timestamp: DateTime.nowUnsafe().toString(),
 										type: 'call' as const,
 										tool: 'llm.generateText',
-										input: { phase: 1, round, query },
+										// The query is on the run's own row; repeating it every round
+										// adds thousands of characters the reader already has.
+										input: { phase: 1, round },
 									},
 									{
 										timestamp: DateTime.nowUnsafe().toString(),
@@ -3081,6 +3116,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									toolCalls,
 									textLength,
 								})
+								// Counted here rather than from the round number: a discovery
+								// scan can start a second pass whose rounds number from one
+								// again, and what a watcher sees must never go backwards.
+								yield* recordProgress
 							})
 
 						// The reflect-and-retry loop runs under the per-run Budget +
@@ -3806,6 +3845,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						yield* Effect.logInfo('research.phase2.resume').pipe(
 							Effect.annotateLogs({ research_id: researchId }),
 						)
+						// Same as the gathering checkpoint above: reusing the earlier
+						// attempt's findings skips the work that would otherwise report,
+						// so tick once to show the run is moving.
+						yield* recordProgress
 					} else {
 						if (retryFindings !== undefined) {
 							// The discovery-scan retry path already ran extraction under the
@@ -3908,6 +3951,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									)
 									break
 								}
+								// Counted here, past both stop checks: the body below can leave
+								// by several different exits, so a round counted at the end
+								// would go unreported whenever it takes one of them.
+								yield* recordProgress
 								const roundHashes: string[] = []
 								// Fetch the cited pages first: cheap certainty about sources
 								// the run already leans on.

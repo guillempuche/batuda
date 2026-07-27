@@ -88,6 +88,9 @@ type ResearchRunDetail = {
 	readonly findings: unknown
 	readonly errorMessage?: string | null
 	readonly reasonCode?: ReasonCode | null
+	// Rounds the run reports having got through, so a page opened partway in
+	// still shows the real count.
+	readonly progressSteps: number | null
 	// Carried so "Run again" can re-target the same subjects.
 	readonly context: unknown
 }
@@ -193,7 +196,7 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 				</Header>
 
 				{isRunning && !isBatch && !failed && !stalled ? (
-					<RunProgress progress={progress} />
+					<RunProgress progress={progress} steps={run.progressSteps} />
 				) : null}
 
 				{isRunning && !isBatch && (failed || stalled) ? (
@@ -409,6 +412,8 @@ function narrowRun(raw: unknown): ResearchRunDetail | null {
 			(RESEARCH_REASON_CODES as readonly string[]).includes(r['reasonCode'])
 				? (r['reasonCode'] as ReasonCode)
 				: null,
+		progressSteps:
+			typeof r['progressSteps'] === 'number' ? r['progressSteps'] : null,
 		context: r['context'] ?? null,
 	}
 }

@@ -74,11 +74,6 @@ msgstr "{0, plural, one {# pass over the evidence} other {# passes over the evid
 msgid "{0, plural, one {# source} other {# sources}}"
 msgstr "{0, plural, one {# source} other {# sources}}"
 
-#. placeholder {0}: progress.toolCalls
-#: src/components/research/run-progress.tsx
-msgid "{0, plural, one {# step run} other {# steps run}}"
-msgstr "{0, plural, one {# step run} other {# steps run}}"
-
 #. placeholder {0}: counts[shelf]
 #: src/routes/tasks/index.tsx
 msgid "{0, plural, one {# task} other {# tasks}}"
@@ -165,6 +160,10 @@ msgstr "{scoped} (default)"
 #: src/routes/emails/index.tsx
 msgid "{selectedCount} threads selected"
 msgstr "{selectedCount} threads selected"
+
+#: src/components/research/run-progress.tsx
+msgid "{steps, plural, one {# step run} other {# steps run}}"
+msgstr "{steps, plural, one {# step run} other {# steps run}}"
 
 #: src/routes/settings/organization/policy.tsx
 msgid "{threshold}%"
