@@ -13,8 +13,8 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 // Rich-compose path. The Tiptap editor's bubble-menu controls carry no
 // stable testids, so formatting is applied the way a user would: the
-// "- " Markdown rule starts a bullet list, and a double-click word
-// selection plus the stock Cmd+B keymap bolds a word. The proof is
+// "- " Markdown rule starts a bullet list, and selecting a word and
+// pressing the stock bold shortcut bolds it. The proof is
 // wire-side: the decoded text/html part the recipient receives, where the
 // brand renderer emits inline-styled spans — a font-weight span for bold,
 // and <ul>/<li> whose rows wrap their text in <span> — not <strong> or
@@ -66,20 +66,27 @@ test.describe('compose with rich formatting', () => {
 			await editor.pressSequentially('- one')
 			await page.keyboard.press('Enter')
 			await editor.pressSequentially('two')
-			// Bold "Hello" by selecting the word — double-click is a reliable
-			// browser primitive — then toggling the editor's stock bold shortcut.
-			// Toggling bold on an empty caret (stored marks) does not survive the
-			// typing that follows in headless Chromium.
+			// Bold the first word by selecting the line and shrinking the selection
+			// with arrow keys, never by clicking a measured spot: a character sits
+			// at a different place on a machine with different fonts, so the click
+			// would land beside the word and select nothing.
 			//
-			// The modifier must be the portable one: bold is Cmd+B on a Mac and
-			// Ctrl+B elsewhere, and naming one outright sends nothing on the other
-			// machine, so the mail simply goes out unbolded.
-			await editor
+			// The modifier must be the portable one too: bold is Cmd+B on a Mac and
+			// Ctrl+B elsewhere, and naming one outright sends nothing on the other.
+			const firstLine = editor
 				.locator('p')
 				.filter({ hasText: 'Hello world' })
 				.first()
-				.dblclick({ position: { x: 8, y: 10 } })
+			await firstLine.selectText()
+			await page.keyboard.press('ArrowLeft')
+			for (let i = 0; i < 'Hello'.length; i++) {
+				await page.keyboard.press('Shift+ArrowRight')
+			}
 			await page.keyboard.press('ControlOrMeta+b')
+
+			// Check the bold landed before sending, so a shortcut that never
+			// arrived is reported here instead of as a wall of email HTML below.
+			await expect(firstLine.locator('strong')).toHaveText('Hello')
 
 			await expect(page.getByTestId('compose-send')).toBeEnabled()
 			await page.getByTestId('compose-send').click()
