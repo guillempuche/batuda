@@ -12,7 +12,10 @@ import {
 	SessionContext,
 	UnknownStack,
 } from '@batuda/controllers'
-import { isTerminalResearchStatus } from '@batuda/domain'
+import {
+	isTerminalResearchEvent,
+	isTerminalResearchStatus,
+} from '@batuda/domain'
 import { resolveInstructions, resolveStackRef } from '@batuda/instructions'
 import {
 	type CreateResearchInput,
@@ -230,13 +233,7 @@ export const ResearchLive = HttpApiBuilder.group(
 
 						const events: unknown[] = []
 						yield* stream.pipe(
-							Stream.takeUntil(
-								evt =>
-									evt.type === 'run.succeeded' ||
-									evt.type === 'run.failed' ||
-									evt.type === 'run.cancelled' ||
-									evt.type === 'run.no_reliable_data',
-							),
+							Stream.takeUntil(evt => isTerminalResearchEvent(evt.type)),
 							Stream.tap(evt =>
 								Effect.sync(() => {
 									events.push(evt)
@@ -256,12 +253,7 @@ export const ResearchLive = HttpApiBuilder.group(
 									: status,
 							events,
 							done: events.some(e =>
-								[
-									'run.succeeded',
-									'run.failed',
-									'run.cancelled',
-									'run.no_reliable_data',
-								].includes((e as { type: string }).type),
+								isTerminalResearchEvent((e as { type: string }).type),
 							),
 						}
 					}).pipe(

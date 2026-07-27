@@ -63,11 +63,16 @@ export { Page, PageId } from './pages'
 export { Product, ProductId } from './products'
 export { Proposal, ProposalId } from './proposals'
 export {
+	ATTENTION_RESEARCH_STATUSES,
+	isActiveResearchStatus,
+	isAttentionResearchStatus,
 	isSucceededResearchStatus,
+	isTerminalResearchEvent,
 	isTerminalResearchStatus,
 	ResearchRun,
 	ResearchRunId,
 	SUCCEEDED_RESEARCH_STATUSES,
+	TERMINAL_RESEARCH_EVENTS,
 	TERMINAL_RESEARCH_STATUSES,
 } from './research-runs'
 export {

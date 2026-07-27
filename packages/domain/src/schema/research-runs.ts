@@ -94,8 +94,39 @@ export const SUCCEEDED_RESEARCH_STATUSES = [
 	'succeeded_low_confidence',
 ] as const
 
+// The statuses that end a run but still want a person to look: it failed, it
+// found nothing usable, or its answer was flagged as shaky. Everything that
+// gathers work awaiting review reads this, so all of it agrees.
+export const ATTENTION_RESEARCH_STATUSES = [
+	'failed',
+	'no_reliable_data',
+	'succeeded_low_confidence',
+] as const
+
+// The events a run publishes when it stops. Written out rather than built from
+// the status list: a deletion happens to a run from the outside, and a shaky
+// success goes out as a plain success, so a list derived from statuses would
+// leave a listener waiting for endings that never arrive.
+export const TERMINAL_RESEARCH_EVENTS = [
+	'run.succeeded',
+	'run.failed',
+	'run.cancelled',
+	'run.no_reliable_data',
+] as const
+
 export const isTerminalResearchStatus = (status: string): boolean =>
 	(TERMINAL_RESEARCH_STATUSES as ReadonlyArray<string>).includes(status)
 
+// Anything that has not stopped counts as still going, so an unfamiliar status
+// keeps a caller waiting instead of giving up on a run that may still finish.
+export const isActiveResearchStatus = (status: string): boolean =>
+	!isTerminalResearchStatus(status)
+
 export const isSucceededResearchStatus = (status: string): boolean =>
 	(SUCCEEDED_RESEARCH_STATUSES as ReadonlyArray<string>).includes(status)
+
+export const isAttentionResearchStatus = (status: string): boolean =>
+	(ATTENTION_RESEARCH_STATUSES as ReadonlyArray<string>).includes(status)
+
+export const isTerminalResearchEvent = (event: string): boolean =>
+	(TERMINAL_RESEARCH_EVENTS as ReadonlyArray<string>).includes(event)
