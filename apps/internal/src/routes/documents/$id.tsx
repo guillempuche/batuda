@@ -5,8 +5,6 @@ import { DateTime } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import styled from 'styled-components'
 
-import { PriButton } from '@batuda/ui/pri'
-
 import { documentAtomFor } from '#/atoms/documents-atoms'
 import { DOCUMENT_KIND_LABELS } from '#/components/documents/document-kinds'
 import { useSetDocumentTitle } from '#/components/layout/top-bar-title'
@@ -15,6 +13,7 @@ import { ErrorState } from '#/components/shared/error-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { dehydrateAtom } from '#/lib/atom-hydration'
+import { documentOpenUrl } from '#/lib/document-links'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import { stenciledTitle } from '#/lib/workshop-mixins'
 
@@ -109,19 +108,14 @@ function DocumentPage() {
 						This document is a web page. It opens in a tab of its own, exactly
 						as it was saved.
 					</Trans>
-					<PriButton
-						type='button'
-						$variant='filled'
+					<OpenPageLink
+						href={documentOpenUrl(id)}
+						target='_blank'
+						rel='noreferrer'
 						data-testid='document-page-open-original'
-						disabled={doc.htmlUrl == null}
-						onClick={() => {
-							if (doc.htmlUrl != null) {
-								window.open(doc.htmlUrl, '_blank', 'noopener,noreferrer')
-							}
-						}}
 					>
 						<Trans>Open the page</Trans>
-					</PriButton>
+					</OpenPageLink>
 				</Notice>
 			) : (
 				<Body data-testid='document-page-body'>
@@ -170,4 +164,13 @@ const Notice = styled.div`
 	gap: var(--space-md);
 	color: var(--color-text-muted);
 	font-size: var(--font-size-sm);
+`
+
+// An ordinary link, so the address is there to copy and the browser opens it
+// the way it opens any other page.
+const OpenPageLink = styled.a`
+	align-self: flex-start;
+	color: var(--color-primary);
+	font-size: var(--font-size-sm);
+	text-decoration: underline;
 `

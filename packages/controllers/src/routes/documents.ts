@@ -14,14 +14,13 @@ import { PaginatedList } from '../pagination'
 
 // A document plus the records it is filed under. The subjects live in their own
 // table, so they ride alongside the row rather than in it.
+//
+// An HTML document's body is not here. It is a stored file, opened through
+// `GET /documents/:id/open` — an address anyone holding this id can build, so it
+// needs no field of its own.
 export const DocumentDetail = Schema.Struct({
 	...Document.json.fields,
 	subjects: Schema.Array(DocumentSubject),
-	// Where an HTML document actually opens: a short-lived link to the stored
-	// page, on the storage address rather than this one, so a page somebody else
-	// wrote never loads beside the signed-in session. Null for markdown, whose
-	// body is right here in `content`.
-	htmlUrl: Schema.NullOr(Schema.String),
 })
 
 // Listing projection: everything but the full markdown `content`, so a long
@@ -78,6 +77,20 @@ export const DocumentsGroup = HttpApiGroup.make('documents')
 		HttpApiEndpoint.get('get', '/documents/:id', {
 			params: { id: Schema.String },
 			success: DocumentDetail,
+			error: NotFound.pipe(HttpApiSchema.status(404)),
+		}),
+	)
+	.add(
+		// The address an HTML document opens at. It never changes, so it can be
+		// sent to somebody or kept in a tab, and it is checked on every open —
+		// unlike the storage link it redirects to, which expires and, while it
+		// lasts, works for whoever holds it. Redirecting rather than serving the
+		// page keeps markup somebody else wrote off this origin. `Schema.Unknown`
+		// because the response is that redirect, not a body — same as the
+		// attachment download.
+		HttpApiEndpoint.get('open', '/documents/:id/open', {
+			params: { id: Schema.String },
+			success: Schema.Unknown,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)

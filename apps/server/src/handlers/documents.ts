@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 
 import { DateTime, Effect, Schema } from 'effect'
+import { HttpServerResponse } from 'effect/unstable/http'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
@@ -16,10 +17,13 @@ import { Document, type DocumentSubjectTable } from '@batuda/domain'
 import { resolvePageTotal } from '../lib/sql-pagination'
 import {
 	type DocumentSubjectRow,
+	deleteStoredFile,
 	HTML_URL_TTL_SECONDS,
 	htmlStorageKey,
 	linkDocument,
+	rewriteStoredHtml,
 	searchTextFromHtml,
+	storedFileFor,
 	subjectsForDocument,
 	unlinkDocument,
 } from '../services/documents'
@@ -72,16 +76,7 @@ export const DocumentsLive = HttpApiBuilder.group(
 				Effect.gen(function* () {
 					const doc = yield* decodeDocument(row)
 					const subjects = yield* subjectsForDocument(sql, id)
-					const storageKey = (row as { storageKey?: string | null }).storageKey
-					// The link is minted per read and expires, so one copied out of
-					// a log or a shared screen stops working shortly after.
-					const htmlUrl =
-						doc.format === 'html' && storageKey
-							? yield* storage
-									.signedUrl(storageKey, HTML_URL_TTL_SECONDS)
-									.pipe(Effect.orDie)
-							: null
-					return { ...doc, subjects, htmlUrl }
+					return { ...doc, subjects }
 				})
 
 			return handlers
@@ -152,6 +147,30 @@ export const DocumentsLive = HttpApiBuilder.group(
 								id: _.params.id,
 							})
 						return yield* detailFor(doc, _.params.id)
+					}).pipe(
+						Effect.catch(e =>
+							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
+						),
+					),
+				)
+				.handleRaw('open', _ =>
+					Effect.gen(function* () {
+						const storageKey = yield* storedFileFor(sql, _.params.id)
+						// A markdown document keeps its body on the row, so there is no
+						// stored page for this address to open.
+						if (storageKey === null)
+							return yield* new NotFound({
+								entity: 'document page',
+								id: _.params.id,
+							})
+						const url = yield* storage
+							.signedUrl(storageKey, HTML_URL_TTL_SECONDS)
+							.pipe(Effect.orDie)
+						// Never cached: a remembered redirect would send the next visit
+						// to a storage link that has already expired.
+						return HttpServerResponse.redirect(url, {
+							headers: { 'cache-control': 'no-store' },
+						})
 					}).pipe(
 						Effect.catch(e =>
 							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
@@ -272,8 +291,22 @@ export const DocumentsLive = HttpApiBuilder.group(
 				)
 				.handle('update', _ =>
 					Effect.gen(function* () {
+						// A web page's body is a stored file, so new content goes there
+						// and the row takes only the fields that come back with it.
+						const storageKey = yield* storedFileFor(sql, _.params.id)
+						const fields =
+							storageKey !== null && _.payload.content !== undefined
+								? {
+										..._.payload,
+										...(yield* rewriteStoredHtml(
+											storage,
+											storageKey,
+											_.payload.content,
+										)),
+									}
+								: _.payload
 						const rows = yield* sql`
-							UPDATE documents SET ${sql.update({ ..._.payload, updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) })}
+							UPDATE documents SET ${sql.update({ ...fields, updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) })}
 							WHERE id = ${_.params.id} RETURNING *
 						`
 						yield* Effect.logInfo('Document updated').pipe(
@@ -288,8 +321,14 @@ export const DocumentsLive = HttpApiBuilder.group(
 				)
 				.handle('remove', _ =>
 					Effect.gen(function* () {
+						// Read where the bytes are before the row that names them is
+						// gone, or nothing can find them afterwards.
+						const storageKey = yield* storedFileFor(sql, _.params.id)
 						// The links go with the row through their foreign key.
 						yield* sql`DELETE FROM documents WHERE id = ${_.params.id}`
+						if (storageKey !== null) {
+							yield* deleteStoredFile(storage, _.params.id, storageKey)
+						}
 						yield* Effect.logInfo('Document removed').pipe(
 							Effect.annotateLogs({
 								event: 'document.removed',

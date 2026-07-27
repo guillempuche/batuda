@@ -3,6 +3,8 @@ import type { SqlClient } from 'effect/unstable/sql'
 
 import type { DocumentSubjectTable } from '@batuda/domain'
 
+import type { StorageProvider } from './storage-provider'
+
 /**
  * Filing documents against CRM records.
  *
@@ -161,3 +163,66 @@ export const subjectsForDocument = (
 		WHERE document_id = ${documentId}
 		ORDER BY subject_table, created_at
 	`.pipe(Effect.orDie)
+
+/**
+ * The stored file behind an HTML document, or nothing for a markdown one, whose
+ * body is on the row itself.
+ */
+export const storedFileFor = (sql: SqlClient.SqlClient, documentId: string) =>
+	Effect.gen(function* () {
+		const rows = yield* sql<{
+			format: string
+			storageKey: string | null
+		}>`SELECT format, storage_key FROM documents WHERE id = ${documentId} LIMIT 1`
+		const row = rows[0]
+		if (!row || row.format !== 'html' || !row.storageKey) return null
+		return row.storageKey
+	}).pipe(Effect.orDie)
+
+/**
+ * Remove the stored page behind a document that is being deleted.
+ *
+ * Deliberately best-effort: a storage failure leaves a file nobody can reach,
+ * which is better than refusing to delete the document.
+ */
+export const deleteStoredFile = (
+	storage: StorageProvider['Service'],
+	documentId: string,
+	storageKey: string,
+) =>
+	storage.delete(storageKey).pipe(
+		Effect.catchTag('StorageError', error =>
+			Effect.logError('Stored page outlived its document').pipe(
+				Effect.annotateLogs({
+					event: 'document.storage_delete_failed',
+					documentId,
+					storageKey,
+					error: error.message,
+				}),
+			),
+		),
+	)
+
+/**
+ * Write a web page's new body where the page is actually read from, and return
+ * the row fields that go with it.
+ *
+ * Putting new HTML on the row instead would leave the stored page serving the
+ * old bytes, with no error. The plain words move with it, or a search would keep
+ * finding the page by wording it no longer contains.
+ */
+export const rewriteStoredHtml = (
+	storage: StorageProvider['Service'],
+	storageKey: string,
+	content: string,
+) =>
+	storage
+		.put({
+			key: storageKey,
+			body: new TextEncoder().encode(content),
+			contentType: 'text/html; charset=utf-8',
+		})
+		.pipe(
+			Effect.orDie,
+			Effect.as({ content: '', searchText: searchTextFromHtml(content) }),
+		)

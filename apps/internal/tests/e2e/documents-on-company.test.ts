@@ -245,6 +245,43 @@ test.describe('documents on the company Files tab', () => {
 		})
 	})
 
+	test.describe('when a document is a saved web page', () => {
+		test('should open at an address that keeps working', async ({ page }) => {
+			// GIVEN the seeded web page, whose body is a stored file rather than a
+			// column, so the only way to read it is the link
+			const pageDoc = psql(
+				`SELECT id FROM documents WHERE format='html' LIMIT 1`,
+			)
+			expect(pageDoc, 'seed should provide one HTML document').not.toBe('')
+
+			await page.goto(`/documents/${pageDoc}`, { waitUntil: 'networkidle' })
+
+			// WHEN the link out to the page is read off the rendered markup
+			const link = page.getByTestId('document-page-open-original')
+			await expect(link).toBeVisible()
+			const href = await link.getAttribute('href')
+			expect(href).toContain(`/v1/documents/${pageDoc}/open`)
+
+			// THEN following it lands on the stored page. Asserting the body proves
+			// the whole chain: the session was accepted, the organisation checked,
+			// a fresh storage link minted, and the redirect followed.
+			const landed = await page.evaluate(async (url: string) => {
+				const res = await fetch(url, { credentials: 'include' })
+				return { ok: res.ok, body: (await res.text()).slice(0, 200) }
+			}, href!)
+			expect(landed.ok).toBe(true)
+			expect(landed.body).toContain('Cal Pep Fonda')
+
+			// AND the address is not a one-shot: it is checked and re-minted each
+			// time, so a second visit works exactly as the first did
+			const again = await page.evaluate(async (url: string) => {
+				const res = await fetch(url, { credentials: 'include' })
+				return res.ok
+			}, href!)
+			expect(again).toBe(true)
+		})
+	})
+
 	test.describe('when Alice adds a document', () => {
 		test('should store the title, type and content she typed', async ({
 			page,
