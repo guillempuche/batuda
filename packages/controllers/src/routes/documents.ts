@@ -10,7 +10,7 @@ import { Document, DocumentSubject, DocumentSubjectTable } from '@batuda/domain'
 import { NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
-import { PaginatedList } from '../pagination'
+import { PaginatedList, pageQuery } from '../pagination'
 
 // A document plus the records it is filed under. The subjects live in their own
 // table, so they ride alongside the row rather than in it.
@@ -67,8 +67,7 @@ export const DocumentsGroup = HttpApiGroup.make('documents')
 				type: Schema.optional(Document.json.fields.type),
 				// Substring match over title and content.
 				q: Schema.optional(Schema.String),
-				limit: Schema.optional(Schema.NumberFromString),
-				offset: Schema.optional(Schema.NumberFromString),
+				...pageQuery,
 			},
 			success: PaginatedList(DocumentSummary),
 		}),

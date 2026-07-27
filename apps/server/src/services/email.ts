@@ -31,7 +31,14 @@ import { EmailDraft, Inbox, InboxFooter } from '@batuda/domain'
 import { renderBlocks, type StagedAttachmentRef } from '@batuda/email/render'
 import type { EmailBlocks } from '@batuda/email/schema'
 
-import { resolvePageTotal } from '../lib/sql-pagination'
+import {
+	type CountMode,
+	pageOf,
+	probeLimit,
+	resolveTotal,
+	takePage,
+	totalColumn,
+} from '../lib/sql-pagination'
 
 // Standard 8-4-4-4-12 hex UUID. Used to guard service entry points that
 // take a `threadId` / `companyId` / `messageId` — placeholder strings
@@ -1518,13 +1525,14 @@ export class EmailService extends Context.Service<EmailService>()(
 					query?: string
 					limit?: number
 					offset?: number
+					count?: CountMode
 				}) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
 						const session = yield* SessionContext
 
-						const limit = filters?.limit ?? 100
-						const offset = filters?.offset ?? 0
+						const page = pageOf(filters ?? {}, 100)
+						const { limit, offset, count } = page
 						const conditions: Array<Statement.Fragment> = [
 							sql`tl.organization_id = ${currentOrg.id}`,
 							// Privacy gate: a private inbox is hidden from anyone
@@ -1575,7 +1583,7 @@ export class EmailService extends Context.Service<EmailService>()(
 						// per-thread sub-selects pivot on external_thread_id (the
 						// column the threading index lives on) so each row stays a
 						// constant-cost lookup.
-						const rows = yield* sql<{
+						const probed = yield* sql<{
 							id: string
 							externalThreadId: string
 							inboxId: string | null
@@ -1595,7 +1603,6 @@ export class EmailService extends Context.Service<EmailService>()(
 							lastInboundAt: Date | null
 							lastInboundClassification: 'normal' | 'spam' | 'blocked' | null
 							isUnread: boolean
-							total: string | number
 						}>`
 							SELECT
 								tl.id,
@@ -1672,20 +1679,35 @@ export class EmailService extends Context.Service<EmailService>()(
 										  AND m.direction = 'inbound'
 									) > COALESCE(tl.last_read_at, 'epoch'::timestamptz),
 									false
-								) AS is_unread,
-								COUNT(*) OVER () AS total
+								) AS is_unread
 							FROM email_thread_links tl
 							LEFT JOIN inboxes i ON i.id = tl.inbox_id
 							${whereClause}
 							ORDER BY tl.updated_at DESC
-							LIMIT ${limit}
+							LIMIT ${probeLimit(limit)}
 							OFFSET ${offset}
 						`
 
-						const total = rows.length > 0 ? Number(rows[0]!.total) : 0
+						const { rows, hasMore } = takePage(probed, limit)
+
+						// Counted separately from the page: asking for both at once stops
+						// the database using the index that keeps threads in order, taking
+						// a screenful from under 1ms to 24ms. The count can then be a
+						// moment older than the rows, which no one reading a list can tell.
+						const countRows =
+							count === 'exact'
+								? yield* sql<{ readonly count: string | number }>`
+										SELECT count(*) AS count
+										FROM email_thread_links tl
+										LEFT JOIN inboxes i ON i.id = tl.inbox_id
+										${whereClause}
+									`
+								: undefined
+						const total =
+							countRows === undefined ? null : Number(countRows[0]?.count ?? 0)
+
 						const items = rows.map(r => {
 							const {
-								total: _t,
 								inboxEmail,
 								inboxDisplayName,
 								inboxPurpose,
@@ -1705,7 +1727,13 @@ export class EmailService extends Context.Service<EmailService>()(
 										: null,
 							}
 						})
-						return yield* decodeThreadList({ items, total, limit, offset })
+						return yield* decodeThreadList({
+							items,
+							total,
+							limit,
+							offset,
+							hasMore,
+						})
 					}).pipe(Effect.orDie),
 
 				listMessages: (filters?: {
@@ -1727,18 +1755,18 @@ export class EmailService extends Context.Service<EmailService>()(
 						if (filters?.status)
 							conditions.push(sql`status = ${filters.status}`)
 
-						const limit = filters?.limit ?? 50
-						const offset = filters?.offset ?? 0
-						const rows = yield* sql<{ readonly total: string | number }>`
-							SELECT *, COUNT(*) OVER () AS total FROM email_messages
+						const page = pageOf(filters ?? {}, 50)
+						const probed = yield* sql<{ readonly total?: string | number }>`
+							SELECT *${totalColumn(sql, page.count)} FROM email_messages
 							WHERE ${sql.and(conditions)}
 							ORDER BY status_updated_at DESC
-							LIMIT ${limit}
-							OFFSET ${offset}
+							LIMIT ${probeLimit(page.limit)}
+							OFFSET ${page.offset}
 						`
-						const total = yield* resolvePageTotal(
+						const { rows, hasMore } = takePage(probed, page.limit)
+						const total = yield* resolveTotal(
+							page,
 							rows,
-							offset,
 							() => sql<{ readonly count: string | number }>`
 								SELECT count(*) AS count FROM email_messages
 								WHERE ${sql.and(conditions)}
@@ -1747,7 +1775,13 @@ export class EmailService extends Context.Service<EmailService>()(
 						const items = yield* decodeMessages(
 							rows.map(r => projectAttachmentsForWire(r)),
 						)
-						return { items, total, limit, offset }
+						return {
+							items,
+							total,
+							limit: page.limit,
+							offset: page.offset,
+							hasMore,
+						}
 					}).pipe(Effect.orDie),
 
 				// `messageId` may be either the local UUID PK or the RFC Message-ID;
@@ -2348,7 +2382,12 @@ export class EmailService extends Context.Service<EmailService>()(
 						)
 					}),
 
-				listDrafts: (inboxId?: string, limit = 100, offset = 0) =>
+				listDrafts: (
+					inboxId?: string,
+					limit = 100,
+					offset = 0,
+					count: CountMode = 'none',
+				) =>
 					Effect.gen(function* () {
 						const list = yield* drafts.list(inboxId)
 						// Sort on the raw Date before decoding — DateTime.Utc has no
@@ -2357,11 +2396,19 @@ export class EmailService extends Context.Service<EmailService>()(
 							.map(draftRowToProviderShape)
 							.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
 						// Drafts arrive as one batch from the provider, so the page is
-						// taken here rather than in a query.
+						// taken here rather than in a query. The total is free once they
+						// are all in hand, but is still withheld unless asked for, so this
+						// list answers like every other one.
 						const items = yield* decodeDrafts(
 							shaped.slice(offset, offset + limit),
 						).pipe(Effect.orDie)
-						return { items, total: shaped.length, limit, offset }
+						return {
+							items,
+							total: count === 'exact' ? shaped.length : null,
+							limit,
+							offset,
+							hasMore: offset + items.length < shaped.length,
+						}
 					}),
 
 				sendDraft: (inboxId: string, draftId: string) =>

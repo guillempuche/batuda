@@ -14,7 +14,13 @@ import {
 } from '@batuda/controllers'
 import { Document, type DocumentSubjectTable } from '@batuda/domain'
 
-import { resolvePageTotal } from '../lib/sql-pagination'
+import {
+	pageOf,
+	probeLimit,
+	resolveTotal,
+	takePage,
+	totalColumn,
+} from '../lib/sql-pagination'
 import {
 	type DocumentSubjectRow,
 	deleteStoredFile,
@@ -82,8 +88,7 @@ export const DocumentsLive = HttpApiBuilder.group(
 			return handlers
 				.handle('list', _ =>
 					Effect.gen(function* () {
-						const limit = Math.min(_.query.limit ?? 50, 200)
-						const offset = _.query.offset ?? 0
+						const page = pageOf(_.query, 50)
 						const conditions: Array<Statement.Fragment> = []
 						if (_.query.subjectTable && _.query.subjectId) {
 							conditions.push(sql`EXISTS (
@@ -104,8 +109,8 @@ export const DocumentsLive = HttpApiBuilder.group(
 						}
 						const whereClause =
 							conditions.length > 0 ? sql`WHERE ${sql.and(conditions)}` : sql``
-						const rows = yield* sql<{
-							readonly total: string | number
+						const probed = yield* sql<{
+							readonly total?: string | number
 							readonly id: string
 						}>`
 							SELECT
@@ -117,23 +122,30 @@ export const DocumentsLive = HttpApiBuilder.group(
 										'subjectId', dl.subject_id
 									) ORDER BY dl.subject_table, dl.created_at)
 									FROM document_links dl WHERE dl.document_id = d.id
-								), '[]'::json) AS subjects,
-								COUNT(*) OVER () AS total
+								), '[]'::json) AS subjects
+								${totalColumn(sql, page.count)}
 							FROM documents d
 							${whereClause}
 							ORDER BY d.updated_at DESC
-							LIMIT ${limit} OFFSET ${offset}
+							LIMIT ${probeLimit(page.limit)} OFFSET ${page.offset}
 						`
-						const total = yield* resolvePageTotal(
+						const { rows, hasMore } = takePage(probed, page.limit)
+						const total = yield* resolveTotal(
+							page,
 							rows,
-							offset,
 							() => sql<{ readonly count: string | number }>`
 								SELECT count(*) AS count FROM documents d
 								${whereClause}
 							`,
 						)
 						const items = yield* decodeSummaries(rows)
-						return { items, total, limit, offset }
+						return {
+							items,
+							total,
+							limit: page.limit,
+							offset: page.offset,
+							hasMore,
+						}
 					}).pipe(Effect.orDie),
 				)
 				.handle('get', _ =>

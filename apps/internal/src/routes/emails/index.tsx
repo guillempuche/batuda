@@ -161,7 +161,10 @@ function toWireSearch(
 		query?: string
 		limit?: number
 		offset?: number
-	} = { limit: EMAILS_PAGE_SIZE }
+		count?: 'exact' | 'none'
+		// This screen numbers its pages and prints "601–700 of 3400", so it needs
+		// the running count on every page, not only the first.
+	} = { limit: EMAILS_PAGE_SIZE, count: 'exact' }
 	if (offset > 0) wire.offset = offset
 	if (search.inboxId !== undefined) wire.inboxId = search.inboxId
 	if (search.companyId !== undefined) wire.companyId = search.companyId
@@ -188,6 +191,7 @@ async function loadThreadsOnServer(wire: EmailsSearch) {
 	if (wire.query !== undefined) queryForServer['query'] = wire.query
 	if (wire.limit !== undefined) queryForServer['limit'] = wire.limit
 	if (wire.offset !== undefined) queryForServer['offset'] = wire.offset
+	if (wire.count !== undefined) queryForServer['count'] = wire.count
 	const program = Effect.gen(function* () {
 		const client = yield* makeBatudaApiServer(cookie ?? undefined)
 		const [envelope, inboxes] = yield* Effect.all(
@@ -1566,14 +1570,19 @@ function narrowEnvelope(value: unknown): PaginatedList<unknown> | null {
 	if (!value || typeof value !== 'object') return null
 	const v = value as Record<string, unknown>
 	if (!Array.isArray(v['items'])) return null
-	if (typeof v['total'] !== 'number') return null
+	// A page that was not counted says so with null. Rejecting the whole
+	// envelope over that would empty the list rather than merely leaving the
+	// running count unknown — this screen always asks to be counted, so a null
+	// here means something else changed, not that there is nothing to show.
+	if (typeof v['total'] !== 'number' && v['total'] !== null) return null
 	if (typeof v['limit'] !== 'number') return null
 	if (typeof v['offset'] !== 'number') return null
 	return {
 		items: v['items'] as ReadonlyArray<unknown>,
-		total: v['total'],
+		total: v['total'] as number | null,
 		limit: v['limit'],
 		offset: v['offset'],
+		hasMore: v['hasMore'] === true,
 	}
 }
 

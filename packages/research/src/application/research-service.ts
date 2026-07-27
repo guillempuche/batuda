@@ -482,9 +482,19 @@ export const readEnrichmentCountry = (
 	return undefined
 }
 
+// The most rows one research list may pull, matching the ceiling the web API
+// enforces. This and the paging helpers below are spelled out here rather than
+// imported, because research is its own bounded context and does not depend on
+// the app that hosts it.
+const MAX_RESEARCH_PAGE = 500
+
 // Clamp list pagination so out-of-range input can't reach SQL: a negative limit
 // makes Postgres reject `LIMIT -1`, an unbounded one would pull the whole table,
-// and a negative offset is meaningless. Defaults match the prior query.
+// and a negative offset is meaningless.
+//
+// Callers over HTTP and over the agent tools are already refused out-of-range
+// values by their own request schemas; this stays as the last line of defence
+// for anything calling the service directly.
 export const clampPagination = (
 	limit: number | undefined,
 	offset: number | undefined,
@@ -494,27 +504,43 @@ export const clampPagination = (
 	const toInt = (n: number | undefined, fallback: number): number =>
 		n !== undefined && Number.isFinite(n) ? Math.trunc(n) : fallback
 	return {
-		limit: Math.min(Math.max(toInt(limit, 20), 1), 100),
+		limit: Math.min(Math.max(toInt(limit, 20), 1), MAX_RESEARCH_PAGE),
 		offset: Math.max(toInt(offset, 0), 0),
 	}
 }
 
-// How many rows match in total, for a page that carries its own
-// `COUNT(*) OVER ()` column. An empty page that starts partway in says nothing
-// about the total — the filters may match nothing, or the page may simply start
-// past the last match — so `countMatching` is asked only in that one case to
-// tell those two apart.
+// Ask for one row more than the page holds, so a list can tell whether
+// anything follows it without counting the whole table. The spare row is
+// dropped again by `takePage` before anyone sees it.
+const probeLimit = (limit: number): number => limit + 1
+
+// Trim the spare row off and say whether it was there. Must run before the
+// rows are decoded, or the caller gets one row more than it asked for.
+const takePage = <R>(
+	rows: ReadonlyArray<R>,
+	limit: number,
+): { readonly rows: ReadonlyArray<R>; readonly hasMore: boolean } => ({
+	rows: rows.slice(0, limit),
+	hasMore: rows.length > limit,
+})
+
+// How many rows match in total, or null when the caller asked not to be told.
+// An empty page that starts partway in says nothing about the total — the
+// filters may match nothing, or the page may simply start past the last match
+// — so `countMatching` is asked only in that one case to tell those apart.
 const resolvePageTotal = <E, R>(
-	rows: ReadonlyArray<{ readonly total: string | number }>,
+	rows: ReadonlyArray<{ readonly total?: string | number }>,
 	offset: number,
+	count: 'exact' | 'none',
 	countMatching: () => Effect.Effect<
 		ReadonlyArray<{ readonly count: string | number }>,
 		E,
 		R
 	>,
-): Effect.Effect<number, E, R> => {
+): Effect.Effect<number | null, E, R> => {
+	if (count === 'none') return Effect.succeed(null)
 	const first = rows[0]
-	if (first !== undefined) return Effect.succeed(Number(first.total))
+	if (first?.total !== undefined) return Effect.succeed(Number(first.total))
 	if (offset === 0) return Effect.succeed(0)
 	return countMatching().pipe(
 		Effect.map(countRows => Number(countRows[0]?.count ?? 0)),
@@ -622,6 +648,7 @@ export const queryPendingProposals = (
 		machineCheckable?: boolean | undefined
 		limit?: number | undefined
 		offset?: number | undefined
+		count?: 'exact' | 'none' | undefined
 	},
 ) =>
 	Effect.gen(function* () {
@@ -638,6 +665,7 @@ export const queryPendingProposals = (
 			conditions.push(sql`machine_checkable = ${filters.machineCheckable}`)
 
 		const { limit, offset } = clampPagination(filters.limit, filters.offset)
+		const count = filters.count ?? 'none'
 
 		// A channel's confidence can be a 0–1 fraction (model) or a 0–100 score
 		// (enrichment); normalize to 0–100 so the reviewer's minimum-confidence
@@ -756,23 +784,25 @@ export const queryPendingProposals = (
 			WHERE ${sql.and(conditions)}
 		`
 
-		const rows = yield* sql<
-			PendingProposalRow & { readonly total: string | number }
+		const probed = yield* sql<
+			PendingProposalRow & { readonly total?: string | number }
 		>`
-			SELECT sub.*, COUNT(*) OVER () AS total
+			SELECT sub.*${count === 'exact' ? sql`, COUNT(*) OVER () AS total` : sql``}
 			FROM (${matching}) sub
 			ORDER BY sub.run_created_at DESC
-			LIMIT ${limit}
+			LIMIT ${probeLimit(limit)}
 			OFFSET ${offset}
 		`
+		const { rows, hasMore } = takePage(probed, limit)
 		const total = yield* resolvePageTotal(
 			rows,
 			offset,
+			count,
 			() => sql<{ readonly count: string | number }>`
 				SELECT count(*) AS count FROM (${matching}) sub
 			`,
 		)
-		return { items: rows, total, limit, offset }
+		return { items: rows, total, limit, offset, hasMore }
 	})
 
 export interface PendingPaidActionRow {
@@ -809,6 +839,7 @@ export const queryPendingPaidActions = (
 		researchId?: string | undefined
 		limit?: number | undefined
 		offset?: number | undefined
+		count?: 'exact' | 'none' | undefined
 	},
 ) =>
 	Effect.gen(function* () {
@@ -818,6 +849,7 @@ export const queryPendingPaidActions = (
 			conditions.push(sql`research_id = ${filters.researchId}`)
 
 		const { limit, offset } = clampPagination(filters.limit, filters.offset)
+		const count = filters.count ?? 'none'
 
 		// An action written before the id stamp has no id and cannot be resolved,
 		// but it still shows, so a run that is stuck waiting is at least visible.
@@ -868,23 +900,25 @@ export const queryPendingPaidActions = (
 			${conditions.length > 0 ? sql`WHERE ${sql.and(conditions)}` : sql``}
 		`
 
-		const rows = yield* sql<
-			PendingPaidActionRow & { readonly total: string | number }
+		const probed = yield* sql<
+			PendingPaidActionRow & { readonly total?: string | number }
 		>`
-			SELECT sub.*, COUNT(*) OVER () AS total
+			SELECT sub.*${count === 'exact' ? sql`, COUNT(*) OVER () AS total` : sql``}
 			FROM (${matching}) sub
 			ORDER BY sub.run_created_at DESC
-			LIMIT ${limit}
+			LIMIT ${probeLimit(limit)}
 			OFFSET ${offset}
 		`
+		const { rows, hasMore } = takePage(probed, limit)
 		const total = yield* resolvePageTotal(
 			rows,
 			offset,
+			count,
 			() => sql<{ readonly count: string | number }>`
 				SELECT count(*) AS count FROM (${matching}) sub
 			`,
 		)
-		return { items: rows, total, limit, offset }
+		return { items: rows, total, limit, offset, hasMore }
 	})
 
 // Outcome of a cancel attempt, decided from whether a queued/running row
@@ -4955,6 +4989,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					since?: string | undefined
 					limit?: number | undefined
 					offset?: number | undefined
+					count?: 'exact' | 'none' | undefined
 				}) =>
 					Effect.gen(function* () {
 						const conditions: Array<
@@ -4993,21 +5028,24 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							filters.limit,
 							filters.offset,
 						)
+						const count = filters.count ?? 'none'
 
-						const rows = yield* sql<{ readonly total: string | number }>`
+						const probed = yield* sql<{ readonly total?: string | number }>`
 							SELECT r.id, r.kind, r.query, r.mode, r.schema_name,
 								r.status, r.cost_cents, r.paid_cost_cents,
-								r.created_by, r.created_at, r.completed_at,
-								COUNT(*) OVER () AS total
+								r.created_by, r.created_at, r.completed_at
+								${count === 'exact' ? sql`, COUNT(*) OVER () AS total` : sql``}
 							FROM research_runs r
 							WHERE ${sql.and(conditions)}
 							ORDER BY r.created_at DESC
-							LIMIT ${limit}
+							LIMIT ${probeLimit(limit)}
 							OFFSET ${offset}
 						`
+						const { rows, hasMore } = takePage(probed, limit)
 						const total = yield* resolvePageTotal(
 							rows,
 							offset,
+							count,
 							() => sql<{ readonly count: string | number }>`
 								SELECT count(*) AS count
 								FROM research_runs r
@@ -5017,7 +5055,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						const items = yield* decodeResearchRunSummaries(rows).pipe(
 							Effect.orDie,
 						)
-						return { items, total, limit, offset }
+						return { items, total, limit, offset, hasMore }
 					}),
 
 				/** Pending proposed updates across the org, for the review inbox. */
@@ -5028,6 +5066,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					machineCheckable?: boolean | undefined
 					limit?: number | undefined
 					offset?: number | undefined
+					count?: 'exact' | 'none' | undefined
 				}) => queryPendingProposals(sql, filters),
 
 				/** Paid lookups across the org still waiting on a person's decision. */
@@ -5035,6 +5074,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					researchId?: string | undefined
 					limit?: number | undefined
 					offset?: number | undefined
+					count?: 'exact' | 'none' | undefined
 				}) => queryPendingPaidActions(sql, filters),
 
 				/** Get all runs linked to a subject row. */

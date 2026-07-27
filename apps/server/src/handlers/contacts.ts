@@ -6,7 +6,13 @@ import { SqlClient } from 'effect/unstable/sql'
 import { BatudaApi, CurrentOrg } from '@batuda/controllers'
 import { Contact, ContactChannel } from '@batuda/domain'
 
-import { resolvePageTotal } from '../lib/sql-pagination'
+import {
+	pageOf,
+	probeLimit,
+	resolveTotal,
+	takePage,
+	totalColumn,
+} from '../lib/sql-pagination'
 import {
 	addChannel,
 	channelsOf,
@@ -31,8 +37,7 @@ export const ContactsLive = HttpApiBuilder.group(
 			return handlers
 				.handle('list', _ =>
 					Effect.gen(function* () {
-						const limit = _.query.limit ?? 100
-						const offset = _.query.offset ?? 0
+						const page = pageOf(_.query, 100)
 						const conditions: Array<Statement.Fragment> = []
 						if (_.query.companyId)
 							conditions.push(sql`c.company_id = ${_.query.companyId}`)
@@ -41,7 +46,7 @@ export const ContactsLive = HttpApiBuilder.group(
 						// tell a researched contact from a hand-entered one. Row-level
 						// security limits the linked runs to the caller's org; how the
 						// trail is worded is left to the presentation layer.
-						const rows = yield* sql`
+						const probed = yield* sql`
 							SELECT c.*, ${contactChannelsJson(sql)} AS channels,
 							COALESCE((
 								SELECT json_agg(json_build_object(
@@ -56,16 +61,17 @@ export const ContactsLive = HttpApiBuilder.group(
 								FROM research_links rl
 								JOIN research_runs r ON r.id = rl.research_id
 								WHERE rl.subject_table = 'contacts' AND rl.subject_id = c.id
-							), '[]'::json) AS provenance,
-							COUNT(*) OVER () AS total
+							), '[]'::json) AS provenance
+							${totalColumn(sql, page.count)}
 							FROM contacts c
 							WHERE ${sql.and(conditions)}
 							ORDER BY c.name
-							LIMIT ${limit} OFFSET ${offset}
+							LIMIT ${probeLimit(page.limit)} OFFSET ${page.offset}
 						`
-						const total = yield* resolvePageTotal(
-							rows as ReadonlyArray<{ readonly total: string | number }>,
-							offset,
+						const { rows, hasMore } = takePage(probed, page.limit)
+						const total = yield* resolveTotal(
+							page,
+							rows as ReadonlyArray<{ readonly total?: string | number }>,
 							() => sql<{ readonly count: string | number }>`
 								SELECT count(*) AS count FROM contacts c
 								WHERE ${sql.and(conditions)}
@@ -86,7 +92,13 @@ export const ContactsLive = HttpApiBuilder.group(
 								})),
 							),
 						)
-						return { items, total, limit, offset }
+						return {
+							items,
+							total,
+							limit: page.limit,
+							offset: page.offset,
+							hasMore,
+						}
 					}).pipe(Effect.orDie),
 				)
 				.handle('create', _ =>

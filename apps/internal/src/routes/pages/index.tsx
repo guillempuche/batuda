@@ -57,7 +57,11 @@ async function loadPagesOnServer(
 	])
 	const program = Effect.gen(function* () {
 		const client = yield* makeBatudaApiServer(cookie ?? undefined)
-		return yield* client.pages.list({ query: search })
+		// Matches `pagesSearchAtom` exactly, so the browser reuses this answer
+		// instead of asking again.
+		return yield* client.pages.list({
+			query: { ...search, count: 'exact' as const },
+		})
 	})
 	const pages = await Effect.runPromise(program)
 	return { pages }

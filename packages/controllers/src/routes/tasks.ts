@@ -16,7 +16,7 @@ import {
 import { BadRequest, Conflict, NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
-import { PaginatedList } from '../pagination'
+import { PaginatedList, pageQuery } from '../pagination'
 
 // bulkComplete reports how many of the requested ids it actually closed.
 export const BulkCompleteResult = Schema.Struct({
@@ -131,8 +131,7 @@ export const TasksGroup = HttpApiGroup.make('tasks')
 				// date on the task — its due date, or when it was created; and
 				// `completed` with the most recently finished.
 				sort: Schema.optional(Schema.Literals(['recent', 'due', 'completed'])),
-				limit: Schema.optional(Schema.NumberFromString),
-				offset: Schema.optional(Schema.NumberFromString),
+				...pageQuery,
 			},
 			success: PaginatedList(Task.json),
 		}),

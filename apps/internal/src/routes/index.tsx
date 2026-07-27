@@ -82,8 +82,14 @@ async function loadPipelineDataOnServer(): Promise<PipelineData> {
 		const client = yield* makeBatudaApiServer(cookie ?? undefined)
 		const [companies, openTasks] = yield* Effect.all(
 			[
-				client.companies.list({ query: { limit: 500 } }),
-				client.tasks.list({ query: { completed: 'false', limit: 500 } }),
+				// These two queries have to match `companiesListAtom` and
+				// `openTasksAtom` exactly: the browser picks up what the server
+				// already fetched by the shape of the question, so any difference
+				// means the page quietly asks again on arrival.
+				client.companies.list({ query: { limit: 500, count: 'exact' } }),
+				client.tasks.list({
+					query: { completed: 'false', limit: 500, count: 'exact' },
+				}),
 			],
 			{ concurrency: 2 },
 		)
@@ -192,10 +198,13 @@ function PipelinePage() {
 	)
 
 	// Counting the rows in hand would under-report as soon as someone has more
-	// open tasks than one page holds, so the total comes from the server.
-	const openTaskCount = AsyncResult.isSuccess(openTasksResult)
-		? openTasksResult.value.total
-		: 0
+	// open tasks than one page holds, so the total comes from the server. The
+	// request asks to be counted, so a missing total means the answer has not
+	// arrived yet rather than that there is nothing.
+	const openTaskCount =
+		(AsyncResult.isSuccess(openTasksResult)
+			? openTasksResult.value.total
+			: null) ?? 0
 
 	const isLoading =
 		AsyncResult.isInitial(companiesResult) ||

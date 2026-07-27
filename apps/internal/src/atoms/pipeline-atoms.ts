@@ -22,8 +22,10 @@ import { BatudaApiAtom } from '#/lib/batuda-api-atom'
  * (status counts, overdue next-action, stale-pipeline, top priorities).
  */
 export const companiesListAtom = BatudaApiAtom.query('companies', 'list', {
-	query: { limit: 500 },
-	serializationKey: 'companies:list:500',
+	// Counted on purpose: the dashboard prints how many companies there are,
+	// and a list that was never counted has nothing truthful to print.
+	query: { limit: 500, count: 'exact' },
+	serializationKey: 'companies:list:500:exact',
 })
 
 /**
@@ -41,8 +43,10 @@ export const companiesListAtom = BatudaApiAtom.query('companies', 'list', {
  * are the first to go (promote to a paginated fetch as the count nears 500).
  */
 export const openTasksAtom = BatudaApiAtom.query('tasks', 'list', {
-	query: { completed: 'false', limit: 500 },
-	serializationKey: 'tasks:open:500',
+	// Counted on purpose: the "Open tasks" counter reports how many exist, not
+	// how many this request happened to bring back.
+	query: { completed: 'false', limit: 500, count: 'exact' },
+	serializationKey: 'tasks:open:500:exact',
 })
 
 /**

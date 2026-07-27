@@ -6,7 +6,14 @@ import { CurrentOrg, NotFound, PageSummary } from '@batuda/controllers'
 import { Page } from '@batuda/domain'
 import { TiptapDocument } from '@batuda/ui/blocks'
 
-import { resolvePageTotal } from '../lib/sql-pagination'
+import {
+	type CountMode,
+	pageOf,
+	probeLimit,
+	resolveTotal,
+	takePage,
+	totalColumn,
+} from '../lib/sql-pagination'
 import { CompanyService } from './companies'
 import { buildPageSlug } from './page-slug'
 
@@ -16,6 +23,7 @@ export interface PageFilters {
 	readonly lang?: string | undefined
 	readonly limit?: number | undefined
 	readonly offset?: number | undefined
+	readonly count?: CountMode | undefined
 }
 
 export interface CreatePageData {
@@ -116,32 +124,38 @@ export class PageService extends Context.Service<PageService>()('PageService', {
 		return {
 			list: (filters: PageFilters) =>
 				Effect.gen(function* () {
-					const limit = filters.limit ?? 100
-					const offset = filters.offset ?? 0
+					const page = pageOf(filters, 100)
 					const conditions: Array<Statement.Fragment> = []
 					if (filters.companyId)
 						conditions.push(sql`company_id = ${filters.companyId}`)
 					if (filters.status) conditions.push(sql`status = ${filters.status}`)
 					if (filters.lang) conditions.push(sql`lang = ${filters.lang}`)
 
-					const rows = yield* sql<{ readonly total: string | number }>`
+					const probed = yield* sql<{ readonly total?: string | number }>`
 						SELECT id, slug, lang, title, status, template,
-							view_count, published_at, company_id,
-							COUNT(*) OVER () AS total
+							view_count, published_at, company_id
+							${totalColumn(sql, page.count)}
 						FROM pages
 						WHERE ${sql.and(conditions)}
-						LIMIT ${limit} OFFSET ${offset}
+						LIMIT ${probeLimit(page.limit)} OFFSET ${page.offset}
 					`
-					const total = yield* resolvePageTotal(
+					const { rows, hasMore } = takePage(probed, page.limit)
+					const total = yield* resolveTotal(
+						page,
 						rows,
-						offset,
 						() => sql<{ readonly count: string | number }>`
 							SELECT count(*) AS count FROM pages
 							WHERE ${sql.and(conditions)}
 						`,
 					)
 					const items = yield* decodeSummaries(rows)
-					return { items, total, limit, offset }
+					return {
+						items,
+						total,
+						limit: page.limit,
+						offset: page.offset,
+						hasMore,
+					}
 				}),
 
 			getBySlugAndLang: (slug: string, lang: string) =>

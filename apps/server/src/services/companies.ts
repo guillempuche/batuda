@@ -5,7 +5,14 @@ import { SqlClient } from 'effect/unstable/sql'
 import { CompanyResearchRun, CurrentOrg, NotFound } from '@batuda/controllers'
 import { Company, Contact, Interaction } from '@batuda/domain'
 
-import { resolvePageTotal } from '../lib/sql-pagination'
+import {
+	type CountMode,
+	pageOf,
+	probeLimit,
+	resolveTotal,
+	takePage,
+	totalColumn,
+} from '../lib/sql-pagination'
 import { contactChannelsJson } from './contact-channels'
 import { researchProvenance } from './research-provenance'
 
@@ -34,6 +41,7 @@ export interface CompanyFilters {
 	readonly maxLng?: number | undefined
 	readonly limit?: number | undefined
 	readonly offset?: number | undefined
+	readonly count?: CountMode | undefined
 }
 
 export class CompanyService extends Context.Service<CompanyService>()(
@@ -98,18 +106,18 @@ export class CompanyService extends Context.Service<CompanyService>()(
 							}
 						})()
 
-						const limit = filters.limit ?? 20
-						const offset = filters.offset ?? 0
-						const rawRows = yield* sql<{ readonly total: string | number }>`
-							SELECT *, COUNT(*) OVER () AS total FROM companies
+						const page = pageOf(filters, 20)
+						const probed = yield* sql<{ readonly total?: string | number }>`
+							SELECT *${totalColumn(sql, page.count)} FROM companies
 							WHERE ${sql.and(conditions)}
 							ORDER BY ${orderBy}
-							LIMIT ${limit} OFFSET ${offset}
+							LIMIT ${probeLimit(page.limit)} OFFSET ${page.offset}
 						`
+						const { rows, hasMore } = takePage(probed, page.limit)
 
-						const total = yield* resolvePageTotal(
-							rawRows,
-							offset,
+						const total = yield* resolveTotal(
+							page,
+							rows,
 							() => sql<{ readonly count: string | number }>`
 								SELECT count(*) AS count FROM companies
 								WHERE ${sql.and(conditions)}
@@ -119,8 +127,14 @@ export class CompanyService extends Context.Service<CompanyService>()(
 						// Decode to the domain shape so the API encodes dates as ISO strings.
 						const items = yield* Schema.decodeUnknownEffect(
 							Schema.Array(Company),
-						)(rawRows)
-						return { items, total, limit, offset }
+						)(rows)
+						return {
+							items,
+							total,
+							limit: page.limit,
+							offset: page.offset,
+							hasMore,
+						}
 					}),
 
 				findBySlug: (slug: string) =>

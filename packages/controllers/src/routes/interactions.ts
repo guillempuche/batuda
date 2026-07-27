@@ -5,7 +5,7 @@ import { Interaction } from '@batuda/domain'
 
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
-import { PaginatedList } from '../pagination'
+import { PaginatedList, pageQuery } from '../pagination'
 
 const CreateInteractionInput = Schema.Struct({
 	companyId: Schema.String,
@@ -28,8 +28,7 @@ export const InteractionsGroup = HttpApiGroup.make('interactions')
 		HttpApiEndpoint.get('list', '/interactions', {
 			query: {
 				companyId: Schema.optional(Schema.String),
-				limit: Schema.optional(Schema.NumberFromString),
-				offset: Schema.optional(Schema.NumberFromString),
+				...pageQuery,
 			},
 			success: PaginatedList(Interaction.json),
 		}),

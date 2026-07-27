@@ -269,7 +269,13 @@ async function loadDetailOnServer(slug: string): Promise<DetailPayload> {
 		const company = yield* client.companies.get({ params: { slug } })
 		const companyId = extractCompanyId(company)
 		if (companyId === null) {
-			const emptyPage = { items: [], total: 0, limit: 0, offset: 0 }
+			const emptyPage = {
+				items: [],
+				total: 0,
+				limit: 0,
+				offset: 0,
+				hasMore: false,
+			}
 			return {
 				company,
 				contacts: emptyPage,
@@ -278,7 +284,10 @@ async function loadDetailOnServer(slug: string): Promise<DetailPayload> {
 		}
 		const [contacts, tasks] = yield* Effect.all(
 			[
-				client.contacts.list({ query: { companyId } }),
+				// Matches `contactsAtomFor` exactly — the browser reuses what the
+				// server already fetched by the shape of the question, so a
+				// difference here means the page quietly asks again on arrival.
+				client.contacts.list({ query: { companyId, count: 'exact' } }),
 				client.tasks.list({ query: { companyId } }),
 			],
 			{ concurrency: 2 },

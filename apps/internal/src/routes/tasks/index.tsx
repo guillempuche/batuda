@@ -186,7 +186,11 @@ async function loadCompaniesOnServer(): Promise<PaginatedList<Company>> {
 	])
 	const program = Effect.gen(function* () {
 		const client = yield* makeBatudaApiServer(cookie ?? undefined)
-		return yield* client.companies.list({ query: { limit: 500 } })
+		// Matches `companiesListAtom` exactly, so the browser reuses this answer
+		// instead of asking again.
+		return yield* client.companies.list({
+			query: { limit: 500, count: 'exact' },
+		})
 	})
 	return Effect.runPromise(program)
 }
