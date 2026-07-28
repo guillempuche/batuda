@@ -64,5 +64,28 @@ export const McpOAuthLive = HttpApiBuilder.group(
 						)
 					}),
 				)
+				.handle('restoreConnection', _ =>
+					Effect.gen(function* () {
+						const org = yield* CurrentOrg
+						const { userId } = yield* SessionContext
+						yield* service.restoreConnection(
+							org.id,
+							userId,
+							_.payload.userId,
+							_.payload.clientId,
+						)
+						// The removal is deleted outright, so this log is the only record
+						// that it was ever lifted.
+						yield* Effect.logInfo('MCP connection restored').pipe(
+							Effect.annotateLogs({
+								event: 'mcp.connection.restored',
+								orgId: org.id,
+								actorUserId: userId,
+								targetUserId: _.payload.userId,
+								clientId: _.payload.clientId,
+							}),
+						)
+					}),
+				)
 		}),
 )

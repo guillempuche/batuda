@@ -49,6 +49,7 @@ let singleOrgUserId: string
 let multiOrgUserId: string
 let nonMemberUserId: string
 let adminUserId: string
+let ownerUserId: string
 
 const orgBySlug = async (slug: string): Promise<Org> => {
 	const result = await pool.query<Org>(
@@ -406,15 +407,23 @@ beforeAll(async () => {
 	multiOrgUserId = await createUser('multi')
 	nonMemberUserId = await createUser('none')
 	adminUserId = await createUser('admin')
+	ownerUserId = await createUser('owner')
 	await addMember(singleOrgUserId, taller.id)
 	await addMember(multiOrgUserId, taller.id)
 	await addMember(multiOrgUserId, restaurant.id)
 	await addMember(adminUserId, taller.id)
+	await addMember(ownerUserId, taller.id)
 	// Promote after the fact: addMember always joins as a plain member, and the
-	// revoke tests need one person who can act for the whole organization.
+	// revoke tests need one person who can act for the whole organization. Two
+	// of them, so a removal can be made by somebody other than the person it
+	// lands on even when that person manages the organization themselves.
 	await pool.query(
 		`UPDATE member SET role = 'admin' WHERE "userId" = $1 AND "organizationId" = $2`,
 		[adminUserId, taller.id],
+	)
+	await pool.query(
+		`UPDATE member SET role = 'owner' WHERE "userId" = $1 AND "organizationId" = $2`,
+		[ownerUserId, taller.id],
 	)
 }, 60_000)
 
@@ -915,14 +924,46 @@ const revokeAsError = (
 		Effect.flip(revokeScoped(org, actorUserId, targetUserId, clientId)),
 	)
 
+const restoreScoped = (
+	org: Org,
+	actorUserId: string,
+	targetUserId: string,
+	clientId: string,
+) =>
+	Effect.gen(function* () {
+		const sql = yield* SqlClient.SqlClient
+		const service = yield* McpOAuthService
+		return yield* enterOrgScope(sql, { org, userId: actorUserId })(
+			service.restoreConnection(org.id, actorUserId, targetUserId, clientId),
+		)
+	})
+
+const restoreAs = (
+	org: Org,
+	actorUserId: string,
+	targetUserId: string,
+	clientId: string = CLIENT_ID,
+) => runtime.runPromise(restoreScoped(org, actorUserId, targetUserId, clientId))
+
+// The failure the caller expects, rather than a rejected promise.
+const restoreAsError = (
+	org: Org,
+	actorUserId: string,
+	targetUserId: string,
+	clientId: string = CLIENT_ID,
+) =>
+	runtime.runPromise(
+		Effect.flip(restoreScoped(org, actorUserId, targetUserId, clientId)),
+	)
+
 const readRevocations = async (userId: string) => {
 	const rows = await pool.query<{
 		organization_id: string
 		revoked_by_user_id: string
 	}>(
 		`SELECT organization_id, revoked_by_user_id FROM mcp_oauth_revocation
-		 WHERE user_id = $1 AND client_id = $2 ORDER BY organization_id`,
-		[userId, CLIENT_ID],
+		 WHERE user_id = $1 ORDER BY organization_id`,
+		[userId],
 	)
 	return rows.rows
 }
@@ -993,7 +1034,7 @@ describe('McpOAuthService.listOrgConnections', () => {
 			expect(rows.some(r => r.userId === singleOrgUserId)).toBe(true)
 		})
 
-		it('should leave out a connection that was cut off', async () => {
+		it('should show a connection that was cut off, and say who cut it off', async () => {
 			// GIVEN a colleague's connection that an admin already revoked
 			await seedConsentedClient(singleOrgUserId, CLIENT_ID, 'mcp-oauth-test')
 			await setSelections(singleOrgUserId, [taller.id])
@@ -1002,8 +1043,27 @@ describe('McpOAuthService.listOrgConnections', () => {
 			// WHEN an admin asks
 			const rows = await listOrgAs(taller, adminUserId)
 
-			// THEN it is gone — the page lists what can reach the data, not what
-			// once could
+			// THEN it is listed as cut off rather than left out. This is the only
+			// place the organization can see what it stopped and allow it back, so
+			// hiding it would make the removal permanent
+			const row = rows.find(r => r.userId === singleOrgUserId)
+			expect(row?.block?.byUserId).toBe(adminUserId)
+			// AND it still wants this organization, so allowing it back would
+			// hand the assistant its access rather than tidy a record away
+			expect(row?.block?.boundHere).toBe(true)
+		})
+
+		it('should leave out a connection its own owner cut off', async () => {
+			// GIVEN a colleague who cut their own connection off from taller
+			await seedConsentedClient(singleOrgUserId, CLIENT_ID, 'mcp-oauth-test')
+			await setSelections(singleOrgUserId, [taller.id])
+			await setRevocations(singleOrgUserId, [taller.id], singleOrgUserId)
+
+			// WHEN an admin asks
+			const rows = await listOrgAs(taller, adminUserId)
+
+			// THEN it is not here. That removal is the colleague's own decision,
+			// reversible from their own list, and not the organization's to undo
 			expect(rows.some(r => r.userId === singleOrgUserId)).toBe(false)
 		})
 
@@ -1114,6 +1174,33 @@ describe('McpOAuthService.revokeConnection', () => {
 			expect(await readRevocations(singleOrgUserId)).toEqual([])
 		})
 
+		it('should NOT let the blocked person overwrite who raised it', async () => {
+			// GIVEN an admin cut the single-org user's connection off
+			await setSelections(singleOrgUserId, [taller.id])
+			await revokeAs(taller, adminUserId, singleOrgUserId)
+
+			// WHEN that person cuts their own connection off as well. Anyone may do
+			// that to their own, so it is the one write they can aim at this row
+			await revokeAs(taller, singleOrgUserId, singleOrgUserId)
+
+			// THEN the admin still owns the removal. Were it to become theirs, the
+			// next line would hand them the way out of a removal they never made
+			expect(await readRevocations(singleOrgUserId)).toEqual([
+				{ organization_id: taller.id, revoked_by_user_id: adminUserId },
+			])
+
+			// AND choosing the organization again still does not clear it
+			await runtime.runPromise(
+				Effect.gen(function* () {
+					const service = yield* McpOAuthService
+					yield* service.selectOrgs(singleOrgUserId, CLIENT_ID, [taller.id])
+				}),
+			)
+			expect(await readRevocations(singleOrgUserId)).toEqual([
+				{ organization_id: taller.id, revoked_by_user_id: adminUserId },
+			])
+		})
+
 		it('should NOT lift a block an admin raised', async () => {
 			// GIVEN an admin cut the single-org user's connection off
 			await setSelections(singleOrgUserId, [taller.id])
@@ -1131,6 +1218,194 @@ describe('McpOAuthService.revokeConnection', () => {
 			// an organization they were removed from
 			expect(await readRevocations(singleOrgUserId)).toEqual([
 				{ organization_id: taller.id, revoked_by_user_id: adminUserId },
+			])
+		})
+	})
+})
+
+describe('McpOAuthService.restoreConnection', () => {
+	describe('an owner allowing back a connection an admin cut off', () => {
+		it('should clear the removal', async () => {
+			// GIVEN an admin cut the single-org user's connection off from taller
+			await seedConsentedClient(singleOrgUserId, CLIENT_ID, 'mcp-oauth-test')
+			await setSelections(singleOrgUserId, [taller.id])
+			await revokeAs(taller, adminUserId, singleOrgUserId)
+
+			// WHEN the owner allows it back
+			await restoreAs(taller, ownerUserId, singleOrgUserId)
+
+			// THEN nothing stands in its way any more
+			expect(await readRevocations(singleOrgUserId)).toEqual([])
+		})
+
+		it('should let the assistant reach the organization again', async () => {
+			// GIVEN a connection cut off from the only organization it has, which
+			// leaves it refused on every request
+			await seedConsentedClient(singleOrgUserId, CLIENT_ID, 'mcp-oauth-test')
+			await setSelections(singleOrgUserId, [taller.id])
+			await revokeAs(taller, adminUserId, singleOrgUserId)
+			const token = await mintToken({ sub: singleOrgUserId })
+			expect(await resolveBearer(token)).toEqual({
+				kind: 'forbidden',
+				code: -32002,
+			})
+
+			// WHEN the owner allows it back
+			await restoreAs(taller, ownerUserId, singleOrgUserId)
+
+			// THEN the token resolves again, which is what a lift is for
+			expect(await resolveBearer(token)).toEqual({
+				kind: 'scoped',
+				orgIds: [taller.id],
+			})
+		})
+	})
+
+	describe('a member with no managing role', () => {
+		it('should be refused', async () => {
+			// GIVEN an admin cut a colleague's connection off
+			await seedConsentedClient(singleOrgUserId, CLIENT_ID, 'mcp-oauth-test')
+			await setSelections(singleOrgUserId, [taller.id])
+			await revokeAs(taller, adminUserId, singleOrgUserId)
+
+			// WHEN a plain member tries to allow back somebody else's connection.
+			// Acting on their own would be refused for a second reason, which would
+			// let this pass even if the role were never checked
+			const error = await restoreAsError(
+				taller,
+				multiOrgUserId,
+				singleOrgUserId,
+			)
+
+			// THEN they are refused for the role, and the removal stands
+			expect(error._tag).toBe('Forbidden')
+			expect(error.message).toContain('owner or an admin')
+			expect(await readRevocations(singleOrgUserId)).toEqual([
+				{ organization_id: taller.id, revoked_by_user_id: adminUserId },
+			])
+		})
+	})
+
+	describe('someone cut off by another person, acting on themselves', () => {
+		it('should be refused even though they manage the organization', async () => {
+			// GIVEN the owner cut the admin's own connection off. The admin manages
+			// taller, so nothing but this rule stands between them and undoing it
+			await seedConsentedClient(adminUserId, CLIENT_ID, 'mcp-oauth-test')
+			await setSelections(adminUserId, [taller.id])
+			await revokeAs(taller, ownerUserId, adminUserId)
+
+			// WHEN the admin tries to allow their own connection back
+			const error = await restoreAsError(taller, adminUserId, adminUserId)
+
+			// THEN they are refused. Recording who made a removal would mean
+			// nothing if the person it was aimed at could lift it themselves
+			expect(error._tag).toBe('Forbidden')
+			expect(error.message).toContain('cannot be allowed back by the person')
+			expect(await readRevocations(adminUserId)).toEqual([
+				{ organization_id: taller.id, revoked_by_user_id: ownerUserId },
+			])
+		})
+	})
+
+	describe('a connection that never chose this organization', () => {
+		it('should be refused rather than cleared', async () => {
+			// GIVEN a connection cut off from taller that has chosen nothing, so
+			// clearing the removal would hand it every organization its owner
+			// belongs to rather than just this one
+			await seedConsentedClient(multiOrgUserId, CLIENT_ID, 'mcp-oauth-test')
+			await setSelections(multiOrgUserId, [])
+			await revokeAs(taller, adminUserId, multiOrgUserId)
+
+			// WHEN the owner tries to allow it back
+			const error = await restoreAsError(taller, ownerUserId, multiOrgUserId)
+
+			// THEN it is refused: this organization can take its own obstacle
+			// away, but it cannot make a choice on someone else's behalf
+			expect(error._tag).toBe('Forbidden')
+			expect(error.message).toContain('not set to work in this organization')
+			expect(await readRevocations(multiOrgUserId)).toEqual([
+				{ organization_id: taller.id, revoked_by_user_id: adminUserId },
+			])
+		})
+	})
+
+	describe('a removal the member made on their own connection', () => {
+		it('should be refused even to an owner', async () => {
+			// GIVEN a member who switched their own assistant off in this
+			// organization
+			await seedConsentedClient(singleOrgUserId, CLIENT_ID, 'mcp-oauth-test')
+			await setSelections(singleOrgUserId, [taller.id])
+			await revokeAs(taller, singleOrgUserId, singleOrgUserId)
+
+			// WHEN an owner tries to switch it back on for them
+			const error = await restoreAsError(taller, ownerUserId, singleOrgUserId)
+
+			// THEN it is refused. The organization may remove a connection, but it
+			// does not get to undo somebody's own decision about their assistant
+			expect(error._tag).toBe('Forbidden')
+			expect(error.message).toContain('removed by the person it belongs to')
+			expect(await readRevocations(singleOrgUserId)).toEqual([
+				{ organization_id: taller.id, revoked_by_user_id: singleOrgUserId },
+			])
+		})
+	})
+
+	describe('nothing is blocked', () => {
+		it('should report that there is nothing to allow back', async () => {
+			// GIVEN a connection this organization has not removed
+			await seedConsentedClient(singleOrgUserId, CLIENT_ID, 'mcp-oauth-test')
+			await setSelections(singleOrgUserId, [taller.id])
+
+			// WHEN an owner tries to allow it back anyway
+			const error = await restoreAsError(taller, ownerUserId, singleOrgUserId)
+
+			// THEN it says so rather than reporting success for a call that changed
+			// nothing — which would also record a removal being lifted that never was
+			expect(error._tag).toBe('NotFound')
+		})
+	})
+
+	describe('two members stopped for the same assistant', () => {
+		it('should allow back only the one named', async () => {
+			// GIVEN two people in this organization stopped for the same assistant
+			await seedConsentedClient(singleOrgUserId, CLIENT_ID, 'mcp-oauth-test')
+			await seedConsentedClient(multiOrgUserId, CLIENT_ID, 'mcp-oauth-test')
+			await setSelections(singleOrgUserId, [taller.id])
+			await setSelections(multiOrgUserId, [taller.id])
+			await revokeAs(taller, adminUserId, singleOrgUserId)
+			await revokeAs(taller, adminUserId, multiOrgUserId)
+
+			// WHEN the owner allows one of them back
+			await restoreAs(taller, ownerUserId, singleOrgUserId)
+
+			// THEN the other person is untouched. They share an assistant, so a
+			// delete that matched on it alone would quietly clear them both
+			expect(await readRevocations(singleOrgUserId)).toEqual([])
+			expect(await readRevocations(multiOrgUserId)).toEqual([
+				{ organization_id: taller.id, revoked_by_user_id: adminUserId },
+			])
+		})
+	})
+
+	describe('a removal recorded by a different organization', () => {
+		it('should be left alone', async () => {
+			// GIVEN the multi-org user cut off from both organizations — taller by
+			// its admin, restaurant by themselves
+			await seedConsentedClient(multiOrgUserId, CLIENT_ID, 'mcp-oauth-test')
+			await setSelections(multiOrgUserId, [taller.id, restaurant.id])
+			await revokeAs(taller, adminUserId, multiOrgUserId)
+			await revokeAs(restaurant, multiOrgUserId, multiOrgUserId)
+
+			// WHEN an owner of taller allows the connection back
+			await restoreAs(taller, ownerUserId, multiOrgUserId)
+
+			// THEN only taller's removal goes. One organization never reaches into
+			// another's, whatever the request asks for
+			expect(await readRevocations(multiOrgUserId)).toEqual([
+				{
+					organization_id: restaurant.id,
+					revoked_by_user_id: multiOrgUserId,
+				},
 			])
 		})
 	})
@@ -1304,6 +1579,23 @@ describe('McpOAuthService.listConnections', () => {
 			expect(connections[0]?.blocks).toEqual([
 				{ organizationId: taller.id, blockedBySelf: true },
 			])
+		})
+	})
+
+	describe('a connection stopped in an organization it never chose', () => {
+		it('should say the member has not chosen it', async () => {
+			// GIVEN a connection stopped here that has chosen nothing
+			await seedConsentedClient(singleOrgUserId, CLIENT_ID, 'mcp-oauth-test')
+			await setSelections(singleOrgUserId, [])
+			await setRevocations(singleOrgUserId, [taller.id], adminUserId)
+
+			// WHEN an admin asks
+			const rows = await listOrgAs(taller, adminUserId)
+
+			// THEN the removal is reported as one that would hand nothing back, so
+			// the screen can say as much rather than offer an action that is refused
+			const row = rows.find(r => r.userId === singleOrgUserId)
+			expect(row?.block?.boundHere).toBe(false)
 		})
 	})
 

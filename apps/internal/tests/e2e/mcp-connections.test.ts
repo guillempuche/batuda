@@ -9,9 +9,11 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 // organization picker; the happy-path consent flow is validated against the dev
 // stack manually.
 //
-// The picker test changes seeded data, so it puts it back — the suite runs
-// against the live development database and `db reset` / `seed` are run by hand,
-// so a change left behind would make the next run start somewhere else.
+// Both tests that change seeded data put it back afterwards, so a re-run — or a
+// retry after a failure part-way through — starts where the seed left it. The
+// restored removal then names whoever was signed in rather than the admin the
+// seed named, which is why nothing asserts on that name. The root `test:e2e`
+// rebuilds the sample data first, so a full run starts clean regardless.
 
 test.beforeEach(async ({ page }) => {
 	await page.goto('/', { waitUntil: 'commit' })
@@ -191,5 +193,54 @@ test.describe('OAuth consent', () => {
 		await expect(page.getByTestId('oauth-consent-allow')).toBeEnabled()
 		await page.getByTestId('oauth-consent-org-restaurant').uncheck()
 		await expect(page.getByTestId('oauth-consent-allow')).toBeDisabled()
+	})
+})
+
+test.describe('settings — allowing a stopped assistant back', () => {
+	// Alice owns taller; Carol's Copilot is a connection of somebody else's, so
+	// this is the case the rules allow — nobody may take back a removal aimed at
+	// themselves. Stopping it again at the end leaves a row where the seed put
+	// one, so a second run finds something to allow back.
+	// Put the removal back however the test ended, including a failed attempt
+	// part-way through — a retry that started from an allowed connection would
+	// fail on the wrong assertion and stay red until someone reseeded by hand.
+	test.afterEach(async ({ page }) => {
+		await page.goto('/settings/mcp/connections', { waitUntil: 'networkidle' })
+		const stillAllowed = page
+			.getByTestId('mcp-org-connection-row')
+			.filter({ hasText: 'Copilot' })
+		if ((await stillAllowed.count()) > 0) {
+			await stillAllowed.getByRole('button', { name: /revoke/i }).click()
+			await page.getByTestId('mcp-org-revoke-confirm').click()
+			await expect(page.getByTestId('mcp-org-blocked-row')).toHaveCount(1)
+		}
+	})
+
+	test('should allow a stopped assistant back', async ({ page }) => {
+		await page.goto('/settings/mcp/connections', { waitUntil: 'networkidle' })
+
+		// GIVEN Carol's Copilot, which the seed has stopped in this organization.
+		// It is listed rather than hidden, because this list is the only way back
+		const blocked = page.getByTestId('mcp-org-blocked-row')
+		await expect(blocked).toHaveCount(1)
+		await expect(blocked).toContainText('Copilot')
+		const active = page
+			.getByTestId('mcp-org-connection-row')
+			.filter({ hasText: 'Copilot' })
+		await expect(active).toHaveCount(0)
+
+		// WHEN the owner allows it back
+		await blocked.getByRole('button', { name: /allow again/i }).click()
+
+		// THEN it leaves the stopped list and can reach the organization again
+		await expect(page.getByTestId('mcp-org-blocked-row')).toHaveCount(0)
+		await expect(active).toHaveCount(1)
+
+		// AND the keyboard lands on the heading of the list the row moved to.
+		// The button it was on has gone with the row, so without this a keyboard
+		// or screen-reader user is dropped back to the top of the document
+		await expect(
+			page.getByRole('heading', { name: /everyone's connections/i }),
+		).toBeFocused()
 	})
 })
