@@ -7,7 +7,7 @@ import { DATABASE_URL } from './helpers/database-url'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 // Asserts /settings/organization/spend renders aggregated paid-research
-// spend and re-fetches when the range toggle changes. Slice B.
+// spend and re-fetches when the range toggle changes.
 //
 // Selectors verified against:
 //   apps/internal/src/routes/settings/organization/index.tsx
@@ -22,7 +22,8 @@ const psql = (sqlText: string): string =>
 	}).trim()
 
 const seededKeys: string[] = []
-// Who the seeded spend is charged to, and how its row is found on the page.
+// Who the seeded spend is charged to — the page should show their name
+// instead.
 let seededUserId = ''
 
 test.describe('org spend dashboard', () => {
@@ -112,11 +113,13 @@ test.describe('org spend dashboard', () => {
 			await expect(byProvider).toContainText('brave')
 			await expect(byProvider).toContainText('firecrawl')
 
-			// AND the user table shows that person with money against them. Not a
-			// call count: this table totals everything the organisation ever spent
-			// per person, and the sample data charges the same person too.
+			// AND the user table names that person and shows money against them,
+			// rather than the account id the spend is stored under. Not a call
+			// count: this table totals everything the organisation ever spent per
+			// person, and the sample data charges the same person too.
 			const byUser = page.getByTestId('settings-spend-by-user')
-			await expect(byUser).toContainText(seededUserId)
+			await expect(byUser).toContainText('Alice Admin')
+			await expect(byUser).not.toContainText(seededUserId)
 			await expect(byUser).toContainText(/€\d/)
 
 			// AND the tool table lists the two seeded tools
