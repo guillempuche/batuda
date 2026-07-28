@@ -29,6 +29,10 @@ jobs:
     name: Probe configured models
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # The RESEARCH_LLM_*_API_KEY secrets below live on the `production`
+    # environment (Infisical syncs them there), and a job only sees an
+    # environment's secrets when it names that environment.
+    environment: production
     permissions:
       contents: read
       issues: write
@@ -46,6 +50,20 @@ jobs:
 
       # Routing comes from the committed production settings, so the check looks
       # at the models production really uses. Only the keys are secret.
+      #
+      # The probe runs as its own step below: what a step writes to GITHUB_ENV
+      # reaches later steps, never the rest of the step that wrote it.
+      - name: Export the configured model settings
+        run: |
+          node -e '
+            const config = require("./apps/server/config.production.json")
+            for (const [key, value] of Object.entries(config)) {
+              if (key.startsWith("RESEARCH_LLM_") && !key.includes("API_KEY")) {
+                console.log(`${key}=${value}`)
+              }
+            }
+          ' >> "$GITHUB_ENV"
+
       - name: Probe every configured slot
         id: probe
         env:
@@ -57,14 +75,6 @@ jobs:
           RESEARCH_LLM_WRITER_API_KEY_2: ${{ secrets.RESEARCH_LLM_WRITER_API_KEY_2 }}
         run: |
           set -o pipefail
-          node -e '
-            const config = require("./apps/server/config.production.json")
-            for (const [key, value] of Object.entries(config)) {
-              if (key.startsWith("RESEARCH_LLM_") && !key.includes("API_KEY")) {
-                console.log(`${key}=${value}`)
-              }
-            }
-          ' >> "$GITHUB_ENV"
           pnpm cli research probe-config 2>&1 | tee probe.log
 
       - name: Open or update an issue when a model can no longer do its work
