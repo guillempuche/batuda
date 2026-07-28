@@ -319,7 +319,10 @@ function BoardColumn({
 		// very same filters this column reads, and the two are different screens.
 		resetKey: `board:${canonicalSearchKey(columnSearch)}`,
 		pageSize: COMPANIES_PAGE_SIZE,
-		count: 'exact',
+		// Uncounted: the number above each column comes from the board's own
+		// snapshot, and its footer stays quiet, so counting every stage on every
+		// board load — and twice more each time a card moves — would be paid for
+		// by nobody.
 		atomFor: page => companiesSearchAtom(columnSearch, page),
 	})
 

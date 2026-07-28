@@ -255,10 +255,12 @@ export function ResearchInbox() {
 	const pendingCount = Math.max(0, totalPending - resolvedCount)
 	// More are waiting than were fetched, so say so rather than quietly ending.
 	const notShown = Math.max(0, totalPending - proposals.length)
-	const recentRuns =
-		(AsyncResult.isSuccess(runCountResult)
-			? runCountResult.value.total
-			: null) ?? 0
+	// Counted server-side over every run, so this is the real figure however
+	// many there are — and left unknown rather than shown as zero until the
+	// count is back, because "0 runs" and "not counted yet" are not the same.
+	const recentRuns = AsyncResult.isSuccess(runCountResult)
+		? (runCountResult.value.total ?? undefined)
+		: undefined
 
 	const isLoading = AsyncResult.isInitial(proposalsResult)
 	const isFailure = AsyncResult.isFailure(proposalsResult)
@@ -378,9 +380,7 @@ export function ResearchInbox() {
 
 			<Counters data-testid='research-inbox-counters'>
 				<Tile>
-					<TileValue>
-						{recentRuns >= INBOX_PROPOSAL_LIMIT ? '100+' : recentRuns}
-					</TileValue>
+					<TileValue>{recentRuns ?? '—'}</TileValue>
 					<TileLabel>
 						<Trans>Recent runs</Trans>
 					</TileLabel>
