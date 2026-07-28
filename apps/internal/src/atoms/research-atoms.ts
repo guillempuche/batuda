@@ -1,7 +1,12 @@
 import { Atom } from 'effect/unstable/reactivity'
 
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
-import type { ListPage } from '#/lib/list-page'
+import {
+	firstPage,
+	type ListPage,
+	listPageKey,
+	listPageQuery,
+} from '#/lib/list-page'
 
 export type ResearchListParams = {
 	readonly subjectTable?: 'companies' | 'contacts'
@@ -86,27 +91,41 @@ const runProposalsCache = new Map<
 	ReturnType<typeof makeRunProposalsAtom>
 >()
 
-/** How many of a run's proposed updates the review screen holds at once. */
+/** How many of a run's proposed updates the review screen reads at a time. */
 export const RUN_PROPOSALS_PAGE_SIZE = 100
 
-function makeRunProposalsAtom(researchId: string) {
-	return BatudaApiAtom.query('research', 'listProposedUpdates', {
+function makeRunProposalsAtom(researchId: string, page: ListPage) {
+	const atom = BatudaApiAtom.query('research', 'listProposedUpdates', {
 		params: { id: researchId },
-		// Uncounted: the review screen works through the proposals it has and
-		// never states how many there are, so paying to count them would buy
-		// nothing.
-		query: { limit: RUN_PROPOSALS_PAGE_SIZE },
-		serializationKey: `research:proposed-updates:${researchId}`,
+		query: listPageQuery(page),
+		serializationKey: `research:proposed-updates:${researchId}::${listPageKey(page)}`,
 	})
+	// Only the first slice is held, so reopening a run paints the top of its
+	// review straight away; later slices are kept by the screen that read them.
+	return page.offset === 0 ? Atom.keepAlive(atom) : atom
 }
 
-/** One run's proposed updates, with their `fields` and pending/resolved status. */
-export function runProposedUpdatesAtom(researchId: string) {
-	const existing = runProposalsCache.get(researchId)
+/**
+ * One slice of a run's proposed updates, with their `fields` and
+ * pending/resolved status.
+ */
+export function runProposedUpdatesAtom(researchId: string, page: ListPage) {
+	const key = `${researchId}::${listPageKey(page)}`
+	const existing = runProposalsCache.get(key)
 	if (existing !== undefined) return existing
-	const atom = makeRunProposalsAtom(researchId)
-	runProposalsCache.set(researchId, atom)
+	const atom = makeRunProposalsAtom(researchId, page)
+	runProposalsCache.set(key, atom)
 	return atom
+}
+
+/**
+ * The first slice the review screen asks for, shared with its route loader.
+ *
+ * Uncounted: the screen works through the proposals it has and never states
+ * how many there are, so paying to count them would buy nothing.
+ */
+export function runProposedUpdatesFirstPage(): ListPage {
+	return firstPage(RUN_PROPOSALS_PAGE_SIZE, 'none')
 }
 
 export const createResearchAtom = BatudaApiAtom.mutation('research', 'create')

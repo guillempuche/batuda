@@ -5,13 +5,14 @@ import { ArrowLeft } from 'lucide-react'
 import styled from 'styled-components'
 
 import {
-	RUN_PROPOSALS_PAGE_SIZE,
 	researchDetailAtom,
 	runProposedUpdatesAtom,
+	runProposedUpdatesFirstPage,
 } from '#/atoms/research-atoms'
 import { useSetDocumentTitle } from '#/components/layout/top-bar-title'
 import { RunDetail } from '#/components/research/run-detail'
 import { dehydrateAtom } from '#/lib/atom-hydration'
+import { listPageQuery } from '#/lib/list-page'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import { stenciledTitle } from '#/lib/workshop-mixins'
 
@@ -31,9 +32,9 @@ async function loadRunOnServer(id: string) {
 		const run = yield* client.research.get({ params: { id } })
 		const proposals = yield* client.research.listProposedUpdates({
 			params: { id },
-			// Matches `runProposedUpdatesAtom` exactly, so the browser reuses this
-			// answer instead of asking again.
-			query: { limit: RUN_PROPOSALS_PAGE_SIZE },
+			// The review screen's own first slice, asked for the same way, so the
+			// browser reuses this answer instead of asking again.
+			query: listPageQuery(runProposedUpdatesFirstPage()),
 		})
 		return { run, proposals }
 	})
@@ -51,7 +52,7 @@ export const Route = createFileRoute('/research/$id')({
 				dehydrated: [
 					dehydrateAtom(researchDetailAtom(id), AsyncResult.success(run)),
 					dehydrateAtom(
-						runProposedUpdatesAtom(id),
+						runProposedUpdatesAtom(id, runProposedUpdatesFirstPage()),
 						AsyncResult.success(proposals),
 					),
 				] as const,
