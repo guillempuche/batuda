@@ -1,6 +1,6 @@
 // Tiny SMTP injector for e2e specs that need to drive the inbound side of the
 // mail-worker. Mirrors `apps/cli/src/lib/smtp-inject.ts` — the CLI helper sits
-// behind an Effect API the seed uses, while this helper is a thin Promise
+// behind an Effect API its commands use, while this helper is a thin Promise
 // wrapper specs can `await`. Both target the same dev mail catcher on
 // localhost:1025.
 

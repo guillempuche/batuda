@@ -1,12 +1,12 @@
 import { Effect } from 'effect'
 import nodemailer from 'nodemailer'
 
-// Shared SMTP injector into the dev mail catcher. The seed uses it to populate
-// demo inboxes via the real ingest path; the `email inject` CLI command uses
-// it for ad-hoc dev pokes; the e2e helper re-exports it for the IMAP-roundtrip
-// spec. One transport per call — connection cost is negligible against the
-// catcher on localhost and removes any cross-process state we'd otherwise have
-// to manage.
+// Shared SMTP injector into the dev mail catcher, used by the `email inject`
+// CLI command for ad-hoc dev pokes and mirrored by an e2e helper for the
+// IMAP-roundtrip spec. Not by the seed: it writes its demo messages straight to
+// the database, so nothing it creates passes through the catcher. One transport
+// per call — connection cost is negligible against the catcher on localhost and
+// removes any cross-process state we'd otherwise have to manage.
 
 export interface InjectAttachment {
 	readonly filename: string

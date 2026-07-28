@@ -19,6 +19,7 @@
 		"check-types": "turbo check-types",
 		"test": "turbo test",
 		"test:integration": "turbo test:integration",
+		"test:e2e": "pnpm cli db reset && pnpm cli seed --quiet && pnpm --filter @batuda/internal test:e2e",
 		"______ Code Quality ______": "",
 		"lint": "pnpm lint-syncpack && pnpm lint-biome && pnpm lint-markdown",
 		"lint-biome": "biome check --write --no-errors-on-unmatched --max-diagnostics=none",
