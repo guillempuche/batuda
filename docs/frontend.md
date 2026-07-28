@@ -439,6 +439,8 @@ const StatusBadge = styled.span<{ $status: string }>`
 | `PriTooltip`     | `Tooltip`     | Short field explanations                                    |
 | `PriCollapsible` | `Collapsible` | Expandable sections on company detail                       |
 
+A folded `PriCollapsible` panel keeps its text on the page rather than dropping it, so the browser's own find-in-page reaches it and opens the section on a match. That is `hiddenUntilFound`, defaulted on in the wrapper — pass `hiddenUntilFound={false}` where content should not linger while folded, as the company timeline does because it holds a status line read aloud by screen readers. It relies on Tailwind's reset scoping `display: none` to `[hidden]:where(:not([hidden='until-found']))`; without that carve-out a folded section would be permanently invisible rather than merely unfindable.
+
 ---
 
 ## Motion — animations

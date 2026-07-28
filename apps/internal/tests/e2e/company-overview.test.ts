@@ -113,8 +113,17 @@ test.describe('company-detail Overview tab', () => {
 			//   [components/companies/about-section.tsx — PriCollapsible.Root, no defaultOpen]
 			const trigger = page.getByTestId('company-about-trigger')
 			await expect(trigger).toBeVisible()
-			// AND the panel content is not visible before the trigger is clicked
-			await expect(page.getByTestId('company-about-panel')).toBeHidden()
+			// AND the panel content is not visible before the trigger is clicked,
+			// but is still on the page — marked so the browser's Find can reach it.
+			// Checking the mark too: "hidden" alone would also pass if the panel
+			// were not rendered at all. The mark sits on the parent, because the
+			// test id is on the inner body.
+			const panel = page.getByTestId('company-about-panel')
+			await expect(panel).toBeHidden()
+			await expect(panel.locator('xpath=..')).toHaveAttribute(
+				'hidden',
+				'until-found',
+			)
 
 			// WHEN the user clicks the About trigger.
 			// The header runs a shared-layout animation and the dev server applies
@@ -122,7 +131,6 @@ test.describe('company-detail Overview tab', () => {
 			// first second and a click sent mid-flight lands on empty space. Retry
 			// until it lands, and only while still closed so a click that did
 			// register is never undone by the next attempt.
-			const panel = page.getByTestId('company-about-panel')
 			await expect(async () => {
 				if ((await trigger.getAttribute('aria-expanded')) !== 'true') {
 					await trigger.click()

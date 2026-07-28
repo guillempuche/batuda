@@ -1228,7 +1228,11 @@ function DetailBody({
 												<ChevronRight size={14} aria-hidden />
 												<Trans>Timeline</Trans>
 											</TimelineTrigger>
-											<PriCollapsible.Panel>
+											{/* This panel starts open, so staying findable while
+											    folded buys nothing — and it holds a status line read
+											    aloud, which would go on announcing from a folded
+											    section. */}
+											<PriCollapsible.Panel hiddenUntilFound={false}>
 												<TimelinePanelInner>
 													<TimelineToolbar>
 														<SystemEventsToggle>
