@@ -257,10 +257,23 @@ Don't pick squash vs rebase alone. Post the commit trail with a one-line summary
 git log main..HEAD --oneline
 ```
 
-- **Rebase** — each commit is independently meaningful and worth keeping on main (matches one-PR-per-slice, each commit a focused topic).
-- **Squash** — the trail has cleanup / fix-on-fix commits not worth preserving. If squashing, draft the squashed message via `/commit` first so it's reviewable.
+**Size decides the starting point.** A short trail — roughly a handful of commits, each a focused topic — rebases. A long one is a sign the work sprawled, and squashing to one commit is usually the better end state; the individual commits stay visible on the PR page for review either way, so squashing costs nothing a reviewer needs.
 
-Default to **rebase** unless squashing serves a specific reason.
+**Then check the trail is worth keeping, because a rebase puts every commit on `main` forever.** The reason to prefer rebase is that somebody can later bisect to the commit that broke something — and that only works if each commit *builds on its own*. Verify it rather than assuming:
+
+```bash
+for sha in $(git rev-list --reverse main..HEAD); do
+  git checkout -q $sha
+  pnpm check-types >/dev/null 2>&1 && echo "OK   $(git log --oneline -1)" || echo "FAIL $(git log --oneline -1)"
+done
+git checkout -q -   # back to the branch
+```
+
+If commits fail, **squash** — rebasing them puts broken revisions on `main`, which is worse than one honest commit: a bisect lands on a build failure and tells you nothing.
+
+This bites hardest after regrouping a sprawling trail by topic. Splitting by area is the natural way to make a big PR readable, and it reliably produces commits that do not build alone, because a file in one group references something that only arrives in another. Regrouping is still worth doing — it makes the PR far easier to review — but it buys readability, not bisectability. Do not offer bisect as its justification.
+
+If squashing, draft the squashed message via `/commit` first so it's reviewable.
 
 ```bash
 gh pr merge <N> --rebase --delete-branch    # or --squash --delete-branch
@@ -283,4 +296,4 @@ If rebase hits conflicts: pause and surface to the user — rebase the branch lo
 - Verification gates: `install` → `check-types` + `test` → `build`.
 - PR body in the house style with a Review guide; `## Verification` claims only what was actually run; first-person singular; understandable by a non-technical reader and a new contributor without prior context; no AI attribution.
 - Open ready by default (draft only for nameable WIP); watch CI to green; address review through the same gates; keep the PR body in sync.
-- Merge by rebase or squash (consult first), never a merge-commit.
+- Merge by rebase or squash (consult first), never a merge-commit. Rebase only a short trail whose commits each build on their own — check, don't assume.

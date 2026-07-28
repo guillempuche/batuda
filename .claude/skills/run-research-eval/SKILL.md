@@ -11,7 +11,7 @@ Full reference: `eval/README.md`. This skill is the run procedure and the guardr
 
 ## Before you touch a command
 
-1. **This spends real money and hours.** One pass of the shipped golden set (~20 companies × `--runs 3`) is roughly **$10–15** and **1–2.5h** of live API calls, billed to the org's Firecrawl/LLM accounts. Confirm the user actually wants to spend it, and confirm **scope**: the current branch only ("after"), or a before/after pair against `main` too (doubles it).
+1. **This spends real money and hours.** Three passes of the shipped golden set (~20 companies each) cost roughly **$10–15** and **1–2.5h** of live API calls, billed to the org's Firecrawl/LLM accounts. Confirm the user actually wants to spend it, and confirm **scope**: the current branch only ("after"), or a before/after pair against `main` too (doubles it). A before/after pair inside 24h must clear `search_cache` between the two sides — its rows live a day and a hit bills nothing, so the second side would otherwise be answered by the first and report near-zero credits.
 2. **Worktree must be up:** `pnpm cli worktree up` (own DB + bucket), `pnpm cli worktree doctor` to confirm Postgres is reachable.
 3. **Org/user** are seeded with generated ids — resolve them from the local DB, don't hard-code:
    ```bash
@@ -21,35 +21,87 @@ Full reference: `eval/README.md`. This skill is the run procedure and the guardr
 
 ## The one rule that trips every run: routing ≠ keys
 
-The keys being present does **not** mean the eval will run. The pipeline also needs the **routing** — `RESEARCH_LLM_{AGENT,EXTRACT,WRITER}_PROVIDERS` + `_MODEL`, and `RESEARCH_PROVIDER_{SEARCH,SCRAPE,REGISTRY_GB}`. If any are missing from the run environment, that provider silently falls back to `stub` and the run reports **100% empty** over canned data.
+Two different things have to be present, and they come from two different places:
 
-- **Check the routing before spending.** Read the selector/model *values* from the env (these are not secret) — if they are absent or `stub`, the run will be worthless:
-  ```bash
-  infisical run --env=<env> -- sh -c 'for v in RESEARCH_LLM_AGENT_PROVIDERS RESEARCH_LLM_AGENT_MODEL RESEARCH_PROVIDER_SCRAPE; do eval "x=\$$v"; echo "$v=${x:-<ABSENT>}"; done'
-  ```
-- **Do NOT guess vendors/models.** They live in the Infisical env (or must be added there); prior-session memory drifts. If the env lacks routing, ask the user for `vendor` + `model` per tier, or have them add `RESEARCH_LLM_*_{PROVIDERS,MODEL}` to the env. Named vendors (`groq`, `fireworks`, `nebius`) carry their own endpoint — a tier needs only `PROVIDERS` + `MODEL`; only `custom` also needs `_BASE_URL`.
-- **Run the two-slot cascade prod runs.** Production routes each tier `custom,<fallback>` (`apps/server/config.production.json`: `custom,groq` for agent/writer, `custom,fireworks` for extract). Measure with the same cascade so a vendor blip falls back instead of failing the run — a single-slot eval under load misreads a transient 4xx as a quality drop. Keep run concurrency at 1 regardless.
-- **Never pass a key on the command line.** Keys inject from the Infisical env. A provider name or model id is fine to pass inline; an API key is not (`pnpm` echoes its argv — a key there leaks).
+- **The routing** — which vendor and model each tier uses — is **not secret** and is **committed** in `apps/server/config.production.json`. It is not in Infisical. Do not go looking for it there, and do not ask the user for it.
+- **The keys** come from Infisical and never appear on a command line.
+
+If the routing is missing from the run environment, that provider silently falls back to `stub` and the run reports **100% empty** over canned data. So the run has to carry the committed routing in explicitly:
+
+```bash
+# Every RESEARCH_* setting except the keys, as `NAME=value` arguments to `env`.
+ROUTING=$(node -e 'const c=require("./apps/server/config.production.json");
+  for (const [k, v] of Object.entries(c))
+    if (k.startsWith("RESEARCH_") && !k.includes("API_KEY")) process.stdout.write(k + "=" + v + "\n")')
+```
+
+Feed it after `infisical run` so it wins over anything the environment carries, together with the worktree's own database (a dev Infisical env ships its own `DATABASE_URL` and would otherwise win):
+
+```bash
+infisical run --env=<env> -- env $ROUTING DATABASE_URL="$DB" \
+  RESEARCH_PROVIDER_REGISTRY_ES=none RESEARCH_PROVIDER_REGISTRY_GB=none \
+  pnpm cli research eval …
+```
+
+This is the same trick `.github/workflows/model_capability.yml` uses to probe the models: committed routing plus injected keys.
+
+**Turn the registries off for a pass that measures quality** — the two `=none` above. A registry hands back a company's directors, who are named people with titles, so leaving it on feeds the contact numbers from a source the change under test has nothing to do with. It costs money and does not fire on every pass. Keep one registries-on pass separately as the figure that represents production.
+
+**Never print a secret.** `infisical secrets` prints values in plain text — it has no redacted mode, and its `--json` output is preceded by the shell banner, so a naive parse returns nothing and tempts you into the plain form. If you need to know which keys exist, list names only:
+
+```bash
+infisical secrets --env=<env> | awk -F'│' 'NF>2 {print $2}'
+```
+
+Reading a key is never necessary: `infisical run` injects them into the child process.
+
+**Run the two-slot cascade production runs.** Each tier routes `custom,<fallback>` — `custom,groq` for agent and writer, `custom,fireworks` for extract. Measure with the same cascade so a vendor blip falls back instead of failing the run; a single-slot eval under load misreads a transient 4xx as a quality drop. Keep run concurrency at 1 regardless.
+
+**`infisical` lives in the nix shell**, not on the plain PATH. Prefix everything with `nix develop --command sh -c '…'`.
 
 ## Infra stays local, never cloud
 
-`DATABASE_URL` and `STORAGE_*` must resolve to the worktree's own DB + bucket, never prod. The dev Infisical env carries neither, so a dev-env run gets both from the worktree `.env` automatically. If you run off an env that *does* carry them (e.g. prod), pin both back to local with a leading `env DATABASE_URL=… STORAGE_ENDPOINT=…` before `pnpm` (see `eval/README.md`).
+`DATABASE_URL` and `STORAGE_*` must resolve to the worktree's own DB + bucket, never prod.
+
+**Pin `DATABASE_URL` on every eval command.** The dev env carries one, and anything the caller exports outranks every `.env` file (`apps/cli/src/lib/load-env.ts`), so the worktree's own value never wins on its own:
+
+```bash
+infisical run --env=dev -- env DATABASE_URL="postgresql://batuda:batuda@localhost:5433/<worktree-db>" pnpm cli research eval …
+```
+
+`STORAGE_*` is genuinely absent from the dev env and comes from the worktree by itself. The eval refuses to start against a non-local database, so a forgotten pin stops the run instead of writing a pass into a shared one.
 
 ## Validate one company first, then the full pass
 
 Always shake out the config on a single row before the billable run — a wrong vendor/model, an expired key, or a network-blocked provider fails in seconds as a 100% empty rate.
 
 ```bash
-# 1. one-row golden (pick one company from the set), --runs 1
-infisical run --env=<env> -- sh -c '<inline routing if not in env> \
-  pnpm cli research eval --org <org> --user <user> --golden <one-row>.json --runs 1 --out /tmp/one.json'
-# grep the run log for "AuthenticationError" / "status: 40" — empty=100% + a 4xx means routing is wrong, fix before step 2.
+DB="postgresql://batuda:batuda@localhost:5433/<worktree-db>"
+ROUTING=$(node -e 'const c=require("./apps/server/config.production.json");
+  for (const [k, v] of Object.entries(c))
+    if (k.startsWith("RESEARCH_") && !k.includes("API_KEY")) process.stdout.write(k + "=" + v + "\n")')
 
-# 2. full pass, --runs 3 (mandatory — the eval re-scrapes each run, a single run is noise)
-infisical run --env=<env> -- pnpm cli research eval --org <org> --user <user> --golden eval/golden.example.json --runs 3 --out report.json
+# 1. one row, one run — proves the routing is live before anything is spent.
+nix develop --command sh -c "infisical run --env=<env> -- env $ROUTING DATABASE_URL='$DB' \
+  RESEARCH_PROVIDER_REGISTRY_ES=none RESEARCH_PROVIDER_REGISTRY_GB=none \
+  pnpm cli research eval --org <org> --user <user> --golden <one-row>.json --runs 1 --out /tmp/one.json"
+# An empty rate of 100% means the routing did not arrive; a 4xx in the log means a
+# key did not. Either way, stop — do not start step 2.
+
+# 2. three full passes — a single one is noise. Clear the caches between them, or
+#    passes 2 and 3 are answered from pass 1 and average away nothing.
+for i in 1 2 3; do
+  psql "$DB" -c 'DELETE FROM search_cache; DELETE FROM llm_cache;'
+  nix develop --command sh -c "infisical run --env=<env> -- env $ROUTING DATABASE_URL='$DB' \
+    RESEARCH_PROVIDER_REGISTRY_ES=none RESEARCH_PROVIDER_REGISTRY_GB=none \
+    pnpm cli research eval --org <org> --user <user> \
+    --golden eval/golden.example.json --runs 1 --by-bucket --out report-$i.json"
+done
 ```
 
-Run the full pass **in the background** (it outlives the 2-minute foreground limit); read `report.json` when it lands.
+Run the passes **in the background** (they outlive the 2-minute foreground limit); read the reports when they land.
+
+**Read credits from the per-run rows, not the summary.** A report's `runs[].usage.creditsUsed` is what a run actually consumed; the printed `Credits per run` averages over repeats, so any repeat served from cache drags it toward zero.
 
 ## Reading the result
 

@@ -5,6 +5,21 @@ For project overview, stack, and setup see [README.md](README.md).
 
 ---
 
+## Never reveal a secret's value
+
+An API key, token, password or connection string must never be printed, echoed, written to a file, pasted into a message, or put in a command's arguments. This holds even when the value is already on the machine, even when a tool offers it, and even when reading it looks like the quickest way to check something.
+
+Two traps have caught this before:
+
+- **A tool that prints values by default.** `infisical secrets` writes every key out in full and has no redacted mode. Its structured output is preceded by a shell banner, so a naive parse comes back empty and tempts you into the plain form. To find out which secrets exist, read their **names**: `infisical secrets --env=<env> | awk -F'│' 'NF>2 {print $2}'`.
+- **Arguments, not just output.** `pnpm` echoes the command line it received, so a key passed as a flag ends up in the log. Pass it through the environment instead (`VAR="$SRC" pnpm …`), never as `--api-key <value>`.
+
+Reading a secret is essentially never necessary. `infisical run -- <command>` injects them into the child process, which is what every script and every check should rely on. If something appears to need the value itself, say so and let the person handle it rather than printing it to find out.
+
+If a value does get exposed, stop, say plainly which ones and where, and tell the person to rotate them. A leaked key that nobody is told about is far worse than one that is.
+
+---
+
 ## Dev environment
 
 This project uses a **Nix flake** (`flake.nix`) with **direnv** (`.envrc`) to provide Node 24 and pnpm. On entering the directory, direnv activates the flake automatically — no manual `nix develop` needed.
