@@ -2543,10 +2543,6 @@ msgstr "Keep editing"
 msgid "Keep it"
 msgstr "Keep it"
 
-#: src/routes/settings/organization/spend.tsx
-msgid "Key"
-msgstr "Key"
-
 #: src/routes/settings/api-keys/index.tsx
 msgid "Key deleted"
 msgstr "Key deleted"
@@ -3791,6 +3787,10 @@ msgstr "Per-run budget"
 #: src/routes/settings/organization/policy.tsx
 msgid "Per-run paid budget"
 msgstr "Per-run paid budget"
+
+#: src/routes/settings/organization/spend.tsx
+msgid "Person"
+msgstr "Person"
 
 #: src/routes/calendar/index.tsx
 #: src/routes/emails/inboxes.tsx
@@ -5283,6 +5283,10 @@ msgstr "Today"
 #: src/routes/login.tsx
 msgid "Too many attempts. Try again in a minute."
 msgstr "Too many attempts. Try again in a minute."
+
+#: src/routes/settings/organization/spend.tsx
+msgid "Tool"
+msgstr "Tool"
 
 #: src/components/companies/proposals-panel.tsx
 msgid "Total"

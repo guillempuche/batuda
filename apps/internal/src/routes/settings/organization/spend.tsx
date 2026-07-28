@@ -3,7 +3,7 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { ArrowLeft, Wallet } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { type ReactNode, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
 import { authClient } from '#/lib/auth-client'
@@ -24,6 +24,17 @@ type SpendBucket = {
 
 const EMPTY: ReadonlyArray<SpendBucket> = []
 
+// Only the fields needed to put a name to a spender. Declared here, as the
+// members page declares its own, because the auth client hands back a loosely
+// typed payload.
+interface OrgMember {
+	readonly userId: string
+	readonly user: {
+		readonly email: string
+		readonly name: string | null
+	}
+}
+
 export const Route = createFileRoute('/settings/organization/spend')({
 	head: () => ({ meta: [{ title: 'Spend — Batuda' }] }),
 	component: SpendPage,
@@ -32,6 +43,7 @@ export const Route = createFileRoute('/settings/organization/spend')({
 function SpendPage() {
 	const { t } = useLingui()
 	const activeMember = authClient.useActiveMember()
+	const activeOrg = authClient.useActiveOrganization()
 	const myRole = activeMember.data?.role ?? null
 	const canSeeSpend = myRole === 'owner' || myRole === 'admin'
 
@@ -87,6 +99,17 @@ function SpendPage() {
 
 	const total = provider.reduce((sum, b) => sum + b.amountCents, 0)
 	const maxBucket = provider.reduce((max, b) => Math.max(max, b.amountCents), 0)
+
+	// Spend is recorded against an account id, which says nothing to a reader.
+	// The organisation payload already carries everyone's name, so falling back
+	// to the id only ever shows for somebody who has since left.
+	const members = (activeOrg.data?.members ?? []) as ReadonlyArray<OrgMember>
+	const nameOf = useMemo(() => {
+		const byId = new Map(
+			members.map(m => [m.userId, m.user.name ?? m.user.email] as const),
+		)
+		return (userId: string) => byId.get(userId) ?? userId
+	}, [members])
 
 	if (!canSeeSpend) {
 		return (
@@ -203,14 +226,18 @@ function SpendPage() {
 				<SectionTitle>
 					<Trans>By user</Trans>
 				</SectionTitle>
-				<BreakdownTable rows={byUser} />
+				<BreakdownTable
+					rows={byUser}
+					heading={<Trans>Person</Trans>}
+					labelOf={nameOf}
+				/>
 			</Section>
 
 			<Section data-testid='settings-spend-by-tool'>
 				<SectionTitle>
 					<Trans>By tool</Trans>
 				</SectionTitle>
-				<BreakdownTable rows={byTool} />
+				<BreakdownTable rows={byTool} heading={<Trans>Tool</Trans>} />
 			</Section>
 		</Page>
 	)
@@ -218,8 +245,15 @@ function SpendPage() {
 
 function BreakdownTable({
 	rows,
+	heading,
+	labelOf,
 }: {
 	readonly rows: ReadonlyArray<SpendBucket>
+	// Names what the first column lists — people, or tools.
+	readonly heading: ReactNode
+	// Turns a row's key into something a reader recognises. Left out where the
+	// key already reads as itself, as a tool or provider name does.
+	readonly labelOf?: (key: string) => string
 }) {
 	if (rows.length === 0) {
 		return (
@@ -232,9 +266,7 @@ function BreakdownTable({
 		<Table>
 			<thead>
 				<tr>
-					<th>
-						<Trans>Key</Trans>
-					</th>
+					<th>{heading}</th>
 					<th>
 						<Trans>Spend</Trans>
 					</th>
@@ -245,8 +277,10 @@ function BreakdownTable({
 			</thead>
 			<tbody>
 				{rows.map(r => (
+					// Keyed by what was stored, not by the label: two people can share
+					// a name.
 					<tr key={r.key}>
-						<td>{r.key}</td>
+						<td>{labelOf ? labelOf(r.key) : r.key}</td>
 						<td>{formatCents(r.amountCents)}</td>
 						<td>{r.calls}</td>
 					</tr>
