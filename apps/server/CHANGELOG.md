@@ -3,6 +3,37 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-28 (server-v2026.7.28)
+
+### Features
+
+* bound every list request and count only when asked ([c9f96f1](https://github.com/guillempuche/batuda/commit/c9f96f19406f26624ee325ecfa11cc6ed4db7df5))
+* count the rounds a research run has got through ([5ccc984](https://github.com/guillempuche/batuda/commit/5ccc984259e6ab0e19390d51b48bf29b0fef6e6a))
+* let a member choose which organizations an assistant works in ([39660e6](https://github.com/guillempuche/batuda/commit/39660e68c1347bdcea8beb0f9565412a3a8f6838))
+* let an organization allow back an assistant it stopped ([37d2b03](https://github.com/guillempuche/batuda/commit/37d2b03af2399690aeb8110323562d859e7a2530))
+* **mcp:** tell the assistant when a list was cut short ([cd6d84d](https://github.com/guillempuche/batuda/commit/cd6d84dde067bb4617277fd9f8475c6756c7df0c))
+* **research:** find a company's own site, and see whether the profile came back full ([be609dc](https://github.com/guillempuche/batuda/commit/be609dc39eff74f6573084ea08a495a46d2e647e)), closes [#328](https://github.com/guillempuche/batuda/issues/328)
+* surface finished research in the daily plan ([aa6d9be](https://github.com/guillempuche/batuda/commit/aa6d9beabba181098c7e6e3a7c1bb3aa9e8550cb))
+* tell the caller when to check a research run again ([5c55ef4](https://github.com/guillempuche/batuda/commit/5c55ef424e78e5ee963b71d73de8ff938075ea39))
+
+### Bug Fixes
+
+* carry the request to be counted all the way through ([790213a](https://github.com/guillempuche/batuda/commit/790213a6af1ec1d167b5212af2381d2ad526cecb))
+* key every poller off the one list of finished statuses ([b8369ec](https://github.com/guillempuche/batuda/commit/b8369ec5c938287d088f1b73ea1daf08ef0ecb68))
+* let the browser find text inside a folded section ([c521122](https://github.com/guillempuche/batuda/commit/c5211227487b6f6e442ffd195e2f2a6a368a5872))
+* **mcp:** tell the agent which of its lists were cut short ([64eab00](https://github.com/guillempuche/batuda/commit/64eab004246f6d521f0da81b5400a57c98400558))
+* **server:** give the paged proposal and page lists a settled order ([53f3308](https://github.com/guillempuche/batuda/commit/53f33086cbdd1d4dbb6873090492b8a815f5ea7e))
+* **server:** settle duplicate-contact search on the oldest match ([04ec65c](https://github.com/guillempuche/batuda/commit/04ec65cb41ae345326c11dd2e33a753ca9fe0953))
+
+### Documentation
+
+* describe how a client follows a running research run ([398d225](https://github.com/guillempuche/batuda/commit/398d225fe3cd939a5c0fb0514067579c78619cb2))
+* write down how a list endpoint answers ([726e21e](https://github.com/guillempuche/batuda/commit/726e21e6dae63d5bd800399f50ab2700a2964e0d))
+
+### CI/CD
+
+* **release:** ui v2026.7.27 ([7dd5da6](https://github.com/guillempuche/batuda/commit/7dd5da62db960b640deb41b4daf3c79305f71e6d))
+
 ## 2026-07-27 (server-v2026.7.27)
 
 ### Features
