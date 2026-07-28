@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-28 (ui-v2026.7.28)
+
+### Bug Fixes
+
+* let the browser find text inside a folded section ([c521122](https://github.com/guillempuche/batuda/commit/c5211227487b6f6e442ffd195e2f2a6a368a5872))
+
 ## 2026-07-27 (ui-v2026.7.27)
 
 ### Bug Fixes
