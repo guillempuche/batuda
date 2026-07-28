@@ -456,7 +456,8 @@ export const linkSubjectToRun = (
 // reachable at one of the proposed channel values, matched on the (kind, value)
 // pair so a shared switchboard number can't merge two different people; (2) one
 // the model itself flagged as already existing; (3) same name under the same
-// company.
+// company. The same search has to name the same person every time it is asked,
+// so where several rows match, each lookup settles on the oldest.
 export const findDuplicateContact = (
 	sql: SqlClient.SqlClient,
 	orgId: string,
@@ -478,6 +479,7 @@ export const findDuplicateContact = (
 			const rows = yield* sql<{ contactId: string }>`
 				SELECT contact_id FROM contact_channels
 				WHERE organization_id = ${orgId} AND (${sql.or(pairs)})
+				ORDER BY created_at, contact_id
 				LIMIT 1
 			`
 			if (rows[0]) return rows[0].contactId
@@ -510,6 +512,7 @@ export const findDuplicateContact = (
 			WHERE organization_id = ${orgId}
 				AND company_id = ${companyId}
 				AND lower(name) = lower(${name})
+			ORDER BY created_at, id
 			LIMIT 1
 		`
 		return byName[0]?.id ?? null

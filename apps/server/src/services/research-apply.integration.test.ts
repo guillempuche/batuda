@@ -50,6 +50,20 @@ const seedContact = async (
 	return r.rows[0]?.id ?? ''
 }
 
+// Rows are stamped with the moment they are inserted, so making a row older
+// than one seeded before it takes an explicit update.
+const backdateContact = (contactId: string, createdAt: string) =>
+	pool.query(`UPDATE contacts SET created_at = $2 WHERE id = $1`, [
+		contactId,
+		createdAt,
+	])
+
+const backdateChannel = (contactId: string, createdAt: string) =>
+	pool.query(
+		`UPDATE contact_channels SET created_at = $2 WHERE contact_id = $1`,
+		[contactId, createdAt],
+	)
+
 const seedChannel = (
 	contactId: string,
 	kind: string,
@@ -264,6 +278,57 @@ describe('findDuplicateContact', () => {
 
 			// THEN the name + company still identify the same person
 			expect(found).toBe(contactId)
+		})
+	})
+
+	describe('when two contacts at one company share a name', () => {
+		it('should settle on the older one, so repeated searches give the same answer', async () => {
+			// GIVEN two people recorded under the same name at the same company
+			const companyId = await seedCompany()
+			const newer = await seedContact(companyId, 'Grace Hopper')
+			const older = await seedContact(companyId, 'Grace Hopper')
+			// The newer row is seeded first, so age and insert order disagree: a
+			// search that takes whichever row comes back first picks the wrong one
+			await backdateContact(newer, '2024-01-01T00:00:00Z')
+			await backdateContact(older, '2020-01-01T00:00:00Z')
+
+			// WHEN the same search runs repeatedly
+			const answers = await Promise.all([
+				dedup('Grace Hopper', companyId, []),
+				dedup('Grace Hopper', companyId, []),
+				dedup('Grace Hopper', companyId, []),
+			])
+
+			// THEN every search names the older contact
+			expect(answers).toEqual([older, older, older])
+		})
+	})
+
+	describe('when two contacts are reachable at the same proposed channel value', () => {
+		it('should settle on the older one rather than either at random', async () => {
+			// GIVEN two people who answer the same switchboard number
+			const companyId = await seedCompany()
+			const newer = await seedContact(companyId, 'Charles Babbage')
+			const older = await seedContact(companyId, 'Ada Lovelace')
+			const switchboard = '+34 900 111 222'
+			await seedChannel(newer, 'phone', switchboard)
+			await seedChannel(older, 'phone', switchboard)
+			// The newer channel goes in first, so age and insert order disagree
+			await backdateChannel(newer, '2024-01-01T00:00:00Z')
+			await backdateChannel(older, '2020-01-01T00:00:00Z')
+
+			// WHEN a proposal carrying that number is checked twice
+			const answers = await Promise.all([
+				dedup('Someone Else', companyId, [
+					{ kind: 'phone', value: switchboard },
+				]),
+				dedup('Someone Else', companyId, [
+					{ kind: 'phone', value: switchboard },
+				]),
+			])
+
+			// THEN both searches reach the older contact
+			expect(answers).toEqual([older, older])
 		})
 	})
 
