@@ -198,7 +198,11 @@ export function DocumentsPanel({
 				</List>
 			)}
 
-			<InfiniteListFooter list={list} testId='subject-documents' />
+			<InfiniteListFooter
+				list={list}
+				testId='subject-documents'
+				listLabel={t`documents`}
+			/>
 
 			{dialog.mode === 'closed' ? null : (
 				<DocumentDialogHost

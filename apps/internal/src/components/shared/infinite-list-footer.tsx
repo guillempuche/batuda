@@ -30,6 +30,7 @@ export function InfiniteListFooter({
 	list,
 	testId,
 	announce = true,
+	listLabel,
 }: {
 	readonly list: InfiniteList<unknown>
 	/** Names the button, for tests: `<testId>-load-more`. */
@@ -40,6 +41,12 @@ export function InfiniteListFooter({
 	 * or a board where one footer per column would say it eight times at once.
 	 */
 	readonly announce?: boolean
+	/**
+	 * What the rows are, for the count read out loud — "documents", "proposals".
+	 * Worth setting wherever two lists share a screen: a bare "showing 40 of 45"
+	 * cannot say which of the two it is counting.
+	 */
+	readonly listLabel?: string
 }) {
 	const { t } = useLingui()
 	const sentinelRef = useRef<HTMLDivElement>(null)
@@ -55,6 +62,18 @@ export function InfiniteListFooter({
 	// time the list grows.
 	const onReach = useRef(loadMore)
 	onReach.current = loadMore
+
+	const statusRef = useRef<HTMLSpanElement>(null)
+	// Set when the reader pressed the button themselves. The last rows take the
+	// button away with them, and whoever was standing on it would otherwise be
+	// dropped back to the very top of the page — so they are moved onto the line
+	// that says the list is now complete, which is also read out to them.
+	const pressedByHand = useRef(false)
+	useEffect(() => {
+		if (hasMore || !pressedByHand.current) return
+		pressedByHand.current = false
+		statusRef.current?.focus()
+	}, [hasMore])
 
 	const canAutoLoad = hasMore && !isLoadingMore && !loadMoreFailed
 	useEffect(() => {
@@ -80,51 +99,80 @@ export function InfiniteListFooter({
 		return () => observer.disconnect()
 	}, [canAutoLoad, viewportRef])
 
-	if (!hasMore) return null
+	// Scrolling more rows into view says nothing on its own to somebody who
+	// cannot see them arrive, so count them out loud instead. A list that never
+	// asked how many there are says only how far it has got, rather than
+	// counting up to a blank. A failure is always said, even where the counting
+	// is turned off, because nothing else on the page reports it.
+	// Written once and used twice, seen and heard, so the two can never drift.
+	const failureNote = t`Could not load more. The rows already here are still current.`
+	const announcement = loadMoreFailed
+		? failureNote
+		: !announce
+			? ''
+			: listLabel === undefined
+				? totalCount === undefined
+					? t`Showing ${loadedCount}`
+					: t`Showing ${loadedCount} of ${totalCount}`
+				: totalCount === undefined
+					? t`Showing ${loadedCount} ${listLabel}`
+					: t`Showing ${loadedCount} of ${totalCount} ${listLabel}`
 
 	return (
-		<Footer>
-			<Sentinel ref={sentinelRef} aria-hidden />
-			{/* After a failure this re-asks for the slice that failed rather than
-			    starting the list over, so a fault on the last step does not cost
-			    the reader everything they have already scrolled through. */}
-			<PriButton
-				type='button'
-				$variant='outlined'
-				onClick={loadMoreFailed ? retry : loadMore}
-				disabled={isLoadingMore}
-				data-testid={`${testId}-load-more`}
-			>
-				<span>{loadMoreFailed ? t`Try again` : t`Load more`}</span>
-			</PriButton>
-			{loadMoreFailed && (
-				<FailureNote role='status'>
-					{t`Could not load more. The rows already here are still current.`}
-				</FailureNote>
+		// Stays on the page after the last rows arrive, holding nothing but the
+		// spoken count. Taking it away at that moment would drop the reader's
+		// place in the page, and would silence the one announcement that says the
+		// list is now complete.
+		<Footer $collapsed={!hasMore}>
+			{hasMore && (
+				<>
+					<Sentinel ref={sentinelRef} aria-hidden />
+					{/* After a failure this re-asks for the slice that failed rather
+					    than starting the list over, so a fault on the last step does
+					    not cost the reader everything they have already scrolled
+					    through. Marked unavailable while a slice is on its way rather
+					    than switched off: switching off the button somebody has just
+					    pressed takes the keyboard back to the top of the page. */}
+					<PriButton
+						type='button'
+						$variant='outlined'
+						onClick={() => {
+							if (isLoadingMore) return
+							pressedByHand.current = true
+							if (loadMoreFailed) retry()
+							else loadMore()
+						}}
+						aria-disabled={isLoadingMore}
+						data-testid={`${testId}-load-more`}
+					>
+						<span>{loadMoreFailed ? t`Try again` : t`Load more`}</span>
+					</PriButton>
+				</>
 			)}
-			{/* Scrolling more rows into view says nothing on its own to somebody
-			    who cannot see them arrive, so count them out loud instead. A list
-			    that never asked how many there are says only how far it has got,
-			    rather than counting up to a blank. */}
-			{announce &&
-				(totalCount === undefined ? (
-					<SrOnly aria-live='polite'>{t`Showing ${loadedCount}`}</SrOnly>
-				) : (
-					<SrOnly aria-live='polite'>
-						{t`Showing ${loadedCount} of ${totalCount}`}
-					</SrOnly>
-				))}
+			{/* The line below already reads this same sentence out loud, so this
+			    copy is kept silent rather than heard twice. */}
+			{loadMoreFailed && <FailureNote aria-hidden>{failureNote}</FailureNote>}
+			<SrOnly role='status' ref={statusRef} tabIndex={-1}>
+				{announcement}
+			</SrOnly>
 		</Footer>
 	)
 }
 
-const Footer = styled.div`
+const Footer = styled.div<{ $collapsed?: boolean }>`
 	display: flex;
 	flex-direction: column;
 	align-items: center;
 	gap: var(--space-xs);
-	padding: var(--space-lg) 0;
+	padding: ${p => (p.$collapsed ? '0' : 'var(--space-lg) 0')};
 	position: relative;
+
+	/* The button is only marked unavailable, never switched off, so the dimmed
+	   look has to be drawn here. */
+	& [aria-disabled='true'] {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
 `
 
 // Sits above the button so the next rows are already on their way by the time

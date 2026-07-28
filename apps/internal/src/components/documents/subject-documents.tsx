@@ -1,4 +1,4 @@
-import { Trans } from '@lingui/react/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import { Link } from '@tanstack/react-router'
 import styled from 'styled-components'
 
@@ -27,6 +27,7 @@ export function SubjectDocuments({
 	readonly subjectTable: DocumentSubjectTable
 	readonly subjectId: string
 }) {
+	const { t } = useLingui()
 	const list = useInfiniteList({
 		resetKey: `subject-documents:${subjectTable}:${subjectId}`,
 		pageSize: SUBJECT_DOCUMENTS_PAGE_SIZE,
@@ -56,7 +57,11 @@ export function SubjectDocuments({
 					</li>
 				))}
 			</List>
-			<InfiniteListFooter list={list} testId='subject-documents-popup' />
+			<InfiniteListFooter
+				list={list}
+				testId='subject-documents-popup'
+				listLabel={t`documents`}
+			/>
 		</Section>
 	)
 }

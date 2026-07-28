@@ -1857,6 +1857,11 @@ msgstr "Nom a mostrar"
 msgid "Document"
 msgstr "Document"
 
+#: src/components/companies/documents-panel.tsx
+#: src/components/documents/subject-documents.tsx
+msgid "documents"
+msgstr "documents"
+
 #: src/components/documents/subject-documents.tsx
 #: src/components/layout/nav-items.ts
 #: src/routes/companies/$slug.tsx
@@ -3396,6 +3401,10 @@ msgstr "Encara no és un contacte registrat"
 msgid "Not a fit"
 msgstr "No encaixa"
 
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Not counted yet"
+msgstr "Encara no comptat"
+
 #: src/components/research/research-dialog.tsx
 msgid "Not enough research budget for this run. Raise the budget or narrow the search."
 msgstr "No hi ha prou pressupost de recerca per a aquesta execució. Augmenta el pressupost o acota la cerca."
@@ -3966,6 +3975,10 @@ msgstr "Proposta en revisió"
 #: src/routes/companies/$slug.tsx
 msgid "Proposal stage — set the next action (send it, chase a decision)."
 msgstr "Etapa de proposta — defineix la següent acció (envia-la, persegueix una decisió)."
+
+#: src/components/companies/proposals-panel.tsx
+msgid "proposals"
+msgstr "propostes"
 
 #: src/routes/companies/$slug.tsx
 msgid "Proposals"
@@ -4632,8 +4645,16 @@ msgid "Showing {loadedCount}"
 msgstr "Es mostren {loadedCount}"
 
 #: src/components/shared/infinite-list-footer.tsx
+msgid "Showing {loadedCount} {listLabel}"
+msgstr "Es mostren {loadedCount} {listLabel}"
+
+#: src/components/shared/infinite-list-footer.tsx
 msgid "Showing {loadedCount} of {totalCount}"
 msgstr "Es mostren {loadedCount} de {totalCount}"
+
+#: src/components/shared/infinite-list-footer.tsx
+msgid "Showing {loadedCount} of {totalCount} {listLabel}"
+msgstr "Es mostren {loadedCount} de {totalCount} {listLabel}"
 
 #: src/routes/login.tsx
 msgid "Sign in"
