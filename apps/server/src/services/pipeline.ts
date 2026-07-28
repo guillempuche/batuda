@@ -6,6 +6,8 @@ import {
 	TERMINAL_RESEARCH_STATUSES,
 } from '@batuda/domain'
 
+import { probeLimit, takePage } from '../lib/sql-pagination'
+
 // The next-steps rows carry raw Date timestamps; read them into DateTime.Utc so
 // the wire schemas (NextSteps) re-encode them as ISO strings.
 const NextStepTaskRow = Schema.Struct({
@@ -74,7 +76,7 @@ export class PipelineService extends Context.Service<PipelineService>()(
 							INNER JOIN companies c ON t.company_id = c.id
 							WHERE t.completed_at IS NULL
 							ORDER BY t.due_at
-							LIMIT ${limit}
+							LIMIT ${probeLimit(limit)}
 						`
 
 						const overdueCompanies = yield* sql`
@@ -83,7 +85,7 @@ export class PipelineService extends Context.Service<PipelineService>()(
 							WHERE next_action_at < now()
 								AND status NOT IN ('closed', 'dead')
 							ORDER BY next_action_at
-							LIMIT ${limit}
+							LIMIT ${probeLimit(limit)}
 						`
 
 						// Research a person still has to deal with: a run that wants to
@@ -127,16 +129,26 @@ export class PipelineService extends Context.Service<PipelineService>()(
 							WHERE f.pending_update_count > 0
 								OR f.status IN ${sql.in(ATTENTION_RESEARCH_STATUSES)}
 							ORDER BY f.completed_at DESC NULLS LAST
-							LIMIT ${limit}
+							LIMIT ${probeLimit(limit)}
 						`
 
+						// The spare row each list asked for is dropped here; only the
+						// flag saying that list was cut short leaves.
+						const tasksPage = takePage(dueTasks, limit)
+						const companiesPage = takePage(overdueCompanies, limit)
+						const researchPage = takePage(researchAwaitingReview, limit)
+
 						return {
-							dueTasks: yield* decodeNextStepTasks(dueTasks),
-							overdueCompanies:
-								yield* decodeNextStepCompanies(overdueCompanies),
-							researchAwaitingReview: yield* decodeNextStepResearchRuns(
-								researchAwaitingReview,
+							dueTasks: yield* decodeNextStepTasks(tasksPage.rows),
+							overdueCompanies: yield* decodeNextStepCompanies(
+								companiesPage.rows,
 							),
+							researchAwaitingReview: yield* decodeNextStepResearchRuns(
+								researchPage.rows,
+							),
+							dueTasksTruncated: tasksPage.hasMore,
+							overdueCompaniesTruncated: companiesPage.hasMore,
+							researchAwaitingReviewTruncated: researchPage.hasMore,
 						}
 					}),
 
