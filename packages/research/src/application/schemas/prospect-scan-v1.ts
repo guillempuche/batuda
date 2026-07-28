@@ -33,7 +33,6 @@ export const ProspectScanV1Schema = Schema.Struct({
 				),
 			),
 			why_relevant: Schema.String,
-			pain_indicators: Schema.optionalKey(Schema.Array(Schema.String)),
 			citations: Schema.Array(Citation),
 		}),
 	),

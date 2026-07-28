@@ -99,6 +99,7 @@ type RunSpec = {
 		| 'running'
 		| 'succeeded'
 		| 'failed'
+		| 'succeeded_low_confidence'
 		| 'cancelled'
 		| 'deleted'
 		| 'no_reliable_data'
@@ -149,7 +150,6 @@ type RunSpec = {
 const SOURCED_ENRICHMENT_FIELDS = [
 	'industry',
 	'size_range',
-	'pain_points',
 	'current_tools',
 	'location',
 	'country',
@@ -284,8 +284,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			enrichment: {
 				industry: 'restaurants',
 				size_range: '6-10',
-				pain_points:
-					'Reserves per telèfon, perden walk-ups els caps de setmana.',
 				current_tools: 'Llibreta + WhatsApp',
 				products_fit: ['gestio-reserves', 'web-starter'],
 				tags: ['gastro', 'garraf'],
@@ -326,8 +324,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			enrichment: {
 				industry: 'manufacturing',
 				size_range: '26-50',
-				pain_points:
-					'Factures manuals amb Excel, errors freqüents al tancar mes.',
 				current_tools: 'Excel + Contaplus',
 				products_fit: ['automatitzacions'],
 				tags: ['indústria', 'facturació'],
@@ -572,11 +568,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					country: 'ES',
 					why_relevant:
 						'Sells exclusively in physical store; Instagram catalogue suggests latent online demand.',
-					pain_indicators: [
-						'no ecommerce',
-						'manual invoicing',
-						'instagram-only catalogue',
-					],
 					citations: [{ source_id: 'src_firecrawl_002' }],
 				},
 				{
@@ -585,7 +576,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					country: 'ES',
 					why_relevant:
 						'Wrought-iron workshop next to La Bisbal; potential ecommerce-local fit.',
-					pain_indicators: ['static-website', 'no online catalogue'],
 					citations: [{ source_id: 'src_firecrawl_002', confidence: 0.7 }],
 				},
 			],
@@ -683,7 +673,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					country: 'ES',
 					why_relevant:
 						'Existing prospect — last contact 2025-09. Worth a follow-up DM via Instagram.',
-					pain_indicators: ['instagram-only', 'no booking page'],
 					citations: [],
 				},
 			],
@@ -774,8 +763,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			enrichment: {
 				industry: 'restaurants',
 				size_range: '6-10',
-				pain_points:
-					'Saturday walk-up loss ~15%; no-show rate 12% on phone bookings.',
 				current_tools: 'Llibreta paper + WhatsApp + 3 phone lines.',
 				products_fit: ['gestio-reserves', 'web-starter'],
 				tags: ['gastro', 'garraf', 'audit'],
@@ -909,7 +896,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					country: 'ES',
 					why_relevant:
 						'Posted on LinkedIn about "tancar mes amb errors" — direct match for our automation pitch.',
-					pain_indicators: ['linkedin signal', 'no current vendor'],
 					citations: [{ source_id: 'src_registry_001' }],
 				},
 				{
@@ -918,7 +904,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					country: 'ES',
 					why_relevant:
 						'Family foundry north of Mataró. Heavy Contaplus + Excel. No visible IT vendor.',
-					pain_indicators: ['contaplus-only', 'family-run'],
 					citations: [{ source_id: 'src_registry_001' }],
 				},
 				{
@@ -927,7 +912,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					country: 'ES',
 					why_relevant:
 						'Mid-size stainless-steel fabricator. Existing finance manager publicly looking for ERP help.',
-					pain_indicators: ['hiring signal', 'public job post'],
 					citations: [],
 				},
 			],
@@ -1050,7 +1034,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					country: 'ES',
 					why_relevant:
 						'Berguedà obrador, similar size; runs Saturday market in Berga next to Forn Queralt.',
-					pain_indicators: ['no-web', 'cash-only'],
 					citations: [],
 				},
 				{
@@ -1059,7 +1042,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					country: 'ES',
 					why_relevant:
 						'Bages obrador with Instagram preorder via DM — overwhelmed weekly.',
-					pain_indicators: ['DM-only orders'],
 					citations: [],
 				},
 			],
@@ -1085,7 +1067,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			enrichment: {
 				industry: 'transport',
 				size_range: '11-25',
-				pain_points: 'Paper-based delivery notes; lost paperwork rate 3%.',
 				current_tools: 'Paper + Sage 200 + WhatsApp.',
 				products_fit: ['automatitzacions'],
 				tags: ['logistics', 'maresme'],
@@ -1148,8 +1129,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			enrichment: {
 				industry: 'hospitality',
 				size_range: '6-10',
-				pain_points:
-					'Booking.com 18% commission; rate-parity clause limits direct discounting.',
 				current_tools: 'Booking + paper register.',
 				products_fit: ['gestio-reserves', 'web-starter'],
 				tags: ['turisme', 'ribagorça', 'rate-strategy'],
@@ -1164,7 +1143,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					subject_id: '<hostal-id>',
 					expected_version: 1,
 					fields: {
-						painPoints: 'Booking 18% commission; wants direct channel < 5%.',
 						currentTools: 'Booking + manual register.',
 					},
 					reason: 'Quoted by owner Arnau in interview.',
@@ -1331,8 +1309,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			enrichment: {
 				industry: 'manufacturing',
 				size_range: '6-10',
-				pain_points:
-					'Sells only at the workshop and a stall during the Fira de Ceràmica.',
 				current_tools: 'Static Wordpress + Instagram.',
 				products_fit: ['ecommerce-local', 'web-starter'],
 				tags: ['artesania', 'empordà', 'cluster'],
@@ -1419,7 +1395,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					country: 'ES',
 					why_relevant:
 						'Adjacent niche to Beta; same target customer (boutique B2B firms).',
-					pain_indicators: ['static brochure', 'gmail addresses'],
 					citations: [],
 				},
 				{
@@ -1428,7 +1403,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					country: 'ES',
 					why_relevant:
 						'Tax + ops consultancy in València; same buyer profile.',
-					pain_indicators: ['no website analytics'],
 					citations: [],
 				},
 			],
@@ -1612,7 +1586,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					subject_table: 'companies',
 					subject_id: '<ferros-id>',
 					expected_version: 1,
-					fields: { painPoints: 'Manual invoicing closing the month.' },
+					fields: { currentTools: 'Spreadsheets for invoicing.' },
 					reason: 'Confirmed by both CEO and CFO in interview.',
 					citations: [{ source_id: 'src_registry_001' }],
 				},
@@ -1660,7 +1634,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					industry: 'comerç',
 					country: 'ES',
 					why_relevant: 'Gràcia concept store with own brand; sells via DMs.',
-					pain_indicators: ['DM-only', 'no payment'],
 					citations: [{ source_id: 'src_exa_002' }],
 				},
 				{
@@ -1670,7 +1643,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					country: 'ES',
 					why_relevant:
 						'Born sustainable-textile boutique; broken cart, no payment integration.',
-					pain_indicators: ['broken-cart', 'no-payment'],
 					citations: [{ source_id: 'src_exa_002' }],
 				},
 				{
@@ -1678,7 +1650,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					industry: 'comerç',
 					country: 'ES',
 					why_relevant: 'Eixample kids brand. Pop-ups but no online channel.',
-					pain_indicators: ['no-online', 'pop-up driven'],
 					citations: [],
 				},
 				{
@@ -1686,7 +1657,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					industry: 'comerç',
 					country: 'ES',
 					why_relevant: 'Gòtic vintage shop selling via Wallapop links.',
-					pain_indicators: ['marketplace-leaning'],
 					citations: [],
 				},
 				{
@@ -1694,7 +1664,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					industry: 'comerç',
 					country: 'ES',
 					why_relevant: 'Sant Antoni bespoke menswear; deposits via Bizum.',
-					pain_indicators: ['Bizum-only payments'],
 					citations: [],
 				},
 				{
@@ -1702,7 +1671,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					industry: 'comerç',
 					country: 'ES',
 					why_relevant: 'Poble Sec florist + lifestyle; ships via WhatsApp.',
-					pain_indicators: ['whatsapp-driven'],
 					citations: [],
 				},
 			],
@@ -1746,8 +1714,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			enrichment: {
 				industry: 'manufacturing',
 				size_range: '11-25',
-				pain_points:
-					'Lead capture from Google ads goes to a generic Wordpress form; no qualification, no SLA.',
 				current_tools: 'Wordpress + Holded + WhatsApp.',
 				products_fit: ['web-starter', 'automatitzacions'],
 				tags: ['electricitat', 'vallès', 'lead-gen'],
@@ -1874,8 +1840,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			enrichment: {
 				industry: 'restaurants',
 				size_range: '1-5',
-				pain_points:
-					'Stock-out by 11:00 on Saturdays; preorders managed via WhatsApp.',
 				current_tools: 'WhatsApp + paper preorder list.',
 				products_fit: ['ecommerce-local', 'web-starter'],
 				tags: ['fornería', 'berguedà', 'mercats'],
@@ -2178,8 +2142,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			enrichment: {
 				industry: 'services',
 				size_range: '6-10',
-				pain_points:
-					'Incumbent vendor restructuring; landing page stale 5 months.',
 				current_tools: 'Webflow + Notion + Linear.',
 				products_fit: ['web-starter'],
 				tags: ['agency', 'design', 'barcelona'],
@@ -2358,8 +2320,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			enrichment: {
 				industry: 'manufacturing',
 				size_range: '6-10',
-				pain_points:
-					'On-site quoting; no follow-up CRM; review responses sporadic.',
 				current_tools: 'WhatsApp Business + Google Business Profile + paper.',
 				products_fit: ['web-starter'],
 				tags: ['tancaments', 'garraf', 'closeout'],
@@ -2426,8 +2386,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			enrichment: {
 				industry: 'services',
 				size_range: '6-10',
-				pain_points:
-					'Lead intake via gmail; proposal-time average 7 h; knowledge dispersed across laptops.',
 				current_tools: 'Gmail + Drive + Notion (light).',
 				products_fit: ['web-starter', 'automatitzacions'],
 				tags: ['consultoria', 'valencia', 'b2b'],
@@ -2590,8 +2548,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			enrichment: {
 				industry: 'services',
 				size_range: '6-10',
-				pain_points:
-					'Instagram-driven inbound; no booking flow; brand refresh launching June 2026.',
 				current_tools: 'Instagram + WhatsApp + paper agenda.',
 				products_fit: ['gestio-reserves', 'web-starter'],
 				tags: ['taller', 'granollers', 'auto'],
@@ -2739,8 +2695,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			enrichment: {
 				industry: 'transport',
 				size_range: '11-25',
-				pain_points:
-					'Free sources confirm the fleet but not the directors or share capital.',
 				current_tools: 'Paper + Sage 200 + WhatsApp.',
 				products_fit: ['automatitzacions'],
 				tags: ['logistics', 'maresme'],
@@ -2796,7 +2750,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					country: 'ES',
 					why_relevant:
 						'CNC shop in Sant Boi with manual invoicing; not yet contacted.',
-					pain_indicators: ['excel-invoicing', 'no-vendor'],
 					citations: [{ source_id: 'src_registry_001' }],
 				},
 			],
@@ -2941,6 +2894,52 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		tokensOut: 260,
 		startedAt: new Date('2026-05-20T10:10:00Z'),
 		completedAt: new Date('2026-05-20T10:10:30Z'),
+	},
+	{
+		key: 'low-confidence-weak-match',
+		companySlug: 'forn-de-pa-queralt',
+		query: 'enrich Forn de Pa Queralt (second attempt)',
+		mode: 'deep',
+		schemaName: 'company_enrichment_v1',
+		kind: 'leaf',
+		status: 'succeeded_low_confidence',
+		entityMatch: 'weak',
+		findings: {
+			enrichment: {
+				industry: 'food-beverage',
+				location: 'Queralt',
+				country: 'ES',
+			},
+			quality: {
+				rounds: 4,
+				sources_matched: 0,
+				fields_grounded: 3,
+				grounding_ratio: 0.5,
+				low_confidence: true,
+			},
+			proposed_updates: [
+				proposal({
+					key: 'low-confidence-industry',
+					subjectTable: 'companies',
+					operation: 'update',
+					reason: 'Named on a bakery directory listing for the town.',
+					fields: { industry: 'food-beverage' },
+					citation: {
+						sourceId: 'src_firecrawl_001',
+						quote: 'Forn de Pa Queralt — bakery, Queralt.',
+						confidence: 0.55,
+					},
+				}),
+			],
+		},
+		briefMd:
+			'## Forn de Pa Queralt\nThe pages found mention the bakery by name but none is its own site, so read this before acting on it.',
+		budgetCents: 50,
+		costCents: 9,
+		tokensIn: 4200,
+		tokensOut: 640,
+		startedAt: new Date('2026-05-21T09:00:00Z'),
+		completedAt: new Date('2026-05-21T09:01:10Z'),
 	},
 	{
 		key: 'failed-unreadable',
@@ -3765,8 +3764,6 @@ export const seedResearchRuns = (
 							enrichment: {
 								industry: 'restaurants',
 								size_range: '6-10',
-								pain_points:
-									'Telèfon-only reservations on weekends, ~20% no-show rate.',
 								current_tools: 'Booking + paper.',
 								products_fit: ['gestio-reserves'],
 								tags: ['gastro', 'sitges'],

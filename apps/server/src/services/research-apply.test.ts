@@ -29,13 +29,13 @@ describe('allowlistFields', () => {
 			// GIVEN a model that sent snake_case field names
 			const { fields: kept } = allowlistFields('companies', {
 				size_range: '51-200',
-				pain_points: 'slow onboarding',
+				current_tools: 'a spreadsheet',
 			})
 
 			// THEN they map to the camelCase column keys
 			expect(kept).toEqual({
 				sizeRange: '51-200',
-				painPoints: 'slow onboarding',
+				currentTools: 'a spreadsheet',
 			})
 		})
 	})

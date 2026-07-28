@@ -45,7 +45,7 @@ const sweep = () =>
 			const retention = yield* ResearchRetention
 			return yield* retention.sweepExpired()
 		}).pipe(Effect.provide(deps)) as Effect.Effect<
-			{ orphanBlobs: number },
+			{ orphanBlobs: number; seenOnly: number },
 			never,
 			never
 		>,
@@ -57,9 +57,16 @@ const llmKey = `ret-llm-${randomUUID()}`
 const runSourceId = `src_run_${randomUUID().replace(/-/g, '').slice(0, 12)}`
 const orphanSourceId = `src_orphan_${randomUUID().replace(/-/g, '').slice(0, 10)}`
 const citedSourceId = `src_cited_${randomUUID().replace(/-/g, '').slice(0, 11)}`
+// Pages a run only saw named: one nothing points at, one a run lists among what
+// it read, and one an applied change cites by address rather than by record id.
+const seenOrphanId = `src_seen_${randomUUID().replace(/-/g, '').slice(0, 12)}`
+const seenLinkedId = `src_seenrun_${randomUUID().replace(/-/g, '').slice(0, 9)}`
+const seenCitedByUrlId = `src_seenurl_${randomUUID().replace(/-/g, '').slice(0, 9)}`
 let runId = ''
 
-const seedSource = (id: string, contentRef: string) =>
+// `contentRef` null means a page the run only saw named, never stored — the
+// shape a search result and a register lookup leave behind.
+const seedSource = (id: string, contentRef: string | null) =>
 	pool.query(
 		`INSERT INTO sources (id, kind, provider, url, url_hash, domain, content_hash, content_ref, last_fetched_at)
 		 VALUES ($1, 'web', 'test', $2, $3, 'example.com', 'chash', $4, now() - interval '1 day')`,
@@ -106,6 +113,32 @@ beforeAll(async () => {
 		 VALUES ($1, $2, 'contacts', $3, 'finding', $4::jsonb)`,
 		[ORG, runId, randomUUID(), JSON.stringify([{ source_id: citedSourceId }])],
 	)
+
+	// A page only ever seen named, that nothing points at.
+	await seedSource(seenOrphanId, null)
+
+	// A page only ever seen named, but listed among what a run read.
+	await seedSource(seenLinkedId, null)
+	await pool.query(
+		`INSERT INTO research_run_sources (organization_id, research_id, source_id, local_ref)
+		 VALUES ($1, $2, $3, 'ref')`,
+		[ORG, runId, seenLinkedId],
+	)
+
+	// A page only ever seen named, cited by its address rather than its record
+	// id — which is how the model is asked to cite, so this is the ordinary
+	// shape, not an odd one.
+	await seedSource(seenCitedByUrlId, null)
+	await pool.query(
+		`INSERT INTO research_links (organization_id, research_id, subject_table, subject_id, link_kind, citations)
+		 VALUES ($1, $2, 'contacts', $3, 'finding', $4::jsonb)`,
+		[
+			ORG,
+			runId,
+			randomUUID(),
+			JSON.stringify([{ source_id: `https://x/${seenCitedByUrlId}` }]),
+		],
+	)
 }, 30_000)
 
 afterAll(async () => {
@@ -113,7 +146,14 @@ afterAll(async () => {
 		ORG,
 	])
 	await pool.query(`DELETE FROM sources WHERE id = ANY($1::text[])`, [
-		[runSourceId, orphanSourceId, citedSourceId],
+		[
+			runSourceId,
+			orphanSourceId,
+			citedSourceId,
+			seenOrphanId,
+			seenLinkedId,
+			seenCitedByUrlId,
+		],
 	])
 	await pool.query(`DELETE FROM search_cache WHERE key_hash = $1`, [searchKey])
 	await pool.query(`DELETE FROM llm_cache WHERE key_hash = $1`, [llmKey])
@@ -128,11 +168,12 @@ const exists = async (table: string, col: string, value: string) => {
 }
 
 describe('research retention sweep', () => {
-	it('should prune expired caches, old transcripts, and orphaned blobs while keeping provenance', async () => {
+	it('should prune expired caches, old transcripts, and unwanted sources while keeping provenance', async () => {
 		// GIVEN expired caches, an old run with a transcript + sources, an
-		// orphaned source, and a cited source (all seeded above)
+		// orphaned source, a cited source, and three pages only ever seen named
+		// (all seeded above)
 		// WHEN the sweep runs
-		await sweep()
+		const result = await sweep()
 
 		// THEN every expired cache row is gone
 		expect(await exists('search_cache', 'key_hash', searchKey)).toBe(false)
@@ -158,5 +199,20 @@ describe('research retention sweep', () => {
 		// AND a source cited by a contact's provenance is kept — the trail holds
 		expect(await exists('sources', 'id', citedSourceId)).toBe(true)
 		expect(deletedBlobs.some(k => k.startsWith('scrape/cited-'))).toBe(false)
+
+		// AND among the pages only ever seen named, never stored: the one nothing
+		// points at is forgotten, and no stored copy was looked for, because there
+		// was never one to delete
+		expect(result.seenOnly).toBeGreaterThan(0)
+		expect(await exists('sources', 'id', seenOrphanId)).toBe(false)
+		expect(deletedBlobs.some(k => k.includes(seenOrphanId))).toBe(false)
+
+		// AND the one a run lists among what it read survives
+		expect(await exists('sources', 'id', seenLinkedId)).toBe(true)
+
+		// AND so does the one cited by its address rather than its record id. The
+		// model is asked to cite the address it read, so that is the ordinary
+		// shape — missing it would quietly break the trail behind an applied change
+		expect(await exists('sources', 'id', seenCitedByUrlId)).toBe(true)
 	})
 })

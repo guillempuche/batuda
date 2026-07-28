@@ -208,4 +208,71 @@ describe('resolveResearchProposedUpdatesBatch', () => {
 			expect(results[0]?.outcome).toBe('invalid')
 		})
 	})
+
+	describe('when the run needs somebody to read it', () => {
+		it('should refuse to apply in bulk but still allow rejecting', async () => {
+			// GIVEN a run that finished unsure which company it was about, carrying
+			//   a suggestion that is otherwise perfectly ordinary
+			const run = await pool.query<{ id: string }>(
+				`INSERT INTO research_runs (organization_id, query, status, created_by, findings)
+				 VALUES ($1, 'q', 'succeeded_low_confidence', 'u1', $2::jsonb) RETURNING id`,
+				[
+					ORG,
+					JSON.stringify({
+						proposed_updates: [
+							proposal({
+								id: 'unsure',
+								subject_table: 'contacts',
+								operation: 'update',
+								subject_id: contactId,
+								expected_version: 0,
+								fields: { role: 'CFO' },
+							}),
+							proposal({
+								id: 'discard',
+								subject_table: 'contacts',
+								operation: 'update',
+								subject_id: contactId,
+								expected_version: 0,
+								fields: { role: 'CFO' },
+							}),
+						],
+					}),
+				],
+			)
+			const unsureRunId = run.rows[0]!.id
+
+			// WHEN a batch tries to apply one and reject the other
+			const results = await runBatch([
+				{
+					researchId: unsureRunId,
+					proposedUpdateId: 'unsure',
+					decision: 'apply',
+				},
+				{
+					researchId: unsureRunId,
+					proposedUpdateId: 'discard',
+					decision: 'reject',
+				},
+			])
+
+			// THEN applying is refused — the screens hide the button, but the rule
+			//   has to hold for a request sent without them
+			expect(
+				results.find(r => r.proposed_update_id === 'unsure')?.outcome,
+			).toBe('needs_review')
+			// AND throwing one away is still fine: no second look is needed to
+			//   discard a doubtful suggestion
+			expect(
+				results.find(r => r.proposed_update_id === 'discard')?.outcome,
+			).toBe('rejected')
+
+			// AND nothing was written
+			const rows = await pool.query<{ role: string }>(
+				`SELECT role FROM contacts WHERE id = $1`,
+				[contactId],
+			)
+			expect(rows.rows[0]?.role).not.toBe('CFO')
+		})
+	})
 })

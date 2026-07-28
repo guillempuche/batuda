@@ -164,21 +164,26 @@ export type {
 	RegistryRecord,
 	ResolvedPolicy,
 	ScrapedPage,
-	SearchResult,
-	SearchResultItem,
 } from './domain/types'
 export {
 	RESEARCH_REASON_CODES,
 	ReasonCode,
+	SearchResult,
+	SearchResultItem,
 	VERIFICATION_VERDICTS,
 	VerificationVerdict,
 } from './domain/types'
 export { makeCachedScrape } from './infrastructure/cached-scrape'
+export { makeCachedSearch } from './infrastructure/cached-search'
 export {
 	type ModelProbeResult,
 	type ProbeCheck,
 	probeModelCapabilities,
 } from './infrastructure/capability-probe'
-export { makeResearchLlmLive } from './infrastructure/llm-live'
+export {
+	type ConfiguredSlot,
+	configuredSlots,
+	makeResearchLlmLive,
+} from './infrastructure/llm-live'
 // ── Infrastructure (provider layers) ──────────────────────────────────────
 export { makeResearchProvidersLive } from './infrastructure/providers-live'

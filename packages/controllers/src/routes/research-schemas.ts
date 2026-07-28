@@ -139,6 +139,9 @@ export const ProposedUpdateResult = Schema.Struct({
 		'invalid',
 		'no_applicable_fields',
 		'proposal_not_found',
+		// Shares the outcome union with the bulk resolve, which is the only place
+		// it is ever returned.
+		'needs_review',
 	]),
 	subject_table: Schema.optional(Schema.String),
 	subject_id: Schema.optional(Schema.String),
@@ -219,6 +222,7 @@ export const BulkResolveItemResult = Schema.Struct({
 		'no_applicable_fields',
 		'run_not_found',
 		'proposal_not_found',
+		'needs_review',
 		'error',
 	]),
 	subject_table: Schema.optional(Schema.String),

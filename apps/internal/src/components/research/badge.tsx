@@ -2,6 +2,8 @@ import styled from 'styled-components'
 
 import type { Tone } from './proposal-logic'
 
+export type { Tone }
+
 /**
  * Shared pill used by the trust and outcome badges. The two-accent workshop
  * palette (terracotta + olive) has no dedicated warning colour, so tones map
@@ -15,6 +17,10 @@ const TONE_ACCENT: Record<Tone, string> = {
 	negative: 'var(--color-error)',
 	neutral: 'var(--color-on-surface-variant)',
 }
+
+/** The accent a tone reads in, so anything showing a status colours it the same
+ * way the badge beside it does. */
+export const toneColor = (tone: Tone): string => TONE_ACCENT[tone]
 
 export const Badge = styled.span.withConfig({
 	displayName: 'ResearchBadge',

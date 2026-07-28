@@ -74,7 +74,12 @@ export class ResearchRunCompleted extends Data.TaggedClass(
 	readonly summary: string
 	// Coming up empty is recorded like any other ending: it cost time and money,
 	// and it is still an answer the person who asked for it needs.
-	readonly status: 'succeeded' | 'failed' | 'cancelled' | 'no_reliable_data'
+	readonly status:
+		| 'succeeded'
+		| 'succeeded_low_confidence'
+		| 'failed'
+		| 'cancelled'
+		| 'no_reliable_data'
 	// Whoever asked for the run, so their own finished research can be found.
 	readonly actorUserId: string | null
 	readonly occurredAt: Date

@@ -15,8 +15,8 @@
  *
  * A quote-less entry cannot be refuted, so it is left untouched; the whole guard
  * is skipped when there is no corpus (a resume), so nothing is dropped for want
- * of evidence. The verdict prose and the `hook` are synthesized, not quotes, so
- * they are left to the prompt's grounding rules.
+ * of evidence. The verdict prose is the run's own wording rather than a quote, so
+ * it is left to the prompt's grounding rules.
  */
 
 import { isPlainObject } from './guard-shapes'

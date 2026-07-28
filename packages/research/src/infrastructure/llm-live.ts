@@ -21,7 +21,7 @@
  * Env scheme (capability-named, no auto-resolution):
  *   RESEARCH_LLM_<TIER>_PROVIDERS=nebius,groq,…          (CSV, slot 0 primary)
  *   RESEARCH_LLM_<TIER>_MODEL=Qwen/Qwen3-32B             (slot 0)
- *   RESEARCH_LLM_<TIER>_MODEL_2=qwen/qwen3.6-27b         (slot 1; defaults to slot 0)
+ *   RESEARCH_LLM_<TIER>_MODEL_2=openai/gpt-oss-120b      (slot 1; defaults to slot 0)
  *   RESEARCH_LLM_<TIER>_API_KEY=…                        (slot 0)
  *   RESEARCH_LLM_<TIER>_API_KEY_2=…                      (slot 1 via keyForSlot)
  *   RESEARCH_LLM_<TIER>_BASE_URL=…                       (custom vendor only)
@@ -65,6 +65,73 @@ const LLM_BASE_URLS = {
 	novita: 'https://api.novita.ai/openai/v1',
 	sambanova: 'https://api.sambanova.ai/v1',
 } as const satisfies Record<Exclude<LlmVendor, 'stub' | 'custom'>, string>
+
+/** One model a tier is configured to reach, and how to reach it. */
+export interface ConfiguredSlot {
+	readonly tier: LlmTier
+	/** 1 for a tier's first choice, 2 for what it falls back to. */
+	readonly slot: number
+	readonly vendor: string
+	readonly model: string
+	readonly baseUrl: string
+	/** The variable holding this slot's key — named, never read here. */
+	readonly apiKeyEnv: string
+}
+
+/**
+ * Every model the settings point a tier at.
+ *
+ * Read the same way a run reads them, so anything checking the settings is
+ * looking at what a run would really use. Working this out separately would be
+ * a second reading of the same settings, free to drift from the first and
+ * report on models nothing runs.
+ *
+ * Stubbed tiers are left out: they reach no vendor, so there is nothing to ask.
+ */
+export const configuredSlots = (
+	tiers: ReadonlyArray<{
+		readonly envPrefix: string
+		readonly tier: LlmTier
+	}> = [
+		{ envPrefix: 'RESEARCH_LLM_AGENT', tier: 'agent' },
+		{ envPrefix: 'RESEARCH_LLM_EXTRACT', tier: 'extract' },
+		{ envPrefix: 'RESEARCH_LLM_WRITER', tier: 'writer' },
+	],
+): Effect.Effect<ReadonlyArray<ConfiguredSlot>, Config.ConfigError> =>
+	Effect.forEach(tiers, ({ envPrefix, tier }) =>
+		Effect.gen(function* () {
+			const vendors = yield* providerListConfig(
+				LLM_VENDORS,
+				`${envPrefix}_PROVIDERS`,
+			)
+			const model = yield* Config.string(`${envPrefix}_MODEL`)
+			return yield* Effect.forEach(vendors, (vendor, i) =>
+				Effect.gen(function* () {
+					if (vendor === 'stub') return []
+					const slotModel =
+						i === 0
+							? model
+							: yield* Config.string(keyForSlot(`${envPrefix}_MODEL`, i)).pipe(
+									Config.withDefault(model),
+								)
+					const baseUrl =
+						vendor === 'custom'
+							? yield* Config.string(keyForSlot(`${envPrefix}_BASE_URL`, i))
+							: LLM_BASE_URLS[vendor]
+					return [
+						{
+							tier,
+							slot: i + 1,
+							vendor,
+							model: slotModel,
+							baseUrl,
+							apiKeyEnv: keyForSlot(`${envPrefix}_API_KEY`, i),
+						} satisfies ConfiguredSlot,
+					]
+				}),
+			).pipe(Effect.map(nested => nested.flat()))
+		}),
+	).pipe(Effect.map(nested => nested.flat()))
 
 // How long one model call may take before it is given up on, per tier. The
 // models these tiers run routinely think for the better part of a minute, so a
@@ -149,7 +216,7 @@ const buildTierLayer = <Self>(
 			const slots = yield* Effect.forEach(vendors, (vendor, i) =>
 				Effect.gen(function* () {
 					// A fallback slot may run a different provider whose model id
-					// differs (`qwen/qwen3.6-27b` on Groq vs `Qwen/Qwen3-32B` on
+					// differs (`openai/gpt-oss-120b` on Groq vs `Qwen/Qwen3-32B` on
 					// Nebius), so each slot reads its own model. Slot 0 is the tier's
 					// base model; later slots default to it when they share the id.
 					const slotModel =

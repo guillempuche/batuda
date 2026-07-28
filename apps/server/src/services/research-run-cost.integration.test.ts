@@ -169,6 +169,7 @@ describe('stamping a research run cost from the paid-spend ledger', () => {
 						tokensOut: 340,
 						costByBucket: { llm_agent: 4.5, search: 2.5 },
 						unitsByProvider: { firecrawl_search: 7 },
+						callsByModel: { 'agent@a-model': 3, 'agent@fallback-model': 1 },
 					})
 				}),
 			)
@@ -179,8 +180,9 @@ describe('stamping a research run cost from the paid-spend ledger', () => {
 				tokens_out: number
 				cost_breakdown: unknown
 				quota_breakdown: unknown
+				llm_models: unknown
 			}>(
-				`SELECT tokens_in, tokens_out, cost_breakdown, quota_breakdown
+				`SELECT tokens_in, tokens_out, cost_breakdown, quota_breakdown, llm_models
 				 FROM research_runs WHERE id = $1`,
 				[researchId],
 			)
@@ -192,6 +194,13 @@ describe('stamping a research run cost from the paid-spend ledger', () => {
 			expect(row?.tokens_out).toBe(340)
 			expect(row?.cost_breakdown).toEqual({ llm_agent: 4.5, search: 2.5 })
 			expect(row?.quota_breakdown).toEqual({ firecrawl_search: 7 })
+			// The models that answered are counted apart from the cost buckets: those
+			// are added up to reach what the run cost, so describing the same spend
+			// twice there would charge the run twice
+			expect(row?.llm_models).toEqual({
+				'agent@a-model': 3,
+				'agent@fallback-model': 1,
+			})
 		})
 	})
 })

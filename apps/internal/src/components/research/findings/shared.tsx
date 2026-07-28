@@ -70,6 +70,7 @@ export type CommonFindings = {
 	readonly proposed_updates?: ReadonlyArray<ProposedUpdate>
 	readonly pending_paid_actions?: ReadonlyArray<PendingPaidAction>
 	readonly discovered_existing?: ReadonlyArray<DiscoveredExisting>
+	readonly quality?: { readonly low_confidence?: boolean }
 }
 
 export function stableKey(parts: ReadonlyArray<string>): string {
@@ -270,10 +271,25 @@ export function CommonSections({
 	// review on the run page, so the read-only findings block only keeps the
 	// pending paid actions.
 	const paid = findings?.pending_paid_actions ?? []
-	if (paid.length === 0) {
+	// Any kind of run can come back unsure which company it found, and a list of
+	// prospects built from the wrong one misleads just as much as a profile of
+	// it, so the warning lives in the block every view shares.
+	const needsReading = findings?.quality?.low_confidence === true
+	if (paid.length === 0 && !needsReading) {
 		return null
 	}
-	return <PendingPaidActionsSection actions={paid} />
+	return (
+		<>
+			{needsReading ? (
+				<Section data-testid='research-needs-reading'>
+					<NeedsReadingFlag>
+						<Trans>Read this before it goes into a record</Trans>
+					</NeedsReadingFlag>
+				</Section>
+			) : null}
+			{paid.length > 0 ? <PendingPaidActionsSection actions={paid} /> : null}
+		</>
+	)
 }
 
 // ── Shared styled primitives ──
@@ -484,6 +500,12 @@ const DiscoveredName = styled.span`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	color: var(--color-on-surface);
+`
+
+// A warning rather than a figure, so it reads in the attention accent instead
+// of the muted one the counts use.
+export const NeedsReadingFlag = styled.span`
+	color: var(--color-primary);
 `
 
 // Counts read one per line, so each can agree with its own number — several

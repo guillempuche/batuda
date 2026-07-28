@@ -482,6 +482,8 @@ describe('summarizeScores', () => {
 		id: 'r',
 		grounded: true,
 		wrongCompany: false,
+		wrongCompanyAutoApplicable: false,
+		lowConfidence: false,
 		empty: false,
 		fieldsExpected: 0,
 		fieldsScored: 0,
@@ -502,16 +504,145 @@ describe('summarizeScores', () => {
 				runs: 0,
 				groundingAccuracy: 0,
 				wrongCompanyRate: 0,
+				wrongCompanyAutoApplicableRate: 0,
+				lowConfidenceRate: 0,
 				emptyRate: 0,
 				fieldPrecision: null,
 				fieldRecall: null,
 				contactRecall: null,
+				fieldsFilledPerRun: null,
+				profileFieldsTotal: null,
+				contactsNamedPerRun: null,
+				contactsTitledPerRun: null,
 				costPerRun: null,
 				costPerGroundedRun: null,
 				paidCostPerRun: null,
 				tokensPerRun: null,
 				creditsPerRun: null,
+				callsByModel: {},
+				cascadedRunRate: null,
 			})
+		})
+	})
+
+	describe('when the runs report how full their profiles came back', () => {
+		it('should average the fields filled and the people named', () => {
+			// GIVEN two runs, one that came back full and one nearly empty
+			const summary = summarizeScores([
+				score({
+					profile: {
+						fieldsTotal: 6,
+						fieldsFilled: 6,
+						contactsNamed: 4,
+						contactsTitled: 3,
+					},
+				}),
+				score({
+					profile: {
+						fieldsTotal: 6,
+						fieldsFilled: 2,
+						contactsNamed: 0,
+						contactsTitled: 0,
+					},
+				}),
+			])
+
+			// WHEN summarized — THEN the averages say how full a profile came back,
+			// which the golden-answer scores cannot: a run answering four scalars
+			// and nothing else looks perfect to them
+			expect(summary.fieldsFilledPerRun).toBe(4)
+			expect(summary.profileFieldsTotal).toBe(6)
+			expect(summary.contactsNamedPerRun).toBe(2)
+			expect(summary.contactsTitledPerRun).toBe(1.5)
+		})
+	})
+
+	describe('when no run reported how full its profile came back', () => {
+		it('should report no fullness figures at all', () => {
+			// GIVEN scores from a pass that never read the fullness back
+			const summary = summarizeScores([score({}), score({})])
+
+			// WHEN summarized — THEN the figures stay absent rather than reading as
+			// zero, which would look like a pass that found nothing
+			expect(summary.fieldsFilledPerRun).toBeNull()
+			expect(summary.contactsNamedPerRun).toBeNull()
+		})
+	})
+
+	describe('when a run that shipped the wrong company was flagged for review', () => {
+		it('should keep it out of the unwatched count but not the overall one', () => {
+			// GIVEN two look-alike runs, one of which finished needing review
+			const lookAlike = {
+				grounded: false,
+				wrongCompany: true,
+				empty: false,
+			}
+			const summary = summarizeScores([
+				score({ ...lookAlike, wrongCompanyAutoApplicable: true }),
+				score({
+					...lookAlike,
+					lowConfidence: true,
+					wrongCompanyAutoApplicable: false,
+				}),
+			])
+
+			// WHEN summarized — THEN both count as wrong, but only the one nobody
+			// would have read counts as having been able to reach a record on its own
+			expect(summary.wrongCompanyRate).toBe(1)
+			expect(summary.wrongCompanyAutoApplicableRate).toBe(0.5)
+			expect(summary.lowConfidenceRate).toBe(0.5)
+		})
+	})
+
+	describe('when a tier answered on more than one model', () => {
+		const usage = (callsByModel: Record<string, number>) => ({
+			costCents: 5,
+			paidCostCents: 0,
+			tokensIn: 100,
+			tokensOut: 20,
+			creditsUsed: 2,
+			callsByModel,
+		})
+
+		it('should count the calls each model took across the pass', () => {
+			// GIVEN two runs, one of which fell back partway through
+			const summary = summarizeScores([
+				score({ usage: usage({ 'agent@primary': 4 }) }),
+				score({ usage: usage({ 'agent@primary': 3, 'agent@fallback': 2 }) }),
+			])
+
+			// WHEN summarized — THEN the totals name both models, so a reader can
+			// see how much of the pass the fallback carried
+			expect(summary.callsByModel).toEqual({
+				'agent@primary': 7,
+				'agent@fallback': 2,
+			})
+		})
+
+		it('should report the share of runs that fell back', () => {
+			// GIVEN three runs, one of them cascaded
+			const summary = summarizeScores([
+				score({ usage: usage({ 'agent@primary': 4 }) }),
+				score({ usage: usage({ 'agent@primary': 3, 'agent@fallback': 2 }) }),
+				score({ usage: usage({ 'agent@primary': 5 }) }),
+			])
+
+			// WHEN summarized — THEN a third of the pass is flagged as having been
+			// answered by something other than the models it set out to measure
+			expect(summary.cascadedRunRate).toBeCloseTo(1 / 3)
+		})
+
+		it('should report no fallback when every tier stayed on one model', () => {
+			// GIVEN two runs, each answered entirely by its first choice — note
+			// two DIFFERENT tiers in one run must not read as a fallback
+			const summary = summarizeScores([
+				score({ usage: usage({ 'agent@primary': 4, 'extract@other': 1 }) }),
+				score({ usage: usage({ 'agent@primary': 2 }) }),
+			])
+
+			// WHEN summarized — THEN the pass is clean and the scores speak for
+			// the models they were taken on
+			expect(summary.cascadedRunRate).toBe(0)
 		})
 	})
 

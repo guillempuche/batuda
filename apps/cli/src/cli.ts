@@ -33,6 +33,7 @@ import {
 	researchEvalContacts,
 	researchEvalInvariance,
 	researchProbe,
+	researchProbeConfig,
 } from './commands/research'
 import { seed, seedIdentities } from './commands/seed'
 import { servicesDown, servicesStatus, servicesUp } from './commands/services'
@@ -936,9 +937,13 @@ const researchProbeCommand = Command.make(
 			Flag.withDescription('OpenAI-compatible endpoint to probe'),
 			Flag.withDefault('https://api.tokenfactory.nebius.com/v1'),
 		),
-		apiKey: Flag.redacted('api-key').pipe(
-			Flag.withDescription('API key (defaults to RESEARCH_LLM_AGENT_API_KEY)'),
-			Flag.optional,
+		// The key is named, never pasted: pnpm echoes its arguments, so a key
+		// written on the command line ends up in logs and shell history.
+		apiKeyEnv: Flag.string('api-key-env').pipe(
+			Flag.withDescription(
+				'Name of the environment variable holding the API key (defaults to RESEARCH_LLM_AGENT_API_KEY)',
+			),
+			Flag.withDefault('RESEARCH_LLM_AGENT_API_KEY'),
 		),
 		models: Flag.string('models').pipe(
 			Flag.withDescription('Comma-separated model ids to probe'),
@@ -947,10 +952,10 @@ const researchProbeCommand = Command.make(
 			),
 		),
 	},
-	({ baseUrl, apiKey, models }) =>
+	({ baseUrl, apiKeyEnv, models }) =>
 		researchProbe({
 			baseUrl,
-			apiKey,
+			apiKeyEnv,
 			models: models
 				.split(',')
 				.map(model => model.trim())
@@ -962,6 +967,17 @@ const researchProbeCommand = Command.make(
 	),
 	Command.withDescription(
 		'Probe each candidate model on an OpenAI-compatible endpoint (Nebius by default) for forced tool calling and strict JSON-schema output — the two features the research agent and extract tiers depend on. Use it to gate a model out before trusting it in a tier.',
+	),
+)
+
+const researchProbeConfigCommand = Command.make('probe-config', {}, () =>
+	researchProbeConfig(),
+).pipe(
+	Command.withShortDescription(
+		'Check every model the settings point a tier at',
+	),
+	Command.withDescription(
+		'Ask each model the research settings point a tier at whether it can still do what that tier needs — forced tool calling and strict JSON output. Reads the same settings a run reads, so it checks the models a run would really use. Exits non-zero only when a model itself will not do the work; a rejected key, a rate limit or a vendor outage are reported and let through, since none of those say anything about the model.',
 	),
 )
 
@@ -1151,6 +1167,7 @@ const researchCommand = Command.make('research').pipe(
 	Command.withSubcommands([
 		researchCapCommand,
 		researchProbeCommand,
+		researchProbeConfigCommand,
 		researchEvalCommand,
 		researchEvalContactsCommand,
 		researchEvalInvarianceCommand,

@@ -14,6 +14,7 @@
  * where a recovered value passes the same grounding guards as any other.
  */
 
+import { mergeContacts } from './contacts-rescue'
 import { enrichmentFill } from './extraction-fill'
 
 // The firmographic scalars worth spending an extra search on. `size_range` is also
@@ -81,19 +82,41 @@ const enrichmentOf = (
 		: undefined
 }
 
+// The people a set of findings names, or none when it names nobody.
+const contactsOf = (
+	findings: unknown,
+): ReadonlyArray<Record<string, unknown>> => {
+	if (findings === null || typeof findings !== 'object') return []
+	const contacts = (findings as { contacts?: unknown }).contacts
+	return Array.isArray(contacts)
+		? (contacts as ReadonlyArray<Record<string, unknown>>)
+		: []
+}
+
 /**
- * Fill the high-value fields from a re-extraction over the enlarged evidence, but
- * only where the first pass left them empty — a value already grounded is never
- * overwritten. Returns the findings and how many fields it filled.
+ * Fold a re-extraction over the enlarged evidence back into the findings.
+ *
+ * A high-value field is filled only where the first pass left it empty, so a value
+ * already grounded is never overwritten. The people come across as well: the pages
+ * this round fetched are read by the same passes as any other, so a leader they
+ * name has already been found and guarded — dropping them here would mean paying
+ * to read a team page and then throwing the team away. Merging keeps whoever was
+ * already known, adds anyone new, and fills in a title for someone who had none,
+ * so a second look can only ever leave the list better than it found it.
  */
 export const mergePerFieldSearch = (
 	findings: unknown,
 	refreshed: unknown,
-): { readonly findings: unknown; readonly filled: number } => {
+): {
+	readonly findings: unknown
+	readonly filled: number
+	/** Whether the people list gained anyone, or gained a detail about anyone. */
+	readonly contactsChanged: boolean
+} => {
 	const enrichment = enrichmentOf(findings)
 	const refreshedEnrichment = enrichmentOf(refreshed)
 	if (enrichment === undefined || refreshedEnrichment === undefined) {
-		return { findings, filled: 0 }
+		return { findings, filled: 0, contactsChanged: false }
 	}
 	let filled = 0
 	const nextEnrichment: Record<string, unknown> = { ...enrichment }
@@ -103,9 +126,26 @@ export const mergePerFieldSearch = (
 			filled++
 		}
 	}
-	if (filled === 0) return { findings, filled: 0 }
+	const known = contactsOf(findings)
+	const found = contactsOf(refreshed)
+	const contacts = found.length > 0 ? mergeContacts(known, found) : known
+	// A second look adds people, but it also puts a title on somebody already
+	// named — and that leaves the list exactly as long as it was. Asking what is
+	// in the list rather than how long it is keeps those titles, which are the
+	// whole reason for opening a team page.
+	const contactsChanged =
+		contacts.length !== known.length ||
+		contacts.some((contact, index) => contact !== known[index])
+	if (filled === 0 && !contactsChanged) {
+		return { findings, filled: 0, contactsChanged: false }
+	}
 	return {
-		findings: { ...(findings as object), enrichment: nextEnrichment },
+		findings: {
+			...(findings as object),
+			enrichment: nextEnrichment,
+			...(contactsChanged ? { contacts } : {}),
+		},
 		filled,
+		contactsChanged,
 	}
 }

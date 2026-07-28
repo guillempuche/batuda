@@ -37,7 +37,6 @@ const ENRICHMENT_FINDINGS = {
 	enrichment: {
 		industry: sourced('Restaurant'),
 		size_range: sourced('11-25'),
-		pain_points: sourced('Table turnover on weekends'),
 		current_tools: sourced('Paper reservations book'),
 	},
 	verdict: 'strong_fit',
@@ -118,7 +117,6 @@ test.describe('research findings', () => {
 			const enrichment = page.getByTestId('research-enrichment')
 			await expect(enrichment).toBeVisible()
 			await expect(enrichment).toContainText('11-25')
-			await expect(enrichment).toContainText('Table turnover on weekends')
 			await expect(enrichment).toContainText('Paper reservations book')
 
 			// AND the fit verdict carries the quote that decided it

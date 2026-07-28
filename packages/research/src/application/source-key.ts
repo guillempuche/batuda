@@ -31,6 +31,13 @@ export const urlHashForScrape = (url: string): string =>
 	createHash('sha256').update(canonicalizeUrl(url)).digest('hex')
 
 /**
+ * The `sources.id` a URL maps to — built from the same hash the row is keyed by,
+ * so a page lands on one row however the run met it.
+ */
+export const sourceIdFor = (urlHash: string): string =>
+	`src_${urlHash.slice(0, 16)}`
+
+/**
  * The `www.`-stripped, lowercased host of a URL, or null if it doesn't parse — for
  * comparing two URLs by the SITE they belong to rather than the exact page.
  */

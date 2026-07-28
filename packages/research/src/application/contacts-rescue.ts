@@ -7,9 +7,9 @@
  * attention is spread across every other field and it returns one contact or none,
  * or a handful of names with no titles. This runs a narrow pass that does nothing
  * but pull named people and their titles, then folds them into the broad findings.
- * It fires when the broad pass found at most one contact, OR when any contact it
- * did find has no title, so a run that already has its people with titles pays
- * nothing.
+ * It runs on every enrichment. The merge only ever adds a person or fills in a
+ * detail one was missing, so a second look cannot cost anything already found,
+ * and the pass is cheap enough not to be worth deciding about.
  *
  * The recovered contacts flow through the same guard chain as the broad ones
  * (citations, per-contact entity binding, source tier), so nothing here ships

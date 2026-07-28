@@ -28,8 +28,9 @@
 
 /**
  * The enrichment scalars we can check against an objective golden answer. Free-text
- * fields (pain points, tags) are left out because there is no single correct value
- * to score them against. Snake case matches the extraction schema's field names.
+ * fields (current tools, tags) are left out because there is no single correct
+ * value to score them against. Snake case matches the extraction schema's field
+ * names.
  */
 export const SCORABLE_FIELDS = [
 	'industry',
@@ -86,6 +87,22 @@ export interface GoldenExpectation {
 }
 
 /**
+ * What a run came back with, counted rather than judged against a known answer.
+ * Without this, a run that returns four right scalars and nothing else scores
+ * the same as one that returns a full picture — the opposite of what a rich
+ * profile is worth.
+ */
+export interface ProfileFullness {
+	/** Profile fields the shape asks for, and how many carry a real value. */
+	readonly fieldsTotal: number
+	readonly fieldsFilled: number
+	/** People named, whether or not a title came with them. */
+	readonly contactsNamed: number
+	/** Of those, how many carry a title — the ones worth writing to. */
+	readonly contactsTitled: number
+}
+
+/**
  * A normalized view of what one run produced, adapted from the run row + its
  * findings by the caller. Keeping the adapter out of here is deliberate: the
  * findings shape changes when citations move per-field, but this view — and so
@@ -116,6 +133,8 @@ export interface RunOutcome {
 	 * register was reached even if its own site was never scraped.
 	 */
 	readonly registryConfirmed?: boolean
+	/** How full the profile came back, across the whole output shape. */
+	readonly profile?: ProfileFullness
 }
 
 // What one run was billed, and what it consumed getting there — read back from
@@ -129,6 +148,13 @@ export interface RunUsage {
 	readonly tokensOut: number
 	/** Provider credits consumed, totalled across every provider. */
 	readonly creditsUsed: number
+	/**
+	 * The models that answered this run, keyed `<tier>@<model>` with the number
+	 * of calls each took. A tier listed twice fell back partway through — which
+	 * matters when reading the score, since the run was then partly the work of
+	 * a model the pass was not set up to measure.
+	 */
+	readonly callsByModel?: Record<string, number>
 }
 
 export interface RunScore {
@@ -137,6 +163,18 @@ export interface RunScore {
 	readonly usage?: RunUsage
 	readonly grounded: boolean
 	readonly wrongCompany: boolean
+	/**
+	 * Whether a wrong company got as far as finishing clean — the most that could
+	 * ever reach a record unwatched. An upper bound, not a count of what would:
+	 * writing anything without a person also needs the organisation to have asked
+	 * for it, the value to be a way of reaching somebody rather than a judgement,
+	 * and that address to have come back reachable. None of which is knowable
+	 * here. Read it as "how much even had the chance", and expect the real number
+	 * to be far lower.
+	 */
+	readonly wrongCompanyAutoApplicable: boolean
+	/** Whether the run finished flagged as needing somebody to read it. */
+	readonly lowConfidence: boolean
 	readonly empty: boolean
 	/** Golden fields we have a true answer for (recall's denominator). */
 	readonly fieldsExpected: number
@@ -152,12 +190,22 @@ export interface RunScore {
 	readonly bucket?: GoldenBucket
 	/** The golden row's expected country (ISO alpha-2), for a by-country breakdown. */
 	readonly country?: string
+	/** How full the profile came back, independent of the golden answers. */
+	readonly profile?: ProfileFullness
 }
 
 export interface EvalSummary {
 	readonly runs: number
 	readonly groundingAccuracy: number
 	readonly wrongCompanyRate: number
+	/**
+	 * Share of runs that shipped another company's data and finished clean — the
+	 * most that could ever be written with nobody looking. An upper bound: see
+	 * `wrongCompanyAutoApplicable` for the conditions it cannot see.
+	 */
+	readonly wrongCompanyAutoApplicableRate: number
+	/** Share of runs that finished flagged as needing somebody to read them. */
+	readonly lowConfidenceRate: number
 	readonly emptyRate: number
 	/** Micro-averaged correct ÷ filled across all runs; null when nothing was filled to check. */
 	readonly fieldPrecision: number | null
@@ -166,6 +214,15 @@ export interface EvalSummary {
 	/** Micro-averaged known people recovered *with a title* ÷ known people, across all
 	 * runs; null when no golden row listed expected contacts. */
 	readonly contactRecall: number | null
+	/**
+	 * Profile fields filled per run, averaged over the runs that reported it, and
+	 * the shape's own field count to read it against.
+	 */
+	readonly fieldsFilledPerRun: number | null
+	readonly profileFieldsTotal: number | null
+	/** People named per run, and how many of those carry a title. */
+	readonly contactsNamedPerRun: number | null
+	readonly contactsTitledPerRun: number | null
 	/** What one run cost on average, in cents; null when no run reported a cost. */
 	readonly costPerRun: number | null
 	/** What one usable run cost — the total spread over the runs that grounded,
@@ -176,6 +233,18 @@ export interface EvalSummary {
 	readonly tokensPerRun: number | null
 	/** Provider credits one run consumed on average. */
 	readonly creditsPerRun: number | null
+	/**
+	 * How many calls each model answered across the whole pass, keyed
+	 * `<tier>@<model>`. Read this before the quality numbers: a tier that shows
+	 * up under two models did not measure the one it was set up to measure, and
+	 * the split says how far off that reading is.
+	 */
+	readonly callsByModel: Record<string, number>
+	/**
+	 * The share of runs where some tier answered on more than one model. Zero
+	 * means every run stayed on its first choice and the scores speak for it.
+	 */
+	readonly cascadedRunRate: number | null
 }
 
 /**
@@ -477,16 +546,25 @@ export const scoreRun = (
 	const wrongCompany =
 		isSucceeded(outcome.status) && !empty && !grounded && !agreesWithGolden
 
+	// The same look-alike, narrowed to the runs that finished clean. A run marked
+	// as needing review is caught by the person reading it, so it cannot be in the
+	// count of what got far enough to be written unwatched.
+	const lowConfidence = outcome.status === 'succeeded_low_confidence'
+	const wrongCompanyAutoApplicable = wrongCompany && !lowConfidence
+
 	return {
 		id: expected.id,
 		grounded,
 		wrongCompany,
+		wrongCompanyAutoApplicable,
+		lowConfidence,
 		empty,
 		fieldsExpected,
 		fieldsScored,
 		fieldsCorrect,
 		contactsExpected: expectedContacts.length,
 		contactsFound,
+		...(outcome.profile !== undefined ? { profile: outcome.profile } : {}),
 		...(outcome.usage !== undefined ? { usage: outcome.usage } : {}),
 		...(expected.bucket !== undefined ? { bucket: expected.bucket } : {}),
 		...(expected.fields.country !== undefined
@@ -505,21 +583,38 @@ export const summarizeScores = (
 			runs: 0,
 			groundingAccuracy: 0,
 			wrongCompanyRate: 0,
+			wrongCompanyAutoApplicableRate: 0,
+			lowConfidenceRate: 0,
 			emptyRate: 0,
 			fieldPrecision: null,
 			fieldRecall: null,
 			contactRecall: null,
+			fieldsFilledPerRun: null,
+			profileFieldsTotal: null,
+			contactsNamedPerRun: null,
+			contactsTitledPerRun: null,
 			costPerRun: null,
 			costPerGroundedRun: null,
 			paidCostPerRun: null,
 			tokensPerRun: null,
 			creditsPerRun: null,
+			callsByModel: {},
+			cascadedRunRate: null,
 		}
 	}
 
 	let grounded = 0
 	let wrong = 0
+	let wrongAutoApplicable = 0
+	let lowConfidence = 0
 	let empty = 0
+	let runsWithProfile = 0
+	let profileFieldsTotal = 0
+	let totalFieldsFilled = 0
+	let totalContactsNamed = 0
+	let totalContactsTitled = 0
+	const callsByModel: Record<string, number> = {}
+	let cascadedRuns = 0
 	let totalExpected = 0
 	let totalScored = 0
 	let totalCorrect = 0
@@ -536,7 +631,19 @@ export const summarizeScores = (
 	for (const score of scores) {
 		if (score.grounded) grounded++
 		if (score.wrongCompany) wrong++
+		if (score.wrongCompanyAutoApplicable) wrongAutoApplicable++
+		if (score.lowConfidence) lowConfidence++
 		if (score.empty) empty++
+		if (score.profile !== undefined) {
+			runsWithProfile++
+			// Every run is measured against the same profile shape, so this is the
+			// same number each time round — kept as scale for the filled count, not
+			// something to add up.
+			profileFieldsTotal = score.profile.fieldsTotal
+			totalFieldsFilled += score.profile.fieldsFilled
+			totalContactsNamed += score.profile.contactsNamed
+			totalContactsTitled += score.profile.contactsTitled
+		}
 		totalExpected += score.fieldsExpected
 		totalScored += score.fieldsScored
 		totalCorrect += score.fieldsCorrect
@@ -549,6 +656,18 @@ export const summarizeScores = (
 			totalTokensIn += score.usage.tokensIn
 			totalTokensOut += score.usage.tokensOut
 			totalCredits += score.usage.creditsUsed
+			for (const [key, calls] of Object.entries(
+				score.usage.callsByModel ?? {},
+			)) {
+				callsByModel[key] = (callsByModel[key] ?? 0) + calls
+			}
+			// A tier naming two models in one run answered partly on each, which
+			// is what makes that run's score a reading of something other than the
+			// models the pass set out to measure.
+			const tiers = Object.keys(score.usage.callsByModel ?? {}).map(
+				key => key.split('@')[0] ?? key,
+			)
+			if (new Set(tiers).size < tiers.length) cascadedRuns += 1
 		}
 	}
 
@@ -556,6 +675,8 @@ export const summarizeScores = (
 		runs,
 		groundingAccuracy: grounded / runs,
 		wrongCompanyRate: wrong / runs,
+		wrongCompanyAutoApplicableRate: wrongAutoApplicable / runs,
+		lowConfidenceRate: lowConfidence / runs,
 		emptyRate: empty / runs,
 		fieldPrecision: totalScored === 0 ? null : totalCorrect / totalScored,
 		fieldRecall: totalExpected === 0 ? null : totalCorrect / totalExpected,
@@ -563,6 +684,13 @@ export const summarizeScores = (
 			totalContactsExpected === 0
 				? null
 				: totalContactsFound / totalContactsExpected,
+		fieldsFilledPerRun:
+			runsWithProfile === 0 ? null : totalFieldsFilled / runsWithProfile,
+		profileFieldsTotal: runsWithProfile === 0 ? null : profileFieldsTotal,
+		contactsNamedPerRun:
+			runsWithProfile === 0 ? null : totalContactsNamed / runsWithProfile,
+		contactsTitledPerRun:
+			runsWithProfile === 0 ? null : totalContactsTitled / runsWithProfile,
 		costPerRun: runsWithUsage === 0 ? null : totalCostCents / runsWithUsage,
 		costPerGroundedRun:
 			runsWithUsage === 0 || grounded === 0 ? null : totalCostCents / grounded,
@@ -573,6 +701,8 @@ export const summarizeScores = (
 				? null
 				: (totalTokensIn + totalTokensOut) / runsWithUsage,
 		creditsPerRun: runsWithUsage === 0 ? null : totalCredits / runsWithUsage,
+		callsByModel,
+		cascadedRunRate: runsWithUsage === 0 ? null : cascadedRuns / runsWithUsage,
 	}
 }
 

@@ -144,7 +144,7 @@ describe('constrainVocabulary', () => {
 				enrichment: {
 					industry: 'freight & logistics',
 					size_range: 'small',
-					pain_points: 'high churn',
+					current_tools: 'a spreadsheet',
 				},
 			}
 
@@ -157,7 +157,7 @@ describe('constrainVocabulary', () => {
 				.enrichment
 			expect(e['industry']).toBe('transport')
 			expect(e).not.toHaveProperty('size_range')
-			expect(e['pain_points']).toBe('high churn')
+			expect(e['current_tools']).toBe('a spreadsheet')
 			expect(result.mapped).toBe(1)
 			expect(result.blanked).toBe(1)
 		})

@@ -73,7 +73,7 @@ describe('CompanyEnrichmentV1Schema', () => {
 	})
 
 	describe('when the model emits a fit verdict', () => {
-		it('should decode the verdict, disqualifiers, per-criterion checks, and hook', () => {
+		it('should decode the verdict, disqualifiers and per-criterion checks', () => {
 			// GIVEN a "no fit" result of the kind that used to appear only in the brief
 			// and was lost from the structured output
 			const payload = {
@@ -103,7 +103,6 @@ describe('CompanyEnrichmentV1Schema', () => {
 					},
 					{ criterion: 'US-based operations', result: 'pass' },
 				],
-				hook: 'Mixed authority — worth a broker-services angle.',
 			}
 
 			// WHEN it is decoded
@@ -117,9 +116,6 @@ describe('CompanyEnrichmentV1Schema', () => {
 			expect(decoded.disqualifiers?.[0]?.source_id).toBe('src-1')
 			expect(decoded.fit_checks?.[0]?.result).toBe('fail')
 			expect(decoded.fit_checks?.[1]?.result).toBe('pass')
-			expect(decoded.hook).toBe(
-				'Mixed authority — worth a broker-services angle.',
-			)
 		})
 
 		it('should reject a verdict outside the fixed set', () => {
@@ -132,16 +128,12 @@ describe('CompanyEnrichmentV1Schema', () => {
 	})
 
 	describe('when the sources disagree on a field', () => {
-		it('should decode each losing reading with its source, not a pain_points note', () => {
+		it('should decode each losing reading with the page that stated it', () => {
 			// GIVEN a head-count the sources disagree on — one entry per reading the
 			// field did not take, each tied to the page that stated it
 			const payload = {
 				enrichment: {
-					pain_points: {
-						value: 'Manual load booking across several systems',
-						source_id: 'src-1',
-						confidence: null,
-					},
+					size_range: { value: '51-200', source_id: 'src-1', confidence: null },
 				},
 				conflicts: [
 					{
@@ -161,17 +153,13 @@ describe('CompanyEnrichmentV1Schema', () => {
 			// WHEN it is decoded
 			const decoded = decode(payload)
 
-			// THEN each reading keeps its value and source so the UI can link them,
-			// and pain_points stays a real pain
+			// THEN each reading keeps its value and source so the UI can link them
 			expect(decoded.conflicts?.[0]?.field).toBe('size_range')
 			expect(decoded.conflicts?.[0]?.value).toBe('11-50')
 			expect(decoded.conflicts?.[0]?.source_id).toBe(
 				'https://indeed.com/cmp/acme',
 			)
 			expect(decoded.conflicts?.[1]?.value).toBe('201-500')
-			expect(decoded.enrichment.pain_points?.value).toBe(
-				'Manual load booking across several systems',
-			)
 		})
 	})
 
@@ -243,7 +231,6 @@ describe('CompanyEnrichmentV1Schema', () => {
 				enrichment: {
 					industry: null,
 					size_range: null,
-					pain_points: null,
 					current_tools: null,
 					tags: null,
 					location: null,

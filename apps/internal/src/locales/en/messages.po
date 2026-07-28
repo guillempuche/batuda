@@ -570,6 +570,10 @@ msgstr "Apply all verified ({verifiedToApply})"
 msgid "Apply field updates ({0})"
 msgstr "Apply field updates ({0})"
 
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Apply these one at a time — this run wasn't sure it found the right company."
+msgstr "Apply these one at a time — this run wasn't sure it found the right company."
+
 #. placeholder {0}: items.length
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Applying {0} changes…"
@@ -624,6 +628,10 @@ msgstr "Assign to me"
 #: src/routes/settings/mcp/connections.tsx
 msgid "Assistant"
 msgstr "Assistant"
+
+#: src/components/research/run-detail.tsx
+msgid "At least one of these results needs reading before it is used. Open the ones marked below."
+msgstr "At least one of these results needs reading before it is used. Open the ones marked below."
 
 #: src/components/emails/attachment-picker.tsx
 msgid "Attach"
@@ -2302,8 +2310,8 @@ msgid "Free research work allowed for one run."
 msgstr "Free research work allowed for one run."
 
 #: src/components/research/inbox/research-inbox.tsx
-msgid "Free-text, low-confidence or unverified — read before applying."
-msgstr "Free-text, low-confidence or unverified — read before applying."
+msgid "Free-text, low-confidence, unverified, or from a run that needs reading — read before applying."
+msgstr "Free-text, low-confidence, unverified, or from a run that needs reading — read before applying."
 
 #: src/components/research/research-dialog.tsx
 msgid "Freeform"
@@ -2415,6 +2423,14 @@ msgstr "I couldn't find any usable pages for this company."
 #: src/components/research/run-detail.tsx
 msgid "I couldn't read the company's website, so there was nothing to work from."
 msgstr "I couldn't read the company's website, so there was nothing to work from."
+
+#: src/components/research/run-detail.tsx
+msgid "I found less to go on here than usual."
+msgstr "I found less to go on here than usual."
+
+#: src/components/research/run-detail.tsx
+msgid "I found pages that mention this company but never clearly landed on its own website, so I can't be sure these findings are about the right one."
+msgstr "I found pages that mention this company but never clearly landed on its own website, so I can't be sure these findings are about the right one."
 
 #: src/components/profile/set-password-nudge.tsx
 msgid "I prefer passwordless"
@@ -3753,13 +3769,7 @@ msgstr "Paid research API calls billed to this organization."
 msgid "Paid spend this month"
 msgstr "Paid spend this month"
 
-#: src/components/research/findings/prospect-scan-view.tsx
-msgid "Pain indicators"
-msgstr "Pain indicators"
-
 #: src/components/companies/about-section.tsx
-#: src/components/research/findings/company-enrichment-view.tsx
-#: src/components/research/run-labels.ts
 msgid "Pain points"
 msgstr "Pain points"
 
@@ -4081,6 +4091,14 @@ msgstr "Read {0}"
 msgid "Read state update failed"
 msgstr "Read state update failed"
 
+#: src/components/research/findings/shared.tsx
+msgid "Read this before it goes into a record"
+msgstr "Read this before it goes into a record"
+
+#: src/components/research/run-detail.tsx
+msgid "Read this before you use it"
+msgstr "Read this before you use it"
+
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Ready to apply"
 msgstr "Ready to apply"
@@ -4358,6 +4376,10 @@ msgstr "Run deleted"
 #: src/components/research/run-detail.tsx
 msgid "Run failed"
 msgstr "Run failed"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Run needs reading"
+msgstr "Run needs reading"
 
 #: src/components/companies/research-summary-card.tsx
 msgid "Run new"

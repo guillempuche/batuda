@@ -24,8 +24,16 @@ export function FreeformView({
 	const proposed = findings?.proposed_updates ?? []
 	const paid = findings?.pending_paid_actions ?? []
 	const existing = findings?.discovered_existing ?? []
+	// A run that needs reading says so even when it suggests nothing — that
+	// warning is the one thing that must never be swallowed by an empty state.
+	const needsReading = findings?.quality?.low_confidence === true
 
-	if (proposed.length === 0 && paid.length === 0 && existing.length === 0) {
+	if (
+		proposed.length === 0 &&
+		paid.length === 0 &&
+		existing.length === 0 &&
+		!needsReading
+	) {
 		return (
 			<EmptyHint>
 				<Trans>

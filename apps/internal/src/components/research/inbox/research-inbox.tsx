@@ -16,6 +16,7 @@ import {
 	researchListAtom,
 	resolveProposalsBatchAtom,
 } from '#/atoms/research-atoms'
+import { Badge } from '#/components/research/badge'
 import {
 	fieldChanges,
 	humanizeFieldKey,
@@ -84,7 +85,13 @@ function rowKey(p: PendingProposal): string {
 	return `${p.researchId}::${p.proposedUpdateId ?? ''}`
 }
 
+/** A run somebody has to read before anything from it enters a record. However
+ * well-checked a value it suggests may be, what is in doubt is which company
+ * that value belongs to, and no email check or confidence score settles that. */
+const NEEDS_READING_STATUSES = new Set(['succeeded_low_confidence'])
+
 function tierOf(p: PendingProposal) {
+	if (NEEDS_READING_STATUSES.has(p.runStatus)) return 'needs_review'
 	return trustTier({
 		verification: p.verification,
 		confidence: p.confidence,
@@ -560,7 +567,7 @@ export function ResearchInbox() {
 					<ProposalSection
 						testId='research-inbox-needs-review'
 						title={t`Needs your review`}
-						hint={t`Free-text, low-confidence or unverified — read before applying.`}
+						hint={t`Free-text, low-confidence, unverified, or from a run that needs reading — read before applying.`}
 						proposals={needsReview}
 						results={results}
 						pending={pending}
@@ -700,11 +707,20 @@ function ProposalRow({
 				) : null}
 				<ProposedValues proposal={proposal} />
 				<RowBadges>
-					<TrustBadge
-						verification={proposal.verification}
-						confidence={proposal.confidence}
-						machineCheckable={proposal.machineCheckable}
-					/>
+					{NEEDS_READING_STATUSES.has(proposal.runStatus) ? (
+						// How well-checked the value is says nothing about whether it
+						// belongs to this company, so a confident badge beside a doubtful
+						// run reads as reassurance it has not earned.
+						<Badge $tone='caution'>
+							<Trans>Run needs reading</Trans>
+						</Badge>
+					) : (
+						<TrustBadge
+							verification={proposal.verification}
+							confidence={proposal.confidence}
+							machineCheckable={proposal.machineCheckable}
+						/>
+					)}
 					{runTotalCents > 0 ? (
 						<Money
 							data-testid='research-inbox-row-cost'

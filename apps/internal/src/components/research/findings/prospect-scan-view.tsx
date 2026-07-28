@@ -25,14 +25,11 @@ import {
 	Section,
 	Sections,
 	SectionTitle,
-	Tag,
-	TagList,
 } from './shared'
 
 /**
  * Renders a `prospect_scan_v1` research finding. Each prospect carries
- * a `why_relevant` rationale + optional industry/country/tax_id +
- * pain-indicator tags + citations.
+ * a `why_relevant` rationale + optional industry/country/tax_id + citations.
  */
 
 type ProspectEntry = {
@@ -42,7 +39,6 @@ type ProspectEntry = {
 	readonly industry?: string
 	readonly country?: string
 	readonly why_relevant: string
-	readonly pain_indicators?: ReadonlyArray<string>
 	readonly citations?: ReadonlyArray<Citation>
 }
 
@@ -97,21 +93,6 @@ export function ProspectScanView({
 												<Trans>Tax ID</Trans>
 											</FieldKey>
 											<FieldValue>{p.tax_id}</FieldValue>
-										</FieldRow>
-									) : null}
-									{p.pain_indicators !== undefined &&
-									p.pain_indicators.length > 0 ? (
-										<FieldRow>
-											<FieldKey>
-												<Trans>Pain indicators</Trans>
-											</FieldKey>
-											<FieldValue>
-												<TagList>
-													{p.pain_indicators.map(t => (
-														<Tag key={t}>{t}</Tag>
-													))}
-												</TagList>
-											</FieldValue>
 										</FieldRow>
 									) : null}
 								</FieldsTable>

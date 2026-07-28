@@ -1,5 +1,7 @@
 /**
- * Wraps a `SearchProvider` with a DB-backed TTL cache (`search_cache`).
+ * Wraps a `SearchProvider` with a DB-backed TTL cache (`search_cache`), and
+ * writes every result carrying page text into `sources` so a run can point at
+ * what it read.
  *
  * Key = sha256(provider + query + limit + recency + location + sorted
  * languages). TTL is 24h for open-ended queries, `max(recency_days/4 h,
@@ -22,24 +24,12 @@ import { Effect, Layer, Schema } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { type SearchInput, SearchProvider } from '../application/ports'
-import { canonicalizeUrl, urlHashForScrape } from '../application/source-key'
+import { recordSeenSources } from '../application/source-record'
 import { ProviderError } from '../domain/errors'
 import { SearchResult } from '../domain/types'
 
 const sha256Hex = (input: string): string =>
 	createHash('sha256').update(input).digest('hex')
-
-// Mirror the scrape cache's source identity so a page reached by both search and
-// scrape maps to one sources row (ON CONFLICT is by url_hash; the id is stable).
-const sourceIdFor = (urlHash: string): string => `src_${urlHash.slice(0, 16)}`
-
-const extractDomain = (url: string): string => {
-	try {
-		return new URL(url).hostname.toLowerCase()
-	} catch {
-		return 'unknown'
-	}
-}
 
 export const computeSearchCacheKey = (
 	provider: string,
@@ -87,6 +77,28 @@ export const makeCachedSearch = () =>
 					const keyHash = computeSearchCacheKey(providerLabel, input)
 					const ttlHours = searchCacheTtlHours(input)
 
+					// A result carrying real page text is something the run can quote, so
+					// the page goes on the record. This holds for an answer served out of
+					// `search_cache` too: what a run has to show for its findings should
+					// not depend on whether someone ran the same search earlier.
+					const recordResultSources = (result: SearchResult) =>
+						recordSeenSources(
+							sql,
+							result.items.flatMap(item => {
+								const text = item.content?.trim() ?? ''
+								return text.length === 0
+									? []
+									: [
+											{
+												url: item.url,
+												...(item.title ? { title: item.title } : {}),
+												contentHash: sha256Hex(text),
+												provider: providerLabel,
+											},
+										]
+							}),
+						)
+
 					const hits = yield* lookup(keyHash)
 					if (hits[0]) {
 						yield* sql`
@@ -112,6 +124,7 @@ export const makeCachedSearch = () =>
 								key_hash: keyHash,
 							}),
 						)
+						yield* recordResultSources(decoded)
 						return new SearchResult({ items: decoded.items, units: 0 })
 					}
 
@@ -129,6 +142,7 @@ export const makeCachedSearch = () =>
 										}),
 								),
 							)
+							yield* recordResultSources(decoded)
 							return new SearchResult({ items: decoded.items, units: 0 })
 						}
 
@@ -155,30 +169,8 @@ export const makeCachedSearch = () =>
 									expires_at  = EXCLUDED.expires_at
 							`
 						}
-						// A result that came back with scraped page content (Firecrawl
-						// scrapeOptions) is real fetched evidence — record a sources row per
-						// such URL so a run can link to it and count it toward grounding,
-						// exactly as a scrape would. Keyed by the same url_hash the scrape
-						// path uses, so the two never duplicate a page.
-						for (const item of result.items) {
-							if (!item.content || item.content.trim().length === 0) continue
-							const canonical = canonicalizeUrl(item.url)
-							const urlHash = urlHashForScrape(item.url)
-							yield* sql`
-								INSERT INTO sources (
-									id, kind, provider, url, url_hash, domain,
-									title, content_hash, first_fetched_at, last_fetched_at
-								) VALUES (
-									${sourceIdFor(urlHash)}, 'web', 'search', ${canonical}, ${urlHash},
-									${extractDomain(canonical)}, ${item.title || null},
-									${sha256Hex(item.content)}, now(), now()
-								)
-								ON CONFLICT (url_hash) DO UPDATE SET
-									last_fetched_at = now(),
-									content_hash    = EXCLUDED.content_hash,
-									title           = COALESCE(EXCLUDED.title, sources.title)
-							`
-						}
+
+						yield* recordResultSources(result)
 						return result
 					}).pipe(sql.withTransaction)
 				}).pipe(

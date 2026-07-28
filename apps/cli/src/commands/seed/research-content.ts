@@ -404,7 +404,6 @@ export const RICH_PROSPECTS_GIRONA = [
 		country: 'ES',
 		why_relevant:
 			'Family restaurant in Banyoles with 40 covers; phone-only reservations; recently posted on Instagram about "no donar a l\'abast els caps de setmana".',
-		pain_indicators: ['phone-only', 'no website', 'visible weekend overflow'],
 		citations: [],
 	},
 	{
@@ -414,7 +413,6 @@ export const RICH_PROSPECTS_GIRONA = [
 		country: 'ES',
 		why_relevant:
 			'12-room hostal in Figueres; rate-parity clause friction with Booking.com; identical pattern to Hostal del Pirineu.',
-		pain_indicators: ['booking.com 17%', 'no direct channel'],
 		citations: [],
 	},
 	{
@@ -423,7 +421,6 @@ export const RICH_PROSPECTS_GIRONA = [
 		country: 'ES',
 		why_relevant:
 			'Artisan bakery chain (3 locations) in Girona. Sell-out by 11:00 every Saturday; preorder via WhatsApp is unmanageable for them.',
-		pain_indicators: ['whatsapp-driven preorders', 'manual fulfilment'],
 		citations: [],
 	},
 	{
@@ -433,7 +430,6 @@ export const RICH_PROSPECTS_GIRONA = [
 		country: 'ES',
 		why_relevant:
 			'Boutique 6-room agroturisme; growing French customer base; no FR localisation today.',
-		pain_indicators: ['single-language', 'low domain authority'],
 		citations: [],
 	},
 ] as const
@@ -857,7 +853,6 @@ export const RICH_PROSPECTS_LOGISTICS = [
 		country: 'ES',
 		why_relevant:
 			'Mid-size carrier in Maresme with same paper-PoD pain. Recent LinkedIn post about "perdem albarans cada setmana".',
-		pain_indicators: ['paper PoD', 'lost-note signal'],
 		citations: [],
 	},
 	{
@@ -867,7 +862,6 @@ export const RICH_PROSPECTS_LOGISTICS = [
 		country: 'ES',
 		why_relevant:
 			'Vallès Oriental fleet, 22 vehicles. Hiring a "responsable digitalització" per public job post.',
-		pain_indicators: ['hiring signal', 'no current vendor'],
 		citations: [],
 	},
 	{
@@ -876,7 +870,6 @@ export const RICH_PROSPECTS_LOGISTICS = [
 		country: 'ES',
 		why_relevant:
 			'Adjacent SME in Maresme. Sage 200 user — same integration shape as Coastal.',
-		pain_indicators: ['sage-200', 'similar profile'],
 		citations: [],
 	},
 	{
@@ -886,7 +879,6 @@ export const RICH_PROSPECTS_LOGISTICS = [
 		country: 'ES',
 		why_relevant:
 			'Smaller fleet (8 vehicles) but rapidly growing; clean field for a fleet-app rollout.',
-		pain_indicators: ['growth-mode', 'paper PoD'],
 		citations: [],
 	},
 ] as const
@@ -899,7 +891,6 @@ export const RICH_PROSPECTS_ELECTRICAL = [
 		country: 'ES',
 		why_relevant:
 			'Bages-area electrical contractor; pulled three Google ads for "electricista urgent" — paying for leads they can\'t qualify.',
-		pain_indicators: ['paid-lead-spend', 'no-CRM'],
 		citations: [],
 	},
 	{
@@ -908,7 +899,6 @@ export const RICH_PROSPECTS_ELECTRICAL = [
 		country: 'ES',
 		why_relevant:
 			'Vic-based; similar size to Electricitat del Vallès; weak digital posture.',
-		pain_indicators: ['weak-digital'],
 		citations: [],
 	},
 	{
@@ -917,7 +907,6 @@ export const RICH_PROSPECTS_ELECTRICAL = [
 		industry: 'manufacturing',
 		country: 'ES',
 		why_relevant: 'New entrant; has a fast site but no booking flow.',
-		pain_indicators: ['no-booking'],
 		citations: [],
 	},
 ] as const
@@ -929,7 +918,6 @@ export const RICH_PROSPECTS_FANTASMA = [
 		country: 'ES',
 		why_relevant:
 			"Small distributor in same Manresa industrial belt. Same low-signal profile as L'Ànec d'Or; worth a postal-mail touch.",
-		pain_indicators: ['no-web', 'low-google-presence'],
 		citations: [],
 	},
 	{
@@ -938,7 +926,6 @@ export const RICH_PROSPECTS_FANTASMA = [
 		country: 'ES',
 		why_relevant:
 			'Family distributor; runs on phone + paper. Postal mail and a cold visit may unlock dialogue.',
-		pain_indicators: ['phone-only'],
 		citations: [],
 	},
 ] as const

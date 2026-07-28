@@ -5,6 +5,7 @@ import {
 	classifyToolChoiceResponse,
 	jsonSchemaProbeBody,
 	toolChoiceProbeBody,
+	verdictForStatus,
 } from './capability-probe'
 
 describe('classifyToolChoiceResponse', () => {
@@ -140,6 +141,74 @@ describe('probe request bodies', () => {
 
 				// WHEN built — THEN the tool list is empty, not a fabricated default
 				expect(body['tools']).toEqual([])
+			})
+		})
+	})
+
+	describe('what a refused request says about the model', () => {
+		describe('when the vendor refuses the request itself', () => {
+			it('should blame the model when it says the feature is unsupported', () => {
+				// GIVEN the refusal a model gives when it cannot do structured output
+				const verdict = verdictForStatus(
+					400,
+					'{"error":{"message":"This model does not support response format `json_schema`."}}',
+				)
+
+				// WHEN classified — THEN it counts against the model, because the same
+				// request will be refused the same way tomorrow
+				expect(verdict).toBe('capability')
+			})
+
+			it('should not blame the model when the account has not accepted its terms', () => {
+				// GIVEN the same status code, for a reason that says nothing about
+				// whether the model can do the work
+				const verdict = verdictForStatus(
+					400,
+					'{"error":{"message":"The model requires terms acceptance. Please have the org admin accept the terms."}}',
+				)
+
+				// WHEN classified — THEN it is held back for a person to look at,
+				// rather than read as the model having gone bad
+				expect(verdict).toBe('unknown')
+			})
+
+			it('should blame the model when it is no longer served', () => {
+				// GIVEN a model the vendor has retired
+				// WHEN classified — THEN it counts against the model: gone is as good a
+				// reason to stop trusting it as refusing
+				expect(verdictForStatus(404, '{"error":"model_not_found"}')).toBe(
+					'capability',
+				)
+			})
+		})
+
+		describe('when the refusal is about us, or about the vendor', () => {
+			it('should separate a rejected key from a bad model', () => {
+				// GIVEN a key the vendor will not accept
+				// WHEN classified — THEN nothing was learned about the model
+				expect(verdictForStatus(401, '{"error":"invalid api key"}')).toBe(
+					'auth',
+				)
+				expect(verdictForStatus(403, '{"error":"forbidden"}')).toBe('auth')
+			})
+
+			it('should separate asking too fast from a bad model', () => {
+				// GIVEN a rate limit
+				// WHEN classified — THEN it is about how we asked, not what we asked
+				expect(verdictForStatus(429, '{"error":"slow down"}')).toBe('quota')
+			})
+
+			it('should treat the vendor having a bad minute as telling us nothing', () => {
+				// GIVEN the vendor's own side failing — the exact shape seen while a
+				// primary model was intermittently unavailable
+				// WHEN classified — THEN it must never be read as the model having
+				// gone bad, or an outage would be recorded as a permanent verdict
+				expect(verdictForStatus(500, '{"error":"InternalServerError"}')).toBe(
+					'transport',
+				)
+				expect(verdictForStatus(502, 'Error processing request')).toBe(
+					'transport',
+				)
 			})
 		})
 	})

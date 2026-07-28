@@ -34,8 +34,8 @@ import { enterOrgScope } from '../middleware/org.js'
 // The entity grounding gate end to end: an enrichment run whose fetched evidence
 // is about a DIFFERENT company must fail closed to no_reliable_data; one that
 // clearly names the target must still succeed; a run that only glancingly
-// mentions it (a weak match) must also fail closed to no_reliable_data rather than
-// present a lookalike's profile; and a run whose only scrape FAILS must resolve to
+// mentions it must keep what it found but finish marked for review rather than
+// presented as certain; and a run whose only scrape FAILS must resolve to
 // no_reliable_data, not failed.
 //
 // One shared ResearchService layer drives every case (a fresh layer per case
@@ -210,6 +210,7 @@ const systemDefaults: SystemDefaults = {
 
 const TERMINAL = new Set([
 	'succeeded',
+	'succeeded_low_confidence',
 	'failed',
 	'cancelled',
 	'no_reliable_data',
@@ -244,6 +245,7 @@ interface RunResult {
 	readonly sourceCount: number
 	readonly findings: {
 		proposed_updates?: unknown[]
+		quality?: { low_confidence?: boolean }
 	} | null
 }
 
@@ -394,7 +396,7 @@ describe('ResearchService entity grounding gate', () => {
 	})
 
 	describe('when the fetched evidence only glancingly mentions the target', () => {
-		it('should fail closed to no_reliable_data instead of presenting a lookalike', async () => {
+		it('should keep what it found but mark it for review', async () => {
 			// GIVEN an enrichment run whose scrape mentions the brand word but never
 			//   the full name or the company's own site (a weak match)
 			const result = await runScenario({
@@ -405,12 +407,15 @@ describe('ResearchService entity grounding gate', () => {
 				isFailure: false,
 			})
 
-			// THEN it fails closed — the evidence never clearly named the target, so no
-			//   lookalike profile is extracted or presented
+			// THEN the run finishes and keeps its findings — a glancing mention is
+			//   usually still about the right company, and discarding the run leaves
+			//   the person who asked with nothing
 			expect(
 				result.status,
 				`unexpected status: ${result.errorMessage ?? '(none)'}`,
-			).toBe('no_reliable_data')
+			).toBe('succeeded_low_confidence')
+			// AND it says outright that somebody has to read it before acting
+			expect(result.findings?.quality?.low_confidence).toBe(true)
 		}, 30_000)
 	})
 

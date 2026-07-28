@@ -12,14 +12,6 @@ export const CompanyEnrichmentV1Schema = Schema.Struct({
 	enrichment: Schema.Struct({
 		industry: Schema.optionalKey(Sourced(Schema.String)),
 		size_range: Schema.optionalKey(Sourced(Schema.String)),
-		pain_points: Schema.optionalKey(
-			Sourced(
-				Schema.String.annotate({
-					description:
-						"A specific operational pain or challenge the evidence indicates this company has, e.g. 'manual load booking across several systems'. This is not the place for a note about disagreeing sources — put those in `conflicts`.",
-				}),
-			),
-		),
 		current_tools: Schema.optionalKey(
 			Sourced(
 				Schema.String.annotate({
@@ -99,18 +91,9 @@ export const CompanyEnrichmentV1Schema = Schema.Struct({
 			}),
 		),
 	),
-	// A one-line outreach angle grounded in the evidence. Absent when the evidence
-	// supports none — never a fabricated number or claim.
-	hook: Schema.optionalKey(
-		Schema.String.annotate({
-			description:
-				'A short, specific outreach angle drawn only from the evidence. Leave it out rather than invent a figure or a pain point.',
-		}),
-	),
 	// A home for "the sources disagree" observations — three sites giving three
-	// different head-counts is genuinely useful, but it is not a pain point, so it
-	// no longer gets stuffed into `pain_points` as a scratch field. The field
-	// itself carries the most recently published reading; each entry here is one
+	// different head-counts is useful to whoever reads the profile. The disputed
+	// field carries the most recently published reading; each entry here is one
 	// losing reading, tied to the page that stated it so a reader can weigh both.
 	conflicts: Schema.optionalKey(
 		Schema.Array(
