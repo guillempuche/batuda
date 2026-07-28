@@ -3,11 +3,7 @@ import { execSync } from 'node:child_process'
 import { expect, test } from '@playwright/test'
 
 import { DATABASE_URL } from './helpers/database-url'
-import {
-	clearCatcher,
-	expectNoMessage,
-	waitForMessage,
-} from './helpers/mail-catcher'
+import { expectNoMessage, waitForMessage } from './helpers/mail-catcher'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 // Sends a brand-new email via the compose UI and asserts it lands on the
@@ -43,8 +39,7 @@ const fillBody = async (
 
 test.describe('compose and send via the mail catcher', () => {
 	test.beforeEach(async ({ page }) => {
-		// GIVEN the catcher is empty for this spec and Alice's session is on Taller
-		await clearCatcher()
+		// GIVEN Alice's session is on Taller
 		// AND the seeded inbox's grant_status is forced to `connected`. The
 		// inbox-health probe (services/inbox-health-probe.ts) marks the inbox
 		// connected against the reachable catcher, but it runs on a 15-min
@@ -62,9 +57,9 @@ test.describe('compose and send via the mail catcher', () => {
 		test("should write the message to the catcher's inbox (poll until present)", async ({
 			page,
 		}) => {
-			// Unique recipient + subject keeps the catcher lookup deterministic
-			// even if a previous run left stragglers (clearCatcher covers it,
-			// but a fresh address belt-and-suspenders the assertion).
+			// A recipient and subject nobody else uses. The catcher is shared with
+			// every other checkout on this machine and keeps what earlier runs
+			// delivered, so this is what makes the lookup below say something.
 			const testId = `e2e-${Date.now()}`
 			const recipient = `${testId}@catcher.local`
 			const subject = `Test ${testId}`
@@ -137,14 +132,18 @@ test.describe('compose and send via the mail catcher', () => {
 				timeout: 15_000,
 			})
 
-			// WHEN Alice puts the suppressed contact in `to`
+			// WHEN Alice puts the suppressed contact in `to`. The subject is made
+			// unique so the check below can name the message that must not arrive;
+			// that mailbox holds what earlier runs, and other checkouts on this
+			// machine, have already delivered to it.
+			const blockedSubject = `blocked send ${Date.now()}`
 			await page.getByTestId('compose-to').fill(SUPPRESSED_EMAIL)
-			await page.getByTestId('compose-subject').fill('blocked send')
+			await page.getByTestId('compose-subject').fill(blockedSubject)
 			await fillBody(page, 'should not arrive')
 
 			// THEN the Send button stays disabled, no message reaches the catcher
 			await expect(page.getByTestId('compose-send')).toBeDisabled()
-			await expectNoMessage(SUPPRESSED_EMAIL)
+			await expectNoMessage(SUPPRESSED_EMAIL, blockedSubject)
 		})
 	})
 })

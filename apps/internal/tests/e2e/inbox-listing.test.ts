@@ -13,8 +13,8 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 //
 // Selectors verified against:
 //   apps/internal/src/routes/emails/index.tsx
-//     (thread-row-{id}, inbox-filter-trigger, inbox-filter-option,
-//      data-inbox-email)
+//     (thread-row-{id}, emails-thread-total, inbox-filter-trigger,
+//      inbox-filter-option, data-inbox-email)
 
 const psql = (sqlText: string): string =>
 	execSync(`psql "${DATABASE_URL}" -tA -c "${sqlText.replace(/"/g, '\\"')}"`, {
@@ -29,13 +29,12 @@ test.describe('emails inbox listing', () => {
 	})
 
 	test.describe('when the user opens /emails', () => {
-		test('should render at least one row per seeded thread', {
+		test('should account for every thread and render the seeded ones', {
 			tag: '@smoke',
 		}, async ({ page }) => {
-			// GIVEN the seed produces 4 inbound threads on Taller (M1+M2
-			// share, M3 single, M4 single on agent inbox, M8 single).
-			// Resolve the count from the DB so the assertion stays in
-			// sync if the seed shape changes.
+			// GIVEN however many threads Taller has. Read from the database
+			// rather than written down, because the seed's own count changes and
+			// every spec that sends an email adds one more for good.
 			const expected = Number(
 				psql(
 					`SELECT count(*) FROM email_thread_links l
@@ -48,9 +47,19 @@ test.describe('emails inbox listing', () => {
 			// WHEN the user lands on /emails
 			await page.goto('/emails', { waitUntil: 'networkidle' })
 
-			// THEN every seeded thread renders as a row
-			const rows = page.locator('[data-testid^="thread-row-"]')
-			await expect(rows).toHaveCount(expected)
+			// THEN the page accounts for all of them. Counting rows instead would
+			// be counting the window, not the mail: the list only builds the rows
+			// that fit on screen, so its row count answers to the height of the
+			// browser rather than to how much mail there is.
+			await expect(page.getByTestId('emails-thread-total')).toHaveText(
+				expected === 1 ? '1 thread' : `${expected} threads`,
+			)
+
+			// AND the seeded threads are among the rows actually drawn
+			await expect(
+				page.locator('[data-testid^="thread-row-"]').first(),
+			).toBeVisible()
+			await expect(page.getByText('Quote for the booking module')).toBeVisible()
 		})
 	})
 
@@ -71,16 +80,23 @@ test.describe('emails inbox listing', () => {
 			// THEN only threads on agent@taller.cat remain. The seed puts
 			// M4 ("Visit photos attached") on the agent inbox; the human
 			// threads (M1/M2/M3/M8) must drop off the list.
+			// Narrowed to Taller: the address alone would also match an inbox of
+			// the same name belonging to another organisation.
 			const expectedAgent = Number(
 				psql(
 					`SELECT count(*) FROM email_thread_links l
 					 JOIN inboxes i ON i.id = l.inbox_id
-					 WHERE i.email = 'agent@taller.cat'`,
+					 JOIN organization o ON o.id = l.organization_id
+					 WHERE i.email = 'agent@taller.cat' AND o.slug = 'taller'`,
 				),
 			)
 			expect(expectedAgent, 'agent inbox must have threads').toBeGreaterThan(0)
-			const rows = page.locator('[data-testid^="thread-row-"]')
-			await expect(rows).toHaveCount(expectedAgent)
+			// The page's own tally, for the same reason as the test above: a row
+			// count would answer to the height of the browser. It holds today
+			// only because the agent inbox has a single thread.
+			await expect(page.getByTestId('emails-thread-total')).toHaveText(
+				expectedAgent === 1 ? '1 thread' : `${expectedAgent} threads`,
+			)
 		})
 	})
 

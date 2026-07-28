@@ -565,7 +565,7 @@ function EmailsIndexPage() {
 				<IntroText>
 					<Title>{t`Emails`}</Title>
 					{!showOnboarding && (
-						<Subtitle>
+						<Subtitle data-testid='emails-thread-total'>
 							{total === 1 ? t`1 thread` : t`${total} threads`}
 						</Subtitle>
 					)}

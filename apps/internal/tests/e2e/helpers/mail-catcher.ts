@@ -50,31 +50,39 @@ async function listMessages(
 	return body.map(m => ({ Subject: m.subject, mimeMessage: m.mimeMessage }))
 }
 
-export async function clearCatcher(): Promise<void> {
-	const res = await fetch(`${MAIL_CATCHER_HTTP_URL}/api/mail/purge`, {
-		method: 'POST',
-	})
-	if (!res.ok) {
-		throw new Error(`mail-catcher purge failed: ${res.status}`)
-	}
-}
-
+// Wait for a message this test can prove is its own.
+//
+// Say which one with `subject`, or with `bodyContains` where the subject is not
+// the test's to choose — a reply inherits its parent's. Say nothing and you get
+// whichever message happens to be first, which on a machine running more than
+// one checkout may belong to somebody else: the catcher is shared, and a
+// mailbox keeps what earlier runs delivered to it.
 export async function waitForMessage(
 	recipient: string,
 	{
 		subject,
+		bodyContains,
 		timeoutMs = 5_000,
 		pollMs = 250,
-	}: { subject?: string; timeoutMs?: number; pollMs?: number } = {},
+	}: {
+		subject?: string
+		bodyContains?: string
+		timeoutMs?: number
+		pollMs?: number
+	} = {},
 ): Promise<CatcherMessage> {
 	const deadline = Date.now() + timeoutMs
 	let lastError: unknown = null
+	const isWanted = (m: CatcherMessage) =>
+		(subject === undefined || m.Subject === subject) &&
+		(bodyContains === undefined || m.mimeMessage.includes(bodyContains))
 	while (Date.now() < deadline) {
 		try {
 			const messages = await listMessages(recipient)
-			const match = subject
-				? messages.find(m => m.Subject === subject)
-				: messages[0]
+			const match =
+				subject === undefined && bodyContains === undefined
+					? messages[0]
+					: messages.find(isWanted)
 			if (match) return match
 		} catch (err) {
 			lastError = err
@@ -88,15 +96,20 @@ export async function waitForMessage(
 	)
 }
 
+// Prove this test's message never arrived. Named by subject rather than by an
+// empty mailbox, because the mailbox holds whatever earlier runs — and other
+// checkouts on this machine — delivered to it.
 export async function expectNoMessage(
 	recipient: string,
+	subject: string,
 	windowMs = 1_500,
 ): Promise<void> {
 	await new Promise(resolve => setTimeout(resolve, windowMs))
 	const messages = await listMessages(recipient)
-	if (messages.length > 0) {
+	const arrived = messages.filter(m => m.Subject === subject)
+	if (arrived.length > 0) {
 		throw new Error(
-			`mail-catcher: expected no message for "${recipient}", got ${messages.length}`,
+			`mail-catcher: expected no "${subject}" for "${recipient}", got ${arrived.length}`,
 		)
 	}
 }

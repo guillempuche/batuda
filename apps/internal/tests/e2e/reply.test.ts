@@ -3,11 +3,7 @@ import { execSync } from 'node:child_process'
 import { expect, test } from '@playwright/test'
 
 import { DATABASE_URL } from './helpers/database-url'
-import {
-	clearCatcher,
-	getRawMessage,
-	waitForMessage,
-} from './helpers/mail-catcher'
+import { getRawMessage, waitForMessage } from './helpers/mail-catcher'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 // Reply path. The seed direct-INSERTs M1+M2 (Pep × Alice) so the thread
@@ -42,8 +38,7 @@ const fillBody = async (
 
 test.describe('reply on a seeded thread', () => {
 	test.beforeEach(async ({ page }) => {
-		// GIVEN the catcher is empty and Alice's session is active on Taller.
-		await clearCatcher()
+		// GIVEN Alice's session is active on Taller.
 		// AND the seeded inbox's grant is forced `connected` — the inbox-health
 		// probe marks it connected against the reachable catcher, but its first
 		// tick can lose the race to a cold catcher; this keeps sendDraft (which
@@ -80,7 +75,11 @@ test.describe('reply on a seeded thread', () => {
 
 			// THEN the catcher captures the reply, and the raw RFC822 carries
 			// In-Reply-To + References pointing at the parent's Message-Id.
+			// Found by its body: a reply's subject comes from the parent, so every
+			// run of this test — and every other checkout on this machine — would
+			// answer to it.
 			const summary = await waitForMessage('pep@calpepfonda.cat', {
+				bodyContains: body,
 				timeoutMs: 10_000,
 			})
 			const raw = getRawMessage(summary)
@@ -115,6 +114,7 @@ test.describe('reply on a seeded thread', () => {
 
 			// THEN the catcher captures the reply with the same threading headers
 			const summary = await waitForMessage('pep@calpepfonda.cat', {
+				bodyContains: body,
 				timeoutMs: 10_000,
 			})
 			const raw = getRawMessage(summary)
