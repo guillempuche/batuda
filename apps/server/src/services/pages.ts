@@ -137,6 +137,10 @@ export class PageService extends Context.Service<PageService>()('PageService', {
 							${totalColumn(sql, page.count)}
 						FROM pages
 						WHERE ${sql.and(conditions)}
+						-- Ordered, and by something no two rows share: without a settled
+						-- order the database may hand back the same row on two
+						-- consecutive slices and never hand back another at all.
+						ORDER BY published_at DESC NULLS LAST, id
 						LIMIT ${probeLimit(page.limit)} OFFSET ${page.offset}
 					`
 					const { rows, hasMore } = takePage(probed, page.limit)

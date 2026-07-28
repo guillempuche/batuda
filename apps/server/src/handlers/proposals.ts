@@ -55,6 +55,10 @@ export const ProposalsLive = HttpApiBuilder.group(
 						const probed = yield* sql<{ readonly total?: string | number }>`
 							SELECT *${totalColumn(sql, page.count)} FROM proposals
 							WHERE ${sql.and(conditions)}
+							-- Ordered, and by something no two rows share: without a
+							-- settled order the database may hand back the same row on
+							-- two consecutive slices and never hand back another.
+							ORDER BY created_at DESC, id
 							LIMIT ${probeLimit(page.limit)} OFFSET ${page.offset}
 						`
 						const { rows, hasMore } = takePage(probed, page.limit)
