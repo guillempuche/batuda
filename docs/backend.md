@@ -394,7 +394,7 @@ export const CreateCompanyInput = Schema.Struct({
 
 ### How a list endpoint answers
 
-Every endpoint that returns more than one row answers with the same envelope, built by `PaginatedList` in `packages/controllers/src/pagination.ts`.
+A list endpoint answers with the same envelope, built by `PaginatedList` in `packages/controllers/src/pagination.ts`. Not every list has been moved onto it yet — several short ones (an org's API keys, an inbox's footers, the instruction templates) still answer with a bare array — but any list that grows with the business belongs on the envelope, and a new one should start there.
 
 ```typescript
 { items, total, limit, offset, hasMore }
@@ -415,7 +415,7 @@ No request may ask for more than `MAX_PAGE_LIMIT` rows, and asking for more is r
 
 `total` is only computed when the caller passes `count=exact`, and is `null` otherwise — which means "not counted", not "none matched". Counting means looking at every matching row, so ask for it only where a screen states a number. A list that simply keeps scrolling reads `hasMore` and never pays for a count.
 
-An agent tool that takes a `limit` must return `hasMore` too, through `PageResult` or `TruncatableResult` in `apps/server/src/mcp/tools/_result.ts`. Without it an assistant reads twenty-five rows, cannot tell a short list from a long one cut short, and answers "you have twenty-five" when three hundred match. A test in `_annotations.test.ts` fails if a tool forgets. Those results carry no `total`: a field that is usually absent has to describe itself as "a number or nothing", which some model providers refuse to read.
+An agent tool that takes a `limit` must return `hasMore` too, through `PageResult` or `TruncatableResult` in `apps/server/src/mcp/tools/_result.ts`. Without it an assistant reads twenty-five rows, cannot tell a short list from a long one cut short, and answers "you have twenty-five" when three hundred match. Where one `limit` caps several lists at once — `get_next_steps` caps three — say it once per list instead, with a `…Truncated` flag each, since a single `hasMore` could not say which list it meant. A test in `_annotations.test.ts` fails if a tool offers neither. Those results carry no `total`: a field that is usually absent has to describe itself as "a number or nothing", which some model providers refuse to read.
 
 ---
 
