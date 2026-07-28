@@ -6,6 +6,9 @@ export const seedReset = Effect.gen(function* () {
 	yield* Effect.logInfo('Truncating CRM tables...')
 	// DELETE (not TRUNCATE CASCADE) so `member.primary_inbox_id`'s ON DELETE SET NULL fires.
 	yield* sql`DELETE FROM inboxes`
+	// Removals go too: they outlive the choice they sit on, so one left behind
+	// would keep cutting a freshly seeded connection off from an organization.
+	yield* sql`DELETE FROM mcp_oauth_revocation WHERE client_id LIKE 'mock-%'`
 	yield* sql`DELETE FROM mcp_oauth_org_membership WHERE client_id LIKE 'mock-%'`
 	yield* sql`DELETE FROM "oauthConsent" WHERE "clientId" LIKE 'mock-%'`
 	yield* sql`DELETE FROM "oauthClient" WHERE "clientId" LIKE 'mock-%'`

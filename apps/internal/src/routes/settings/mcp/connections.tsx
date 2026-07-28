@@ -1,12 +1,13 @@
+import { CheckboxGroup } from '@base-ui/react/checkbox-group'
 import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
-import { ArrowLeft, Plug, X } from 'lucide-react'
+import { ArrowLeft, Check, Plug, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import styled from 'styled-components'
 
-import { PriButton, PriDialog, usePriToast } from '@batuda/ui/pri'
+import { PriButton, PriCheckbox, PriDialog, usePriToast } from '@batuda/ui/pri'
 
 import { PriTable } from '#/components/primitives/pri-table'
 import { ErrorState } from '#/components/shared/error-state'
@@ -20,17 +21,24 @@ import {
 
 /**
  * The AI assistants (ChatGPT, Claude.ai, …) a member has connected over MCP.
- * Each connection may act in one or more organizations. Single-org users have
- * their lone org auto-bound at consent time; multi-org users pick one or more
- * there. This page only takes access away again; per-request org selection
- * happens via the X-Batuda-Organization-Id header the MCP client sends.
+ * Each connection reaches the organizations chosen for it, and every request
+ * settles on exactly one — an assistant cannot say which it means, so in
+ * practice a connection wants a single organization. This page is where that
+ * choice is changed, and where access is taken away again.
  */
+
+type ConnectionBlock = {
+	readonly organizationId: string
+	readonly blockedBySelf: boolean
+}
 
 type Connection = {
 	readonly clientId: string
 	readonly name: string | null
 	readonly createdAt: string
 	readonly organizationIds: ReadonlyArray<string>
+	readonly chosenOrganizationIds: ReadonlyArray<string>
+	readonly blocks: ReadonlyArray<ConnectionBlock>
 	readonly redirectHost: string | null
 }
 
@@ -101,6 +109,12 @@ function ConnectionsPage() {
 			mode: 'promiseExit',
 		},
 	)
+	const selectOrgs = useAtomSet(
+		BatudaApiAtom.mutation('mcpOAuth', 'selectOrgs'),
+		{
+			mode: 'promiseExit',
+		},
+	)
 
 	const orgs = authClient.useListOrganizations()
 	const orgNameById = useMemo(() => {
@@ -124,6 +138,29 @@ function ConnectionsPage() {
 	// The connection currently being revoked, so its button can disable until
 	// the call finishes and a second click can't race it.
 	const [revokingId, setRevokingId] = useState<string | null>(null)
+
+	// The connection whose organizations are being changed, and the ticks shown
+	// for it. One dialog serves every row, so both are set the moment its button
+	// is pressed — ticks filled in any later would still show the connection
+	// opened before this one.
+	const [editingConnection, setEditingConnection] = useState<Connection | null>(
+		null,
+	)
+	const [tickedOrgIds, setTickedOrgIds] = useState<ReadonlyArray<string>>([])
+	const [saving, setSaving] = useState(false)
+
+	const openOrgPicker = (connection: Connection) => {
+		const blockedIds = new Set(connection.blocks.map(b => b.organizationId))
+		setEditingConnection(connection)
+		// Start ticked as whatever the connection reaches today: everything the
+		// person belongs to while nobody has chosen for it, and only what survives
+		// once anything has been chosen or blocked.
+		setTickedOrgIds(
+			connection.chosenOrganizationIds.length === 0 && blockedIds.size === 0
+				? (orgs.data ?? []).map(o => o.id)
+				: connection.organizationIds,
+		)
+	}
 
 	const rows = useMemo<ReadonlyArray<Connection>>(
 		() =>
@@ -169,6 +206,44 @@ function ConnectionsPage() {
 		}
 	}
 
+	// Save the ticked organizations for this connection. What goes out is exactly
+	// what is ticked — nothing is added back behind the person's back. That
+	// matters for the organizations they blocked themselves: sending one again is
+	// what lifts their own block, so it has to be their tick that sends it, never
+	// something this screen quietly carries along.
+	const handleSaveOrgs = async () => {
+		if (!editingConnection || tickedOrgIds.length === 0) return
+		setSaving(true)
+		try {
+			const exit = await selectOrgs({
+				payload: {
+					clientId: editingConnection.clientId,
+					organizationIds: tickedOrgIds,
+				},
+				reactivityKeys: ['mcpConnections'],
+			} as never)
+			if (exit._tag === 'Success') {
+				toastManager.add({
+					title: t`Organizations updated`,
+					description:
+						tickedOrgIds.length === 1
+							? t`This assistant now works in one organization.`
+							: t`This assistant is authorized for ${tickedOrgIds.length} organizations.`,
+					type: 'success',
+				})
+				setEditingConnection(null)
+				return
+			}
+			toastManager.add({
+				title: t`Could not save`,
+				description: t`Something went wrong. Try again.`,
+				type: 'error',
+			})
+		} finally {
+			setSaving(false)
+		}
+	}
+
 	return (
 		<Page>
 			<BackLink to='/settings' aria-label={t`Back to settings`}>
@@ -185,8 +260,9 @@ function ConnectionsPage() {
 				</Heading>
 				<Subtitle>
 					<Trans>
-						AI assistants you've connected over MCP. Each may act in one or more
-						of your organizations; the assistant picks which per request.
+						AI assistants you've connected over MCP. Each works in the
+						organizations you choose for it — usually one, since most assistants
+						cannot say which they mean when there are several.
 					</Trans>
 				</Subtitle>
 			</Intro>
@@ -239,9 +315,19 @@ function ConnectionsPage() {
 										<Trans>Organizations</Trans>
 									</OrgsLabel>
 									{row.organizationIds.length === 0 ? (
-										<UnboundTag data-testid='mcp-connection-unbound'>
-											<Trans>No organization selected</Trans>
-										</UnboundTag>
+										row.chosenOrganizationIds.length === 0 &&
+										row.blocks.length === 0 ? (
+											// Nothing chosen and nothing in the way: the connection
+											// reaches everything this person can. Saying "none" here
+											// would understate what the assistant can already see.
+											<UnboundTag data-testid='mcp-connection-unbound'>
+												<Trans>All your organizations</Trans>
+											</UnboundTag>
+										) : (
+											<UnboundTag data-testid='mcp-connection-unbound'>
+												<Trans>No organization selected</Trans>
+											</UnboundTag>
+										)
 									) : (
 										<OrgChips>
 											{row.organizationIds.map(orgId => (
@@ -267,6 +353,17 @@ function ConnectionsPage() {
 											))}
 										</OrgChips>
 									)}
+									<PriButton
+										type='button'
+										$variant='text'
+										data-testid={`mcp-connection-change-orgs-${row.clientId}`}
+										disabled={orgs.isPending}
+										onClick={() => {
+											openOrgPicker(row)
+										}}
+									>
+										<Trans>Change organizations</Trans>
+									</PriButton>
 								</OrgsForConnection>
 							</ConnRow>
 						))}
@@ -275,7 +372,164 @@ function ConnectionsPage() {
 			</ListSection>
 
 			{canManage ? <OrgConnectionsSection /> : null}
+
+			<PriDialog.Root
+				open={editingConnection !== null}
+				onOpenChange={(nextOpen: boolean) => {
+					if (!nextOpen && !saving) setEditingConnection(null)
+				}}
+			>
+				<PriDialog.Portal>
+					<PriDialog.Backdrop />
+					<PriDialog.Popup data-testid='mcp-connection-orgs-dialog'>
+						<PriDialog.Title>
+							<Trans>Choose organizations</Trans>
+						</PriDialog.Title>
+						<PriDialog.Description>
+							<Trans>
+								This assistant works in the organizations you tick here.
+							</Trans>
+						</PriDialog.Description>
+
+						{editingConnection ? (
+							<OrgPicker
+								connection={editingConnection}
+								orgs={orgs.data ?? []}
+								tickedOrgIds={tickedOrgIds}
+								onTickedOrgIdsChange={setTickedOrgIds}
+							/>
+						) : null}
+
+						<ConfirmActions>
+							<PriDialog.Close
+								render={props => (
+									<PriButton
+										type='button'
+										$variant='text'
+										disabled={saving}
+										data-testid='mcp-connection-orgs-cancel'
+										{...props}
+									>
+										<Trans>Cancel</Trans>
+									</PriButton>
+								)}
+							/>
+							<PriButton
+								type='button'
+								$variant='filled'
+								disabled={saving || tickedOrgIds.length === 0}
+								data-testid='mcp-connection-orgs-save'
+								onClick={() => {
+									void handleSaveOrgs()
+								}}
+							>
+								{saving ? <Trans>Saving…</Trans> : <Trans>Save</Trans>}
+							</PriButton>
+						</ConfirmActions>
+					</PriDialog.Popup>
+				</PriDialog.Portal>
+			</PriDialog.Root>
 		</Page>
+	)
+}
+
+// The organization picker inside the dialog. The two ways a connection loses an
+// organization are offered differently: one the person cut off themselves comes
+// back by ticking it and saving, which is the way out of an accidental removal,
+// while one an owner cut off is shown but not tickable, because nothing done
+// here can undo it.
+//
+// Blocked organizations are never in the ticked list. A checkbox reads its state
+// from that list alone, so leaving one in would draw it ticked and greyed —
+// telling someone the assistant reaches an organization it cannot.
+function OrgPicker({
+	connection,
+	orgs,
+	tickedOrgIds,
+	onTickedOrgIdsChange,
+}: {
+	readonly connection: Connection
+	readonly orgs: ReadonlyArray<{ readonly id: string; readonly name: string }>
+	readonly tickedOrgIds: ReadonlyArray<string>
+	readonly onTickedOrgIdsChange: (next: ReadonlyArray<string>) => void
+}) {
+	// Missing from the map means the organization is not blocked at all.
+	const blockedBySelfByOrgId = useMemo(() => {
+		const map = new Map<string, boolean>()
+		for (const block of connection.blocks) {
+			map.set(block.organizationId, block.blockedBySelf)
+		}
+		return map
+	}, [connection.blocks])
+
+	if (orgs.length === 0) {
+		return (
+			<PickerEmpty>
+				<Trans>Loading your organizations…</Trans>
+			</PickerEmpty>
+		)
+	}
+
+	return (
+		<>
+			<CheckboxGroup
+				value={tickedOrgIds as Array<string>}
+				onValueChange={onTickedOrgIdsChange}
+				aria-labelledby='mcp-org-picker-label'
+			>
+				<PickerLabel id='mcp-org-picker-label'>
+					<Trans>Organizations</Trans>
+				</PickerLabel>
+				<PickerList>
+					{orgs.map(org => {
+						const blockedBySelf = blockedBySelfByOrgId.get(org.id)
+						const blockedByOwner = blockedBySelf === false
+						const labelId = `mcp-org-pick-label-${org.id}`
+						const reasonId = `mcp-org-pick-reason-${org.id}`
+						return (
+							<PickerRow key={org.id} $blocked={blockedByOwner}>
+								<PriCheckbox.Root
+									name={org.id}
+									disabled={blockedByOwner}
+									aria-labelledby={labelId}
+									aria-describedby={
+										blockedBySelf === undefined ? undefined : reasonId
+									}
+									data-testid={`mcp-connection-org-pick-${org.id}`}
+								>
+									<PriCheckbox.Indicator>
+										<Check size={14} aria-hidden />
+									</PriCheckbox.Indicator>
+								</PriCheckbox.Root>
+								<PickerText>
+									<PickerName id={labelId}>{org.name}</PickerName>
+									{blockedBySelf === true ? (
+										<PickerReason id={reasonId}>
+											<Trans>
+												You removed this one. Tick it to restore it.
+											</Trans>
+										</PickerReason>
+									) : null}
+									{blockedByOwner ? (
+										<PickerReason id={reasonId}>
+											<Trans>An owner removed this one.</Trans>
+										</PickerReason>
+									) : null}
+								</PickerText>
+							</PickerRow>
+						)
+					})}
+				</PickerList>
+			</CheckboxGroup>
+			{tickedOrgIds.length > 1 ? (
+				<PickerWarning role='status' data-testid='mcp-connection-orgs-warning'>
+					<Trans>
+						Most assistants can only work in one organization per connection.
+						With more than one ticked, this one will keep asking you to choose.
+					</Trans>
+				</PickerWarning>
+			) : null}
+		</>
 	)
 }
 
@@ -550,11 +804,33 @@ function narrowConnections(
 		const organizationIds = Array.isArray(organizationIdsRaw)
 			? organizationIdsRaw.filter((id): id is string => typeof id === 'string')
 			: []
+		const chosenRaw = r['chosenOrganizationIds']
+		const chosenOrganizationIds = Array.isArray(chosenRaw)
+			? chosenRaw.filter((id): id is string => typeof id === 'string')
+			: []
+		const blocksRaw = r['blocks']
+		const blocks = Array.isArray(blocksRaw)
+			? blocksRaw.flatMap((block): ReadonlyArray<ConnectionBlock> => {
+					if (!block || typeof block !== 'object') return []
+					const b = block as Record<string, unknown>
+					return typeof b['organizationId'] === 'string' &&
+						typeof b['blockedBySelf'] === 'boolean'
+						? [
+								{
+									organizationId: b['organizationId'],
+									blockedBySelf: b['blockedBySelf'],
+								},
+							]
+						: []
+				})
+			: []
 		out.push({
 			clientId,
 			createdAt,
 			name: typeof r['name'] === 'string' ? r['name'] : null,
 			organizationIds,
+			chosenOrganizationIds,
+			blocks,
 			redirectHost:
 				typeof r['redirectHost'] === 'string' ? r['redirectHost'] : null,
 		})
@@ -741,6 +1017,74 @@ const UnboundTag = styled.span.withConfig({ displayName: 'McpConnUnbound' })`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	font-style: italic;
+`
+
+// ── The organization picker ──
+
+const PickerLabel = styled.span.withConfig({
+	displayName: 'McpConnPickerLabel',
+})`
+	display: block;
+	font-family: var(--font-body);
+	font-size: var(--typescale-label-medium-size);
+	font-weight: var(--typescale-label-medium-weight);
+	color: var(--color-on-surface-variant);
+	margin-bottom: var(--space-2xs);
+`
+
+const PickerList = styled.div.withConfig({ displayName: 'McpConnPickerList' })`
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2xs);
+`
+
+const PickerRow = styled.div.withConfig({
+	displayName: 'McpConnPickerRow',
+})<{ $blocked?: boolean }>`
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-2xs);
+	opacity: ${p => (p.$blocked ? 0.6 : 1)};
+`
+
+const PickerText = styled.span.withConfig({ displayName: 'McpConnPickerText' })`
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3xs);
+`
+
+const PickerName = styled.span.withConfig({ displayName: 'McpConnPickerName' })`
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-medium-size);
+	color: var(--color-on-surface);
+`
+
+const PickerReason = styled.span.withConfig({
+	displayName: 'McpConnPickerReason',
+})`
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+	color: var(--color-on-surface-variant);
+`
+
+const PickerEmpty = styled.p.withConfig({ displayName: 'McpConnPickerEmpty' })`
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-medium-size);
+	color: var(--color-on-surface-variant);
+	margin: 0;
+`
+
+const PickerWarning = styled.p.withConfig({
+	displayName: 'McpConnPickerWarning',
+})`
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+	line-height: var(--typescale-body-small-line);
+	color: var(--color-on-surface-variant);
+	padding: var(--space-2xs);
+	border-radius: var(--shape-3xs);
+	background: color-mix(in srgb, var(--color-secondary) 8%, transparent);
+	margin: 0;
 `
 
 // ── The organization-wide section ──

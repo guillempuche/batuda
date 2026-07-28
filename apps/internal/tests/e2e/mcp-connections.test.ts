@@ -2,11 +2,16 @@ import { expect, test } from '@playwright/test'
 
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
-// The MCP OAuth UI: the connections settings page (where a member binds each
-// authorized AI client to an org) and the consent screen. The full OAuth dance
-// (a real client → authorize → login → consent → token) needs a live OAuth
-// client, so this covers the routing + the unauthenticated/empty states; the
-// happy-path consent flow is validated against the dev stack manually.
+// The MCP OAuth UI: the connections settings page (where a member chooses which
+// organizations each authorized AI client works in) and the consent screen. The
+// full OAuth dance (a real client → authorize → login → consent → token) needs a
+// live OAuth client, so this covers the routing, the listing, and the
+// organization picker; the happy-path consent flow is validated against the dev
+// stack manually.
+//
+// The picker test changes seeded data, so it puts it back — the suite runs
+// against the live development database and `db reset` / `seed` are run by hand,
+// so a change left behind would make the next run start somewhere else.
 
 test.beforeEach(async ({ page }) => {
 	await page.goto('/', { waitUntil: 'commit' })
@@ -32,16 +37,120 @@ test.describe('settings — MCP connections', () => {
 		}).toPass({ timeout: 15_000 })
 
 		// THEN the page lists the clients the seed authorized for her — ChatGPT
-		// across two organizations and Claude across one, which is what the page
-		// exists to show. Asserting an empty state here would contradict the
-		// seed, whose whole purpose is to give this page something to render.
-		await expect(page.getByTestId('mcp-connection-row')).toHaveCount(2)
+		// across two organizations, Claude across one, and Codex cut off from
+		// both, which is what the page exists to show. Asserting an empty state
+		// here would contradict the seed, whose whole purpose is to give this
+		// page something to render.
+		await expect(page.getByTestId('mcp-connection-row')).toHaveCount(3)
 		await expect(
 			page.getByTestId('mcp-connection-name').filter({ hasText: 'ChatGPT' }),
 		).toBeVisible()
 		await expect(
 			page.getByTestId('mcp-connection-name').filter({ hasText: 'Claude' }),
 		).toBeVisible()
+	})
+})
+
+test.describe('settings — choosing a connection’s organizations', () => {
+	// Alice belongs to taller + restaurant, and the seed authorizes ChatGPT for
+	// both — the state that leaves an assistant unable to say which one it means.
+	const CHATGPT_CHANGE_ORGS = 'mcp-connection-change-orgs-mock-chatgpt-client'
+
+	test.beforeEach(async ({ page }) => {
+		await page.goto('/settings/mcp/connections', { waitUntil: 'networkidle' })
+	})
+
+	// Tick every organization back on, whatever the test left ChatGPT reaching,
+	// so a re-run starts from the same place the seed left.
+	test.afterEach(async ({ page }) => {
+		await page.goto('/settings/mcp/connections', { waitUntil: 'networkidle' })
+		await page.getByTestId(CHATGPT_CHANGE_ORGS).click()
+		const orgCheckboxes = page
+			.getByTestId('mcp-connection-orgs-dialog')
+			.locator('[data-testid^="mcp-connection-org-pick-"]')
+		const count = await orgCheckboxes.count()
+		for (let i = 0; i < count; i++) {
+			const box = orgCheckboxes.nth(i)
+			if ((await box.getAttribute('aria-checked')) !== 'true') await box.click()
+		}
+		await page.getByTestId('mcp-connection-orgs-save').click()
+		await expect(page.getByTestId('mcp-connection-orgs-dialog')).toBeHidden()
+	})
+
+	test('should narrow a two-organization connection down to one', async ({
+		page,
+	}) => {
+		// GIVEN ChatGPT reaching both of Alice's organizations
+		const chatgptRow = page
+			.getByTestId('mcp-connection-row')
+			.filter({ hasText: 'ChatGPT' })
+		await expect(chatgptRow.getByTestId('mcp-connection-org')).toHaveCount(2)
+
+		// WHEN she opens the picker and unticks all but the first organization
+		await page.getByTestId(CHATGPT_CHANGE_ORGS).click()
+		const dialog = page.getByTestId('mcp-connection-orgs-dialog')
+		await expect(dialog).toBeVisible()
+		const boxes = dialog.locator('[data-testid^="mcp-connection-org-pick-"]')
+		await expect(boxes).toHaveCount(2)
+		// Warned while more than one is ticked — an assistant cannot choose
+		// between them, so this state is the one that leaves it stuck
+		await expect(page.getByTestId('mcp-connection-orgs-warning')).toBeVisible()
+		await boxes.nth(1).click()
+		await expect(page.getByTestId('mcp-connection-orgs-warning')).toBeHidden()
+		await page.getByTestId('mcp-connection-orgs-save').click()
+
+		// THEN the connection is left reaching exactly one organization, which is
+		// what makes it usable without the assistant being asked to pick
+		await expect(dialog).toBeHidden()
+		await expect(chatgptRow.getByTestId('mcp-connection-org')).toHaveCount(1)
+	})
+
+	test('should refuse to save when nothing is ticked', async ({ page }) => {
+		// GIVEN the picker open on ChatGPT
+		await page.getByTestId(CHATGPT_CHANGE_ORGS).click()
+		const dialog = page.getByTestId('mcp-connection-orgs-dialog')
+		const boxes = dialog.locator('[data-testid^="mcp-connection-org-pick-"]')
+
+		// WHEN every organization is unticked
+		const count = await boxes.count()
+		for (let i = 0; i < count; i++) await boxes.nth(i).click()
+
+		// THEN saving is refused here rather than at the server, which reads an
+		// empty choice as "nobody has chosen" and would widen access instead of
+		// removing it. Taking access away is what the revoke button is for
+		await expect(page.getByTestId('mcp-connection-orgs-save')).toBeDisabled()
+	})
+
+	test('should offer back an organization the member removed, but not one an owner removed', async ({
+		page,
+	}) => {
+		// GIVEN Codex, cut off from one organization by Alice and from the other
+		// by that organization's owner
+		const codexRow = page
+			.getByTestId('mcp-connection-row')
+			.filter({ hasText: 'Codex' })
+		// It reaches nothing, and says so rather than claiming nothing was chosen
+		await expect(codexRow.getByTestId('mcp-connection-unbound')).toHaveText(
+			/no organization selected/i,
+		)
+
+		// WHEN she opens its picker
+		await page
+			.getByTestId('mcp-connection-change-orgs-mock-codex-client')
+			.click()
+		const dialog = page.getByTestId('mcp-connection-orgs-dialog')
+		const boxes = dialog.locator('[data-testid^="mcp-connection-org-pick-"]')
+
+		// THEN her own removal is offered back and the owner's is not — one of
+		// them she can undo by choosing it again, the other she cannot
+		await expect(dialog.getByText(/you removed this one/i)).toBeVisible()
+		await expect(dialog.getByText(/an owner removed this one/i)).toBeVisible()
+		await expect(boxes).toHaveCount(2)
+		const enabled = await Promise.all([
+			boxes.nth(0).isEnabled(),
+			boxes.nth(1).isEnabled(),
+		])
+		expect(enabled.filter(Boolean)).toHaveLength(1)
 	})
 })
 

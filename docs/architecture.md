@@ -458,13 +458,13 @@ All auth is handled by [Better Auth](https://www.better-auth.com/) v1.6.11 with 
 
 **Route protection:**
 
-| Routes                                                      | Auth                                                                              |
-| ----------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `GET /health`, `GET /pages/:slug`, `POST /pages/:slug/view` | Public — no auth                                                                  |
-| `/auth/*`                                                   | Better Auth endpoints (sign-up, sign-in, session, API key management)             |
-| All `/v1/*` routes                                          | Protected — `SessionMiddleware` validates cookie, bearer token, or API key        |
-| `/mcp` (HTTP transport)                                     | Protected — HTTP middleware validates Better Auth session, provides `CurrentUser` |
-| MCP stdio                                                   | Trusted local process — static `CurrentUser`                                      |
+| Routes                                                      | Auth                                                                            |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `GET /health`, `GET /pages/:slug`, `POST /pages/:slug/view` | Public — no auth                                                                |
+| `/auth/*`                                                   | Better Auth endpoints (sign-up, sign-in, session, API key management)           |
+| All `/v1/*` routes                                          | Protected — `SessionMiddleware` validates cookie, bearer token, or API key      |
+| `/mcp` (HTTP transport)                                     | Protected — API key, OAuth bearer, or cookie session; resolves one org per call |
+| MCP stdio                                                   | Trusted local process — static `CurrentUser`, org from an env var               |
 
 **API key flow.** Two kinds of `x-api-key` keys exist:
 
@@ -480,15 +480,21 @@ All auth is handled by [Better Auth](https://www.better-auth.com/) v1.6.11 with 
   `POST /auth/api-key/create`). They carry no org metadata and serve `/auth/admin/*`
   and webhook callers, not `/mcp`.
 
-Both are validated by `@better-auth/api-key` (`enableSessionForAPIKeys: true`); `SessionMiddleware` validates `/v1/*` uniformly via `auth.api.getSession()`.
+Both are validated by `@better-auth/api-key` with `enableSessionForAPIKeys: false` — a key authenticates the `/mcp` path only, checked there with `verifyApiKey`, and never stands in for a login session on the cookie-gated REST API, so a leaked key cannot be replayed beyond `/mcp`. `SessionMiddleware` validates `/v1/*` uniformly via `auth.api.getSession()`.
 
 **MCP auth on behalf of user:**
 
-MCP protocol has no built-in auth. Auth happens at the transport level:
+MCP protocol has no built-in auth. Auth happens at the transport level, and every call resolves exactly one organization before a tool runs — the organization is never a tool argument. Tool handlers read `CurrentUser` and `CurrentOrg` for attribution and permissions; the organization scope itself is enforced by RLS, not by the handler.
 
-- **HTTP** (`/mcp`): middleware validates Better Auth session on each POST, provides `CurrentUser` context to tool handlers
-- **Stdio**: `CurrentUser` provided statically (trusted local user)
-- Tool handlers can `yield* CurrentUser` for audit logging and permissions
+The three credential paths on HTTP `/mcp` differ only in where the organization comes from:
+
+- **API key** (`x-api-key`) — organization and acting member come from the key's metadata, so a key is pinned to one organization for its whole life. The creating member's `member` row is re-checked on every call, so the key stops working once that person leaves.
+- **OAuth bearer** (web-chat clients) — an access token is self-contained and cannot be called back once issued, so authorization is re-read on every request instead of being baked into the token. Under the `app_mcp_resolver` role, in a user-scoped transaction that precedes any organization scope, the server reads the caller's live memberships, the organizations this connection (`client_id`) was authorized for, and the ones it has been cut off from. The authorized set is the intersection, minus removals, which is what makes cutting a connection off take effect immediately. A connection nobody has configured yet falls back to the user's live organizations, so a single-organization user never has to visit a settings page; a connection that *was* configured but whose every choice has gone stale is rejected rather than widened, since silently granting organizations the user never chose would be a privilege escalation.
+- **Cookie session** (a person in a browser tab) — uses the session's `activeOrganizationId`; a session with none is refused rather than defaulted.
+
+**One organization per connection.** When an OAuth connection is authorized for several organizations, a request has to name which one in an `X-Batuda-Organization-Id` header — but no assistant can do that per call. Claude.ai stores headers once per connection from an allow-listed set of names, Claude Code takes them per server entry, and ChatGPT's connector form has no header field at all. So a connection authorized for more than one organization is a dead end in practice, and the refusal points the member at `/settings/mcp/connections`, where a connection can be narrowed to a single organization at any time. That page is the only way back: Better Auth skips the consent screen once a consent row covers the requested scopes, so reconnecting the same assistant never asks again.
+
+Stdio is the local-development transport: a trusted local process with no session at all, so `CurrentUser` is static and the organization is read from an env var — required, never defaulted, so a local run cannot silently target whichever organization happened to be seeded first.
 
 ---
 

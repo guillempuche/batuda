@@ -20,9 +20,15 @@ import { agedPaperSurface, stenciledTitle } from '#/lib/workshop-mixins'
  *
  * Organization binding happens here, not later: a single-org user is auto-bound
  * (no selector); a multi-org user must select one or more orgs before Allow.
- * The binding is written through `/v1/mcp-oauth/select-orgs` before the
- * consent POST, so the connection is usable the moment the assistant gets its
- * code — no trip to /settings/mcp/connections first.
+ * The binding is written through `/v1/mcp-oauth/select-orgs` after the consent
+ * POST succeeds but before the redirect, so the connection is usable the moment
+ * the assistant gets its code, and a consent that fails leaves no binding behind
+ * for a connection that was never created.
+ *
+ * This is the only time this screen appears for a given assistant: once a
+ * consent covers the scopes it asks for, later authorize requests skip straight
+ * past it. Changing the organizations afterwards happens at
+ * /settings/mcp/connections.
  */
 
 export const Route = createFileRoute('/oauth/consent')({
@@ -105,15 +111,29 @@ function ConsentPage() {
 						? [memberships[0]!.id]
 						: []
 				if (orgIds.length > 0) {
-					await fetch(`${apiBaseUrl()}/v1/mcp-oauth/select-orgs`, {
-						method: 'POST',
-						credentials: 'include',
-						headers: { 'content-type': 'application/json' },
-						body: JSON.stringify({
-							clientId: client_id,
-							organizationIds: orgIds,
-						}),
-					})
+					const bindRes = await fetch(
+						`${apiBaseUrl()}/v1/mcp-oauth/select-orgs`,
+						{
+							method: 'POST',
+							credentials: 'include',
+							headers: { 'content-type': 'application/json' },
+							body: JSON.stringify({
+								clientId: client_id,
+								organizationIds: orgIds,
+							}),
+						},
+					)
+					// Stop rather than send them onward: a connection with no
+					// organization recorded reaches every organization the person
+					// belongs to, so carrying on here would hand the assistant more
+					// than they just chose to give it.
+					if (!bindRes.ok) {
+						setSubmitting(null)
+						setError(
+							t`Your choice of organization could not be saved, so this was stopped rather than give the assistant more access than you picked. Try again.`,
+						)
+						return
+					}
 				}
 			}
 			if (data.url) {
@@ -217,8 +237,9 @@ function ConsentPage() {
 						</CheckboxGroup>
 						<OrgHint>
 							<Trans>
-								Pick one or more. The assistant will ask which to use per
-								request.
+								Most assistants can only work in one organization, so picking a
+								single one here is usually what you want. You can change this
+								later in Settings → MCP connections.
 							</Trans>
 						</OrgHint>
 					</OrgSection>

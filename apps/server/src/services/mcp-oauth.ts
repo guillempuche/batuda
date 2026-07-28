@@ -10,6 +10,14 @@ import { Auth } from '../lib/auth'
 // whole organization; everyone else may only manage their own connections.
 const MANAGING_ROLES: ReadonlySet<string> = new Set(['owner', 'admin'])
 
+// An organization a connection has been cut off from. `blockedBySelf` marks a
+// block the person placed on their own connection — that one lifts when they
+// choose the organization again; an owner's does not.
+export interface McpConnectionBlock {
+	readonly organizationId: string
+	readonly blockedBySelf: boolean
+}
+
 // A user's MCP OAuth connection: an OAuth client they've consented to, the
 // orgs its access tokens may act in (empty until chosen), and the host of
 // its first redirect URI. The host is provenance — the client `name` is
@@ -19,7 +27,11 @@ export interface McpConnection {
 	readonly clientId: string
 	readonly name: string | null
 	readonly createdAt: string
+	// Where the connection can act right now.
 	readonly organizationIds: ReadonlyArray<string>
+	// Everything ever chosen for it, blocked organizations included.
+	readonly chosenOrganizationIds: ReadonlyArray<string>
+	readonly blocks: ReadonlyArray<McpConnectionBlock>
 	readonly redirectHost: string | null
 }
 
@@ -28,7 +40,14 @@ interface ConnectionRow {
 	readonly name: string | null
 	readonly createdAt: string | Date
 	readonly organizationIds: ReadonlyArray<string> | null
+	readonly chosenOrganizationIds: ReadonlyArray<string> | null
 	readonly redirectUris: unknown
+}
+
+interface RevocationRow {
+	readonly clientId: string
+	readonly organizationId: string
+	readonly revokedByUserId: string
 }
 
 // One connection as an owner or an admin sees it: whose it is, what tool last
@@ -396,45 +415,78 @@ export class McpOAuthService extends Context.Service<McpOAuthService>()(
 				// with the orgs each is currently bound to (empty until chosen).
 				// Aggregated with array_agg so one row per connection carries the
 				// full org list, instead of one row per (connection, org).
+				//
+				// Removals are read on their own rather than joined to the choices,
+				// because a connection can be cut off from an organization it was
+				// never chosen for, and a join hanging off the choice would miss that
+				// removal entirely. Both reads share one transaction, so they cannot
+				// disagree.
 				listConnections: (
 					userId: string,
 				): Effect.Effect<ReadonlyArray<McpConnection>> =>
 					Effect.gen(function* () {
-						const result = yield* withResolverTx(userId, client =>
-							client.query<ConnectionRow>(
-								`SELECT c."clientId"            AS "clientId",
-								        oc.name               AS name,
-								        oc."redirectUris"     AS "redirectUris",
-								        c."createdAt"         AS "createdAt",
-								        COALESCE(
-								          array_agg(sel.organization_id ORDER BY sel.organization_id)
-								          FILTER (WHERE sel.organization_id IS NOT NULL
-									            AND rev.organization_id IS NULL),
-								          ARRAY[]::text[]
-								        )                    AS "organizationIds"
-								 FROM "oauthConsent" c
-								 JOIN "oauthClient" oc ON oc."clientId" = c."clientId"
-								 LEFT JOIN mcp_oauth_org_membership sel
-								   ON sel.user_id = c."userId" AND sel.client_id = c."clientId"
-								 -- An organization the connection has been cut off from is left
-								 -- out: the choice behind it is kept so it can be put back, but
-								 -- showing it would claim the connection still reaches data it
-								 -- can no longer touch.
-								 LEFT JOIN mcp_oauth_revocation rev
-								   ON rev.user_id = sel.user_id
-								  AND rev.client_id = sel.client_id
-								  AND rev.organization_id = sel.organization_id
-								 WHERE c."userId" = $1
-								 GROUP BY c."clientId", oc.name, oc."redirectUris", c."createdAt"
-								 ORDER BY c."createdAt" DESC`,
-								[userId],
-							),
+						const { connections, revocations } = yield* withResolverTx(
+							userId,
+							async client => {
+								const connections = await client.query<ConnectionRow>(
+									`SELECT c."clientId"            AS "clientId",
+									        oc.name               AS name,
+									        oc."redirectUris"     AS "redirectUris",
+									        c."createdAt"         AS "createdAt",
+									        COALESCE(
+									          array_agg(sel.organization_id ORDER BY sel.organization_id)
+									          FILTER (WHERE sel.organization_id IS NOT NULL
+										            AND rev.organization_id IS NULL),
+									          ARRAY[]::text[]
+									        )                    AS "organizationIds",
+									        COALESCE(
+									          array_agg(sel.organization_id ORDER BY sel.organization_id)
+									          FILTER (WHERE sel.organization_id IS NOT NULL),
+									          ARRAY[]::text[]
+									        )                    AS "chosenOrganizationIds"
+									 FROM "oauthConsent" c
+									 JOIN "oauthClient" oc ON oc."clientId" = c."clientId"
+									 LEFT JOIN mcp_oauth_org_membership sel
+									   ON sel.user_id = c."userId" AND sel.client_id = c."clientId"
+									 -- An organization the connection has been cut off from is left
+									 -- out of what it can reach, but kept in what was chosen: the
+									 -- choice survives the removal so it can be put back.
+									 LEFT JOIN mcp_oauth_revocation rev
+									   ON rev.user_id = sel.user_id
+									  AND rev.client_id = sel.client_id
+									  AND rev.organization_id = sel.organization_id
+									 WHERE c."userId" = $1
+									 GROUP BY c."clientId", oc.name, oc."redirectUris", c."createdAt"
+									 ORDER BY c."createdAt" DESC`,
+									[userId],
+								)
+								const revocations = await client.query<RevocationRow>(
+									`SELECT client_id          AS "clientId",
+									        organization_id    AS "organizationId",
+									        revoked_by_user_id AS "revokedByUserId"
+									 FROM mcp_oauth_revocation
+									 WHERE user_id = $1`,
+									[userId],
+								)
+								return { connections, revocations }
+							},
 						)
-						return result.rows.map(row => ({
+						const blocksByClient = new Map<string, Array<McpConnectionBlock>>()
+						for (const row of revocations.rows) {
+							const blocks = blocksByClient.get(row.clientId) ?? []
+							blocks.push({
+								organizationId: row.organizationId,
+								blockedBySelf: row.revokedByUserId === userId,
+							})
+							blocksByClient.set(row.clientId, blocks)
+						}
+						return connections.rows.map(row => ({
 							clientId: row.clientId,
 							name: row.name,
 							createdAt: new Date(row.createdAt).toISOString(),
 							organizationIds: row.organizationIds ?? [],
+							chosenOrganizationIds: row.chosenOrganizationIds ?? [],
+							blocks: blocksByClient.get(row.clientId) ?? [],
 							redirectHost: firstRedirectHost(row.redirectUris),
 						}))
 					}),
