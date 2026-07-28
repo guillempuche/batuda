@@ -1,4 +1,4 @@
-import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
+import { useAtomSet, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { DateTime } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
@@ -8,6 +8,7 @@ import styled from 'styled-components'
 import { PriButton, usePriToast } from '@batuda/ui/pri'
 
 import {
+	RUN_PROPOSALS_PAGE_SIZE,
 	researchDetailAtom,
 	resolveProposalsBatchAtom,
 	runProposedUpdatesAtom,
@@ -36,6 +37,8 @@ import {
 	strongestChannelTrust,
 } from '#/components/research/review/proposal-narrow'
 import { TrustBadge } from '#/components/research/trust-badge'
+import { InfiniteListFooter } from '#/components/shared/infinite-list-footer'
+import { useInfiniteList } from '#/hooks/use-infinite-list'
 import {
 	type ResolveDecision,
 	type ResolveOutcome,
@@ -57,8 +60,15 @@ export function ProposedUpdatesReview({
 	const { t } = useLingui()
 	const toast = usePriToast()
 
-	const proposalsResult = useAtomValue(runProposedUpdatesAtom(researchId))
-	const refreshProposals = useAtomRefresh(runProposedUpdatesAtom(researchId))
+	const proposalList = useInfiniteList({
+		resetKey: `research-review:${researchId}`,
+		pageSize: RUN_PROPOSALS_PAGE_SIZE,
+		atomFor: page => runProposedUpdatesAtom(researchId, page),
+	})
+	// Resolving one proposal changes what the server says about the others in
+	// the same run, so the review starts over rather than trusting the slices
+	// it read before the decision.
+	const refreshProposals = proposalList.refresh
 	const detailResult = useAtomValue(researchDetailAtom(researchId))
 
 	const resolveBatch = useAtomSet(resolveProposalsBatchAtom, {
@@ -77,11 +87,8 @@ export function ProposedUpdatesReview({
 	const [batchBusy, setBatchBusy] = useState(false)
 
 	const proposals = useMemo<ReadonlyArray<ReviewProposal>>(
-		() =>
-			AsyncResult.isSuccess(proposalsResult)
-				? narrowProposedUpdates(proposalsResult.value.items)
-				: [],
-		[proposalsResult],
+		() => narrowProposedUpdates(proposalList.items),
+		[proposalList.items],
 	)
 	const context = useMemo<RunContext>(
 		() =>
@@ -92,8 +99,14 @@ export function ProposedUpdatesReview({
 	)
 
 	// A terminal run with nothing proposed and no CRM matches still deserves a
-	// clear "nothing here" line rather than a blank gap on the page.
-	if (proposals.length === 0 && context.discoveredExisting.length === 0)
+	// clear "nothing here" line rather than a blank gap on the page — but only
+	// once the first slice is back, so a slow read never says "nothing" about a
+	// run whose proposals are still on their way.
+	if (
+		proposals.length === 0 &&
+		context.discoveredExisting.length === 0 &&
+		!proposalList.isLoadingFirstPage
+	)
 		return (
 			<Section data-testid='research-review-empty'>
 				<EmptyReview>
@@ -248,6 +261,7 @@ export function ProposedUpdatesReview({
 					/>
 				))}
 			</List>
+			<InfiniteListFooter list={proposalList} testId='research-review' />
 		</Section>
 	)
 }
