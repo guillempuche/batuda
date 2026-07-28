@@ -7,7 +7,7 @@ import { SEED_REFERENCE, type SeedCtx, seedUuid } from './shared'
 // the page always shows the empty state and the multi-org chip UI can't be
 // exercised without running a real OAuth dance.
 //
-// Three clients are seeded:
+// Four clients are seeded. The first three are Alice's:
 //   - "ChatGPT" (redirect host chatgpt.com) — bound to both taller + restaurant,
 //     so the multi-org chip UI with per-org remove is visible.
 //   - "Claude" (redirect host claude.ai) — bound to only taller, so the
@@ -16,6 +16,12 @@ import { SEED_REFERENCE, type SeedCtx, seedUuid } from './shared'
 //     taller by Alice herself, restaurant by that organization's owner. Only
 //     her own removal can she take back, and nothing else in local dev leaves
 //     a connection in either state.
+// And one is Carol's:
+//   - "Copilot" — chosen for taller, cut off from it by Bea. This is the removal
+//     an owner of taller can allow back: made by somebody else, on someone
+//     else's connection, for an organization that connection still wants. A
+//     removal aimed at you can never be lifted by you, so none of Alice's own
+//     connections could stand in for it.
 //
 // Runs after identities (which create the users + orgs). The OAuth client /
 // consent tables are managed by Better Auth but written here directly — the
@@ -63,10 +69,22 @@ export const seedMcpOAuth = (ctx: SeedCtx) =>
 		`
 		const bobId = bobRows[0]?.id
 
-		// Clean up any prior seed rows (idempotent re-runs).
-		yield* sql`DELETE FROM mcp_oauth_revocation WHERE user_id = ${aliceId} AND client_id LIKE 'mock-%'`
-		yield* sql`DELETE FROM mcp_oauth_org_membership WHERE user_id = ${aliceId} AND client_id LIKE 'mock-%'`
-		yield* sql`DELETE FROM "oauthConsent" WHERE "userId" = ${aliceId} AND "clientId" LIKE 'mock-%'`
+		// Carol is a plain member of taller and Bea an admin of it — the pair
+		// behind Copilot's removal below.
+		const carolRows = yield* sql<{ id: string }>`
+			SELECT id FROM "user" WHERE email = 'colleague@taller.cat' LIMIT 1
+		`
+		const carolId = carolRows[0]?.id
+		const beaRows = yield* sql<{ id: string }>`
+			SELECT id FROM "user" WHERE email = 'boss@batuda.dev' LIMIT 1
+		`
+		const beaId = beaRows[0]?.id
+
+		// Clean up any prior seed rows (idempotent re-runs). Keyed on the mock
+		// client rather than one person, so rows seeded for anyone go too.
+		yield* sql`DELETE FROM mcp_oauth_revocation WHERE client_id LIKE 'mock-%'`
+		yield* sql`DELETE FROM mcp_oauth_org_membership WHERE client_id LIKE 'mock-%'`
+		yield* sql`DELETE FROM "oauthConsent" WHERE "clientId" LIKE 'mock-%'`
 		yield* sql`DELETE FROM "oauthClient" WHERE "clientId" LIKE 'mock-%'`
 
 		for (const client of MOCK_CLIENTS) {
@@ -116,6 +134,32 @@ export const seedMcpOAuth = (ctx: SeedCtx) =>
 			VALUES (${aliceId}, 'mock-codex-client', ${tallerOrgId}, ${SEED_REFERENCE}, ${aliceId})
 			ON CONFLICT (user_id, client_id, organization_id) DO NOTHING
 		`
+		// Copilot → Carol's, chosen for taller, then cut off from taller by Bea:
+		// the removal an owner of taller can allow back.
+		if (carolId && beaId) {
+			yield* sql`
+				INSERT INTO "oauthClient" (id, "clientId", "redirectUris", name, "createdAt", "updatedAt")
+				VALUES (${seedUuid('oauth-client', 'mock-copilot-client')}, 'mock-copilot-client', '["https://copilot.example/callback"]'::jsonb, 'Copilot', ${SEED_REFERENCE}, ${SEED_REFERENCE})
+			`
+			// An hour earlier than the rest so the list has a settled order rather
+			// than every row sharing one timestamp.
+			yield* sql`
+				INSERT INTO "oauthConsent" (id, "clientId", "userId", scopes, "createdAt", "updatedAt")
+				VALUES (${seedUuid('oauth-consent', 'mock-copilot-client')}, 'mock-copilot-client', ${carolId}, '["openid"]'::jsonb, ${SEED_REFERENCE}::timestamptz - interval '1 hour', ${SEED_REFERENCE})
+			`
+			yield* sql`
+				INSERT INTO mcp_oauth_org_membership (user_id, client_id, organization_id, updated_at)
+				VALUES (${carolId}, 'mock-copilot-client', ${tallerOrgId}, ${SEED_REFERENCE})
+				ON CONFLICT (user_id, client_id, organization_id) DO NOTHING
+			`
+			yield* sql`
+				INSERT INTO mcp_oauth_revocation
+					(user_id, client_id, organization_id, revoked_at, revoked_by_user_id)
+				VALUES (${carolId}, 'mock-copilot-client', ${tallerOrgId}, ${SEED_REFERENCE}, ${beaId})
+				ON CONFLICT (user_id, client_id, organization_id) DO NOTHING
+			`
+		}
+
 		if (bobId) {
 			yield* sql`
 				INSERT INTO mcp_oauth_revocation
@@ -126,6 +170,8 @@ export const seedMcpOAuth = (ctx: SeedCtx) =>
 		}
 
 		yield* Effect.logInfo(
-			'  mcp-oauth: seeded 3 mock connections (ChatGPT multi-org, Claude single-org, Codex blocked)',
+			carolId && beaId
+				? '  mcp-oauth: seeded 4 mock connections (ChatGPT multi-org, Claude single-org, Codex blocked, Copilot blocked by an admin)'
+				: '  mcp-oauth: seeded 3 mock connections — Carol or Bea missing, so the stopped-by-an-admin one was skipped',
 		)
 	})

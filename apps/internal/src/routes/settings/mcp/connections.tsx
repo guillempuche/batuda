@@ -4,13 +4,14 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { ArrowLeft, Check, Plug, X } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 
 import { PriButton, PriCheckbox, PriDialog, usePriToast } from '@batuda/ui/pri'
 
 import { PriTable } from '#/components/primitives/pri-table'
 import { ErrorState } from '#/components/shared/error-state'
+import { SrOnly } from '#/components/shared/sr-only'
 import { authClient } from '#/lib/auth-client'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import {
@@ -64,6 +65,15 @@ type OrgConnection = {
 		readonly version: string | null
 	} | null
 	readonly lastUsedAt: string | null
+	// Set when this organization has stopped the connection. `boundHere` says
+	// whether the member it belongs to has still chosen this organization, which
+	// decides whether allowing it back hands access over or only clears a record.
+	readonly block: {
+		readonly byUserId: string
+		readonly byName: string | null
+		readonly at: string
+		readonly boundHere: boolean
+	} | null
 }
 
 export const Route = createFileRoute('/settings/mcp/connections')({
@@ -436,8 +446,8 @@ function ConnectionsPage() {
 // The organization picker inside the dialog. The two ways a connection loses an
 // organization are offered differently: one the person cut off themselves comes
 // back by ticking it and saving, which is the way out of an accidental removal,
-// while one an owner cut off is shown but not tickable, because nothing done
-// here can undo it.
+// while one an owner cut off is shown but not tickable — that one is the
+// organization's to take back, from its own settings, not this person's.
 //
 // Blocked organizations are never in the ticked list. A checkbox reads its state
 // from that list alone, so leaving one in would draw it ticked and greyed —
@@ -512,7 +522,9 @@ function OrgPicker({
 									) : null}
 									{blockedByOwner ? (
 										<PickerReason id={reasonId}>
-											<Trans>An owner removed this one.</Trans>
+											<Trans>
+												An owner removed this one. Ask them to allow it again.
+											</Trans>
 										</PickerReason>
 									) : null}
 								</PickerText>
@@ -546,11 +558,25 @@ function OrgConnectionsSection() {
 		BatudaApiAtom.mutation('mcpOAuth', 'revokeConnection'),
 		{ mode: 'promiseExit' },
 	)
+	const restoreConnection = useAtomSet(
+		BatudaApiAtom.mutation('mcpOAuth', 'restoreConnection'),
+		{ mode: 'promiseExit' },
+	)
 
-	// The row awaiting confirmation, and the one whose revoke is in flight so a
-	// second click can't race it.
+	// The row awaiting confirmation, and the rows whose revoke or allow-again is
+	// in flight so a second click can't race it.
 	const [confirmTarget, setConfirmTarget] = useState<OrgConnection | null>(null)
 	const [revokingId, setRevokingId] = useState<string | null>(null)
+	const [restoringId, setRestoringId] = useState<string | null>(null)
+
+	// Whose connections these are matters here: nobody may put back a removal
+	// aimed at them by somebody else, so their own rows get an explanation
+	// rather than a button that is always refused.
+	const session = authClient.useSession()
+	const myUserId = session.data?.user?.id ?? null
+
+	// Where the keyboard lands after a row moves between the two tables.
+	const activeHeadingRef = useRef<HTMLHeadingElement>(null)
 
 	const rows = useMemo<ReadonlyArray<OrgConnection>>(
 		() =>
@@ -559,6 +585,11 @@ function OrgConnectionsSection() {
 				: [],
 		[listResult],
 	)
+	// One answer, two tables: the first promises what can reach this
+	// organization's data, so a connection the organization has stopped belongs
+	// beside it rather than inside it.
+	const active = useMemo(() => rows.filter(row => !row.block), [rows])
+	const blocked = useMemo(() => rows.filter(row => row.block), [rows])
 	const isLoading = AsyncResult.isInitial(listResult)
 	const isFailure = AsyncResult.isFailure(listResult)
 
@@ -594,13 +625,48 @@ function OrgConnectionsSection() {
 		}
 	}
 
+	// Take away the removal standing in front of a connection. Only an owner or
+	// an admin may, and never the person the removal was aimed at — the server
+	// refuses that outright.
+	const allowAgain = async (row: OrgConnection) => {
+		const rowId = `${row.userId}:${row.clientId}`
+		if (restoringId !== null) return
+		setRestoringId(rowId)
+		try {
+			const exit = await restoreConnection({
+				payload: { clientId: row.clientId, userId: row.userId },
+				reactivityKeys: ['mcpConnections'],
+			} as never)
+			if (exit._tag === 'Success') {
+				toastManager.add({
+					title: t`Connection allowed again`,
+					description: t`It can reach this organization from its next request.`,
+					type: 'success',
+				})
+				// The row leaves this table for the one above, taking the button —
+				// and the keyboard's place on the page — with it. Send it to the
+				// heading of the list it moved to, so nobody is dropped back to the
+				// top of the document with no idea where their row went.
+				activeHeadingRef.current?.focus()
+				return
+			}
+			toastManager.add({
+				title: t`Could not allow it again`,
+				description: t`Something went wrong. Try again.`,
+				type: 'error',
+			})
+		} finally {
+			setRestoringId(null)
+		}
+	}
+
 	const confirmLabel = confirmTarget
 		? (confirmTarget.memberName ?? confirmTarget.memberEmail)
 		: ''
 
 	return (
 		<ListSection>
-			<SectionTitle>
+			<SectionTitle ref={activeHeadingRef} tabIndex={-1}>
 				<Trans>Everyone's connections</Trans>
 			</SectionTitle>
 			<SectionLead>
@@ -622,9 +688,13 @@ function OrgConnectionsSection() {
 					title={t`Could not load the organization's connections.`}
 					onRetry={refreshList}
 				/>
-			) : rows.length === 0 ? (
+			) : active.length === 0 ? (
 				<Empty data-testid='mcp-org-connections-empty'>
-					<Trans>Nothing is connected to this organization yet.</Trans>
+					{blocked.length > 0 ? (
+						<Trans>Nothing can reach this organization right now.</Trans>
+					) : (
+						<Trans>Nothing is connected to this organization yet.</Trans>
+					)}
 				</Empty>
 			) : (
 				<PriTable.Root data-testid='mcp-org-connections'>
@@ -647,7 +717,7 @@ function OrgConnectionsSection() {
 						</PriTable.Row>
 					</PriTable.Head>
 					<PriTable.Body>
-						{rows.map(row => {
+						{active.map(row => {
 							const rowId = `${row.userId}:${row.clientId}`
 							const toolLabel = row.client
 								? [row.client.name, row.client.version]
@@ -694,6 +764,106 @@ function OrgConnectionsSection() {
 					</PriTable.Body>
 				</PriTable.Root>
 			)}
+
+			{!isLoading && !isFailure && blocked.length > 0 ? (
+				<BlockedGroup aria-labelledby='mcp-org-blocked-title'>
+					<SectionTitle id='mcp-org-blocked-title'>
+						<Trans>Stopped here</Trans>
+					</SectionTitle>
+					<SectionLead>
+						<Trans>
+							Assistants this organization has stopped. Allowing one back lets
+							it reach this organization again from its next request, and
+							nothing else — it can never reach an organization its owner has
+							not chosen.
+						</Trans>
+					</SectionLead>
+					<PriTable.Root data-testid='mcp-org-blocked'>
+						<PriTable.Head>
+							<PriTable.Row>
+								<PriTable.ColumnHeader $flex='grow'>
+									<Trans>Member</Trans>
+								</PriTable.ColumnHeader>
+								<PriTable.ColumnHeader $flex='grow'>
+									<Trans>Assistant</Trans>
+								</PriTable.ColumnHeader>
+								<PriTable.ColumnHeader $flex='shrink'>
+									<Trans>Stopped by</Trans>
+								</PriTable.ColumnHeader>
+								<PriTable.ColumnHeader $flex='shrink'>
+									<SrOnly>
+										<Trans>Actions</Trans>
+									</SrOnly>
+								</PriTable.ColumnHeader>
+							</PriTable.Row>
+						</PriTable.Head>
+						<PriTable.Body>
+							{blocked.map(row => {
+								const rowId = `${row.userId}:${row.clientId}`
+								const memberLabel = row.memberName ?? row.memberEmail
+								const assistantLabel = connectionTitle(
+									row.name,
+									row.redirectHost,
+									t`Unnamed client`,
+								)
+								return (
+									<PriTable.Row key={rowId} data-testid='mcp-org-blocked-row'>
+										<PriTable.Cell $flex='grow'>
+											<MemberName>{memberLabel}</MemberName>
+											<ConnMeta>{row.memberEmail}</ConnMeta>
+										</PriTable.Cell>
+										<PriTable.Cell $flex='grow'>{assistantLabel}</PriTable.Cell>
+										<PriTable.Cell $flex='shrink'>
+											<MemberName>
+												{row.block?.byName ?? (
+													<Trans>Someone since removed</Trans>
+												)}
+											</MemberName>
+											{row.block ? (
+												<ConnMeta>{formatDate(row.block.at)}</ConnMeta>
+											) : null}
+										</PriTable.Cell>
+										<PriTable.Cell $flex='shrink'>
+											{row.userId === myUserId ? (
+												// Their own connection, removed by somebody else. The
+												// server refuses this one however senior they are, so
+												// offering the button would only ever fail.
+												<ConnMeta data-testid='mcp-org-blocked-own'>
+													<Trans>
+														Ask an owner or admin to allow yours back
+													</Trans>
+												</ConnMeta>
+											) : row.block?.boundHere ? (
+												<PriButton
+													type='button'
+													$variant='outlined'
+													disabled={restoringId !== null}
+													aria-label={t`Allow again — ${memberLabel}'s ${assistantLabel}`}
+													data-testid={`mcp-org-blocked-restore-${rowId}`}
+													onClick={() => {
+														void allowAgain(row)
+													}}
+												>
+													<Trans>Allow again</Trans>
+												</PriButton>
+											) : (
+												// Nothing to hand back: the member has not chosen this
+												// organization, so clearing the removal would grant
+												// nothing — and the server refuses it for that reason.
+												<ConnMeta data-testid='mcp-org-blocked-unchosen'>
+													<Trans>
+														Its owner has not chosen this organization
+													</Trans>
+												</ConnMeta>
+											)}
+										</PriTable.Cell>
+									</PriTable.Row>
+								)
+							})}
+						</PriTable.Body>
+					</PriTable.Root>
+				</BlockedGroup>
+			) : null}
 
 			<PriDialog.Root
 				open={confirmTarget !== null}
@@ -785,9 +955,26 @@ function narrowOrgConnections(
 									: null,
 						}
 					: null,
+			block: narrowBlock(r['block']),
 		})
 	}
 	return out
+}
+
+// Anything but a complete removal record reads as a connection nothing has
+// stopped, which is the safe way round: it shows the assistant as reachable and
+// offers no button, rather than inventing a removal nobody made.
+function narrowBlock(value: unknown): OrgConnection['block'] {
+	if (!value || typeof value !== 'object') return null
+	const b = value as Record<string, unknown>
+	return typeof b['byUserId'] === 'string' && typeof b['at'] === 'string'
+		? {
+				byUserId: b['byUserId'],
+				byName: typeof b['byName'] === 'string' ? b['byName'] : null,
+				at: b['at'],
+				boundHere: b['boundHere'] === true,
+			}
+		: null
 }
 
 function narrowConnections(
@@ -1088,6 +1275,17 @@ const PickerWarning = styled.p.withConfig({
 `
 
 // ── The organization-wide section ──
+
+// A section rather than a plain box, so its heading reads as part of the
+// organization's connections rather than a separate top-level list.
+const BlockedGroup = styled.section.withConfig({
+	displayName: 'McpConnBlockedGroup',
+})`
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2xs);
+	margin-top: var(--space-md);
+`
 
 const SectionLead = styled.p.withConfig({ displayName: 'McpConnSectionLead' })`
 	font-family: var(--font-body);

@@ -66,6 +66,15 @@ export interface OrgMcpConnection {
 		readonly version: string | null
 	} | null
 	readonly lastUsedAt: string | null
+	// Set when this organization has cut the connection off. `boundHere` says
+	// whether the member it belongs to has still chosen this organization, which
+	// decides whether lifting the block hands access back or only clears a record.
+	readonly block: {
+		readonly byUserId: string
+		readonly byName: string | null
+		readonly at: string
+		readonly boundHere: boolean
+	} | null
 }
 
 interface OrgConnectionRow {
@@ -296,10 +305,24 @@ export class McpOAuthService extends Context.Service<McpOAuthService>()(
 						const revoked = yield* sql<{
 							userId: string
 							clientId: string
+							revokedByUserId: string
+							revokedAt: Date
 						}>`
-							SELECT user_id AS "userId", client_id AS "clientId"
+							SELECT user_id AS "userId", client_id AS "clientId",
+							       revoked_by_user_id AS "revokedByUserId",
+							       revoked_at AS "revokedAt"
 							FROM mcp_oauth_revocation
 						`.pipe(Effect.orDie)
+						// Only removals someone else made belong here. One a person made
+						// on their own connection is theirs to undo, and they already can
+						// by choosing the organization again in their own list — showing
+						// it to an owner would invite undoing a decision that was never
+						// the organization's to make.
+						const orgBlockByKey = new Map(
+							revoked
+								.filter(r => r.revokedByUserId !== r.userId)
+								.map(r => [`${r.userId}:${r.clientId}`, r]),
+						)
 						const revokedKeys = new Set(
 							revoked.map(r => `${r.userId}:${r.clientId}`),
 						)
@@ -321,19 +344,55 @@ export class McpOAuthService extends Context.Service<McpOAuthService>()(
 							seen.map(s => [`${s.userId}:${s.principalId}`, s]),
 						)
 
+						// Who raised each block, by name. Read on the owner pool like the
+						// connections above: the people table is not organization-scoped,
+						// so reading it as the request role would be an identity lookup
+						// nothing confines.
+						const blockerIds = [
+							...new Set(
+								[...orgBlockByKey.values()].map(b => b.revokedByUserId),
+							),
+						]
+						// Their email stands in when they never set a name, so somebody
+						// still present is never reported as gone.
+						const blockerNames = new Map<string, string>()
+						if (blockerIds.length > 0) {
+							const blockers = yield* Effect.tryPromise(() =>
+								auth.pool.query<{
+									id: string
+									name: string | null
+									email: string
+								}>('SELECT id, name, email FROM "user" WHERE id = ANY($1)', [
+									blockerIds,
+								]),
+							).pipe(
+								Effect.orDie,
+								Effect.map(r => r.rows),
+							)
+							for (const b of blockers)
+								blockerNames.set(b.id, b.name ?? b.email)
+						}
+
 						return (
 							rows
 								// Mirror how a request is judged: a connection scoped to this
 								// organization counts, and so does one nobody has scoped at
 								// all, because that falls back to every organization its owner
-								// belongs to. A block always wins.
-								.filter(
-									row =>
-										!revokedKeys.has(`${row.userId}:${row.clientId}`) &&
-										(row.boundHere || !row.hasAnySelection),
-								)
+								// belongs to. A connection this organization has cut off is
+								// listed too — it is the only place someone can see what was
+								// stopped here, and lift it.
+								.filter(row => {
+									const key = `${row.userId}:${row.clientId}`
+									const stoppedHere = orgBlockByKey.has(key)
+									const reachesHere =
+										!revokedKeys.has(key) &&
+										(row.boundHere || !row.hasAnySelection)
+									return stoppedHere || reachesHere
+								})
 								.map(row => {
-									const tool = seenByKey.get(`${row.userId}:${row.clientId}`)
+									const key = `${row.userId}:${row.clientId}`
+									const tool = seenByKey.get(key)
+									const block = orgBlockByKey.get(key)
 									return {
 										clientId: row.clientId,
 										userId: row.userId,
@@ -347,6 +406,15 @@ export class McpOAuthService extends Context.Service<McpOAuthService>()(
 											: null,
 										lastUsedAt: tool?.lastSeenAt
 											? new Date(tool.lastSeenAt).toISOString()
+											: null,
+										block: block
+											? {
+													byUserId: block.revokedByUserId,
+													byName:
+														blockerNames.get(block.revokedByUserId) ?? null,
+													at: new Date(block.revokedAt).toISOString(),
+													boundHere: row.boundHere,
+												}
 											: null,
 									}
 								})
@@ -402,12 +470,146 @@ export class McpOAuthService extends Context.Service<McpOAuthService>()(
 						// Re-revoking is not an error — it refreshes who cut it off and
 						// when, which is what an owner overriding a member's own block
 						// should do.
+						// Cutting your own connection off must not rewrite who made a
+						// removal somebody else made. Otherwise the person a removal was
+						// aimed at could make it read as their own, and everything that
+						// asks "did they make this themselves?" — choosing the
+						// organization again, allowing it back — would then let them
+						// straight past it. An owner or an admin still takes the record
+						// over, which is what lets them override a member's own removal.
 						yield* sql`
 							INSERT INTO mcp_oauth_revocation
 								(user_id, client_id, organization_id, revoked_at, revoked_by_user_id)
 							VALUES (${targetUserId}, ${clientId}, ${orgId}, now(), ${actorUserId})
 							ON CONFLICT (user_id, client_id, organization_id)
-							DO UPDATE SET revoked_at = now(), revoked_by_user_id = ${actorUserId}
+							DO UPDATE SET
+								revoked_at = now(),
+								revoked_by_user_id = CASE
+									WHEN ${actorUserId} = ${targetUserId}
+									 AND mcp_oauth_revocation.revoked_by_user_id <> ${targetUserId}
+									THEN mcp_oauth_revocation.revoked_by_user_id
+									ELSE ${actorUserId}
+								END
+						`.pipe(Effect.orDie)
+					}),
+
+				// Let a connection this organization cut off work here again. Only an
+				// owner or an admin may, and only for the organization the request is
+				// already acting in.
+				//
+				// It clears the removal and nothing else. That is deliberate: the
+				// person's own choice of organizations is theirs, so this can only
+				// take away the obstacle in front of a choice they already made —
+				// never make one for them. That is also why a connection that has not
+				// chosen this organization is refused rather than cleared: clearing it
+				// would hand the assistant back every organization that person belongs
+				// to, including ones this organization has no say over.
+				restoreConnection: (
+					orgId: string,
+					actorUserId: string,
+					targetUserId: string,
+					clientId: string,
+				): Effect.Effect<void, Forbidden | NotFound> =>
+					Effect.gen(function* () {
+						// The active organization already confines `member`, so the user
+						// id alone identifies the row. No row means the actor is not in
+						// this organization at all, refused like the wrong role.
+						const actor = yield* sql<{ role: string | null }>`
+							SELECT role FROM member WHERE "userId" = ${actorUserId} LIMIT 1
+						`.pipe(Effect.orDie)
+						const role = actor[0]?.role ?? null
+						if (role === null || !MANAGING_ROLES.has(role)) {
+							return yield* new Forbidden({
+								message:
+									'Only an owner or an admin can allow a connection back into the organization.',
+							})
+						}
+
+						const blockRows = yield* sql<{ revokedByUserId: string }>`
+							SELECT revoked_by_user_id AS "revokedByUserId"
+							FROM mcp_oauth_revocation
+							WHERE user_id = ${targetUserId}
+							  AND client_id = ${clientId}
+							  AND organization_id = ${orgId}
+							LIMIT 1
+						`.pipe(Effect.orDie)
+						const block = blockRows[0]
+
+						// Nothing to allow back. Saying so beats reporting success for a
+						// call that changed nothing, which would also write a record of a
+						// removal being lifted that never was.
+						if (block === undefined) {
+							return yield* new NotFound({
+								entity: 'mcpConnection',
+								id: clientId,
+							})
+						}
+
+						// A removal someone made on their own connection is their own
+						// decision, and they undo it themselves by choosing the
+						// organization again. The organization can override it by removing
+						// the connection itself, but it cannot quietly switch somebody's
+						// assistant back on for them.
+						if (block.revokedByUserId === targetUserId) {
+							return yield* new Forbidden({
+								message:
+									'This connection was removed by the person it belongs to, so only they can put it back.',
+							})
+						}
+
+						// Nobody undoes a removal somebody else made against them. Without
+						// this an owner or an admin who was cut off could let their own
+						// assistant straight back in, which is the one thing recording who
+						// made the removal exists to prevent.
+						if (targetUserId === actorUserId) {
+							return yield* new Forbidden({
+								message:
+									'Someone else removed this connection, so it cannot be allowed back by the person it was removed from.',
+							})
+						}
+
+						// The person whose connection this is must belong to the
+						// organization, or there is nothing here to allow back.
+						const target = yield* sql<{ userId: string }>`
+							SELECT "userId" FROM member WHERE "userId" = ${targetUserId} LIMIT 1
+						`.pipe(Effect.orDie)
+						if (target.length === 0) {
+							return yield* new NotFound({
+								entity: 'mcpConnection',
+								id: clientId,
+							})
+						}
+
+						// Read on the owner pool, like the connection list: the request
+						// role has no grant on the choices table at all.
+						const chosen = yield* Effect.tryPromise(() =>
+							auth.pool.query(
+								`SELECT 1 FROM mcp_oauth_org_membership
+								 WHERE user_id = $1 AND client_id = $2 AND organization_id = $3`,
+								[targetUserId, clientId, orgId],
+							),
+						).pipe(Effect.orDie)
+						// Counted from the rows themselves: the driver's own count is
+						// allowed to be absent, and an absent one is not zero, so reading
+						// it here would wave the call through.
+						if (chosen.rows.length === 0) {
+							return yield* new Forbidden({
+								message:
+									'This assistant is not set to work in this organization, so there is nothing to allow back. Its owner has to choose this organization first.',
+							})
+						}
+
+						// Name the organization rather than leaning on the request's own
+						// scope alone. The database confines this to the acting
+						// organization as a backstop, but a row it hides is silently
+						// skipped rather than refused, and a caller on the role that
+						// bypasses those checks would otherwise clear the removal in
+						// every organization at once.
+						yield* sql`
+							DELETE FROM mcp_oauth_revocation
+							WHERE user_id = ${targetUserId}
+							  AND client_id = ${clientId}
+							  AND organization_id = ${orgId}
 						`.pipe(Effect.orDie)
 					}),
 

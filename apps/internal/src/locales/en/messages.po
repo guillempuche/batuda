@@ -284,6 +284,7 @@ msgstr "Across companies in stage"
 
 #: src/routes/emails/inboxes.tsx
 #: src/routes/settings/mcp/connections.tsx
+#: src/routes/settings/mcp/connections.tsx
 msgid "Actions"
 msgstr "Actions"
 
@@ -479,6 +480,14 @@ msgstr "All your organizations"
 msgid "Allow"
 msgstr "Allow"
 
+#: src/routes/settings/mcp/connections.tsx
+msgid "Allow again"
+msgstr "Allow again"
+
+#: src/routes/settings/mcp/connections.tsx
+msgid "Allow again — {memberLabel}'s {assistantLabel}"
+msgstr "Allow again — {memberLabel}'s {assistantLabel}"
+
 #. placeholder {0}: change.to
 #: src/components/research/inbox/research-inbox.tsx
 msgid "already {0}"
@@ -506,8 +515,8 @@ msgid "An org stack runs for every member who hasn't set their own. The one mark
 msgstr "An org stack runs for every member who hasn't set their own. The one marked default applies to a run that names none. Only org templates can go in an org stack."
 
 #: src/routes/settings/mcp/connections.tsx
-msgid "An owner removed this one."
-msgstr "An owner removed this one."
+msgid "An owner removed this one. Ask them to allow it again."
+msgstr "An owner removed this one. Ask them to allow it again."
 
 #: src/components/research/inbox/research-inbox.tsx
 msgid "and {hidden} more on the run"
@@ -621,13 +630,22 @@ msgstr "Archived — not pursuing"
 msgid "as of"
 msgstr "as of"
 
+#: src/routes/settings/mcp/connections.tsx
+msgid "Ask an owner or admin to allow yours back"
+msgstr "Ask an owner or admin to allow yours back"
+
 #: src/components/companies/company-owner-control.tsx
 msgid "Assign to me"
 msgstr "Assign to me"
 
 #: src/routes/settings/mcp/connections.tsx
+#: src/routes/settings/mcp/connections.tsx
 msgid "Assistant"
 msgstr "Assistant"
+
+#: src/routes/settings/mcp/connections.tsx
+msgid "Assistants this organization has stopped. Allowing one back lets it reach this organization again from its next request, and nothing else — it can never reach an organization its owner has not chosen."
+msgstr "Assistants this organization has stopped. Allowing one back lets it reach this organization again from its next request, and nothing else — it can never reach an organization its owner has not chosen."
 
 #: src/components/research/run-detail.tsx
 msgid "At least one of these results needs reading before it is used. Open the ones marked below."
@@ -1152,6 +1170,10 @@ msgid "Connecting…"
 msgstr "Connecting…"
 
 #: src/routes/settings/mcp/connections.tsx
+msgid "Connection allowed again"
+msgstr "Connection allowed again"
+
+#: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/connections.tsx
 msgid "Connection revoked"
 msgstr "Connection revoked"
@@ -1252,6 +1274,10 @@ msgstr "Could not add {trimmed}. Please try again."
 #: src/components/research/findings/prospect-scan-view.tsx
 msgid "Could not add as a lead"
 msgstr "Could not add as a lead"
+
+#: src/routes/settings/mcp/connections.tsx
+msgid "Could not allow it again"
+msgstr "Could not allow it again"
 
 #: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/review/proposed-updates-review.tsx
@@ -2561,6 +2587,10 @@ msgstr "Invalid"
 msgid "It can no longer reach this organization."
 msgstr "It can no longer reach this organization."
 
+#: src/routes/settings/mcp/connections.tsx
+msgid "It can reach this organization from its next request."
+msgstr "It can reach this organization from its next request."
+
 #: src/routes/login.tsx
 msgid "It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it? Check spam."
 msgstr "It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it? Check spam."
@@ -2568,6 +2598,10 @@ msgstr "It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it? Check 
 #: src/components/primitives/pri-rich-text.tsx
 msgid "Italic"
 msgstr "Italic"
+
+#: src/routes/settings/mcp/connections.tsx
+msgid "Its owner has not chosen this organization"
+msgstr "Its owner has not chosen this organization"
 
 #: src/routes/calendar/index.tsx
 msgid "Join video call"
@@ -2946,6 +2980,7 @@ msgstr "Meetings are missing from this list. Everything else below is still accu
 msgid "Meetings from bookings, email invitations, and internal blocks."
 msgstr "Meetings from bookings, email invitations, and internal blocks."
 
+#: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/organization/members.tsx
 #: src/routes/settings/organization/members.tsx
@@ -3436,6 +3471,10 @@ msgstr "Note"
 #: src/components/research/run-labels.ts
 msgid "Notes"
 msgstr "Notes"
+
+#: src/routes/settings/mcp/connections.tsx
+msgid "Nothing can reach this organization right now."
+msgstr "Nothing can reach this organization right now."
 
 #: src/routes/tasks/index.tsx
 msgid "Nothing changed yet."
@@ -4757,6 +4796,10 @@ msgstr "someone"
 msgid "Someone had already decided this one."
 msgstr "Someone had already decided this one."
 
+#: src/routes/settings/mcp/connections.tsx
+msgid "Someone since removed"
+msgstr "Someone since removed"
+
 #: src/components/research/run-detail.tsx
 msgid "Something went wrong while running this research."
 msgstr "Something went wrong while running this research."
@@ -4766,6 +4809,7 @@ msgid "Something went wrong. Start the connection again from your assistant."
 msgstr "Something went wrong. Start the connection again from your assistant."
 
 #: src/routes/reset-password.tsx
+#: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/connections.tsx
@@ -4910,6 +4954,14 @@ msgstr "Step {0} of 3"
 #: src/routes/settings/profile/templates.tsx
 msgid "Still in use"
 msgstr "Still in use"
+
+#: src/routes/settings/mcp/connections.tsx
+msgid "Stopped by"
+msgstr "Stopped by"
+
+#: src/routes/settings/mcp/connections.tsx
+msgid "Stopped here"
+msgstr "Stopped here"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Stored encrypted with AES-256-GCM."
@@ -5463,6 +5515,7 @@ msgstr "Unknown user"
 msgid "Unlinked"
 msgstr "Unlinked"
 
+#: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/connections.tsx
 msgid "Unnamed client"

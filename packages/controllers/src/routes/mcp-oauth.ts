@@ -79,6 +79,26 @@ export const OrgMcpConnectionView = Schema.Struct({
 		}),
 	),
 	lastUsedAt: Schema.NullOr(Schema.String),
+	// Set when this organization has cut the connection off, null when it has
+	// not.
+	block: Schema.NullOr(
+		Schema.Struct({
+			byUserId: Schema.String,
+			byName: Schema.NullOr(Schema.String),
+			at: Schema.String,
+			// Whether the member has still chosen this organization for the
+			// assistant. Lifting a removal only hands access back when they have.
+			boundHere: Schema.Boolean,
+		}),
+	),
+})
+
+// Let a connection work in the acting organization again. `userId` names whose
+// connection, and is never optional: the removal being lifted was usually aimed
+// at someone other than the owner or admin asking.
+export const RestoreConnectionInput = Schema.Struct({
+	clientId: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
+	userId: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
 })
 
 // ── Route group ──
@@ -114,6 +134,19 @@ export const McpOAuthGroup = HttpApiGroup.make('mcpOAuth')
 		// members who come here to pick an org in the first place.
 		HttpApiEndpoint.post('revokeConnection', '/mcp-oauth/revoke', {
 			payload: RevokeConnectionInput,
+			success: Schema.Void,
+			error: [
+				Forbidden.pipe(HttpApiSchema.status(403)),
+				NotFound.pipe(HttpApiSchema.status(404)),
+			],
+		}).middleware(OrgMiddleware),
+	)
+	.add(
+		// The way back from a removal an owner made. Org-scoped like revoke: it
+		// only ever clears what was recorded against the organization the
+		// request is already acting in.
+		HttpApiEndpoint.post('restoreConnection', '/mcp-oauth/restore', {
+			payload: RestoreConnectionInput,
 			success: Schema.Void,
 			error: [
 				Forbidden.pipe(HttpApiSchema.status(403)),

@@ -284,6 +284,7 @@ msgstr "A través d'empreses en l'etapa"
 
 #: src/routes/emails/inboxes.tsx
 #: src/routes/settings/mcp/connections.tsx
+#: src/routes/settings/mcp/connections.tsx
 msgid "Actions"
 msgstr "Accions"
 
@@ -479,6 +480,14 @@ msgstr "Totes les teves organitzacions"
 msgid "Allow"
 msgstr "Permet"
 
+#: src/routes/settings/mcp/connections.tsx
+msgid "Allow again"
+msgstr "Torna-hi a permetre"
+
+#: src/routes/settings/mcp/connections.tsx
+msgid "Allow again — {memberLabel}'s {assistantLabel}"
+msgstr "Torna a permetre — {assistantLabel} de {memberLabel}"
+
 #. placeholder {0}: change.to
 #: src/components/research/inbox/research-inbox.tsx
 msgid "already {0}"
@@ -506,8 +515,8 @@ msgid "An org stack runs for every member who hasn't set their own. The one mark
 msgstr "Una pila de l'organització s'aplica a tots els membres que no n'han definit una de pròpia. La marcada per defecte s'aplica quan una execució no n'anomena cap. En una pila de l'organització només hi poden anar plantilles de l'organització."
 
 #: src/routes/settings/mcp/connections.tsx
-msgid "An owner removed this one."
-msgstr "Un propietari l’ha tret."
+msgid "An owner removed this one. Ask them to allow it again."
+msgstr "Un propietari l’ha tret. Demana-li que hi torni a permetre l’accés."
 
 #: src/components/research/inbox/research-inbox.tsx
 msgid "and {hidden} more on the run"
@@ -621,13 +630,22 @@ msgstr "Arxivat — no el continuo"
 msgid "as of"
 msgstr "a data de"
 
+#: src/routes/settings/mcp/connections.tsx
+msgid "Ask an owner or admin to allow yours back"
+msgstr "Demana a un propietari o administrador que torni a permetre el teu"
+
 #: src/components/companies/company-owner-control.tsx
 msgid "Assign to me"
 msgstr "Assigna-me'l"
 
 #: src/routes/settings/mcp/connections.tsx
+#: src/routes/settings/mcp/connections.tsx
 msgid "Assistant"
 msgstr "Assistent"
+
+#: src/routes/settings/mcp/connections.tsx
+msgid "Assistants this organization has stopped. Allowing one back lets it reach this organization again from its next request, and nothing else — it can never reach an organization its owner has not chosen."
+msgstr "Assistents que aquesta organització ha aturat. Si en tornes a permetre un, podrà accedir a aquesta organització a partir de la petició següent, i a res més: mai no podrà accedir a una organització que el seu propietari no hagi triat."
 
 #: src/components/research/run-detail.tsx
 msgid "At least one of these results needs reading before it is used. Open the ones marked below."
@@ -1152,6 +1170,10 @@ msgid "Connecting…"
 msgstr "Connectant…"
 
 #: src/routes/settings/mcp/connections.tsx
+msgid "Connection allowed again"
+msgstr "Connexió permesa de nou"
+
+#: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/connections.tsx
 msgid "Connection revoked"
 msgstr "Connexió revocada"
@@ -1252,6 +1274,10 @@ msgstr "No s'ha pogut afegir {trimmed}. Torna-ho a provar."
 #: src/components/research/findings/prospect-scan-view.tsx
 msgid "Could not add as a lead"
 msgstr "No s'ha pogut afegir com a oportunitat"
+
+#: src/routes/settings/mcp/connections.tsx
+msgid "Could not allow it again"
+msgstr "No s’ha pogut tornar a permetre"
 
 #: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/review/proposed-updates-review.tsx
@@ -2561,6 +2587,10 @@ msgstr "No vàlid"
 msgid "It can no longer reach this organization."
 msgstr "Ja no pot accedir a aquesta organització."
 
+#: src/routes/settings/mcp/connections.tsx
+msgid "It can reach this organization from its next request."
+msgstr "Podrà accedir a aquesta organització a partir de la petició següent."
+
 #: src/routes/login.tsx
 msgid "It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it? Check spam."
 msgstr "Caduca en {MAGIC_LINK_EXPIRY_MINUTES} minuts. No el veus? Mira el correu brossa."
@@ -2568,6 +2598,10 @@ msgstr "Caduca en {MAGIC_LINK_EXPIRY_MINUTES} minuts. No el veus? Mira el correu
 #: src/components/primitives/pri-rich-text.tsx
 msgid "Italic"
 msgstr "Cursiva"
+
+#: src/routes/settings/mcp/connections.tsx
+msgid "Its owner has not chosen this organization"
+msgstr "El seu propietari no ha triat aquesta organització"
 
 #: src/routes/calendar/index.tsx
 msgid "Join video call"
@@ -2946,6 +2980,7 @@ msgstr "Falten les reunions d'aquesta llista. La resta del que hi ha a sota cont
 msgid "Meetings from bookings, email invitations, and internal blocks."
 msgstr "Reunions des de reserves, invitacions per correu i blocs interns."
 
+#: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/organization/members.tsx
 #: src/routes/settings/organization/members.tsx
@@ -3436,6 +3471,10 @@ msgstr "Nota"
 #: src/components/research/run-labels.ts
 msgid "Notes"
 msgstr "Notes"
+
+#: src/routes/settings/mcp/connections.tsx
+msgid "Nothing can reach this organization right now."
+msgstr "Ara mateix res no pot accedir a aquesta organització."
 
 #: src/routes/tasks/index.tsx
 msgid "Nothing changed yet."
@@ -4757,6 +4796,10 @@ msgstr "algú"
 msgid "Someone had already decided this one."
 msgstr "Algú ja havia decidit aquesta."
 
+#: src/routes/settings/mcp/connections.tsx
+msgid "Someone since removed"
+msgstr "Algú que ja no hi és"
+
 #: src/components/research/run-detail.tsx
 msgid "Something went wrong while running this research."
 msgstr "Alguna cosa ha anat malament en executar aquesta recerca."
@@ -4766,6 +4809,7 @@ msgid "Something went wrong. Start the connection again from your assistant."
 msgstr "Alguna cosa ha anat malament. Torna a iniciar la connexió des del teu assistent."
 
 #: src/routes/reset-password.tsx
+#: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/connections.tsx
@@ -4910,6 +4954,14 @@ msgstr "Pas {0} de 3"
 #: src/routes/settings/profile/templates.tsx
 msgid "Still in use"
 msgstr "Encara s'utilitza"
+
+#: src/routes/settings/mcp/connections.tsx
+msgid "Stopped by"
+msgstr "Aturat per"
+
+#: src/routes/settings/mcp/connections.tsx
+msgid "Stopped here"
+msgstr "Aturats aquí"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Stored encrypted with AES-256-GCM."
@@ -5463,6 +5515,7 @@ msgstr "Usuari desconegut"
 msgid "Unlinked"
 msgstr "Sense enllaçar"
 
+#: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/connections.tsx
 msgid "Unnamed client"
