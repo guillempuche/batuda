@@ -59,9 +59,22 @@ const PriTrigger = styled(Collapsible.Trigger).withConfig({
 	}
 `
 
-const PriPanel = styled(Collapsible.Panel).withConfig({
-	displayName: 'PriCollapsiblePanel',
-})`
+// A folded panel keeps its text on the page instead of throwing it away, so
+// the browser's own Find reaches it and opens the section on a match. On by
+// default so sections written later get it too; pass `hiddenUntilFound={false}`
+// where content should not linger. Reading the prop here, rather than fixing
+// the value, is what leaves that choice to the caller.
+//
+// It rests on Tailwind's reset sparing `hidden='until-found'` from
+// `display: none`. If that exception ever goes, a folded section stays
+// invisible for good rather than merely unfindable.
+const PriPanel = styled(Collapsible.Panel)
+	.attrs<{
+		readonly hiddenUntilFound?: boolean
+	}>(props => ({ hiddenUntilFound: props.hiddenUntilFound ?? true }))
+	.withConfig({
+		displayName: 'PriCollapsiblePanel',
+	})`
 	overflow: hidden;
 	transition: height 260ms cubic-bezier(0.22, 1.2, 0.4, 1);
 
