@@ -23,7 +23,7 @@ import {
 	DocumentCreated,
 	TimelineActivityService,
 } from '../../services/timeline-activity'
-import { ListResult, toItems } from './_result'
+import { McpPageLimit, TruncatableResult, toTruncatable } from './_result'
 
 const REQUEST_DEPENDENCIES = [CurrentOrg]
 
@@ -64,8 +64,9 @@ const GetDocuments = Tool.make('get_documents', {
 		subject_id: Schema.optional(Schema.String),
 		type: Schema.optional(Document.json.fields.type),
 		q: Schema.optional(Schema.String),
+		limit: Schema.optional(McpPageLimit),
 	}),
-	success: ListResult(DocumentSummary),
+	success: TruncatableResult(DocumentSummary),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Documents')
@@ -194,6 +195,7 @@ export const DocumentHandlersLive = DocumentTools.toLayer(
 		return {
 			get_documents: params =>
 				Effect.gen(function* () {
+					const limit = params.limit ?? 100
 					const conditions = []
 					if (params.subject_table && params.subject_id) {
 						conditions.push(sql`EXISTS (
@@ -228,10 +230,10 @@ export const DocumentHandlersLive = DocumentTools.toLayer(
 							), '[]'::json) AS subjects
 						FROM documents d
 						${whereClause}
-						ORDER BY d.updated_at DESC
-						LIMIT 100
+						ORDER BY d.updated_at DESC, d.id
+						LIMIT ${limit + 1}
 					`
-					return toItems(yield* decodeSummaries(rows))
+					return toTruncatable(yield* decodeSummaries(rows), limit)
 				}).pipe(Effect.orDie),
 			get_document: ({ id }) =>
 				Effect.gen(function* () {

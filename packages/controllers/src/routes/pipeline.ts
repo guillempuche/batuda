@@ -3,6 +3,7 @@ import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi'
 
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
+import { pageQuery } from '../pagination'
 
 // Pipeline snapshot for the dashboard: a status → count histogram plus the two
 // attention counters. All plain numbers, so the response encoder types it fine.
@@ -50,6 +51,13 @@ export const NextSteps = Schema.Struct({
 	dueTasks: Schema.Array(NextStepTask),
 	overdueCompanies: Schema.Array(NextStepCompany),
 	researchAwaitingReview: Schema.Array(NextStepResearchRun),
+
+	// One cap covers three separate lists, so "there is more" has to be said
+	// three times: a reader told only that something was cut short cannot tell
+	// which of the three it happened to.
+	dueTasksTruncated: Schema.Boolean,
+	overdueCompaniesTruncated: Schema.Boolean,
+	researchAwaitingReviewTruncated: Schema.Boolean,
 })
 
 export const PipelineGroup = HttpApiGroup.make('pipeline')
@@ -60,9 +68,7 @@ export const PipelineGroup = HttpApiGroup.make('pipeline')
 	)
 	.add(
 		HttpApiEndpoint.get('nextSteps', '/pipeline/next-steps', {
-			query: {
-				limit: Schema.optional(Schema.NumberFromString),
-			},
+			query: { limit: pageQuery.limit },
 			success: NextSteps,
 		}),
 	)

@@ -179,14 +179,14 @@ const ForwardInvitation = Tool.make('forward_invitation', {
 
 const ListUpcoming = Tool.make('list_upcoming_meetings', {
 	description:
-		'List upcoming calendar events (status!=cancelled, start_at > now()) with filters. Returns the raw calendar_events rows so the agent can pick by source, title, or attendee. Default limit is 25.',
+		'List upcoming calendar events (status!=cancelled, start_at > now()) with filters. Returns the raw calendar_events rows so the agent can pick by source, title, or attendee. Returns at most `limit` rows (default 25, max 500); `hasMore` says whether more matched than were returned — read it before saying how many there are.',
 	parameters: Schema.Struct({
 		company_id: Schema.optional(Schema.String),
 		contact_id: Schema.optional(Schema.String),
 		source: Schema.optional(Schema.Literals(['booking', 'email', 'internal'])),
 		limit: Schema.optional(McpPageLimit),
 	}),
-	success: ListResult(CalendarEvent.json),
+	success: TruncatableResult(CalendarEvent.json),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Upcoming Meetings')
@@ -425,10 +425,13 @@ export const CalendarHandlersLive = CalendarTools.toLayer(
 					const rows = yield* sql`
 						SELECT * FROM calendar_events
 						WHERE ${sql.and(conditions)}
-						ORDER BY start_at ASC
-						LIMIT ${limit}
+						ORDER BY start_at ASC, id
+						LIMIT ${limit + 1}
 					`
-					return toItems(yield* withAttendees(sql, yield* decodeEvents(rows)))
+					return toTruncatable(
+						yield* withAttendees(sql, yield* decodeEvents(rows)),
+						limit,
+					)
 				}).pipe(Effect.orDie),
 			manage_event_types: params =>
 				Effect.gen(function* () {

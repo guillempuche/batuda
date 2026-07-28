@@ -16,7 +16,7 @@ import {
 	writeChannels,
 } from '../../services/contact-channels'
 import { unlinkSubject } from '../../services/documents'
-import { ListResult, toItems } from './_result'
+import { McpPageLimit, TruncatableResult, toTruncatable } from './_result'
 
 const decodeContact = Schema.decodeUnknownEffect(Contact)
 const decodeChannels = Schema.decodeUnknownEffect(Schema.Array(ContactChannel))
@@ -32,11 +32,13 @@ const ChannelInput = Schema.Struct({
 })
 
 const ListContacts = Tool.make('list_contacts', {
-	description: 'List contacts for a company, each with its channels.',
+	description:
+		'List contacts for a company, each with its channels. Returns at most `limit` rows (default 100, max 500); `hasMore` says whether more matched than were returned — read it before saying how many there are.',
 	parameters: Schema.Struct({
 		company_id: Schema.String,
+		limit: Schema.optional(McpPageLimit),
 	}),
-	success: ListResult(ContactSummary),
+	success: TruncatableResult(ContactSummary),
 })
 	.annotate(Tool.Title, 'List Contacts')
 	.annotate(Tool.Readonly, true)
@@ -104,13 +106,15 @@ export const ContactHandlersLive = ContactTools.toLayer(
 		const sql = yield* SqlClient.SqlClient
 
 		return {
-			list_contacts: ({ company_id }) =>
+			list_contacts: ({ company_id, limit: requestedLimit }) =>
 				Effect.gen(function* () {
+					const limit = requestedLimit ?? 100
 					const rows = yield* sql`
 						SELECT c.*, ${contactChannelsJson(sql)} AS channels
 						FROM contacts c
 						WHERE c.company_id = ${company_id}
-						ORDER BY c.name
+						ORDER BY c.name, c.id
+						LIMIT ${limit + 1}
 					`
 					// Decode each contact's own columns; `channels` is already JSON
 					// from json_agg, so keep it as-is.
@@ -123,7 +127,7 @@ export const ContactHandlersLive = ContactTools.toLayer(
 							})),
 						),
 					)
-					return toItems(contacts)
+					return toTruncatable(contacts, limit)
 				}).pipe(Effect.orDie),
 
 			create_contact: ({ company_id, channels, ...fields }) =>

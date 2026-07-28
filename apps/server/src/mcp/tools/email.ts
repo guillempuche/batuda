@@ -752,7 +752,7 @@ export const EmailHandlersLive = EmailTools.toLayer(
 						...(params.limit !== undefined && { limit: params.limit }),
 						...(params.offset !== undefined && { offset: params.offset }),
 					})
-					.pipe(Effect.orDie),
+					.pipe(Effect.orDie, Effect.map(toPage)),
 			get_email_thread: ({ thread_id }) =>
 				svc.getThread(thread_id).pipe(Effect.orDie),
 			update_email_thread_status: ({ thread_id, status }) =>

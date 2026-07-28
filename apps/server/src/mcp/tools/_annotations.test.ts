@@ -56,17 +56,6 @@ const DESTRUCTIVE_NAME = /^(delete_|discard_|cancel_)/
 const IDEMPOTENT_NAME =
 	/^(update_|mark_|set_|reschedule_|reopen_|snooze_|complete_)/
 
-// Tools that take a `limit` but deliberately do not report whether they cut
-// anything off. Named one by one so dropping a tool out of the rule is a
-// decision somebody made on purpose, not something a new tool inherits.
-const TRUNCATION_EXEMPT = new Set([
-	// Answers with two separate lists under one limit, so a single "there is
-	// more" cannot say which of them it refers to.
-	'get_next_steps',
-	// Bounded by the stretch of time asked for rather than by a row count.
-	'list_upcoming_meetings',
-])
-
 // Tools whose result already carries a field shaped as a choice inside a
 // choice — a number that may be absent. Named one by one so the rule can keep
 // new ones out without pretending these two are fine.
@@ -131,57 +120,58 @@ describe('MCP tool annotation coverage', () => {
 						).not.toBe('array')
 					})
 
-					if (!TRUNCATION_EXEMPT.has(toolName)) {
-						it('should say whether it returned everything it found', () => {
-							// GIVEN a tool that lets the caller cap how many rows come
-							//       back, so its answer may be only part of the truth
-							// WHEN reading its success schema
-							// THEN the schema carries `hasMore` — the only thing that
-							//      tells a short list apart from a long one cut short,
-							//      so an assistant without it reports the page it got
-							//      as the whole answer
-							// [tools/${toolkitName} — truncation-signal invariant]
-							const input = Tool.getJsonSchema(tool) as {
-								properties?: Record<string, unknown>
-							}
-							if (input.properties?.['limit'] === undefined) return
+					it('should say whether it returned everything it found', () => {
+						// GIVEN a tool that lets the caller cap how many rows come
+						//       back, so its answer may be only part of the truth
+						// WHEN reading its success schema
+						// THEN the schema says somewhere that rows were left behind —
+						//      `hasMore` for a single list, or a `…Truncated` flag per
+						//      list where one cap covers several. Without either, an
+						//      assistant reports the part it got as the whole answer
+						// [tools/${toolkitName} — truncation-signal invariant]
+						const input = Tool.getJsonSchema(tool) as {
+							properties?: Record<string, unknown>
+						}
+						if (input.properties?.['limit'] === undefined) return
+						const output = Tool.getJsonSchemaFromSchema(tool.successSchema) as {
+							properties?: Record<string, unknown>
+						}
+						const signals = Object.keys(output.properties ?? {}).filter(
+							field => field === 'hasMore' || field.endsWith('Truncated'),
+						)
+						expect(
+							signals,
+							`${toolName} takes a limit but never says whether more rows exist; return PageResult / TruncatableResult from _result.ts, or one \`…Truncated\` flag per list`,
+						).not.toEqual([])
+					})
+
+					it.skipIf(KNOWN_NESTED_CHOICE.has(toolName))(
+						'should describe every result field as one kind of thing',
+						() => {
+							// GIVEN a tool registered in the toolkit
+							// WHEN reading the shape it publishes for its result
+							// THEN no field offers a choice nested inside another
+							//      choice — some model providers reject a tool that
+							//      publishes one rather than read it, and the tool
+							//      disappears for everyone on that provider
+							// [tools/${toolkitName} — flat result-shape invariant]
 							const output = Tool.getJsonSchemaFromSchema(
 								tool.successSchema,
 							) as { properties?: Record<string, unknown> }
+							const nested = Object.entries(output.properties ?? {})
+								.filter(([, shape]) =>
+									((shape as { anyOf?: Array<unknown> }).anyOf ?? []).some(
+										branch =>
+											(branch as { anyOf?: unknown }).anyOf !== undefined,
+									),
+								)
+								.map(([field]) => field)
 							expect(
-								output.properties?.['hasMore'],
-								`${toolName} takes a limit but never says whether more rows exist; return PageResult / TruncatableResult from _result.ts`,
-							).toBeDefined()
-						})
-
-						it.skipIf(KNOWN_NESTED_CHOICE.has(toolName))(
-							'should describe every result field as one kind of thing',
-							() => {
-								// GIVEN a tool registered in the toolkit
-								// WHEN reading the shape it publishes for its result
-								// THEN no field offers a choice nested inside another
-								//      choice — some model providers reject a tool that
-								//      publishes one rather than read it, and the tool
-								//      disappears for everyone on that provider
-								// [tools/${toolkitName} — flat result-shape invariant]
-								const output = Tool.getJsonSchemaFromSchema(
-									tool.successSchema,
-								) as { properties?: Record<string, unknown> }
-								const nested = Object.entries(output.properties ?? {})
-									.filter(([, shape]) =>
-										((shape as { anyOf?: Array<unknown> }).anyOf ?? []).some(
-											branch =>
-												(branch as { anyOf?: unknown }).anyOf !== undefined,
-										),
-									)
-									.map(([field]) => field)
-								expect(
-									nested,
-									`${toolName} publishes ${nested.join(', ')} as a choice inside a choice`,
-								).toEqual([])
-							},
-						)
-					}
+								nested,
+								`${toolName} publishes ${nested.join(', ')} as a choice inside a choice`,
+							).toEqual([])
+						},
+					)
 
 					if (READ_ONLY_NAME.test(toolName)) {
 						it('should declare Tool.Readonly = true', () => {
