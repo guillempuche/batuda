@@ -7,6 +7,17 @@ name: E2E full suite
 on:
   push:
     branches: [main]
+    # Release commits only bump a changelog and a version — nothing the browser
+    # can exercise, and worse: a newer push cancels the run underneath it
+    # (below), so four release commits in a row used to cancel the run for the
+    # real commit they were releasing. `paths-ignore` stops the run being
+    # created at all; a job-level `if` cannot, because a run joins the
+    # concurrency group before any job condition is read.
+    #
+    # A dependency change still runs — it also moves pnpm-lock.yaml.
+    paths-ignore:
+      - "**/CHANGELOG.md"
+      - "**/package.json"
 
 # A newer push supersedes an in-flight full run — the latest commit is what
 # matters for a post-merge backstop.
