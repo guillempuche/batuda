@@ -156,7 +156,7 @@ function formatTotal(
 
 /** List, create, and edit a company's proposals + move them through the pipeline. */
 export function ProposalsPanel({ companyId }: { readonly companyId: string }) {
-	const { i18n } = useLingui()
+	const { i18n, t } = useLingui()
 	const list = useInfiniteList({
 		resetKey: `proposals:${companyId}`,
 		pageSize: PROPOSALS_PAGE_SIZE,
@@ -229,7 +229,11 @@ export function ProposalsPanel({ companyId }: { readonly companyId: string }) {
 				</List>
 			)}
 
-			<InfiniteListFooter list={list} testId='company-proposals' />
+			<InfiniteListFooter
+				list={list}
+				testId='company-proposals'
+				listLabel={t`proposals`}
+			/>
 
 			<ProposalDialog
 				companyId={companyId}

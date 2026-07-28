@@ -380,7 +380,17 @@ export function ResearchInbox() {
 
 			<Counters data-testid='research-inbox-counters'>
 				<Tile>
-					<TileValue>{recentRuns ?? '—'}</TileValue>
+					{/* The dash is punctuation, which a screen reader is free to skip
+					    over — so the tile would otherwise have no value at all until
+					    the count lands, and none ever if the count fails. */}
+					<TileValue>
+						{recentRuns ?? (
+							<>
+								<span aria-hidden>—</span>
+								<SrOnly>{t`Not counted yet`}</SrOnly>
+							</>
+						)}
+					</TileValue>
 					<TileLabel>
 						<Trans>Recent runs</Trans>
 					</TileLabel>

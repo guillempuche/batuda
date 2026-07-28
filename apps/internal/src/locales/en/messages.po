@@ -1839,6 +1839,11 @@ msgstr "Display name"
 msgid "Document"
 msgstr "Document"
 
+#: src/components/companies/documents-panel.tsx
+#: src/components/documents/subject-documents.tsx
+msgid "documents"
+msgstr "documents"
+
 #: src/components/documents/subject-documents.tsx
 #: src/components/layout/nav-items.ts
 #: src/routes/companies/$slug.tsx
@@ -3366,6 +3371,10 @@ msgstr "Not a contact on file yet"
 msgid "Not a fit"
 msgstr "Not a fit"
 
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Not counted yet"
+msgstr "Not counted yet"
+
 #: src/components/research/research-dialog.tsx
 msgid "Not enough research budget for this run. Raise the budget or narrow the search."
 msgstr "Not enough research budget for this run. Raise the budget or narrow the search."
@@ -3935,6 +3944,10 @@ msgstr "Proposal in review"
 #: src/routes/companies/$slug.tsx
 msgid "Proposal stage — set the next action (send it, chase a decision)."
 msgstr "Proposal stage — set the next action (send it, chase a decision)."
+
+#: src/components/companies/proposals-panel.tsx
+msgid "proposals"
+msgstr "proposals"
 
 #: src/routes/companies/$slug.tsx
 msgid "Proposals"
@@ -4599,8 +4612,16 @@ msgid "Showing {loadedCount}"
 msgstr "Showing {loadedCount}"
 
 #: src/components/shared/infinite-list-footer.tsx
+msgid "Showing {loadedCount} {listLabel}"
+msgstr "Showing {loadedCount} {listLabel}"
+
+#: src/components/shared/infinite-list-footer.tsx
 msgid "Showing {loadedCount} of {totalCount}"
 msgstr "Showing {loadedCount} of {totalCount}"
+
+#: src/components/shared/infinite-list-footer.tsx
+msgid "Showing {loadedCount} of {totalCount} {listLabel}"
+msgstr "Showing {loadedCount} of {totalCount} {listLabel}"
 
 #: src/routes/login.tsx
 msgid "Sign in"
