@@ -89,8 +89,8 @@
 │  Research providers (packages/research infrastructure)           │
 │  Selected at boot via RESEARCH_PROVIDER_* env vars               │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
-│  │ Brave Search │  │  Firecrawl   │  │  libreBORME/einforma │  │
-│  │  (web search)│  │ (scrape/ext) │  │  (ES registries)     │  │
+│  │  Firecrawl   │  │ Brave Search │  │  libreBORME/einforma │  │
+│  │ (search/read)│  │  (web search)│  │  (ES registries)     │  │
 │  └──────────────┘  └──────────────┘  └──────────────────────┘  │
 │  ┌──────────────────────────────────────────────────────────┐   ���
 │  │  LLM inference (Groq, Nebius, Fireworks, Together, etc.) │   │
@@ -303,7 +303,7 @@ User fills interaction form
 ### AI agent creates a prospect page
 
 ```
-Agent researches company (get_company, Firecrawl/Exa)
+Agent researches company (get_company, Firecrawl)
   → Agent calls create_page({ company_id, slug, lang: "ca", template: "product-pitch", content: {...} })
   → Server creates pages row with status: "draft"
   → Agent reviews, then calls publish_page(id)
@@ -364,7 +364,7 @@ One entry point, three shapes of request:
 
 ### The run flow
 
-A run is dispatched, not run inline. `start_research` commits a run row as `queued` inside the request transaction and returns immediately; a consumer daemon drains the queue and runs each as a fiber on its own connection. The fiber has three phases: a tool-calling loop (search, read, registry, CRM lookup — accumulating findings and archiving each source), a structured-output pass that validates the findings against the run's schema, and a brief pass that renders a human-readable markdown summary. Tool calls stream to the web app over SSE as they happen, and the fiber writes a count of the rounds it has got through to the run row as it goes, so any client — an MCP caller included — can read live progress without a stream; findings, sources, and the tool log persist at the end.
+A run is dispatched, not run inline. `start_research` commits a run row as `queued` inside the request transaction and returns immediately; a consumer daemon drains the queue and runs each as a fiber on its own connection. The fiber has three phases: a tool-calling loop (search, read, registry, CRM lookup — accumulating findings, recording every page it reaches and archiving the ones it opens), a structured-output pass that validates the findings against the run's schema, and a brief pass that renders a human-readable markdown summary. Tool calls stream to the web app over SSE as they happen, and the fiber writes a count of the rounds it has got through to the run row as it goes, so any client — an MCP caller included — can read live progress without a stream; findings, sources, and the tool log persist at the end.
 
 The first phase starts from the target's own site where there is one: the run maps that domain and reads its own pages before anything a search engine offers, because a company is the best source on itself. The second phase does not settle for what the first pass happened to find — fields still empty afterwards earn further rounds of targeted search and scraping, each round re-running the guards, until the fields fill or the run's budget or deadline stops it.
 
@@ -380,14 +380,14 @@ At a glance:
   Phase 1 · agent reflect-loop
       web_search · scrape_page · registry_lookup · crm_lookup
       site discovery: map the target's own domain and read its own pages first
-      accumulate findings, archive each source as it is read
+      accumulate findings, record each page reached, archive the ones opened
 
   Phase 2 · structured extraction
       validate the findings against the run's schema
       guard chain — a list of named links, run in the order they are written:
           citations · contact entity · scalars · websites · value provenance
           fit evidence · vocabulary · applicability · discovered-existing
-          prospect criteria · model critics · per-source entity · source tier
+          prospect criteria · field-support critic · per-source entity · source tier
       gap rounds: fields still empty earn another targeted search and scrape,
           until the run's budget or its deadline says stop
 
@@ -425,15 +425,15 @@ Two independent layers gate every external call, and the agent experiences both 
 
 The rules the loop follows: climb cost tiers only when a cheaper one cannot answer (cheap web search and scrape before a paid per-company report); never exceed the paid budget without proposing the paid action for human approval; and the monthly cap is the only rail a user cannot override per-run, enforced exactly under a per-user advisory lock so concurrent fan-out fibers cannot overshoot it.
 
-Three safety invariants hold regardless of budget: the agent never mutates a CRM row (it proposes; a human applies, under optimistic concurrency), every claim in the findings must carry a citation that resolves to an archived source (an uncited claim fails the run), and paid calls are metered idempotently so a retried fiber is never double-charged.
+Three safety invariants hold regardless of budget: the agent never mutates a CRM row (it proposes; a human applies, under optimistic concurrency), every claim in the findings must carry a citation that resolves to a page the run actually reached (an uncited claim fails the run) — a page it opened is archived, while one it only saw named in a search result is recorded and citable without a stored copy, and paid calls are metered idempotently so a retried fiber is never double-charged.
 
 ### Surfaces
 
-The same loop is reached three ways. External agents call the MCP tools (`start_research`, `get_research`, and the in-loop `web_search` / `scrape_page` / `registry_lookup` / `discover_contacts` and the propose-update family) and read a run as an MCP resource. The web app drives the HTTP API — create a run, poll or stream it over SSE, approve a paid action, apply or reject a proposed update. And the research page renders the findings, the human brief, the source list with archived snapshots, and the proposals panel where a human applies changes.
+The same loop is reached three ways. External agents call the MCP tools (`start_research`, `get_research`, and the in-loop `web_search` / `scrape_page` / `registry_lookup` / `discover_contacts` and the propose-update family) and read a run as an MCP resource. The web app drives the HTTP API — create a run, poll or stream it over SSE, approve a paid action, apply or reject a proposed update. And the research page renders the findings, the human brief, the source list, with a snapshot for each page the run opened, and the proposals panel where a human applies changes.
 
 ### Data model
 
-Research owns a small set of tables, created together in the `research` migration: `research_runs` (one row per run — leaf, group, or follow-up — with findings, brief, cost, and tool log), `sources` and `research_run_sources` (globally-deduped sources linked to runs with a stable citation ref), `research_links` (polymorphic run ↔ company/contact links carrying applied-change provenance), `research_paid_spend` (an idempotent audit row per paid call), and the policy and quota tables (`user_research_policy`, `provider_quotas`, `provider_usage`). Companies and contacts are soft-deleted so a research link never dangles, and carry a version column so a proposed update cannot silently overwrite a human edit made mid-run. An hourly sweep prunes run transcripts and orphaned scrape blobs past their retention window while keeping every applied contact's provenance trail.
+Research owns a small set of tables, created together in the `research` migration: `research_runs` (one row per run — leaf, group, or follow-up — with findings, brief, cost, and tool log), `sources` and `research_run_sources` (globally-deduped sources linked to runs with a stable citation ref — a row records either a page the run opened and stored, or one it only saw named in a search result, which carries no stored copy), `research_links` (polymorphic run ↔ company/contact links carrying applied-change provenance), `research_paid_spend` (an idempotent audit row per paid call), and the policy and quota tables (`user_research_policy`, `provider_quotas`, `provider_usage`). Companies and contacts are soft-deleted so a research link never dangles, and carry a version column so a proposed update cannot silently overwrite a human edit made mid-run. An hourly sweep prunes run transcripts and, once nothing points at them any more, the stored pages and the records of pages a run only saw — while keeping every applied contact's provenance trail.
 
 ### Quality — the eval harness
 
@@ -584,7 +584,7 @@ webhook_endpoints   — outgoing webhook configuration
 call_recordings     — audio metadata per call (transcript columns nullable, populated in a later phase)
 ```
 
-### Research tables (migration 0003_research)
+### Research tables
 
 ```
 research_runs       — one row per research run (leaf, group, or followup)
@@ -601,7 +601,7 @@ provider_quotas     — per-user per-provider quota config (monthly plan or pay-
 provider_usage      — consumption counter per provider per billing period
 ```
 
-**Retention.** A scheduled sweep (`ResearchRetention`, in `ServicesLive`) runs hourly and prunes storage that would otherwise grow unbounded: expired cache rows (their TTL only gates reads), the `research_text` + `tool_log` transcript of runs older than `RESEARCH_RETENTION_DAYS` (default 90), and scrape blobs whose `sources` row no surviving run fetches and no applied contact cites. It keeps the run rows, `sources`, `research_run_sources`, and `research_links.citations`, so a contact's provenance trail survives the prune (see [§Research](#research)).
+**Retention.** A scheduled sweep (`ResearchRetention`, in `ServicesLive`) runs hourly and clears out what research leaves behind, in four passes: expired cache rows (their TTL only gates reads); the `research_text` + `tool_log` transcript of runs older than `RESEARCH_RETENTION_DAYS` (default 90); stored page text that no surviving run fetches and no applied contact cites, along with the `sources` row that pointed at it; and the records of pages a run only saw named, which never had stored text, once nothing points at those either. The last two are kept apart deliberately — pages merely seen outnumber stored ones by roughly ten to one, so sharing a batch would leave the stored copies, the ones that cost money to keep, queued behind them. The run rows, `research_run_sources` and `research_links.citations` stay, so a contact's provenance trail survives the prune (see [§Research](#research)).
 
 ### Better Auth tables (auto-managed)
 

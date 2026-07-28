@@ -15,11 +15,9 @@ import { BookingProviderLive, IcsParserLive } from '@batuda/calendar'
 import { BatudaApi } from '@batuda/controllers'
 import { ParticipantMatcher } from '@batuda/email/participant-matcher'
 import {
-	AUTO_APPLY_CONFIDENCE_FLOOR,
 	ContactDiscovery,
 	makeResearchLlmLive,
 	makeResearchProvidersLive,
-	queryPendingProposals,
 	ResearchEventSink,
 	ResearchService,
 } from '@batuda/research'
@@ -79,6 +77,7 @@ import { PageService } from './services/pages'
 import { PipelineService } from './services/pipeline'
 import { RecordingService } from './services/recordings'
 import { resolveResearchProposedUpdate } from './services/research-apply'
+import { proposalsToAutoApply } from './services/research-auto-apply'
 import { ResearchBlobStorageLive } from './services/research-blob-storage'
 import { ResearchRetention } from './services/research-retention'
 import { S3StorageProviderLive } from './services/s3-storage-provider'
@@ -126,7 +125,12 @@ const ApiLive = HttpApiBuilder.layer(BatudaApi).pipe(
 // a line here too, or runs that end that way leave no trace.
 const TIMELINE_STATUS_FOR_EVENT: Record<
 	string,
-	'succeeded' | 'failed' | 'cancelled' | 'no_reliable_data' | null
+	| 'succeeded'
+	| 'succeeded_low_confidence'
+	| 'failed'
+	| 'cancelled'
+	| 'no_reliable_data'
+	| null
 > = {
 	'research.succeeded': 'succeeded',
 	'research.failed': 'failed',
@@ -174,7 +178,15 @@ const ResearchEventSinkLive = Layer.effect(
 					`
 					const [run] = rows
 					if (!run) return
-					const status = TIMELINE_STATUS_FOR_EVENT[event] ?? null
+					// A run that needs reading ends on the same event as any other
+					// success, so the company's own history would record it as clean.
+					// The row itself says which it was, and that is what a person
+					// scrolling back months later has to see.
+					const mapped = TIMELINE_STATUS_FOR_EVENT[event] ?? null
+					const status =
+						mapped === 'succeeded' && run.status === 'succeeded_low_confidence'
+							? 'succeeded_low_confidence'
+							: mapped
 
 					// Fan out as the system actor: load the real org and enter
 					// app_user scope so the timeline write passes RLS like a
@@ -249,53 +261,39 @@ const ResearchEventSinkLive = Layer.effect(
 							// without waiting for a person; everything else stays pending
 							// for review. Best-effort per finding — a failure just leaves
 							// that finding pending.
-							const autoApplyMin =
-								run.paidPolicy?.autoApplyMinConfidence ?? null
-							// Gate on the run's PERSISTED status, not the event-derived one:
-							// both a full and a low-confidence run fire research.succeeded, but
-							// only a full 'succeeded' run may auto-write. A low-confidence run
-							// (weak entity match — possibly the wrong company) keeps every
-							// finding pending for a human, per the status's whole purpose.
-							if (run.status === 'succeeded' && autoApplyMin != null) {
-								const eligible = yield* queryPendingProposals(sql, {
+							// Which suggestions may be written with nobody looking is decided
+							// in one place, so the rule can be checked rather than imitated.
+							// The status comes off the stored row, not the event that ended
+							// the run: a run that needs reading ends on the same event as any
+							// other success.
+							const toApply = yield* proposalsToAutoApply(sql, {
+								researchId,
+								runStatus: run.status,
+								autoApplyMinConfidence:
+									run.paidPolicy?.autoApplyMinConfidence ?? null,
+							})
+							yield* Effect.forEach(toApply, proposedUpdateId =>
+								resolveResearchProposedUpdate(
 									researchId,
-									machineCheckable: true,
-									// A threshold at or below the third-party cap would let a
-									// capped outside estimate write itself; hold it to the floor
-									// so a weak value always waits for a person.
-									minConfidence: Math.max(
-										autoApplyMin,
-										AUTO_APPLY_CONFIDENCE_FLOOR,
-									),
-								})
-								const deliverable = eligible.items.filter(
-									(p): p is typeof p & { proposedUpdateId: string } =>
-										p.verification === 'deliverable' &&
-										p.proposedUpdateId !== null,
-								)
-								yield* Effect.forEach(deliverable, p =>
-									resolveResearchProposedUpdate(
-										researchId,
-										p.proposedUpdateId,
-										'apply',
-										null,
-									).pipe(
-										Effect.provideService(CompanyService, companyService),
-										Effect.provideService(Geocoder, geocoder),
-										Effect.provideService(SqlClient.SqlClient, sql),
-										Effect.provideService(TimelineActivityService, timeline),
-										Effect.catchCause(cause =>
-											Effect.logWarning('research auto-apply failed').pipe(
-												Effect.annotateLogs({
-													event: 'research.autoapply.failed',
-													researchId,
-													cause: Cause.pretty(cause),
-												}),
-											),
+									proposedUpdateId,
+									'apply',
+									null,
+								).pipe(
+									Effect.provideService(CompanyService, companyService),
+									Effect.provideService(Geocoder, geocoder),
+									Effect.provideService(SqlClient.SqlClient, sql),
+									Effect.provideService(TimelineActivityService, timeline),
+									Effect.catchCause(cause =>
+										Effect.logWarning('research auto-apply failed').pipe(
+											Effect.annotateLogs({
+												event: 'research.autoapply.failed',
+												researchId,
+												cause: Cause.pretty(cause),
+											}),
 										),
 									),
-								)
-							}
+								),
+							)
 						}),
 					).pipe(
 						// Org deleted between run completion and fan-out: skip

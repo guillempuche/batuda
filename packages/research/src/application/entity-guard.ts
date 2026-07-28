@@ -11,10 +11,10 @@
  * Three verdicts drive the run:
  *  - 'strong'  the target's full name or its own domain appears in the evidence;
  *  - 'weak'    only a distinctive word of the name appears — the run never
- *              clearly landed on the target, so it fails closed as no_reliable_data
- *              rather than present a lookalike's pages as the target's profile;
+ *              clearly landed on the target, so its findings are kept but marked
+ *              for somebody to read before anything is acted on;
  *  - 'absent'  nothing in the evidence names the target — the run is misattributed
- *              and also fails closed as no_reliable_data.
+ *              and fails closed as no_reliable_data.
  */
 
 // Legal-form suffixes dropped before matching, so "Acme Logistics S.L." and a
@@ -406,7 +406,8 @@ export const placesCorroborate = (
 /** Whether the run actually reached the company's own site — a fetched page whose
  * host is a target domain, or whose registrable label is (part of) the company's
  * name. A name written only on third-party pages (news, directories) is not an
- * own-site reach. */
+ * own-site reach. Judges pages already read and leans towards yes; picking a site
+ * still to be read is the stricter `isOwnSiteHost`. */
 export const reachedOwnSite = (
 	targets: EntityTargets,
 	pages: ReadonlyArray<{ readonly host?: string | undefined }>,
@@ -422,6 +423,40 @@ export const reachedOwnSite = (
 			targets.cores.some(core => core.includes(folded) || folded.includes(core))
 		)
 	})
+
+/**
+ * Whether a host is the company's own site, rather than somebody's page about it.
+ * This picks the one site a run then goes and reads, so a wrong yes sends it off
+ * to read a directory as if it were the company — stricter on purpose than
+ * `reachedOwnSite`, which only asks whether a run got anywhere near the company.
+ *
+ * The name has to BE the domain, not merely appear inside it: "Acme Logistics" is
+ * at home on acmelogistics.com and on the shorter acme.com, since a company often
+ * registers less than its full name, but not on acme-directory.com.
+ */
+export const isOwnSiteHost = (
+	targets: EntityTargets,
+	host: string,
+): boolean => {
+	if (targets.domains.includes(host)) return true
+	const label = domainLabelOf(host)
+	if (label === undefined) return false
+	const folded = collapse(label)
+	// The domain spells out the whole name, with at most the legal form tacked on
+	// — "Fusteria Miquel" at fusteriamiquel.cat or fusteriamiquelsl.cat. Anything
+	// else appended is somebody writing about the company rather than the company
+	// itself: acmelogisticsreviews.com is a review site.
+	const spellsOutTheName = targets.cores.some(core => {
+		if (core.length < 4 || !folded.startsWith(core)) return false
+		const rest = folded.slice(core.length)
+		return rest === '' || LEGAL_SUFFIXES.has(rest)
+	})
+	// Or the domain is one distinctive word of the name, which is how most firms
+	// register: "Transportes García" lives at garcia.es. Only a distinctive word
+	// counts, so the trade a company is in — which identifies nobody — cannot
+	// hand it transportes.com.
+	return spellsOutTheName || targets.words.includes(folded)
+}
 
 /**
  * Tightens a name-only strong match with the queried location. A page that merely

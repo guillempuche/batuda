@@ -74,9 +74,36 @@ describe('computeRunQuality', () => {
 				fieldsGrounded: 0,
 				fieldsTotal: 0,
 			})
-			// THEN it is trusted — a scan has no single subject, so entity match and
-			// first-party sources don't apply to it
+			// THEN it is trusted — this scan was pinned to no company, so there is
+			// no entity verdict to weigh
 			expect(quality.low_confidence).toBe(false)
+		})
+	})
+
+	describe('for a scan launched from one company', () => {
+		const anchoredScan = (entityMatch: 'strong' | 'weak' | 'absent'): boolean =>
+			computeRunQuality({
+				schemaName: 'prospect_scan_v1',
+				entityMatch,
+				rounds: 3,
+				sourcesTotal: 6,
+				sourcesFirstParty: 2,
+				fieldsGrounded: 0,
+				fieldsTotal: 0,
+			}).low_confidence
+
+		it('should flag one that never clearly reached that company', () => {
+			// GIVEN a scan pinned to a company, vetted against plenty of sources, but
+			// whose evidence only glances at the company it was launched from —
+			// everything it found is a list built off the wrong starting point
+			// THEN it is marked for review however many sources it read
+			expect(anchoredScan('weak')).toBe(true)
+			expect(anchoredScan('absent')).toBe(true)
+		})
+
+		it('should trust one that clearly reached it', () => {
+			// GIVEN the same scan, this time clearly about the right company
+			expect(anchoredScan('strong')).toBe(false)
 		})
 	})
 })

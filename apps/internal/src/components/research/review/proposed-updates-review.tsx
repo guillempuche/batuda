@@ -47,6 +47,7 @@ import {
 import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
 
 type RunContext = {
+	readonly status: string
 	readonly completedAt: string | null
 	readonly sourceById: ReadonlyMap<string, ProvenanceSource>
 	readonly discoveredExisting: ReadonlyArray<DiscoveredExisting>
@@ -94,7 +95,12 @@ export function ProposedUpdatesReview({
 		() =>
 			AsyncResult.isSuccess(detailResult)
 				? narrowRunContext(detailResult.value)
-				: { completedAt: null, sourceById: new Map(), discoveredExisting: [] },
+				: {
+						status: '',
+						completedAt: null,
+						sourceById: new Map(),
+						discoveredExisting: [],
+					},
 		[detailResult],
 	)
 
@@ -122,14 +128,21 @@ export function ProposedUpdatesReview({
 			pendingResolve[p.id] === undefined &&
 			sendingResolve[p.id] === undefined,
 	)
-	const verifiedPending = pending.filter(
-		p => trustTier(strongestChannelTrust(p.channels)) === 'trustworthy',
-	)
+	// A run somebody has to read offers no batches. Applying one item at a time
+	// is a person deciding with the run in front of them; a batch is an
+	// automation, and what is in doubt here is which company these values belong
+	// to — something no deliverability check can settle.
+	const needsReading = context.status === 'succeeded_low_confidence'
+	const verifiedPending = needsReading
+		? []
+		: pending.filter(
+				p => trustTier(strongestChannelTrust(p.channels)) === 'trustworthy',
+			)
 	// Proposals that only touch plain fields (no email/phone channel) — the
 	// lowest-risk batch, since there's no deliverability to get wrong.
-	const fieldOnlyPending = pending.filter(
-		p => p.channels.length === 0 && p.scalarFields.length > 0,
-	)
+	const fieldOnlyPending = needsReading
+		? []
+		: pending.filter(p => p.channels.length === 0 && p.scalarFields.length > 0)
 
 	function resolveOne(
 		proposal: ReviewProposal,
@@ -181,6 +194,14 @@ export function ProposedUpdatesReview({
 					<Trans>Proposed updates</Trans>
 				</SectionTitle>
 				<HeadActions>
+					{needsReading ? (
+						<BatchNote>
+							<Trans>
+								Apply these one at a time — this run wasn't sure it found the
+								right company.
+							</Trans>
+						</BatchNote>
+					) : null}
 					{fieldOnlyPending.length > 0 ? (
 						<PriButton
 							type='button'
@@ -417,7 +438,12 @@ function dateToIsoOrNull(value: unknown): string | null {
 
 function narrowRunContext(raw: unknown): RunContext {
 	if (!raw || typeof raw !== 'object') {
-		return { completedAt: null, sourceById: new Map(), discoveredExisting: [] }
+		return {
+			status: '',
+			completedAt: null,
+			sourceById: new Map(),
+			discoveredExisting: [],
+		}
 	}
 	const r = raw as Record<string, unknown>
 	const sourceById = new Map<string, ProvenanceSource>()
@@ -445,6 +471,7 @@ function narrowRunContext(raw: unknown): RunContext {
 			? (r['findings'] as Record<string, unknown>)
 			: {}
 	return {
+		status: typeof r['status'] === 'string' ? r['status'] : '',
 		completedAt: dateToIsoOrNull(r['completedAt']),
 		sourceById,
 		discoveredExisting: narrowDiscoveredExisting(
@@ -507,6 +534,16 @@ const HeadActions = styled.div`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-sm);
+`
+
+// Says why the batch buttons are absent, so their absence reads as deliberate
+// rather than as the page having failed to load them.
+const BatchNote = styled.p`
+	margin: 0;
+	max-width: 34ch;
+	color: var(--color-on-surface-variant);
+	font-size: var(--typescale-body-small-size);
+	line-height: var(--typescale-body-small-line);
 `
 
 const SectionTitle = styled.h3`

@@ -160,7 +160,22 @@ export const evalSummaryAttributes = (
 		'eval.runs': summary.runs,
 		'eval.grounding_accuracy': summary.groundingAccuracy,
 		'eval.wrong_company_rate': summary.wrongCompanyRate,
+		'eval.wrong_company_auto_applicable_rate':
+			summary.wrongCompanyAutoApplicableRate,
+		'eval.low_confidence_rate': summary.lowConfidenceRate,
 		'eval.empty_rate': summary.emptyRate,
+	}
+	if (summary.fieldsFilledPerRun !== null) {
+		attributes['eval.fields_filled_per_run'] = summary.fieldsFilledPerRun
+	}
+	if (summary.profileFieldsTotal !== null) {
+		attributes['eval.profile_fields_total'] = summary.profileFieldsTotal
+	}
+	if (summary.contactsNamedPerRun !== null) {
+		attributes['eval.contacts_named_per_run'] = summary.contactsNamedPerRun
+	}
+	if (summary.contactsTitledPerRun !== null) {
+		attributes['eval.contacts_titled_per_run'] = summary.contactsTitledPerRun
 	}
 	if (summary.fieldPrecision !== null) {
 		attributes['eval.field_precision'] = summary.fieldPrecision
@@ -185,6 +200,16 @@ export const evalSummaryAttributes = (
 	}
 	if (summary.creditsPerRun !== null) {
 		attributes['eval.credits_per_run'] = summary.creditsPerRun
+	}
+	// Which models answered, so a chart of quality over time can tell a real
+	// change from a pass that was carried out by a different model than the one
+	// it was set up to measure.
+	const answered = Object.keys(summary.callsByModel)
+	if (answered.length > 0) {
+		attributes['eval.answered_by'] = answered.sort().join(',')
+	}
+	if (summary.cascadedRunRate !== null) {
+		attributes['eval.cascaded_run_rate'] = summary.cascadedRunRate
 	}
 	return attributes
 }

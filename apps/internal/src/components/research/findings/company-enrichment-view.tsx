@@ -26,7 +26,7 @@ import {
 
 /**
  * Renders a `company_enrichment_v1` research finding. Surfaces the
- * enrichment object (industry, size_range, pain_points, etc.) as a
+ * enrichment object (industry, size_range, current_tools, etc.) as a
  * typed field table, then competitor + contact arrays as their own
  * sections, finally the cross-cutting common sections.
  */
@@ -57,7 +57,6 @@ const sourcedToCitations = (
 type EnrichmentBlock = {
 	readonly industry?: SourcedString
 	readonly size_range?: SourcedString
-	readonly pain_points?: SourcedString
 	readonly current_tools?: SourcedString
 	readonly tags?: ReadonlyArray<string>
 	readonly location?: SourcedString
@@ -127,7 +126,6 @@ type CompanyEnrichmentFindings = CommonFindings & {
 	readonly verdict_rationale?: string
 	readonly fit_checks?: ReadonlyArray<FitCheck>
 	readonly disqualifiers?: ReadonlyArray<Disqualifier>
-	readonly hook?: string
 	readonly conflicts?: ReadonlyArray<ConflictEntry>
 	readonly quality?: QualityBlock
 	readonly competitors?: ReadonlyArray<CompetitorEntry>
@@ -168,7 +166,6 @@ const ENRICHMENT_FIELDS: ReadonlyArray<{
 		| 'size_range'
 		| 'country'
 		| 'location'
-		| 'pain_points'
 		| 'current_tools'
 	readonly label: ReactNode
 }> = [
@@ -176,7 +173,6 @@ const ENRICHMENT_FIELDS: ReadonlyArray<{
 	{ key: 'size_range', label: <Trans>Size</Trans> },
 	{ key: 'country', label: <Trans>Country</Trans> },
 	{ key: 'location', label: <Trans>Location</Trans> },
-	{ key: 'pain_points', label: <Trans>Pain points</Trans> },
 	{ key: 'current_tools', label: <Trans>Current tools</Trans> },
 ]
 
@@ -192,7 +188,6 @@ export function CompanyEnrichmentView({
 	const verdictRationale = findings?.verdict_rationale
 	const fitChecks = findings?.fit_checks ?? []
 	const disqualifiers = findings?.disqualifiers ?? []
-	const hook = findings?.hook
 	const conflicts = findings?.conflicts ?? []
 	const quality = findings?.quality
 
@@ -200,8 +195,7 @@ export function CompanyEnrichmentView({
 		<Sections>
 			{verdict !== undefined ||
 			fitChecks.length > 0 ||
-			disqualifiers.length > 0 ||
-			hook !== undefined ? (
+			disqualifiers.length > 0 ? (
 				<Section data-testid='research-fit'>
 					<SectionTitle>
 						<Trans>Fit</Trans>
@@ -239,7 +233,6 @@ export function CompanyEnrichmentView({
 							))}
 						</List>
 					) : null}
-					{hook !== undefined ? <Reason>{hook}</Reason> : null}
 				</Section>
 			) : null}
 

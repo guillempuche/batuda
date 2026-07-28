@@ -149,9 +149,10 @@ export const RegistryLookupTool = Tool.make('registry_lookup', {
 
 export const DiscoverContactsTool = Tool.make('discover_contacts', {
 	description:
-		'Find verified decision-maker contacts for a company: guesses likely emails, MX-gates them, and pays to verify deliverability. Metered against this run. Returns ranked candidates each with a deliverability verdict, or {status:"no_reliable_contact"}. Fold the results into contact_discovery_v1 findings; to persist a new contact, add a proposed_updates entry with operation:"create" carrying the contact and its channels.',
+		'Find verified decision-maker contacts for a company: guesses likely emails, MX-gates them, and pays to verify deliverability. Metered against this run. Returns ranked candidates each with a deliverability verdict, or {status:"no_reliable_contact"}. Worth calling when reading the company\'s own pages turned up nobody with a title. Put the people it returns in the findings\' contacts list; to persist one, add a proposed_updates entry with operation:"create" carrying the contact and its channels.',
 	parameters: DiscoverContactsParams,
 	success: ToolResultSchema,
+	failureMode: 'return',
 })
 
 export const researchToolkit = Toolkit.make(
@@ -500,6 +501,13 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 						Effect.catchCause(cause =>
 							mapToolError('discover_contacts')(cause),
 						),
+						Effect.withSpan('research.tool.discover_contacts', {
+							attributes: {
+								'research.tool': 'discover_contacts',
+								'research.run_id': researchId,
+								domain: params.domain,
+							},
+						}),
 					),
 		})
 	}),

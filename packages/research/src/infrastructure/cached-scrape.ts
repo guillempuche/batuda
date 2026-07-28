@@ -39,6 +39,7 @@ import {
 	ScrapeProvider,
 } from '../application/ports'
 import { canonicalizeUrl } from '../application/source-key'
+import { recordFetchedSource } from '../application/source-record'
 import { ProviderError } from '../domain/errors'
 import { ScrapedPage } from '../domain/types'
 
@@ -83,8 +84,6 @@ export const scrapeCacheTtlHours = (domain: string, path: string): number => {
 }
 
 const blobKeyFor = (contentHash: string): string => `scrape/${contentHash}`
-
-const sourceIdFor = (urlHash: string): string => `src_${urlHash.slice(0, 16)}`
 
 export const makeCachedScrape = () =>
 	Layer.effect(
@@ -207,19 +206,6 @@ export const makeCachedScrape = () =>
 						const page = yield* inner.scrape(input)
 						const markdown = page.markdown ?? ''
 
-						// Persist the URL the page actually resolved to, but only when it
-						// truly landed on a different host (a redirect/rebrand) — otherwise
-						// keep the canonical requested url so non-redirect rows are
-						// unchanged. The row stays keyed by the requested url_hash so the
-						// lookup still hits; storing the destination lets a later cache hit
-						// recover it for grounding.
-						const storedUrl =
-							page.resolvedUrl !== undefined &&
-							extractDomain(page.resolvedUrl) !== extractDomain(canonical)
-								? page.resolvedUrl
-								: canonical
-						const storedDomain = extractDomain(storedUrl)
-
 						// Best-effort cache write: the page is already in hand, so a store
 						// failure must not fail the scrape. On failure we record no
 						// content_ref, so the next lookup re-fetches rather than pointing at
@@ -251,26 +237,19 @@ export const makeCachedScrape = () =>
 							if (wrote) storedRef = contentRef
 						}
 
-						yield* sql`
-							INSERT INTO sources (
-								id, kind, provider, url, url_hash, domain,
-								title, language, content_hash, content_ref,
-								first_fetched_at, last_fetched_at
-							) VALUES (
-								${sourceIdFor(urlHash)}, 'web', 'scrape', ${storedUrl}, ${urlHash}, ${storedDomain},
-								${page.title ?? null}, ${page.language ?? null},
-								${page.contentHash}, ${storedRef},
-								now(), now()
-							)
-							ON CONFLICT (url_hash) DO UPDATE SET
-								last_fetched_at = now(),
-								url             = EXCLUDED.url,
-								domain          = EXCLUDED.domain,
-								content_hash    = EXCLUDED.content_hash,
-								content_ref     = EXCLUDED.content_ref,
-								title           = COALESCE(EXCLUDED.title, sources.title),
-								language        = COALESCE(EXCLUDED.language, sources.language)
-						`
+						yield* recordFetchedSource(sql, {
+							requestedUrl: canonical,
+							...(page.resolvedUrl !== undefined
+								? { resolvedUrl: page.resolvedUrl }
+								: {}),
+							...(page.title !== undefined ? { title: page.title } : {}),
+							...(page.language !== undefined
+								? { language: page.language }
+								: {}),
+							contentHash: page.contentHash,
+							contentRef: storedRef,
+							provider: 'scrape',
+						})
 
 						return page
 					}).pipe(sql.withTransaction)

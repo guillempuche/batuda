@@ -70,7 +70,6 @@ const FIELD_LABEL: Record<string, MessageDescriptor> = {
 	location: msg`Location`,
 	address: msg`Address`,
 	website: msg`Website`,
-	pain_points: msg`Pain points`,
 	current_tools: msg`Current tools`,
 	tax_id: msg`Tax ID`,
 	role: msg`Role`,

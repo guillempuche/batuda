@@ -16,13 +16,14 @@ import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { CurrentOrg } from '@batuda/controllers'
-import { queryPendingProposals, resolvePolicy } from '@batuda/research'
+import { resolvePolicy } from '@batuda/research'
 
 import { PgLive } from '../db/client'
 import { applyTestEnv } from '../test-env'
 import { CompanyService } from './companies'
 import { Geocoder } from './geocoder'
 import { resolveResearchProposedUpdate } from './research-apply'
+import { proposalsToAutoApply } from './research-auto-apply'
 import { TimelineActivityService } from './timeline-activity'
 
 applyTestEnv()
@@ -63,29 +64,23 @@ const policyFor = (userId: string) =>
 		}),
 	)
 
-// Mirror the sink's decision: eligible = machine-checkable + confidence at or
-// above the threshold, kept only when the email verdict is deliverable.
+// Exercises the real rule the server uses, rather than a copy of it: a copy
+// passes just as happily when the rule it imitates is deleted.
 const autoApply = (research: string, threshold: number) =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
-		const eligible = yield* queryPendingProposals(sql, {
+		const [row] = yield* sql<{ status: string }>`
+			SELECT status FROM research_runs WHERE id = ${research}::uuid
+		`
+		const toApply = yield* proposalsToAutoApply(sql, {
 			researchId: research,
-			machineCheckable: true,
-			minConfidence: threshold,
+			runStatus: row?.status ?? '',
+			autoApplyMinConfidence: threshold,
 		})
-		const deliverable = eligible.items.filter(
-			(p): p is typeof p & { proposedUpdateId: string } =>
-				p.verification === 'deliverable' && p.proposedUpdateId !== null,
+		yield* Effect.forEach(toApply, id =>
+			resolveResearchProposedUpdate(research, id, 'apply', null),
 		)
-		yield* Effect.forEach(deliverable, p =>
-			resolveResearchProposedUpdate(
-				research,
-				p.proposedUpdateId,
-				'apply',
-				null,
-			),
-		)
-		return deliverable.map(p => p.proposedUpdateId)
+		return toApply
 	}).pipe(
 		Effect.provideService(CurrentOrg, { id: ORG, name: 'a', slug: 'a' }),
 		Effect.provide(deps),
@@ -237,5 +232,51 @@ describe('auto-apply decision', () => {
 		expect(byId.get('lowconf')).toBe('pending')
 		expect(byId.get('freetext')).toBe('pending')
 		expect(byId.get('risky')).toBe('pending')
+	})
+
+	it('should leave a run that needs reading entirely alone', async () => {
+		// GIVEN a run that finished unsure which company it was about, carrying a
+		//   suggestion that is otherwise as good as they get: machine-checkable,
+		//   fully confident, and a deliverable address
+		const company = await pool.query<{ id: string }>(
+			`INSERT INTO companies (organization_id, slug, name)
+			 VALUES ($1, $2, 'Lookalike') RETURNING id`,
+			[ORG, `lookalike-${randomUUID()}`],
+		)
+		const lookalikeId = company.rows[0]!.id
+		const run = await pool.query<{ id: string }>(
+			`INSERT INTO research_runs (organization_id, query, status, created_by, findings)
+			 VALUES ($1, 'q', 'succeeded_low_confidence', $2, $3::jsonb) RETURNING id`,
+			[
+				ORG,
+				USER,
+				JSON.stringify({
+					proposed_updates: [
+						pending({
+							id: 'unsure',
+							subject_table: 'contacts',
+							operation: 'create',
+							fields: {
+								name: 'Unsure',
+								company_id: lookalikeId,
+								channels: [channel('deliverable', 0.99)],
+							},
+						}),
+					],
+				}),
+			],
+		)
+
+		// WHEN the completion decision runs
+		const applied = await autoApply(run.rows[0]!.id, 80)
+
+		// THEN nothing is written: how good the address is says nothing about
+		//   whether it belongs to the company that was asked about, which is the
+		//   very thing this run could not settle
+		expect(applied).toEqual([])
+		const res = await pool.query<{
+			findings: { proposed_updates: Array<{ id: string; status: string }> }
+		}>(`SELECT findings FROM research_runs WHERE id = $1`, [run.rows[0]!.id])
+		expect(res.rows[0]!.findings.proposed_updates[0]!.status).toBe('pending')
 	})
 })

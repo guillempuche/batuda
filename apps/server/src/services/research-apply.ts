@@ -32,8 +32,8 @@ import {
 // Only these columns can be set by an applied proposal — never an arbitrary
 // column. Keys are the camelCase names the SQL client maps to snake_case; the
 // model may send either casing, so proposal keys are normalized before the
-// lookup. Excludes identity, coordinates (set by the geocoder), version, and
-// timestamps.
+// lookup. Excludes identity, coordinates (set by the geocoder), version,
+// timestamps, and the pain points a person fills in from calls and emails.
 export const COMPANY_FIELDS = new Set([
 	'name',
 	'status',
@@ -50,7 +50,6 @@ export const COMPANY_FIELDS = new Set([
 	'googleMapsUrl',
 	'productsFit',
 	'tags',
-	'painPoints',
 	'currentTools',
 ])
 
@@ -456,8 +455,7 @@ export const linkSubjectToRun = (
 // reachable at one of the proposed channel values, matched on the (kind, value)
 // pair so a shared switchboard number can't merge two different people; (2) one
 // the model itself flagged as already existing; (3) same name under the same
-// company. The same search has to name the same person every time it is asked,
-// so where several rows match, each lookup settles on the oldest.
+// company.
 export const findDuplicateContact = (
 	sql: SqlClient.SqlClient,
 	orgId: string,
@@ -479,7 +477,6 @@ export const findDuplicateContact = (
 			const rows = yield* sql<{ contactId: string }>`
 				SELECT contact_id FROM contact_channels
 				WHERE organization_id = ${orgId} AND (${sql.or(pairs)})
-				ORDER BY created_at, contact_id
 				LIMIT 1
 			`
 			if (rows[0]) return rows[0].contactId
@@ -512,7 +509,6 @@ export const findDuplicateContact = (
 			WHERE organization_id = ${orgId}
 				AND company_id = ${companyId}
 				AND lower(name) = lower(${name})
-			ORDER BY created_at, id
 			LIMIT 1
 		`
 		return byName[0]?.id ?? null
@@ -545,12 +541,24 @@ export type ResolveOutcome =
 	| { readonly outcome: 'no_applicable_fields' }
 	| { readonly outcome: 'run_not_found' }
 	| { readonly outcome: 'proposal_not_found' }
+	| {
+			// The run this came from needs somebody to read it before anything from
+			// it enters a record, so a batch may not sweep it up.
+			readonly outcome: 'needs_review'
+	  }
 
 export const resolveResearchProposedUpdate = (
 	runId: string,
 	proposedUpdateId: string,
 	decision: 'apply' | 'reject',
 	actorUserId: string | null,
+	/**
+	 * Whether this is one of many resolved in a single request. A person deciding
+	 * on one suggestion with the run in front of them may apply anything; a batch
+	 * is an automation, and a run that needs reading is precisely what an
+	 * automation must not act on.
+	 */
+	options?: { readonly inBatch?: boolean },
 ) =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
@@ -605,14 +613,24 @@ export const resolveResearchProposedUpdate = (
 			context: { subjects?: Array<{ table?: string; id?: string }> } | null
 			country: string | null
 			briefMd: string | null
+			status: string
 		}>`
-			SELECT findings, context, country, brief_md AS "briefMd"
+			SELECT findings, context, country, brief_md AS "briefMd", status
 			FROM research_runs
 			WHERE id = ${runId} AND organization_id = ${org.id}
 			LIMIT 1
 		`
 		const run = rows[0]
 		if (!run) return { outcome: 'run_not_found' } satisfies ResolveOutcome
+		// The screens hide their "apply everything" buttons for such a run, but the
+		// same request can be sent without them, so the rule is kept here where no
+		// caller can go round it.
+		if (
+			options?.inBatch === true &&
+			decision === 'apply' &&
+			run.status === 'succeeded_low_confidence'
+		)
+			return { outcome: 'needs_review' } satisfies ResolveOutcome
 
 		const findings = run.findings
 		const proposals = findings?.proposed_updates ?? []
@@ -872,6 +890,7 @@ export const resolveResearchProposedUpdatesBatch = (
 			item.proposedUpdateId,
 			item.decision,
 			actorUserId,
+			{ inBatch: true },
 		).pipe(
 			Effect.map(
 				outcome =>

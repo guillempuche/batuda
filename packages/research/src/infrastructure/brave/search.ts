@@ -1,14 +1,14 @@
 /**
  * Brave Search provider — real web search via the Brave Search API.
  *
- * Exposes a factory (`makeBraveSearch(slot)`) that reads an index-suffixed
- * API key, plus a convenience Layer that wires slot 0 for single-slot callers.
- * This file serves as the **template** for adding new real providers.
+ * Exposes a factory (`makeBraveSearch(slot)`) that reads an index-suffixed API
+ * key, so a run can hold more than one account for the same vendor. This file
+ * serves as the **template** for adding new real providers.
  *
  * @see https://api.search.brave.com/app/documentation/web-search
  */
 
-import { Config, Effect, Layer, Redacted, Schema } from 'effect'
+import { Config, Effect, Redacted, Schema } from 'effect'
 import { HttpClient, HttpClientResponse } from 'effect/unstable/http'
 
 import { type SearchInput, SearchProvider } from '../../application/ports'
@@ -136,8 +136,3 @@ export const makeBraveSearch = (slot: number) =>
 				),
 		})
 	})
-
-export const BraveSearchProvider = Layer.effect(
-	SearchProvider,
-	makeBraveSearch(0),
-)

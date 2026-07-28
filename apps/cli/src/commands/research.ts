@@ -25,6 +25,7 @@ import {
 	type ContactRunScore,
 	type CreateResearchInput,
 	compareFramings,
+	configuredSlots,
 	contactEvalSpanAttributes,
 	contactEvalSummaryAttributes,
 	type EvalSummary,
@@ -37,6 +38,7 @@ import {
 	makeResearchProvidersLive,
 	outcomeFromContactRun,
 	outcomeFromRun,
+	ProviderError,
 	parseContactGoldenSet,
 	parseGoldenSet,
 	probeModelCapabilities,
@@ -54,6 +56,7 @@ import {
 } from '@batuda/research'
 
 import { SqlLive } from '../db'
+import { requireLocalDatabase } from '../lib/confirm-cloud'
 
 // `pnpm cli` runs from apps/cli, so resolve a relative --golden/--out against the
 // repo root — where a reader of the docs expects the path to be.
@@ -75,21 +78,22 @@ const formatProbe = (result: ModelProbeResult): string =>
 /**
  * Probe each candidate model on an OpenAI-compatible endpoint for the two features
  * the research tiers depend on — forced tool calling and strict JSON-schema output.
- * The API key defaults to the agent tier's key so it reuses the research setup.
+ *
+ * The key is read from whichever environment variable is named, so probing a
+ * tier's second model is a matter of naming that tier's second key. The key
+ * itself never appears on the command line, where it would be echoed into logs
+ * and shell history.
  *
  * It probes with the real research tools, so a pass means the model accepts what a
  * run would actually send it.
  */
 export const researchProbe = (opts: {
 	readonly baseUrl: string
-	readonly apiKey: Option.Option<Redacted.Redacted<string>>
+	readonly apiKeyEnv: string
 	readonly models: ReadonlyArray<string>
 }) =>
 	Effect.gen(function* () {
-		const apiKey = yield* Option.match(opts.apiKey, {
-			onSome: key => Effect.succeed(key),
-			onNone: () => Config.redacted('RESEARCH_LLM_AGENT_API_KEY'),
-		})
+		const apiKey = yield* Config.redacted(opts.apiKeyEnv)
 		const tools = researchToolkitWireFormat()
 		yield* Console.log(
 			`Probing ${opts.models.length} model(s) at ${opts.baseUrl} with ${tools.length} research tool(s)\n`,
@@ -114,11 +118,81 @@ export const researchProbe = (opts: {
 		}
 	}).pipe(Effect.provide(FetchHttpClient.layer))
 
+/**
+ * Ask every model the settings point a tier at whether it can still do what
+ * that tier needs.
+ *
+ * A model can stop supporting a feature without anything here changing, and
+ * nothing notices until the moment it is needed — which is exactly when the
+ * first-choice model is already struggling. This is meant to be run on a
+ * schedule so that day arrives with warning.
+ *
+ * It fails only when a model itself will not do the work. A rejected key, a
+ * rate limit or a vendor having a bad minute are reported and let through:
+ * treating those as a verdict would raise an alarm about a model over somebody
+ * else's outage.
+ */
+export const researchProbeConfig = () =>
+	Effect.gen(function* () {
+		const slots = yield* configuredSlots()
+		if (slots.length === 0) {
+			yield* Console.log('No tier reaches a vendor; nothing to check.')
+			return
+		}
+		const tools = researchToolkitWireFormat()
+		const unusable: string[] = []
+		const unknown: string[] = []
+
+		for (const slot of slots) {
+			const where = `${slot.tier} slot ${slot.slot} — ${slot.model} on ${slot.vendor}`
+			const apiKey = yield* Config.redacted(slot.apiKeyEnv).pipe(
+				Effect.map(Option.some),
+				Effect.orElseSucceed(() => Option.none<Redacted.Redacted<string>>()),
+			)
+			if (Option.isNone(apiKey)) {
+				unknown.push(`${where}: no key in ${slot.apiKeyEnv}`)
+				yield* Console.log(`? ${where} — no key in ${slot.apiKeyEnv}`)
+				continue
+			}
+			const result = yield* probeModelCapabilities({
+				baseUrl: slot.baseUrl,
+				apiKey: apiKey.value,
+				model: slot.model,
+				tools,
+			})
+			yield* Console.log(`${mark(result.passed)} ${where}`)
+			yield* Console.log(formatProbe(result).split('\n').slice(1).join('\n'))
+			for (const check of [result.toolChoice, result.jsonSchema]) {
+				if (check.ok) continue
+				if (check.verdict === 'capability')
+					unusable.push(`${where}: ${check.detail}`)
+				else unknown.push(`${where}: [${check.verdict}] ${check.detail}`)
+			}
+		}
+
+		if (unknown.length > 0) {
+			yield* Console.log(
+				`\nCould not tell for ${unknown.length} check(s) — nothing here says a model went bad:\n${unknown.map(line => `  ${line}`).join('\n')}`,
+			)
+		}
+		if (unusable.length > 0) {
+			yield* Console.log(
+				`\n${unusable.length} model(s) can no longer do what their tier needs:\n${unusable.map(line => `  ${line}`).join('\n')}`,
+			)
+			return yield* Effect.fail(
+				new Error(`${unusable.length} configured model(s) unusable`),
+			)
+		}
+		yield* Console.log('\nEvery configured model can still do its tier’s work.')
+	}).pipe(Effect.provide(FetchHttpClient.layer))
+
 // ── eval ───────────────────────────────────────────────────
 
-// Scrape-content cache for one eval process. With forceFresh runs there is
-// nothing to reuse across companies, so an in-memory map is both enough and
-// correct — it keeps each run isolated and never persists between processes.
+// Holds scraped page text for one eval process only, so a pass leaves no page
+// bodies behind. A key with no bytes fails as a recoverable provider error,
+// which the scrape cache answers by treating the page as unread and fetching it
+// again: the database outlives this map, so a pass can meet a page an earlier
+// pass recorded and stopping the run over it would be wrong.
 const inMemoryBlob = Layer.sync(BlobStorage, () => {
 	const store = new Map<string, Uint8Array>()
 	return BlobStorage.of({
@@ -130,7 +204,13 @@ const inMemoryBlob = Layer.sync(BlobStorage, () => {
 			const bytes = store.get(key)
 			return bytes !== undefined
 				? Effect.succeed(bytes)
-				: Effect.die(new Error(`blob not found: ${key}`))
+				: Effect.fail(
+						new ProviderError({
+							provider: 'eval-blob',
+							message: `blob not found: ${key}`,
+							recoverable: true,
+						}),
+					)
 		},
 	})
 })
@@ -192,6 +272,8 @@ interface FinishedRun {
 	readonly tokensIn?: number
 	readonly tokensOut?: number
 	readonly quotaBreakdown?: Record<string, number> | null
+	// How many calls each model answered, keyed `<tier>@<model>`.
+	readonly llmModels?: Record<string, number> | null
 	// The run's final entity verdict, from its own column (not the findings JSON).
 	readonly entityMatch?: string | null
 }
@@ -202,12 +284,14 @@ interface FinishedRun {
 // report answers is what one run consumed in total.
 const usageOf = (run: FinishedRun): RunUsage => {
 	const credits = Object.values(run.quotaBreakdown ?? {})
+	const callsByModel = run.llmModels ?? {}
 	return {
 		costCents: run.costCents ?? 0,
 		paidCostCents: run.paidCostCents ?? 0,
 		tokensIn: run.tokensIn ?? 0,
 		tokensOut: run.tokensOut ?? 0,
 		creditsUsed: credits.reduce((total, n) => total + n, 0),
+		...(Object.keys(callsByModel).length > 0 ? { callsByModel } : {}),
 	}
 }
 
@@ -326,6 +410,11 @@ const cents = (value: number | null): string =>
 const count = (value: number | null): string =>
 	value === null ? 'n/a' : String(Math.round(value))
 
+// A per-run average of whole things lands between them, so keep one decimal:
+// three people across two runs is 1.5, and rounding that to 2 overstates it.
+const decimal = (value: number | null): string =>
+	value === null ? 'n/a' : value.toFixed(1)
+
 const formatSummary = (summary: EvalSummary): string =>
 	[
 		'',
@@ -334,14 +423,37 @@ const formatSummary = (summary: EvalSummary): string =>
 		`Field precision:        ${pct(summary.fieldPrecision)}`,
 		`Field recall:           ${pct(summary.fieldRecall)}`,
 		`Titled-contact recall:  ${pct(summary.contactRecall)}`,
+		`Profile fields filled:  ${decimal(summary.fieldsFilledPerRun)} of ${count(summary.profileFieldsTotal)}`,
+		`People named per run:   ${decimal(summary.contactsNamedPerRun)}`,
+		`  of those, titled:     ${decimal(summary.contactsTitledPerRun)}`,
 		`Wrong-company rate:     ${pct(summary.wrongCompanyRate)}`,
+		`Wrong and unwatched:    ${pct(summary.wrongCompanyAutoApplicableRate)}`,
+		`Needs-review rate:      ${pct(summary.lowConfidenceRate)}`,
 		`Empty rate:             ${pct(summary.emptyRate)}`,
 		`Cost per run:           ${cents(summary.costPerRun)}`,
 		`Cost per grounded run:  ${cents(summary.costPerGroundedRun)}`,
 		`  of which metered:     ${cents(summary.paidCostPerRun)}`,
 		`Tokens per run:         ${count(summary.tokensPerRun)}`,
 		`Credits per run:        ${count(summary.creditsPerRun)}`,
+		...formatAnsweringModels(summary),
 	].join('\n')
+
+// Which models actually did the work. A tier is configured with a first choice
+// and a second one for when the first falters, so a pass can quietly be carried
+// out by a model it was not set up to measure — and the quality of the two is
+// not the same. Silent when every run stayed on its first choice.
+const formatAnsweringModels = (summary: EvalSummary): ReadonlyArray<string> => {
+	const entries = Object.entries(summary.callsByModel)
+	if (entries.length === 0) return []
+	const lines = entries
+		.sort(([, a], [, b]) => b - a)
+		.map(([key, calls]) => `  ${key}: ${calls} call(s)`)
+	return [
+		`Answered by:`,
+		...lines,
+		`Runs that fell back:    ${pct(summary.cascadedRunRate)}`,
+	]
+}
 
 // One compact line per group (a bucket, a country), so a segment that regressed
 // stands out against the whole-set numbers above.
@@ -384,6 +496,7 @@ export const researchEval = (opts: {
 	readonly byBucket: boolean
 }) =>
 	Effect.gen(function* () {
+		yield* requireLocalDatabase('research eval')
 		const raw = yield* Effect.tryPromise({
 			try: () => readFile(fromRepoRoot(opts.goldenPath), 'utf8'),
 			catch: error => new Error(`cannot read golden set: ${String(error)}`),
@@ -638,6 +751,7 @@ export const researchEvalInvariance = (opts: {
 	readonly concurrency: number
 }) =>
 	Effect.gen(function* () {
+		yield* requireLocalDatabase('research eval-invariance')
 		const raw = yield* Effect.tryPromise({
 			try: () => readFile(fromRepoRoot(opts.goldenPath), 'utf8'),
 			catch: error => new Error(`cannot read golden set: ${String(error)}`),
@@ -739,6 +853,7 @@ export const researchEvalContacts = (opts: {
 	readonly out: Option.Option<string>
 }) =>
 	Effect.gen(function* () {
+		yield* requireLocalDatabase('research eval-contacts')
 		// The --enrich / --enrich-mode flags need to reach the settings the
 		// enrichment step reads. Those settings are captured from the environment
 		// once, before this handler runs, so writing to process.env now would be

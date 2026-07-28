@@ -21,7 +21,7 @@ import { PriButton } from '@batuda/ui/pri'
 
 import { researchDetailAtom } from '#/atoms/research-atoms'
 import { MarkdownView } from '#/components/markdown/markdown-view'
-import { Badge } from '#/components/research/badge'
+import { Badge, type Tone, toneColor } from '#/components/research/badge'
 import { CompanyEnrichmentView } from '#/components/research/findings/company-enrichment-view'
 import { CompetitorScanView } from '#/components/research/findings/competitor-scan-view'
 import { ContactDiscoveryView } from '#/components/research/findings/contact-discovery-view'
@@ -91,6 +91,9 @@ type ResearchRunDetail = {
 	// Rounds the run reports having got through, so a page opened partway in
 	// still shows the real count.
 	readonly progressSteps: number | null
+	// How clearly the run's evidence was about the company asked for, so the
+	// notice can name the doubt instead of only saying there is one.
+	readonly entityMatch?: string | null
 	// Carried so "Run again" can re-target the same subjects.
 	readonly context: unknown
 }
@@ -182,7 +185,7 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 					<Heading>{run.query}</Heading>
 					<HeaderMeta>
 						<StatusText
-							$status={run.status}
+							$tone={statusTone(run.status)}
 							data-testid={`research-run-status-${run.id}`}
 						>
 							{runStatusLabel ? i18n._(runStatusLabel) : run.status}
@@ -220,6 +223,33 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 							<Trans>Refresh</Trans>
 						</PriButton>
 					</StalledNotice>
+				) : null}
+
+				{run.status === 'succeeded_low_confidence' ? (
+					<ReviewNotice
+						role='status'
+						data-testid={`research-run-review-${run.id}`}
+					>
+						<strong>
+							<Trans>Read this before you use it</Trans>
+						</strong>
+						{isBatch ? (
+							// A batch carries the mark up from whichever of its results
+							// earned it, so the reason belongs to that result, not here.
+							<Trans>
+								At least one of these results needs reading before it is used.
+								Open the ones marked below.
+							</Trans>
+						) : run.entityMatch === 'weak' ? (
+							<Trans>
+								I found pages that mention this company but never clearly landed
+								on its own website, so I can't be sure these findings are about
+								the right one.
+							</Trans>
+						) : (
+							<Trans>I found less to go on here than usual.</Trans>
+						)}
+					</ReviewNotice>
 				) : null}
 
 				{run.status === 'failed' || run.status === 'no_reliable_data' ? (
@@ -414,6 +444,7 @@ function narrowRun(raw: unknown): ResearchRunDetail | null {
 				: null,
 		progressSteps:
 			typeof r['progressSteps'] === 'number' ? r['progressSteps'] : null,
+		entityMatch: typeof r['entityMatch'] === 'string' ? r['entityMatch'] : null,
 		context: r['context'] ?? null,
 	}
 }
@@ -468,13 +499,12 @@ const ProvenanceLabel = styled.span`
 `
 
 const StatusText = styled.span.withConfig({
-	shouldForwardProp: prop => prop !== '$status',
-})<{ $status: string }>`
+	shouldForwardProp: prop => prop !== '$tone',
+})<{ $tone: Tone }>`
 	font-family: var(--font-display);
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
-	color: ${p =>
-		p.$status === 'failed' ? 'var(--color-error)' : 'var(--color-on-surface)'};
+	color: ${p => toneColor(p.$tone)};
 `
 
 const SchemaText = styled.span`
@@ -489,6 +519,20 @@ const ErrorBlock = styled.div`
 	border: 1px solid var(--color-error);
 	border-radius: var(--shape-2xs);
 	color: var(--color-error);
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+`
+
+// The same box the failure block uses, in the caution accent: nothing went
+// wrong here, so it must not read as an error — only as something to read.
+const ReviewNotice = styled.div`
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3xs);
+	padding: var(--space-sm);
+	border: 1px solid var(--color-primary);
+	border-radius: var(--shape-2xs);
+	color: var(--color-primary);
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 `

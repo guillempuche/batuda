@@ -44,6 +44,10 @@ export class ResearchRun extends Model.Class<ResearchRun>('ResearchRun')({
 	paidCostCents: Schema.Number,
 	costBreakdown: Schema.Unknown,
 	quotaBreakdown: Schema.Unknown,
+	// How many calls each model answered, keyed `<tier>@<model>`. A tier with
+	// two entries fell back partway through, and the counts say how much of it
+	// each model carried.
+	llmModels: Schema.Unknown,
 	tokensIn: Schema.Number,
 	tokensOut: Schema.Number,
 	paidPolicy: Schema.Unknown,

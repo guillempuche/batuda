@@ -49,6 +49,18 @@ export interface UsageSnapshot {
 	readonly costByBucket: Record<string, number>
 	/** Credits consumed, per provider and port: `firecrawl_search`. */
 	readonly unitsByProvider: Record<string, number>
+	/**
+	 * How many calls each model answered, per tier: `agent@Qwen/Qwen3-32B`. A
+	 * tier with two entries fell back partway through, and the counts say how
+	 * much of it ran on each — which is the difference between reading a run's
+	 * quality as the model it was configured with and as the model that
+	 * actually produced it.
+	 *
+	 * Counted apart from the cost buckets on purpose: those are summed to reach
+	 * the run's total, so a second entry describing the same spend would charge
+	 * the run twice.
+	 */
+	readonly callsByModel: Record<string, number>
 }
 
 export interface UsageMeterService {
@@ -103,6 +115,7 @@ interface MeterState {
 	readonly tokensOut: number
 	readonly microcentsByBucket: Record<string, number>
 	readonly unitsByProvider: Record<string, number>
+	readonly callsByModel: Record<string, number>
 }
 
 const EMPTY: MeterState = {
@@ -113,6 +126,7 @@ const EMPTY: MeterState = {
 	tokensOut: 0,
 	microcentsByBucket: {},
 	unitsByProvider: {},
+	callsByModel: {},
 }
 
 const add = (
@@ -144,6 +158,11 @@ export const makeUsageMeter: Effect.Effect<UsageMeterService> = Effect.gen(
 							s.microcentsByBucket,
 							`llm_${usage.tier}`,
 							usage.microcents,
+						),
+						callsByModel: add(
+							s.callsByModel,
+							`${usage.tier}@${usage.model}`,
+							1,
 						),
 					}))
 					const tags = { tier: usage.tier, model: usage.model }
@@ -205,6 +224,7 @@ export const makeUsageMeter: Effect.Effect<UsageMeterService> = Effect.gen(
 							tokensOut: s.seedTokensOut + s.tokensOut,
 							costByBucket,
 							unitsByProvider: s.unitsByProvider,
+							callsByModel: s.callsByModel,
 						} satisfies UsageSnapshot
 					}),
 				),

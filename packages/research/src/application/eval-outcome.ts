@@ -18,6 +18,7 @@ import {
 	type ScorableField,
 	type TerminalStatus,
 } from './eval-scoring'
+import { contactFill, enrichmentFill } from './extraction-fill'
 import { hostOf } from './source-key'
 
 const TERMINAL_STATUSES: ReadonlySet<string> = new Set<TerminalStatus>([
@@ -107,12 +108,21 @@ export const outcomeFromRun = (input: {
 		typeof findings === 'object' &&
 		(findings as { registry_confirmed?: unknown }).registry_confirmed === true
 
+	const profileFill = enrichmentFill(findings)
+	const people = contactFill(findings)
+
 	return {
 		status: toTerminalStatus(input.status),
 		reachedDomains,
 		fields,
 		contacts,
 		registryConfirmed,
+		profile: {
+			fieldsTotal: profileFill.total,
+			fieldsFilled: profileFill.filled,
+			contactsNamed: people.named,
+			contactsTitled: people.titled,
+		},
 		...(input.usage !== undefined ? { usage: input.usage } : {}),
 	}
 }

@@ -35,6 +35,68 @@ export const schemaNames = [
 // widens to plain string when the tuple is read across a package boundary).
 export const SchemaNameSchema = Schema.Literals(schemaNames)
 
+// Fields every schema carries that are not something to go and find out: they
+// are how a run hands work back to the CRM, and the prompt covers them where it
+// explains that work.
+const PLUMBING_FIELDS = new Set([
+	'proposed_updates',
+	'pending_paid_actions',
+	'discovered_existing',
+])
+
+/**
+ * The fields inside a block of them, seeing past an optional wrapper.
+ *
+ * A list of repeated things — the people, the competitors — is deliberately not
+ * opened up. Naming it is what the searching agent needs: it has to know to go
+ * and find people at all. Spelling out each person's own fields is a detail for
+ * whoever writes them down afterwards, and every extra word here competes for
+ * the attention of a small model that has little to spare.
+ */
+const innerFields = (field: unknown): Record<string, unknown> | undefined => {
+	const seen = new Set<unknown>()
+	let current = field
+	while (
+		current !== null &&
+		typeof current === 'object' &&
+		!seen.has(current)
+	) {
+		seen.add(current)
+		const own = (current as { fields?: Record<string, unknown> }).fields
+		if (own !== undefined) return own
+		current = (current as { schema?: unknown }).schema
+	}
+	return undefined
+}
+
+/**
+ * The names of everything a run of this kind is expected to come back with,
+ * read off the schema itself so the two can never drift apart.
+ *
+ * The agent doing the searching is told the schema only by name, which tells it
+ * nothing: it goes looking for the facts the instructions happen to mention and
+ * leaves the rest of the profile empty, never having been told those fields
+ * exist. A nested block is listed as `block.field`, since that is how the
+ * output is shaped. Empty for a run that writes a brief rather than a profile.
+ */
+export const schemaFieldNames = (schemaName: string): ReadonlyArray<string> => {
+	const schema = schemaRegistry[schemaName]
+	const fields = (schema as { fields?: Record<string, unknown> } | undefined)
+		?.fields
+	if (fields === undefined) return []
+	const names: string[] = []
+	for (const [key, field] of Object.entries(fields)) {
+		if (PLUMBING_FIELDS.has(key)) continue
+		const nested = innerFields(field)
+		if (nested === undefined) {
+			names.push(key)
+			continue
+		}
+		for (const inner of Object.keys(nested)) names.push(`${key}.${inner}`)
+	}
+	return names
+}
+
 export {
 	CompanyEnrichmentV1Schema,
 	CompetitorScanV1Schema,

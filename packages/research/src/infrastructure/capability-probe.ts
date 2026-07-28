@@ -25,10 +25,35 @@ import {
 	HttpClientResponse,
 } from 'effect/unstable/http'
 
+/**
+ * Why a check came out the way it did.
+ *
+ * The distinction that matters is between a model that cannot do what a tier
+ * needs and everything else. Only the first is a reason to stop trusting the
+ * model; an expired key, a rate limit or a vendor having a bad minute say
+ * nothing about it, and treating those the same way turns a passing outage into
+ * a false accusation.
+ */
+export type ProbeVerdict =
+	| 'ok'
+	/** The model itself will not do it — the answer will be the same tomorrow. */
+	| 'capability'
+	/** The key was refused, so nothing about the model was learned. */
+	| 'auth'
+	/** Too many requests, or the account is out of allowance. */
+	| 'quota'
+	/** The request never got a usable answer back. */
+	| 'transport'
+	/** A refusal that fits none of the above; treated as worth a human look. */
+	| 'unknown'
+
 /** One capability's verdict: did the round-trip work, and a short human reason. */
 export interface ProbeCheck {
 	readonly ok: boolean
 	readonly detail: string
+	readonly verdict: ProbeVerdict
+	/** The HTTP status behind the verdict, when the request reached the vendor. */
+	readonly status?: number
 }
 
 /** Both capability verdicts for one model, plus whether it clears the gate (both ok). */
@@ -39,8 +64,54 @@ export interface ModelProbeResult {
 	readonly passed: boolean
 }
 
-const pass = (detail: string): ProbeCheck => ({ ok: true, detail })
-const fail = (detail: string): ProbeCheck => ({ ok: false, detail })
+const pass = (detail: string): ProbeCheck => ({
+	ok: true,
+	detail,
+	verdict: 'ok',
+})
+
+// Answering at all and answering badly are both the model's own doing, so a
+// reply that came back 200 and still fell short is a capability verdict.
+const fail = (
+	detail: string,
+	verdict: ProbeVerdict = 'capability',
+	status?: number,
+): ProbeCheck => ({
+	ok: false,
+	detail,
+	verdict,
+	...(status === undefined ? {} : { status }),
+})
+
+/**
+ * What a refused request says about the model.
+ *
+ * A 404 is the model being gone, which is as good a reason to stop trusting it
+ * as a refusal. A 401 or 403 is about the key. A 429 is about how fast we asked.
+ * Anything from the vendor's own side says nothing at all. A plain 400 usually
+ * is the model declining the request, but not always — a model that needs terms
+ * accepted answers exactly the same way — so the body decides.
+ */
+export const verdictForStatus = (
+	status: number,
+	body: string,
+): ProbeVerdict => {
+	if (status === 401 || status === 403) return 'auth'
+	if (status === 429) return 'quota'
+	if (status >= 500) return 'transport'
+	if (status === 404) return 'capability'
+	if (status === 400) {
+		const lower = body.toLowerCase()
+		const aboutTheModel =
+			lower.includes('does not support') ||
+			lower.includes('not supported') ||
+			lower.includes('unsupported')
+		if (aboutTheModel) return 'capability'
+		if (lower.includes('terms') || lower.includes('quota')) return 'unknown'
+		return 'capability'
+	}
+	return 'unknown'
+}
 
 /**
  * The chat-completions body that forces the model to call a tool.
@@ -62,6 +133,11 @@ export const toolChoiceProbeBody = (
 	],
 	tools,
 	tool_choice: 'required',
+	// A ceiling, not a target. It only exists so a model that never stops
+	// writing cannot run up a bill; it has to clear the room a reasoning model
+	// spends thinking before it answers, or the answer is cut off mid-word and
+	// the model is blamed for it.
+	max_tokens: 4096,
 })
 
 /** The chat-completions body that forces a strict JSON-schema response. */
@@ -93,6 +169,7 @@ export const jsonSchemaProbeBody = (
 			},
 		},
 	},
+	max_tokens: 4096,
 })
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -166,14 +243,28 @@ const runCheck = (
 			response,
 		).pipe(Effect.orElseSucceed(() => null))
 		if (response.status < 200 || response.status >= 300) {
-			const snippet = JSON.stringify(json ?? '').slice(0, 200)
-			return fail(`HTTP ${response.status}${snippet ? `: ${snippet}` : ''}`)
+			// Enough of the body to carry the vendor's own words, which is what
+			// separates "this model will not do it" from "your key expired".
+			const snippet = JSON.stringify(json ?? '').slice(0, 600)
+			return fail(
+				`HTTP ${response.status}${snippet ? `: ${snippet}` : ''}`,
+				verdictForStatus(response.status, snippet),
+				response.status,
+			)
 		}
 		return classify(json)
 	}).pipe(
 		Effect.catchCause(cause =>
-			Effect.succeed(fail(Cause.pretty(cause).slice(0, 200))),
+			Effect.succeed(fail(Cause.pretty(cause).slice(0, 300), 'transport')),
 		),
+		// A model that never answers would otherwise hold up whatever is waiting
+		// on the probe. Generous, because these models routinely think for the
+		// better part of a minute before saying anything.
+		Effect.timeoutOrElse({
+			duration: '45 seconds',
+			orElse: () =>
+				Effect.succeed(fail('no answer within 45 seconds', 'transport')),
+		}),
 	)
 
 /**

@@ -1,0 +1,113 @@
+name: Model capability
+
+# Asks every model the research settings point a tier at whether it can still do
+# what that tier needs. A model can stop supporting a feature without anything
+# in this repo changing, and nothing notices until the moment it is needed —
+# which is exactly when the first-choice model is already struggling.
+#
+# It opens an issue instead of failing a build. A red check here would be a red
+# check on whatever pull request happened to be open when a vendor had a bad
+# minute, which is somebody else's problem wearing our clothes.
+#
+# It deliberately does NOT live in the deploy-parity test: that runs on pull
+# requests only, never on a deploy, and its stand-in settings overwrite any real
+# key given to it — so a check placed there could never reach a vendor at all.
+
+on:
+  schedule:
+    # Early morning UTC, so a model that went bad overnight is known before the
+    # working day rather than during it.
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/server/config.production.json'
+
+jobs:
+  probe:
+    name: Probe configured models
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Routing comes from the committed production settings, so the check looks
+      # at the models production really uses. Only the keys are secret.
+      - name: Probe every configured slot
+        id: probe
+        env:
+          RESEARCH_LLM_AGENT_API_KEY: ${{ secrets.RESEARCH_LLM_AGENT_API_KEY }}
+          RESEARCH_LLM_AGENT_API_KEY_2: ${{ secrets.RESEARCH_LLM_AGENT_API_KEY_2 }}
+          RESEARCH_LLM_EXTRACT_API_KEY: ${{ secrets.RESEARCH_LLM_EXTRACT_API_KEY }}
+          RESEARCH_LLM_EXTRACT_API_KEY_2: ${{ secrets.RESEARCH_LLM_EXTRACT_API_KEY_2 }}
+          RESEARCH_LLM_WRITER_API_KEY: ${{ secrets.RESEARCH_LLM_WRITER_API_KEY }}
+          RESEARCH_LLM_WRITER_API_KEY_2: ${{ secrets.RESEARCH_LLM_WRITER_API_KEY_2 }}
+        run: |
+          set -o pipefail
+          node -e '
+            const config = require("./apps/server/config.production.json")
+            for (const [key, value] of Object.entries(config)) {
+              if (key.startsWith("RESEARCH_LLM_") && !key.includes("API_KEY")) {
+                console.log(`${key}=${value}`)
+              }
+            }
+          ' >> "$GITHUB_ENV"
+          pnpm cli research probe-config 2>&1 | tee probe.log
+
+      - name: Open or update an issue when a model can no longer do its work
+        if: failure() && steps.probe.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs')
+            const log = fs.readFileSync('probe.log', 'utf8').slice(-5000)
+            const title = 'A configured research model can no longer do its tier’s work'
+            const body = [
+              'The scheduled capability check found a model that will not do what its tier needs.',
+              '',
+              'This is about the model itself, not a key or an outage — those are reported and let through.',
+              'Until it is replaced, the tier it belongs to has no working fallback: when the other slot',
+              'falters, the run fails instead of degrading.',
+              '',
+              'Probe each candidate with `pnpm cli research probe --api-key-env <VAR> --models <ids>`',
+              'before changing `apps/server/config.production.json`, and update the prices beside the model.',
+              '',
+              '```',
+              log,
+              '```',
+            ].join('\n')
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'model-capability',
+            })
+            if (existing.data.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.data[0].number,
+                body,
+              })
+              return
+            }
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+              labels: ['model-capability'],
+            })

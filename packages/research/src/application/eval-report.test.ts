@@ -12,6 +12,8 @@ const score = (over: Partial<RunScore>): RunScore => ({
 	id: 'r',
 	grounded: true,
 	wrongCompany: false,
+	wrongCompanyAutoApplicable: false,
+	lowConfidence: false,
 	empty: false,
 	fieldsExpected: 0,
 	fieldsScored: 0,
@@ -163,6 +165,14 @@ describe('evalSummaryAttributes', () => {
 				paidCostPerRun: 29,
 				tokensPerRun: 42_000,
 				creditsPerRun: 12,
+				fieldsFilledPerRun: null,
+				profileFieldsTotal: null,
+				contactsNamedPerRun: null,
+				contactsTitledPerRun: null,
+				lowConfidenceRate: 0,
+				wrongCompanyAutoApplicableRate: 0,
+				callsByModel: {},
+				cascadedRunRate: 0,
 			})
 
 			// WHEN flattened — THEN each top-line rate is present
@@ -192,6 +202,14 @@ describe('evalSummaryAttributes', () => {
 				paidCostPerRun: null,
 				tokensPerRun: null,
 				creditsPerRun: null,
+				fieldsFilledPerRun: null,
+				profileFieldsTotal: null,
+				contactsNamedPerRun: null,
+				contactsTitledPerRun: null,
+				lowConfidenceRate: 0,
+				wrongCompanyAutoApplicableRate: 0,
+				callsByModel: {},
+				cascadedRunRate: null,
 			})
 
 			// WHEN flattened — THEN each null rate is left off, not charted as zero

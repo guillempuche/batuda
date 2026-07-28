@@ -172,6 +172,11 @@ export const makeCachedLanguageModel = (
 				)
 				ON CONFLICT (key_hash) DO UPDATE SET
 					response    = EXCLUDED.response,
+					-- Whoever answers last owns the row. A tier can fall back to a
+					-- different model between one answer and the next, and leaving the
+					-- earlier name in place would credit this answer to a model that
+					-- never produced it.
+					model       = EXCLUDED.model,
 					tokens_in   = EXCLUDED.tokens_in,
 					tokens_out  = EXCLUDED.tokens_out,
 					cached_at   = EXCLUDED.cached_at,

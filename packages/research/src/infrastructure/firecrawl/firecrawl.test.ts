@@ -398,9 +398,77 @@ describe('makeFirecrawlScrape', () => {
 })
 
 describe('makeFirecrawlSearch', () => {
-	it('should map web results to items with markdown content and the real credit cost', async () => {
-		// GIVEN a search response with scraped markdown on the first result, the
-		// second result missing title/description/markdown, and a credit total
+	it('should map web results to items carrying the matching passage and the real credit cost', async () => {
+		// GIVEN a search response with a matching passage on the first result, the
+		// second result missing title and description, and a credit total
+		const { exit } = runSearch(200, {
+			data: {
+				web: [
+					{
+						url: 'https://acme.es',
+						title: 'Acme',
+						description: 'Freight forwarder since 1998, 40 staff in Valencia.',
+					},
+					{ url: 'https://acme.es/about' },
+				],
+			},
+			creditsUsed: 7,
+		})
+
+		// THEN the passage becomes both the snippet and the content the run can
+		// cite, a result without one falls back to empty strings and no content,
+		// and the run is billed the reported credits rather than a flat 1
+		const resolved = await exit
+		const result = Exit.isSuccess(resolved) ? resolved.value : undefined
+		expect(result?.items.map(i => i.url)).toEqual([
+			'https://acme.es',
+			'https://acme.es/about',
+		])
+		expect(result?.items[0]?.snippet).toBe(
+			'Freight forwarder since 1998, 40 staff in Valencia.',
+		)
+		expect(result?.items[0]?.content).toBe(
+			'Freight forwarder since 1998, 40 staff in Valencia.',
+		)
+		expect(result?.items[1]?.title).toBe('')
+		expect(result?.items[1]?.snippet).toBe('')
+		expect(result?.items[1]?.content).toBeUndefined()
+		expect(result?.units).toBe(7)
+	})
+
+	it('should keep the whole passage as content and preview it in the snippet', async () => {
+		// GIVEN a passage longer than the snippet preview
+		const passage = `Acme employs ${'x'.repeat(400)} people.`
+		const { exit } = runSearch(200, {
+			data: { web: [{ url: 'https://acme.es', description: passage }] },
+		})
+
+		// THEN content keeps every word, so a fact late in the passage can still
+		// be cited, while the snippet carries only the opening as a preview
+		const resolved = await exit
+		const result = Exit.isSuccess(resolved) ? resolved.value : undefined
+		expect(result?.items[0]?.content).toBe(passage)
+		expect(result?.items[0]?.snippet).toBe(passage.slice(0, 300))
+	})
+
+	it('should carry no content when the passage is only whitespace', async () => {
+		// GIVEN a result whose description is blank padding
+		const { exit } = runSearch(200, {
+			data: { web: [{ url: 'https://acme.es', description: '   \n  ' }] },
+		})
+
+		// THEN the item carries no content: empty evidence would still record a
+		// source row for a page holding nothing
+		const resolved = await exit
+		const result = Exit.isSuccess(resolved) ? resolved.value : undefined
+		expect(result?.items).toHaveLength(1)
+		expect(result?.items[0]?.content).toBeUndefined()
+		expect(result?.items[0]?.snippet).toBe('')
+	})
+
+	it('should ignore page markdown and keep the passage as its content', async () => {
+		// GIVEN a search response that also carries the page's markdown, as it
+		// does when a caller asks Firecrawl to fetch each result
 		const { exit } = runSearch(200, {
 			data: {
 				web: [
@@ -410,26 +478,17 @@ describe('makeFirecrawlSearch', () => {
 						description: 'Freight forwarder',
 						markdown: '# Acme\nFull page content.',
 					},
-					{ url: 'https://acme.es/about' },
 				],
 			},
-			creditsUsed: 7,
 		})
 
-		// THEN each result maps to a SearchResultItem (missing title/snippet
-		// default to empty strings), the markdown becomes content, and the run
-		// is billed the reported credits rather than a flat 1
+		// THEN the response still decodes and the evidence is the passage alone,
+		// so a page body the run never paid for cannot slip in
 		const resolved = await exit
+		expect(Exit.isSuccess(resolved)).toBe(true)
 		const result = Exit.isSuccess(resolved) ? resolved.value : undefined
-		expect(result?.items.map(i => i.url)).toEqual([
-			'https://acme.es',
-			'https://acme.es/about',
-		])
-		expect(result?.items[0]?.snippet).toBe('Freight forwarder')
-		expect(result?.items[0]?.content).toBe('# Acme\nFull page content.')
-		expect(result?.items[1]?.title).toBe('')
-		expect(result?.items[1]?.content).toBeUndefined()
-		expect(result?.units).toBe(7)
+		expect(result?.items).toHaveLength(1)
+		expect(result?.items[0]?.content).toBe('Freight forwarder')
 	})
 
 	it('should bill one unit when the response omits a credit total', async () => {
@@ -463,17 +522,24 @@ describe('makeFirecrawlSearch', () => {
 		expect(log.last?.headers['authorization']).toBe('Bearer fc_k')
 	})
 
-	it('should exclude <form> blocks from the per-result scrape', async () => {
+	it('should not ask Firecrawl to fetch every result', async () => {
 		// GIVEN any successful search
 		const { exit, log } = runSearch(200, { data: { web: [] } })
 		await exit
 
-		// THEN the embedded scrapeOptions drop <form> content, matching the adapter
-		const scrapeOptions = bodyJson(log.last)['scrapeOptions'] as Record<
-			string,
-			unknown
-		>
-		expect(scrapeOptions?.['excludeTags']).toEqual(['form'])
+		// THEN the request carries no scrape options: they bill a full page read
+		// per result, and opening a page stays the job of `scrape_page`
+		expect(bodyJson(log.last)).not.toHaveProperty('scrapeOptions')
+	})
+
+	it('should ask for the passage of each page that answers the query', async () => {
+		// GIVEN any successful search
+		const { exit, log } = runSearch(200, { data: { web: [] } })
+		await exit
+
+		// THEN the request asks for passages: without the flag each result comes
+		// back with the site's generic blurb instead of the text that matched
+		expect(bodyJson(log.last)['highlights']).toBe(true)
 	})
 
 	it('should send a normalized lower-case country for a locale hint', async () => {

@@ -8,17 +8,21 @@
  * run already produced. The flag is deliberately conservative: it should catch the
  * clearly-thin runs, not second-guess a solid one.
  *
- * The signals differ by run kind, so the check branches:
- *  - enrichment fills a named company's profile, so it keys off the entity match
- *    (already downgraded when a field came from a source that can't speak for the
- *    company) and how much of the profile is grounded;
- *  - a prospect scan reports a list of third parties, so it keys off how many
- *    sources it actually vetted the list against.
+ * Two signals raise it. Whenever a run was pinned to one company, anything short
+ * of clearly reaching that company counts — which covers an enrichment filling
+ * that company's profile and equally a scan launched from it, since a scan can be
+ * pinned to a subject too and a wrong one there is just as misleading. On top of
+ * that, a prospect scan reports a list of third parties, so vetting that list
+ * against a single source is thin however well the company itself was found.
  */
 
 export interface RunQualityInput {
 	readonly schemaName: string
-	/** The run's entity verdict after any per-source downgrade; null for a scan. */
+	/**
+	 * The run's entity verdict after any per-source downgrade. Null when the run
+	 * was pinned to no company at all — an open-ended scan or a freeform brief —
+	 * so there was never an entity to match.
+	 */
 	readonly entityMatch: 'strong' | 'weak' | 'absent' | null
 	/** Reflect-loop rounds phase 1 ran (0 on a resume). */
 	readonly rounds: number
@@ -48,16 +52,18 @@ export const computeRunQuality = (input: RunQualityInput): RunQuality => {
 		input.fieldsTotal > 0 ? input.fieldsGrounded / input.fieldsTotal : 0
 	const isScan = input.schemaName === 'prospect_scan_v1'
 
-	const lowConfidence = isScan
-		? // A scan that vetted its list against a single source hasn't done enough to
-			// trust unreviewed.
-			input.sourcesTotal <= 1
-		: // Enrichment: a weak or absent entity match. A run only reaches success with
-			// a strong match, so this fires when the per-source gate downgraded it — a
-			// field came from a source that can't speak for the company. A strong match
-			// stays trusted even on a thin-web company; grounding_ratio is reported in
-			// the block for a caller that wants to gate on thinness itself.
-			input.entityMatch === 'weak' || input.entityMatch === 'absent'
+	// Anything short of clearly reaching the company the run was pinned to. Asked
+	// of every run kind on purpose: a scan launched from one company is pinned to
+	// it just as an enrichment is, and a scan built from the wrong company is no
+	// safer to act on unread. A run pinned to nobody has no verdict and so raises
+	// nothing here. A strong match stays trusted even on a thin-web company;
+	// grounding_ratio is reported for a caller that wants to gate on thinness.
+	const unsureOfTheCompany =
+		input.entityMatch !== null && input.entityMatch !== 'strong'
+	// And a scan that vetted its list of other firms against a single source
+	// hasn't done enough to act on unread, however well it found the company.
+	const thinlyVetted = isScan && input.sourcesTotal <= 1
+	const lowConfidence = unsureOfTheCompany || thinlyVetted
 
 	return {
 		rounds: input.rounds,

@@ -41,11 +41,6 @@ import {
 	validateFindingCitations,
 } from './citation-guard'
 import { ContactDiscovery } from './contact-discovery'
-import {
-	ContactVerdictsSchema,
-	contactCriticPrompt,
-	critiqueContactEntities,
-} from './contact-entity-critic'
 import { bindContactsToEntity } from './contact-entity-guard'
 import {
 	ContactsRescueSchema,
@@ -79,6 +74,7 @@ import {
 	groundedSourceIds,
 	isConfirmedRegistryMatch,
 	isEntityGroundedSchema,
+	isOwnSiteHost,
 	queryName,
 	reachedOwnSite,
 	withRedirectDomain,
@@ -124,8 +120,13 @@ import {
 } from './prospect-criteria-guard'
 import { computeRunQuality } from './research-quality'
 import { guardScalarFields } from './scalar-field-guard'
-import { type FreeformSchema, schemaRegistry } from './schemas/index'
+import {
+	type FreeformSchema,
+	schemaFieldNames,
+	schemaRegistry,
+} from './schemas/index'
 import { hostOf, urlHashForScrape } from './source-key'
+import { recordSeenSource } from './source-record'
 import { enforceSourceTier, isFirstPartyHost } from './source-tier-guard'
 import { stripReasoning } from './strip-reasoning'
 import {
@@ -214,12 +215,10 @@ const MAX_LOOP_PROMPT_CHARS = 90000
 // loop; the extractor gets the fuller pages here so a fact sitting past that cut
 // (a leadership list, a tools section) still reaches the structured output.
 //
-// Sized to the extract tier's real capacity: the primary model serves a 256k-token
-// window and the fallback ~128k, so ~45k tokens of pages (this) plus the ~24k-token
-// transcript and the schema/output still leave headroom on the smaller of the two —
-// far above the old 60k-char (~15k-token) budget, which truncated content-rich
-// targets and multi-company discovery scans. A per-page cap keeps one very long
-// page from crowding out the others, so breadth survives when the budget is tight.
+// Sized to the smallest window the extract tier runs on: ~45k tokens of pages
+// (this) plus the ~24k-token transcript and the schema still leave room for the
+// answer inside a 128k-token model. A per-page cap keeps one very long page from
+// crowding out the others, so breadth survives when the budget is tight.
 const MAX_EXTRACTION_PAGE_CHARS = 180000
 const MAX_EXTRACTION_CHARS_PER_PAGE = 40000
 
@@ -331,6 +330,20 @@ export const labelledGroundedPages = (
 	groundedPages(targets, pages).map(page =>
 		page.host ? `[source: ${page.host}]\n${page.text}` : page.text,
 	)
+
+/**
+ * Just the pages the run opened in full, dropping the passages a search quoted.
+ * A passage is one sentence, not the page, so two checks go wrong reading one
+ * as the other: "have we already read this page?" — counting a passage skips a
+ * page worth opening — and "is this page about the right company?" — a sentence
+ * that never repeats the name reads as the wrong company and voids a field that
+ * was fine.
+ */
+export const openedPages = <
+	Entry extends { readonly kind: 'page' | 'passage' },
+>(
+	corpus: ReadonlyArray<Entry>,
+): ReadonlyArray<Entry> => corpus.filter(entry => entry.kind === 'page')
 
 // The cited-but-never-fetched sources of an enrichment's company fields — the
 // citations the per-source entity check had to fail open on. A gap round
@@ -571,6 +584,7 @@ export const stampRunCostFromLedger = (
 		readonly tokensOut: number
 		readonly costByBucket: Record<string, number>
 		readonly unitsByProvider: Record<string, number>
+		readonly callsByModel: Record<string, number>
 	},
 ) =>
 	sql`
@@ -585,6 +599,10 @@ export const stampRunCostFromLedger = (
 			quota_breakdown = COALESCE(
 				${usage ? JSON.stringify(usage.unitsByProvider) : null}::jsonb,
 				quota_breakdown
+			),
+			llm_models = COALESCE(
+				${usage ? JSON.stringify(usage.callsByModel) : null}::jsonb,
+				llm_models
 			),
 			paid_cost_cents = COALESCE(
 				(SELECT SUM(amount_cents)::int FROM research_paid_spend
@@ -982,6 +1000,7 @@ export const buildResearchSystemPrompt = (args: {
 		args.segments.length === 0
 			? ''
 			: `\n\nAdditional standing instructions (follow within the rules above):\n${args.segments.map(s => `--- instruction ---\n${s}`).join('\n')}`
+	const schemaFields = schemaFieldNames(args.schemaName)
 	return [
 		'You are a research agent for Batuda CRM.',
 		'Given a query, produce a thorough research brief with findings, sources, and citations.',
@@ -990,9 +1009,12 @@ export const buildResearchSystemPrompt = (args: {
 		'The employee headcount is rarely on a company\'s own homepage. If the site does not state it, search for it (the company name with "number of employees", or its LinkedIn / ZoomInfo profile) before finishing — do not conclude the size is unknown without having searched.',
 		"The company's own site rarely tells the whole story. Vary your searches across the open web — recent news and trade press (roughly the last 12 months), industry blogs, magazines, and event or conference pages — for funding, leadership changes, tooling, and growth signals the site omits.",
 		'For a citation to a page you scraped, set source_id to the exact URL you scraped with scrape_page. Never invent an identifier — a made-up source is dropped.',
-		'When you search, use plain keywords, and only add a site: filter for a real domain you know — never a placeholder like site:example.com.',
+		'Name the people who run the company — each with the exact title they are given — and treat that as part of the job, not an extra. They are listed on a team, leadership, management or "equipo" page, almost never on the homepage, so open one when the site has it. When reading the pages turns up nobody with a title, discover_contacts is the tool that finds them.',
+		'A search result quotes only the one sentence of a page that matched your query. When a page looks like it holds more than that sentence, open it with scrape_page rather than settling for the snippet.',
 		'For discovery or prospecting queries, prefer authoritative sources — business directories, industry association member lists, and sector registries — over social media, forums, or glossary pages. Treat such a page as somewhere to find candidates, not as the answer: a "top N" or "largest" ranking lists the biggest firms in a sector, which is the opposite of what most prospecting asks for. Carry every qualifier in the request — size, place, and niche — into each search, and check each candidate against all of them before returning it; leave out one that fails any, however prominently a directory listed it.',
-		`Output schema: ${args.schemaName}`,
+		schemaFields.length === 0
+			? `Output schema: ${args.schemaName}`
+			: `Output schema: ${args.schemaName}. Come back with everything it holds, not only the facts named above: ${schemaFields.join(', ')}. Leave a field out when the evidence does not support it — never fill one by guessing.`,
 		args.subjectContext,
 		args.hintsContext,
 		instructionBlock,
@@ -1072,10 +1094,10 @@ const PROPOSE_UPDATES_DIRECTIVE = [
  * way a run turns up an edit for a company it was handed rather than one it found.
  */
 // Asks the model to land the fit judgement in the structured output, not only in
-// the brief. Added only for the enrichment schema, which is the one that carries
-// the verdict/disqualifiers/fit_checks/hook fields.
+// the brief. Applies only to the enrichment schema, which is the one that
+// carries the verdict/disqualifiers/fit_checks fields.
 const FIT_VERDICT_DIRECTIVE =
-	'Decide whether this company fits the target customer profile using the fit rules in the instructions above, and record it: set `verdict` (strong_fit / possible_fit / weak_fit / no_fit) with a short `verdict_rationale`; for a company that fails a rule, list each failure in `disqualifiers` with the rule and the evidence quote that shows it; and only when the evidence supports one, put a single grounded outreach angle in `hook` — never a figure or claim the evidence does not state. Also fill `fit_checks` with one row per fit rule in the instructions — every rule, including the ones the company passes — each marked pass, fail, or unknown per the evidence, with the quote and source URL that decide it.'
+	'Decide whether this company fits the target customer profile using the fit rules in the instructions above, and record it: set `verdict` (strong_fit / possible_fit / weak_fit / no_fit) with a short `verdict_rationale`; for a company that fails a rule, list each failure in `disqualifiers` with the rule and the evidence quote that shows it. Also fill `fit_checks` with one row per fit rule in the instructions — every rule, including the ones the company passes — each marked pass, fail, or unknown per the evidence, with the quote and source URL that decide it.'
 
 export const buildExtractionPrompt = (args: {
 	readonly citationInstruction: string
@@ -1487,8 +1509,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 				})
 
 			// Recompute a group parent's status from its children: still running if
-			// any child is in flight, failed if any finished without success, else
-			// succeeded. Sets completed_at once no child is in flight.
+			// any child is in flight, failed if any finished without success, needing
+			// a read if any child needs one, else succeeded. A batch reporting a clean
+			// success would bury the one result somebody still has to read. Sets
+			// completed_at once no child is in flight.
 			const rollupParentStatus = (parentId: string) =>
 				sql`
 					UPDATE research_runs
@@ -1499,6 +1523,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						WHEN (SELECT COUNT(*) FILTER (WHERE status IN ('failed', 'no_reliable_data', 'cancelled'))
 							FROM research_runs WHERE parent_id = ${parentId} AND status != 'deleted') > 0
 						THEN 'failed'
+						WHEN (SELECT COUNT(*) FILTER (WHERE status = 'succeeded_low_confidence')
+							FROM research_runs WHERE parent_id = ${parentId} AND status != 'deleted') > 0
+						THEN 'succeeded_low_confidence'
 						ELSE 'succeeded'
 					END,
 					completed_at = CASE
@@ -2005,17 +2032,20 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					): Record<string, unknown> =>
 						registryConfirmed ? { ...obj, registry_confirmed: true } : obj
 
-					// Fail a run closed as no_reliable_data because its evidence was not clearly
-					// about the requested company. Called by the phase-1 entity gate and again on
-					// resume, where that gate is skipped — so a weak or absent match never reaches
-					// extraction to present a lookalike's profile.
-					const failClosedOnEntity = (verdict: EntityMatch) =>
+					// Fail a run closed as no_reliable_data because nothing in its evidence
+					// was about the requested company. Called by the phase-1 entity gate and
+					// again on resume, where that gate is skipped. Takes only 'absent' — a
+					// glancing mention still has something worth showing a person, so it
+					// finishes marked for review rather than being thrown away.
+					const failClosedOnEntity = (
+						verdict: Extract<EntityMatch, 'absent'>,
+					) =>
 						Effect.gen(function* () {
 							const toolLogNow = yield* Ref.get(toolLog)
 							yield* sql`
 								UPDATE research_runs
 								SET status = 'no_reliable_data',
-									reason_code = ${(verdict === 'weak' ? 'weak_no_official_site' : 'entity_mismatch') satisfies ReasonCode},
+									reason_code = ${'entity_mismatch' satisfies ReasonCode},
 									phase = 1,
 									entity_match = ${verdict},
 									findings = ${JSON.stringify(
@@ -2031,7 +2061,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								WHERE id = ${researchId} AND status = 'running'
 							`
 							yield* publishEvent(researchId, 'run.no_reliable_data', {
-								reason: verdict === 'weak' ? 'entity_weak' : 'entity_mismatch',
+								reason: 'entity_mismatch',
 								entityMatch: verdict,
 							})
 							// Stamp this run's cost before the group rolls up, so the parent
@@ -2074,7 +2104,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// How many reflect-loop rounds phase 1 ran, for the run's quality
 					// signal; stays 0 on a resume that skips phase 1.
 					let runRounds = 0
-					// Full scraped page content gathered this run — the corpus the value
+					// Every piece of real page text gathered this run — the corpus the value
 					// guard checks findings against. Kept separate from the model-facing
 					// transcript (capped per page); empty on a resume that skips phase 1.
 					const scrapeCorpus: Array<{
@@ -2083,6 +2113,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						// The page's own host, so an own-domain page grounds on its host even
 						// when its body never spells the company name (an offices/team page).
 						host: string | undefined
+						// Whether this is the whole page or just the one passage a search
+						// quoted from it. Both are real text worth citing, but only a whole
+						// page shows what the page is about.
+						kind: 'page' | 'passage'
 					}> = []
 					// Hosts of the search results this run surfaced. The extraction prompt
 					// tells the model to cite a result's URL for a fact seen only in its
@@ -2862,49 +2896,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// rule as the deterministic half — the array order is the run order.
 							const criticChain: ReadonlyArray<GuardLink> = [
 								{
-									// Contact entity critic: before the field critic, judge each
-									// remaining contact as a whole — is this person the company's own
-									// staff, or a client / partner / competitor quoted on its site? The
-									// deterministic contact guard catches only a quote that names
-									// another company; this catches a testimonial that names none. Fail
-									// open, and gentle: it drops only a clear outsider. Runs first so the
-									// field critic never spends a judgement on a contact about to go.
-									name: 'contact-entity-critic',
-									run: findings =>
-										Effect.gen(function* () {
-											const check = yield* critiqueContactEntities(
-												findings,
-												claims =>
-													extractLlm
-														.generateObject({
-															schema: ContactVerdictsSchema,
-															prompt: contactCriticPrompt(criticTarget, claims),
-														})
-														.pipe(
-															Effect.map(response => ({
-																verdicts: response.value.verdicts,
-															})),
-															Effect.catchCause(() =>
-																Effect.succeed({
-																	verdicts: [],
-																}),
-															),
-														),
-											)
-											if (check.dropped > 0) {
-												yield* Effect.logWarning(
-													'research.contacts.critic_dropped',
-												).pipe(
-													Effect.annotateLogs({
-														research_id: researchId,
-														dropped: check.dropped,
-													}),
-												)
-											}
-											return { findings: check.findings }
-										}),
-								},
-								{
 									// Critic: a final per-field second look. For each value still
 									// carrying a source + quote, ask the extract model whether the
 									// quote really backs the value and is about the target company —
@@ -2964,8 +2955,8 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										Effect.gen(function* () {
 											if (!isEnrichmentRun || !entityTargets)
 												return { findings }
-											const corpusByHash = new Map(
-												scrapeCorpus.map(
+											const openedByHash = new Map(
+												openedPages(scrapeCorpus).map(
 													page =>
 														[
 															page.urlHash,
@@ -2977,7 +2968,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												findings,
 												entityTargets,
 												sourceId =>
-													corpusByHash.get(urlHashForScrape(sourceId)),
+													openedByHash.get(urlHashForScrape(sourceId)),
 											)
 											entityFieldsDropped =
 												check.droppedCompanyFields + check.droppedOffEntity
@@ -3167,21 +3158,110 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							const scrape = yield* ScrapeProvider
 							const siteMap = yield* MapProvider
 							const registry = yield* RegistryRouter
+							const anchorSearch = yield* SearchProvider
 
-							// Anchor: when the caller handed in the company's own domain, fetch
-							// that official site once now so grounding has the right company's
-							// page even if the model never navigates there. Best-effort — a
-							// refused, unreachable, or empty site just falls back to the model's
-							// own searching, and a people directory (LinkedIn) is left to
-							// discover_contacts rather than fetched here.
+							// Bound to a const so the null check holds inside the closure
+							// below; `entityTargets` is a reassignable `let`.
+							const anchorTargets = entityTargets
+
+							// A company's own site is where its people, its address and its
+							// size are actually written, and a small company with no website
+							// on file has no domain anywhere — without one, every own-site
+							// page below goes unread. One search by name finds it, and the
+							// first result that is the company's own site rather than a
+							// directory listing it counts from here on as a given domain does.
+							// Only for a run whose whole job is this one company — a scan
+							// anchored to a subject uses it as a starting point for finding
+							// other firms, so its own site is not what that run is after.
+							const searchedOwnHost =
+								anchorHost === undefined &&
+								anchorTargets !== null &&
+								isEntityGroundedSchema(schemaName)
+									? yield* Effect.gen(function* () {
+											yield* budget.chargeCheap('search', SEARCH_COST_CENTS)
+											// Plenty of small firms share a name, so the town the
+											// caller asked about is what tells the one being
+											// researched from its namesakes. It has to be the town
+											// as the caller wrote it: the run's place words are
+											// every long word of the query's tail, which for a
+											// query like "Acme, find their CEO" is "find".
+											const found = yield* anchorSearch.search({
+												query:
+													hintLocation === undefined
+														? entityName
+														: `${entityName} ${hintLocation}`,
+												limit: 5,
+												...(hints?.location
+													? { location: hints.location }
+													: {}),
+											})
+											for (const item of found.items) {
+												const host = domainHost(item.url)
+												if (
+													host !== undefined &&
+													isOwnSiteHost(anchorTargets, host)
+												)
+													return host
+											}
+											return undefined
+										}).pipe(
+											// Never let this stop the run: with no host found, the
+											// loop does its own searching instead.
+											Effect.catchCause(cause =>
+												Cause.hasInterruptsOnly(cause)
+													? Effect.failCause(cause)
+													: Effect.logInfo(
+															'research.anchor.search_failed',
+														).pipe(
+															Effect.annotateLogs({
+																research_id: researchId,
+																cause: Cause.pretty(cause),
+															}),
+															Effect.as(undefined),
+														),
+											),
+										)
+									: undefined
+
+							// The company's own site for the rest of phase 1, whether the
+							// caller gave it or the search found it.
+							const ownHost = anchorHost ?? searchedOwnHost
+
+							if (searchedOwnHost !== undefined) {
+								// Treat it exactly as a domain the caller supplied. Without
+								// this the site's own pages are still fetched but then read as
+								// somebody else's: a contact page showing only an address and a
+								// phone never spells the company name, so it is judged as being
+								// about nobody and dropped — the very page the search went
+								// looking for. It is also what holds a third-party estimate to
+								// a lower confidence than the company's own word.
+								if (entityTargets !== null) {
+									entityTargets = withRedirectDomain(
+										entityTargets,
+										searchedOwnHost,
+									)
+								}
+								yield* Effect.logInfo('research.anchor.host_found').pipe(
+									Effect.annotateLogs({
+										research_id: researchId,
+										host: searchedOwnHost,
+									}),
+								)
+							}
+
+							// Anchor: fetch the company's official site once now so grounding
+							// has its page even if the model never navigates there.
+							// Best-effort — a refused, unreachable, or empty site just falls
+							// back to the model's own searching, and a people directory
+							// (LinkedIn) is left to discover_contacts rather than fetched here.
 							if (
-								anchorHost !== undefined &&
-								!isUnsupportedScrapeUrl(`https://${anchorHost}`)
+								ownHost !== undefined &&
+								!isUnsupportedScrapeUrl(`https://${ownHost}`)
 							) {
 								yield* Effect.gen(function* () {
 									yield* budget.chargeCheap('scrape', SCRAPE_COST_CENTS)
 									const page = yield* scrape.scrape({
-										url: `https://${anchorHost}`,
+										url: `https://${ownHost}`,
 										formats: ['markdown', 'links'],
 									})
 									if (
@@ -3189,7 +3269,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										page.markdown.trim().length > 0
 									) {
 										const hash = urlHashForScrape(page.url)
-										// The caller's own domain may 301 to a different host (a
+										// The company's own domain may 301 to a different host (a
 										// rebrand); the fetch followed it, so the destination is the
 										// same company's official site. Fold that host in as a
 										// strong-match key and put the reached URL in the corpus, so
@@ -3198,13 +3278,14 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										const resolvedUrl = page.resolvedUrl ?? page.url
 										const destHost = domainHost(resolvedUrl)
 										const followedRedirect =
-											destHost !== undefined && destHost !== anchorHost
+											destHost !== undefined && destHost !== ownHost
 										scrapeCorpus.push({
 											urlHash: hash,
 											text: followedRedirect
 												? `${resolvedUrl}\n${page.markdown}`
 												: page.markdown,
 											host: destHost,
+											kind: 'page',
 										})
 										if (followedRedirect && entityTargets !== null) {
 											entityTargets = withRedirectDomain(
@@ -3223,7 +3304,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										).pipe(
 											Effect.annotateLogs({
 												research_id: researchId,
-												host: anchorHost,
+												host: ownHost,
 												...(followedRedirect
 													? { resolved_host: destHost }
 													: {}),
@@ -3234,11 +3315,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									// rarely spells; fetch a few, chosen from the homepage's own links so no path is
 									// guessed, and let own-host grounding keep what they hold. Each fetch is isolated
 									// so one failure never sinks the rest, and bounded by MAX_ABOUT_PAGES.
-									const seedHost =
-										domainHost(page.resolvedUrl ?? page.url) ?? anchorHost
+									const reachedHost =
+										domainHost(page.resolvedUrl ?? page.url) ?? ownHost
 									for (const aboutUrl of aboutPageCandidates(
 										page.links ?? [],
-										seedHost,
+										reachedHost,
 										MAX_ABOUT_PAGES,
 									)) {
 										if (isUnsupportedScrapeUrl(aboutUrl)) continue
@@ -3257,6 +3338,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													urlHash: aboutHash,
 													text: about.markdown,
 													host: domainHost(about.resolvedUrl ?? about.url),
+													kind: 'page',
 												})
 												seededAnchorHashes.push(aboutHash)
 												seededTranscriptParts.push(
@@ -3295,7 +3377,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									// skip here, never a failed run.
 									yield* Effect.gen(function* () {
 										const mapped = yield* siteMap.map({
-											url: `https://${seedHost}`,
+											url: `https://${reachedHost}`,
 											limit: 100,
 										})
 										// One provider unit, charged after the call returns so a
@@ -3308,7 +3390,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											mapped.links.filter(
 												url => !seeded.has(urlHashForScrape(url)),
 											),
-											seedHost,
+											reachedHost,
 											MAX_DISCOVERY_PAGES,
 										)
 										if (discovered.length > 0) {
@@ -3337,6 +3419,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														urlHash: foundHash,
 														text: found.markdown,
 														host: domainHost(found.resolvedUrl ?? found.url),
+														kind: 'page',
 													})
 													seededAnchorHashes.push(foundHash)
 													seededTranscriptParts.push(
@@ -3374,7 +3457,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												: Effect.logInfo('research.discovery.skipped').pipe(
 														Effect.annotateLogs({
 															research_id: researchId,
-															host: seedHost,
+															host: reachedHost,
 															cause: Cause.pretty(cause),
 														}),
 													),
@@ -3387,7 +3470,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											: Effect.logWarning('research.anchor.seed_failed').pipe(
 													Effect.annotateLogs({
 														research_id: researchId,
-														host: anchorHost,
+														host: ownHost,
 														cause: Cause.pretty(cause),
 													}),
 												),
@@ -3414,7 +3497,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													? registrySnapshot['country']
 													: undefined,
 											locationHint: hints?.location,
-											anchorHost,
+											// An address the run found points at a country's
+											// register just as well as one the caller gave.
+											anchorHost: ownHost,
 										})
 									: undefined
 							if (registryCountry !== undefined) {
@@ -3441,22 +3526,18 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										query: registryQuery,
 									})
 									const hash = urlHashForScrape(record.sourceUrl)
-									const domain =
-										domainHost(record.sourceUrl) ??
-										registryCountry.toLowerCase()
 									// A record read from a national register sits in `sources`
 									// alongside the fetched pages, so a value taken from it grounds
-									// the same way a scraped fact does.
-									yield* sql`
-										INSERT INTO sources (id, kind, provider, url, url_hash, domain, title, content_hash, first_fetched_at, last_fetched_at)
-										VALUES (
-											${`src_${hash.slice(0, 16)}`}, 'registry',
-											${`registry-${registryCountry.toLowerCase()}`},
-											${record.sourceUrl}, ${hash}, ${domain}, ${record.legalName},
-											${hash}, now(), now()
-										)
-										ON CONFLICT (url_hash) DO UPDATE SET last_fetched_at = now()
-									`
+									// the same way a scraped fact does. Nothing of the register page
+									// itself is kept, only the record, so it is written down as seen
+									// rather than as a page held on file.
+									yield* recordSeenSource(sql, {
+										url: record.sourceUrl,
+										title: record.legalName,
+										contentHash: hash,
+										provider: `registry-${registryCountry.toLowerCase()}`,
+										kind: 'registry',
+									})
 									seededRegistryHashes.push(hash)
 									seededTranscriptParts.push(
 										`[registry_lookup] ${boundedToolResult({ url: record.sourceUrl, ...record })}`,
@@ -3542,13 +3623,14 @@ export class ResearchService extends Context.Service<ResearchService>()(
 															urlHash: urlHashForScrape(page.url),
 															text: page.markdown,
 															host: domainHost(page.url),
+															kind: 'page',
 														})
 													}
 												} else if (tr.name === 'web_search') {
-													// A search that returned scraped page content (Firecrawl
-													// scrapeOptions) is real fetched evidence — ground on each
-													// such result, exactly like a scrape. The sources row was
-													// upserted by the search cache when the tool ran.
+													// A search result that arrived with real page text counts
+													// as a page the run has read — ground on it exactly like a
+													// scrape. The sources row was recorded by the search cache
+													// when the tool ran.
 													const searchResult = tr.result as
 														| { items?: ReadonlyArray<unknown> }
 														| null
@@ -3574,6 +3656,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 																urlHash: urlHashForScrape(item.url),
 																text: item.content,
 																host: domainHost(item.url),
+																kind: 'passage',
 															})
 														}
 													}
@@ -3783,6 +3866,14 @@ export class ResearchService extends Context.Service<ResearchService>()(
 
 						const loopResult = phaseOutcome.loop
 						runRounds = loopResult.rounds
+						// Why the searching stopped. A run that ran out of room to think,
+						// rather than finishing what it set out to do, had more it wanted
+						// to read — so a thin profile there is a ceiling to raise, not a
+						// prompt to reword.
+						yield* Effect.annotateCurrentSpan({
+							'research.phase1.stop_reason': loopResult.stopReason,
+							'research.phase1.rounds': loopResult.rounds,
+						})
 						// Prepend the anchor site's content so phase-2 extraction reads the
 						// official page first; empty when nothing was seeded.
 						researchText = [...seededTranscriptParts, loopResult.researchText]
@@ -3794,10 +3885,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 
 						// Entity grounding gate: from the fetched evidence alone (never the
 						// model's prose), classify how strongly the pages concern the
-						// requested company. Nothing about the target ('absent'), or only a
-						// glancing mention of it ('weak'), fails closed now — before phase 2
-						// extraction can turn a lookalike's pages into a confident profile.
-						// Only a strong match proceeds.
+						// requested company. Nothing about the target at all ('absent')
+						// fails closed here, before phase 2 can turn a lookalike's pages
+						// into a confident profile. A glancing mention ('weak') carries on
+						// and finishes marked for reading.
 						const entityCorpus = [
 							evidenceText,
 							...scrapeCorpus.map(page => page.text),
@@ -3817,7 +3908,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							cityGate({
 								targets: entityTargets,
 								corpus: entityCorpus,
-								pages: scrapeCorpus,
+								// Pages only: this asks whether the run reached the company's
+								// own site, and a search quoting a sentence off a namesake's
+								// site is not having been there.
+								pages: openedPages(scrapeCorpus),
 								registryConfirmed,
 							}) === 'downgrade'
 						) {
@@ -3829,7 +3923,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							)
 							entityMatch = 'absent'
 						}
-						if (entityMatch === 'absent' || entityMatch === 'weak') {
+						if (entityMatch === 'absent') {
 							yield* failClosedOnEntity(entityMatch)
 							return
 						}
@@ -3864,9 +3958,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 
 					// The phase-1 entity gate is skipped when a run resumes from a checkpoint
 					// (the loop that decides the verdict does not re-run), so re-check the stored
-					// verdict here: a weak or absent match fails closed before phase 2 instead of
-					// extracting a lookalike's profile on resume.
-					if (entityMatch === 'weak' || entityMatch === 'absent') {
+					// verdict here: evidence about no company at all fails closed before phase 2
+					// instead of extracting a lookalike's profile on resume.
+					if (entityMatch === 'absent') {
 						yield* failClosedOnEntity(entityMatch)
 						return
 					}
@@ -3947,12 +4041,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									0,
 									MAX_PER_FIELD_SEARCHES,
 								)
-								const corpusHashes = new Set(
-									scrapeCorpus.map(page => page.urlHash),
+								const openedHashes = new Set(
+									openedPages(scrapeCorpus).map(page => page.urlHash),
 								)
 								const citedUnscraped = citedUnscrapedSources(
 									findings,
-									hash => corpusHashes.has(hash) || citedAttempted.has(hash),
+									hash => openedHashes.has(hash) || citedAttempted.has(hash),
 									MAX_CITED_SCRAPES_PER_ROUND,
 								)
 								// Grounded and fully fetched — nothing left to close.
@@ -4016,6 +4110,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													urlHash: citedHash,
 													text: cited.markdown,
 													host: domainHost(cited.resolvedUrl ?? cited.url),
+													kind: 'page',
 												})
 											}
 										}).pipe(
@@ -4041,8 +4136,8 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								// right away — the point of fetching is that a wrong-company
 								// page can now void the field it sourced, no LLM call needed.
 								if (roundHashes.length > 0 && entityTargets) {
-									const gapCorpusByHash = new Map(
-										scrapeCorpus.map(
+									const gapOpenedByHash = new Map(
+										openedPages(scrapeCorpus).map(
 											page =>
 												[
 													page.urlHash,
@@ -4053,7 +4148,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									const recheck = guardEntitySources(
 										findings,
 										entityTargets,
-										sourceId => gapCorpusByHash.get(urlHashForScrape(sourceId)),
+										sourceId => gapOpenedByHash.get(urlHashForScrape(sourceId)),
 									)
 									findings = recheck.findings
 									if (recheck.droppedOffEntity > 0) {
@@ -4109,6 +4204,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														urlHash: hash,
 														text: item.content,
 														host,
+														kind: 'passage',
 													})
 												}
 											}
@@ -4140,6 +4236,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									'research.gap_rounds.round': gapRound,
 									'research.per_field_search.fired': perFieldFired,
 									'research.per_field_search.filled': merged.filled,
+									'research.gap_rounds.contacts_kept':
+										contactFill(findings).named,
+									'research.gap_rounds.titled_kept':
+										contactFill(findings).titled,
 								})
 								yield* Effect.logInfo('research.gap_rounds.closed').pipe(
 									Effect.annotateLogs({
@@ -4167,16 +4267,21 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// Bind to a const so the null-narrowing survives the closures
 							// below (`entityTargets` is a reassignable `let`).
 							const emailTargets = entityTargets
+							// A mailbox is only taken off a page the run opened. The one
+							// sentence a search quotes is too little to tell whose page it
+							// came from, and an address is worth having only when we know
+							// it belongs to this company.
+							const openedForEmail = openedPages(scrapeCorpus)
 							const emailVerdicts = classifyEntityMatchPerSource(
 								emailTargets,
-								scrapeCorpus.map(page => ({
+								openedForEmail.map(page => ({
 									sourceId: page.urlHash,
 									text: page.text,
 									host: page.host,
 								})),
 							)
 							const emailKeep = new Set(groundedSourceIds(emailVerdicts))
-							const groundedForEmail = scrapeCorpus.filter(page =>
+							const groundedForEmail = openedForEmail.filter(page =>
 								emailKeep.has(page.urlHash),
 							)
 							const ownHosts = [
@@ -4376,8 +4481,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						quality,
 					}
 					// A thin result flips to a distinct terminal status an automation can
-					// gate on; the group rollup still treats it as a success (see
-					// rollupParentStatus), so a fan-out isn't failed by one weak leaf.
+					// gate on. A fan-out is not failed by one thin leaf — its group
+					// carries the same marker instead, so the batch reads as needing a
+					// look rather than as either broken or clean.
 					const finalStatus = quality.low_confidence
 						? 'succeeded_low_confidence'
 						: 'succeeded'

@@ -44,7 +44,7 @@ describe('needsPerFieldSearch', () => {
 		})
 
 		it('should ignore non-high-value fields that are empty', () => {
-			// GIVEN the high-value four filled but pain_points/current_tools empty
+			// GIVEN the high-value four filled and the rest of the enrichment empty
 			const findings = {
 				enrichment: {
 					country: sourced('GB'),
@@ -94,8 +94,8 @@ describe('perFieldSearchQuery', () => {
 	describe('when the field has no known intent', () => {
 		it('should fall back to the raw field name', () => {
 			// GIVEN a field with no phrasing mapped
-			expect(perFieldSearchQuery('Acme', undefined, 'pain_points')).toBe(
-				'"Acme" pain_points',
+			expect(perFieldSearchQuery('Acme', undefined, 'current_tools')).toBe(
+				'"Acme" current_tools',
 			)
 		})
 	})
@@ -142,6 +142,84 @@ describe('mergePerFieldSearch', () => {
 			// THEN nothing is filled and the same findings come back
 			expect(filled).toBe(0)
 			expect(next).toBe(findings)
+		})
+	})
+
+	describe('when the pages this round fetched name people', () => {
+		it('should carry the new contacts across and count them', () => {
+			// GIVEN findings that named one person
+			const findings = {
+				enrichment: { country: sourced('ES') },
+				contacts: [{ name: 'Anna Puig', role: sourced('CEO') }],
+			}
+			// AND a re-extraction that names her again plus someone new
+			const refreshed = {
+				enrichment: { country: sourced('ES') },
+				contacts: [
+					{ name: 'Anna Puig', role: sourced('CEO') },
+					{ name: 'Marc Vila', role: sourced('Operations Manager') },
+				],
+			}
+
+			// WHEN merged
+			const { findings: next, contactsChanged } = mergePerFieldSearch(
+				findings,
+				refreshed,
+			)
+
+			// THEN the second person is kept, the first not duplicated
+			expect(contactsChanged).toBe(true)
+			const contacts = (next as { contacts: ReadonlyArray<{ name: string }> })
+				.contacts
+			expect(contacts.map(contact => contact.name)).toEqual([
+				'Anna Puig',
+				'Marc Vila',
+			])
+		})
+
+		it('should keep a person the re-extraction no longer names', () => {
+			// GIVEN a person found earlier whom the fresh pass missed
+			const findings = {
+				enrichment: { country: sourced('ES') },
+				contacts: [{ name: 'Anna Puig', role: sourced('CEO') }],
+			}
+			const refreshed = { enrichment: { country: sourced('ES') }, contacts: [] }
+
+			// WHEN merged — THEN a second look never loses somebody
+			const { findings: next, contactsChanged } = mergePerFieldSearch(
+				findings,
+				refreshed,
+			)
+			expect(contactsChanged).toBe(false)
+			expect(next).toBe(findings)
+		})
+
+		it('should keep a title the second look put on someone already named', () => {
+			// GIVEN a person found earlier whose job title was never established
+			const findings = {
+				enrichment: { country: sourced('ES') },
+				contacts: [{ name: 'Anna Puig' }],
+			}
+			// AND a re-extraction that reads her title off the team page
+			const refreshed = {
+				enrichment: { country: sourced('ES') },
+				contacts: [{ name: 'Anna Puig', role: sourced('CEO') }],
+			}
+
+			// WHEN merged
+			const { findings: next, contactsChanged } = mergePerFieldSearch(
+				findings,
+				refreshed,
+			)
+
+			// THEN the title is kept, even though the list is exactly as long as it
+			// was — a title is the whole reason for opening a team page, and counting
+			// people alone would throw it away
+			expect(contactsChanged).toBe(true)
+			const contacts = (
+				next as { contacts: ReadonlyArray<{ role?: { value: string } }> }
+			).contacts
+			expect(contacts[0]?.role?.value).toBe('CEO')
 		})
 	})
 })

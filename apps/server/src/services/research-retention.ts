@@ -4,16 +4,22 @@ import { SqlClient } from 'effect/unstable/sql'
 import { StorageProvider } from './storage-provider'
 
 /**
- * Prunes research storage that would otherwise grow without bound. Three
- * sweeps, all safe to repeat:
+ * Clears out what research leaves behind. Four sweeps, all safe to repeat:
  *
  *  - expired cache rows (search / llm / research) — their TTL only
  *    gates reads today, nothing ever deletes them;
  *  - the bulky transcript (research_text + tool_log) of runs older than the
  *    retention window, while keeping the run row, its sources, and the citation
  *    trail so a contact's "sourced from research" provenance survives;
- *  - scrape blobs whose source no surviving run fetches and no applied contact
- *    cites — the blob and its global source row are removed together.
+ *  - stored page text nothing points at any more — the stored copy and the
+ *    record of the page go together;
+ *  - records of pages a run only saw named, which never had a stored copy, once
+ *    nothing points at them either.
+ *
+ * The last two are kept apart deliberately. Pages a run merely saw outnumber the
+ * ones it stored by roughly ten to one, so sharing a batch would leave the
+ * stored copies queued behind them — and those are the ones that cost money to
+ * keep.
  */
 export class ResearchRetention extends Context.Service<ResearchRetention>()(
 	'ResearchRetention',
@@ -48,10 +54,55 @@ export class ResearchRetention extends Context.Service<ResearchRetention>()(
 							AND (research_text IS NOT NULL OR tool_log <> '[]'::jsonb)
 					`.pipe(Effect.ignore)
 
-					// Reference-counted blob GC. A scrape blob is orphaned only when no
-					// run's sources reference it AND no applied contact cites it; the
-					// age gate avoids racing a source just inserted before its links
-					// are written.
+					// Nothing points at this page any more. Three ways it could still be
+					// spoken for: a run lists it among what it read, a paid lookup was
+					// charged against it, or an applied change cites it. A citation
+					// names either the stable record id or the page's own address —
+					// the model is asked to cite the address it read — so both have to
+					// be checked, or a page that is cited looks unwanted.
+					const unreferenced = sql`
+						NOT EXISTS (
+							SELECT 1 FROM research_run_sources rrs
+							WHERE rrs.source_id = s.id
+						)
+						AND NOT EXISTS (
+							SELECT 1 FROM research_paid_spend ps
+							WHERE ps.source_id = s.id
+						)
+						AND NOT EXISTS (
+							SELECT 1
+							FROM research_links rl,
+								LATERAL jsonb_array_elements(
+									CASE WHEN jsonb_typeof(rl.citations) = 'array'
+										THEN rl.citations ELSE '[]'::jsonb END
+								) c
+							WHERE c->>'source_id' = s.id OR c->>'source_id' = s.url
+						)
+					`
+
+					// One row that is still spoken for would make the whole batch fail,
+					// so say so instead of dropping it silently — a sweep that quietly
+					// stops clearing anything looks exactly like one with nothing to do.
+					const forgetSources = (ids: ReadonlyArray<string>) =>
+						sql`DELETE FROM sources WHERE id IN ${sql.in(ids)}`.pipe(
+							Effect.tapError(error =>
+								Effect.logWarning('research.retention.forget_failed').pipe(
+									Effect.annotateLogs({
+										event: 'research.retention.forget_failed',
+										rows: ids.length,
+										message: error.message,
+									}),
+								),
+							),
+							Effect.ignore,
+						)
+
+					// The age gate avoids racing a page recorded moments ago, before the
+					// run that read it has finished writing what it points at.
+					const olderThanWindow = sql`
+						s.last_fetched_at < now() - interval '1 day' * ${retentionDays}
+					`
+
 					const orphans = yield* sql<{
 						id: string
 						contentRef: string
@@ -59,20 +110,8 @@ export class ResearchRetention extends Context.Service<ResearchRetention>()(
 						SELECT s.id, s.content_ref
 						FROM sources s
 						WHERE s.content_ref IS NOT NULL
-							AND s.last_fetched_at < now() - interval '1 day' * ${retentionDays}
-							AND NOT EXISTS (
-								SELECT 1 FROM research_run_sources rrs
-								WHERE rrs.source_id = s.id
-							)
-							AND NOT EXISTS (
-								SELECT 1
-								FROM research_links rl,
-									LATERAL jsonb_array_elements(
-										CASE WHEN jsonb_typeof(rl.citations) = 'array'
-											THEN rl.citations ELSE '[]'::jsonb END
-									) c
-								WHERE c->>'source_id' = s.id
-							)
+							AND ${olderThanWindow}
+							AND ${unreferenced}
 						LIMIT 500
 					`.pipe(Effect.orElseSucceed(() => []))
 
@@ -80,12 +119,25 @@ export class ResearchRetention extends Context.Service<ResearchRetention>()(
 						yield* storage.delete(orphan.contentRef).pipe(Effect.ignore)
 					}
 					if (orphans.length > 0) {
-						yield* sql`
-							DELETE FROM sources WHERE id IN ${sql.in(orphans.map(o => o.id))}
-						`.pipe(Effect.ignore)
+						yield* forgetSources(orphans.map(o => o.id))
 					}
 
-					return { orphanBlobs: orphans.length }
+					// Pages a run only saw named keep no stored copy, so there is
+					// nothing to delete but the record itself.
+					const seenOnly = yield* sql<{ id: string }>`
+						SELECT s.id
+						FROM sources s
+						WHERE s.content_ref IS NULL
+							AND ${olderThanWindow}
+							AND ${unreferenced}
+						LIMIT 500
+					`.pipe(Effect.orElseSucceed(() => []))
+
+					if (seenOnly.length > 0) {
+						yield* forgetSources(seenOnly.map(row => row.id))
+					}
+
+					return { orphanBlobs: orphans.length, seenOnly: seenOnly.length }
 				})
 
 			return { sweepExpired } as const

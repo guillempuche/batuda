@@ -3,6 +3,10 @@
  * API. Firecrawl runs the query on its own infra and returns web results
  * (url + title + snippet), the same source the `firecrawl_search` tool uses.
  *
+ * Search is discovery only: it reports which pages look relevant and quotes the
+ * passage that made each one look that way. Reading a page in full is the
+ * separate `scrape_page` step, so the run pays to open just the pages it picks.
+ *
  * Mirrors the `firecrawl/scrape.ts` adapter (Config.redacted key → HttpClient →
  * Schema-decoded body → ProviderError) with the shared `hardenHttp` wrapper for
  * timeout + recoverable-only retry. Reads the same `RESEARCH_API_KEY_SEARCH`
@@ -24,7 +28,6 @@ import { ProviderError } from '../../domain/errors'
 import { SearchResult, SearchResultItem } from '../../domain/types'
 import { keyForSlot } from '../_config'
 import { hardenHttp } from '../_http-harden'
-import { cleanScrapedMarkdown } from './clean-scraped-markdown'
 
 const SEARCH_URL = 'https://api.firecrawl.dev/v2/search'
 
@@ -36,14 +39,15 @@ const SearchResponse = Schema.Struct({
 				Schema.Struct({
 					url: Schema.String,
 					title: Schema.optional(Schema.String),
+					// The passage of the page that matched the query, picked by
+					// Firecrawl. Falls back to the site's own blurb when the page has
+					// no matching passage.
 					description: Schema.optional(Schema.String),
-					// Present when scrapeOptions asked for it — the page's main content.
-					markdown: Schema.optional(Schema.String),
 				}),
 			),
 		),
 	}),
-	// Total credits this call actually cost (search + per-result scraping).
+	// Total credits this call actually cost.
 	creditsUsed: Schema.optional(Schema.Number),
 })
 
@@ -83,15 +87,13 @@ export const makeFirecrawlSearch = (slot: number) =>
 								// Web results only — skip the news/image sources the research
 								// loop has no way to scrape or cite.
 								sources: [{ type: 'web' }],
-								// Return each result's main content as markdown, so one
-								// search can ground the run without a separate scrape.
-								// Drop <form> blocks so a "contact us" pop-up form doesn't
-								// stand in for the page body (same fix as the scrape adapter).
-								scrapeOptions: {
-									formats: ['markdown'],
-									onlyMainContent: true,
-									excludeTags: ['form'],
-								},
+								// Ask for the passage of each page that answers the query; a
+								// result otherwise carries only the site's generic blurb,
+								// which rarely says anything about the company. The passage
+								// costs nothing extra, while asking for the pages themselves
+								// would bill a full page read per result — opening a page
+								// stays a step of its own.
+								highlights: true,
 								...(input.recency
 									? { tbs: tbsForRecency(input.recency.days) }
 									: {}),
@@ -131,19 +133,22 @@ export const makeFirecrawlSearch = (slot: number) =>
 						)
 						return new SearchResult({
 							items: (body.data.web ?? []).map(r => {
-								// Clean page-builder markup out of the scraped content before
-								// it becomes grounding evidence; an empty result means the page
-								// was mostly scaffolding, so the item carries no content.
-								const content = cleanScrapedMarkdown(r.markdown ?? '')
+								// The passage is real text off the page, so the run can cite
+								// it and count it as evidence without paying to open the
+								// page. A result with no passage still keeps its place: the
+								// URL alone is worth scraping later.
+								const passage = (r.description ?? '').trim()
 								return new SearchResultItem({
 									url: r.url,
 									title: r.title ?? '',
-									snippet: r.description ?? '',
-									...(content.length > 0 ? { content } : {}),
+									// A preview at the same cut-off the Brave context adapter
+									// uses; the whole passage goes in `content` below.
+									snippet: passage.slice(0, 300),
+									...(passage.length > 0 ? { content: passage } : {}),
 								})
 							}),
-							// Bill the credits Firecrawl actually charged (search plus the
-							// per-result scrape), not a flat 1, so the run budget is honest.
+							// Bill the credits Firecrawl actually charged, not a flat 1, so
+							// the run budget is honest.
 							units: body.creditsUsed ?? 1,
 						})
 					}),

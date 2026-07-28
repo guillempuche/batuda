@@ -570,6 +570,10 @@ msgstr "Aplica tot el verificat ({verifiedToApply})"
 msgid "Apply field updates ({0})"
 msgstr "Aplica actualitzacions de camps ({0})"
 
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Apply these one at a time — this run wasn't sure it found the right company."
+msgstr "Aplica-les d'una en una: aquesta execució no tenia clar si havia trobat l'empresa correcta."
+
 #. placeholder {0}: items.length
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Applying {0} changes…"
@@ -624,6 +628,10 @@ msgstr "Assigna-me'l"
 #: src/routes/settings/mcp/connections.tsx
 msgid "Assistant"
 msgstr "Assistent"
+
+#: src/components/research/run-detail.tsx
+msgid "At least one of these results needs reading before it is used. Open the ones marked below."
+msgstr "Almenys un d'aquests resultats s'ha de llegir abans de fer-lo servir. Obre els que estan marcats a sota."
 
 #: src/components/emails/attachment-picker.tsx
 msgid "Attach"
@@ -2302,8 +2310,8 @@ msgid "Free research work allowed for one run."
 msgstr "Treball de recerca gratuït permès per a una execució."
 
 #: src/components/research/inbox/research-inbox.tsx
-msgid "Free-text, low-confidence or unverified — read before applying."
-msgstr "Text lliure, poca confiança o sense verificar — llegeix-ho abans d'aplicar."
+msgid "Free-text, low-confidence, unverified, or from a run that needs reading — read before applying."
+msgstr "Text lliure, poca confiança, sense verificar o d'una execució que cal revisar — llegeix-ho abans d'aplicar."
 
 #: src/components/research/research-dialog.tsx
 msgid "Freeform"
@@ -2415,6 +2423,14 @@ msgstr "No he trobat cap pàgina útil d'aquesta empresa."
 #: src/components/research/run-detail.tsx
 msgid "I couldn't read the company's website, so there was nothing to work from."
 msgstr "No he pogut llegir el lloc web de l'empresa, així que no hi havia res per treballar."
+
+#: src/components/research/run-detail.tsx
+msgid "I found less to go on here than usual."
+msgstr "Aquí he trobat menys informació que de costum."
+
+#: src/components/research/run-detail.tsx
+msgid "I found pages that mention this company but never clearly landed on its own website, so I can't be sure these findings are about the right one."
+msgstr "He trobat pàgines que esmenten aquesta empresa, però cap no era del seu lloc web propi, així que no puc assegurar que aquestes dades siguin de l'empresa correcta."
 
 #: src/components/profile/set-password-nudge.tsx
 msgid "I prefer passwordless"
@@ -3753,13 +3769,7 @@ msgstr "Crides d'API de recerca pagades carregades a aquesta organització."
 msgid "Paid spend this month"
 msgstr "Despesa de pagament aquest mes"
 
-#: src/components/research/findings/prospect-scan-view.tsx
-msgid "Pain indicators"
-msgstr "Indicadors de dolor"
-
 #: src/components/companies/about-section.tsx
-#: src/components/research/findings/company-enrichment-view.tsx
-#: src/components/research/run-labels.ts
 msgid "Pain points"
 msgstr "Punts febles"
 
@@ -4081,6 +4091,14 @@ msgstr "Llegeix {0}"
 msgid "Read state update failed"
 msgstr "Ha fallat l'actualització de l'estat de lectura"
 
+#: src/components/research/findings/shared.tsx
+msgid "Read this before it goes into a record"
+msgstr "Llegeix-ho abans que entri en una fitxa"
+
+#: src/components/research/run-detail.tsx
+msgid "Read this before you use it"
+msgstr "Llegeix-ho abans de fer-ho servir"
+
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Ready to apply"
 msgstr "A punt per aplicar"
@@ -4358,6 +4376,10 @@ msgstr "Execució eliminada"
 #: src/components/research/run-detail.tsx
 msgid "Run failed"
 msgstr "Execució fallida"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Run needs reading"
+msgstr "Cal llegir l'execució"
 
 #: src/components/companies/research-summary-card.tsx
 msgid "Run new"

@@ -1,11 +1,11 @@
 /**
  * Stub Spanish report provider — returns a deterministic fake company report.
  *
- * Exports both the instance (for the provider factory table in
- * `providers-live.ts`) and the standalone Layer (single-slot callers, tests).
+ * Exported as an instance, which is what the provider factory table in
+ * `providers-live.ts` picks from when the config names this vendor.
  */
 
-import { Effect, Layer } from 'effect'
+import { Effect } from 'effect'
 
 import { ReportRouter } from '../../application/ports'
 import { CompanyReport } from '../../domain/types'
@@ -45,7 +45,3 @@ export const StubReportEsProviderInstance = ReportRouter.of({
 			}),
 		),
 })
-
-export const StubReportEsProvider = Layer.succeed(ReportRouter)(
-	StubReportEsProviderInstance,
-)

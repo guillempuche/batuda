@@ -10,6 +10,7 @@ import {
 	type EntityTargets,
 	groundedSourceIds,
 	isConfirmedRegistryMatch,
+	isOwnSiteHost,
 	parseQueryDomain,
 	placesCorroborate,
 	queryPlaces,
@@ -658,6 +659,97 @@ describe('reachedOwnSite', () => {
 		it('should return false for a page with no host', () => {
 			// GIVEN a corpus entry carrying no host (e.g. a tool result)
 			expect(reachedOwnSite(targets, [{ host: undefined }])).toBe(false)
+		})
+	})
+})
+
+describe('isOwnSiteHost', () => {
+	// "Transportes García" — the trade first, the family name last, which is how
+	// most small firms in Spain and Catalonia are named.
+	const garcia: EntityTargets = {
+		cores: ['transportesgarcia'],
+		words: ['garcia'],
+		domains: [],
+		places: ['barcelona'],
+	}
+
+	describe('when the domain is the company site', () => {
+		it('should accept a domain the caller supplied', () => {
+			// GIVEN the host the caller handed over
+			const anchored: EntityTargets = { ...garcia, domains: ['tg.example'] }
+			expect(isOwnSiteHost(anchored, 'tg.example')).toBe(true)
+		})
+
+		it('should accept the distinctive part of the name on its own', () => {
+			// GIVEN the family name, which is what such a firm actually registers
+			// THEN it is the company's site even though the name says more
+			expect(isOwnSiteHost(garcia, 'garcia.es')).toBe(true)
+			expect(isOwnSiteHost(garcia, 'garcia.cat')).toBe(true)
+		})
+
+		it('should accept the whole name spelled out', () => {
+			expect(isOwnSiteHost(garcia, 'transportesgarcia.com')).toBe(true)
+		})
+
+		it('should accept the whole name with the legal form tacked on', () => {
+			// GIVEN a domain registered as the firm signs itself
+			expect(isOwnSiteHost(garcia, 'transportesgarciasl.es')).toBe(true)
+		})
+	})
+
+	describe('when the domain only carries the trade the company is in', () => {
+		it('should reject it — an industry word identifies nobody', () => {
+			// GIVEN a domain that is the generic half of the name. Accepting this
+			// would send the run off to read a stranger's site as the company's.
+			expect(isOwnSiteHost(garcia, 'transportes.com')).toBe(false)
+			expect(isOwnSiteHost(garcia, 'transporte.es')).toBe(false)
+		})
+	})
+
+	describe('when the domain is somebody writing about the company', () => {
+		it('should reject a directory or review site carrying the name', () => {
+			const acme: EntityTargets = {
+				cores: ['acmelogistics'],
+				words: ['acme'],
+				domains: [],
+				places: [],
+			}
+			// GIVEN hosts that spell the company out and then add their own purpose
+			expect(isOwnSiteHost(acme, 'acmelogisticsreviews.com')).toBe(false)
+			expect(isOwnSiteHost(acme, 'acme-directory.com')).toBe(false)
+		})
+
+		it('should reject a well-known aggregator', () => {
+			expect(isOwnSiteHost(garcia, 'crunchbase.com')).toBe(false)
+			expect(isOwnSiteHost(garcia, 'zoominfo.com')).toBe(false)
+		})
+
+		it('should reject an unrelated host', () => {
+			expect(isOwnSiteHost(garcia, 'doordash.com')).toBe(false)
+		})
+	})
+
+	describe('when the name gives nothing to match on', () => {
+		it('should reject rather than guess', () => {
+			// GIVEN a company whose name folds to under four characters, and one
+			// whose every word is the trade it works in
+			const tiny: EntityTargets = {
+				cores: ['abc'],
+				words: [],
+				domains: [],
+				places: [],
+			}
+			const generic: EntityTargets = {
+				cores: ['transporteslogistica'],
+				words: [],
+				domains: [],
+				places: [],
+			}
+
+			// THEN no host is accepted on the strength of it
+			expect(isOwnSiteHost(tiny, 'a-b-c.com')).toBe(false)
+			expect(isOwnSiteHost(tiny, 'abcdirectory.com')).toBe(false)
+			expect(isOwnSiteHost(generic, 'transportes.com')).toBe(false)
 		})
 	})
 })

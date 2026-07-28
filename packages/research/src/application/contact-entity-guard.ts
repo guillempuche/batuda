@@ -12,9 +12,9 @@
  * name they mention (a proper name followed by a company marker — Inc, Ltd,
  * Logistics, Group, …), and drops the contact when every company its evidence names
  * is some *other* company and none is the target. A contact whose quotes name no
- * company, or name the target, is kept — subtler cases (no company in the quote at
- * all) are left to the model-backed critic, which already asks whether a quote is
- * about this company.
+ * company, or name the target, is kept: a testimonial that names nobody's employer
+ * reads the same as a real member of staff, and losing real people is the worse of
+ * the two mistakes.
  */
 
 import { classifyEntityMatch, type EntityTargets } from './entity-guard'

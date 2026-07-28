@@ -5,7 +5,7 @@
  * House returns, to drive the name-split + guess path.
  */
 
-import { Effect, Layer } from 'effect'
+import { Effect } from 'effect'
 
 import { RegistryRouter } from '../../application/ports'
 import { RegistryRecord } from '../../domain/types'
@@ -29,7 +29,3 @@ export const StubRegistryGbProviderInstance = RegistryRouter.of({
 			}),
 		),
 })
-
-export const StubRegistryGbProvider = Layer.succeed(RegistryRouter)(
-	StubRegistryGbProviderInstance,
-)
