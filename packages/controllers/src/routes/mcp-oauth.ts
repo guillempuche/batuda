@@ -31,15 +31,31 @@ export const RevokeConnectionInput = Schema.Struct({
 
 // ── View ──
 
+// An organization this connection has been cut off from. `blockedBySelf`
+// tells apart a removal the person made on their own connection, which they
+// can undo by choosing that organization again, from one an owner made for
+// the whole organization, which they cannot.
+export const McpConnectionBlock = Schema.Struct({
+	organizationId: Schema.String,
+	blockedBySelf: Schema.Boolean,
+})
+
 // One MCP OAuth connection: an OAuth client the caller consented to, with
 // the orgs its tokens may act in (empty until chosen). The /mcp Bearer path
-// re-checks each against live membership and picks one per request via the
-// X-Batuda-Organization-Id hint (single-org users are auto-resolved).
+// re-checks each against live membership; a single organization resolves on
+// its own, and a request has to name which one when there are several.
 export const McpConnectionView = Schema.Struct({
 	clientId: Schema.String,
 	name: Schema.NullOr(Schema.String),
 	createdAt: Schema.String,
+	// What the connection can reach right now: chosen, minus anything blocked.
 	organizationIds: Schema.Array(Schema.String),
+	// Everything chosen, blocked organizations included. Empty means nobody has
+	// chosen yet, which — with nothing blocked — reaches every organization the
+	// person belongs to. Kept apart from `organizationIds` so a connection
+	// blocked down to nothing is not read as one nobody has chosen for.
+	chosenOrganizationIds: Schema.Array(Schema.String),
+	blocks: Schema.Array(McpConnectionBlock),
 	// Host of the client's first redirect URI — provenance shown beside the
 	// self-asserted `name` (null if it registered none / they're unparseable).
 	redirectHost: Schema.NullOr(Schema.String),

@@ -567,6 +567,28 @@ describe('OAuth Bearer org resolution', () => {
 			// THEN it refuses (no org entered) with the select-an-org code
 			expect(outcome).toEqual({ kind: 'forbidden', code: -32002 })
 		})
+
+		it('should start working once they narrow the connection to one org', async () => {
+			// GIVEN that same refused connection, narrowed to a single organization
+			// through the call the settings screen makes — not by staging rows, so
+			// this covers the whole path a person actually takes out of the refusal
+			const token = await mintToken({ sub: multiOrgUserId })
+			await runtime.runPromise(
+				Effect.gen(function* () {
+					const service = yield* McpOAuthService
+					return yield* service.selectOrgs(multiOrgUserId, CLIENT_ID, [
+						taller.id,
+					])
+				}),
+			)
+
+			// WHEN the Bearer path resolves again, still without a hint — assistants
+			// cannot send one, which is why narrowing has to be enough on its own
+			const outcome = await resolveBearer(token)
+
+			// THEN it resolves to the chosen organization
+			expect(outcome).toEqual({ kind: 'scoped', orgIds: [taller.id] })
+		})
 	})
 
 	describe('a multi-org user whose last selected org was revoked', () => {
@@ -1212,6 +1234,102 @@ describe('McpOAuthService.listConnections', () => {
 			// THEN the connection's organizationIds is empty (unbound)
 			expect(connections).toHaveLength(1)
 			expect(connections[0]?.organizationIds).toEqual([])
+		})
+
+		it('should return an empty chosenOrganizationIds array', async () => {
+			// GIVEN a consented client but no selection
+			await seedConsentedClient(multiOrgUserId, CLIENT_ID, 'mcp-oauth-test')
+
+			// WHEN listConnections runs
+			const connections = await runtime.runPromise(
+				Effect.gen(function* () {
+					const service = yield* McpOAuthService
+					return yield* service.listConnections(multiOrgUserId)
+				}),
+			)
+
+			// THEN nothing has been chosen either — which is what tells the screen
+			// this connection reaches every organization rather than none
+			expect(connections[0]?.chosenOrganizationIds).toEqual([])
+			expect(connections[0]?.blocks).toEqual([])
+		})
+	})
+
+	describe('a connection cut off by an owner', () => {
+		it('should report the block as not raised by the connection owner', async () => {
+			// GIVEN a connection authorized for both orgs, cut off from taller by an
+			// admin rather than by the person who owns the connection
+			await seedConsentedClient(multiOrgUserId, CLIENT_ID, 'mcp-oauth-test')
+			await setSelections(multiOrgUserId, [taller.id, restaurant.id])
+			await setRevocations(multiOrgUserId, [taller.id], adminUserId)
+
+			// WHEN listConnections runs
+			const connections = await runtime.runPromise(
+				Effect.gen(function* () {
+					const service = yield* McpOAuthService
+					return yield* service.listConnections(multiOrgUserId)
+				}),
+			)
+
+			// THEN the block is reported as someone else's, so the screen can show it
+			// as something this person cannot undo
+			expect(connections[0]?.blocks).toEqual([
+				{ organizationId: taller.id, blockedBySelf: false },
+			])
+			// AND the choice behind it survives, even though it is unreachable
+			expect(connections[0]?.chosenOrganizationIds).toEqual(
+				[restaurant.id, taller.id].sort(),
+			)
+			expect(connections[0]?.organizationIds).toEqual([restaurant.id])
+		})
+	})
+
+	describe('a connection the caller cut off themselves', () => {
+		it('should report the block as their own', async () => {
+			// GIVEN a connection the person cut off from taller themselves
+			await seedConsentedClient(multiOrgUserId, CLIENT_ID, 'mcp-oauth-test')
+			await setSelections(multiOrgUserId, [taller.id, restaurant.id])
+			await setRevocations(multiOrgUserId, [taller.id])
+
+			// WHEN listConnections runs
+			const connections = await runtime.runPromise(
+				Effect.gen(function* () {
+					const service = yield* McpOAuthService
+					return yield* service.listConnections(multiOrgUserId)
+				}),
+			)
+
+			// THEN it is marked as theirs — the screen offers it back, because
+			// choosing that organization again lifts their own block
+			expect(connections[0]?.blocks).toEqual([
+				{ organizationId: taller.id, blockedBySelf: true },
+			])
+		})
+	})
+
+	describe('a connection cut off from an org it never chose', () => {
+		it('should still report the block', async () => {
+			// GIVEN a connection nobody has scoped, cut off from taller anyway.
+			// There is no choice for the removal to hang off, which is exactly the
+			// case a join through the chosen organizations cannot see
+			await seedConsentedClient(multiOrgUserId, CLIENT_ID, 'mcp-oauth-test')
+			await setSelections(multiOrgUserId, [])
+			await setRevocations(multiOrgUserId, [taller.id], adminUserId)
+
+			// WHEN listConnections runs
+			const connections = await runtime.runPromise(
+				Effect.gen(function* () {
+					const service = yield* McpOAuthService
+					return yield* service.listConnections(multiOrgUserId)
+				}),
+			)
+
+			// THEN the block is still reported, so the screen never claims the way is
+			// clear while the connection stays shut out
+			expect(connections[0]?.chosenOrganizationIds).toEqual([])
+			expect(connections[0]?.blocks).toEqual([
+				{ organizationId: taller.id, blockedBySelf: false },
+			])
 		})
 	})
 })

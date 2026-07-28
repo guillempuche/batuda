@@ -413,6 +413,12 @@ const McpAuthMiddleware = HttpRouter.middleware(
 								? allowedOrgIds[0]
 								: undefined
 						if (!orgId) {
+							// Point at the settings page first: an assistant sets headers
+							// once for a whole connection, if at all, so asking someone to
+							// send one per call is asking for something most of them cannot
+							// do. Narrowing the connection to one organization works
+							// everywhere; the header stays as a footnote for the
+							// command-line clients that can send it.
 							return yield* rejectAuth(
 								hint ? 'org_hint_not_authorized' : 'org_selection_required',
 								jsonRpcError(
@@ -420,9 +426,7 @@ const McpAuthMiddleware = HttpRouter.middleware(
 									-32002,
 									hint
 										? 'X-Batuda-Organization-Id is not authorized for this connection'
-										: allowedOrgIds.length === 1
-											? 'Select an organization for this connection at /settings/mcp/connections'
-											: 'Send X-Batuda-Organization-Id with one of the authorized organizations',
+										: 'This connection is authorized for more than one organization. Choose one at /settings/mcp/connections, or send X-Batuda-Organization-Id with one of them.',
 								),
 							)
 						}

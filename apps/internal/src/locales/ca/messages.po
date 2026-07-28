@@ -426,8 +426,8 @@ msgid "AI agent"
 msgstr "Agent IA"
 
 #: src/routes/settings/mcp/connections.tsx
-msgid "AI assistants you've connected over MCP. Each may act in one or more of your organizations; the assistant picks which per request."
-msgstr "Assistents d'IA que has connectat per MCP. Cadascun pot actuar en una o més de les teves organitzacions; l'assistent tria quina en cada petició."
+msgid "AI assistants you've connected over MCP. Each works in the organizations you choose for it — usually one, since most assistants cannot say which they mean when there are several."
+msgstr "Assistents d'IA que has connectat per MCP. Cadascun treballa a les organitzacions que li triïs — normalment una, perquè la majoria d'assistents no poden dir a quina es refereixen quan n'hi ha diverses."
 
 #: src/routes/companies/index.tsx
 #: src/routes/emails/index.tsx
@@ -472,6 +472,10 @@ msgstr "Tot el temps"
 msgid "All under control"
 msgstr "Tot sota control"
 
+#: src/routes/settings/mcp/connections.tsx
+msgid "All your organizations"
+msgstr "Totes les teves organitzacions"
+
 #: src/routes/oauth/consent.tsx
 msgid "Allow"
 msgstr "Permet"
@@ -501,6 +505,10 @@ msgstr "Un assistent d'IA vol connectar-se al teu compte de Batuda per MCP i act
 #: src/routes/settings/organization/templates.tsx
 msgid "An org stack runs for every member who hasn't set their own. The one marked default applies to a run that names none. Only org templates can go in an org stack."
 msgstr "Una pila de l'organització s'aplica a tots els membres que no n'han definit una de pròpia. La marcada per defecte s'aplica quan una execució no n'anomena cap. En una pila de l'organització només hi poden anar plantilles de l'organització."
+
+#: src/routes/settings/mcp/connections.tsx
+msgid "An owner removed this one."
+msgstr "Un propietari l’ha tret."
 
 #: src/components/research/inbox/research-inbox.tsx
 msgid "and {hidden} more on the run"
@@ -827,6 +835,7 @@ msgstr "Crides"
 #: src/routes/emails/inboxes.tsx
 #: src/routes/settings/api-keys/index.tsx
 #: src/routes/settings/mcp/connections.tsx
+#: src/routes/settings/mcp/connections.tsx
 #: src/routes/tasks/index.tsx
 msgid "Cancel"
 msgstr "Cancel·la"
@@ -859,6 +868,10 @@ msgstr "Cc"
 #: src/routes/settings/profile/index.tsx
 msgid "Change my mind — set a password anyway"
 msgstr "Canvio d'opinió — vull posar contrasenya"
+
+#: src/routes/settings/mcp/connections.tsx
+msgid "Change organizations"
+msgstr "Canvia les organitzacions"
 
 #: src/routes/settings/profile/index.tsx
 #: src/routes/settings/profile/index.tsx
@@ -909,6 +922,10 @@ msgstr "ChatGPT i Claude.ai no poden enviar una clau, així que es connecten amb
 #: src/routes/login.tsx
 msgid "Check your inbox"
 msgstr "Mira la safata d'entrada"
+
+#: src/routes/settings/mcp/connections.tsx
+msgid "Choose organizations"
+msgstr "Tria les organitzacions"
 
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
@@ -1396,6 +1413,7 @@ msgid "Could not revoke"
 msgstr "No s'ha pogut revocar"
 
 #: src/routes/companies/$slug.tsx
+#: src/routes/settings/mcp/connections.tsx
 msgid "Could not save"
 msgstr "No s'ha pogut desar"
 
@@ -2690,6 +2708,10 @@ msgstr "S'estan carregant els canvis pendents de revisió."
 msgid "Loading the review queue"
 msgstr "S'està carregant la cua de revisió"
 
+#: src/routes/settings/mcp/connections.tsx
+msgid "Loading your organizations…"
+msgstr "S’estan carregant les teves organitzacions…"
+
 #: src/routes/settings/organization/policy.tsx
 msgid "Loading your research budget…"
 msgstr "Carregant el teu pressupost de recerca…"
@@ -2956,6 +2978,14 @@ msgstr "Confiança mínima per aplicar automàticament"
 #: src/routes/settings/organization/policy.tsx
 msgid "Monthly paid cap"
 msgstr "Límit mensual de pagament"
+
+#: src/routes/settings/mcp/connections.tsx
+msgid "Most assistants can only work in one organization per connection. With more than one ticked, this one will keep asking you to choose."
+msgstr "La majoria d’assistents només poden treballar en una organització per connexió. Amb més d’una marcada, aquest et continuarà demanant que en triïs una."
+
+#: src/routes/oauth/consent.tsx
+msgid "Most assistants can only work in one organization, so picking a single one here is usually what you want. You can change this later in Settings → MCP connections."
+msgstr "La majoria d’assistents només poden treballar en una organització, així que aquí normalment et convé triar-ne una de sola. Ho pots canviar més endavant a Configuració → Connexions MCP."
 
 #: src/routes/settings/organization/policy.tsx
 msgid "Most this organization can spend on paid research each month, shared by everyone in it."
@@ -3594,8 +3624,13 @@ msgstr "Organització"
 #: src/components/layout/org-switcher.tsx
 #: src/routes/oauth/consent.tsx
 #: src/routes/settings/mcp/connections.tsx
+#: src/routes/settings/mcp/connections.tsx
 msgid "Organizations"
 msgstr "Organitzacions"
+
+#: src/routes/settings/mcp/connections.tsx
+msgid "Organizations updated"
+msgstr "Organitzacions actualitzades"
 
 #: src/components/companies/upcoming-meetings-card.tsx
 msgid "organizer"
@@ -3824,10 +3859,6 @@ msgstr "Tria una pila desada o fes servir la teva predeterminada."
 #: src/routes/emails/index.tsx
 msgid "Pick an organization from the switcher in the header, or sign out and back in. After a recent dev DB reset, existing sessions can point at organization ids that the reset removed."
 msgstr "Tria una organització al selector de la barra superior, o tanca la sessió i torna a entrar. Després d'un reset recent de la base de dades de dev, les sessions existents poden apuntar a identificadors d'organització que el reset ha esborrat."
-
-#: src/routes/oauth/consent.tsx
-msgid "Pick one or more. The assistant will ask which to use per request."
-msgstr "Tria'n una o més. L'assistent demanarà quina fer servir en cada petició."
 
 #: src/routes/emails/inboxes.tsx
 msgid "Pick one to use as your default sender."
@@ -4348,6 +4379,7 @@ msgstr "Context comercial"
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/pages/$id.tsx
+#: src/routes/settings/mcp/connections.tsx
 msgid "Save"
 msgstr "Desa"
 
@@ -4384,6 +4416,7 @@ msgstr "Desada, però no s'ha marcat com a predeterminada"
 #: src/routes/emails/inboxes.tsx
 #: src/routes/pages/$id.tsx
 #: src/routes/reset-password.tsx
+#: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/organization/policy.tsx
 #: src/routes/settings/profile/index.tsx
 #: src/routes/settings/profile/index.tsx
@@ -4682,6 +4715,7 @@ msgid "Something went wrong. Start the connection again from your assistant."
 msgstr "Alguna cosa ha anat malament. Torna a iniciar la connexió des del teu assistent."
 
 #: src/routes/reset-password.tsx
+#: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/profile/index.tsx
@@ -5160,6 +5194,19 @@ msgstr "La persona inicia la sessió a la pàgina d'inici de sessió amb aquesta
 #: src/routes/settings/mcp/connections.tsx
 msgid "This assistant can no longer reach this organization."
 msgstr "Aquest assistent ja no pot accedir a aquesta organització."
+
+#. placeholder {0}: tickedOrgIds.length
+#: src/routes/settings/mcp/connections.tsx
+msgid "This assistant is authorized for {0} organizations."
+msgstr "Aquest assistent està autoritzat a {0} organitzacions."
+
+#: src/routes/settings/mcp/connections.tsx
+msgid "This assistant now works in one organization."
+msgstr "Aquest assistent ara treballa en una sola organització."
+
+#: src/routes/settings/mcp/connections.tsx
+msgid "This assistant works in the organizations you tick here."
+msgstr "Aquest assistent treballa a les organitzacions que marquis aquí."
 
 #: src/routes/companies/$slug.tsx
 msgid "This company can't be displayed"
@@ -5656,6 +5703,10 @@ msgstr "No tens permís per veure aquesta pàgina."
 msgid "You got in from a link in your email."
 msgstr "Has entrat des d'un enllaç al teu correu."
 
+#: src/routes/settings/mcp/connections.tsx
+msgid "You removed this one. Tick it to restore it."
+msgstr "L’has tret tu. Marca-la per tornar-la a activar."
+
 #: src/routes/settings/profile/index.tsx
 msgid "You sign in from email links. I won't bring it up again."
 msgstr "Entres des d'enllaços al correu. No t'ho tornaré a esmentar."
@@ -5671,6 +5722,10 @@ msgstr "tu@exemple.com"
 #: src/routes/settings/profile/index.tsx
 msgid "Your Batuda workbench identity."
 msgstr "La teva identitat al banc de Batuda."
+
+#: src/routes/oauth/consent.tsx
+msgid "Your choice of organization could not be saved, so this was stopped rather than give the assistant more access than you picked. Try again."
+msgstr "No s’ha pogut desar la teva tria d’organització, així que s’ha aturat en comptes de donar a l’assistent més accés del que has triat. Torna-ho a provar."
 
 #: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/index.tsx
