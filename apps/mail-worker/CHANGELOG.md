@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-28 (mail-worker-v2026.7.28)
+
+### Features
+
+* count the rounds a research run has got through ([5ccc984](https://github.com/guillempuche/batuda/commit/5ccc984259e6ab0e19390d51b48bf29b0fef6e6a))
+* **research:** find a company's own site, and see whether the profile came back full ([be609dc](https://github.com/guillempuche/batuda/commit/be609dc39eff74f6573084ea08a495a46d2e647e)), closes [#328](https://github.com/guillempuche/batuda/issues/328)
+
+### Bug Fixes
+
+* key every poller off the one list of finished statuses ([b8369ec](https://github.com/guillempuche/batuda/commit/b8369ec5c938287d088f1b73ea1daf08ef0ecb68))
+
 ## 2026-07-27 (mail-worker-v2026.7.27)
 
 ### Features
