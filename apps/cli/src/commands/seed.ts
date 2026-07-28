@@ -1,7 +1,6 @@
 import { Effect } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { clearMailCatcher } from '../lib/mail-catcher'
 import { seedCalendar } from './seed/calendar'
 import {
 	seedCompanies,
@@ -38,11 +37,6 @@ export { PRESETS, type Preset } from './seed/shared'
 export const seed = (preset: Preset) =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
-
-		// Outside the transaction below: emptying the catcher is a call to
-		// another service and cannot be taken back if the seed rolls back.
-		yield* Effect.logInfo('Purging mail catcher...')
-		yield* clearMailCatcher
 
 		return yield* sql.withTransaction(
 			Effect.gen(function* () {

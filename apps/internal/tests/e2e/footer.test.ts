@@ -4,7 +4,6 @@ import { expect, test } from '@playwright/test'
 
 import { DATABASE_URL } from './helpers/database-url'
 import {
-	clearCatcher,
 	getMessage,
 	getRawMessage,
 	waitForMessage,
@@ -83,7 +82,6 @@ test.describe('compose with footer', () => {
 	})
 
 	test.beforeEach(async ({ page }) => {
-		await clearCatcher()
 		// See send-email.test.ts for the rationale: force `connected` so a
 		// cold-catcher probe tick can't trip GrantUnavailable on sendDraft.
 		psql(

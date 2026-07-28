@@ -3,11 +3,7 @@ import { execSync } from 'node:child_process'
 import { expect, test } from '@playwright/test'
 
 import { DATABASE_URL } from './helpers/database-url'
-import {
-	clearCatcher,
-	getMessage,
-	waitForMessage,
-} from './helpers/mail-catcher'
+import { getMessage, waitForMessage } from './helpers/mail-catcher'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 // Sends an email with a small PDF attachment via the compose UI and
@@ -61,7 +57,6 @@ const fillBody = async (
 
 test.describe('compose with attachment', () => {
 	test.beforeEach(async ({ page }) => {
-		await clearCatcher()
 		// See send-email.test.ts beforeEach for the rationale: force the
 		// seeded inbox `connected` so a cold-catcher probe tick can't trip
 		// GrantUnavailable on sendDraft.

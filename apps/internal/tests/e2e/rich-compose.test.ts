@@ -4,7 +4,6 @@ import { expect, test } from '@playwright/test'
 
 import { DATABASE_URL } from './helpers/database-url'
 import {
-	clearCatcher,
 	getMessage,
 	getRawMessage,
 	waitForMessage,
@@ -34,8 +33,7 @@ const editorOf = (page: import('@playwright/test').Page) =>
 
 test.describe('compose with rich formatting', () => {
 	test.beforeEach(async ({ page }) => {
-		// GIVEN the catcher is empty and the seeded inbox is reachable.
-		await clearCatcher()
+		// GIVEN the seeded inbox is reachable.
 		psql(
 			`UPDATE inboxes SET grant_status='connected' WHERE email='admin@taller.cat'`,
 		)
