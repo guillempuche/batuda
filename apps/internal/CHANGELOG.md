@@ -3,6 +3,51 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-28 (internal-v2026.7.28)
+
+### Features
+
+* bound every list request and count only when asked ([c9f96f1](https://github.com/guillempuche/batuda/commit/c9f96f19406f26624ee325ecfa11cc6ed4db7df5))
+* count the rounds a research run has got through ([5ccc984](https://github.com/guillempuche/batuda/commit/5ccc984259e6ab0e19390d51b48bf29b0fef6e6a))
+* **internal:** let a run's review keep loading past a hundred changes ([a461044](https://github.com/guillempuche/batuda/commit/a4610440bf4eaf6fc480561d1a730f30e18b1af4))
+* **internal:** let the rest of the lists keep loading as you scroll ([e4c12af](https://github.com/guillempuche/batuda/commit/e4c12af57fec97c8b28bce7794e402d2565dcd5a))
+* let a member choose which organizations an assistant works in ([39660e6](https://github.com/guillempuche/batuda/commit/39660e68c1347bdcea8beb0f9565412a3a8f6838))
+* let an organization allow back an assistant it stopped ([37d2b03](https://github.com/guillempuche/batuda/commit/37d2b03af2399690aeb8110323562d859e7a2530))
+* **mcp:** tell the assistant when a list was cut short ([cd6d84d](https://github.com/guillempuche/batuda/commit/cd6d84dde067bb4617277fd9f8475c6756c7df0c))
+* **research:** find a company's own site, and see whether the profile came back full ([be609dc](https://github.com/guillempuche/batuda/commit/be609dc39eff74f6573084ea08a495a46d2e647e)), closes [#328](https://github.com/guillempuche/batuda/issues/328)
+* surface finished research in the daily plan ([aa6d9be](https://github.com/guillempuche/batuda/commit/aa6d9beabba181098c7e6e3a7c1bb3aa9e8550cb))
+
+### Bug Fixes
+
+* carry the request to be counted all the way through ([790213a](https://github.com/guillempuche/batuda/commit/790213a6af1ec1d167b5212af2381d2ad526cecb))
+* **internal:** count what exists, not what a screen happened to fetch ([3c29c0c](https://github.com/guillempuche/batuda/commit/3c29c0cbe97b6bcdc5cbcd06247814f95b77badb))
+* **internal:** keep keyboard and screen reader with a growing list ([0efef6a](https://github.com/guillempuche/batuda/commit/0efef6a6ff45bb9ba2c76bbbaf5836ccdc4ec6d8))
+* **internal:** name the person behind each row of spend ([6767e7a](https://github.com/guillempuche/batuda/commit/6767e7ac30f29e236e77b3328be82c2758ddc4c7))
+* **internal:** stop two screens handing each other their place in a list ([5592eb4](https://github.com/guillempuche/batuda/commit/5592eb4d26eb772a809f4394a81d3a4d0ab4e48d))
+* key every poller off the one list of finished statuses ([b8369ec](https://github.com/guillempuche/batuda/commit/b8369ec5c938287d088f1b73ea1daf08ef0ecb68))
+* let the browser find text inside a folded section ([c521122](https://github.com/guillempuche/batuda/commit/c5211227487b6f6e442ffd195e2f2a6a368a5872))
+* **mcp:** tell the agent which of its lists were cut short ([64eab00](https://github.com/guillempuche/batuda/commit/64eab004246f6d521f0da81b5400a57c98400558))
+
+### Refactoring
+
+* **internal:** read each page of a list once instead of re-reading it ([1d1656f](https://github.com/guillempuche/batuda/commit/1d1656fdbc50f64df2158bd0a447874c6fdad716))
+
+### Documentation
+
+* describe how a client follows a running research run ([398d225](https://github.com/guillempuche/batuda/commit/398d225fe3cd939a5c0fb0514067579c78619cb2))
+
+### Tests
+
+* stop two browser tests failing on state they do not own ([d7025bf](https://github.com/guillempuche/batuda/commit/d7025bf8267f570f49ee77565e06cbe39a6bf8be))
+
+### CI/CD
+
+* **release:** ui v2026.7.27 ([7dd5da6](https://github.com/guillempuche/batuda/commit/7dd5da62db960b640deb41b4daf3c79305f71e6d))
+
+### Chores
+
+* rebuild local test data before the browser suite runs ([ada2db9](https://github.com/guillempuche/batuda/commit/ada2db926ee8d46ed75943a7323753b785a88244))
+
 ## 2026-07-27 (internal-v2026.7.27)
 
 ### Features
