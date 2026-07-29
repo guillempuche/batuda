@@ -16,7 +16,7 @@ Deployed at `batuda.co`. Tenant marketing sites live in their own repos (e.g. th
 - **BaseUI** — headless, accessible components (styled with styled-components)
 - **Motion + Motion Plus** — animations (`motion/react` for layout/transitions, `motion-plus/react` for premium components)
 - **react-leaflet + Leaflet** — interactive map showing a company's location
-- **Tiptap** — rich text editor for documents and proposals
+- **Tiptap** — rich text editor for instruction templates, pages, and the email composer
 
 ---
 
@@ -163,7 +163,7 @@ All spacing, typography, and color values come from CSS custom properties define
 
 ### Tailwind setup
 
-Tailwind v4 is in the build pipeline, but **no app code uses Tailwind classes** — there is not a single `className` in `apps/internal/src` or `packages/ui/src`. What it is there for is the `@theme` block below, which declares the canonical breakpoints that `tokens.css` refers to. Styling is done with styled-components (see [Styling conventions](#styling-conventions--styled-components)).
+Tailwind v4 is in the build pipeline, but **no app code uses Tailwind utility classes** — `className` appears twice in the whole of `apps/internal/src` and `packages/ui/src`, once to forward a class so `styled()` can target a primitive and once for `sr-only`. What it is there for is the `@theme` block below, which declares the canonical breakpoints that `tokens.css` refers to. Styling is done with styled-components (see [Styling conventions](#styling-conventions--styled-components)).
 
 ```css
 /* packages/ui/src/tailwind.css */
@@ -325,11 +325,12 @@ The `Pri` prefix marks primitive components. Two locations:
 
 Library primitives at the time of writing: `PriAvatar`, `PriButton`,
 `PriCheckbox`, `PriCollapsible`, `PriContextMenu`, `PriDialog`, `PriField`,
-`PriInput`, `PriNumberField`, `PriPopover`, `PriPreviewCard`,
+`PriInput`, `PriMenu`, `PriNumberField`, `PriPopover`, `PriPreviewCard`,
 `PriScrollArea`, `PriSelect`, `PriTabs`, `PriTextarea`, `PriToast`,
-`PriToggleGroup`, `PriToolbar`, `PriTooltip`.
+`PriToggle`, `PriToggleGroup`, `PriToolbar`, `PriTooltip`.
 
-App-local primitives at the time of writing: `PriPasswordInput`, `PriTable`.
+App-local primitives at the time of writing: `PriCopyButton`,
+`PriPasswordInput`, `PriRichText`, `PriTable`.
 
 #### `PriPasswordInput` — uncontrolled only
 
@@ -427,17 +428,17 @@ const StatusBadge = styled.span<{ $status: string }>`
 
 ### Primitives in this project
 
-| Primitive        | BaseUI base   | Used for                                                    |
-| ---------------- | ------------- | ----------------------------------------------------------- |
-| `PriButton`      | `Button`      | All interactive buttons                                     |
-| `PriInput`       | `Input`       | Text inputs in forms                                        |
-| `PriSelect`      | `Select`      | Status, region, industry dropdowns                          |
-| `PriDialog`      | `Dialog`      | Interaction log modal, company quick-edit                   |
-| `PriTabs`        | `Tabs`        | Company detail (Profile / Interactions / Documents / Tasks) |
-| `PriMenu`        | `Menu`        | Action menus on company cards                               |
-| `PriCheckbox`    | `Checkbox`    | Task completion                                             |
-| `PriTooltip`     | `Tooltip`     | Short field explanations                                    |
-| `PriCollapsible` | `Collapsible` | Expandable sections on company detail                       |
+| Primitive        | BaseUI base   | Used for                                                   |
+| ---------------- | ------------- | ---------------------------------------------------------- |
+| `PriButton`      | `Button`      | All interactive buttons                                    |
+| `PriInput`       | `Input`       | Text inputs in forms                                       |
+| `PriSelect`      | `Select`      | Status, region, industry dropdowns                         |
+| `PriDialog`      | `Dialog`      | Interaction log modal, company quick-edit                  |
+| `PriTabs`        | `Tabs`        | Company detail (Overview / Conversations / People / Files) |
+| `PriMenu`        | `Menu`        | Action menus on company cards                              |
+| `PriCheckbox`    | `Checkbox`    | Task completion                                            |
+| `PriTooltip`     | `Tooltip`     | Short field explanations                                   |
+| `PriCollapsible` | `Collapsible` | Expandable sections on company detail                      |
 
 A folded `PriCollapsible` panel keeps its text on the page rather than dropping it, so the browser's own find-in-page reaches it and opens the section on a match. That is `hiddenUntilFound`, defaulted on in the wrapper — pass `hiddenUntilFound={false}` where content should not linger while folded, as the company timeline does because it holds a status line read aloud by screen readers. It relies on Tailwind's reset scoping `display: none` to `[hidden]:where(:not([hidden='until-found']))`; without that carve-out a folded section would be permanently invisible rather than merely unfindable.
 
@@ -557,65 +558,70 @@ Motion components marked `"use client"` work with TanStack Start SSR — they re
 
 ## Tiptap — rich text editor
 
-[Tiptap](https://github.com/ueberdosis/tiptap) is used for editing styled text content: documents (research, meeting notes), proposals, and any other rich text fields.
+[Tiptap](https://github.com/ueberdosis/tiptap) backs the app's rich text surfaces. Each one stores a different shape — markdown, ProseMirror JSON, HTML — so the storage format is the first thing to settle when adding another.
 
 ### Installation
 
 Scaffolded via `apps/internal/package.json`:
 
 - `@tiptap/react` — React integration
+- `@tiptap/core` — editor core
 - `@tiptap/starter-kit` — bold, italic, headings, lists, code blocks, etc.
+- `@tiptap/markdown` — markdown in and out, for editors that store markdown text
 - `@tiptap/pm` — ProseMirror core (peer dep)
-
-### Usage pattern
-
-```tsx
-import { useEditor, EditorContent } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
-
-function DocumentEditor({ content, onUpdate }: { content: string; onUpdate: (html: string) => void }) {
-  const editor = useEditor({
-    extensions: [StarterKit],
-    content,
-    onUpdate: ({ editor }) => onUpdate(editor.getHTML()),
-  })
-
-  return <EditorContent editor={editor} className="tiptap-editor" />
-}
-```
-
-### Styling
-
-Tiptap renders standard HTML elements inside `.tiptap` — these need global styles. Use `createGlobalStyle` from styled-components:
-
-```tsx
-import { createGlobalStyle } from 'styled-components'
-
-const TiptapStyles = createGlobalStyle`
-  .tiptap-editor .tiptap {
-    font-size: var(--typescale-body-large-size);
-    line-height: var(--typescale-body-large-line);
-    color: var(--color-on-surface);
-    padding: var(--space-sm);
-    min-height: 12rem;
-    outline: none;
-  }
-
-  .tiptap-editor .tiptap h1 { font-size: var(--typescale-headline-large-size); }
-  .tiptap-editor .tiptap h2 { font-size: var(--typescale-headline-medium-size); }
-  .tiptap-editor .tiptap h3 { font-size: var(--typescale-headline-small-size); }
-`
-```
 
 ### Where used
 
-| View                      | Usage                                         |
-| ------------------------- | --------------------------------------------- |
-| Documents tab (edit mode) | Full editor — research, meeting pre/postnotes |
-| Proposals tab (edit)      | Proposal notes and description                |
-| Interaction summary       | Optional rich text for detailed summaries     |
+| Surface                               | Stores           | Editor                                       |
+| ------------------------------------- | ---------------- | -------------------------------------------- |
+| Instruction templates (`PriRichText`) | markdown string  | `components/primitives/pri-rich-text.tsx`    |
+| Pages block editor                    | ProseMirror JSON | `routes/pages/$id.tsx` (`getJSON()`)         |
+| Email composer                        | HTML             | `packages/email/src/editor/email-editor.tsx` |
 
-For read-only display, render the stored HTML directly (no editor instance needed).
+The documents dialog is **not** one of them — it edits its body in a `PriTextarea` (`components/companies/documents-panel.tsx`).
+
+### Usage pattern
+
+`PriRichText` is the one to copy for a new markdown field. It round-trips a plain markdown **string** rather than HTML: `contentType: 'markdown'` reads the initial `content` as markdown, and `editor.getMarkdown()` returns it.
+
+```tsx
+import { Markdown } from '@tiptap/markdown'
+import { EditorContent, useEditor } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+
+const editor = useEditor({
+  extensions: [StarterKit, Markdown],
+  content: defaultValue,
+  contentType: 'markdown',
+  // apps/internal server-renders; deferring the first paint avoids a hydration
+  // mismatch on the contenteditable. Leaving it out throws on load.
+  immediatelyRender: false,
+  onUpdate: ({ editor }) => onChange(editor.getMarkdown()),
+})
+```
+
+Keep the field **uncontrolled** and read it from `FormData` on submit, mirroring `PriPasswordInput` — `PriRichText` mirrors its markdown into a hidden input for exactly that. A controlled `value` + `onChange` drops programmatic fills, so Playwright `fill()` silently does nothing.
+
+### Styling
+
+Tiptap renders standard HTML elements inside `.tiptap`. Style them from a styled wrapper around `EditorContent`, the way `PriRichText` does — there is no `createGlobalStyle` anywhere in the app, and a global rule would leak across every editor on the page.
+
+```tsx
+const Content = styled.div`
+  .tiptap {
+    min-height: 14rem;
+    padding: var(--space-xs) var(--space-sm);
+    font-size: var(--typescale-body-large-size);
+    color: var(--color-on-surface);
+    outline: none;
+  }
+
+  .tiptap h1 { font-size: var(--typescale-title-large-size); }
+  .tiptap h2 { font-size: var(--typescale-title-medium-size); }
+`
+```
+
+For read-only display, render the stored markdown through `MarkdownView` (`components/markdown/markdown-view.tsx`, backed by Streamdown) rather than mounting an editor.
 
 ---
 
@@ -660,43 +666,43 @@ const PipelineGrid = styled.div`
 
 ## Route structure
 
-TanStack Start uses file-based routing under `src/routes/`:
+TanStack Start uses file-based routing under `src/routes/`. The top level, at the time of writing:
 
 ```
 src/routes/
 ├── __root.tsx              # Root layout: nav, page wrapper
 ├── index.tsx               # / — Pipeline dashboard
-├── companies/
-│   ├── index.tsx           # /companies — list with filters
-│   └── $slug.tsx           # /companies/$slug — detail
-└── tasks/
-    └── index.tsx           # /tasks — next steps
+├── login.tsx               # plus forgot-password / reset-password
+├── calendar/               # companies/, documents/, emails/, oauth/,
+├── pages/                  # profile/, research/, settings/, tasks/
+└── …
 ```
 
-### Server functions (data fetching)
+### Data fetching — `BatudaApiAtom`
 
-Use TanStack Start server functions to call the backend — never call the API from the browser directly:
+Data is read and written **from the browser**, through `BatudaApiAtom` (`src/lib/batuda-api-atom.ts`), an `AtomHttpApi.Service` derived from `@batuda/controllers`. It gives a fully typed client over the same contract the server implements, consumed with `@effect/atom-react`:
 
 ```tsx
-// src/routes/companies/index.tsx
-import { createServerFn } from "@tanstack/react-start"
+// src/atoms/instruction-atoms.ts — one atom per endpoint
+export const instructionTemplatesAtom = BatudaApiAtom.query(
+  'instructions',
+  'listTemplates',
+  {},
+)
+export const updateTemplateAtom = BatudaApiAtom.mutation(
+  'instructions',
+  'updateTemplate',
+)
 
-const fetchCompanies = createServerFn({ method: "GET" })
-  .validator(CompanyFiltersSchema)
-  .handler(async ({ data }) => {
-    const res = await fetch(`${process.env.SERVER_URL}/companies?${toQueryString(data)}`)
-    return res.json()
-  })
+// in a component
+const result = useAtomValue(instructionTemplatesAtom)
+const refresh = useAtomRefresh(instructionTemplatesAtom)
+const update = useAtomSet(updateTemplateAtom, { mode: 'promiseExit' })
 ```
 
-### Typed API client
+A query resolves to an `AsyncResult` — narrow it with `AsyncResult.isSuccess` / `isFailure`. `useAtomRefresh` keeps serving the **previous** value while the new one is in flight, so a component that must show what was just written should read the mutation's own reply rather than waiting on the refreshed list.
 
-```typescript
-// src/lib/api.ts
-// Derived from @batuda/controllers — see TODO_FRONTEND Phase 6
-// HttpApiClient.make(BatudaApi) gives a fully typed client
-// Used only inside server functions
-```
+Auth is the exception: it goes through `authClient` (Better Auth). `createServerFn` is used in exactly one place, `src/lib/server-cookie.ts`, for cookie access during SSR — not for reaching the API.
 
 ---
 
