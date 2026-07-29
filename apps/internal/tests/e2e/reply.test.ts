@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process'
 
 import { expect, test } from '@playwright/test'
 
+import { openCompose } from './helpers/compose'
 import { DATABASE_URL } from './helpers/database-url'
 import { getRawMessage, waitForMessage } from './helpers/mail-catcher'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
@@ -66,8 +67,7 @@ test.describe('reply on a seeded thread', () => {
 			await page.goto(`/emails/${threadId}`, { waitUntil: 'networkidle' })
 
 			// WHEN Alice clicks Reply and sends a body via the compose form
-			await page.getByTestId('thread-reply').click()
-			await expect(page.getByTestId('compose-form')).toBeVisible()
+			await openCompose(page, 'thread-reply')
 			const body = `e2e reply ${Date.now()}`
 			await fillBody(page, body)
 			await expect(page.getByTestId('compose-send')).toBeEnabled()
@@ -75,9 +75,9 @@ test.describe('reply on a seeded thread', () => {
 
 			// THEN the catcher captures the reply, and the raw RFC822 carries
 			// In-Reply-To + References pointing at the parent's Message-Id.
-			// Found by its body: a reply's subject comes from the parent, so every
-			// run of this test — and every other checkout on this machine — would
-			// answer to it.
+			// Found by its body: a reply takes the parent's subject, so a subject
+			// match would also answer with every earlier run's reply, and with any
+			// other checkout's on this machine.
 			const summary = await waitForMessage('pep@calpepfonda.cat', {
 				bodyContains: body,
 				timeoutMs: 10_000,
@@ -105,8 +105,7 @@ test.describe('reply on a seeded thread', () => {
 			await page.goto(`/emails/${threadId}`, { waitUntil: 'networkidle' })
 
 			// WHEN Alice clicks Reply all and sends
-			await page.getByTestId('thread-reply-all').click()
-			await expect(page.getByTestId('compose-form')).toBeVisible()
+			await openCompose(page, 'thread-reply-all')
 			const body = `e2e reply-all ${Date.now()}`
 			await fillBody(page, body)
 			await expect(page.getByTestId('compose-send')).toBeEnabled()

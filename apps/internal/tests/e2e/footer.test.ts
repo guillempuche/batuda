@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process'
 
 import { expect, test } from '@playwright/test'
 
+import { openCompose } from './helpers/compose'
 import { DATABASE_URL } from './helpers/database-url'
 import {
 	getMessage,
@@ -100,8 +101,7 @@ test.describe('compose with footer', () => {
 
 			// WHEN Alice sends a brand-new email
 			await page.goto('/emails')
-			await page.getByTestId('emails-compose').click()
-			await expect(page.getByTestId('compose-form')).toBeVisible()
+			await openCompose(page, 'emails-compose')
 			await page.getByTestId('compose-to').fill(recipient)
 			await page.getByTestId('compose-subject').fill(`Subj ${testId}`)
 			await fillBody(page, `Body ${testId}`)
@@ -111,7 +111,9 @@ test.describe('compose with footer', () => {
 			// THEN the catcher's parsed text body and the raw wire bytes both
 			// contain the footer marker — proves the server appended the
 			// footer before serializing.
-			const summary = await waitForMessage(recipient)
+			const summary = await waitForMessage(recipient, {
+				subject: `Subj ${testId}`,
+			})
 			const detail = await getMessage(summary)
 			expect(detail.Text).toContain(footerMarker)
 

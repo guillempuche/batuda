@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process'
 
 import { expect, test } from '@playwright/test'
 
+import { openCompose } from './helpers/compose'
 import { DATABASE_URL } from './helpers/database-url'
 import {
 	getMessage,
@@ -50,8 +51,7 @@ test.describe('compose with rich formatting', () => {
 
 			// WHEN Alice opens compose and types a rich body
 			await page.goto('/emails')
-			await page.getByTestId('emails-compose').click()
-			await expect(page.getByTestId('compose-form')).toBeVisible()
+			await openCompose(page, 'emails-compose')
 			await page.getByTestId('compose-to').fill(recipient)
 			await page.getByTestId('compose-subject').fill(`Subj ${testId}`)
 
@@ -92,7 +92,9 @@ test.describe('compose with rich formatting', () => {
 			// THEN the decoded html part carries the formatting. The brand
 			// renderer emits inline-styled spans, not <strong> or bare <ul>:
 			// bold is a font-weight span, list rows wrap their text in <span>.
-			const summary = await waitForMessage(recipient)
+			const summary = await waitForMessage(recipient, {
+				subject: `Subj ${testId}`,
+			})
 			const html = (await getMessage(summary)).Html
 			expect(html).toMatch(/<span style="font-weight:\s*700">Hello<\/span>/i)
 			expect(html).toMatch(/<ul[^>]*>/i)
@@ -109,8 +111,7 @@ test.describe('compose with rich formatting', () => {
 			const recipient = `${testId}@catcher.local`
 
 			await page.goto('/emails')
-			await page.getByTestId('emails-compose').click()
-			await expect(page.getByTestId('compose-form')).toBeVisible()
+			await openCompose(page, 'emails-compose')
 			await page.getByTestId('compose-to').fill(recipient)
 			await page.getByTestId('compose-subject').fill(`Subj ${testId}`)
 
@@ -120,7 +121,9 @@ test.describe('compose with rich formatting', () => {
 
 			await page.getByTestId('compose-send').click()
 
-			const summary = await waitForMessage(recipient)
+			const summary = await waitForMessage(recipient, {
+				subject: `Subj ${testId}`,
+			})
 			const raw = getRawMessage(summary)
 			// A text/plain part is the baseline for any nodemailer-emitted
 			// message; if this regresses, the rich path probably stopped

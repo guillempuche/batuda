@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process'
 
 import { expect, test } from '@playwright/test'
 
+import { openCompose } from './helpers/compose'
 import { DATABASE_URL } from './helpers/database-url'
 import { expectNoMessage, waitForMessage } from './helpers/mail-catcher'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
@@ -57,17 +58,16 @@ test.describe('compose and send via the mail catcher', () => {
 		test("should write the message to the catcher's inbox (poll until present)", async ({
 			page,
 		}) => {
-			// A recipient and subject nobody else uses. The catcher is shared with
-			// every other checkout on this machine and keeps what earlier runs
-			// delivered, so this is what makes the lookup below say something.
+			// GIVEN a recipient and subject nobody else uses — the catcher is shared
+			// with every checkout on this machine and keeps what earlier runs
+			// delivered, so only a unique pair makes the lookup below mean anything.
 			const testId = `e2e-${Date.now()}`
 			const recipient = `${testId}@catcher.local`
 			const subject = `Test ${testId}`
 
 			// WHEN Alice opens compose, fills the form, and clicks Send
 			await page.goto('/emails')
-			await page.getByTestId('emails-compose').click()
-			await expect(page.getByTestId('compose-form')).toBeVisible()
+			await openCompose(page, 'emails-compose')
 			await page.getByTestId('compose-to').fill(recipient)
 			await page.getByTestId('compose-subject').fill(subject)
 			await fillBody(page, `Hello from e2e ${testId}`)
@@ -75,7 +75,7 @@ test.describe('compose and send via the mail catcher', () => {
 			await page.getByTestId('compose-send').click()
 
 			// THEN the mail catcher receives the message within the polling window
-			const msg = await waitForMessage(recipient)
+			const msg = await waitForMessage(recipient, { subject })
 			expect(msg.Subject).toBe(subject)
 		})
 
@@ -86,8 +86,7 @@ test.describe('compose and send via the mail catcher', () => {
 			const recipient = `${testId}@catcher.local`
 
 			await page.goto('/emails')
-			await page.getByTestId('emails-compose').click()
-			await expect(page.getByTestId('compose-form')).toBeVisible()
+			await openCompose(page, 'emails-compose')
 			await page.getByTestId('compose-to').fill(recipient)
 			await page.getByTestId('compose-subject').fill(`Subj ${testId}`)
 			await fillBody(page, `Body ${testId}`)
@@ -95,7 +94,7 @@ test.describe('compose and send via the mail catcher', () => {
 
 			// Wait for the catcher to confirm the round-trip before checking the
 			// UI — eliminates the "did the click do nothing?" failure mode.
-			await waitForMessage(recipient)
+			await waitForMessage(recipient, { subject: `Subj ${testId}` })
 			await expect(page.getByTestId('compose-window')).toBeHidden({
 				timeout: 5_000,
 			})
@@ -123,19 +122,11 @@ test.describe('compose and send via the mail catcher', () => {
 			// GIVEN Alice opens compose from Pep Casals' company so SuppressionGuard
 			// has a companyId to query against
 			await page.goto('/companies/cal-pep-fonda', { waitUntil: 'networkidle' })
-			// Wait for hydration so the click lands on the wired action, and give
-			// the compose dialog room to mount on a cold dev bundle (mirrors the
-			// attachment spec's rationale).
-			await expect(page.getByTestId('action-compose-email')).toBeEnabled()
-			await page.getByTestId('action-compose-email').click()
-			await expect(page.getByTestId('compose-form')).toBeVisible({
-				timeout: 15_000,
-			})
+			await openCompose(page, 'action-compose-email')
 
-			// WHEN Alice puts the suppressed contact in `to`. The subject is made
-			// unique so the check below can name the message that must not arrive;
-			// that mailbox holds what earlier runs, and other checkouts on this
-			// machine, have already delivered to it.
+			// WHEN Alice puts the suppressed contact in `to`, under a subject unique
+			// to this run so the check below can name the message that must not
+			// arrive.
 			const blockedSubject = `blocked send ${Date.now()}`
 			await page.getByTestId('compose-to').fill(SUPPRESSED_EMAIL)
 			await page.getByTestId('compose-subject').fill(blockedSubject)

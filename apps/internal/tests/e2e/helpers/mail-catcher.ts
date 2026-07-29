@@ -1,6 +1,8 @@
 // Tiny client over the dev mail-catcher's REST API (GreenMail). The dev
 // compose service exposes it at host :8025; specs poll it to assert what the
-// server actually wrote to the SMTP socket, and purge it between tests.
+// server actually wrote to the SMTP socket. Nothing here empties it: one
+// catcher serves every checkout on this machine, and it can only be emptied
+// whole. `pnpm cli email clear` does that when you mean to.
 // Override MAIL_CATCHER_HTTP_URL to point at a remote dev stack.
 
 import { simpleParser } from 'mailparser'
@@ -50,13 +52,24 @@ async function listMessages(
 	return body.map(m => ({ Subject: m.subject, mimeMessage: m.mimeMessage }))
 }
 
+// How a caller names the message it is waiting for: one of the two is required.
+// A mailbox keeps what earlier runs delivered to it, and the catcher is shared
+// with every other checkout on this machine, so "the first message" is easily
+// somebody else's.
+type MessageIdentifier =
+	| { subject: string; bodyContains?: string }
+	| { subject?: string; bodyContains: string }
+
 // Wait for a message this test can prove is its own.
 //
-// Say which one with `subject`, or with `bodyContains` where the subject is not
-// the test's to choose — a reply inherits its parent's. Say nothing and you get
-// whichever message happens to be first, which on a machine running more than
-// one checkout may belong to somebody else: the catcher is shared, and a
-// mailbox keeps what earlier runs delivered to it.
+// Name it by `subject`, or by `bodyContains` where the subject is not the
+// test's to choose — a reply inherits its parent's.
+export async function waitForMessage(
+	recipient: string,
+	options: MessageIdentifier & { timeoutMs?: number; pollMs?: number },
+): Promise<CatcherMessage>
+// Both names stay optional in the implementation, so a call that skips them
+// reaches the explanation below instead of failing on a missing argument.
 export async function waitForMessage(
 	recipient: string,
 	{
@@ -71,18 +84,26 @@ export async function waitForMessage(
 		pollMs?: number
 	} = {},
 ): Promise<CatcherMessage> {
+	// Checked at run time as well: nothing type-checks this folder, so the
+	// signature above only guides the editor.
+	if (!subject && !bodyContains) {
+		throw new Error(
+			`mail-catcher: say which message you are waiting for on "${recipient}" — pass a subject, or bodyContains where the subject is not yours to choose. The mailbox also holds what earlier runs, and other checkouts on this machine, delivered to it.`,
+		)
+	}
+
 	const deadline = Date.now() + timeoutMs
 	let lastError: unknown = null
+	// Read the same way the check above reads them, so a name given as an empty
+	// string is ignored rather than matched against — which would find nothing
+	// and time out instead of saying what was wrong.
 	const isWanted = (m: CatcherMessage) =>
-		(subject === undefined || m.Subject === subject) &&
-		(bodyContains === undefined || m.mimeMessage.includes(bodyContains))
+		(!subject || m.Subject === subject) &&
+		(!bodyContains || m.mimeMessage.includes(bodyContains))
 	while (Date.now() < deadline) {
 		try {
 			const messages = await listMessages(recipient)
-			const match =
-				subject === undefined && bodyContains === undefined
-					? messages[0]
-					: messages.find(isWanted)
+			const match = messages.find(isWanted)
 			if (match) return match
 		} catch (err) {
 			lastError = err
@@ -104,6 +125,14 @@ export async function expectNoMessage(
 	subject: string,
 	windowMs = 1_500,
 ): Promise<void> {
+	// An empty subject matches nothing, so the check would pass without having
+	// proved anything.
+	if (!subject) {
+		throw new Error(
+			`mail-catcher: name the message that must not arrive for "${recipient}" — an unnamed check on a shared mailbox proves nothing.`,
+		)
+	}
+
 	await new Promise(resolve => setTimeout(resolve, windowMs))
 	const messages = await listMessages(recipient)
 	const arrived = messages.filter(m => m.Subject === subject)
