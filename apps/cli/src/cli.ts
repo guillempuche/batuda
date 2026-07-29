@@ -53,6 +53,7 @@ import { withDb } from './db'
 import { requireLocalDatabase } from './lib/confirm-cloud'
 import { appendEnvKeys, resetEnvFile } from './lib/env-file'
 import { loadEnv } from './lib/load-env'
+import { emailClear } from './lib/mail-catcher'
 import { recoveryHint } from './lib/recovery-hint'
 
 // ── Seed ───────────────────────────────────────────────────
@@ -252,7 +253,7 @@ const dbResetCommand = Command.make('reset', {}, () =>
 ).pipe(
 	Command.withShortDescription('Drop schema + re-run migrations'),
 	Command.withDescription(
-		'Drop the public schema, re-run migrations, and purge the mail catcher (no seed; chain `seed` for sample data)',
+		'Drop the public schema and re-run migrations (no seed; chain `seed` for sample data). Leaves the mail catcher alone — it is shared with every checkout; empty it with `email clear` if you mean to',
 	),
 )
 
@@ -876,7 +877,10 @@ const emailInjectCommand = Command.make(
 		),
 		from: Flag.string('from').pipe(
 			Flag.withDescription('Sender address (any value works locally)'),
-			Flag.withFallbackPrompt(Prompt.text({ message: 'From:' })),
+			// The catcher accepts any sender, so there is nothing here only a person
+			// could answer — and asking would leave a script or an agent waiting
+			// forever at a prompt it cannot see.
+			Flag.withDefault('dev@batuda.test'),
 		),
 		subject: Flag.string('subject').pipe(
 			Flag.withDescription('Subject line'),
@@ -921,11 +925,20 @@ const emailInjectCommand = Command.make(
 	),
 )
 
+const emailClearCommand = Command.make('clear', {}, () => emailClear).pipe(
+	Command.withShortDescription(
+		'Empty the mail catcher (affects every checkout)',
+	),
+	Command.withDescription(
+		'Discard every message the mail catcher is holding. One catcher serves every checkout on this machine, so this empties it for all of them — nothing else does it for you, because the catcher cannot empty one mailbox at a time',
+	),
+)
+
 const emailCommand = Command.make('email').pipe(
 	Command.withDescription(
-		'Email: inject canned messages into the mail catcher',
+		'Email: inject canned messages into the mail catcher, or empty it',
 	),
-	Command.withSubcommands([emailInjectCommand]),
+	Command.withSubcommands([emailInjectCommand, emailClearCommand]),
 )
 
 // ── Research ───────────────────────────────────────────────

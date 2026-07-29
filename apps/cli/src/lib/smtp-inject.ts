@@ -54,7 +54,6 @@ export const injectViaSmtp = (
 				secure: false,
 				requireTLS: false,
 				auth: undefined,
-				tls: { rejectUnauthorized: false },
 			})
 			try {
 				const result = await transport.sendMail({

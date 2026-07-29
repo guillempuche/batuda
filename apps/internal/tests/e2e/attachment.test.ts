@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process'
 
 import { expect, test } from '@playwright/test'
 
+import { openCompose } from './helpers/compose'
 import { DATABASE_URL } from './helpers/database-url'
 import { getMessage, waitForMessage } from './helpers/mail-catcher'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
@@ -76,16 +77,8 @@ test.describe('compose with attachment', () => {
 			const filename = `${testId}.pdf`
 
 			// GIVEN compose is open and the form is fillable
-			// Wait for hydration before clicking the open button. `goto`'s
-			// default `load` event fires before TanStack Start finishes
-			// streaming + hydrating, so the click can land on the not-yet-
-			// wired form action and the SSR replay buffer occasionally
-			// misses it on hot-rebuilt dev bundles.
 			await page.goto('/emails', { waitUntil: 'networkidle' })
-			await page.getByTestId('emails-compose').click()
-			await expect(page.getByTestId('compose-form')).toBeVisible({
-				timeout: 15_000,
-			})
+			await openCompose(page, 'emails-compose')
 			await page.getByTestId('compose-to').fill(recipient)
 			await page.getByTestId('compose-subject').fill(`Subj ${testId}`)
 			await fillBody(page, `Body ${testId}`)
@@ -110,7 +103,9 @@ test.describe('compose with attachment', () => {
 			await page.getByTestId('compose-send').click()
 
 			// THEN the catcher receives the message with the attachment metadata
-			const summary = await waitForMessage(recipient)
+			const summary = await waitForMessage(recipient, {
+				subject: `Subj ${testId}`,
+			})
 			const detail = await getMessage(summary)
 			const att = detail.Attachments.find(a => a.FileName === filename)
 			expect(att, 'attachment present on catcher message').toBeDefined()
@@ -125,16 +120,8 @@ test.describe('compose with attachment', () => {
 			const recipient = `${testId}@catcher.local`
 			const filename = `${testId}.pdf`
 
-			// Wait for hydration before clicking the open button. `goto`'s
-			// default `load` event fires before TanStack Start finishes
-			// streaming + hydrating, so the click can land on the not-yet-
-			// wired form action and the SSR replay buffer occasionally
-			// misses it on hot-rebuilt dev bundles.
 			await page.goto('/emails', { waitUntil: 'networkidle' })
-			await page.getByTestId('emails-compose').click()
-			await expect(page.getByTestId('compose-form')).toBeVisible({
-				timeout: 15_000,
-			})
+			await openCompose(page, 'emails-compose')
 			await page.getByTestId('compose-to').fill(recipient)
 			await page.getByTestId('compose-subject').fill(`Subj ${testId}`)
 			await fillBody(page, `Body ${testId}`)
@@ -153,7 +140,7 @@ test.describe('compose with attachment', () => {
 
 			// Wait for the send to land in the catcher before reading the
 			// staging row — the post-send purge runs after the SMTP ack.
-			await waitForMessage(recipient)
+			await waitForMessage(recipient, { subject: `Subj ${testId}` })
 
 			// THEN the staging row is gone — markSentAndCleanup deletes it
 			// immediately after the provider acks (see

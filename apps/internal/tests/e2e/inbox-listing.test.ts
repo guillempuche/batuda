@@ -55,10 +55,18 @@ test.describe('emails inbox listing', () => {
 				expected === 1 ? '1 thread' : `${expected} threads`,
 			)
 
-			// AND the seeded threads are among the rows actually drawn
+			// AND rows are actually drawn
 			await expect(
 				page.locator('[data-testid^="thread-row-"]').first(),
 			).toBeVisible()
+
+			// AND a known thread can be reached. Searched for rather than looked
+			// for on screen: the list only draws the rows that fit, so an older
+			// thread sits below the fold and is not there to find — which is the
+			// same trap as counting rows, one step further along.
+			await page
+				.getByTestId('emails-search')
+				.fill('Quote for the booking module')
 			await expect(page.getByText('Quote for the booking module')).toBeVisible()
 		})
 	})
