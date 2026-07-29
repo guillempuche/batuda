@@ -9,9 +9,12 @@ dist/
 # Turbo
 .turbo/
 
-# Playwright test artefacts
+# Playwright test artefacts. Run from the repo root rather than the app, and
+# Playwright drops them here instead.
 apps/*/test-results/
 apps/*/playwright-report/
+/test-results/
+/playwright-report/
 
 # Environment
 .env

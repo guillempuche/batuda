@@ -2,12 +2,16 @@ import { expect, test } from '@playwright/test'
 
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
-// /settings/profile/templates — the personal instruction stacks section.
+// The instruction stacks sections, personal and organization-wide.
 // A stack is a named, ordered group of instruction templates for one agent;
 // exactly one per agent can be the default that applies when a run names none.
+// The organization's default is admin-only, and unsetting it leaves every
+// member who hasn't picked their own running with no shared guidance.
 // Selectors verified against:
 //   apps/internal/src/routes/settings/profile/templates.tsx
 //     (new-stack, inherit-banner, use-org-default)
+//   apps/internal/src/routes/settings/organization/templates.tsx
+//     (org-default-banner, clear-org-default, org-default-clear-confirm)
 //   apps/internal/src/components/instructions/stack-list.tsx (stack-row)
 //   apps/internal/src/components/instructions/stack-editor.tsx
 //     (stack-editor, stack-name, stack-make-default, stack-save, stack-cancel)
@@ -117,6 +121,35 @@ test.describe('instruction stacks', () => {
 			await expect(
 				page.getByTestId('stack-row').filter({ hasText: 'e2e-incomplete' }),
 			).toHaveCount(0)
+		})
+	})
+	test.describe('when an admin clears the organization default', () => {
+		test('should stop showing a default until another is set', async ({
+			page,
+		}) => {
+			await page.goto('/settings/organization/templates', {
+				waitUntil: 'networkidle',
+			})
+
+			// GIVEN an org stack marked as the default
+			const banner = page.getByTestId('org-default-banner')
+			const stackRow = page.getByTestId('stack-row').first()
+			await expect(stackRow).toBeVisible()
+			if (!(await banner.isVisible())) {
+				await stackRow.getByRole('button', { name: /^Make / }).click()
+			}
+			await expect(banner).toBeVisible()
+
+			// WHEN the default is cleared
+			await page.getByTestId('clear-org-default').click()
+			await page.getByTestId('org-default-clear-confirm-button').click()
+
+			// THEN nothing is held up as the organization's default any more
+			await expect(banner).toBeHidden()
+
+			// AND another stack can be made the default, putting one back
+			await stackRow.getByRole('button', { name: /^Make / }).click()
+			await expect(banner).toBeVisible()
 		})
 	})
 })

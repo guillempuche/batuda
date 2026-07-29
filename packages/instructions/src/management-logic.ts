@@ -3,22 +3,20 @@ import { personalTemplatesInOrgStack } from './resolver'
 // Pure management decisions, separated from the SQL layer so every branch can be
 // unit-tested without a database.
 
-export type TemplateEditMode = 'in_place' | 'fork' | 'deny'
+export type TemplateEditMode = 'in_place' | 'deny'
 
 // How an edit to a template should be applied:
-//   - the owner edits their own template in place;
-//   - an org admin edits an org-owned template in place;
-//   - any other member editing an org-owned template gets a personal fork;
+//   - you edit your own template in place;
+//   - anyone in the organization edits a template the organization owns in
+//     place, because shared guidance is everyone's to look after;
 //   - editing someone else's personal template is denied (RLS hides it anyway).
 export const decideTemplateEdit = (args: {
 	readonly ownerUserId: string | null
 	readonly actorUserId: string
-	readonly actorIsAdmin: boolean
-}): TemplateEditMode => {
-	if (args.ownerUserId === args.actorUserId) return 'in_place'
-	if (args.ownerUserId === null) return args.actorIsAdmin ? 'in_place' : 'fork'
-	return 'deny'
-}
+}): TemplateEditMode =>
+	args.ownerUserId === args.actorUserId || args.ownerUserId === null
+		? 'in_place'
+		: 'deny'
 
 export type StackTemplatesCheck =
 	| { readonly kind: 'ok' }

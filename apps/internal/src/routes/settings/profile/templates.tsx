@@ -3,7 +3,7 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute } from '@tanstack/react-router'
 import { Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
-import { ArrowLeft, Pencil, Plus, ScrollText, Trash2 } from 'lucide-react'
+import { ArrowLeft, Plus, ScrollText } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
@@ -13,7 +13,6 @@ import { PriButton, usePriToast } from '@batuda/ui/pri'
 import {
 	clearDefaultStackAtom,
 	deleteStackAtom,
-	deleteTemplateAtom,
 	instructionResolutionAtom,
 	instructionStacksAtom,
 	instructionTemplatesAtom,
@@ -21,23 +20,15 @@ import {
 } from '#/atoms/instruction-atoms'
 import { AgentSelector } from '#/components/instructions/agent-selector'
 import {
-	InstructionIconButton,
-	OwnerBadge,
-} from '#/components/instructions/instruction-chrome'
-import {
 	BackLink,
 	Empty,
 	Heading,
 	Intro,
 	Page,
-	RowActions,
 	Section,
 	SectionHead,
 	SectionTitle,
 	Subtitle,
-	TemplateList,
-	TemplateNameButton,
-	TemplateRowItem,
 } from '#/components/instructions/instruction-page-chrome'
 import {
 	narrowResolution,
@@ -51,11 +42,7 @@ import { StackEditor } from '#/components/instructions/stack-editor'
 import { StackList } from '#/components/instructions/stack-list'
 import type { StackOption } from '#/components/instructions/stack-picker'
 import { TemplateDeleteConfirm } from '#/components/instructions/template-delete-confirm'
-import {
-	type TemplateDraft,
-	TemplateEditorDialog,
-} from '#/components/instructions/template-editor-dialog'
-import { TemplateViewDialog } from '#/components/instructions/template-view-dialog'
+import { TemplateLibrary } from '#/components/instructions/template-library'
 import { ErrorState } from '#/components/shared/error-state'
 import { authClient } from '#/lib/auth-client'
 import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
@@ -67,7 +54,8 @@ import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
 // The writing surfaces live in the `?dlg=` param so they are deep-linkable and
 // the browser Back button closes them — `create`/`new-stack` open on their own,
 // `edit`/`stack` target a row by id. Reading carries its own `?read=` key so it
-// can open over any of them.
+// can open over any of them. The template half of this union is handled inside
+// TemplateLibrary, which decodes the same values against its own narrower one.
 const templatesDlgSchema = Schema.Union([
 	dlgNoId('create'),
 	dlgWithId('edit'),
@@ -105,7 +93,6 @@ function TemplatesPage() {
 	)
 	const resolutionResult = useAtomValue(resolutionAtom)
 	const refreshResolution = useAtomRefresh(resolutionAtom)
-	const deleteTemplate = useAtomSet(deleteTemplateAtom, { mode: 'promiseExit' })
 	const deleteStack = useAtomSet(deleteStackAtom, { mode: 'promiseExit' })
 	const setDefaultStack = useAtomSet(setDefaultStackAtom, {
 		mode: 'promiseExit',
@@ -160,48 +147,9 @@ function TemplatesPage() {
 	)
 
 	const { dlg, open: openDlg, close: closeDlg } = useDlg(templatesDlgSchema)
-	const { readId, openRead, closeRead } = useReadParam()
-	const [confirmTarget, setConfirmTarget] = useState<{
-		readonly id: string
-		readonly name: string
-	} | null>(null)
-	const [deleting, setDeleting] = useState(false)
+	const { openRead } = useReadParam()
 	const [confirmStack, setConfirmStack] = useState<StackShape | null>(null)
 	const [deletingStack, setDeletingStack] = useState(false)
-
-	// The edit dialog resolves its target from the loaded list, so a link to an
-	// open template reopens the right one on refresh. The list also carries the
-	// organization's templates, which this page can only read — an edit link
-	// naming one is turned into a read below rather than opening an editor whose
-	// Save could never work.
-	const editingRow =
-		dlg?.kind === 'edit'
-			? (templates.find(
-					row =>
-						row.id === dlg.id &&
-						row.ownerUserId !== null &&
-						row.ownerUserId === myUserId,
-				) ?? null)
-			: null
-	// Held steady while the editor is open. The editor resets its unsaved-changes
-	// guard and any error message whenever this value changes, so rebuilding it
-	// on every render would quietly drop a draft and hide failed saves.
-	const editingId = editingRow?.id ?? null
-	// biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the template being edited, not the row object the list rebuilds on every refresh
-	const editing: TemplateDraft | null = useMemo(
-		() =>
-			editingRow
-				? { id: editingRow.id, name: editingRow.name, body: editingRow.body }
-				: null,
-		[editingId],
-	)
-	const dialogOpen =
-		dlg?.kind === 'create' || (dlg?.kind === 'edit' && editingRow !== null)
-
-	const viewingRow =
-		readId !== undefined
-			? (templates.find(row => row.id === readId) ?? null)
-			: null
 
 	// The stack editor mounts for a create (`new-stack`) or an edit (`stack`)
 	// whose target is loaded. Resolving from the loaded list keeps a deep link
@@ -214,42 +162,15 @@ function TemplatesPage() {
 		dlg?.kind === 'new-stack' ||
 		(dlg?.kind === 'stack' && editingStack !== null)
 
-	// A link to a row that is gone drops itself once the list loads. An edit link
-	// naming a template this page can't change becomes a read of it, so a shared
-	// address still shows the template.
+	// A link to a stack that is gone drops itself once the list has loaded.
 	const templatesLoaded = AsyncResult.isSuccess(templatesResult)
 	const stacksLoaded = AsyncResult.isSuccess(stacksResult)
-	const readableInstead =
-		dlg?.kind === 'edit' && editingRow === null
-			? (templates.find(row => row.id === dlg.id) ?? null)
-			: null
 	useEffect(() => {
-		if (dlg?.kind === 'edit' && templatesLoaded && editingRow === null) {
-			closeDlg()
-			if (readableInstead !== null) openRead(readableInstead.id)
-		}
-		if (readId !== undefined && templatesLoaded && viewingRow === null) {
-			closeRead()
-		}
 		if (dlg?.kind === 'stack' && stacksLoaded && editingStack === null) {
 			closeDlg()
 		}
-	}, [
-		dlg,
-		templatesLoaded,
-		editingRow,
-		readableInstead,
-		readId,
-		viewingRow,
-		stacksLoaded,
-		editingStack,
-		openRead,
-		closeRead,
-		closeDlg,
-	])
+	}, [dlg, stacksLoaded, editingStack, closeDlg])
 
-	const openCreate = () => openDlg({ kind: 'create' })
-	const openEdit = (row: TemplateShape) => openDlg({ kind: 'edit', id: row.id })
 	const openNewStack = () => openDlg({ kind: 'new-stack' })
 	const openEditStack = (s: StackShape) => openDlg({ kind: 'stack', id: s.id })
 
@@ -257,6 +178,12 @@ function TemplatesPage() {
 		refreshStacks()
 		refreshResolution()
 		closeDlg()
+	}
+
+	// A template can sit inside a stack, so a change to one can change the other.
+	const templatesChanged = () => {
+		refreshTemplates()
+		refreshStacks()
 	}
 
 	const setDefault = async (s: StackShape) => {
@@ -310,47 +237,6 @@ function TemplatesPage() {
 		})
 	}
 
-	const confirmDelete = async () => {
-		const target = confirmTarget
-		if (!target || deleting) return
-		setDeleting(true)
-		const exit = await deleteTemplate({ params: { id: target.id } } as never)
-		setDeleting(false)
-		setConfirmTarget(null)
-		if (exit._tag !== 'Success') {
-			toast.add({
-				title: t`Delete failed`,
-				description: t`Couldn't delete the template. Please try again.`,
-				type: 'error',
-			})
-			return
-		}
-		const outcome = outcomeOf(exit)
-		// A template still referenced by a stack is blocked server-side; surface
-		// why instead of letting the row silently reappear.
-		if (outcome === 'in_use') {
-			toast.add({
-				title: t`Still in use`,
-				description: t`Remove "${target.name}" from the stacks that use it first, then delete it.`,
-				type: 'error',
-			})
-			refreshStacks()
-			return
-		}
-		if (outcome !== 'deleted') {
-			toast.add({
-				title: t`Delete failed`,
-				description: t`Couldn't delete the template. Please try again.`,
-				type: 'error',
-			})
-			refreshTemplates()
-			return
-		}
-		toast.add({ title: t`Template deleted`, type: 'success' })
-		refreshTemplates()
-		refreshStacks()
-	}
-
 	return (
 		<Page>
 			<BackLink to='/settings/profile'>
@@ -373,89 +259,29 @@ function TemplatesPage() {
 				</Subtitle>
 			</Intro>
 
-			<Section>
-				<SectionHead>
-					<SectionTitle>
-						<Trans>Templates</Trans>
-					</SectionTitle>
-					<PriButton
-						type='button'
-						$variant='filled'
-						data-testid='templates-new'
-						onClick={openCreate}
-					>
-						<Plus size={16} aria-hidden />
-						<Trans>New template</Trans>
-					</PriButton>
-				</SectionHead>
-
-				{templatesFailed ? (
-					<ErrorState
-						variant='inline'
-						data-testid='profile-templates-error'
-						title={t`Couldn't load your templates.`}
-						onRetry={refreshTemplates}
-					/>
-				) : templates.length === 0 ? (
-					<Empty>
-						<Trans>
-							No templates yet. Create one to start shaping your runs.
-						</Trans>
-					</Empty>
-				) : (
-					<TemplateList>
-						{templates.map(row => {
-							// Row security only ever returns org-owned or the actor's own
-							// templates, so ownership is a two-way split here.
-							const mine =
-								row.ownerUserId !== null && row.ownerUserId === myUserId
-							return (
-								<TemplateRowItem key={row.id} data-testid='template-row'>
-									{/* Any template on this page can be read, the org's as well
-									    as your own; only its owner can change it. */}
-									<TemplateNameButton
-										type='button'
-										aria-label={t`Read ${row.name}`}
-										data-testid={`template-view-${row.id}`}
-										onClick={() => openRead(row.id)}
-									>
-										{row.name}
-									</TemplateNameButton>
-									<OwnerBadge>
-										{row.ownerUserId === null ? (
-											<Trans>Org</Trans>
-										) : (
-											<Trans>Mine</Trans>
-										)}
-									</OwnerBadge>
-									<RowActions>
-										{mine ? (
-											<>
-												<InstructionIconButton
-													type='button'
-													aria-label={t`Edit ${row.name}`}
-													onClick={() => openEdit(row)}
-												>
-													<Pencil size={14} aria-hidden />
-												</InstructionIconButton>
-												<InstructionIconButton
-													type='button'
-													aria-label={t`Delete ${row.name}`}
-													onClick={() =>
-														setConfirmTarget({ id: row.id, name: row.name })
-													}
-												>
-													<Trash2 size={14} aria-hidden />
-												</InstructionIconButton>
-											</>
-										) : null}
-									</RowActions>
-								</TemplateRowItem>
-							)
-						})}
-					</TemplateList>
-				)}
-			</Section>
+			<TemplateLibrary
+				templates={templates}
+				loaded={templatesLoaded}
+				failed={templatesFailed}
+				scope='personal'
+				myUserId={myUserId}
+				onChanged={templatesChanged}
+				onRetry={refreshTemplates}
+				title={<Trans>Templates</Trans>}
+				newLabel={<Trans>New template</Trans>}
+				emptyText={
+					<Trans>
+						No templates yet. Create one to start shaping your runs.
+					</Trans>
+				}
+				testIds={{
+					row: 'template-row',
+					view: 'template-view',
+					newButton: 'templates-new',
+					error: 'profile-templates-error',
+					dialog: 'template-view-dialog',
+				}}
+			/>
 
 			<Section>
 				<SectionHead>
@@ -568,57 +394,6 @@ function TemplatesPage() {
 					</>
 				)}
 			</Section>
-
-			<TemplateViewDialog
-				open={viewingRow !== null}
-				name={viewingRow?.name ?? ''}
-				body={viewingRow?.body ?? ''}
-				updatedAt={viewingRow?.updatedAt ?? null}
-				canEdit={
-					viewingRow !== null &&
-					viewingRow.ownerUserId !== null &&
-					viewingRow.ownerUserId === myUserId
-				}
-				orgOwned={viewingRow?.ownerUserId === null}
-				// Stepping from reading to editing swaps one dialog for the other, so
-				// Back leaves the template rather than dropping you back into reading
-				// what you just finished editing.
-				onEdit={() => {
-					if (viewingRow === null) return
-					closeRead()
-					openDlg({ kind: 'edit', id: viewingRow.id })
-				}}
-				onClose={closeRead}
-				testId='template-view-dialog'
-			/>
-
-			<TemplateEditorDialog
-				open={dialogOpen}
-				onOpenChange={next => {
-					if (!next) closeDlg()
-				}}
-				editing={editing}
-				onSaved={() => {
-					refreshTemplates()
-				}}
-			/>
-
-			<TemplateDeleteConfirm
-				open={confirmTarget !== null}
-				deleting={deleting}
-				onConfirm={() => {
-					void confirmDelete()
-				}}
-				onClose={() => setConfirmTarget(null)}
-				testId='template-delete-confirm'
-				title={<Trans>Delete this template?</Trans>}
-				description={
-					<Trans>
-						"{confirmTarget?.name ?? ''}" will be removed for good. This can't
-						be undone.
-					</Trans>
-				}
-			/>
 
 			<TemplateDeleteConfirm
 				open={confirmStack !== null}

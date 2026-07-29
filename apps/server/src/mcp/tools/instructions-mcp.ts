@@ -21,16 +21,17 @@ import { toItems } from './_result'
 
 // One consolidated, action-based tool for the whole instruction surface —
 // templates (reusable prompt blocks) and named stacks (ordered lists of
-// templates per agent). Each acts as the attributed user; scope=org writes are
-// admin-gated inside InstructionsService, and every outcome (including admin /
-// validation rejections and unresolved refs) comes back in the result body.
+// templates per agent). Each acts as the attributed user; org-owned stack
+// writes are admin-gated inside InstructionsService, while templates are open
+// to any member, and every outcome (including admin / validation rejections and
+// unresolved refs) comes back in the result body.
 
 const REQUEST_DEPENDENCIES = [SessionContext, CurrentOrg]
 const Scope = Schema.Literals(['personal', 'org'])
 
 const ManageInstructions = Tool.make('manage_instructions', {
 	description:
-		'Manage instruction templates and named instruction stacks for the active org. Templates are reusable blocks of prompt text; stacks are named, ordered lists of templates per agent (research, email), with at most one default per scope. scope=org targets org-owned rows (admin only); scope=personal targets your own. Editing an org template as a non-admin forks a personal copy; transfer_template hands a personal template you own to another member. `stack` accepts a stack name or id and `templates` accepts template names or ids — an unknown or ambiguous ref returns {_tag:"instruction_clarification"} with candidates instead of acting. A personal stack with composition=extend layers its templates on the live org default. set_default_stack makes a stack the default for its agent and scope; clear_default_stack unsets the default (personal: you inherit the org default; org, admin-only: the agent runs with no org default).',
+		'Manage instruction templates and named instruction stacks for the active org. Templates are reusable blocks of prompt text; stacks are named, ordered lists of templates per agent (research, email), with at most one default per scope. scope=org targets org-owned rows; scope=personal targets your own. Any member may create, edit or delete a template in either scope, and an edit to an org template changes it for everyone; org-owned *stacks* are admin-only. transfer_template hands a personal template you own to another member. `stack` accepts a stack name or id and `templates` accepts template names or ids — an unknown or ambiguous ref returns {_tag:"instruction_clarification"} with candidates instead of acting. A personal stack with composition=extend layers its templates on the live org default. set_default_stack makes a stack the default for its agent and scope; clear_default_stack unsets the default (personal: you inherit the org default; org, admin-only: the agent runs with no org default).',
 	parameters: Schema.Struct({
 		action: Schema.Literals([
 			'list_templates',
@@ -131,7 +132,7 @@ export const InstructionsMcpHandlersLive = InstructionsMcpTools.toLayer(
 						case 'delete_template':
 							if (params.id === undefined)
 								return { error: 'id is required to delete' }
-							return yield* run(svc.remove(userId, params.id))
+							return yield* run(svc.remove(params.id))
 						case 'transfer_template':
 							if (
 								params.id === undefined ||

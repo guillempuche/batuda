@@ -1,7 +1,7 @@
 // The instruction endpoints return `Schema.Unknown` bodies, so each surface
 // narrows the raw JSON into the small shapes it renders. Keeping the narrowing
-// in one place means the user library, the org admin page, and the pickers all
-// read the same fields the same way.
+// in one place means the personal library, the organization's page, and the
+// pickers all read the same fields the same way.
 
 export type TemplateShape = {
 	readonly id: string
@@ -35,6 +35,23 @@ export function narrowTemplates(value: unknown): ReadonlyArray<TemplateShape> {
 		})
 	}
 	return out
+}
+
+// Pulls the saved row out of the `{ outcome, template }` a template mutation
+// answers with. Reading it back from here, rather than from the list being
+// refreshed, is what lets a screen show the text that was just stored: a
+// refresh keeps serving the previous value until the new one lands.
+export function narrowSavedTemplate(exit: {
+	readonly _tag: string
+	readonly value?: unknown
+}): TemplateShape | null {
+	if (exit._tag !== 'Success') return null
+	const value = exit.value
+	if (!value || typeof value !== 'object') return null
+	const [saved] = narrowTemplates([
+		(value as Record<string, unknown>)['template'],
+	])
+	return saved ?? null
 }
 
 export type StackComposition = 'replace' | 'extend'

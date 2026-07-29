@@ -140,23 +140,24 @@ function OrganizationSettingsPage() {
 						</NavRow>
 					) : null}
 
-					{canInvite ? (
-						<NavRow
-							to='/settings/organization/templates'
-							data-testid='settings-org-templates-link'
-							aria-label={t`Manage org instruction templates`}
-						>
-							<NavRowLabel>
-								<ScrollText size={18} aria-hidden />
-								<NavRowTitle>
-									<Trans>Instruction templates</Trans>
-								</NavRowTitle>
-							</NavRowLabel>
-							<NavRowDescription>
-								<Trans>Shared guidance and the org research default.</Trans>
-							</NavRowDescription>
-						</NavRow>
-					) : null}
+					{/* Everyone gets this row: the shared templates behind it are
+					    anyone's to write and keep, and only the stacks on that page
+					    are admin-only. */}
+					<NavRow
+						to='/settings/organization/templates'
+						data-testid='settings-org-templates-link'
+						aria-label={t`Manage org instruction templates`}
+					>
+						<NavRowLabel>
+							<ScrollText size={18} aria-hidden />
+							<NavRowTitle>
+								<Trans>Instruction templates</Trans>
+							</NavRowTitle>
+						</NavRowLabel>
+						<NavRowDescription>
+							<Trans>Shared guidance and the org research default.</Trans>
+						</NavRowDescription>
+					</NavRow>
 				</>
 			)}
 		</Page>

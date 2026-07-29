@@ -7,9 +7,10 @@ import { SessionMiddleware } from '../middleware/session'
 // ── Inputs ──
 //
 // `scope` decides whether a write targets a personal template (the actor) or an
-// org-owned one (admin-gated in the handler). Mutation responses carry a
-// discriminated `{ outcome }` in the body (Schema.Unknown) rather than mapping
-// every case to an HTTP status, so the UI and MCP read the same shape.
+// org-owned one, which anyone in the organization may manage. Mutation
+// responses carry a discriminated `{ outcome }` in the body (Schema.Unknown)
+// rather than mapping every case to an HTTP status, so the UI and MCP read the
+// same shape.
 
 const Scope = Schema.Literals(['personal', 'org'])
 

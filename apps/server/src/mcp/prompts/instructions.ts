@@ -98,6 +98,6 @@ export const SaveInstructionPrompt = McpServer.prompt({
 		Effect.succeed(`The user wants to save a standing instruction named "${name}" (${scope} scope).
 
 1. Capture the preference the user expressed in this conversation as the instruction body — concise and imperative (e.g. "Always open with the contact's first name").
-2. Create it: call manage_instructions with action "create_template", name "${name}", scope "${scope}", and that body. (scope "org" is admin-only and is rejected for non-admins — save it as "personal" instead if that happens.)
+2. Create it: call manage_instructions with action "create_template", name "${name}", scope "${scope}", and that body. (scope "org" is shared with everyone in the organization and any member may create one; scope "personal" is yours alone.)
 3. Offer to put it in a stack for an agent (research or email) with manage_instructions action "create_stack" (and "set_default_stack" to make it the default), or apply it per run via the apply-instruction prompt.`),
 })

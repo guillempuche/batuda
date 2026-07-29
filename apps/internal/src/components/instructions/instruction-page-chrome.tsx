@@ -8,8 +8,8 @@ import {
 	stenciledTitle,
 } from '#/lib/workshop-mixins'
 
-// Shared page furniture for the instruction-template settings pages (the user
-// library and the org admin page). Both pages lay out the same workshop
+// Shared page furniture for the instruction-template settings pages (a member's
+// own library and the organization's). Both pages lay out the same workshop
 // surfaces — brushed-metal sections, a stencilled title, a ruled list of
 // template rows — so the chrome lives in one place to stay in step.
 
