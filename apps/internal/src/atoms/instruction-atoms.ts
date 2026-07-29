@@ -50,6 +50,12 @@ export const deleteTemplateAtom = BatudaApiAtom.mutation(
 	'instructions',
 	'deleteTemplate',
 )
+// Hand a template you own to another member. It leaves your library on success,
+// because the read policy scopes personal templates to their owner.
+export const transferTemplateAtom = BatudaApiAtom.mutation(
+	'instructions',
+	'transferTemplate',
+)
 export const createStackAtom = BatudaApiAtom.mutation(
 	'instructions',
 	'createStack',

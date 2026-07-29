@@ -25,7 +25,6 @@ export {
 	createTemplate,
 	deleteStack,
 	deleteTemplate,
-	forkTemplate,
 	getDefaultStacks,
 	getStack,
 	getTemplate,

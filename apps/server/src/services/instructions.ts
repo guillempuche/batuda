@@ -10,7 +10,6 @@ import {
 	decideTemplateEdit,
 	deleteStack,
 	deleteTemplate,
-	forkTemplate,
 	getDefaultStacks,
 	getStack,
 	getTemplate,
@@ -28,26 +27,27 @@ import {
 } from '@batuda/instructions'
 
 // Orchestration for instruction-template management shared by the HTTP and MCP
-// surfaces. It captures `sql` once, applies the org-owned admin gate (Better
-// Auth member.role, which RLS can't read) and the fork-on-edit rule, and maps
-// the package's SQL primitives to discriminated outcomes the transports render.
+// surfaces. It captures `sql` once, applies the admin gate on the
+// organization's stacks (Better Auth member.role, which RLS can't read), and
+// maps the package's SQL primitives to discriminated outcomes the transports
+// render. Templates themselves are anyone's to manage: whatever the read
+// policy returns, the reader may also change or remove.
 // SQL faults stay in the Effect error channel; each transport redacts them.
 
 type Scope = 'personal' | 'org'
 
-export type CreateOutcome =
-	| { readonly outcome: 'created'; readonly template: InstructionTemplate }
-	| { readonly outcome: 'forbidden' }
+export type CreateOutcome = {
+	readonly outcome: 'created'
+	readonly template: InstructionTemplate
+}
 
 export type UpdateOutcome =
 	| { readonly outcome: 'updated'; readonly template: InstructionTemplate }
-	| { readonly outcome: 'forked'; readonly template: InstructionTemplate }
 	| { readonly outcome: 'not_found' }
 
 export type DeleteOutcome =
 	| { readonly outcome: 'deleted' }
 	| { readonly outcome: 'in_use' }
-	| { readonly outcome: 'forbidden' }
 	| { readonly outcome: 'not_found' }
 
 export type TransferOutcome =
@@ -137,8 +137,6 @@ export class InstructionsService extends Context.Service<InstructionsService>()(
 					},
 				): Effect.Effect<CreateOutcome, never, SqlClient.SqlClient> =>
 					Effect.gen(function* () {
-						if (input.scope === 'org' && !(yield* isAdmin(userId)))
-							return { outcome: 'forbidden' as const }
 						const template = yield* createTemplate({
 							organizationId,
 							ownerUserId: input.scope === 'org' ? null : userId,
@@ -149,9 +147,9 @@ export class InstructionsService extends Context.Service<InstructionsService>()(
 						return { outcome: 'created' as const, template }
 					}).pipe(redactSql),
 
-				// Members editing an org template get a personal fork; the owner and
-				// org admins edit in place. RLS hides other members' personal
-				// templates, so an unreadable id reads as not-found.
+				// Your own templates and the organization's are both edited in place.
+				// RLS hides other members' personal templates, so an unreadable id
+				// reads as not-found.
 				update: (
 					userId: string,
 					id: string,
@@ -163,41 +161,25 @@ export class InstructionsService extends Context.Service<InstructionsService>()(
 					Effect.gen(function* () {
 						const existing = yield* getTemplate(id)
 						if (!existing) return { outcome: 'not_found' as const }
-						const actorIsAdmin =
-							existing.ownerUserId === null ? yield* isAdmin(userId) : false
 						const mode = decideTemplateEdit({
 							ownerUserId: existing.ownerUserId,
 							actorUserId: userId,
-							actorIsAdmin,
 						})
 						if (mode === 'deny') return { outcome: 'not_found' as const }
-						if (mode === 'in_place') {
-							const template = yield* updateTemplateFields(id, fields)
-							return template
-								? { outcome: 'updated' as const, template }
-								: { outcome: 'not_found' as const }
-						}
-						// fork: a member editing an org template gets a personal copy. The
-						// fork already carries the source text, so falling back to it still
-						// returns a valid template if the follow-up edit found no row.
-						const forked = yield* forkTemplate(id, {
-							ownerUserId: userId,
-							createdBy: userId,
-						})
-						if (!forked) return { outcome: 'not_found' as const }
-						const template = yield* updateTemplateFields(forked.id, fields)
-						return { outcome: 'forked' as const, template: template ?? forked }
+						const template = yield* updateTemplateFields(id, fields)
+						return template
+							? { outcome: 'updated' as const, template }
+							: { outcome: 'not_found' as const }
 					}).pipe(redactSql),
 
+				// The existence check keeps a template you can't read reading as
+				// not-found, rather than as "in use" by a stack you also can't see.
 				remove: (
-					userId: string,
 					id: string,
 				): Effect.Effect<DeleteOutcome, never, SqlClient.SqlClient> =>
 					Effect.gen(function* () {
 						const existing = yield* getTemplate(id)
 						if (!existing) return { outcome: 'not_found' as const }
-						if (existing.ownerUserId === null && !(yield* isAdmin(userId)))
-							return { outcome: 'forbidden' as const }
 						const result = yield* deleteTemplate(id)
 						return { outcome: result }
 					}).pipe(redactSql),

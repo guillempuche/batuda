@@ -6,7 +6,7 @@ import { fingerprintTemplates } from '@batuda/instructions'
 import { normalizeRows, type SeedCtx, withSeedIds } from './shared'
 
 // Standing instruction templates + per-agent default stacks for local dev.
-// owner_user_id NULL = org-owned (admin-managed, every member reads it); a set
+// owner_user_id NULL = org-owned (every member reads and manages it); a set
 // owner = personal (only that user). The research agent reads its default stack
 // on every run: the org default is the base ('replace'), and a user stack with
 // 'extend' adds that user's own templates on top. The [tag] name prefix is just
@@ -82,8 +82,8 @@ export const seedInstructions = ({
 		}
 
 		// Two personal owners (Alice the admin, Carol a plain member) so the
-		// personal-vs-org split and the admin-only gate on org rows are both
-		// exercisable; a restaurant-org row proves cross-org RLS isolation.
+		// personal-vs-org split is exercisable from either side; a restaurant-org
+		// row proves cross-org RLS isolation.
 		const templateRows = [
 			...TALLER_ORG_TEMPLATES.map(t => ({
 				organizationId: tallerOrgId,

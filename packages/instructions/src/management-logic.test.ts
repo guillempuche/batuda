@@ -4,70 +4,38 @@ import { classifyStackTemplates, decideTemplateEdit } from './management-logic'
 
 describe('decideTemplateEdit', () => {
 	describe('when the actor owns the template', () => {
-		it('should edit in place, regardless of admin role', () => {
-			// GIVEN a personal template owned by the actor [management-logic.ts:13]
-			// THEN a non-admin owner edits their own template in place
-			expect(
-				decideTemplateEdit({
-					ownerUserId: 'u1',
-					actorUserId: 'u1',
-					actorIsAdmin: false,
-				}),
-			).toBe('in_place')
-			// AND an admin owner is the same — ownership decides, not the role
-			expect(
-				decideTemplateEdit({
-					ownerUserId: 'u1',
-					actorUserId: 'u1',
-					actorIsAdmin: true,
-				}),
-			).toBe('in_place')
+		it('should edit it in place', () => {
+			// GIVEN a personal template owned by the actor
+			// WHEN the owner edits it
+			// THEN it changes in place
+			expect(decideTemplateEdit({ ownerUserId: 'u1', actorUserId: 'u1' })).toBe(
+				'in_place',
+			)
 		})
 	})
 
-	describe('when the template is org-owned', () => {
-		it('should edit in place for an admin', () => {
-			// GIVEN an org-owned template (owner null) and an admin actor [management-logic.ts:13]
-			expect(
-				decideTemplateEdit({
-					ownerUserId: null,
-					actorUserId: 'u1',
-					actorIsAdmin: true,
-				}),
-			).toBe('in_place')
-		})
-
-		it('should fork for a non-admin member', () => {
-			// GIVEN an org-owned template and a non-admin member [management-logic.ts:13]
-			// THEN the member gets a personal copy rather than editing the shared one
-			expect(
-				decideTemplateEdit({
-					ownerUserId: null,
-					actorUserId: 'u1',
-					actorIsAdmin: false,
-				}),
-			).toBe('fork')
+	describe('when the template belongs to the organization', () => {
+		it('should edit it in place for anyone in the organization', () => {
+			// GIVEN an org-owned template (no personal owner)
+			// WHEN any member edits it — the shared guidance is everyone's to keep
+			// THEN it changes in place, for everyone, whoever the member is
+			expect(decideTemplateEdit({ ownerUserId: null, actorUserId: 'u1' })).toBe(
+				'in_place',
+			)
+			expect(decideTemplateEdit({ ownerUserId: null, actorUserId: 'u2' })).toBe(
+				'in_place',
+			)
 		})
 	})
 
 	describe("when the template is another member's personal template", () => {
-		it('should deny even for an admin', () => {
-			// GIVEN a personal template owned by someone else [management-logic.ts:13]
-			// THEN it is denied — RLS hides it, and admin does not grant edit access
-			expect(
-				decideTemplateEdit({
-					ownerUserId: 'u2',
-					actorUserId: 'u1',
-					actorIsAdmin: false,
-				}),
-			).toBe('deny')
-			expect(
-				decideTemplateEdit({
-					ownerUserId: 'u2',
-					actorUserId: 'u1',
-					actorIsAdmin: true,
-				}),
-			).toBe('deny')
+		it('should deny the edit', () => {
+			// GIVEN a personal template owned by somebody else
+			// WHEN a different member tries to edit it
+			// THEN it is denied — it is not theirs, and RLS hides it anyway
+			expect(decideTemplateEdit({ ownerUserId: 'u2', actorUserId: 'u1' })).toBe(
+				'deny',
+			)
 		})
 	})
 })

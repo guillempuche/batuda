@@ -9,8 +9,9 @@ import { SqlClient } from 'effect/unstable/sql'
 // RLS is asymmetric by design. Reads are RLS-enforced: a member sees
 // org-owned templates + their own, never another member's personal ones. Writes
 // are constrained only to the org at the DB level — row ownership, the admin
-// gate on org-owned rows (Better-Auth member.role, which Postgres RLS can't
-// read), and ownership transfer are all enforced in the application service.
+// gate on the organization's stacks (Better-Auth member.role, which Postgres
+// RLS can't read), and ownership transfer are all enforced in the application
+// service.
 // FORCE ROW LEVEL SECURITY applies the policies to the table owner too;
 // app_service (BYPASSRLS) bypasses them for worker/cron paths. New tables
 // inherit app_user/app_service DML grants via the ALTER DEFAULT PRIVILEGES set
@@ -55,7 +56,7 @@ export default Effect.gen(function* () {
 				)
 			)
 	`
-	// Create: own or org-owned (the org-owned case is admin-gated in the app).
+	// Create: own or org-owned; either is open to anyone in the organization.
 	yield* sql`
 		CREATE POLICY insert_instruction_templates ON instruction_templates
 			FOR INSERT TO app_user
@@ -69,7 +70,8 @@ export default Effect.gen(function* () {
 	`
 	// Update: may target own/org-owned rows; the new owner only has to stay in
 	// the org, so the app can transfer ownership (donate to org, hand to another
-	// member) — RLS can't model that since it can't read member.role.
+	// member) — a handover the row's writer could not otherwise perform, since
+	// the row leaves their readable set the moment the owner changes.
 	yield* sql`
 		CREATE POLICY update_instruction_templates ON instruction_templates
 			FOR UPDATE TO app_user

@@ -12,9 +12,9 @@ import { InstructionsService } from '../services/instructions'
 
 // HTTP surface for instruction-template management. Handlers stay thin: they
 // pull the active org + user, delegate to InstructionsService (which owns the
-// admin gate and fork-on-edit), and return its discriminated outcome in the
-// body. An unknown `agent` path segment is reported in-band rather than as a
-// route 404, matching the rest of the surface.
+// admin gate on the organization's stacks), and return its discriminated
+// outcome in the body. An unknown `agent` path segment is reported in-band
+// rather than as a route 404, matching the rest of the surface.
 export const InstructionsLive = HttpApiBuilder.group(
 	BatudaApi,
 	'instructions',
@@ -53,12 +53,7 @@ export const InstructionsLive = HttpApiBuilder.group(
 							})
 						}),
 					)
-					.handle('deleteTemplate', _ =>
-						Effect.gen(function* () {
-							const { userId } = yield* SessionContext
-							return yield* svc.remove(userId, _.params.id)
-						}),
-					)
+					.handle('deleteTemplate', _ => svc.remove(_.params.id))
 					.handle('transferTemplate', _ =>
 						Effect.gen(function* () {
 							const org = yield* CurrentOrg

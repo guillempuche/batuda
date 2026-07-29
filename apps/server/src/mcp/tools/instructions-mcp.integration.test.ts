@@ -2,8 +2,9 @@
 // template transfer (ownership handoff), driven through the real toolkit handlers
 // the way a `tools/call` would, inside the same org RLS scope (`enterOrgScope`)
 // the /mcp middleware applies. Asserts both the discriminated `{ outcome }` bodies
-// and the resulting DB state. Uses the seeded `taller` org: its `owner` acts as
-// the admin gate, its plain `member` as the transfer target. Requires
+// and the resulting DB state. Uses the seeded `taller` org: its `owner` exercises
+// the admin gate on org stacks, and its plain `member` is both the transfer
+// target and the proof that templates are open to everyone. Requires
 // $DATABASE_URL.
 
 import { randomUUID } from 'node:crypto'
@@ -430,6 +431,55 @@ describe('MCP instruction tools against live Postgres', () => {
 				[templateId],
 			)
 			expect(template.rows).toHaveLength(1)
+		})
+
+		it('should let a plain member create, edit and delete an org template', async () => {
+			// GIVEN an org template a plain member creates for the whole org
+			const name = `${MARKER}memberorgtpl-${randomUUID().slice(0, 8)}`
+			const created = (await callTool(memberId, 'manage_instructions', {
+				action: 'create_template',
+				name,
+				body: 'first body',
+				scope: 'org',
+			})) as CreateOutcome
+			expect(created.outcome).toBe('created')
+			if (created.outcome !== 'created') return
+			const templateId = created.template.id
+			// AND it belongs to the organization, not to the member who wrote it
+			expect(created.template.ownerUserId).toBeNull()
+
+			// WHEN the same member rewrites it
+			const edited = (await callTool(memberId, 'manage_instructions', {
+				action: 'update_template',
+				id: templateId,
+				body: 'second body',
+			})) as { outcome: string }
+
+			// THEN the shared row itself changed — no personal copy was made
+			expect(edited.outcome).toBe('updated')
+			const rows = await pool.query<{ body: string; owner: string | null }>(
+				'SELECT body, owner_user_id AS owner FROM instruction_templates WHERE id = $1',
+				[templateId],
+			)
+			expect(rows.rows[0]?.body).toBe('second body')
+			expect(rows.rows[0]?.owner).toBeNull()
+			const copies = await pool.query<{ id: string }>(
+				'SELECT id FROM instruction_templates WHERE name = $1',
+				[name],
+			)
+			expect(copies.rows).toHaveLength(1)
+
+			// AND the member can delete the org template as well
+			const removed = (await callTool(memberId, 'manage_instructions', {
+				action: 'delete_template',
+				id: templateId,
+			})) as { outcome: string }
+			expect(removed.outcome).toBe('deleted')
+			const gone = await pool.query<{ id: string }>(
+				'SELECT id FROM instruction_templates WHERE id = $1',
+				[templateId],
+			)
+			expect(gone.rows).toHaveLength(0)
 		})
 
 		it('should forbid a plain member from changing an org stack', async () => {

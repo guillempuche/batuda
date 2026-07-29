@@ -114,24 +114,6 @@ export const updateTemplateFields = (
 		return row ? toTemplate(row) : undefined
 	})
 
-// Copy a template's text into a new personal template owned by `ownerUserId` —
-// the app forks instead of editing in place when a member edits an org template.
-export const forkTemplate = (
-	id: string,
-	opts: { readonly ownerUserId: string; readonly createdBy: string },
-): Eff<InstructionTemplate | undefined> =>
-	Effect.gen(function* () {
-		const source = yield* getTemplate(id)
-		if (!source) return undefined
-		return yield* createTemplate({
-			organizationId: source.organizationId,
-			ownerUserId: opts.ownerUserId,
-			name: source.name,
-			body: source.body,
-			createdBy: opts.createdBy,
-		})
-	})
-
 // Hand a template to another member in the same org. A member can't make this
 // change directly: once the new owner is set, the per-user read policy hides the
 // row from the member, and the table refuses to write a row they can no longer
