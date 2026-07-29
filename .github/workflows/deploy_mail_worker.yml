@@ -166,3 +166,53 @@ jobs:
           # claimAvailableInboxes runs every 5 s, so an IDLE-established
           # log line should appear within ~10 s if any inbox is provisioned.
           unikraft instances logs batuda-mail-worker --tail 100 || echo "::warning::No logs yet"
+
+      # Every release publishes a ~430 MiB image, and for a long time nothing
+      # removed the old ones. The registry filled to its 10 GiB ceiling and a
+      # push then failed outright ("403 Forbidden ... will exceed the
+      # configured upper limit"), which fails the release. Keep the last few
+      # versions so a rollback still has an image to return to, and drop the
+      # rest.
+      #
+      # The storage ceiling is shared with every other image in the
+      # organization, so this keeps our own history bounded but cannot on its
+      # own guarantee there is room: a push can still be refused because
+      # something else grew.
+      #
+      # Never fails the release. The deploy has already succeeded by this
+      # point, so tidying that could not run is a warning, not a bad release.
+      - name: Prune old images
+        continue-on-error: true
+        run: |
+          set -u
+          REPO="${{ env.KRAFTCLOUD_ORG }}/batuda-mail-worker"
+          # The version this run just put live. Asking the platform which image
+          # an instance runs does not work here: it answers with the name
+          # alone, no version, so it cannot say which of them is live.
+          DEPLOYED="$REPO:${{ steps.meta.outputs.version }}"
+          KEEP=3
+
+          # The trailing colon keeps the untagged `<repo>` entry out of the
+          # list — it is a separate image that no release publishes. The same
+          # image is reported once per metro, hence the de-duplication.
+          all=$(unikraft images list -o json 2>/dev/null \
+            | jq -r --arg prefix "$REPO:" '.[] | (.ref // "") | select(startswith($prefix))' \
+            | sort -u)
+          if [ -z "$all" ]; then
+            echo "::warning::The image list came back empty, so nothing was pruned."
+            exit 0
+          fi
+
+          # Keep the newest few, and always keep what this run put live. A
+          # rollback re-deploys an older version, which by number alone looks
+          # stale and would otherwise be deleted moments after going live.
+          # `sort -V` orders these dated names properly, so 2026.7.9 comes
+          # before 2026.7.10 and a same-day patch comes after what it patches.
+          keep=$({ printf '%s\n' "$all" | sort -Vr | head -n "$KEEP"; printf '%s\n' "$DEPLOYED"; } | sort -u)
+          echo "Keeping:"
+          printf '%s\n' "$keep" | sed 's/^/  /'
+
+          comm -23 <(printf '%s\n' "$all") <(printf '%s\n' "$keep") | while read -r ref; do
+            echo "  deleting $ref"
+            unikraft images delete "$ref" || echo "::warning::Could not delete $ref"
+          done
