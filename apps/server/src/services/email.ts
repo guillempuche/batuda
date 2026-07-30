@@ -527,25 +527,20 @@ export class EmailService extends Context.Service<EmailService>()(
 				created_at, updated_at
 			`
 
-			// Whose mailbox someone may act through: their own, and the team's.
-			// A colleague's mailbox is not theirs to send from, whatever else
-			// they are allowed to do around the organization.
+			// Their own and the team's. A colleague's is not theirs to send from.
 			const mayActThrough = (inbox: InboxRow, userId: string) =>
 				inbox.ownerUserId === null || inbox.ownerUserId === userId
 
-			// Whose settings someone may change, or remove: their own mailbox,
-			// and — for whoever runs the organization — anyone's. A mailbox with
-			// no owner is the organization's own, so it is theirs to look after
-			// rather than any one member's.
+			// Their own, or anyone's for whoever runs the organization — which
+			// includes the team's, since it belongs to no one member.
 			const mayLookAfter = (
 				inbox: InboxRow,
 				userId: string,
 				role: string | null,
 			) => isOrgManager(role) || inbox.ownerUserId === userId
 
-			// A half-written message is as private as a sent one, so reaching it
-			// takes the same standing as the mailbox it will go out from — which
-			// is the draft's own mailbox, not whichever one the caller names.
+			// Gated on the draft's own mailbox, not whichever one the caller
+			// names — a half-written message is as private as a sent one.
 			const assertDraftReachable = (
 				draftInboxId: string,
 				draftId: string,
@@ -572,9 +567,7 @@ export class EmailService extends Context.Service<EmailService>()(
 					return mayActThrough(inbox, session.userId) ? inbox : null
 				})
 
-			// The same lookup for changing a mailbox rather than acting through
-			// it, which is the stricter of the two for a member and the looser
-			// for whoever runs the organization.
+			// For changing a mailbox rather than acting through it.
 			const resolveInboxToLookAfter = (inboxId: string) =>
 				Effect.gen(function* () {
 					const currentOrg = yield* CurrentOrg
@@ -1939,9 +1932,8 @@ export class EmailService extends Context.Service<EmailService>()(
 							? null
 							: (input.ownerUserId ?? session.userId)
 
-						// Connecting a mailbox in somebody else's name, or one that
-						// belongs to everyone, is looking after the organization
-						// rather than looking after yourself.
+						// Connecting one in somebody else's name, or the team's, is
+						// looking after the organization rather than yourself.
 						const actsForSomeoneElse =
 							ownerUserId === null || ownerUserId !== session.userId
 						if (actsForSomeoneElse && !isOrgManager(currentOrg.role)) {
@@ -1950,10 +1942,8 @@ export class EmailService extends Context.Service<EmailService>()(
 									'Only an organization admin can connect a mailbox for the team or for another member',
 							})
 						}
-						// One address is connected once at a time. Answered here so
-						// reconnecting an address already in use gets a plain reply
-						// rather than a database error, and the same reply whoever
-						// holds that address — it never names the colleague who does.
+						// Answered here so reconnecting an address in use gets a plain
+						// reply rather than a database error.
 						const alreadyConnected = yield* sql<{ count: number }>`
 							SELECT count(*)::int AS count FROM inboxes
 							WHERE organization_id = ${currentOrg.id}
@@ -1984,11 +1974,9 @@ export class EmailService extends Context.Service<EmailService>()(
 							})
 						}
 
-						// The first mailbox somebody connects becomes the address they
-						// send from, so nobody has to go looking for a setting to make
-						// sending work at all. Only ever for the person doing the
-						// connecting: setting one up on somebody's behalf leaves that
-						// choice to them, the same as everywhere else.
+						// A first mailbox becomes what that person sends from, so
+						// sending works without hunting for a setting. Only for the
+						// person connecting it: choosing is never done for somebody.
 						const isFirstOwnMailbox =
 							ownerUserId === session.userId &&
 							(yield* sql<{ count: number }>`
@@ -2044,10 +2032,9 @@ export class EmailService extends Context.Service<EmailService>()(
 								}),
 							)
 
-						// Giving up the previously marked mailbox and marking this one
-						// happen together, and only once the connection has been tried:
-						// a mailbox that turns out unreachable must not leave somebody
-						// with nothing to send from. Only ever the same person's.
+						// Unmarking the old and marking the new happen together, after
+						// the connection is tried, so a mailbox that turns out
+						// unreachable cannot leave somebody with nothing to send from.
 						const rows = yield* sql
 							.withTransaction(
 								Effect.gen(function* () {
@@ -2091,10 +2078,9 @@ export class EmailService extends Context.Service<EmailService>()(
 								}),
 							)
 							.pipe(
-								// Two people connecting the same address at once both get
-								// past the check above, since the connection attempt between
-								// them takes real time. The loser is told the same thing the
-								// check would have told them, rather than seeing a crash.
+								// Two at once both pass the check above, since the connection
+								// attempt between takes real time. The loser gets told, not
+								// crashed.
 								Effect.catchTag('SqlError', error =>
 									String(error.cause).includes('idx_inboxes_email_active')
 										? Effect.fail(
@@ -2317,11 +2303,9 @@ export class EmailService extends Context.Service<EmailService>()(
 						if (!target) {
 							return yield* new NotFound({ entity: 'Inbox', id })
 						}
-						// Removing a mailbox stops it syncing and takes it out of the
-						// pickers, but the row stays: threads and message search go on
-						// resolving through it long after somebody removes it.
-						// Removing one that was already gone changes nothing, and says
-						// so, rather than reporting a removal that never happened.
+						// The row stays so threads and search keep resolving through
+						// it. Removing one already gone says so, rather than reporting
+						// a removal that never happened.
 						if (!target.active) {
 							return yield* new NotFound({ entity: 'Inbox', id })
 						}
@@ -2338,11 +2322,8 @@ export class EmailService extends Context.Service<EmailService>()(
 						return yield* decodeInbox(rows[0]!).pipe(Effect.orDie)
 					}),
 
-				// Manual re-test of a stored mailbox — decrypt, probe, and write
-				// back the grant status. Shares reprobeInbox with updateInbox,
-				// which does its own checking; asked for directly, it is the
-				// mailbox's keeper who may ask, since the answer is whether
-				// somebody's stored password still works.
+				// Decrypt, probe, write back the grant status. Gated on its own,
+				// since the answer is whether somebody's password still works.
 				testInbox: (id: string) =>
 					Effect.gen(function* () {
 						const target = yield* resolveInboxToLookAfter(id)
@@ -2352,9 +2333,8 @@ export class EmailService extends Context.Service<EmailService>()(
 						return yield* reprobeInbox(id)
 					}),
 
-				// Chooses which of the caller's own mailboxes they send from when
-				// they don't say. Nobody else's is touched, and nobody else can
-				// make this choice for them.
+				// Which of the caller's own mailboxes they send from when they
+				// don't say. Nobody else's is touched, or can be.
 				setPrimaryInbox: (id: string) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
@@ -2594,9 +2574,8 @@ export class EmailService extends Context.Service<EmailService>()(
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
 						const session = yield* SessionContext
-						// A mailbox out of the caller's reach answers with an empty
-						// page, the same as one that is not there at all, so this can
-						// never be used to find out what exists.
+						// Out of reach answers empty, same as absent, so this can never
+						// be used to find out what exists.
 						if (inboxId !== undefined && !(yield* resolveInbox(inboxId))) {
 							return {
 								items: [],
@@ -2609,9 +2588,7 @@ export class EmailService extends Context.Service<EmailService>()(
 							}
 						}
 						const list = yield* drafts.list(inboxId)
-						// Naming no mailbox means "mine", not "everyone's" — half-written
-						// mail is as private as sent mail, so a colleague's never comes
-						// back here.
+						// Naming no mailbox means "mine", not "everyone's".
 						const reachable = yield* sql<{ id: string }>`
 							SELECT id FROM inboxes
 							WHERE organization_id = ${currentOrg.id}
@@ -2794,9 +2771,8 @@ export class EmailService extends Context.Service<EmailService>()(
 				listFooters: (inboxId: string) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
-						// Visible to whoever sends through the mailbox, and to whoever
-						// looks after it — otherwise an admin would be shown nothing on
-						// a mailbox whose signature they are allowed to rewrite.
+						// Either standing: an admin who may rewrite a signature would
+						// otherwise be shown none.
 						const inbox =
 							(yield* resolveInbox(inboxId)) ??
 							(yield* resolveInboxToLookAfter(inboxId))
@@ -2843,9 +2819,8 @@ export class EmailService extends Context.Service<EmailService>()(
 				}) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
-						// Writing a signature changes what goes out on every message
-						// the mailbox sends, so it takes the same standing as changing
-						// the mailbox itself.
+						// A signature goes out on every message the mailbox sends, so
+						// writing one takes the same standing as changing the mailbox.
 						const inbox = yield* resolveInboxToLookAfter(input.inboxId)
 						if (!inbox) {
 							return yield* new NotFound({
