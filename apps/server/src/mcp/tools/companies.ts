@@ -19,23 +19,6 @@ import { McpPageLimit, McpPageOffset, PageResult, toPage } from './_result'
 
 const REQUEST_DEPENDENCIES = [CurrentOrg, CurrentUser]
 
-// Slugs from a create-batch that produced no new row: those whose slug already
-// existed, plus every repeat beyond the first within the same call (the unique
-// constraint lets only one of a duplicated slug land, so the rest are skips).
-// Exported for its unit test.
-export const skippedCreateSlugs = (
-	requestedSlugs: ReadonlyArray<string>,
-	landedSlugs: ReadonlySet<string>,
-): string[] => {
-	const accounted = new Set<string>()
-	const skipped: string[] = []
-	for (const slug of requestedSlugs) {
-		if (landedSlugs.has(slug) && !accounted.has(slug)) accounted.add(slug)
-		else skipped.push(slug)
-	}
-	return skipped
-}
-
 const SearchCompanies = Tool.make('search_companies', {
 	description:
 		'Filter companies by status, country (ISO 3166-1 alpha-2, e.g. US/ES/DE), industry, priority, search query, the research fit verdict (strong_fit / possible_fit / weak_fit / no_fit), a fit criterion the company passed (matched loosely against the criterion text), or a geographic bounding box. The box is any subset of min_lat/max_lat/min_lng/max_lng (decimal degrees); each bound is applied independently and only matches companies with stored coordinates. Returns summaries (including latitude/longitude) — call get_company for full details. `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true.',
@@ -81,6 +64,10 @@ const GetCompany = Tool.make('get_company', {
 const companyInputFields = {
 	name: Schema.String,
 	slug: Schema.String,
+	taxId: Schema.optional(Schema.String).annotate({
+		description:
+			'The number the company is registered or taxed under — a Spanish NIF/CIF, a UK company number, an EU VAT number. Copy it exactly as printed; punctuation and case are ignored when matching. Supplying it is the surest way to avoid creating a company you already hold under a different name.',
+	}),
 	status: Schema.optional(Schema.String),
 	industry: Schema.optional(Schema.String),
 	sizeRange: Schema.optional(Schema.String),
@@ -110,13 +97,18 @@ const CompanyInput = Schema.Struct(companyInputFields)
 
 const CreateCompanies = Tool.make('create_companies', {
 	description:
-		'Create one or more companies in a single call — pass `companies` as an array (a single element to create just one, the whole shortlist to load a batch). Slug: unique kebab-case from name. Status: prospect|lead|qualified|proposal|negotiation|client|closed|dead (default: prospect). Priority: 1 (highest) to 5 (lowest, default: 2). Runs in one transaction; a company whose slug already exists is skipped (not an error), so re-running an overlapping list is safe. Returns { created, skipped_slugs }: the rows that landed, and the slugs that already existed.',
+		'Create one or more companies in a single call — pass `companies` as an array (a single element to create just one, the whole shortlist to load a batch). Slug: unique kebab-case from name. Status: prospect|lead|qualified|proposal|negotiation|client|closed|dead (default: prospect). Priority: 1 (highest) to 5 (lowest, default: 2). Pass taxId whenever you know it: a company is skipped if its slug already exists OR its registration number already does, so the number catches the same firm arriving under a different trading name. Runs in one transaction; a skip is not an error, so re-running an overlapping list is safe. Returns { created, skipped }: the rows that landed, and for each one left out its slug plus matched_on ("slug" or "tax_id") saying which identity already existed.',
 	parameters: Schema.Struct({
 		companies: Schema.Array(CompanyInput),
 	}),
 	success: Schema.Struct({
 		created: Schema.Array(Company.json),
-		skipped_slugs: Schema.Array(Schema.String),
+		skipped: Schema.Array(
+			Schema.Struct({
+				slug: Schema.String,
+				matched_on: Schema.Literals(['slug', 'tax_id']),
+			}),
+		),
 	}),
 	dependencies: REQUEST_DEPENDENCIES,
 })
@@ -130,6 +122,10 @@ const UpdateCompany = Tool.make('update_company', {
 	parameters: Schema.Struct({
 		id: Schema.String,
 		name: Schema.optional(Schema.String),
+		taxId: Schema.optional(Schema.String).annotate({
+			description:
+				'The number the company is registered or taxed under. Worth writing down once a registry lookup returns it — a later lookup can then resolve this company exactly instead of paying to search by name again.',
+		}),
 		status: Schema.optional(Schema.String),
 		industry: Schema.optional(Schema.String),
 		sizeRange: Schema.optional(Schema.String),
@@ -236,13 +232,17 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 				),
 			create_companies: params =>
 				Effect.gen(function* () {
-					const created = yield* service.createMany(params.companies)
-					const landed = new Set(created.map(company => company.slug))
-					const skipped_slugs = skippedCreateSlugs(
-						params.companies.map(company => company.slug),
-						landed,
-					)
-					return { created, skipped_slugs }
+					const batch = yield* service.createMany(params.companies)
+					return {
+						created: batch.created,
+						skipped: batch.skipped.map(skip => ({
+							slug: skip.slug,
+							matched_on:
+								skip.matchedOn === 'taxId'
+									? ('tax_id' as const)
+									: ('slug' as const),
+						})),
+					}
 				}).pipe(Effect.orDie),
 			update_company: ({ id, ...fields }) =>
 				Effect.gen(function* () {
