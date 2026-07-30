@@ -129,6 +129,7 @@ export class CompanyService extends Context.Service<CompanyService>()(
 									OR EXISTS (
 										SELECT 1 FROM sites s
 										WHERE s.company_id = companies.id
+											AND s.organization_id = ${currentOrg.id}
 											AND s.latitude IS NOT NULL
 											AND s.longitude IS NOT NULL
 											AND ${sql.and(siteBox)}

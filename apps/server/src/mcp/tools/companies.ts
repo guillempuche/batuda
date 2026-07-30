@@ -315,6 +315,17 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 						ORDER BY is_primary DESC, name
 					`
 					if (params.action === 'add') {
+						// The company has to be this organisation's. The foreign key only
+						// says it exists, not whose it is, so without this a branch could
+						// be hung off somebody else's company.
+						const owned = yield* sql`
+							SELECT id FROM companies
+							WHERE id = ${params.company_id}
+								AND organization_id = ${currentOrg.id}
+								AND deleted_at IS NULL
+							LIMIT 1
+						`
+						if (owned.length === 0) return { sites: [] }
 						yield* sql`
 							INSERT INTO sites ${sql.insert({
 								organizationId: currentOrg.id,
