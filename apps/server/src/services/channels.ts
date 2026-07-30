@@ -24,6 +24,48 @@ export interface ChannelInput {
 /** What a way of reaching someone can hang off. */
 export type ChannelSubject = 'companies' | 'contacts'
 
+// The ways of reaching a company that used to be columns on its row. Callers
+// still name them that way — a company "has a website" reads naturally, and the
+// API, the MCP tools and the web app all say it — so the names stay, and this is
+// where they stop being columns and become rows.
+const COMPANY_CHANNEL_FIELDS = [
+	'website',
+	'email',
+	'phone',
+	'instagram',
+	'linkedin',
+] as const
+
+/**
+ * Separate a company's write into the columns it really has and the ways of
+ * reaching it, which live elsewhere now.
+ *
+ * Doing it here rather than at each entry point means the HTTP routes, both MCP
+ * tools and the research apply path all behave the same, and none of them has to
+ * know that these five stopped being columns.
+ */
+export const splitCompanyChannelFields = (
+	data: Record<string, unknown>,
+): {
+	readonly columns: Record<string, unknown>
+	readonly channels: ReadonlyArray<ChannelInput>
+} => {
+	const columns: Record<string, unknown> = {}
+	const channels: Array<ChannelInput> = []
+	for (const [key, value] of Object.entries(data)) {
+		if (!(COMPANY_CHANNEL_FIELDS as ReadonlyArray<string>).includes(key)) {
+			columns[key] = value
+			continue
+		}
+		// A blank is a caller clearing the field, which is a removal rather than a
+		// write; nothing to add, and the row it would have written is left alone.
+		if (typeof value === 'string' && value.trim() !== '') {
+			channels.push({ kind: key, value: value.trim(), is_primary: true })
+		}
+	}
+	return { columns, channels }
+}
+
 // The resolved SQL client is passed in (not pulled from context) so these
 // helpers add nothing to a caller's requirements — MCP tool handlers and HTTP
 // route handlers both already hold one.

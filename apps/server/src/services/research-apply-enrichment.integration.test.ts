@@ -144,15 +144,15 @@ describe('occUpdate, on the enrichment it records for a company', () => {
 				},
 			)
 
-			// WHEN a second run fills only the phone, from a different page
+			// WHEN a second run fills only the location, from a different page
 			await apply(
 				id,
 				1,
-				{ phone: '+34 900 000 000' },
+				{ location: 'Girona' },
 				{
 					...noRunFacts,
 					provenance: {
-						phone: { sourceUrl: 'https://acme.es/contact', runId: RUN_ID },
+						location: { sourceUrl: 'https://acme.es/contact', runId: RUN_ID },
 					},
 				},
 			)
@@ -162,7 +162,7 @@ describe('occUpdate, on the enrichment it records for a company', () => {
 			expect(row.field_provenance?.['industry']?.sourceUrl).toBe(
 				'https://acme.es/about',
 			)
-			expect(row.field_provenance?.['phone']?.sourceUrl).toBe(
+			expect(row.field_provenance?.['location']?.sourceUrl).toBe(
 				'https://acme.es/contact',
 			)
 		})
@@ -188,7 +188,7 @@ describe('occUpdate, on the enrichment it records for a company', () => {
 			await apply(
 				id,
 				1,
-				{ phone: '+34 911 111 111' },
+				{ location: 'Salt' },
 				{ ...noRunFacts, provenance: {} },
 			)
 

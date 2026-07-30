@@ -71,11 +71,18 @@ beforeAll(async () => {
 	// The matcher finds the company by the sender's domain, so the company has to
 	// carry a website on that domain for any of this to reach the branch.
 	const company = await pool.query<{ id: string }>(
-		`INSERT INTO companies (organization_id, slug, name, website)
-		 VALUES ($1, $2, 'Taller Puig', $3) RETURNING id`,
-		[ORG, `taller-${randomUUID()}`, `https://${DOMAIN}`],
+		`INSERT INTO companies (organization_id, slug, name)
+		 VALUES ($1, $2, 'Taller Puig') RETURNING id`,
+		[ORG, `taller-${randomUUID()}`],
 	)
 	companyId = company.rows[0]!.id
+	// The website is what ties the sender's domain to this company, and it is a
+	// channel rather than a column.
+	await pool.query(
+		`INSERT INTO channels (organization_id, subject_table, subject_id, channel, address, is_primary)
+		 VALUES ($1, 'companies', $2, 'website', $3, true)`,
+		[ORG, companyId, `https://${DOMAIN}`],
+	)
 }, 30_000)
 
 afterAll(async () => {

@@ -94,14 +94,21 @@ export class ParticipantMatcher extends Context.Service<ParticipantMatcher>()(
 						const domain = email.split('@')[1]
 						if (!domain) return new NoMatch({ email })
 
+						// Which company this domain belongs to, read off the addresses
+						// the company holds rather than off two columns it used to have.
+						// Its own mailbox at that domain, or its website mentioning it,
+						// are both good enough — the same two tests as before, asked of
+						// the list instead of the row.
 						const companies = yield* sql<{ id: string }>`
-							SELECT id FROM companies
-							WHERE organization_id = ${currentOrg.id}
+							SELECT c.id FROM companies c
+							JOIN channels ch
+								ON ch.subject_table = 'companies' AND ch.subject_id = c.id
+							WHERE c.organization_id = ${currentOrg.id}
 								AND (
-									lower(email) LIKE ${`%@${domain}`}
-									OR lower(website) LIKE ${`%${domain}%`}
+									(ch.channel = 'email' AND lower(ch.address) LIKE ${`%@${domain}`})
+									OR (ch.channel = 'website' AND lower(ch.address) LIKE ${`%${domain}%`})
 								)
-							ORDER BY updated_at DESC
+							ORDER BY c.updated_at DESC
 							LIMIT 1
 						`
 						const [company] = companies

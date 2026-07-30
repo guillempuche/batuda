@@ -14,6 +14,7 @@ import {
 	seedCompanyId,
 	seedContactId,
 	seedUuid,
+	splitCompanyChannels,
 	withSeedIds,
 } from './shared'
 
@@ -139,10 +140,19 @@ export const seedCompanies = (
 		).map(c => ({ ...c, id: seedCompanyId(c.slug) }))
 
 		yield* Effect.logInfo(`Seeding companies (${preset})...`)
+		// A company's website and mailbox are no longer columns on its row, so the
+		// fixtures — which still describe a company as having them, because that is
+		// how a person describes one — are split before the insert.
+		const taller = splitCompanyChannels(companies, tallerOrgId)
 		const insertedCompanies =
 			yield* sql<CompanyRow>`INSERT INTO companies ${sql.insert(
-				normalizeRows(stamp(companies)),
+				normalizeRows(stamp(taller.companies)),
 			)} RETURNING id, slug, status`
+		if (taller.channels.length > 0) {
+			yield* sql`INSERT INTO channels ${sql.insert(
+				normalizeRows(taller.channels),
+			)}`
+		}
 
 		const companyMap = new Map(insertedCompanies.map(c => [c.slug, c.id]))
 		yield* Effect.logInfo(`  taller org: ${insertedCompanies.length} companies`)
@@ -199,10 +209,16 @@ export const seedCompanies = (
 				organizationId: restaurantOrgId,
 			}))
 
+			const restaurant = splitCompanyChannels(restaurantRows, restaurantOrgId)
 			const insertedRestaurant =
 				yield* sql<CompanyRow>`INSERT INTO companies ${sql.insert(
-					normalizeRows(restaurantRows),
+					normalizeRows(restaurant.companies),
 				)} RETURNING id, slug, status`
+			if (restaurant.channels.length > 0) {
+				yield* sql`INSERT INTO channels ${sql.insert(
+					normalizeRows(restaurant.channels),
+				)}`
+			}
 			for (const c of insertedRestaurant) {
 				restaurantCompanyMap.set(c.slug, c.id)
 			}

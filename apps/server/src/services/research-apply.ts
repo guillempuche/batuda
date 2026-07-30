@@ -8,7 +8,11 @@ export {
 	researchProvenance,
 } from './research-provenance'
 
-import { type ChannelInput, writeChannels } from './channels'
+import {
+	type ChannelInput,
+	splitCompanyChannelFields,
+	writeChannels,
+} from './channels'
 import { forkCompanyRegeocode } from './company-geocoding'
 import {
 	ResearchProposalApplied,
@@ -34,6 +38,11 @@ import {
 // model may send either casing, so proposal keys are normalized before the
 // lookup. Excludes identity, coordinates (set by the geocoder), version,
 // timestamps, and the pain points a person fills in from calls and emails.
+//
+// A company's mailbox, number, website and handles are not here because they are
+// no longer columns. They are still proposed by those names — what a reviewer
+// reads is "email: info@…" — and are written as channels instead; see
+// COMPANY_CHANNEL_PROPOSAL_FIELDS below.
 export const COMPANY_FIELDS = new Set([
 	'name',
 	'status',
@@ -43,11 +52,6 @@ export const COMPANY_FIELDS = new Set([
 	'location',
 	'source',
 	'priority',
-	'website',
-	'email',
-	'phone',
-	'instagram',
-	'linkedin',
 	'googleMapsUrl',
 	'productsFit',
 	'tags',
@@ -781,6 +785,19 @@ export const resolveResearchProposedUpdate = (
 				reason: validated.reason,
 			} satisfies ResolveOutcome
 
+		// A company proposal may name a way of reaching it. Those are taken out
+		// first and written as channels; what is left goes to the columns.
+		const proposedChannels =
+			validated.table === 'companies'
+				? splitCompanyChannelFields(
+						Object.fromEntries(
+							Object.entries(validated.fields).map(([key, value]) => [
+								key,
+								readSourced(value).value,
+							]),
+						),
+					).channels
+				: []
 		const { fields, citations: fieldCitations } = allowlistFields(
 			validated.table,
 			validated.fields,
@@ -796,8 +813,16 @@ export const resolveResearchProposedUpdate = (
 			targetCompanyIds.has(validated.subjectId)
 		)
 			fields['country'] = run.country
-		if (Object.keys(fields).length === 0)
+		if (Object.keys(fields).length === 0 && proposedChannels.length === 0)
 			return { outcome: 'no_applicable_fields' } satisfies ResolveOutcome
+		if (proposedChannels.length > 0) {
+			yield* writeChannels(
+				sql,
+				org.id,
+				{ table: 'companies', id: validated.subjectId },
+				proposedChannels,
+			)
+		}
 
 		// A subject_id that isn't a UUID trips text parsing (22P02) in the WHERE
 		// clause; that is a bad proposal (the model can invent an id), not a server

@@ -1737,6 +1737,23 @@ function narrowCompany(raw: unknown): CompanyDetail | null {
 		if (!Array.isArray(raw)) return []
 		return raw.filter((v): v is string => typeof v === 'string')
 	}
+	// How to reach the company is no longer a column each: a company can hold
+	// several mailboxes, numbers and handles — one per shop, one per office — so
+	// they arrive as a list. The header shows one of each, which is the one marked
+	// primary. The server hands the list back with those first, so the first match
+	// of a kind is the one to show.
+	const channel = (kind: string): string | null => {
+		const list = r['channels']
+		if (!Array.isArray(list)) return null
+		for (const entry of list) {
+			if (!entry || typeof entry !== 'object') continue
+			const row = entry as Record<string, unknown>
+			if (row['kind'] !== kind) continue
+			const value = row['value']
+			if (typeof value === 'string' && value.trim() !== '') return value
+		}
+		return null
+	}
 	return {
 		id: r['id'],
 		slug: r['slug'],
@@ -1750,11 +1767,11 @@ function narrowCompany(raw: unknown): CompanyDetail | null {
 		location: str('location'),
 		source: str('source'),
 		priority: num('priority'),
-		website: str('website'),
-		email: str('email'),
-		phone: str('phone'),
-		instagram: str('instagram'),
-		linkedin: str('linkedin'),
+		website: channel('website'),
+		email: channel('email'),
+		phone: channel('phone'),
+		instagram: channel('instagram'),
+		linkedin: channel('linkedin'),
 		googleMapsUrl: str('googleMapsUrl'),
 		painPoints: str('painPoints'),
 		currentTools: str('currentTools'),
