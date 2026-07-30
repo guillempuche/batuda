@@ -1778,11 +1778,6 @@ msgstr "Date"
 msgid "Dead"
 msgstr "Dead"
 
-#: src/components/research/findings/contact-discovery-view.tsx
-#: src/routes/companies/$slug.tsx
-msgid "Decision maker"
-msgstr "Decision maker"
-
 #: src/routes/calendar/index.tsx
 msgid "Decline"
 msgstr "Decline"
@@ -1853,10 +1848,6 @@ msgstr "Delete this key?"
 #: src/routes/settings/organization/templates.tsx
 msgid "Delete this org stack?"
 msgstr "Delete this org stack?"
-
-#: src/routes/settings/organization/templates.tsx
-#~ msgid "Delete this org template?"
-#~ msgstr "Delete this org template?"
 
 #: src/routes/settings/profile/templates.tsx
 msgid "Delete this stack?"
@@ -3423,10 +3414,6 @@ msgid "No org stacks yet. Create one to get started."
 msgstr "No org stacks yet. Create one to get started."
 
 #: src/routes/settings/organization/templates.tsx
-#~ msgid "No org templates yet."
-#~ msgstr "No org templates yet."
-
-#: src/routes/settings/organization/templates.tsx
 msgid "No org templates yet. Create one to get started."
 msgstr "No org templates yet. Create one to get started."
 
@@ -4789,10 +4776,6 @@ msgstr "Shared guidance every member's agents can use, plus the organization's s
 msgid "Shared with everyone in your organization — their agents follow it on every run."
 msgstr "Shared with everyone in your organization — their agents follow it on every run."
 
-#: src/components/instructions/template-editor-dialog.tsx
-#~ msgid "Shared with everyone in your organization — their research agent follows it on every run."
-#~ msgstr "Shared with everyone in your organization — their research agent follows it on every run."
-
 #: src/routes/emails/inboxes.tsx
 msgid "Shared with the team"
 msgstr "Shared with the team"
@@ -5525,10 +5508,6 @@ msgstr "This runs research on {0} companies, up to about {1} in paid data. Start
 msgid "This stack no longer exists."
 msgstr "This stack no longer exists."
 
-#: src/components/instructions/template-view-dialog.tsx
-#~ msgid "This template is empty, so it adds nothing to a run. Ask whoever looks after it to fill it in."
-#~ msgstr "This template is empty, so it adds nothing to a run. Ask whoever looks after it to fill it in."
-
 #: src/components/instructions/template-dialog.tsx
 msgid "This template is empty, so it adds nothing to a run. Fill it in to give your agents something to follow."
 msgstr "This template is empty, so it adds nothing to a run. Fill it in to give your agents something to follow."
@@ -6018,14 +5997,6 @@ msgstr "Your organization has no default yet."
 #: src/routes/settings/profile/templates.tsx
 msgid "Your organization has no default yet. Make a stack your default to steer every run."
 msgstr "Your organization has no default yet. Make a stack your default to steer every run."
-
-#: src/components/instructions/template-view-dialog.tsx
-#~ msgid "Your organization looks after this one."
-#~ msgstr "Your organization looks after this one."
-
-#: src/routes/settings/organization/templates.tsx
-#~ msgid "Your organization's admins manage these templates. You can read any of them, and use them in your own stacks or per run."
-#~ msgstr "Your organization's admins manage these templates. You can read any of them, and use them in your own stacks or per run."
 
 #: src/routes/settings/organization/members.tsx
 msgid "Your session has expired. Sign in again to continue."

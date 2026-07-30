@@ -1778,11 +1778,6 @@ msgstr "Data"
 msgid "Dead"
 msgstr "Descartat"
 
-#: src/components/research/findings/contact-discovery-view.tsx
-#: src/routes/companies/$slug.tsx
-msgid "Decision maker"
-msgstr "Responsable de decisió"
-
 #: src/routes/calendar/index.tsx
 msgid "Decline"
 msgstr "Rebutja"
@@ -1853,10 +1848,6 @@ msgstr "Vols eliminar aquesta clau?"
 #: src/routes/settings/organization/templates.tsx
 msgid "Delete this org stack?"
 msgstr "Vols eliminar aquesta pila de l'organització?"
-
-#: src/routes/settings/organization/templates.tsx
-#~ msgid "Delete this org template?"
-#~ msgstr "Vols eliminar aquesta plantilla de l'organització?"
 
 #: src/routes/settings/profile/templates.tsx
 msgid "Delete this stack?"
@@ -3423,10 +3414,6 @@ msgid "No org stacks yet. Create one to get started."
 msgstr "Encara no hi ha piles de l'organització. Crea'n una per començar."
 
 #: src/routes/settings/organization/templates.tsx
-#~ msgid "No org templates yet."
-#~ msgstr "Encara no hi ha plantilles d'organització."
-
-#: src/routes/settings/organization/templates.tsx
 msgid "No org templates yet. Create one to get started."
 msgstr "Encara no hi ha plantilles de l'organització. Crea'n una per començar."
 
@@ -4789,10 +4776,6 @@ msgstr "Orientació compartida que poden fer servir els agents de tots els membr
 msgid "Shared with everyone in your organization — their agents follow it on every run."
 msgstr "Compartida amb tothom de la teva organització: els seus agents la segueixen a cada execució."
 
-#: src/components/instructions/template-editor-dialog.tsx
-#~ msgid "Shared with everyone in your organization — their research agent follows it on every run."
-#~ msgstr "Compartida amb tothom de la teva organització; el seu agent de recerca la segueix en cada recerca."
-
 #: src/routes/emails/inboxes.tsx
 msgid "Shared with the team"
 msgstr "Compartida amb l'equip"
@@ -5525,10 +5508,6 @@ msgstr "Això farà recerca sobre {0} empreses, fins a uns {1} en dades de pagam
 msgid "This stack no longer exists."
 msgstr "Aquesta pila ja no existeix."
 
-#: src/components/instructions/template-view-dialog.tsx
-#~ msgid "This template is empty, so it adds nothing to a run. Ask whoever looks after it to fill it in."
-#~ msgstr "Aquesta plantilla és buida, així que no aporta res a cap execució. Demana a qui se n'ocupa que l'ompli."
-
 #: src/components/instructions/template-dialog.tsx
 msgid "This template is empty, so it adds nothing to a run. Fill it in to give your agents something to follow."
 msgstr "Aquesta plantilla és buida, així que no aporta res a cap execució. Omple-la per donar als teus agents alguna cosa a seguir."
@@ -6018,14 +5997,6 @@ msgstr "La teva organització encara no té cap valor per defecte."
 #: src/routes/settings/profile/templates.tsx
 msgid "Your organization has no default yet. Make a stack your default to steer every run."
 msgstr "La teva organització encara no té cap predeterminada. Marca una pila com a predeterminada per guiar totes les execucions."
-
-#: src/components/instructions/template-view-dialog.tsx
-#~ msgid "Your organization looks after this one."
-#~ msgstr "D'aquesta se n'ocupa la teva organització."
-
-#: src/routes/settings/organization/templates.tsx
-#~ msgid "Your organization's admins manage these templates. You can read any of them, and use them in your own stacks or per run."
-#~ msgstr "Els administradors de la teva organització gestionen aquestes plantilles. Pots llegir-ne qualsevol i fer-les servir en les teves piles o per execució."
 
 #: src/routes/settings/organization/members.tsx
 msgid "Your session has expired. Sign in again to continue."
