@@ -65,17 +65,29 @@ export const parseGoldenRow = (row: RawGoldenRow): GoldenParseResult => {
 		return { ok: false, error: 'expected output is not a JSON object' }
 	}
 
-	const officialDomain = answer['officialDomain']
-	if (
-		typeof officialDomain !== 'string' ||
-		officialDomain.trim().length === 0
-	) {
-		return { ok: false, error: 'expected output has no officialDomain string' }
-	}
-
 	const rawAltDomains = answer['altDomains']
 	if (rawAltDomains !== undefined && !isStringArray(rawAltDomains)) {
 		return { ok: false, error: 'altDomains must be an array of strings' }
+	}
+
+	// A row has to name at least one address that proves the run reached the right
+	// company, but it does not have to be the company's own site. Some companies
+	// have no site at all — a market stall, a family workshop, a jobbing builder —
+	// and they are exactly the hard cases worth measuring. For one of those, the
+	// proof is a register entry or a directory page, given as an alt domain.
+	// Insisting on an official domain kept every such company out of the set.
+	const rawOfficialDomain = answer['officialDomain']
+	const officialDomain =
+		typeof rawOfficialDomain === 'string' && rawOfficialDomain.trim().length > 0
+			? rawOfficialDomain
+			: null
+	const altDomains = rawAltDomains ?? []
+	if (officialDomain === null && altDomains.length === 0) {
+		return {
+			ok: false,
+			error:
+				'expected output needs an officialDomain, or altDomains for a company with no website of its own',
+		}
 	}
 
 	const fields: Partial<Record<ScorableField, string>> = {}
@@ -139,6 +151,7 @@ export const parseGoldenRow = (row: RawGoldenRow): GoldenParseResult => {
 			query: row.query,
 			officialDomain,
 			...(rawAltDomains !== undefined ? { altDomains: rawAltDomains } : {}),
+
 			fields,
 			...(contacts.length > 0 ? { contacts } : {}),
 			...(rawBucket !== undefined ? { bucket: rawBucket as GoldenBucket } : {}),

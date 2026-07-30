@@ -809,3 +809,136 @@ describe('groupSummaries', () => {
 		})
 	})
 })
+
+describe('scoreRun for the company shapes this measures', () => {
+	// A company with no website of its own: the only proof the run reached it is a
+	// register entry, given as an alt domain.
+	const noWebsite: GoldenExpectation = {
+		id: 'taller-puig',
+		query: 'Taller Puig, Girona',
+		officialDomain: null,
+		altDomains: ['librebor.es'],
+		fields: { country: 'ES' },
+	}
+
+	describe('when the company has no website at all', () => {
+		it('should ground on the register entry that stands in for one', () => {
+			// GIVEN a run that reached only the register page
+			const result = scoreRun(
+				noWebsite,
+				outcome({
+					reachedDomains: ['https://librebor.es/busqueda/taller-puig'],
+					fields: { country: 'ES' },
+				}),
+			)
+
+			// THEN it counts as having reached the target
+			expect(result.grounded).toBe(true)
+			expect(result.wrongCompany).toBe(false)
+		})
+
+		it('should not ground on an unrelated site', () => {
+			// GIVEN a run that read somebody else's page
+			const result = scoreRun(
+				noWebsite,
+				outcome({ reachedDomains: ['https://other-company.es/'] }),
+			)
+
+			// THEN a null official domain does not make everything ground
+			expect(result.grounded).toBe(false)
+		})
+	})
+
+	describe('when the only thing a run found was the published mailbox', () => {
+		it('should not count as an empty run', () => {
+			// GIVEN a thin-web company whose contact page prints one role address,
+			// and a run that came back with that and nothing else
+			const result = scoreRun(
+				noWebsite,
+				outcome({
+					reachedDomains: ['https://librebor.es/x'],
+					fields: { email: 'info@tallerpuig.es' },
+				}),
+			)
+
+			// THEN the run is not filed with the ones that found nothing — a way of
+			// reaching the company is the most actionable thing there is to find
+			expect(result.empty).toBe(false)
+		})
+	})
+
+	describe('when a telephone number is written differently on each page', () => {
+		it('should match on the digits, ignoring spacing and country code', () => {
+			const expectedPhone: GoldenExpectation = {
+				id: 'phone',
+				query: 'Acme',
+				officialDomain: 'acme.es',
+				fields: { phone: '+34 972 123 456' },
+			}
+
+			// GIVEN the same line printed without its country code or spacing
+			const same = scoreRun(
+				expectedPhone,
+				outcome({ fields: { phone: '972123456' } }),
+			)
+			// THEN it is one number, scored correct
+			expect(same.fieldsCorrect).toBe(1)
+
+			// AND a genuinely different line is not
+			const different = scoreRun(
+				expectedPhone,
+				outcome({ fields: { phone: '+34 972 123 457' } }),
+			)
+			expect(different.fieldsCorrect).toBe(0)
+			expect(different.fieldsScored).toBe(1)
+		})
+	})
+
+	describe('when a registration number carries punctuation or a prefix', () => {
+		it('should match on its letters and digits alone', () => {
+			const expectedTaxId: GoldenExpectation = {
+				id: 'tax',
+				query: 'Acme',
+				officialDomain: 'acme.es',
+				fields: { tax_id: 'B-12345678' },
+			}
+
+			// GIVEN the same number printed without the hyphen and in lower case
+			expect(
+				scoreRun(expectedTaxId, outcome({ fields: { tax_id: 'b12345678' } }))
+					.fieldsCorrect,
+			).toBe(1)
+
+			// AND a different company's number does not match
+			expect(
+				scoreRun(expectedTaxId, outcome({ fields: { tax_id: 'B12345679' } }))
+					.fieldsCorrect,
+			).toBe(0)
+		})
+	})
+
+	describe('when a row states no expected value for the new fields', () => {
+		it('should not count them against precision or recall', () => {
+			// GIVEN the original row, which states industry, country and size only
+			const result = scoreRun(
+				acme,
+				outcome({
+					fields: {
+						industry: 'transport',
+						country: 'ES',
+						size_range: '26-50',
+						// Values the golden row says nothing about
+						email: 'info@acme.es',
+						phone: '+34 900 000 000',
+					},
+				}),
+			)
+
+			// THEN only the three the row has an answer for are counted, so adding
+			// fields to the scored list cannot move a historic row's numbers
+			expect(result.fieldsExpected).toBe(3)
+			expect(result.fieldsScored).toBe(3)
+			expect(result.fieldsCorrect).toBe(3)
+		})
+	})
+})

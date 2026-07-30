@@ -18,9 +18,23 @@ pnpm cli research eval --org <org-id> --user <user-id> --golden eval/golden.json
 
 Add `--by-bucket` to also print those metrics broken out by the golden rows' size/reach `bucket` (big / small / niche) and by `country`, so a regression that only hits, say, niche companies or one country is visible instead of averaged into the whole-set numbers. The same per-bucket and per-country summaries are always written to the `--out` report as `byBucket` / `byCountry`, and each run's span carries `eval.bucket` / `eval.country` for grouping on the monitoring board.
 
-Titled-contact recall answers a gap the four scalar fields miss: of the people a company is known to publish, how many the run returned **with a title**. Contacts sit outside the scored field set, so a run can pass every field yet hand back the decision-makers with no title — the exact symptom this metric watches. It only appears (else `n/a`) for rows that list expected `contacts`.
+Titled-contact recall answers a gap the scalar fields miss: of the people a company is known to publish, how many the run returned **with a title**. Contacts sit outside the scored field set, so a run can pass every field yet hand back the decision-makers with no title — the exact symptom this metric watches. It only appears (else `n/a`) for rows that list expected `contacts`.
 
-The scored fields are four of the profile's six, and the golden set has a right answer for even fewer. A run that returns those four and nothing else scores full marks, which is the opposite of what a rich profile means. Three counts sit beside them for that reason: **profile fields filled** (out of the shape's own total), **people named per run**, and **of those, titled**. They need no golden data — they are counted off what came back — and they are the numbers to watch when a change is meant to make a profile fuller rather than more correct.
+The scored fields are seven of the profile's ten, and the golden set has a right answer for even fewer. A run that returns those seven and nothing else scores full marks, which is the opposite of what a rich profile means. Three counts sit beside them for that reason: **profile fields filled** (out of the shape's own total), **people named per run**, and **of those, titled**. They need no golden data — they are counted off what came back — and they are the numbers to watch when a change is meant to make a profile fuller rather than more correct.
+
+### Which fields are scored, and why
+
+Scored: `industry`, `size_range`, `country`, `location`, `email`, `phone`, `tax_id`. Each has exactly one right answer that can be written down and checked.
+
+The company's own `email`, `phone` and `tax_id` were added when the profile gained them. Adding a field to the scored list costs nothing in **field precision** or **field recall**: a row that states no expected value for a field is skipped for that field in both counts, so a historic row's numbers cannot move. It does change the **empty rate**, deliberately — a run whose only real find was the role mailbox printed on the company's contact page used to be filed alongside the runs that found nothing at all.
+
+Not scored: `website`, `current_tools`, `tags`. The website is already what grounding is measured on (a row's `officialDomain`), so scoring it here would report the same success twice and make a change to grounding look twice as large. Tools and tags are free text with no single correct value.
+
+Matching is per field: `location` by containment either way; `industry` through the vocabulary map; `phone` on its digits, last nine only, so spacing and a country code cannot fail a correct number; `tax_id` on its letters and digits alone, so `B-12345678` and `b12345678` are one number; `email`, `country` and `size_range` exactly, since the pipeline is meant to emit those verbatim.
+
+### When the profile shape changes, take a baseline first
+
+**Profile fullness** divides by the extraction schema's own field count, so adding a field to the schema moves the denominator and drops the ratio on identical output. It went from 6 to 10 when the company's contact details and registration number were added, which is a third off the ratio for output that did not change. Any comparison across such a change is meaningless unless the before-pass was taken on the old shape — so take the baseline *before* editing the schema, and say in the write-up which shape each side was measured on.
 
 Read them against the guard stages on the monitoring board, below. Fields filled rising while the guards drop no more than before is a real gain; fields filled and guard drops rising together is padding.
 
@@ -80,17 +94,17 @@ A JSON array of rows. Copy `golden.example.json` to your own `golden.json` and r
     "officialDomain": "company.com",
     "altDomains": ["a-registry-profile.example"],
     "bucket": "small",
-    "fields": { "industry": "…", "size_range": "…", "country": "…", "location": "…" },
+    "fields": { "industry": "…", "size_range": "…", "country": "…", "location": "…", "email": "…", "phone": "…", "tax_id": "…" },
     "contacts": ["Ada Lovelace", { "name": "Alan Turing" }]
   }
 }
 ```
 
 - `query` — what the pipeline is asked to research (add the city for a generic name).
-- `officialDomain` — the company's own website host; the primary proof the run reached the target. **Required.**
-- `altDomains` — other hosts that also prove the target was reached (a registry profile, a known subsidiary). Optional.
+- `officialDomain` — the company's own website host; the primary proof the run reached the target. Required **unless** the company has no website of its own, in which case leave it out and give `altDomains` instead.
+- `altDomains` — other hosts that also prove the target was reached (a registry profile, a known subsidiary). Optional when there is an `officialDomain`; required when there is not. A row naming neither is rejected — nothing could ever prove the run reached the right company.
 - `bucket` — the company's size/reach segment: `big` (a household name, easy to research), `small` (an SMB with a light web presence), or `niche` (a specialist with little third-party coverage, the hardest). Optional, but an unknown value is rejected loudly; drives the `--by-bucket` breakdown so a regression that hits only one segment is not averaged away.
-- `fields` — the known-correct values. Only these four keys are scored, and a misspelled key is rejected loudly. All optional — score only the fields you can verify.
+- `fields` — the known-correct values. Only the scored keys listed below are accepted, and a misspelled or unscored key is rejected loudly. All optional — score only the fields you can verify.
 - `contacts` — people the company is known to publish, each a name string or a `{ "name": "…" }` object. They score titled-contact recall: how many came back with a title. Name matching folds accents and tolerates a middle name/initial, but it tokenizes on Latin letters — a name written only in a non-Latin script (CJK, Cyrillic, Greek, Arabic) won't match, so romanize it in the golden row. Optional; a fabricated name skews the metric exactly as a wrong field value does, so list only real, verifiable people. No `role` here — the metric checks that the run supplied *some* title, not which one.
 
 ### Allowed field values
@@ -101,11 +115,43 @@ Match the CRM's own vocabulary, or the value can never match what the pipeline e
 - `size_range` — `1-5` · `6-10` · `11-25` · `26-50` · `51-200`
 - `country` — ISO 3166-1 alpha-2 code (e.g. `GB` · `ES` · `US`)
 - `location` — free text (matched by containment, so formatting differences are tolerated)
+- `email` — the company's own published mailbox, exactly as printed (`info@…`, `hola@…`). Not a named person's address; those belong in `contacts`.
+- `phone` — the company's own published number, in any format (matched on digits)
+- `tax_id` — the registration number, in any format (matched on letters and digits)
 
-## Two kinds of row to include
+## Four kinds of row to include
 
 - **Clean companies** — a company with its fields filled in (`country`, `location`, `industry`, and `size_range` where known). These score field precision and recall.
 - **Generic / look-alike names** — a company whose name is common (many "Sunset Logistics" exist). Give the `query` a city and the real `officialDomain`; leave a field unset if you can't verify it. These catch the pipeline confidently returning a same-named *different* company (the wrong-company rate).
+- **Reachable only by a role mailbox** — a small company that names nobody on its site but prints `info@` or `hola@` on its contact page. Put that address in `fields.email`. These are what proves the role-mailbox harvest works end to end: without such a row the harvest is unmeasured, and the run reads as empty.
+
+  ```json
+  {
+    "id": "example-role-mailbox-only",
+    "query": "Company Name, City",
+    "expectedOutput": {
+      "officialDomain": "company.example",
+      "bucket": "small",
+      "fields": { "country": "ES", "email": "info@company.example" }
+    }
+  }
+  ```
+
+- **No website at all** — a market stall, a family workshop, a jobbing builder. Omit `officialDomain` and give the register or directory page that proves the company exists as `altDomains`. These exercise the path where nothing can be guessed from a domain and the register is the only source of people.
+
+  ```json
+  {
+    "id": "example-no-website",
+    "query": "Company Name, City",
+    "expectedOutput": {
+      "altDomains": ["librebor.es"],
+      "bucket": "niche",
+      "fields": { "country": "ES", "tax_id": "B12345678" }
+    }
+  }
+  ```
+
+Both blocks above are **templates, not data** — the ids say so. Replace every value with a company you have actually checked. A made-up address or registration number poisons the numbers exactly as a made-up industry does, and these two fields are easier to get wrong because they look precise.
 
 ## Registries: UK is free, ES is paid
 
