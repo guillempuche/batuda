@@ -39,6 +39,7 @@ export const COMPANY_FIELDS = new Set([
 	'status',
 	'industry',
 	'sizeRange',
+	'taxId',
 	'location',
 	'source',
 	'priority',

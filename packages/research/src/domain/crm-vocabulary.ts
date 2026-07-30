@@ -40,6 +40,11 @@ export type CrmSizeRange = (typeof CRM_SIZE_RANGES)[number]
 // (the one place that sees both this and the write allowlist) fails otherwise.
 export const SNAPSHOT_COMPANY_FIELDS = [
 	'name',
+	// Shown so a run that finds the registration number can see we already hold
+	// it and say nothing, and so a run that finds a different one can say so.
+	// Left out, the number could only ever be written by the first run to find it
+	// and never corrected by any run after.
+	'taxId',
 	'website',
 	'email',
 	'phone',

@@ -44,6 +44,18 @@ export interface CompanyFilters {
 	readonly count?: CountMode | undefined
 }
 
+/**
+ * A registration number stripped down to the part that identifies the company:
+ * punctuation and spacing removed, letters raised.
+ *
+ * The same Spanish company is printed "B12345678", "B-12345678" and "ES B12345678"
+ * on three different pages, and comparing those as typed would treat one company as
+ * three. Must stay in step with the expression the index is built on, or a
+ * comparison stops using it.
+ */
+export const normalizeTaxId = (taxId: string): string =>
+	taxId.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
+
 export class CompanyService extends Context.Service<CompanyService>()(
 	'CompanyService',
 	{
@@ -181,26 +193,63 @@ export class CompanyService extends Context.Service<CompanyService>()(
 						)
 					}),
 
-				// Insert a batch in one transaction, skipping any whose slug already
-				// exists in the org (a duplicate slug is a conflict, not a failure — the
-				// whole batch shouldn't die on one). Returns only the rows that landed,
-				// so the caller can tell which slugs were skipped. Each row inserts its
-				// own columns, so companies with different optional fields batch cleanly.
+				// Insert a batch in one transaction, leaving out any company already on
+				// file — a duplicate is a conflict, not a failure, so the whole batch
+				// must not die on one. Each row inserts its own columns, so companies
+				// with different optional fields batch cleanly.
+				//
+				// A company is already on file if either of two things matches. Its slug,
+				// which the table enforces. Or its registration number, which is the
+				// surer of the two — the same firm reaches us under "Acme" and "Acme
+				// Logistics SL" and gets two different slugs, while its number is the
+				// same both times. That one has to be looked up rather than left to the
+				// table: a single statement can name only one conflict to watch for.
+				//
+				// The lookup runs inside the same transaction as the inserts, so a number
+				// repeated twice within one batch is caught on the second one too.
+				//
+				// Both keys are reported back by what matched, so a caller told a company
+				// was left out can tell "you already have this slug" from "you already
+				// have this company under another name" without guessing.
 				createMany: (items: ReadonlyArray<Record<string, unknown>>) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
 						const inserted: Array<unknown> = []
+						const skipped: Array<{
+							readonly slug: string
+							readonly matchedOn: 'slug' | 'taxId'
+						}> = []
 						for (const data of items) {
+							const slug = typeof data['slug'] === 'string' ? data['slug'] : ''
+							const taxId =
+								typeof data['taxId'] === 'string' ? data['taxId'] : null
+							if (taxId !== null && normalizeTaxId(taxId) !== '') {
+								const existing = yield* sql`
+									SELECT id FROM companies
+									WHERE organization_id = ${currentOrg.id}
+										AND tax_id IS NOT NULL
+										AND upper(regexp_replace(tax_id, '[^A-Za-z0-9]', '', 'g'))
+											= ${normalizeTaxId(taxId)}
+									LIMIT 1
+								`
+								if (existing.length > 0) {
+									skipped.push({ slug, matchedOn: 'taxId' })
+									continue
+								}
+							}
 							const rows = yield* sql`
 								INSERT INTO companies ${sql.insert({ ...data, organizationId: currentOrg.id })}
 								ON CONFLICT (organization_id, slug) DO NOTHING
 								RETURNING *
 							`
-							if (rows[0] !== undefined) inserted.push(rows[0])
+							if (rows[0] === undefined)
+								skipped.push({ slug, matchedOn: 'slug' })
+							else inserted.push(rows[0])
 						}
-						return yield* Schema.decodeUnknownEffect(Schema.Array(Company))(
-							inserted,
-						)
+						const created = yield* Schema.decodeUnknownEffect(
+							Schema.Array(Company),
+						)(inserted)
+						return { created, skipped }
 					}).pipe(sql.withTransaction),
 
 				update: (id: string, data: Record<string, unknown>) =>

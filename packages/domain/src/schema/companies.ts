@@ -42,6 +42,13 @@ export class Company extends Model.Class<Company>('Company')({
 	slug: Schema.String,
 	name: Schema.String,
 
+	// The number the company is registered under — a Spanish NIF/CIF, a UK company
+	// number, a VAT number. The one name for a company that is the same the world
+	// over and does not change, which makes it the surest way to tell two
+	// similarly-named companies apart. Free text, because every country writes it
+	// differently and a person typing one in should never be refused for it.
+	taxId: Schema.NullOr(Schema.String),
+
 	// Pipeline
 	status: Schema.String,
 	// values: prospect | contacted | responded | meeting

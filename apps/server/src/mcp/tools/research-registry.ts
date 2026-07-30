@@ -17,7 +17,7 @@ import {
 
 const LookupRegistry = Tool.make('lookup_registry', {
 	description:
-		'Look up a company in its national business registry by tax id or name. Returns legal name, tax id, status, and (when available) directors. A country without a national registry returns {status:"no_registry"} — use discover_contacts there. Some registries are metered (e.g. ES libreBORME ~€0.29/lookup).',
+		'Look up a company in its national business registry by tax id or name. Returns legal name, tax id, status, and (when available) directors. Prefer tax_id when the company record already holds one (get_company shows it): it resolves exactly, where a name can match the wrong firm. A country without a national registry returns {status:"no_registry"} — use discover_contacts there. Some registries are metered (e.g. ES libreBORME ~€0.29/lookup), so store what you learn on the company with update_company rather than looking the same one up twice.',
 	parameters: Schema.Struct({
 		country: AcceptedCountry.annotate({
 			description:
