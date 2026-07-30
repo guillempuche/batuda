@@ -43,7 +43,12 @@ const deps = Layer.mergeAll(
 
 const runBatch = (items: ReadonlyArray<BatchResolveItem>) =>
 	resolveResearchProposedUpdatesBatch(items, 'u1').pipe(
-		Effect.provideService(CurrentOrg, { id: ORG, name: 'b', slug: 'b' }),
+		Effect.provideService(CurrentOrg, {
+			id: ORG,
+			name: 'b',
+			slug: 'b',
+			role: 'member',
+		}),
 		Effect.provide(deps),
 		Effect.orDie,
 		Effect.runPromise,

@@ -70,7 +70,12 @@ const searchWith = (filters: Record<string, unknown>) =>
 			const page = yield* svc.search(filters)
 			return page.items
 		}).pipe(
-			Effect.provideService(CurrentOrg, { id: ORG, name: 'd', slug: 'd' }),
+			Effect.provideService(CurrentOrg, {
+				id: ORG,
+				name: 'd',
+				slug: 'd',
+				role: 'member',
+			}),
 		),
 	)
 
@@ -80,7 +85,12 @@ const detailOf = (slug: string) =>
 			const svc = yield* CompanyService
 			return yield* svc.getWithRelations(slug)
 		}).pipe(
-			Effect.provideService(CurrentOrg, { id: ORG, name: 'd', slug: 'd' }),
+			Effect.provideService(CurrentOrg, {
+				id: ORG,
+				name: 'd',
+				slug: 'd',
+				role: 'member',
+			}),
 		),
 	)
 

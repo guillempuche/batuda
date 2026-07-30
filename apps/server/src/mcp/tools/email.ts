@@ -86,7 +86,6 @@ const SendEmailResult = Schema.Union([
 const DeletedResult = Schema.Struct({ _tag: Schema.Literal('deleted') })
 
 const ThreadStatus = Schema.Literals(['open', 'closed', 'archived'])
-const InboxPurpose = Schema.Literals(['human', 'agent', 'shared'])
 const Recipients = Schema.Union([Schema.String, Schema.Array(Schema.String)])
 
 // MCP attachments reference staged uploads — agents call
@@ -180,12 +179,11 @@ const StageEmailAttachment = Tool.make('stage_email_attachment', {
 
 const ListEmailThreads = Tool.make('list_email_threads', {
 	description:
-		'List email threads with filters. Returns an envelope {items, limit, offset, hasMore} — `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true. Each item carries message_count, last_message_at, last_message_direction, last_inbound_at, is_unread, and the linked inbox {email, displayName, purpose}. Supports search by subject (query), status (open/closed/archived), and inbox purpose (human/agent/shared). Default limit is 100, max 500.',
+		'List email threads with filters. Returns an envelope {items, limit, offset, hasMore} — `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true. Each item carries message_count, last_message_at, last_message_direction, last_inbound_at, is_unread, and the linked inbox {email, displayName, description}. Supports search by subject (query) and status (open/closed/archived). Default limit is 100, max 500.',
 	parameters: Schema.Struct({
 		inbox_id: Schema.optional(Schema.String),
 		company_id: Schema.optional(Schema.String),
 		status: Schema.optional(ThreadStatus),
-		purpose: Schema.optional(InboxPurpose),
 		query: Schema.optional(Schema.String),
 		limit: Schema.optional(McpPageLimit),
 		offset: Schema.optional(McpPageOffset),
@@ -312,21 +310,19 @@ const DownloadEmailAttachment = Tool.make('download_email_attachment', {
 	.annotate(Tool.OpenWorld, true)
 
 // ── Inbox management ─────────────────────────────────────────────
-// Inboxes are owned by an (organization, user) pair. Each row stores its
-// own IMAP/SMTP transport configuration plus encrypted credentials —
-// Batuda is a generic mail client (Infomaniak, Fastmail, M365 IMAP, …),
-// not a hosted mailbox. `purpose` drives composer visibility: human
-// inboxes belong to a team member, agent inboxes are AI-only, shared
-// inboxes surface in both.
+// Each row stores its own IMAP/SMTP transport configuration plus encrypted
+// credentials — Batuda is a generic mail client (Infomaniak, Fastmail, M365
+// IMAP, …), not a hosted mailbox. `ownerUserId` says whose it is: set means
+// it belongs to that member, null means the whole team's. That is what
+// decides who may send through it and who may change it.
 
 const ImapSecurity = Schema.Literals(['tls', 'starttls', 'plain'])
 const SmtpSecurity = Schema.Literals(['tls', 'starttls', 'plain'])
 
 const ListEmailInboxes = Tool.make('list_email_inboxes', {
 	description:
-		'List the mailboxes visible to the calling member in the active organization. Each row carries purpose (human/agent/shared), ownerUserId, isDefault, active flag, IMAP/SMTP transport hosts, and grant_status. Filter by purpose, active flag, or owner. Private mailboxes belonging to other members are hidden automatically. The response also reports whether the caller has a primary mailbox set (hasDefault plus its id and address), so a composer can check before send_email whether to prompt the user to connect one first.',
+		"List the mailboxes visible to the calling member in the active organization. Each row carries description (free text saying what the mailbox is for, may be empty), ownerUserId, isDefault, active flag, IMAP/SMTP transport hosts, and grant_status. ownerUserId is what matters for what you can do: it is the member the mailbox belongs to, or null when the mailbox belongs to the whole team. You can send through your own mailboxes and the team's, but not a colleague's. Filter by active flag or owner. Private mailboxes belonging to other members are hidden automatically. The response also reports whether the caller has a mailbox they send from by default (hasDefault plus its id and address), so a composer can check before send_email whether to prompt the user to connect one first.",
 	parameters: Schema.Struct({
-		purpose: Schema.optional(InboxPurpose),
 		active: Schema.optional(Schema.Boolean),
 		owner_user_id: Schema.optional(Schema.String),
 	}),
@@ -356,7 +352,7 @@ const ListEmailProviderPresets = Tool.make('list_email_provider_presets', {
 
 const ManageEmailInbox = Tool.make('manage_email_inbox', {
 	description:
-		"Manage the mailboxes connected to the active organization. action=create connects a new one and needs the full IMAP + SMTP details plus a password (use list_email_provider_presets to pre-fill hosts and ports for a known provider) — Batuda is a generic IMAP/SMTP client, not a hosted mail provider, so if the account has two-factor authentication its normal login password is rejected and a provider app-specific password is required (see appPasswordUrl on the matching preset); Gmail and Microsoft 365 no longer allow password sign-in at all (passwordAuthSupported=false). action=update changes only the fields you pass on an existing id, re-encrypting the password if one is given, and active=false hides the mailbox from composers and stops syncing while keeping historical threads. action=test re-runs a real IMAP LOGIN and SMTP check against the stored credentials and refreshes grant_status — use it after changing a password. action=delete soft-deletes: it sets active=false and is_default=false, preserving messages, and update with active=true restores it. action=set_primary promotes one of your own human mailboxes to be your default From identity, clearing the previous one; it rejects shared, inactive, and other members' mailboxes. Credentials are encrypted at rest. purpose=human defaults ownership to the caller; purpose=shared clears any owner_user_id and rejects is_private=true.",
+		"Manage the mailboxes connected to the active organization. Who may do what: a member manages only their own mailboxes, while an organization admin manages anyone's — but nobody, admin included, chooses which mailbox another member sends from by default, since that is a personal preference. A mailbox you may not manage answers as if it did not exist, so do not read that as proof it is absent. action=create connects a new one and needs the full IMAP + SMTP details plus a password (use list_email_provider_presets to pre-fill hosts and ports for a known provider) — Batuda is a generic IMAP/SMTP client, not a hosted mail provider, so if the account has two-factor authentication its normal login password is rejected and a provider app-specific password is required (see appPasswordUrl on the matching preset); Gmail and Microsoft 365 no longer allow password sign-in at all (passwordAuthSupported=false). A new mailbox belongs to the caller unless shared=true sets it up for the whole team, which only an admin may do and which rules out is_private and is_default. The first mailbox someone connects becomes the one they send from, so there is usually nothing further to set. action=update changes only the fields you pass on an existing id, re-encrypting the password if one is given, and active=false hides the mailbox from composers and stops syncing while keeping historical threads. action=test re-runs a real IMAP LOGIN and SMTP check against the stored credentials and refreshes grant_status — use it after changing a password. action=delete soft-deletes: it sets active=false and is_default=false, preserving messages, and update with active=true restores it; deleting one that was already deleted reports it as absent rather than succeeding again. action=set_primary chooses which of your own mailboxes you send from when you do not say, clearing the previous one; it rejects deleted mailboxes and anyone else's. description is free text saying what the mailbox is for and nothing depends on it, up to 200 characters. Credentials are encrypted at rest.",
 	parameters: Schema.Struct({
 		action: Schema.Literals([
 			'create',
@@ -376,10 +372,15 @@ const ManageEmailInbox = Tool.make('manage_email_inbox', {
 		smtp_host: Schema.optional(Schema.String),
 		smtp_port: Schema.optional(Schema.Number),
 		smtp_security: Schema.optional(SmtpSecurity),
-		purpose: Schema.optional(InboxPurpose),
 		username: Schema.optional(Schema.String),
 		display_name: Schema.optional(Schema.NullOr(Schema.String)),
+		// Free text saying what the mailbox is for. Nothing depends on it.
+		description: Schema.optional(Schema.NullOr(Schema.String)),
 		owner_user_id: Schema.optional(Schema.NullOr(Schema.String)),
+		// Set up for the whole team rather than one person, which only an
+		// organization admin may do. Such a mailbox has no owner, so it can be
+		// neither private nor anybody's default sender.
+		shared: Schema.optional(Schema.Boolean),
 		is_default: Schema.optional(Schema.Boolean),
 		is_private: Schema.optional(Schema.Boolean),
 		active: Schema.optional(Schema.Boolean),
@@ -745,9 +746,6 @@ export const EmailHandlersLive = EmailTools.toLayer(
 							companyId: params.company_id,
 						}),
 						...(params.status !== undefined && { status: params.status }),
-						...(params.purpose !== undefined && {
-							purpose: params.purpose,
-						}),
 						...(params.query !== undefined && { query: params.query }),
 						...(params.limit !== undefined && { limit: params.limit }),
 						...(params.offset !== undefined && { offset: params.offset }),
@@ -822,7 +820,6 @@ export const EmailHandlersLive = EmailTools.toLayer(
 			list_email_inboxes: params =>
 				Effect.gen(function* () {
 					const inboxes = yield* svc.listLocalInboxes({
-						...(params.purpose !== undefined && { purpose: params.purpose }),
 						...(params.active !== undefined && { active: params.active }),
 						...(params.owner_user_id !== undefined && {
 							ownerUserId: params.owner_user_id,
@@ -872,7 +869,6 @@ export const EmailHandlersLive = EmailTools.toLayer(
 						const {
 							email,
 							password,
-							purpose,
 							imap_host,
 							imap_port,
 							imap_security,
@@ -883,7 +879,6 @@ export const EmailHandlersLive = EmailTools.toLayer(
 						if (
 							email === undefined ||
 							password === undefined ||
-							purpose === undefined ||
 							imap_host === undefined ||
 							imap_port === undefined ||
 							imap_security === undefined ||
@@ -892,31 +887,49 @@ export const EmailHandlersLive = EmailTools.toLayer(
 							smtp_security === undefined
 						)
 							return dieMissing(
-								'create needs email, password, purpose and the full imap_* and smtp_* transport details',
+								'create needs email, password and the full imap_* and smtp_* transport details',
 							)
-						return svc
-							.createInbox({
-								...transport,
-								// Null means "clear it", which only makes sense against a
-								// mailbox that already exists.
-								...(typeof params.display_name === 'string' && {
-									displayName: params.display_name,
-								}),
-								...(typeof params.owner_user_id === 'string' && {
-									ownerUserId: params.owner_user_id,
-								}),
-								email,
-								password,
-								purpose,
-								username: params.username ?? email,
-								imapHost: imap_host,
-								imapPort: imap_port,
-								imapSecurity: imap_security,
-								smtpHost: smtp_host,
-								smtpPort: smtp_port,
-								smtpSecurity: smtp_security,
-							})
-							.pipe(Effect.orDie)
+						return (
+							svc
+								.createInbox({
+									...transport,
+									// Null means "clear it", which only makes sense against a
+									// mailbox that already exists.
+									...(typeof params.display_name === 'string' && {
+										displayName: params.display_name,
+									}),
+									...(typeof params.description === 'string' && {
+										description: params.description,
+									}),
+									...(params.shared !== undefined && { shared: params.shared }),
+									...(params.is_default !== undefined && {
+										isDefault: params.is_default,
+									}),
+									...(params.is_private !== undefined && {
+										isPrivate: params.is_private,
+									}),
+									...(typeof params.owner_user_id === 'string' && {
+										ownerUserId: params.owner_user_id,
+									}),
+									email,
+									password,
+									username: params.username ?? email,
+									imapHost: imap_host,
+									imapPort: imap_port,
+									imapSecurity: imap_security,
+									smtpHost: smtp_host,
+									smtpPort: smtp_port,
+									smtpSecurity: smtp_security,
+								})
+								// Refusals carry their reason, so the caller learns it needs
+								// an admin rather than seeing an unexplained failure.
+								.pipe(
+									Effect.catchTag('BadRequest', e =>
+										Effect.die(new Error(e.message)),
+									),
+									Effect.orDie,
+								)
+						)
 					}
 					case 'update':
 						return needsId().pipe(
@@ -931,13 +944,24 @@ export const EmailHandlersLive = EmailTools.toLayer(
 									...(params.owner_user_id !== undefined && {
 										ownerUserId: params.owner_user_id,
 									}),
-									...(params.purpose !== undefined && {
-										purpose: params.purpose,
+									...(params.description !== undefined && {
+										description: params.description,
+									}),
+									...(params.is_default !== undefined && {
+										isDefault: params.is_default,
+									}),
+									...(params.is_private !== undefined && {
+										isPrivate: params.is_private,
 									}),
 									...(params.active !== undefined && { active: params.active }),
 								}),
 							),
 							Effect.catchTag('NotFound', e => Effect.die(e)),
+							// Refusals carry their reason, so the caller learns whose
+							// mailbox it is rather than seeing an unexplained failure.
+							Effect.catchTag('BadRequest', e =>
+								Effect.die(new Error(e.message)),
+							),
 							Effect.orDie,
 						)
 					case 'test':
@@ -955,6 +979,11 @@ export const EmailHandlersLive = EmailTools.toLayer(
 					case 'set_primary':
 						return needsId().pipe(
 							Effect.flatMap(id => svc.setPrimaryInbox(id)),
+							// Refusals carry their reason, so the caller learns the
+							// mailbox is not theirs rather than seeing a bare failure.
+							Effect.catchTag('BadRequest', e =>
+								Effect.die(new Error(e.message)),
+							),
 							Effect.orDie,
 						)
 				}

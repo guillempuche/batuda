@@ -62,6 +62,10 @@ export const detachFromTransaction =
  * so the user GUC is left unset rather than written as an empty string — an
  * empty string reads back as `''` (not NULL) and could match an empty-keyed
  * row under a future user-scoped policy.
+ *
+ * `role` is optional for the same reason and defaults to none: work with no
+ * member behind it manages nothing, so leaving it out grants no authority
+ * rather than borrowing someone else's.
  */
 export const enterOrgScope =
 	(
@@ -69,7 +73,11 @@ export const enterOrgScope =
 		// free of SqlClient — the HTTP middleware boundary only admits the
 		// services it provides. Every caller already holds a layer-level binding.
 		sql: SqlClient.SqlClient,
-		scope: { readonly org: OrgRow; readonly userId?: string | undefined },
+		scope: {
+			readonly org: OrgRow
+			readonly userId?: string | undefined
+			readonly role?: string | null | undefined
+		},
 	) =>
 	<A, E, R>(effect: Effect.Effect<A, E, R>) =>
 		sql
@@ -79,7 +87,10 @@ export const enterOrgScope =
 					yield* sql`SELECT set_config('app.current_org_id', ${scope.org.id}, true)`
 					if (scope.userId !== undefined)
 						yield* sql`SELECT set_config('app.current_user_id', ${scope.userId}, true)`
-					return yield* Effect.provideService(effect, CurrentOrg, scope.org)
+					return yield* Effect.provideService(effect, CurrentOrg, {
+						...scope.org,
+						role: scope.role ?? null,
+					})
 				}),
 			)
 			// Die only on SqlError: the role/GUC prologue and the commit are
@@ -169,8 +180,9 @@ export const resolveSystemOrg =
  *   2. Reject with `Unauthorized` if no session — defense in depth, since
  *      `SessionMiddleware` should already have stopped that path.
  *   3. Reject with `Forbidden` if the session has no `activeOrganizationId`.
- *   4. Look up the organization row by id — slug + name are read alongside
- *      so route handlers can build org-scoped URLs without a second query.
+ *   4. Look up the organization row by id, together with the caller's role
+ *      in it — slug + name are read alongside so route handlers can build
+ *      org-scoped URLs without a second query.
  *   5. Hand off to `enterOrgScope` — role + both GUCs + `CurrentOrg` inside
  *      one transaction; see its doc for the savepoint/scope mechanics.
  */
@@ -214,10 +226,16 @@ export const OrgMiddlewareLive = Layer.effect(
 				// die rather than leaking `SqlError` into the middleware's
 				// declared { Unauthorized | Forbidden } error union, which would
 				// otherwise force every protected route to handle SqlError.
-				const orgRows = yield* sql<OrgRow>`
-					SELECT id, name, slug
-					FROM "organization"
-					WHERE id = ${activeOrgId}
+				//
+				// The membership join is LEFT on purpose: a session still pointing
+				// at an organization the person has since left resolves that org
+				// with no standing in it, so they manage nothing there.
+				const orgRows = yield* sql<OrgRow & { readonly role: string | null }>`
+					SELECT o.id, o.name, o.slug, m.role
+					FROM "organization" o
+					LEFT JOIN "member" m
+						ON m."organizationId" = o.id AND m."userId" = ${result.user.id}
+					WHERE o.id = ${activeOrgId}
 					LIMIT 1
 				`.pipe(Effect.orDie)
 				const row = orgRows[0]
@@ -241,6 +259,7 @@ export const OrgMiddlewareLive = Layer.effect(
 				return yield* enterOrgScope(sql, {
 					org: row,
 					userId: result.user.id,
+					role: row.role,
 				})(effect)
 			})
 	}),

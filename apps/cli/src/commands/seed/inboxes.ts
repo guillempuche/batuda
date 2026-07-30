@@ -10,7 +10,8 @@ interface InboxSpec {
 	readonly displayName: string
 	readonly ownerEmail: string
 	readonly orgId: string
-	readonly purpose: 'human' | 'agent'
+	// What the mailbox is for, in the words its owner would use.
+	readonly description: string
 	readonly isDefault: boolean
 	readonly footerText: string
 	readonly grantStatus:
@@ -55,7 +56,7 @@ export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 				displayName: 'Alice Admin',
 				ownerEmail: 'admin@taller.cat',
 				orgId: tallerOrgId,
-				purpose: 'human',
+				description: 'Customer enquiries',
 				isDefault: true,
 				footerText: '— Alice Admin\nTaller Demo · taller.cat',
 				grantStatus: 'connected',
@@ -66,7 +67,7 @@ export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 				displayName: 'Alice Agent',
 				ownerEmail: 'admin@taller.cat',
 				orgId: tallerOrgId,
-				purpose: 'agent',
+				description: 'Replies drafted for me to check',
 				isDefault: false,
 				footerText: "Automated response from Alice's agent.",
 				grantStatus: 'connected',
@@ -78,7 +79,7 @@ export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 				displayName: 'Taller Alerts (auth failed)',
 				ownerEmail: 'admin@taller.cat',
 				orgId: tallerOrgId,
-				purpose: 'human',
+				description: 'Alerts from the workshop machines',
 				isDefault: false,
 				footerText: '— Taller Demo',
 				grantStatus: 'auth_failed',
@@ -89,7 +90,7 @@ export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 				displayName: 'Taller Noreply (connect failed)',
 				ownerEmail: 'admin@taller.cat',
 				orgId: tallerOrgId,
-				purpose: 'human',
+				description: 'Notices nobody should reply to',
 				isDefault: false,
 				footerText: '— Taller Demo',
 				grantStatus: 'connect_failed',
@@ -100,7 +101,7 @@ export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 				displayName: 'Taller Archive (disabled)',
 				ownerEmail: 'admin@taller.cat',
 				orgId: tallerOrgId,
-				purpose: 'human',
+				description: 'Old post kept for reference',
 				isDefault: false,
 				footerText: '— Taller Demo',
 				grantStatus: 'disabled',
@@ -114,7 +115,7 @@ export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 					displayName: 'Bob Owner',
 					ownerEmail: 'admin@restaurant.demo',
 					orgId: restaurantOrgId,
-					purpose: 'human',
+					description: 'Bookings and guest questions',
 					isDefault: true,
 					footerText: '— Bob Owner\nRestaurant Demo',
 					grantStatus: 'connected',
@@ -125,7 +126,7 @@ export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 					displayName: 'Bob Agent',
 					ownerEmail: 'admin@restaurant.demo',
 					orgId: restaurantOrgId,
-					purpose: 'agent',
+					description: 'Replies drafted for me to check',
 					isDefault: false,
 					footerText: "Automated response from Bob's agent.",
 					grantStatus: 'connected',
@@ -183,7 +184,7 @@ export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 					organizationId: spec.orgId,
 					email: spec.email,
 					displayName: spec.displayName,
-					purpose: spec.purpose,
+					description: spec.description,
 					ownerUserId: ownerId,
 					isDefault: spec.isDefault,
 					isPrivate: false,
@@ -217,7 +218,7 @@ export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 				})}
 			`
 			yield* Effect.logInfo(
-				`  inbox: ${spec.email} (${spec.purpose}, owner ${ownerId})`,
+				`  inbox: ${spec.email} (${spec.description}, owner ${ownerId})`,
 			)
 			seededInboxes.push({
 				id: inboxId,

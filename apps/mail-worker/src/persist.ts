@@ -124,6 +124,8 @@ export const persistInboundMessage = (args: {
 							id: args.organizationId,
 							name: '',
 							slug: '',
+							// Delivering mail is nobody's request, so it manages nothing.
+							role: null,
 						}),
 					)
 			: new NoMatch({ email: '' })

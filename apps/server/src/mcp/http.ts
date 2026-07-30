@@ -85,6 +85,19 @@ const McpAuthMiddleware = HttpRouter.middleware(
 				Effect.map(rows => rows[0]),
 			)
 
+		// What the person behind this connection may do in the org. An AI client
+		// acts for them, so it carries their standing rather than a lesser one of
+		// its own — someone who runs the org still runs it from a chat window.
+		const loadRole = (orgId: string, userId: string) =>
+			sql<{ role: string | null }>`
+				SELECT role FROM member
+				WHERE "organizationId" = ${orgId} AND "userId" = ${userId}
+				LIMIT 1
+			`.pipe(
+				Effect.orDie,
+				Effect.map(rows => rows[0]?.role ?? null),
+			)
+
 		return httpEffect =>
 			Effect.gen(function* () {
 				const req = yield* HttpServerRequest.HttpServerRequest
@@ -110,6 +123,9 @@ const McpAuthMiddleware = HttpRouter.middleware(
 						// recorded against it. Absent on the browser path, which is a
 						// person in a tab rather than a machine connection.
 						readonly credentialId?: string | undefined
+						// What this person may do in the org — null when they hold no
+						// membership there, which manages nothing.
+						readonly role: string | null
 					},
 				) =>
 					// Tag the request span with how the caller authenticated and the
@@ -160,7 +176,11 @@ const McpAuthMiddleware = HttpRouter.middleware(
 									name: principal.name ?? undefined,
 									isAgent: principal.isAgent,
 								}),
-								enterOrgScope(sql, { org, userId: principal.userId }),
+								enterOrgScope(sql, {
+									org,
+									userId: principal.userId,
+									role: principal.role,
+								}),
 							),
 						),
 					)
@@ -250,6 +270,7 @@ const McpAuthMiddleware = HttpRouter.middleware(
 						name: creator.name,
 						isAgent: true,
 						credentialId: verified.key.id,
+						role: yield* loadRole(org.id, creator.id),
 					})
 				}
 
@@ -443,6 +464,7 @@ const McpAuthMiddleware = HttpRouter.middleware(
 							name: user.name,
 							isAgent: false,
 							credentialId: clientId,
+							role: yield* loadRole(org.id, user.id),
 						})
 						// payload undefined → opaque/session bearer → fall through.
 					}
@@ -492,6 +514,7 @@ const McpAuthMiddleware = HttpRouter.middleware(
 					email: result.user.email,
 					name: result.user.name ?? null,
 					isAgent: result.user.isAgent === true,
+					role: yield* loadRole(org.id, result.user.id),
 				})
 			})
 	}),

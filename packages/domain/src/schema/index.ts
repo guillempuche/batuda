@@ -49,7 +49,6 @@ export {
 	Inbox,
 	InboxGrantStatus,
 	InboxId,
-	InboxPurpose,
 	InboxTransportSecurity,
 } from './inboxes'
 export { Interaction, InteractionId } from './interactions'

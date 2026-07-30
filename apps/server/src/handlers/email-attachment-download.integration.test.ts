@@ -76,13 +76,13 @@ describe('email_messages.attachments storage contract', () => {
 		const id = randomUUID()
 		await pool.query(
 			`INSERT INTO inboxes (
-				id, organization_id, email, purpose, owner_user_id,
+				id, organization_id, email, owner_user_id,
 				imap_host, imap_port, imap_security,
 				smtp_host, smtp_port, smtp_security,
 				username, password_ciphertext, password_nonce, password_tag,
 				active
 			) VALUES (
-				$1::uuid, $2, $3, 'human', 'email-attachment-test-user',
+				$1::uuid, $2, $3,  'email-attachment-test-user',
 				'imap.test', 993, 'tls',
 				'smtp.test', 587, 'starttls',
 				$3, $4, $4, $4,

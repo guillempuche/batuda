@@ -110,11 +110,10 @@ beforeAll(async () => {
 
 	const inboxResult = await pool.query<{ id: string }>(
 		`INSERT INTO inboxes
-		 (organization_id, owner_user_id, email, purpose,
-		  imap_host, imap_port, imap_security,
+		 (organization_id, owner_user_id, email, imap_host, imap_port, imap_security,
 		  smtp_host, smtp_port, smtp_security,
 		  username, password_ciphertext, password_nonce, password_tag)
-		 VALUES ($1, $2, $3, 'human',
+		 VALUES ($1, $2, $3, 
 		         'imap.example.com', 993, 'tls',
 		         'smtp.example.com', 465, 'tls',
 		         $3, '\\x00'::bytea, '\\x00'::bytea, '\\x00'::bytea)

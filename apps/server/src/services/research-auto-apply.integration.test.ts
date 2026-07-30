@@ -82,7 +82,12 @@ const autoApply = (research: string, threshold: number) =>
 		)
 		return toApply
 	}).pipe(
-		Effect.provideService(CurrentOrg, { id: ORG, name: 'a', slug: 'a' }),
+		Effect.provideService(CurrentOrg, {
+			id: ORG,
+			name: 'a',
+			slug: 'a',
+			role: 'member',
+		}),
 		Effect.provide(deps),
 		Effect.orDie,
 		Effect.runPromise,

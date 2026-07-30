@@ -84,6 +84,7 @@ const awaitingReview = (): Promise<
 						id: orgId,
 						name: 'fixture',
 						slug: 'fixture',
+						role: 'member',
 					}),
 				)
 				return next.researchAwaitingReview

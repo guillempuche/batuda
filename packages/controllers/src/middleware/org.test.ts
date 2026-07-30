@@ -14,10 +14,10 @@ describe('CurrentOrg', () => {
 		expect(CurrentOrg.key).toBe('CurrentOrg')
 	})
 
-	it('should round-trip the { id, name, slug } shape through Layer.succeed', () =>
+	it('should round-trip the { id, name, slug, role } shape through Layer.succeed', () =>
 		Effect.runPromise(
 			Effect.gen(function* () {
-				// GIVEN a Layer.succeed(CurrentOrg, { id, name, slug })
+				// GIVEN a Layer.succeed(CurrentOrg, { id, name, slug, role })
 				// WHEN an Effect yields the tag
 				// THEN the resolved value preserves every field verbatim
 				const org = yield* CurrentOrg
@@ -25,6 +25,7 @@ describe('CurrentOrg', () => {
 					id: 'org_alpha',
 					name: 'Alpha',
 					slug: 'alpha',
+					role: 'admin',
 				})
 			}).pipe(
 				Effect.provide(
@@ -32,6 +33,7 @@ describe('CurrentOrg', () => {
 						id: 'org_alpha',
 						name: 'Alpha',
 						slug: 'alpha',
+						role: 'admin',
 					}),
 				),
 			),

@@ -14,15 +14,16 @@ import { Atom } from 'effect/unstable/reactivity'
  * (rather than imported from the route) to keep this atom free of UI imports.
  */
 
-type InboxPurpose = 'human' | 'agent' | 'shared'
 type TransportSecurity = 'tls' | 'starttls' | 'plain'
 
 export type InboxDraft = {
 	readonly email: string
 	readonly displayName: string
-	readonly purpose: InboxPurpose
+	readonly description: string
+	// Set up for the whole team rather than one person, which leaves it
+	// without an owner and so neither private nor anybody's default.
+	readonly shared: boolean
 	readonly ownerUserId: string
-	readonly isDefault: boolean
 	readonly isPrivate: boolean
 	readonly imapHost: string
 	readonly imapPort: number
@@ -36,9 +37,9 @@ export type InboxDraft = {
 export const emptyInboxDraft: InboxDraft = {
 	email: '',
 	displayName: '',
-	purpose: 'human',
+	description: '',
+	shared: false,
 	ownerUserId: '',
-	isDefault: false,
 	isPrivate: false,
 	imapHost: '',
 	imapPort: 993,

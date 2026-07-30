@@ -27,7 +27,7 @@ import {
 	NotFound,
 	SessionContext,
 } from '@batuda/controllers'
-import { EmailDraft, Inbox, InboxFooter } from '@batuda/domain'
+import { EmailDraft, Inbox, InboxFooter, isOrgManager } from '@batuda/domain'
 import { renderBlocks, type StagedAttachmentRef } from '@batuda/email/render'
 import type { EmailBlocks } from '@batuda/email/schema'
 
@@ -448,7 +448,7 @@ type InboxRow = {
 	organizationId: string
 	email: string
 	displayName: string | null
-	purpose: 'human' | 'agent' | 'shared'
+	description: string | null
 	ownerUserId: string | null
 	isDefault: boolean
 	isPrivate: boolean
@@ -520,23 +520,76 @@ export class EmailService extends Context.Service<EmailService>()(
 			// even if the planner skips the RLS policy.
 
 			const selectInboxColumns = sql`
-				id, organization_id, email, display_name, purpose, owner_user_id,
+				id, organization_id, email, display_name, description, owner_user_id,
 				is_default, is_private, active, imap_host, imap_port, imap_security,
 				smtp_host, smtp_port, smtp_security, username,
 				grant_status, grant_last_error, grant_last_seen_at,
 				created_at, updated_at
 			`
 
+			// Whose mailbox someone may act through: their own, and the team's.
+			// A colleague's mailbox is not theirs to send from, whatever else
+			// they are allowed to do around the organization.
+			const mayActThrough = (inbox: InboxRow, userId: string) =>
+				inbox.ownerUserId === null || inbox.ownerUserId === userId
+
+			// Whose settings someone may change, or remove: their own mailbox,
+			// and — for whoever runs the organization — anyone's. A mailbox with
+			// no owner is the organization's own, so it is theirs to look after
+			// rather than any one member's.
+			const mayLookAfter = (
+				inbox: InboxRow,
+				userId: string,
+				role: string | null,
+			) => isOrgManager(role) || inbox.ownerUserId === userId
+
+			// A half-written message is as private as a sent one, so reaching it
+			// takes the same standing as the mailbox it will go out from — which
+			// is the draft's own mailbox, not whichever one the caller names.
+			const assertDraftReachable = (
+				draftInboxId: string,
+				draftId: string,
+			): Effect.Effect<void, NotFound, CurrentOrg | SessionContext> =>
+				Effect.gen(function* () {
+					if (yield* resolveInbox(draftInboxId)) return
+					return yield* new NotFound({ entity: 'EmailDraft', id: draftId })
+				})
+
+			// Mailboxes out of the caller's reach read as absent rather than
+			// refused, so this can never be used to find out what exists.
 			const resolveInbox = (inboxId: string) =>
 				Effect.gen(function* () {
 					const currentOrg = yield* CurrentOrg
+					const session = yield* SessionContext
 					const rows = yield* sql<InboxRow>`
 						SELECT ${selectInboxColumns} FROM inboxes
 						WHERE id = ${inboxId}
 						  AND organization_id = ${currentOrg.id}
 						LIMIT 1
 					`.pipe(Effect.orDie)
-					return rows[0] ?? null
+					const inbox = rows[0]
+					if (!inbox) return null
+					return mayActThrough(inbox, session.userId) ? inbox : null
+				})
+
+			// The same lookup for changing a mailbox rather than acting through
+			// it, which is the stricter of the two for a member and the looser
+			// for whoever runs the organization.
+			const resolveInboxToLookAfter = (inboxId: string) =>
+				Effect.gen(function* () {
+					const currentOrg = yield* CurrentOrg
+					const session = yield* SessionContext
+					const rows = yield* sql<InboxRow>`
+						SELECT ${selectInboxColumns} FROM inboxes
+						WHERE id = ${inboxId}
+						  AND organization_id = ${currentOrg.id}
+						LIMIT 1
+					`.pipe(Effect.orDie)
+					const inbox = rows[0]
+					if (!inbox) return null
+					return mayLookAfter(inbox, session.userId, currentOrg.role)
+						? inbox
+						: null
 				})
 
 			// Decrypt the stored credentials in-memory, run an IMAP LOGIN + SMTP
@@ -643,7 +696,6 @@ export class EmailService extends Context.Service<EmailService>()(
 						SELECT ${selectInboxColumns} FROM inboxes
 						WHERE organization_id = ${currentOrg.id}
 						  AND owner_user_id = ${session.userId}
-						  AND purpose = 'human'
 						  AND is_default = true
 						  AND active = true
 						LIMIT 1
@@ -1278,7 +1330,7 @@ export class EmailService extends Context.Service<EmailService>()(
 							updatedAt: Date
 							inboxEmail: string | null
 							inboxDisplayName: string | null
-							inboxPurpose: 'human' | 'agent' | 'shared' | null
+							inboxDescription: string | null
 							inboxIsPrivate: boolean | null
 							inboxOwnerUserId: string | null
 						}>`
@@ -1311,7 +1363,7 @@ export class EmailService extends Context.Service<EmailService>()(
 								tl.updated_at,
 								i.email AS inbox_email,
 								i.display_name AS inbox_display_name,
-								i.purpose AS inbox_purpose,
+								i.description AS inbox_description,
 								i.is_private AS inbox_is_private,
 								i.owner_user_id AS inbox_owner_user_id
 							FROM email_thread_links tl
@@ -1462,14 +1514,15 @@ export class EmailService extends Context.Service<EmailService>()(
 							companyId: link.companyId,
 							contactId: link.contactId,
 							messages: messagesOut,
-							inbox:
-								link.inboxEmail && link.inboxPurpose
-									? {
-											email: link.inboxEmail,
-											displayName: link.inboxDisplayName,
-											purpose: link.inboxPurpose,
-										}
-									: null,
+							// Keyed off the address alone: a mailbox is linked or it is
+							// not, and its description may legitimately be empty.
+							inbox: link.inboxEmail
+								? {
+										email: link.inboxEmail,
+										displayName: link.inboxDisplayName,
+										description: link.inboxDescription,
+									}
+								: null,
 						}).pipe(Effect.orDie)
 					}),
 
@@ -1521,7 +1574,6 @@ export class EmailService extends Context.Service<EmailService>()(
 					inboxId?: string
 					companyId?: string
 					status?: string
-					purpose?: 'human' | 'agent' | 'shared'
 					query?: string
 					limit?: number
 					offset?: number
@@ -1547,8 +1599,6 @@ export class EmailService extends Context.Service<EmailService>()(
 							conditions.push(sql`tl.company_id = ${filters.companyId}`)
 						if (filters?.status)
 							conditions.push(sql`tl.status = ${filters.status}`)
-						if (filters?.purpose)
-							conditions.push(sql`i.purpose = ${filters.purpose}`)
 						if (filters?.query) {
 							const trimmedQuery = filters.query.trim()
 							if (trimmedQuery.length > 0) {
@@ -1596,7 +1646,7 @@ export class EmailService extends Context.Service<EmailService>()(
 							updatedAt: Date
 							inboxEmail: string | null
 							inboxDisplayName: string | null
-							inboxPurpose: 'human' | 'agent' | 'shared' | null
+							inboxDescription: string | null
 							messageCount: string | number
 							lastMessageAt: Date | null
 							lastMessageDirection: 'inbound' | 'outbound' | null
@@ -1633,7 +1683,7 @@ export class EmailService extends Context.Service<EmailService>()(
 								tl.updated_at,
 								i.email AS inbox_email,
 								i.display_name AS inbox_display_name,
-								i.purpose AS inbox_purpose,
+								i.description AS inbox_description,
 								(
 									SELECT COUNT(*) FROM email_messages m
 									WHERE m.organization_id = tl.organization_id
@@ -1710,21 +1760,22 @@ export class EmailService extends Context.Service<EmailService>()(
 							const {
 								inboxEmail,
 								inboxDisplayName,
-								inboxPurpose,
+								inboxDescription,
 								messageCount,
 								...rest
 							} = r
 							return {
 								...rest,
 								messageCount: Number(messageCount),
-								inbox:
-									inboxEmail && inboxPurpose
-										? {
-												email: inboxEmail,
-												displayName: inboxDisplayName,
-												purpose: inboxPurpose,
-											}
-										: null,
+								// Keyed off the address alone: a mailbox is linked or it
+								// is not, and its description may legitimately be empty.
+								inbox: inboxEmail
+									? {
+											email: inboxEmail,
+											displayName: inboxDisplayName,
+											description: inboxDescription,
+										}
+									: null,
 							}
 						})
 						return yield* decodeThreadList({
@@ -1814,7 +1865,6 @@ export class EmailService extends Context.Service<EmailService>()(
 				listProviderPresets: () => Effect.succeed(PROVIDER_PRESETS),
 
 				listLocalInboxes: (filters?: {
-					purpose?: 'human' | 'agent' | 'shared'
 					active?: boolean
 					ownerUserId?: string
 				}) =>
@@ -1827,8 +1877,6 @@ export class EmailService extends Context.Service<EmailService>()(
 							// always show; others' never do.
 							sql`(is_private = false OR owner_user_id = ${session.userId})`,
 						]
-						if (filters?.purpose)
-							conditions.push(sql`purpose = ${filters.purpose}`)
 						if (filters?.active !== undefined)
 							conditions.push(sql`active = ${filters.active}`)
 						if (filters?.ownerUserId)
@@ -1837,7 +1885,7 @@ export class EmailService extends Context.Service<EmailService>()(
 							SELECT ${selectInboxColumns}
 							FROM inboxes
 							WHERE ${sql.and(conditions)}
-							ORDER BY is_default DESC, purpose, email
+							ORDER BY is_default DESC, email
 						`
 						return yield* decodeInboxes(rows)
 					}).pipe(Effect.orDie),
@@ -1850,7 +1898,6 @@ export class EmailService extends Context.Service<EmailService>()(
 							SELECT id, email FROM inboxes
 							WHERE organization_id = ${currentOrg.id}
 							  AND owner_user_id = ${session.userId}
-							  AND purpose = 'human'
 							  AND is_default = true
 							  AND active = true
 							LIMIT 1
@@ -1868,7 +1915,8 @@ export class EmailService extends Context.Service<EmailService>()(
 				createInbox: (input: {
 					email: string
 					displayName?: string | undefined
-					purpose: 'human' | 'agent' | 'shared'
+					description?: string | undefined
+					shared?: boolean | undefined
 					ownerUserId?: string | undefined
 					isPrivate?: boolean | undefined
 					isDefault?: boolean | undefined
@@ -1885,20 +1933,71 @@ export class EmailService extends Context.Service<EmailService>()(
 						const currentOrg = yield* CurrentOrg
 						const session = yield* SessionContext
 
-						// purpose CHECK constraint demands an owner for human/agent
-						// and forbids one for shared. Default to the caller for
-						// human inboxes when ownerUserId is omitted; reject the
-						// shared+owner mismatch up-front so the DB error stays
-						// internal.
-						const ownerUserId =
-							input.purpose === 'shared'
-								? null
-								: (input.ownerUserId ?? session.userId)
-						if (input.purpose === 'shared' && input.isPrivate === true) {
+						// A mailbox belongs to whoever connects it unless it is being
+						// set up for the whole team.
+						const ownerUserId = input.shared
+							? null
+							: (input.ownerUserId ?? session.userId)
+
+						// Connecting a mailbox in somebody else's name, or one that
+						// belongs to everyone, is looking after the organization
+						// rather than looking after yourself.
+						const actsForSomeoneElse =
+							ownerUserId === null || ownerUserId !== session.userId
+						if (actsForSomeoneElse && !isOrgManager(currentOrg.role)) {
 							return yield* new BadRequest({
-								message: 'Shared inboxes cannot be private',
+								message:
+									'Only an organization admin can connect a mailbox for the team or for another member',
 							})
 						}
+						// One address is connected once at a time. Answered here so
+						// reconnecting an address already in use gets a plain reply
+						// rather than a database error, and the same reply whoever
+						// holds that address — it never names the colleague who does.
+						const alreadyConnected = yield* sql<{ count: number }>`
+							SELECT count(*)::int AS count FROM inboxes
+							WHERE organization_id = ${currentOrg.id}
+							  AND lower(email) = lower(${input.email})
+							  AND active = true
+						`.pipe(Effect.orDie)
+						if ((alreadyConnected[0]?.count ?? 0) > 0) {
+							return yield* new BadRequest({
+								message: 'That address is already connected',
+							})
+						}
+						if (input.shared && input.isPrivate === true) {
+							return yield* new BadRequest({
+								message: 'A mailbox shared with the team cannot be private',
+							})
+						}
+						if (input.shared && input.isDefault === true) {
+							return yield* new BadRequest({
+								message:
+									'A mailbox shared with the team cannot be anyone’s default sender',
+							})
+						}
+						// Setting up a mailbox for somebody does not extend to deciding
+						// what they send from — that stays theirs to pick.
+						if (input.isDefault === true && ownerUserId !== session.userId) {
+							return yield* new BadRequest({
+								message: 'A member chooses their own default sender',
+							})
+						}
+
+						// The first mailbox somebody connects becomes the address they
+						// send from, so nobody has to go looking for a setting to make
+						// sending work at all. Only ever for the person doing the
+						// connecting: setting one up on somebody's behalf leaves that
+						// choice to them, the same as everywhere else.
+						const isFirstOwnMailbox =
+							ownerUserId === session.userId &&
+							(yield* sql<{ count: number }>`
+								SELECT count(*)::int AS count FROM inboxes
+								WHERE organization_id = ${currentOrg.id}
+								  AND owner_user_id = ${ownerUserId}
+								  AND active = true
+							`.pipe(Effect.orDie))[0]?.count === 0
+						const isDefault = input.isDefault === true || isFirstOwnMailbox
 
 						// Generate the inbox id up-front so HKDF can derive a stable
 						// per-row subkey before INSERT.
@@ -1908,24 +2007,6 @@ export class EmailService extends Context.Service<EmailService>()(
 							inboxId,
 							plain: input.password,
 						})
-
-						// If a different default already exists for this (owner,
-						// purpose) bucket, clear it first — the partial unique
-						// index covers (organization_id, owner_user_id, purpose)
-						// and would otherwise reject the INSERT.
-						if (input.isDefault) {
-							const ownerCondition = ownerUserId
-								? sql`owner_user_id = ${ownerUserId}`
-								: sql`owner_user_id IS NULL`
-							yield* sql`
-								UPDATE inboxes
-								SET is_default = false, updated_at = now()
-								WHERE organization_id = ${currentOrg.id}
-								  AND ${ownerCondition}
-								  AND purpose = ${input.purpose}
-								  AND is_default = true
-							`
-						}
 
 						// Probe IMAP LOGIN + SMTP EHLO/AUTH against the supplied
 						// credentials. We still INSERT the row on probe failure so
@@ -1963,39 +2044,72 @@ export class EmailService extends Context.Service<EmailService>()(
 								}),
 							)
 
-						const rows = yield* sql<InboxRow>`
-							INSERT INTO inboxes ${sql.insert({
-								id: inboxId,
-								organizationId: currentOrg.id,
-								email: input.email,
-								displayName: input.displayName ?? null,
-								purpose: input.purpose,
-								ownerUserId,
-								isDefault: input.isDefault ?? false,
-								isPrivate: input.isPrivate ?? false,
-								active: true,
-								imapHost: input.imapHost,
-								imapPort: input.imapPort,
-								imapSecurity: input.imapSecurity,
-								smtpHost: input.smtpHost,
-								smtpPort: input.smtpPort,
-								smtpSecurity: input.smtpSecurity,
-								username: input.username,
-								passwordCiphertext: encrypted.ciphertext,
-								passwordNonce: encrypted.nonce,
-								passwordTag: encrypted.tag,
-								grantStatus: probe.status,
-								grantLastError: probe.detail,
-								grantLastSeenAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
-								folderState: '{}',
-							})}
-							RETURNING ${selectInboxColumns}
-						`
+						// Giving up the previously marked mailbox and marking this one
+						// happen together, and only once the connection has been tried:
+						// a mailbox that turns out unreachable must not leave somebody
+						// with nothing to send from. Only ever the same person's.
+						const rows = yield* sql
+							.withTransaction(
+								Effect.gen(function* () {
+									if (isDefault && ownerUserId !== null) {
+										yield* sql`
+										UPDATE inboxes
+										SET is_default = false, updated_at = now()
+										WHERE organization_id = ${currentOrg.id}
+										  AND owner_user_id = ${ownerUserId}
+										  AND is_default = true
+									`
+									}
+									return yield* sql<InboxRow>`
+									INSERT INTO inboxes ${sql.insert({
+										id: inboxId,
+										organizationId: currentOrg.id,
+										email: input.email,
+										displayName: input.displayName ?? null,
+										description: input.description ?? null,
+										ownerUserId,
+										isDefault,
+										isPrivate: input.isPrivate ?? false,
+										active: true,
+										imapHost: input.imapHost,
+										imapPort: input.imapPort,
+										imapSecurity: input.imapSecurity,
+										smtpHost: input.smtpHost,
+										smtpPort: input.smtpPort,
+										smtpSecurity: input.smtpSecurity,
+										username: input.username,
+										passwordCiphertext: encrypted.ciphertext,
+										passwordNonce: encrypted.nonce,
+										passwordTag: encrypted.tag,
+										grantStatus: probe.status,
+										grantLastError: probe.detail,
+										grantLastSeenAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
+										folderState: '{}',
+									})}
+									RETURNING ${selectInboxColumns}
+								`
+								}),
+							)
+							.pipe(
+								// Two people connecting the same address at once both get
+								// past the check above, since the connection attempt between
+								// them takes real time. The loser is told the same thing the
+								// check would have told them, rather than seeing a crash.
+								Effect.catchTag('SqlError', error =>
+									String(error.cause).includes('idx_inboxes_email_active')
+										? Effect.fail(
+												new BadRequest({
+													message: 'That address is already connected',
+												}),
+											)
+										: Effect.die(error),
+								),
+							)
 						yield* Effect.logInfo('Inbox created').pipe(
 							Effect.annotateLogs({
 								event: 'inbox.created',
 								email: input.email,
-								purpose: input.purpose,
+								shared: ownerUserId === null,
 							}),
 						)
 						return yield* decodeInbox(rows[0]!).pipe(Effect.orDie)
@@ -2005,7 +2119,7 @@ export class EmailService extends Context.Service<EmailService>()(
 					id: string,
 					patch: {
 						displayName?: string | null | undefined
-						purpose?: 'human' | 'agent' | 'shared' | undefined
+						description?: string | null | undefined
 						ownerUserId?: string | null | undefined
 						isPrivate?: boolean | undefined
 						isDefault?: boolean | undefined
@@ -2022,25 +2136,100 @@ export class EmailService extends Context.Service<EmailService>()(
 				) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
+						const session = yield* SessionContext
 
-						// Existence + org scope first so the rest of the work cannot
-						// silently target someone else's row.
-						const existing = yield* resolveInbox(id)
+						// Whether this mailbox is the caller's to change at all comes
+						// first, so nothing below can quietly reach a colleague's row.
+						const existing = yield* resolveInboxToLookAfter(id)
 						if (!existing) {
 							return yield* new NotFound({ entity: 'Inbox', id })
+						}
+
+						// Handing a mailbox to somebody else, or to the whole team, is
+						// looking after the organization rather than yourself.
+						if (
+							patch.ownerUserId !== undefined &&
+							patch.ownerUserId !== session.userId &&
+							!isOrgManager(currentOrg.role)
+						) {
+							return yield* new BadRequest({
+								message:
+									'Only an organization admin can hand a mailbox to someone else',
+							})
+						}
+
+						// Which address somebody sends from is their own choice, so it
+						// is not something anyone else changes for them — running the
+						// organization included, and taking it away counts as changing
+						// it. Read against who will own the mailbox once this call is
+						// done, so handing it over and marking it in one go cannot slip
+						// past.
+						const ownerAfterPatch =
+							patch.ownerUserId !== undefined
+								? patch.ownerUserId
+								: existing.ownerUserId
+						if (
+							patch.isDefault !== undefined &&
+							(existing.ownerUserId !== session.userId ||
+								ownerAfterPatch !== session.userId)
+						) {
+							return yield* new BadRequest({
+								message: 'A member chooses their own default sender',
+							})
+						}
+
+						// A mailbox belonging to everyone cannot also be hidden from
+						// them. Said here in words, because otherwise the database rule
+						// catches it and the caller sees only a crash.
+						if (patch.isPrivate === true && ownerAfterPatch === null) {
+							return yield* new BadRequest({
+								message: 'A mailbox shared with the team cannot be private',
+							})
+						}
+
+						// Bringing a removed mailbox back is refused while its address
+						// is in use elsewhere, for the same reason connecting it twice
+						// is: one address, one live mailbox.
+						if (patch.active === true && !existing.active) {
+							const addressTaken = yield* sql<{ count: number }>`
+								SELECT count(*)::int AS count FROM inboxes
+								WHERE organization_id = ${currentOrg.id}
+								  AND lower(email) = lower(${existing.email})
+								  AND active = true
+								  AND id <> ${id}
+							`.pipe(Effect.orDie)
+							if ((addressTaken[0]?.count ?? 0) > 0) {
+								return yield* new BadRequest({
+									message: 'That address is already connected',
+								})
+							}
 						}
 
 						const sets: Array<Statement.Fragment> = []
 						if (patch.displayName !== undefined)
 							sets.push(sql`display_name = ${patch.displayName}`)
-						if (patch.purpose !== undefined)
-							sets.push(sql`purpose = ${patch.purpose}`)
+						if (patch.description !== undefined)
+							sets.push(sql`description = ${patch.description}`)
 						if (patch.ownerUserId !== undefined)
 							sets.push(sql`owner_user_id = ${patch.ownerUserId}`)
 						if (patch.isPrivate !== undefined)
 							sets.push(sql`is_private = ${patch.isPrivate}`)
 						if (patch.isDefault !== undefined)
 							sets.push(sql`is_default = ${patch.isDefault}`)
+						// Handing a mailbox to somebody else does not hand over the
+						// choice of sending from it: the mark comes off, so the mailbox
+						// cannot quietly become what its new owner sends as.
+						if (
+							ownerAfterPatch !== existing.ownerUserId &&
+							patch.isDefault === undefined
+						) {
+							sets.push(sql`is_default = false`)
+						}
+						// Giving a mailbox to the whole team opens it to them, since a
+						// mailbox everybody owns cannot be hidden from anybody.
+						if (ownerAfterPatch === null && patch.isPrivate === undefined) {
+							sets.push(sql`is_private = false`)
+						}
 						if (patch.active !== undefined)
 							sets.push(sql`active = ${patch.active}`)
 						if (patch.imapHost !== undefined)
@@ -2085,23 +2274,15 @@ export class EmailService extends Context.Service<EmailService>()(
 							patch.smtpPort !== undefined ||
 							patch.smtpSecurity !== undefined
 
-						// Promoting to default requires clearing the prior default
-						// in the same (owner, purpose) bucket, mirroring createInbox.
+						// Taking the mark means giving up whichever of the caller's
+						// own mailboxes held it. The check above already established
+						// that this mailbox is theirs, so nobody else's is touched.
 						if (patch.isDefault === true) {
-							const targetPurpose = patch.purpose ?? existing.purpose
-							const targetOwner =
-								patch.ownerUserId !== undefined
-									? patch.ownerUserId
-									: existing.ownerUserId
-							const ownerCondition = targetOwner
-								? sql`owner_user_id = ${targetOwner}`
-								: sql`owner_user_id IS NULL`
 							yield* sql`
 								UPDATE inboxes
 								SET is_default = false, updated_at = now()
 								WHERE organization_id = ${currentOrg.id}
-								  AND ${ownerCondition}
-								  AND purpose = ${targetPurpose}
+								  AND owner_user_id = ${session.userId}
 								  AND is_default = true
 								  AND id <> ${id}
 							`
@@ -2128,10 +2309,22 @@ export class EmailService extends Context.Service<EmailService>()(
 				deleteInbox: (id: string) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
-						// Soft delete: thread history (and message search) needs the
-						// inbox row to keep resolving long after the user removes it.
-						// `active=false` flips the worker off and hides the inbox
-						// from compose/picker UIs.
+
+						// This lookup is the gate: it queries directly below rather
+						// than through the shared reader, so without it a member could
+						// remove a colleague's mailbox.
+						const target = yield* resolveInboxToLookAfter(id)
+						if (!target) {
+							return yield* new NotFound({ entity: 'Inbox', id })
+						}
+						// Removing a mailbox stops it syncing and takes it out of the
+						// pickers, but the row stays: threads and message search go on
+						// resolving through it long after somebody removes it.
+						// Removing one that was already gone changes nothing, and says
+						// so, rather than reporting a removal that never happened.
+						if (!target.active) {
+							return yield* new NotFound({ entity: 'Inbox', id })
+						}
 						const rows = yield* sql<InboxRow>`
 							UPDATE inboxes
 							SET active = false, is_default = false, updated_at = now()
@@ -2146,13 +2339,22 @@ export class EmailService extends Context.Service<EmailService>()(
 					}),
 
 				// Manual re-test of a stored mailbox — decrypt, probe, and write
-				// back the grant status. Shares reprobeInbox with updateInbox.
-				testInbox: (id: string) => reprobeInbox(id),
+				// back the grant status. Shares reprobeInbox with updateInbox,
+				// which does its own checking; asked for directly, it is the
+				// mailbox's keeper who may ask, since the answer is whether
+				// somebody's stored password still works.
+				testInbox: (id: string) =>
+					Effect.gen(function* () {
+						const target = yield* resolveInboxToLookAfter(id)
+						if (!target) {
+							return yield* new NotFound({ entity: 'Inbox', id })
+						}
+						return yield* reprobeInbox(id)
+					}),
 
-				// Promotes a single inbox to `is_default=true` for the calling
-				// member. Validates ownership so a member cannot promote an
-				// org-mate's inbox (or a shared inbox) into their own primary
-				// slot.
+				// Chooses which of the caller's own mailboxes they send from when
+				// they don't say. Nobody else's is touched, and nobody else can
+				// make this choice for them.
 				setPrimaryInbox: (id: string) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
@@ -2162,19 +2364,15 @@ export class EmailService extends Context.Service<EmailService>()(
 						if (!target) {
 							return yield* new NotFound({ entity: 'Inbox', id })
 						}
-						if (target.purpose !== 'human') {
-							return yield* new BadRequest({
-								message: 'Only human inboxes can be set as primary',
-							})
-						}
 						if (target.ownerUserId !== session.userId) {
 							return yield* new BadRequest({
-								message: 'Cannot set someone else’s inbox as primary',
+								message: 'A member chooses their own default sender',
 							})
 						}
 						if (!target.active) {
 							return yield* new BadRequest({
-								message: 'Cannot set an inactive inbox as primary',
+								message:
+									'A mailbox that was removed cannot be the one you send from',
 							})
 						}
 
@@ -2185,7 +2383,6 @@ export class EmailService extends Context.Service<EmailService>()(
 									SET is_default = false, updated_at = now()
 									WHERE organization_id = ${currentOrg.id}
 									  AND owner_user_id = ${session.userId}
-									  AND purpose = 'human'
 									  AND is_default = true
 									  AND id <> ${id}
 								`
@@ -2341,6 +2538,8 @@ export class EmailService extends Context.Service<EmailService>()(
 						if (!inbox) {
 							return yield* new NotFound({ entity: 'Inbox', id: inboxId })
 						}
+						const existing = yield* drafts.get(draftId)
+						yield* assertDraftReachable(existing.inboxId, draftId)
 						const updated = yield* drafts.update(draftId, {
 							...(params.to !== undefined && {
 								to: toRecipientArray(params.to) ?? [],
@@ -2367,6 +2566,8 @@ export class EmailService extends Context.Service<EmailService>()(
 						if (!inbox) {
 							return yield* new NotFound({ entity: 'Inbox', id: inboxId })
 						}
+						const existing = yield* drafts.get(draftId)
+						yield* assertDraftReachable(existing.inboxId, draftId)
 						yield* staging.sweepForDraft(draftId).pipe(Effect.ignore)
 						yield* drafts.remove(draftId)
 					}),
@@ -2378,6 +2579,7 @@ export class EmailService extends Context.Service<EmailService>()(
 							return yield* new NotFound({ entity: 'Inbox', id: inboxId })
 						}
 						const draft = yield* drafts.get(draftId)
+						yield* assertDraftReachable(draft.inboxId, draftId)
 						return yield* decodeDraft(draftRowToProviderShape(draft)).pipe(
 							Effect.orDie,
 						)
@@ -2390,10 +2592,36 @@ export class EmailService extends Context.Service<EmailService>()(
 					count: CountMode = 'none',
 				) =>
 					Effect.gen(function* () {
+						const currentOrg = yield* CurrentOrg
+						const session = yield* SessionContext
+						// A mailbox out of the caller's reach answers with an empty
+						// page, the same as one that is not there at all, so this can
+						// never be used to find out what exists.
+						if (inboxId !== undefined && !(yield* resolveInbox(inboxId))) {
+							return {
+								items: [],
+								// Counted the same way an empty mailbox of one's own is,
+								// or the two would be tellable apart.
+								total: count === 'exact' ? 0 : null,
+								limit,
+								offset,
+								hasMore: false,
+							}
+						}
 						const list = yield* drafts.list(inboxId)
+						// Naming no mailbox means "mine", not "everyone's" — half-written
+						// mail is as private as sent mail, so a colleague's never comes
+						// back here.
+						const reachable = yield* sql<{ id: string }>`
+							SELECT id FROM inboxes
+							WHERE organization_id = ${currentOrg.id}
+							  AND (owner_user_id IS NULL OR owner_user_id = ${session.userId})
+						`.pipe(Effect.orDie)
+						const reachableIds = new Set(reachable.map(r => r.id))
 						// Sort on the raw Date before decoding — DateTime.Utc has no
 						// getTime().
 						const shaped = list
+							.filter(d => reachableIds.has(d.inboxId))
 							.map(draftRowToProviderShape)
 							.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
 						// Drafts arrive as one batch from the provider, so the page is
@@ -2422,6 +2650,7 @@ export class EmailService extends Context.Service<EmailService>()(
 						yield* assertInboxUsable(inbox)
 
 						const draft = yield* drafts.get(draftId)
+						yield* assertDraftReachable(draft.inboxId, draftId)
 						const ctx = parseClientId(draft.clientId ?? undefined)
 
 						if (ctx.contactId) {
@@ -2565,6 +2794,13 @@ export class EmailService extends Context.Service<EmailService>()(
 				listFooters: (inboxId: string) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
+						// Visible to whoever sends through the mailbox, and to whoever
+						// looks after it — otherwise an admin would be shown nothing on
+						// a mailbox whose signature they are allowed to rewrite.
+						const inbox =
+							(yield* resolveInbox(inboxId)) ??
+							(yield* resolveInboxToLookAfter(inboxId))
+						if (!inbox) return []
 						const rows = yield* sql`
 							SELECT * FROM inbox_footers
 							WHERE inbox_id = ${inboxId}
@@ -2589,6 +2825,13 @@ export class EmailService extends Context.Service<EmailService>()(
 								id,
 							})
 						}
+						const inboxId = (rows[0] as { inboxId: string }).inboxId
+						const inbox =
+							(yield* resolveInbox(inboxId)) ??
+							(yield* resolveInboxToLookAfter(inboxId))
+						if (!inbox) {
+							return yield* new NotFound({ entity: 'InboxFooter', id })
+						}
 						return yield* decodeFooter(rows[0]!).pipe(Effect.orDie)
 					}),
 
@@ -2600,7 +2843,10 @@ export class EmailService extends Context.Service<EmailService>()(
 				}) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
-						const inbox = yield* resolveInbox(input.inboxId)
+						// Writing a signature changes what goes out on every message
+						// the mailbox sends, so it takes the same standing as changing
+						// the mailbox itself.
+						const inbox = yield* resolveInboxToLookAfter(input.inboxId)
 						if (!inbox) {
 							return yield* new NotFound({
 								entity: 'Inbox',
@@ -2639,6 +2885,21 @@ export class EmailService extends Context.Service<EmailService>()(
 				) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
+						// Rewriting a signature changes what goes out on the mailbox's
+						// mail, so it takes the same standing as changing the mailbox.
+						const owning = yield* sql<{ inboxId: string }>`
+							SELECT inbox_id AS "inboxId" FROM inbox_footers
+							WHERE id = ${id}
+							  AND organization_id = ${currentOrg.id}
+							LIMIT 1
+						`
+						const owningInboxId = owning[0]?.inboxId
+						if (owningInboxId === undefined) {
+							return yield* new NotFound({ entity: 'InboxFooter', id })
+						}
+						if (!(yield* resolveInboxToLookAfter(owningInboxId))) {
+							return yield* new NotFound({ entity: 'InboxFooter', id })
+						}
 						if (patch.isDefault === true) {
 							const existing = yield* sql<{ inboxId: string }>`
 								SELECT inbox_id FROM inbox_footers
@@ -2698,6 +2959,17 @@ export class EmailService extends Context.Service<EmailService>()(
 				deleteFooter: (id: string) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
+						// Removing a signature changes what goes out on the mailbox's
+						// mail, so it takes the same standing as changing the mailbox.
+						const owning = yield* sql<{ inboxId: string }>`
+							SELECT inbox_id AS "inboxId" FROM inbox_footers
+							WHERE id = ${id}
+							  AND organization_id = ${currentOrg.id}
+							LIMIT 1
+						`
+						const owningInboxId = owning[0]?.inboxId
+						if (owningInboxId === undefined) return
+						if (!(yield* resolveInboxToLookAfter(owningInboxId))) return
 						yield* sql`
 							DELETE FROM inbox_footers
 							WHERE id = ${id}

@@ -82,13 +82,13 @@ const insertInbox = (args: {
 		if (created !== undefined) {
 			yield* sql`
 				INSERT INTO inboxes (
-					id, organization_id, email, purpose, owner_user_id,
+					id, organization_id, email, owner_user_id,
 					imap_host, imap_port, imap_security,
 					smtp_host, smtp_port, smtp_security,
 					username, password_ciphertext, password_nonce, password_tag,
 					active, created_at
 				) VALUES (
-					${args.id}::uuid, ${args.orgId}, ${args.email}, 'human', 'org-resolution-test-user',
+					${args.id}::uuid, ${args.orgId}, ${args.email},  'org-resolution-test-user',
 					'imap.test', 993, 'tls',
 					'smtp.test', 587, 'starttls',
 					${args.email}, ${placeholder}, ${placeholder}, ${placeholder},
@@ -99,13 +99,13 @@ const insertInbox = (args: {
 		}
 		yield* sql`
 			INSERT INTO inboxes (
-				id, organization_id, email, purpose, owner_user_id,
+				id, organization_id, email, owner_user_id,
 				imap_host, imap_port, imap_security,
 				smtp_host, smtp_port, smtp_security,
 				username, password_ciphertext, password_nonce, password_tag,
 				active
 			) VALUES (
-				${args.id}::uuid, ${args.orgId}, ${args.email}, 'human', 'org-resolution-test-user',
+				${args.id}::uuid, ${args.orgId}, ${args.email},  'org-resolution-test-user',
 				'imap.test', 993, 'tls',
 				'smtp.test', 587, 'starttls',
 				${args.email}, ${placeholder}, ${placeholder}, ${placeholder},

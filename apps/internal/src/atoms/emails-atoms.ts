@@ -11,7 +11,6 @@ export type EmailsSearch = {
 	readonly inboxId?: string
 	readonly companyId?: string
 	readonly status?: 'open' | 'closed' | 'archived'
-	readonly purpose?: 'human' | 'agent' | 'shared'
 	readonly query?: string
 	readonly limit?: number
 	readonly offset?: number
@@ -31,7 +30,6 @@ function makeListAtom(search: EmailsSearch) {
 		query['companyId'] = search.companyId
 	}
 	if (search.status !== undefined) query['status'] = search.status
-	if (search.purpose !== undefined) query['purpose'] = search.purpose
 	if (search.query !== undefined && search.query !== '') {
 		query['query'] = search.query
 	}
@@ -62,7 +60,6 @@ export function canonicalKey(search: EmailsSearch): string {
 		entries.push(['companyId', search.companyId])
 	}
 	if (search.status !== undefined) entries.push(['status', search.status])
-	if (search.purpose !== undefined) entries.push(['purpose', search.purpose])
 	if (search.query !== undefined && search.query !== '') {
 		entries.push(['query', search.query])
 	}
@@ -76,7 +73,10 @@ export function canonicalKey(search: EmailsSearch): string {
 }
 
 export const inboxesListAtom = BatudaApiAtom.query('email', 'listInboxes', {
-	query: {},
+	// Removed mailboxes keep their row so old threads still resolve through
+	// them, but they are gone as far as anyone managing mailboxes is
+	// concerned — otherwise removing one looks like it did nothing.
+	query: { active: 'true' },
 	serializationKey: 'email:inboxes',
 })
 

@@ -13,9 +13,7 @@ import {
 	ChevronLeft,
 	FileText,
 	Inbox as InboxIcon,
-	Pause,
 	Pencil,
-	Play,
 	Plus,
 	RefreshCw,
 	Star,
@@ -61,7 +59,9 @@ import { EmptyState } from '#/components/shared/empty-state'
 import { ErrorState } from '#/components/shared/error-state'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { SkeletonRows } from '#/components/shared/skeleton-row'
+import { SrOnly } from '#/components/shared/sr-only'
 import { dehydrateAtom } from '#/lib/atom-hydration'
+import { authClient } from '#/lib/auth-client'
 import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
 import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
@@ -72,18 +72,16 @@ import {
 	stenciledTitle,
 } from '#/lib/workshop-mixins'
 
-type InboxPurpose = 'human' | 'agent' | 'shared'
 type TransportSecurity = 'tls' | 'starttls' | 'plain'
 type GrantStatus = 'connected' | 'auth_failed' | 'connect_failed' | 'disabled'
-// What the status pill shows. A paused inbox (active=false) reads "Paused"
-// regardless of its last sign-in result, so it gets its own tone.
-type StatusTone = GrantStatus | 'paused'
+// What the status pill shows: how signing in to the mailbox last went.
+type StatusTone = GrantStatus
 
 type InboxRow = {
 	readonly id: string
 	readonly email: string
 	readonly displayName: string | null
-	readonly purpose: InboxPurpose
+	readonly description: string | null
 	readonly ownerUserId: string | null
 	readonly isDefault: boolean
 	readonly isPrivate: boolean
@@ -126,7 +124,7 @@ async function loadInboxesOnServer() {
 	])
 	const program = Effect.gen(function* () {
 		const client = yield* makeBatudaApiServer(cookie ?? undefined)
-		return yield* client.email.listInboxes({ query: {} })
+		return yield* client.email.listInboxes({ query: { active: 'true' } })
 	})
 	return Effect.runPromise(program)
 }
@@ -219,6 +217,24 @@ function InboxesPage() {
 
 	const { dlg, open, close } = useInboxDlg()
 
+	const meUserId = useMeUserId()
+	const canManageOthers = useCanManageOthers()
+	const identityPending = useIdentityPending()
+	// Read out when the address somebody sends from changes, since the row
+	// simply redraws in place.
+	const [primaryAnnouncement, setPrimaryAnnouncement] = useState('')
+	// Their own mailbox, as opposed to a colleague's or the team's.
+	const isMine = useCallback(
+		(row: InboxRow) => meUserId !== undefined && row.ownerUserId === meUserId,
+		[meUserId],
+	)
+	// Everyone looks after their own; whoever runs the organization looks
+	// after everyone's, the team's included.
+	const canLookAfter = useCallback(
+		(row: InboxRow) => canManageOthers || isMine(row),
+		[canManageOthers, isMine],
+	)
+
 	const rows = useMemo<ReadonlyArray<InboxRow>>(
 		() =>
 			AsyncResult.isSuccess(inboxesResult)
@@ -234,18 +250,29 @@ function InboxesPage() {
 				: [],
 		[presetsResult],
 	)
-	const isLoading = AsyncResult.isInitial(inboxesResult)
+	// Waiting on who is asking counts as still loading: the rows are unusable
+	// until then, since every control on them turns on whose mailbox it is.
+	const isLoading = AsyncResult.isInitial(inboxesResult) || identityPending
 	const isFailure = AsyncResult.isFailure(inboxesResult)
+	// Settled means both the list and who is asking. The list arrives already
+	// filled from the server, so without the second half a link straight to a
+	// mailbox's settings would judge it unreachable and shut itself before the
+	// answer to "whose is it" had even come back.
 	const listSettled =
-		AsyncResult.isSuccess(inboxesResult) || AsyncResult.isFailure(inboxesResult)
+		(AsyncResult.isSuccess(inboxesResult) ||
+			AsyncResult.isFailure(inboxesResult)) &&
+		!identityPending
 
 	// Edit/footers dialogs carry only the row id in the URL; resolve the row
 	// from the loaded list. A deep link to a row that no longer exists closes
-	// itself once the list has loaded.
+	// itself once the list has loaded — and so does one naming a mailbox this
+	// person cannot change, since the address bar is as much a way in as the
+	// buttons are.
 	const targetRow = useMemo(() => {
 		if (dlg === undefined || dlg.kind === 'create') return null
-		return rows.find(row => row.id === dlg.id) ?? null
-	}, [dlg, rows])
+		const row = rows.find(row => row.id === dlg.id) ?? null
+		return row !== null && canLookAfter(row) ? row : null
+	}, [dlg, rows, canLookAfter])
 	useEffect(() => {
 		if (dlg === undefined || dlg.kind === 'create') return
 		if (listSettled && targetRow === null) close()
@@ -261,16 +288,11 @@ function InboxesPage() {
 		[inboxStatusResult],
 	)
 
+	// Only the viewer's own mailboxes can be offered: choosing what somebody
+	// sends from is theirs alone.
 	const primarySuggestions = useMemo(
-		() =>
-			rows.filter(
-				row =>
-					row.active &&
-					row.purpose === 'human' &&
-					row.ownerUserId !== null &&
-					row.ownerUserId !== '',
-			),
-		[rows],
+		() => rows.filter(row => row.active && isMine(row)),
+		[rows, isMine],
 	)
 	const showPrimaryBanner = !hasPrimary && primarySuggestions.length > 0
 
@@ -284,44 +306,27 @@ function InboxesPage() {
 		[open],
 	)
 
-	const toggleActive = useCallback(
+	// Goes through the same call as the banner, which is the one that checks
+	// the mailbox is yours — so the star cannot move a colleague's.
+	const setDefault = useCallback(
 		async (row: InboxRow) => {
-			const exit = await updateInbox({
-				params: { id: row.id },
-				payload: { active: !row.active },
-			})
+			if (row.isDefault) return
+			const exit = await setPrimaryInbox({ params: { id: row.id } })
 			if (exit._tag !== 'Success') {
 				toastManager.add({
-					title: t`Update failed`,
-					description: t`Could not toggle the inbox state.`,
+					title: t`Could not set the default inbox`,
 					type: 'error',
 				})
 				return
 			}
 			refreshInboxes()
 			refreshInboxStatus()
+			// Said out loud as well as drawn: the row redraws in place, which is
+			// a change somebody not looking at it would otherwise miss.
+			setPrimaryAnnouncement(t`${row.email} is now the address you send from`)
+			toastManager.add({ title: t`Primary inbox set`, type: 'success' })
 		},
-		[updateInbox, refreshInboxes, refreshInboxStatus, toastManager, t],
-	)
-
-	const setDefault = useCallback(
-		async (row: InboxRow) => {
-			if (row.isDefault) return
-			const exit = await updateInbox({
-				params: { id: row.id },
-				payload: { isDefault: true },
-			})
-			if (exit._tag !== 'Success') {
-				toastManager.add({
-					title: t`Update failed`,
-					description: t`Could not set the default inbox.`,
-					type: 'error',
-				})
-				return
-			}
-			refreshInboxes()
-		},
-		[updateInbox, refreshInboxes, toastManager, t],
+		[setPrimaryInbox, refreshInboxes, refreshInboxStatus, toastManager, t],
 	)
 
 	const handleTest = useCallback(
@@ -390,6 +395,11 @@ function InboxesPage() {
 
 	return (
 		<Page>
+			{/* Mounted from the start and filled later: a region that appears
+			    together with its words is often not read out at all. */}
+			<SrOnly role='status' aria-live='polite'>
+				{primaryAnnouncement}
+			</SrOnly>
 			<Intro>
 				<IntroText>
 					<BackLink>
@@ -515,7 +525,7 @@ function InboxesPage() {
 					<TableHead role='row'>
 						<HeadCell role='columnheader'>{t`Email`}</HeadCell>
 						<HeadCell role='columnheader'>{t`Status`}</HeadCell>
-						<HeadCell role='columnheader'>{t`Used for`}</HeadCell>
+						<HeadCell role='columnheader'>{t`What it's for`}</HeadCell>
 						<HeadCell role='columnheader'>{t`Primary`}</HeadCell>
 						<HeadCell role='columnheader'>{t`Added`}</HeadCell>
 						<HeadCell role='columnheader' aria-label={t`Actions`}>
@@ -525,20 +535,17 @@ function InboxesPage() {
 					{rows.map(row => {
 						const providerName = providerNameFor(presets, row.imapHost)
 						const appPwUrl = authPasswordUrlFor(presets, row.imapHost)
-						// A paused (inactive) inbox isn't syncing, so that takes
-						// precedence over whatever its last sign-in result was.
-						const statusTone: StatusTone = !row.active
-							? 'paused'
-							: row.grantStatus
-						const statusLabel = !row.active
-							? t`Paused`
-							: row.grantStatus === 'connected'
+						// Only mailboxes still in use are listed, so what shows here
+						// is how the last sign-in went and nothing else.
+						const statusTone: StatusTone = row.grantStatus
+						const statusLabel =
+							row.grantStatus === 'connected'
 								? t`Connected`
 								: row.grantStatus === 'auth_failed'
 									? t`Couldn't sign in`
 									: row.grantStatus === 'connect_failed'
 										? t`Couldn't connect`
-										: t`Paused`
+										: t`Not syncing`
 						return (
 							<TableRow key={row.id} role='row' $inactive={!row.active}>
 								<CellEmail role='cell'>
@@ -592,33 +599,65 @@ function InboxesPage() {
 									)}
 								</CellStatus>
 								<CellPurpose role='cell'>
-									<MobileCaption>{t`Used for`}</MobileCaption>
-									<PurposeBadge $purpose={row.purpose}>
-										{row.purpose === 'human'
-											? t`Personal`
-											: row.purpose === 'agent'
-												? t`AI agent`
-												: t`Shared`}
-									</PurposeBadge>
+									<MobileCaption>{t`What it's for`}</MobileCaption>
+									{row.ownerUserId === null ? (
+										<TeamTag>{t`Shared with the team`}</TeamTag>
+									) : !isMine(row) ? (
+										// A colleague's mailbox otherwise looks like your own
+										// here, told apart only by a control the row leaves out.
+										<SrOnly>{t`Belongs to another member`}</SrOnly>
+									) : null}
+									{row.description !== null && row.description !== '' ? (
+										<DescriptionText>{row.description}</DescriptionText>
+									) : row.ownerUserId !== null ? (
+										<Muted>
+											<SrOnly>{t`No description`}</SrOnly>
+											<span aria-hidden>—</span>
+										</Muted>
+									) : null}
 								</CellPurpose>
 								<CellDefault role='cell'>
 									<MobileCaption>{t`Primary`}</MobileCaption>
-									{row.isDefault ? (
+									{/* One button either way for the caller's own mailboxes,
+									    marked pressed once chosen. Swapping it for plain text
+									    on success would unmount the button under the finger
+									    that just pressed it, dropping focus to the top of the
+									    page, and the change would go unannounced. */}
+									{isMine(row) ? (
+										<PrimaryToggle
+											type='button'
+											$active={row.isDefault}
+											aria-pressed={row.isDefault}
+											onClick={() => {
+												void setDefault(row)
+											}}
+											aria-label={
+												row.isDefault
+													? t`${row.email} is the address you send from`
+													: t`Make ${row.email} the address you send from`
+											}
+										>
+											<Star
+												size={row.isDefault ? 12 : 14}
+												aria-hidden
+												fill={row.isDefault ? 'currentColor' : 'none'}
+											/>
+											{row.isDefault ? <span>{t`Primary`}</span> : null}
+										</PrimaryToggle>
+									) : row.isDefault ? (
 										<PrimaryLabel>
 											<Star size={12} aria-hidden fill='currentColor' />
 											{t`Primary`}
 										</PrimaryLabel>
 									) : (
-										<IconToggle
-											type='button'
-											$active={false}
-											onClick={() => {
-												void setDefault(row)
-											}}
-											aria-label={t`Make ${row.email} the primary sender`}
-										>
-											<Star size={14} aria-hidden fill='none' />
-										</IconToggle>
+										// Which address somebody sends from is theirs to pick,
+										// so there is nothing to offer on anyone else's. A bare
+										// dash is punctuation a screen reader may pass over,
+										// leaving the cell sounding empty.
+										<Muted>
+											<SrOnly>{t`Not yours to set`}</SrOnly>
+											<span aria-hidden>—</span>
+										</Muted>
 									)}
 								</CellDefault>
 								<CellDate role='cell'>
@@ -626,43 +665,44 @@ function InboxesPage() {
 									{row.createdAt !== null ? (
 										<RelativeDate value={row.createdAt} />
 									) : (
-										<Muted>—</Muted>
+										<Muted>
+											<SrOnly>{t`Not recorded`}</SrOnly>
+											<span aria-hidden>—</span>
+										</Muted>
 									)}
 								</CellDate>
 								<CellActions role='cell'>
-									<PriTooltip.Provider delay={300}>
-										<ActionButton
-											icon={RefreshCw}
-											label={t`Test connection`}
-											onClick={() => {
-												void handleTest(row)
-											}}
-										/>
-										<ActionButton
-											icon={FileText}
-											label={t`Email signature`}
-											onClick={() => openFooters(row)}
-										/>
-										<ActionButton
-											icon={Pencil}
-											label={t`Edit settings`}
-											onClick={() => openEdit(row)}
-										/>
-										<ActionButton
-											icon={row.active ? Pause : Play}
-											label={row.active ? t`Pause syncing` : t`Resume syncing`}
-											onClick={() => {
-												void toggleActive(row)
-											}}
-										/>
-										<ActionButton
-											icon={Trash2}
-											label={t`Remove`}
-											onClick={() => {
-												void handleDelete(row)
-											}}
-										/>
-									</PriTooltip.Provider>
+									{/* Nothing to offer on a mailbox this person cannot
+									    change — the server would turn every one of these
+									    down anyway. */}
+									{canLookAfter(row) ? (
+										<PriTooltip.Provider delay={300}>
+											<ActionButton
+												icon={RefreshCw}
+												label={t`Test connection`}
+												onClick={() => {
+													void handleTest(row)
+												}}
+											/>
+											<ActionButton
+												icon={FileText}
+												label={t`Email signature`}
+												onClick={() => openFooters(row)}
+											/>
+											<ActionButton
+												icon={Pencil}
+												label={t`Edit settings`}
+												onClick={() => openEdit(row)}
+											/>
+											<ActionButton
+												icon={Trash2}
+												label={t`Remove`}
+												onClick={() => {
+													void handleDelete(row)
+												}}
+											/>
+										</PriTooltip.Provider>
+									) : null}
 								</CellActions>
 							</TableRow>
 						)
@@ -760,6 +800,28 @@ function DialogPending({ onClose }: { readonly onClose: () => void }) {
 	)
 }
 
+// Whoever runs the organization looks after everyone's mailboxes; everyone
+// else only their own.
+function useCanManageOthers(): boolean {
+	const role = authClient.useActiveMember().data?.role ?? null
+	return role === 'owner' || role === 'admin'
+}
+
+// The signed-in member, so the list can tell their own mailboxes from the
+// team's and from colleagues'.
+function useMeUserId(): string | undefined {
+	return authClient.useSession().data?.user?.id
+}
+
+// Whether we yet know who is asking. Until we do, every mailbox looks like
+// somebody else's, so the rows would draw with nothing on them and then fill
+// in — moving what a person can tab to while they are already tabbing.
+function useIdentityPending(): boolean {
+	const member = authClient.useActiveMember()
+	const session = authClient.useSession()
+	return member.isPending === true || session.isPending === true
+}
+
 function isInboxStatus(value: unknown): value is {
 	hasDefault: boolean
 	primary: { inboxId: string; email: string } | null
@@ -778,9 +840,9 @@ type MutationResult =
 type CreatePayload = {
 	readonly email: string
 	readonly displayName?: string
-	readonly purpose: InboxPurpose
+	readonly description?: string
+	readonly shared?: boolean
 	readonly ownerUserId?: string
-	readonly isDefault?: boolean
 	readonly isPrivate?: boolean
 	readonly imapHost: string
 	readonly imapPort: number
@@ -794,11 +856,9 @@ type CreatePayload = {
 
 type UpdatePayload = {
 	readonly displayName?: string | null
-	readonly purpose?: InboxPurpose
+	readonly description?: string | null
 	readonly ownerUserId?: string | null
-	readonly isDefault?: boolean
 	readonly isPrivate?: boolean
-	readonly active?: boolean
 	readonly imapHost?: string
 	readonly imapPort?: number
 	readonly imapSecurity?: TransportSecurity
@@ -815,9 +875,9 @@ function rowToDraft(row: InboxRow): InboxDraft {
 	return {
 		email: row.email,
 		displayName: row.displayName ?? '',
-		purpose: row.purpose,
+		description: row.description ?? '',
+		shared: row.ownerUserId === null,
 		ownerUserId: row.ownerUserId ?? '',
-		isDefault: row.isDefault,
 		isPrivate: row.isPrivate,
 		imapHost: row.imapHost,
 		imapPort: row.imapPort,
@@ -845,6 +905,9 @@ function InboxFormDialog({
 }) {
 	const { t } = useLingui()
 	const isCreate = editing === null
+	// Setting a mailbox up for the team, or in somebody else's name, is for
+	// whoever runs the organization — so nobody else is shown the controls.
+	const canManageOthers = useCanManageOthers()
 
 	const presetsResult = useAtomValue(providerPresetsAtom)
 	const presets = useMemo<ReadonlyArray<ProviderPreset>>(
@@ -954,13 +1017,19 @@ function InboxFormDialog({
 			editing !== null
 				? await onUpdate(editing.id, {
 						displayName: draft.displayName === '' ? null : draft.displayName,
-						purpose: draft.purpose,
-						ownerUserId:
-							draft.purpose === 'human' && draft.ownerUserId !== ''
-								? draft.ownerUserId
-								: null,
-						isDefault: draft.isDefault,
-						isPrivate: draft.isPrivate,
+						description: draft.description === '' ? null : draft.description,
+						// Only sent when the owner is actually being changed. A blank
+						// field means "leave it as it is", never "give it to the team"
+						// — handing a mailbox over is always something typed on
+						// purpose.
+						...(draft.shared
+							? { ownerUserId: null }
+							: draft.ownerUserId !== '' && { ownerUserId: draft.ownerUserId }),
+						// A mailbox belonging to everyone cannot be hidden from them.
+						// Decided here rather than by clearing the box, so somebody who
+						// ticks "shared" and changes their mind still finds their
+						// privacy answer where they left it.
+						isPrivate: draft.shared ? false : draft.isPrivate,
 						imapHost: draft.imapHost,
 						imapPort: draft.imapPort,
 						imapSecurity: draft.imapSecurity,
@@ -973,11 +1042,13 @@ function InboxFormDialog({
 				: await onCreate({
 						email: draft.email,
 						...(draft.displayName !== '' && { displayName: draft.displayName }),
-						purpose: draft.purpose,
-						...(draft.purpose === 'human' &&
+						...(draft.description !== '' && {
+							description: draft.description,
+						}),
+						...(draft.shared && { shared: true }),
+						...(!draft.shared &&
 							draft.ownerUserId !== '' && { ownerUserId: draft.ownerUserId }),
-						...(draft.isDefault && { isDefault: true }),
-						...(draft.isPrivate && { isPrivate: true }),
+						...(!draft.shared && draft.isPrivate && { isPrivate: true }),
 						imapHost: draft.imapHost,
 						imapPort: draft.imapPort,
 						imapSecurity: draft.imapSecurity,
@@ -1244,92 +1315,74 @@ function InboxFormDialog({
 						)}
 
 						<Field>
-							<Label>{t`Purpose`}</Label>
-							<PriSelect.Root
-								value={draft.purpose}
-								onValueChange={value => {
-									if (
-										value === 'human' ||
-										value === 'agent' ||
-										value === 'shared'
-									) {
-										patchDraft({ purpose: value })
-									}
-								}}
-							>
-								<PriSelect.Trigger aria-label={t`Purpose`}>
-									<PriSelect.Value />
-									<PriSelect.Icon>
-										<ChevronLeft
-											size={14}
-											aria-hidden
-											style={{ transform: 'rotate(-90deg)' }}
-										/>
-									</PriSelect.Icon>
-								</PriSelect.Trigger>
-								<PriSelect.Portal>
-									<PriSelect.Positioner>
-										<PriSelect.Popup>
-											<PriSelect.Item value='human'>
-												<PriSelect.ItemIndicator>
-													<Check size={12} aria-hidden />
-												</PriSelect.ItemIndicator>
-												<PriSelect.ItemText>{t`Human`}</PriSelect.ItemText>
-											</PriSelect.Item>
-											<PriSelect.Item value='agent'>
-												<PriSelect.ItemIndicator>
-													<Check size={12} aria-hidden />
-												</PriSelect.ItemIndicator>
-												<PriSelect.ItemText>{t`Agent`}</PriSelect.ItemText>
-											</PriSelect.Item>
-											<PriSelect.Item value='shared'>
-												<PriSelect.ItemIndicator>
-													<Check size={12} aria-hidden />
-												</PriSelect.ItemIndicator>
-												<PriSelect.ItemText>{t`Shared`}</PriSelect.ItemText>
-											</PriSelect.Item>
-										</PriSelect.Popup>
-									</PriSelect.Positioner>
-								</PriSelect.Portal>
-							</PriSelect.Root>
+							<Label htmlFor='ix-description'>{t`What's this mailbox for?`}</Label>
+							<PriInput
+								id='ix-description'
+								type='text'
+								value={draft.description}
+								maxLength={200}
+								aria-describedby='ix-description-hint'
+								onChange={e => patchDraft({ description: e.target.value })}
+								placeholder={t`e.g. Customer enquiries`}
+							/>
+							{/* The limit is spelled out because the field itself just
+							    stops taking more, without saying why. */}
+							<Hint id='ix-description-hint'>{t`Just a note to yourself — it changes nothing about how the mailbox works. Up to 200 characters.`}</Hint>
 						</Field>
 
-						{draft.purpose === 'human' && (
-							<Field>
-								<Label htmlFor='ix-owner'>{t`Owner user ID`}</Label>
-								<PriInput
-									id='ix-owner'
-									type='text'
-									value={draft.ownerUserId}
-									onChange={e => patchDraft({ ownerUserId: e.target.value })}
-									placeholder={t`Defaults to you when omitted.`}
-								/>
-							</Field>
-						)}
-
-						<CheckboxRow>
-							<input
-								id='ix-default'
-								type='checkbox'
-								checked={draft.isDefault}
-								onChange={e => patchDraft({ isDefault: e.target.checked })}
-							/>
-							<label htmlFor='ix-default'>{t`Use as default for this purpose`}</label>
-						</CheckboxRow>
-
-						{draft.purpose !== 'shared' && (
+						{canManageOthers && (
 							<CheckboxRow>
 								<input
-									id='ix-private'
+									id='ix-shared'
 									type='checkbox'
-									checked={draft.isPrivate}
-									onChange={e => patchDraft({ isPrivate: e.target.checked })}
+									checked={draft.shared}
+									aria-controls='ix-ownership-options'
+									aria-expanded={!draft.shared}
+									onChange={e => patchDraft({ shared: e.target.checked })}
 								/>
-								<label htmlFor='ix-private'>
-									{t`Private — hide threads from other members`}
+								<label htmlFor='ix-shared'>
+									{t`Shared with the whole team — no single owner`}
 								</label>
 							</CheckboxRow>
 						)}
+
+						{/* Ticking the box takes two questions off the form, which is a
+						    change somebody not looking at it would otherwise miss. Both
+						    answers are kept as typed, so changing one's mind puts them
+						    back; only the submit decides what a team mailbox sends. */}
+						<div id='ix-ownership-options'>
+							{canManageOthers && !draft.shared && (
+								<Field>
+									<Label htmlFor='ix-owner'>{t`Owner user ID`}</Label>
+									<PriInput
+										id='ix-owner'
+										type='text'
+										value={draft.ownerUserId}
+										onChange={e => patchDraft({ ownerUserId: e.target.value })}
+										placeholder={t`Defaults to you when omitted.`}
+									/>
+								</Field>
+							)}
+
+							{!draft.shared && (
+								<CheckboxRow>
+									<input
+										id='ix-private'
+										type='checkbox'
+										checked={draft.isPrivate}
+										onChange={e => patchDraft({ isPrivate: e.target.checked })}
+									/>
+									<label htmlFor='ix-private'>
+										{t`Private — hide threads from other members`}
+									</label>
+								</CheckboxRow>
+							)}
+						</div>
+						<SrOnly role='status' aria-live='polite'>
+							{draft.shared
+								? t`Owner and privacy hidden — a team mailbox has no owner and cannot be private`
+								: ''}
+						</SrOnly>
 
 						{errorMessage !== null && (
 							<ErrorText role='alert'>{errorMessage}</ErrorText>
@@ -1877,16 +1930,13 @@ function narrowInboxRows(rows: unknown): ReadonlyArray<InboxRow> {
 		const r = row as Record<string, unknown>
 		if (typeof r['id'] !== 'string') continue
 		if (typeof r['email'] !== 'string') continue
-		const purpose = r['purpose']
-		if (purpose !== 'human' && purpose !== 'agent' && purpose !== 'shared') {
-			continue
-		}
 		out.push({
 			id: r['id'],
 			email: r['email'],
 			displayName:
 				typeof r['displayName'] === 'string' ? r['displayName'] : null,
-			purpose,
+			description:
+				typeof r['description'] === 'string' ? r['description'] : null,
 			ownerUserId:
 				typeof r['ownerUserId'] === 'string' ? r['ownerUserId'] : null,
 			isDefault: r['isDefault'] === true,
@@ -1992,13 +2042,15 @@ const InboxesTable = styled.div.withConfig({ displayName: 'InboxesTable' })`
 	background: var(--color-paper-aged);
 `
 
-// Columns: email · status · used-for · primary · added · actions.
+// Columns: email · status · what-it's-for · primary · added · actions.
+// The description column flexes rather than sitting at a fixed width, since
+// what someone writes there runs to a line rather than a single word.
 const gridTemplate = css`
 	display: grid;
 	grid-template-columns:
 		minmax(0, 2fr)
 		minmax(8rem, 0.9fr)
-		7rem
+		minmax(7rem, 1.2fr)
 		6rem
 		minmax(0, 0.8fr)
 		auto;
@@ -2096,7 +2148,13 @@ const DisplayName = styled.span.withConfig({
 
 const CellPurpose = styled.div.withConfig({
 	displayName: 'InboxesCellPurpose',
-})``
+})`
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: var(--space-3xs);
+	min-width: 0;
+`
 
 const CellStatus = styled.div.withConfig({ displayName: 'InboxesCellStatus' })`
 	display: flex;
@@ -2339,10 +2397,9 @@ const TechDetails = styled.details.withConfig({
 	}
 `
 
-const PurposeBadge = styled.span.withConfig({
-	displayName: 'InboxesPurposeBadge',
-	shouldForwardProp: prop => prop !== '$purpose',
-})<{ $purpose: InboxPurpose }>`
+// Marks the mailboxes that belong to everyone rather than to one person —
+// the one thing about a mailbox still worth saying at a glance.
+const TeamTag = styled.span.withConfig({ displayName: 'InboxesTeamTag' })`
 	display: inline-flex;
 	align-items: center;
 	padding: 2px var(--space-2xs);
@@ -2352,25 +2409,20 @@ const PurposeBadge = styled.span.withConfig({
 	font-weight: var(--font-weight-bold);
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
-	${p =>
-		p.$purpose === 'human'
-			? css`
-					background: color-mix(in oklab, var(--color-primary) 16%, transparent);
-					color: color-mix(in oklab, var(--color-primary) 80%, black);
-					border: 1px solid
-						color-mix(in oklab, var(--color-primary) 45%, transparent);
-				`
-			: p.$purpose === 'agent'
-				? css`
-						background: color-mix(in oklab, var(--color-on-surface-variant) 16%, transparent);
-						color: var(--color-on-surface);
-						border: 1px solid color-mix(in oklab, var(--color-on-surface-variant) 45%, transparent);
-					`
-				: css`
-						background: transparent;
-						color: var(--color-on-surface-variant);
-						border: 1px dashed var(--color-outline);
-					`}
+	background: transparent;
+	color: var(--color-on-surface-variant);
+	border: 1px dashed var(--color-outline);
+`
+
+const DescriptionText = styled.span.withConfig({
+	displayName: 'InboxesDescriptionText',
+})`
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+	color: var(--color-on-surface-variant);
+	/* Free text somebody types, so a single long word (a pasted address)
+	   must wrap rather than widen the column past its share. */
+	overflow-wrap: anywhere;
 `
 
 const IconToggle = styled.button.withConfig({
@@ -2404,6 +2456,21 @@ const IconToggle = styled.button.withConfig({
 		outline: none;
 		box-shadow: var(--glow-active);
 	}
+`
+
+// The same control before and after choosing, so pressing it never pulls the
+// focused element out from under the person who pressed it. Widens to carry
+// the word once chosen, matching the plain label shown on other people's rows.
+const PrimaryToggle = styled(IconToggle)`
+	gap: var(--space-3xs);
+	width: auto;
+	min-width: 1.75rem;
+	padding: 0 ${p => (p.$active ? 'var(--space-2xs)' : '0')};
+	font-family: var(--font-display);
+	font-size: var(--typescale-label-small-size);
+	font-weight: var(--font-weight-bold);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
 `
 
 const IconAction = styled.button.withConfig({
@@ -2457,10 +2524,12 @@ const ActionLabel = styled.span.withConfig({
 	}
 `
 
+// Italic and the variant tone already read as de-emphasised. Fading it further
+// dropped the text under the contrast floor on paper, where most people read
+// it, so the tone carries it alone.
 const Muted = styled.span.withConfig({ displayName: 'InboxesMuted' })`
 	color: var(--color-on-surface-variant);
 	font-style: italic;
-	opacity: 0.7;
 `
 
 const EmptyHelp = styled.div.withConfig({ displayName: 'InboxesEmptyHelp' })`

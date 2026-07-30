@@ -37,6 +37,7 @@ const record = (event: ResearchProposalApplied) =>
 				id: ORG,
 				name: 'audit',
 				slug: 'audit',
+				role: 'member',
 			}),
 		)
 	}).pipe(Effect.provide(deps), Effect.orDie, Effect.runPromise)

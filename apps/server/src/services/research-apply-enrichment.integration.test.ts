@@ -41,7 +41,12 @@ const personEdits = (id: string, fields: Record<string, unknown>) =>
 			const svc = yield* CompanyService
 			return yield* svc.update(id, fields)
 		}).pipe(
-			Effect.provideService(CurrentOrg, { id: ORG, name: 'b', slug: 'b' }),
+			Effect.provideService(CurrentOrg, {
+				id: ORG,
+				name: 'b',
+				slug: 'b',
+				role: 'member',
+			}),
 		),
 	)
 

@@ -50,7 +50,13 @@ const CurrentOrgFromEnv = Layer.effect(
 		const id = yield* Config.string('BATUDA_ACTIVE_ORG_ID')
 		const name = yield* Config.string('BATUDA_ACTIVE_ORG_NAME')
 		const slug = yield* Config.string('BATUDA_ACTIVE_ORG_SLUG')
-		return { id, name, slug }
+		// Starts at the lowest standing, so local tools reach a colleague's
+		// things only when the developer says so. Set `owner` or `admin` to
+		// try what someone running the organization can do.
+		const role = yield* Config.string('BATUDA_ACTIVE_ORG_ROLE').pipe(
+			Config.withDefault('member'),
+		)
+		return { id, name, slug, role }
 	}),
 )
 

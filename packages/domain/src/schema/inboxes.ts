@@ -3,9 +3,6 @@ import { Model } from 'effect/unstable/schema'
 
 export const InboxId = Schema.String.pipe(Schema.brand('InboxId'))
 
-export const InboxPurpose = Schema.Literals(['human', 'agent', 'shared'])
-export type InboxPurpose = typeof InboxPurpose.Type
-
 export const InboxTransportSecurity = Schema.Literals([
 	'tls',
 	'starttls',
@@ -31,7 +28,11 @@ export class Inbox extends Model.Class<Inbox>('Inbox')({
 	organizationId: Schema.String,
 	email: Schema.String,
 	displayName: Schema.NullOr(Schema.String),
-	purpose: InboxPurpose,
+	// What the mailbox is for, in whatever words fit. Free text: nothing
+	// branches on it.
+	description: Schema.NullOr(Schema.String),
+	// Who may touch the mailbox follows from this: set means it belongs to that
+	// person, null means it is the whole team's and so cannot be private.
 	ownerUserId: Schema.NullOr(Schema.String),
 	isDefault: Schema.Boolean,
 	isPrivate: Schema.Boolean,

@@ -146,22 +146,7 @@ export class Auth extends Context.Service<Auth>()('Auth', {
 					// orgs; `session.activeOrganizationId` drives which org a request
 					// reads/writes. Tables that own org-scoped data carry an
 					// `organization_id` column populated from `CurrentOrg`.
-					// `member.primary_inbox_id` is the member's default From identity
-					// in this org; the column + FK + ON DELETE SET NULL are added by
-					// the migration since `additionalFields` does not generate FKs.
-					organization({
-						schema: {
-							member: {
-								additionalFields: {
-									primaryInboxId: {
-										type: 'string' as const,
-										required: false,
-										fieldName: 'primary_inbox_id' as const,
-									},
-								},
-							},
-						},
-					}),
+					organization(),
 					// enableMetadata: org-owned keys carry { organizationId } so the
 					// MCP path resolves the org from the key (BADREQUEST otherwise).
 					// enableSessionForAPIKeys is off on purpose: a key authenticates
