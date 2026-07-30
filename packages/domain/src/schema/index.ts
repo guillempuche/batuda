@@ -4,6 +4,7 @@ export {
 	BUYING_ROLES,
 	BuyingRole,
 	decidesPurchase,
+	isBuyingRole,
 } from './buying-roles'
 export {
 	CalendarEvent,

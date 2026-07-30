@@ -38,11 +38,20 @@ export type BuyingRole = typeof BuyingRole.Type
 // The parts that can move a purchase forward. A gatekeeper can stop one and an
 // evaluator can sink one, but neither carries it — so "who is worth reaching" is
 // these two, which is the question the old yes/no was really being asked.
-const DECIDING: ReadonlySet<string> = new Set(['economic_buyer', 'champion'])
+//
+// Picked out of the list above rather than written out again, so renaming a part
+// there cannot quietly leave this one behind still naming the old word.
+const DECIDING: ReadonlySet<BuyingRole> = new Set(
+	BUYING_ROLES.filter(role => role === 'economic_buyer' || role === 'champion'),
+)
 
 /**
  * Whether this person can carry a purchase forward. Null — nobody has said what
  * part they play — is not a yes.
  */
 export const decidesPurchase = (role: string | null | undefined): boolean =>
-	role != null && DECIDING.has(role)
+	role != null && (DECIDING as ReadonlySet<string>).has(role)
+
+/** Whether a stored value is one of the parts this vocabulary knows. */
+export const isBuyingRole = (role: string): role is BuyingRole =>
+	(BUYING_ROLES as ReadonlyArray<string>).includes(role)

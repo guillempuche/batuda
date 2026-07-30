@@ -90,6 +90,7 @@ import {
 import { ResearchSummaryCard } from '#/components/companies/research-summary-card'
 import { UpcomingMeetingsCard } from '#/components/companies/upcoming-meetings-card'
 import { WherePanel } from '#/components/companies/where-panel'
+import { useBuyingRoleLabel } from '#/components/contacts/buying-role-label'
 import {
 	ContactEditDialog,
 	type EditableContact,
@@ -484,6 +485,7 @@ function DetailBody({
 	refreshCompany: () => void
 }) {
 	const { t } = useLingui()
+	const buyingRoleLabel = useBuyingRoleLabel()
 	const { open: openQuickCapture } = useQuickCapture()
 	const { openCompose } = useComposeEmail()
 	const [tab, setTab] = useTabSearchParam<CompanyTab>(COMPANY_TABS, 'overview')
@@ -1379,9 +1381,11 @@ function DetailBody({
 										<ContactHeader>
 											<ContactName>
 												{contact.name}
-												{decidesPurchase(contact.buyingRole) && (
-													<DecisionBadge>
-														<Trans>Decision maker</Trans>
+												{buyingRoleLabel(contact.buyingRole) !== null && (
+													<DecisionBadge
+														$decides={decidesPurchase(contact.buyingRole)}
+													>
+														{buyingRoleLabel(contact.buyingRole)}
 													</DecisionBadge>
 												)}
 												{(contact.emailStatus === 'bounced' ||
@@ -2436,12 +2440,14 @@ const ContactName = styled.span.withConfig({
 
 const DecisionBadge = styled.span.withConfig({
 	displayName: 'CompanyDetailDecisionBadge',
-})`
+	shouldForwardProp: prop => prop !== '$decides',
+})<{ $decides: boolean }>`
 	${brushedMetalPlate}
 	${stenciledTitle}
 	display: inline-flex;
 	padding: var(--space-3xs) var(--space-2xs);
-	border-left: 3px solid var(--color-secondary);
+	border-left: 3px solid
+		${p => (p.$decides ? 'var(--color-secondary)' : 'var(--color-outline)')};
 	font-size: var(--typescale-label-small-size);
 	transform: rotate(-0.5deg);
 `

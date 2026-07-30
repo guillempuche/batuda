@@ -38,13 +38,19 @@ export default Effect.gen(function* () {
 	// One statement per kind rather than one clever statement: each reads as the
 	// sentence it is, and a column that turns out to be empty everywhere simply
 	// moves nothing.
+	// Trimmed against every kind of blank, not just the space. Plain `btrim`
+	// strips spaces alone, so a column holding a tab or a stray newline would read
+	// as having something in it and arrive as an address made of whitespace.
+	const BLANK = ' \t\r\n'
 	for (const [column, channel] of MOVED) {
 		yield* sql`
 			INSERT INTO channels
 				(organization_id, subject_table, subject_id, channel, address, is_primary)
-			SELECT organization_id, 'companies', id, ${channel}, btrim(${sql(column)}), true
+			SELECT organization_id, 'companies', id, ${channel},
+				btrim(${sql(column)}, ${BLANK}), true
 			FROM companies
-			WHERE ${sql(column)} IS NOT NULL AND btrim(${sql(column)}) <> ''
+			WHERE ${sql(column)} IS NOT NULL
+				AND btrim(${sql(column)}, ${BLANK}) <> ''
 			ON CONFLICT (subject_table, subject_id, channel, address) DO NOTHING
 		`
 	}

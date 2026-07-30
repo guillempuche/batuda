@@ -49,6 +49,7 @@ const match = (email: string) =>
 				id: ORG,
 				name: 'Role Address Org',
 				slug: ORG,
+				role: null,
 			}),
 		),
 	)

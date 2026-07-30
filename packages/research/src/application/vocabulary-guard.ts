@@ -12,6 +12,8 @@
  * dropped downstream.
  */
 
+import { isBuyingRole } from '@batuda/domain'
+
 import {
 	CRM_INDUSTRIES,
 	CRM_SIZE_RANGES,
@@ -235,6 +237,81 @@ export const mapCountry = (raw: string): string | null => {
 	return iso ?? raw
 }
 
+// The words a model reaches for when naming somebody's part in a purchase, and
+// the part each one means. Written as fragments so "Economic Buyer", "the
+// economic buyer" and "economic_buyer" all land in the same place.
+//
+// Without this the raw phrase is stored as typed, and everything downstream asks
+// "is this one of the five?" and gets no. A real budget holder written up as
+// "Decision maker" would therefore read as somebody who does not decide — the
+// exact person the whole taxonomy exists to surface, quietly dropped.
+const BUYING_ROLE_RULES: ReadonlyArray<
+	readonly [string, ReadonlyArray<string>]
+> = [
+	[
+		'economic_buyer',
+		[
+			'economic buyer',
+			'economic_buyer',
+			'budget',
+			'decision maker',
+			'decision-maker',
+			'decision_maker',
+			'decisionmaker',
+			'owner',
+			'founder',
+			'signer',
+			'approver',
+		],
+	],
+	[
+		'champion',
+		['champion', 'advocate', 'sponsor', 'internal supporter', 'promoter'],
+	],
+	[
+		'gatekeeper',
+		[
+			'gatekeeper',
+			'gate keeper',
+			'procurement',
+			'purchasing',
+			'assistant',
+			'receptionist',
+			'secretar',
+		],
+	],
+	[
+		'technical_evaluator',
+		[
+			'technical evaluator',
+			'technical_evaluator',
+			'evaluator',
+			'technical',
+			'engineer',
+			'quality',
+		],
+	],
+	['user', ['end user', 'end-user', 'user', 'operator']],
+]
+
+/**
+ * Fold a model's words for somebody's part in a purchase onto the fixed set.
+ *
+ * Unmappable is null, which drops the field — deliberately harsher than the
+ * industry mapper's fallback to "other". There is no "some other part" here:
+ * saying nothing about how somebody decides is honest, while inventing a part
+ * would put a made-up person in front of a salesperson.
+ */
+export const mapBuyingRole = (raw: string): string | null => {
+	const n = normalize(raw)
+	if (isHardJunk(n)) return null
+	if (isBuyingRole(n)) return n
+	for (const [code, keywords] of BUYING_ROLE_RULES) {
+		if (keywords.some(k => n.includes(k))) return code
+	}
+	return null
+}
+
 const MAPPERS: Record<string, (raw: string) => string | null> = {
 	industry: mapIndustry,
 	country: mapCountry,
@@ -243,6 +320,11 @@ const MAPPERS: Record<string, (raw: string) => string | null> = {
 	// spells it the way the company record does.
 	size_range: mapSizeRange,
 	sizeRange: mapSizeRange,
+	// Named twice for the same reason as the size band: a run's own findings
+	// spell it as the research schema does, a proposed CRM change as the record
+	// does.
+	buying_role: mapBuyingRole,
+	buyingRole: mapBuyingRole,
 }
 
 export interface VocabularyResult {
