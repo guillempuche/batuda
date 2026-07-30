@@ -254,20 +254,17 @@ function InboxesPage() {
 	// until then, since every control on them turns on whose mailbox it is.
 	const isLoading = AsyncResult.isInitial(inboxesResult) || identityPending
 	const isFailure = AsyncResult.isFailure(inboxesResult)
-	// Settled means both the list and who is asking. The list arrives already
-	// filled from the server, so without the second half a link straight to a
-	// mailbox's settings would judge it unreachable and shut itself before the
-	// answer to "whose is it" had even come back.
+	// Both the list and who is asking. The list arrives already filled from
+	// the server, so without the second half a link to a mailbox's settings
+	// would judge it unreachable and shut itself.
 	const listSettled =
 		(AsyncResult.isSuccess(inboxesResult) ||
 			AsyncResult.isFailure(inboxesResult)) &&
 		!identityPending
 
 	// Edit/footers dialogs carry only the row id in the URL; resolve the row
-	// from the loaded list. A deep link to a row that no longer exists closes
-	// itself once the list has loaded — and so does one naming a mailbox this
-	// person cannot change, since the address bar is as much a way in as the
-	// buttons are.
+	// from the loaded list. A deep link closes itself when the row is gone, or
+	// is not this person's to change — the address bar is a way in too.
 	const targetRow = useMemo(() => {
 		if (dlg === undefined || dlg.kind === 'create') return null
 		const row = rows.find(row => row.id === dlg.id) ?? null
@@ -650,10 +647,8 @@ function InboxesPage() {
 											{t`Primary`}
 										</PrimaryLabel>
 									) : (
-										// Which address somebody sends from is theirs to pick,
-										// so there is nothing to offer on anyone else's. A bare
-										// dash is punctuation a screen reader may pass over,
-										// leaving the cell sounding empty.
+										// Nothing to offer on anyone else's. The dash alone is
+										// punctuation a screen reader may pass over.
 										<Muted>
 											<SrOnly>{t`Not yours to set`}</SrOnly>
 											<span aria-hidden>—</span>
@@ -813,9 +808,8 @@ function useMeUserId(): string | undefined {
 	return authClient.useSession().data?.user?.id
 }
 
-// Whether we yet know who is asking. Until we do, every mailbox looks like
-// somebody else's, so the rows would draw with nothing on them and then fill
-// in — moving what a person can tab to while they are already tabbing.
+// Until we know who is asking every mailbox looks like somebody else's, so
+// the rows would fill in after paint — moving what a person can tab to.
 function useIdentityPending(): boolean {
 	const member = authClient.useActiveMember()
 	const session = authClient.useSession()
@@ -1018,10 +1012,8 @@ function InboxFormDialog({
 				? await onUpdate(editing.id, {
 						displayName: draft.displayName === '' ? null : draft.displayName,
 						description: draft.description === '' ? null : draft.description,
-						// Only sent when the owner is actually being changed. A blank
-						// field means "leave it as it is", never "give it to the team"
-						// — handing a mailbox over is always something typed on
-						// purpose.
+						// Blank means "leave it as it is", never "give it to the team":
+						// handing a mailbox over is always typed on purpose.
 						...(draft.shared
 							? { ownerUserId: null }
 							: draft.ownerUserId !== '' && { ownerUserId: draft.ownerUserId }),

@@ -97,9 +97,8 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 		[inboxes, meUserId],
 	)
 
-	// Nothing is chosen until we know who is asking: before that only the
-	// team's mailboxes look sendable, and picking one would bind the draft to
-	// an address the person never meant to write from.
+	// Nothing is chosen until we know who is asking — before that only team
+	// mailboxes look sendable, and the draft would bind to one of those.
 	const defaultInboxId = useMemo(
 		() =>
 			meUserId === undefined
@@ -123,17 +122,15 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 		attachments: [],
 	}))
 
-	// A draft picked up later can name a mailbox that has since been removed
-	// or was never this person's to write from; fall back rather than send
-	// from an address the server will refuse.
+	// A draft picked up later can name a mailbox since removed, or never this
+	// person's; fall back rather than send from an address that is refused.
 	const chosenInboxId =
 		form.inboxId !== null && sendableInboxes.some(i => i.id === form.inboxId)
 			? form.inboxId
 			: null
 	const effectiveInboxId = chosenInboxId ?? defaultInboxId
-	// Sending from an address you did not pick is not a mistake you can take
-	// back, so a swap is said out loud — and on a reply, where no picker is
-	// drawn at all, the address that will actually go out is written down.
+	// Sending from an address you did not pick cannot be taken back, so a swap
+	// is said out loud and a reply writes down what will go out.
 	const substituted =
 		form.inboxId !== null && chosenInboxId === null && effectiveInboxId !== null
 	const sendingFrom =
