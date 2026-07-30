@@ -20,6 +20,23 @@ export class Contact extends Model.Class<Contact>('Contact')({
 	lastMeetingAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
 	nextCalendarEventAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
 
+	// Where each fact about this person came from and when it was true — the page
+	// it was read on, the run that read it, how sure that run was, and the date
+	// the page dated it to. The same record a company keeps, and it matters more
+	// here: a job title from eighteen months ago is worse than none, because it
+	// gets quoted confidently in an opening line.
+	fieldProvenance: Schema.NullOr(
+		Schema.Record(
+			Schema.String,
+			Schema.Struct({
+				sourceUrl: Schema.String,
+				runId: Schema.String,
+				confidence: Schema.optionalKey(Schema.Number),
+				asOf: Schema.optionalKey(Schema.String),
+			}),
+		),
+	),
+
 	createdAt: Model.DateTimeInsertFromDate,
 	updatedAt: Model.DateTimeUpdateFromDate,
 }) {}

@@ -104,6 +104,22 @@ const apply = (
 		}),
 	)
 
+// The same write, aimed at whichever table — the record a person keeps of where
+// each fact came from is the point of the cases below.
+const applyTo = (
+	table: 'companies' | 'contacts',
+	id: string,
+	version: number,
+	fields: Record<string, unknown>,
+	enrichment: Parameters<typeof occUpdate>[6],
+) =>
+	runtime.runPromise(
+		Effect.gen(function* () {
+			const sql = yield* SqlClient.SqlClient
+			return yield* occUpdate(sql, table, id, ORG, version, fields, enrichment)
+		}),
+	)
+
 const noRunFacts = {
 	isRunTarget: false,
 	fitVerdict: null,
@@ -369,6 +385,95 @@ describe('occUpdate, on the enrichment it records for a company', () => {
 			const row = await readCompany(id)
 			expect(row.account_brief).toBe('My notes.')
 			expect(row.brief_updated_by).toBe('user_123')
+		})
+	})
+})
+
+describe('the record a person keeps of where each fact came from', () => {
+	const seedPerson = async (companyId: string): Promise<string> => {
+		const r = await pool.query<{ id: string }>(
+			`INSERT INTO contacts (organization_id, company_id, name)
+			 VALUES ($1, $2, 'Dolors Puig') RETURNING id`,
+			[ORG, companyId],
+		)
+		return r.rows[0]!.id
+	}
+
+	const provenanceOf = async (contactId: string) =>
+		(
+			await pool.query<{
+				field_provenance: Record<
+					string,
+					{ sourceUrl: string; asOf?: string }
+				> | null
+			}>(`SELECT field_provenance FROM contacts WHERE id = $1`, [contactId])
+		).rows[0]?.field_provenance ?? null
+
+	describe('when a run fills a job title from a dated page', () => {
+		it('should record the page and the date it was true as of', async () => {
+			// GIVEN a person on file with nothing said about where their details
+			// came from
+			const companyId = await seedCompany()
+			const contactId = await seedPerson(companyId)
+			expect(await provenanceOf(contactId)).toBeNull()
+
+			// WHEN a run writes their title, citing a page that dates it
+			await applyTo(
+				'contacts',
+				contactId,
+				0,
+				{ role: 'Plant Manager' },
+				{
+					provenance: {
+						role: {
+							sourceUrl: 'https://acme.es/team',
+							runId: RUN_ID,
+							asOf: '2026-03',
+						},
+					},
+				},
+			)
+
+			// THEN the person answers "where did this title come from, and when was
+			// it true?" — which only a company could do before
+			const stored = await provenanceOf(contactId)
+			expect(stored?.['role']?.sourceUrl).toBe('https://acme.es/team')
+			expect(stored?.['role']?.asOf).toBe('2026-03')
+		})
+
+		it('should leave an earlier field alone when a later run fills another', async () => {
+			// GIVEN a person whose title already says where it came from
+			const companyId = await seedCompany()
+			const contactId = await seedPerson(companyId)
+			await applyTo(
+				'contacts',
+				contactId,
+				0,
+				{ role: 'Plant Manager' },
+				{
+					provenance: {
+						role: { sourceUrl: 'https://acme.es/team', runId: RUN_ID },
+					},
+				},
+			)
+
+			// WHEN a later run corrects the name from somewhere else
+			await applyTo(
+				'contacts',
+				contactId,
+				1,
+				{ name: 'Dolors Puig i Roca' },
+				{
+					provenance: {
+						name: { sourceUrl: 'https://acme.es/about', runId: RUN_ID },
+					},
+				},
+			)
+
+			// THEN both are on file — the box was added to, not replaced
+			const stored = await provenanceOf(contactId)
+			expect(stored?.['role']?.sourceUrl).toBe('https://acme.es/team')
+			expect(stored?.['name']?.sourceUrl).toBe('https://acme.es/about')
 		})
 	})
 })

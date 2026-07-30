@@ -321,13 +321,17 @@ const pgErrorCode = (error: unknown): string | undefined => {
 export type CompanyEnrichment = {
 	/** Where each written value came from, keyed by the column it explains. */
 	readonly provenance: Record<string, FieldSource>
-	/** True when this row is the company the run researched. */
-	readonly isRunTarget: boolean
-	readonly fitVerdict: string | null
-	readonly fitChecks: unknown
-	readonly fitConflicts: unknown
+	/**
+	 * The rest is a company's alone — its fit judgement and its written brief.
+	 * A person carries only the provenance, so these are optional rather than a
+	 * second payload type that would repeat the one field they share.
+	 */
+	readonly isRunTarget?: boolean
+	readonly fitVerdict?: string | null
+	readonly fitChecks?: unknown
+	readonly fitConflicts?: unknown
 	/** The run's brief, in markdown, already carrying its own dated heading. */
-	readonly brief: string | null
+	readonly brief?: string | null
 }
 
 // Serialize a json column value, or null to leave the stored one alone.
@@ -363,19 +367,30 @@ export const occUpdate = (
 	// written empty, which is not valid SQL.
 	const setFields =
 		Object.keys(fields).length > 0 ? sql`${sql.update(fields)},` : sql``
+	const provenance =
+		enrichment && Object.keys(enrichment.provenance).length > 0
+			? JSON.stringify(enrichment.provenance)
+			: null
+	// A person records where each of their facts came from, exactly as a company
+	// does. It matters more here, not less: a job title from eighteen months ago
+	// is worse than none, because it gets quoted confidently in an opening line.
+	// Added to what is there rather than replacing it, so a run that fills one
+	// field leaves the others' sources alone.
 	if (table === 'contacts')
 		return sql<{ version: number }>`
 			UPDATE contacts
-			SET ${setFields} version = version + 1, updated_at = now()
+			SET ${setFields}
+				field_provenance = CASE
+					WHEN ${provenance}::jsonb IS NULL THEN field_provenance
+					ELSE COALESCE(field_provenance, '{}'::jsonb) || ${provenance}::jsonb
+				END,
+				version = version + 1,
+				updated_at = now()
 			WHERE id = ${subjectId}
 				AND organization_id = ${orgId}
 				AND version = ${expectedVersion}
 			RETURNING version
 		`
-	const provenance =
-		enrichment && Object.keys(enrichment.provenance).length > 0
-			? JSON.stringify(enrichment.provenance)
-			: null
 	const isRunTarget = enrichment?.isRunTarget ?? false
 	const fitVerdict = isRunTarget ? (enrichment?.fitVerdict ?? null) : null
 	const fitChecks = isRunTarget ? jsonOrNull(enrichment?.fitChecks) : null
@@ -861,7 +876,7 @@ export const resolveResearchProposedUpdate = (
 						fitConflicts: findings?.conflicts ?? null,
 						brief: run.briefMd,
 					}
-				: undefined,
+				: { provenance: sources },
 		).pipe(
 			Effect.catchTag('SqlError', e => {
 				const code = pgErrorCode(e)
