@@ -197,7 +197,13 @@ export type DiscoverContactsOutcome =
 
 export interface DiscoverContactsInput {
 	readonly companyName: string
-	readonly domain: string
+	/**
+	 * The company's web domain, or null when it has no website at all — a market
+	 * stall, a family workshop, a jobbing builder. Without one nothing can be
+	 * guessed and no enrichment vendor can be asked, so the answer is whoever the
+	 * national registry names, with no address.
+	 */
+	readonly domain: string | null
 	readonly country?: string | undefined
 	// Standalone path: discover builds its own anchor run + per-call budget.
 	readonly userId?: string | undefined
@@ -355,11 +361,19 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 						// Universal fallback (paid) when no registry hit. runEnrichmentChain
 						// bills + calls each configured vendor; the idempotency key names the
 						// vendor so a resumed run re-charges it as a DB no-op, not a re-pay.
-						if (people.length === 0) {
+						//
+						// A company with no website is skipped here rather than asked about:
+						// every vendor is keyed on the domain, so the call could only come
+						// back empty, and it would still be charged for. Its idempotency key
+						// is built from the domain too, so a domain-less call would share one
+						// key with every other domain-less company and the second such run
+						// would read the first one's charge as its own.
+						const domain = input.domain
+						if (people.length === 0 && domain !== null) {
 							people = yield* runEnrichmentChain(
 								enrichment,
 								{
-									domain: input.domain,
+									domain,
 									companyName: input.companyName,
 									country: input.country,
 								},
@@ -368,12 +382,15 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 										`${label}-enrich`,
 										enrichCostFor(label),
 										'discover_contacts',
-										`${researchId}:${label}-enrich:${input.domain}`,
+										`${researchId}:${label}-enrich:${domain}`,
 									),
 							)
 						}
 
-						const mxOutcome = yield* mx.resolve(input.domain)
+						// Whether the company's domain accepts mail at all. With no domain
+						// there is nothing to ask, and nothing will be guessed against it
+						// either, so the question never arises.
+						const mxOutcome = domain === null ? null : yield* mx.resolve(domain)
 
 						// Verify one address. Any failure (provider or budget) degrades
 						// to 'unknown' so a hit cap returns what was gathered.
@@ -427,14 +444,18 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 									const channels: ContactChannel[] = []
 
 									// Email channel: guess (if needed) → MX gate → verify.
-									// Included only when actually sendable.
+									// Included only when actually sendable. Nothing can be
+									// guessed without a domain, so a person the registry named
+									// keeps whatever address they arrived with, which is none.
 									const chosen =
 										person.email ??
-										guessEmails({
-											firstName: person.firstName,
-											lastName: person.lastName,
-											domain: input.domain,
-										})[0]
+										(domain === null
+											? undefined
+											: guessEmails({
+													firstName: person.firstName,
+													lastName: person.lastName,
+													domain,
+												})[0])
 									if (chosen) {
 										let verdict: VerificationVerdict
 										let confidence: number | undefined
@@ -490,10 +511,18 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 										channels.push({ kind: 'phone', value: person.phone })
 									}
 
-									if (channels.length === 0) return null
+									// A person with no way of reaching them is still worth handing
+									// back: the name and the job title are the useful part, and
+									// for a company with no website they are all there is to
+									// find. Better than reporting nobody was found while the
+									// registry plainly names the director. What is worthless is a
+									// row with neither a name nor a way to reach anyone, so that
+									// is what gets dropped.
+									const name = `${person.firstName} ${person.lastName}`.trim()
+									if (name === '' && channels.length === 0) return null
 
 									const contact: DiscoveredContact = {
-										name: `${person.firstName} ${person.lastName}`.trim(),
+										name,
 										role: person.position,
 										is_decision_maker: isDecisionMaker(
 											person.position,

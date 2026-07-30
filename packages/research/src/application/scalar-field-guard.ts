@@ -78,9 +78,20 @@ export const PAGE_LITERAL_FIELDS = new Set([
 	'currentTools',
 ])
 
-// Contact channels the value guard already checks against the evidence far more
-// precisely than a text test could, so this guard leaves them alone.
+// Ways of reaching a person, which the value guard already matches against the
+// evidence address-for-address and digit-for-digit — far more precisely than the
+// word-overlap test here could — so this guard leaves those alone.
+//
+// The company's own mailbox and telephone number are a different case, even though
+// they are spelled the same way. They are checks this guard alone makes: that the
+// field names a page at all, and that the line quoted for it really appears in what
+// the run read. So the exemption holds only for a person, and the block a value
+// sits in is what tells the two apart.
 const CHANNEL_KEYS = new Set(['email', 'phone', 'whatsapp'])
+
+// The company-profile block. A channel field inside it describes the company, so it
+// is graded here; the same field name outside it describes a person.
+const COMPANY_PROFILE_KEY = 'enrichment'
 
 // Subtrees that are not scalar fields: the block-level citation arrays and the
 // freeform proposed-update JSON, whose contents could otherwise look like a field.
@@ -243,11 +254,20 @@ export const guardScalarFields = (
 		return null
 	}
 
-	const walk = (value: unknown, key: string | undefined): unknown => {
-		if (Array.isArray(value)) return value.map(item => walk(item, undefined))
+	const walk = (
+		value: unknown,
+		key: string | undefined,
+		inCompanyProfile: boolean,
+	): unknown => {
+		if (Array.isArray(value))
+			return value.map(item => walk(item, undefined, inCompanyProfile))
 		if (value === null || typeof value !== 'object') return value
 
-		if (isSourcedField(value) && key !== undefined && !CHANNEL_KEYS.has(key)) {
+		if (
+			isSourcedField(value) &&
+			key !== undefined &&
+			(inCompanyProfile || !CHANNEL_KEYS.has(key))
+		) {
 			const wrapper = value as {
 				value: unknown
 				source_id?: unknown
@@ -289,12 +309,14 @@ export const guardScalarFields = (
 
 		return Object.fromEntries(
 			Object.entries(value as Record<string, unknown>).map(([k, v]) =>
-				SKIP_KEYS.has(k) ? [k, v] : [k, walk(v, k)],
+				SKIP_KEYS.has(k)
+					? [k, v]
+					: [k, walk(v, k, inCompanyProfile || k === COMPANY_PROFILE_KEY)],
 			),
 		)
 	}
 
-	const guardedFindings = walk(findings, undefined)
+	const guardedFindings = walk(findings, undefined, false)
 	const countReason = (reason: FieldDropReason): number =>
 		drops.filter(d => d.reason === reason).length
 	return {

@@ -502,3 +502,57 @@ describe('verifyValueProvenance', () => {
 		})
 	})
 })
+
+describe('verifyValueProvenance on the keys that name a row', () => {
+	describe('when a new-person suggestion carries the company it belongs to', () => {
+		it('should leave the company id alone even though it reads like a number', () => {
+			// GIVEN a company id made only of digits and hyphens, which is the shape a
+			// telephone number takes, and which no scraped page would ever contain
+			const findings = {
+				proposed_updates: [
+					{
+						subject_table: 'contacts',
+						operation: 'create',
+						fields: {
+							name: 'Jane Doe',
+							company_id: '00000000-0000-4000-8000-000000000001',
+						},
+					},
+				],
+			}
+
+			// WHEN checked against evidence that says nothing of the sort
+			const result = verifyValueProvenance(findings, 'Acme Logistics SL')
+
+			// THEN the id is untouched — emptied, it would take the whole suggestion
+			// with it, since a person with no company cannot be written
+			expect(result.findings).toStrictEqual(findings)
+			expect(result.strippedValues).toBe(0)
+			expect(result.droppedProposals).toBe(0)
+		})
+
+		it('should still empty an invented address on the same suggestion', () => {
+			// GIVEN the same suggestion, now also claiming an address nothing supports
+			const findings = {
+				proposed_updates: [
+					{
+						subject_table: 'contacts',
+						operation: 'create',
+						fields: {
+							name: 'Jane Doe',
+							company_id: '00000000-0000-4000-8000-000000000001',
+							email: 'jane@invented.example',
+						},
+					},
+				],
+			}
+
+			// WHEN checked
+			const result = verifyValueProvenance(findings, 'Acme Logistics SL')
+
+			// THEN the invented address goes and the whole suggestion is dropped for
+			// it, while the id was never the reason
+			expect(result.droppedProposals).toBe(1)
+		})
+	})
+})

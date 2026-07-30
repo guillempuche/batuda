@@ -37,6 +37,44 @@ export const CompanyEnrichmentV1Schema = Schema.Struct({
 				}),
 			),
 		),
+		// The company's registration number, sourced like every other field here.
+		// The prospect scan reads one too, but as a plain string with no page behind
+		// it, so nothing can be written from that — this is the graded version.
+		tax_id: Schema.optionalKey(
+			Sourced(
+				Schema.String.annotate({
+					description:
+						'The number the company is registered or taxed under, copied exactly as printed — a Spanish NIF/CIF, a UK company number, an EU VAT number. Take it only from a page that states it for THIS company (its own legal notice or imprint, or an official register); never assemble or infer one.',
+				}),
+			),
+		),
+		// How to reach the company itself, as opposed to one of its people. For a
+		// company with a thin website and nobody named on it, a department mailbox
+		// or a switchboard number printed on its contact page is the only way in.
+		email: Schema.optionalKey(
+			Sourced(
+				Schema.String.annotate({
+					description:
+						"A mailbox the company publishes for itself — a department or role address printed on its own pages (info@, sales@, hola@). A named person's own address belongs on that person in the people list, not here.",
+				}),
+			),
+		),
+		phone: Schema.optionalKey(
+			Sourced(
+				Schema.String.annotate({
+					description:
+						"The company's own published telephone number, copied as printed including its country code where the page gives one.",
+				}),
+			),
+		),
+		website: Schema.optionalKey(
+			Sourced(
+				Schema.String.annotate({
+					description:
+						"The company's own official website. It must be the site the company runs — not a directory or aggregator profile page about the company, and not a social-media page.",
+				}),
+			),
+		),
 	}),
 	// The fit judgement the run reaches. It was previously written only into the
 	// human brief and lost from the structured output, so a consumer reading

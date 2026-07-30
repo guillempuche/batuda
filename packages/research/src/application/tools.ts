@@ -102,8 +102,12 @@ const DiscoverContactsParams = Schema.Struct({
 	company_name: Schema.String.annotate({
 		description: 'Company legal or trading name',
 	}),
-	domain: Schema.String.annotate({
-		description: 'Company web domain, e.g. "acme.com" (no scheme, no @)',
+	// Required + nullable rather than optional: a nullable field wrapped in
+	// `optionalKey` serialises to a nested anyOf that a strict provider rejects,
+	// which is what silently disabled the second-vendor fallback once before.
+	domain: Schema.NullOr(Schema.String).annotate({
+		description:
+			'Company web domain, e.g. "acme.com" (no scheme, no @); null when the company has no website — a market stall, a family workshop, a jobbing builder. With no domain no address can be guessed, so the answer is names and job titles from the national registry rather than verified mailboxes.',
 	}),
 	country: Schema.NullOr(Schema.String).annotate({
 		description:
@@ -141,7 +145,7 @@ export const ScrapePageTool = Tool.make('scrape_page', {
 
 export const RegistryLookupTool = Tool.make('registry_lookup', {
 	description:
-		'Look up a company in its national business registry. Accepts any ISO country; one without a national registry returns {status:"no_registry"} — use discover_contacts for contact enrichment there. Metered (~€0.29/lookup), so use it to confirm a specific company rather than browsing. Returns legal name, tax id, status, and (when available) directors.',
+		'Look up a company in its national business registry. Accepts any ISO country; one without a national registry returns {status:"no_registry"} — use discover_contacts for contact enrichment there. Metered (~€0.29/lookup), so use it to confirm a specific company rather than browsing. If the company on file already shows a taxId, pass it as tax_id instead of searching by name: it resolves exactly, so the money buys an answer about the right company. Returns legal name, tax id, status, and (when available) directors.',
 	parameters: RegistryLookupParams,
 	success: ToolResultSchema,
 	failureMode: 'return',
@@ -149,7 +153,7 @@ export const RegistryLookupTool = Tool.make('registry_lookup', {
 
 export const DiscoverContactsTool = Tool.make('discover_contacts', {
 	description:
-		'Find verified decision-maker contacts for a company: guesses likely emails, MX-gates them, and pays to verify deliverability. Metered against this run. Returns ranked candidates each with a deliverability verdict, or {status:"no_reliable_contact"}. Worth calling when reading the company\'s own pages turned up nobody with a title. Put the people it returns in the findings\' contacts list; to persist one, add a proposed_updates entry with operation:"create" carrying the contact and its channels.',
+		'Find decision-maker contacts for a company: guesses likely emails, MX-gates them, and pays to verify deliverability. Metered against this run. Returns ranked candidates, each with a deliverability verdict where an address was found, or {status:"no_reliable_contact"}. Pass domain:null for a company with no website — you then get names and job titles with no address, which is still worth having. Worth calling when reading the company\'s own pages turned up nobody with a title. Put the people it returns in the findings\' contacts list; to persist one, add a proposed_updates entry with operation:"create" carrying the contact and any channels it has.',
 	parameters: DiscoverContactsParams,
 	success: ToolResultSchema,
 	failureMode: 'return',

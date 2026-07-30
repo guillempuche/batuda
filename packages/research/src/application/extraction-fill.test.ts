@@ -15,16 +15,22 @@ const sourced = (value: string) => ({
 })
 
 describe('ENRICHMENT_FIELDS', () => {
-	it('should list the six company-profile fields, from the schema itself', () => {
+	it('should list every company-profile field, from the schema itself', () => {
 		// GIVEN the field list derived from the enrichment schema
-		// THEN it is exactly the six the model is asked to fill
+		// THEN it is exactly the fields the model is asked to fill, which is what
+		// the fullness measure divides by — so a field added to the schema has to be
+		// added here too, on purpose, rather than quietly shifting the denominator
 		expect([...ENRICHMENT_FIELDS].sort()).toEqual([
 			'country',
 			'current_tools',
+			'email',
 			'industry',
 			'location',
+			'phone',
 			'size_range',
 			'tags',
+			'tax_id',
+			'website',
 		])
 	})
 })
@@ -36,9 +42,9 @@ describe('enrichmentFill', () => {
 			const result = enrichmentFill({ enrichment: {} })
 
 			// THEN every field is missing and none is filled
-			expect(result.total).toBe(6)
+			expect(result.total).toBe(ENRICHMENT_FIELDS.length)
 			expect(result.filled).toBe(0)
-			expect(result.missing.length).toBe(6)
+			expect(result.missing.length).toBe(ENRICHMENT_FIELDS.length)
 		})
 	})
 

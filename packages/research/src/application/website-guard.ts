@@ -19,9 +19,10 @@
  * describes itself in the first path segment ("xpo.com/about-xpo-logistics"), and a
  * blank costs a real website, so the bar to blank is deliberately high.
  *
- * It reads only the (name, website) pair, so it needs no evidence corpus and no
- * database, and it fires on any object carrying both — which is exactly a scanned
- * competitor or prospect and nothing else.
+ * It reads only a name and a website, so it needs no evidence corpus and no
+ * database. It fires on any object carrying both — a scanned competitor or prospect
+ * — and on the run's own answer for the target's website, which arrives on its own
+ * with no name beside it and so is judged against the target's name passed in.
  */
 
 import { collapse, nameCore } from './entity-guard'
@@ -102,27 +103,59 @@ export interface WebsiteGuardResult {
 	readonly blankedProfilePage: number
 }
 
-export const guardCompanyWebsites = (findings: unknown): WebsiteGuardResult => {
+/**
+ * `targetName` is the company the run is about, for the one website that is the
+ * run's own answer for it rather than a scanned stranger's. That field sits alone —
+ * a value with the page it came from and no company name beside it — so without the
+ * name told from outside, the two name-based rules have nothing to compare and only
+ * the known-directory rule can fire. Leave it out and that is exactly what happens,
+ * which is still the check this guard exists for.
+ */
+export const guardCompanyWebsites = (
+	findings: unknown,
+	targetName?: string,
+): WebsiteGuardResult => {
 	let blankedDirectory = 0
 	let blankedProfilePage = 0
+
+	const count = (verdict: Exclude<WebsiteVerdict, 'keep'>): void => {
+		if (verdict === 'directory') blankedDirectory++
+		else blankedProfilePage++
+	}
 
 	// Walk one child, honouring the key it sits under: the proposed-update and
 	// citation subtrees hold their own `name` (a person's, on a contact proposal)
 	// and must not have it matched against a host, so they are copied through whole.
 	const walkChild = (key: string, value: unknown): unknown =>
-		SKIP_KEYS.has(key) ? value : walk(value)
+		SKIP_KEYS.has(key) ? value : walk(value, key)
 
-	function walk(value: unknown): unknown {
+	function walk(value: unknown, key?: string): unknown {
 		if (Array.isArray(value)) return value.map(item => walk(item))
 		if (!isPlainObject(value)) return value
+
+		// The run's own answer for the target's website: a value carrying the page it
+		// was read from, under the `website` key, with no company name beside it.
+		if (
+			key === 'website' &&
+			typeof value['value'] === 'string' &&
+			typeof value['name'] !== 'string'
+		) {
+			const verdict = classifyWebsite(targetName ?? '', value['value'])
+			if (verdict !== 'keep') {
+				count(verdict)
+				// Emptied rather than removed: the field is the whole object here, and
+				// a reader of the profile still needs to see the key was asked for.
+				return null
+			}
+			return value
+		}
 
 		const name = value['name']
 		const website = value['website']
 		if (typeof name === 'string' && typeof website === 'string') {
 			const verdict = classifyWebsite(name, website)
 			if (verdict !== 'keep') {
-				if (verdict === 'directory') blankedDirectory++
-				else blankedProfilePage++
+				count(verdict)
 				// Drop the key entirely, so the value reads as one the model never
 				// gave — the same as any other field a guard removes.
 				const { website: _dropped, ...rest } = value

@@ -68,7 +68,9 @@ let registryCalls = 0
 // assert the follow-up reused the run's id + budget rather than opening a new one.
 interface DiscoverCall {
 	companyName: string
-	domain: string
+	// Null for a company with no website — discovery accepts that and answers with
+	// names and job titles instead of addresses.
+	domain: string | null
 	country: string | undefined
 	runContextResearchId: string | undefined
 }

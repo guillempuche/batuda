@@ -108,8 +108,9 @@ beforeAll(async () => {
 		'2026-05-01T10:00:00Z',
 	)
 
-	// Run B (newest): a free-text company update (no channel, no confidence) and
-	// a discovered contact reachable only by phone.
+	// Run B (newest): a free-text company update (no channel, no confidence), a
+	// company mailbox written as a plain sourced field rather than a channel list,
+	// and a discovered contact reachable only by phone.
 	await seedRun(
 		'succeeded',
 		{
@@ -120,6 +121,20 @@ beforeAll(async () => {
 					operation: 'update',
 					reason: 'sector',
 					fields: { industry: 'logistics' },
+				}),
+				pending({
+					subject_table: 'companies',
+					subject_id: 'co2',
+					operation: 'update',
+					reason: 'Contact us: info@co2.es',
+					fields: {
+						email: {
+							value: 'info@co2.es',
+							source_id: 'src_home',
+							quote: 'Contact us: info@co2.es',
+							confidence: 1,
+						},
+					},
 				}),
 				pending({
 					subject_table: 'contacts',
@@ -167,12 +182,12 @@ afterAll(async () => {
 describe('queryPendingProposals', () => {
 	describe('when several runs hold pending proposals', () => {
 		it('should return every pending one and skip the already-applied', async () => {
-			// GIVEN four proposals across three runs, one already applied
+			// GIVEN five proposals across three runs, one already applied
 			// WHEN the inbox is read
 			const rows = await listScoped()
 
-			// THEN only the four pending proposals surface
-			expect(rows).toHaveLength(4)
+			// THEN only the five pending proposals surface
+			expect(rows).toHaveLength(5)
 			expect(rows.every(r => r.proposedUpdateId !== null)).toBe(true)
 		})
 	})
@@ -192,12 +207,27 @@ describe('queryPendingProposals', () => {
 		it('should leave a free-text update without a confidence and not machine-checkable', async () => {
 			// GIVEN a company update carrying no channel
 			const rows = await listScoped({ subjectTable: 'companies' })
+			const freeText = rows.find(r => r.reason === 'sector')
 
 			// THEN it has no score and is flagged as free text
-			expect(rows).toHaveLength(1)
-			expect(rows[0]?.confidence).toBeNull()
-			expect(rows[0]?.verification).toBeNull()
-			expect(rows[0]?.machineCheckable).toBe(false)
+			expect(freeText?.confidence).toBeNull()
+			expect(freeText?.verification).toBeNull()
+			expect(freeText?.machineCheckable).toBe(false)
+		})
+
+		it('should score a company mailbox written as a plain field, not a channel list', async () => {
+			// GIVEN a company proposal whose email is a sourced field rather than an
+			// entry in a `channels` array
+			const rows = await listScoped({ subjectTable: 'companies' })
+			const mailbox = rows.find(r => r.reason === 'Contact us: info@co2.es')
+
+			// THEN it carries a real score and counts as checkable, so a reviewer with
+			// a confidence floor still sees it
+			expect(mailbox?.confidence).toBe(100)
+			expect(mailbox?.machineCheckable).toBe(true)
+			// AND it has no delivery verdict, because nobody has tried the address —
+			// which is what keeps it out of unattended writing
+			expect(mailbox?.verification).toBeNull()
 		})
 	})
 
@@ -208,27 +238,29 @@ describe('queryPendingProposals', () => {
 
 			// THEN only company proposals come back
 			expect(companies.every(r => r.subjectTable === 'companies')).toBe(true)
-			expect(companies).toHaveLength(1)
+			expect(companies).toHaveLength(2)
 		})
 	})
 
 	describe('when filtered by a minimum confidence', () => {
 		it('should drop proposals below the threshold and those with none', async () => {
-			// GIVEN scores of 90, 70, 50, and null across the pending set
+			// GIVEN scores of 100, 90, 70, 50, and null across the pending set
 			const rows = await listScoped({ minConfidence: 60 })
 
-			// THEN only the 90 and 70 proposals qualify
-			expect(rows.map(r => r.confidence).sort()).toEqual([70, 90])
+			// THEN only the three at or above the floor qualify
+			expect(
+				rows.map(r => r.confidence).sort((a, b) => Number(a) - Number(b)),
+			).toEqual([70, 90, 100])
 		})
 	})
 
 	describe('when filtered to machine-checkable only', () => {
 		it('should exclude free-text proposals', async () => {
-			// GIVEN one free-text update and three verifiable-channel proposals
+			// GIVEN one free-text update and four proposals naming a reachable value
 			const rows = await listScoped({ machineCheckable: true })
 
-			// THEN only the verifiable ones remain
-			expect(rows).toHaveLength(3)
+			// THEN only the ones a machine could check remain
+			expect(rows).toHaveLength(4)
 			expect(rows.every(r => r.machineCheckable)).toBe(true)
 		})
 	})
@@ -254,7 +286,7 @@ describe('queryPendingProposals', () => {
 		})
 
 		it('should cap results with the limit', async () => {
-			// GIVEN four pending proposals
+			// GIVEN five pending proposals
 			const rows = await listScoped({ limit: 2 })
 
 			// THEN only the first page is returned

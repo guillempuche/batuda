@@ -18,11 +18,14 @@ import { redactDbErrors } from './_research-shared'
 
 const DiscoverContacts = Tool.make('discover_contacts', {
 	description:
-		'Find verified decision-maker email contacts for a company. Returns ranked candidates, each with a deliverability verdict (email_verification) and is_decision_maker flag — or an explicit no_reliable_contact result, never an unverified blast list. Result is one of: {status:"ok", contacts:[...]}, {status:"no_reliable_contact"}, {status:"budget_exceeded"}, or {status:"cancelled"}. An "ok" result may also carry verificationStopped:"monthly_cap_reached", meaning the organization spent its monthly research budget partway through: the contacts are real, but any email_verification of "unknown" was left unchecked for lack of budget rather than checked and found doubtful — say so rather than presenting those addresses as verified. Paid lookups are metered against the research budget; spend above the auto-approve threshold asks for confirmation first.',
+		'Find decision-maker contacts for a company. Returns ranked candidates, each with an is_decision_maker flag and, where an address was found, a deliverability verdict (email_verification) — or an explicit no_reliable_contact result, never an unverified blast list. Pass domain:null for a company with no website at all (a market stall, a family workshop, a jobbing builder): no address can be guessed and no enrichment vendor is paid, so what comes back is names and job titles from the national registry, which is still worth having — say plainly that those people have no address rather than implying one. Result is one of: {status:"ok", contacts:[...]}, {status:"no_reliable_contact"}, {status:"budget_exceeded"}, or {status:"cancelled"}. An "ok" result may also carry verificationStopped:"monthly_cap_reached", meaning the organization spent its monthly research budget partway through: the contacts are real, but any email_verification of "unknown" was left unchecked for lack of budget rather than checked and found doubtful — say so rather than presenting those addresses as verified. Paid lookups are metered against the research budget; spend above the auto-approve threshold asks for confirmation first.',
 	parameters: Schema.Struct({
 		company_name: Schema.String,
-		domain: Schema.String.annotate({
-			description: 'Company web domain, e.g. "acme.com" (no scheme, no @).',
+		// Required + nullable, never optional: a nullable field inside `optionalKey`
+		// becomes a nested anyOf that a strict provider rejects outright.
+		domain: Schema.NullOr(Schema.String).annotate({
+			description:
+				'Company web domain, e.g. "acme.com" (no scheme, no @); null when the company has no website.',
 		}),
 		country: Schema.optional(Schema.String).annotate({
 			description: 'ISO-3166 country hint for enrichment (optional).',
@@ -62,7 +65,10 @@ export const ResearchContactsHandlersLive = ResearchContactsTools.toLayer(
 					const policy = yield* resolvePolicy({ sql, userId, systemDefaults })
 					if (estimateDiscoverCostCents > policy.autoApprovePaidCents) {
 						const { confirm } = yield* McpServer.elicit({
-							message: `Discovering decision-maker contacts for ${params.company_name} (${params.domain}) may spend up to ~${estimateDiscoverCostCents}¢ on paid lookups, above your auto-approve limit of ${policy.autoApprovePaidCents}¢. Proceed?`,
+							// A company with no website is named on its own — writing the
+							// domain in regardless would put the word "null" in front of
+							// whoever is being asked to approve the spending.
+							message: `Discovering decision-maker contacts for ${params.company_name}${params.domain === null ? '' : ` (${params.domain})`} may spend up to ~${estimateDiscoverCostCents}¢ on paid lookups, above your auto-approve limit of ${policy.autoApprovePaidCents}¢. Proceed?`,
 							schema: Schema.Struct({
 								confirm: Schema.Literals(['yes', 'no']),
 							}),

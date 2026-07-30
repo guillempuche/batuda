@@ -118,9 +118,15 @@ const agentLlm: LanguageModel.Service = {
 		Stream.succeed({ type: 'text-delta' as const, delta: '' }) as never,
 }
 
-// The extractor proposes creating one contact citing the scraped page. Its only
-// field is a name (no email/phone), so the value guard cannot strip it — whether
-// it survives to the findings is decided by the entity gate alone.
+// The company a proposed new person is attached to. It need not be a live row:
+// what the checks in this run ask is whether the change names a company at all,
+// and whether that company really exists is settled when somebody accepts it.
+const NEW_CONTACT_COMPANY_ID = '00000000-0000-4000-8000-000000000001'
+
+// The extractor proposes creating one contact citing the scraped page. It carries
+// a name and the company it belongs to, and no email or phone, so the value guard
+// cannot strip it — whether it survives to the findings is decided by the entity
+// gate alone.
 const extractLlm: LanguageModel.Service = {
 	generateText: (_o: unknown) => Effect.succeed(finalRound) as never,
 	generateObject: (_o: unknown) =>
@@ -135,7 +141,10 @@ const extractLlm: LanguageModel.Service = {
 					{
 						subject_table: 'contacts',
 						operation: 'create',
-						fields: { name: 'Jane Doe' },
+						// A new person has to name the company they belong to, or the
+						// change could never be written; a create that leaves it out is
+						// dropped before anybody is shown it.
+						fields: { name: 'Jane Doe', company_id: NEW_CONTACT_COMPANY_ID },
 						reason: 'discovered on the about page',
 						citations: [{ source_id: scenario.url }],
 					},
