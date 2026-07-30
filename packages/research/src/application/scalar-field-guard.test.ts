@@ -416,6 +416,78 @@ describe('guardScalarFields', () => {
 			expect(result.droppedUngrounded).toBe(0)
 		})
 
+		it('should ground the company own mailbox, which is not a person channel', () => {
+			// GIVEN the company's own email and phone in the profile block, unsourced
+			const findings = {
+				enrichment: {
+					email: { value: 'info@acme.es', confidence: null },
+					phone: { value: '+34 600 000 000', confidence: null },
+				},
+			}
+
+			// WHEN grounded
+			const result = guardScalarFields(findings, 'contact info@acme.es')
+
+			// THEN both are dropped for naming no page — the value guard checks the
+			// address itself, but only this guard asks where it was read
+			const profile = (
+				result.findings as { enrichment: Record<string, unknown> }
+			).enrichment
+			expect(profile['email']).toBeNull()
+			expect(profile['phone']).toBeNull()
+			expect(result.droppedUngrounded).toBe(2)
+		})
+
+		it('should keep the company own mailbox when it names the page it came from', () => {
+			// GIVEN the same fields, each carrying the page they were read off
+			const findings = {
+				enrichment: {
+					email: {
+						value: 'info@acme.es',
+						source_id: 'src_home',
+						quote: 'Contact us: info@acme.es',
+						confidence: 1,
+					},
+				},
+			}
+
+			// WHEN grounded against evidence that contains that line
+			const result = guardScalarFields(findings, 'contact us: info@acme.es')
+
+			// THEN it survives untouched
+			const profile = (
+				result.findings as { enrichment: Record<string, unknown> }
+			).enrichment
+			expect(profile['email']).toEqual(findings.enrichment.email)
+			expect(result.droppedUngrounded).toBe(0)
+			expect(result.droppedUnsupported).toBe(0)
+		})
+
+		it('should drop a company mailbox whose quote is absent from the evidence', () => {
+			// GIVEN an address whose supporting line appears nowhere the run read
+			const findings = {
+				enrichment: {
+					email: {
+						value: 'info@acme.es',
+						source_id: 'src_home',
+						quote: 'Reach our Barcelona showroom on the fourth floor',
+						confidence: 1,
+					},
+				},
+			}
+
+			// WHEN grounded against evidence that says nothing of the kind
+			const result = guardScalarFields(findings, 'acme sells pumps')
+
+			// THEN the field goes, because its stated evidence was invented
+			expect(
+				(result.findings as { enrichment: Record<string, unknown> }).enrichment[
+					'email'
+				],
+			).toBeNull()
+			expect(result.droppedUnsupported).toBe(1)
+		})
+
 		it('should still ground a contact role', () => {
 			// GIVEN a role (not a channel) with no source
 			const findings = {

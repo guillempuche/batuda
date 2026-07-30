@@ -89,7 +89,62 @@ describe('filterApplicableProposals', () => {
 
 	describe('when a create carries a new row', () => {
 		it('should keep a create with a fields object and no subject', () => {
-			// GIVEN a create (contacts) with the new row in fields and no subject_id
+			// GIVEN a create (contacts) naming the company it belongs to, no subject_id
+			const findings = withProposals([
+				{
+					subject_table: 'contacts',
+					operation: 'create',
+					fields: {
+						name: 'Jane Doe',
+						company_id: 'co-1',
+						email: 'jane@acme.test',
+					},
+				},
+			])
+			// WHEN filtered — a create needs no existing subject of its own
+			const result = filterApplicableProposals(findings, () => false)
+			// THEN it survives
+			expect(survivors(result)).toHaveLength(1)
+			expect(result.dropped).toBe(0)
+		})
+
+		it('should keep a create that names its company in camelCase', () => {
+			// GIVEN the other spelling the apply path also accepts
+			const findings = withProposals([
+				{
+					subject_table: 'contacts',
+					operation: 'create',
+					fields: { name: 'Jane Doe', companyId: 'co-1' },
+				},
+			])
+			// WHEN filtered
+			const result = filterApplicableProposals(findings, () => false)
+			// THEN both spellings count as naming the company
+			expect(survivors(result)).toHaveLength(1)
+		})
+
+		it('should keep a person carrying no address at all', () => {
+			// GIVEN somebody named on a page with no email or phone findable — the
+			// name and the job title are the useful part on their own
+			const findings = withProposals([
+				{
+					subject_table: 'contacts',
+					operation: 'create',
+					fields: {
+						name: 'Jane Doe',
+						company_id: 'co-1',
+						role: 'Plant Manager',
+					},
+				},
+			])
+			// WHEN filtered
+			const result = filterApplicableProposals(findings, () => false)
+			// THEN they survive to be reviewed
+			expect(survivors(result)).toHaveLength(1)
+		})
+
+		it('should drop a create that names no company', () => {
+			// GIVEN a new person with nothing to attach them to
 			const findings = withProposals([
 				{
 					subject_table: 'contacts',
@@ -97,11 +152,43 @@ describe('filterApplicableProposals', () => {
 					fields: { name: 'Jane Doe', email: 'jane@acme.test' },
 				},
 			])
-			// WHEN filtered — a create needs no existing subject
+			// WHEN filtered
 			const result = filterApplicableProposals(findings, () => false)
-			// THEN it survives
-			expect(survivors(result)).toHaveLength(1)
-			expect(result.dropped).toBe(0)
+			// THEN it goes now, rather than failing in front of whoever clicks accept
+			expect(survivors(result)).toHaveLength(0)
+			expect(result.dropped).toBe(1)
+		})
+
+		it('should drop a create whose company is blank', () => {
+			// GIVEN a company id that is only whitespace
+			const findings = withProposals([
+				{
+					subject_table: 'contacts',
+					operation: 'create',
+					fields: { name: 'Jane Doe', company_id: '   ' },
+				},
+			])
+			// WHEN filtered
+			const result = filterApplicableProposals(findings, () => false)
+			// THEN a blank names no company
+			expect(survivors(result)).toHaveLength(0)
+			expect(result.dropped).toBe(1)
+		})
+
+		it('should drop a create for any table other than people', () => {
+			// GIVEN a create aimed at companies, which the apply path cannot insert
+			const findings = withProposals([
+				{
+					subject_table: 'companies',
+					operation: 'create',
+					fields: { name: 'Acme SL', company_id: 'co-1' },
+				},
+			])
+			// WHEN filtered
+			const result = filterApplicableProposals(findings, () => false)
+			// THEN only a person can be created, so it is dropped
+			expect(survivors(result)).toHaveLength(0)
+			expect(result.dropped).toBe(1)
 		})
 
 		it('should drop a create whose fields is prose', () => {
@@ -136,6 +223,107 @@ describe('filterApplicableProposals', () => {
 			// THEN it is dropped like any un-resolvable update
 			expect(survivors(result)).toHaveLength(0)
 			expect(result.dropped).toBe(1)
+		})
+	})
+})
+
+// The fields a surviving proposal would actually write, narrowed from unknown.
+const fieldsOf = (proposal: unknown): Record<string, unknown> => {
+	const fields = (proposal as { fields?: unknown }).fields
+	if (fields === null || typeof fields !== 'object' || Array.isArray(fields)) {
+		throw new Error('proposal carries no fields object')
+	}
+	return fields as Record<string, unknown>
+}
+
+describe('filterApplicableProposals when an earlier check emptied a field', () => {
+	describe('when one of several fields was emptied', () => {
+		it('should take that field out and keep the rest', () => {
+			// GIVEN a proposal whose email an earlier check could not support, so it
+			// was replaced with nothing, beside an industry it could
+			const findings = withProposals([
+				{
+					subject_table: 'companies',
+					subject_id: 'co-1',
+					fields: { industry: 'transport', email: null },
+				},
+			])
+
+			// WHEN filtered against a live company
+			const result = filterApplicableProposals(findings, () => true)
+
+			// THEN the change still lands, carrying only the field it stands behind —
+			// keeping the empty one would erase the address already on the record
+			expect(survivors(result)).toHaveLength(1)
+			expect(fieldsOf(survivors(result)[0])).toStrictEqual({
+				industry: 'transport',
+			})
+			expect(result.emptiedFields).toBe(1)
+			expect(result.dropped).toBe(0)
+		})
+
+		it('should read one level into the sourced shape a value travels in', () => {
+			// GIVEN the per-field shape with its inner value emptied
+			const findings = withProposals([
+				{
+					subject_table: 'companies',
+					subject_id: 'co-1',
+					fields: {
+						email: { value: null, source_id: 'src_a' },
+						industry: { value: 'transport', source_id: 'src_a' },
+					},
+				},
+			])
+
+			// WHEN filtered
+			const result = filterApplicableProposals(findings, () => true)
+
+			// THEN the emptied one is taken out, the real one stays
+			expect(Object.keys(fieldsOf(survivors(result)[0]))).toStrictEqual([
+				'industry',
+			])
+			expect(result.emptiedFields).toBe(1)
+		})
+	})
+
+	describe('when every field was emptied', () => {
+		it('should drop the proposal whole', () => {
+			// GIVEN a proposal left with nothing it can stand behind
+			const findings = withProposals([
+				{
+					subject_table: 'companies',
+					subject_id: 'co-1',
+					fields: { email: null, phone: undefined },
+				},
+			])
+
+			// WHEN filtered
+			const result = filterApplicableProposals(findings, () => true)
+
+			// THEN there is nothing to offer, so it goes rather than sitting in the
+			// review inbox as a change that would only clear two fields
+			expect(survivors(result)).toHaveLength(0)
+			expect(result.dropped).toBe(1)
+		})
+	})
+
+	describe('when a field holds a legitimate falsy value', () => {
+		it('should keep it — empty means absent, not zero or blank', () => {
+			// GIVEN a priority of zero and an empty-string location
+			const findings = withProposals([
+				{
+					subject_table: 'companies',
+					subject_id: 'co-1',
+					fields: { priority: 0, location: '' },
+				},
+			])
+
+			// WHEN filtered
+			const result = filterApplicableProposals(findings, () => true)
+
+			// THEN neither is mistaken for an emptied field
+			expect(survivors(result)).toHaveLength(1)
+			expect(result.emptiedFields).toBe(0)
 		})
 	})
 })

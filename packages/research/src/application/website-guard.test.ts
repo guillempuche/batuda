@@ -238,6 +238,94 @@ describe('guardCompanyWebsites', () => {
 		})
 	})
 
+	describe('when the run answers with the target company own website', () => {
+		it('should blank a known directory even with no name to compare', () => {
+			// GIVEN the profile's website field pointing at an aggregator listing
+			const findings = {
+				enrichment: {
+					website: {
+						value: 'https://www.crunchbase.com/organization/acme',
+						source_id: 'src_a',
+						confidence: null,
+					},
+				},
+			}
+
+			// WHEN checked with no target name supplied
+			const result = guardCompanyWebsites(findings)
+
+			// THEN the known-directory rule still fires, which is the whole point
+			expect(
+				(result.findings as { enrichment: Record<string, unknown> }).enrichment[
+					'website'
+				],
+			).toBeNull()
+			expect(result.blankedDirectory).toBe(1)
+		})
+
+		it('should blank a listing on an unknown host once the target name is known', () => {
+			// GIVEN a directory we do not list, filing the company one level down
+			const findings = {
+				enrichment: {
+					website: {
+						value: 'https://empresas.example.org/company/redwood-logistics',
+						source_id: 'src_a',
+						confidence: null,
+					},
+				},
+			}
+
+			// WHEN checked against the company the run is about
+			const result = guardCompanyWebsites(findings, 'Redwood Logistics')
+
+			// THEN the name-in-a-deeper-path rule catches it
+			expect(
+				(result.findings as { enrichment: Record<string, unknown> }).enrichment[
+					'website'
+				],
+			).toBeNull()
+			expect(result.blankedProfilePage).toBe(1)
+		})
+
+		it('should keep the company own site', () => {
+			// GIVEN the company's real website
+			const website = {
+				value: 'https://redwoodlogistics.com/about',
+				source_id: 'src_a',
+				confidence: null,
+			}
+			const findings = { enrichment: { website } }
+
+			// WHEN checked against the company the run is about
+			const result = guardCompanyWebsites(findings, 'Redwood Logistics')
+
+			// THEN the host carries the name, so it stands
+			expect(
+				(result.findings as { enrichment: Record<string, unknown> }).enrichment[
+					'website'
+				],
+			).toEqual(website)
+			expect(result.blankedDirectory + result.blankedProfilePage).toBe(0)
+		})
+
+		it('should leave a competitor website judged against its own name', () => {
+			// GIVEN a competitor entry whose site is its own, beside a target name
+			// that has nothing to do with it
+			const findings = {
+				competitors: [
+					{ name: 'Rival Freight', website: 'https://rivalfreight.com' },
+				],
+			}
+
+			// WHEN checked while the run is about a different company
+			const result = guardCompanyWebsites(findings, 'Redwood Logistics')
+
+			// THEN the pair rule wins for a named company, so the site is kept
+			expect(result.findings).toEqual(findings)
+			expect(result.blankedDirectory + result.blankedProfilePage).toBe(0)
+		})
+	})
+
 	describe('when a proposed update carries a person name and a website', () => {
 		it('should not match a contact name against a host', () => {
 			// GIVEN a create proposal whose fields hold a PERSON's name and a site

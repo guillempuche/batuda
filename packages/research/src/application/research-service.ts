@@ -92,7 +92,11 @@ import {
 	sizeRescuePrompt,
 } from './firmographics-rescue'
 import { guardFitEvidence } from './fit-evidence-guard'
-import { harvestGenericEmails } from './generic-emails'
+import {
+	type GenericEmail,
+	harvestGenericEmails,
+	withRoleMailbox,
+} from './generic-emails'
 import { type GuardLink, runGuardChain } from './guard-chain'
 import { normalizePaidActionTool } from './paid-action-tool'
 import {
@@ -125,7 +129,7 @@ import {
 	schemaFieldNames,
 	schemaRegistry,
 } from './schemas/index'
-import { hostOf, urlHashForScrape } from './source-key'
+import { hostOf, sourceIdFor, urlHashForScrape } from './source-key'
 import { recordSeenSource } from './source-record'
 import { enforceSourceTier, isFirstPartyHost } from './source-tier-guard'
 import { stripReasoning } from './strip-reasoning'
@@ -685,10 +689,16 @@ export const queryPendingProposals = (
 		const { limit, offset } = clampPagination(filters.limit, filters.offset)
 		const count = filters.count ?? 'none'
 
-		// A channel's confidence can be a 0–1 fraction (model) or a 0–100 score
-		// (enrichment); normalize to 0–100 so the reviewer's minimum-confidence
-		// filter compares like with like. The CASE guards keep a stray non-array
-		// `proposed_updates`/`channels` from breaking the row expansion.
+		// A confidence can be a 0–1 fraction (model) or a 0–100 score (enrichment);
+		// normalize to 0–100 so the reviewer's minimum-confidence filter compares
+		// like with like. The CASE guards keep a stray non-array `proposed_updates`
+		// or `channels` from breaking the row expansion.
+		//
+		// A proposal names a way of reaching someone in one of two shapes, and both
+		// have to be read: a person's proposal carries a `channels` list, while a
+		// company's carries a plain `email` or `phone` field. Reading only the list
+		// left a company mailbox with no confidence at all, which hid it from any
+		// organisation that sets a minimum and barred it from unattended writing.
 		const matching = sql`
 			WITH pending AS (
 				SELECT
@@ -711,53 +721,78 @@ export const queryPendingProposals = (
 						THEN pu->'fields' ELSE '{}'::jsonb END AS fields,
 					CASE WHEN jsonb_typeof(pu->'citations') = 'array'
 						THEN pu->'citations' ELSE '[]'::jsonb END AS citations,
-					(
-						SELECT max(
-							CASE
-								WHEN jsonb_typeof(ch->'confidence') = 'number'
-								THEN CASE
-									WHEN (ch->>'confidence')::numeric <= 1
-									THEN (ch->>'confidence')::numeric * 100
-									ELSE (ch->>'confidence')::numeric
-								END
-							END
-						)
-						FROM jsonb_array_elements(
-							CASE WHEN jsonb_typeof(pu->'fields'->'channels') = 'array'
-								THEN pu->'fields'->'channels' ELSE '[]'::jsonb END
-						) ch
-					)::int AS confidence,
-					-- A proposal is only as good as its best email address: an
-					-- undeliverable address sitting next to a deliverable one still
-					-- reaches the person, so the verdicts are ranked and the strongest
-					-- one wins, rather than whichever channel happens to be listed first.
-					(
-						SELECT ch->>'verification'
-						FROM jsonb_array_elements(
-							CASE WHEN jsonb_typeof(pu->'fields'->'channels') = 'array'
-								THEN pu->'fields'->'channels' ELSE '[]'::jsonb END
-						) ch
-						WHERE ch->>'kind' = 'email'
-						ORDER BY CASE ch->>'verification'
-							WHEN 'deliverable' THEN 0
-							WHEN 'risky' THEN 1
-							WHEN 'catch_all' THEN 2
-							WHEN 'unknown' THEN 3
-							WHEN 'undeliverable' THEN 4
-							ELSE 5
-						END
-						LIMIT 1
-					) AS verification,
-					jsonb_path_exists(
-						CASE WHEN jsonb_typeof(pu->'fields'->'channels') = 'array'
-							THEN pu->'fields'->'channels' ELSE '[]'::jsonb END,
-						'$[*] ? (@.kind == "email" || @.kind == "phone")'
-					) AS machine_checkable
+					reach.confidence::int AS confidence,
+					reach.verification AS verification,
+					-- No reachable value at all is a definite "cannot be checked by
+					-- machine", not an unknown, so the reviewer's filter still matches it.
+					COALESCE(reach.machine_checkable, false) AS machine_checkable
 				FROM research_runs r,
 					LATERAL jsonb_array_elements(
 						CASE WHEN jsonb_typeof(r.findings->'proposed_updates') = 'array'
 							THEN r.findings->'proposed_updates' ELSE '[]'::jsonb END
-					) pu
+					) pu,
+					LATERAL (
+						WITH reachable AS (
+							SELECT
+								ch->>'kind' AS kind,
+								ch->>'verification' AS verification,
+								CASE
+									WHEN jsonb_typeof(ch->'confidence') = 'number'
+									THEN CASE
+										WHEN (ch->>'confidence')::numeric <= 1
+										THEN (ch->>'confidence')::numeric * 100
+										ELSE (ch->>'confidence')::numeric
+									END
+								END AS confidence
+							FROM jsonb_array_elements(
+								CASE WHEN jsonb_typeof(pu->'fields'->'channels') = 'array'
+									THEN pu->'fields'->'channels' ELSE '[]'::jsonb END
+							) ch
+							UNION ALL
+							-- The company's own mailbox and number, written as plain fields
+							-- rather than as a list. Either the value carries the page it
+							-- came from, or it is the bare address on its own; both count.
+							-- Nobody has tried delivering to one, so it has no verdict.
+							SELECT
+								field.name,
+								NULL::text,
+								CASE
+									WHEN jsonb_typeof(pu->'fields'->field.name->'confidence') = 'number'
+									THEN CASE
+										WHEN (pu->'fields'->field.name->>'confidence')::numeric <= 1
+										THEN (pu->'fields'->field.name->>'confidence')::numeric * 100
+										ELSE (pu->'fields'->field.name->>'confidence')::numeric
+									END
+								END
+							FROM (VALUES ('email'), ('phone')) AS field(name)
+							WHERE nullif(trim(CASE jsonb_typeof(pu->'fields'->field.name)
+								WHEN 'object' THEN pu->'fields'->field.name->>'value'
+								WHEN 'string' THEN pu->'fields'->>field.name
+							END), '') IS NOT NULL
+						)
+						SELECT
+							max(confidence) AS confidence,
+							-- A proposal is only as good as its best email address: an
+							-- undeliverable address sitting next to a deliverable one still
+							-- reaches the person, so the verdicts are ranked and the
+							-- strongest wins, not whichever happens to be listed first.
+							(
+								SELECT verification
+								FROM reachable
+								WHERE kind = 'email' AND verification IS NOT NULL
+								ORDER BY CASE verification
+									WHEN 'deliverable' THEN 0
+									WHEN 'risky' THEN 1
+									WHEN 'catch_all' THEN 2
+									WHEN 'unknown' THEN 3
+									WHEN 'undeliverable' THEN 4
+									ELSE 5
+								END
+								LIMIT 1
+							) AS verification,
+							bool_or(kind IN ('email', 'phone')) AS machine_checkable
+						FROM reachable
+					) reach
 				WHERE r.status != 'deleted'
 					AND pu->>'status' = 'pending'
 			)
@@ -1076,6 +1111,28 @@ const PROPOSE_UPDATES_DIRECTIVE = [
 	'Do not propose a value that only repeats what `current` already says, and never take a value from `current` itself: it is what is already on file, not evidence. A field the evidence says nothing about is left out.',
 ].join('\n')
 
+// Told to a run that holds the company on file, so a person the evidence names who
+// is not already a row can be offered as somebody new.
+//
+// Without this the run only ever offers corrections to people already on file, so a
+// plant manager, a head teacher or a purchasing lead named on a page is read,
+// reported in the profile, and then goes no further. Everything downstream of the
+// ask already works: the offer travels as a create, the checks handle it, and
+// accepting it writes the person — merging them into an existing row if they turn
+// out to be the same person under a different spelling.
+//
+// It needs the company's own id, which is why it is told only to a run that was
+// handed a company: a new person has to belong to a company row, and a run that
+// holds none has nothing to attach one to.
+const proposeContactDirective = (companyId: string): string =>
+	[
+		"Separately, for a person the evidence identifies as one of this company's own leaders or employees who is NOT among the rows on file above, add an entry to `proposed_updates` offering them as somebody new:",
+		'- set `operation` to "create" and `subject_table` to "contacts"; leave `subject_id` out and set `expected_version` to null — there is no row for them yet;',
+		`- in \`fields\`, give their \`name\`, their \`role\`, and \`company_id\`: "${companyId}" copied exactly; add an email or phone only if the evidence states one for that person;`,
+		'- give a `reason`, and cite the page that names them — an entry with no citation is discarded.',
+		'Offer a person even when no address for them can be found: the name and the job title are the useful part on their own. Still list them in the people list as well — the offer is in addition to that list, not instead of it. Never offer somebody the evidence describes as a client, a partner, a supplier, or a competitor.',
+	].join('\n')
+
 /**
  * The instruction for the structured-extraction pass: read the gathered evidence
  * and fill the output schema from it.
@@ -1123,6 +1180,10 @@ export const buildExtractionPrompt = (args: {
 			'',
 			PROPOSE_UPDATES_DIRECTIVE,
 		)
+		const company = args.subjects.find(s => s.subject_table === 'companies')
+		if (company !== undefined) {
+			lines.push('', proposeContactDirective(company.subject_id))
+		}
 	}
 	if (args.fitVerdict) {
 		lines.push('', FIT_VERDICT_DIRECTIVE)
@@ -2179,6 +2240,57 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						),
 					)
 
+					// The company's published role mailboxes (info@, sales@, hola@), read
+					// off the pages this run opened. For a company with a thin website and
+					// no named executive, a department mailbox on its contact page is often
+					// the only way to reach it at all.
+					//
+					// Only pages the run opened count, and only ones that read as this
+					// company's: the single sentence a search quotes is too little to tell
+					// whose page it came from, and an address is worth having only when we
+					// know whose it is.
+					const harvestRoleMailboxes = (): ReadonlyArray<GenericEmail> => {
+						if (
+							schemaName !== 'company_enrichment_v1' ||
+							entityTargets === null
+						)
+							return []
+						// Bound to a const so the narrowing survives the closures below —
+						// `entityTargets` can be reassigned when a seeded domain redirects.
+						const targets = entityTargets
+						const opened = openedPages(scrapeCorpus)
+						const keep = new Set(
+							groundedSourceIds(
+								classifyEntityMatchPerSource(
+									targets,
+									opened.map(page => ({
+										sourceId: page.urlHash,
+										text: page.text,
+										host: page.host,
+									})),
+								),
+							),
+						)
+						const grounded = opened.filter(page => keep.has(page.urlHash))
+						const ownHosts = [
+							...targets.domains,
+							...grounded
+								.map(page => page.host)
+								.filter(
+									(host): host is string =>
+										host !== undefined && reachedOwnSite(targets, [{ host }]),
+								),
+						]
+						return harvestGenericEmails(
+							grounded.map(page => ({
+								text: page.text,
+								host: page.host,
+								sourceId: sourceIdFor(page.urlHash),
+							})),
+							ownHosts,
+						)
+					}
+
 					// Phase-2 extraction + every grounding guard, shared so both the
 					// normal path and the discovery-scan retry run the same logic. Returns
 					// the cleaned findings; the caller writes the single phase-2 checkpoint.
@@ -2250,17 +2362,45 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									fitVerdict: schemaName === 'company_enrichment_v1',
 								}),
 							})
-							let result = withProposalIds(structuredResponse.value as unknown)
+							// Fold the harvested role mailbox in before the ids are stamped, so
+							// the change it offers gets an id a person can act on, and before
+							// the checks below, so it is held to the same standard as every
+							// other value the run produces.
+							const harvestedMailboxes = harvestRoleMailboxes()
+							const companySubject = subjects.find(s => s.table === 'companies')
+							let result = withProposalIds(
+								withRoleMailbox(
+									structuredResponse.value as unknown,
+									harvestedMailboxes,
+									companySubject === undefined
+										? undefined
+										: {
+												id: companySubject.id,
+												version:
+													typeof companySubject.expected_version === 'number'
+														? companySubject.expected_version
+														: null,
+											},
+								),
+							)
+							if (harvestedMailboxes.length > 0) {
+								yield* Effect.annotateCurrentSpan({
+									'research.generic_emails.found': harvestedMailboxes.length,
+								})
+							}
 							// Only company_enrichment fills a profile and runs the focused rescue
 							// passes below; the scan and freeform schemas have no profile to
 							// measure or recover.
 							const isEnrichmentRun = schemaName === 'company_enrichment_v1'
 							// How much of the profile the broad pass filled on its own, before any
 							// rescue or guard touched it — the number that shows an all-empty
-							// answer for what it is instead of a clean run.
+							// answer for what it is instead of a clean run. Read off what the
+							// model returned, not off `result`: the harvested mailbox folded in
+							// above is the pipeline's own work, and counting it here would credit
+							// the model for a field it never filled.
 							if (isEnrichmentRun) {
-								const broadFill = enrichmentFill(result)
-								const broadContacts = contactFill(result)
+								const broadFill = enrichmentFill(structuredResponse.value)
+								const broadContacts = contactFill(structuredResponse.value)
 								yield* Effect.annotateCurrentSpan({
 									'research.enrichment.fields_total': broadFill.total,
 									'research.enrichment.filled_broad': broadFill.filled,
@@ -2583,7 +2723,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									name: 'websites',
 									run: findings =>
 										Effect.gen(function* () {
-											const check = guardCompanyWebsites(findings)
+											const check = guardCompanyWebsites(
+												findings,
+												rescueTarget.name,
+											)
 											if (
 												check.blankedDirectory > 0 ||
 												check.blankedProfilePage > 0
@@ -2741,17 +2884,27 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												findings,
 												(table, id) => liveSubjects.has(`${table}:${id}`),
 											)
-											if (check.dropped > 0) {
+											if (check.dropped > 0 || check.emptiedFields > 0) {
 												yield* Effect.logWarning(
 													'research.proposals.unappliable',
 												).pipe(
 													Effect.annotateLogs({
 														research_id: researchId,
 														dropped: check.dropped,
+														// Fields an earlier check had emptied, taken out
+														// here so accepting the change cannot erase what
+														// the record already holds.
+														emptied_fields: check.emptiedFields,
 													}),
 												)
 											}
-											return { findings: check.findings }
+											return {
+												findings: check.findings,
+												spanCounts: {
+													'research.proposals.emptied_fields':
+														check.emptiedFields,
+												},
+											}
 										}),
 								},
 								{
@@ -4254,58 +4407,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								// stopped closing gaps — stop before burning the remaining
 								// rounds on the same result.
 								if (merged.filled === 0 && citedUnscraped.length === 0) break
-							}
-						}
-						// Published role mailboxes (info@, sales@, hola@): read verbatim
-						// from the company's own pages, they are often the only actionable
-						// channel for a thin-web company with no named executive. Added after
-						// the guard chain — grounded by construction (a known role word at one
-						// of the company's own domains) — so the guards never see, and so never
-						// strip, them. Skipped on resume when nothing was re-fetched, leaving
-						// any addresses from the pre-crash pass in place.
-						if (schemaName === 'company_enrichment_v1' && entityTargets) {
-							// Bind to a const so the null-narrowing survives the closures
-							// below (`entityTargets` is a reassignable `let`).
-							const emailTargets = entityTargets
-							// A mailbox is only taken off a page the run opened. The one
-							// sentence a search quotes is too little to tell whose page it
-							// came from, and an address is worth having only when we know
-							// it belongs to this company.
-							const openedForEmail = openedPages(scrapeCorpus)
-							const emailVerdicts = classifyEntityMatchPerSource(
-								emailTargets,
-								openedForEmail.map(page => ({
-									sourceId: page.urlHash,
-									text: page.text,
-									host: page.host,
-								})),
-							)
-							const emailKeep = new Set(groundedSourceIds(emailVerdicts))
-							const groundedForEmail = openedForEmail.filter(page =>
-								emailKeep.has(page.urlHash),
-							)
-							const ownHosts = [
-								...emailTargets.domains,
-								...groundedForEmail
-									.map(page => page.host)
-									.filter(
-										(host): host is string =>
-											host !== undefined &&
-											reachedOwnSite(emailTargets, [{ host }]),
-									),
-							]
-							const genericEmails = harvestGenericEmails(
-								groundedForEmail,
-								ownHosts,
-							)
-							if (genericEmails.length > 0) {
-								findings = {
-									...(findings as object),
-									generic_emails: genericEmails,
-								}
-								yield* Effect.annotateCurrentSpan({
-									'research.generic_emails.found': genericEmails.length,
-								})
 							}
 						}
 						yield* Ref.update(toolLog, log => [

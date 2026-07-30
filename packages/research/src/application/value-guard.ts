@@ -221,6 +221,13 @@ export const verifyValueProvenance = (
 			}
 			return Object.fromEntries(
 				Object.entries(value as Record<string, unknown>).map(([k, v]) => {
+					// A key that names a row rather than a fact is left alone, the same
+					// way the whole-proposal check above leaves it alone. These never
+					// appear in a scraped page, so holding one to the evidence would
+					// always empty it — and a company id emptied here takes the whole
+					// new-person suggestion with it, since a person with no company
+					// cannot be written.
+					if (STRUCTURAL_KEYS.has(k)) return [k, v] as const
 					if (typeof v === 'string') {
 						const t = v.trim()
 						// A dedicated email field holding an invented address.
