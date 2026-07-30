@@ -55,6 +55,21 @@ runs:
       run: |
         services="db storage"
         if [ "$WITH_MAIL" = "true" ]; then services="$services mail-catcher"; fi
+        # Fetching the images is the one step here that reaches outside the
+        # runner, and a slow minute at the registry used to fail the whole run
+        # before a single test had started. Three tries, backing off, so a bad
+        # minute costs a wait instead of a red build that says nothing about
+        # the change under test.
+        pull_attempt=1
+        until docker compose -f docker/docker-compose.yml pull --quiet $services storage-init; do
+          if [ "$pull_attempt" -ge 3 ]; then
+            echo "Could not fetch the container images after 3 tries." >&2
+            exit 1
+          fi
+          echo "Image pull failed (attempt $pull_attempt) — retrying shortly."
+          sleep $((pull_attempt * 10))
+          pull_attempt=$((pull_attempt + 1))
+        done
         docker compose -f docker/docker-compose.yml up -d --wait $services
         # The bucket is created by a container that stops as soon as it's done, and
         # `--wait` treats a stopped container as a failure — listing it above passed
