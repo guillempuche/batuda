@@ -98,14 +98,43 @@ export class CompanyService extends Context.Service<CompanyService>()(
 							)
 						if (filters.query)
 							conditions.push(sql`name ILIKE ${`%${filters.query}%`}`)
-						if (filters.minLat !== undefined)
-							conditions.push(sql`latitude >= ${filters.minLat}`)
-						if (filters.maxLat !== undefined)
-							conditions.push(sql`latitude <= ${filters.maxLat}`)
-						if (filters.minLng !== undefined)
-							conditions.push(sql`longitude >= ${filters.minLng}`)
-						if (filters.maxLng !== undefined)
-							conditions.push(sql`longitude <= ${filters.maxLng}`)
+						// A rectangle on the map matches a company when the company's own
+						// pin is inside it, or when any of its branches is. Without the
+						// second half, a chain registered in one city is invisible to
+						// somebody drawing a box around another — even with a shop on that
+						// city's main street. Each bound is still applied on its own, so a
+						// half-drawn box narrows rather than matching nothing.
+						const box: Array<Statement.Fragment> = []
+						const siteBox: Array<Statement.Fragment> = []
+						if (filters.minLat !== undefined) {
+							box.push(sql`latitude >= ${filters.minLat}`)
+							siteBox.push(sql`s.latitude >= ${filters.minLat}`)
+						}
+						if (filters.maxLat !== undefined) {
+							box.push(sql`latitude <= ${filters.maxLat}`)
+							siteBox.push(sql`s.latitude <= ${filters.maxLat}`)
+						}
+						if (filters.minLng !== undefined) {
+							box.push(sql`longitude >= ${filters.minLng}`)
+							siteBox.push(sql`s.longitude >= ${filters.minLng}`)
+						}
+						if (filters.maxLng !== undefined) {
+							box.push(sql`longitude <= ${filters.maxLng}`)
+							siteBox.push(sql`s.longitude <= ${filters.maxLng}`)
+						}
+						if (box.length > 0)
+							conditions.push(
+								sql`(
+									(${sql.and(box)})
+									OR EXISTS (
+										SELECT 1 FROM sites s
+										WHERE s.company_id = companies.id
+											AND s.latitude IS NOT NULL
+											AND s.longitude IS NOT NULL
+											AND ${sql.and(siteBox)}
+									)
+								)`,
+							)
 
 						// Whitelisted sort key → a fixed ORDER BY fragment; never
 						// interpolate raw sort text into the query.
@@ -320,6 +349,18 @@ export class CompanyService extends Context.Service<CompanyService>()(
 							})
 						const companyId = companyRow['id']
 
+						// The places this company trades from. Empty for the great
+						// majority — one place, and the company's own coordinates say
+						// where it is — so a branch row exists only where there is a
+						// second one.
+						const siteRows = yield* sql`
+							SELECT id, name, address, location, country,
+								latitude, longitude, is_primary AS "isPrimary"
+							FROM sites
+							WHERE company_id = ${companyId} AND organization_id = ${currentOrg.id}
+							ORDER BY is_primary DESC, name
+						`
+
 						const contactRows = yield* sql`
 							SELECT c.*, ${channelsJsonFor(sql, 'contacts')} AS channels
 							FROM contacts c
@@ -372,6 +413,7 @@ export class CompanyService extends Context.Service<CompanyService>()(
 							...company,
 							channels: (companyRow['channels'] ??
 								[]) as ReadonlyArray<unknown>,
+							sites: siteRows as ReadonlyArray<unknown>,
 							contacts,
 							recentInteractions,
 							researchRuns,

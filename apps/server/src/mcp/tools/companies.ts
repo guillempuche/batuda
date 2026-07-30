@@ -1,4 +1,4 @@
-import { Effect, Schema } from 'effect'
+import { DateTime, Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
@@ -187,12 +187,40 @@ const GeocodeCompany = Tool.make('geocode_company', {
 	.annotate(Tool.Idempotent, true)
 	.annotate(Tool.OpenWorld, true)
 
+// One tool for the places a company trades from, rather than three. A flat
+// `action` with the fields each one needs, never a union: a strict provider
+// rejects the nested shape a union serialises to.
+const ManageCompanySites = Tool.make('manage_company_sites', {
+	description:
+		"The places a company trades from — its shops, offices, depots. Most companies need none of these: a company with one place is described by its own address and coordinates, and a site is what you add when there is a second. Adding one is what makes that place findable on the map on its own, so a rep drawing a box around their territory sees the branch there rather than only the city the company is registered in. action: 'list' (all of them), 'add' (name plus, where known, address/location/country/latitude/longitude), 'update' (by site_id, only the fields to change), 'remove' (by site_id). Give coordinates when you have them — a site without them is recorded but cannot be found on a map.",
+	parameters: Schema.Struct({
+		action: Schema.Literals(['list', 'add', 'update', 'remove']),
+		company_id: Schema.String,
+		site_id: Schema.optional(Schema.String),
+		name: Schema.optional(Schema.String),
+		address: Schema.optional(Schema.String),
+		location: Schema.optional(Schema.String),
+		country: Schema.optional(Schema.String),
+		latitude: Schema.optional(Schema.Number),
+		longitude: Schema.optional(Schema.Number),
+		is_primary: Schema.optional(Schema.Boolean),
+	}),
+	success: Schema.Struct({
+		sites: Schema.Array(Schema.Unknown),
+	}),
+	dependencies: REQUEST_DEPENDENCIES,
+})
+	.annotate(Tool.Title, 'Manage Company Sites')
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.OpenWorld, false)
+
 export const CompanyTools = Toolkit.make(
 	SearchCompanies,
 	GetCompany,
 	CreateCompanies,
 	UpdateCompany,
 	GeocodeCompany,
+	ManageCompanySites,
 )
 
 export const CompanyHandlersLive = CompanyTools.toLayer(
@@ -274,6 +302,66 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 						actorUserId: null,
 					}).pipe(Effect.provideService(TimelineActivityService, timeline))
 					return result
+				}).pipe(Effect.orDie),
+			manage_company_sites: params =>
+				Effect.gen(function* () {
+					const currentOrg = yield* CurrentOrg
+					const list = () => sql`
+						SELECT id, name, address, location, country,
+							latitude, longitude, is_primary AS "isPrimary"
+						FROM sites
+						WHERE company_id = ${params.company_id}
+							AND organization_id = ${currentOrg.id}
+						ORDER BY is_primary DESC, name
+					`
+					if (params.action === 'add') {
+						yield* sql`
+							INSERT INTO sites ${sql.insert({
+								organizationId: currentOrg.id,
+								companyId: params.company_id,
+								name: params.name ?? 'Site',
+								address: params.address ?? null,
+								location: params.location ?? null,
+								country: params.country ?? null,
+								latitude: params.latitude ?? null,
+								longitude: params.longitude ?? null,
+								isPrimary: params.is_primary ?? false,
+							})}
+						`
+					}
+					if (params.action === 'update' && params.site_id !== undefined) {
+						// Only what the caller named: an omitted field is one they did
+						// not mean to touch, not one they meant to clear.
+						const patch: Record<string, unknown> = {
+							updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
+						}
+						if (params.name !== undefined) patch['name'] = params.name
+						if (params.address !== undefined) patch['address'] = params.address
+						if (params.location !== undefined)
+							patch['location'] = params.location
+						if (params.country !== undefined) patch['country'] = params.country
+						if (params.latitude !== undefined)
+							patch['latitude'] = params.latitude
+						if (params.longitude !== undefined)
+							patch['longitude'] = params.longitude
+						if (params.is_primary !== undefined)
+							patch['isPrimary'] = params.is_primary
+						yield* sql`
+							UPDATE sites SET ${sql.update(patch)}
+							WHERE id = ${params.site_id}
+								AND company_id = ${params.company_id}
+								AND organization_id = ${currentOrg.id}
+						`
+					}
+					if (params.action === 'remove' && params.site_id !== undefined) {
+						yield* sql`
+							DELETE FROM sites
+							WHERE id = ${params.site_id}
+								AND company_id = ${params.company_id}
+								AND organization_id = ${currentOrg.id}
+						`
+					}
+					return { sites: yield* list() }
 				}).pipe(Effect.orDie),
 			geocode_company: ({ id }) =>
 				geocodeCompany(id).pipe(

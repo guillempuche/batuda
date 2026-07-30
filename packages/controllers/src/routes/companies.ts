@@ -32,6 +32,9 @@ export const CompanyDetail = Schema.Struct({
 	// possible — a chain's shops, a firm's sales and support offices — so the one
 	// to show is the primary of its kind rather than "the" email.
 	channels: Schema.Array(Schema.Unknown),
+	// The places the company trades from. A company with one place needs none of
+	// these — its own coordinates say where it is — so this is empty for most.
+	sites: Schema.Array(Schema.Unknown),
 	contacts: Schema.Array(
 		Schema.Struct({
 			...Contact.json.fields,
