@@ -302,3 +302,85 @@ describe('parseGoldenRow — bucket', () => {
 		})
 	})
 })
+
+describe('parseGoldenRow for the company shapes this measures', () => {
+	describe('when the company has no website of its own', () => {
+		it('should accept the row when an alt domain proves the target', () => {
+			// GIVEN a market-stall-shaped company whose only public record is a
+			// register entry
+			const result = parseGoldenRow(
+				row({
+					expectedOutput: {
+						altDomains: ['librebor.es'],
+						fields: { country: 'ES' },
+					},
+				}),
+			)
+
+			// THEN the row is usable, with no official domain to score grounding on
+			expect(result.ok).toBe(true)
+			if (result.ok) {
+				expect(result.value.officialDomain).toBeNull()
+				expect(result.value.altDomains).toEqual(['librebor.es'])
+			}
+		})
+
+		it('should still reject a row that names no address at all', () => {
+			// GIVEN neither an official domain nor an alt one, so nothing could ever
+			// prove the run reached the right company
+			const result = parseGoldenRow(row({ expectedOutput: { fields: {} } }))
+
+			// THEN it is refused, with the reason naming what is missing
+			expect(result.ok).toBe(false)
+			if (!result.ok) {
+				expect(result.error).toContain('officialDomain')
+				expect(result.error).toContain('altDomains')
+			}
+		})
+	})
+
+	describe('when a row states the company own mailbox or number', () => {
+		it('should accept them as scored fields', () => {
+			// GIVEN a thin-web company whose one reachable address is a role mailbox
+			const result = parseGoldenRow(
+				row({
+					expectedOutput: {
+						officialDomain: 'tallerpuig.es',
+						fields: {
+							email: 'info@tallerpuig.es',
+							phone: '+34 972 123 456',
+							tax_id: 'B-12345678',
+						},
+					},
+				}),
+			)
+
+			// THEN all three are kept — they each have one right answer to check
+			expect(result.ok).toBe(true)
+			if (result.ok) {
+				expect(result.value.fields).toEqual({
+					email: 'info@tallerpuig.es',
+					phone: '+34 972 123 456',
+					tax_id: 'B-12345678',
+				})
+			}
+		})
+
+		it('should still reject a field name that is not scored', () => {
+			// GIVEN the company's website, which grounding already measures
+			const result = parseGoldenRow(
+				row({
+					expectedOutput: {
+						officialDomain: 'acme.es',
+						fields: { website: 'acme.es' },
+					},
+				}),
+			)
+
+			// THEN a key outside the scored list is refused loudly rather than
+			// silently ignored
+			expect(result.ok).toBe(false)
+			if (!result.ok) expect(result.error).toContain('website')
+		})
+	})
+})

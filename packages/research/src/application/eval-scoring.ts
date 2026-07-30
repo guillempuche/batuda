@@ -31,12 +31,27 @@
  * fields (current tools, tags) are left out because there is no single correct
  * value to score them against. Snake case matches the extraction schema's field
  * names.
+ *
+ * A company's mailbox, telephone number and registration number are in because each
+ * has exactly one right answer that can be written down and checked. Adding them
+ * costs nothing in the two per-field figures — a row that states no expected value
+ * for a field is skipped for that field, in both the precision and the recall
+ * count — but it does change the empty rate, and deliberately so: a run whose only
+ * real find was the mailbox printed on the company's contact page used to be filed
+ * alongside the runs that found nothing at all.
+ *
+ * The company's website is deliberately NOT in. It is already the thing grounding is
+ * measured on — a golden row's `officialDomain` — so scoring it here would report
+ * the same success twice and make a change to grounding look twice as large.
  */
 export const SCORABLE_FIELDS = [
 	'industry',
 	'size_range',
 	'country',
 	'location',
+	'email',
+	'phone',
+	'tax_id',
 ] as const
 
 export type ScorableField = (typeof SCORABLE_FIELDS)[number]
@@ -74,7 +89,12 @@ export interface GoldenExpectation {
 	/** What the run is asked to research — a name, or name + location for a generic name. */
 	readonly query: string
 	/** The company's own official website host — the primary proof the target was reached. */
-	readonly officialDomain: string
+	/**
+	 * The company's own website host — the primary proof the run reached the target.
+	 * Null for a company that has no site of its own, where the proof is an alt
+	 * domain (a register entry, a directory page) or a register lookup instead.
+	 */
+	readonly officialDomain: string | null
 	/** Other hosts that still prove the target was reached (a registry profile, a known subsidiary). */
 	readonly altDomains?: ReadonlyArray<string>
 	/** Known-correct field values. Only fields listed here are scored for precision. */
@@ -412,8 +432,28 @@ const fieldMatches = (
 	if (field === 'industry') {
 		return industryMatches(normalizedExpected, normalizedActual)
 	}
-	// country and size_range are codes the pipeline is meant to emit verbatim, so
-	// they hold to an exact match.
+	// A telephone number is printed a dozen ways for the same line — spaces, dots,
+	// brackets, a country code on one page and not the next — so only the digits
+	// are compared, and only the last nine of them, which is a full national number
+	// everywhere the pipeline researches. Anything shorter is compared whole.
+	if (field === 'phone') {
+		const lastDigits = (value: string): string => {
+			const digits = value.replace(/\D/g, '')
+			return digits.length > 9 ? digits.slice(-9) : digits
+		}
+		const expectedDigits = lastDigits(expected)
+		return expectedDigits !== '' && lastDigits(actual) === expectedDigits
+	}
+	// A registration number is written with and without its punctuation and its
+	// country prefix, so it is compared on its letters and digits alone.
+	if (field === 'tax_id') {
+		const bare = (value: string): string =>
+			value.replace(/[^a-z0-9]/gi, '').toUpperCase()
+		const expectedBare = bare(expected)
+		return expectedBare !== '' && bare(actual) === expectedBare
+	}
+	// An email address, a country code and a size band are all values the pipeline
+	// is meant to emit verbatim, so they hold to an exact match.
 	return normalizedActual === normalizedExpected
 }
 
@@ -479,9 +519,10 @@ export const scoreRun = (
 	expected: GoldenExpectation,
 	outcome: RunOutcome,
 ): RunScore => {
-	const anchors = [expected.officialDomain, ...(expected.altDomains ?? [])].map(
-		normalizeDomain,
-	)
+	const anchors = [
+		...(expected.officialDomain === null ? [] : [expected.officialDomain]),
+		...(expected.altDomains ?? []),
+	].map(normalizeDomain)
 	// Reached the target either by fetching its own site (or a subdomain / alt
 	// domain), or by resolving it in the official company register — a registry
 	// confirmation grounds a company whose own site was never scraped.
