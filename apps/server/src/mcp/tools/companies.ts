@@ -214,6 +214,30 @@ const ManageCompanySites = Tool.make('manage_company_sites', {
 	.annotate(Tool.Destructive, false)
 	.annotate(Tool.OpenWorld, false)
 
+// One tool for how two companies belong together, with a flat `action` for the
+// same reason the sites tool has one.
+const ManageCompanyRelations = Tool.make('manage_company_relations', {
+	description:
+		"How two companies belong together — a holding and the firm it owns, a franchisor and its franchisee, a company and whoever bought it. Recording one stops the pair reading as two near-duplicates that somebody eventually merges by mistake. action: 'list' (everything this company is part of, from both directions), 'add' (related_company_id plus kind), 'remove' (by relation_id). kind: 'parent' (company_id is owned BY related_company_id), 'franchise_of' (company_id trades under related_company_id's brand but is independently owned — not a subsidiary, and it decides for itself), 'acquired_by' (company_id was bought by related_company_id). Store the pair once, from the owned/franchised/acquired side; the other company shows it too without a second entry.",
+	parameters: Schema.Struct({
+		action: Schema.Literals(['list', 'add', 'remove']),
+		company_id: Schema.String,
+		related_company_id: Schema.optional(Schema.String),
+		kind: Schema.optional(
+			Schema.Literals(['parent', 'franchise_of', 'acquired_by']),
+		),
+		note: Schema.optional(Schema.String),
+		relation_id: Schema.optional(Schema.String),
+	}),
+	success: Schema.Struct({
+		relations: Schema.Array(Schema.Unknown),
+	}),
+	dependencies: REQUEST_DEPENDENCIES,
+})
+	.annotate(Tool.Title, 'Manage Company Relations')
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.OpenWorld, false)
+
 export const CompanyTools = Toolkit.make(
 	SearchCompanies,
 	GetCompany,
@@ -221,6 +245,7 @@ export const CompanyTools = Toolkit.make(
 	UpdateCompany,
 	GeocodeCompany,
 	ManageCompanySites,
+	ManageCompanyRelations,
 )
 
 export const CompanyHandlersLive = CompanyTools.toLayer(
@@ -373,6 +398,58 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 						`
 					}
 					return { sites: yield* list() }
+				}).pipe(Effect.orDie),
+			manage_company_relations: params =>
+				Effect.gen(function* () {
+					const currentOrg = yield* CurrentOrg
+					const list = () => sql`
+						SELECT r.id, r.kind, r.note, 'outgoing' AS direction,
+							c2.id AS "companyId", c2.name, c2.slug
+						FROM company_relations r
+						JOIN companies c2 ON c2.id = r.related_company_id
+						WHERE r.company_id = ${params.company_id}
+							AND r.organization_id = ${currentOrg.id}
+						UNION ALL
+						SELECT r.id, r.kind, r.note, 'incoming' AS direction,
+							c2.id AS "companyId", c2.name, c2.slug
+						FROM company_relations r
+						JOIN companies c2 ON c2.id = r.company_id
+						WHERE r.related_company_id = ${params.company_id}
+							AND r.organization_id = ${currentOrg.id}
+					`
+					if (
+						params.action === 'add' &&
+						params.related_company_id !== undefined &&
+						params.kind !== undefined
+					) {
+						// Both companies have to be this organisation's. The foreign keys
+						// only say they exist, not whose they are.
+						const owned = yield* sql<{ n: string }>`
+							SELECT count(*)::text AS n FROM companies
+							WHERE id IN (${params.company_id}, ${params.related_company_id})
+								AND organization_id = ${currentOrg.id}
+								AND deleted_at IS NULL
+						`
+						if (Number(owned[0]?.n ?? 0) !== 2) return { relations: [] }
+						yield* sql`
+							INSERT INTO company_relations ${sql.insert({
+								organizationId: currentOrg.id,
+								companyId: params.company_id,
+								relatedCompanyId: params.related_company_id,
+								kind: params.kind,
+								note: params.note ?? null,
+							})}
+							ON CONFLICT (company_id, related_company_id, kind) DO NOTHING
+						`
+					}
+					if (params.action === 'remove' && params.relation_id !== undefined) {
+						yield* sql`
+							DELETE FROM company_relations
+							WHERE id = ${params.relation_id}
+								AND organization_id = ${currentOrg.id}
+						`
+					}
+					return { relations: yield* list() }
 				}).pipe(Effect.orDie),
 			geocode_company: ({ id }) =>
 				geocodeCompany(id).pipe(

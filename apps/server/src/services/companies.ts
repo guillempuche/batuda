@@ -362,6 +362,29 @@ export class CompanyService extends Context.Service<CompanyService>()(
 							ORDER BY is_primary DESC, name
 						`
 
+						// Companies this one belongs with, read from both ends: a
+						// statement is stored once, from the subject's side, so "who owns
+						// this" and "what does this own" are the same rows approached
+						// either way round. Without both, half of every pairing would be
+						// invisible from the company you happened to open.
+						const relationRows = yield* sql`
+							SELECT r.id, r.kind, r.note,
+								'outgoing' AS direction,
+								c2.id AS "companyId", c2.name, c2.slug
+							FROM company_relations r
+							JOIN companies c2 ON c2.id = r.related_company_id
+							WHERE r.company_id = ${companyId}
+								AND r.organization_id = ${currentOrg.id}
+							UNION ALL
+							SELECT r.id, r.kind, r.note,
+								'incoming' AS direction,
+								c2.id AS "companyId", c2.name, c2.slug
+							FROM company_relations r
+							JOIN companies c2 ON c2.id = r.company_id
+							WHERE r.related_company_id = ${companyId}
+								AND r.organization_id = ${currentOrg.id}
+						`
+
 						const contactRows = yield* sql`
 							SELECT c.*, ${channelsJsonFor(sql, 'contacts')} AS channels
 							FROM contacts c
@@ -415,6 +438,7 @@ export class CompanyService extends Context.Service<CompanyService>()(
 							channels: (companyRow['channels'] ??
 								[]) as ReadonlyArray<unknown>,
 							sites: siteRows as ReadonlyArray<unknown>,
+							relations: relationRows as ReadonlyArray<unknown>,
 							contacts,
 							recentInteractions,
 							researchRuns,

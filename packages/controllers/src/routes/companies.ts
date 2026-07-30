@@ -35,6 +35,9 @@ export const CompanyDetail = Schema.Struct({
 	// The places the company trades from. A company with one place needs none of
 	// these — its own coordinates say where it is — so this is empty for most.
 	sites: Schema.Array(Schema.Unknown),
+	// Companies this one belongs with — a parent, a franchisor, whoever bought
+	// it — seen from both ends, so opening either company shows the pairing.
+	relations: Schema.Array(Schema.Unknown),
 	contacts: Schema.Array(
 		Schema.Struct({
 			...Contact.json.fields,
