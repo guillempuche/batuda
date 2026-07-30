@@ -110,6 +110,19 @@ jobs:
       # or failed on timing alone. `run` waits and reports whether it worked.
       - name: Start Postgres + MinIO via docker compose
         run: |
+          # Fetching the images is the one step here that reaches outside the
+          # runner, so it gets a few tries: a slow minute at the registry
+          # should cost a wait, not a red build on an unrelated change.
+          pull_attempt=1
+          until docker compose -f docker/docker-compose.yml pull --quiet db storage storage-init; do
+            if [ "$pull_attempt" -ge 3 ]; then
+              echo "Could not fetch the container images after 3 tries." >&2
+              exit 1
+            fi
+            echo "Image pull failed (attempt $pull_attempt) — retrying shortly."
+            sleep $((pull_attempt * 10))
+            pull_attempt=$((pull_attempt + 1))
+          done
           docker compose -f docker/docker-compose.yml up -d --wait db storage
           docker compose -f docker/docker-compose.yml run --rm --no-deps storage-init
 

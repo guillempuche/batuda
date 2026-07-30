@@ -36,7 +36,11 @@ services:
   # via STORAGE_ENDPOINT (http://localhost:9000 in dev, R2 endpoint in prod).
   storage:
     container_name: batuda-storage
-    image: minio/minio:latest
+    # Pinned like every other service here: `latest` re-checks the registry on
+    # every start, so a slow day at Docker Hub failed the build rather than
+    # reusing what was already on the machine — and it could change underneath
+    # a laptop between two mornings.
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     command: server /data --console-address ":9001"
     ports:
       - "9000:9000" # S3 API
@@ -51,7 +55,7 @@ services:
   # safe to re-run; exits 0 once the bucket exists.
   storage-init:
     container_name: batuda-storage-init
-    image: minio/mc:latest
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
     depends_on:
       - storage
     restart: "no"
