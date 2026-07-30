@@ -4,7 +4,8 @@ import { SqlClient } from 'effect/unstable/sql'
 export const seedReset = Effect.gen(function* () {
 	const sql = yield* SqlClient.SqlClient
 	yield* Effect.logInfo('Truncating CRM tables...')
-	// DELETE (not TRUNCATE CASCADE) so `member.primary_inbox_id`'s ON DELETE SET NULL fires.
+	// DELETE rather than TRUNCATE CASCADE: threads and messages point at
+	// mailboxes, and cascading would take the history with them.
 	yield* sql`DELETE FROM inboxes`
 	// Removals go too: they outlive the choice they sit on, so one left behind
 	// would keep cutting a freshly seeded connection off from an organization.

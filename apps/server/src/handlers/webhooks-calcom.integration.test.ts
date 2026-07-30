@@ -96,13 +96,13 @@ const ensureFixtureInbox = (orgId: string) =>
 		const placeholder = new Uint8Array([0])
 		yield* sql`
 			INSERT INTO inboxes (
-				organization_id, email, purpose, owner_user_id,
+				organization_id, email, owner_user_id,
 				imap_host, imap_port, imap_security,
 				smtp_host, smtp_port, smtp_security,
 				username, password_ciphertext, password_nonce, password_tag,
 				active
 			) VALUES (
-				${orgId}, ${FIXTURE_INBOX_EMAIL}, 'human', 'webhooks-calcom-test-user',
+				${orgId}, ${FIXTURE_INBOX_EMAIL},  'webhooks-calcom-test-user',
 				'imap.test', 993, 'tls',
 				'smtp.test', 587, 'starttls',
 				${FIXTURE_INBOX_EMAIL}, ${placeholder}, ${placeholder}, ${placeholder},

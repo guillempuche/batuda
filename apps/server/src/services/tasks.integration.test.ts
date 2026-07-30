@@ -99,6 +99,7 @@ const createWith = (
 			id: currentOrg,
 			name: 'fixture',
 			slug: 'fixture',
+			role: 'member',
 		}),
 	).pipe(
 		// TaskService now records onto the timeline, so it needs
@@ -217,7 +218,12 @@ const listWith = (
 ) => {
 	const deps = Layer.mergeAll(
 		TaskService.layer,
-		Layer.succeed(CurrentOrg, { id: org, name: 'fixture', slug: 'fixture' }),
+		Layer.succeed(CurrentOrg, {
+			id: org,
+			name: 'fixture',
+			slug: 'fixture',
+			role: 'member',
+		}),
 	).pipe(
 		// TaskService now records onto the timeline, so it needs
 		// TimelineActivityService; both resolve their SqlClient from PgLive.
@@ -705,7 +711,12 @@ describe('TaskService.list', () => {
 const countsWith = (org: string, boundaries: TaskDayBoundaries) => {
 	const deps = Layer.mergeAll(
 		TaskService.layer,
-		Layer.succeed(CurrentOrg, { id: org, name: 'fixture', slug: 'fixture' }),
+		Layer.succeed(CurrentOrg, {
+			id: org,
+			name: 'fixture',
+			slug: 'fixture',
+			role: 'member',
+		}),
 	).pipe(
 		Layer.provideMerge(TimelineActivityService.layer),
 		Layer.provideMerge(PgLive),
@@ -923,7 +934,12 @@ const attempt = (
 ): Promise<{ failedWith: string | null }> => {
 	const deps = Layer.mergeAll(
 		TaskService.layer,
-		Layer.succeed(CurrentOrg, { id: org, name: 'fixture', slug: 'fixture' }),
+		Layer.succeed(CurrentOrg, {
+			id: org,
+			name: 'fixture',
+			slug: 'fixture',
+			role: 'member',
+		}),
 	).pipe(
 		// TaskService now records onto the timeline, so it needs
 		// TimelineActivityService; both resolve their SqlClient from PgLive.
@@ -969,7 +985,12 @@ const runScoped = <A>(
 ): Promise<A> => {
 	const deps = Layer.mergeAll(
 		TaskService.layer,
-		Layer.succeed(CurrentOrg, { id: org, name: 'fixture', slug: 'fixture' }),
+		Layer.succeed(CurrentOrg, {
+			id: org,
+			name: 'fixture',
+			slug: 'fixture',
+			role: 'member',
+		}),
 	).pipe(
 		Layer.provideMerge(TimelineActivityService.layer),
 		Layer.provideMerge(PgLive),

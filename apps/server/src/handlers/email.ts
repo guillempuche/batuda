@@ -107,9 +107,6 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 							companyId: _.query.companyId,
 						}),
 						...(_.query.status !== undefined && { status: _.query.status }),
-						...(_.query.purpose !== undefined && {
-							purpose: _.query.purpose,
-						}),
 						...(_.query.query !== undefined && { query: _.query.query }),
 						...(_.query.limit !== undefined && { limit: _.query.limit }),
 						...(_.query.offset !== undefined && { offset: _.query.offset }),
@@ -179,9 +176,6 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 				)
 				.handle('listInboxes', _ =>
 					svc.listLocalInboxes({
-						...(_.query.purpose !== undefined && {
-							purpose: _.query.purpose,
-						}),
 						...(_.query.active !== undefined && {
 							active: _.query.active === 'true',
 						}),
@@ -193,32 +187,35 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 				.handle('listProviderPresets', () => svc.listProviderPresets())
 				.handle('inboxStatus', () => svc.inboxStatus())
 				.handle('createInbox', _ =>
-					svc
-						.createInbox({
-							email: _.payload.email,
-							...(_.payload.displayName !== undefined && {
-								displayName: _.payload.displayName,
-							}),
-							purpose: _.payload.purpose,
-							...(_.payload.ownerUserId !== undefined && {
-								ownerUserId: _.payload.ownerUserId,
-							}),
-							...(_.payload.isPrivate !== undefined && {
-								isPrivate: _.payload.isPrivate,
-							}),
-							...(_.payload.isDefault !== undefined && {
-								isDefault: _.payload.isDefault,
-							}),
-							imapHost: _.payload.imapHost,
-							imapPort: _.payload.imapPort,
-							imapSecurity: _.payload.imapSecurity,
-							smtpHost: _.payload.smtpHost,
-							smtpPort: _.payload.smtpPort,
-							smtpSecurity: _.payload.smtpSecurity,
-							username: _.payload.username,
-							password: _.payload.password,
-						})
-						.pipe(Effect.catchTag('SqlError', e => Effect.die(e))),
+					svc.createInbox({
+						email: _.payload.email,
+						...(_.payload.displayName !== undefined && {
+							displayName: _.payload.displayName,
+						}),
+						...(_.payload.description !== undefined && {
+							description: _.payload.description,
+						}),
+						...(_.payload.shared !== undefined && {
+							shared: _.payload.shared,
+						}),
+						...(_.payload.ownerUserId !== undefined && {
+							ownerUserId: _.payload.ownerUserId,
+						}),
+						...(_.payload.isPrivate !== undefined && {
+							isPrivate: _.payload.isPrivate,
+						}),
+						...(_.payload.isDefault !== undefined && {
+							isDefault: _.payload.isDefault,
+						}),
+						imapHost: _.payload.imapHost,
+						imapPort: _.payload.imapPort,
+						imapSecurity: _.payload.imapSecurity,
+						smtpHost: _.payload.smtpHost,
+						smtpPort: _.payload.smtpPort,
+						smtpSecurity: _.payload.smtpSecurity,
+						username: _.payload.username,
+						password: _.payload.password,
+					}),
 				)
 				.handle('updateInbox', _ =>
 					svc
@@ -226,8 +223,8 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 							...(_.payload.displayName !== undefined && {
 								displayName: _.payload.displayName,
 							}),
-							...(_.payload.purpose !== undefined && {
-								purpose: _.payload.purpose,
+							...(_.payload.description !== undefined && {
+								description: _.payload.description,
 							}),
 							...(_.payload.ownerUserId !== undefined && {
 								ownerUserId: _.payload.ownerUserId,
@@ -388,7 +385,10 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 								isDefault: _.payload.isDefault,
 							}),
 						})
-						.pipe(Effect.orDie),
+						.pipe(
+							Effect.catchTag('NotFound', e => Effect.fail(e)),
+							Effect.catchTag('SqlError', e => Effect.die(e)),
+						),
 				)
 				.handle('getFooter', _ =>
 					svc.getFooter(_.params.id).pipe(

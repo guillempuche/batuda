@@ -70,13 +70,13 @@ describe('InboxHealthProbe', () => {
 		const placeholder = new Uint8Array([0])
 		const rows = yield* sql<{ id: string }>`
 			INSERT INTO inboxes (
-				organization_id, email, purpose, owner_user_id,
+				organization_id, email, owner_user_id,
 				imap_host, imap_port, imap_security,
 				smtp_host, smtp_port, smtp_security,
 				username, password_ciphertext, password_nonce, password_tag,
 				active
 			) VALUES (
-				${TEST_INBOX_ORG}, 'probe@test.local', 'human', ${TEST_INBOX_USER},
+				${TEST_INBOX_ORG}, 'probe@test.local',  ${TEST_INBOX_USER},
 				'imap.test.local', 993, 'tls',
 				'smtp.test.local', 587, 'starttls',
 				'probe@test.local', ${placeholder}, ${placeholder}, ${placeholder},

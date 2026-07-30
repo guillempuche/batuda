@@ -43,7 +43,12 @@ const deps = Layer.mergeAll(
 
 const apply = (runId: string, proposalId: string) =>
 	resolveResearchProposedUpdate(runId, proposalId, 'apply', null).pipe(
-		Effect.provideService(CurrentOrg, { id: ORG, name: 'p', slug: 'p' }),
+		Effect.provideService(CurrentOrg, {
+			id: ORG,
+			name: 'p',
+			slug: 'p',
+			role: 'member',
+		}),
 		Effect.provide(deps),
 		Effect.orDie,
 		Effect.runPromise,

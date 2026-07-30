@@ -87,6 +87,7 @@ const recordScoped = (event: TimelineEvent): Promise<unknown> => {
 						id: tallerOrgId,
 						name: 'fixture',
 						slug: 'fixture',
+						role: 'member',
 					}),
 				)
 			}),

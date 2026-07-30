@@ -64,7 +64,7 @@ type DeliverabilityStatus =
 type ThreadInbox = {
 	readonly email: string
 	readonly displayName: string | null
-	readonly purpose: 'human' | 'agent' | 'shared'
+	readonly description: string | null
 }
 
 type AttachmentMeta = {
@@ -436,17 +436,15 @@ function ThreadDetailPage() {
 									</Link>
 								</CompanyLinkWrap>
 							) : (
-								<MetaValueMuted>{t`—`}</MetaValueMuted>
+								<MetaValueMuted>{t`No company linked`}</MetaValueMuted>
 							)}
 						</MetaItem>
 						<MetaItem>
 							<MetaLabel>{t`Inbox`}</MetaLabel>
 							{detail.inbox !== null ? (
-								<InboxBadge $purpose={detail.inbox.purpose}>
-									{detail.inbox.email}
-								</InboxBadge>
+								<InboxBadge>{detail.inbox.email}</InboxBadge>
 							) : (
-								<MetaValueMuted>{t`—`}</MetaValueMuted>
+								<MetaValueMuted>{t`No mailbox linked`}</MetaValueMuted>
 							)}
 						</MetaItem>
 					</MetaStripMobile>
@@ -483,15 +481,18 @@ function ThreadDetailPage() {
 						<SideLabel>{t`Inbox`}</SideLabel>
 						{detail.inbox !== null ? (
 							<div>
-								<InboxBadge $purpose={detail.inbox.purpose}>
-									{detail.inbox.email}
-								</InboxBadge>
+								<InboxBadge>{detail.inbox.email}</InboxBadge>
 								{detail.inbox.displayName ? (
 									<SideValueMuted>{detail.inbox.displayName}</SideValueMuted>
 								) : null}
+								{/* Written out in the panel, since a hover tooltip is out
+								    of reach on a keyboard or a touchscreen. */}
+								{detail.inbox.description ? (
+									<SideValueMuted>{detail.inbox.description}</SideValueMuted>
+								) : null}
 							</div>
 						) : (
-							<SideValueMuted>{t`—`}</SideValueMuted>
+							<SideValueMuted>{t`No mailbox linked`}</SideValueMuted>
 						)}
 					</SideSection>
 					<SideSection>
@@ -735,16 +736,10 @@ function narrowInbox(raw: unknown): ThreadInbox | null {
 	if (!raw || typeof raw !== 'object') return null
 	const r = raw as Record<string, unknown>
 	if (typeof r['email'] !== 'string') return null
-	const purpose =
-		r['purpose'] === 'human' ||
-		r['purpose'] === 'agent' ||
-		r['purpose'] === 'shared'
-			? r['purpose']
-			: 'human'
 	return {
 		email: r['email'],
 		displayName: typeof r['displayName'] === 'string' ? r['displayName'] : null,
-		purpose,
+		description: typeof r['description'] === 'string' ? r['description'] : null,
 	}
 }
 
@@ -1059,37 +1054,18 @@ const CompanyLinkWrap = styled.div.withConfig({
 	}
 `
 
-/* Each badge is its accent at low opacity with a darker text tone on top. The
- * text is deliberately darker than the tint it sits on — matching them (text and
- * background the same colour) leaves too little contrast to read at label size.
- * "Shared" is neutral rather than a third accent: the palette has exactly two. */
-const inboxTone = (purpose: 'human' | 'agent' | 'shared') => {
-	if (purpose === 'human')
-		return css`
-			background: color-mix(in oklab, var(--color-primary) 10%, transparent);
-			color: var(--color-primary);
-		`
-	if (purpose === 'agent')
-		return css`
-			background: color-mix(in oklab, var(--color-secondary) 14%, transparent);
-			color: var(--color-on-secondary-container);
-		`
-	return css`
-		background: color-mix(in oklab, var(--color-on-surface-variant) 12%, transparent);
-		color: var(--color-on-surface-variant);
-	`
-}
-
-const InboxBadge = styled.span.withConfig({ displayName: 'ThreadInboxBadge' })<{
-	readonly $purpose: 'human' | 'agent' | 'shared'
-}>`
+/* The tint sits under text a shade darker than itself — matching them leaves
+ * too little contrast to read at label size. One tone for every mailbox: what
+ * a mailbox is for is its own words now, which no colour could stand in for. */
+const InboxBadge = styled.span.withConfig({ displayName: 'ThreadInboxBadge' })`
 	display: inline-flex;
 	align-items: center;
 	padding: var(--space-3xs) var(--space-xs);
 	border-radius: var(--shape-2xs);
 	font-family: var(--font-mono, ui-monospace, monospace);
 	font-size: var(--typescale-label-small-size);
-	${({ $purpose }) => inboxTone($purpose)}
+	background: color-mix(in oklab, var(--color-primary) 10%, transparent);
+	color: var(--color-primary);
 `
 
 const SideRail = styled.aside.withConfig({ displayName: 'ThreadSideRail' })`

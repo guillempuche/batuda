@@ -614,7 +614,8 @@ api_key             — hashed API keys (referenceId, configId, quotas, per-key
                       rate limits; metadata carries organizationId + createdByUserId
                       for org-scoped /mcp keys)
 organization        — tenant root; users belong via member rows
-member              — (organization_id, user_id) plus primary_inbox_id additionalField
+member              — (organization_id, user_id) plus role, which decides who
+                      may act on another member's things
 invitation          — created by Better Auth's schema, unused by Batuda:
                       people are added straight to an org, never invited.
                       Kept RLS-policied so the live table is never unguarded.
@@ -627,8 +628,10 @@ inboxes              — one row per IMAP+SMTP mailbox; carries credentials
                        (password_ciphertext/nonce/tag, AES-256-GCM, HKDF
                        subkey from EMAIL_CREDENTIAL_KEY + inbox.id),
                        grant_status, folder_state JSONB per IMAP folder.
-                       Owned by (organization_id, owner_user_id);
-                       purpose ∈ {human, agent, shared}
+                       Owned by (organization_id, owner_user_id) — set means
+                       one member's, NULL means the whole team's, which is
+                       what decides who may send through it and change it;
+                       description is free text and carries no rules
 email_thread_links   — (organization_id, external_thread_id) where
                        external_thread_id is the thread root's RFC Message-ID
 email_messages       — every fetched/sent message; raw_rfc822_ref points at

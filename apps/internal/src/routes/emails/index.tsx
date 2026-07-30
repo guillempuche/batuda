@@ -95,7 +95,7 @@ type InboundClassification = 'normal' | 'spam' | 'blocked'
 type ThreadInbox = {
 	readonly email: string
 	readonly displayName: string | null
-	readonly purpose: 'human' | 'agent' | 'shared'
+	readonly description: string | null
 }
 
 type ThreadRow = {
@@ -118,7 +118,7 @@ type InboxOption = {
 	readonly id: string
 	readonly email: string
 	readonly displayName: string | null
-	readonly purpose: 'human' | 'agent' | 'shared'
+	readonly description: string | null
 }
 
 type CompanyLookup = {
@@ -140,7 +140,6 @@ const validateSearch = validateSearchWith({
 	inboxId: Schema.NonEmptyString,
 	companyId: Schema.NonEmptyString,
 	status: Schema.Literals(['open', 'closed', 'archived'] as const),
-	purpose: Schema.Literals(['human', 'agent', 'shared'] as const),
 	query: Schema.NonEmptyString,
 	page: Schema.Union([Schema.Number, Schema.NumberFromString]).pipe(
 		Schema.refine((n): n is number => Number.isFinite(n) && n >= 1),
@@ -157,7 +156,6 @@ function toWireSearch(
 		inboxId?: string
 		companyId?: string
 		status?: 'open' | 'closed' | 'archived'
-		purpose?: 'human' | 'agent' | 'shared'
 		query?: string
 		limit?: number
 		offset?: number
@@ -169,7 +167,6 @@ function toWireSearch(
 	if (search.inboxId !== undefined) wire.inboxId = search.inboxId
 	if (search.companyId !== undefined) wire.companyId = search.companyId
 	if (search.status !== undefined) wire.status = search.status
-	if (search.purpose !== undefined) wire.purpose = search.purpose
 	if (search.query !== undefined) wire.query = search.query
 	return wire
 }
@@ -187,7 +184,6 @@ async function loadThreadsOnServer(wire: EmailsSearch) {
 	if (wire.inboxId !== undefined) queryForServer['inboxId'] = wire.inboxId
 	if (wire.companyId !== undefined) queryForServer['companyId'] = wire.companyId
 	if (wire.status !== undefined) queryForServer['status'] = wire.status
-	if (wire.purpose !== undefined) queryForServer['purpose'] = wire.purpose
 	if (wire.query !== undefined) queryForServer['query'] = wire.query
 	if (wire.limit !== undefined) queryForServer['limit'] = wire.limit
 	if (wire.offset !== undefined) queryForServer['offset'] = wire.offset
@@ -197,7 +193,9 @@ async function loadThreadsOnServer(wire: EmailsSearch) {
 		const [envelope, inboxes] = yield* Effect.all(
 			[
 				client.email.listThreads({ query: queryForServer }),
-				client.email.listInboxes({ query: {} }),
+				// Must match the list atom this hydrates, or the filter chip would
+				// offer mailboxes that are gone until the first client fetch.
+				client.email.listInboxes({ query: { active: 'true' } }),
 			],
 			{ concurrency: 2 },
 		)
@@ -1528,7 +1526,6 @@ function mergeSearch(
 		inboxId: string | undefined
 		companyId: string | undefined
 		status: ThreadStatus | undefined
-		purpose: 'human' | 'agent' | 'shared' | undefined
 		query: string | undefined
 		page: number | undefined
 	}>,
@@ -1537,7 +1534,6 @@ function mergeSearch(
 		inboxId?: string
 		companyId?: string
 		status?: ThreadStatus
-		purpose?: 'human' | 'agent' | 'shared'
 		query?: string
 		page?: number
 	} = {}
@@ -1547,8 +1543,6 @@ function mergeSearch(
 	if (companyId !== undefined && companyId !== '') result.companyId = companyId
 	const status = 'status' in next ? next.status : prev.status
 	if (status !== undefined) result.status = status
-	const purpose = 'purpose' in next ? next.purpose : prev.purpose
-	if (purpose !== undefined) result.purpose = purpose
 	const query = 'query' in next ? next.query : prev.query
 	if (query !== undefined && query !== '') result.query = query
 	const page = 'page' in next ? next.page : prev.page
@@ -1561,7 +1555,6 @@ function hasActiveFilters(search: EmailsSearch & { page?: number }): boolean {
 		search.inboxId !== undefined ||
 		search.companyId !== undefined ||
 		search.status !== undefined ||
-		search.purpose !== undefined ||
 		search.query !== undefined
 	)
 }
@@ -1639,14 +1632,10 @@ function narrowInbox(value: unknown): ThreadInbox | null {
 	if (!value || typeof value !== 'object') return null
 	const v = value as Record<string, unknown>
 	if (typeof v['email'] !== 'string') return null
-	const purpose = v['purpose']
-	if (purpose !== 'human' && purpose !== 'agent' && purpose !== 'shared') {
-		return null
-	}
 	return {
 		email: v['email'],
 		displayName: typeof v['displayName'] === 'string' ? v['displayName'] : null,
-		purpose,
+		description: typeof v['description'] === 'string' ? v['description'] : null,
 	}
 }
 
@@ -1659,16 +1648,13 @@ function narrowInboxes(
 		const r = row as Record<string, unknown>
 		if (typeof r['id'] !== 'string') continue
 		if (typeof r['email'] !== 'string') continue
-		const purpose = r['purpose']
-		if (purpose !== 'human' && purpose !== 'agent' && purpose !== 'shared') {
-			continue
-		}
 		out.push({
 			id: r['id'],
 			email: r['email'],
 			displayName:
 				typeof r['displayName'] === 'string' ? r['displayName'] : null,
-			purpose,
+			description:
+				typeof r['description'] === 'string' ? r['description'] : null,
 		})
 	}
 	return out

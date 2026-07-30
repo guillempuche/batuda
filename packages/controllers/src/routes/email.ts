@@ -25,16 +25,22 @@ import { PaginatedList, pageQuery } from '../pagination'
 const Recipients = Schema.Union([Schema.String, Schema.Array(Schema.String)])
 
 const ThreadStatus = Schema.Literals(['open', 'closed', 'archived'])
-const InboxPurpose = Schema.Literals(['human', 'agent', 'shared'])
 const InboundClassification = Schema.Literals(['normal', 'spam', 'blocked'])
 const MessageDirection = Schema.Literals(['inbound', 'outbound'])
+
+// A line about what a mailbox is for, not a place to paste a document. The
+// same limit the database holds, so an over-long one is turned away here
+// with a clear answer rather than deeper down with an opaque one.
+const InboxDescription = Schema.String.pipe(
+	Schema.check(Schema.isMaxLength(200)),
+)
 
 // Shape of the inbox summary reattached to a thread (list + detail). Only
 // the display-safe fields — never credentials or transport hosts.
 const ThreadInbox = Schema.Struct({
 	email: Schema.String,
 	displayName: Schema.NullOr(Schema.String),
-	purpose: InboxPurpose,
+	description: Schema.NullOr(Schema.String),
 })
 
 // ── Enriched thread response shapes ─────────────────────────────
@@ -203,7 +209,6 @@ export const EmailGroup = HttpApiGroup.make('email')
 				inboxId: Schema.optional(Schema.String),
 				companyId: Schema.optional(Schema.String),
 				status: Schema.optional(ThreadStatus),
-				purpose: Schema.optional(InboxPurpose),
 				query: Schema.optional(Schema.String),
 				...pageQuery,
 			},
@@ -266,7 +271,6 @@ export const EmailGroup = HttpApiGroup.make('email')
 	.add(
 		HttpApiEndpoint.get('listInboxes', '/email/inboxes', {
 			query: {
-				purpose: Schema.optional(InboxPurpose),
 				active: Schema.optional(Schema.Literals(['true', 'false'])),
 				ownerUserId: Schema.optional(Schema.String),
 			},
@@ -291,7 +295,11 @@ export const EmailGroup = HttpApiGroup.make('email')
 			payload: Schema.Struct({
 				email: Schema.String,
 				displayName: Schema.optional(Schema.String),
-				purpose: InboxPurpose,
+				description: Schema.optional(InboxDescription),
+				// Set up for the whole team rather than for one person. Only an
+				// organization admin may, and such a mailbox has no owner, so it
+				// can be neither private nor anybody's default sender.
+				shared: Schema.optional(Schema.Boolean),
 				ownerUserId: Schema.optional(Schema.String),
 				isPrivate: Schema.optional(Schema.Boolean),
 				isDefault: Schema.optional(Schema.Boolean),
@@ -313,7 +321,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 			params: { id: Schema.String },
 			payload: Schema.Struct({
 				displayName: Schema.optional(Schema.NullOr(Schema.String)),
-				purpose: Schema.optional(InboxPurpose),
+				description: Schema.optional(Schema.NullOr(InboxDescription)),
 				ownerUserId: Schema.optional(Schema.NullOr(Schema.String)),
 				isPrivate: Schema.optional(Schema.Boolean),
 				isDefault: Schema.optional(Schema.Boolean),
@@ -333,7 +341,12 @@ export const EmailGroup = HttpApiGroup.make('email')
 				password: Schema.optional(Schema.String),
 			}),
 			success: Inbox.json,
-			error: NotFound.pipe(HttpApiSchema.status(404)),
+			error: [
+				NotFound.pipe(HttpApiSchema.status(404)),
+				// Handing a mailbox to somebody else, or choosing a default
+				// sender on their behalf, is turned away rather than obeyed.
+				BadRequest.pipe(HttpApiSchema.status(400)),
+			],
 		}),
 	)
 	.add(
@@ -353,9 +366,9 @@ export const EmailGroup = HttpApiGroup.make('email')
 		}),
 	)
 	.add(
-		// Set the calling member's primary_inbox_id. Validates ownership
-		// (same org + same user) so the call cannot point at someone else's
-		// inbox.
+		// Choose which of the caller's own mailboxes they send from when they
+		// don't say. It has to be theirs and still in use, so this can neither
+		// point at a colleague's nor change what anyone else sends from.
 		HttpApiEndpoint.post('setPrimaryInbox', '/email/inboxes/:id/primary', {
 			params: { id: Schema.String },
 			success: Inbox.json,
@@ -518,6 +531,8 @@ export const EmailGroup = HttpApiGroup.make('email')
 				isDefault: Schema.optional(Schema.Boolean),
 			}),
 			success: InboxFooter.json,
+			// A mailbox that isn't the caller's to look after answers as absent.
+			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.add(

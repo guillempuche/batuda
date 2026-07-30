@@ -13,9 +13,6 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#: src/routes/emails/$threadId.tsx
-#: src/routes/emails/$threadId.tsx
-#: src/routes/emails/$threadId.tsx
 #: src/routes/pages/index.tsx
 msgid "—"
 msgstr "—"
@@ -98,6 +95,16 @@ msgstr "{0} attendees"
 #: src/routes/settings/organization/spend.tsx
 msgid "{0} calls"
 msgstr "{0} calls"
+
+#. placeholder {0}: row.email
+#: src/routes/emails/inboxes.tsx
+msgid "{0} is now the address you send from"
+msgstr "{0} is now the address you send from"
+
+#. placeholder {0}: row.email
+#: src/routes/emails/inboxes.tsx
+msgid "{0} is the address you send from"
+msgstr "{0} is the address you send from"
 
 #. placeholder {0}: thread.messageCount
 #: src/routes/emails/index.tsx
@@ -416,14 +423,6 @@ msgstr "Advanced settings (IMAP / SMTP)"
 #: src/routes/settings/mcp/index.tsx
 msgid "After approving, manage which org each one acts in here."
 msgstr "After approving, manage which org each one acts in here."
-
-#: src/routes/emails/inboxes.tsx
-msgid "Agent"
-msgstr "Agent"
-
-#: src/routes/emails/inboxes.tsx
-msgid "AI agent"
-msgstr "AI agent"
 
 #: src/routes/settings/mcp/connections.tsx
 msgid "AI assistants you've connected over MCP. Each works in the organizations you choose for it — usually one, since most assistants cannot say which they mean when there are several."
@@ -748,6 +747,10 @@ msgstr "Batuda is invite-only. Request access from the Engranatge team."
 #: src/components/emails/compose-form.tsx
 msgid "Bcc"
 msgstr "Bcc"
+
+#: src/routes/emails/inboxes.tsx
+msgid "Belongs to another member"
+msgstr "Belongs to another member"
 
 #: src/routes/emails/index.tsx
 msgid "Blocked"
@@ -1488,8 +1491,8 @@ msgid "Could not set primary inbox"
 msgstr "Could not set primary inbox"
 
 #: src/routes/emails/inboxes.tsx
-msgid "Could not set the default inbox."
-msgstr "Could not set the default inbox."
+msgid "Could not set the default inbox"
+msgstr "Could not set the default inbox"
 
 #: src/routes/login.tsx
 msgid "Could not sign in. Check your email and password."
@@ -1511,10 +1514,6 @@ msgstr "Could not start the research run. Please try again."
 #: src/components/layout/org-switcher.tsx
 msgid "Could not switch organization. Please try again."
 msgstr "Could not switch organization. Please try again."
-
-#: src/routes/emails/inboxes.tsx
-msgid "Could not toggle the inbox state."
-msgstr "Could not toggle the inbox state."
 
 #: src/components/contacts/manage-channels-dialog.tsx
 msgid "Could not update channels"
@@ -1969,6 +1968,10 @@ msgstr "e.g. Cold outreach"
 msgid "e.g. Company signature"
 msgstr "e.g. Company signature"
 
+#: src/routes/emails/inboxes.tsx
+msgid "e.g. Customer enquiries"
+msgstr "e.g. Customer enquiries"
+
 #: src/components/research/research-dialog.tsx
 msgid "e.g. ES"
 msgstr "e.g. ES"
@@ -2343,6 +2346,7 @@ msgstr "Free-text, low-confidence, unverified, or from a run that needs reading 
 msgid "Freeform"
 msgstr "Freeform"
 
+#: src/components/emails/compose-form.tsx
 #: src/routes/emails/$threadId.tsx
 msgid "From"
 msgstr "From"
@@ -2433,10 +2437,6 @@ msgstr "Hot"
 #: src/components/instructions/stack-editor.tsx
 msgid "How this stack uses the org default"
 msgstr "How this stack uses the org default"
-
-#: src/routes/emails/inboxes.tsx
-msgid "Human"
-msgstr "Human"
 
 #: src/components/research/run-detail.tsx
 msgid "I couldn't confirm the company's own website, so the findings weren't reliable enough to keep."
@@ -2606,6 +2606,10 @@ msgstr "Its owner has not chosen this organization"
 #: src/routes/calendar/index.tsx
 msgid "Join video call"
 msgstr "Join video call"
+
+#: src/routes/emails/inboxes.tsx
+msgid "Just a note to yourself — it changes nothing about how the mailbox works. Up to 200 characters."
+msgstr "Just a note to yourself — it changes nothing about how the mailbox works. Up to 200 characters."
 
 #: src/components/instructions/template-editor-dialog.tsx
 msgid "Keep editing"
@@ -2845,15 +2849,15 @@ msgstr "Low"
 msgid "Low priority"
 msgstr "Low priority"
 
+#. placeholder {0}: row.email
+#: src/routes/emails/inboxes.tsx
+msgid "Make {0} the address you send from"
+msgstr "Make {0} the address you send from"
+
 #. placeholder {0}: stack.name
 #: src/components/instructions/stack-list.tsx
 msgid "Make {0} the default"
 msgstr "Make {0} the default"
-
-#. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx
-msgid "Make {0} the primary sender"
-msgstr "Make {0} the primary sender"
 
 #: src/components/contacts/manage-channels-dialog.tsx
 msgid "Make primary"
@@ -3231,6 +3235,10 @@ msgstr "No companies match the filters"
 msgid "No companies yet"
 msgstr "No companies yet"
 
+#: src/routes/emails/$threadId.tsx
+msgid "No company linked"
+msgstr "No company linked"
+
 #: src/components/layout/org-switcher.tsx
 #: src/routes/login.tsx
 #: src/routes/oauth/consent.tsx
@@ -3266,6 +3274,10 @@ msgstr "No coordinates yet. Locate this company to plot it on the map."
 msgid "no date"
 msgstr "no date"
 
+#: src/routes/emails/inboxes.tsx
+msgid "No description"
+msgstr "No description"
+
 #: src/components/companies/documents-panel.tsx
 msgid "No documents yet."
 msgstr "No documents yet."
@@ -3297,6 +3309,11 @@ msgstr "No keys yet. Create one above to connect an agent."
 #: src/routes/calendar/index.tsx
 msgid "no location"
 msgstr "no location"
+
+#: src/routes/emails/$threadId.tsx
+#: src/routes/emails/$threadId.tsx
+msgid "No mailbox linked"
+msgstr "No mailbox linked"
 
 #: src/routes/settings/organization/members.tsx
 msgid "No members yet."
@@ -3460,9 +3477,21 @@ msgstr "Not counted yet"
 msgid "Not enough research budget for this run. Raise the budget or narrow the search."
 msgstr "Not enough research budget for this run. Raise the budget or narrow the search."
 
+#: src/routes/emails/inboxes.tsx
+msgid "Not recorded"
+msgstr "Not recorded"
+
 #: src/routes/forgot-password.tsx
 msgid "Not seeing it? Check your spam folder. If you're sure the email is right and it never arrives, an admin can help."
 msgstr "Not seeing it? Check your spam folder. If you're sure the email is right and it never arrives, an admin can help."
+
+#: src/routes/emails/inboxes.tsx
+msgid "Not syncing"
+msgstr "Not syncing"
+
+#: src/routes/emails/inboxes.tsx
+msgid "Not yours to set"
+msgstr "Not yours to set"
 
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Note"
@@ -3745,6 +3774,10 @@ msgid "Owner"
 msgstr "Owner"
 
 #: src/routes/emails/inboxes.tsx
+msgid "Owner and privacy hidden — a team mailbox has no owner and cannot be private"
+msgstr "Owner and privacy hidden — a team mailbox has no owner and cannot be private"
+
+#: src/routes/emails/inboxes.tsx
 msgid "Owner user ID"
 msgstr "Owner user ID"
 
@@ -3846,15 +3879,6 @@ msgstr "Passwords need at least {MIN_PASSWORD_LENGTH} characters."
 msgid "Paste an app password — I'll show you where to get one"
 msgstr "Paste an app password — I'll show you where to get one"
 
-#: src/routes/emails/inboxes.tsx
-msgid "Pause syncing"
-msgstr "Pause syncing"
-
-#: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
-msgid "Paused"
-msgstr "Paused"
-
 #: src/components/research/findings/shared.tsx
 msgid "Pending paid actions"
 msgstr "Pending paid actions"
@@ -3885,7 +3909,6 @@ msgid "Person"
 msgstr "Person"
 
 #: src/routes/calendar/index.tsx
-#: src/routes/emails/inboxes.tsx
 #: src/routes/tasks/index.tsx
 #: src/routes/tasks/index.tsx
 msgid "Personal"
@@ -3970,9 +3993,11 @@ msgstr "Price"
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
 msgid "Primary"
 msgstr "Primary"
 
+#: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
 msgid "Primary inbox set"
 msgstr "Primary inbox set"
@@ -4070,11 +4095,6 @@ msgstr "Published"
 #: src/routes/pages/$id.tsx
 msgid "Publishing…"
 msgstr "Publishing…"
-
-#: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
-msgid "Purpose"
-msgstr "Purpose"
 
 #: src/components/companies/proposals-panel.tsx
 msgid "Qty"
@@ -4357,10 +4377,6 @@ msgstr "Resume drafting ({0})"
 msgid "Resume drafting (1)"
 msgstr "Resume drafting (1)"
 
-#: src/routes/emails/inboxes.tsx
-msgid "Resume syncing"
-msgstr "Resume syncing"
-
 #: src/components/shared/error-state.tsx
 msgid "Retry"
 msgstr "Retry"
@@ -4584,6 +4600,10 @@ msgid "Send reset link"
 msgstr "Send reset link"
 
 #: src/components/emails/compose-form.tsx
+msgid "Sending from {sendingFrom} instead"
+msgstr "Sending from {sendingFrom} instead"
+
+#: src/components/emails/compose-form.tsx
 #: src/routes/forgot-password.tsx
 #: src/routes/login.tsx
 msgid "Sending…"
@@ -4649,11 +4669,6 @@ msgstr "Setup guide →"
 msgid "Shaped by"
 msgstr "Shaped by"
 
-#: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
-msgid "Shared"
-msgstr "Shared"
-
 #: src/routes/settings/organization/index.tsx
 msgid "Shared guidance and the org research default."
 msgstr "Shared guidance and the org research default."
@@ -4665,6 +4680,14 @@ msgstr "Shared guidance every member's agents can use, plus the organization's s
 #: src/components/instructions/template-editor-dialog.tsx
 msgid "Shared with everyone in your organization — their research agent follows it on every run."
 msgstr "Shared with everyone in your organization — their research agent follows it on every run."
+
+#: src/routes/emails/inboxes.tsx
+msgid "Shared with the team"
+msgstr "Shared with the team"
+
+#: src/routes/emails/inboxes.tsx
+msgid "Shared with the whole team — no single owner"
+msgstr "Shared with the whole team — no single owner"
 
 #. placeholder {0}: msg.cc.length
 #: src/routes/emails/$threadId.tsx
@@ -5559,8 +5582,6 @@ msgstr "Update"
 
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
 msgid "Update failed"
 msgstr "Update failed"
 
@@ -5593,10 +5614,6 @@ msgstr "Use a different email"
 msgid "Use as default footer"
 msgstr "Use as default footer"
 
-#: src/routes/emails/inboxes.tsx
-msgid "Use as default for this purpose"
-msgstr "Use as default for this purpose"
-
 #: src/routes/login.tsx
 msgid "Use password instead"
 msgstr "Use password instead"
@@ -5608,11 +5625,6 @@ msgstr "Use the org default instead"
 #: src/routes/emails/inboxes.tsx
 msgid "Use your email provider's app-specific password — not your normal login password."
 msgstr "Use your email provider's app-specific password — not your normal login password."
-
-#: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
-msgid "Used for"
-msgstr "Used for"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Username"
@@ -5710,6 +5722,11 @@ msgstr "What happened?"
 msgid "What is this about?"
 msgstr "What is this about?"
 
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
+msgid "What it's for"
+msgstr "What it's for"
+
 #: src/components/research/research-dialog.tsx
 msgid "What kind of research?"
 msgstr "What kind of research?"
@@ -5725,6 +5742,10 @@ msgstr "What this run has cost so far"
 #: src/components/companies/followup-dialog.tsx
 msgid "What to follow up on"
 msgstr "What to follow up on"
+
+#: src/routes/emails/inboxes.tsx
+msgid "What's this mailbox for?"
+msgstr "What's this mailbox for?"
 
 #: src/components/shared/channel-icon.tsx
 msgid "WhatsApp"
@@ -5806,6 +5827,10 @@ msgstr "You don't have permission to see this page."
 #: src/components/profile/set-password-nudge.tsx
 msgid "You got in from a link in your email."
 msgstr "You got in from a link in your email."
+
+#: src/components/emails/compose-form.tsx
+msgid "You have no mailbox to send from. Connect one under Emails → your email connections, or ask an admin to set up one shared with the team."
+msgstr "You have no mailbox to send from. Connect one under Emails → your email connections, or ask an admin to set up one shared with the team."
 
 #: src/routes/settings/mcp/connections.tsx
 msgid "You removed this one. Tick it to restore it."

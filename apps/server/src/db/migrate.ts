@@ -43,25 +43,12 @@ export const betterAuthSchemaConfig = {
 		},
 	},
 	// `organization()` here so Better Auth generates the `organization` /
-	// `member` / `invitation` tables alongside the rest. `member.primary_inbox_id`
-	// is a Batuda extension recording each member's default From identity.
+	// `member` / `invitation` tables alongside the rest.
 	plugins: [
 		openAPI(),
 		bearer(),
 		admin(),
-		organization({
-			schema: {
-				member: {
-					additionalFields: {
-						primaryInboxId: {
-							type: 'string',
-							required: false,
-							fieldName: 'primary_inbox_id',
-						},
-					},
-				},
-			},
-		}),
+		organization(),
 		apiKey(),
 		// Generates the OAuth provider tables (oauthClient, oauthAccessToken,
 		// oauthRefreshToken, oauthConsent) plus the jwt plugin's jwks table,
@@ -130,10 +117,9 @@ const logMigrationTarget = Effect.gen(function* () {
 	)
 })
 
-// Better Auth migrations run first so the CRM migration (0001_initial)
-// can reference Better Auth tables — specifically the FK from
-// member.primary_inbox_id → inboxes(id) needs the `member` table to
-// already exist when the ALTER TABLE fires.
+// Better Auth migrations run first so the CRM migrations can reference Better
+// Auth tables — 0001_initial alters `member`, which has to exist by the time
+// that ALTER TABLE fires.
 const program = Effect.gen(function* () {
 	yield* logMigrationTarget
 	yield* Effect.log('Running Better Auth migrations...')

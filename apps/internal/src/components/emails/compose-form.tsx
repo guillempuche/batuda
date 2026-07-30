@@ -24,14 +24,18 @@ import {
 } from '#/components/contacts/display-channels'
 import { AttachmentPicker } from '#/components/emails/attachment-picker'
 import { EmailEditor } from '#/components/emails/email-editor'
+import { SrOnly } from '#/components/shared/sr-only'
 import { type Draft, useComposeEmail } from '#/context/compose-email-context'
+import { authClient } from '#/lib/auth-client'
 import type { StagedAttachment } from '#/lib/email-attachments'
 
 type InboxOption = {
 	readonly id: string
 	readonly email: string
 	readonly displayName: string | null
-	readonly purpose: 'human' | 'agent' | 'shared'
+	// Whose mailbox it is: a member's, or null for the whole team's. You can
+	// send through your own and the team's, never a colleague's.
+	readonly ownerUserId: string | null
 	readonly isDefault: boolean
 	readonly active: boolean
 }
@@ -71,6 +75,7 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 		threadAtomFor(draft.threadId ?? '__unused__'),
 	)
 
+	const meUserId = authClient.useSession().data?.user?.id
 	const inboxes = useMemo<ReadonlyArray<InboxOption>>(
 		() =>
 			AsyncResult.isSuccess(inboxesResult)
@@ -79,13 +84,32 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 		[inboxesResult],
 	)
 
+	// Only what this person can actually send through: their own mailboxes and
+	// the team's. Offering a colleague's would fail on send anyway.
+	const sendableInboxes = useMemo(
+		() =>
+			inboxes.filter(
+				i =>
+					i.active &&
+					(i.ownerUserId === null ||
+						(meUserId !== undefined && i.ownerUserId === meUserId)),
+			),
+		[inboxes, meUserId],
+	)
+
+	// Nothing is chosen until we know who is asking: before that only the
+	// team's mailboxes look sendable, and picking one would bind the draft to
+	// an address the person never meant to write from.
 	const defaultInboxId = useMemo(
 		() =>
-			(
-				inboxes.find(i => i.purpose === 'human' && i.isDefault && i.active) ??
-				inboxes.find(i => i.purpose === 'human' && i.active)
-			)?.id ?? null,
-		[inboxes],
+			meUserId === undefined
+				? null
+				: ((
+						sendableInboxes.find(i => i.ownerUserId !== null && i.isDefault) ??
+						sendableInboxes.find(i => i.ownerUserId !== null) ??
+						sendableInboxes[0]
+					)?.id ?? null),
+		[sendableInboxes, meUserId],
 	)
 
 	const [form, setForm] = useState<DraftForm>(() => ({
@@ -99,7 +123,21 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 		attachments: [],
 	}))
 
-	const effectiveInboxId = form.inboxId ?? defaultInboxId
+	// A draft picked up later can name a mailbox that has since been removed
+	// or was never this person's to write from; fall back rather than send
+	// from an address the server will refuse.
+	const chosenInboxId =
+		form.inboxId !== null && sendableInboxes.some(i => i.id === form.inboxId)
+			? form.inboxId
+			: null
+	const effectiveInboxId = chosenInboxId ?? defaultInboxId
+	// Sending from an address you did not pick is not a mistake you can take
+	// back, so a swap is said out loud — and on a reply, where no picker is
+	// drawn at all, the address that will actually go out is written down.
+	const substituted =
+		form.inboxId !== null && chosenInboxId === null && effectiveInboxId !== null
+	const sendingFrom =
+		sendableInboxes.find(i => i.id === effectiveInboxId)?.email ?? null
 
 	// `serverId` is mirrored from the ref into state so `canSend`'s
 	// useMemo re-runs when createDraft resolves -- refs aren't dep-
@@ -363,9 +401,10 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 
 	// Base UI's Select.Value needs the value→label map to render the chosen
 	// inbox as its name rather than its raw id.
-	const inboxItems = inboxes
-		.filter(i => i.active && i.purpose !== 'agent')
-		.map(i => ({ value: i.id, label: i.displayName ?? i.email }))
+	const inboxItems = sendableInboxes.map(i => ({
+		value: i.id,
+		label: i.displayName ?? i.email,
+	}))
 
 	return (
 		<Form
@@ -375,7 +414,16 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 				if (canSend) void handleSend()
 			}}
 		>
-			{!isReply ? (
+			{/* Nothing to send from is a dead end, so it says so rather than
+			    offering an empty picker beside a Send that cannot work. Held
+			    back until the session lands, since until then the person's own
+			    mailboxes are filtered out and an empty list means nothing. */}
+			{sendableInboxes.length === 0 && meUserId !== undefined ? (
+				<ErrorBanner role='alert'>
+					<AlertTriangle size={14} aria-hidden />
+					<span>{t`You have no mailbox to send from. Connect one under Emails → your email connections, or ask an admin to set up one shared with the team.`}</span>
+				</ErrorBanner>
+			) : !isReply ? (
 				<Field>
 					<FieldLabel htmlFor={`inbox-${draft.id}`}>{t`Inbox`}</FieldLabel>
 					<PriSelect.Root
@@ -403,6 +451,20 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 					</PriSelect.Root>
 				</Field>
 			) : null}
+
+			{/* A reply draws no picker, so the address it will go out from is
+			    written down rather than left to be assumed. */}
+			{isReply && sendingFrom !== null ? (
+				<Field>
+					<FieldLabel as='span'>{t`From`}</FieldLabel>
+					<ReplyFromValue>{sendingFrom}</ReplyFromValue>
+				</Field>
+			) : null}
+			<SrOnly role='status' aria-live='polite'>
+				{substituted && sendingFrom !== null
+					? t`Sending from ${sendingFrom} instead`
+					: ''}
+			</SrOnly>
 
 			{!isReply ? (
 				<Field>
@@ -633,18 +695,13 @@ function narrowInboxes(raw: unknown): ReadonlyArray<InboxOption> {
 		if (!entry || typeof entry !== 'object') continue
 		const r = entry as Record<string, unknown>
 		if (typeof r['id'] !== 'string' || typeof r['email'] !== 'string') continue
-		const purpose =
-			r['purpose'] === 'human' ||
-			r['purpose'] === 'agent' ||
-			r['purpose'] === 'shared'
-				? r['purpose']
-				: 'human'
 		out.push({
 			id: r['id'],
 			email: r['email'],
 			displayName:
 				typeof r['displayName'] === 'string' ? r['displayName'] : null,
-			purpose,
+			ownerUserId:
+				typeof r['ownerUserId'] === 'string' ? r['ownerUserId'] : null,
 			isDefault: r['isDefault'] === true,
 			active: r['active'] !== false,
 		})
@@ -681,6 +738,14 @@ const FieldLabel = styled.label.withConfig({
 	letter-spacing: 0.08em;
 	text-transform: uppercase;
 	color: var(--color-on-surface-variant);
+`
+
+const ReplyFromValue = styled.span.withConfig({
+	displayName: 'ComposeReplyFromValue',
+})`
+	font-family: var(--font-mono, ui-monospace, monospace);
+	font-size: var(--typescale-body-small-size);
+	color: var(--color-on-surface);
 `
 
 const CcBccToggle = styled.button.withConfig({

@@ -97,13 +97,13 @@ describe('EmailService.updateInbox re-probe', () => {
 		const placeholder = new Uint8Array([0])
 		const rows = yield* sql<{ id: string }>`
 			INSERT INTO inboxes (
-				organization_id, email, display_name, purpose, owner_user_id,
+				organization_id, email, display_name, owner_user_id,
 				imap_host, imap_port, imap_security,
 				smtp_host, smtp_port, smtp_security,
 				username, password_ciphertext, password_nonce, password_tag,
 				active, grant_status
 			) VALUES (
-				${TEST_ORG}, 'update@test.local', 'Baseline', 'human', ${TEST_USER},
+				${TEST_ORG}, 'update@test.local', 'Baseline',  ${TEST_USER},
 				'imap.test.local', 993, 'tls',
 				'smtp.test.local', 587, 'starttls',
 				'update@test.local', ${placeholder}, ${placeholder}, ${placeholder},
@@ -379,13 +379,13 @@ describe('EmailService.updateInbox re-probe — real credential round-trip', () 
 				const enc = encryptWithKey(TEST_KEY, { inboxId, plain: ORIGINAL_PW })
 				yield* sql`
 					INSERT INTO inboxes (
-						id, organization_id, email, display_name, purpose, owner_user_id,
+						id, organization_id, email, display_name, owner_user_id,
 						imap_host, imap_port, imap_security,
 						smtp_host, smtp_port, smtp_security,
 						username, password_ciphertext, password_nonce, password_tag,
 						active, grant_status
 					) VALUES (
-						${inboxId}, ${TEST_ORG}, 'roundtrip@test.local', 'Roundtrip', 'human', ${TEST_USER},
+						${inboxId}, ${TEST_ORG}, 'roundtrip@test.local', 'Roundtrip',  ${TEST_USER},
 						'imap.test.local', 993, 'tls',
 						'smtp.test.local', 587, 'starttls',
 						'roundtrip@test.local', ${enc.ciphertext}, ${enc.nonce}, ${enc.tag},
@@ -474,13 +474,13 @@ describe('EmailService.listThreads unread flag', () => {
 		const placeholder = new Uint8Array([0])
 		const inbox = yield* sql<{ id: string }>`
 			INSERT INTO inboxes (
-				organization_id, email, display_name, purpose, owner_user_id,
+				organization_id, email, display_name, owner_user_id,
 				imap_host, imap_port, imap_security,
 				smtp_host, smtp_port, smtp_security,
 				username, password_ciphertext, password_nonce, password_tag,
 				active, grant_status
 			) VALUES (
-				${TEST_ORG}, ${inboxEmail}, 'Threads', 'human', ${TEST_USER},
+				${TEST_ORG}, ${inboxEmail}, 'Threads',  ${TEST_USER},
 				'imap.test.local', 993, 'tls',
 				'smtp.test.local', 587, 'starttls',
 				${inboxEmail}, ${placeholder}, ${placeholder}, ${placeholder},

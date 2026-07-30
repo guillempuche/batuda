@@ -275,7 +275,6 @@ const fakeInbox = (orgId: string, ownerUserId: string, email: string) => ({
 	organization_id: orgId,
 	owner_user_id: ownerUserId,
 	email,
-	purpose: 'human',
 	imap_host: 'imap.example.com',
 	imap_port: 993,
 	imap_security: 'tls',
@@ -339,9 +338,9 @@ describe('multi-org isolation', () => {
 			// THEN only the taller row is visible — RLS USING fires regardless of query shape
 			await withSuper(async client => {
 				const inboxIns = await client.query<{ id: string }>(
-					`INSERT INTO inboxes (organization_id, owner_user_id, email, purpose, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, password_ciphertext, password_nonce, password_tag)
-					 VALUES ($1,$2,$3,'human','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x'),
-					        ($4,$5,$6,'human','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x') RETURNING id, organization_id`,
+					`INSERT INTO inboxes (organization_id, owner_user_id, email, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, password_ciphertext, password_nonce, password_tag)
+					 VALUES ($1,$2,$3,'x',1,'tls','x',1,'tls','u','\\x','\\x','\\x'),
+					        ($4,$5,$6,'x',1,'tls','x',1,'tls','u','\\x','\\x','\\x') RETURNING id, organization_id`,
 					[
 						ctx.tallerOrgId,
 						ctx.aliceId,
@@ -384,9 +383,9 @@ describe('multi-org isolation', () => {
 			// THEN only taller's thread row is visible
 			await withSuper(async client => {
 				const inboxIns = await client.query<{ id: string }>(
-					`INSERT INTO inboxes (organization_id, owner_user_id, email, purpose, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, password_ciphertext, password_nonce, password_tag)
-					 VALUES ($1,$2,'a@a','human','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x'),
-					        ($3,$4,'b@b','human','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x') RETURNING id`,
+					`INSERT INTO inboxes (organization_id, owner_user_id, email, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, password_ciphertext, password_nonce, password_tag)
+					 VALUES ($1,$2,'a@a','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x'),
+					        ($3,$4,'b@b','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x') RETURNING id`,
 					[ctx.tallerOrgId, ctx.aliceId, ctx.restaurantOrgId, ctx.bobId],
 				)
 				await client.query(
@@ -416,9 +415,9 @@ describe('multi-org isolation', () => {
 			// THEN only the taller participant is visible — proves the EXISTS subquery policy
 			await withSuper(async client => {
 				const inboxIns = await client.query<{ id: string }>(
-					`INSERT INTO inboxes (organization_id, owner_user_id, email, purpose, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, password_ciphertext, password_nonce, password_tag)
-					 VALUES ($1,$2,'a@a','human','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x'),
-					        ($3,$4,'b@b','human','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x') RETURNING id`,
+					`INSERT INTO inboxes (organization_id, owner_user_id, email, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, password_ciphertext, password_nonce, password_tag)
+					 VALUES ($1,$2,'a@a','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x'),
+					        ($3,$4,'b@b','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x') RETURNING id`,
 					[ctx.tallerOrgId, ctx.aliceId, ctx.restaurantOrgId, ctx.bobId],
 				)
 				const msgIns = await client.query<{ id: string }>(
@@ -805,9 +804,9 @@ describe('multi-org isolation', () => {
 
 		const seedTwoInboxes = async (client: pg.PoolClient) => {
 			const ins = await client.query<{ id: string }>(
-				`INSERT INTO inboxes (organization_id, owner_user_id, email, purpose, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, password_ciphertext, password_nonce, password_tag)
-				 VALUES ($1,$2,'a@a','human','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x'),
-				        ($3,$4,'b@b','human','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x')
+				`INSERT INTO inboxes (organization_id, owner_user_id, email, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, password_ciphertext, password_nonce, password_tag)
+				 VALUES ($1,$2,'a@a','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x'),
+				        ($3,$4,'b@b','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x')
 				 RETURNING id`,
 				[ctx.tallerOrgId, ctx.aliceId, ctx.restaurantOrgId, ctx.bobId],
 			)
@@ -867,17 +866,74 @@ describe('multi-org isolation', () => {
 	})
 
 	describe('DB-level invariants', () => {
-		it("CHECK rejects purpose='shared' + is_private=true on insert", async () => {
-			// GIVEN an attempt to create a shared inbox marked private (nonsensical)
+		it('should reject a team mailbox that is also hidden from the team', async () => {
+			// GIVEN a mailbox with no owner — the whole team's — marked private
 			// WHEN INSERT runs
-			// THEN the table-level CHECK constraint rejects it
+			// THEN the table-level CHECK rejects it, since a mailbox belonging to
+			// everyone cannot also be hidden from them
 			await expect(
 				ctx.pool.query(
-					`INSERT INTO inboxes (organization_id, owner_user_id, email, purpose, is_private, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, password_ciphertext, password_nonce, password_tag)
-					 VALUES ($1, NULL, 'shared@x', 'shared', true, 'x', 1, 'tls', 'x', 1, 'tls', 'u', '\\x', '\\x', '\\x')`,
+					`INSERT INTO inboxes (organization_id, owner_user_id, email, is_private, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, password_ciphertext, password_nonce, password_tag)
+					 VALUES ($1, NULL, 'shared@x', true, 'x', 1, 'tls', 'x', 1, 'tls', 'u', '\\x', '\\x', '\\x')`,
 					[ctx.tallerOrgId],
 				),
-			).rejects.toThrow(/inboxes_purpose_owner_chk|check constraint/i)
+			).rejects.toThrow(/inboxes_team_mailbox_chk|check constraint/i)
+		})
+
+		it('should reject a team mailbox marked as somebody’s default sender', async () => {
+			// GIVEN a mailbox with no owner marked as a default sender
+			// WHEN INSERT runs
+			// THEN the same CHECK rejects it: nobody sends from a mailbox that
+			// belongs to everyone by default
+			await expect(
+				ctx.pool.query(
+					`INSERT INTO inboxes (organization_id, owner_user_id, email, is_default, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, password_ciphertext, password_nonce, password_tag)
+					 VALUES ($1, NULL, 'shared-default@x', true, 'x', 1, 'tls', 'x', 1, 'tls', 'u', '\\x', '\\x', '\\x')`,
+					[ctx.tallerOrgId],
+				),
+			).rejects.toThrow(/inboxes_team_mailbox_chk|check constraint/i)
+		})
+
+		it('should reject the same address connected twice while both are in use', async () => {
+			// GIVEN an address already connected and in use
+			// WHEN the same address is connected again without removing the first
+			// THEN the unique index rejects it, so the list cannot fill up with
+			// duplicates of one mailbox
+			await withSuper(async client => {
+				await client.query(
+					`INSERT INTO inboxes (organization_id, owner_user_id, email, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, password_ciphertext, password_nonce, password_tag)
+					 VALUES ($1,$2,'twice@x','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x')`,
+					[ctx.tallerOrgId, ctx.aliceId],
+				)
+				await expect(
+					client.query(
+						`INSERT INTO inboxes (organization_id, owner_user_id, email, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, password_ciphertext, password_nonce, password_tag)
+						 VALUES ($1,$2,'TWICE@x','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x')`,
+						[ctx.tallerOrgId, ctx.aliceId],
+					),
+				).rejects.toThrow(/idx_inboxes_email_active|unique/i)
+			})
+		})
+
+		it('should allow one person only one default sender', async () => {
+			// GIVEN a member whose mailbox is already the one they send from
+			// WHEN a second of their mailboxes is marked the same way
+			// THEN the unique index rejects it, so "which address do I send
+			// from" always has exactly one answer
+			await withSuper(async client => {
+				await client.query(
+					`INSERT INTO inboxes (organization_id, owner_user_id, email, is_default, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, password_ciphertext, password_nonce, password_tag)
+					 VALUES ($1,$2,'first@x',true,'x',1,'tls','x',1,'tls','u','\\x','\\x','\\x')`,
+					[ctx.tallerOrgId, ctx.aliceId],
+				)
+				await expect(
+					client.query(
+						`INSERT INTO inboxes (organization_id, owner_user_id, email, is_default, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, password_ciphertext, password_nonce, password_tag)
+						 VALUES ($1,$2,'second@x',true,'x',1,'tls','x',1,'tls','u','\\x','\\x','\\x')`,
+						[ctx.tallerOrgId, ctx.aliceId],
+					),
+				).rejects.toThrow(/idx_inboxes_default_per_owner|unique/i)
+			})
 		})
 
 		it('idx_email_messages_msgid is org-scoped (same Message-ID across orgs allowed; within an org rejected)', async () => {
@@ -887,9 +943,9 @@ describe('multi-org isolation', () => {
 			// AND a duplicate within the same org is rejected
 			await withSuper(async client => {
 				const inboxIns = await client.query<{ id: string }>(
-					`INSERT INTO inboxes (organization_id, owner_user_id, email, purpose, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, password_ciphertext, password_nonce, password_tag)
-					 VALUES ($1,$2,'a@a','human','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x'),
-					        ($3,$4,'b@b','human','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x') RETURNING id`,
+					`INSERT INTO inboxes (organization_id, owner_user_id, email, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, password_ciphertext, password_nonce, password_tag)
+					 VALUES ($1,$2,'a@a','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x'),
+					        ($3,$4,'b@b','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x') RETURNING id`,
 					[ctx.tallerOrgId, ctx.aliceId, ctx.restaurantOrgId, ctx.bobId],
 				)
 				// Same Message-ID in two different orgs — allowed.
@@ -915,28 +971,23 @@ describe('multi-org isolation', () => {
 			})
 		})
 
-		it('member.primary_inbox_id is nulled when the referenced inbox row is deleted', async () => {
-			// GIVEN a member with primary_inbox_id pointing at an inbox row
-			// WHEN the inbox row is deleted
-			// THEN ON DELETE SET NULL fires and the member's primary_inbox_id reads NULL
-			await withSuper(async client => {
-				const inboxIns = await client.query<{ id: string }>(
-					`INSERT INTO inboxes (organization_id, owner_user_id, email, purpose, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, password_ciphertext, password_nonce, password_tag)
-					 VALUES ($1,$2,'a@a','human','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x') RETURNING id`,
-					[ctx.tallerOrgId, ctx.aliceId],
-				)
-				const inboxId = inboxIns.rows[0]?.id
-				await client.query(
-					`UPDATE "member" SET primary_inbox_id = $1 WHERE "userId" = $2 AND "organizationId" = $3`,
-					[inboxId, ctx.aliceId, ctx.tallerOrgId],
-				)
-				await client.query(`DELETE FROM inboxes WHERE id = $1`, [inboxId])
-				const after = await client.query<{ primary_inbox_id: string | null }>(
-					`SELECT primary_inbox_id FROM "member" WHERE "userId" = $1 AND "organizationId" = $2`,
-					[ctx.aliceId, ctx.tallerOrgId],
-				)
-				expect(after.rows[0]?.primary_inbox_id).toBeNull()
-			})
+		it('should keep no record of a default sender on the membership row', async () => {
+			// GIVEN the membership table
+			// WHEN its columns are read
+			// THEN it carries nothing about which mailbox somebody sends from:
+			// that lives on the mailbox itself, and a second copy nothing wrote
+			// was only ever a place for the two to disagree
+			// Read the whole membership row's columns rather than probing for the
+			// one that should be missing: a query that finds nothing also finds
+			// nothing when the table name or schema is wrong, and would pass for
+			// the wrong reason.
+			const cols = await ctx.pool.query<{ column_name: string }>(
+				`SELECT column_name FROM information_schema.columns
+				 WHERE table_schema = current_schema() AND table_name = 'member'`,
+			)
+			const names = cols.rows.map(r => r.column_name)
+			expect(names).toContain('role')
+			expect(names).not.toContain('primary_inbox_id')
 		})
 	})
 
