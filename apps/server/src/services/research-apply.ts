@@ -356,10 +356,17 @@ export const occUpdate = (
 	fields: Record<string, unknown>,
 	enrichment?: CompanyEnrichment,
 ) => {
+	// A change can carry no column at all and still be a real change: a company's
+	// mailbox and number are rows elsewhere now, so a suggestion naming only those
+	// leaves nothing to set here. The row still has to be claimed — its version
+	// checked and bumped — so the assignment list is simply left out rather than
+	// written empty, which is not valid SQL.
+	const setFields =
+		Object.keys(fields).length > 0 ? sql`${sql.update(fields)},` : sql``
 	if (table === 'contacts')
 		return sql<{ version: number }>`
 			UPDATE contacts
-			SET ${sql.update(fields)}, version = version + 1, updated_at = now()
+			SET ${setFields} version = version + 1, updated_at = now()
 			WHERE id = ${subjectId}
 				AND organization_id = ${orgId}
 				AND version = ${expectedVersion}
@@ -376,7 +383,7 @@ export const occUpdate = (
 	const brief = isRunTarget ? (enrichment?.brief ?? null) : null
 	return sql<{ version: number }>`
 		UPDATE companies
-		SET ${sql.update(fields)},
+		SET ${setFields}
 			field_provenance = CASE
 				WHEN ${provenance}::jsonb IS NULL THEN field_provenance
 				ELSE COALESCE(field_provenance, '{}'::jsonb) || ${provenance}::jsonb
@@ -786,15 +793,24 @@ export const resolveResearchProposedUpdate = (
 			} satisfies ResolveOutcome
 
 		// A company proposal may name a way of reaching it. Those are taken out
-		// first and written as channels; what is left goes to the columns.
+		// first and written as addresses; what is left goes to the columns.
+		//
+		// Their citations are carried across by hand, because the allowlist no
+		// longer sees these keys and would otherwise drop them. The company row
+		// still answers "where did this email come from?" the way it did when the
+		// address was a column of its own — the record of that is worth more than
+		// the tidiness of dropping it with the field.
+		const channelCitations: Record<string, FieldCitation> = {}
 		const proposedChannels =
 			validated.table === 'companies'
 				? splitCompanyChannelFields(
 						Object.fromEntries(
-							Object.entries(validated.fields).map(([key, value]) => [
-								key,
-								readSourced(value).value,
-							]),
+							Object.entries(validated.fields).map(([key, value]) => {
+								const read = readSourced(value)
+								if (read.citation !== undefined)
+									channelCitations[snakeToCamel(key)] = read.citation
+								return [key, read.value]
+							}),
 						),
 					).channels
 				: []
@@ -802,7 +818,10 @@ export const resolveResearchProposedUpdate = (
 			validated.table,
 			validated.fields,
 		)
-		const sources = yield* resolveFieldSources(sql, runId, fieldCitations)
+		const sources = yield* resolveFieldSources(sql, runId, {
+			...channelCitations,
+			...fieldCitations,
+		})
 
 		// Persist the run's country onto its own target company as the run's
 		// findings are applied. `country` is not an allowlisted proposal field —
@@ -815,14 +834,6 @@ export const resolveResearchProposedUpdate = (
 			fields['country'] = run.country
 		if (Object.keys(fields).length === 0 && proposedChannels.length === 0)
 			return { outcome: 'no_applicable_fields' } satisfies ResolveOutcome
-		if (proposedChannels.length > 0) {
-			yield* writeChannels(
-				sql,
-				org.id,
-				{ table: 'companies', id: validated.subjectId },
-				proposedChannels,
-			)
-		}
 
 		// A subject_id that isn't a UUID trips text parsing (22P02) in the WHERE
 		// clause; that is a bad proposal (the model can invent an id), not a server
@@ -866,6 +877,18 @@ export const resolveResearchProposedUpdate = (
 			} satisfies ResolveOutcome
 		if (updatedRows.length === 0)
 			return { outcome: 'conflict' } satisfies ResolveOutcome
+
+		// Only now that the row's version proved unchanged. Written earlier, an
+		// address would land even when the change was refused for being out of
+		// date — a rejected suggestion that still altered the record.
+		if (proposedChannels.length > 0) {
+			yield* writeChannels(
+				sql,
+				org.id,
+				{ table: 'companies', id: validated.subjectId },
+				proposedChannels,
+			)
+		}
 
 		yield* setProposalStatus(sql, runId, org.id, index, 'applied')
 		yield* linkSubjectToRun(
