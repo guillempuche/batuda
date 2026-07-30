@@ -8,7 +8,7 @@ import {
 	Trash2,
 	UserRoundPlus,
 } from 'lucide-react'
-import { type ReactNode, useEffect, useMemo, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 
 import { PriButton, PriMenu, usePriToast } from '@batuda/ui/pri'
 
@@ -100,6 +100,11 @@ export function TemplateLibrary({
 	const { dlg, open: openDlg, close: closeDlg } = useDlg(templateDlgSchema)
 	const { readId, openRead, closeRead } = useReadParam()
 
+	// Deleting or handing over a template takes its row away, buttons and all,
+	// and closes the dialog if it was open, so nothing is left holding focus.
+	// Send focus to the New button, the one control that is always on the page.
+	const newButtonRef = useRef<HTMLButtonElement>(null)
+
 	const [confirmDelete, setConfirmDelete] = useState<TemplateShape | null>(null)
 	const [deleting, setDeleting] = useState(false)
 	const [confirmTransfer, setConfirmTransfer] = useState<TemplateShape | null>(
@@ -176,6 +181,7 @@ export function TemplateLibrary({
 		}
 		toast.add({ title: t`Template deleted`, type: 'success' })
 		if (target?.id === row.id) closeDialog()
+		newButtonRef.current?.focus()
 		onChanged()
 	}
 
@@ -197,6 +203,7 @@ export function TemplateLibrary({
 				type: 'success',
 			})
 			if (target?.id === row.id) closeDialog()
+			newButtonRef.current?.focus()
 			onChanged()
 			return
 		}
@@ -228,6 +235,7 @@ export function TemplateLibrary({
 			<SectionHead>
 				<SectionTitle>{title}</SectionTitle>
 				<PriButton
+					ref={newButtonRef}
 					type='button'
 					$variant='filled'
 					data-testid={testIds.newButton}

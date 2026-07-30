@@ -2094,6 +2094,10 @@ msgstr "Edited by hand <0/>. Research adds below your text."
 msgid "Edited by hand. Research adds below your text."
 msgstr "Edited by hand. Research adds below your text."
 
+#: src/components/instructions/template-dialog.tsx
+msgid "Editing this template"
+msgstr "Editing this template"
+
 #: src/routes/pages/$id.tsx
 #: src/routes/pages/$id.tsx
 msgid "Editor"
@@ -4231,6 +4235,10 @@ msgstr "Read this before it goes into a record"
 #: src/components/research/run-detail.tsx
 msgid "Read this before you use it"
 msgstr "Read this before you use it"
+
+#: src/components/instructions/template-dialog.tsx
+msgid "Reading this template"
+msgstr "Reading this template"
 
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Ready to apply"

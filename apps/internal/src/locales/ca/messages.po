@@ -2094,6 +2094,10 @@ msgstr "Editat a mà <0/>. La recerca afegeix sota el teu text."
 msgid "Edited by hand. Research adds below your text."
 msgstr "Editat a mà. La recerca afegeix sota el teu text."
 
+#: src/components/instructions/template-dialog.tsx
+msgid "Editing this template"
+msgstr "S’està editant aquesta plantilla"
+
 #: src/routes/pages/$id.tsx
 #: src/routes/pages/$id.tsx
 msgid "Editor"
@@ -4231,6 +4235,10 @@ msgstr "Llegeix-ho abans que entri en una fitxa"
 #: src/components/research/run-detail.tsx
 msgid "Read this before you use it"
 msgstr "Llegeix-ho abans de fer-ho servir"
+
+#: src/components/instructions/template-dialog.tsx
+msgid "Reading this template"
+msgstr "S’està llegint aquesta plantilla"
 
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Ready to apply"
