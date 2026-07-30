@@ -1,24 +1,26 @@
 import { Effect, Exit } from 'effect'
 import { describe, expect, it } from 'vitest'
 
+import { decidesPurchase } from '@batuda/domain'
+
 import { BudgetExceeded, ProviderError } from '../domain/errors'
 import { EnrichmentResult, type VerificationVerdict } from '../domain/types'
 import {
+	buyingRoleFromTitle,
 	compareContacts,
 	type DiscoveredContact,
 	dedupePeople,
 	emailChannel,
-	isDecisionMaker,
 	runEnrichmentChain,
 } from './contact-discovery'
 
 const contact = (over: {
-	is_decision_maker?: boolean
+	buying_role?: string | null
 	verification?: VerificationVerdict
 	confidence?: number
 }): DiscoveredContact => ({
 	name: 'Test Person',
-	is_decision_maker: over.is_decision_maker ?? false,
+	buying_role: over.buying_role ?? null,
 	channels: [
 		{
 			kind: 'email',
@@ -30,12 +32,14 @@ const contact = (over: {
 	],
 })
 
-describe('isDecisionMaker', () => {
+describe('buyingRoleFromTitle', () => {
 	describe('when seniority marks the executive tier', () => {
 		it('should flag an executive regardless of title', () => {
 			// GIVEN Hunter seniority 'executive'
 			// THEN the person counts as a decision-maker
-			expect(isDecisionMaker(undefined, 'executive')).toBe(true)
+			expect(decidesPurchase(buyingRoleFromTitle(undefined, 'executive'))).toBe(
+				true,
+			)
 		})
 	})
 
@@ -43,27 +47,41 @@ describe('isDecisionMaker', () => {
 		it('should match director / chief / head / founder titles', () => {
 			// GIVEN common decision-maker titles
 			// THEN each is recognised
-			expect(isDecisionMaker('Managing Director', undefined)).toBe(true)
-			expect(isDecisionMaker('Chief Financial Officer', undefined)).toBe(true)
-			expect(isDecisionMaker('Head of Procurement', undefined)).toBe(true)
-			expect(isDecisionMaker('Founder', undefined)).toBe(true)
+			expect(
+				decidesPurchase(buyingRoleFromTitle('Managing Director', undefined)),
+			).toBe(true)
+			expect(
+				decidesPurchase(
+					buyingRoleFromTitle('Chief Financial Officer', undefined),
+				),
+			).toBe(true)
+			expect(
+				decidesPurchase(buyingRoleFromTitle('Head of Procurement', undefined)),
+			).toBe(true)
+			expect(decidesPurchase(buyingRoleFromTitle('Founder', undefined))).toBe(
+				true,
+			)
 		})
 
 		it('should match three-letter C-suite abbreviations', () => {
 			// GIVEN bare C?O abbreviations rather than spelled-out titles
 			// THEN the c[a-z]o branch recognises them
 			// [contact-discovery.ts — DECISION_MAKER_TITLE: c[a-z]o]
-			expect(isDecisionMaker('CEO', undefined)).toBe(true)
-			expect(isDecisionMaker('CTO', undefined)).toBe(true)
-			expect(isDecisionMaker('COO', undefined)).toBe(true)
+			expect(decidesPurchase(buyingRoleFromTitle('CEO', undefined))).toBe(true)
+			expect(decidesPurchase(buyingRoleFromTitle('CTO', undefined))).toBe(true)
+			expect(decidesPurchase(buyingRoleFromTitle('COO', undefined))).toBe(true)
 		})
 
 		it('should match a VP only as a whole word', () => {
 			// GIVEN a VP title and a word that merely contains "vp"
 			// THEN the \bvp\b boundary matches the role but not the noise word
 			// [contact-discovery.ts — DECISION_MAKER_TITLE: \bvp\b]
-			expect(isDecisionMaker('VP Sales', undefined)).toBe(true)
-			expect(isDecisionMaker('Revport Analyst', undefined)).toBe(false)
+			expect(decidesPurchase(buyingRoleFromTitle('VP Sales', undefined))).toBe(
+				true,
+			)
+			expect(
+				decidesPurchase(buyingRoleFromTitle('Revport Analyst', undefined)),
+			).toBe(false)
 		})
 	})
 
@@ -72,8 +90,12 @@ describe('isDecisionMaker', () => {
 			// GIVEN Hunter seniorities other than 'executive'
 			// THEN the owner/founder alternatives are honoured too
 			// [contact-discovery.ts — /executive|owner|founder/i on seniority]
-			expect(isDecisionMaker(undefined, 'owner')).toBe(true)
-			expect(isDecisionMaker(undefined, 'founder')).toBe(true)
+			expect(decidesPurchase(buyingRoleFromTitle(undefined, 'owner'))).toBe(
+				true,
+			)
+			expect(decidesPurchase(buyingRoleFromTitle(undefined, 'founder'))).toBe(
+				true,
+			)
 		})
 	})
 
@@ -84,7 +106,9 @@ describe('isDecisionMaker', () => {
 			// deliberately loose (only \bvp\b is boundary-guarded). A future
 			// tighten would change this expectation on purpose.
 			// [contact-discovery.ts — DECISION_MAKER_TITLE has no \b around 'head']
-			expect(isDecisionMaker('Headcount Analyst', undefined)).toBe(true)
+			expect(
+				decidesPurchase(buyingRoleFromTitle('Headcount Analyst', undefined)),
+			).toBe(true)
 		})
 	})
 
@@ -92,14 +116,18 @@ describe('isDecisionMaker', () => {
 		it('should not flag an individual contributor', () => {
 			// GIVEN a junior role with no leadership title
 			// THEN the person is not a decision-maker
-			expect(isDecisionMaker('Sales Associate', 'junior')).toBe(false)
+			expect(
+				decidesPurchase(buyingRoleFromTitle('Sales Associate', 'junior')),
+			).toBe(false)
 		})
 
 		it('should not flag when both signals are absent', () => {
 			// GIVEN no role and no seniority (both undefined)
 			// THEN there is nothing to match on
 			// [contact-discovery.ts — both guards fall through to false]
-			expect(isDecisionMaker(undefined, undefined)).toBe(false)
+			expect(decidesPurchase(buyingRoleFromTitle(undefined, undefined))).toBe(
+				false,
+			)
 		})
 	})
 })
@@ -108,8 +136,8 @@ describe('compareContacts', () => {
 	describe('when one contact is a decision-maker', () => {
 		it('should sort the decision-maker first', () => {
 			// GIVEN a decision-maker and a non-decision-maker
-			const dm = contact({ is_decision_maker: true })
-			const other = contact({ is_decision_maker: false })
+			const dm = contact({ buying_role: 'economic_buyer' })
+			const other = contact({ buying_role: null })
 			// THEN the decision-maker sorts ahead
 			expect([other, dm].sort(compareContacts)[0]).toBe(dm)
 		})
@@ -158,7 +186,7 @@ describe('compareContacts', () => {
 			const withEmail = contact({ verification: 'deliverable' })
 			const socialOnly: DiscoveredContact = {
 				name: 'Social Only',
-				is_decision_maker: false,
+				buying_role: null,
 				channels: [{ kind: 'linkedin', value: 'https://linkedin.com/in/x' }],
 			}
 			expect([socialOnly, withEmail].sort(compareContacts)[0]).toBe(withEmail)
@@ -172,7 +200,7 @@ describe('emailChannel', () => {
 			// GIVEN a contact with both a social and an email channel
 			const c: DiscoveredContact = {
 				name: 'Has Email',
-				is_decision_maker: false,
+				buying_role: null,
 				channels: [
 					{ kind: 'linkedin', value: 'https://linkedin.com/in/x' },
 					{ kind: 'email', value: 'x@acme.com', verification: 'deliverable' },
@@ -188,7 +216,7 @@ describe('emailChannel', () => {
 			// GIVEN a contact reachable only on social channels
 			const c: DiscoveredContact = {
 				name: 'No Email',
-				is_decision_maker: false,
+				buying_role: null,
 				channels: [{ kind: 'phone', value: '+34000000000' }],
 			}
 			// THEN there is no email channel to rank on

@@ -44,7 +44,7 @@ type ContactFixture = {
 	readonly companyId: string
 	readonly name: string
 	readonly role?: string
-	readonly isDecisionMaker?: boolean
+	readonly buyingRole?: string | null
 	readonly email?: string
 	readonly phone?: string
 	readonly whatsapp?: string
@@ -320,7 +320,7 @@ export const seedContacts = (
 						companyId,
 						name: c.name,
 						role: c.role,
-						isDecisionMaker: c.isDecisionMaker,
+						buyingRole: c.buyingRole,
 						...(c.email === null ? {} : { email: c.email }),
 						...(c.phone === null ? {} : { phone: c.phone }),
 					},
@@ -350,7 +350,7 @@ export const seedContacts = (
 							companyId: c.companyId,
 							name: c.name,
 							role: c.role ?? null,
-							isDecisionMaker: c.isDecisionMaker ?? null,
+							buyingRole: c.buyingRole ?? null,
 						})),
 					),
 				),
@@ -384,7 +384,7 @@ export const seedContacts = (
 							companyId: c.companyId,
 							name: c.name,
 							role: c.role ?? null,
-							isDecisionMaker: c.isDecisionMaker ?? null,
+							buyingRole: c.buyingRole ?? null,
 						})),
 					),
 				)} RETURNING id, name`

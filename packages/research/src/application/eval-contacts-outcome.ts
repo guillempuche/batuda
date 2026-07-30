@@ -9,6 +9,8 @@
  * I/O-free, the same seam the research eval keeps between outcome and scoring.
  */
 
+import { decidesPurchase } from '@batuda/domain'
+
 import { type DiscoverContactsOutcome, emailChannel } from './contact-discovery'
 import type {
 	ContactRunOutcome,
@@ -27,7 +29,7 @@ export const outcomeFromContactRun = (
 					return {
 						name: contact.name,
 						role: contact.role,
-						isDecisionMaker: contact.is_decision_maker,
+						isDecisionMaker: decidesPurchase(contact.buying_role),
 						email:
 							channel !== undefined
 								? {

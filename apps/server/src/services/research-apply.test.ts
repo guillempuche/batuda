@@ -44,14 +44,14 @@ describe('allowlistFields', () => {
 		it('should use the contact allowlist, not the company one', () => {
 			// GIVEN a contact proposal that also carries a company-only field
 			const { fields: kept } = allowlistFields('contacts', {
-				is_decision_maker: true,
+				buying_role: 'economic_buyer',
 				role: 'Head of operations',
 				industry: 'company-only, should drop',
 			})
 
 			// THEN only contact columns survive
 			expect(kept).toEqual({
-				isDecisionMaker: true,
+				buyingRole: 'economic_buyer',
 				role: 'Head of operations',
 			})
 		})
@@ -168,7 +168,7 @@ describe('validateCreate', () => {
 			name: 'Ada Lovelace',
 			company_id: 'co-1',
 			role: 'CTO',
-			is_decision_maker: true,
+			buying_role: 'economic_buyer',
 			industry: 'company-only, should drop',
 			channels: [
 				{
@@ -197,7 +197,7 @@ describe('validateCreate', () => {
 			expect(result.fields).toEqual({
 				name: 'Ada Lovelace',
 				role: 'CTO',
-				isDecisionMaker: true,
+				buyingRole: 'economic_buyer',
 			})
 			expect(result.channels).toEqual([
 				{

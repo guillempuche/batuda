@@ -14,6 +14,8 @@
 import { Config, Context, Effect, Layer, Ref } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
+import { decidesPurchase } from '@batuda/domain'
+
 import { isRegistryCountry, type RegistryCountry } from '../domain/country'
 import { EnrichmentResult, type VerificationVerdict } from '../domain/types'
 import { makeBudgetLayer } from './budget'
@@ -145,13 +147,31 @@ const VERDICT_RANK: Record<VerificationVerdict, number> = {
 const DECISION_MAKER_TITLE =
 	/director|head|chief|c[a-z]o|founder|owner|partner|managing|president|\bvp\b/i
 
-export const isDecisionMaker = (
+/**
+ * What part a person's title suggests they play in a purchase.
+ *
+ * Only one part is ever guessed: somebody senior enough to hold a budget is the
+ * economic buyer. Everything else is left unsaid.
+ *
+ * That is deliberate, and it is narrower than it might look. Whether somebody is
+ * a champion depends on what they want, which no title reveals. And a title that
+ * names the buying itself — head of procurement — is just as often the person who
+ * signs as the person a request passes through, so calling it a gate would quietly
+ * demote half of them and drop them out of "who is worth reaching".
+ *
+ * The value of naming the parts is in what a person or a run with real evidence
+ * can record, not in what a pattern over job titles can infer. This keeps the
+ * guess exactly as wide as the yes/no it replaces, so nothing measured against it
+ * shifts underfoot.
+ */
+export const buyingRoleFromTitle = (
 	role: string | undefined,
 	seniority: string | undefined,
-): boolean => {
-	if (seniority && /executive|owner|founder/i.test(seniority)) return true
-	if (role && DECISION_MAKER_TITLE.test(role)) return true
-	return false
+): string | null => {
+	if (seniority && /executive|owner|founder/i.test(seniority))
+		return 'economic_buyer'
+	if (role && DECISION_MAKER_TITLE.test(role)) return 'economic_buyer'
+	return null
 }
 
 /**
@@ -170,7 +190,8 @@ export interface ContactChannel {
 export interface DiscoveredContact {
 	readonly name: string
 	readonly role?: string | undefined
-	readonly is_decision_maker: boolean
+	/** What part they play in a purchase; null when the title does not say. */
+	readonly buying_role: string | null
 	readonly channels: ReadonlyArray<ContactChannel>
 }
 
@@ -226,9 +247,12 @@ export const compareContacts = (
 	a: DiscoveredContact,
 	b: DiscoveredContact,
 ): number => {
-	if (a.is_decision_maker !== b.is_decision_maker) {
-		return a.is_decision_maker ? -1 : 1
-	}
+	// Whoever can carry a purchase forward comes first. A gatekeeper and an
+	// evaluator matter, but neither moves a deal on their own, so they rank with
+	// everyone else rather than above them.
+	const aDecides = decidesPurchase(a.buying_role)
+	const bDecides = decidesPurchase(b.buying_role)
+	if (aDecides !== bDecides) return aDecides ? -1 : 1
 	const emailA = emailChannel(a)
 	const emailB = emailChannel(b)
 	const rankA = VERDICT_RANK[emailA?.verification ?? 'unknown']
@@ -524,7 +548,7 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 									const contact: DiscoveredContact = {
 										name,
 										role: person.position,
-										is_decision_maker: isDecisionMaker(
+										buying_role: buyingRoleFromTitle(
 											person.position,
 											person.seniority,
 										),

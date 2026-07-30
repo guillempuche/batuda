@@ -11,7 +11,12 @@ export class Contact extends Model.Class<Contact>('Contact')({
 
 	name: Schema.String,
 	role: Schema.NullOr(Schema.String),
-	isDecisionMaker: Schema.NullOr(Schema.Boolean),
+	// What part this person plays in deciding whether their company buys —
+	// economic buyer, champion, gatekeeper, technical evaluator, user. Null means
+	// nobody has said, which is a real answer and is not the same as "no".
+	// Free text for the same reason industry is: a stored value the vocabulary
+	// does not yet know is shown, never decode-rejected.
+	buyingRole: Schema.NullOr(Schema.String),
 
 	metadata: Schema.NullOr(Schema.Unknown),
 

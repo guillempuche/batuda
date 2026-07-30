@@ -14,7 +14,7 @@ export type EditableContact = {
 	readonly id: string
 	readonly name: string
 	readonly role: string | null
-	readonly isDecisionMaker: boolean
+	readonly buyingRole: string | null
 }
 
 type Props = {
@@ -51,14 +51,14 @@ export function ContactEditDialog({
 
 	const [name, setName] = useState('')
 	const [role, setRole] = useState('')
-	const [isDecisionMaker, setIsDecisionMaker] = useState(false)
+	const [buyingRole, setBuyingRole] = useState('')
 	const [busy, setBusy] = useState(false)
 
 	useEffect(() => {
 		if (!open) return
 		setName(contact?.name ?? '')
 		setRole(contact?.role ?? '')
-		setIsDecisionMaker(contact?.isDecisionMaker ?? false)
+		setBuyingRole(contact?.buyingRole ?? '')
 		setBusy(false)
 	}, [open, contact])
 
@@ -75,7 +75,7 @@ export function ContactEditDialog({
 							companyId,
 							name: trimmedName,
 							...(trimmedRole ? { role: trimmedRole } : {}),
-							isDecisionMaker,
+							buyingRole: buyingRole === '' ? null : buyingRole,
 						},
 					} as never)
 				: await updateContact({
@@ -83,7 +83,7 @@ export function ContactEditDialog({
 						payload: {
 							name: trimmedName,
 							role: trimmedRole,
-							isDecisionMaker,
+							buyingRole: buyingRole === '' ? null : buyingRole,
 						},
 					} as never)
 		setBusy(false)
@@ -147,15 +147,29 @@ export function ContactEditDialog({
 								onChange={e => setRole(e.target.value)}
 							/>
 						</Field>
-						<ToggleLabel>
-							<input
-								type='checkbox'
-								checked={isDecisionMaker}
-								data-testid='contact-decision-maker'
-								onChange={e => setIsDecisionMaker(e.target.checked)}
-							/>
-							<Trans>Decision maker</Trans>
-						</ToggleLabel>
+						<Field>
+							<label htmlFor='contact-buying-role'>
+								<Trans>Part in a purchase</Trans>
+							</label>
+							{/* A picker rather than a tick box: several people commonly hold
+							    different parts, and "not ticked" used to mean both "does not
+							    decide" and "nobody has looked". Blank now means the second. */}
+							<select
+								id='contact-buying-role'
+								value={buyingRole}
+								data-testid='contact-buying-role'
+								onChange={e => setBuyingRole(e.target.value)}
+							>
+								<option value=''>{t`Not known`}</option>
+								<option value='economic_buyer'>{t`Holds the budget`}</option>
+								<option value='champion'>{t`Argues for it inside`}</option>
+								<option value='gatekeeper'>{t`Controls access`}</option>
+								<option value='technical_evaluator'>
+									{t`Judges whether it works`}
+								</option>
+								<option value='user'>{t`Uses it day to day`}</option>
+							</select>
+						</Field>
 
 						<Footer>
 							<PriButton
@@ -233,16 +247,6 @@ const Label = styled.label`
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
 	color: var(--color-on-surface-variant);
-`
-
-const ToggleLabel = styled.label`
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-2xs);
-	font-family: var(--font-body);
-	font-size: var(--typescale-body-medium-size);
-	color: var(--color-on-surface);
-	cursor: pointer;
 `
 
 const Footer = styled.div`

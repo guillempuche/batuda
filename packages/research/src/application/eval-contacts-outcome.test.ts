@@ -14,7 +14,7 @@ describe('outcomeFromContactRun', () => {
 					{
 						name: 'Ada Lovelace',
 						role: 'CEO',
-						is_decision_maker: true,
+						buying_role: 'economic_buyer',
 						channels: [
 							{
 								kind: 'email',
@@ -48,7 +48,7 @@ describe('outcomeFromContactRun', () => {
 				contacts: [
 					{
 						name: 'Bo Jones',
-						is_decision_maker: false,
+						buying_role: null,
 						channels: [
 							{
 								kind: 'email',
@@ -76,7 +76,7 @@ describe('outcomeFromContactRun', () => {
 				contacts: [
 					{
 						name: 'Cy Reach',
-						is_decision_maker: false,
+						buying_role: null,
 						channels: [{ kind: 'linkedin', value: 'https://x' }],
 					},
 				],

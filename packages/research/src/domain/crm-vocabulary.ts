@@ -53,8 +53,4 @@ export const SNAPSHOT_COMPANY_FIELDS = [
 	'tags',
 ] as const
 
-export const SNAPSHOT_CONTACT_FIELDS = [
-	'name',
-	'role',
-	'isDecisionMaker',
-] as const
+export const SNAPSHOT_CONTACT_FIELDS = ['name', 'role', 'buyingRole'] as const

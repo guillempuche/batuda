@@ -42,6 +42,7 @@ import type {
 	ContactListItem,
 } from '@batuda/controllers'
 import type { Task } from '@batuda/domain'
+import { decidesPurchase } from '@batuda/domain'
 import { Sidebar, Stack, Switcher } from '@batuda/ui'
 import {
 	PriButton,
@@ -208,7 +209,7 @@ type ContactRow = {
 	readonly id: string
 	readonly name: string
 	readonly role: string | null
-	readonly isDecisionMaker: boolean
+	readonly buyingRole: string | null
 	readonly channels: ReadonlyArray<DisplayChannel>
 	// Derived from the primary email channel for the send action + suppression UI.
 	readonly email: string | null
@@ -713,7 +714,7 @@ function DetailBody({
 						id: editingContactRow.id,
 						name: editingContactRow.name,
 						role: editingContactRow.role,
-						isDecisionMaker: editingContactRow.isDecisionMaker,
+						buyingRole: editingContactRow.buyingRole,
 					}
 				: null,
 		[editingContactId],
@@ -1378,7 +1379,7 @@ function DetailBody({
 										<ContactHeader>
 											<ContactName>
 												{contact.name}
-												{contact.isDecisionMaker && (
+												{decidesPurchase(contact.buyingRole) && (
 													<DecisionBadge>
 														<Trans>Decision maker</Trans>
 													</DecisionBadge>
@@ -1876,7 +1877,7 @@ function narrowContacts(
 			id: r['id'],
 			name: r['name'],
 			role: typeof r['role'] === 'string' ? r['role'] : null,
-			isDecisionMaker: r['isDecisionMaker'] === true,
+			buyingRole: typeof r['buyingRole'] === 'string' ? r['buyingRole'] : null,
 			channels,
 			email: primaryEmail?.value ?? null,
 			emailStatus: primaryEmail?.status ?? 'unknown',

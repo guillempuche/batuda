@@ -119,7 +119,7 @@ const ResearchLive = ResearchService.layer.pipe(
 							{
 								name: 'Dana Director',
 								role: 'CEO',
-								is_decision_maker: true,
+								buying_role: 'economic_buyer',
 								channels: [
 									{
 										kind: 'email',

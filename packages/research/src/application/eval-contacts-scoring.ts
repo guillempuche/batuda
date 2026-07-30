@@ -17,7 +17,9 @@
  * people the golden set actually knows an address for.
  */
 
-import { isDecisionMaker } from './contact-discovery'
+import { decidesPurchase } from '@batuda/domain'
+
+import { buyingRoleFromTitle } from './contact-discovery'
 import { contactNameMatches } from './eval-scoring'
 
 export type ContactTerminalStatus =
@@ -106,7 +108,7 @@ export const scoreContactRun = (
 	for (const golden of expected.expectedContacts) {
 		const hit = findMatch(golden)
 		if (hit !== undefined) contactsMatched++
-		if (isDecisionMaker(golden.role, undefined)) {
+		if (decidesPurchase(buyingRoleFromTitle(golden.role, undefined))) {
 			decisionMakersExpected++
 			if (hit !== undefined) decisionMakersMatched++
 		}

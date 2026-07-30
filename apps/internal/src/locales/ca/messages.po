@@ -634,6 +634,11 @@ msgstr "Arxivat"
 msgid "Archived — not pursuing"
 msgstr "Arxivat — no el continuo"
 
+#: src/components/contacts/buying-role-label.tsx
+#: src/components/contacts/contact-edit-dialog.tsx
+msgid "Argues for it inside"
+msgstr "Hi dona suport internament"
+
 #: src/components/companies/company-fit-section.tsx
 msgid "as of"
 msgstr "a data de"
@@ -1248,6 +1253,11 @@ msgstr "Contingut"
 msgid "Content (Markdown)"
 msgstr "Contingut (Markdown)"
 
+#: src/components/contacts/buying-role-label.tsx
+#: src/components/contacts/contact-edit-dialog.tsx
+msgid "Controls access"
+msgstr "Controla l'accés"
+
 #: src/routes/companies/$slug.tsx
 #: src/routes/companies/$slug.tsx
 msgid "Conversations"
@@ -1768,7 +1778,6 @@ msgstr "Data"
 msgid "Dead"
 msgstr "Descartat"
 
-#: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/research/findings/contact-discovery-view.tsx
 #: src/routes/companies/$slug.tsx
 msgid "Decision maker"
@@ -2485,6 +2494,11 @@ msgstr "Alta"
 msgid "High priority"
 msgstr "Prioritat alta"
 
+#: src/components/contacts/buying-role-label.tsx
+#: src/components/contacts/contact-edit-dialog.tsx
+msgid "Holds the budget"
+msgstr "Té el pressupost"
+
 #: src/routes/companies/index.tsx
 msgid "Hot"
 msgstr "Calent"
@@ -2661,6 +2675,11 @@ msgstr "El seu propietari no ha triat aquesta organització"
 #: src/routes/calendar/index.tsx
 msgid "Join video call"
 msgstr "Uneix-te a la videotrucada"
+
+#: src/components/contacts/buying-role-label.tsx
+#: src/components/contacts/contact-edit-dialog.tsx
+msgid "Judges whether it works"
+msgstr "Valora si funciona"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Just a note to yourself — it changes nothing about how the mailbox works. Up to 200 characters."
@@ -3549,6 +3568,10 @@ msgstr "No hi ha prou pressupost de recerca per a aquesta execució. Augmenta el
 msgid "Not in your organization"
 msgstr "No és a la teva organització"
 
+#: src/components/contacts/contact-edit-dialog.tsx
+msgid "Not known"
+msgstr "No se sap"
+
 #: src/routes/emails/inboxes.tsx
 msgid "Not recorded"
 msgstr "No consta"
@@ -3918,6 +3941,10 @@ msgstr "Despesa de pagament aquest mes"
 #: src/components/companies/about-section.tsx
 msgid "Pain points"
 msgstr "Punts febles"
+
+#: src/components/contacts/contact-edit-dialog.tsx
+msgid "Part in a purchase"
+msgstr "Paper en una compra"
 
 #: src/components/research/findings/company-enrichment-view.tsx
 msgid "Pass"
@@ -5734,6 +5761,11 @@ msgstr "Fes servir la contrasenya d'aplicació del teu proveïdor de correu, no 
 #: src/routes/emails/inboxes.tsx
 msgid "Username"
 msgstr "Nom d'usuari"
+
+#: src/components/contacts/buying-role-label.tsx
+#: src/components/contacts/contact-edit-dialog.tsx
+msgid "Uses it day to day"
+msgstr "L'utilitza cada dia"
 
 #: src/routes/settings/profile/templates.tsx
 msgid "Using the org default"

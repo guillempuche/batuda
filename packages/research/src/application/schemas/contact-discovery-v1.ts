@@ -14,7 +14,12 @@ export const ContactDiscoveryV1Schema = Schema.Struct({
 		Schema.Struct({
 			name: Schema.String,
 			role: Schema.optionalKey(Schema.String),
-			is_decision_maker: Schema.optionalKey(Schema.Boolean),
+			buying_role: Schema.optionalKey(
+				Schema.String.annotate({
+					description:
+						"What part this person plays in deciding whether their company buys: 'economic_buyer' (holds the budget), 'champion' (wants it and argues for it inside), 'gatekeeper' (controls access - procurement, an assistant), 'technical_evaluator' (judges whether it works), 'user' (lives with it). Leave it out unless the evidence actually shows it; several people commonly hold different parts, and guessing one is worse than saying nothing.",
+				}),
+			),
 			// Open channel list (email, phone, linkedin, x, website, bluesky, …).
 			// Only the email channel carries a deliverability verdict + confidence.
 			channels: Schema.optionalKey(

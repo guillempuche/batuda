@@ -61,7 +61,7 @@ export const COMPANY_FIELDS = new Set([
 // Reachable addresses (email/phone/whatsapp/linkedin/instagram) live on
 // their own channel rows, not on `contacts`, so they are not settable here; only
 // the row's own columns remain.
-export const CONTACT_FIELDS = new Set(['name', 'role', 'isDecisionMaker'])
+export const CONTACT_FIELDS = new Set(['name', 'role', 'buyingRole'])
 
 const snakeToCamel = (s: string) =>
 	s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())

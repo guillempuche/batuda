@@ -1,6 +1,8 @@
 import { Trans } from '@lingui/react/macro'
 import styled from 'styled-components'
 
+import { decidesPurchase } from '@batuda/domain'
+
 import { displayValue } from '#/components/research/field-diff'
 import { SafeLink } from '#/components/research/safe-link'
 import {
@@ -34,7 +36,7 @@ type ContactEntry = {
 	readonly email?: string
 	readonly phone?: string
 	readonly linkedin?: string
-	readonly is_decision_maker?: boolean
+	readonly buying_role?: string | null
 	readonly notes?: string
 	readonly citations?: ReadonlyArray<Citation>
 }
@@ -74,7 +76,7 @@ export function ContactDiscoveryView({
 									<RowHead>
 										<Pill>{name}</Pill>
 										{role !== null ? <Reason>{role}</Reason> : null}
-										{c.is_decision_maker === true ? (
+										{decidesPurchase(c.buying_role) ? (
 											<DecisionMakerBadge>
 												<Trans>Decision maker</Trans>
 											</DecisionMakerBadge>

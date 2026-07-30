@@ -146,7 +146,7 @@ export class ParticipantMatcher extends Context.Service<ParticipantMatcher>()(
 								companyId,
 								name: args.displayName ?? email,
 								role: null,
-								isDecisionMaker: null,
+								buyingRole: null,
 								metadata: null,
 							})} RETURNING id
 						`

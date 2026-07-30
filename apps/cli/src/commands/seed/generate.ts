@@ -374,7 +374,7 @@ export type GeneratedContact = {
 	readonly companySlug: string
 	readonly name: string
 	readonly role: string
-	readonly isDecisionMaker: boolean
+	readonly buyingRole: string | null
 	readonly email: string | null
 	readonly phone: string | null
 }
@@ -419,7 +419,9 @@ export const generateContacts = (options: {
 				companySlug: company.slug,
 				name,
 				role: i === 0 ? 'Propietari' : pick(rng, ROLES),
-				isDecisionMaker: i === 0,
+				// The first person generated for a company is its owner, and an
+				// owner-run business is exactly where one person holds the budget.
+				buyingRole: i === 0 ? 'economic_buyer' : null,
 				email: chance(rng, 0.85) ? `${localPart}@${domain}` : null,
 				phone: chance(rng, 0.5)
 					? `+34 6${Math.floor(rng() * 90 + 10)} ${Math.floor(rng() * 900 + 100)} ${Math.floor(rng() * 900 + 100)}`
