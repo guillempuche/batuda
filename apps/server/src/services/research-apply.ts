@@ -8,8 +8,8 @@ export {
 	researchProvenance,
 } from './research-provenance'
 
+import { type ChannelInput, writeChannels } from './channels'
 import { forkCompanyRegeocode } from './company-geocoding'
-import { type ChannelInput, writeChannels } from './contact-channels'
 import {
 	ResearchProposalApplied,
 	TimelineActivityService,
@@ -55,7 +55,7 @@ export const COMPANY_FIELDS = new Set([
 ])
 
 // Reachable addresses (email/phone/whatsapp/linkedin/instagram) live on
-// contact_channels, not on `contacts`, so they are not settable here; only
+// their own channel rows, not on `contacts`, so they are not settable here; only
 // the row's own columns remain.
 export const CONTACT_FIELDS = new Set(['name', 'role', 'isDecisionMaker'])
 
@@ -473,11 +473,16 @@ export const findDuplicateContact = (
 		const searchableChannels = channels.filter(c => c.value.length > 0)
 		if (searchableChannels.length > 0) {
 			const pairs = searchableChannels.map(
-				c => sql`(kind = ${c.kind} AND value = ${c.value})`,
+				c => sql`(channel = ${c.kind} AND address = ${c.value})`,
 			)
+			// Only a person's channels are searched. A company now owns addresses
+			// too — a shared info@ among them — and one of those matching would
+			// merge two different people into whoever holds it.
 			const rows = yield* sql<{ contactId: string }>`
-				SELECT contact_id FROM contact_channels
-				WHERE organization_id = ${orgId} AND (${sql.or(pairs)})
+				SELECT subject_id AS contact_id FROM channels
+				WHERE organization_id = ${orgId}
+					AND subject_table = 'contacts'
+					AND (${sql.or(pairs)})
 				LIMIT 1
 			`
 			if (rows[0]) return rows[0].contactId
@@ -685,7 +690,12 @@ export const resolveResearchProposedUpdate = (
 				// Merge the discovered channels onto the person's existing row
 				// (additive — the human-owned scalar fields stay untouched) and link
 				// the run, rather than inserting a second contact for the same person.
-				yield* writeChannels(sql, org.id, existingId, created.channels)
+				yield* writeChannels(
+					sql,
+					org.id,
+					{ table: 'contacts' as const, id: existingId },
+					created.channels,
+				)
 				yield* linkSubjectToRun(
 					sql,
 					org.id,
@@ -740,7 +750,12 @@ export const resolveResearchProposedUpdate = (
 					reason: 'contact insert returned no row',
 				} satisfies ResolveOutcome
 			// Deliverability verdict + confidence land on the channels, not the row.
-			yield* writeChannels(sql, org.id, row.id, created.channels)
+			yield* writeChannels(
+				sql,
+				org.id,
+				{ table: 'contacts' as const, id: row.id },
+				created.channels,
+			)
 			yield* linkSubjectToRun(sql, org.id, runId, 'contacts', row.id, citations)
 			yield* setProposalStatus(sql, runId, org.id, index, 'applied')
 			yield* recordApplied(

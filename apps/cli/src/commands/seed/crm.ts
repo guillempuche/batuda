@@ -242,9 +242,10 @@ const buildChannels = (
 			statusReason: string | null,
 		) => ({
 			id: seedUuid('channel', `${contactId}:${kind}:${value}`),
-			contactId,
-			kind,
-			value,
+			subjectTable: 'contacts',
+			subjectId: contactId,
+			channel: kind,
+			address: value,
 			isPrimary,
 			verification: null,
 			confidence: null,
@@ -342,7 +343,7 @@ export const seedContacts = (
 
 		const channelRows = buildChannels(contacts, contactMap)
 		if (channelRows.length > 0) {
-			yield* sql`INSERT INTO contact_channels ${sql.insert(
+			yield* sql`INSERT INTO channels ${sql.insert(
 				normalizeRows(stamp(channelRows)),
 			)}`
 		}
@@ -377,7 +378,7 @@ export const seedContacts = (
 				restaurantIds,
 			).map(r => ({ ...r, organizationId: restaurantOrgId }))
 			if (restaurantChannels.length > 0) {
-				yield* sql`INSERT INTO contact_channels ${sql.insert(
+				yield* sql`INSERT INTO channels ${sql.insert(
 					normalizeRows(restaurantChannels),
 				)}`
 			}

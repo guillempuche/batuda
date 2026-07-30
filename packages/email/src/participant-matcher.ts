@@ -1,7 +1,7 @@
 import { Context, Data, Effect, Layer } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { CurrentOrg } from '@batuda/domain'
+import { CurrentOrg, isRoleAddress } from '@batuda/domain'
 
 export class MatchedContact extends Data.TaggedClass('MatchedContact')<{
 	readonly contactId: string
@@ -67,10 +67,11 @@ export class ParticipantMatcher extends Context.Service<ParticipantMatcher>()(
 							id: string
 							companyId: string
 						}>`
-							SELECT c.id, c.company_id FROM contact_channels ch
-							JOIN contacts c ON c.id = ch.contact_id
-							WHERE ch.kind = 'email'
-							  AND lower(ch.value) = ${email}
+							SELECT c.id, c.company_id FROM channels ch
+							JOIN contacts c ON c.id = ch.subject_id
+							WHERE ch.subject_table = 'contacts'
+							  AND ch.channel = 'email'
+							  AND lower(ch.address) = ${email}
 							  AND ch.organization_id = ${currentOrg.id}
 							ORDER BY c.updated_at DESC
 						`
@@ -111,6 +112,27 @@ export class ParticipantMatcher extends Context.Service<ParticipantMatcher>()(
 							return new MatchedCompanyOnly({ companyId })
 						}
 
+						// A shared mailbox — info@, hola@, sales@ — is answered by
+						// whoever is on duty, so there is no person here to record.
+						// Making one invents somebody who does not exist: a contact
+						// named after an address, who can then be assigned a task or
+						// greeted by name in a template. The address is real and worth
+						// keeping, so it goes on the company, where the next reply and
+						// the send gate both find it.
+						if (isRoleAddress(email)) {
+							yield* sql`
+								INSERT INTO channels
+									(organization_id, subject_table, subject_id, channel, address)
+								VALUES (${currentOrg.id}, 'companies', ${companyId}, 'email', ${email})
+								ON CONFLICT (subject_table, subject_id, channel, address) DO NOTHING
+							`
+							return new MatchedCompanyOnly({ companyId })
+						}
+
+						// No `notes` here: a person's notes became filed documents, and the
+						// column went with them. Naming it made every one of these
+						// inserts fail, which took calendar ingest down for any attendee
+						// not already on file — the exact case this branch exists for.
 						const inserted = yield* sql<{ id: string }>`
 							INSERT INTO contacts ${sql.insert({
 								organizationId: currentOrg.id,
@@ -118,7 +140,6 @@ export class ParticipantMatcher extends Context.Service<ParticipantMatcher>()(
 								name: args.displayName ?? email,
 								role: null,
 								isDecisionMaker: null,
-								notes: null,
 								metadata: null,
 							})} RETURNING id
 						`
@@ -131,9 +152,9 @@ export class ParticipantMatcher extends Context.Service<ParticipantMatcher>()(
 						// The inbound sender address becomes the contact's primary
 						// email channel, so a later reply matches it back.
 						yield* sql`
-							INSERT INTO contact_channels
-								(organization_id, contact_id, kind, value, is_primary)
-							VALUES (${currentOrg.id}, ${createdContact.id}, 'email', ${email}, true)
+							INSERT INTO channels
+								(organization_id, subject_table, subject_id, channel, address, is_primary)
+							VALUES (${currentOrg.id}, 'contacts', ${createdContact.id}, 'email', ${email}, true)
 						`
 						return new CreatedContact({
 							contactId: createdContact.id,

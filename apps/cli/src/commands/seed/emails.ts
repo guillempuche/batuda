@@ -225,10 +225,10 @@ export const seedDemoEmails = (
 			calPepCompanyId = companyRows[0]?.id ?? null
 			const contactRows = yield* sql<{ id: string }>`
 				SELECT c.id FROM contacts c
-				JOIN contact_channels ch ON ch.contact_id = c.id
+				JOIN channels ch ON ch.subject_table = 'contacts' AND ch.subject_id = c.id
 				WHERE c.organization_id = ${tallerOrgId}
-				  AND ch.kind = 'email'
-				  AND ch.value = 'pep@calpepfonda.cat'
+				  AND ch.channel = 'email'
+				  AND ch.address = 'pep@calpepfonda.cat'
 				LIMIT 1
 			`
 			pepContactId = contactRows[0]?.id ?? null

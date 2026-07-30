@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { clampConfidence } from './contact-channels'
+import { clampConfidence } from './channels'
 
 describe('clampConfidence', () => {
 	describe('when the value is a 0–1 fraction (the research model scale)', () => {

@@ -38,7 +38,7 @@ test.describe('contact suppression banner', () => {
 
 		// AND the seeded Pep Casals email channel is forced to bounced state.
 		psql(
-			`UPDATE contact_channels SET status='bounced', status_reason='${TARGET_REASON}', status_updated_at=now() WHERE kind='email' AND value='${TARGET_EMAIL}'`,
+			`UPDATE channels SET status='bounced', status_reason='${TARGET_REASON}', status_updated_at=now() WHERE channel='email' AND address='${TARGET_EMAIL}'`,
 		)
 	})
 
@@ -46,7 +46,7 @@ test.describe('contact suppression banner', () => {
 		// Revert the seeded bounce so the channel is reusable across runs and
 		// other suites that read the same contact don't see leftover state.
 		psql(
-			`UPDATE contact_channels SET status='unknown', status_reason=NULL, status_updated_at=now(), soft_bounce_count=0 WHERE kind='email' AND value='${TARGET_EMAIL}'`,
+			`UPDATE channels SET status='unknown', status_reason=NULL, status_updated_at=now(), soft_bounce_count=0 WHERE channel='email' AND address='${TARGET_EMAIL}'`,
 		)
 	})
 
@@ -98,7 +98,7 @@ test.describe('contact suppression banner', () => {
 		// AND the channel row should reflect status='unknown' (the route
 		// resets it to that value, not to 'valid').
 		const row = psql(
-			`SELECT status FROM contact_channels WHERE kind='email' AND value='${TARGET_EMAIL}'`,
+			`SELECT status FROM channels WHERE channel='email' AND address='${TARGET_EMAIL}'`,
 		)
 		expect(row).toBe('unknown')
 	})

@@ -137,9 +137,12 @@ export const retrySmtpSend = <A, E>(
 // snake_case columns to camelCase on read, so every row type in this file
 // is camelCase even though the SQL selects use snake_case.
 // The suppression query filters to these two, so the row type narrows to them.
-type ContactSuppressionRow = {
+// The contact is whoever happens to hold the address, and is null when it is a
+// company's own mailbox — which is exactly the case the check used to miss.
+type SuppressionRow = {
 	status: 'bounced' | 'complained'
 	statusReason: string | null
+	contactId: string | null
 }
 
 const firstRecipient = (to: string | string[]): string =>
@@ -483,29 +486,46 @@ export class EmailService extends Context.Service<EmailService>()(
 			void calendar // calendar handoff lives in mail-worker; kept as a dep so the
 			//             service stays compatible when worker integration lands.
 
-			const assertContactNotSuppressed = (
-				contactId: string,
-				recipient: string | string[],
-			) =>
+			/**
+			 * Refuse to send to an address that hard-bounced or reported spam.
+			 *
+			 * The question is asked of the address, not of whoever it belongs to.
+			 * That matters because two ways of writing an email name no person at
+			 * all: a reply to a thread that arrived from a shared mailbox — inbound
+			 * mail deliberately invents nobody for a role address — and the "email
+			 * this company" button, which opens on a company. Both used to skip the
+			 * check entirely, so a company mailbox that hard-bounced was written to
+			 * again, and again, by design.
+			 *
+			 * It is asked of every recipient, and of the whole organisation's
+			 * addresses rather than one record's: an address that bounced is the
+			 * same address whichever record happens to hold it. Scoped to the
+			 * organisation both by its own condition and by row-level security, so
+			 * one company's bounce can never speak for another's.
+			 */
+			const assertRecipientsNotSuppressed = (recipient: string | string[]) =>
 				Effect.gen(function* () {
-					// Suppression is per-address now: block only when the specific
-					// email channel being sent to is bounced/complained.
+					const currentOrg = yield* CurrentOrg
 					const recipients = (
 						Array.isArray(recipient) ? recipient : [recipient]
-					).map(r => r.toLowerCase())
-					const rows = yield* sql<ContactSuppressionRow>`
-						SELECT status, status_reason
-						FROM contact_channels
-						WHERE contact_id = ${contactId}
-						  AND kind = 'email'
-						  AND lower(value) = ANY(${recipients})
+					)
+						.map(r => r.trim().toLowerCase())
+						.filter(r => r !== '')
+					if (recipients.length === 0) return
+					const rows = yield* sql<SuppressionRow>`
+						SELECT status, status_reason,
+							CASE WHEN subject_table = 'contacts' THEN subject_id END AS contact_id
+						FROM channels
+						WHERE organization_id = ${currentOrg.id}
+						  AND channel = 'email'
+						  AND lower(address) = ANY(${recipients})
 						  AND status IN ('bounced', 'complained')
 						LIMIT 1
 					`
 					const row = rows[0]
 					if (row) {
 						return yield* new EmailSuppressed({
-							contactId,
+							contactId: row.contactId,
 							recipient: firstRecipient(recipient),
 							status: row.status,
 							reason: row.statusReason,
@@ -1029,9 +1049,7 @@ export class EmailService extends Context.Service<EmailService>()(
 							: yield* resolveDefaultInboxForCurrentUser()
 						yield* assertInboxUsable(inbox)
 
-						if (contactId) {
-							yield* assertContactNotSuppressed(contactId, to)
-						}
+						yield* assertRecipientsNotSuppressed(to)
 
 						const staged = yield* staging.resolve(inbox.id, attachmentRefs)
 						let blocks: EmailBlocks = bodyJson
@@ -1201,9 +1219,7 @@ export class EmailService extends Context.Service<EmailService>()(
 						// parsed From/To/Cc separately.
 						const replyRecipients = lastMessage.recipients?.to ?? []
 
-						if (link.contactId) {
-							yield* assertContactNotSuppressed(link.contactId, replyRecipients)
-						}
+						yield* assertRecipientsNotSuppressed(replyRecipients)
 
 						const staged = yield* staging.resolve(inbox.id, attachmentRefs)
 						let blocks: EmailBlocks = bodyJson
@@ -2630,12 +2646,7 @@ export class EmailService extends Context.Service<EmailService>()(
 						yield* assertDraftReachable(draft.inboxId, draftId)
 						const ctx = parseClientId(draft.clientId ?? undefined)
 
-						if (ctx.contactId) {
-							yield* assertContactNotSuppressed(
-								ctx.contactId,
-								draft.toAddresses as string[],
-							)
-						}
+						yield* assertRecipientsNotSuppressed(draft.toAddresses as string[])
 
 						// Reply path needs the parent thread's external_thread_id +
 						// references chain so the new message lands inside that

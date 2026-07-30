@@ -551,8 +551,10 @@ export const EmailHandlersLive = EmailTools.toLayer(
 		// deliverable or has no verdict to act on.
 		const riskyEmailVerdict = (contactId: string) =>
 			sql<{ verification: string | null }>`
-				SELECT verification FROM contact_channels
-				WHERE contact_id = ${contactId} AND kind = 'email'
+				SELECT verification FROM channels
+				WHERE subject_table = 'contacts'
+					AND subject_id = ${contactId}
+					AND channel = 'email'
 				ORDER BY is_primary DESC NULLS LAST
 				LIMIT 1
 			`.pipe(

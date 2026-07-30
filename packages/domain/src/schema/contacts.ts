@@ -3,7 +3,7 @@ import { Model } from 'effect/unstable/schema'
 
 export const ContactId = Schema.String.pipe(Schema.brand('ContactId'))
 
-// Reachable addresses (email, phone, linkedin, …) live in `contact_channels`,
+// Reachable addresses (email, phone, linkedin, …) live in `channels`,
 // the single source of truth — `contacts` carries only identity + activity.
 export class Contact extends Model.Class<Contact>('Contact')({
 	id: Model.GeneratedByDb(ContactId),

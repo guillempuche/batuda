@@ -77,7 +77,7 @@ const insertContact = async (
 	// The address lives on the email channel now — that's what inbound
 	// matching joins against.
 	await pool.query(
-		`INSERT INTO contact_channels (organization_id, contact_id, kind, value, is_primary) VALUES ($1, $2, 'email', $3, true)`,
+		`INSERT INTO channels (organization_id, subject_table, subject_id, channel, address, is_primary) VALUES ($1, 'contacts', $2, 'email', $3, true)`,
 		[ORG_ID, row.id, email],
 	)
 	return row.id

@@ -13,7 +13,7 @@ import {
 	takePage,
 	totalColumn,
 } from '../lib/sql-pagination'
-import { contactChannelsJson } from './contact-channels'
+import { channelsJsonFor } from './channels'
 import { researchProvenance } from './research-provenance'
 
 export interface CompanyFilters {
@@ -286,7 +286,7 @@ export class CompanyService extends Context.Service<CompanyService>()(
 						const companyId = companyRow['id']
 
 						const contactRows = yield* sql`
-							SELECT c.*, ${contactChannelsJson(sql)} AS channels
+							SELECT c.*, ${channelsJsonFor(sql, 'contacts')} AS channels
 							FROM contacts c
 							WHERE c.company_id = ${companyId}
 							  AND c.organization_id = ${currentOrg.id}

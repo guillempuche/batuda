@@ -14,7 +14,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { PgLive } from '../db/client'
 import { applyTestEnv } from '../test-env'
-import { writeChannels } from './contact-channels'
+import { writeChannels } from './channels'
 import { findDuplicateContact } from './research-apply'
 
 applyTestEnv()
@@ -57,8 +57,8 @@ const seedChannel = (
 	org = ORG,
 ) =>
 	pool.query(
-		`INSERT INTO contact_channels (organization_id, contact_id, kind, value)
-		 VALUES ($1, $2, $3, $4)`,
+		`INSERT INTO channels (organization_id, subject_table, subject_id, channel, address)
+		 VALUES ($1, 'contacts', $2, $3, $4)`,
 		[org, contactId, kind, value],
 	)
 
@@ -92,7 +92,7 @@ beforeAll(() => {
 })
 
 afterAll(async () => {
-	// contacts + contact_channels cascade from companies, so deleting the
+	// contacts cascade from companies and channels are cleared alongside, so deleting the
 	// companies clears everything both orgs seeded.
 	await pool.query(
 		`DELETE FROM companies WHERE organization_id = ANY($1::text[])`,
@@ -113,7 +113,7 @@ describe('writeChannels confidence normalization', () => {
 			await runtime.runPromise(
 				Effect.gen(function* () {
 					const sql = yield* SqlClient.SqlClient
-					yield* writeChannels(sql, ORG, contactId, [
+					yield* writeChannels(sql, ORG, { table: 'contacts', id: contactId }, [
 						{ kind: 'email', value: 'grace@acme.es', confidence: 0.9 },
 					])
 				}),
@@ -121,8 +121,8 @@ describe('writeChannels confidence normalization', () => {
 
 			// THEN the whole-number column holds 90, not a coerced 1
 			const rows = await pool.query<{ confidence: number }>(
-				`SELECT confidence FROM contact_channels
-				 WHERE contact_id = $1 AND kind = 'email'`,
+				`SELECT confidence FROM channels
+				 WHERE subject_table = 'contacts' AND subject_id = $1 AND channel = 'email'`,
 				[contactId],
 			)
 			expect(rows.rows[0]?.confidence).toBe(90)
@@ -139,7 +139,7 @@ describe('writeChannels confidence normalization', () => {
 			await runtime.runPromise(
 				Effect.gen(function* () {
 					const sql = yield* SqlClient.SqlClient
-					yield* writeChannels(sql, ORG, contactId, [
+					yield* writeChannels(sql, ORG, { table: 'contacts', id: contactId }, [
 						{ kind: 'email', value: 'kat@acme.es', confidence: 85 },
 					])
 				}),
@@ -147,8 +147,8 @@ describe('writeChannels confidence normalization', () => {
 
 			// THEN the score is preserved
 			const rows = await pool.query<{ confidence: number }>(
-				`SELECT confidence FROM contact_channels
-				 WHERE contact_id = $1 AND kind = 'email'`,
+				`SELECT confidence FROM channels
+				 WHERE subject_table = 'contacts' AND subject_id = $1 AND channel = 'email'`,
 				[contactId],
 			)
 			expect(rows.rows[0]?.confidence).toBe(85)
@@ -165,7 +165,7 @@ describe('writeChannels confidence normalization', () => {
 			await runtime.runPromise(
 				Effect.gen(function* () {
 					const sql = yield* SqlClient.SqlClient
-					yield* writeChannels(sql, ORG, contactId, [
+					yield* writeChannels(sql, ORG, { table: 'contacts', id: contactId }, [
 						{ kind: 'linkedin', value: 'in/margaret' },
 					])
 				}),
@@ -173,8 +173,8 @@ describe('writeChannels confidence normalization', () => {
 
 			// THEN the column stays empty rather than defaulting to a number
 			const rows = await pool.query<{ confidence: number | null }>(
-				`SELECT confidence FROM contact_channels
-				 WHERE contact_id = $1 AND kind = 'linkedin'`,
+				`SELECT confidence FROM channels
+				 WHERE subject_table = 'contacts' AND subject_id = $1 AND channel = 'linkedin'`,
 				[contactId],
 			)
 			expect(rows.rows[0]?.confidence).toBeNull()

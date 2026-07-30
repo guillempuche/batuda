@@ -74,6 +74,7 @@ export {
 	TERMINAL_RESEARCH_EVENTS,
 	TERMINAL_RESEARCH_STATUSES,
 } from './research-runs'
+export { isRoleAddress } from './role-addresses'
 export {
 	DOCUMENT_SUBJECT_TABLES,
 	DocumentSubjectTable,

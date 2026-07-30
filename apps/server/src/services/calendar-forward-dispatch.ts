@@ -102,11 +102,12 @@ export const dispatchForwardInvitation = (args: {
 		// way as any other agent-sent email.
 		const contactRows = yield* sql<{ id: string; companyId: string | null }>`
 			SELECT c.id, c.company_id AS "companyId"
-			FROM contact_channels ch
-			JOIN contacts c ON c.id = ch.contact_id
-			WHERE ch.organization_id = ${currentOrg.id}
-			  AND ch.kind = 'email'
-			  AND lower(ch.value) = ${args.toEmail.toLowerCase()}
+			FROM channels ch
+			JOIN contacts c ON c.id = ch.subject_id
+			WHERE ch.subject_table = 'contacts'
+			  AND ch.organization_id = ${currentOrg.id}
+			  AND ch.channel = 'email'
+			  AND lower(ch.address) = ${args.toEmail.toLowerCase()}
 			ORDER BY c.created_at ASC
 			LIMIT 1
 		`
