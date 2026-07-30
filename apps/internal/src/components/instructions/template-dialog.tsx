@@ -24,6 +24,7 @@ import {
 import { MarkdownView } from '#/components/markdown/markdown-view'
 import { PriRichText } from '#/components/primitives/pri-rich-text'
 import { RelativeDate } from '#/components/shared/relative-date'
+import { SrOnly } from '#/components/shared/sr-only'
 import { stenciledTitle } from '#/lib/workshop-mixins'
 
 /**
@@ -89,6 +90,9 @@ export function TemplateDialog({
 	const keepEditingRef = useRef<HTMLButtonElement>(null)
 	const editButtonRef = useRef<HTMLButtonElement>(null)
 	const nameRef = useRef<HTMLInputElement>(null)
+	// The control that had focus when the discard prompt appeared, so keeping the
+	// draft hands the writer back to it rather than to the top of the dialog.
+	const focusedBeforePromptRef = useRef<HTMLElement | null>(null)
 	// Set when the guard is answering a browser Back rather than a click, so
 	// discarding lets that navigation through instead of only closing the dialog.
 	const pendingNav = useRef<(() => void) | null>(null)
@@ -124,6 +128,41 @@ export function TemplateDialog({
 		else editButtonRef.current?.focus()
 	}, [editing, open])
 
+	// Sighted readers watch the dialog turn into the editor and back. Focus moves
+	// within the same dialog, so nothing is announced on its own — this says which
+	// mode you landed in. It stays empty until the first switch, so opening the
+	// dialog isn't narrated twice.
+	const [modeAnnouncement, setModeAnnouncement] = useState('')
+	const announcedMode = useRef<boolean | null>(null)
+	useEffect(() => {
+		if (!open) {
+			announcedMode.current = null
+			setModeAnnouncement('')
+			return
+		}
+		if (announcedMode.current === null) {
+			announcedMode.current = editing
+			return
+		}
+		if (announcedMode.current === editing) return
+		announcedMode.current = editing
+		setModeAnnouncement(
+			editing ? t`Editing this template` : t`Reading this template`,
+		)
+	}, [editing, open, t])
+
+	// Every way into the prompt notes where focus stood first. It has to happen
+	// here rather than once the prompt is up, because the control that asks
+	// (Cancel) is the one the prompt replaces.
+	const askDiscard = () => {
+		const active = document.activeElement
+		// A browser Back arrives with nothing focused, and the page body counts as
+		// an element — handing focus back to it is the very thing this avoids.
+		focusedBeforePromptRef.current =
+			active instanceof HTMLElement && active !== document.body ? active : null
+		setConfirmDiscard(true)
+	}
+
 	// Browser Back never reaches the dialog's own close handler — it drops the
 	// search key, and the dialog is simply told it is shut. Blocking the
 	// navigation is the only way an unsaved rewrite survives a stray Back.
@@ -132,10 +171,11 @@ export function TemplateDialog({
 		disabled: !open || !editing,
 		withResolver: true,
 	})
+	// biome-ignore lint/correctness/useExhaustiveDependencies: listing askDiscard would re-run this on every render and overwrite the remembered focus with the prompt's own button
 	useEffect(() => {
 		if (blocker.status !== 'blocked') return
 		pendingNav.current = blocker.proceed
-		setConfirmDiscard(true)
+		askDiscard()
 	}, [blocker.status, blocker.proceed])
 
 	const shown = saved ?? target
@@ -153,6 +193,9 @@ export function TemplateDialog({
 
 	const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
 		event.preventDefault()
+		// Save stays clickable while a save is in flight, so a second press stops
+		// here rather than sending the same text twice.
+		if (submitting) return
 		const form = new FormData(event.currentTarget)
 		const name = String(form.get('name') ?? '').trim()
 		const body = String(form.get('body') ?? '').trim()
@@ -197,7 +240,7 @@ export function TemplateDialog({
 			return
 		}
 		if (editing && dirtyRef.current) {
-			setConfirmDiscard(true)
+			askDiscard()
 			return
 		}
 		onOpenChange(false)
@@ -208,7 +251,7 @@ export function TemplateDialog({
 	// one that quietly throws the draft away.
 	const leaveEditing = () => {
 		if (dirtyRef.current) {
-			setConfirmDiscard(true)
+			askDiscard()
 			return
 		}
 		if (isCreate) onOpenChange(false)
@@ -217,6 +260,12 @@ export function TemplateDialog({
 
 	const keepEditing = () => {
 		setConfirmDiscard(false)
+		// Back to whatever had focus before the prompt. Cancel is usually that
+		// control and the prompt takes its place, so fall back to the name field.
+		const previous = focusedBeforePromptRef.current
+		focusedBeforePromptRef.current = null
+		if (previous?.isConnected) previous.focus()
+		else nameRef.current?.focus()
 		if (pendingNav.current !== null) {
 			pendingNav.current = null
 			blocker.reset?.()
@@ -226,6 +275,7 @@ export function TemplateDialog({
 	const discard = () => {
 		dirtyRef.current = false
 		setConfirmDiscard(false)
+		focusedBeforePromptRef.current = null
 		const proceed = pendingNav.current
 		pendingNav.current = null
 		if (proceed !== null) {
@@ -267,6 +317,9 @@ export function TemplateDialog({
 			<PriDialog.Portal>
 				<PriDialog.Backdrop />
 				<PriDialog.Popup mobile='sheet' data-testid={testId}>
+					<SrOnly role='status' aria-live='polite'>
+						{modeAnnouncement}
+					</SrOnly>
 					<Header>
 						<TitleBlock>
 							<PriDialog.Title>
@@ -321,7 +374,11 @@ export function TemplateDialog({
 							/>
 
 							{orgOwned ? (
-								<OrgNotice role='note' data-testid={`${testId}-org-notice`}>
+								<OrgNotice
+									id='template-org-notice'
+									role='note'
+									data-testid={`${testId}-org-notice`}
+								>
 									<Trans>
 										This one belongs to your organization. What you save here
 										changes it for everybody.
@@ -347,7 +404,14 @@ export function TemplateDialog({
 										data-testid='template-editor-name'
 										defaultValue={target?.name ?? ''}
 										placeholder={t`e.g. [research] Spain hospitality sourcing`}
-										aria-describedby='template-name-hint'
+										// Focus lands straight in this field when reading turns into
+										// writing, past the notice above it, so the notice is read
+										// out with the field rather than only being there to see.
+										aria-describedby={
+											orgOwned
+												? 'template-org-notice template-name-hint'
+												: 'template-name-hint'
+										}
 										onChange={() => {
 											dirtyRef.current = true
 										}}
@@ -413,11 +477,15 @@ export function TemplateDialog({
 									</DiscardBar>
 								) : (
 									<Footer>
+										{/* aria-disabled, not disabled: switching a focused button
+										    to disabled throws focus to the top of the page, and a
+										    failed save would leave the writer stranded there.
+										    handleSubmit ignores the repeat press instead. */}
 										<PriButton
 											type='submit'
 											$variant='filled'
 											data-testid='template-editor-submit'
-											disabled={submitting}
+											aria-disabled={submitting}
 										>
 											{submitting ? (
 												<Trans>Saving…</Trans>

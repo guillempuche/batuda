@@ -143,7 +143,11 @@ export const PriButton = styled(Button).withConfig({
 		z-index: 1;
 	}
 
-	&:disabled {
+	/* A button that stays reachable while it is busy uses aria-disabled rather
+	 * than the disabled attribute, so keyboard focus isn't thrown to the top of
+	 * the page mid-action. It has to look the same either way. */
+	&:disabled,
+	&[aria-disabled='true'] {
 		opacity: 0.5;
 		cursor: not-allowed;
 	}

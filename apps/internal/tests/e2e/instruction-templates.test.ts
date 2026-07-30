@@ -1,3 +1,4 @@
+import type { Browser, BrowserContext } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 
 import { setActiveOrgBySlug } from './helpers/set-active-org'
@@ -14,7 +15,10 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 //     (new-stack)
 //   apps/internal/src/components/instructions/template-library.tsx
 //     (template-row, template-view-{id}, org-template-row,
-//      org-template-view-{id}, template-edit-{id})
+//      org-template-view-{id}, template-edit-{id}, template-more-{id},
+//      template-transfer-{id}, templates-new, org-templates-new)
+//   apps/internal/src/components/instructions/template-transfer-dialog.tsx
+//     (template-transfer-confirm, -target, -option-{userId}, -button)
 //   apps/internal/src/components/instructions/template-dialog.tsx
 //     (template-view-dialog, -body, -edit, org-template-view-dialog,
 //      template-editor-name, template-editor-body, template-editor-submit,
@@ -22,10 +26,43 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 //   apps/internal/src/components/instructions/stack-picker.tsx (stack-read-{id})
 //   apps/internal/src/components/instructions/stack-editor.tsx (stack-name)
 
+const BASE_URL = process.env['E2E_BASE_URL'] ?? 'https://batuda.localhost'
+
 test.beforeEach(async ({ page }) => {
 	await page.goto('/', { waitUntil: 'commit' })
 	await setActiveOrgBySlug(page, 'taller')
 })
+
+// The suite runs single-worker against one shared database, so a case that
+// rewrites a template makes its own rather than taking a seeded one away from
+// everything else that reads it.
+const uniq = (label: string) => `e2e-${label}-${Date.now()}`
+
+// Carol is the org's plain member. She needs her own browser context: the authed
+// project injects Alice's cookie, which would quietly run these as the owner and
+// prove nothing. Signed in over the API — her login is not what this is about.
+async function signInAsCarol(browser: Browser): Promise<BrowserContext> {
+	const context = await browser.newContext({
+		ignoreHTTPSErrors: true,
+		baseURL: BASE_URL,
+		storageState: { cookies: [], origins: [] },
+	})
+	const headers = { origin: BASE_URL, 'content-type': 'application/json' }
+	const signedIn = await context.request.post(
+		`${BASE_URL}/auth/sign-in/email`,
+		{
+			headers,
+			data: { email: 'colleague@taller.cat', password: 'batuda-dev-2026' },
+		},
+	)
+	expect(signedIn.ok(), 'Carol should be able to sign in').toBe(true)
+	const switched = await context.request.post(
+		`${BASE_URL}/auth/organization/set-active`,
+		{ headers, data: { organizationSlug: 'taller' } },
+	)
+	expect(switched.ok(), 'Carol should reach taller').toBe(true)
+	return context
+}
 
 test.describe('reading an instruction template', () => {
 	test.describe('when the template belongs to the organization', () => {
@@ -315,6 +352,62 @@ test.describe('managing an instruction template', () => {
 			// THEN the editor is open, and the address addresses it so a reload keeps it
 			await expect(page.getByTestId('template-editor-name')).toBeVisible()
 			expect(decodeURIComponent(page.url())).toContain('"kind":"edit"')
+		})
+	})
+})
+
+test.describe('managing the organization’s shared templates', () => {
+	test.describe('when a plain member rewrites one of them', () => {
+		test('should change the shared copy the owner reads, not a copy of their own', async ({
+			page,
+			browser,
+		}) => {
+			// GIVEN a shared template the owner has just written
+			const name = uniq('shared')
+			await page.goto('/settings/organization/templates', {
+				waitUntil: 'networkidle',
+			})
+			await page.getByTestId('org-templates-new').click()
+			await page.getByTestId('template-editor-name').fill(name)
+			await page.getByTestId('template-editor-body').fill('owner wrote this')
+			await page.getByTestId('template-editor-submit').click()
+			const ownerRow = page
+				.getByTestId('org-template-row')
+				.filter({ hasText: name })
+			await expect(ownerRow).toBeVisible()
+
+			// WHEN the org's plain member rewrites it
+			const carol = await signInAsCarol(browser)
+			const carolPage = await carol.newPage()
+			try {
+				await carolPage.goto('/settings/organization/templates', {
+					waitUntil: 'networkidle',
+				})
+				const carolRow = carolPage
+					.getByTestId('org-template-row')
+					.filter({ hasText: name })
+				await expect(carolRow).toBeVisible()
+				await carolRow.getByRole('button', { name: /^Read / }).click()
+				await carolPage.getByTestId('org-template-view-dialog-edit').click()
+				await carolPage
+					.getByTestId('template-editor-body')
+					.fill('the member rewrote this')
+				await carolPage.getByTestId('template-editor-submit').click()
+				await expect(
+					carolPage.getByTestId('org-template-view-dialog-body'),
+				).toContainText('the member rewrote this')
+			} finally {
+				await carol.close()
+			}
+
+			// THEN the owner sees the member's text in the same row — one shared
+			// template that changed, not a personal copy alongside it
+			await page.reload({ waitUntil: 'networkidle' })
+			await expect(ownerRow).toHaveCount(1)
+			await ownerRow.getByRole('button', { name: /^Read / }).click()
+			await expect(
+				page.getByTestId('org-template-view-dialog-body'),
+			).toContainText('the member rewrote this')
 		})
 	})
 })
