@@ -946,6 +946,10 @@ msgid "Channel kind"
 msgstr "Channel kind"
 
 #: src/components/contacts/manage-channels-dialog.tsx
+msgid "Channel label"
+msgstr "Channel label"
+
+#: src/components/contacts/manage-channels-dialog.tsx
 msgid "Channel value"
 msgstr "Channel value"
 
@@ -3761,6 +3765,10 @@ msgstr "Open-ended brief. Pick when the question does not fit a fixed shape — 
 msgid "Opened"
 msgstr "Opened"
 
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "orders, Girona shop…"
+msgstr "orders, Girona shop…"
+
 #: src/components/instructions/stack-picker.tsx
 #: src/components/instructions/template-library.tsx
 msgid "Org"
@@ -4083,6 +4091,10 @@ msgstr "Previous"
 #: src/components/companies/proposals-panel.tsx
 msgid "Price"
 msgstr "Price"
+
+#: src/components/companies/company-channels-section.tsx
+msgid "primary"
+msgstr "primary"
 
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
@@ -5792,6 +5804,10 @@ msgstr "Visit"
 msgid "Visit notes"
 msgstr "Visit notes"
 
+#: src/components/companies/company-channels-section.tsx
+msgid "Ways to reach"
+msgstr "Ways to reach"
+
 #: src/routes/login.tsx
 msgid "We couldn't sign you in via that link. Try again."
 msgstr "We couldn't sign you in via that link. Try again."
@@ -5910,6 +5926,11 @@ msgstr "would become"
 #: src/routes/emails/inboxes.tsx
 msgid "Write footer…"
 msgstr "Write footer…"
+
+#. placeholder {0}: ch.value
+#: src/components/companies/company-channels-section.tsx
+msgid "Write to {0}"
+msgstr "Write to {0}"
 
 #: src/components/emails/compose-form.tsx
 msgid "Write your message…"

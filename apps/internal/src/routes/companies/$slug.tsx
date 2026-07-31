@@ -12,7 +12,6 @@ import { DateTime, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import {
 	AlertTriangle,
-	AtSign,
 	BadgeCheck,
 	Briefcase,
 	CalendarClock,
@@ -27,7 +26,6 @@ import {
 	Mail,
 	MailPlus,
 	MapPin,
-	MessageCircle,
 	Pencil,
 	Phone,
 	Plus,
@@ -64,6 +62,7 @@ import { researchListAtom } from '#/atoms/research-atoms'
 import { AboutSection } from '#/components/companies/about-section'
 import { AccountBriefSection } from '#/components/companies/account-brief-section'
 import { CadenceCard } from '#/components/companies/cadence-card'
+import { CompanyChannelsSection } from '#/components/companies/company-channels-section'
 import {
 	CompanyFitSection,
 	type FieldSource,
@@ -91,6 +90,7 @@ import { ResearchSummaryCard } from '#/components/companies/research-summary-car
 import { UpcomingMeetingsCard } from '#/components/companies/upcoming-meetings-card'
 import { WherePanel } from '#/components/companies/where-panel'
 import { useBuyingRoleLabel } from '#/components/contacts/buying-role-label'
+import { CHANNEL_ICON } from '#/components/contacts/channel-icons'
 import {
 	ContactEditDialog,
 	type EditableContact,
@@ -169,6 +169,7 @@ type CompanyDetail = {
 	readonly location: string | null
 	readonly source: string | null
 	readonly priority: number | null
+	readonly channels: ReadonlyArray<DisplayChannel>
 	readonly website: string | null
 	readonly email: string | null
 	readonly phone: string | null
@@ -1319,6 +1320,16 @@ function DetailBody({
 											onRunNew={() => openDlg({ kind: 'research' })}
 										/>
 									)}
+									<CompanyChannelsSection
+										channels={company.channels}
+										onEmail={address =>
+											openCompose({
+												mode: 'new',
+												companyId: company.id,
+												to: address,
+											})
+										}
+									/>
 									<WherePanel company={company} compact />
 									<AccountBriefSection
 										company={company}
@@ -1473,6 +1484,9 @@ function DetailBody({
 																<ExternalLink size={12} aria-hidden />
 															)}
 														</ContactLink>
+														{ch.label ? (
+															<ChannelLabel>{ch.label}</ChannelLabel>
+														) : null}
 														{hasTrust ? (
 															<TrustBadge
 																verification={ch.verification}
@@ -1772,6 +1786,9 @@ function narrowCompany(raw: unknown): CompanyDetail | null {
 		location: str('location'),
 		source: str('source'),
 		priority: num('priority'),
+		// The fields below hold one of each kind; keeping the whole list is the
+		// only way a second mailbox is ever seen.
+		channels: narrowChannels(r['channels']),
 		website: channel('website'),
 		email: channel('email'),
 		phone: channel('phone'),
@@ -1922,16 +1939,14 @@ function narrowContactProvenance(
 	return out
 }
 
-const CHANNEL_ICON: Record<string, typeof Mail> = {
-	email: Mail,
-	phone: Phone,
-	whatsapp: MessageCircle,
-	linkedin: Briefcase,
-	x: AtSign,
-	instagram: AtSign,
-	website: Globe,
-	bluesky: AtSign,
-}
+const ChannelLabel = styled.span`
+	padding: 0 var(--space-2xs);
+	border-radius: var(--radius-xs);
+	background: var(--color-surface-container-high);
+	color: var(--color-on-surface-variant);
+	font-size: var(--typescale-label-small-size);
+	white-space: nowrap;
+`
 
 const textOrNull = (value: unknown): string | null =>
 	typeof value === 'string' && value.trim().length > 0 ? value : null
