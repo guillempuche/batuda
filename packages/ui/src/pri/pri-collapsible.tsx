@@ -50,11 +50,14 @@ const PriTrigger = styled(Collapsible.Trigger).withConfig({
 		box-shadow: var(--glow-active);
 	}
 
-	& svg {
+	/* Only the leading arrow turns. A trigger is free to carry another icon
+	 * alongside its label — one naming the section — and turning that one on
+	 * open leaves it lying on its side. */
+	& > svg:first-child {
 		transition: transform 200ms ease;
 	}
 
-	&[data-panel-open] svg {
+	&[data-panel-open] > svg:first-child {
 		transform: rotate(90deg);
 	}
 `
