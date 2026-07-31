@@ -8,6 +8,10 @@ export const ContactId = Schema.String.pipe(Schema.brand('ContactId'))
 export class Contact extends Model.Class<Contact>('Contact')({
 	id: Model.GeneratedByDb(ContactId),
 	companyId: Schema.String,
+	// The branch this person works at. Beside `companyId` rather than replacing
+	// it: someone who covers several branches belongs to the company, and that is
+	// most people, so null is an ordinary answer rather than a gap.
+	siteId: Schema.NullOr(Schema.String),
 
 	name: Schema.String,
 	role: Schema.NullOr(Schema.String),
