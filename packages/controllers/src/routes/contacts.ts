@@ -14,6 +14,7 @@ import { PaginatedList, pageQuery } from '../pagination'
 const ChannelInput = Schema.Struct({
 	kind: Schema.String,
 	value: Schema.String,
+	label: Schema.optional(Schema.String),
 	verification: Schema.optional(Schema.String),
 	confidence: Schema.optional(Schema.Number),
 	is_primary: Schema.optional(Schema.Boolean),
@@ -21,6 +22,8 @@ const ChannelInput = Schema.Struct({
 
 const CreateContactInput = Schema.Struct({
 	companyId: Schema.String,
+	// The branch this person works at, when the company has more than one.
+	siteId: Schema.optional(Schema.String),
 	name: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
 	role: Schema.optional(Schema.String),
 	buyingRole: Schema.optional(Schema.String),
@@ -29,6 +32,7 @@ const CreateContactInput = Schema.Struct({
 })
 
 const UpdateContactInput = Schema.Struct({
+	siteId: Schema.optional(Schema.NullOr(Schema.String)),
 	name: Schema.optional(Schema.String),
 	role: Schema.optional(Schema.String),
 	buyingRole: Schema.optional(Schema.String),
@@ -41,12 +45,18 @@ const UpdateContactInput = Schema.Struct({
 const AddChannelInput = Schema.Struct({
 	kind: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
 	value: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
+	// Which of several this is, in a person's own words: "Girona shop",
+	// "switchboard". Without it a second mailbox is just another address.
+	label: Schema.optional(Schema.String),
 	is_primary: Schema.optional(Schema.Boolean),
 })
 
 const PatchChannelInput = Schema.Struct({
 	kind: Schema.optional(Schema.String),
 	value: Schema.optional(Schema.String),
+	// Nullable so a name given by mistake can be taken back off; leaving it out
+	// keeps whatever is there.
+	label: Schema.optional(Schema.NullOr(Schema.String)),
 	is_primary: Schema.optional(Schema.Boolean),
 })
 
