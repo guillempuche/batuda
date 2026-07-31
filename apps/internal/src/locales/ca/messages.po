@@ -774,6 +774,10 @@ msgstr "Bloquejat"
 msgid "Blocked by the provider. The body is shown for review only."
 msgstr "Bloquejat pel proveïdor. El cos es mostra només per revisar-lo."
 
+#: src/components/contacts/channel-kind-label.tsx
+msgid "Bluesky"
+msgstr "Bluesky"
+
 #: src/components/companies/companies-header.tsx
 msgid "Board"
 msgstr "Tauler"
@@ -1790,6 +1794,10 @@ msgstr "Rebutja"
 msgid "declined"
 msgstr "ha declinat"
 
+#: src/components/companies/company-channels-section.tsx
+msgid "default"
+msgstr "predeterminat"
+
 #: src/components/instructions/stack-list.tsx
 #: src/routes/emails/inboxes.tsx
 msgid "Default"
@@ -2108,6 +2116,7 @@ msgid "Editor"
 msgstr "Editor"
 
 #: src/components/companies/conversations-tab.tsx
+#: src/components/contacts/channel-kind-label.tsx
 #: src/components/instructions/agent-selector.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
@@ -2611,6 +2620,7 @@ msgstr "Infomaniak necessita una contrasenya d'aplicació de Mail creada al teu 
 msgid "Infomaniak needs a Mail app password created in your Mail service — not an account application password."
 msgstr "Infomaniak necessita una contrasenya d'aplicació de Mail creada al teu servei Mail, no una contrasenya d'aplicació del compte."
 
+#: src/components/contacts/channel-kind-label.tsx
 #: src/components/shared/channel-icon.tsx
 msgid "Instagram"
 msgstr "Instagram"
@@ -2781,6 +2791,7 @@ msgstr "Clar"
 msgid "Line items"
 msgstr "Línies"
 
+#: src/components/contacts/channel-kind-label.tsx
 #: src/components/research/findings/contact-discovery-view.tsx
 #: src/components/research/run-labels.ts
 #: src/components/shared/channel-icon.tsx
@@ -2918,6 +2929,11 @@ msgstr "Baixa"
 msgid "Low priority"
 msgstr "Prioritat baixa"
 
+#. placeholder {0}: ch.value
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Make {0} primary"
+msgstr "Fes {0} principal"
+
 #. placeholder {0}: row.email
 #: src/routes/emails/inboxes.tsx
 msgid "Make {0} the address you send from"
@@ -2929,8 +2945,8 @@ msgid "Make {0} the default"
 msgstr "Fes que {0} sigui la predeterminada"
 
 #: src/components/contacts/manage-channels-dialog.tsx
-msgid "Make primary"
-msgstr "Fes-lo principal"
+#~ msgid "Make primary"
+#~ msgstr "Fes-lo principal"
 
 #: src/components/instructions/stack-editor.tsx
 msgid "Make this my default"
@@ -3765,6 +3781,10 @@ msgstr "Resum lliure. Tria-ho quan la pregunta no encaixa en una forma fixa — 
 msgid "Opened"
 msgstr "Obert"
 
+#: src/components/companies/company-channels-section.tsx
+msgid "opens in a new tab"
+msgstr "s'obre en una pestanya nova"
+
 #: src/components/contacts/manage-channels-dialog.tsx
 msgid "orders, Girona shop…"
 msgstr "comandes, botiga de Girona…"
@@ -4010,6 +4030,7 @@ msgstr "Persona"
 msgid "Personal"
 msgstr "Personal"
 
+#: src/components/contacts/channel-kind-label.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/findings/contact-discovery-view.tsx
 #: src/components/research/run-labels.ts
@@ -4359,7 +4380,9 @@ msgid "Remove \"{0}\" from the stacks that use it first, then delete it."
 msgstr "Treu «{0}» de les piles que la fan servir abans d'eliminar-la."
 
 #. placeholder {0}: att.filename
+#. placeholder {0}: ch.value
 #. placeholder {0}: o.name
+#: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/emails/attachment-picker.tsx
 #: src/components/instructions/stack-picker.tsx
 msgid "Remove {0}"
@@ -4374,8 +4397,8 @@ msgid "Remove {email} from this organization?"
 msgstr "Vols eliminar {email} d'aquesta organització?"
 
 #: src/components/contacts/manage-channels-dialog.tsx
-msgid "Remove channel"
-msgstr "Elimina el canal"
+#~ msgid "Remove channel"
+#~ msgstr "Elimina el canal"
 
 #: src/components/companies/proposals-panel.tsx
 msgid "Remove line"
@@ -5829,6 +5852,7 @@ msgstr "Encaix feble"
 msgid "Weaknesses"
 msgstr "Punts febles"
 
+#: src/components/contacts/channel-kind-label.tsx
 #: src/components/research/run-labels.ts
 msgid "Website"
 msgstr "Lloc web"
@@ -5879,6 +5903,7 @@ msgstr "Sobre què fer seguiment"
 msgid "What's this mailbox for?"
 msgstr "Per a què serveix aquesta bústia?"
 
+#: src/components/contacts/channel-kind-label.tsx
 #: src/components/shared/channel-icon.tsx
 msgid "WhatsApp"
 msgstr "WhatsApp"
@@ -5951,6 +5976,10 @@ msgstr "Escrit per la recerca. Si l'edites, passa a ser teu."
 #: src/components/research/target-correction.tsx
 msgid "Wrong company? Enter its official website"
 msgstr "Empresa equivocada? Introdueix el seu lloc web oficial"
+
+#: src/components/contacts/channel-kind-label.tsx
+msgid "X"
+msgstr "X"
 
 #: src/routes/settings/profile/index.tsx
 msgid "You currently sign in from email links. Add a password to skip checking your email next time."
