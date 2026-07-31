@@ -2207,31 +2207,35 @@ export class EmailService extends Context.Service<EmailService>()(
 							}
 						}
 
+						// Who a mailbox belongs to is not written from here. The column
+						// is out of this role's reach, so the change goes through a
+						// routine that re-checks the rules for itself — the database
+						// says no even if the checks above were ever loosened. It
+						// settles what follows from a handover in the same statement:
+						// the mark for sending comes off, so the mailbox cannot quietly
+						// become what its new owner sends as, and a mailbox given to the
+						// whole team stops being hidden from them.
+						const handingOver =
+							patch.ownerUserId !== undefined &&
+							patch.ownerUserId !== existing.ownerUserId
+						if (handingOver) {
+							yield* sql`
+								SELECT 1 FROM transfer_inbox(
+									${id}::uuid,
+									${patch.ownerUserId ?? null}
+								)
+							`.pipe(Effect.orDie)
+						}
+
 						const sets: Array<Statement.Fragment> = []
 						if (patch.displayName !== undefined)
 							sets.push(sql`display_name = ${patch.displayName}`)
 						if (patch.description !== undefined)
 							sets.push(sql`description = ${patch.description}`)
-						if (patch.ownerUserId !== undefined)
-							sets.push(sql`owner_user_id = ${patch.ownerUserId}`)
 						if (patch.isPrivate !== undefined)
 							sets.push(sql`is_private = ${patch.isPrivate}`)
 						if (patch.isDefault !== undefined)
 							sets.push(sql`is_default = ${patch.isDefault}`)
-						// Handing a mailbox to somebody else does not hand over the
-						// choice of sending from it: the mark comes off, so the mailbox
-						// cannot quietly become what its new owner sends as.
-						if (
-							ownerAfterPatch !== existing.ownerUserId &&
-							patch.isDefault === undefined
-						) {
-							sets.push(sql`is_default = false`)
-						}
-						// Giving a mailbox to the whole team opens it to them, since a
-						// mailbox everybody owns cannot be hidden from anybody.
-						if (ownerAfterPatch === null && patch.isPrivate === undefined) {
-							sets.push(sql`is_private = false`)
-						}
 						if (patch.active !== undefined)
 							sets.push(sql`active = ${patch.active}`)
 						if (patch.imapHost !== undefined)
@@ -2258,8 +2262,19 @@ export class EmailService extends Context.Service<EmailService>()(
 							sets.push(sql`password_tag = ${encrypted.tag}`)
 						}
 
+						// A handover writes on its own, so a patch that only changed
+						// hands has nothing left to write — but the row it started from
+						// is now out of date, and reading it back is what the caller
+						// gets to see.
 						if (sets.length === 0) {
-							return yield* decodeInbox(existing).pipe(Effect.orDie)
+							if (!handingOver) {
+								return yield* decodeInbox(existing).pipe(Effect.orDie)
+							}
+							const handed = yield* resolveInboxToLookAfter(id)
+							if (!handed) {
+								return yield* new NotFound({ entity: 'Inbox', id })
+							}
+							return yield* decodeInbox(handed).pipe(Effect.orDie)
 						}
 
 						// A credential or transport change is re-probed after the
