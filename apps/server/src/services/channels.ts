@@ -22,7 +22,7 @@ export interface ChannelInput {
 }
 
 /** What a way of reaching someone can hang off. */
-export type ChannelSubject = 'companies' | 'contacts'
+export type ChannelSubject = 'companies' | 'contacts' | 'sites'
 
 // The ways of reaching a company that used to be columns on its row. Callers
 // still name them that way — a company "has a website" reads naturally, and the
@@ -105,13 +105,13 @@ export const writeChannels = (
 				(organization_id, subject_table, subject_id, channel, address, label, verification, confidence, is_primary)
 			VALUES (
 				${orgId}, ${subject.table}, ${subject.id}, ${c.kind}, ${c.value}, ${c.label ?? null},
-				${c.verification ?? null}, ${clampConfidence(c.confidence)}, ${c.is_primary ?? false}
+				${c.verification ?? null}, ${clampConfidence(c.confidence)}, COALESCE(${c.is_primary ?? null}, false)
 			)
 			ON CONFLICT (subject_table, subject_id, channel, address) DO UPDATE SET
 				label = COALESCE(EXCLUDED.label, channels.label),
 				verification = EXCLUDED.verification,
 				confidence = EXCLUDED.confidence,
-				is_primary = EXCLUDED.is_primary,
+				is_primary = COALESCE(${c.is_primary ?? null}, channels.is_primary),
 				updated_at = now()
 		`,
 		{ discard: true },
@@ -151,19 +151,12 @@ export const channelsJsonFor = (sql: Sql, subject: ChannelSubject) =>
 	`
 
 /**
- * The columns a channel row is handed back as, named one by one.
- *
- * Storage keys a channel by its subject and calls its two main columns `channel`
- * and `address`; every caller outside this file — the HTTP API, the web app, the
- * MCP tools — knows them as `contact_id`, `kind` and `value`. Translating in this
- * one place is what let the columns be renamed, and a company's channels be
- * stored beside a person's, without any of them noticing. Moving the outside
- * names is then a separate decision, made on purpose.
+ * Storage calls a channel's two main columns `channel` and `address`, while
+ * everyone reading a channel knows them as `kind` and `value`. Translating in
+ * this one place keeps the storage names free to change on their own.
  */
-const channelRowColumns = (sql: Sql) =>
+const channelColumnsWithoutSubject = (sql: Sql) =>
 	sql`
-		id,
-		subject_id AS contact_id,
 		channel AS kind,
 		address AS value,
 		label, verification, confidence, is_primary,
@@ -171,7 +164,12 @@ const channelRowColumns = (sql: Sql) =>
 		created_at, updated_at
 	`
 
-/** Every channel of one subject, primary first. */
+// A person's channels are handed back keyed `contact_id`: that is the name
+// callers read them by, whatever storage calls the column.
+const channelRowColumns = (sql: Sql) =>
+	sql`id, subject_id AS contact_id, ${channelColumnsWithoutSubject(sql)}`
+
+/** Every channel of one person, primary first. */
 export const channelsOf = (
 	sql: Sql,
 	subject: { readonly table: ChannelSubject; readonly id: string },
@@ -182,6 +180,47 @@ export const channelsOf = (
 		ORDER BY is_primary DESC, channel
 	`
 
+/**
+ * Every channel of a company or one of its branches, primary first.
+ *
+ * Kept apart from `channelsOf` because that one hands the subject back as
+ * `contact_id`, which is a lie for a company: anyone passing that id where a
+ * contact id belongs would be trusting the field name, not misreading it.
+ */
+export const subjectChannelsOf = (
+	sql: Sql,
+	subject: { readonly table: ChannelSubject; readonly id: string },
+) =>
+	sql`
+		SELECT id, subject_table, subject_id, ${channelColumnsWithoutSubject(sql)}
+		FROM channels
+		WHERE subject_table = ${subject.table} AND subject_id = ${subject.id}
+		ORDER BY is_primary DESC, channel
+	`
+
+/**
+ * Stand down whichever address of the same kind was the default before, leaving
+ * the named one as the only one.
+ *
+ * "Primary" is what decides where a message actually goes, so two of them for
+ * one kind is not a cosmetic mess: the address a message leaves for becomes
+ * whichever the sort happens to surface first. That was unaskable while a
+ * company had a single mailbox, and is asked constantly once it has three.
+ *
+ * The old default is read from the newly-marked row itself, so nothing has to be
+ * looked up first and no caller can pass a subject that disagrees with the row.
+ */
+const standDownOtherPrimaries = (sql: Sql, channelId: string) =>
+	sql`
+		UPDATE channels SET is_primary = false, updated_at = now()
+		WHERE id <> ${channelId}
+			AND is_primary
+			AND (subject_table, subject_id, channel) = (
+				SELECT subject_table, subject_id, channel
+				FROM channels WHERE id = ${channelId}
+			)
+	`
+
 /** Add a single channel (the UI's "add"), returning the stored row. */
 export const addChannel = (
 	sql: Sql,
@@ -189,19 +228,30 @@ export const addChannel = (
 	subject: { readonly table: ChannelSubject; readonly id: string },
 	c: ChannelInput,
 ) =>
-	sql`
-		INSERT INTO channels
-			(organization_id, subject_table, subject_id, channel, address, label, verification, confidence, is_primary)
-		VALUES (
-			${orgId}, ${subject.table}, ${subject.id}, ${c.kind}, ${c.value}, ${c.label ?? null},
-			${c.verification ?? null}, ${clampConfidence(c.confidence)}, ${c.is_primary ?? false}
-		)
-		ON CONFLICT (subject_table, subject_id, channel, address) DO UPDATE SET
-			label = COALESCE(EXCLUDED.label, channels.label),
-			is_primary = EXCLUDED.is_primary,
-			updated_at = now()
-		RETURNING ${channelRowColumns(sql)}
-	`.pipe(Effect.map(rows => rows[0]))
+	Effect.gen(function* () {
+		// Saying nothing about the default is not the same as saying "not the
+		// default": naming an address already on file — which is how somebody
+		// labels one — must not quietly move where mail goes.
+		const wantsPrimary = c.is_primary ?? null
+		const rows = yield* sql`
+			INSERT INTO channels
+				(organization_id, subject_table, subject_id, channel, address, label, verification, confidence, is_primary)
+			VALUES (
+				${orgId}, ${subject.table}, ${subject.id}, ${c.kind}, ${c.value}, ${c.label ?? null},
+				${c.verification ?? null}, ${clampConfidence(c.confidence)}, COALESCE(${wantsPrimary}, false)
+			)
+			ON CONFLICT (subject_table, subject_id, channel, address) DO UPDATE SET
+				label = COALESCE(EXCLUDED.label, channels.label),
+				is_primary = COALESCE(${wantsPrimary}, channels.is_primary),
+				updated_at = now()
+			RETURNING ${channelRowColumns(sql)}
+		`
+		const stored = rows[0] as { readonly id: string } | undefined
+		if (c.is_primary === true && stored !== undefined) {
+			yield* standDownOtherPrimaries(sql, stored.id)
+		}
+		return rows[0]
+	})
 
 /**
  * Edit a channel's reachable value / kind / label / primary flag. Never touches
@@ -230,6 +280,9 @@ export const patchChannel = (
 			UPDATE channels SET ${sql.update(data)}
 			WHERE id = ${channelId} RETURNING ${channelRowColumns(sql)}
 		`
+		if (patch.is_primary === true) {
+			yield* standDownOtherPrimaries(sql, channelId)
+		}
 		return rows[0]
 	})
 

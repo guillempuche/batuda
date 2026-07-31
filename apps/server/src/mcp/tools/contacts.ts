@@ -16,6 +16,7 @@ import {
 	writeChannels,
 } from '../../services/channels'
 import { unlinkSubject } from '../../services/documents'
+import { ownedSiteId } from '../../services/sites'
 import { McpPageLimit, TruncatableResult, toTruncatable } from './_result'
 
 const decodeContact = Schema.decodeUnknownEffect(Contact)
@@ -26,6 +27,10 @@ const decodeChannels = Schema.decodeUnknownEffect(Schema.Array(ContactChannel))
 const ChannelInput = Schema.Struct({
 	kind: Schema.String,
 	value: Schema.String,
+	label: Schema.optional(Schema.String).annotate({
+		description:
+			'Which of several this is, in the words a person would use: "Girona shop", "sales office", "switchboard". Give it whenever somebody holds more than one of a kind — without it a second address is indistinguishable from the first.',
+	}),
 	verification: Schema.optional(Schema.String),
 	confidence: Schema.optional(Schema.Number),
 	is_primary: Schema.optional(Schema.Boolean),
@@ -50,6 +55,10 @@ const CreateContact = Tool.make('create_contact', {
 		'Create a contact linked to a company. Role examples: CEO, CTO, Marketing Director, Sales Manager. Pass channels[] for every reachable address (kind: email | phone | linkedin | x | website | bluesky | …); the primary email channel is the address used for sending.',
 	parameters: Schema.Struct({
 		company_id: Schema.String,
+		site_id: Schema.optional(Schema.String).annotate({
+			description:
+				'The branch this person works at, when the company has more than one and it is known which. Leave it out for someone who works for the company at large or moves between its branches — most people, and guessing here is worse than saying nothing.',
+		}),
 		name: Schema.String,
 		role: Schema.optional(Schema.String),
 		channels: Schema.optional(Schema.Array(ChannelInput)),
@@ -66,6 +75,10 @@ const UpdateContact = Tool.make('update_contact', {
 		'Update one or more fields on an existing contact by UUID. Only include fields to change. Pass channels[] to add/refresh reachable addresses. Set clear_email_suppression=true to reset the email channel to "unknown" (use after a bounced/complained contact confirms their address is good again — this re-enables outbound mail to that address).',
 	parameters: Schema.Struct({
 		id: Schema.String,
+		site_id: Schema.optional(Schema.NullOr(Schema.String)).annotate({
+			description:
+				'The branch this person works at, when the company has more than one and it is known which. Leave it out for someone who works for the company at large or moves between its branches — most people, and guessing here is worse than saying nothing. Pass null to clear a branch somebody no longer works at; leaving it out changes nothing.',
+		}),
 		name: Schema.optional(Schema.String),
 		role: Schema.optional(Schema.String),
 		channels: Schema.optional(Schema.Array(ChannelInput)),
@@ -130,12 +143,19 @@ export const ContactHandlersLive = ContactTools.toLayer(
 					return toTruncatable(contacts, limit)
 				}).pipe(Effect.orDie),
 
-			create_contact: ({ company_id, channels, ...fields }) =>
+			create_contact: ({ company_id, site_id, channels, ...fields }) =>
 				Effect.gen(function* () {
 					const currentOrg = yield* CurrentOrg
+					const siteId = yield* ownedSiteId(
+						sql,
+						currentOrg.id,
+						company_id,
+						site_id,
+					)
 					const rows = yield* sql`INSERT INTO contacts ${sql.insert({
 						organizationId: currentOrg.id,
 						companyId: company_id,
+						siteId: siteId ?? null,
 						...fields,
 					})} RETURNING *`
 					const contact = rows[0] as { id: string }
@@ -156,11 +176,34 @@ export const ContactHandlersLive = ContactTools.toLayer(
 					return { ...decoded, channels: decodedChannels }
 				}).pipe(Effect.orDie),
 
-			update_contact: ({ id, channels, clear_email_suppression, ...fields }) =>
+			update_contact: ({
+				id,
+				site_id,
+				channels,
+				clear_email_suppression,
+				...fields
+			}) =>
 				Effect.gen(function* () {
 					const currentOrg = yield* CurrentOrg
+					// A branch counts as theirs only if it belongs to the company this
+					// person works for, and only the stored row says which company that is.
+					const owner = yield* sql`
+						SELECT company_id AS "companyId" FROM contacts
+						WHERE id = ${id} AND organization_id = ${currentOrg.id}
+						LIMIT 1
+					`
+					const companyId = (
+						owner[0] as { readonly companyId: string } | undefined
+					)?.companyId
+					const siteId =
+						companyId === undefined
+							? undefined
+							: yield* ownedSiteId(sql, currentOrg.id, companyId, site_id)
 					const rows = yield* sql`UPDATE contacts SET ${sql.update({
 						...fields,
+						// Only when named: leaving it out means "don't touch", which is
+						// what a caller changing only a phone number expects.
+						...(siteId === undefined ? {} : { siteId }),
 						updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 					})} WHERE id = ${id} RETURNING *`
 					if (clear_email_suppression) yield* clearEmailSuppression(sql, id)

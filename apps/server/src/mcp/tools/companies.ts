@@ -5,6 +5,11 @@ import { SqlClient } from 'effect/unstable/sql'
 import { CompanyDetail, CurrentOrg } from '@batuda/controllers'
 import { Company } from '@batuda/domain'
 
+import {
+	addChannel,
+	patchChannel,
+	subjectChannelsOf,
+} from '../../services/channels'
 import { CompanyService } from '../../services/companies'
 import { withBriefOwnership } from '../../services/company-brief'
 import {
@@ -214,6 +219,31 @@ const ManageCompanySites = Tool.make('manage_company_sites', {
 	.annotate(Tool.Destructive, false)
 	.annotate(Tool.OpenWorld, false)
 
+// One tool for the ways of reaching a company, flat `action` for the same reason
+// the sites tool has one. A branch's own phone differs from the company
+// switchboard only by `site_id`, so a second tool would duplicate the lot.
+const ManageCompanyChannels = Tool.make('manage_company_channels', {
+	description:
+		"The ways of reaching a company — its mailboxes, phones, website, social handles. A company can hold several of a kind, which is the point of this tool: `update_company` writes one email and one phone, and a firm with an orders mailbox, an accounts mailbox and a switchboard needs all of them kept apart. Give each one a `label` in the words somebody would actually use — 'orders', 'accounts', 'Girona shop' — because two addresses with no labels are indistinguishable a month later. Pass `site_id` to hang the channel off one branch instead of the company as a whole. action: 'list' (all of them; add site_id to see one branch's), 'add' (kind plus value, and a label whenever there is more than one of that kind), 'update' (by channel_id, only the fields to change), 'remove' (by channel_id). kind is open — email, phone, linkedin, instagram, website, x, bluesky, … — and `is_primary` marks the one to use when nothing says otherwise; the primary email is the address mail is sent to.",
+	parameters: Schema.Struct({
+		action: Schema.Literals(['list', 'add', 'update', 'remove']),
+		company_id: Schema.String,
+		site_id: Schema.optional(Schema.String),
+		channel_id: Schema.optional(Schema.String),
+		kind: Schema.optional(Schema.String),
+		value: Schema.optional(Schema.String),
+		label: Schema.optional(Schema.NullOr(Schema.String)),
+		is_primary: Schema.optional(Schema.Boolean),
+	}),
+	success: Schema.Struct({
+		channels: Schema.Array(Schema.Unknown),
+	}),
+	dependencies: REQUEST_DEPENDENCIES,
+})
+	.annotate(Tool.Title, 'Manage Company Channels')
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.OpenWorld, false)
+
 // One tool for how two companies belong together, with a flat `action` for the
 // same reason the sites tool has one.
 const ManageCompanyRelations = Tool.make('manage_company_relations', {
@@ -245,6 +275,7 @@ export const CompanyTools = Toolkit.make(
 	UpdateCompany,
 	GeocodeCompany,
 	ManageCompanySites,
+	ManageCompanyChannels,
 	ManageCompanyRelations,
 )
 
@@ -390,14 +421,99 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 						`
 					}
 					if (params.action === 'remove' && params.site_id !== undefined) {
-						yield* sql`
+						const removed = yield* sql`
 							DELETE FROM sites
 							WHERE id = ${params.site_id}
 								AND company_id = ${params.company_id}
 								AND organization_id = ${currentOrg.id}
+							RETURNING id
 						`
+						// A channel says what it hangs off by table and id, with no
+						// foreign key to follow, so nothing clears these on its own —
+						// they would sit there for good, pointing at a place that is
+						// closed.
+						if (removed.length > 0) {
+							yield* sql`
+								DELETE FROM channels
+								WHERE subject_table = 'sites'
+									AND subject_id = ${params.site_id}
+									AND organization_id = ${currentOrg.id}
+							`
+						}
 					}
 					return { sites: yield* list() }
+				}).pipe(Effect.orDie),
+			manage_company_channels: params =>
+				Effect.gen(function* () {
+					const currentOrg = yield* CurrentOrg
+					const subject = params.site_id
+						? ({ table: 'sites', id: params.site_id } as const)
+						: ({ table: 'companies', id: params.company_id } as const)
+
+					// An id only proves the row exists, not whose it is, so without this
+					// a channel could be hung off somebody else's company or branch.
+					const owned = params.site_id
+						? yield* sql`
+							SELECT s.id FROM sites s
+							JOIN companies c ON c.id = s.company_id AND c.deleted_at IS NULL
+							WHERE s.id = ${params.site_id}
+								AND s.company_id = ${params.company_id}
+								AND s.organization_id = ${currentOrg.id}
+							LIMIT 1
+						`
+						: yield* sql`
+							SELECT id FROM companies
+							WHERE id = ${params.company_id}
+								AND organization_id = ${currentOrg.id}
+								AND deleted_at IS NULL
+							LIMIT 1
+						`
+					if (owned.length === 0) return { channels: [] }
+
+					if (
+						params.action === 'add' &&
+						params.kind !== undefined &&
+						params.value !== undefined
+					) {
+						yield* addChannel(sql, currentOrg.id, subject, {
+							kind: params.kind,
+							value: params.value,
+							// On a new one there is nothing to take back, so a null name
+							// and no name are the same thing.
+							label: params.label ?? undefined,
+							is_primary: params.is_primary,
+						})
+					}
+					if (params.action === 'update' && params.channel_id !== undefined) {
+						// Scoped to the subject we just proved is theirs, so a channel id
+						// belonging to another company cannot be edited through it.
+						const mine = yield* sql`
+							SELECT id FROM channels
+							WHERE id = ${params.channel_id}
+								AND subject_table = ${subject.table}
+								AND subject_id = ${subject.id}
+								AND organization_id = ${currentOrg.id}
+							LIMIT 1
+						`
+						if (mine.length > 0) {
+							yield* patchChannel(sql, params.channel_id, {
+								kind: params.kind,
+								value: params.value,
+								label: params.label,
+								is_primary: params.is_primary,
+							})
+						}
+					}
+					if (params.action === 'remove' && params.channel_id !== undefined) {
+						yield* sql`
+							DELETE FROM channels
+							WHERE id = ${params.channel_id}
+								AND subject_table = ${subject.table}
+								AND subject_id = ${subject.id}
+								AND organization_id = ${currentOrg.id}
+						`
+					}
+					return { channels: yield* subjectChannelsOf(sql, subject) }
 				}).pipe(Effect.orDie),
 			manage_company_relations: params =>
 				Effect.gen(function* () {
