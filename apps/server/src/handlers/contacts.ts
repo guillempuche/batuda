@@ -23,6 +23,7 @@ import {
 	writeChannels,
 } from '../services/channels'
 import { unlinkSubject } from '../services/documents'
+import { ownedSiteId } from '../services/sites'
 
 const decodeContact = Schema.decodeUnknownEffect(Contact)
 const decodeChannel = Schema.decodeUnknownEffect(ContactChannel)
@@ -104,9 +105,16 @@ export const ContactsLive = HttpApiBuilder.group(
 				.handle('create', _ =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
-						const { channels, ...fields } = _.payload
+						const { channels, siteId, ...fields } = _.payload
+						const ownedSite = yield* ownedSiteId(
+							sql,
+							currentOrg.id,
+							_.payload.companyId,
+							siteId,
+						)
 						const rows = yield* sql`INSERT INTO contacts ${sql.insert({
 							...fields,
+							siteId: ownedSite ?? null,
 							organizationId: currentOrg.id,
 						})} RETURNING *`
 						const contact = rows[0] as { id: string }
@@ -135,9 +143,28 @@ export const ContactsLive = HttpApiBuilder.group(
 				.handle('update', _ =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
-						const { channels, ...fields } = _.payload
+						const { channels, siteId, ...fields } = _.payload
+						// A branch counts as theirs only if it belongs to the company this
+						// person works for, and only the stored row says which company
+						// that is.
+						const owner = yield* sql`
+							SELECT company_id AS "companyId" FROM contacts
+							WHERE id = ${_.params.id} AND organization_id = ${currentOrg.id}
+							LIMIT 1
+						`
+						const companyId = (
+							owner[0] as { readonly companyId: string } | undefined
+						)?.companyId
+						const ownedSite =
+							companyId === undefined
+								? undefined
+								: yield* ownedSiteId(sql, currentOrg.id, companyId, siteId)
+						// Left out when nobody named a branch, so a caller changing only a
+						// phone number does not wipe where that person works.
+						const siteChange =
+							ownedSite === undefined ? {} : { siteId: ownedSite }
 						const rows = yield* sql`
-							UPDATE contacts SET ${sql.update({ ...fields, updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) })}
+							UPDATE contacts SET ${sql.update({ ...fields, ...siteChange, updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) })}
 							WHERE id = ${_.params.id} RETURNING *
 						`
 						if (channels && channels.length > 0)
