@@ -8,6 +8,11 @@ export type DisplayChannel = {
 	readonly id: string
 	readonly kind: string
 	readonly value: string
+	/**
+	 * Which of several this is, in somebody's own words: "orders", "Girona shop".
+	 * Null when nobody said — one mailbox needs no name.
+	 */
+	readonly label: string | null
 	readonly verification: string | null
 	/** Stored 0–100 confidence score, or null. Shown as a trust badge. */
 	readonly confidence: number | null
@@ -35,6 +40,10 @@ export function narrowChannels(raw: unknown): ReadonlyArray<DisplayChannel> {
 			id: r['id'],
 			kind: r['kind'],
 			value: r['value'],
+			label:
+				typeof r['label'] === 'string' && r['label'].trim() !== ''
+					? r['label']
+					: null,
 			verification:
 				typeof r['verification'] === 'string' ? r['verification'] : null,
 			confidence: typeof r['confidence'] === 'number' ? r['confidence'] : null,

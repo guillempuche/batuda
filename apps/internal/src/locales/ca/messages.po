@@ -946,6 +946,10 @@ msgid "Channel kind"
 msgstr "Tipus de canal"
 
 #: src/components/contacts/manage-channels-dialog.tsx
+msgid "Channel label"
+msgstr "Etiqueta del canal"
+
+#: src/components/contacts/manage-channels-dialog.tsx
 msgid "Channel value"
 msgstr "Valor del canal"
 
@@ -3761,6 +3765,10 @@ msgstr "Resum lliure. Tria-ho quan la pregunta no encaixa en una forma fixa — 
 msgid "Opened"
 msgstr "Obert"
 
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "orders, Girona shop…"
+msgstr "comandes, botiga de Girona…"
+
 #: src/components/instructions/stack-picker.tsx
 #: src/components/instructions/template-library.tsx
 msgid "Org"
@@ -4083,6 +4091,10 @@ msgstr "Anterior"
 #: src/components/companies/proposals-panel.tsx
 msgid "Price"
 msgstr "Preu"
+
+#: src/components/companies/company-channels-section.tsx
+msgid "primary"
+msgstr "principal"
 
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
@@ -5792,6 +5804,10 @@ msgstr "Visita"
 msgid "Visit notes"
 msgstr "Notes de visita"
 
+#: src/components/companies/company-channels-section.tsx
+msgid "Ways to reach"
+msgstr "Com contactar"
+
 #: src/routes/login.tsx
 msgid "We couldn't sign you in via that link. Try again."
 msgstr "No s'ha pogut iniciar sessió amb aquest enllaç. Torna-ho a provar."
@@ -5910,6 +5926,11 @@ msgstr "passaria a ser"
 #: src/routes/emails/inboxes.tsx
 msgid "Write footer…"
 msgstr "Escriu el peu de pàgina…"
+
+#. placeholder {0}: ch.value
+#: src/components/companies/company-channels-section.tsx
+msgid "Write to {0}"
+msgstr "Escriu a {0}"
 
 #: src/components/emails/compose-form.tsx
 msgid "Write your message…"

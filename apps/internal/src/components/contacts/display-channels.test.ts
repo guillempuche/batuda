@@ -39,6 +39,7 @@ describe('narrowChannels', () => {
 				id: 'x',
 				kind: 'email',
 				value: 'pep@calpepfonda.cat',
+				label: null,
 				verification: 'deliverable',
 				confidence: null,
 				isPrimary: true,
@@ -226,6 +227,38 @@ describe('channelHref', () => {
 				href: 'https://acme.com',
 				external: true,
 			})
+		})
+	})
+})
+
+describe('narrowChannels labels', () => {
+	describe('when a channel carries the name somebody gave it', () => {
+		it('should keep the label so two of a kind can be told apart', () => {
+			// GIVEN two mailboxes of the same kind, each named
+			// WHEN narrowed
+			// THEN each keeps its own label
+			const [orders, accounts] = narrowChannels([
+				channel({ id: '1', value: 'orders@x.cat', label: 'orders' }),
+				channel({ id: '2', value: 'accounts@x.cat', label: 'accounts' }),
+			])
+			expect(orders?.label).toBe('orders')
+			expect(accounts?.label).toBe('accounts')
+		})
+	})
+
+	describe('when nobody named the channel', () => {
+		it('should read a missing, blank or non-string label as none', () => {
+			// GIVEN channels with no label, a whitespace-only one, and a number
+			// WHEN narrowed
+			// THEN all three come back as null rather than an empty chip
+			const [absent, blank, wrongType] = narrowChannels([
+				channel({ id: '1' }),
+				channel({ id: '2', label: '   ' }),
+				channel({ id: '3', label: 7 }),
+			])
+			expect(absent?.label).toBeNull()
+			expect(blank?.label).toBeNull()
+			expect(wrongType?.label).toBeNull()
 		})
 	})
 })

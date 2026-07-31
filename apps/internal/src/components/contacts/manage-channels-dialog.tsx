@@ -56,6 +56,7 @@ export function ManageChannelsDialog({
 
 	const [newKind, setNewKind] = useState<string>('email')
 	const [newValue, setNewValue] = useState<string>('')
+	const [newLabel, setNewLabel] = useState<string>('')
 	const [busy, setBusy] = useState(false)
 
 	const failed = () =>
@@ -70,13 +71,17 @@ export function ManageChannelsDialog({
 		const value = newValue.trim()
 		if (!contactId || !value || busy) return
 		setBusy(true)
+		const label = newLabel.trim()
 		const exit = await addChannel({
 			params: { id: contactId },
-			payload: { kind: newKind, value },
+			// An empty label is left out rather than stored blank, so "nobody named
+			// this one" stays distinct from "somebody named it the empty string".
+			payload: { kind: newKind, value, ...(label ? { label } : {}) },
 		} as never)
 		setBusy(false)
 		if (exit._tag === 'Success') {
 			setNewValue('')
+			setNewLabel('')
 			onChanged()
 		} else failed()
 	}
@@ -138,7 +143,10 @@ export function ManageChannelsDialog({
 							{channels.map(ch => (
 								<ChannelRow key={ch.id}>
 									<Kind>{ch.kind}</Kind>
-									<Value>{ch.value}</Value>
+									<Value>
+										{ch.value}
+										{ch.label ? <ChannelLabel>{ch.label}</ChannelLabel> : null}
+									</Value>
 									{ch.kind === 'email' && (
 										<IconButton
 											type='button'
@@ -183,6 +191,12 @@ export function ManageChannelsDialog({
 							placeholder={t`name@company.com`}
 							value={newValue}
 							onChange={e => setNewValue(e.target.value)}
+						/>
+						<PriInput
+							aria-label={t`Channel label`}
+							placeholder={t`orders, Girona shop…`}
+							value={newLabel}
+							onChange={e => setNewLabel(e.target.value)}
 						/>
 						<PriButton type='submit' disabled={busy || newValue.trim() === ''}>
 							<Trans>Add</Trans>
@@ -253,6 +267,15 @@ const Value = styled.span`
 	overflow-wrap: anywhere;
 `
 
+const ChannelLabel = styled.span`
+	margin-inline-start: var(--space-xs);
+	padding: 0 var(--space-2xs);
+	border-radius: var(--radius-xs);
+	background: var(--color-surface-container-high);
+	color: var(--color-on-surface-variant);
+	font-size: var(--typescale-label-small-size);
+`
+
 const IconButton = styled.button<{ $active?: boolean }>`
 	display: inline-flex;
 	padding: var(--space-2xs);
@@ -270,6 +293,7 @@ const IconButton = styled.button<{ $active?: boolean }>`
 
 const AddForm = styled.form`
 	display: flex;
+	flex-wrap: wrap;
 	gap: var(--space-xs);
 	align-items: center;
 `
