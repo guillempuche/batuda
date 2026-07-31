@@ -5,11 +5,12 @@ process.env['DATABASE_URL'] ??=
 
 import { Effect, Exit, Layer } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { CurrentOrg, SessionContext } from '@batuda/controllers'
 
 import { PgLive } from '../db/client.js'
+import { enterOrgScope } from '../middleware/org.js'
 import { CalendarService } from './calendar.js'
 import { CredentialCrypto } from './credential-crypto.js'
 import { EmailService } from './email.js'
@@ -76,6 +77,10 @@ const actingAs = (userId: string, role: string) =>
 		}),
 	)
 
+// Run the way a request does: inside the organization's own database scope, as
+// the role a request runs as. Some of what these scenarios rely on is enforced
+// down there rather than in the service, and a caller that only stubbed the
+// session would be testing looser conditions than production ever has.
 const run = <A, E>(
 	effect: Effect.Effect<
 		A,
@@ -86,11 +91,19 @@ const run = <A, E>(
 	role: string,
 ) =>
 	Effect.runPromiseExit(
-		effect.pipe(
-			Effect.provide(serviceLayer),
-			Effect.provide(actingAs(userId, role)),
-			Effect.provide(PgLive),
-		),
+		Effect.gen(function* () {
+			const sql = yield* SqlClient.SqlClient
+			return yield* enterOrgScope(sql, {
+				org: { id: ORG, name: 'Authz Test', slug: 'authz-test' } as never,
+				userId,
+				role,
+			})(
+				effect.pipe(
+					Effect.provide(serviceLayer),
+					Effect.provide(actingAs(userId, role)),
+				),
+			)
+		}).pipe(Effect.provide(PgLive)),
 	)
 
 const placeholder = new Uint8Array([0])
@@ -100,17 +113,19 @@ const insertInbox = (args: {
 	readonly email: string
 	readonly ownerUserId: string | null
 	readonly isDefault?: boolean
+	readonly isPrivate?: boolean
 }) =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
 		const rows = yield* sql<{ id: string }>`
 			INSERT INTO inboxes (
-				organization_id, email, owner_user_id, is_default,
+				organization_id, email, owner_user_id, is_default, is_private,
 				imap_host, imap_port, imap_security,
 				smtp_host, smtp_port, smtp_security, username,
 				password_ciphertext, password_nonce, password_tag
 			) VALUES (
 				${ORG}, ${args.email}, ${args.ownerUserId}, ${args.isDefault ?? false},
+				${args.isPrivate ?? false},
 				'imap.test', 993, 'tls', 'smtp.test', 465, 'tls', ${args.email},
 				${placeholder}, ${placeholder}, ${placeholder}
 			)
@@ -119,11 +134,47 @@ const insertInbox = (args: {
 		return rows[0]!.id
 	})
 
+// Alice and Bob have to be real members, not just names in a stubbed session:
+// handing a mailbox over asks the database who is running the organization,
+// rather than believing what the caller says about itself.
+const seedMembership = Effect.gen(function* () {
+	const sql = yield* SqlClient.SqlClient
+	yield* sql`
+		INSERT INTO "organization" (id, name, slug, "createdAt")
+		VALUES (${ORG}, 'Authz Test', 'authz-test', now())
+		ON CONFLICT (id) DO NOTHING
+	`
+	for (const [userId, role] of [
+		[ALICE, 'owner'],
+		[BOB, 'member'],
+	] as const) {
+		yield* sql`
+			INSERT INTO "user" (id, name, email, "emailVerified")
+			VALUES (${userId}, ${userId}, ${`${userId}@test.local`}, true)
+			ON CONFLICT (id) DO NOTHING
+		`
+		yield* sql`
+			INSERT INTO member (id, "organizationId", "userId", role, "createdAt")
+			VALUES (${`m-${userId}`}, ${ORG}, ${userId}, ${role}, now())
+			ON CONFLICT (id) DO NOTHING
+		`
+	}
+})
+
 const cleanup = Effect.gen(function* () {
 	const sql = yield* SqlClient.SqlClient
 	yield* sql`DELETE FROM email_drafts WHERE organization_id = ${ORG}`
 	yield* sql`DELETE FROM inbox_footers WHERE organization_id = ${ORG}`
 	yield* sql`DELETE FROM inboxes WHERE organization_id = ${ORG}`
+})
+
+// The organization and its people outlive each scenario; only the mailboxes
+// are swept between them.
+const dropMembership = Effect.gen(function* () {
+	const sql = yield* SqlClient.SqlClient
+	yield* sql`DELETE FROM member WHERE "organizationId" = ${ORG}`
+	yield* sql`DELETE FROM "organization" WHERE id = ${ORG}`
+	yield* sql`DELETE FROM "user" WHERE id IN (${ALICE}, ${BOB})`
 })
 
 // A half-written message sitting in a mailbox, put there without going through
@@ -151,6 +202,20 @@ const insertDraft = (inboxId: string) =>
 const runPlain = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
 	Effect.runPromise(effect.pipe(Effect.provide(PgLive)))
 
+// Read back the two things a handover settles, without going through the
+// service that performed it.
+const readOwnership = (inboxId: string) =>
+	Effect.gen(function* () {
+		const sql = yield* SqlClient.SqlClient
+		const rows = yield* sql<{
+			ownerUserId: string | null
+			isPrivate: boolean
+		}>`
+			SELECT owner_user_id, is_private FROM inboxes WHERE id = ${inboxId}
+		`
+		return rows[0] ?? null
+	})
+
 // The mailbox somebody sends from, read straight from the row.
 const defaultOf = (userId: string) =>
 	runPlain(
@@ -166,12 +231,17 @@ const defaultOf = (userId: string) =>
 	)
 
 describe('who may reach a mailbox', () => {
+	beforeAll(async () => {
+		await runPlain(seedMembership)
+	})
+
 	beforeEach(async () => {
 		await runPlain(cleanup)
 	})
 
 	afterAll(async () => {
 		await runPlain(cleanup)
+		await runPlain(dropMembership)
 	})
 
 	describe('when the mailbox belongs to a colleague', () => {
@@ -330,6 +400,71 @@ describe('who may reach a mailbox', () => {
 			// THEN Bob does not silently start sending as that address: the mark
 			// comes off, for him to make the choice himself
 			expect(await defaultOf(BOB)).toHaveLength(0)
+		})
+
+		it('should give it to the whole team, and stop hiding it from them', async () => {
+			// GIVEN a mailbox of Bob's that only he can see
+			const id = await runPlain(
+				insertInbox({
+					email: 'to-the-team@test.local',
+					ownerUserId: BOB,
+					isPrivate: true,
+				}),
+			)
+
+			// WHEN Alice, who runs the organization, gives it to everybody
+			const exit = await run(
+				Effect.gen(function* () {
+					const svc = yield* EmailService
+					return yield* svc.updateInbox(id, { ownerUserId: null })
+				}),
+				ALICE,
+				'admin',
+			)
+
+			// THEN it belongs to nobody in particular, and is no longer hidden —
+			// a mailbox the team owns cannot be kept from them
+			expect(Exit.isSuccess(exit)).toBe(true)
+			const row = await runPlain(readOwnership(id))
+			expect(row).toEqual({ ownerUserId: null, isPrivate: false })
+		})
+	})
+
+	// The checks above are the application's. This one is the database's, asked
+	// directly, because that is the whole point: if the checks above were ever
+	// loosened the way an instruction template's once were, this is what would
+	// still be standing.
+	describe('when a member goes at the owner column directly', () => {
+		it('should refuse the write, admin or not', async () => {
+			// GIVEN a mailbox belonging to Alice
+			const id = await runPlain(
+				insertInbox({ email: 'not-yours@test.local', ownerUserId: ALICE }),
+			)
+
+			// WHEN Bob, an ordinary member, writes his own name onto it under the
+			// role a request actually runs as
+			const exit = await Effect.runPromiseExit(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					yield* sql.withTransaction(
+						Effect.gen(function* () {
+							yield* sql`SET LOCAL ROLE app_user`
+							yield* sql`SELECT set_config('app.current_org_id', ${ORG}, true)`
+							yield* sql`SELECT set_config('app.current_user_id', ${BOB}, true)`
+							yield* sql`
+								UPDATE inboxes SET owner_user_id = ${BOB} WHERE id = ${id}
+							`
+						}),
+					)
+				}).pipe(Effect.provide(PgLive)),
+			)
+
+			// THEN the database refuses it: that column is not a request's to write
+			expect(Exit.isFailure(exit)).toBe(true)
+			expect(await runPlain(readOwnership(id))).toEqual({
+				ownerUserId: ALICE,
+				isPrivate: false,
+			})
 		})
 	})
 
