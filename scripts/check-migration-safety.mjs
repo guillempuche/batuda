@@ -11,6 +11,25 @@
 //
 //   // expand-contract: <why the old shape is safe to drop in this same deploy>
 //
+// It also checks how the new migrations are NUMBERED, which matters more than it
+// looks. A migration's number is the only thing deciding whether it ever runs:
+// the migrator records the highest number applied and, next time, runs only what
+// is above it. Two failures follow from that, and a long-lived branch hits both.
+//
+// A number already taken on the base ref is the loud one — the migrator refuses
+// to start, naming duplicate ids, so nothing corrupts but nothing migrates either
+// until somebody renumbers.
+//
+// A number at or below the base ref's highest is the quiet one, and the reason
+// this check exists. Two branches numbering from the same starting point is
+// normal; whichever merges second is then numbered below something already on
+// the base, and any database that applied that branch first will never run the
+// other's migration. No error, no retry, no way back — it is simply skipped
+// forever, and the mismatch surfaces later as a missing column.
+//
+// One rule catches both: a new migration must be numbered above everything on
+// the base ref. Rebase, renumber, and the branch is safe again.
+//
 // Usage: node scripts/check-migration-safety.mjs [baseRef]   (default: origin/main)
 
 import { execSync } from 'node:child_process'
@@ -54,6 +73,67 @@ if (added.length === 0) {
 }
 
 let failed = false
+
+// ── Numbering ────────────────────────────────────────────────────────────────
+// The number off the front of the filename: `0047_company_tax_id.ts` → 47.
+const idOf = file => {
+	const match = /(?:^|\/)(\d+)_/.exec(file)
+	return match ? Number(match[1]) : null
+}
+
+const baseIds = new Set(
+	execSync(`git ls-tree --name-only ${baseRef} -- ${MIGRATIONS_DIR}`, {
+		encoding: 'utf8',
+	})
+		.trim()
+		.split('\n')
+		.filter(Boolean)
+		.map(idOf)
+		.filter(id => id !== null),
+)
+const highestOnBase = baseIds.size === 0 ? -1 : Math.max(...baseIds)
+const seen = new Map()
+
+for (const file of added) {
+	const id = idOf(file)
+	if (id === null) {
+		failed = true
+		console.error(
+			`✗ ${file} — no number at the front of the filename; name it <number>_<what_it_does>.ts`,
+		)
+	} else if (baseIds.has(id)) {
+		failed = true
+		console.error(
+			`✗ ${file} — number ${id} is already taken on ${baseRef}. Rebase and renumber above ${highestOnBase}.`,
+		)
+	} else if (seen.has(id)) {
+		failed = true
+		console.error(
+			`✗ ${file} — number ${id} is used twice here (also ${seen.get(id)}).`,
+		)
+	} else if (id <= highestOnBase) {
+		failed = true
+		seen.set(id, file)
+		console.error(
+			`✗ ${file} — number ${id} sits below ${highestOnBase}, the highest on ${baseRef}. ` +
+				`A database that already ran this branch would skip everything in between, permanently. ` +
+				`Rebase and renumber above ${highestOnBase}.`,
+		)
+	} else {
+		seen.set(id, file)
+		console.log(`✓ ${file} — numbered ${id}, above ${highestOnBase}`)
+	}
+}
+
+if (failed) {
+	console.error(
+		'\nA migration runs only if its number is above the highest the database has\n' +
+			'already applied. Numbering at or below that means it is skipped — silently,\n' +
+			'once, and for good. Rebase onto the base ref and renumber.\n',
+	)
+	process.exit(1)
+}
+
 for (const file of added) {
 	const sql = readFileSync(file, 'utf8')
 	const hits = DESTRUCTIVE.filter(([, re]) => re.test(sql)).map(
