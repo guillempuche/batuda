@@ -44,7 +44,7 @@ export type ReviewProposal = {
 // reference turns up spelled either way and both are listed.
 const SPECIAL_FIELDS = new Set(['name', 'channels', 'company_id', 'companyId'])
 
-// Turns a field name into something a reviewer reads: "is_decision_maker"
+// Turns a field name into something a reviewer reads: "buying_role"
 // becomes "Is decision maker". The words come from the data rather than a fixed
 // phrase, so there is nothing to translate — only the spelling to tidy up.
 const fieldLabel = (key: string): string => {

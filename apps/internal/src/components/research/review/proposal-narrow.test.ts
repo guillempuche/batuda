@@ -79,15 +79,15 @@ describe('narrowProposedUpdates', () => {
 			// writes it
 			// WHEN narrowed
 			const [snake] = narrowProposedUpdates([
-				proposal({ fields: { is_decision_maker: 'yes' } }),
+				proposal({ fields: { buying_role: 'economic_buyer' } }),
 			])
 			const [camel] = narrowProposedUpdates([
-				proposal({ fields: { isDecisionMaker: 'yes' } }),
+				proposal({ fields: { buyingRole: 'economic_buyer' } }),
 			])
 
 			// THEN both read the same on screen, instead of showing a raw field name
-			expect(snake?.scalarFields).toEqual([['Is decision maker', 'yes']])
-			expect(camel?.scalarFields).toEqual([['Is decision maker', 'yes']])
+			expect(snake?.scalarFields).toEqual([['Buying role', 'economic_buyer']])
+			expect(camel?.scalarFields).toEqual([['Buying role', 'economic_buyer']])
 		})
 	})
 

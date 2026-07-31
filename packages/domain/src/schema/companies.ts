@@ -79,12 +79,14 @@ export class Company extends Model.Class<Company>('Company')({
 	priority: Schema.NullOr(Schema.Number),
 	// values: 1 (hot) | 2 (medium) | 3 (cold)
 
-	// Contact info
-	website: Schema.NullOr(Schema.String),
-	email: Schema.NullOr(Schema.String),
-	phone: Schema.NullOr(Schema.String),
-	instagram: Schema.NullOr(Schema.String),
-	linkedin: Schema.NullOr(Schema.String),
+	// How to reach the company lives in `channels`, keyed to the company the same
+	// way a person's is keyed to them — so a chain can hold one mailbox per shop
+	// and a firm one per office, each labelled. "The company's email" is the
+	// primary email channel, which is one answer today and can be several
+	// tomorrow.
+	//
+	// The map link stays here: it points at a place, not at anybody, and belongs
+	// with the coordinates beside it.
 	googleMapsUrl: Schema.NullOr(Schema.String),
 
 	// Sales intel

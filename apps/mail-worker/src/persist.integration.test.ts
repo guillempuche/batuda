@@ -55,11 +55,18 @@ let aliceContactId: string
 
 const insertCompany = async (slug: string, email: string): Promise<string> => {
 	const result = await pool.query<{ id: string }>(
-		`INSERT INTO companies (organization_id, slug, name, email) VALUES ($1, $2, $3, $4) RETURNING id`,
-		[ORG_ID, slug, slug, email],
+		`INSERT INTO companies (organization_id, slug, name) VALUES ($1, $2, $3) RETURNING id`,
+		[ORG_ID, slug, slug],
 	)
 	const row = result.rows[0]
 	if (!row) throw new Error(`failed to insert company ${slug}`)
+	// The company's own mailbox is one of the addresses it holds, not a column.
+	// It matters here because matching an inbound sender to a company reads it.
+	await pool.query(
+		`INSERT INTO channels (organization_id, subject_table, subject_id, channel, address, is_primary)
+		 VALUES ($1, 'companies', $2, 'email', $3, true)`,
+		[ORG_ID, row.id, email],
+	)
 	return row.id
 }
 
@@ -77,7 +84,7 @@ const insertContact = async (
 	// The address lives on the email channel now — that's what inbound
 	// matching joins against.
 	await pool.query(
-		`INSERT INTO contact_channels (organization_id, contact_id, kind, value, is_primary) VALUES ($1, $2, 'email', $3, true)`,
+		`INSERT INTO channels (organization_id, subject_table, subject_id, channel, address, is_primary) VALUES ($1, 'contacts', $2, 'email', $3, true)`,
 		[ORG_ID, row.id, email],
 	)
 	return row.id

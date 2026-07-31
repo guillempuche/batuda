@@ -165,3 +165,61 @@ export type SeedCtx = {
 	readonly restaurantOrgId: string | null
 	readonly stamp: StampFn
 }
+
+// The ways of reaching a company that used to be columns on its row. Seed
+// fixtures still describe a company as having a website and a mailbox, which
+// reads naturally; this is what turns that description into the rows the
+// database now keeps, and hands back the company without them so the insert
+// only names real columns.
+const COMPANY_CHANNEL_FIELDS = [
+	'website',
+	'email',
+	'phone',
+	'instagram',
+	'linkedin',
+] as const
+
+export type SeedChannelRow = Record<string, unknown> & {
+	readonly organizationId: string
+	readonly subjectTable: 'companies'
+	readonly subjectId: string
+	readonly channel: string
+	readonly address: string
+	readonly isPrimary: boolean
+}
+
+export const splitCompanyChannels = <
+	T extends Record<string, unknown> & { id: string; organizationId?: string },
+>(
+	companies: ReadonlyArray<T>,
+	defaultOrgId: string,
+): {
+	readonly companies: Array<Record<string, unknown>>
+	readonly channels: Array<SeedChannelRow>
+} => {
+	const channels: Array<SeedChannelRow> = []
+	const stripped = companies.map(company => {
+		const rest: Record<string, unknown> = {}
+		for (const [key, value] of Object.entries(company)) {
+			if ((COMPANY_CHANNEL_FIELDS as ReadonlyArray<string>).includes(key)) {
+				if (typeof value === 'string' && value.trim() !== '') {
+					channels.push({
+						organizationId:
+							typeof company.organizationId === 'string'
+								? company.organizationId
+								: defaultOrgId,
+						subjectTable: 'companies',
+						subjectId: company.id,
+						channel: key,
+						address: value.trim(),
+						isPrimary: true,
+					})
+				}
+				continue
+			}
+			rest[key] = value
+		}
+		return rest
+	})
+	return { companies: stripped, channels }
+}

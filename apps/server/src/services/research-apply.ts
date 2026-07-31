@@ -8,8 +8,12 @@ export {
 	researchProvenance,
 } from './research-provenance'
 
+import {
+	type ChannelInput,
+	splitCompanyChannelFields,
+	writeChannels,
+} from './channels'
 import { forkCompanyRegeocode } from './company-geocoding'
-import { type ChannelInput, writeChannels } from './contact-channels'
 import {
 	ResearchProposalApplied,
 	TimelineActivityService,
@@ -34,6 +38,11 @@ import {
 // model may send either casing, so proposal keys are normalized before the
 // lookup. Excludes identity, coordinates (set by the geocoder), version,
 // timestamps, and the pain points a person fills in from calls and emails.
+//
+// A company's mailbox, number, website and handles are not here because they are
+// no longer columns. They are still proposed by those names — what a reviewer
+// reads is "email: info@…" — and are written as channels instead; see
+// COMPANY_CHANNEL_PROPOSAL_FIELDS below.
 export const COMPANY_FIELDS = new Set([
 	'name',
 	'status',
@@ -43,11 +52,6 @@ export const COMPANY_FIELDS = new Set([
 	'location',
 	'source',
 	'priority',
-	'website',
-	'email',
-	'phone',
-	'instagram',
-	'linkedin',
 	'googleMapsUrl',
 	'productsFit',
 	'tags',
@@ -55,9 +59,9 @@ export const COMPANY_FIELDS = new Set([
 ])
 
 // Reachable addresses (email/phone/whatsapp/linkedin/instagram) live on
-// contact_channels, not on `contacts`, so they are not settable here; only
+// their own channel rows, not on `contacts`, so they are not settable here; only
 // the row's own columns remain.
-export const CONTACT_FIELDS = new Set(['name', 'role', 'isDecisionMaker'])
+export const CONTACT_FIELDS = new Set(['name', 'role', 'buyingRole'])
 
 const snakeToCamel = (s: string) =>
 	s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
@@ -317,13 +321,17 @@ const pgErrorCode = (error: unknown): string | undefined => {
 export type CompanyEnrichment = {
 	/** Where each written value came from, keyed by the column it explains. */
 	readonly provenance: Record<string, FieldSource>
-	/** True when this row is the company the run researched. */
-	readonly isRunTarget: boolean
-	readonly fitVerdict: string | null
-	readonly fitChecks: unknown
-	readonly fitConflicts: unknown
+	/**
+	 * The rest is a company's alone — its fit judgement and its written brief.
+	 * A person carries only the provenance, so these are optional rather than a
+	 * second payload type that would repeat the one field they share.
+	 */
+	readonly isRunTarget?: boolean
+	readonly fitVerdict?: string | null
+	readonly fitChecks?: unknown
+	readonly fitConflicts?: unknown
 	/** The run's brief, in markdown, already carrying its own dated heading. */
-	readonly brief: string | null
+	readonly brief?: string | null
 }
 
 // Serialize a json column value, or null to leave the stored one alone.
@@ -352,19 +360,37 @@ export const occUpdate = (
 	fields: Record<string, unknown>,
 	enrichment?: CompanyEnrichment,
 ) => {
+	// A change can carry no column at all and still be a real change: a company's
+	// mailbox and number are rows elsewhere now, so a suggestion naming only those
+	// leaves nothing to set here. The row still has to be claimed — its version
+	// checked and bumped — so the assignment list is simply left out rather than
+	// written empty, which is not valid SQL.
+	const setFields =
+		Object.keys(fields).length > 0 ? sql`${sql.update(fields)},` : sql``
+	const provenance =
+		enrichment && Object.keys(enrichment.provenance).length > 0
+			? JSON.stringify(enrichment.provenance)
+			: null
+	// A person records where each of their facts came from, exactly as a company
+	// does. It matters more here, not less: a job title from eighteen months ago
+	// is worse than none, because it gets quoted confidently in an opening line.
+	// Added to what is there rather than replacing it, so a run that fills one
+	// field leaves the others' sources alone.
 	if (table === 'contacts')
 		return sql<{ version: number }>`
 			UPDATE contacts
-			SET ${sql.update(fields)}, version = version + 1, updated_at = now()
+			SET ${setFields}
+				field_provenance = CASE
+					WHEN ${provenance}::jsonb IS NULL THEN field_provenance
+					ELSE COALESCE(field_provenance, '{}'::jsonb) || ${provenance}::jsonb
+				END,
+				version = version + 1,
+				updated_at = now()
 			WHERE id = ${subjectId}
 				AND organization_id = ${orgId}
 				AND version = ${expectedVersion}
 			RETURNING version
 		`
-	const provenance =
-		enrichment && Object.keys(enrichment.provenance).length > 0
-			? JSON.stringify(enrichment.provenance)
-			: null
 	const isRunTarget = enrichment?.isRunTarget ?? false
 	const fitVerdict = isRunTarget ? (enrichment?.fitVerdict ?? null) : null
 	const fitChecks = isRunTarget ? jsonOrNull(enrichment?.fitChecks) : null
@@ -372,7 +398,7 @@ export const occUpdate = (
 	const brief = isRunTarget ? (enrichment?.brief ?? null) : null
 	return sql<{ version: number }>`
 		UPDATE companies
-		SET ${sql.update(fields)},
+		SET ${setFields}
 			field_provenance = CASE
 				WHEN ${provenance}::jsonb IS NULL THEN field_provenance
 				ELSE COALESCE(field_provenance, '{}'::jsonb) || ${provenance}::jsonb
@@ -473,11 +499,16 @@ export const findDuplicateContact = (
 		const searchableChannels = channels.filter(c => c.value.length > 0)
 		if (searchableChannels.length > 0) {
 			const pairs = searchableChannels.map(
-				c => sql`(kind = ${c.kind} AND value = ${c.value})`,
+				c => sql`(channel = ${c.kind} AND address = ${c.value})`,
 			)
+			// Only a person's channels are searched. A company now owns addresses
+			// too — a shared info@ among them — and one of those matching would
+			// merge two different people into whoever holds it.
 			const rows = yield* sql<{ contactId: string }>`
-				SELECT contact_id FROM contact_channels
-				WHERE organization_id = ${orgId} AND (${sql.or(pairs)})
+				SELECT subject_id AS contact_id FROM channels
+				WHERE organization_id = ${orgId}
+					AND subject_table = 'contacts'
+					AND (${sql.or(pairs)})
 				LIMIT 1
 			`
 			if (rows[0]) return rows[0].contactId
@@ -685,7 +716,12 @@ export const resolveResearchProposedUpdate = (
 				// Merge the discovered channels onto the person's existing row
 				// (additive — the human-owned scalar fields stay untouched) and link
 				// the run, rather than inserting a second contact for the same person.
-				yield* writeChannels(sql, org.id, existingId, created.channels)
+				yield* writeChannels(
+					sql,
+					org.id,
+					{ table: 'contacts' as const, id: existingId },
+					created.channels,
+				)
 				yield* linkSubjectToRun(
 					sql,
 					org.id,
@@ -740,7 +776,12 @@ export const resolveResearchProposedUpdate = (
 					reason: 'contact insert returned no row',
 				} satisfies ResolveOutcome
 			// Deliverability verdict + confidence land on the channels, not the row.
-			yield* writeChannels(sql, org.id, row.id, created.channels)
+			yield* writeChannels(
+				sql,
+				org.id,
+				{ table: 'contacts' as const, id: row.id },
+				created.channels,
+			)
 			yield* linkSubjectToRun(sql, org.id, runId, 'contacts', row.id, citations)
 			yield* setProposalStatus(sql, runId, org.id, index, 'applied')
 			yield* recordApplied(
@@ -766,11 +807,36 @@ export const resolveResearchProposedUpdate = (
 				reason: validated.reason,
 			} satisfies ResolveOutcome
 
+		// A company proposal may name a way of reaching it. Those are taken out
+		// first and written as addresses; what is left goes to the columns.
+		//
+		// Their citations are carried across by hand, because the allowlist no
+		// longer sees these keys and would otherwise drop them. The company row
+		// still answers "where did this email come from?" the way it did when the
+		// address was a column of its own — the record of that is worth more than
+		// the tidiness of dropping it with the field.
+		const channelCitations: Record<string, FieldCitation> = {}
+		const proposedChannels =
+			validated.table === 'companies'
+				? splitCompanyChannelFields(
+						Object.fromEntries(
+							Object.entries(validated.fields).map(([key, value]) => {
+								const read = readSourced(value)
+								if (read.citation !== undefined)
+									channelCitations[snakeToCamel(key)] = read.citation
+								return [key, read.value]
+							}),
+						),
+					).channels
+				: []
 		const { fields, citations: fieldCitations } = allowlistFields(
 			validated.table,
 			validated.fields,
 		)
-		const sources = yield* resolveFieldSources(sql, runId, fieldCitations)
+		const sources = yield* resolveFieldSources(sql, runId, {
+			...channelCitations,
+			...fieldCitations,
+		})
 
 		// Persist the run's country onto its own target company as the run's
 		// findings are applied. `country` is not an allowlisted proposal field —
@@ -781,7 +847,7 @@ export const resolveResearchProposedUpdate = (
 			targetCompanyIds.has(validated.subjectId)
 		)
 			fields['country'] = run.country
-		if (Object.keys(fields).length === 0)
+		if (Object.keys(fields).length === 0 && proposedChannels.length === 0)
 			return { outcome: 'no_applicable_fields' } satisfies ResolveOutcome
 
 		// A subject_id that isn't a UUID trips text parsing (22P02) in the WHERE
@@ -810,7 +876,7 @@ export const resolveResearchProposedUpdate = (
 						fitConflicts: findings?.conflicts ?? null,
 						brief: run.briefMd,
 					}
-				: undefined,
+				: { provenance: sources },
 		).pipe(
 			Effect.catchTag('SqlError', e => {
 				const code = pgErrorCode(e)
@@ -826,6 +892,18 @@ export const resolveResearchProposedUpdate = (
 			} satisfies ResolveOutcome
 		if (updatedRows.length === 0)
 			return { outcome: 'conflict' } satisfies ResolveOutcome
+
+		// Only now that the row's version proved unchanged. Written earlier, an
+		// address would land even when the change was refused for being out of
+		// date — a rejected suggestion that still altered the record.
+		if (proposedChannels.length > 0) {
+			yield* writeChannels(
+				sql,
+				org.id,
+				{ table: 'companies', id: validated.subjectId },
+				proposedChannels,
+			)
+		}
 
 		yield* setProposalStatus(sql, runId, org.id, index, 'applied')
 		yield* linkSubjectToRun(

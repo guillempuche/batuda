@@ -106,13 +106,13 @@ test.describe('compose and send via the mail catcher', () => {
 			// AND Pep Casals' email channel is forced into bounced state so
 			// SuppressionGuard trips on the recipient
 			psql(
-				`UPDATE contact_channels SET status='bounced', status_reason='${SUPPRESSED_REASON}', status_updated_at=now() WHERE kind='email' AND value='${SUPPRESSED_EMAIL}'`,
+				`UPDATE channels SET status='bounced', status_reason='${SUPPRESSED_REASON}', status_updated_at=now() WHERE channel='email' AND address='${SUPPRESSED_EMAIL}'`,
 			)
 		})
 
 		test.afterEach(() => {
 			psql(
-				`UPDATE contact_channels SET status='unknown', status_reason=NULL, status_updated_at=now(), soft_bounce_count=0 WHERE kind='email' AND value='${SUPPRESSED_EMAIL}'`,
+				`UPDATE channels SET status='unknown', status_reason=NULL, status_updated_at=now(), soft_bounce_count=0 WHERE channel='email' AND address='${SUPPRESSED_EMAIL}'`,
 			)
 		})
 

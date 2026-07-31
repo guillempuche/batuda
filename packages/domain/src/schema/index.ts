@@ -1,6 +1,12 @@
 export { DbNumber } from './_common'
 export { ApiKey, ApiKeyId } from './api-keys'
 export {
+	BUYING_ROLES,
+	BuyingRole,
+	decidesPurchase,
+	isBuyingRole,
+} from './buying-roles'
+export {
 	CalendarEvent,
 	CalendarEventAttendee,
 	CalendarEventId,
@@ -74,6 +80,7 @@ export {
 	TERMINAL_RESEARCH_EVENTS,
 	TERMINAL_RESEARCH_STATUSES,
 } from './research-runs'
+export { isRoleAddress } from './role-addresses'
 export {
 	DOCUMENT_SUBJECT_TABLES,
 	DocumentSubjectTable,

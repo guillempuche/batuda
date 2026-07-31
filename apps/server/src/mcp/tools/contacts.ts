@@ -10,11 +10,11 @@ import {
 import { Contact, ContactChannel } from '@batuda/domain'
 
 import {
+	channelsJsonFor,
 	channelsOf,
 	clearEmailSuppression,
-	contactChannelsJson,
 	writeChannels,
-} from '../../services/contact-channels'
+} from '../../services/channels'
 import { unlinkSubject } from '../../services/documents'
 import { McpPageLimit, TruncatableResult, toTruncatable } from './_result'
 
@@ -110,7 +110,7 @@ export const ContactHandlersLive = ContactTools.toLayer(
 				Effect.gen(function* () {
 					const limit = requestedLimit ?? 100
 					const rows = yield* sql`
-						SELECT c.*, ${contactChannelsJson(sql)} AS channels
+						SELECT c.*, ${channelsJsonFor(sql, 'contacts')} AS channels
 						FROM contacts c
 						WHERE c.company_id = ${company_id}
 						ORDER BY c.name, c.id
@@ -140,9 +140,17 @@ export const ContactHandlersLive = ContactTools.toLayer(
 					})} RETURNING *`
 					const contact = rows[0] as { id: string }
 					if (channels && channels.length > 0) {
-						yield* writeChannels(sql, currentOrg.id, contact.id, channels)
+						yield* writeChannels(
+							sql,
+							currentOrg.id,
+							{ table: 'contacts' as const, id: contact.id },
+							channels,
+						)
 					}
-					const ch = yield* channelsOf(sql, contact.id)
+					const ch = yield* channelsOf(sql, {
+						table: 'contacts' as const,
+						id: contact.id,
+					})
 					const decoded = yield* decodeContact(rows[0])
 					const decodedChannels = yield* decodeChannels(ch)
 					return { ...decoded, channels: decodedChannels }
@@ -157,9 +165,17 @@ export const ContactHandlersLive = ContactTools.toLayer(
 					})} WHERE id = ${id} RETURNING *`
 					if (clear_email_suppression) yield* clearEmailSuppression(sql, id)
 					if (channels && channels.length > 0) {
-						yield* writeChannels(sql, currentOrg.id, id, channels)
+						yield* writeChannels(
+							sql,
+							currentOrg.id,
+							{ table: 'contacts' as const, id: id },
+							channels,
+						)
 					}
-					const ch = yield* channelsOf(sql, id)
+					const ch = yield* channelsOf(sql, {
+						table: 'contacts' as const,
+						id: id,
+					})
 					const decoded = yield* decodeContact(rows[0])
 					const decodedChannels = yield* decodeChannels(ch)
 					return { ...decoded, channels: decodedChannels }

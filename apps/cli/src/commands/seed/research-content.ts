@@ -370,7 +370,7 @@ export const RICH_CONTACTS_HOSTAL = [
 		role: 'Owner / GM',
 		email: 'arnau@hostalpirineu.com',
 		phone: '+34 974 551 234',
-		is_decision_maker: true,
+		buying_role: 'economic_buyer',
 		notes:
 			'Quoted on Booking commission frustration; wants direct channel < 5%. Best reached mid-week, mornings.',
 		citations: [{ source_id: 'src_firecrawl_003', confidence: 0.91 }],
@@ -380,7 +380,7 @@ export const RICH_CONTACTS_HOSTAL = [
 		role: 'Reservations / Front desk',
 		email: 'reserves@hostalpirineu.com',
 		phone: '+34 974 551 235',
-		is_decision_maker: false,
+		buying_role: null,
 		notes:
 			'Daughter of Arnau. Handles 90% of inbound emails. Asked us to copy her on every reply to keep the inbox sane.',
 		citations: [{ source_id: 'src_firecrawl_003', confidence: 0.78 }],
@@ -389,7 +389,7 @@ export const RICH_CONTACTS_HOSTAL = [
 		name: 'Jordi Pons',
 		role: 'F&B manager',
 		email: 'jordi@hostalpirineu.com',
-		is_decision_maker: false,
+		buying_role: null,
 		notes:
 			'Runs the restaurant + breakfast service. Not a buyer for booking, but a champion if the system improves no-shows.',
 		citations: [{ source_id: 'src_firecrawl_003', confidence: 0.65 }],
@@ -661,7 +661,7 @@ export const RICH_CONTACTS_FERROS = [
 		email: 'david@ferrosbl.cat',
 		phone: '+34 936 770 100',
 		linkedin: 'https://linkedin.com/in/davidferran',
-		is_decision_maker: true,
+		buying_role: 'economic_buyer',
 		notes:
 			'Family-business founder. Decides on technology with his CFO Marta. Best reached early mornings before 09:00.',
 		citations: [{ source_id: 'src_registry_001', confidence: 0.92 }],
@@ -671,7 +671,7 @@ export const RICH_CONTACTS_FERROS = [
 		role: 'CFO',
 		email: 'marta.sole@ferrosbl.cat',
 		phone: '+34 936 770 102',
-		is_decision_maker: true,
+		buying_role: 'economic_buyer',
 		notes:
 			'Holds the budget. Pain owner for the manual-invoicing problem. Deeply numerate; will ask for ROI tables.',
 		citations: [{ source_id: 'src_registry_001', confidence: 0.88 }],
@@ -680,7 +680,7 @@ export const RICH_CONTACTS_FERROS = [
 		name: 'Jordi Camps',
 		role: 'Operations manager',
 		email: 'jordi.camps@ferrosbl.cat',
-		is_decision_maker: false,
+		buying_role: null,
 		notes:
 			'Day-to-day system user. Conservative; warm him up before the demo or he will stonewall.',
 		citations: [{ source_id: 'src_registry_001', confidence: 0.71 }],
@@ -689,7 +689,7 @@ export const RICH_CONTACTS_FERROS = [
 		name: 'Anna Coll',
 		role: 'IT lead (consultant)',
 		email: 'anna@cmconsult.cat',
-		is_decision_maker: false,
+		buying_role: null,
 		notes:
 			'Part-time consultant. Will validate the integration story; influencer not buyer.',
 		citations: [],
@@ -701,7 +701,7 @@ export const RICH_CONTACTS_BAKERY = [
 		name: 'Joan Queralt',
 		role: 'Owner / baker',
 		phone: '+34 938 220 100',
-		is_decision_maker: true,
+		buying_role: 'economic_buyer',
 		notes:
 			'Wakes at 03:30; reachable on the obrador phone after 09:30 once the morning bake is out.',
 		citations: [],
@@ -711,7 +711,7 @@ export const RICH_CONTACTS_BAKERY = [
 		role: 'Front-of-house / orders',
 		email: 'anna@fornqueralt.cat',
 		phone: '+34 938 220 101',
-		is_decision_maker: false,
+		buying_role: null,
 		notes:
 			"Joan's daughter. Manages the WhatsApp preorder list. Will be the system's primary user.",
 		citations: [],
@@ -720,7 +720,7 @@ export const RICH_CONTACTS_BAKERY = [
 		name: 'Pere Sala',
 		role: 'Wholesale buyer (Mercat de Berga)',
 		phone: '+34 626 110 220',
-		is_decision_maker: false,
+		buying_role: null,
 		notes:
 			'Stallholder; runs the Wednesday market stand. Receives the bread by van each morning at 06:30.',
 		citations: [],
@@ -734,7 +734,7 @@ export const RICH_CONTACTS_CONSULTORIA = [
 		email: 'b.ortega@consultoriabeta.es',
 		phone: '+34 963 110 010',
 		linkedin: 'https://linkedin.com/in/beatriuortega',
-		is_decision_maker: true,
+		buying_role: 'economic_buyer',
 		notes:
 			'Decides alone. Skeptical of vendors who lead with features; prefers a pain-first conversation.',
 		citations: [],
@@ -743,7 +743,7 @@ export const RICH_CONTACTS_CONSULTORIA = [
 		name: 'Pau Ferrer',
 		role: 'Senior consultant',
 		email: 'p.ferrer@consultoriabeta.es',
-		is_decision_maker: false,
+		buying_role: null,
 		notes:
 			"Will be the system's power user. Track-record of championing internal tools.",
 		citations: [],
@@ -752,7 +752,7 @@ export const RICH_CONTACTS_CONSULTORIA = [
 		name: 'Eva Riba',
 		role: 'Office manager',
 		email: 'admin@consultoriabeta.es',
-		is_decision_maker: false,
+		buying_role: null,
 		notes:
 			'Owns invoicing; will run the procurement paperwork. Friendly gatekeeper.',
 		citations: [],
@@ -764,7 +764,7 @@ export const RICH_CONTACTS_TANCAMENTS = [
 		name: 'Ramon Vidal',
 		role: 'Owner',
 		phone: '+34 938 110 333',
-		is_decision_maker: true,
+		buying_role: 'economic_buyer',
 		notes:
 			'Hates email. Mobile only. Decides during morning coffee — book calls before 10:00.',
 		citations: [],
@@ -774,7 +774,7 @@ export const RICH_CONTACTS_TANCAMENTS = [
 		role: 'Finance / daughter',
 		email: 'maria@tancamentsgarraf.cat',
 		phone: '+34 938 110 334',
-		is_decision_maker: false,
+		buying_role: null,
 		notes:
 			'Will inherit the business. Future-decision-maker for the sister company in Sant Sadurní.',
 		citations: [],

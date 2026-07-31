@@ -119,7 +119,7 @@ const ResearchLive = ResearchService.layer.pipe(
 							{
 								name: 'Dana Director',
 								role: 'CEO',
-								is_decision_maker: true,
+								buying_role: 'economic_buyer',
 								channels: [
 									{
 										kind: 'email',
@@ -191,11 +191,19 @@ const seedOrigin = async (
 // the company's name + website back when a gate's own args carry neither.
 const seedCompany = async (name: string, website: string): Promise<string> => {
 	const r = await pool.query<{ id: string }>(
-		`INSERT INTO companies (organization_id, slug, name, website)
-		 VALUES ($1, $2, $3, $4) RETURNING id`,
-		[ORG, `c-${randomUUID()}`, name, website],
+		`INSERT INTO companies (organization_id, slug, name)
+		 VALUES ($1, $2, $3) RETURNING id`,
+		[ORG, `c-${randomUUID()}`, name],
 	)
-	return r.rows[0]!.id
+	const id = r.rows[0]!.id
+	// The website is a channel now, and the approve path reads it back from
+	// there when a gate's own arguments carry no domain.
+	await pool.query(
+		`INSERT INTO channels (organization_id, subject_table, subject_id, channel, address, is_primary)
+		 VALUES ($1, 'companies', $2, 'website', $3, true)`,
+		[ORG, id, website],
+	)
+	return id
 }
 
 const approve = (runId: string, paId: string, user: string) =>

@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
+import { BUYING_ROLES, decidesPurchase } from '@batuda/domain'
+
 import {
 	constrainVocabulary,
+	mapBuyingRole,
 	mapCountry,
 	mapIndustry,
 	mapSizeRange,
@@ -240,6 +243,54 @@ describe('constrainVocabulary', () => {
 				blanked: 0,
 			})
 			expect(constrainVocabulary([1, 2]).findings).toEqual([1, 2])
+		})
+	})
+})
+
+describe('mapBuyingRole', () => {
+	describe('when the model names the part in its own words', () => {
+		it('should fold the phrases that mean whoever holds the budget', () => {
+			// GIVEN the words a model reaches for instead of the fixed one — this is
+			// the case that matters, because stored as typed it reads as somebody who
+			// does NOT decide, which is the opposite of the truth
+			for (const raw of [
+				'Decision maker',
+				'decision-maker',
+				'Economic Buyer',
+				'the owner',
+				'Founder',
+				'budget holder',
+			]) {
+				expect(mapBuyingRole(raw), raw).toBe('economic_buyer')
+			}
+			// AND that value then reads as somebody worth reaching
+			expect(decidesPurchase(mapBuyingRole('Decision maker'))).toBe(true)
+		})
+
+		it('should fold the other four parts too', () => {
+			expect(mapBuyingRole('Internal champion')).toBe('champion')
+			expect(mapBuyingRole('Head of Procurement')).toBe('gatekeeper')
+			expect(mapBuyingRole('Technical Evaluator')).toBe('technical_evaluator')
+			expect(mapBuyingRole('end user')).toBe('user')
+		})
+
+		it('should pass a value already in the vocabulary straight through', () => {
+			for (const code of BUYING_ROLES) {
+				expect(mapBuyingRole(code), code).toBe(code)
+			}
+		})
+	})
+
+	describe('when the words mean nothing the vocabulary knows', () => {
+		it('should say nothing rather than invent a part', () => {
+			// GIVEN prose, junk, or a part this vocabulary has no word for
+			for (const raw of ['n/a', '', 'purple', 'they were quite helpful']) {
+				expect(mapBuyingRole(raw), raw).toBeNull()
+			}
+			// THEN nothing is claimed — saying nothing about how somebody decides is
+			// honest, where a made-up part puts an invented person in front of a
+			// salesperson
+			expect(decidesPurchase(mapBuyingRole('purple'))).toBe(false)
 		})
 	})
 })

@@ -1553,9 +1553,32 @@ export class ResearchService extends Context.Service<ResearchService>()(
 				Effect.gen(function* () {
 					const snapshots = []
 					for (const s of subjects) {
+						// A company's website, mailbox and number are rows now, not
+						// columns. They are read back onto the picture of the company
+						// under the names they always had, because that picture is what
+						// grounds the whole run: the domain here is how the run tells the
+						// company it was asked about from a same-named one somewhere
+						// else. Losing it would not fail — it would quietly research the
+						// wrong company.
+						const reachable =
+							s.table === 'companies'
+								? sql`,
+										(SELECT ch.address FROM channels ch
+											WHERE ch.subject_table = 'companies' AND ch.subject_id = t.id
+												AND ch.channel = 'website'
+											ORDER BY ch.is_primary DESC LIMIT 1) AS website,
+										(SELECT ch.address FROM channels ch
+											WHERE ch.subject_table = 'companies' AND ch.subject_id = t.id
+												AND ch.channel = 'email'
+											ORDER BY ch.is_primary DESC LIMIT 1) AS email,
+										(SELECT ch.address FROM channels ch
+											WHERE ch.subject_table = 'companies' AND ch.subject_id = t.id
+												AND ch.channel = 'phone'
+											ORDER BY ch.is_primary DESC LIMIT 1) AS phone`
+								: sql``
 						const [row] = yield* sql`
-							SELECT *, version FROM ${sql(s.table)}
-							WHERE id = ${s.id} AND deleted_at IS NULL
+							SELECT t.*, t.version${reachable} FROM ${sql(s.table)} t
+							WHERE t.id = ${s.id} AND t.deleted_at IS NULL
 							LIMIT 1
 						`
 						if (row) {
@@ -5653,12 +5676,21 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								const subject =
 									companies.length === 1 ? companies[0] : undefined
 								if (subject) {
+									// The company's own site is one of the addresses it holds
+									// rather than a column, so it is read from there. A company
+									// with none simply yields no domain, which the discovery
+									// call now accepts.
 									const [row] = yield* sql<{
 										name: string | null
 										website: string | null
 									}>`
-										SELECT name, website FROM companies
-										WHERE id = ${subject.id} AND deleted_at IS NULL
+										SELECT c.name,
+											(SELECT ch.address FROM channels ch
+												WHERE ch.subject_table = 'companies' AND ch.subject_id = c.id
+													AND ch.channel = 'website'
+												ORDER BY ch.is_primary DESC LIMIT 1) AS website
+										FROM companies c
+										WHERE c.id = ${subject.id} AND c.deleted_at IS NULL
 										LIMIT 1
 									`
 									const domain = row?.website

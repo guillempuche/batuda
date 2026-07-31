@@ -140,7 +140,7 @@ export const parseBounce = (mail: ParsedMail): ParsedBounce | null => {
 // Subsystem" as a normal entry in the inbox list.
 //
 // Org isolation: every statement here names this org explicitly — the
-// email_messages match, the contact_channels update, and the timeline_activity
+// email_messages match, the channels update, and the timeline_activity
 // insert, which writes the org onto each row. Only recipients of an email
 // *we sent from this org* get touched.
 export const applyBounce = (args: {
@@ -175,7 +175,7 @@ export const applyBounce = (args: {
 		// Suppression lives on the email channel now; match by address and
 		// scope to this org explicitly (the worker runs BYPASSRLS).
 		const updatedContacts = yield* sql<{ id: string; companyId: string }>`
-			UPDATE contact_channels ch
+			UPDATE channels ch
 			SET status = ${isHard ? 'bounced' : sql.literal('status')},
 			    status_reason = ${bounce.diagnostic},
 			    status_updated_at = now(),
@@ -184,10 +184,11 @@ export const applyBounce = (args: {
 			      ELSE ch.soft_bounce_count + 1
 			    END
 			FROM contacts c
-			WHERE ch.contact_id = c.id
-			  AND ch.kind = 'email'
+			WHERE ch.subject_table = 'contacts'
+			  AND ch.subject_id = c.id
+			  AND ch.channel = 'email'
 			  AND ch.organization_id = ${organizationId}
-			  AND lower(ch.value) = ANY(${recipients})
+			  AND lower(ch.address) = ANY(${recipients})
 			RETURNING c.id, c.company_id
 		`
 
@@ -197,12 +198,12 @@ export const applyBounce = (args: {
 		// natural trigger; idle accounts shouldn't be re-evaluated.
 		if (!isHard) {
 			yield* sql`
-				UPDATE contact_channels
+				UPDATE channels
 				SET status = 'bounced',
 				    status_updated_at = now()
-				WHERE kind = 'email'
+				WHERE channel = 'email'
 				  AND organization_id = ${organizationId}
-				  AND lower(value) = ANY(${recipients})
+				  AND lower(address) = ANY(${recipients})
 				  AND soft_bounce_count >= 3
 				  AND status_updated_at >= now() - interval '7 days'
 			`

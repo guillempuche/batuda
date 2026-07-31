@@ -107,8 +107,8 @@ beforeAll(async () => {
 	contactId = contact.rows[0]!.id
 
 	await pool.query(
-		`INSERT INTO contact_channels (organization_id, contact_id, kind, value, is_primary)
-		 VALUES ($1, $2, 'email', $3, true)`,
+		`INSERT INTO channels (organization_id, subject_table, subject_id, channel, address, is_primary)
+		 VALUES ($1, 'contacts', $2, 'email', $3, true)`,
 		[ORG_ID, contactId, `nobody@${DOMAIN}`],
 	)
 })
@@ -118,7 +118,7 @@ afterAll(async () => {
 	for (const table of [
 		'timeline_activity',
 		'email_messages',
-		'contact_channels',
+		'channels',
 		'contacts',
 		'companies',
 		'inboxes',

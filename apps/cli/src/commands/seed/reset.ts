@@ -13,5 +13,10 @@ export const seedReset = Effect.gen(function* () {
 	yield* sql`DELETE FROM mcp_oauth_org_membership WHERE client_id LIKE 'mock-%'`
 	yield* sql`DELETE FROM "oauthConsent" WHERE "clientId" LIKE 'mock-%'`
 	yield* sql`DELETE FROM "oauthClient" WHERE "clientId" LIKE 'mock-%'`
-	yield* sql`TRUNCATE companies, products, pages, research_runs, sources, user_research_policy, organization_research_policy, email_thread_links, email_messages, call_recordings, instruction_templates, instruction_stacks, instruction_stack_items CASCADE`
+	// `channels` is named here rather than left to the cascade. It says what it
+	// belongs to by table and id, so it holds no foreign key pointing at a
+	// company or a person — and a table nothing points at is a table nothing
+	// clears. Left out, every address on file would survive a reset and attach
+	// itself to whatever new row happened to be given the same id.
+	yield* sql`TRUNCATE companies, channels, products, pages, research_runs, sources, user_research_policy, organization_research_policy, email_thread_links, email_messages, call_recordings, instruction_templates, instruction_stacks, instruction_stack_items CASCADE`
 })

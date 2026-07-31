@@ -13,7 +13,11 @@ import {
 	takePage,
 	totalColumn,
 } from '../lib/sql-pagination'
-import { contactChannelsJson } from './contact-channels'
+import {
+	channelsJsonFor,
+	splitCompanyChannelFields,
+	writeChannels,
+} from './channels'
 import { researchProvenance } from './research-provenance'
 
 export interface CompanyFilters {
@@ -94,14 +98,44 @@ export class CompanyService extends Context.Service<CompanyService>()(
 							)
 						if (filters.query)
 							conditions.push(sql`name ILIKE ${`%${filters.query}%`}`)
-						if (filters.minLat !== undefined)
-							conditions.push(sql`latitude >= ${filters.minLat}`)
-						if (filters.maxLat !== undefined)
-							conditions.push(sql`latitude <= ${filters.maxLat}`)
-						if (filters.minLng !== undefined)
-							conditions.push(sql`longitude >= ${filters.minLng}`)
-						if (filters.maxLng !== undefined)
-							conditions.push(sql`longitude <= ${filters.maxLng}`)
+						// A rectangle on the map matches a company when the company's own
+						// pin is inside it, or when any of its branches is. Without the
+						// second half, a chain registered in one city is invisible to
+						// somebody drawing a box around another — even with a shop on that
+						// city's main street. Each bound is still applied on its own, so a
+						// half-drawn box narrows rather than matching nothing.
+						const box: Array<Statement.Fragment> = []
+						const siteBox: Array<Statement.Fragment> = []
+						if (filters.minLat !== undefined) {
+							box.push(sql`latitude >= ${filters.minLat}`)
+							siteBox.push(sql`s.latitude >= ${filters.minLat}`)
+						}
+						if (filters.maxLat !== undefined) {
+							box.push(sql`latitude <= ${filters.maxLat}`)
+							siteBox.push(sql`s.latitude <= ${filters.maxLat}`)
+						}
+						if (filters.minLng !== undefined) {
+							box.push(sql`longitude >= ${filters.minLng}`)
+							siteBox.push(sql`s.longitude >= ${filters.minLng}`)
+						}
+						if (filters.maxLng !== undefined) {
+							box.push(sql`longitude <= ${filters.maxLng}`)
+							siteBox.push(sql`s.longitude <= ${filters.maxLng}`)
+						}
+						if (box.length > 0)
+							conditions.push(
+								sql`(
+									(${sql.and(box)})
+									OR EXISTS (
+										SELECT 1 FROM sites s
+										WHERE s.company_id = companies.id
+											AND s.organization_id = ${currentOrg.id}
+											AND s.latitude IS NOT NULL
+											AND s.longitude IS NOT NULL
+											AND ${sql.and(siteBox)}
+									)
+								)`,
+							)
 
 						// Whitelisted sort key → a fixed ORDER BY fragment; never
 						// interpolate raw sort text into the query.
@@ -186,8 +220,18 @@ export class CompanyService extends Context.Service<CompanyService>()(
 				create: (data: Record<string, unknown>) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
+						const split = splitCompanyChannelFields(data)
 						const rows =
-							yield* sql`INSERT INTO companies ${sql.insert({ ...data, organizationId: currentOrg.id })} RETURNING *`
+							yield* sql`INSERT INTO companies ${sql.insert({ ...split.columns, organizationId: currentOrg.id })} RETURNING *`
+						const row = rows[0]
+						if (row !== undefined && split.channels.length > 0) {
+							yield* writeChannels(
+								sql,
+								currentOrg.id,
+								{ table: 'companies', id: String(row['id']) },
+								split.channels,
+							)
+						}
 						return yield* Schema.decodeUnknownEffect(Schema.Array(Company))(
 							rows,
 						)
@@ -237,14 +281,25 @@ export class CompanyService extends Context.Service<CompanyService>()(
 									continue
 								}
 							}
+							const split = splitCompanyChannelFields(data)
 							const rows = yield* sql`
-								INSERT INTO companies ${sql.insert({ ...data, organizationId: currentOrg.id })}
+								INSERT INTO companies ${sql.insert({ ...split.columns, organizationId: currentOrg.id })}
 								ON CONFLICT (organization_id, slug) DO NOTHING
 								RETURNING *
 							`
-							if (rows[0] === undefined)
-								skipped.push({ slug, matchedOn: 'slug' })
-							else inserted.push(rows[0])
+							const row = rows[0]
+							if (row === undefined) skipped.push({ slug, matchedOn: 'slug' })
+							else {
+								if (split.channels.length > 0) {
+									yield* writeChannels(
+										sql,
+										currentOrg.id,
+										{ table: 'companies', id: String(row['id']) },
+										split.channels,
+									)
+								}
+								inserted.push(row)
+							}
 						}
 						const created = yield* Schema.decodeUnknownEffect(
 							Schema.Array(Company),
@@ -258,8 +313,17 @@ export class CompanyService extends Context.Service<CompanyService>()(
 						// Bumping the version on every edit is what lets a research apply notice
 						// that somebody changed the row while the run was thinking, so its findings
 						// can never quietly overwrite a person's edit.
+						const split = splitCompanyChannelFields(data)
+						if (split.channels.length > 0) {
+							yield* writeChannels(
+								sql,
+								currentOrg.id,
+								{ table: 'companies', id },
+								split.channels,
+							)
+						}
 						const rows = yield* sql`
-							UPDATE companies SET ${sql.update({ ...data, updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) })},
+							UPDATE companies SET ${sql.update({ ...split.columns, updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) })},
 								version = version + 1
 							WHERE id = ${id} AND organization_id = ${currentOrg.id}
 							RETURNING *
@@ -273,8 +337,9 @@ export class CompanyService extends Context.Service<CompanyService>()(
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
 						const companyRows = yield* sql`
-							SELECT * FROM companies
-							WHERE slug = ${slug} AND organization_id = ${currentOrg.id}
+							SELECT c.*, ${channelsJsonFor(sql, 'companies')} AS channels
+							FROM companies c
+							WHERE c.slug = ${slug} AND c.organization_id = ${currentOrg.id}
 							LIMIT 1
 						`
 						const companyRow = companyRows[0]
@@ -285,8 +350,43 @@ export class CompanyService extends Context.Service<CompanyService>()(
 							})
 						const companyId = companyRow['id']
 
+						// The places this company trades from. Empty for the great
+						// majority — one place, and the company's own coordinates say
+						// where it is — so a branch row exists only where there is a
+						// second one.
+						const siteRows = yield* sql`
+							SELECT id, name, address, location, country,
+								latitude, longitude, is_primary AS "isPrimary"
+							FROM sites
+							WHERE company_id = ${companyId} AND organization_id = ${currentOrg.id}
+							ORDER BY is_primary DESC, name
+						`
+
+						// Companies this one belongs with, read from both ends: a
+						// statement is stored once, from the subject's side, so "who owns
+						// this" and "what does this own" are the same rows approached
+						// either way round. Without both, half of every pairing would be
+						// invisible from the company you happened to open.
+						const relationRows = yield* sql`
+							SELECT r.id, r.kind, r.note,
+								'outgoing' AS direction,
+								c2.id AS "companyId", c2.name, c2.slug
+							FROM company_relations r
+							JOIN companies c2 ON c2.id = r.related_company_id
+							WHERE r.company_id = ${companyId}
+								AND r.organization_id = ${currentOrg.id}
+							UNION ALL
+							SELECT r.id, r.kind, r.note,
+								'incoming' AS direction,
+								c2.id AS "companyId", c2.name, c2.slug
+							FROM company_relations r
+							JOIN companies c2 ON c2.id = r.company_id
+							WHERE r.related_company_id = ${companyId}
+								AND r.organization_id = ${currentOrg.id}
+						`
+
 						const contactRows = yield* sql`
-							SELECT c.*, ${contactChannelsJson(sql)} AS channels
+							SELECT c.*, ${channelsJsonFor(sql, 'contacts')} AS channels
 							FROM contacts c
 							WHERE c.company_id = ${companyId}
 							  AND c.organization_id = ${currentOrg.id}
@@ -330,7 +430,19 @@ export class CompanyService extends Context.Service<CompanyService>()(
 								String(companyId),
 							),
 						)
-						return { ...company, contacts, recentInteractions, researchRuns }
+						// The company's channels ride alongside the decoded row rather
+						// than through it: they are not columns of `companies`, so the
+						// row shape neither knows nor should know about them.
+						return {
+							...company,
+							channels: (companyRow['channels'] ??
+								[]) as ReadonlyArray<unknown>,
+							sites: siteRows as ReadonlyArray<unknown>,
+							relations: relationRows as ReadonlyArray<unknown>,
+							contacts,
+							recentInteractions,
+							researchRuns,
+						}
 					}),
 			}
 		}),

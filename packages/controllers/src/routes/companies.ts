@@ -23,10 +23,21 @@ export const CompanyResearchRun = Schema.Struct({
 	),
 })
 
-// Company detail: the company plus its contacts (each with the `channels` JSON
-// array the client parses) and recent interactions.
+// Company detail: the company plus its own ways of being reached, its contacts
+// (each with the `channels` JSON array the client parses) and recent
+// interactions.
 export const CompanyDetail = Schema.Struct({
 	...Company.json.fields,
+	// The company's own mailboxes, numbers and handles. Several of each are
+	// possible — a chain's shops, a firm's sales and support offices — so the one
+	// to show is the primary of its kind rather than "the" email.
+	channels: Schema.Array(Schema.Unknown),
+	// The places the company trades from. A company with one place needs none of
+	// these — its own coordinates say where it is — so this is empty for most.
+	sites: Schema.Array(Schema.Unknown),
+	// Companies this one belongs with — a parent, a franchisor, whoever bought
+	// it — seen from both ends, so opening either company shows the pairing.
+	relations: Schema.Array(Schema.Unknown),
 	contacts: Schema.Array(
 		Schema.Struct({
 			...Contact.json.fields,

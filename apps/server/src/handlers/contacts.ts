@@ -15,13 +15,13 @@ import {
 } from '../lib/sql-pagination'
 import {
 	addChannel,
+	channelsJsonFor,
 	channelsOf,
 	clearEmailSuppression,
-	contactChannelsJson,
 	deleteChannel,
 	patchChannel,
 	writeChannels,
-} from '../services/contact-channels'
+} from '../services/channels'
 import { unlinkSubject } from '../services/documents'
 
 const decodeContact = Schema.decodeUnknownEffect(Contact)
@@ -47,7 +47,7 @@ export const ContactsLive = HttpApiBuilder.group(
 						// security limits the linked runs to the caller's org; how the
 						// trail is worded is left to the presentation layer.
 						const probed = yield* sql`
-							SELECT c.*, ${contactChannelsJson(sql)} AS channels,
+							SELECT c.*, ${channelsJsonFor(sql, 'contacts')} AS channels,
 							COALESCE((
 								SELECT json_agg(json_build_object(
 									'runId', rl.research_id,
@@ -111,8 +111,16 @@ export const ContactsLive = HttpApiBuilder.group(
 						})} RETURNING *`
 						const contact = rows[0] as { id: string }
 						if (channels && channels.length > 0)
-							yield* writeChannels(sql, currentOrg.id, contact.id, channels)
-						const ch = yield* channelsOf(sql, contact.id)
+							yield* writeChannels(
+								sql,
+								currentOrg.id,
+								{ table: 'contacts' as const, id: contact.id },
+								channels,
+							)
+						const ch = yield* channelsOf(sql, {
+							table: 'contacts' as const,
+							id: contact.id,
+						})
 						yield* Effect.logInfo('Contact created').pipe(
 							Effect.annotateLogs({
 								event: 'contact.created',
@@ -133,8 +141,16 @@ export const ContactsLive = HttpApiBuilder.group(
 							WHERE id = ${_.params.id} RETURNING *
 						`
 						if (channels && channels.length > 0)
-							yield* writeChannels(sql, currentOrg.id, _.params.id, channels)
-						const ch = yield* channelsOf(sql, _.params.id)
+							yield* writeChannels(
+								sql,
+								currentOrg.id,
+								{ table: 'contacts' as const, id: _.params.id },
+								channels,
+							)
+						const ch = yield* channelsOf(sql, {
+							table: 'contacts' as const,
+							id: _.params.id,
+						})
 						yield* Effect.logInfo('Contact updated').pipe(
 							Effect.annotateLogs({
 								event: 'contact.updated',
@@ -166,7 +182,7 @@ export const ContactsLive = HttpApiBuilder.group(
 						return yield* addChannel(
 							sql,
 							currentOrg.id,
-							_.params.id,
+							{ table: 'contacts' as const, id: _.params.id },
 							_.payload,
 						).pipe(Effect.flatMap(decodeChannel))
 					}).pipe(Effect.orDie),
@@ -185,7 +201,10 @@ export const ContactsLive = HttpApiBuilder.group(
 				.handle('clearSuppression', _ =>
 					Effect.gen(function* () {
 						yield* clearEmailSuppression(sql, _.params.id)
-						const ch = yield* channelsOf(sql, _.params.id)
+						const ch = yield* channelsOf(sql, {
+							table: 'contacts' as const,
+							id: _.params.id,
+						})
 						yield* Effect.logInfo('Contact suppression cleared').pipe(
 							Effect.annotateLogs({
 								event: 'contact.suppression_cleared',

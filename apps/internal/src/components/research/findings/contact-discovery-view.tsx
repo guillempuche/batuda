@@ -1,6 +1,7 @@
 import { Trans } from '@lingui/react/macro'
 import styled from 'styled-components'
 
+import { useBuyingRoleLabel } from '#/components/contacts/buying-role-label'
 import { displayValue } from '#/components/research/field-diff'
 import { SafeLink } from '#/components/research/safe-link'
 import {
@@ -34,7 +35,7 @@ type ContactEntry = {
 	readonly email?: string
 	readonly phone?: string
 	readonly linkedin?: string
-	readonly is_decision_maker?: boolean
+	readonly buying_role?: string | null
 	readonly notes?: string
 	readonly citations?: ReadonlyArray<Citation>
 }
@@ -48,6 +49,7 @@ export function ContactDiscoveryView({
 }: {
 	readonly findings: ContactDiscoveryFindings | null | undefined
 }) {
+	const buyingRoleLabel = useBuyingRoleLabel()
 	const contacts = findings?.contacts ?? []
 
 	return (
@@ -74,9 +76,9 @@ export function ContactDiscoveryView({
 									<RowHead>
 										<Pill>{name}</Pill>
 										{role !== null ? <Reason>{role}</Reason> : null}
-										{c.is_decision_maker === true ? (
+										{buyingRoleLabel(c.buying_role ?? null) !== null ? (
 											<DecisionMakerBadge>
-												<Trans>Decision maker</Trans>
+												{buyingRoleLabel(c.buying_role ?? null)}
 											</DecisionMakerBadge>
 										) : null}
 									</RowHead>

@@ -1,4 +1,4 @@
-import { Effect, Schema } from 'effect'
+import { DateTime, Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
@@ -187,12 +187,65 @@ const GeocodeCompany = Tool.make('geocode_company', {
 	.annotate(Tool.Idempotent, true)
 	.annotate(Tool.OpenWorld, true)
 
+// One tool for the places a company trades from, rather than three. A flat
+// `action` with the fields each one needs, never a union: a strict provider
+// rejects the nested shape a union serialises to.
+const ManageCompanySites = Tool.make('manage_company_sites', {
+	description:
+		"The places a company trades from — its shops, offices, depots. Most companies need none of these: a company with one place is described by its own address and coordinates, and a site is what you add when there is a second. Adding one is what makes that place findable on the map on its own, so a rep drawing a box around their territory sees the branch there rather than only the city the company is registered in. action: 'list' (all of them), 'add' (name plus, where known, address/location/country/latitude/longitude), 'update' (by site_id, only the fields to change), 'remove' (by site_id). Give coordinates when you have them — a site without them is recorded but cannot be found on a map.",
+	parameters: Schema.Struct({
+		action: Schema.Literals(['list', 'add', 'update', 'remove']),
+		company_id: Schema.String,
+		site_id: Schema.optional(Schema.String),
+		name: Schema.optional(Schema.String),
+		address: Schema.optional(Schema.String),
+		location: Schema.optional(Schema.String),
+		country: Schema.optional(Schema.String),
+		latitude: Schema.optional(Schema.Number),
+		longitude: Schema.optional(Schema.Number),
+		is_primary: Schema.optional(Schema.Boolean),
+	}),
+	success: Schema.Struct({
+		sites: Schema.Array(Schema.Unknown),
+	}),
+	dependencies: REQUEST_DEPENDENCIES,
+})
+	.annotate(Tool.Title, 'Manage Company Sites')
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.OpenWorld, false)
+
+// One tool for how two companies belong together, with a flat `action` for the
+// same reason the sites tool has one.
+const ManageCompanyRelations = Tool.make('manage_company_relations', {
+	description:
+		"How two companies belong together — a holding and the firm it owns, a franchisor and its franchisee, a company and whoever bought it. Recording one stops the pair reading as two near-duplicates that somebody eventually merges by mistake. action: 'list' (everything this company is part of, from both directions), 'add' (related_company_id plus kind), 'remove' (by relation_id). kind: 'parent' (company_id is owned BY related_company_id), 'franchise_of' (company_id trades under related_company_id's brand but is independently owned — not a subsidiary, and it decides for itself), 'acquired_by' (company_id was bought by related_company_id). Store the pair once, from the owned/franchised/acquired side; the other company shows it too without a second entry.",
+	parameters: Schema.Struct({
+		action: Schema.Literals(['list', 'add', 'remove']),
+		company_id: Schema.String,
+		related_company_id: Schema.optional(Schema.String),
+		kind: Schema.optional(
+			Schema.Literals(['parent', 'franchise_of', 'acquired_by']),
+		),
+		note: Schema.optional(Schema.String),
+		relation_id: Schema.optional(Schema.String),
+	}),
+	success: Schema.Struct({
+		relations: Schema.Array(Schema.Unknown),
+	}),
+	dependencies: REQUEST_DEPENDENCIES,
+})
+	.annotate(Tool.Title, 'Manage Company Relations')
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.OpenWorld, false)
+
 export const CompanyTools = Toolkit.make(
 	SearchCompanies,
 	GetCompany,
 	CreateCompanies,
 	UpdateCompany,
 	GeocodeCompany,
+	ManageCompanySites,
+	ManageCompanyRelations,
 )
 
 export const CompanyHandlersLive = CompanyTools.toLayer(
@@ -274,6 +327,129 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 						actorUserId: null,
 					}).pipe(Effect.provideService(TimelineActivityService, timeline))
 					return result
+				}).pipe(Effect.orDie),
+			manage_company_sites: params =>
+				Effect.gen(function* () {
+					const currentOrg = yield* CurrentOrg
+					const list = () => sql`
+						SELECT id, name, address, location, country,
+							latitude, longitude, is_primary AS "isPrimary"
+						FROM sites
+						WHERE company_id = ${params.company_id}
+							AND organization_id = ${currentOrg.id}
+						ORDER BY is_primary DESC, name
+					`
+					if (params.action === 'add') {
+						// The company has to be this organisation's. The foreign key only
+						// says it exists, not whose it is, so without this a branch could
+						// be hung off somebody else's company.
+						const owned = yield* sql`
+							SELECT id FROM companies
+							WHERE id = ${params.company_id}
+								AND organization_id = ${currentOrg.id}
+								AND deleted_at IS NULL
+							LIMIT 1
+						`
+						if (owned.length === 0) return { sites: [] }
+						yield* sql`
+							INSERT INTO sites ${sql.insert({
+								organizationId: currentOrg.id,
+								companyId: params.company_id,
+								name: params.name ?? 'Site',
+								address: params.address ?? null,
+								location: params.location ?? null,
+								country: params.country ?? null,
+								latitude: params.latitude ?? null,
+								longitude: params.longitude ?? null,
+								isPrimary: params.is_primary ?? false,
+							})}
+						`
+					}
+					if (params.action === 'update' && params.site_id !== undefined) {
+						// Only what the caller named: an omitted field is one they did
+						// not mean to touch, not one they meant to clear.
+						const patch: Record<string, unknown> = {
+							updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
+						}
+						if (params.name !== undefined) patch['name'] = params.name
+						if (params.address !== undefined) patch['address'] = params.address
+						if (params.location !== undefined)
+							patch['location'] = params.location
+						if (params.country !== undefined) patch['country'] = params.country
+						if (params.latitude !== undefined)
+							patch['latitude'] = params.latitude
+						if (params.longitude !== undefined)
+							patch['longitude'] = params.longitude
+						if (params.is_primary !== undefined)
+							patch['isPrimary'] = params.is_primary
+						yield* sql`
+							UPDATE sites SET ${sql.update(patch)}
+							WHERE id = ${params.site_id}
+								AND company_id = ${params.company_id}
+								AND organization_id = ${currentOrg.id}
+						`
+					}
+					if (params.action === 'remove' && params.site_id !== undefined) {
+						yield* sql`
+							DELETE FROM sites
+							WHERE id = ${params.site_id}
+								AND company_id = ${params.company_id}
+								AND organization_id = ${currentOrg.id}
+						`
+					}
+					return { sites: yield* list() }
+				}).pipe(Effect.orDie),
+			manage_company_relations: params =>
+				Effect.gen(function* () {
+					const currentOrg = yield* CurrentOrg
+					const list = () => sql`
+						SELECT r.id, r.kind, r.note, 'outgoing' AS direction,
+							c2.id AS "companyId", c2.name, c2.slug
+						FROM company_relations r
+						JOIN companies c2 ON c2.id = r.related_company_id
+						WHERE r.company_id = ${params.company_id}
+							AND r.organization_id = ${currentOrg.id}
+						UNION ALL
+						SELECT r.id, r.kind, r.note, 'incoming' AS direction,
+							c2.id AS "companyId", c2.name, c2.slug
+						FROM company_relations r
+						JOIN companies c2 ON c2.id = r.company_id
+						WHERE r.related_company_id = ${params.company_id}
+							AND r.organization_id = ${currentOrg.id}
+					`
+					if (
+						params.action === 'add' &&
+						params.related_company_id !== undefined &&
+						params.kind !== undefined
+					) {
+						// Both companies have to be this organisation's. The foreign keys
+						// only say they exist, not whose they are.
+						const owned = yield* sql<{ n: string }>`
+							SELECT count(*)::text AS n FROM companies
+							WHERE id IN (${params.company_id}, ${params.related_company_id})
+								AND organization_id = ${currentOrg.id}
+								AND deleted_at IS NULL
+						`
+						if (Number(owned[0]?.n ?? 0) !== 2) return { relations: [] }
+						yield* sql`
+							INSERT INTO company_relations ${sql.insert({
+								organizationId: currentOrg.id,
+								companyId: params.company_id,
+								relatedCompanyId: params.related_company_id,
+								kind: params.kind,
+								note: params.note ?? null,
+							})}
+							ON CONFLICT (company_id, related_company_id, kind) DO NOTHING
+						`
+					}
+					if (params.action === 'remove' && params.relation_id !== undefined) {
+						yield* sql`
+							DELETE FROM company_relations
+							WHERE id = ${params.relation_id}
+								AND organization_id = ${currentOrg.id}
+						`
+					}
+					return { relations: yield* list() }
 				}).pipe(Effect.orDie),
 			geocode_company: ({ id }) =>
 				geocodeCompany(id).pipe(

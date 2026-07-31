@@ -94,7 +94,23 @@ export const Citation = Schema.Struct({
 // instead of one citation list for a whole block, so a single unsupported field
 // can be dropped on its own without discarding its neighbours.
 export const Sourced = <Value extends Schema.Top>(value: Value) =>
-	Schema.Struct({ value, ...Citation.fields })
+	Schema.Struct({
+		value,
+		...Citation.fields,
+		// When the page said this was true, where it says so. A job title is the
+		// case that matters: boards turn over yearly and hospitality churns
+		// managers, so a title from eighteen months ago is worse than none — it
+		// gets quoted confidently in an opening line. Left out when the page gives
+		// no date, which is most of the time; a guess would be worse than nothing.
+		// `optionalKey` around a plain string is safe here — it is a union that
+		// would serialise to the nested shape a strict provider rejects.
+		as_of: Schema.optionalKey(
+			Schema.String.annotate({
+				description:
+					'The date this was true as of, as the page states it (YYYY-MM-DD, or YYYY-MM / YYYY when that is all it gives). Only when the page actually dates it — never inferred from when the page was published or fetched.',
+			}),
+		),
+	})
 
 export const DiscoveredExisting = Schema.Struct({
 	subject_table: ResearchSubjectTable,

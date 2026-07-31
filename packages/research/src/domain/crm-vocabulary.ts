@@ -45,11 +45,6 @@ export const SNAPSHOT_COMPANY_FIELDS = [
 	// Left out, the number could only ever be written by the first run to find it
 	// and never corrected by any run after.
 	'taxId',
-	'website',
-	'email',
-	'phone',
-	'linkedin',
-	'instagram',
 	'industry',
 	'sizeRange',
 	'location',
@@ -58,8 +53,4 @@ export const SNAPSHOT_COMPANY_FIELDS = [
 	'tags',
 ] as const
 
-export const SNAPSHOT_CONTACT_FIELDS = [
-	'name',
-	'role',
-	'isDecisionMaker',
-] as const
+export const SNAPSHOT_CONTACT_FIELDS = ['name', 'role', 'buyingRole'] as const

@@ -14,6 +14,7 @@ import {
 	seedCompanyId,
 	seedContactId,
 	seedUuid,
+	splitCompanyChannels,
 	withSeedIds,
 } from './shared'
 
@@ -43,7 +44,7 @@ type ContactFixture = {
 	readonly companyId: string
 	readonly name: string
 	readonly role?: string
-	readonly isDecisionMaker?: boolean
+	readonly buyingRole?: string | null
 	readonly email?: string
 	readonly phone?: string
 	readonly whatsapp?: string
@@ -139,10 +140,19 @@ export const seedCompanies = (
 		).map(c => ({ ...c, id: seedCompanyId(c.slug) }))
 
 		yield* Effect.logInfo(`Seeding companies (${preset})...`)
+		// A company's website and mailbox are no longer columns on its row, so the
+		// fixtures — which still describe a company as having them, because that is
+		// how a person describes one — are split before the insert.
+		const taller = splitCompanyChannels(companies, tallerOrgId)
 		const insertedCompanies =
 			yield* sql<CompanyRow>`INSERT INTO companies ${sql.insert(
-				normalizeRows(stamp(companies)),
+				normalizeRows(stamp(taller.companies)),
 			)} RETURNING id, slug, status`
+		if (taller.channels.length > 0) {
+			yield* sql`INSERT INTO channels ${sql.insert(
+				normalizeRows(taller.channels),
+			)}`
+		}
 
 		const companyMap = new Map(insertedCompanies.map(c => [c.slug, c.id]))
 		yield* Effect.logInfo(`  taller org: ${insertedCompanies.length} companies`)
@@ -199,10 +209,16 @@ export const seedCompanies = (
 				organizationId: restaurantOrgId,
 			}))
 
+			const restaurant = splitCompanyChannels(restaurantRows, restaurantOrgId)
 			const insertedRestaurant =
 				yield* sql<CompanyRow>`INSERT INTO companies ${sql.insert(
-					normalizeRows(restaurantRows),
+					normalizeRows(restaurant.companies),
 				)} RETURNING id, slug, status`
+			if (restaurant.channels.length > 0) {
+				yield* sql`INSERT INTO channels ${sql.insert(
+					normalizeRows(restaurant.channels),
+				)}`
+			}
 			for (const c of insertedRestaurant) {
 				restaurantCompanyMap.set(c.slug, c.id)
 			}
@@ -242,9 +258,10 @@ const buildChannels = (
 			statusReason: string | null,
 		) => ({
 			id: seedUuid('channel', `${contactId}:${kind}:${value}`),
-			contactId,
-			kind,
-			value,
+			subjectTable: 'contacts',
+			subjectId: contactId,
+			channel: kind,
+			address: value,
 			isPrimary,
 			verification: null,
 			confidence: null,
@@ -303,7 +320,7 @@ export const seedContacts = (
 						companyId,
 						name: c.name,
 						role: c.role,
-						isDecisionMaker: c.isDecisionMaker,
+						buyingRole: c.buyingRole,
 						...(c.email === null ? {} : { email: c.email }),
 						...(c.phone === null ? {} : { phone: c.phone }),
 					},
@@ -333,7 +350,7 @@ export const seedContacts = (
 							companyId: c.companyId,
 							name: c.name,
 							role: c.role ?? null,
-							isDecisionMaker: c.isDecisionMaker ?? null,
+							buyingRole: c.buyingRole ?? null,
 						})),
 					),
 				),
@@ -342,7 +359,7 @@ export const seedContacts = (
 
 		const channelRows = buildChannels(contacts, contactMap)
 		if (channelRows.length > 0) {
-			yield* sql`INSERT INTO contact_channels ${sql.insert(
+			yield* sql`INSERT INTO channels ${sql.insert(
 				normalizeRows(stamp(channelRows)),
 			)}`
 		}
@@ -367,7 +384,7 @@ export const seedContacts = (
 							companyId: c.companyId,
 							name: c.name,
 							role: c.role ?? null,
-							isDecisionMaker: c.isDecisionMaker ?? null,
+							buyingRole: c.buyingRole ?? null,
 						})),
 					),
 				)} RETURNING id, name`
@@ -377,7 +394,7 @@ export const seedContacts = (
 				restaurantIds,
 			).map(r => ({ ...r, organizationId: restaurantOrgId }))
 			if (restaurantChannels.length > 0) {
-				yield* sql`INSERT INTO contact_channels ${sql.insert(
+				yield* sql`INSERT INTO channels ${sql.insert(
 					normalizeRows(restaurantChannels),
 				)}`
 			}

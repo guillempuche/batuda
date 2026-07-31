@@ -281,3 +281,115 @@ describe('resolveResearchProposedUpdatesBatch', () => {
 		})
 	})
 })
+
+describe('applying a company address a run found', () => {
+	const seedRunWith = async (
+		fields: Record<string, unknown>,
+		expectedVersion: number,
+	): Promise<string> => {
+		const run = await pool.query<{ id: string }>(
+			`INSERT INTO research_runs (organization_id, query, status, created_by, findings)
+			 VALUES ($1, 'q', 'succeeded', 'u1', $2::jsonb) RETURNING id`,
+			[
+				ORG,
+				JSON.stringify({
+					proposed_updates: [
+						proposal({
+							id: 'pc1',
+							subject_table: 'companies',
+							operation: 'update',
+							subject_id: companyId,
+							expected_version: expectedVersion,
+							fields,
+						}),
+					],
+				}),
+			],
+		)
+		return run.rows[0]!.id
+	}
+
+	const companyAddresses = () =>
+		pool.query<{ channel: string; address: string }>(
+			`SELECT channel, address FROM channels
+			 WHERE organization_id = $1 AND subject_table = 'companies' AND subject_id = $2`,
+			[ORG, companyId],
+		)
+
+	describe('when the change is accepted', () => {
+		it('should store the address and remember which page it came from', async () => {
+			// GIVEN a run offering the company's published mailbox, citing the page
+			// it read it on — a page the run really fetched
+			await pool.query(
+				`INSERT INTO sources (id, kind, provider, url, url_hash, domain, content_hash)
+				 VALUES ('src_pc_home', 'web', 'test', 'https://acme.example/contact', $1, 'acme.example', $2)
+				 ON CONFLICT (url_hash) DO NOTHING`,
+				[`hash-${randomUUID()}`, `content-${randomUUID()}`],
+			)
+			const version = (
+				await pool.query<{ version: number }>(
+					`SELECT version FROM companies WHERE id = $1`,
+					[companyId],
+				)
+			).rows[0]!.version
+			const runId = await seedRunWith(
+				{
+					email: {
+						value: 'hola@acme.example',
+						source_id: 'src_pc_home',
+						confidence: 1,
+					},
+				},
+				version,
+			)
+			await pool.query(
+				`INSERT INTO research_run_sources (organization_id, research_id, source_id, local_ref, fetched_at, cost_cents)
+				 VALUES ($1, $2, 'src_pc_home', 'https://acme.example/contact', now(), 0)`,
+				[ORG, runId],
+			)
+
+			// WHEN it is accepted
+			const [outcome] = await runBatch([
+				{ researchId: runId, proposedUpdateId: 'pc1', decision: 'apply' },
+			])
+
+			// THEN it lands as one of the company's addresses, not as a column
+			expect(outcome?.outcome).toBe('applied')
+			const rows = (await companyAddresses()).rows
+			expect(rows).toContainEqual({
+				channel: 'email',
+				address: 'hola@acme.example',
+			})
+
+			// AND the company still answers "where did this come from?", which it did
+			// while the address was a column of its own
+			const provenance = await pool.query<{
+				field_provenance: Record<string, { sourceUrl: string }> | null
+			}>(`SELECT field_provenance FROM companies WHERE id = $1`, [companyId])
+			expect(provenance.rows[0]?.field_provenance?.['email']?.sourceUrl).toBe(
+				'https://acme.example/contact',
+			)
+		})
+	})
+
+	describe('when the row moved on while the run was thinking', () => {
+		it('should refuse the change without writing the address anyway', async () => {
+			// GIVEN a run offering an address against a version the row has passed
+			const before = (await companyAddresses()).rows.length
+			const runId = await seedRunWith(
+				{ phone: { value: '+34 972 000 000', source_id: 'src_pc_home' } },
+				999,
+			)
+
+			// WHEN it is accepted
+			const [outcome] = await runBatch([
+				{ researchId: runId, proposedUpdateId: 'pc1', decision: 'apply' },
+			])
+
+			// THEN it is refused as out of date, and — the point of this test —
+			// nothing was written on the way to refusing it
+			expect(outcome?.outcome).toBe('conflict')
+			expect((await companyAddresses()).rows).toHaveLength(before)
+		})
+	})
+})

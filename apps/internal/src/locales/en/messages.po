@@ -634,6 +634,11 @@ msgstr "Archived"
 msgid "Archived — not pursuing"
 msgstr "Archived — not pursuing"
 
+#: src/components/contacts/buying-role-label.tsx
+#: src/components/contacts/contact-edit-dialog.tsx
+msgid "Argues for it inside"
+msgstr "Argues for it inside"
+
 #: src/components/companies/company-fit-section.tsx
 msgid "as of"
 msgstr "as of"
@@ -1248,6 +1253,11 @@ msgstr "Content"
 msgid "Content (Markdown)"
 msgstr "Content (Markdown)"
 
+#: src/components/contacts/buying-role-label.tsx
+#: src/components/contacts/contact-edit-dialog.tsx
+msgid "Controls access"
+msgstr "Controls access"
+
 #: src/routes/companies/$slug.tsx
 #: src/routes/companies/$slug.tsx
 msgid "Conversations"
@@ -1768,12 +1778,6 @@ msgstr "Date"
 msgid "Dead"
 msgstr "Dead"
 
-#: src/components/contacts/contact-edit-dialog.tsx
-#: src/components/research/findings/contact-discovery-view.tsx
-#: src/routes/companies/$slug.tsx
-msgid "Decision maker"
-msgstr "Decision maker"
-
 #: src/routes/calendar/index.tsx
 msgid "Decline"
 msgstr "Decline"
@@ -1844,10 +1848,6 @@ msgstr "Delete this key?"
 #: src/routes/settings/organization/templates.tsx
 msgid "Delete this org stack?"
 msgstr "Delete this org stack?"
-
-#: src/routes/settings/organization/templates.tsx
-#~ msgid "Delete this org template?"
-#~ msgstr "Delete this org template?"
 
 #: src/routes/settings/profile/templates.tsx
 msgid "Delete this stack?"
@@ -2485,6 +2485,11 @@ msgstr "High"
 msgid "High priority"
 msgstr "High priority"
 
+#: src/components/contacts/buying-role-label.tsx
+#: src/components/contacts/contact-edit-dialog.tsx
+msgid "Holds the budget"
+msgstr "Holds the budget"
+
 #: src/routes/companies/index.tsx
 msgid "Hot"
 msgstr "Hot"
@@ -2661,6 +2666,11 @@ msgstr "Its owner has not chosen this organization"
 #: src/routes/calendar/index.tsx
 msgid "Join video call"
 msgstr "Join video call"
+
+#: src/components/contacts/buying-role-label.tsx
+#: src/components/contacts/contact-edit-dialog.tsx
+msgid "Judges whether it works"
+msgstr "Judges whether it works"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Just a note to yourself — it changes nothing about how the mailbox works. Up to 200 characters."
@@ -3404,10 +3414,6 @@ msgid "No org stacks yet. Create one to get started."
 msgstr "No org stacks yet. Create one to get started."
 
 #: src/routes/settings/organization/templates.tsx
-#~ msgid "No org templates yet."
-#~ msgstr "No org templates yet."
-
-#: src/routes/settings/organization/templates.tsx
 msgid "No org templates yet. Create one to get started."
 msgstr "No org templates yet. Create one to get started."
 
@@ -3548,6 +3554,10 @@ msgstr "Not enough research budget for this run. Raise the budget or narrow the 
 #: src/components/instructions/template-library.tsx
 msgid "Not in your organization"
 msgstr "Not in your organization"
+
+#: src/components/contacts/contact-edit-dialog.tsx
+msgid "Not known"
+msgstr "Not known"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Not recorded"
@@ -3918,6 +3928,10 @@ msgstr "Paid spend this month"
 #: src/components/companies/about-section.tsx
 msgid "Pain points"
 msgstr "Pain points"
+
+#: src/components/contacts/contact-edit-dialog.tsx
+msgid "Part in a purchase"
+msgstr "Part in a purchase"
 
 #: src/components/research/findings/company-enrichment-view.tsx
 msgid "Pass"
@@ -4762,10 +4776,6 @@ msgstr "Shared guidance every member's agents can use, plus the organization's s
 msgid "Shared with everyone in your organization — their agents follow it on every run."
 msgstr "Shared with everyone in your organization — their agents follow it on every run."
 
-#: src/components/instructions/template-editor-dialog.tsx
-#~ msgid "Shared with everyone in your organization — their research agent follows it on every run."
-#~ msgstr "Shared with everyone in your organization — their research agent follows it on every run."
-
 #: src/routes/emails/inboxes.tsx
 msgid "Shared with the team"
 msgstr "Shared with the team"
@@ -5498,10 +5508,6 @@ msgstr "This runs research on {0} companies, up to about {1} in paid data. Start
 msgid "This stack no longer exists."
 msgstr "This stack no longer exists."
 
-#: src/components/instructions/template-view-dialog.tsx
-#~ msgid "This template is empty, so it adds nothing to a run. Ask whoever looks after it to fill it in."
-#~ msgstr "This template is empty, so it adds nothing to a run. Ask whoever looks after it to fill it in."
-
 #: src/components/instructions/template-dialog.tsx
 msgid "This template is empty, so it adds nothing to a run. Fill it in to give your agents something to follow."
 msgstr "This template is empty, so it adds nothing to a run. Fill it in to give your agents something to follow."
@@ -5734,6 +5740,11 @@ msgstr "Use your email provider's app-specific password — not your normal logi
 #: src/routes/emails/inboxes.tsx
 msgid "Username"
 msgstr "Username"
+
+#: src/components/contacts/buying-role-label.tsx
+#: src/components/contacts/contact-edit-dialog.tsx
+msgid "Uses it day to day"
+msgstr "Uses it day to day"
 
 #: src/routes/settings/profile/templates.tsx
 msgid "Using the org default"
@@ -5986,14 +5997,6 @@ msgstr "Your organization has no default yet."
 #: src/routes/settings/profile/templates.tsx
 msgid "Your organization has no default yet. Make a stack your default to steer every run."
 msgstr "Your organization has no default yet. Make a stack your default to steer every run."
-
-#: src/components/instructions/template-view-dialog.tsx
-#~ msgid "Your organization looks after this one."
-#~ msgstr "Your organization looks after this one."
-
-#: src/routes/settings/organization/templates.tsx
-#~ msgid "Your organization's admins manage these templates. You can read any of them, and use them in your own stacks or per run."
-#~ msgstr "Your organization's admins manage these templates. You can read any of them, and use them in your own stacks or per run."
 
 #: src/routes/settings/organization/members.tsx
 msgid "Your session has expired. Sign in again to continue."

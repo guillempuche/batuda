@@ -42,6 +42,7 @@ import type {
 	ContactListItem,
 } from '@batuda/controllers'
 import type { Task } from '@batuda/domain'
+import { decidesPurchase } from '@batuda/domain'
 import { Sidebar, Stack, Switcher } from '@batuda/ui'
 import {
 	PriButton,
@@ -89,6 +90,7 @@ import {
 import { ResearchSummaryCard } from '#/components/companies/research-summary-card'
 import { UpcomingMeetingsCard } from '#/components/companies/upcoming-meetings-card'
 import { WherePanel } from '#/components/companies/where-panel'
+import { useBuyingRoleLabel } from '#/components/contacts/buying-role-label'
 import {
 	ContactEditDialog,
 	type EditableContact,
@@ -208,7 +210,7 @@ type ContactRow = {
 	readonly id: string
 	readonly name: string
 	readonly role: string | null
-	readonly isDecisionMaker: boolean
+	readonly buyingRole: string | null
 	readonly channels: ReadonlyArray<DisplayChannel>
 	// Derived from the primary email channel for the send action + suppression UI.
 	readonly email: string | null
@@ -483,6 +485,7 @@ function DetailBody({
 	refreshCompany: () => void
 }) {
 	const { t } = useLingui()
+	const buyingRoleLabel = useBuyingRoleLabel()
 	const { open: openQuickCapture } = useQuickCapture()
 	const { openCompose } = useComposeEmail()
 	const [tab, setTab] = useTabSearchParam<CompanyTab>(COMPANY_TABS, 'overview')
@@ -713,7 +716,7 @@ function DetailBody({
 						id: editingContactRow.id,
 						name: editingContactRow.name,
 						role: editingContactRow.role,
-						isDecisionMaker: editingContactRow.isDecisionMaker,
+						buyingRole: editingContactRow.buyingRole,
 					}
 				: null,
 		[editingContactId],
@@ -1378,9 +1381,11 @@ function DetailBody({
 										<ContactHeader>
 											<ContactName>
 												{contact.name}
-												{contact.isDecisionMaker && (
-													<DecisionBadge>
-														<Trans>Decision maker</Trans>
+												{buyingRoleLabel(contact.buyingRole) !== null && (
+													<DecisionBadge
+														$decides={decidesPurchase(contact.buyingRole)}
+													>
+														{buyingRoleLabel(contact.buyingRole)}
 													</DecisionBadge>
 												)}
 												{(contact.emailStatus === 'bounced' ||
@@ -1737,6 +1742,23 @@ function narrowCompany(raw: unknown): CompanyDetail | null {
 		if (!Array.isArray(raw)) return []
 		return raw.filter((v): v is string => typeof v === 'string')
 	}
+	// How to reach the company is no longer a column each: a company can hold
+	// several mailboxes, numbers and handles — one per shop, one per office — so
+	// they arrive as a list. The header shows one of each, which is the one marked
+	// primary. The server hands the list back with those first, so the first match
+	// of a kind is the one to show.
+	const channel = (kind: string): string | null => {
+		const list = r['channels']
+		if (!Array.isArray(list)) return null
+		for (const entry of list) {
+			if (!entry || typeof entry !== 'object') continue
+			const row = entry as Record<string, unknown>
+			if (row['kind'] !== kind) continue
+			const value = row['value']
+			if (typeof value === 'string' && value.trim() !== '') return value
+		}
+		return null
+	}
 	return {
 		id: r['id'],
 		slug: r['slug'],
@@ -1750,11 +1772,11 @@ function narrowCompany(raw: unknown): CompanyDetail | null {
 		location: str('location'),
 		source: str('source'),
 		priority: num('priority'),
-		website: str('website'),
-		email: str('email'),
-		phone: str('phone'),
-		instagram: str('instagram'),
-		linkedin: str('linkedin'),
+		website: channel('website'),
+		email: channel('email'),
+		phone: channel('phone'),
+		instagram: channel('instagram'),
+		linkedin: channel('linkedin'),
 		googleMapsUrl: str('googleMapsUrl'),
 		painPoints: str('painPoints'),
 		currentTools: str('currentTools'),
@@ -1859,7 +1881,7 @@ function narrowContacts(
 			id: r['id'],
 			name: r['name'],
 			role: typeof r['role'] === 'string' ? r['role'] : null,
-			isDecisionMaker: r['isDecisionMaker'] === true,
+			buyingRole: typeof r['buyingRole'] === 'string' ? r['buyingRole'] : null,
 			channels,
 			email: primaryEmail?.value ?? null,
 			emailStatus: primaryEmail?.status ?? 'unknown',
@@ -2418,12 +2440,14 @@ const ContactName = styled.span.withConfig({
 
 const DecisionBadge = styled.span.withConfig({
 	displayName: 'CompanyDetailDecisionBadge',
-})`
+	shouldForwardProp: prop => prop !== '$decides',
+})<{ $decides: boolean }>`
 	${brushedMetalPlate}
 	${stenciledTitle}
 	display: inline-flex;
 	padding: var(--space-3xs) var(--space-2xs);
-	border-left: 3px solid var(--color-secondary);
+	border-left: 3px solid
+		${p => (p.$decides ? 'var(--color-secondary)' : 'var(--color-outline)')};
 	font-size: var(--typescale-label-small-size);
 	transform: rotate(-0.5deg);
 `
