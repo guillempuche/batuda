@@ -774,6 +774,10 @@ msgstr "Blocked"
 msgid "Blocked by the provider. The body is shown for review only."
 msgstr "Blocked by the provider. The body is shown for review only."
 
+#: src/components/contacts/channel-kind-label.tsx
+msgid "Bluesky"
+msgstr "Bluesky"
+
 #: src/components/companies/companies-header.tsx
 msgid "Board"
 msgstr "Board"
@@ -1790,6 +1794,10 @@ msgstr "Decline"
 msgid "declined"
 msgstr "declined"
 
+#: src/components/companies/company-channels-section.tsx
+msgid "default"
+msgstr "default"
+
 #: src/components/instructions/stack-list.tsx
 #: src/routes/emails/inboxes.tsx
 msgid "Default"
@@ -2108,6 +2116,7 @@ msgid "Editor"
 msgstr "Editor"
 
 #: src/components/companies/conversations-tab.tsx
+#: src/components/contacts/channel-kind-label.tsx
 #: src/components/instructions/agent-selector.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
@@ -2611,6 +2620,7 @@ msgstr "Infomaniak needs a Mail app password created in your Mail service — no
 msgid "Infomaniak needs a Mail app password created in your Mail service — not an account application password."
 msgstr "Infomaniak needs a Mail app password created in your Mail service — not an account application password."
 
+#: src/components/contacts/channel-kind-label.tsx
 #: src/components/shared/channel-icon.tsx
 msgid "Instagram"
 msgstr "Instagram"
@@ -2781,6 +2791,7 @@ msgstr "Light"
 msgid "Line items"
 msgstr "Line items"
 
+#: src/components/contacts/channel-kind-label.tsx
 #: src/components/research/findings/contact-discovery-view.tsx
 #: src/components/research/run-labels.ts
 #: src/components/shared/channel-icon.tsx
@@ -2918,6 +2929,11 @@ msgstr "Low"
 msgid "Low priority"
 msgstr "Low priority"
 
+#. placeholder {0}: ch.value
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Make {0} primary"
+msgstr "Make {0} primary"
+
 #. placeholder {0}: row.email
 #: src/routes/emails/inboxes.tsx
 msgid "Make {0} the address you send from"
@@ -2929,8 +2945,8 @@ msgid "Make {0} the default"
 msgstr "Make {0} the default"
 
 #: src/components/contacts/manage-channels-dialog.tsx
-msgid "Make primary"
-msgstr "Make primary"
+#~ msgid "Make primary"
+#~ msgstr "Make primary"
 
 #: src/components/instructions/stack-editor.tsx
 msgid "Make this my default"
@@ -3765,6 +3781,10 @@ msgstr "Open-ended brief. Pick when the question does not fit a fixed shape — 
 msgid "Opened"
 msgstr "Opened"
 
+#: src/components/companies/company-channels-section.tsx
+msgid "opens in a new tab"
+msgstr "opens in a new tab"
+
 #: src/components/contacts/manage-channels-dialog.tsx
 msgid "orders, Girona shop…"
 msgstr "orders, Girona shop…"
@@ -4010,6 +4030,7 @@ msgstr "Person"
 msgid "Personal"
 msgstr "Personal"
 
+#: src/components/contacts/channel-kind-label.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/findings/contact-discovery-view.tsx
 #: src/components/research/run-labels.ts
@@ -4359,7 +4380,9 @@ msgid "Remove \"{0}\" from the stacks that use it first, then delete it."
 msgstr "Remove \"{0}\" from the stacks that use it first, then delete it."
 
 #. placeholder {0}: att.filename
+#. placeholder {0}: ch.value
 #. placeholder {0}: o.name
+#: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/emails/attachment-picker.tsx
 #: src/components/instructions/stack-picker.tsx
 msgid "Remove {0}"
@@ -4374,8 +4397,8 @@ msgid "Remove {email} from this organization?"
 msgstr "Remove {email} from this organization?"
 
 #: src/components/contacts/manage-channels-dialog.tsx
-msgid "Remove channel"
-msgstr "Remove channel"
+#~ msgid "Remove channel"
+#~ msgstr "Remove channel"
 
 #: src/components/companies/proposals-panel.tsx
 msgid "Remove line"
@@ -5829,6 +5852,7 @@ msgstr "Weak fit"
 msgid "Weaknesses"
 msgstr "Weaknesses"
 
+#: src/components/contacts/channel-kind-label.tsx
 #: src/components/research/run-labels.ts
 msgid "Website"
 msgstr "Website"
@@ -5879,6 +5903,7 @@ msgstr "What to follow up on"
 msgid "What's this mailbox for?"
 msgstr "What's this mailbox for?"
 
+#: src/components/contacts/channel-kind-label.tsx
 #: src/components/shared/channel-icon.tsx
 msgid "WhatsApp"
 msgstr "WhatsApp"
@@ -5951,6 +5976,10 @@ msgstr "Written by research. Editing it makes it yours."
 #: src/components/research/target-correction.tsx
 msgid "Wrong company? Enter its official website"
 msgstr "Wrong company? Enter its official website"
+
+#: src/components/contacts/channel-kind-label.tsx
+msgid "X"
+msgstr "X"
 
 #: src/routes/settings/profile/index.tsx
 msgid "You currently sign in from email links. Add a password to skip checking your email next time."

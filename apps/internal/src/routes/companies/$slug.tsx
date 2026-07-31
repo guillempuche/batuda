@@ -1940,6 +1940,7 @@ function narrowContactProvenance(
 }
 
 const ChannelLabel = styled.span`
+	display: inline-block;
 	padding: 0 var(--space-2xs);
 	border-radius: var(--radius-xs);
 	background: var(--color-surface-container-high);

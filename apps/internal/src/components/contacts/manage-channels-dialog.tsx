@@ -150,7 +150,7 @@ export function ManageChannelsDialog({
 									{ch.kind === 'email' && (
 										<IconButton
 											type='button'
-											aria-label={t`Make primary`}
+											aria-label={t`Make ${ch.value} primary`}
 											$active={ch.isPrimary}
 											disabled={ch.isPrimary || busy}
 											onClick={() => handleMakePrimary(ch.id)}
@@ -163,7 +163,7 @@ export function ManageChannelsDialog({
 									)}
 									<IconButton
 										type='button'
-										aria-label={t`Remove channel`}
+										aria-label={t`Remove ${ch.value}`}
 										disabled={busy}
 										onClick={() => handleRemove(ch.id)}
 									>
@@ -268,6 +268,7 @@ const Value = styled.span`
 `
 
 const ChannelLabel = styled.span`
+	display: inline-block;
 	margin-inline-start: var(--space-xs);
 	padding: 0 var(--space-2xs);
 	border-radius: var(--radius-xs);
