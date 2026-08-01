@@ -26,6 +26,7 @@ import * as core from "./internal/core.ts"
 import * as internal from "./internal/effect.ts"
 import * as internalExecutionPlan from "./internal/executionPlan.ts"
 import * as internalLayer from "./internal/layer.ts"
+import * as InternalRecord from "./internal/record.ts"
 import * as internalRequest from "./internal/request.ts"
 import * as internalSchedule from "./internal/schedule.ts"
 import type * as Layer from "./Layer.ts"
@@ -564,6 +565,58 @@ export const partition: {
     options?: { readonly concurrency?: Concurrency | undefined }
   ): Effect<[excluded: Array<E>, satisfying: Array<B>], never, R>
 } = internal.partition
+
+/**
+ * Reduces elements from left to right with an effectful accumulator function.
+ *
+ * **When to use**
+ *
+ * Use when each accumulation step is effectful and must run sequentially in
+ * iteration order.
+ *
+ * **Details**
+ *
+ * The accumulator function receives the current accumulator, the current
+ * element, and its zero-based index. The `zero` function is evaluated each
+ * time the effect runs. An empty iterable succeeds with its result. If a step
+ * fails, remaining elements are not processed.
+ *
+ * **Example** (Summing values sequentially)
+ *
+ * ```ts
+ * import { Console, Effect } from "effect"
+ *
+ * const program = Effect.reduce(
+ *   [1, 2, 3],
+ *   () => 0,
+ *   (total, value, index) =>
+ *     Console.log(`Adding ${value} at index ${index}`).pipe(
+ *       Effect.as(total + value)
+ *     )
+ * )
+ *
+ * Effect.runPromise(program).then(console.log)
+ * // Output:
+ * // Adding 1 at index 0
+ * // Adding 2 at index 1
+ * // Adding 3 at index 2
+ * // 6
+ * ```
+ *
+ * @category collecting
+ * @since 2.0.0
+ */
+export const reduce: {
+  <Z, A, E, R>(
+    zero: LazyArg<Z>,
+    f: (z: Z, a: A, i: number) => Effect<Z, E, R>
+  ): (elements: Iterable<A>) => Effect<Z, E, R>
+  <A, Z, E, R>(
+    elements: Iterable<A>,
+    zero: LazyArg<Z>,
+    f: (z: Z, a: A, i: number) => Effect<Z, E, R>
+  ): Effect<Z, E, R>
+} = internal.reduce
 
 /**
  * Applies an effectful function to each element and accumulates all failures.
@@ -6170,6 +6223,72 @@ export const updateService: {
 } = internal.updateService
 
 /**
+ * Updates a service for the lifetime of the current scope and restores its
+ * previous value when the scope closes.
+ *
+ * **When to use**
+ *
+ * Use when you need a setup effect to change a service for subsequent effects
+ * in the same scope.
+ *
+ * **Details**
+ *
+ * The updater receives the currently visible service value. A
+ * `Context.Service` remains in the requirements, while a `Context.Reference`
+ * uses its default when no override is present and adds no service requirement.
+ * The returned effect always requires `Scope`. The optional `reset` function
+ * receives the original, updated, and current values when the scope closes,
+ * allowing changes to be merged during restoration. It defaults to returning
+ * the original value.
+ *
+ * **Example** (Updating a reference within a scope)
+ *
+ * ```ts
+ * import { Context, Effect } from "effect"
+ *
+ * const CurrentNumber = Context.Reference<number>("CurrentNumber", {
+ *   defaultValue: () => 1
+ * })
+ *
+ * const program = Effect.gen(function*() {
+ *   const before = yield* CurrentNumber
+ *   const during = yield* Effect.scoped(
+ *     Effect.gen(function*() {
+ *       yield* Effect.updateServiceScoped(
+ *         CurrentNumber,
+ *         (value) => value + 1,
+ *         {
+ *           // Optional: when omitted, the original value is restored
+ *           reset: (original, updated, current) =>
+ *             Math.max(original, updated, current) + 1
+ *         }
+ *       )
+ *       return yield* CurrentNumber
+ *     })
+ *   )
+ *   const after = yield* CurrentNumber
+ *
+ *   console.log([before, during, after])
+ *   // [1, 2, 3]
+ * })
+ *
+ * Effect.runPromise(program)
+ * ```
+ *
+ * @see {@link updateService} for updating a service only within a wrapped effect
+ *
+ * @category context
+ * @since 4.0.0
+ */
+export const updateServiceScoped: <I, A>(
+  service: Context.Key<I, A>,
+  f: (value: A) => A,
+  options?: {
+    readonly reset?: ((original: A, updated: A, current: A) => A) | undefined
+  } | undefined
+) => Effect<void, never, I | Scope> = internal.updateServiceScoped
+
+/**
  * Provides one concrete service implementation to an effect.
  *
  * **When to use**
@@ -6305,52 +6424,6 @@ export const provideServiceEffect: {
     acquire: Effect<S, E2, R2>
   ): Effect<A, E | E2, Exclude<R, I> | R2>
 } = internal.provideServiceEffect
-
-// -----------------------------------------------------------------------------
-// References
-// -----------------------------------------------------------------------------
-
-/**
- * Sets the concurrency level for parallel operations within an effect.
- *
- * **Example** (Setting local concurrency)
- *
- * ```ts
- * import { Console, Effect } from "effect"
- *
- * const task = (id: number) =>
- *   Effect.gen(function*() {
- *     yield* Console.log(`Task ${id} starting`)
- *     yield* Effect.sleep("100 millis")
- *     yield* Console.log(`Task ${id} completed`)
- *     return id
- *   })
- *
- * // Run tasks with limited concurrency (max 2 at a time)
- * const program = Effect.gen(function*() {
- *   const tasks = [1, 2, 3, 4, 5].map(task)
- *   return yield* Effect.all(tasks, { concurrency: 2 })
- * }).pipe(
- *   Effect.withConcurrency(2)
- * )
- *
- * Effect.runPromise(program).then(console.log)
- * // Tasks will run with max 2 concurrent operations
- * // [1, 2, 3, 4, 5]
- * ```
- *
- * @category references
- * @since 2.0.0
- */
-export const withConcurrency: {
-  (
-    concurrency: number | "unbounded"
-  ): <A, E, R>(self: Effect<A, E, R>) => Effect<A, E, R>
-  <A, E, R>(
-    self: Effect<A, E, R>,
-    concurrency: number | "unbounded"
-  ): Effect<A, E, R>
-} = internal.withConcurrency
 
 // -----------------------------------------------------------------------------
 // Resource management & finalization
@@ -14062,11 +14135,11 @@ export const annotateLogs = dual<
     ...args: [Record<string, unknown>] | [key: string, value: unknown]
   ): Effect<A, E, R> =>
     internal.updateService(effect, CurrentLogAnnotations, (annotations) => {
-      const newAnnotations = { ...annotations }
+      const newAnnotations = args.length === 1 ? { ...annotations, ...args[0] } : { ...annotations }
       if (args.length === 1) {
-        Object.assign(newAnnotations, args[0])
+        return newAnnotations
       } else {
-        newAnnotations[args[0]] = args[1]
+        InternalRecord.assignProperty(newAnnotations, args[0], args[1])
       }
       return newAnnotations
     })

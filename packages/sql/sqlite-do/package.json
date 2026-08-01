@@ -1,17 +1,17 @@
 {
   "name": "@effect/sql-sqlite-do",
-  "version": "4.0.0-beta.98",
+  "version": "4.0.0-beta.102",
   "type": "module",
   "license": "MIT",
   "description": "A SQLite toolkit for Effect",
   "homepage": "https://effect.website",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Effect-TS/effect-smol.git",
+    "url": "https://github.com/Effect-TS/effect.git",
     "directory": "packages/sql/sqlite-do"
   },
   "bugs": {
-    "url": "https://github.com/Effect-TS/effect-smol/issues"
+    "url": "https://github.com/Effect-TS/effect/issues"
   },
   "tags": [
     "typescript",

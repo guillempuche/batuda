@@ -274,6 +274,13 @@ export interface Tool<
   readonly needsApproval?: boolean | NeedsApprovalFunction<any> | undefined
 
   /**
+   * Set whether user approval is required before executing this tool.
+   */
+  setNeedsApproval(
+    needsApproval: NeedsApproval<Config["parameters"]>
+  ): Tool<Name, Config, Requirements>
+
+  /**
    * Adds a _request-level_ dependency which must be provided before the tool
    * call handler can be executed.
    *
@@ -1028,37 +1035,37 @@ export type RequiresHandler<Tool extends Any> = Tool extends ProviderDefined<
 // Constructors
 // =============================================================================
 
+// Clones a tool while preserving its prototype (and thus its kind, e.g.
+// user-defined vs. provider-defined vs. dynamic) and its own properties such
+// as `id`. Optional `overrides` replace individual fields on the clone.
+const clone = (self: Any, overrides?: Record<string, unknown>): any =>
+  Object.assign(Object.create(Object.getPrototypeOf(self)), self, overrides)
+
 const Proto = {
   [TypeId]: { _Requirements: identity },
   pipe() {
     return pipeArguments(this, arguments)
   },
   addDependency(this: Any) {
-    return userDefinedProto({ ...this })
+    return clone(this)
   },
   setParameters(this: Any, parametersSchema: Schema.Constraint) {
-    return userDefinedProto({
-      ...this,
-      parametersSchema
-    })
+    return clone(this, { parametersSchema })
   },
   setSuccess(this: Any, successSchema: Schema.Constraint) {
-    return userDefinedProto({ ...this, successSchema })
+    return clone(this, { successSchema })
   },
   setFailure(this: Any, failureSchema: Schema.Constraint) {
-    return userDefinedProto({ ...this, failureSchema })
+    return clone(this, { failureSchema })
+  },
+  setNeedsApproval(this: Any, needsApproval: NeedsApproval<any>) {
+    return clone(this, { needsApproval })
   },
   annotate<I, S>(this: Any, tag: Context.Key<I, S>, value: S) {
-    return userDefinedProto({
-      ...this,
-      annotations: Context.add(this.annotations, tag, value)
-    })
+    return clone(this, { annotations: Context.add(this.annotations, tag, value) })
   },
   annotateMerge<I>(this: Any, context: Context.Context<I>) {
-    return userDefinedProto({
-      ...this,
-      annotations: Context.merge(this.annotations, context)
-    })
+    return clone(this, { annotations: Context.merge(this.annotations, context) })
   }
 }
 
@@ -1132,7 +1139,7 @@ const providerDefinedProto = <
     readonly failureMode: Mode
   },
   RequiresHandler
-> => Object.assign(Object.create(ProviderDefinedProto), { ...options })
+> => Object.assign(Object.create(ProviderDefinedProto), { annotations: Context.empty(), ...options })
 
 const dynamicProto = <
   const Name extends string,
@@ -1669,10 +1676,18 @@ export const getJsonSchema = <Tool extends Any>(tool: Tool, options?: {
 export const getJsonSchemaFromSchema = <S extends Schema.Constraint>(schema: S, options?: {
   readonly transformer?: CodecTransformer
 }): JsonSchema.JsonSchema => {
+  return getJsonSchemaFromSchemaWith(schema, Schema.toJsonSchemaDocument, options)
+}
+
+const getJsonSchemaFromSchemaWith = <S extends Schema.Constraint>(
+  schema: S,
+  toJsonSchemaDocument: (schema: Schema.Constraint) => JsonSchema.Document<"draft-2020-12">,
+  options?: { readonly transformer?: CodecTransformer }
+): JsonSchema.JsonSchema => {
   if (Predicate.isNotUndefined(options?.transformer)) {
     return options.transformer(schema).jsonSchema
   }
-  const document = Schema.toJsonSchemaDocument(schema)
+  const document = toJsonSchemaDocument(schema)
   if (Object.keys(document.definitions).length > 0) {
     document.schema.$defs = document.definitions
   }
@@ -1918,13 +1933,13 @@ function filter(obj: any) {
     next = []
 
     for (const node of nodes) {
-      if (Object.prototype.hasOwnProperty.call(node, "__proto__")) {
+      if (Object.hasOwn(node, "__proto__")) {
         throw new SyntaxError("Object contains forbidden prototype property")
       }
 
       if (
-        Object.prototype.hasOwnProperty.call(node, "constructor") &&
-        Object.prototype.hasOwnProperty.call(node.constructor, "prototype")
+        Object.hasOwn(node, "constructor") &&
+        Object.hasOwn(node.constructor, "prototype")
       ) {
         throw new SyntaxError("Object contains forbidden prototype property")
       }
