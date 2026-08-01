@@ -20,7 +20,7 @@
 	"dependencies": {
 		"@better-auth/api-key": "1.6.11",
 		"better-auth": "1.6.11",
-		"effect": "4.0.0-beta.98",
+		"effect": "4.0.0-beta.102",
 		"kysely": "^0.28.15",
 		"pg": "^8.20.0"
 	},

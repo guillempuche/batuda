@@ -21,17 +21,26 @@ forceLegacyDeploy: true
 # because the older API name no longer exists in beta.43).
 # INVARIANT: every entry here MUST match the `effect` / `@effect/*` version
 # pinned in the workspace package.json files — bump them together, never one
-# side alone, or the deploy re-resolve reintroduces the boot crash above.
+# side alone. An override wins over every package.json specifier, so bumping
+# only that side leaves the whole tree on the old version while every file
+# claims otherwise. `pnpm check-effect-pins` is what catches it.
 # `@effect/ai-openai-compat` is listed because it rides into the server
 # unikernel via `@batuda/research`, so it crosses the same deploy boundary.
+# `@effect/platform` and `@effect/sql` are pinned to a version that does not
+# exist, on purpose. Those two names stopped at 0.97.1 and 0.52.1 — v4 folded
+# them into `effect` itself — and both still ask for `effect@^3`. Nothing in the
+# tree depends on them today, so the pin never resolves and never has to. If
+# some future transitive drags one in, the install fails loudly here instead of
+# quietly seating a v3 package next to our v4 runtime, which is the crash above.
+# Do not delete these to make an install pass: find what pulled them in.
 overrides:
-  '@effect/platform-node-shared': 4.0.0-beta.98
-  '@effect/platform-node': 4.0.0-beta.98
-  '@effect/platform': 4.0.0-beta.98
-  '@effect/sql-pg': 4.0.0-beta.98
-  '@effect/sql': 4.0.0-beta.98
-  '@effect/ai-openai-compat': 4.0.0-beta.98
-  effect: 4.0.0-beta.98
+  '@effect/platform-node-shared': 4.0.0-beta.102
+  '@effect/platform-node': 4.0.0-beta.102
+  '@effect/platform': 4.0.0-beta.102
+  '@effect/sql-pg': 4.0.0-beta.102
+  '@effect/sql': 4.0.0-beta.102
+  '@effect/ai-openai-compat': 4.0.0-beta.102
+  effect: 4.0.0-beta.102
   # Pin the whole @tiptap family to one version. `@tiptap/markdown` (used by
   # apps/internal's rich-text editor) is published only from 3.28.0 and needs
   # `@tiptap/core@^3.28.0`, but `@react-email/editor` pulls the rest of the

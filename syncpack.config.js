@@ -28,13 +28,12 @@ export default {
 			policy: 'sameRange',
 		},
 		{
+			// A wildcard, so a new `@effect/*` package joins the group by existing
+			// rather than by someone remembering to list it here. This only sees
+			// package.json; the overrides block in pnpm-workspace.yaml outranks all
+			// of it and is checked by scripts/check-effect-pins.mjs.
 			label: 'Effect',
-			dependencies: [
-				'effect',
-				'@effect/platform-node',
-				'@effect/platform-node-shared',
-				'@effect/sql-pg',
-			],
+			dependencies: ['effect', '@effect/*'],
 			policy: 'sameRange',
 		},
 		{

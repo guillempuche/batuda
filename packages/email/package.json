@@ -50,7 +50,7 @@
 		"@react-email/components": "^1.0.12",
 		"@react-email/editor": "^1.1.0",
 		"@react-email/render": "^2.0.7",
-		"effect": "4.0.0-beta.98",
+		"effect": "4.0.0-beta.102",
 		"parse5": "^8.0.0"
 	},
 	"peerDependencies": {

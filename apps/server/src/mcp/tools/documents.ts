@@ -23,6 +23,7 @@ import {
 	DocumentCreated,
 	TimelineActivityService,
 } from '../../services/timeline-activity'
+import { ToolMessage } from '../tool-message'
 import { McpPageLimit, TruncatableResult, toTruncatable } from './_result'
 
 const REQUEST_DEPENDENCIES = [CurrentOrg]
@@ -240,7 +241,10 @@ export const DocumentHandlersLive = DocumentTools.toLayer(
 					const rows =
 						yield* sql`SELECT * FROM documents WHERE id = ${id} LIMIT 1`
 					const doc = rows[0]
-					if (!doc) return yield* Effect.die(`Document ${id} not found`)
+					if (!doc)
+						return yield* Effect.die(
+							new ToolMessage(`No document with id ${id}.`),
+						)
 					const decoded = yield* decodeDocument(doc)
 					const subjects = yield* subjectsForDocument(sql, id)
 					// An agent authenticates with a key and has no browser session,
@@ -293,8 +297,8 @@ export const DocumentHandlersLive = DocumentTools.toLayer(
 								)
 								if (!linked) {
 									return yield* Effect.die(
-										new Error(
-											`document subject ${params.subject_table}/${params.subject_id} not found`,
+										new ToolMessage(
+											`No ${params.subject_table} with id ${params.subject_id}.`,
 										),
 									)
 								}

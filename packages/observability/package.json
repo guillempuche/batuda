@@ -18,7 +18,7 @@
 		"test:watch": "vitest"
 	},
 	"dependencies": {
-		"effect": "4.0.0-beta.98"
+		"effect": "4.0.0-beta.102"
 	},
 	"devDependencies": {
 		"@types/node": "^22.15.0",

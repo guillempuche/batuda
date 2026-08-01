@@ -47,18 +47,25 @@ const PLUMBING_FIELDS = new Set([
 /**
  * The fields inside a block of them, seeing past an optional wrapper.
  *
- * A list of repeated things — the people, the competitors — is deliberately not
- * opened up. Naming it is what the searching agent needs: it has to know to go
- * and find people at all. Spelling out each person's own fields is a detail for
- * whoever writes them down afterwards, and every extra word here competes for
- * the attention of a small model that has little to spare.
+ * A list of repeated things — the people, the competitors — stays closed. Naming
+ * it is what the searching agent needs: it has to know to go and find people at
+ * all, while each person's own fields are a detail for whoever writes them down
+ * afterwards, and every extra word competes for the attention of a small model
+ * with little to spare. It stays closed only because a list holds its entry
+ * shape under a name this walk does not follow, so the test next door pins the
+ * result exactly.
+ *
+ * A shape is callable as well as readable, so it answers "function" rather than
+ * "object" when asked what it is. Looking only for an object walks straight past
+ * every one of them, leaving a block that appears to hold no fields — no error,
+ * just a prompt that never mentions them.
  */
 const innerFields = (field: unknown): Record<string, unknown> | undefined => {
 	const seen = new Set<unknown>()
 	let current = field
 	while (
 		current !== null &&
-		typeof current === 'object' &&
+		(typeof current === 'object' || typeof current === 'function') &&
 		!seen.has(current)
 	) {
 		seen.add(current)

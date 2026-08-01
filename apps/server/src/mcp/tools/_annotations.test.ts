@@ -18,6 +18,7 @@ import { PipelineTools } from './pipeline'
 import { ProductTools } from './products'
 import { ProposalTools } from './proposals'
 import { RecordingTools } from './recordings'
+import { ResearchContactsTools } from './research-contacts'
 import { ResearchLifecycleTools } from './research-lifecycle'
 import { ResearchMcpTools } from './research-mcp'
 import { ResearchRegistryTools } from './research-registry'
@@ -37,6 +38,7 @@ const TOOLKITS = {
 	ProductTools,
 	ProposalTools,
 	RecordingTools,
+	ResearchContactsTools,
 	ResearchLifecycleTools,
 	ResearchMcpTools,
 	ResearchRegistryTools,
@@ -50,6 +52,11 @@ const TOOLKITS = {
 // naming-pattern invariants below.
 const isActionParameterized = (toolName: string): boolean =>
 	toolName.startsWith('manage_') || toolName.startsWith('resolve_')
+
+// A floor, not an exact figure: adding one tool should not fail this file, but
+// registering a whole toolkit in the server without listing it in TOOLKITS
+// above should, since everything below only walks what is listed there.
+const EXPECTED_TOOL_COUNT = 94
 
 const READ_ONLY_NAME = /^(list_|get_|search_|find_|lookup_)/
 const DESTRUCTIVE_NAME = /^(delete_|discard_|cancel_)/
@@ -65,6 +72,33 @@ const KNOWN_NESTED_CHOICE = new Set([
 ])
 
 describe('MCP tool annotation coverage', () => {
+	describe('given the set of tools every rule below walks', () => {
+		it('should let no tool go unchecked', () => {
+			// GIVEN the toolkits this file imports one by one, by hand
+			// WHEN comparing them against the tools the server actually serves
+			// THEN none is missing — a toolkit added to the server but not here is
+			//      silently exempt from every rule in this file
+			const walked = Object.values(TOOLKITS).flatMap(toolkit =>
+				Object.keys(toolkit.tools),
+			)
+			expect(walked.length).toBe(new Set(walked).size)
+			expect(walked.length).toBeGreaterThanOrEqual(EXPECTED_TOOL_COUNT)
+		})
+
+		it('should exempt only tools that still exist', () => {
+			// GIVEN the named exemptions from the flat-result rule
+			// WHEN checking each against the live tools
+			// THEN every one still names a real tool — `it.skipIf` cannot fail, so
+			//      an exemption left behind after a rename quietly stops applying
+			//      to anything while looking like it still guards something
+			const live = new Set(
+				Object.values(TOOLKITS).flatMap(toolkit => Object.keys(toolkit.tools)),
+			)
+			const stale = [...KNOWN_NESTED_CHOICE].filter(name => !live.has(name))
+			expect(stale, `${stale.join(', ')} no longer exists`).toEqual([])
+		})
+	})
+
 	for (const [toolkitName, toolkit] of Object.entries(TOOLKITS)) {
 		describe(`given ${toolkitName}`, () => {
 			for (const [toolName, tool] of Object.entries(toolkit.tools)) {
