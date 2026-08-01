@@ -1,17 +1,17 @@
 {
   "name": "@effect/platform-node",
   "type": "module",
-  "version": "4.0.0-beta.98",
+  "version": "4.0.0-beta.102",
   "license": "MIT",
   "description": "Platform specific implementations for the Node.js runtime",
   "homepage": "https://effect.website",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Effect-TS/effect-smol.git",
+    "url": "https://github.com/Effect-TS/effect.git",
     "directory": "packages/platform-node"
   },
   "bugs": {
-    "url": "https://github.com/Effect-TS/effect-smol/issues"
+    "url": "https://github.com/Effect-TS/effect/issues"
   },
   "tags": [
     "node",

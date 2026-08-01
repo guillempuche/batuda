@@ -1,17 +1,17 @@
 {
   "name": "@effect/atom-vue",
-  "version": "4.0.0-beta.98",
+  "version": "4.0.0-beta.102",
   "type": "module",
   "license": "MIT",
   "description": "Vue bindings for the Effect Atom modules",
   "homepage": "https://effect.website",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Effect-TS/effect-smol.git",
+    "url": "https://github.com/Effect-TS/effect.git",
     "directory": "packages/atom/vue"
   },
   "bugs": {
-    "url": "https://github.com/Effect-TS/effect-smol/issues"
+    "url": "https://github.com/Effect-TS/effect/issues"
   },
   "tags": [
     "typescript",

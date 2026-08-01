@@ -26,6 +26,7 @@ import * as Stdio from "../../Stdio.ts"
 import * as Terminal from "../../Terminal.ts"
 import type { Contravariant, Covariant, NoInfer, Simplify } from "../../Types.ts"
 import type { ChildProcessSpawner } from "../process/ChildProcessSpawner.ts"
+import * as CliConfig from "./CliConfig.ts"
 import * as CliError from "./CliError.ts"
 import * as CliOutput from "./CliOutput.ts"
 import * as GlobalFlag from "./GlobalFlag.ts"
@@ -34,7 +35,9 @@ import { mergeConfig, parseConfig } from "./internal/config.ts"
 import { getGlobalFlagsForCommandPath, getGlobalFlagsForCommandTree, getHelpForCommandPath } from "./internal/help.ts"
 import * as Lexer from "./internal/lexer.ts"
 import * as Parser from "./internal/parser.ts"
+import * as Wizard from "./internal/wizard.ts"
 import * as Param from "./Param.ts"
+import * as Prompt from "./Prompt.ts"
 
 /* ========================================================================== */
 /* Public Types                                                               */
@@ -367,6 +370,21 @@ export type Error<C> = C extends Command<
   infer _Error,
   infer _Requirements
 > ? _Error :
+  never
+
+/**
+ * A utility type to extract the required services type from a `Command`.
+ *
+ * @category utility types
+ * @since 4.0.0
+ */
+export type Services<C> = C extends Command<
+  infer _Name,
+  infer _Input,
+  infer _ContextInput,
+  infer _Error,
+  infer _Requirements
+> ? _Requirements :
   never
 
 /**
@@ -737,7 +755,7 @@ export const withSubcommands: {
 
     const context = yield* impl.parseContext(raw)
     const result = yield* sub.parse(raw.subcommand.value.parsedInput)
-    return Object.assign({}, context, { [SubcommandStateSymbol]: { name: sub.name, result } }) as NextInput
+    return { ...context, [SubcommandStateSymbol]: { name: sub.name, result } } as NextInput
   })
 
   const handle = Effect.fnUntraced(function*(input: NextInput, path: ReadonlyArray<string>) {
@@ -834,20 +852,20 @@ export const withSharedFlags: {
     type NextInput = Simplify<Input & SharedInput>
     type NextContextInput = Simplify<ContextInput & SharedInput>
 
-    const parseShared = makeParser(sharedConfig) as (
+    const parseShared = makeParser(sharedConfig, { allowLeftovers: true }) as (
       input: ParsedTokens
     ) => Effect.Effect<SharedInput, CliError.CliError, Environment>
 
     const parse = Effect.fnUntraced(function*(raw: ParsedTokens) {
       const base = yield* impl.parse(raw)
       const shared = yield* parseShared(raw)
-      return Object.assign({}, base, shared) as NextInput
+      return { ...(base as object), ...(shared as object) } as NextInput
     })
 
     const parseContext = Effect.fnUntraced(function*(raw: ParsedTokens) {
       const base = yield* impl.parseContext(raw)
       const shared = yield* parseShared(raw)
-      return Object.assign({}, base, shared) as NextContextInput
+      return { ...(base as object), ...(shared as object) } as NextContextInput
     })
 
     const handle = (
@@ -930,8 +948,7 @@ type ExtractSubcommand<T> = T extends Command<infer _Name, infer _Input, infer _
   : T extends Command.SubcommandGroup<infer Commands> ? Commands[number]
   : never
 type ExtractSubcommandErrors<T extends ReadonlyArray<Command.SubcommandEntry>> = Error<ExtractSubcommand<T[number]>>
-type ExtractSubcommandContext<T extends ReadonlyArray<Command.SubcommandEntry>> = ExtractSubcommand<T[number]> extends
-  Command<infer _Name, infer _Input, infer _CI, infer _E, infer _R> ? _R : never
+type ExtractSubcommandContext<T extends ReadonlyArray<Command.SubcommandEntry>> = Services<ExtractSubcommand<T[number]>>
 
 /**
  * Sets the description for a command.
@@ -1354,6 +1371,38 @@ export const provideEffectDiscard: {
 /* Execution                                                                  */
 /* ========================================================================== */
 
+/**
+ * Interactively constructs command-line arguments for a command.
+ *
+ * **Details**
+ *
+ * The returned arguments include the command name and can be inspected,
+ * modified, or passed to another command runner by the caller.
+ *
+ * **Example** (Constructing command arguments)
+ *
+ * ```ts
+ * import { Console, Effect } from "effect"
+ * import { Command } from "effect/unstable/cli"
+ *
+ * const command = Command.make("app")
+ *
+ * const program = Effect.gen(function*() {
+ *   const args = yield* Command.wizard(command)
+ *   yield* Console.log(args.join(" "))
+ * })
+ * ```
+ *
+ * @category command execution
+ * @since 4.0.0
+ */
+export const wizard = <Name extends string, Input, E, R, ContextInput>(
+  command: Command<Name, Input, ContextInput, E, R>,
+  options?: {
+    readonly prefix?: ReadonlyArray<string> | undefined
+  } | undefined
+): Effect.Effect<Array<string>, CliError.CliError | Terminal.QuitError, Environment> => Wizard.run(command, options)
+
 const getOutOfScopeGlobalFlagErrors = (
   allFlags: ReadonlyArray<GlobalFlag.GlobalFlag<any>>,
   activeFlags: ReadonlyArray<GlobalFlag.GlobalFlag<any>>,
@@ -1398,8 +1447,9 @@ const showHelp = <Name extends string, Input, E, R, ContextInput>(
   error: CliError.ShowHelp
 ): Effect.Effect<void, CliError.CliError, Environment> =>
   Effect.gen(function*() {
+    const { builtIns } = yield* CliConfig.CliConfig
     const formatter = yield* CliOutput.Formatter
-    const helpDoc = yield* getHelpForCommandPath(command, error.commandPath, GlobalFlag.BuiltIns)
+    const helpDoc = yield* getHelpForCommandPath(command, error.commandPath, builtIns)
     yield* Console.log(formatter.formatHelpDoc(helpDoc))
     if (error.errors.length > 0) {
       yield* Console.error(formatter.formatErrors(error.errors as any))
@@ -1516,10 +1566,11 @@ export const runWith = <const Name extends string, Input, E, R, ContextInput>(
   const commandImpl = toImpl(command)
   return Effect.fnUntraced(
     function*(args: ReadonlyArray<string>) {
+      const { builtIns } = yield* CliConfig.CliConfig
       const { tokens, trailingOperands } = Lexer.lex(args)
 
       // 1. Collect known global flags from the command tree
-      const allFlags = getGlobalFlagsForCommandTree(command, GlobalFlag.BuiltIns)
+      const allFlags = getGlobalFlagsForCommandTree(command, builtIns)
 
       // 2. Extract global flag tokens
       const allFlagParams = allFlags.flatMap((f) => Param.extractSingleParams(f.flag))
@@ -1534,8 +1585,8 @@ export const runWith = <const Name extends string, Input, E, R, ContextInput>(
       // 3. Parse command arguments from remaining tokens
       const parsedArgs = yield* Parser.parseArgs({ tokens: remainder, trailingOperands }, command)
       const commandPath = [command.name, ...Parser.getCommandPath(parsedArgs)] as const
-      const handlerCtx: GlobalFlag.HandlerContext = { command, commandPath, version: config.version }
-      const activeFlags = getGlobalFlagsForCommandPath(command, commandPath, GlobalFlag.BuiltIns)
+      const handlerCtx: GlobalFlag.HandlerContext = { builtIns, command, commandPath, version: config.version }
+      const activeFlags = getGlobalFlagsForCommandPath(command, commandPath, builtIns)
 
       // 4. Reject globals that were passed outside the active command scope
       const outOfScopeErrors = getOutOfScopeGlobalFlagErrors(allFlags, activeFlags, flagMap, commandPath)
@@ -1557,6 +1608,29 @@ export const runWith = <const Name extends string, Input, E, R, ContextInput>(
         })
         if (!hasEntry) continue
         const [, value] = yield* flag.flag.parse(emptyArgs)
+        if (flag === GlobalFlag.Wizard) {
+          return yield* Effect.gen(function*() {
+            yield* Console.log(Wizard.renderIntroduction(command.name, config.version, command.description))
+            const prefix = [
+              command.name,
+              ...args.filter((arg) => arg !== "--wizard" && !arg.startsWith("--wizard="))
+            ]
+            const wizardArgs = yield* Wizard.run(command, { commandPath, prefix })
+            yield* Console.log(Wizard.renderCompletion(wizardArgs))
+            const shouldRun = yield* Prompt.run(Prompt.toggle({
+              message: "Run this command?",
+              initial: true,
+              active: "yes",
+              inactive: "no"
+            }))
+            if (shouldRun) {
+              yield* Console.log()
+              yield* runWith(command, config)(wizardArgs.slice(1))
+            }
+          }).pipe(
+            Effect.catchTag("QuitError", () => Console.log(Wizard.renderQuit()))
+          )
+        }
         yield* flag.run(value, handlerCtx)
         return
       }
@@ -1575,7 +1649,9 @@ export const runWith = <const Name extends string, Input, E, R, ContextInput>(
 
       // 7. Provide setting values
       let program = commandImpl.handle(parseResult.success, [command.name])
-      const [, logLevel] = yield* GlobalFlag.LogLevel.flag.parse(emptyArgs)
+      const logLevel = activeFlags.includes(GlobalFlag.LogLevel)
+        ? (yield* GlobalFlag.LogLevel.flag.parse(emptyArgs))[1]
+        : Option.none()
       program = Effect.provideService(program, GlobalFlag.LogLevel, logLevel)
       for (const flag of activeFlags) {
         if (flag._tag !== "Setting" || flag === GlobalFlag.LogLevel) continue

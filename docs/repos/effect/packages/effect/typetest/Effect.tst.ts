@@ -74,6 +74,14 @@ class AcquireReleaseDependency extends Context.Service<AcquireReleaseDependency,
   "AcquireReleaseDependency"
 ) {}
 
+class UpdateServiceScopedService extends Context.Service<UpdateServiceScopedService, number>()(
+  "UpdateServiceScopedService"
+) {}
+
+const UpdateServiceScopedReference = Context.Reference<number>("UpdateServiceScopedReference", {
+  defaultValue: () => 0
+})
+
 describe("Types", () => {
   describe("ReasonOf", () => {
     it("extracts reason type", () => {
@@ -600,6 +608,34 @@ describe("Effect.annotateLogsScoped", () => {
   })
 })
 
+describe("Effect.updateServiceScoped", () => {
+  it("adds a Context.Service to the requirements", () => {
+    const result = Effect.updateServiceScoped(UpdateServiceScopedService, (value) => value + 1)
+    expect(result).type.toBe<Effect.Effect<void, never, UpdateServiceScopedService | Scope.Scope>>()
+  })
+
+  it("does not add a Context.Reference to the requirements", () => {
+    const result = Effect.updateServiceScoped(UpdateServiceScopedReference, (value) => value + 1)
+    expect(result).type.toBe<Effect.Effect<void, never, Scope.Scope>>()
+  })
+
+  it("types the reset values from the service", () => {
+    const result = Effect.updateServiceScoped(
+      UpdateServiceScopedService,
+      (value) => value + 1,
+      {
+        reset: (original, updated, current) => {
+          expect(original).type.toBe<number>()
+          expect(updated).type.toBe<number>()
+          expect(current).type.toBe<number>()
+          return current
+        }
+      }
+    )
+    expect(result).type.toBe<Effect.Effect<void, never, UpdateServiceScopedService | Scope.Scope>>()
+  })
+})
+
 describe("Effect.forkScoped", () => {
   it("adds Scope to requirements in data-first usage", () => {
     const result = pipe(
@@ -790,6 +826,25 @@ describe("Effect.partition", () => {
       Effect.partition((n) => n % 2 === 0 ? Effect.fail(n) : Effect.succeed(`${n}`))
     )
     expect(result).type.toBe<Effect.Effect<[excluded: Array<number>, satisfying: Array<string>], never, never>>()
+  })
+})
+
+describe("Effect.reduce", () => {
+  it("data-first", () => {
+    const result = Effect.reduce(
+      [1, 2, 3],
+      () => "",
+      (acc, n) => string.pipe(Effect.map((value) => `${acc}${value}${n}`))
+    )
+    expect(result).type.toBe<Effect.Effect<string, "err-1", "dep-1">>()
+  })
+
+  it("data-last", () => {
+    const result = pipe(
+      [1, 2, 3],
+      Effect.reduce(() => "", (acc, n) => string.pipe(Effect.map((value) => `${acc}${value}${n}`)))
+    )
+    expect(result).type.toBe<Effect.Effect<string, "err-1", "dep-1">>()
   })
 })
 
