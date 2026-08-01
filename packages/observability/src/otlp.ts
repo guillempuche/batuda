@@ -1,8 +1,9 @@
-import { Config, Duration, Effect, Layer } from 'effect'
+import { Config, Duration, Effect, Layer, Tracer } from 'effect'
 import { FetchHttpClient } from 'effect/unstable/http'
 import { Otlp } from 'effect/unstable/observability'
 
 import { buildMeta } from './build-meta'
+import { redactingTracer } from './redact-spans'
 
 /**
  * Parse OTLP headers from the standard comma-separated format.
@@ -69,6 +70,12 @@ export const makeOtlpObservability = (options: {
 				}),
 			)
 
+			// The exporter's own tracer, wrapped, so caller-supplied attributes are
+			// scrubbed on the way out whichever library recorded them.
+			const RedactedTracer = Layer.effect(Tracer.Tracer)(
+				Effect.map(Effect.service(Tracer.Tracer), redactingTracer),
+			)
+
 			return Otlp.layerJson({
 				baseUrl,
 				resource: {
@@ -88,6 +95,11 @@ export const makeOtlpObservability = (options: {
 				loggerExportInterval: Duration.seconds(1),
 				metricsExportInterval: Duration.seconds(60),
 				metricsTemporality: 'cumulative',
-			}).pipe(Layer.provide(FetchHttpClient.layer))
+			}).pipe(
+				Layer.provide(FetchHttpClient.layer),
+				// Merged, not provided: the exporter's flusher, logger and metrics
+				// still have to reach the process; only the tracer is swapped.
+				layer => RedactedTracer.pipe(Layer.provideMerge(layer)),
+			)
 		}),
 	)
