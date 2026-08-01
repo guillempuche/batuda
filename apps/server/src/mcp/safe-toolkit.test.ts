@@ -1,33 +1,31 @@
-// Covers the two client-facing defects mcpToolkitSafe corrects (issue #168), at
-// two levels: the unit blocks feed the shaping helpers (toStructuredContent,
-// sanitizeCause) the shapes that handlers actually produce; the round-trip block
-// drives tools registered with mcpToolkitSafe over a real in-process MCP HTTP
-// server and asserts what the client receives, so a future effect release that
-// changes the bridge's result/error rendering fails here rather than in prod.
+// Covers what mcpToolkitSafe corrects on top of the library, at two levels: the
+// unit blocks feed the shaping helpers the shapes handlers actually produce; the
+// round-trip block drives tools registered with mcpToolkitSafe over a real
+// in-process MCP HTTP server and asserts what the client receives, so a future
+// effect release that changes the bridge's result/error rendering fails here
+// rather than in prod.
+//
+// The error half turns on one distinction: a failure whose wording was written
+// for the caller reaches them, and everything else does not, because an internal
+// fault's text carries database phrasing and table names. A failure the caller
+// cannot see must still reach the server log, or nobody can answer "why did that
+// tool fail" — asserted here too, since the ordering that guarantees it is easy
+// to lose.
 
 import { createServer } from 'node:http'
 
 import { NodeHttpServer } from '@effect/platform-node'
-import { Cause, Effect, Exit, Layer, ManagedRuntime, Schema } from 'effect'
+import { Effect, Layer, Logger, ManagedRuntime, Schema } from 'effect'
 import { McpServer, Tool, Toolkit } from 'effect/unstable/ai'
 import { HttpRouter, HttpServer } from 'effect/unstable/http'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
+	clientFacingMessage,
 	mcpToolkitSafe,
-	sanitizeCause,
 	toStructuredContent,
 } from './safe-toolkit'
-
-// Render the cause of a failing effect the way the MCP bridge does, so the
-// tests exercise sanitizeCause against a real Cause (not a hand-built one).
-const causeOf = (
-	effect: Effect.Effect<unknown, unknown>,
-): Cause.Cause<unknown> => {
-	const exit = Effect.runSyncExit(effect)
-	if (Exit.isFailure(exit)) return exit.cause
-	throw new Error('expected the effect to fail')
-}
+import { ToolMessage } from './tool-message'
 
 describe('toStructuredContent', () => {
 	describe('when the handler returns a plain object', () => {
@@ -83,117 +81,70 @@ describe('toStructuredContent', () => {
 	})
 })
 
-describe('sanitizeCause', () => {
-	describe('when the effect dies with a redacted string defect', () => {
-		it('should surface the string without decoration', () => {
-			// GIVEN a defect that is already a safe string (as redactDbErrors emits)
-			const cause = causeOf(Effect.die('internal error'))
-			// WHEN sanitizing it for the client
-			// THEN the message is preserved verbatim
-			expect(sanitizeCause(cause)).toBe('internal error')
+describe('clientFacingMessage', () => {
+	describe('when the failure was worded for the caller', () => {
+		it('should hand back that wording untouched', () => {
+			// GIVEN a failure a tool raised deliberately, to be read and acted on
+			// WHEN deciding what the caller is told
+			// THEN they are told exactly that
+			expect(
+				clientFacingMessage(
+					new ToolMessage('draft_id is required to send a draft'),
+				),
+			).toBe('draft_id is required to send a draft')
 		})
 	})
 
-	describe('when the effect dies with an Error carrying a stack and bundle path', () => {
-		it('should not leak the stack, bundle path, or nested cause', () => {
-			// GIVEN an Error whose message and stack reference an internal bundle
-			const err = new Error(
-				'read failed at /app/dist/s3-storage-provider-a1b2.mjs',
+	describe('when the failure came from somewhere inside the server', () => {
+		it('should say nothing about it beyond that it failed', () => {
+			// GIVEN a fault carrying database phrasing and an internal path — the
+			//       shape an `orDie`'d query error has
+			const leak = new Error(
+				'permission denied for table member at /app/dist/db-a1b2.mjs',
 			)
-			err.stack =
-				'Error: read failed\n    at load (/app/dist/s3-storage-provider-a1b2.mjs:12:9)\n    at run (/app/dist/index.mjs:3:1)'
-			const cause = causeOf(Effect.die(err))
-
-			// WHEN sanitizing it for the client
-			const rendered = sanitizeCause(cause)
-
-			// THEN no bundle path, no `.mjs`, and no stack frame survives
-			expect(rendered).not.toContain('/app/dist')
-			expect(rendered).not.toContain('.mjs')
-			expect(rendered).not.toMatch(/\n\s*at\s/)
-			// AND the caller still gets a short, human-readable signal
-			expect(rendered).toContain('read failed')
-			expect(rendered.length).toBeLessThanOrEqual(500)
+			// WHEN deciding what the caller is told
+			const message = clientFacingMessage(leak)
+			// THEN none of it reaches them
+			expect(message).not.toContain('permission denied')
+			expect(message).not.toContain('member')
+			expect(message).not.toContain('/app/dist')
+			expect(message).toContain('internal server error')
 		})
-	})
 
-	describe('when the message embeds a non-JavaScript absolute path', () => {
-		it('should redact the path regardless of its extension', () => {
-			// GIVEN a filesystem error naming an internal secret path
-			const cause = causeOf(
-				Effect.die(new Error("ENOENT: open '/app/secrets/key.pem'")),
+		it('should say the same for a bare string thrown as a fault', () => {
+			// GIVEN a fault that is a plain string rather than an error
+			// WHEN deciding what the caller is told
+			// THEN it is not forwarded either — only a marked failure is
+			expect(clientFacingMessage('raw postgres text')).toContain(
+				'internal server error',
 			)
-			// WHEN sanitizing it
-			const rendered = sanitizeCause(cause)
-			// THEN the path is gone even though it does not end in .js/.ts
-			expect(rendered).not.toContain('/app/secrets')
-			expect(rendered).not.toContain('.pem')
-		})
-
-		it('should leave a URL in the message intact', () => {
-			// GIVEN a scraping failure that names the URL it hit — useful signal
-			const cause = causeOf(
-				Effect.die(new Error('fetch failed for https://example.com/a/b/c')),
-			)
-			// WHEN sanitizing it
-			// THEN the URL survives; only server filesystem paths are redacted
-			expect(sanitizeCause(cause)).toContain('https://example.com/a/b/c')
-		})
-	})
-
-	describe('when the message is a long slash-heavy string', () => {
-		it('should redact it without pathological backtracking', () => {
-			// GIVEN a message with many path segments and no file extension —
-			// the shape that made the previous regex backtrack exponentially
-			const segments = `/${Array.from({ length: 60 }, (_, i) => `seg${i}`).join('/')}`
-			const cause = causeOf(Effect.die(new Error(`fetch failed ${segments}`)))
-			// WHEN sanitizing it (this returns promptly; a hang would fail the run)
-			const rendered = sanitizeCause(cause)
-			// THEN the path is redacted
-			expect(rendered).toContain('<path>')
-			expect(rendered).not.toContain('/seg59')
-		})
-	})
-
-	describe('when the effect fails with a tagged domain error', () => {
-		it('should surface the tag and message but nothing more', () => {
-			// GIVEN a tagged error the way a provider failure would surface
-			const cause = causeOf(
-				Effect.fail({
-					_tag: 'ProviderError',
-					message: 'no credit remaining',
-				}),
-			)
-			// WHEN sanitizing it
-			// THEN the client sees the tag and message, useful but internals-free
-			expect(sanitizeCause(cause)).toBe('ProviderError: no credit remaining')
-		})
-	})
-
-	describe('when the cause carries no renderable error', () => {
-		it('should fall back to a generic message', () => {
-			// GIVEN an empty cause (no failure or defect to render)
-			// WHEN sanitizing it
-			// THEN a generic, safe message is returned rather than an empty string
-			expect(sanitizeCause(Cause.empty)).toBe('internal error')
 		})
 	})
 })
 
-// Four tools covering the shapes the bridge must normalize: a list (bare array),
-// a miss (null), an already-valid record, and a failure that dies with an Error
-// whose message and stack reference an internal bundle path.
+// Tools covering the shapes the bridge must normalize — a list (bare array), a
+// miss (null), an already-valid record — and the two failure kinds: one worded
+// for the caller, one an internal fault naming a bundle path.
 const ListTool = Tool.make('list_thing', { success: Schema.Unknown })
 const MissTool = Tool.make('missing_thing', { success: Schema.Unknown })
 const RecordTool = Tool.make('one_thing', { success: Schema.Unknown })
+const SpeakingTool = Tool.make('speaking_thing', { success: Schema.Unknown })
 const BoomTool = Tool.make('boom_thing', { success: Schema.Unknown })
-const SafeTools = Toolkit.make(ListTool, MissTool, RecordTool, BoomTool)
+const SafeTools = Toolkit.make(
+	ListTool,
+	MissTool,
+	RecordTool,
+	SpeakingTool,
+	BoomTool,
+)
 
 const SafeHandlersLive = SafeTools.toLayer(
 	Effect.succeed({
 		list_thing: () => Effect.succeed([{ id: 'a' }, { id: 'b' }]),
 		missing_thing: () => Effect.succeed(null),
 		one_thing: () => Effect.succeed({ ok: true }),
+		speaking_thing: () =>
+			Effect.die(new ToolMessage('footer_id is required to update a footer')),
 		boom_thing: () => {
 			const err = new Error('provider exploded at /app/dist/thing-9f.mjs')
 			err.stack =
@@ -202,6 +153,18 @@ const SafeHandlersLive = SafeTools.toLayer(
 		},
 	}),
 )
+
+// Every log the server writes while a test runs, so a failure the caller never
+// sees can still be shown to have been recorded.
+const logged: Array<{ level: string; text: string }> = []
+const CaptureLogs = Logger.layer([
+	Logger.make(options => {
+		logged.push({
+			level: String(options.logLevel),
+			text: `${JSON.stringify(options.message)} ${String(options.cause ?? '')}`,
+		})
+	}),
+])
 
 const McpHttpLive = mcpToolkitSafe(SafeTools).pipe(
 	Layer.provide(SafeHandlersLive),
@@ -212,7 +175,10 @@ const McpHttpLive = mcpToolkitSafe(SafeTools).pipe(
 
 const ServerLive = HttpRouter.serve(McpHttpLive, {
 	disableListenLog: true,
-}).pipe(Layer.provideMerge(NodeHttpServer.layer(createServer, { port: 0 })))
+}).pipe(
+	Layer.provideMerge(NodeHttpServer.layer(createServer, { port: 0 })),
+	Layer.provideMerge(CaptureLogs),
+)
 
 const runtime = ManagedRuntime.make(ServerLive)
 
@@ -325,19 +291,41 @@ describe('a tool served through mcpToolkitSafe', () => {
 		})
 	})
 
+	describe('when the handler fails with wording meant for the caller', () => {
+		it('should deliver that wording, so the caller can act on it', async () => {
+			// WHEN the client calls a tool that refuses for a reason it can state
+			const reply = await readReply(await callTool('speaking_thing'))
+
+			// THEN the reason survives intact — this is the whole point of marking
+			// it, and without it the caller cannot tell what to send instead
+			expect(reply.result?.isError).toBe(true)
+			expect(reply.result?.content?.[0]?.text).toBe(
+				'footer_id is required to update a footer',
+			)
+		})
+	})
+
 	describe('when the handler dies with an internal error', () => {
-		it('should return a sanitized message with no stack or bundle path', async () => {
+		it('should tell the caller nothing about it, but record it', async () => {
+			logged.length = 0
+
 			// WHEN the client calls a tool that dies referencing a bundle path
 			const reply = await readReply(await callTool('boom_thing'))
 
-			// THEN the call is flagged as an error but the text leaks no internals
+			// THEN the call is flagged as an error and the text carries none of it
 			expect(reply.result?.isError).toBe(true)
 			const text = reply.result?.content?.[0]?.text ?? ''
 			expect(text).not.toContain('/app/dist')
 			expect(text).not.toContain('.mjs')
-			expect(text).not.toMatch(/\n\s*at\s/)
-			// AND the caller still gets a usable signal
-			expect(text).toContain('provider exploded')
+			expect(text).not.toContain('provider exploded')
+
+			// AND it reached the server log, named by the tool it came from, so
+			// somebody can still answer why the call failed
+			const failures = logged.filter(entry => entry.level === 'Error')
+			expect(failures.length).toBeGreaterThan(0)
+			expect(failures.map(entry => entry.text).join('\n')).toContain(
+				'provider exploded',
+			)
 		})
 	})
 })

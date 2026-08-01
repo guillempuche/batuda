@@ -63,6 +63,14 @@ jobs:
       - name: Check dependencies
         run: pnpm check-deps
 
+      # An entry in pnpm-workspace.yaml's `overrides:` outranks every
+      # package.json, so raising only the packages leaves the repo running the
+      # old Effect while every manifest claims otherwise. The lockfile it
+      # produces is self-consistent, so nothing above catches it — not syncpack,
+      # which only reads package.json, and not --frozen-lockfile.
+      - name: Check Effect pins agree
+        run: pnpm check-effect-pins
+
       - name: Build
         run: pnpm build
 

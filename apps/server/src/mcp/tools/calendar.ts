@@ -11,6 +11,7 @@ import { CalendarService } from '../../services/calendar'
 import { dispatchForwardInvitation } from '../../services/calendar-forward-dispatch'
 import { dispatchRsvpReply } from '../../services/calendar-rsvp-dispatch'
 import { EmailService } from '../../services/email'
+import { ToolMessage } from '../tool-message'
 import {
 	ListResult,
 	McpPageLimit,
@@ -451,7 +452,9 @@ export const CalendarHandlersLive = CalendarTools.toLayer(
 					const rows =
 						yield* sql`SELECT * FROM calendar_events WHERE id = ${id} LIMIT 1`
 					if (rows.length === 0)
-						return yield* Effect.die(`Calendar event ${id} not found`)
+						return yield* Effect.die(
+							new ToolMessage(`No calendar event with id ${id}.`),
+						)
 					const [event] = yield* withAttendees(sql, [
 						yield* decodeEvent(rows[0]),
 					])

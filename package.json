@@ -35,6 +35,7 @@
 		"db:down": "docker compose -f docker/docker-compose.yml down",
 		"db:migrate": "pnpm --filter @batuda/server run migrate",
 		"check-bundle-size": "node scripts/check-bundle-size.mjs",
+		"check-effect-pins": "node scripts/check-effect-pins.mjs",
 		"check-migrations": "node scripts/check-migration-safety.mjs",
 		"______ Release ______": "",
 		"release:server": "release-it --config .release-it.server.cjs",

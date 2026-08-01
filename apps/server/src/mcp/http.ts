@@ -4,6 +4,7 @@ import { verifyAccessToken } from 'better-auth/oauth2'
 import { Effect, Layer } from 'effect'
 import { McpServer } from 'effect/unstable/ai'
 import {
+	Headers,
 	HttpRouter,
 	HttpServerRequest,
 	HttpServerResponse,
@@ -18,6 +19,33 @@ import { enterOrgScope, enterUserScope } from '../middleware/org'
 import { clientIdentityOf, recordClientSeen } from './client-seen'
 import { CurrentUser } from './current-user'
 import { McpToolsLive } from './server'
+
+const PROTOCOL_VERSION_HEADER = 'mcp-protocol-version'
+const SESSION_ID_HEADER = 'mcp-session-id'
+
+// A client opening a connection names the newest protocol revision it speaks,
+// and the route refuses anything past the newest the library knows with an empty
+// 400 — nothing for the client to read, and the older transport it would fall
+// back to answers 405 here. So on the opening request, the one carrying no
+// session yet, the named revision is dropped and the exchange goes ahead, which
+// is what settles the revision both sides use. After that the client has been
+// told which revision it got, so naming another one is its own mistake to fix
+// and the refusal stands.
+export const withNegotiableProtocolVersion = (
+	request: HttpServerRequest.HttpServerRequest,
+) => {
+	const named = request.headers[PROTOCOL_VERSION_HEADER]
+	if (named === undefined || request.headers[SESSION_ID_HEADER] !== undefined)
+		return Effect.succeed(request)
+	return Effect.as(
+		Effect.logInfo('mcp.protocol_version.deferred_to_negotiation').pipe(
+			Effect.annotateLogs({ 'mcp.protocol_version.named': named }),
+		),
+		request.modify({
+			headers: Headers.remove(request.headers, PROTOCOL_VERSION_HEADER),
+		}),
+	)
+}
 
 const jsonRpcError = (
 	status: number,
@@ -100,10 +128,11 @@ const McpAuthMiddleware = HttpRouter.middleware(
 
 		return httpEffect =>
 			Effect.gen(function* () {
-				const req = yield* HttpServerRequest.HttpServerRequest
-				if (!req.url.startsWith('/mcp')) {
+				const incoming = yield* HttpServerRequest.HttpServerRequest
+				if (!incoming.url.startsWith('/mcp')) {
 					return yield* httpEffect
 				}
+				const req = yield* withNegotiableProtocolVersion(incoming)
 
 				const incomingMessage = NodeHttpServerRequest.toIncomingMessage(req)
 				const headers = fromNodeHeaders(incomingMessage.headers)
@@ -164,6 +193,10 @@ const McpAuthMiddleware = HttpRouter.middleware(
 								}
 								return yield* httpEffect
 							}).pipe(
+								// The very request the body was read from: a request remembers
+								// its body and a copy does not, so handing the route the other
+								// one leaves it waiting forever on a stream already drained.
+								Effect.provideService(HttpServerRequest.HttpServerRequest, req),
 								Effect.provideService(CurrentUser, {
 									userId: principal.userId,
 									email: principal.email,

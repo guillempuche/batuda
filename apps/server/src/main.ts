@@ -444,20 +444,21 @@ const AppLive = Layer.mergeAll(
 // surfaces in the program's R only because Tool.make declares
 // `dependencies: [CurrentOrg]` for typing.
 //
-// No root layer for it on purpose: `McpServer.toolkit(...)` snapshots the
-// service map at layer-build time (effect/src/unstable/ai/McpServer.ts:610)
-// and re-injects it per tool call via `Effect.provideContext`, where
-// `Context.merge` lets the snapshot OVERRIDE the request fiber. A
-// boot-time sentinel would clobber McpAuthMiddleware's real value and
-// return empty/foreign rows from every tool; leaving the tag absent at
-// boot keeps it out of the snapshot so the request value survives.
+// No root layer for it on purpose: registering a toolkit snapshots the
+// service map once, when the layer is built, and re-injects that snapshot on
+// every tool call — where it OVERRIDES the request's own services rather than
+// deferring to them. A boot-time placeholder would therefore replace the real
+// value McpAuthMiddleware resolved, and every tool would read another
+// organization's rows, or none. Leaving the tag absent at boot keeps it out of
+// the snapshot, so the request's value is what survives.
 //
 // The runMain cast type-erases the unsatisfied requirement. A
 // defect-throwing fallback would surface accidental out-of-scope reads
-// more loudly but crashes startup for the same snapshot reason. The
-// pattern stops being necessary when upstream defers `McpServer.toolkit`
-// capture to request time; `main.boot.test.ts:149-156` is the regression
-// guard (not in `pnpm test` today — run via `pnpm test:integration`).
+// more loudly but crashes startup for the same snapshot reason. The pattern
+// stops being necessary when the library defers that capture to request time.
+// The regression guard is the "should not surface a CurrentOrg
+// out-of-request-scope Defect" case in main.boot.test.ts, which runs under
+// `pnpm --filter @batuda/server test:boot` rather than `pnpm test`.
 
 // `HttpMiddleware.tracer` wraps the whole server chain in a per-request span so
 // traces export to OTLP and per-route span annotations (request id, org id, tool

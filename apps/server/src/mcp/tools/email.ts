@@ -17,6 +17,7 @@ import {
 	EmailAttachmentStaging,
 	type StagingRef,
 } from '../../services/email-attachment-staging'
+import { ToolMessage } from '../tool-message'
 import {
 	ListResult,
 	McpPageLimit,
@@ -505,7 +506,15 @@ const ManageInboxFooter = Tool.make('manage_inbox_footer', {
 
 // Action-parameterized tools can't mark a field required per-action at the
 // schema level, so the merged handlers guard the conditional ones at runtime.
-const dieMissing = (message: string) => Effect.die(new Error(message))
+// Marked, so the wording survives to the caller instead of being replaced by
+// the generic sentence every unmarked fault gets (see ../tool-message).
+const dieMissing = (message: string) => Effect.die(new ToolMessage(message))
+
+// The row named does not exist. Access is filtered by the database rather than
+// refused, so a row belonging to another organization arrives here the same way
+// — and "no such row" is the honest answer to both.
+const dieNotFound = (error: { entity: string; id: string }) =>
+	Effect.die(new ToolMessage(`No ${error.entity} with id ${error.id}.`))
 
 export const EmailTools = Toolkit.make(
 	SendEmail,
@@ -765,7 +774,7 @@ export const EmailHandlersLive = EmailTools.toLayer(
 								? r['updatedAt'].toISOString()
 								: String(r['updatedAt']),
 					})),
-					Effect.catchTag('NotFound', e => Effect.die(e)),
+					Effect.catchTag('NotFound', dieNotFound),
 					Effect.orDie,
 				),
 			mark_email_thread_read: ({ thread_id }) => svc.markThreadRead(thread_id),
@@ -927,7 +936,7 @@ export const EmailHandlersLive = EmailTools.toLayer(
 								// an admin rather than seeing an unexplained failure.
 								.pipe(
 									Effect.catchTag('BadRequest', e =>
-										Effect.die(new Error(e.message)),
+										Effect.die(new ToolMessage(e.message)),
 									),
 									Effect.orDie,
 								)
@@ -958,24 +967,24 @@ export const EmailHandlersLive = EmailTools.toLayer(
 									...(params.active !== undefined && { active: params.active }),
 								}),
 							),
-							Effect.catchTag('NotFound', e => Effect.die(e)),
+							Effect.catchTag('NotFound', dieNotFound),
 							// Refusals carry their reason, so the caller learns whose
 							// mailbox it is rather than seeing an unexplained failure.
 							Effect.catchTag('BadRequest', e =>
-								Effect.die(new Error(e.message)),
+								Effect.die(new ToolMessage(e.message)),
 							),
 							Effect.orDie,
 						)
 					case 'test':
 						return needsId().pipe(
 							Effect.flatMap(id => svc.testInbox(id)),
-							Effect.catchTag('NotFound', e => Effect.die(e)),
+							Effect.catchTag('NotFound', dieNotFound),
 							Effect.orDie,
 						)
 					case 'delete':
 						return needsId().pipe(
 							Effect.flatMap(id => svc.deleteInbox(id)),
-							Effect.catchTag('NotFound', e => Effect.die(e)),
+							Effect.catchTag('NotFound', dieNotFound),
 							Effect.orDie,
 						)
 					case 'set_primary':
@@ -984,7 +993,7 @@ export const EmailHandlersLive = EmailTools.toLayer(
 							// Refusals carry their reason, so the caller learns the
 							// mailbox is not theirs rather than seeing a bare failure.
 							Effect.catchTag('BadRequest', e =>
-								Effect.die(new Error(e.message)),
+								Effect.die(new ToolMessage(e.message)),
 							),
 							Effect.orDie,
 						)
@@ -1110,10 +1119,7 @@ export const EmailHandlersLive = EmailTools.toLayer(
 									isDefault: params.is_default,
 								}),
 							})
-							.pipe(
-								Effect.catchTag('NotFound', e => Effect.die(e)),
-								Effect.orDie,
-							)
+							.pipe(Effect.catchTag('NotFound', dieNotFound), Effect.orDie)
 					case 'delete':
 						if (params.footer_id === undefined)
 							return dieMissing('footer_id is required to delete a footer')

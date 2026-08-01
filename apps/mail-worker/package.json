@@ -15,9 +15,9 @@
 		"@batuda/domain": "workspace:*",
 		"@batuda/email": "workspace:*",
 		"@batuda/observability": "workspace:*",
-		"@effect/platform-node": "4.0.0-beta.98",
-		"@effect/sql-pg": "4.0.0-beta.98",
-		"effect": "4.0.0-beta.98",
+		"@effect/platform-node": "4.0.0-beta.102",
+		"@effect/sql-pg": "4.0.0-beta.102",
+		"effect": "4.0.0-beta.102",
 		"imapflow": "^1.3.2",
 		"mailparser": "^3.9.8",
 		"pg": "^8.20.0"

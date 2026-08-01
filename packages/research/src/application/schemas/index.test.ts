@@ -16,17 +16,27 @@ describe('schemaFieldNames', () => {
 			// separate thing to go and find out
 			expect(names).toContain('enrichment.industry')
 			expect(names).toContain('enrichment.country')
+			// AND a field that is one of a fixed set of answers stays whole: there
+			// is nothing inside a verdict to go and find
+			expect(names).toContain('verdict')
+			expect(names).toContain('verdict_rationale')
 		})
 	})
 
 	describe('when a block sits behind an optional wrapper', () => {
-		it('should still open it up', () => {
-			// GIVEN a scan whose market summary is optional
-			const names = schemaFieldNames('competitor_scan_v1')
-
-			// THEN naming the block alone would say nothing about what goes in it
-			expect(names).toContain('market_summary.market_maturity')
-			expect(names).toContain('market_summary.total_competitors_found')
+		it('should open the block and leave the list closed', () => {
+			// GIVEN a scan with both shapes at once: a list of competitors, and a
+			// market summary that may be left out
+			// THEN naming the block alone would say nothing about what goes in it,
+			//      while the list is named without spelling out each entry — pinned
+			//      exactly, so opening a list or closing a block both fail here
+			expect(schemaFieldNames('competitor_scan_v1')).toEqual([
+				'competitors',
+				'market_summary.total_competitors_found',
+				'market_summary.market_maturity',
+				'market_summary.key_differentiators',
+				'market_summary.citations',
+			])
 		})
 	})
 

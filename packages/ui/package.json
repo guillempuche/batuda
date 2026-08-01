@@ -38,7 +38,7 @@
 		"@base-ui/react": "1.6.0",
 		"@tiptap/core": "^3.28.0",
 		"@tiptap/pm": "^3.28.0",
-		"effect": "4.0.0-beta.98",
+		"effect": "4.0.0-beta.102",
 		"styled-components": "6.3.12"
 	},
 	"peerDependencies": {
