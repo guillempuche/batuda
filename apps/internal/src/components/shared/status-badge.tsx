@@ -3,6 +3,7 @@ import { msg } from '@lingui/core/macro'
 import { useLingui } from '@lingui/react'
 import styled from 'styled-components'
 
+import { COMPANY_STATUSES } from '@batuda/domain'
 import { PriTooltip } from '@batuda/ui/pri'
 
 import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
@@ -14,28 +15,13 @@ import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
  * embossed display-font uppercase. Wrapped in `PriTooltip` for the
  * long-press / hover explanation of the abbreviated status.
  */
-export type CompanyStatus =
-	| 'prospect'
-	| 'contacted'
-	| 'responded'
-	| 'meeting'
-	| 'proposal'
-	| 'client'
-	| 'closed'
-	| 'dead'
+export type CompanyStatus = (typeof COMPANY_STATUSES)[number]
 
-// Canonical pipeline order — the single source used by the list filter bar, the
-// board columns, and the dashboard strip.
-export const STATUS_ORDER: ReadonlyArray<CompanyStatus> = [
-	'prospect',
-	'contacted',
-	'responded',
-	'meeting',
-	'proposal',
-	'client',
-	'closed',
-	'dead',
-]
+// The pipeline order used by the list filter bar, the board columns and the
+// dashboard strip. It comes from the domain, which is also what the server will
+// accept — a stage spelled only here would be a column nothing could ever be
+// moved into.
+export const STATUS_ORDER: ReadonlyArray<CompanyStatus> = COMPANY_STATUSES
 
 export const statusLabels: Record<CompanyStatus, MessageDescriptor> = {
 	prospect: msg`Prospect`,

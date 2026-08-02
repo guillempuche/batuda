@@ -38,6 +38,7 @@ import {
 	statusLabels,
 } from '#/components/shared/status-badge'
 import { useBulkSelection } from '#/hooks/use-bulk-selection'
+import { useCompanyIndustries } from '#/hooks/use-company-industries'
 import { useInfiniteList } from '#/hooks/use-infinite-list'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import { CompanyOwnerControl } from './company-owner-control'
@@ -414,10 +415,13 @@ function DraggableCard({
 	readonly onMove: (card: BoardCardData, toStatus: string) => void
 }) {
 	const { t } = useLingui()
+	// The row carries the trade's web-address form; the name is what to read.
+	const { labelFor } = useCompanyIndustries()
 	const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
 		id: card.id,
 		data: { card, fromStatus: card.status },
 	})
+	const industry = labelFor(card.industry)
 
 	return (
 		<CardShell
@@ -452,7 +456,7 @@ function DraggableCard({
 					<GripVertical size={14} aria-hidden />
 				</DragHandle>
 			</CardTop>
-			{card.industry && <CardIndustry>{card.industry}</CardIndustry>}
+			{industry !== null && <CardIndustry>{industry}</CardIndustry>}
 			<CardBottom>
 				<CompanyOwnerControl companyId={card.id} ownerId={card.ownerId} />
 				<StagePicker

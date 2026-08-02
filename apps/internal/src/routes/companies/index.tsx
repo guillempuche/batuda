@@ -28,6 +28,7 @@ import {
 	StatusBadge,
 } from '#/components/shared/status-badge'
 import { useQuickCapture } from '#/context/quick-capture-context'
+import { useCompanyIndustries } from '#/hooks/use-company-industries'
 import { useInfiniteList } from '#/hooks/use-infinite-list'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { useOrgMembers } from '#/lib/org-members'
@@ -228,22 +229,26 @@ function CompaniesListPage() {
 		[openQuickCapture],
 	)
 
-	// Country + industry options are the distinct values present in the loaded
-	// companies — international, never a hardcoded Spanish vocabulary. Priority
-	// and sort are fixed, geography-neutral sets.
+	// Country options are the distinct values present in the loaded companies —
+	// international, never a hardcoded Spanish vocabulary. Priority and sort are
+	// fixed, geography-neutral sets.
 	const countryOptions = useMemo(
 		() => [...new Set(companies.map(c => c.country).filter(isNonEmpty))].sort(),
 		[companies],
 	)
-	const industryOptions = useMemo(
-		() =>
-			[...new Set(companies.map(c => c.industry).filter(isNonEmpty))].sort(),
-		[companies],
-	)
+	// Trades come from the organisation's own list rather than from the companies
+	// on screen: a trade only used further down the list was not offered at all,
+	// so there was no way to filter for it.
+	const { industries } = useCompanyIndustries()
 
 	const activeFilters = hasActiveFilters(search)
+	// The filtered count says "1 company" too. Landing on a single match is
+	// ordinary now that the filter offers every trade the organisation has, and
+	// it used to read "1 companies".
 	const countLabel = activeFilters
-		? t`${total} companies with filters applied`
+		? total === 1
+			? t`1 company with filters applied`
+			: t`${total} companies with filters applied`
 		: total === 1
 			? t`1 company`
 			: t`${total} companies`
@@ -255,9 +260,11 @@ function CompaniesListPage() {
 		{ value: ALL, label: t`All countries` },
 		...countryOptions.map(r => ({ value: r, label: r })),
 	]
+	// Filtered by the web-address form, which is what the row carries and what a
+	// shared link keeps working with; the name is what the reader picks from.
 	const industryItems = [
 		{ value: ALL, label: t`All industries` },
-		...industryOptions.map(r => ({ value: r, label: r })),
+		...industries.map(i => ({ value: i.slug, label: i.label })),
 	]
 	const priorityItems = [
 		{ value: ALL, label: t`Any priority` },

@@ -5,6 +5,7 @@ import styled from 'styled-components'
 
 import { PriContextMenu } from '@batuda/ui/pri'
 
+import { useCompanyIndustries } from '#/hooks/use-company-industries'
 import { agedPaperSurface } from '#/lib/workshop-mixins'
 import { PriorityDot } from './priority-dot'
 import { RelativeDate } from './relative-date'
@@ -47,7 +48,9 @@ export function CompanyCard({
 	actions?: CompanyCardActions
 }) {
 	const { t } = useLingui()
-	const subtitle = [company.location, company.industry]
+	// The row carries the trade's web-address form; the name is what to read.
+	const { labelFor } = useCompanyIndustries()
+	const subtitle = [company.location, labelFor(company.industry)]
 		.filter((part): part is string => Boolean(part))
 		.join(' · ')
 

@@ -2,6 +2,7 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import {
 	Building2,
+	Hammer,
 	ScrollText,
 	SlidersHorizontal,
 	Users,
@@ -139,6 +140,27 @@ function OrganizationSettingsPage() {
 							</NavRowDescription>
 						</NavRow>
 					) : null}
+
+					{/* Everyone gets this row: a trade is written by whoever types it
+					    onto a company, so tidying the list is not an admin's job. */}
+					<NavRow
+						to='/settings/organization/industries'
+						data-testid='settings-org-industries-link'
+						aria-label={t`Review the industries on your companies`}
+					>
+						<NavRowLabel>
+							<Hammer size={18} aria-hidden />
+							<NavRowTitle>
+								<Trans>Industries</Trans>
+							</NavRowTitle>
+						</NavRowLabel>
+						<NavRowDescription>
+							<Trans>
+								The trades your companies are in — check the ones research
+								suggested, and merge any duplicates.
+							</Trans>
+						</NavRowDescription>
+					</NavRow>
 
 					{/* Everyone gets this row: the shared templates behind it are
 					    anyone's to write and keep, and only the stacks on that page
