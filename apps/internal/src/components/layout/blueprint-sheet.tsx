@@ -303,18 +303,6 @@ const Content = styled.div`
 	position: relative;
 	z-index: 2;
 
-	/* Opt-in full height: a page marks its root [data-sheet-fill] to fill the
-	   sheet (e.g. a list that grows to the available space and scrolls inside
-	   itself). Bounded to the viewport height so the inner list scrolls rather
-	   than pushing the whole page taller. Every other page keeps the default
-	   top-stacked, sheet-scrolled flow untouched. */
-	&:has(> [data-sheet-fill]) {
-		display: flex;
-		flex-direction: column;
-		height: 100%;
-		min-height: 0;
-	}
-
 	@media (min-width: 768px) {
 		padding-top: var(--space-xl);
 		padding-right: var(--space-xl);

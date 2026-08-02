@@ -16,7 +16,6 @@ import {
 	useReactTable,
 	type VisibilityState,
 } from '@tanstack/react-table'
-import { useVirtualizer } from '@tanstack/react-virtual'
 import { Cause, DateTime, Option, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import {
@@ -41,14 +40,7 @@ import {
 	Search,
 	X,
 } from 'lucide-react'
-import {
-	useCallback,
-	useContext,
-	useEffect,
-	useMemo,
-	useRef,
-	useState,
-} from 'react'
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import styled, { css } from 'styled-components'
 
 import {
@@ -72,6 +64,7 @@ import {
 	updateThreadStatusAtom,
 } from '#/atoms/emails-atoms'
 import { companiesListAtom } from '#/atoms/pipeline-atoms'
+import { useOptionalBlueprintViewportRef } from '#/components/layout/blueprint-sheet'
 import { PriTable } from '#/components/primitives/pri-table'
 import { EmptyState } from '#/components/shared/empty-state'
 import { ErrorState } from '#/components/shared/error-state'
@@ -248,6 +241,7 @@ function EmailsIndexPage() {
 	const search = Route.useSearch()
 	const navigate = useNavigate({ from: Route.fullPath })
 	const { openCompose, drafts } = useComposeEmail()
+	const sheetViewportRef = useOptionalBlueprintViewportRef()
 	const wire = useMemo(() => toWireSearch(search), [search])
 
 	// Atom identity is keyed by the canonical wire-shape key, not by the
@@ -418,8 +412,15 @@ function EmailsIndexPage() {
 				search: prev =>
 					mergeSearch(prev, { page: page <= 1 ? undefined : page }),
 			})
+			// The page buttons sit under the last row, so without this the next
+			// page opens at its end instead of at its first thread. Phones
+			// scroll the page itself, and the sheet hands out the same ref
+			// either way, so ask whether it really scrolls before trusting it.
+			const sheet = sheetViewportRef?.current
+			if (sheet && sheet.scrollHeight > sheet.clientHeight) sheet.scrollTop = 0
+			else window.scrollTo({ top: 0 })
 		},
-		[navigate],
+		[navigate, sheetViewportRef],
 	)
 	const handleClearFilters = useCallback(() => {
 		setSearchInput('')
@@ -558,7 +559,7 @@ function EmailsIndexPage() {
 	const allSelected = threads.length > 0 && selectedCount === threads.length
 
 	return (
-		<Page data-sheet-fill>
+		<Page>
 			<Intro>
 				<IntroText>
 					<Title>{t`Emails`}</Title>
@@ -830,7 +831,7 @@ function EmailsIndexPage() {
 	)
 }
 
-// ── ThreadsGrid: TanStack Table + Virtual + PriTable ──────────────
+// ── ThreadsGrid: TanStack Table + PriTable ────────────────────────
 
 type ThreadsGridProps = {
 	readonly threads: ReadonlyArray<ThreadRow>
@@ -1016,22 +1017,14 @@ function ThreadsGrid({
 		defaultColumn: { minSize: 48 },
 	})
 
-	const scrollRef = useRef<HTMLDivElement>(null)
 	const rows = table.getRowModel().rows
-	const virtualizer = useVirtualizer({
-		count: rows.length,
-		getScrollElement: () => scrollRef.current,
-		estimateSize: () => 64,
-		overscan: 8,
-	})
-	const virtualRows = virtualizer.getVirtualItems()
 
 	return (
 		<GridShell>
 			<GridToolbar>
 				<ColumnVisibilityMenu table={table} />
 			</GridToolbar>
-			<GridScroll ref={scrollRef}>
+			<GridFrame>
 				<PriTable.Root>
 					{selectedCount > 0 ? (
 						<SelectionHead>
@@ -1143,36 +1136,16 @@ function ThreadsGrid({
 							))}
 						</PriTable.Head>
 					)}
-					<PriTable.Body
-						style={{
-							height: virtualizer.getTotalSize(),
-							position: 'relative',
-						}}
-					>
-						{virtualRows.map(vi => {
-							const row = rows[vi.index]
-							if (row === undefined) return null
+					<PriTable.Body>
+						{rows.map(row => {
 							const thread = row.original
 							return (
 								<GridRow
 									key={row.id}
-									// Rows vary in height (the stacked mobile card is taller
-									// than a desktop row), so let the virtualizer measure each
-									// one instead of assuming the estimate — otherwise
-									// absolutely-positioned rows would overlap.
-									ref={virtualizer.measureElement}
-									data-index={vi.index}
 									data-testid={`thread-row-${thread.id}`}
 									data-unread={thread.isUnread ? 'true' : 'false'}
 									data-draft={thread.hasDraft ? 'true' : 'false'}
 									data-selected={selected.has(thread.id) ? 'true' : 'false'}
-									style={{
-										position: 'absolute',
-										top: 0,
-										left: 0,
-										right: 0,
-										transform: `translateY(${vi.start}px)`,
-									}}
 									tabIndex={0}
 									aria-label={
 										thread.subject
@@ -1224,7 +1197,7 @@ function ThreadsGrid({
 						})}
 					</PriTable.Body>
 				</PriTable.Root>
-			</GridScroll>
+			</GridFrame>
 		</GridShell>
 	)
 }
@@ -1666,10 +1639,6 @@ const Page = styled.div.withConfig({ displayName: 'EmailsIndexPage' })`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-lg);
-	/* Fill the sheet so the thread list can grow to the available height
-	   instead of collapsing to a fixed max-height. */
-	flex: 1;
-	min-height: 0;
 `
 
 const Intro = styled.div.withConfig({ displayName: 'EmailsIndexIntro' })`
@@ -1984,9 +1953,6 @@ const GridShell = styled.div.withConfig({ displayName: 'EmailsGridShell' })`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-xs);
-	/* Grow to fill the page so the scroll area below takes the free height. */
-	flex: 1;
-	min-height: 0;
 `
 
 // Below the table breakpoint each row is a stacked card: checkbox on the
@@ -2061,13 +2027,8 @@ const GridToolbar = styled.div.withConfig({
 	gap: var(--space-xs);
 `
 
-const GridScroll = styled.div.withConfig({ displayName: 'EmailsGridScroll' })`
+const GridFrame = styled.div.withConfig({ displayName: 'EmailsGridFrame' })`
 	position: relative;
-	/* Fill the remaining page height (no fixed cap) and scroll the rows
-	   internally; pagination will bound the row count later. */
-	flex: 1;
-	min-height: 0;
-	overflow-y: auto;
 	border: 1px solid var(--color-outline-variant);
 	border-radius: var(--shape-2xs);
 	background: var(--color-surface);
