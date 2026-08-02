@@ -180,6 +180,8 @@ For the full command reference (login flow, navigation, interaction, network ins
 
 A click on an element below the fold does nothing and still prints `✓ Done`, which looks identical to a broken handler — scroll it into view first. Before reporting any button as broken, verify the click actually landed; see the interaction section of `references/agent-browser.md` for the recipe.
 
+**A dropdown will not stay open under a synthetic click.** `agent-browser click` on a `PriSelect` trigger leaves `aria-expanded="false"` — Base UI opens on the press and closes again on the release. The options are still in the DOM afterwards (Base UI keeps them mounted), so a check that counts `[role=option]` reads as success while the popup is invisible and has zero height, and every attempt to click an option then fails as "covered". Open it from the keyboard instead — focus the trigger, press `ArrowDown` — and it stays open. Playwright's own `click` does not have this problem, so an e2e test can drive it directly.
+
 **Wait after loading `/login` before filling anything.** Without a pause the password field is often not in the DOM yet, so `fill` reports `✗ Element not found`, the submit click posts an empty form, and the next `find testid "org-switcher"` also misses — three failures that together read exactly like broken auth. It is a hydration race, not a bug in the app. The same applies after `pnpm dev` restarts: the session cookie is gone, so a page you had open lands back on `/login?returnTo=…` and every subsequent `find` fails until you sign in again.
 
 Quick login test:

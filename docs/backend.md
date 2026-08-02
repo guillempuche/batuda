@@ -85,7 +85,7 @@ apps/server/src/
 │   ├── ...
 │   └── health.ts
 ├── lib/
-│   ├── auth.ts               # Better Auth instance as ServiceMap.Service
+│   ├── auth.ts               # Better Auth instance as Context.Service
 │   └── env.ts                # EnvVars service (DATABASE_URL, RESEARCH_*, etc.)
 ├── mcp/
 │   ├── server.ts             # McpToolsLive — toolkits + resources + prompts
@@ -274,12 +274,12 @@ Follow only the patterns documented here — do not mix in patterns from older E
 ### Layer composition
 
 ```typescript
-import { Effect, Layer, ServiceMap } from "effect"
+import { Context, Effect, Layer } from "effect"
 import { SqlClient } from 'effect/unstable/sql'
 import type { Statement } from 'effect/unstable/sql'
 
 // Service definition — uses Effect SQL template literals
-class CompanyService extends ServiceMap.Service<CompanyService>()(
+class CompanyService extends Context.Service<CompanyService>()(
   "CompanyService",
   {
     make: Effect.gen(function* () {
@@ -295,7 +295,7 @@ class CompanyService extends ServiceMap.Service<CompanyService>()(
         search: (filters: CompanyFilters) => {
           const conditions: Array<Statement.Fragment> = []
           if (filters.status) conditions.push(sql`status = ${filters.status}`)
-          if (filters.region) conditions.push(sql`region = ${filters.region}`)
+          if (filters.country) conditions.push(sql`country = ${filters.country}`)
           return sql`
             SELECT * FROM companies
             WHERE ${sql.and(conditions)}
@@ -382,15 +382,38 @@ Map to HTTP responses in the route definition via `HttpApiSchema.status()`.
 ```typescript
 import { Schema } from "effect"
 
+import { COMPANY_STATUSES } from '@batuda/domain'
+
 export const CreateCompanyInput = Schema.Struct({
-  name: Schema.String.pipe(Schema.minLength(1)),
-  slug: Schema.String.pipe(Schema.pattern(/^[a-z0-9-]+$/)),
-  status: Schema.Literal("prospect", "contacted", "responded", "meeting", "proposal", "client", "closed", "dead"),
-  region: Schema.optional(Schema.Literal("cat", "ara", "cv")),
-  priority: Schema.optional(Schema.Int.pipe(Schema.between(1, 3))),
-  metadata: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Unknown }))
+  name: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
+  slug: Schema.String.pipe(Schema.check(Schema.isPattern(/^[a-z0-9-]+$/))),
+  // A closed set lives in `packages/domain` and is read from there, so the
+  // browser, the agent tools and the research apply path cannot disagree about
+  // which words are allowed.
+  status: Schema.optional(Schema.Literals(COMPANY_STATUSES)),
+  country: Schema.optional(Schema.String.pipe(Schema.check(Schema.isPattern(/^[A-Za-z]{2}$/)))),
+  priority: Schema.optional(Schema.Literals([1, 2, 3])),
+  // Finite, not Number: a plain number also publishes "NaN" and "Infinity" as
+  // alternatives, which becomes a choice inside a choice once it is nullable —
+  // a shape some model providers refuse to read.
+  latitude: Schema.optional(Schema.Finite.pipe(Schema.check(Schema.isBetween({ minimum: -90, maximum: 90 })))),
+  metadata: Schema.optional(Schema.Record(Schema.String, Schema.Unknown))
 })
 ```
+
+### Where a rule about a value lives
+
+Write the rule in TypeScript, in `packages/domain`, and read it from every way in — the HTTP input schemas, the agent tool parameters, and the research apply path. A value refused at one door and accepted at another is how the two answers quietly drift apart.
+
+Two things belong in the database instead, and only these. A **unique index** is a race guard: two writers asking for the same new row at the same moment end with one, and the loser re-reads it. A **CHECK on a closed vocabulary** is a backstop, added only after the existing rows have been put right — `companies_status_chk` and `companies_latlng_chk` are the shape. A two-letter country code is *not* a closed vocabulary: that is the shape of a code, not a list of the countries that exist.
+
+Nothing else. No generated column, no trigger, no expression that decides something the application also decides — a rule written twice is a rule that will disagree with itself, and the copy in SQL is the one nobody reads. Where a migration genuinely has to fold a whole existing table, pin the two against each other with a test (`company-industries-fold.integration.test.ts` is the example) and say in the migration that the application's version is the one that wins.
+
+### When a tool cannot find the thing it was asked for
+
+A read answers with nothing: `success: Schema.NullOr(...)`. An action says what it could not find: `dieNotFound(entity, id)`.
+
+Two traps. `Effect.orDie` maps the whole error channel to `never`, so catching an error and re-failing it *before* an `orDie` puts it straight back and kills it — the endpoint answers 500 while type-checking perfectly. Write `Effect.catch(e => e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e))` with no trailing `orDie`. And wrapping a success in `NullOr` makes the flat-result rule in `_annotations.test.ts` pass vacuously unless it looks through the null branch, because the top level stops being an object.
 
 ### How a list endpoint answers
 
@@ -439,7 +462,7 @@ McpToolsLive (src/mcp/server.ts)
 
 ### Tool definition pattern
 
-Tools are defined with `Tool.make()`, grouped into `Toolkit.make()`, and registered via `McpServer.toolkit()`. Handlers are separate from definitions via `Toolkit.toLayer()`.
+Tools are defined with `Tool.make()`, grouped into `Toolkit.make()`, and registered via `mcpToolkitSafe()`. Handlers are separate from definitions via `Toolkit.toLayer()`.
 
 ```typescript
 // src/mcp/tools/companies.ts
@@ -447,10 +470,10 @@ import { Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 
 const SearchCompanies = Tool.make('search_companies', {
-  description: 'Filter companies by status, region, industry, priority, or query.',
+  description: 'Filter companies by status, country, industry, priority, or query.',
   parameters: Schema.Struct({
     status: Schema.optional(Schema.String),
-    region: Schema.optional(Schema.String),
+    country: Schema.optional(Schema.String),
     limit: Schema.optional(Schema.Number),
   }),
   success: Schema.Unknown,
@@ -545,7 +568,7 @@ publish_page: ({ id }) => Effect.gen(function* () {
   const page = yield* service.getById(id)
   const { confirm } = yield* McpServer.elicit({
     message: `Publish "${page.title}"? This makes it publicly visible.`,
-    schema: Schema.Struct({ confirm: Schema.Literal('yes', 'no') }),
+    schema: Schema.Struct({ confirm: Schema.Literals(['yes', 'no']) }),
   }).pipe(Effect.catchTag('ElicitationDeclined', () => Effect.succeed({ confirm: 'no' as const })))
   if (confirm === 'no') return { status: 'cancelled' }
   return yield* service.publish(id)
@@ -558,12 +581,9 @@ MCP protocol has no built-in auth. A `CurrentUser` context tag bridges transport
 
 ```typescript
 // src/mcp/current-user.ts
-export class CurrentUser extends Context.Tag('CurrentUser')<CurrentUser, {
-  readonly userId: string
-  readonly email: string
-  readonly name: string
-  readonly isAgent: boolean
-}>() {}
+export class CurrentUser extends Context.Service<CurrentUser>()('CurrentUser', {
+  // `Context.Tag` belongs to Effect v2/v3 and does not exist here.
+}) {}
 ```
 
 - **HTTP transport**: middleware validates Better Auth session → provides `CurrentUser` per-request
@@ -603,13 +623,13 @@ const program = HttpRouter.serve(AppLive).pipe(...)
 
 ```typescript
 export const McpToolsLive = Layer.mergeAll(
-  McpServer.toolkit(CompanyTools),
-  McpServer.toolkit(ContactTools),
-  McpServer.toolkit(InteractionTools),
-  McpServer.toolkit(TaskTools),
-  McpServer.toolkit(DocumentTools),
-  McpServer.toolkit(PageTools),
-  McpServer.toolkit(PipelineTools),
+  mcpToolkitSafe(CompanyTools),
+  mcpToolkitSafe(ContactTools),
+  mcpToolkitSafe(InteractionTools),
+  mcpToolkitSafe(TaskTools),
+  mcpToolkitSafe(DocumentTools),
+  mcpToolkitSafe(PageTools),
+  mcpToolkitSafe(PipelineTools),
   CompanyResource,
   PipelineResource,
   DocumentResource,
@@ -647,7 +667,7 @@ Better Auth v1.5.6 handles all authentication. See [architecture.md](architectur
 
 Key files:
 
-- `src/lib/auth.ts` — Better Auth instance as `ServiceMap.Service`, with plugins: `openAPI`, `bearer`, `admin`, `apiKey`, `magicLink` (links are dispatched through `EmailProvider.sendMagicLink` — locally they land in `apps/server/.dev-inbox/` as `*sign-in-to-batuda*.md` files; in cloud they go through the transactional email provider, Resend)
+- `src/lib/auth.ts` — Better Auth instance as `Context.Service`, with plugins: `openAPI`, `bearer`, `admin`, `apiKey`, `magicLink` (links are dispatched through `EmailProvider.sendMagicLink` — locally they land in `apps/server/.dev-inbox/` as `*sign-in-to-batuda*.md` files; in cloud they go through the transactional email provider, Resend)
 - `src/lib/env.ts` — Centralized environment variables (DATABASE_URL, BETTER_AUTH_SECRET, etc.)
 - `src/middleware/session.ts` — `SessionMiddleware` validates sessions via `auth.api.getSession()`, provides `SessionContext`
 - `src/routes/auth.ts` — Wildcard `/auth/*` GET/POST routes
@@ -913,7 +933,7 @@ Style: 2-space indent, 100-char line width, single quotes, ES5 trailing commas, 
 1. Define tool with `Tool.make(name, { description, parameters, success })` in `src/mcp/tools/<domain>.ts`
 2. Add annotations: `.annotate(Tool.Title, ...)`, `.annotate(Tool.Readonly, ...)`, `.annotate(Tool.Destructive, false)`, `.annotate(Tool.OpenWorld, false)`
 3. Add to a `Toolkit.make(...)` and export both `*Tools` and `*HandlersLive`
-4. Register in `src/mcp/server.ts` via `McpServer.toolkit(Tools)` + `Layer.provide(HandlersLive)`
+4. Register in `src/mcp/server.ts` via `mcpToolkitSafe(Tools)` + `Layer.provide(HandlersLive)`
 5. Document in `AGENTS.md` if it changes agent workflows
 
 ## Adding a new MCP resource

@@ -283,7 +283,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		findings: {
 			enrichment: {
 				industry: 'restaurants',
-				size_range: '6-10',
+				size_range: '1-10',
 				current_tools: 'Llibreta + WhatsApp',
 				products_fit: ['gestio-reserves', 'web-starter'],
 				tags: ['gastro', 'garraf'],
@@ -323,7 +323,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		findings: {
 			enrichment: {
 				industry: 'manufacturing',
-				size_range: '26-50',
+				size_range: '11-50',
 				current_tools: 'Excel + Contaplus',
 				products_fit: ['automatitzacions'],
 				tags: ['indústria', 'facturació'],
@@ -762,7 +762,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		findings: {
 			enrichment: {
 				industry: 'restaurants',
-				size_range: '6-10',
+				size_range: '1-10',
 				current_tools: 'Llibreta paper + WhatsApp + 3 phone lines.',
 				products_fit: ['gestio-reserves', 'web-starter'],
 				tags: ['gastro', 'garraf', 'audit'],
@@ -797,7 +797,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					subject_table: 'companies',
 					subject_id: '<cal-pep-id>',
 					expected_version: 1,
-					fields: { sizeRange: '6-10', country: 'ES' },
+					fields: { sizeRange: '1-10', country: 'ES' },
 					reason: 'Confirmed via on-site visit and Google Business Profile.',
 					citations: [{ source_id: 'src_firecrawl_001' }],
 				},
@@ -1066,7 +1066,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		findings: {
 			enrichment: {
 				industry: 'transport',
-				size_range: '11-25',
+				size_range: '11-50',
 				current_tools: 'Paper + Sage 200 + WhatsApp.',
 				products_fit: ['automatitzacions'],
 				tags: ['logistics', 'maresme'],
@@ -1128,7 +1128,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		findings: {
 			enrichment: {
 				industry: 'hospitality',
-				size_range: '6-10',
+				size_range: '1-10',
 				current_tools: 'Booking + paper register.',
 				products_fit: ['gestio-reserves', 'web-starter'],
 				tags: ['turisme', 'ribagorça', 'rate-strategy'],
@@ -1308,7 +1308,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		findings: {
 			enrichment: {
 				industry: 'manufacturing',
-				size_range: '6-10',
+				size_range: '1-10',
 				current_tools: 'Static Wordpress + Instagram.',
 				products_fit: ['ecommerce-local', 'web-starter'],
 				tags: ['artesania', 'empordà', 'cluster'],
@@ -1713,7 +1713,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		findings: {
 			enrichment: {
 				industry: 'manufacturing',
-				size_range: '11-25',
+				size_range: '11-50',
 				current_tools: 'Wordpress + Holded + WhatsApp.',
 				products_fit: ['web-starter', 'automatitzacions'],
 				tags: ['electricitat', 'vallès', 'lead-gen'],
@@ -1742,7 +1742,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					subject_table: 'companies',
 					subject_id: '<electricitat-id>',
 					expected_version: 1,
-					fields: { sizeRange: '11-25', country: 'ES' },
+					fields: { sizeRange: '11-50', country: 'ES' },
 					reason: 'Confirmed via libreBORME + on-site signage check.',
 					citations: [{ source_id: 'src_registry_001' }],
 				},
@@ -1839,7 +1839,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		findings: {
 			enrichment: {
 				industry: 'restaurants',
-				size_range: '1-5',
+				size_range: '1-10',
 				current_tools: 'WhatsApp + paper preorder list.',
 				products_fit: ['ecommerce-local', 'web-starter'],
 				tags: ['fornería', 'berguedà', 'mercats'],
@@ -2141,7 +2141,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		findings: {
 			enrichment: {
 				industry: 'services',
-				size_range: '6-10',
+				size_range: '1-10',
 				current_tools: 'Webflow + Notion + Linear.',
 				products_fit: ['web-starter'],
 				tags: ['agency', 'design', 'barcelona'],
@@ -2319,7 +2319,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		findings: {
 			enrichment: {
 				industry: 'manufacturing',
-				size_range: '6-10',
+				size_range: '1-10',
 				current_tools: 'WhatsApp Business + Google Business Profile + paper.',
 				products_fit: ['web-starter'],
 				tags: ['tancaments', 'garraf', 'closeout'],
@@ -2385,7 +2385,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		findings: {
 			enrichment: {
 				industry: 'services',
-				size_range: '6-10',
+				size_range: '1-10',
 				current_tools: 'Gmail + Drive + Notion (light).',
 				products_fit: ['web-starter', 'automatitzacions'],
 				tags: ['consultoria', 'valencia', 'b2b'],
@@ -2409,7 +2409,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					subject_table: 'companies',
 					subject_id: '<consultoria-id>',
 					expected_version: 1,
-					fields: { country: 'ES', sizeRange: '6-10' },
+					fields: { country: 'ES', sizeRange: '1-10' },
 					reason: 'Confirmed via AEAT registry sample.',
 					citations: [{ source_id: 'src_exa_001' }],
 				},
@@ -2547,7 +2547,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		findings: {
 			enrichment: {
 				industry: 'services',
-				size_range: '6-10',
+				size_range: '1-10',
 				current_tools: 'Instagram + WhatsApp + paper agenda.',
 				products_fit: ['gestio-reserves', 'web-starter'],
 				tags: ['taller', 'granollers', 'auto'],
@@ -2576,7 +2576,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					subject_table: 'companies',
 					subject_id: '<jove-id>',
 					expected_version: 1,
-					fields: { sizeRange: '6-10' },
+					fields: { sizeRange: '1-10' },
 					reason: 'Field visit + Instagram team-page count.',
 					citations: [],
 				},
@@ -2694,7 +2694,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		findings: {
 			enrichment: {
 				industry: 'transport',
-				size_range: '11-25',
+				size_range: '11-50',
 				current_tools: 'Paper + Sage 200 + WhatsApp.',
 				products_fit: ['automatitzacions'],
 				tags: ['logistics', 'maresme'],
@@ -3763,7 +3763,7 @@ export const seedResearchRuns = (
 						findings: JSON.stringify({
 							enrichment: {
 								industry: 'restaurants',
-								size_range: '6-10',
+								size_range: '1-10',
 								current_tools: 'Booking + paper.',
 								products_fit: ['gestio-reserves'],
 								tags: ['gastro', 'sitges'],

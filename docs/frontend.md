@@ -376,7 +376,7 @@ BaseUI provides headless, accessible components. Style them with styled-componen
 ### Usage pattern
 
 ```tsx
-// src/components/pri/PriButton.tsx
+// packages/ui/src/pri/pri-button.tsx
 import { Button } from '@base-ui/react/button'
 import styled, { css } from 'styled-components'
 
@@ -397,7 +397,7 @@ const variants = {
   `,
 }
 
-const PriButton = styled(Button.Root)<{ $variant?: keyof typeof variants }>`
+const PriButton = styled(Button)<{ $variant?: keyof typeof variants }>`
   font-size: var(--typescale-label-large-size);
   font-weight: var(--typescale-label-large-weight);
   padding: var(--space-2xs) var(--space-md);
@@ -432,7 +432,7 @@ const StatusBadge = styled.span<{ $status: string }>`
 | ---------------- | ------------- | ---------------------------------------------------------- |
 | `PriButton`      | `Button`      | All interactive buttons                                    |
 | `PriInput`       | `Input`       | Text inputs in forms                                       |
-| `PriSelect`      | `Select`      | Status, region, industry dropdowns                         |
+| `PriSelect`      | `Select`      | Status and size dropdowns                                  |
 | `PriDialog`      | `Dialog`      | Interaction log modal, company quick-edit                  |
 | `PriTabs`        | `Tabs`        | Company detail (Overview / Conversations / People / Files) |
 | `PriMenu`        | `Menu`        | Action menus on company cards                              |
@@ -800,7 +800,7 @@ const CardHead = styled.div`
 
 ### Company list (`/companies`)
 
-- Filter bar: status, region, industry, priority, product_fit (pills, multi-select)
+- Filter bar: status, country, industry, priority, product_fit (pills, multi-select)
 - Search input (name)
 - Company cards: name, location, status chip, industry, last contacted date, priority dot
 - Sorted by priority ASC, then last_contacted_at DESC

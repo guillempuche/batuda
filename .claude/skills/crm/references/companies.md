@@ -27,19 +27,23 @@ Generate slugs in kebab-case from the company name:
 | 2        | Medium  | Contact within 2 weeks |
 | 3        | Cold    | Backlog, no urgency    |
 
-## Source field
+## Size range
 
-Always set `source` when creating a company. Valid values:
+| Value          | Reach for it when                                      |
+| -------------- | ------------------------------------------------------ |
+| `1-10`         | A sole trader, a family business, a small workshop     |
+| `11-50`        | A single site with a manager between you and the owner |
+| `51-200`       | Several sites, or a head office and a floor            |
+| `201-500`      | A department to sell into                              |
+| `501-1000`     | A buyer whose job is buying                            |
+| `1001-5000`    | A regional group                                       |
+| `5001-25000`   | A national employer                                    |
+| `25001-100000` | A multinational                                        |
+| `100001+`      | One of the largest employers anywhere                  |
 
-| Value         | When to use                          |
-| ------------- | ------------------------------------ |
-| `firecrawl`   | Found via Firecrawl scraping         |
-| `exa`         | Found via Exa search                 |
-| `google_maps` | Found via Google Maps                |
-| `referral`    | Referred by existing contact         |
-| `linkedin`    | Found on LinkedIn                    |
-| `instagram`   | Found on Instagram                   |
-| `manual`      | Manually entered, no specific source |
+## Industry
+
+Not a fixed set. Send the trade in the words a person would write — `Serralleria`, `Freight forwarding`, `Bicycle manufacturing` — and the server files it under the organisation's own entry, creating one the first time anybody uses it, whatever the spelling. What comes back on the row is that entry's web-address form (`serralleria`), which is what `search_companies({ industry })` and a shared link both take.
 
 ## Metadata jsonb
 

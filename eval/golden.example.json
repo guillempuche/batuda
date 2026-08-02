@@ -6,7 +6,7 @@
 			"officialDomain": "brompton.com",
 			"bucket": "big",
 			"fields": {
-				"industry": "manufacturing",
+				"industry": "Bicycle manufacturing",
 				"country": "GB",
 				"location": "London"
 			},
@@ -20,7 +20,7 @@
 			"officialDomain": "gymshark.com",
 			"bucket": "big",
 			"fields": {
-				"industry": "retail",
+				"industry": "Sportswear",
 				"country": "GB",
 				"location": "Solihull"
 			},
@@ -34,7 +34,7 @@
 			"officialDomain": "monzo.com",
 			"bucket": "big",
 			"fields": {
-				"industry": "services",
+				"industry": "Banking",
 				"country": "GB",
 				"location": "London"
 			},
@@ -49,7 +49,7 @@
 			"altDomains": ["dyson.co.uk"],
 			"bucket": "big",
 			"fields": {
-				"industry": "manufacturing",
+				"industry": "Home appliance manufacturing",
 				"country": "GB",
 				"location": "Malmesbury"
 			},
@@ -64,7 +64,7 @@
 			"altDomains": ["jcb.co.uk"],
 			"bucket": "big",
 			"fields": {
-				"industry": "manufacturing",
+				"industry": "Construction equipment manufacturing",
 				"country": "GB",
 				"location": "Rocester"
 			},
@@ -79,7 +79,7 @@
 			"altDomains": ["nandos.com"],
 			"bucket": "big",
 			"fields": {
-				"industry": "restaurants",
+				"industry": "Restaurants",
 				"country": "GB",
 				"location": "London"
 			}
@@ -133,7 +133,7 @@
 			"officialDomain": "enganchesaragon.com",
 			"bucket": "small",
 			"fields": {
-				"industry": "manufacturing",
+				"industry": "Towbar manufacturing",
 				"size_range": "51-200",
 				"country": "ES",
 				"location": "Zaragoza"
@@ -147,7 +147,7 @@
 			"officialDomain": "cohitech.net",
 			"bucket": "small",
 			"fields": {
-				"industry": "manufacturing",
+				"industry": "Sheet metal fabrication",
 				"size_range": "51-200",
 				"country": "ES",
 				"location": "Balsareny"
@@ -161,7 +161,7 @@
 			"officialDomain": "pronimetal.com",
 			"bucket": "small",
 			"fields": {
-				"industry": "manufacturing",
+				"industry": "Metal fabrication",
 				"size_range": "51-200",
 				"country": "ES",
 				"location": "Alagón"
@@ -175,7 +175,7 @@
 			"officialDomain": "pcexautomotive.com",
 			"bucket": "small",
 			"fields": {
-				"industry": "distribution",
+				"industry": "Car parts distribution",
 				"size_range": "11-25",
 				"country": "ES",
 				"location": "Alicante"
@@ -228,7 +228,7 @@
 			"officialDomain": "europa-worldwide.com",
 			"bucket": "big",
 			"fields": {
-				"industry": "transport",
+				"industry": "Freight forwarding",
 				"country": "GB",
 				"location": "Dartford"
 			},
@@ -273,7 +273,7 @@
 			"officialDomain": "beckhoff.com",
 			"bucket": "big",
 			"fields": {
-				"industry": "manufacturing",
+				"industry": "Industrial automation",
 				"country": "DE",
 				"location": "Verl"
 			},
@@ -288,7 +288,7 @@
 			"altDomains": ["vollrathfoodservice.com"],
 			"bucket": "big",
 			"fields": {
-				"industry": "manufacturing",
+				"industry": "Foodservice equipment manufacturing",
 				"country": "US",
 				"location": "Sheboygan"
 			},

@@ -1,33 +1,15 @@
-// The CRM's fixed vocabulary for the classification fields research writes back —
-// a local mirror of @batuda/domain's Company schema (industry / size_range).
-// Kept as a copy so this package keeps its zero-workspace-dependency boundary; a
-// sync test in apps/server (which sees both packages) fails if the two ever drift
-// apart.
+// The one classification field research still rewrites to a fixed code. A trade
+// is no longer among them: each organisation keeps its own list, so the words a
+// page uses are stored as written and only the size bands are folded.
+//
+// Read from the CRM's own list rather than copied. This used to be a copy kept in
+// step by a test, which could only ever prove the two were equal — never that
+// they were right — and left a window in which a band added to one silently did
+// not exist in the other.
 
-export const CRM_INDUSTRIES = [
-	'restaurants',
-	'construction',
-	'retail',
-	'manufacturing',
-	'services',
-	'hospitality',
-	'distribution',
-	'transport',
-	'other',
-] as const
-export type CrmIndustry = (typeof CRM_INDUSTRIES)[number]
+import { COMPANY_SIZE_RANGES } from '@batuda/domain'
 
-export const CRM_SIZE_RANGES = [
-	'1-5',
-	'6-10',
-	'11-25',
-	'26-50',
-	'51-200',
-	'201-500',
-	'501-1000',
-	'1001-5000',
-	'5001+',
-] as const
+export const CRM_SIZE_RANGES = COMPANY_SIZE_RANGES
 export type CrmSizeRange = (typeof CRM_SIZE_RANGES)[number]
 
 // What a research run is shown of a company or contact it already holds, so it can

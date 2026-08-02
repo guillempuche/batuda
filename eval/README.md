@@ -30,7 +30,7 @@ The company's own `email`, `phone` and `tax_id` were added when the profile gain
 
 Not scored: `website`, `current_tools`, `tags`. The website is already what grounding is measured on (a row's `officialDomain`), so scoring it here would report the same success twice and make a change to grounding look twice as large. Tools and tags are free text with no single correct value.
 
-Matching is per field: `location` by containment either way; `industry` through the vocabulary map; `phone` on its digits, last nine only, so spacing and a country code cannot fail a correct number; `tax_id` on its letters and digits alone, so `B-12345678` and `b12345678` are one number; `email`, `country` and `size_range` exactly, since the pipeline is meant to emit those verbatim.
+Matching is per field: `location` by containment either way; `industry` by the same rule the CRM uses to decide two spellings are one trade, plus a shared word stem so an ending (“fusteria” against “fusteries”) is not counted as a miss; `phone` on its digits, last nine only, so spacing and a country code cannot fail a correct number; `tax_id` on its letters and digits alone, so `B-12345678` and `b12345678` are one number; `email`, `country` and `size_range` exactly, since the pipeline is meant to emit those verbatim.
 
 ### When the profile shape changes, take a baseline first
 
@@ -109,10 +109,10 @@ A JSON array of rows. Copy `golden.example.json` to your own `golden.json` and r
 
 ### Allowed field values
 
-Match the CRM's own vocabulary, or the value can never match what the pipeline extracts:
+Two of these are fixed sets, and the value has to be one of them or it can never match what the pipeline extracts:
 
-- `industry` — `restaurants` · `construction` · `retail` · `manufacturing` · `services` · `hospitality` · `distribution` · `transport` · `other`
-- `size_range` — `1-5` · `6-10` · `11-25` · `26-50` · `51-200`
+- `industry` — free text: the trade in the words somebody who had read the site would write down (`Bicycle manufacturing`, `Freight forwarding`). There is no list to pick from — an organisation's trades are whatever its people call them — so write the wording you would expect, not a category
+- `size_range` — `1-10` · `11-50` · `51-200` · `201-500` · `501-1000` · `1001-5000` · `5001-25000` · `25001-100000` · `100001+`
 - `country` — ISO 3166-1 alpha-2 code (e.g. `GB` · `ES` · `US`)
 - `location` — free text (matched by containment, so formatting differences are tolerated)
 - `email` — the company's own published mailbox, exactly as printed (`info@…`, `hola@…`). Not a named person's address; those belong in `contacts`.
@@ -163,7 +163,7 @@ Know what turning them off costs: a registry lookup that resolves the target by 
 
 ## Note
 
-`golden.example.json` ships a mix of real, verified companies: UK ones (whose register, Companies House, is free) that exercise grounding and the wrong-company rate, and Spanish small businesses (whose register, libreBORME, is paid) that exercise `country` (`ES`) and `size_range` against a thin web presence. Replace them with your own targets in any country; for UK companies the pipeline extracts English industry terms, so `industry` precision there mostly measures the vocabulary gap, not grounding.
+`golden.example.json` ships a mix of real, verified companies: UK ones (whose register, Companies House, is free) that exercise grounding and the wrong-company rate, and Spanish small businesses (whose register, libreBORME, is paid) that exercise `country` (`ES`) and `size_range` against a thin web presence. Replace them with your own targets in any country. `industry` is scored against the wording you write in the golden, so keep it to the trade rather than a judgement about the sector — a run that read the site and wrote the same trade in its own words is a hit, and one that guessed from the company name is not.
 
 ## Charting runs on the monitoring board
 

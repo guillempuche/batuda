@@ -33,7 +33,9 @@ Always call `search_companies` before `get_company`. Fetch document content only
 
 All IDs are UUIDs. All timestamps are UTC.
 
-Text enum fields (status, industry, channel, etc.) are plain strings — not Postgres enums. Valid values are documented in `packages/domain/src/schema/`.
+Fields that take one of a fixed set of words (status, priority, size range, channel kind) are plain strings, not Postgres enums; the sets they take are in `packages/domain/src/schema/`.
+
+`industry` is not one of them. A company's trade is whatever the organisation calls it, so send the words a person would write (`Serralleria`, `Freight forwarding`) and the server files it under that organisation's own entry, creating one the first time anybody uses it. What comes back on the row is that entry's web-address form, which is what a filter and a shared link use.
 
 `metadata jsonb` columns accept any valid JSON object. Always merge, never replace:
 
@@ -122,6 +124,6 @@ For page structure details, consult `references/documents.md`.
 
 For detailed field values, workflows, and examples, consult:
 
-- **`references/companies.md`** — Status flow, slug format, priority, source values, metadata patterns
+- **`references/companies.md`** — Status flow, slug format, priority, size ranges, how a trade is named, metadata patterns
 - **`references/interactions.md`** — Channel/direction/type/outcome values, log_interaction example, next_action workflow
 - **`references/documents.md`** — Document types, research workflow, pages (Tiptap JSON, publish flow), tasks

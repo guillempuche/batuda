@@ -12,6 +12,7 @@ import {
 import { seedDocuments } from './seed/documents'
 import { seedDemoEmails } from './seed/emails'
 import { seedInboxes } from './seed/inboxes'
+import { seedIndustryVocabulary } from './seed/industries'
 import { linkRunProvenance, seedInstructions } from './seed/instructions'
 import { seedMcpOAuth } from './seed/mcp-oauth'
 import { seedPages } from './seed/pages'
@@ -91,6 +92,7 @@ export const seed = (preset: Preset) =>
 					ctx,
 					insertedProducts.map(p => p.slug),
 				)
+				yield* seedIndustryVocabulary(sql)
 				const { insertedContacts, contactMap } = yield* seedContacts(
 					ctx,
 					companyMap,

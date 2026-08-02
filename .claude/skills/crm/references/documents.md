@@ -34,7 +34,7 @@ These six are the whole list — the tools reject anything else.
 
 When researching a new company with Firecrawl/Exa:
 
-1. `create_companies(...)` with known fields (name, slug, source, industry, etc.)
+1. `create_companies(...)` with known fields (name, slug, industry, country, etc.)
 2. `create_document({ subject_table: "companies", subject_id: <id>, type: "research", content: <scraped + structured markdown> })`
 
 Structure research documents with clear sections: overview, products/services, team, location, online presence, opportunities.

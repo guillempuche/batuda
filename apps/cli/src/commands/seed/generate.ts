@@ -69,31 +69,35 @@ export const daysBefore = (
  * generated "Transports Riera" is filed under transport rather than a random
  * sector. Keeps the demo data coherent when someone filters by industry.
  */
+// A trade is whatever a person would write, not one of a fixed few. Two
+// spellings of metalwork and two of carpentry are here on purpose: a real
+// database fills up with those, and without them nothing local exercises the
+// merging that the trades list exists to make possible.
 const TRADES = [
-	{ prefix: 'Restaurant', industry: 'restaurants' },
-	{ prefix: 'Bar', industry: 'restaurants' },
-	{ prefix: 'Celler', industry: 'restaurants' },
-	{ prefix: 'Forn', industry: 'restaurants' },
-	{ prefix: 'Hostal', industry: 'hospitality' },
-	{ prefix: 'Apartaments', industry: 'hospitality' },
-	{ prefix: 'Construccions', industry: 'construction' },
-	{ prefix: 'Fusteria', industry: 'construction' },
-	{ prefix: 'Electricitat', industry: 'construction' },
-	{ prefix: 'Climatització', industry: 'construction' },
-	{ prefix: 'Taller', industry: 'manufacturing' },
-	{ prefix: 'Metalls', industry: 'manufacturing' },
-	{ prefix: 'Impremta', industry: 'manufacturing' },
-	{ prefix: 'Transports', industry: 'transport' },
-	{ prefix: 'Logística', industry: 'transport' },
-	{ prefix: 'Distribucions', industry: 'distribution' },
-	{ prefix: 'Majorista', industry: 'distribution' },
-	{ prefix: 'Ferreteria', industry: 'retail' },
-	{ prefix: 'Òptica', industry: 'retail' },
-	{ prefix: 'Floristeria', industry: 'retail' },
-	{ prefix: 'Assessoria', industry: 'services' },
-	{ prefix: 'Gestoria', industry: 'services' },
-	{ prefix: 'Neteges', industry: 'services' },
-	{ prefix: 'Jardineria', industry: 'services' },
+	{ prefix: 'Restaurant', industry: 'Restauració' },
+	{ prefix: 'Bar', industry: 'Restauració' },
+	{ prefix: 'Celler', industry: 'Elaboració de vi' },
+	{ prefix: 'Forn', industry: 'Fleca i pastisseria' },
+	{ prefix: 'Hostal', industry: 'Allotjament' },
+	{ prefix: 'Apartaments', industry: 'Allotjament' },
+	{ prefix: 'Construccions', industry: 'Construcció' },
+	{ prefix: 'Fusteria', industry: 'Fusteria' },
+	{ prefix: 'Electricitat', industry: 'Instal·lacions elèctriques' },
+	{ prefix: 'Climatització', industry: 'Climatització' },
+	{ prefix: 'Taller', industry: 'Metal·lúrgia' },
+	{ prefix: 'Metalls', industry: 'metal·lúrgia' },
+	{ prefix: 'Impremta', industry: 'Arts gràfiques' },
+	{ prefix: 'Transports', industry: 'Transport de mercaderies' },
+	{ prefix: 'Logística', industry: 'Logística' },
+	{ prefix: 'Distribucions', industry: 'Distribució' },
+	{ prefix: 'Majorista', industry: 'Distribució' },
+	{ prefix: 'Ferreteria', industry: 'Ferreteria' },
+	{ prefix: 'Òptica', industry: 'Òptica' },
+	{ prefix: 'Floristeria', industry: 'Floristeria' },
+	{ prefix: 'Assessoria', industry: 'Assessoria fiscal' },
+	{ prefix: 'Gestoria', industry: 'Assessoria fiscal' },
+	{ prefix: 'Neteges', industry: 'Neteja industrial' },
+	{ prefix: 'Jardineria', industry: 'Jardineria' },
 ] as const
 
 const FAMILY_NAMES = [
@@ -149,17 +153,7 @@ const TOWNS = [
 	{ name: 'Olot', lat: 42.1818, lng: 2.49 },
 ] as const
 
-const SOURCES = [
-	'firecrawl',
-	'exa',
-	'google_maps',
-	'referral',
-	'linkedin',
-	'instagram',
-	'manual',
-] as const
-
-const SIZE_RANGES = ['1-5', '6-10', '11-25', '26-50', '51-200'] as const
+const SIZE_RANGES = ['1-10', '1-10', '11-50', '11-50', '51-200'] as const
 
 /**
  * Pipeline stages weighted like a real funnel — many early-stage leads,
@@ -231,7 +225,6 @@ export type GeneratedCompany = {
 	readonly sizeRange: string
 	readonly country: string
 	readonly location: string
-	readonly source: string
 	readonly priority: number
 	readonly website: string | null
 	readonly email: string | null
@@ -307,7 +300,6 @@ export const generateCompanies = (options: {
 			sizeRange: pick(rng, SIZE_RANGES),
 			country: 'ES',
 			location: town.name,
-			source: pick(rng, SOURCES),
 			priority: chance(rng, 0.45) ? 2 : 3,
 			website: chance(rng, 0.7) ? `https://${domain}` : null,
 			email: chance(rng, 0.8) ? `info@${domain}` : null,

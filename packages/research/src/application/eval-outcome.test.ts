@@ -122,14 +122,14 @@ describe('outcomeFromRun', () => {
 			const outcome = outcomeFromRun({
 				status: 'succeeded',
 				findings: {
-					enrichment: { industry: 'transport', size_range: '26-50' },
+					enrichment: { industry: 'transport', size_range: '11-50' },
 				},
 				fetchedUrls: ['https://www.acme.es/about'],
 			})
 
 			// WHEN adapted — THEN the field resolves and the fetched page grounds it
 			expect(outcome.fields.industry).toBe('transport')
-			expect(outcome.fields.size_range).toBe('26-50')
+			expect(outcome.fields.size_range).toBe('11-50')
 			expect(outcome.reachedDomains).toEqual(['acme.es'])
 		})
 	})
