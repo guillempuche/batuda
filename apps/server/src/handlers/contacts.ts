@@ -212,12 +212,21 @@ export const ContactsLive = HttpApiBuilder.group(
 							{ table: 'contacts' as const, id: _.params.id },
 							_.payload,
 						).pipe(Effect.flatMap(decodeChannel))
-					}).pipe(Effect.orDie),
+					}).pipe(
+						// Only the refusal reaches the caller; everything else is a fault.
+						// Re-failing and then calling orDie would put the refusal back and
+						// kill it, which reads as a server error rather than an answer.
+						Effect.catch(e =>
+							e._tag === 'BadRequest' ? Effect.fail(e) : Effect.die(e),
+						),
+					),
 				)
 				.handle('updateChannel', _ =>
 					patchChannel(sql, _.params.channelId, _.payload).pipe(
 						Effect.flatMap(decodeChannel),
-						Effect.orDie,
+						Effect.catch(e =>
+							e._tag === 'BadRequest' ? Effect.fail(e) : Effect.die(e),
+						),
 					),
 				)
 				.handle('deleteChannel', _ =>

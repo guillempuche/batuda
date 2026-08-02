@@ -18,6 +18,11 @@ import {
 	splitCompanyChannelFields,
 	writeChannels,
 } from './channels'
+import {
+	findIndustryByName,
+	industryForWrite,
+	withIndustry,
+} from './company-industries'
 import { researchProvenance } from './research-provenance'
 
 export interface CompanyFilters {
@@ -76,8 +81,18 @@ export class CompanyService extends Context.Service<CompanyService>()(
 						if (filters.status) conditions.push(sql`status = ${filters.status}`)
 						if (filters.country)
 							conditions.push(sql`country = ${filters.country}`)
-						if (filters.industry)
-							conditions.push(sql`industry = ${filters.industry}`)
+						if (filters.industry) {
+							const trade = yield* findIndustryByName(
+								sql,
+								currentOrg.id,
+								filters.industry,
+							)
+							conditions.push(
+								trade === undefined
+									? sql`false`
+									: sql`industry_id = ${trade.id}`,
+							)
+						}
 						if (filters.priority)
 							conditions.push(sql`priority = ${filters.priority}`)
 						// 'none' narrows to unassigned leads; any other value matches one owner.
@@ -221,8 +236,19 @@ export class CompanyService extends Context.Service<CompanyService>()(
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
 						const split = splitCompanyChannelFields(data)
+						// The trade a caller named becomes an entry in the organisation's
+						// own list, so its name and the entry it points at are written
+						// together and can never disagree.
+						const columns = withIndustry(
+							split.columns,
+							yield* industryForWrite(
+								sql,
+								currentOrg.id,
+								split.columns['industry'],
+							),
+						)
 						const rows =
-							yield* sql`INSERT INTO companies ${sql.insert({ ...split.columns, organizationId: currentOrg.id })} RETURNING *`
+							yield* sql`INSERT INTO companies ${sql.insert({ ...columns, organizationId: currentOrg.id })} RETURNING *`
 						const row = rows[0]
 						if (row !== undefined && split.channels.length > 0) {
 							yield* writeChannels(
@@ -282,8 +308,19 @@ export class CompanyService extends Context.Service<CompanyService>()(
 								}
 							}
 							const split = splitCompanyChannelFields(data)
+							// The trade a caller named becomes an entry in the organisation's
+							// own list, so its name and the entry it points at are written
+							// together and can never disagree.
+							const columns = withIndustry(
+								split.columns,
+								yield* industryForWrite(
+									sql,
+									currentOrg.id,
+									split.columns['industry'],
+								),
+							)
 							const rows = yield* sql`
-								INSERT INTO companies ${sql.insert({ ...split.columns, organizationId: currentOrg.id })}
+								INSERT INTO companies ${sql.insert({ ...columns, organizationId: currentOrg.id })}
 								ON CONFLICT (organization_id, slug) DO NOTHING
 								RETURNING *
 							`
@@ -314,6 +351,17 @@ export class CompanyService extends Context.Service<CompanyService>()(
 						// that somebody changed the row while the run was thinking, so its findings
 						// can never quietly overwrite a person's edit.
 						const split = splitCompanyChannelFields(data)
+						// The trade a caller named becomes an entry in the organisation's
+						// own list, so its name and the entry it points at are written
+						// together and can never disagree.
+						const columns = withIndustry(
+							split.columns,
+							yield* industryForWrite(
+								sql,
+								currentOrg.id,
+								split.columns['industry'],
+							),
+						)
 						if (split.channels.length > 0) {
 							yield* writeChannels(
 								sql,
@@ -323,7 +371,7 @@ export class CompanyService extends Context.Service<CompanyService>()(
 							)
 						}
 						const rows = yield* sql`
-							UPDATE companies SET ${sql.update({ ...split.columns, updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) })},
+							UPDATE companies SET ${sql.update({ ...columns, updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) })},
 								version = version + 1
 							WHERE id = ${id} AND organization_id = ${currentOrg.id}
 							RETURNING *
