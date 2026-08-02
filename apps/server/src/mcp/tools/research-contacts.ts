@@ -12,13 +12,14 @@ import {
 
 import { EnvVars } from '../../lib/env'
 import { detachFromTransaction } from '../../middleware/org'
+import { canElicit } from './_elicit'
 import { redactDbErrors } from './_research-shared'
 
 // ── discover_contacts ──
 
 const DiscoverContacts = Tool.make('discover_contacts', {
 	description:
-		'Find decision-maker contacts for a company. Returns ranked candidates, each with a buying_role saying what part they play in a purchase (economic_buyer holds the budget, champion argues for it inside, gatekeeper controls access, technical_evaluator judges whether it works, user lives with it; null when the title does not say) and, where an address was found, a deliverability verdict (email_verification) — or an explicit no_reliable_contact result, never an unverified blast list. Pass domain:null for a company with no website at all (a market stall, a family workshop, a jobbing builder): no address can be guessed and no enrichment vendor is paid, so what comes back is names and job titles from the national registry, which is still worth having — say plainly that those people have no address rather than implying one. Result is one of: {status:"ok", contacts:[...]}, {status:"no_reliable_contact"}, {status:"budget_exceeded"}, or {status:"cancelled"}. An "ok" result may also carry verificationStopped:"monthly_cap_reached", meaning the organization spent its monthly research budget partway through: the contacts are real, but any email_verification of "unknown" was left unchecked for lack of budget rather than checked and found doubtful — say so rather than presenting those addresses as verified. Paid lookups are metered against the research budget; spend above the auto-approve threshold asks for confirmation first.',
+		'Find decision-maker contacts for a company. Returns ranked candidates, each with a buying_role saying what part they play in a purchase (economic_buyer holds the budget, champion argues for it inside, gatekeeper controls access, technical_evaluator judges whether it works, user lives with it; null when the title does not say) and, where an address was found, a deliverability verdict (email_verification) — or an explicit no_reliable_contact result, never an unverified blast list. Pass domain:null for a company with no website at all (a market stall, a family workshop, a jobbing builder): no address can be guessed and no enrichment vendor is paid, so what comes back is names and job titles from the national registry, which is still worth having — say plainly that those people have no address rather than implying one. Result is one of: {status:"ok", contacts:[...]}, {status:"no_reliable_contact"}, {status:"budget_exceeded"}, {status:"cancelled"} (somebody was asked to approve the spending and said no), or {status:"confirmation_required"} (the spending needs approval and this client has no way to ask for it — the result carries the estimate, the current limit and what to do about it; relay that instead of retrying, since retrying gives the same answer). An "ok" result may also carry verificationStopped:"monthly_cap_reached", meaning the organization spent its monthly research budget partway through: the contacts are real, but any email_verification of "unknown" was left unchecked for lack of budget rather than checked and found doubtful — say so rather than presenting those addresses as verified. Paid lookups are metered against the research budget; spend above the auto-approve threshold asks for confirmation first.',
 	parameters: Schema.Struct({
 		company_name: Schema.String,
 		// Required + nullable, never optional: a nullable field inside `optionalKey`
@@ -64,6 +65,18 @@ export const ResearchContactsHandlersLive = ResearchContactsTools.toLayer(
 					// Confirm before spending above the caller's auto-approve limit.
 					const policy = yield* resolvePolicy({ sql, userId, systemDefaults })
 					if (estimateDiscoverCostCents > policy.autoApprovePaidCents) {
+						// A client with no way to put the question is not somebody
+						// saying no. Say what the spending would be and how to allow
+						// it, so the lookup can still be had — reading the refusal as a
+						// decision left this unapprovable from any client that cannot ask.
+						if (!(yield* canElicit)) {
+							return {
+								status: 'confirmation_required' as const,
+								estimatedCostCents: estimateDiscoverCostCents,
+								autoApproveLimitCents: policy.autoApprovePaidCents,
+								nextStep: `This lookup may spend up to ~${estimateDiscoverCostCents}¢, above your auto-approve limit of ${policy.autoApprovePaidCents}¢, and this client has no way to ask you to approve it. Say the amount out loud to whoever is reading, and if they agree, raise the limit with research_policy(action:"set", auto_approve_paid_cents:${estimateDiscoverCostCents}) — or from Research budget under organization settings — then ask again.`,
+							}
+						}
 						const { confirm } = yield* McpServer.elicit({
 							// A company with no website is named on its own — writing the
 							// domain in regardless would put the word "null" in front of

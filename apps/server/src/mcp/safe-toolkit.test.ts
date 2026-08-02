@@ -15,13 +15,22 @@
 import { createServer } from 'node:http'
 
 import { NodeHttpServer } from '@effect/platform-node'
-import { Effect, Layer, Logger, ManagedRuntime, Schema } from 'effect'
+import {
+	Effect,
+	Exit,
+	Layer,
+	Logger,
+	ManagedRuntime,
+	References,
+	Schema,
+} from 'effect'
 import { McpServer, Tool, Toolkit } from 'effect/unstable/ai'
 import { HttpRouter, HttpServer } from 'effect/unstable/http'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
 	clientFacingMessage,
+	isExpectedFailure,
 	mcpToolkitSafe,
 	toStructuredContent,
 } from './safe-toolkit'
@@ -122,6 +131,57 @@ describe('clientFacingMessage', () => {
 	})
 })
 
+describe('isExpectedFailure', () => {
+	const causeOf = (effect: Effect.Effect<never, unknown>) => {
+		const exit = Effect.runSyncExit(effect)
+		if (!Exit.isFailure(exit)) throw new Error('expected the effect to fail')
+		return exit.cause
+	}
+
+	describe('when the tool said what it could not do', () => {
+		it('should call it an expected answer', () => {
+			// GIVEN a tool that stopped with wording written for the caller — the
+			// shape every "no such thing" answer has
+			// WHEN deciding whether it went wrong
+			// THEN it did not
+			expect(
+				isExpectedFailure(
+					causeOf(Effect.die(new ToolMessage('No EmailDraft with id d_1.'))),
+				),
+			).toBe(true)
+		})
+	})
+
+	describe('when something inside the server broke', () => {
+		it('should call an internal fault unexpected', () => {
+			// GIVEN a fault nobody wrote for the caller
+			// WHEN deciding whether it went wrong
+			// THEN it did
+			expect(
+				isExpectedFailure(causeOf(Effect.die(new Error('connection reset')))),
+			).toBe(false)
+		})
+
+		it('should call a bare string unexpected', () => {
+			// GIVEN a fault that is not even an error object
+			// WHEN deciding whether it went wrong
+			// THEN it did — only a marked failure counts as expected
+			expect(isExpectedFailure(causeOf(Effect.die('raw postgres text')))).toBe(
+				false,
+			)
+		})
+
+		it('should call an ordinary failure unexpected', () => {
+			// GIVEN a tool that failed rather than stopping deliberately
+			// WHEN deciding whether it went wrong
+			// THEN it did
+			expect(
+				isExpectedFailure(causeOf(Effect.fail(new Error('query timed out')))),
+			).toBe(false)
+		})
+	})
+})
+
 // Tools covering the shapes the bridge must normalize — a list (bare array), a
 // miss (null), an already-valid record — and the two failure kinds: one worded
 // for the caller, one an internal fault naming a bundle path.
@@ -155,7 +215,8 @@ const SafeHandlersLive = SafeTools.toLayer(
 )
 
 // Every log the server writes while a test runs, so a failure the caller never
-// sees can still be shown to have been recorded.
+// sees can still be shown to have been recorded. Debug lines are kept too, or
+// the difference between a fault and an ordinary answer could not be seen.
 const logged: Array<{ level: string; text: string }> = []
 const CaptureLogs = Logger.layer([
 	Logger.make(options => {
@@ -164,7 +225,7 @@ const CaptureLogs = Logger.layer([
 			text: `${JSON.stringify(options.message)} ${String(options.cause ?? '')}`,
 		})
 	}),
-])
+]).pipe(Layer.provideMerge(Layer.succeed(References.MinimumLogLevel, 'Debug')))
 
 const McpHttpLive = mcpToolkitSafe(SafeTools).pipe(
 	Layer.provide(SafeHandlersLive),
@@ -300,6 +361,27 @@ describe('a tool served through mcpToolkitSafe', () => {
 			// it, and without it the caller cannot tell what to send instead
 			expect(reply.result?.isError).toBe(true)
 			expect(reply.result?.content?.[0]?.text).toBe(
+				'footer_id is required to update a footer',
+			)
+		})
+
+		it('should not record it as something that went wrong', async () => {
+			logged.length = 0
+
+			// WHEN the client calls a tool that answers with a stated reason —
+			// "no draft with that id" is what most of these say, and there are
+			// far more of those than there are faults
+			await readReply(await callTool('speaking_thing'))
+
+			// THEN nothing lands in the error log: the tool did what it was asked
+			// and said so, and filing that as a fault buries the real ones
+			expect(logged.filter(entry => entry.level === 'Error')).toEqual([])
+
+			// AND it is still written down, named by the tool it came from, so it
+			// can be found when somebody goes looking
+			const debug = logged.filter(entry => entry.level === 'Debug')
+			expect(debug.length).toBeGreaterThan(0)
+			expect(debug.map(entry => entry.text).join('\n')).toContain(
 				'footer_id is required to update a footer',
 			)
 		})

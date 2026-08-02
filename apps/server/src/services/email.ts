@@ -51,6 +51,7 @@ import { CalendarService } from './calendar.js'
 import { CredentialCrypto } from './credential-crypto.js'
 import type { ResolvedStaging, StagingRef } from './email-attachment-staging.js'
 import { EmailAttachmentStaging } from './email-attachment-staging.js'
+import type { DraftRow } from './email-draft-store.js'
 import { DraftStore } from './email-draft-store.js'
 import type { SendAttachmentInput } from './email-provider.js'
 import { EmailProvider } from './email-provider.js'
@@ -559,15 +560,30 @@ export class EmailService extends Context.Service<EmailService>()(
 				role: string | null,
 			) => isOrgManager(role) || inbox.ownerUserId === userId
 
+			// Read a half-written message, if the caller may reach it at all.
 			// Gated on the draft's own mailbox, not whichever one the caller
 			// names — a half-written message is as private as a sent one.
-			const assertDraftReachable = (
-				draftInboxId: string,
+			//
+			// Both refusals are the same answer, and the mailbox lookup runs
+			// either way so they also take the same time: leaving it out when
+			// nothing turned up made "no such draft" the quicker of the two, and
+			// how long an answer takes would then say which it was.
+			const reachableDraft = (
+				namedInboxId: string,
 				draftId: string,
-			): Effect.Effect<void, NotFound, CurrentOrg | SessionContext> =>
+			): Effect.Effect<DraftRow, NotFound, CurrentOrg | SessionContext> =>
 				Effect.gen(function* () {
-					if (yield* resolveInbox(draftInboxId)) return
-					return yield* new NotFound({ entity: 'EmailDraft', id: draftId })
+					const draft = yield* drafts
+						.get(draftId)
+						.pipe(Effect.catchTag('NotFound', () => Effect.succeed(null)))
+					const reachable = yield* resolveInbox(draft?.inboxId ?? namedInboxId)
+					if (draft === null || reachable === null) {
+						// The draft's own mailbox id must never appear here. It is the
+						// id of somebody else's private mailbox, and naming it would
+						// hand one person the whereabouts of another's mail.
+						return yield* new NotFound({ entity: 'EmailDraft', id: draftId })
+					}
+					return draft
 				})
 
 			// Mailboxes out of the caller's reach read as absent rather than
@@ -2549,8 +2565,7 @@ export class EmailService extends Context.Service<EmailService>()(
 						if (!inbox) {
 							return yield* new NotFound({ entity: 'Inbox', id: inboxId })
 						}
-						const existing = yield* drafts.get(draftId)
-						yield* assertDraftReachable(existing.inboxId, draftId)
+						yield* reachableDraft(inboxId, draftId)
 						const updated = yield* drafts.update(draftId, {
 							...(params.to !== undefined && {
 								to: toRecipientArray(params.to) ?? [],
@@ -2577,8 +2592,7 @@ export class EmailService extends Context.Service<EmailService>()(
 						if (!inbox) {
 							return yield* new NotFound({ entity: 'Inbox', id: inboxId })
 						}
-						const existing = yield* drafts.get(draftId)
-						yield* assertDraftReachable(existing.inboxId, draftId)
+						yield* reachableDraft(inboxId, draftId)
 						yield* staging.sweepForDraft(draftId).pipe(Effect.ignore)
 						yield* drafts.remove(draftId)
 					}),
@@ -2589,8 +2603,7 @@ export class EmailService extends Context.Service<EmailService>()(
 						if (!inbox) {
 							return yield* new NotFound({ entity: 'Inbox', id: inboxId })
 						}
-						const draft = yield* drafts.get(draftId)
-						yield* assertDraftReachable(draft.inboxId, draftId)
+						const draft = yield* reachableDraft(inboxId, draftId)
 						return yield* decodeDraft(draftRowToProviderShape(draft)).pipe(
 							Effect.orDie,
 						)
@@ -2657,8 +2670,7 @@ export class EmailService extends Context.Service<EmailService>()(
 						}
 						yield* assertInboxUsable(inbox)
 
-						const draft = yield* drafts.get(draftId)
-						yield* assertDraftReachable(draft.inboxId, draftId)
+						const draft = yield* reachableDraft(inboxId, draftId)
 						const ctx = parseClientId(draft.clientId ?? undefined)
 
 						yield* assertRecipientsNotSuppressed(draft.toAddresses as string[])

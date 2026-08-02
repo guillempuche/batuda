@@ -268,7 +268,7 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 				.handle('deleteInbox', _ =>
 					svc.deleteInbox(_.params.id).pipe(
 						Effect.map(() => undefined as void),
-						Effect.catchTag('NotFound', e => Effect.die(e)),
+						Effect.catchTag('NotFound', e => Effect.fail(e)),
 						Effect.catchTag('SqlError', e => Effect.die(e)),
 					),
 				)
@@ -319,7 +319,11 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 								}),
 							},
 						)
-						.pipe(Effect.orDie),
+						.pipe(
+							Effect.catch(e =>
+								e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
+							),
+						),
 				)
 				.handle('listDrafts', _ =>
 					svc
@@ -332,7 +336,13 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 						.pipe(Effect.orDie),
 				)
 				.handle('getDraft', _ =>
-					svc.getDraft(_.query.inboxId, _.params.draftId).pipe(Effect.orDie),
+					svc
+						.getDraft(_.query.inboxId, _.params.draftId)
+						.pipe(
+							Effect.catch(e =>
+								e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
+							),
+						),
 				)
 				.handle('updateDraft', _ =>
 					svc
@@ -352,17 +362,27 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 								bodyJson: _.payload.bodyJson,
 							}),
 						})
-						.pipe(Effect.orDie),
+						.pipe(
+							Effect.catch(e =>
+								e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
+							),
+						),
 				)
 				.handle('deleteDraft', _ =>
-					svc.deleteDraft(_.query.inboxId, _.params.draftId).pipe(Effect.orDie),
+					svc
+						.deleteDraft(_.query.inboxId, _.params.draftId)
+						.pipe(
+							Effect.catch(e =>
+								e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
+							),
+						),
 				)
 				.handle('sendDraft', _ =>
 					svc.sendDraft(_.payload.inboxId, _.params.draftId).pipe(
 						Effect.catchTags({
 							EmailError: e =>
 								Effect.fail(new BadRequest({ message: e.message })),
-							NotFound: e => Effect.die(e),
+							NotFound: e => Effect.fail(e),
 							InboxInactive: e => Effect.die(e),
 							GrantUnavailable: e => Effect.die(e),
 							BadRequest: e => Effect.die(e),

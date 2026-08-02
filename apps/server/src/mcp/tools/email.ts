@@ -18,6 +18,7 @@ import {
 	type StagingRef,
 } from '../../services/email-attachment-staging'
 import { ToolMessage } from '../tool-message'
+import { canElicit } from './_elicit'
 import {
 	ListResult,
 	McpPageLimit,
@@ -60,6 +61,17 @@ const toStagingRefs = (
 // ── Shared result schemas ────────────────────────────────────────
 // Keeping these narrow (discriminated unions, explicit enums) so AI
 // consumers can pattern-match results without re-parsing free text.
+//
+// One rule runs through the tools below: a read answers with nothing when there
+// is nothing to answer with, and an action says what it could not find. So the
+// reads declare `Schema.NullOr` and the actions raise `dieNotFound`.
+//
+// Answering with nothing is safe here because of ../safe-toolkit.ts, whose
+// `toStructuredContent` leaves structured output off entirely for a null; the
+// library it stands in for would ship `structuredContent: null`, which strict
+// clients reject and which makes the whole tool disappear from view. That file
+// says to re-sync it on an upgrade — the reads here are part of what depends
+// on it.
 
 const SendEmailResult = Schema.Union([
 	Schema.Struct({
@@ -73,8 +85,10 @@ const SendEmailResult = Schema.Union([
 		recipient: Schema.String,
 		reason: Schema.NullOr(Schema.String),
 	}),
-	// Soft, agent-only: the agent declined the confirmation prompt for a risky
-	// address or an over-cap thread. Nothing was sent.
+	// Soft, agent-only: a risky address or an over-cap thread asked for
+	// confirmation and did not get it — either the answer was no, or this
+	// client has no way to put the question. Nothing was sent, and the reason
+	// says which.
 	Schema.Struct({
 		_tag: Schema.Literal('cancelled'),
 		reason: Schema.String,
@@ -199,11 +213,11 @@ const ListEmailThreads = Tool.make('list_email_threads', {
 
 const GetEmailThread = Tool.make('get_email_thread', {
 	description:
-		'Get a full email thread with all messages from the provider. Each message is enriched with deliverability state (status, bounce_type) from email_messages.',
+		'Get a full email thread with all messages from the provider. Each message is enriched with deliverability state (status, bounce_type) from email_messages. Returns null when no such thread exists in the active organization.',
 	parameters: Schema.Struct({
 		thread_id: Schema.String,
 	}),
-	success: EmailThreadDetail,
+	success: Schema.NullOr(EmailThreadDetail),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Get Email Thread')
@@ -278,11 +292,11 @@ const ListEmailMessages = Tool.make('list_email_messages', {
 
 const GetEmailMessage = Tool.make('get_email_message', {
 	description:
-		'Get a single per-message deliverability record by id. Returns status, recipient, subject, error, timestamps — the full audit row for one outbound send.',
+		'Get a single per-message deliverability record by id. Returns status, recipient, subject, error, timestamps — the full audit row for one outbound send. Returns null when no such record exists in the active organization.',
 	parameters: Schema.Struct({
 		message_id: Schema.String,
 	}),
-	success: EmailMessageRecord,
+	success: Schema.NullOr(EmailMessageRecord),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Get Email Message')
@@ -292,17 +306,22 @@ const GetEmailMessage = Tool.make('get_email_message', {
 
 const DownloadEmailAttachment = Tool.make('download_email_attachment', {
 	description:
-		'Download an attachment from a received email message as base64. Returns { filename, content_type, base64, size }. The provider stream is collected into memory — use sparingly for large files (the HTTP transport stays canonical for big transfers).',
+		'Download an attachment from a received email message as base64. Returns { filename, content_type, base64, size }, or null when no such message or attachment exists. The provider stream is collected into memory — use sparingly for large files (the HTTP transport stays canonical for big transfers).',
 	parameters: Schema.Struct({
 		message_id: Schema.String,
 		attachment_id: Schema.String,
 	}),
-	success: Schema.Struct({
-		filename: Schema.NullOr(Schema.String),
-		content_type: Schema.String,
-		base64: Schema.String,
-		size: Schema.optional(Schema.Number),
-	}),
+	success: Schema.NullOr(
+		Schema.Struct({
+			filename: Schema.NullOr(Schema.String),
+			content_type: Schema.String,
+			base64: Schema.String,
+			// Finite rather than plain Number: a byte count is never infinite, and
+			// a plain number also publishes the words "Infinity" and "NaN" as a
+			// second choice inside this one, which some providers refuse to read.
+			size: Schema.optional(Schema.Finite),
+		}),
+	),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Download Email Attachment')
@@ -449,7 +468,7 @@ const GetEmailDraft = Tool.make('get_email_draft', {
 		inbox_id: Schema.String,
 		draft_id: Schema.String,
 	}),
-	success: EmailDraft.json,
+	success: Schema.NullOr(EmailDraft.json),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Get Email Draft')
@@ -515,6 +534,11 @@ const dieMissing = (message: string) => Effect.die(new ToolMessage(message))
 // — and "no such row" is the honest answer to both.
 const dieNotFound = (error: { entity: string; id: string }) =>
 	Effect.die(new ToolMessage(`No ${error.entity} with id ${error.id}.`))
+
+// The read half of the same rule: nothing to answer with is answered with
+// nothing. Used where a row's absence is a normal answer rather than a reason
+// the caller's request could not be carried out.
+const asNothing = () => Effect.succeed(null)
 
 export const EmailTools = Toolkit.make(
 	SendEmail,
@@ -595,17 +619,34 @@ export const EmailHandlersLive = EmailTools.toLayer(
 				return { count: counts[0]?.n ?? 0, contactId: link.contactId }
 			})
 
-		// Ask the agent to confirm; declining (or no human to answer) aborts.
+		// Ask the agent to confirm. Nothing is sent unless the answer is yes, but
+		// the three answers are kept apart: a client that cannot show a question
+		// is not somebody saying no, and the caller is told which it was.
 		const confirmSend = (reason: string) =>
-			McpServer.elicit({
-				message: `${reason}. Send anyway?`,
-				schema: Schema.Struct({ confirm: Schema.Literals(['yes', 'no']) }),
-			}).pipe(
-				Effect.catchTag('ElicitationDeclined', () =>
-					Effect.succeed({ confirm: 'no' as const }),
-				),
-				Effect.map(r => r.confirm === 'yes'),
-			)
+			Effect.gen(function* () {
+				if (!(yield* canElicit)) return 'unaskable' as const
+				const { confirm } = yield* McpServer.elicit({
+					message: `${reason}. Send anyway?`,
+					schema: Schema.Struct({ confirm: Schema.Literals(['yes', 'no']) }),
+				}).pipe(
+					Effect.catchTag('ElicitationDeclined', () =>
+						Effect.succeed({ confirm: 'no' as const }),
+					),
+				)
+				return confirm === 'yes'
+					? ('confirmed' as const)
+					: ('declined' as const)
+			})
+
+		// Why nothing was sent, in the caller's words. A client with no way to ask
+		// says so, rather than reporting a refusal nobody gave.
+		const notSentReason = (
+			answer: 'declined' | 'unaskable',
+			reasons: string,
+		): string =>
+			answer === 'unaskable'
+				? `this client cannot ask anyone to confirm, and ${reasons}`
+				: reasons
 
 		return {
 			send_email: params =>
@@ -614,13 +655,13 @@ export const EmailHandlersLive = EmailTools.toLayer(
 					if (params.contact_id) {
 						const risky = yield* riskyEmailVerdict(params.contact_id)
 						if (risky) {
-							const ok = yield* confirmSend(
+							const answer = yield* confirmSend(
 								`This contact's email is not confirmed deliverable (verification: ${risky})`,
 							)
-							if (!ok) {
+							if (answer !== 'confirmed') {
 								return {
 									_tag: 'cancelled' as const,
-									reason: `email verification: ${risky}`,
+									reason: notSentReason(answer, `email verification: ${risky}`),
 								}
 							}
 						}
@@ -690,9 +731,12 @@ export const EmailHandlersLive = EmailTools.toLayer(
 						)
 					}
 					if (reasons.length > 0) {
-						const ok = yield* confirmSend(`Heads up: ${reasons.join('; ')}`)
-						if (!ok) {
-							return { _tag: 'cancelled' as const, reason: reasons.join('; ') }
+						const answer = yield* confirmSend(`Heads up: ${reasons.join('; ')}`)
+						if (answer !== 'confirmed') {
+							return {
+								_tag: 'cancelled' as const,
+								reason: notSentReason(answer, reasons.join('; ')),
+							}
 						}
 					}
 					return yield* svc
@@ -763,7 +807,9 @@ export const EmailHandlersLive = EmailTools.toLayer(
 					})
 					.pipe(Effect.orDie, Effect.map(toPage)),
 			get_email_thread: ({ thread_id }) =>
-				svc.getThread(thread_id).pipe(Effect.orDie),
+				svc
+					.getThread(thread_id)
+					.pipe(Effect.catchTag('NotFound', asNothing), Effect.orDie),
 			update_email_thread_status: ({ thread_id, status }) =>
 				svc.updateThreadStatus(thread_id, status).pipe(
 					Effect.map(r => ({
@@ -797,12 +843,15 @@ export const EmailHandlersLive = EmailTools.toLayer(
 					})
 					.pipe(Effect.orDie, Effect.map(toPage)),
 			get_email_message: ({ message_id }) =>
-				svc.getMessage(message_id).pipe(Effect.orDie),
+				svc
+					.getMessage(message_id)
+					.pipe(Effect.catchTag('NotFound', asNothing), Effect.orDie),
 			download_email_attachment: ({ message_id, attachment_id }) =>
 				Effect.gen(function* () {
 					const piped = yield* svc
 						.streamAttachment(message_id, attachment_id)
-						.pipe(Effect.orDie)
+						.pipe(Effect.catchTag('NotFound', asNothing), Effect.orDie)
+					if (piped === null) return null
 					const chunks: Uint8Array[] = []
 					yield* Effect.tryPromise({
 						try: async () => {
@@ -1037,13 +1086,13 @@ export const EmailHandlersLive = EmailTools.toLayer(
 									}),
 								},
 							)
-							.pipe(Effect.orDie)
+							.pipe(Effect.catchTag('NotFound', dieNotFound), Effect.orDie)
 					case 'update':
 						if (params.draft_id === undefined)
 							return dieMissing('draft_id is required to update a draft')
 						return svc
 							.updateDraft(params.inbox_id, params.draft_id, fields)
-							.pipe(Effect.orDie)
+							.pipe(Effect.catchTag('NotFound', dieNotFound), Effect.orDie)
 					case 'send':
 						if (params.draft_id === undefined)
 							return dieMissing('draft_id is required to send a draft')
@@ -1061,6 +1110,7 @@ export const EmailHandlersLive = EmailTools.toLayer(
 									reason: e.reason,
 								}),
 							),
+							Effect.catchTag('NotFound', dieNotFound),
 							Effect.orDie,
 						)
 					case 'delete':
@@ -1068,15 +1118,24 @@ export const EmailHandlersLive = EmailTools.toLayer(
 							return dieMissing('draft_id is required to delete a draft')
 						return svc
 							.deleteDraft(params.inbox_id, params.draft_id)
-							.pipe(Effect.orDie, Effect.as({ _tag: 'deleted' as const }))
+							.pipe(
+								Effect.catchTag('NotFound', dieNotFound),
+								Effect.orDie,
+								Effect.as({ _tag: 'deleted' as const }),
+							)
 				}
 			},
 			list_email_drafts: params =>
 				svc
 					.listDrafts(params.inbox_id, params.limit, params.offset)
 					.pipe(Effect.orDie, Effect.map(toPage)),
+			// Both answers this can give — no such draft, and a draft in a mailbox
+			// the caller may not act through — are a draft they cannot see, so both
+			// read as nothing, the same way listing an unreachable mailbox does.
 			get_email_draft: ({ inbox_id, draft_id }) =>
-				svc.getDraft(inbox_id, draft_id).pipe(Effect.orDie),
+				svc
+					.getDraft(inbox_id, draft_id)
+					.pipe(Effect.catchTag('NotFound', asNothing), Effect.orDie),
 			manage_inbox_footer: params => {
 				switch (params.action) {
 					case 'list':
@@ -1086,7 +1145,9 @@ export const EmailHandlersLive = EmailTools.toLayer(
 					case 'get':
 						if (params.footer_id === undefined)
 							return dieMissing('footer_id is required to get a footer')
-						return svc.getFooter(params.footer_id).pipe(Effect.orDie)
+						return svc
+							.getFooter(params.footer_id)
+							.pipe(Effect.catchTag('NotFound', dieNotFound), Effect.orDie)
 					case 'create':
 						if (
 							params.inbox_id === undefined ||
@@ -1105,7 +1166,7 @@ export const EmailHandlersLive = EmailTools.toLayer(
 									isDefault: params.is_default,
 								}),
 							})
-							.pipe(Effect.orDie)
+							.pipe(Effect.catchTag('NotFound', dieNotFound), Effect.orDie)
 					case 'update':
 						if (params.footer_id === undefined)
 							return dieMissing('footer_id is required to update a footer')

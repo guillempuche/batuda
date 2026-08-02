@@ -1,4 +1,4 @@
-import { Context, Effect, Layer, Option, Sink, Stream } from 'effect'
+import { Cause, Context, Effect, Layer, Option, Sink, Stream } from 'effect'
 import {
 	AiError,
 	McpSchema,
@@ -41,6 +41,13 @@ export const toStructuredContent = (
 // them is an internal fault whose text nobody vetted — a database error arrives
 // carrying table names and Postgres phrasing.
 const INTERNAL_FAILURE = 'The tool failed because of an internal server error.'
+
+// Whether a failure is one the tool meant to give. "No EmailDraft with id …"
+// is an answer, not a fault: the caller asked about something that is not
+// there and was told so. Recording those as errors buries the faults nobody
+// expected among hundreds of ordinary answers.
+export const isExpectedFailure = (cause: Cause.Cause<unknown>): boolean =>
+	isToolMessage(Cause.squash(cause))
 
 export const clientFacingMessage = (error: unknown): string => {
 	if (isToolMessage(error)) return error.message
@@ -117,11 +124,14 @@ const registerToolkitSafe = <Tools extends Record<string, Tool.Any>>(
 								],
 							})
 						}),
-						// Named, so one line says which tool failed.
+						// Named, so one line says which tool failed. A failure the tool
+						// meant to give is written at debug instead, so the error log
+						// keeps holding only what nobody expected.
 						Effect.tapCause(cause =>
-							Effect.logError(cause).pipe(
-								Effect.annotateLogs({ 'mcp.tool': tool.name }),
-							),
+							(isExpectedFailure(cause)
+								? Effect.logDebug(cause)
+								: Effect.logError(cause)
+							).pipe(Effect.annotateLogs({ 'mcp.tool': tool.name })),
 						),
 						Effect.catch(error =>
 							Effect.succeed(

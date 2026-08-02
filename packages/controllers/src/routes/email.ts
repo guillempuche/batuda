@@ -460,6 +460,8 @@ export const EmailGroup = HttpApiGroup.make('email')
 				threadLinkId: Schema.optional(Schema.String),
 			}),
 			success: EmailDraft.json,
+			// A mailbox the caller may not send through answers as absent.
+			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.add(
@@ -476,6 +478,9 @@ export const EmailGroup = HttpApiGroup.make('email')
 			params: { draftId: Schema.String },
 			query: { inboxId: Schema.String },
 			success: EmailDraft.json,
+			// A draft in a mailbox the caller may not send through answers as
+			// absent, exactly as one that never existed does.
+			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.add(
@@ -490,6 +495,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 				bodyJson: Schema.optional(EmailBlocks),
 			}),
 			success: EmailDraft.json,
+			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.add(
@@ -497,6 +503,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 			params: { draftId: Schema.String },
 			query: { inboxId: Schema.String },
 			success: Schema.Void,
+			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.add(
@@ -512,6 +519,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 			error: [
 				EmailSuppressed.pipe(HttpApiSchema.status(409)),
 				BadRequest.pipe(HttpApiSchema.status(400)),
+				NotFound.pipe(HttpApiSchema.status(404)),
 			],
 		}),
 	)

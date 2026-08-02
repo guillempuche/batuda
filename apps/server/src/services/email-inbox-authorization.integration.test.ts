@@ -202,6 +202,25 @@ const insertDraft = (inboxId: string) =>
 const runPlain = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
 	Effect.runPromise(effect.pipe(Effect.provide(PgLive)))
 
+// One way of reaching into a mailbox for a single half-written message, named
+// by the mailbox the caller asks with and the message they ask for.
+type ReachIn = (
+	inboxId: string,
+	draftId: string,
+) => Effect.Effect<
+	unknown,
+	unknown,
+	EmailService | SqlClient.SqlClient | CurrentOrg | SessionContext
+>
+
+// Everything a refusal says apart from the id, which is only ever the one the
+// caller supplied and so is theirs already.
+const withoutId = (failure: unknown): Record<string, unknown> => {
+	const said = { ...(failure as Record<string, unknown>) }
+	delete said['id']
+	return said
+}
+
 // Read back the two things a handover settles, without going through the
 // service that performed it.
 const readOwnership = (inboxId: string) =>
@@ -497,6 +516,102 @@ describe('who may reach a mailbox', () => {
 				Exit.isSuccess(exit) ? (exit.value as { _tag: string })._tag : null,
 			).toBe('NotFound')
 		})
+
+		// Every way of reaching into a mailbox for one half-written message.
+		// Adding a fifth is one line.
+		const reachingIn: ReadonlyArray<readonly [string, ReachIn]> = [
+			[
+				'reading it',
+				(inboxId, draftId) =>
+					Effect.gen(function* () {
+						const svc = yield* EmailService
+						return yield* svc.getDraft(inboxId, draftId)
+					}),
+			],
+			[
+				'changing it',
+				(inboxId, draftId) =>
+					Effect.gen(function* () {
+						const svc = yield* EmailService
+						return yield* svc.updateDraft(inboxId, draftId, {
+							subject: 'read by somebody else',
+						})
+					}),
+			],
+			[
+				'throwing it away',
+				(inboxId, draftId) =>
+					Effect.gen(function* () {
+						const svc = yield* EmailService
+						return yield* svc.deleteDraft(inboxId, draftId)
+					}),
+			],
+			[
+				'sending it',
+				(inboxId, draftId) =>
+					Effect.gen(function* () {
+						const svc = yield* EmailService
+						return yield* svc.sendDraft(inboxId, draftId)
+					}),
+			],
+		]
+
+		for (const [what, reach] of reachingIn) {
+			it(`should answer ${what} exactly as it answers about one that was never written`, async () => {
+				// GIVEN a draft sitting in Bob's mailbox, and Alice with her own
+				const bobInbox = await runPlain(
+					insertInbox({
+						email: `bob-${what.replace(/\s+/g, '-')}@test.local`,
+						ownerUserId: BOB,
+					}),
+				)
+				const aliceInbox = await runPlain(
+					insertInbox({
+						email: `alice-${what.replace(/\s+/g, '-')}@test.local`,
+						ownerUserId: ALICE,
+					}),
+				)
+				const bobDraft = await runPlain(insertDraft(bobInbox))
+
+				// WHEN Alice reaches for Bob's, and then for one that was never
+				// written at all — naming her own mailbox both times
+				const onBobs = await run(
+					Effect.flip(reach(aliceInbox, bobDraft)),
+					ALICE,
+					'member',
+				)
+				const onNothing = await run(
+					Effect.flip(reach(aliceInbox, 'draft_never_written')),
+					ALICE,
+					'member',
+				)
+
+				// THEN both refuse, and word for word they are the same refusal
+				// apart from the id she herself supplied. Anything that told the
+				// two apart would say whether the draft is there, which is the
+				// only thing keeping somebody from finding out what a colleague
+				// is writing
+				expect(Exit.isSuccess(onBobs)).toBe(true)
+				expect(Exit.isSuccess(onNothing)).toBe(true)
+				const bobsAnswer = Exit.isSuccess(onBobs) ? onBobs.value : null
+				const nothingsAnswer = Exit.isSuccess(onNothing)
+					? onNothing.value
+					: null
+				expect(withoutId(bobsAnswer)).toEqual(withoutId(nothingsAnswer))
+
+				// AND that shared answer is "no such draft" rather than some other
+				// refusal both happen to share, which would let this pass while
+				// saying nothing
+				expect(withoutId(bobsAnswer)).toMatchObject({
+					_tag: 'NotFound',
+					entity: 'EmailDraft',
+				})
+
+				// AND nothing in it names the mailbox the draft really sits in,
+				// which is the whereabouts of somebody else's private mail
+				expect(JSON.stringify(bobsAnswer)).not.toContain(bobInbox)
+			})
+		}
 
 		it('should keep it out of the list when no mailbox is named', async () => {
 			// GIVEN a draft in Bob's mailbox and one in Alice's
