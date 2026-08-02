@@ -1,41 +1,115 @@
 import { Schema } from 'effect'
 import { Model } from 'effect/unstable/schema'
 
-import { DbNumber } from './_common'
+import { DbNumberOrNull } from './_common'
+import {
+	EMAIL_ADDRESS_PATTERN,
+	INSTAGRAM_ADDRESS_PATTERN,
+	LINKEDIN_ADDRESS_PATTERN,
+	MAPS_ADDRESS_PATTERN,
+	PHONE_ADDRESS_PATTERN,
+	WEBSITE_ADDRESS_PATTERN,
+} from './channel-address'
 
 export const CompanyId = Schema.String.pipe(Schema.brand('CompanyId'))
 
-// The CRM's fixed vocabularies for a company's classification. The columns stay
-// free text in the database; these are the allowed values the research pipeline
-// maps to and the UI offers. Exported as tuples so both a Schema.Literals and a
-// plain-array membership check read from one source.
-export const COMPANY_INDUSTRIES = [
-	'restaurants',
-	'construction',
-	'retail',
-	'manufacturing',
-	'services',
-	'hospitality',
-	'distribution',
-	'transport',
-	'other',
-] as const
-export const CompanyIndustry = Schema.Literals(COMPANY_INDUSTRIES)
-export type CompanyIndustry = typeof CompanyIndustry.Type
-
+// How many people a company employs, in bands. A fixed set because a band only
+// means something next to the others — unlike a trade, which each organisation
+// names for itself in `company_industries`. Exported as a tuple so both a
+// Schema.Literals and a plain-array membership check read from one source.
+//
+// The bottom is deliberately coarse and the top is not. Splitting a sole trader
+// from a five-person workshop rarely changes how either is sold to, and both are
+// reached the same way — so they share a band. Above a few thousand people the
+// differences are real: who buys, how long it takes, and whether there is a
+// procurement department at all are not the same question at eight thousand as at
+// two hundred thousand, and an organisation selling up there needs to tell them
+// apart.
+//
+// Every boundary below is one the previous, narrower set also had, so a company
+// banded under the old scale lands in exactly one band under this one.
 export const COMPANY_SIZE_RANGES = [
-	'1-5',
-	'6-10',
-	'11-25',
-	'26-50',
+	'1-10',
+	'11-50',
 	'51-200',
 	'201-500',
 	'501-1000',
 	'1001-5000',
-	'5001+',
+	'5001-25000',
+	'25001-100000',
+	'100001+',
 ] as const
 export const CompanySizeRange = Schema.Literals(COMPANY_SIZE_RANGES)
 export type CompanySizeRange = typeof CompanySizeRange.Type
+
+// The stages a company moves through, in the order they are worked. This order is
+// the board's column order and the dashboard's lane order, not just a list of
+// allowed words — reordering it moves the columns. A stage spelled any other way
+// belongs to no column and shows up nowhere, which is why every way in reads from
+// here.
+export const COMPANY_STATUSES = [
+	'prospect',
+	'contacted',
+	'responded',
+	'meeting',
+	'proposal',
+	'client',
+	'closed',
+	'dead',
+] as const
+export const CompanyStatus = Schema.Literals(COMPANY_STATUSES)
+export type CompanyStatus = typeof CompanyStatus.Type
+
+// How warm a lead is: 1 hot, 2 medium, 3 cold. Three bands, because these are the
+// only ones with a name to show and to filter by.
+export const COMPANY_PRIORITIES = [1, 2, 3] as const
+export const CompanyPriority = Schema.Literals(COMPANY_PRIORITIES)
+export type CompanyPriority = typeof CompanyPriority.Type
+
+// The shape each written-in value has to have. They live beside the vocabularies
+// above so every way into a company row checks the same thing, and something that
+// could never be a real address or phone number is turned away where it is typed
+// rather than stored and puzzled over later.
+//
+// These belong on what a caller sends, never on the stored row: a row written
+// before these existed still has to be readable, or every list of companies fails
+// on the first bad value somebody saved months ago.
+export const CompanySlug = Schema.String.pipe(
+	Schema.check(Schema.isPattern(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)),
+)
+export const CompanyCountry = Schema.String.pipe(
+	Schema.check(Schema.isPattern(/^[A-Za-z]{2}$/)),
+)
+// The four ways of reaching a company are the same shapes a person's channels
+// use, read from one place — a company's email and a contact's email are the same
+// question, and answering it twice is how the two doors start disagreeing.
+export const CompanyWebsite = Schema.String.pipe(
+	Schema.check(Schema.isPattern(WEBSITE_ADDRESS_PATTERN)),
+)
+export const CompanyEmail = Schema.String.pipe(
+	Schema.check(Schema.isPattern(EMAIL_ADDRESS_PATTERN)),
+)
+export const CompanyPhone = Schema.String.pipe(
+	Schema.check(Schema.isPattern(PHONE_ADDRESS_PATTERN)),
+)
+export const CompanyInstagram = Schema.String.pipe(
+	Schema.check(Schema.isPattern(INSTAGRAM_ADDRESS_PATTERN)),
+)
+export const CompanyLinkedin = Schema.String.pipe(
+	Schema.check(Schema.isPattern(LINKEDIN_ADDRESS_PATTERN)),
+)
+export const CompanyGoogleMapsUrl = Schema.String.pipe(
+	Schema.check(Schema.isPattern(MAPS_ADDRESS_PATTERN)),
+)
+// Finite rather than a plain number: a plain number also allows the words "NaN"
+// and "Infinity", which no place on Earth has, and which reach the database as a
+// server error instead of a refused value.
+export const CompanyLatitude = Schema.Finite.pipe(
+	Schema.check(Schema.isBetween({ minimum: -90, maximum: 90 })),
+)
+export const CompanyLongitude = Schema.Finite.pipe(
+	Schema.check(Schema.isBetween({ minimum: -180, maximum: 180 })),
+)
 
 export class Company extends Model.Class<Company>('Company')({
 	id: Model.GeneratedByDb(CompanyId),
@@ -65,19 +139,23 @@ export class Company extends Model.Class<Company>('Company')({
 	verifiedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
 	verifiedBy: Schema.NullOr(Schema.String),
 
-	// Classification. Allowed values for industry / size are COMPANY_INDUSTRIES /
-	// COMPANY_SIZE_RANGES above; the columns stay free text (the research vocabulary
-	// guard is the enforcement point) so a manual edit is never decode-rejected.
+	// Classification. `industry` is the web-address form of an entry in the
+	// organisation's own list of trades — kept on the row so a filter and a shared
+	// link need no join, and written only by the trades service, alongside the
+	// entry it points at. That entry's id stays out of here: the readable form is
+	// what a caller should hold on to, and the id is storage.
+	//
+	// Size takes one of COMPANY_SIZE_RANGES. Read back these stay plain strings, so
+	// a row holding an older value is still shown rather than failing to load.
 	// country is the global geographic segment — an ISO 3166-1 alpha-2 code.
 	industry: Schema.NullOr(Schema.String),
 	sizeRange: Schema.NullOr(Schema.String),
 	country: Schema.NullOr(Schema.String),
 	location: Schema.NullOr(Schema.String),
-	source: Schema.NullOr(Schema.String),
-	// values: firecrawl | exa | google_maps | referral
-	//         | linkedin | instagram | manual
-	priority: Schema.NullOr(Schema.Number),
-	// values: 1 (hot) | 2 (medium) | 3 (cold)
+	// Finite for the same reason DbNumber is: a plain number publishes "NaN" and
+	// "Infinity" beside it, which becomes a choice inside a choice here.
+	priority: Schema.NullOr(Schema.Finite),
+	// values: COMPANY_PRIORITIES — 1 (hot) | 2 (medium) | 3 (cold)
 
 	// How to reach the company lives in `channels`, keyed to the company the same
 	// way a person's is keyed to them — so a chain can hold one mailbox per shop
@@ -168,8 +246,8 @@ export class Company extends Model.Class<Company>('Company')({
 	nextCalendarEventAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
 
 	// Geocoded place (optional — populated via Nominatim or seed)
-	latitude: Schema.NullOr(DbNumber),
-	longitude: Schema.NullOr(DbNumber),
+	latitude: DbNumberOrNull,
+	longitude: DbNumberOrNull,
 	geocodedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
 	geocodeSource: Schema.NullOr(Schema.String),
 

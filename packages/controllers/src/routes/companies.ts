@@ -5,7 +5,24 @@ import {
 	HttpApiSchema,
 } from 'effect/unstable/httpapi'
 
-import { Company, Contact, Interaction } from '@batuda/domain'
+import {
+	Company,
+	CompanyCountry,
+	CompanyEmail,
+	CompanyGoogleMapsUrl,
+	CompanyInstagram,
+	CompanyLatitude,
+	CompanyLinkedin,
+	CompanyLongitude,
+	CompanyPhone,
+	CompanyPriority,
+	CompanySizeRange,
+	CompanySlug,
+	CompanyStatus,
+	CompanyWebsite,
+	Contact,
+	Interaction,
+} from '@batuda/domain'
 
 import { NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
@@ -48,65 +65,72 @@ export const CompanyDetail = Schema.Struct({
 	researchRuns: Schema.Array(CompanyResearchRun),
 })
 
-const CreateCompanyInput = Schema.Struct({
+// What a caller may write. The shapes come from the domain so the browser, the
+// agent tools and the research apply path all turn away the same values — and
+// they sit here rather than on `Company`, which has to keep reading rows written
+// before any of this existed.
+export const CreateCompanyInput = Schema.Struct({
 	name: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
-	slug: Schema.String.pipe(Schema.check(Schema.isPattern(/^[a-z0-9-]+$/))),
-	status: Schema.optional(Schema.String),
+	slug: CompanySlug,
+	status: Schema.optional(CompanyStatus),
 	industry: Schema.optional(Schema.String),
-	sizeRange: Schema.optional(Schema.String),
-	country: Schema.optional(Schema.String),
+	sizeRange: Schema.optional(CompanySizeRange),
+	country: Schema.optional(CompanyCountry),
 	location: Schema.optional(Schema.String),
-	source: Schema.optional(Schema.String),
-	priority: Schema.optional(Schema.Number),
-	website: Schema.optional(Schema.String),
-	email: Schema.optional(Schema.String),
-	phone: Schema.optional(Schema.String),
-	instagram: Schema.optional(Schema.String),
-	linkedin: Schema.optional(Schema.String),
-	googleMapsUrl: Schema.optional(Schema.String),
+	priority: Schema.optional(CompanyPriority),
+	website: Schema.optional(CompanyWebsite),
+	email: Schema.optional(CompanyEmail),
+	phone: Schema.optional(CompanyPhone),
+	instagram: Schema.optional(CompanyInstagram),
+	linkedin: Schema.optional(CompanyLinkedin),
+	googleMapsUrl: Schema.optional(CompanyGoogleMapsUrl),
 	productsFit: Schema.optional(Schema.Array(Schema.String)),
 	tags: Schema.optional(Schema.Array(Schema.String)),
 	painPoints: Schema.optional(Schema.String),
 	currentTools: Schema.optional(Schema.String),
 	nextAction: Schema.optional(Schema.String),
 	nextActionAt: Schema.optional(Schema.DateTimeUtc),
-	latitude: Schema.optional(Schema.Number),
-	longitude: Schema.optional(Schema.Number),
+	latitude: Schema.optional(CompanyLatitude),
+	longitude: Schema.optional(CompanyLongitude),
 	geocodedAt: Schema.optional(Schema.DateTimeUtc),
 	geocodeSource: Schema.optional(Schema.String),
 	metadata: Schema.optional(Schema.Unknown),
 })
 
-const UpdateCompanyInput = Schema.Struct({
+// Every field a person can empty from the company page is nullable here. The page
+// sends null for a field cleared to blank, so a plain optional refused the write
+// and the edit came back as a rejected change with nothing to explain it.
+export const UpdateCompanyInput = Schema.Struct({
 	// The account's running notes, in markdown. A person editing them takes
 	// ownership of them, which is what stops later research replacing their text.
-	accountBrief: Schema.optional(Schema.String),
-	name: Schema.optional(Schema.String),
+	accountBrief: Schema.optional(Schema.NullOr(Schema.String)),
+	name: Schema.optional(
+		Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
+	),
 	// null clears the owner (release a lead); omitting leaves it unchanged.
 	ownerId: Schema.optional(Schema.NullOr(Schema.String)),
-	status: Schema.optional(Schema.String),
-	industry: Schema.optional(Schema.String),
-	sizeRange: Schema.optional(Schema.String),
-	country: Schema.optional(Schema.String),
-	location: Schema.optional(Schema.String),
-	source: Schema.optional(Schema.String),
-	priority: Schema.optional(Schema.Number),
-	website: Schema.optional(Schema.String),
-	email: Schema.optional(Schema.String),
-	phone: Schema.optional(Schema.String),
-	instagram: Schema.optional(Schema.String),
-	linkedin: Schema.optional(Schema.String),
-	googleMapsUrl: Schema.optional(Schema.String),
-	productsFit: Schema.optional(Schema.Array(Schema.String)),
-	tags: Schema.optional(Schema.Array(Schema.String)),
-	painPoints: Schema.optional(Schema.String),
-	currentTools: Schema.optional(Schema.String),
-	nextAction: Schema.optional(Schema.String),
-	nextActionAt: Schema.optional(Schema.DateTimeUtc),
-	latitude: Schema.optional(Schema.Number),
-	longitude: Schema.optional(Schema.Number),
-	geocodedAt: Schema.optional(Schema.DateTimeUtc),
-	geocodeSource: Schema.optional(Schema.String),
+	status: Schema.optional(CompanyStatus),
+	industry: Schema.optional(Schema.NullOr(Schema.String)),
+	sizeRange: Schema.optional(Schema.NullOr(CompanySizeRange)),
+	country: Schema.optional(Schema.NullOr(CompanyCountry)),
+	location: Schema.optional(Schema.NullOr(Schema.String)),
+	priority: Schema.optional(Schema.NullOr(CompanyPriority)),
+	website: Schema.optional(Schema.NullOr(CompanyWebsite)),
+	email: Schema.optional(Schema.NullOr(CompanyEmail)),
+	phone: Schema.optional(Schema.NullOr(CompanyPhone)),
+	instagram: Schema.optional(Schema.NullOr(CompanyInstagram)),
+	linkedin: Schema.optional(Schema.NullOr(CompanyLinkedin)),
+	googleMapsUrl: Schema.optional(Schema.NullOr(CompanyGoogleMapsUrl)),
+	productsFit: Schema.optional(Schema.NullOr(Schema.Array(Schema.String))),
+	tags: Schema.optional(Schema.NullOr(Schema.Array(Schema.String))),
+	painPoints: Schema.optional(Schema.NullOr(Schema.String)),
+	currentTools: Schema.optional(Schema.NullOr(Schema.String)),
+	nextAction: Schema.optional(Schema.NullOr(Schema.String)),
+	nextActionAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
+	latitude: Schema.optional(Schema.NullOr(CompanyLatitude)),
+	longitude: Schema.optional(Schema.NullOr(CompanyLongitude)),
+	geocodedAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
+	geocodeSource: Schema.optional(Schema.NullOr(Schema.String)),
 	metadata: Schema.optional(Schema.Unknown),
 })
 

@@ -1,4 +1,6 @@
-import { Schema } from 'effect'
+import type { Schema } from 'effect'
+
+import { CompanyCountry } from '@batuda/domain'
 
 // Countries with a national business-registry adapter. Closed set: each entry
 // needs a provider builder and a vendor-table row (below), so adding a country
@@ -14,10 +16,9 @@ export const isRegistryCountry = (cc: string): cc is RegistryCountry =>
 
 // Any ISO 3166-1 alpha-2 code the agent may target. Open on purpose: a company
 // in a country without a registry is still a valid target — it routes to an
-// explicit no_registry result rather than being unrepresentable.
-export const AcceptedCountry = Schema.String.check(
-	Schema.isPattern(/^[A-Za-z]{2}$/),
-)
+// explicit no_registry result rather than being unrepresentable. The shape is the
+// CRM's, so a country a run may target and one a person may type are the same set.
+export const AcceptedCountry = CompanyCountry
 export type AcceptedCountry = Schema.Schema.Type<typeof AcceptedCountry>
 
 // Turn a model-supplied place hint into a two-letter country code (upper-case),
