@@ -16,6 +16,10 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 //     (thread-row-{id}, emails-thread-total, inbox-filter-trigger,
 //      inbox-filter-option, data-inbox-email)
 
+// Hand-copy of EMAILS_PAGE_SIZE in src/atoms/emails-atoms.ts: importing it
+// pulls in Vite's `import.meta.env`, which Node does not have.
+const PAGE_SIZE = 100
+
 const psql = (sqlText: string): string =>
 	execSync(`psql "${DATABASE_URL}" -tA -c "${sqlText.replace(/"/g, '\\"')}"`, {
 		encoding: 'utf8',
@@ -48,9 +52,9 @@ test.describe('emails inbox listing', () => {
 			await page.goto('/emails', { waitUntil: 'networkidle' })
 
 			// THEN the page accounts for all of them. Counting rows instead would
-			// be counting the window, not the mail: the list only builds the rows
-			// that fit on screen, so its row count answers to the height of the
-			// browser rather than to how much mail there is.
+			// count one page of mail rather than all of it: the list draws a
+			// page at a time, so its row count stops at the page size however
+			// much mail there is.
 			await expect(page.getByTestId('emails-thread-total')).toHaveText(
 				expected === 1 ? '1 thread' : `${expected} threads`,
 			)
@@ -61,13 +65,38 @@ test.describe('emails inbox listing', () => {
 			).toBeVisible()
 
 			// AND a known thread can be reached. Searched for rather than looked
-			// for on screen: the list only draws the rows that fit, so an older
-			// thread sits below the fold and is not there to find — which is the
-			// same trap as counting rows, one step further along.
+			// for on screen: an older thread can sit on a later page, and is
+			// then not there to find — the same trap as counting rows, one step
+			// further along.
 			await page
 				.getByTestId('emails-search')
 				.fill('Quote for the booking module')
 			await expect(page.getByText('Quote for the booking module')).toBeVisible()
+		})
+	})
+
+	test.describe('when a page holds more threads than fit on screen', () => {
+		test('should draw a row for every thread on the page', async ({ page }) => {
+			// GIVEN however many threads Taller has, capped at the one page the
+			// list draws at a time.
+			const totalThreads = Number(
+				psql(
+					`SELECT count(*) FROM email_thread_links l
+					 JOIN organization o ON o.id = l.organization_id
+					 WHERE o.slug = 'taller'`,
+				),
+			)
+			const expectedRows = Math.min(totalThreads, PAGE_SIZE)
+
+			// WHEN the user lands on /emails
+			await page.goto('/emails', { waitUntil: 'networkidle' })
+
+			// THEN every one of them has a row, including the ones below the
+			// fold. A list that draws only what fits the window leaves the rest
+			// of the page unreachable on a short screen.
+			await expect(page.locator('[data-testid^="thread-row-"]')).toHaveCount(
+				expectedRows,
+			)
 		})
 	})
 
@@ -100,8 +129,8 @@ test.describe('emails inbox listing', () => {
 			)
 			expect(expectedAgent, 'agent inbox must have threads').toBeGreaterThan(0)
 			// The page's own tally, for the same reason as the test above: a row
-			// count would answer to the height of the browser. It holds today
-			// only because the agent inbox has a single thread.
+			// count would stop at the page size. It holds today only because the
+			// agent inbox has a single thread.
 			await expect(page.getByTestId('emails-thread-total')).toHaveText(
 				expectedAgent === 1 ? '1 thread' : `${expectedAgent} threads`,
 			)

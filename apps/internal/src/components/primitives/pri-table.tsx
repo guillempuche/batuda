@@ -3,8 +3,8 @@ import styled from 'styled-components'
 /**
  * Batuda-internal table primitive. Compound export: `PriTable = { Root, Head,
  * Body, Row, ColumnHeader, Cell, Resizer }`. Semantic `<table>` subtree with
- * `display: block`/`flex` overrides so TanStack Virtual rows can live inside
- * `<tbody>` as absolutely-positioned `<tr>`s. Explicit ARIA roles are set so
+ * `display: block`/`flex` overrides so a row can restack as a card on narrow
+ * screens and the head can stay pinned. Explicit ARIA roles are set so
  * assistive tech still treats the subtree as a table after CSS display
  * overrides strip the implicit roles.
  *
