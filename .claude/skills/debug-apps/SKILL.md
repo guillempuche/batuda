@@ -127,11 +127,20 @@ last path segment (so `ui/foo` → `foo.batuda.localhost`), so there's no clash
 with the main checkout. See the `/worktree` skill for the full model.
 
 ```bash
-# Provision this worktree: creates its DB + bucket, writes .env, migrates + seeds.
+# 1. Install. In a worktree this MUST be --ignore-scripts: core.hooksPath points at
+# the main checkout, so lefthook's `prepare` step fails and takes the install with it.
+pnpm install --ignore-scripts
+
+# 2. --ignore-scripts leaves workspace dist/ unbuilt, and the server imports
+# @batuda/ui as built output — without this it dies on `Cannot find module
+# '@batuda/ui/dist/blocks/index.mjs'`.
+pnpm --filter @batuda/ui build
+
+# 3. Provision this worktree: creates its DB + bucket, writes .env, migrates + seeds.
 # Auto-runs once on session start (skips once the DB exists); re-running re-seeds.
 pnpm cli worktree up
 
-# Run the stack — portless injects PORT/PORTLESS_URL per service, no clash with main.
+# 4. Run the stack — portless injects PORT/PORTLESS_URL per service, no clash with main.
 pnpm dev
 
 pnpm cli worktree ls        # every worktree + its DB + provisioned state + URL
@@ -178,6 +187,8 @@ Use `agent-browser` (Playwright-based CLI) to test the app as a real user. Ensur
 
 For the full command reference (login flow, navigation, interaction, network inspection), consult `references/agent-browser.md`.
 
+If the session has browser MCP tools (`preview_start`, `read_page`, `form_input`, `javascript_tool`, `resize_window`), they drive the same app and suit some jobs better: `read_page` returns an accessibility tree with stable refs, `resize_window` sweeps viewports, and `javascript_tool` reads computed styles and element geometry — which is what the layout section below needs and `agent-browser` cannot do. Use whichever is available; don't mix both against one page.
+
 A click on an element below the fold does nothing and still prints `✓ Done`, which looks identical to a broken handler — scroll it into view first. Before reporting any button as broken, verify the click actually landed; see the interaction section of `references/agent-browser.md` for the recipe.
 
 **A dropdown will not stay open under a synthetic click.** `agent-browser click` on a `PriSelect` trigger leaves `aria-expanded="false"` — Base UI opens on the press and closes again on the release. The options are still in the DOM afterwards (Base UI keeps them mounted), so a check that counts `[role=option]` reads as success while the popup is invisible and has zero height, and every attempt to click an option then fails as "covered". Open it from the keyboard instead — focus the trigger, press `ArrowDown` — and it stays open. Playwright's own `click` does not have this problem, so an e2e test can drive it directly.
@@ -207,6 +218,41 @@ To force one feed to fail while the rest of a page keeps working — the only ho
 docker exec batuda-db psql -U batuda -d <db> -c "REVOKE SELECT ON calendar_events FROM app_user, app_service;"
 # ... check the page shows its failure state, then ...
 docker exec batuda-db psql -U batuda -d <db> -c "GRANT SELECT ON calendar_events TO app_user, app_service;"
+```
+
+## When the page renders but looks wrong
+
+The checks above all assume something *errors*. A layout bug throws nothing: the request is 200, the rows are in the DOM, and the screen is still wrong. Do not reach for the network tab or the server log — measure the box that is the wrong size.
+
+Two symptoms, one cause. A list that shows a couple of rows and refuses to grow, or content clipped with no way to scroll to it, is almost always a scroll container that collapsed to leftover flex space.
+
+**Find the clipped container.** Anything whose content is taller than its own box is a scroller that is losing:
+
+```js
+[...document.querySelectorAll('*')]
+  .filter(el => { const s = getComputedStyle(el)
+    return (s.overflowY === 'auto' || s.overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 4 })
+  .map(el => ({ cls: el.className.toString().slice(0, 60),
+                clientH: el.clientHeight, scrollH: el.scrollHeight }))
+```
+
+Styled-components names each class after its component and the file it sits in, so a hit names the file to open. `side-nav__NavList` is a normal hit — ignore it.
+
+**Then walk the height chain upward** from that element, reading `clientHeight`, `display`, `flex`, `minHeight` and `overflowY` at each ancestor up to `<body>`. The break is the first ancestor whose height stops coming from real content — a `flex: 1` child inside a viewport-locked parent gets whatever the fixed siblings above it left over, which can be almost nothing.
+
+**Sweep viewport sizes before concluding anything.** These bugs scale with height, so one window size tells you nothing about severity — the same page can look acceptable at 1920×1080 and show half a row at 1440×620. Resize to at least 1280×720, 1440×900, 1920×1080, tablet and mobile, re-measuring at each. Note that below 768px the app drops the viewport height lock and the document scrolls instead, so a desktop-only bug disappears on mobile.
+
+**The app's intended pattern is that `PriScrollArea` scrolls the whole page.** A route with its own `overflow-y: auto` is the exception and deserves suspicion. Two things break when a route introduces one: `infinite-list-footer.tsx` observes the sheet viewport, never a page-local scroller, so auto-load silently stops firing; and only the sheet viewport carries `data-scroll-restoration-id`, so an inner scroller loses its position on back-navigation.
+
+**Row counts lie when a list is paginated.** `EMAILS_PAGE_SIZE` caps the emails list at 100, so a DOM row count answers to the page size, not to how much data exists. Assert on the page's own total (`emails-thread-total`) instead — see `apps/internal/tests/e2e/inbox-listing.test.ts`.
+
+**Need more rows than the seed provides?** `--preset full` scales companies, not mail — it still leaves 7 threads. Insert them directly into the worktree's disposable DB:
+
+```bash
+docker exec batuda-db psql -U batuda -d batuda_<slug> -c "
+INSERT INTO email_thread_links (organization_id, external_thread_id, inbox_id, subject, status, created_at, updated_at)
+SELECT '<org-id>', 'bulk-' || g, '<inbox-id>', 'Test thread ' || g, 'open', now(), now()
+FROM generate_series(1, 113) g;"
 ```
 
 ## Watch several worktrees at once
