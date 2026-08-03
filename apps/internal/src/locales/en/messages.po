@@ -5670,6 +5670,10 @@ msgstr "Thread metadata"
 msgid "Thread not found"
 msgstr "Thread not found"
 
+#: src/routes/emails/index.tsx
+msgid "Thread pages"
+msgstr "Thread pages"
+
 #: src/routes/settings/organization/spend.tsx
 msgid "Time range"
 msgstr "Time range"

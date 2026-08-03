@@ -5670,6 +5670,10 @@ msgstr "Metadades del fil"
 msgid "Thread not found"
 msgstr "Fil no trobat"
 
+#: src/routes/emails/index.tsx
+msgid "Thread pages"
+msgstr "Pàgines de fils"
+
 #: src/routes/settings/organization/spend.tsx
 msgid "Time range"
 msgstr "Interval de temps"
