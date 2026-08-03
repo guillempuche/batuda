@@ -14,9 +14,11 @@
  * dropped downstream.
  */
 
-import { isBuyingRole } from '@batuda/domain'
-
-import { CRM_SIZE_RANGES, type CrmSizeRange } from '../domain/crm-vocabulary'
+import {
+	COMPANY_SIZE_RANGES,
+	type CompanySizeRange,
+	isBuyingRole,
+} from '@batuda/domain'
 
 // Trim, lowercase, and strip accents so "Manufactura"/"manufactura" and
 // "Girona"/"girona" fold onto one keyword table.
@@ -60,16 +62,16 @@ export const cleanIndustryLabel = (raw: string): string | null => {
 	return raw.trim().replace(/\s+/g, ' ')
 }
 
-export const mapSizeRange = (raw: string): CrmSizeRange | null => {
+export const mapSizeRange = (raw: string): CompanySizeRange | null => {
 	const n = normalize(raw)
 	if (isHardJunk(n)) return null
-	if ((CRM_SIZE_RANGES as readonly string[]).includes(n))
-		return n as CrmSizeRange
+	if ((COMPANY_SIZE_RANGES as readonly string[]).includes(n))
+		return n as CompanySizeRange
 	// Take the first integer — a single head-count, or the lower bound of an
-	// "N-M" / "N to M" range — and bucket it; a value above the top bracket falls
-	// to the closest one. A qualitative size ("SME", "small") has no integer → null.
+	// "N-M" / "N to M" range — and bucket it; the top band is open, so a very large
+	// number lands there. A qualitative size ("SME", "small") has no integer → null.
 	// Strip a thousands separator sitting between digits first ("1,700" / "1.700"
-	// employees), or the match would read "1" and bucket a 1,700-person company as 1-5.
+	// employees), or the match would read "1" and bucket a 1,700-person company as 1-10.
 	const firstInt = n.replace(/(?<=\d)[.,](?=\d)/g, '').match(/\d+/)?.[0]
 	if (firstInt === undefined) return null
 	const count = Number(firstInt)

@@ -143,8 +143,6 @@ export {
 // ── Domain ─────────────────────────────────────────────────────────────────
 export { AcceptedCountry } from './domain/country'
 export {
-	CRM_SIZE_RANGES,
-	type CrmSizeRange,
 	SNAPSHOT_COMPANY_FIELDS,
 	SNAPSHOT_CONTACT_FIELDS,
 } from './domain/crm-vocabulary'

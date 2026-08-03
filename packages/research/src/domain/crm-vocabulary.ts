@@ -1,17 +1,3 @@
-// The one classification field research still rewrites to a fixed code. A trade
-// is no longer among them: each organisation keeps its own list, so the words a
-// page uses are stored as written and only the size bands are folded.
-//
-// Read from the CRM's own list rather than copied. This used to be a copy kept in
-// step by a test, which could only ever prove the two were equal — never that
-// they were right — and left a window in which a band added to one silently did
-// not exist in the other.
-
-import { COMPANY_SIZE_RANGES } from '@batuda/domain'
-
-export const CRM_SIZE_RANGES = COMPANY_SIZE_RANGES
-export type CrmSizeRange = (typeof CRM_SIZE_RANGES)[number]
-
 // What a research run is shown of a company or contact it already holds, so it can
 // spot a value the evidence contradicts and propose a correction. Deliberately
 // narrower than everything stored: the pipeline stage, who owns the lead, when

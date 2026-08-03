@@ -109,7 +109,7 @@ describe('mapSizeRange', () => {
 			expect(mapSizeRange('500')).toBe('201-500')
 			expect(mapSizeRange('501-1,000')).toBe('501-1000')
 			// AND a head-count written with a thousands separator — "1,700" must read
-			// as 1700, not 1, so a large company is not bucketed as 1-5
+			// as 1700, not 1, so a large company is not bucketed as 1-10
 			expect(mapSizeRange('1,700 employees')).toBe('1001-5000')
 			expect(mapSizeRange('1.700 empleados')).toBe('1001-5000')
 			// AND a size written as a long sentence still buckets on its first integer,
