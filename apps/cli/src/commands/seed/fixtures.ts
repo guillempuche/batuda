@@ -65,7 +65,6 @@ export const PRODUCTS = [
 			'Lloc web professional amb SEO local i mòbil-first per a petits negocis.',
 		defaultPrice: '990.00',
 		priceType: 'fixed',
-		targetIndustries: ['Restauració', 'Moda i complements', 'Consultoria'],
 	},
 	{
 		slug: 'gestio-reserves',
@@ -76,7 +75,6 @@ export const PRODUCTS = [
 			'Sistema de reserves online amb calendari, recordatoris i pagaments.',
 		defaultPrice: '49.00',
 		priceType: 'monthly',
-		targetIndustries: ['Restauració', 'Allotjament', 'Consultoria'],
 	},
 	{
 		slug: 'automatitzacions',
@@ -87,11 +85,6 @@ export const PRODUCTS = [
 			'Workflows automàtics: facturació, seguiment clients, notificacions.',
 		defaultPrice: '1500.00',
 		priceType: 'fixed',
-		targetIndustries: [
-			'Serralleria',
-			'Distribució',
-			'Instal·lacions elèctriques',
-		],
 	},
 	{
 		slug: 'ecommerce-local',
@@ -101,7 +94,6 @@ export const PRODUCTS = [
 		description: 'Botiga online amb enviament local i integració amb TPV.',
 		defaultPrice: '2500.00',
 		priceType: 'fixed',
-		targetIndustries: ['Moda i complements', 'Ceràmica', 'Distribució'],
 	},
 	{
 		slug: 'social-media-pack',
@@ -112,7 +104,6 @@ export const PRODUCTS = [
 			'Gestió de xarxes socials: contingut, programació i analítica.',
 		defaultPrice: '300.00',
 		priceType: 'monthly',
-		targetIndustries: ['Restauració', 'Moda i complements', 'Allotjament'],
 	},
 	{
 		slug: 'consultoria-custom',
@@ -122,7 +113,6 @@ export const PRODUCTS = [
 		description: 'Projectes de consultoria digital amb abast i preu negociats.',
 		defaultPrice: null,
 		priceType: 'custom',
-		targetIndustries: ['Consultoria', 'Taller mecànic'],
 		metadata: { requiresDiscoveryCall: true },
 	},
 	{
@@ -134,7 +124,6 @@ export const PRODUCTS = [
 			'El nostre propi CRM — usat internament per validar funcionalitats.',
 		defaultPrice: null,
 		priceType: null,
-		targetIndustries: null,
 		metadata: { internal: true },
 	},
 ]
