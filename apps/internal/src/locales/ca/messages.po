@@ -60,6 +60,11 @@ msgstr "(sense assumpte)"
 msgid "(no summary)"
 msgstr "(sense resum)"
 
+#. placeholder {0}: needsReview.length
+#: src/routes/settings/organization/industries.tsx
+msgid "{0, plural, one {# came from research and nobody has read it yet.} other {# came from research and nobody has read them yet.}}"
+msgstr "{0, plural, one {# ve de la recerca i encara ningú no l'ha llegit.} other {# venen de la recerca i encara ningú no les ha llegit.}}"
+
 #. placeholder {0}: quality.fields_grounded ?? 0
 #: src/components/research/findings/company-enrichment-view.tsx
 msgid "{0, plural, one {# fact backed by a source} other {# facts backed by a source}}"
@@ -104,11 +109,6 @@ msgstr "{0} assistents"
 #: src/routes/settings/organization/spend.tsx
 msgid "{0} calls"
 msgstr "{0} crides"
-
-#. placeholder {0}: needsReview.length
-#: src/routes/settings/organization/industries.tsx
-msgid "{0} came from research and nobody has read them yet."
-msgstr "{0} venen de la recerca i encara ningú no les ha llegit."
 
 #. placeholder {0}: industry.companyCount
 #: src/routes/settings/organization/industries.tsx
@@ -3138,6 +3138,7 @@ msgid "Members"
 msgstr "Membres"
 
 #: src/routes/settings/organization/industries.tsx
+#: src/routes/settings/organization/industries.tsx
 msgid "Merge"
 msgstr "Fusiona"
 
@@ -4455,6 +4456,7 @@ msgid "Release owner"
 msgstr "Allibera el responsable"
 
 #: src/routes/emails/inboxes.tsx
+#: src/routes/settings/organization/industries.tsx
 #: src/routes/settings/organization/members.tsx
 msgid "Remove"
 msgstr "Elimina"

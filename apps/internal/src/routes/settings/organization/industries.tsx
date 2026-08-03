@@ -1,5 +1,5 @@
 import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
-import { Trans, useLingui } from '@lingui/react/macro'
+import { Plural, Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { ArrowLeft, Check, Merge, Trash2 } from 'lucide-react'
@@ -200,10 +200,11 @@ function IndustriesPage() {
 				<Card data-testid='industries-list'>
 					{needsReview.length > 0 ? (
 						<ReviewNote data-testid='industries-review-note'>
-							<Trans>
-								{needsReview.length} came from research and nobody has read them
-								yet.
-							</Trans>
+							<Plural
+								value={needsReview.length}
+								one='# came from research and nobody has read it yet.'
+								other='# came from research and nobody has read them yet.'
+							/>
 						</ReviewNote>
 					) : null}
 					<Rows>
@@ -288,6 +289,7 @@ function IndustriesPage() {
 												data-testid='industry-merge'
 											>
 												<Merge size={14} aria-hidden />
+												<Trans>Merge</Trans>
 											</PriButton>
 											{industry.companyCount === 0 ? (
 												<PriButton
@@ -299,6 +301,7 @@ function IndustriesPage() {
 													data-testid='industry-remove'
 												>
 													<Trash2 size={14} aria-hidden />
+													<Trans>Remove</Trans>
 												</PriButton>
 											) : null}
 										</>
@@ -465,11 +468,21 @@ const Row = styled.div.withConfig({
 	displayName: 'IndustriesRow',
 	shouldForwardProp: prop => prop !== '$flagged',
 })<{ $flagged: boolean }>`
+	/* Stacked on a phone: a trade's name and the two things you can do to it do
+	 * not fit on one line there, and squeezing them together wraps the name into
+	 * the buttons. */
 	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: var(--space-sm);
+	flex-direction: column;
+	align-items: flex-start;
+	gap: var(--space-2xs);
 	padding: var(--space-sm) var(--space-2xs);
+
+	@media (min-width: 768px) {
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-sm);
+	}
 	border-bottom: 1px solid
 		color-mix(in srgb, var(--color-on-surface) 12%, transparent);
 	border-left: 3px solid
