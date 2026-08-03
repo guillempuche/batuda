@@ -3,6 +3,45 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-03 (server-v2026.8.3)
+
+### Features
+
+* a company is more than one mailbox, one place, and one decider ([247bf91](https://github.com/guillempuche/batuda/commit/247bf915739c8be4574fea8a187251ab7ea975a6)), closes [#376](https://github.com/guillempuche/batuda/issues/376)
+* carry an address name and a person's branch through the API ([ee93ba0](https://github.com/guillempuche/batuda/commit/ee93ba046366222c755258ddc3f8f79fd367b426))
+* describe mailboxes freely and decide access from who owns them ([a626db1](https://github.com/guillempuche/batuda/commit/a626db1b98848b30d5ca898ba27b4f2158ea9bde)), closes [#375](https://github.com/guillempuche/batuda/issues/375)
+* keep the contact details and people a research run finds ([8eff397](https://github.com/guillempuche/batuda/commit/8eff397812861fcec30ec459514d222fa0261dd9))
+* let each organisation name the trades it sells to ([fd9c998](https://github.com/guillempuche/batuda/commit/fd9c9982e9eef1db581ec8c77fccdbd156cf0340))
+* let every member manage the shared instruction templates ([e3e692a](https://github.com/guillempuche/batuda/commit/e3e692a123747b0fe11566dbf9bec5aaacae6864))
+* **server:** name a company's addresses and let a branch hold its own ([22c8bc7](https://github.com/guillempuche/batuda/commit/22c8bc7daa180a358ea5deda4bd8564ccf6fab91))
+* store the number a company is registered under ([d0dd2c5](https://github.com/guillempuche/batuda/commit/d0dd2c50629ec6c2ccfc7d71e127ad5086c58f22))
+
+### Bug Fixes
+
+* keep the template dialog usable by keyboard and screen reader ([7356841](https://github.com/guillempuche/batuda/commit/735684190611848eb1de14828ed8f6ef0b1d3e31))
+* **observability:** stop sending tool arguments to the tracing vendor ([7a69465](https://github.com/guillempuche/batuda/commit/7a694658bf9e44c0ffd840f5f0c13abd93c71c0f))
+* **server:** put mailbox ownership out of an ordinary request's reach ([e4810c4](https://github.com/guillempuche/batuda/commit/e4810c492d640a516370c24826aaa25f88a13e6f)), closes [#386](https://github.com/guillempuche/batuda/issues/386)
+* **server:** stop a burst of writers colliding over one new trade ([d8329b3](https://github.com/guillempuche/batuda/commit/d8329b38c322d455655470ede2437959421dd9fd))
+* **ui:** turn only the leading arrow when a section opens ([575ada2](https://github.com/guillempuche/batuda/commit/575ada2a86b84a89d9f4aaad58ca64dbc28db585))
+
+### Refactoring
+
+* remove what the trades change left behind ([263d903](https://github.com/guillempuche/batuda/commit/263d90396fa30e9b89da931666ce6cb0cf348ca0))
+* stop keeping a second list of who a product is for ([4c2d5ea](https://github.com/guillempuche/batuda/commit/4c2d5ea12103b77b00bc5fe3bf7d2341bb49a7c7))
+
+### Tests
+
+* **research:** measure the company shapes this issue is about ([030c5b3](https://github.com/guillempuche/batuda/commit/030c5b31911bdf124d3f694bf69cce5e9ed67e00))
+
+### CI/CD
+
+* **release:** ui v2026.7.28 ([acb53ba](https://github.com/guillempuche/batuda/commit/acb53ba19db2f26498659d1979f20b9f1dad953e))
+
+### Chores
+
+* raise Effect to beta.102 and fix what the raise uncovered ([72da41c](https://github.com/guillempuche/batuda/commit/72da41cf0d4e69a002cf740a1f8f96cbbe5a80c9))
+* say the mailbox rules once instead of three times ([a9cff18](https://github.com/guillempuche/batuda/commit/a9cff18ad9635b0073dfe06a7151d81c207b794c))
+
 ## 2026-07-28 (server-v2026.7.28)
 
 ### Features
