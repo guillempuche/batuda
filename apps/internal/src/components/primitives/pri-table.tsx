@@ -15,7 +15,11 @@ import styled from 'styled-components'
  * card for mobile.
  */
 
-const Root = styled.table.withConfig({
+// Every part of the table names its own role. A `display: block`/`flex`/`grid`
+// override drops the role a browser would otherwise infer from the tag, and the
+// chain has to be unbroken — a table owns rowgroups, a rowgroup owns rows, a row
+// owns cells — or a screen reader stops treating any of it as a table.
+const Root = styled.table.attrs({ role: 'table' }).withConfig({
 	displayName: 'PriTable.Root',
 	shouldForwardProp: prop => !prop.startsWith('$'),
 })<{ $dense?: boolean }>`
@@ -28,7 +32,7 @@ const Root = styled.table.withConfig({
 	display: block;
 `
 
-const Head = styled.thead.withConfig({
+const Head = styled.thead.attrs({ role: 'rowgroup' }).withConfig({
 	displayName: 'PriTable.Head',
 })`
 	display: block;
@@ -50,19 +54,23 @@ const Head = styled.thead.withConfig({
 	}
 `
 
-const Body = styled.tbody.withConfig({
+const Body = styled.tbody.attrs({ role: 'rowgroup' }).withConfig({
 	displayName: 'PriTable.Body',
 })`
 	display: block;
 	position: relative;
 `
 
-const Row = styled.tr.withConfig({
+const Row = styled.tr.attrs({ role: 'row' }).withConfig({
 	displayName: 'PriTable.Row',
 })`
 	display: flex;
 	align-items: stretch;
 	width: 100%;
+	/* Keyboard focus scrolls a row into view against the page, which has the
+	   pinned head across its top and, on a phone, the nav bar across its
+	   bottom. Hold the row clear of both so focus is never behind them. */
+	scroll-margin-block: 3rem calc(var(--bottom-nav-space) + var(--space-sm));
 	transition: background 120ms ease;
 	border-bottom: 1px solid var(--color-outline-variant);
 	cursor: pointer;
@@ -98,7 +106,7 @@ const Row = styled.tr.withConfig({
 const flexFor = (intent?: 'fixed' | 'grow' | 'shrink') =>
 	intent === 'grow' ? '1 1 0' : intent === 'shrink' ? '0 1 auto' : '0 0 auto'
 
-const ColumnHeader = styled.th.withConfig({
+const ColumnHeader = styled.th.attrs({ role: 'columnheader' }).withConfig({
 	displayName: 'PriTable.ColumnHeader',
 	shouldForwardProp: prop => !prop.startsWith('$'),
 })<{
@@ -122,7 +130,7 @@ const ColumnHeader = styled.th.withConfig({
 	user-select: none;
 `
 
-const Cell = styled.td.withConfig({
+const Cell = styled.td.attrs({ role: 'cell' }).withConfig({
 	displayName: 'PriTable.Cell',
 	shouldForwardProp: prop => !prop.startsWith('$'),
 })<{

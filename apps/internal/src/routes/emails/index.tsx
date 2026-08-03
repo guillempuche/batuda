@@ -40,7 +40,14 @@ import {
 	Search,
 	X,
 } from 'lucide-react'
-import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import {
+	useCallback,
+	useContext,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react'
 import styled, { css } from 'styled-components'
 
 import {
@@ -64,7 +71,6 @@ import {
 	updateThreadStatusAtom,
 } from '#/atoms/emails-atoms'
 import { companiesListAtom } from '#/atoms/pipeline-atoms'
-import { useOptionalBlueprintViewportRef } from '#/components/layout/blueprint-sheet'
 import { PriTable } from '#/components/primitives/pri-table'
 import { EmptyState } from '#/components/shared/empty-state'
 import { ErrorState } from '#/components/shared/error-state'
@@ -241,7 +247,7 @@ function EmailsIndexPage() {
 	const search = Route.useSearch()
 	const navigate = useNavigate({ from: Route.fullPath })
 	const { openCompose, drafts } = useComposeEmail()
-	const sheetViewportRef = useOptionalBlueprintViewportRef()
+	const listTopRef = useRef<HTMLDivElement>(null)
 	const wire = useMemo(() => toWireSearch(search), [search])
 
 	// Atom identity is keyed by the canonical wire-shape key, not by the
@@ -412,15 +418,14 @@ function EmailsIndexPage() {
 				search: prev =>
 					mergeSearch(prev, { page: page <= 1 ? undefined : page }),
 			})
-			// The page buttons sit under the last row, so without this the next
-			// page opens at its end instead of at its first thread. Phones
-			// scroll the page itself, and the sheet hands out the same ref
-			// either way, so ask whether it really scrolls before trusting it.
-			const sheet = sheetViewportRef?.current
-			if (sheet && sheet.scrollHeight > sheet.clientHeight) sheet.scrollTop = 0
-			else window.scrollTo({ top: 0 })
+			// The page buttons sit under the last row, so the next page would
+			// otherwise open at its end instead of at its first thread. Moving
+			// focus to the top of the list scrolls it there and takes the
+			// keyboard with it — the button just pressed is about to be disabled
+			// on the first and last page, which would strand focus on nothing.
+			listTopRef.current?.focus()
 		},
-		[navigate, sheetViewportRef],
+		[navigate],
 	)
 	const handleClearFilters = useCallback(() => {
 		setSearchInput('')
@@ -782,6 +787,9 @@ function EmailsIndexPage() {
 						/>
 					) : (
 						<>
+							{/* Where paging sends the keyboard and the screen, so a new
+							    page opens at its first thread. */}
+							<ListTop ref={listTopRef} tabIndex={-1} />
 							{drafts.length > 0 && <DraftsResumeStrip drafts={drafts} />}
 							<ThreadsGrid
 								threads={threads}
@@ -798,8 +806,8 @@ function EmailsIndexPage() {
 					)}
 
 					{total > EMAILS_PAGE_SIZE && (
-						<Pagination>
-							<PageLabel>{t`Showing ${firstRow}–${lastRow} of ${total}`}</PageLabel>
+						<Pagination aria-label={t`Thread pages`}>
+							<PageLabel role='status'>{t`Showing ${firstRow}–${lastRow} of ${total}`}</PageLabel>
 							<PageNav>
 								<PriButton
 									type='button'
@@ -1029,80 +1037,81 @@ function ThreadsGrid({
 					{selectedCount > 0 ? (
 						<SelectionHead>
 							<PriTable.Row>
-								<SelectionCell
-									$flex='grow'
-									role='toolbar'
-									aria-label={t`Bulk thread actions`}
-								>
-									<PriCheckbox.Root
-										checked={allSelected}
-										onCheckedChange={checked => {
-											if (checked) selectAll()
-											else clearSelection()
-										}}
-										aria-label={t`Select all threads on this page`}
+								<SelectionCell $flex='grow'>
+									<BulkToolbar
+										role='toolbar'
+										aria-label={t`Bulk thread actions`}
 									>
-										<PriCheckbox.Indicator>
-											<Check size={12} aria-hidden />
-										</PriCheckbox.Indicator>
-									</PriCheckbox.Root>
-									<BulkLabel aria-live='polite'>
-										{selectedCount === 1
-											? t`1 thread selected`
-											: t`${selectedCount} threads selected`}
-									</BulkLabel>
-									<PriButton
-										type='button'
-										$variant='outlined'
-										onClick={() => {
-											void applyStatus(Array.from(selected), 'closed')
-											clearSelection()
-										}}
-									>
-										<CheckCheck size={14} aria-hidden />
-										<span>{t`Close`}</span>
-									</PriButton>
-									<PriButton
-										type='button'
-										$variant='outlined'
-										onClick={() => {
-											void applyStatus(Array.from(selected), 'open')
-											clearSelection()
-										}}
-									>
-										<ArchiveRestore size={14} aria-hidden />
-										<span>{t`Reopen`}</span>
-									</PriButton>
-									<PriButton
-										type='button'
-										$variant='outlined'
-										onClick={() => {
-											void applyStatus(Array.from(selected), 'archived')
-											clearSelection()
-										}}
-									>
-										<Archive size={14} aria-hidden />
-										<span>{t`Archive`}</span>
-									</PriButton>
-									<PriButton
-										type='button'
-										$variant='outlined'
-										onClick={() => {
-											void applyRead(Array.from(selected), true)
-											clearSelection()
-										}}
-									>
-										<Eye size={14} aria-hidden />
-										<span>{t`Mark read`}</span>
-									</PriButton>
-									<PriButton
-										type='button'
-										$variant='text'
-										onClick={clearSelection}
-									>
-										<X size={14} aria-hidden />
-										<span>{t`Clear`}</span>
-									</PriButton>
+										<PriCheckbox.Root
+											checked={allSelected}
+											onCheckedChange={checked => {
+												if (checked) selectAll()
+												else clearSelection()
+											}}
+											aria-label={t`Select all threads on this page`}
+										>
+											<PriCheckbox.Indicator>
+												<Check size={12} aria-hidden />
+											</PriCheckbox.Indicator>
+										</PriCheckbox.Root>
+										<BulkLabel aria-live='polite'>
+											{selectedCount === 1
+												? t`1 thread selected`
+												: t`${selectedCount} threads selected`}
+										</BulkLabel>
+										<PriButton
+											type='button'
+											$variant='outlined'
+											onClick={() => {
+												void applyStatus(Array.from(selected), 'closed')
+												clearSelection()
+											}}
+										>
+											<CheckCheck size={14} aria-hidden />
+											<span>{t`Close`}</span>
+										</PriButton>
+										<PriButton
+											type='button'
+											$variant='outlined'
+											onClick={() => {
+												void applyStatus(Array.from(selected), 'open')
+												clearSelection()
+											}}
+										>
+											<ArchiveRestore size={14} aria-hidden />
+											<span>{t`Reopen`}</span>
+										</PriButton>
+										<PriButton
+											type='button'
+											$variant='outlined'
+											onClick={() => {
+												void applyStatus(Array.from(selected), 'archived')
+												clearSelection()
+											}}
+										>
+											<Archive size={14} aria-hidden />
+											<span>{t`Archive`}</span>
+										</PriButton>
+										<PriButton
+											type='button'
+											$variant='outlined'
+											onClick={() => {
+												void applyRead(Array.from(selected), true)
+												clearSelection()
+											}}
+										>
+											<Eye size={14} aria-hidden />
+											<span>{t`Mark read`}</span>
+										</PriButton>
+										<PriButton
+											type='button'
+											$variant='text'
+											onClick={clearSelection}
+										>
+											<X size={14} aria-hidden />
+											<span>{t`Clear`}</span>
+										</PriButton>
+									</BulkToolbar>
 								</SelectionCell>
 							</PriTable.Row>
 						</SelectionHead>
@@ -1158,13 +1167,11 @@ function ThreadsGrid({
 											params: { threadId: thread.id },
 										})
 									}}
-									// Enter/Space opens the focused row; ignore keys that
-									// bubbled up from the checkbox or action buttons.
+									// Enter opens the focused row; ignore keys that bubbled up
+									// from the checkbox or action buttons. Space is left to the
+									// page, where it is how you scroll down a long list.
 									onKeyDown={e => {
-										if (
-											(e.key === 'Enter' || e.key === ' ') &&
-											e.target === e.currentTarget
-										) {
+										if (e.key === 'Enter' && e.target === e.currentTarget) {
 											e.preventDefault()
 											void navigate({
 												to: '/emails/$threadId',
@@ -1806,15 +1813,25 @@ const SelectionCell = styled(PriTable.ColumnHeader).withConfig({
 	displayName: 'EmailsIndexSelectionCell',
 })`
 	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: var(--space-xs);
 	width: 100%;
 	padding: var(--space-2xs) var(--space-sm);
 	text-transform: none;
 	letter-spacing: normal;
 	white-space: normal;
 	background: color-mix(in oklab, var(--color-primary) 12%, var(--color-surface));
+`
+
+// The bulk buttons group as a toolbar on their own element rather than on the
+// header cell around them: a row owns cells, so a cell that called itself a
+// toolbar would break the table apart for a screen reader.
+const BulkToolbar = styled.div.withConfig({
+	displayName: 'EmailsIndexBulkToolbar',
+})`
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-xs);
+	width: 100%;
 `
 
 const BulkLabel = styled.span.withConfig({
@@ -1899,7 +1916,19 @@ const SuspiciousTag = styled.span.withConfig({
 	text-transform: uppercase;
 `
 
-const Pagination = styled.div.withConfig({
+// Carries no styling of its own — it exists to be focused, and the scroll
+// margin keeps the top of the list clear of the bar pinned above it.
+const ListTop = styled.div.withConfig({
+	displayName: 'EmailsIndexListTop',
+})`
+	scroll-margin-block-start: var(--space-md);
+
+	&:focus {
+		outline: none;
+	}
+`
+
+const Pagination = styled.nav.withConfig({
 	displayName: 'EmailsIndexPagination',
 })`
 	${brushedMetalPlate}

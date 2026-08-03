@@ -2944,10 +2944,6 @@ msgstr "Fes que {0} sigui l'adreça des d'on envies"
 msgid "Make {0} the default"
 msgstr "Fes que {0} sigui la predeterminada"
 
-#: src/components/contacts/manage-channels-dialog.tsx
-#~ msgid "Make primary"
-#~ msgstr "Fes-lo principal"
-
 #: src/components/instructions/stack-editor.tsx
 msgid "Make this my default"
 msgstr "Fes que sigui la meva predeterminada"
@@ -4396,10 +4392,6 @@ msgstr "Elimina {chip}"
 msgid "Remove {email} from this organization?"
 msgstr "Vols eliminar {email} d'aquesta organització?"
 
-#: src/components/contacts/manage-channels-dialog.tsx
-#~ msgid "Remove channel"
-#~ msgstr "Elimina el canal"
-
 #: src/components/companies/proposals-panel.tsx
 msgid "Remove line"
 msgstr "Elimina la línia"
@@ -5567,6 +5559,10 @@ msgstr "Metadades del fil"
 #: src/routes/emails/$threadId.tsx
 msgid "Thread not found"
 msgstr "Fil no trobat"
+
+#: src/routes/emails/index.tsx
+msgid "Thread pages"
+msgstr "Pàgines de fils"
 
 #: src/routes/settings/organization/spend.tsx
 msgid "Time range"

@@ -2944,10 +2944,6 @@ msgstr "Make {0} the address you send from"
 msgid "Make {0} the default"
 msgstr "Make {0} the default"
 
-#: src/components/contacts/manage-channels-dialog.tsx
-#~ msgid "Make primary"
-#~ msgstr "Make primary"
-
 #: src/components/instructions/stack-editor.tsx
 msgid "Make this my default"
 msgstr "Make this my default"
@@ -4396,10 +4392,6 @@ msgstr "Remove {chip}"
 msgid "Remove {email} from this organization?"
 msgstr "Remove {email} from this organization?"
 
-#: src/components/contacts/manage-channels-dialog.tsx
-#~ msgid "Remove channel"
-#~ msgstr "Remove channel"
-
 #: src/components/companies/proposals-panel.tsx
 msgid "Remove line"
 msgstr "Remove line"
@@ -5567,6 +5559,10 @@ msgstr "Thread metadata"
 #: src/routes/emails/$threadId.tsx
 msgid "Thread not found"
 msgstr "Thread not found"
+
+#: src/routes/emails/index.tsx
+msgid "Thread pages"
+msgstr "Thread pages"
 
 #: src/routes/settings/organization/spend.tsx
 msgid "Time range"
