@@ -69,10 +69,18 @@ export const resolveIndustry = (
 		`
 		if (existing[0] !== undefined) return existing[0]
 
+		// No index is named: the table is unique on both the folded name and the
+		// slug, and naming only one of them leaves the other free to raise. With
+		// several writers in flight one can clear the named index and then meet
+		// another's committed row in the second, which is a plain unique violation
+		// rather than the quiet do-nothing this needs. Both indexes say the same
+		// thing here — the slug is the folded name with its spaces hyphenated — so
+		// either one firing means the trade already exists, which is what the read
+		// below goes to fetch.
 		const inserted = yield* sql<Industry>`
 			INSERT INTO company_industries (organization_id, label, slug, folded_key, needs_review)
 			VALUES (${orgId}, ${label.trim()}, ${slugFromLabel(label)}, ${folded}, ${options?.needsReview ?? false})
-			ON CONFLICT (organization_id, folded_key) DO NOTHING
+			ON CONFLICT DO NOTHING
 			RETURNING ${COLUMNS(sql)}
 		`
 		if (inserted[0] !== undefined) return inserted[0]

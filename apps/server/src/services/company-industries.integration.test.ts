@@ -142,18 +142,25 @@ describe('naming a trade', () => {
 		})
 	})
 
-	describe('when two writers ask for the same new trade at once', () => {
-		it('should still end with one row', async () => {
-			// GIVEN four callers naming a trade the organisation does not have yet
+	describe('when several writers ask for the same new trade at once', () => {
+		it('should give them one row without any of them failing', async () => {
+			// GIVEN six callers naming a trade the organisation does not have yet
 			// WHEN they all resolve it at the same moment
-			// THEN they get one trade between them: the loser of the race reads back
-			//      what the winner wrote instead of failing or making a second row
-			const results = await Promise.all(
-				Array.from({ length: 4 }, () =>
-					run(withSql(sql => resolveIndustry(sql, ORG, 'Fusteria'))),
+			// THEN none of them fails. This is asserted before the count because a
+			//      raised unique violation used to read as a flake: the callers that
+			//      did survive still agreed on one id, so counting alone passed while
+			//      a caller had been handed a server error.
+			const outcomes = await Promise.all(
+				Array.from({ length: 6 }, () =>
+					attempt(withSql(sql => resolveIndustry(sql, ORG, 'Fusteria'))),
 				),
 			)
-			expect(new Set(results.map(r => r.id)).size).toBe(1)
+			expect(outcomes.filter(Exit.isFailure)).toEqual([])
+
+			// AND they get one trade between them: whoever loses the race reads back
+			// what the winner wrote instead of making a second row
+			const ids = outcomes.flatMap(o => (Exit.isSuccess(o) ? [o.value.id] : []))
+			expect(new Set(ids).size).toBe(1)
 		})
 	})
 
