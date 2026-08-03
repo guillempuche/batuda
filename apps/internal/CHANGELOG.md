@@ -3,6 +3,46 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-03 (internal-v2026.8.3)
+
+### Features
+
+* a company is more than one mailbox, one place, and one decider ([247bf91](https://github.com/guillempuche/batuda/commit/247bf915739c8be4574fea8a187251ab7ea975a6)), closes [#376](https://github.com/guillempuche/batuda/issues/376)
+* carry an address name and a person's branch through the API ([ee93ba0](https://github.com/guillempuche/batuda/commit/ee93ba046366222c755258ddc3f8f79fd367b426))
+* describe mailboxes freely and decide access from who owns them ([a626db1](https://github.com/guillempuche/batuda/commit/a626db1b98848b30d5ca898ba27b4f2158ea9bde)), closes [#375](https://github.com/guillempuche/batuda/issues/375)
+* **internal:** show every way of reaching a company, each named ([d27999a](https://github.com/guillempuche/batuda/commit/d27999a9ab5769844e95734c7c0d83a1abd1b232))
+* keep the contact details and people a research run finds ([8eff397](https://github.com/guillempuche/batuda/commit/8eff397812861fcec30ec459514d222fa0261dd9))
+* let each organisation name the trades it sells to ([fd9c998](https://github.com/guillempuche/batuda/commit/fd9c9982e9eef1db581ec8c77fccdbd156cf0340))
+* let every member manage the shared instruction templates ([e3e692a](https://github.com/guillempuche/batuda/commit/e3e692a123747b0fe11566dbf9bec5aaacae6864))
+* store the number a company is registered under ([d0dd2c5](https://github.com/guillempuche/batuda/commit/d0dd2c50629ec6c2ccfc7d71e127ad5086c58f22))
+
+### Bug Fixes
+
+* **internal:** let a screen reader and keyboard follow the thread list ([6e36437](https://github.com/guillempuche/batuda/commit/6e3643753e6cbe656b0862bcbf1070a0f9568cee))
+* **internal:** say which address is which to a reader who hears the page ([1db4f90](https://github.com/guillempuche/batuda/commit/1db4f907fa38a48579d9a79ebc034dab1aaf2fed))
+* **internal:** show the whole page of mail instead of a few rows ([e3f0e53](https://github.com/guillempuche/batuda/commit/e3f0e53bef64b3cccea2ae2243c4f8c005f8db1d))
+* keep the template dialog usable by keyboard and screen reader ([7356841](https://github.com/guillempuche/batuda/commit/735684190611848eb1de14828ed8f6ef0b1d3e31))
+* **ui:** turn only the leading arrow when a section opens ([575ada2](https://github.com/guillempuche/batuda/commit/575ada2a86b84a89d9f4aaad58ca64dbc28db585))
+
+### Refactoring
+
+* remove what the trades change left behind ([263d903](https://github.com/guillempuche/batuda/commit/263d90396fa30e9b89da931666ce6cb0cf348ca0))
+* stop keeping a second list of who a product is for ([4c2d5ea](https://github.com/guillempuche/batuda/commit/4c2d5ea12103b77b00bc5fe3bf7d2341bb49a7c7))
+
+### Tests
+
+* **research:** measure the company shapes this issue is about ([030c5b3](https://github.com/guillempuche/batuda/commit/030c5b31911bdf124d3f694bf69cce5e9ed67e00))
+* stop the mail tests reading and waiting on the wrong things ([9ed6517](https://github.com/guillempuche/batuda/commit/9ed651777ff23c6c922911b4708148beb5e0a047))
+
+### CI/CD
+
+* **release:** ui v2026.7.28 ([acb53ba](https://github.com/guillempuche/batuda/commit/acb53ba19db2f26498659d1979f20b9f1dad953e))
+
+### Chores
+
+* raise Effect to beta.102 and fix what the raise uncovered ([72da41c](https://github.com/guillempuche/batuda/commit/72da41cf0d4e69a002cf740a1f8f96cbbe5a80c9))
+* say the mailbox rules once instead of three times ([a9cff18](https://github.com/guillempuche/batuda/commit/a9cff18ad9635b0073dfe06a7151d81c207b794c))
+
 ## 2026-07-28 (internal-v2026.7.28)
 
 ### Features
