@@ -2,20 +2,31 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { ChevronRight } from 'lucide-react'
 import styled from 'styled-components'
 
+import { COMPANY_SIZE_RANGES } from '@batuda/domain'
 import { PriCollapsible } from '@batuda/ui/pri'
 
 import {
 	EditableChips,
+	EditableCombobox,
 	EditableField,
+	EditableSelect,
 } from '#/components/shared/editable-field'
+import { useCompanyIndustries } from '#/hooks/use-company-industries'
 import { agedPaperSurface, stenciledTitle } from '#/lib/workshop-mixins'
+
+// The bands are numbers, not words, so they read the same in every language and
+// need no translating. An empty first entry is what lets somebody take a size
+// back off a company.
+const SIZE_OPTIONS = [
+	{ value: '', label: '—' },
+	...COMPANY_SIZE_RANGES.map(band => ({ value: band, label: band })),
+]
 
 export type AboutCompany = {
 	readonly industry: string | null
 	readonly country: string | null
 	readonly location: string | null
 	readonly sizeRange: string | null
-	readonly source: string | null
 	readonly painPoints: string | null
 	readonly currentTools: string | null
 	readonly tags: ReadonlyArray<string>
@@ -28,7 +39,7 @@ export type AboutCompany = {
  * Overview leads with deal-driving signals (next action, cadence,
  * tasks, timeline). Three subsections:
  *
- *   - Sales context (industry, country, location, size, source)
+ *   - Sales context (industry, country, location, size)
  *   - Discovery (pain points, current tools)
  *   - Tags & fit (tags, products fit)
  *
@@ -43,6 +54,7 @@ export function AboutSection({
 	readonly onSave: (field: string, next: unknown) => Promise<void>
 }) {
 	const { t } = useLingui()
+	const { labels, labelFor } = useCompanyIndustries()
 	return (
 		<PriCollapsible.Root>
 			<TriggerWrap>
@@ -58,10 +70,16 @@ export function AboutSection({
 							<Trans>Sales context</Trans>
 						</GroupTitle>
 						<Grid>
-							<EditableField
+							{/* Typed, not picked from a list: the first person to sell to
+							    boat builders has to be able to write it down. What the
+							    others already wrote is offered while typing, so the same
+							    trade is spelled the same way twice. */}
+							<EditableCombobox
 								label={t`Industry`}
-								value={company.industry}
+								value={labelFor(company.industry)}
+								suggestions={labels}
 								onSave={next => onSave('industry', next)}
+								testId='company-industry'
 							/>
 							<EditableField
 								label={t`Country`}
@@ -73,15 +91,16 @@ export function AboutSection({
 								value={company.location}
 								onSave={next => onSave('location', next)}
 							/>
-							<EditableField
+							{/* A band rather than a typed number: the bands are a closed set,
+							    so a typed "20 people" would be refused on the way in with
+							    nothing on screen to say which words are allowed. A row still
+							    holding an older band shows it, because the dropdown falls
+							    back to whatever value it was given. */}
+							<EditableSelect
 								label={t`Size`}
 								value={company.sizeRange}
+								options={SIZE_OPTIONS}
 								onSave={next => onSave('sizeRange', next)}
-							/>
-							<EditableField
-								label={t`Source`}
-								value={company.source}
-								onSave={next => onSave('source', next)}
 							/>
 						</Grid>
 					</Group>

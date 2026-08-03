@@ -37,6 +37,10 @@ export {
 	CompanyResearchRun,
 } from './routes/companies'
 export {
+	CompanyIndustriesGroup,
+	CompanyIndustryView,
+} from './routes/company-industries'
+export {
 	ContactListItem,
 	ContactSummary,
 	ContactsGroup,

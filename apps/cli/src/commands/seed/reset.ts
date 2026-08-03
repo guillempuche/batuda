@@ -18,5 +18,5 @@ export const seedReset = Effect.gen(function* () {
 	// company or a person — and a table nothing points at is a table nothing
 	// clears. Left out, every address on file would survive a reset and attach
 	// itself to whatever new row happened to be given the same id.
-	yield* sql`TRUNCATE companies, channels, products, pages, research_runs, sources, user_research_policy, organization_research_policy, email_thread_links, email_messages, call_recordings, instruction_templates, instruction_stacks, instruction_stack_items CASCADE`
+	yield* sql`TRUNCATE companies, company_industries, channels, products, pages, research_runs, sources, user_research_policy, organization_research_policy, email_thread_links, email_messages, call_recordings, instruction_templates, instruction_stacks, instruction_stack_items CASCADE`
 })

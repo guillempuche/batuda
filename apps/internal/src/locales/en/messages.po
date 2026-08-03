@@ -60,6 +60,11 @@ msgstr "(no subject)"
 msgid "(no summary)"
 msgstr "(no summary)"
 
+#. placeholder {0}: needsReview.length
+#: src/routes/settings/organization/industries.tsx
+msgid "{0, plural, one {# came from research and nobody has read it yet.} other {# came from research and nobody has read them yet.}}"
+msgstr "{0, plural, one {# came from research and nobody has read it yet.} other {# came from research and nobody has read them yet.}}"
+
 #. placeholder {0}: quality.fields_grounded ?? 0
 #: src/components/research/findings/company-enrichment-view.tsx
 msgid "{0, plural, one {# fact backed by a source} other {# facts backed by a source}}"
@@ -104,6 +109,11 @@ msgstr "{0} attendees"
 #: src/routes/settings/organization/spend.tsx
 msgid "{0} calls"
 msgstr "{0} calls"
+
+#. placeholder {0}: industry.companyCount
+#: src/routes/settings/organization/industries.tsx
+msgid "{0} companies"
+msgstr "{0} companies"
 
 #. placeholder {0}: row.email
 #: src/routes/emails/inboxes.tsx
@@ -229,8 +239,13 @@ msgid "1 call"
 msgstr "1 call"
 
 #: src/routes/companies/index.tsx
+#: src/routes/settings/organization/industries.tsx
 msgid "1 company"
 msgstr "1 company"
+
+#: src/routes/companies/index.tsx
+msgid "1 company with filters applied"
+msgstr "1 company with filters applied"
 
 #: src/routes/emails/index.tsx
 msgid "1 msg"
@@ -269,6 +284,7 @@ msgid "About"
 msgstr "About"
 
 #: src/routes/calendar/index.tsx
+#: src/routes/settings/organization/industries.tsx
 msgid "Accept"
 msgstr "Accept"
 
@@ -529,6 +545,10 @@ msgstr "An owner removed this one. Ask them to allow it again."
 #: src/components/research/inbox/research-inbox.tsx
 msgid "and {hidden} more on the run"
 msgstr "and {hidden} more on the run"
+
+#: src/routes/settings/organization/industries.tsx
+msgid "Another industry may already go by that name — merge them instead."
+msgstr "Another industry may already go by that name — merge them instead."
 
 #: src/components/research/research-dialog.tsx
 msgid "Any"
@@ -883,6 +903,7 @@ msgstr "Calls"
 #: src/routes/settings/api-keys/index.tsx
 #: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/connections.tsx
+#: src/routes/settings/organization/industries.tsx
 #: src/routes/tasks/index.tsx
 msgid "Cancel"
 msgstr "Cancel"
@@ -1309,6 +1330,11 @@ msgstr "Copy your key now"
 msgid "Could be more than one person on file"
 msgstr "Could be more than one person on file"
 
+#. placeholder {0}: industry.label
+#: src/routes/settings/organization/industries.tsx
+msgid "Could not accept {0}"
+msgstr "Could not accept {0}"
+
 #: src/routes/settings/organization/members.tsx
 msgid "Could not add {trimmed}. Please try again."
 msgstr "Could not add {trimmed}. Please try again."
@@ -1408,6 +1434,10 @@ msgstr "Could not load tasks"
 msgid "Could not load the board"
 msgstr "Could not load the board"
 
+#: src/routes/settings/organization/industries.tsx
+msgid "Could not load the industries"
+msgstr "Could not load the industries"
+
 #: src/routes/settings/mcp/connections.tsx
 msgid "Could not load the organization's connections."
 msgstr "Could not load the organization's connections."
@@ -1460,6 +1490,11 @@ msgstr "Could not locate"
 msgid "Could not log the interaction. Please try again."
 msgstr "Could not log the interaction. Please try again."
 
+#. placeholder {0}: from.label
+#: src/routes/settings/organization/industries.tsx
+msgid "Could not merge {0}"
+msgstr "Could not merge {0}"
+
 #: src/components/companies/pipeline-board.tsx
 msgid "Could not move the lead"
 msgstr "Could not move the lead"
@@ -1473,9 +1508,19 @@ msgstr "Could not publish the page. Please try again."
 msgid "Could not reach {0}."
 msgstr "Could not reach {0}."
 
+#. placeholder {0}: industry.label
+#: src/routes/settings/organization/industries.tsx
+msgid "Could not remove {0}"
+msgstr "Could not remove {0}"
+
 #: src/routes/settings/organization/members.tsx
 msgid "Could not remove {email}. Please try again."
 msgstr "Could not remove {email}. Please try again."
+
+#. placeholder {0}: industry.label
+#: src/routes/settings/organization/industries.tsx
+msgid "Could not rename {0}"
+msgstr "Could not rename {0}"
 
 #: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/review/proposed-updates-review.tsx
@@ -2058,6 +2103,7 @@ msgid "Edit {0}"
 msgstr "Edit {0}"
 
 #: src/components/shared/editable-field.tsx
+#: src/components/shared/editable-field.tsx
 msgid "Edit {label}"
 msgstr "Edit {label}"
 
@@ -2211,6 +2257,10 @@ msgstr "Event"
 #: src/routes/settings/mcp/connections.tsx
 msgid "Every assistant that can reach this organization's data right now. Names come from the assistant itself, so treat them as labels rather than proof."
 msgstr "Every assistant that can reach this organization's data right now. Names come from the assistant itself, so treat them as labels rather than proof."
+
+#: src/routes/settings/organization/industries.tsx
+msgid "Every company on it moves to the industry you pick, and this one goes."
+msgstr "Every company on it moves to the industry you pick, and this one goes."
 
 #: src/routes/documents/index.tsx
 msgid "Every kind"
@@ -2600,6 +2650,11 @@ msgstr "Inbox updated"
 msgid "Inboxes"
 msgstr "Inboxes"
 
+#: src/routes/settings/organization/index.tsx
+#: src/routes/settings/organization/industries.tsx
+msgid "Industries"
+msgstr "Industries"
+
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/findings/prospect-scan-view.tsx
@@ -2668,6 +2723,10 @@ msgstr "It can reach this organization from its next request."
 #: src/routes/login.tsx
 msgid "It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it? Check spam."
 msgstr "It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it? Check spam."
+
+#: src/routes/settings/organization/industries.tsx
+msgid "It is still on at least one company — merge it instead."
+msgstr "It is still on at least one company — merge it instead."
 
 #: src/components/primitives/pri-rich-text.tsx
 msgid "Italic"
@@ -2861,6 +2920,7 @@ msgstr "Loading your research budget…"
 #: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/organization/index.tsx
+#: src/routes/settings/organization/industries.tsx
 #: src/routes/settings/organization/members.tsx
 msgid "Loading…"
 msgstr "Loading…"
@@ -2943,10 +3003,6 @@ msgstr "Make {0} the address you send from"
 #: src/components/instructions/stack-list.tsx
 msgid "Make {0} the default"
 msgstr "Make {0} the default"
-
-#: src/components/contacts/manage-channels-dialog.tsx
-#~ msgid "Make primary"
-#~ msgstr "Make primary"
 
 #: src/components/instructions/stack-editor.tsx
 msgid "Make this my default"
@@ -3080,6 +3136,26 @@ msgstr "Member"
 #: src/routes/settings/organization/members.tsx
 msgid "Members"
 msgstr "Members"
+
+#: src/routes/settings/organization/industries.tsx
+#: src/routes/settings/organization/industries.tsx
+msgid "Merge"
+msgstr "Merge"
+
+#. placeholder {0}: mergeSource?.label ?? ''
+#: src/routes/settings/organization/industries.tsx
+msgid "Merge {0}"
+msgstr "Merge {0}"
+
+#. placeholder {0}: industry.label
+#: src/routes/settings/organization/industries.tsx
+msgid "Merge {0} into another"
+msgstr "Merge {0} into another"
+
+#. placeholder {0}: from.label
+#: src/routes/settings/organization/industries.tsx
+msgid "Merged {0}"
+msgstr "Merged {0}"
 
 #: src/components/research/proposal-outcome.tsx
 msgid "Merged into existing"
@@ -3399,6 +3475,10 @@ msgstr "No footers"
 #: src/routes/index.tsx
 msgid "No high-priority companies without a scheduled follow-up"
 msgstr "No high-priority companies without a scheduled follow-up"
+
+#: src/routes/settings/organization/industries.tsx
+msgid "No industries yet. One appears here as soon as a company is given a trade."
+msgstr "No industries yet. One appears here as soon as a company is given a trade."
 
 #: src/routes/settings/api-keys/index.tsx
 msgid "No keys yet. Create one above to connect an agent."
@@ -3820,6 +3900,7 @@ msgid "Org templates"
 msgstr "Org templates"
 
 #: src/routes/settings/organization/index.tsx
+#: src/routes/settings/organization/industries.tsx
 #: src/routes/settings/organization/members.tsx
 #: src/routes/settings/profile/index.tsx
 msgid "Organization"
@@ -4052,6 +4133,11 @@ msgstr "Pick a provider"
 #: src/components/research/research-dialog.tsx
 msgid "Pick a saved stack, or use your default."
 msgstr "Pick a saved stack, or use your default."
+
+#: src/routes/settings/organization/industries.tsx
+#: src/routes/settings/organization/industries.tsx
+msgid "Pick an industry"
+msgstr "Pick an industry"
 
 #: src/routes/emails/index.tsx
 msgid "Pick an organization from the switcher in the header, or sign out and back in. After a recent dev DB reset, existing sessions can point at organization ids that the reset removed."
@@ -4370,6 +4456,7 @@ msgid "Release owner"
 msgstr "Release owner"
 
 #: src/routes/emails/inboxes.tsx
+#: src/routes/settings/organization/industries.tsx
 #: src/routes/settings/organization/members.tsx
 msgid "Remove"
 msgstr "Remove"
@@ -4381,10 +4468,11 @@ msgstr "Remove \"{0}\" from the stacks that use it first, then delete it."
 
 #. placeholder {0}: att.filename
 #. placeholder {0}: ch.value
-#. placeholder {0}: o.name
+#. placeholder {0}: industry.label
 #: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/emails/attachment-picker.tsx
 #: src/components/instructions/stack-picker.tsx
+#: src/routes/settings/organization/industries.tsx
 msgid "Remove {0}"
 msgstr "Remove {0}"
 
@@ -4396,10 +4484,6 @@ msgstr "Remove {chip}"
 msgid "Remove {email} from this organization?"
 msgstr "Remove {email} from this organization?"
 
-#: src/components/contacts/manage-channels-dialog.tsx
-#~ msgid "Remove channel"
-#~ msgstr "Remove channel"
-
 #: src/components/companies/proposals-panel.tsx
 msgid "Remove line"
 msgstr "Remove line"
@@ -4407,6 +4491,12 @@ msgstr "Remove line"
 #: src/routes/settings/organization/members.tsx
 msgid "Removing…"
 msgstr "Removing…"
+
+#. placeholder {0}: industry.label
+#: src/routes/settings/organization/industries.tsx
+#: src/routes/settings/organization/industries.tsx
+msgid "Rename {0}"
+msgstr "Rename {0}"
 
 #: src/routes/emails/$threadId.tsx
 #: src/routes/emails/index.tsx
@@ -4515,6 +4605,10 @@ msgstr "Retry"
 msgid "Reusable, standing guidance your agents follow — what you sell, who you target, tone, and which sources to trust."
 msgstr "Reusable, standing guidance your agents follow — what you sell, who you target, tone, and which sources to trust."
 
+#: src/routes/settings/organization/index.tsx
+msgid "Review the industries on your companies"
+msgstr "Review the industries on your companies"
+
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Review what the research agent found and decide what enters the CRM."
 msgstr "Review what the research agent found and decide what enters the CRM."
@@ -4599,6 +4693,7 @@ msgstr "Sales context"
 #: src/routes/emails/inboxes.tsx
 #: src/routes/pages/$id.tsx
 #: src/routes/settings/mcp/connections.tsx
+#: src/routes/settings/organization/industries.tsx
 msgid "Save"
 msgstr "Save"
 
@@ -4980,7 +5075,6 @@ msgstr "Sort"
 msgid "source"
 msgstr "source"
 
-#: src/components/companies/about-section.tsx
 #: src/routes/calendar/index.tsx
 #: src/routes/tasks/index.tsx
 msgid "Source"
@@ -5401,6 +5495,14 @@ msgstr "The threads could not be fetched. Check that the session is valid, then 
 #: src/routes/reset-password.tsx
 msgid "The token expired or was already used. Request a fresh link."
 msgstr "The token expired or was already used. Request a fresh link."
+
+#: src/routes/settings/organization/index.tsx
+msgid "The trades your companies are in — check the ones research suggested, and merge any duplicates."
+msgstr "The trades your companies are in — check the ones research suggested, and merge any duplicates."
+
+#: src/routes/settings/organization/industries.tsx
+msgid "The trades your companies are in. Each one is written the first time somebody uses it, however they spell it — this is where the list gets tidied."
+msgstr "The trades your companies are in. Each one is written the first time somebody uses it, however they spell it — this is where the list gets tidied."
 
 #: src/routes/settings/profile/index.tsx
 msgid "The two new password fields don't match."

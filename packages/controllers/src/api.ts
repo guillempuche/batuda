@@ -5,6 +5,7 @@ import { AuthGroup } from './routes/auth'
 import { CalcomWebhookGroup } from './routes/calcom-webhook'
 import { CalendarGroup } from './routes/calendar'
 import { CompaniesGroup } from './routes/companies'
+import { CompanyIndustriesGroup } from './routes/company-industries'
 import { ContactsGroup } from './routes/contacts'
 import { DocumentsGroup } from './routes/documents'
 import { EmailGroup } from './routes/email'
@@ -38,6 +39,7 @@ export const BatudaApi = HttpApi.make('BatudaApi')
 	.add(McpOAuthGroup)
 	.add(MembersGroup)
 	.add(CompaniesGroup)
+	.add(CompanyIndustriesGroup)
 	.add(ContactsGroup)
 	.add(InteractionsGroup)
 	.add(TasksGroup)

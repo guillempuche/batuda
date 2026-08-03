@@ -200,8 +200,8 @@ describe('ingestCalcomCancel — SQL contract', () => {
 		let companyId = existing.rows[0]?.id
 		if (!companyId) {
 			const inserted = await pool.query<{ id: string }>(
-				`INSERT INTO companies (organization_id, slug, name, status, source)
-				 VALUES ($1, $2, 'Cancel-task fixture', 'prospect', 'manual')
+				`INSERT INTO companies (organization_id, slug, name, status)
+				 VALUES ($1, $2, 'Cancel-task fixture', 'prospect')
 				 RETURNING id`,
 				[orgId, FIXTURE_COMPANY_SLUG],
 			)

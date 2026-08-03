@@ -16,7 +16,7 @@ const acme: GoldenExpectation = {
 	fields: {
 		industry: 'transport',
 		country: 'ES',
-		size_range: '26-50',
+		size_range: '11-50',
 	},
 }
 
@@ -249,35 +249,65 @@ describe('scoreRun', () => {
 		})
 	})
 
-	describe('when scoring the open industry field across languages', () => {
+	describe('when scoring the trade a run named', () => {
 		const withIndustry = (expected: string, actual: string): RunScore =>
 			scoreRun(
 				{ ...acme, fields: { industry: expected } },
 				outcome({ fields: { industry: actual } }),
 			)
 
-		it('should match a Catalan code against its English cognate via the shared stem', () => {
-			// GIVEN the golden holds the CRM code and the run reports English free text
-			// WHEN their Latin stems line up — THEN the field counts as correct
+		it('should count a longer naming of the same trade as correct', () => {
+			// GIVEN a golden naming the trade and a run that read it off a page,
+			// where the page says more than the golden does
+			// WHEN the golden's words are all in what was read
+			// THEN it is the same trade, so the field counts as correct
 			expect(
-				withIndustry('manufacturing', 'Bike Manufacturing Ltd').fieldsCorrect,
-			).toBe(1)
-			expect(
-				withIndustry('services', 'financial services provider').fieldsCorrect,
-			).toBe(1)
-		})
-
-		it('should match across accents', () => {
-			// GIVEN an accented code and its un-accented English cognate
-			expect(
-				withIndustry('construction', 'construction company').fieldsCorrect,
+				withIndustry(
+					'Bicycle manufacturing',
+					'Bicycle manufacturing and repair',
+				).fieldsCorrect,
 			).toBe(1)
 		})
 
-		it('should still miss a genuine categorization gap', () => {
-			// GIVEN a bank the run labels "banking" while the CRM codes it "services"
-			// WHEN no stem is shared — THEN it counts as wrong, the signal the eval wants
-			expect(withIndustry('services', 'banking').fieldsCorrect).toBe(0)
+		it('should read two spellings of one trade as one trade', () => {
+			// GIVEN the same trade written with and without its accents, and with
+			// the Catalan l·l spelled out
+			// WHEN scored — THEN the spelling difference does not cost a point,
+			// because the CRM would file both on one entry too
+			expect(withIndustry('Metal·lúrgia', 'metallurgia').fieldsCorrect).toBe(1)
+			expect(
+				withIndustry('Fusteria d’alumini', "fusteria d'alumini").fieldsCorrect,
+			).toBe(1)
+		})
+
+		it('should forgive an ending on the same word', () => {
+			// GIVEN a golden in the singular and a page that wrote the plural
+			// WHEN the two share a stem — THEN they are the same trade
+			expect(withIndustry('Fusteria', 'Fusteries Roca').fieldsCorrect).toBe(1)
+			expect(
+				withIndustry('manufacturing', 'Bike Manufacturer Ltd').fieldsCorrect,
+			).toBe(1)
+		})
+
+		it('should score a trade written in a non-Latin script', () => {
+			// GIVEN a trade named in Cyrillic on both sides — the case an
+			// a-to-z-only comparison silently turned into "no words at all"
+			expect(withIndustry('Логистика', 'Логистика').fieldsCorrect).toBe(1)
+			expect(withIndustry('Логистика', 'Строительство').fieldsCorrect).toBe(0)
+		})
+
+		it('should still miss a genuinely different trade', () => {
+			// GIVEN a bank a run labelled "banking" against a golden of "insurance"
+			// WHEN no stem is shared — THEN it counts as wrong, the signal the eval
+			// exists to give
+			expect(withIndustry('insurance', 'banking').fieldsCorrect).toBe(0)
+		})
+
+		it('should score a name with nothing to fold as a miss, not a match', () => {
+			// GIVEN a run that answered with punctuation only
+			// WHEN there is no word in it — THEN it matches nothing, rather than
+			// matching every other empty folding
+			expect(withIndustry('Fusteria', '...').fieldsCorrect).toBe(0)
 		})
 	})
 
@@ -926,7 +956,7 @@ describe('scoreRun for the company shapes this measures', () => {
 					fields: {
 						industry: 'transport',
 						country: 'ES',
-						size_range: '26-50',
+						size_range: '11-50',
 						// Values the golden row says nothing about
 						email: 'info@acme.es',
 						phone: '+34 900 000 000',

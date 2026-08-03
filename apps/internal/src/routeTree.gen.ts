@@ -40,6 +40,7 @@ import { Route as SettingsOrganizationTemplatesRouteImport } from './routes/sett
 import { Route as SettingsOrganizationSpendRouteImport } from './routes/settings/organization/spend'
 import { Route as SettingsOrganizationPolicyRouteImport } from './routes/settings/organization/policy'
 import { Route as SettingsOrganizationMembersRouteImport } from './routes/settings/organization/members'
+import { Route as SettingsOrganizationIndustriesRouteImport } from './routes/settings/organization/industries'
 import { Route as SettingsMcpConnectionsRouteImport } from './routes/settings/mcp/connections'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -203,6 +204,12 @@ const SettingsOrganizationMembersRoute =
     path: '/settings/organization/members',
     getParentRoute: () => rootRouteImport,
   } as any)
+const SettingsOrganizationIndustriesRoute =
+  SettingsOrganizationIndustriesRouteImport.update({
+    id: '/settings/organization/industries',
+    path: '/settings/organization/industries',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const SettingsMcpConnectionsRoute = SettingsMcpConnectionsRouteImport.update({
   id: '/settings/mcp/connections',
   path: '/settings/mcp/connections',
@@ -233,6 +240,7 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof SettingsIndexRoute
   '/tasks/': typeof TasksIndexRoute
   '/settings/mcp/connections': typeof SettingsMcpConnectionsRoute
+  '/settings/organization/industries': typeof SettingsOrganizationIndustriesRoute
   '/settings/organization/members': typeof SettingsOrganizationMembersRoute
   '/settings/organization/policy': typeof SettingsOrganizationPolicyRoute
   '/settings/organization/spend': typeof SettingsOrganizationSpendRoute
@@ -267,6 +275,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsIndexRoute
   '/tasks': typeof TasksIndexRoute
   '/settings/mcp/connections': typeof SettingsMcpConnectionsRoute
+  '/settings/organization/industries': typeof SettingsOrganizationIndustriesRoute
   '/settings/organization/members': typeof SettingsOrganizationMembersRoute
   '/settings/organization/policy': typeof SettingsOrganizationPolicyRoute
   '/settings/organization/spend': typeof SettingsOrganizationSpendRoute
@@ -302,6 +311,7 @@ export interface FileRoutesById {
   '/settings/': typeof SettingsIndexRoute
   '/tasks/': typeof TasksIndexRoute
   '/settings/mcp/connections': typeof SettingsMcpConnectionsRoute
+  '/settings/organization/industries': typeof SettingsOrganizationIndustriesRoute
   '/settings/organization/members': typeof SettingsOrganizationMembersRoute
   '/settings/organization/policy': typeof SettingsOrganizationPolicyRoute
   '/settings/organization/spend': typeof SettingsOrganizationSpendRoute
@@ -338,6 +348,7 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/tasks/'
     | '/settings/mcp/connections'
+    | '/settings/organization/industries'
     | '/settings/organization/members'
     | '/settings/organization/policy'
     | '/settings/organization/spend'
@@ -372,6 +383,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/tasks'
     | '/settings/mcp/connections'
+    | '/settings/organization/industries'
     | '/settings/organization/members'
     | '/settings/organization/policy'
     | '/settings/organization/spend'
@@ -406,6 +418,7 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/tasks/'
     | '/settings/mcp/connections'
+    | '/settings/organization/industries'
     | '/settings/organization/members'
     | '/settings/organization/policy'
     | '/settings/organization/spend'
@@ -441,6 +454,7 @@ export interface RootRouteChildren {
   SettingsIndexRoute: typeof SettingsIndexRoute
   TasksIndexRoute: typeof TasksIndexRoute
   SettingsMcpConnectionsRoute: typeof SettingsMcpConnectionsRoute
+  SettingsOrganizationIndustriesRoute: typeof SettingsOrganizationIndustriesRoute
   SettingsOrganizationMembersRoute: typeof SettingsOrganizationMembersRoute
   SettingsOrganizationPolicyRoute: typeof SettingsOrganizationPolicyRoute
   SettingsOrganizationSpendRoute: typeof SettingsOrganizationSpendRoute
@@ -671,6 +685,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsOrganizationMembersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/organization/industries': {
+      id: '/settings/organization/industries'
+      path: '/settings/organization/industries'
+      fullPath: '/settings/organization/industries'
+      preLoaderRoute: typeof SettingsOrganizationIndustriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/mcp/connections': {
       id: '/settings/mcp/connections'
       path: '/settings/mcp/connections'
@@ -705,6 +726,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsIndexRoute: SettingsIndexRoute,
   TasksIndexRoute: TasksIndexRoute,
   SettingsMcpConnectionsRoute: SettingsMcpConnectionsRoute,
+  SettingsOrganizationIndustriesRoute: SettingsOrganizationIndustriesRoute,
   SettingsOrganizationMembersRoute: SettingsOrganizationMembersRoute,
   SettingsOrganizationPolicyRoute: SettingsOrganizationPolicyRoute,
   SettingsOrganizationSpendRoute: SettingsOrganizationSpendRoute,

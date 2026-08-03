@@ -130,6 +130,7 @@ import {
 import { ScrewDot } from '#/components/shared/workshop-decorations'
 import { useComposeEmail } from '#/context/compose-email-context'
 import { useQuickCapture } from '#/context/quick-capture-context'
+import { useCompanyIndustries } from '#/hooks/use-company-industries'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
@@ -167,7 +168,6 @@ type CompanyDetail = {
 	readonly sizeRange: string | null
 	readonly country: string | null
 	readonly location: string | null
-	readonly source: string | null
 	readonly priority: number | null
 	readonly channels: ReadonlyArray<DisplayChannel>
 	readonly website: string | null
@@ -487,6 +487,7 @@ function DetailBody({
 }) {
 	const { t } = useLingui()
 	const buyingRoleLabel = useBuyingRoleLabel()
+	const { labelFor } = useCompanyIndustries()
 	const { open: openQuickCapture } = useQuickCapture()
 	const { openCompose } = useComposeEmail()
 	const [tab, setTab] = useTabSearchParam<CompanyTab>(COMPANY_TABS, 'overview')
@@ -920,7 +921,8 @@ function DetailBody({
 		refreshCompany,
 	])
 
-	const subtitleParts = [company.location, company.industry].filter(
+	// The row carries the trade's web-address form; the name is what to read.
+	const subtitleParts = [company.location, labelFor(company.industry)].filter(
 		(part): part is string => Boolean(part),
 	)
 	const subtitle = subtitleParts.join(' · ')
@@ -1784,7 +1786,6 @@ function narrowCompany(raw: unknown): CompanyDetail | null {
 		sizeRange: str('sizeRange'),
 		country: str('country'),
 		location: str('location'),
-		source: str('source'),
 		priority: num('priority'),
 		// The fields below hold one of each kind; keeping the whole list is the
 		// only way a second mailbox is ever seen.

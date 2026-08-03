@@ -6,13 +6,18 @@ import { Page } from '@batuda/domain'
 import { BlockNode, TiptapDocument } from '@batuda/ui/blocks'
 
 import { PageService } from '../../services/pages'
+import { canElicit } from './_elicit'
 import { McpPageLimit, McpPageOffset, PageResult, toPage } from './_result'
 
-// `publish_page` returns the published page, or a cancelled marker when the
-// user declines the confirmation elicitation.
+// `publish_page` returns the published page, or a cancelled marker saying why
+// nothing was published — the person declined, or this client has no way to put
+// the question to them at all.
 const PublishResult = Schema.Union([
 	Page.json,
-	Schema.Struct({ status: Schema.Literal('cancelled') }),
+	Schema.Struct({
+		status: Schema.Literal('cancelled'),
+		reason: Schema.String,
+	}),
 ])
 
 const CreatePage = Tool.make('create_page', {
@@ -147,6 +152,15 @@ export const PageHandlersLive = PageTools.toLayer(
 			publish_page: ({ id }) =>
 				Effect.gen(function* () {
 					const page = yield* service.getById(id)
+					// Making a page public is not something to do unasked, so a client
+					// that cannot put the question stops here — and says that is why,
+					// rather than reporting a refusal nobody gave.
+					if (!(yield* canElicit))
+						return {
+							status: 'cancelled' as const,
+							reason:
+								'this client cannot ask anyone to confirm making the page public; publish it from the app instead',
+						}
 					const { confirm } = yield* McpServer.elicit({
 						message: `Publish page "${page['title']}" (${page['slug']}/${page['lang']})? This makes it publicly visible.`,
 						schema: Schema.Struct({
@@ -157,7 +171,11 @@ export const PageHandlersLive = PageTools.toLayer(
 							Effect.succeed({ confirm: 'no' as const }),
 						),
 					)
-					if (confirm === 'no') return { status: 'cancelled' as const }
+					if (confirm === 'no')
+						return {
+							status: 'cancelled' as const,
+							reason: 'the page was not published because the answer was no',
+						}
 					const rows = yield* service.publish(id)
 					const published = rows[0]
 					if (published === undefined)

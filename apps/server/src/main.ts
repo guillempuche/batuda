@@ -27,6 +27,7 @@ import { ApiKeysLive } from './handlers/api-keys'
 import { AuthHandlerLive } from './handlers/auth'
 import { CalendarLive } from './handlers/calendar'
 import { CompaniesLive } from './handlers/companies'
+import { CompanyIndustriesLive } from './handlers/company-industries'
 import { ContactsLive } from './handlers/contacts'
 import { DocumentsLive } from './handlers/documents'
 import { EmailLive } from './handlers/email'
@@ -96,6 +97,7 @@ const ApiLive = HttpApiBuilder.layer(BatudaApi).pipe(
 		McpOAuthLive,
 		MembersLive,
 		CompaniesLive,
+		CompanyIndustriesLive,
 		PipelineLive,
 		ContactsLive,
 		InteractionsLive,

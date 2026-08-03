@@ -27,6 +27,8 @@
  * (years, small counts) stay untouched.
  */
 
+import { EMAIL_ADDRESS_PATTERN } from '@batuda/domain'
+
 import {
 	isInCorpus,
 	PAGE_LITERAL_FIELDS,
@@ -34,7 +36,9 @@ import {
 } from './scalar-field-guard'
 
 // A field value that IS exactly an email (used when blanking a dedicated field).
-const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
+// Shared with the CRM's own check so a value this guard keeps is one the write
+// path would also accept.
+const EMAIL_RE = EMAIL_ADDRESS_PATTERN
 // Emails found anywhere inside a value (a proposal field is a CRM write, so an
 // invented address embedded in prose is still a risk).
 const EMAIL_G = /[^@\s]+@[^@\s]+\.[^@\s]+/g

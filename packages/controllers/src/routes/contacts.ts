@@ -1,8 +1,13 @@
 import { Schema } from 'effect'
-import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi'
+import {
+	HttpApiEndpoint,
+	HttpApiGroup,
+	HttpApiSchema,
+} from 'effect/unstable/httpapi'
 
 import { Contact, ContactChannel } from '@batuda/domain'
 
+import { BadRequest } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 import { PaginatedList, pageQuery } from '../pagination'
@@ -121,6 +126,9 @@ export const ContactsGroup = HttpApiGroup.make('contacts')
 			params: { id: Schema.String },
 			payload: AddChannelInput,
 			success: ContactChannel.json,
+			// An address that could never be one of its kind — a phone number in the
+			// email field — is said so plainly rather than read as a server fault.
+			error: BadRequest.pipe(HttpApiSchema.status(400)),
 		}),
 	)
 	.add(
@@ -131,6 +139,7 @@ export const ContactsGroup = HttpApiGroup.make('contacts')
 				params: { id: Schema.String, channelId: Schema.String },
 				payload: PatchChannelInput,
 				success: ContactChannel.json,
+				error: BadRequest.pipe(HttpApiSchema.status(400)),
 			},
 		),
 	)

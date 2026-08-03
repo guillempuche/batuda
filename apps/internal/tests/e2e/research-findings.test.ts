@@ -36,7 +36,7 @@ const sourced = (value: string) => ({ value, source_id: 'src-fixture-1' })
 const ENRICHMENT_FINDINGS = {
 	enrichment: {
 		industry: sourced('Restaurant'),
-		size_range: sourced('11-25'),
+		size_range: sourced('11-50'),
 		current_tools: sourced('Paper reservations book'),
 	},
 	verdict: 'strong_fit',
@@ -116,7 +116,7 @@ test.describe('research findings', () => {
 			// THEN the multi-word values render rather than reading as blank
 			const enrichment = page.getByTestId('research-enrichment')
 			await expect(enrichment).toBeVisible()
-			await expect(enrichment).toContainText('11-25')
+			await expect(enrichment).toContainText('11-50')
 			await expect(enrichment).toContainText('Paper reservations book')
 
 			// AND the fit verdict carries the quote that decided it

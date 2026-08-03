@@ -60,6 +60,11 @@ msgstr "(sense assumpte)"
 msgid "(no summary)"
 msgstr "(sense resum)"
 
+#. placeholder {0}: needsReview.length
+#: src/routes/settings/organization/industries.tsx
+msgid "{0, plural, one {# came from research and nobody has read it yet.} other {# came from research and nobody has read them yet.}}"
+msgstr "{0, plural, one {# ve de la recerca i encara ningú no l'ha llegit.} other {# venen de la recerca i encara ningú no les ha llegit.}}"
+
 #. placeholder {0}: quality.fields_grounded ?? 0
 #: src/components/research/findings/company-enrichment-view.tsx
 msgid "{0, plural, one {# fact backed by a source} other {# facts backed by a source}}"
@@ -104,6 +109,11 @@ msgstr "{0} assistents"
 #: src/routes/settings/organization/spend.tsx
 msgid "{0} calls"
 msgstr "{0} crides"
+
+#. placeholder {0}: industry.companyCount
+#: src/routes/settings/organization/industries.tsx
+msgid "{0} companies"
+msgstr "{0} empreses"
 
 #. placeholder {0}: row.email
 #: src/routes/emails/inboxes.tsx
@@ -229,8 +239,13 @@ msgid "1 call"
 msgstr "1 crida"
 
 #: src/routes/companies/index.tsx
+#: src/routes/settings/organization/industries.tsx
 msgid "1 company"
 msgstr "1 empresa"
+
+#: src/routes/companies/index.tsx
+msgid "1 company with filters applied"
+msgstr "1 empresa amb els filtres aplicats"
 
 #: src/routes/emails/index.tsx
 msgid "1 msg"
@@ -269,6 +284,7 @@ msgid "About"
 msgstr "Sobre l'empresa"
 
 #: src/routes/calendar/index.tsx
+#: src/routes/settings/organization/industries.tsx
 msgid "Accept"
 msgstr "Accepta"
 
@@ -529,6 +545,10 @@ msgstr "Un propietari l’ha tret. Demana-li que hi torni a permetre l’accés.
 #: src/components/research/inbox/research-inbox.tsx
 msgid "and {hidden} more on the run"
 msgstr "i {hidden} més a l'execució"
+
+#: src/routes/settings/organization/industries.tsx
+msgid "Another industry may already go by that name — merge them instead."
+msgstr "Pot ser que ja hi hagi una altra indústria amb aquest nom: fusiona-les."
 
 #: src/components/research/research-dialog.tsx
 msgid "Any"
@@ -883,6 +903,7 @@ msgstr "Crides"
 #: src/routes/settings/api-keys/index.tsx
 #: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/connections.tsx
+#: src/routes/settings/organization/industries.tsx
 #: src/routes/tasks/index.tsx
 msgid "Cancel"
 msgstr "Cancel·la"
@@ -1309,6 +1330,11 @@ msgstr "Copia la teva clau ara"
 msgid "Could be more than one person on file"
 msgstr "Podria ser més d'una persona de les que tens fitxades"
 
+#. placeholder {0}: industry.label
+#: src/routes/settings/organization/industries.tsx
+msgid "Could not accept {0}"
+msgstr "No s’ha pogut acceptar {0}"
+
 #: src/routes/settings/organization/members.tsx
 msgid "Could not add {trimmed}. Please try again."
 msgstr "No s'ha pogut afegir {trimmed}. Torna-ho a provar."
@@ -1408,6 +1434,10 @@ msgstr "No s'han pogut carregar les tasques"
 msgid "Could not load the board"
 msgstr "No s'ha pogut carregar el tauler"
 
+#: src/routes/settings/organization/industries.tsx
+msgid "Could not load the industries"
+msgstr "No s’han pogut carregar les indústries"
+
 #: src/routes/settings/mcp/connections.tsx
 msgid "Could not load the organization's connections."
 msgstr "No s'han pogut carregar les connexions de l'organització."
@@ -1460,6 +1490,11 @@ msgstr "No s'ha pogut localitzar"
 msgid "Could not log the interaction. Please try again."
 msgstr "No s'ha pogut registrar la interacció. Torna-ho a provar."
 
+#. placeholder {0}: from.label
+#: src/routes/settings/organization/industries.tsx
+msgid "Could not merge {0}"
+msgstr "No s’ha pogut fusionar {0}"
+
 #: src/components/companies/pipeline-board.tsx
 msgid "Could not move the lead"
 msgstr "No s'ha pogut moure el lead"
@@ -1473,9 +1508,19 @@ msgstr "No s'ha pogut publicar la pàgina. Torna-ho a provar."
 msgid "Could not reach {0}."
 msgstr "No s'ha pogut arribar a {0}."
 
+#. placeholder {0}: industry.label
+#: src/routes/settings/organization/industries.tsx
+msgid "Could not remove {0}"
+msgstr "No s’ha pogut eliminar {0}"
+
 #: src/routes/settings/organization/members.tsx
 msgid "Could not remove {email}. Please try again."
 msgstr "No s'ha pogut eliminar {email}. Torna-ho a provar."
+
+#. placeholder {0}: industry.label
+#: src/routes/settings/organization/industries.tsx
+msgid "Could not rename {0}"
+msgstr "No s’ha pogut reanomenar {0}"
 
 #: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/review/proposed-updates-review.tsx
@@ -2058,6 +2103,7 @@ msgid "Edit {0}"
 msgstr "Edita {0}"
 
 #: src/components/shared/editable-field.tsx
+#: src/components/shared/editable-field.tsx
 msgid "Edit {label}"
 msgstr "Edita {label}"
 
@@ -2211,6 +2257,10 @@ msgstr "Esdeveniment"
 #: src/routes/settings/mcp/connections.tsx
 msgid "Every assistant that can reach this organization's data right now. Names come from the assistant itself, so treat them as labels rather than proof."
 msgstr "Tots els assistents que ara mateix poden accedir a les dades d'aquesta organització. Els noms els diu el mateix assistent, així que tracta'ls com a etiquetes, no com a prova."
+
+#: src/routes/settings/organization/industries.tsx
+msgid "Every company on it moves to the industry you pick, and this one goes."
+msgstr "Totes les empreses que hi ha passen a la indústria que triïs, i aquesta desapareix."
 
 #: src/routes/documents/index.tsx
 msgid "Every kind"
@@ -2600,6 +2650,11 @@ msgstr "Safata actualitzada"
 msgid "Inboxes"
 msgstr "Bústies"
 
+#: src/routes/settings/organization/index.tsx
+#: src/routes/settings/organization/industries.tsx
+msgid "Industries"
+msgstr "Indústries"
+
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/findings/prospect-scan-view.tsx
@@ -2668,6 +2723,10 @@ msgstr "Podrà accedir a aquesta organització a partir de la petició següent.
 #: src/routes/login.tsx
 msgid "It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it? Check spam."
 msgstr "Caduca en {MAGIC_LINK_EXPIRY_MINUTES} minuts. No el veus? Mira el correu brossa."
+
+#: src/routes/settings/organization/industries.tsx
+msgid "It is still on at least one company — merge it instead."
+msgstr "Encara és en almenys una empresa: fusiona-la."
 
 #: src/components/primitives/pri-rich-text.tsx
 msgid "Italic"
@@ -2861,6 +2920,7 @@ msgstr "Carregant el teu pressupost de recerca…"
 #: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/organization/index.tsx
+#: src/routes/settings/organization/industries.tsx
 #: src/routes/settings/organization/members.tsx
 msgid "Loading…"
 msgstr "Carregant…"
@@ -2943,10 +3003,6 @@ msgstr "Fes que {0} sigui l'adreça des d'on envies"
 #: src/components/instructions/stack-list.tsx
 msgid "Make {0} the default"
 msgstr "Fes que {0} sigui la predeterminada"
-
-#: src/components/contacts/manage-channels-dialog.tsx
-#~ msgid "Make primary"
-#~ msgstr "Fes-lo principal"
 
 #: src/components/instructions/stack-editor.tsx
 msgid "Make this my default"
@@ -3080,6 +3136,26 @@ msgstr "Membre"
 #: src/routes/settings/organization/members.tsx
 msgid "Members"
 msgstr "Membres"
+
+#: src/routes/settings/organization/industries.tsx
+#: src/routes/settings/organization/industries.tsx
+msgid "Merge"
+msgstr "Fusiona"
+
+#. placeholder {0}: mergeSource?.label ?? ''
+#: src/routes/settings/organization/industries.tsx
+msgid "Merge {0}"
+msgstr "Fusiona {0}"
+
+#. placeholder {0}: industry.label
+#: src/routes/settings/organization/industries.tsx
+msgid "Merge {0} into another"
+msgstr "Fusiona {0} amb una altra"
+
+#. placeholder {0}: from.label
+#: src/routes/settings/organization/industries.tsx
+msgid "Merged {0}"
+msgstr "S’ha fusionat {0}"
 
 #: src/components/research/proposal-outcome.tsx
 msgid "Merged into existing"
@@ -3399,6 +3475,10 @@ msgstr "Sense peus de pàgina"
 #: src/routes/index.tsx
 msgid "No high-priority companies without a scheduled follow-up"
 msgstr "Cap empresa d'alta prioritat sense seguiment programat"
+
+#: src/routes/settings/organization/industries.tsx
+msgid "No industries yet. One appears here as soon as a company is given a trade."
+msgstr "Encara no hi ha indústries. N’apareixerà una tan bon punt donis un ofici a una empresa."
 
 #: src/routes/settings/api-keys/index.tsx
 msgid "No keys yet. Create one above to connect an agent."
@@ -3820,6 +3900,7 @@ msgid "Org templates"
 msgstr "Plantilles de l'organització"
 
 #: src/routes/settings/organization/index.tsx
+#: src/routes/settings/organization/industries.tsx
 #: src/routes/settings/organization/members.tsx
 #: src/routes/settings/profile/index.tsx
 msgid "Organization"
@@ -4052,6 +4133,11 @@ msgstr "Tria un proveïdor"
 #: src/components/research/research-dialog.tsx
 msgid "Pick a saved stack, or use your default."
 msgstr "Tria una pila desada o fes servir la teva predeterminada."
+
+#: src/routes/settings/organization/industries.tsx
+#: src/routes/settings/organization/industries.tsx
+msgid "Pick an industry"
+msgstr "Tria una indústria"
 
 #: src/routes/emails/index.tsx
 msgid "Pick an organization from the switcher in the header, or sign out and back in. After a recent dev DB reset, existing sessions can point at organization ids that the reset removed."
@@ -4370,6 +4456,7 @@ msgid "Release owner"
 msgstr "Allibera el responsable"
 
 #: src/routes/emails/inboxes.tsx
+#: src/routes/settings/organization/industries.tsx
 #: src/routes/settings/organization/members.tsx
 msgid "Remove"
 msgstr "Elimina"
@@ -4381,10 +4468,11 @@ msgstr "Treu «{0}» de les piles que la fan servir abans d'eliminar-la."
 
 #. placeholder {0}: att.filename
 #. placeholder {0}: ch.value
-#. placeholder {0}: o.name
+#. placeholder {0}: industry.label
 #: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/emails/attachment-picker.tsx
 #: src/components/instructions/stack-picker.tsx
+#: src/routes/settings/organization/industries.tsx
 msgid "Remove {0}"
 msgstr "Elimina {0}"
 
@@ -4396,10 +4484,6 @@ msgstr "Elimina {chip}"
 msgid "Remove {email} from this organization?"
 msgstr "Vols eliminar {email} d'aquesta organització?"
 
-#: src/components/contacts/manage-channels-dialog.tsx
-#~ msgid "Remove channel"
-#~ msgstr "Elimina el canal"
-
 #: src/components/companies/proposals-panel.tsx
 msgid "Remove line"
 msgstr "Elimina la línia"
@@ -4407,6 +4491,12 @@ msgstr "Elimina la línia"
 #: src/routes/settings/organization/members.tsx
 msgid "Removing…"
 msgstr "Eliminant…"
+
+#. placeholder {0}: industry.label
+#: src/routes/settings/organization/industries.tsx
+#: src/routes/settings/organization/industries.tsx
+msgid "Rename {0}"
+msgstr "Reanomena {0}"
 
 #: src/routes/emails/$threadId.tsx
 #: src/routes/emails/index.tsx
@@ -4515,6 +4605,10 @@ msgstr "Torna-ho a provar"
 msgid "Reusable, standing guidance your agents follow — what you sell, who you target, tone, and which sources to trust."
 msgstr "Orientació reutilitzable i permanent que segueixen els teus agents: què vens, a qui t'adreces, el to i en quines fonts confiar."
 
+#: src/routes/settings/organization/index.tsx
+msgid "Review the industries on your companies"
+msgstr "Revisa les indústries de les teves empreses"
+
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Review what the research agent found and decide what enters the CRM."
 msgstr "Revisa què ha trobat l'agent de recerca i decideix què entra al CRM."
@@ -4599,6 +4693,7 @@ msgstr "Context comercial"
 #: src/routes/emails/inboxes.tsx
 #: src/routes/pages/$id.tsx
 #: src/routes/settings/mcp/connections.tsx
+#: src/routes/settings/organization/industries.tsx
 msgid "Save"
 msgstr "Desa"
 
@@ -4980,7 +5075,6 @@ msgstr "Ordena"
 msgid "source"
 msgstr "font"
 
-#: src/components/companies/about-section.tsx
 #: src/routes/calendar/index.tsx
 #: src/routes/tasks/index.tsx
 msgid "Source"
@@ -5401,6 +5495,14 @@ msgstr "No s'han pogut carregar les converses. Comprova que la sessió sigui và
 #: src/routes/reset-password.tsx
 msgid "The token expired or was already used. Request a fresh link."
 msgstr "El token ha caducat o ja s'ha fet servir. Demana un enllaç nou."
+
+#: src/routes/settings/organization/index.tsx
+msgid "The trades your companies are in — check the ones research suggested, and merge any duplicates."
+msgstr "Els oficis de les teves empreses: comprova els que ha proposat la recerca i fusiona’n els duplicats."
+
+#: src/routes/settings/organization/industries.tsx
+msgid "The trades your companies are in. Each one is written the first time somebody uses it, however they spell it — this is where the list gets tidied."
+msgstr "Els oficis de les teves empreses. Cadascun s’escriu el primer cop que algú l’utilitza, tal com l’escrigui: aquí és on s’endreça la llista."
 
 #: src/routes/settings/profile/index.tsx
 msgid "The two new password fields don't match."

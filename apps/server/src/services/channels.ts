@@ -1,6 +1,9 @@
 import { DateTime, Effect } from 'effect'
 import type { SqlClient } from 'effect/unstable/sql'
 
+import { BadRequest } from '@batuda/controllers'
+import { channelAddressIsValid } from '@batuda/domain'
+
 // The open channel shape both the MCP tool and the HTTP API accept. `kind` and
 // `value` are the names the outside world uses; storage calls them `channel` and
 // `address`. The two are mapped explicitly in one place (see `channelsJsonFor`),
@@ -222,6 +225,25 @@ const standDownOtherPrimaries = (sql: Sql, channelId: string) =>
 	`
 
 /** Add a single channel (the UI's "add"), returning the stored row. */
+/**
+ * Turn away an address that could never be one of its kind.
+ *
+ * The company fields check this on the way in, so without the same check here a
+ * mail address the create tool refuses is accepted by the channel tool — one
+ * value, two doors, two answers. A kind nothing describes passes, because an
+ * unknown platform is not a wrong address.
+ */
+const assertAddressLooksRight = (kind: string, value: string) =>
+	channelAddressIsValid(kind, value)
+		? Effect.void
+		: Effect.fail(
+				new BadRequest({
+					// "a valid email" rather than "a email": the article stays right
+					// whatever the kind is called.
+					message: `That does not look like a valid ${kind}: "${value}".`,
+				}),
+			)
+
 export const addChannel = (
 	sql: Sql,
 	orgId: string,
@@ -229,6 +251,7 @@ export const addChannel = (
 	c: ChannelInput,
 ) =>
 	Effect.gen(function* () {
+		yield* assertAddressLooksRight(c.kind, c.value)
 		// Saying nothing about the default is not the same as saying "not the
 		// default": naming an address already on file — which is how somebody
 		// labels one — must not quietly move where mail goes.
@@ -269,6 +292,19 @@ export const patchChannel = (
 	},
 ) =>
 	Effect.gen(function* () {
+		// Changing only the address says nothing about what kind it is, so the kind
+		// on file is what decides whether the new address is plausible.
+		if (patch.value !== undefined) {
+			const kind =
+				patch.kind ??
+				(yield* sql<{
+					channel: string
+				}>`SELECT channel FROM channels WHERE id = ${channelId} LIMIT 1`)[0]
+					?.channel
+			if (kind !== undefined) {
+				yield* assertAddressLooksRight(kind, patch.value)
+			}
+		}
 		const data: Record<string, unknown> = {
 			updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 		}

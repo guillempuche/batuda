@@ -12,6 +12,7 @@ import styled from 'styled-components'
 
 import { PriInput, PriSelect } from '@batuda/ui/pri'
 
+import { PriCombobox } from '#/components/primitives/pri-combobox'
 import {
 	agedPaperSurface,
 	brushedMetalPlate,
@@ -235,6 +236,157 @@ export function EditableSelect({
 					</PriSelect.Positioner>
 				</PriSelect.Portal>
 			</PriSelect.Root>
+		</Field>
+	)
+}
+
+export interface EditableComboboxProps {
+	readonly label: string
+	readonly value: string | null
+	/** What other people have already written here, to offer while typing. */
+	readonly suggestions: ReadonlyArray<string>
+	readonly onSave: (next: string | null) => Promise<void>
+	readonly placeholder?: string
+	readonly testId?: string
+}
+
+/**
+ * Click-to-edit text with suggestions. Anything can be typed — the list is
+ * there so the same thing gets written the same way twice, not to limit what
+ * the field will take.
+ *
+ * Enter is handled on the wrapper rather than on the input, so it only ever
+ * fires when the list did not already act on it: picking a highlighted
+ * suggestion stops the key from travelling any further, and this handler sees
+ * only the Enter that means "keep what I typed".
+ */
+export function EditableCombobox({
+	label,
+	value,
+	suggestions,
+	onSave,
+	placeholder,
+	testId,
+}: EditableComboboxProps) {
+	const { t } = useLingui()
+	const [editing, setEditing] = useState(false)
+	const [draft, setDraft] = useState(value ?? '')
+	const [pending, setPending] = useState(false)
+	const cancelledRef = useRef(false)
+	// Picking a suggestion saves straight away and blur then fires on the way
+	// out, so both paths would otherwise send the same value twice.
+	const savingRef = useRef(false)
+
+	useEffect(() => {
+		if (!editing) setDraft(value ?? '')
+	}, [editing, value])
+
+	const commit = useCallback(
+		async (raw: string) => {
+			if (cancelledRef.current) {
+				cancelledRef.current = false
+				return
+			}
+			if (savingRef.current) return
+			const next = raw.trim()
+			const canonical = next.length === 0 ? null : next
+			if (canonical === (value ?? null)) {
+				setEditing(false)
+				return
+			}
+			savingRef.current = true
+			setPending(true)
+			try {
+				await onSave(canonical)
+				setEditing(false)
+			} finally {
+				savingRef.current = false
+				setPending(false)
+			}
+		},
+		[value, onSave],
+	)
+
+	const cancel = useCallback(() => {
+		cancelledRef.current = true
+		setDraft(value ?? '')
+		setEditing(false)
+	}, [value])
+
+	if (!editing) {
+		return (
+			<Field>
+				<FieldLabel>{label}</FieldLabel>
+				<ReadTrigger
+					type='button'
+					onClick={() => setEditing(true)}
+					$multiline={false}
+					aria-label={t`Edit ${label}`}
+					data-testid={testId}
+				>
+					{value !== null && value !== '' ? (
+						<Value>{value}</Value>
+					) : (
+						<Empty>—</Empty>
+					)}
+					<PencilMark aria-hidden>
+						<Pencil size={12} />
+					</PencilMark>
+				</ReadTrigger>
+			</Field>
+		)
+	}
+
+	return (
+		<Field>
+			<FieldLabel>{label}</FieldLabel>
+			{/* biome-ignore lint/a11y/noStaticElementInteractions: the keys belong to
+			    the input inside; the wrapper only sees the ones it did not act on. */}
+			<ComboboxShell
+				onKeyDown={e => {
+					if (e.key === 'Escape') {
+						e.preventDefault()
+						cancel()
+						return
+					}
+					if (e.key === 'Enter') {
+						e.preventDefault()
+						void commit(draft)
+					}
+				}}
+			>
+				<PriCombobox.Root
+					items={suggestions}
+					value={draft}
+					onValueChange={(next, details) => {
+						setDraft(next)
+						if (details.reason === 'item-press') void commit(next)
+					}}
+				>
+					<PriCombobox.Input
+						autoFocus
+						placeholder={placeholder}
+						disabled={pending}
+						aria-label={label}
+						data-testid={testId}
+						onBlur={() => void commit(draft)}
+					/>
+					<PriCombobox.Portal>
+						<PriCombobox.Positioner sideOffset={6}>
+							<PriCombobox.Popup>
+								<PriCombobox.Empty />
+								<PriCombobox.List>
+									{(item: string) => (
+										<PriCombobox.Item key={item} value={item}>
+											{item}
+										</PriCombobox.Item>
+									)}
+								</PriCombobox.List>
+							</PriCombobox.Popup>
+						</PriCombobox.Positioner>
+					</PriCombobox.Portal>
+				</PriCombobox.Root>
+			</ComboboxShell>
 		</Field>
 	)
 }
@@ -482,6 +634,12 @@ const SelectTrigger = styled(PriSelect.Trigger).withConfig({
 		background: color-mix(in srgb, var(--color-paper-fibre-a) 45%, transparent);
 		box-shadow: none;
 	}
+`
+
+const ComboboxShell = styled.div.withConfig({
+	displayName: 'EditableComboboxShell',
+})`
+	display: contents;
 `
 
 const ChipRow = styled.div.withConfig({ displayName: 'EditableChipsRow' })`

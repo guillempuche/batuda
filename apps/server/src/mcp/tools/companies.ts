@@ -3,7 +3,24 @@ import { Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { CompanyDetail, CurrentOrg } from '@batuda/controllers'
-import { Company } from '@batuda/domain'
+import {
+	COMPANY_PRIORITIES,
+	COMPANY_STATUSES,
+	Company,
+	CompanyCountry,
+	CompanyEmail,
+	CompanyGoogleMapsUrl,
+	CompanyInstagram,
+	CompanyLatitude,
+	CompanyLinkedin,
+	CompanyLongitude,
+	CompanyPhone,
+	CompanyPriority,
+	CompanySizeRange,
+	CompanySlug,
+	CompanyStatus,
+	CompanyWebsite,
+} from '@batuda/domain'
 
 import {
 	addChannel,
@@ -12,14 +29,17 @@ import {
 } from '../../services/channels'
 import { CompanyService } from '../../services/companies'
 import { withBriefOwnership } from '../../services/company-brief'
+import { findDuplicateCompanies } from '../../services/company-duplicates'
 import {
 	geocodeCompany,
 	updateCompanyRegeocoding,
 } from '../../services/company-geocoding'
+import { listIndustries } from '../../services/company-industries'
 import { recordStageChange } from '../../services/company-stage-change'
 import { Geocoder } from '../../services/geocoder'
 import { TimelineActivityService } from '../../services/timeline-activity'
 import { CurrentUser } from '../current-user'
+import { ToolMessage } from '../tool-message'
 import { McpPageLimit, McpPageOffset, PageResult, toPage } from './_result'
 
 const REQUEST_DEPENDENCIES = [CurrentOrg, CurrentUser]
@@ -67,42 +87,48 @@ const GetCompany = Tool.make('get_company', {
 
 // The fields a new company carries — one array element of a create_companies call.
 const companyInputFields = {
-	name: Schema.String,
-	slug: Schema.String,
+	name: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
+	slug: CompanySlug,
 	taxId: Schema.optional(Schema.String).annotate({
 		description:
 			'The number the company is registered or taxed under — a Spanish NIF/CIF, a UK company number, an EU VAT number. Copy it exactly as printed; punctuation and case are ignored when matching. Supplying it is the surest way to avoid creating a company you already hold under a different name.',
 	}),
-	status: Schema.optional(Schema.String),
+	status: Schema.optional(CompanyStatus),
 	industry: Schema.optional(Schema.String),
-	sizeRange: Schema.optional(Schema.String),
-	country: Schema.optional(Schema.String),
+	sizeRange: Schema.optional(CompanySizeRange),
+	country: Schema.optional(CompanyCountry),
 	location: Schema.optional(Schema.String),
-	source: Schema.optional(Schema.String),
-	priority: Schema.optional(Schema.Number),
-	website: Schema.optional(Schema.String),
-	email: Schema.optional(Schema.String),
-	phone: Schema.optional(Schema.String),
-	instagram: Schema.optional(Schema.String),
-	linkedin: Schema.optional(Schema.String),
-	googleMapsUrl: Schema.optional(Schema.String),
+	priority: Schema.optional(CompanyPriority),
+	website: Schema.optional(CompanyWebsite),
+	email: Schema.optional(CompanyEmail),
+	phone: Schema.optional(CompanyPhone),
+	instagram: Schema.optional(CompanyInstagram),
+	linkedin: Schema.optional(CompanyLinkedin),
+	googleMapsUrl: Schema.optional(CompanyGoogleMapsUrl),
 	productsFit: Schema.optional(Schema.Array(Schema.String)),
 	tags: Schema.optional(Schema.Array(Schema.String)),
 	painPoints: Schema.optional(Schema.String),
 	currentTools: Schema.optional(Schema.String),
 	nextAction: Schema.optional(Schema.String),
 	nextActionAt: Schema.optional(Schema.String),
-	latitude: Schema.optional(Schema.Number),
-	longitude: Schema.optional(Schema.Number),
+	// Finite, not a plain number: a plain number also admits NaN, which reaches
+	// the database as a server error rather than a refused value.
+	latitude: Schema.optional(CompanyLatitude),
+	longitude: Schema.optional(CompanyLongitude),
 	geocodedAt: Schema.optional(Schema.String),
 	geocodeSource: Schema.optional(Schema.String),
 	metadata: Schema.optional(Schema.Unknown),
 }
 const CompanyInput = Schema.Struct(companyInputFields)
 
+// Written from the vocabularies rather than typed out beside them. The typed-out
+// version drifted: it offered three statuses the app has never had and a priority
+// range twice the real one, and assistants followed it into rows that show up in
+// no board column. Now the sentence cannot say anything the schema would refuse.
+export const CREATE_COMPANIES_DESCRIPTION = `Create one or more companies in a single call — pass \`companies\` as an array (a single element to create just one, the whole shortlist to load a batch). Slug: unique kebab-case from name. Status: ${COMPANY_STATUSES.join('|')} (default: prospect). Priority: ${COMPANY_PRIORITIES[0]} (highest) to ${COMPANY_PRIORITIES[COMPANY_PRIORITIES.length - 1]} (lowest, default: 2). Pass taxId whenever you know it: a company is skipped if its slug already exists OR its registration number already does, so the number catches the same firm arriving under a different trading name. Runs in one transaction; a skip is not an error, so re-running an overlapping list is safe. Returns { created, skipped, possible_duplicates }: the rows that landed, for each one left out its slug plus matched_on ("slug" or "tax_id") saying which identity already existed, and any company that looks like one already on file under a different name — reported, not blocked, so check those before treating them as new.`
+
 const CreateCompanies = Tool.make('create_companies', {
-	description:
-		'Create one or more companies in a single call — pass `companies` as an array (a single element to create just one, the whole shortlist to load a batch). Slug: unique kebab-case from name. Status: prospect|lead|qualified|proposal|negotiation|client|closed|dead (default: prospect). Priority: 1 (highest) to 5 (lowest, default: 2). Pass taxId whenever you know it: a company is skipped if its slug already exists OR its registration number already does, so the number catches the same firm arriving under a different trading name. Runs in one transaction; a skip is not an error, so re-running an overlapping list is safe. Returns { created, skipped }: the rows that landed, and for each one left out its slug plus matched_on ("slug" or "tax_id") saying which identity already existed.',
+	description: CREATE_COMPANIES_DESCRIPTION,
 	parameters: Schema.Struct({
 		companies: Schema.Array(CompanyInput),
 	}),
@@ -112,6 +138,17 @@ const CreateCompanies = Tool.make('create_companies', {
 			Schema.Struct({
 				slug: Schema.String,
 				matched_on: Schema.Literals(['slug', 'tax_id']),
+			}),
+		),
+		// Reported rather than refused: only the person adding them knows whether
+		// two similar names are two branches or one company typed twice.
+		possible_duplicates: Schema.Array(
+			Schema.Struct({
+				slug: Schema.String,
+				existing_slug: Schema.String,
+				existing_name: Schema.String,
+				matched_on: Schema.Literals(['website', 'name']),
+				confidence: Schema.Number,
 			}),
 		),
 	}),
@@ -131,27 +168,26 @@ const UpdateCompany = Tool.make('update_company', {
 			description:
 				'The number the company is registered or taxed under. Worth writing down once a registry lookup returns it — a later lookup can then resolve this company exactly instead of paying to search by name again.',
 		}),
-		status: Schema.optional(Schema.String),
+		status: Schema.optional(CompanyStatus),
 		industry: Schema.optional(Schema.String),
-		sizeRange: Schema.optional(Schema.String),
-		country: Schema.optional(Schema.String),
+		sizeRange: Schema.optional(CompanySizeRange),
+		country: Schema.optional(CompanyCountry),
 		location: Schema.optional(Schema.String),
-		source: Schema.optional(Schema.String),
-		priority: Schema.optional(Schema.Number),
-		website: Schema.optional(Schema.String),
-		email: Schema.optional(Schema.String),
-		phone: Schema.optional(Schema.String),
-		instagram: Schema.optional(Schema.String),
-		linkedin: Schema.optional(Schema.String),
-		googleMapsUrl: Schema.optional(Schema.String),
+		priority: Schema.optional(CompanyPriority),
+		website: Schema.optional(CompanyWebsite),
+		email: Schema.optional(CompanyEmail),
+		phone: Schema.optional(CompanyPhone),
+		instagram: Schema.optional(CompanyInstagram),
+		linkedin: Schema.optional(CompanyLinkedin),
+		googleMapsUrl: Schema.optional(CompanyGoogleMapsUrl),
 		productsFit: Schema.optional(Schema.Array(Schema.String)),
 		tags: Schema.optional(Schema.Array(Schema.String)),
 		painPoints: Schema.optional(Schema.String),
 		currentTools: Schema.optional(Schema.String),
 		nextAction: Schema.optional(Schema.String),
 		nextActionAt: Schema.optional(Schema.String),
-		latitude: Schema.optional(Schema.Number),
-		longitude: Schema.optional(Schema.Number),
+		latitude: Schema.optional(CompanyLatitude),
+		longitude: Schema.optional(CompanyLongitude),
 		geocodedAt: Schema.optional(Schema.String),
 		geocodeSource: Schema.optional(Schema.String),
 		accountBrief: Schema.optional(
@@ -268,6 +304,32 @@ const ManageCompanyRelations = Tool.make('manage_company_relations', {
 	.annotate(Tool.Destructive, false)
 	.annotate(Tool.OpenWorld, false)
 
+const ListIndustries = Tool.make('list_industries', {
+	description:
+		'List the trades this organisation sells to — its own list, not a fixed one, so another organisation has different entries. Read it before filtering companies by industry or writing a trade onto one: search_companies matches a trade this organisation actually has, and naming one it does not returns nothing. Writing a company with a trade that is not on the list adds it, so prefer an entry that is already here over a new wording of the same thing. `needsReview` marks a trade research suggested that nobody has confirmed yet.',
+	parameters: Schema.Struct({
+		needs_review: Schema.optional(Schema.Boolean).annotate({
+			description:
+				'Only the trades waiting for somebody to confirm them. Omit for all of them.',
+		}),
+	}),
+	success: Schema.Struct({
+		industries: Schema.Array(
+			Schema.Struct({
+				label: Schema.String,
+				slug: Schema.String,
+				company_count: Schema.Number,
+				needs_review: Schema.Boolean,
+			}),
+		),
+	}),
+	dependencies: REQUEST_DEPENDENCIES,
+})
+	.annotate(Tool.Title, 'List Industries')
+	.annotate(Tool.Readonly, true)
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.OpenWorld, false)
+
 export const CompanyTools = Toolkit.make(
 	SearchCompanies,
 	GetCompany,
@@ -277,6 +339,7 @@ export const CompanyTools = Toolkit.make(
 	ManageCompanySites,
 	ManageCompanyChannels,
 	ManageCompanyRelations,
+	ListIndustries,
 )
 
 export const CompanyHandlersLive = CompanyTools.toLayer(
@@ -316,6 +379,18 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 				),
 			create_companies: params =>
 				Effect.gen(function* () {
+					const currentOrg = yield* CurrentOrg
+					// Looked for before the write, so a company is compared against what
+					// was already on file rather than against the rest of this batch.
+					const possibleDuplicates = yield* findDuplicateCompanies(
+						sql,
+						currentOrg.id,
+						params.companies.map(c => ({
+							slug: c.slug,
+							name: c.name,
+							website: c.website,
+						})),
+					)
 					const batch = yield* service.createMany(params.companies)
 					return {
 						created: batch.created,
@@ -326,6 +401,7 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 									? ('tax_id' as const)
 									: ('slug' as const),
 						})),
+						possible_duplicates: possibleDuplicates,
 					}
 				}).pipe(Effect.orDie),
 			update_company: ({ id, ...fields }) =>
@@ -514,7 +590,15 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 						`
 					}
 					return { channels: yield* subjectChannelsOf(sql, subject) }
-				}).pipe(Effect.orDie),
+				}).pipe(
+					// An address that could never be one of its kind is worth saying in
+					// words the assistant can act on, rather than the fixed sentence a
+					// raw fault gets.
+					Effect.catchTag('BadRequest', e =>
+						Effect.die(new ToolMessage(e.message)),
+					),
+					Effect.orDie,
+				),
 			manage_company_relations: params =>
 				Effect.gen(function* () {
 					const currentOrg = yield* CurrentOrg
@@ -577,6 +661,25 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 					})),
 					Effect.orDie,
 				),
+			list_industries: params =>
+				Effect.gen(function* () {
+					const currentOrg = yield* CurrentOrg
+					const industries = yield* listIndustries(
+						sql,
+						currentOrg.id,
+						params.needs_review === undefined
+							? undefined
+							: { needsReview: params.needs_review },
+					)
+					return {
+						industries: industries.map(i => ({
+							label: i.label,
+							slug: i.slug,
+							company_count: i.companyCount,
+							needs_review: i.needsReview,
+						})),
+					}
+				}).pipe(Effect.orDie),
 		}
 	}),
 )

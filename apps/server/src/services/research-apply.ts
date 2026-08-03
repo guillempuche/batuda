@@ -50,7 +50,6 @@ export const COMPANY_FIELDS = new Set([
 	'sizeRange',
 	'taxId',
 	'location',
-	'source',
 	'priority',
 	'googleMapsUrl',
 	'productsFit',

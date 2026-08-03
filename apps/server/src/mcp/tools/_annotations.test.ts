@@ -65,11 +65,35 @@ const IDEMPOTENT_NAME =
 
 // Tools whose result already carries a field shaped as a choice inside a
 // choice — a number that may be absent. Named one by one so the rule can keep
-// new ones out without pretending these two are fine.
-const KNOWN_NESTED_CHOICE = new Set([
-	'download_email_attachment',
-	'log_interaction',
-])
+// new ones out without pretending these are fine.
+//
+// `update_company` is here because a company's priority and its two map
+// coordinates are shaped that way in the company record itself, which is
+// decoded from every stored row and cannot be tightened without turning rows
+// already holding an odd value into failures. It only became visible once the
+// rule started looking through "or nothing" below; the company field-shape
+// work is what removes it.
+const KNOWN_NESTED_CHOICE = new Set(['log_interaction'])
+
+// The published shape of a result, with "or nothing" peeled off. A read that
+// answers with nothing publishes a choice between its shape and null, and
+// reading the fields off that outer choice finds none — which would quietly
+// stop the rules below from checking anything at all.
+const resultShape = (
+	schema: Tool.Any['successSchema'],
+): { properties?: Record<string, unknown>; type?: unknown } => {
+	const published = Tool.getJsonSchemaFromSchema(schema) as {
+		anyOf?: ReadonlyArray<{ type?: unknown }>
+		properties?: Record<string, unknown>
+		type?: unknown
+	}
+	const branches = (published.anyOf ?? []).filter(
+		branch => branch.type !== 'null',
+	)
+	return published.anyOf !== undefined && branches.length === 1
+		? (branches[0] as { properties?: Record<string, unknown>; type?: unknown })
+		: published
+}
 
 describe('MCP tool annotation coverage', () => {
 	describe('given the set of tools every rule below walks', () => {
@@ -145,9 +169,7 @@ describe('MCP tool annotation coverage', () => {
 						//      List tools must wrap rows in an object (_result.ts
 						//      ListResult → { items }).
 						// [tools/${toolkitName} — structured-output object invariant]
-						const outputSchema = Tool.getJsonSchemaFromSchema(
-							tool.successSchema,
-						) as { type?: unknown }
+						const outputSchema = resultShape(tool.successSchema)
 						expect(
 							outputSchema.type,
 							`${toolName} success schema must not encode to a JSON array; wrap the list in an object (ListResult / { items })`,
@@ -167,9 +189,7 @@ describe('MCP tool annotation coverage', () => {
 							properties?: Record<string, unknown>
 						}
 						if (input.properties?.['limit'] === undefined) return
-						const output = Tool.getJsonSchemaFromSchema(tool.successSchema) as {
-							properties?: Record<string, unknown>
-						}
+						const output = resultShape(tool.successSchema)
 						const signals = Object.keys(output.properties ?? {}).filter(
 							field => field === 'hasMore' || field.endsWith('Truncated'),
 						)
@@ -189,9 +209,7 @@ describe('MCP tool annotation coverage', () => {
 							//      publishes one rather than read it, and the tool
 							//      disappears for everyone on that provider
 							// [tools/${toolkitName} — flat result-shape invariant]
-							const output = Tool.getJsonSchemaFromSchema(
-								tool.successSchema,
-							) as { properties?: Record<string, unknown> }
+							const output = resultShape(tool.successSchema)
 							const nested = Object.entries(output.properties ?? {})
 								.filter(([, shape]) =>
 									((shape as { anyOf?: Array<unknown> }).anyOf ?? []).some(

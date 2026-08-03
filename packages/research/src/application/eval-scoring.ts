@@ -26,6 +26,8 @@
  * the right entity was reached.
  */
 
+import { foldLabel } from '@batuda/domain'
+
 /**
  * The enrichment scalars we can check against an objective golden answer. Free-text
  * fields (current tools, tags) are left out because there is no single correct
@@ -388,17 +390,25 @@ export const contactNameMatches = (
 }
 
 /**
- * Industry is an open free-text field. The golden holds the CRM's own code
- * ("manufacturing") and the pipeline maps its extracted value to that same code, but
- * a source page's own wording ("manufacturer", "manufacture") can leave an inflected
- * variant, so match on a shared stem — a prefix at least half the code's length (min
- * 4 chars) that starts some word in the extracted value — instead of an exact string.
- * A real categorization gap (a bank reported as "banking" vs the code "services")
- * still counts as a miss, which is the quality signal the eval wants to keep.
+ * A trade is whatever the page calls it, on both sides: the golden holds the
+ * wording a person would expect, and the pipeline keeps the wording it read. So
+ * this asks whether the two namings are the same trade, not whether they are the
+ * same string.
+ *
+ * `foldLabel` is the same rule the CRM uses to decide that two spellings are one
+ * trade, so a difference this accepts is a difference that would land on one
+ * entry there. On top of it, a shared stem — a prefix at least half the expected
+ * name's length, minimum four characters, starting some word of what was read —
+ * covers the endings a language puts on the same word ("fusteria" against
+ * "fusteries", "manufacturing" against "manufacturer").
+ *
+ * A real miss still reads as one: a bank reported as "banking" against an
+ * expected "insurance" shares no stem, which is the signal the eval is for.
  */
 const industryMatches = (expected: string, actual: string): boolean => {
-	const foldedExpected = foldDiacritics(expected)
-	const foldedActual = foldDiacritics(actual)
+	const foldedExpected = foldLabel(expected)
+	const foldedActual = foldLabel(actual)
+	if (foldedExpected.length === 0 || foldedActual.length === 0) return false
 	if (
 		foldedActual.includes(foldedExpected) ||
 		foldedExpected.includes(foldedActual)
@@ -408,7 +418,7 @@ const industryMatches = (expected: string, actual: string): boolean => {
 		0,
 		Math.max(4, Math.ceil(foldedExpected.length / 2)),
 	)
-	return foldedActual.split(/[^a-z0-9]+/).some(word => word.startsWith(stem))
+	return foldedActual.split(' ').some(word => word.startsWith(stem))
 }
 
 const fieldMatches = (

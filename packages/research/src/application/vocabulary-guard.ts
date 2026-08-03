@@ -1,12 +1,14 @@
 /**
- * Rewrites a run's extracted industry / size / country to the CRM's fixed codes.
+ * Rewrites a run's extracted size / country to the CRM's fixed codes, and keeps
+ * its industry as written.
  *
- * The extractor emits these fields in whatever words the source page used
- * ("manufacturing", "50 employees"), but the CRM stores a fixed set of codes.
- * This guard maps each value to the closest code by deterministic keyword rules —
- * model-independent, so it does not regress if the extract model changes —
- * sending a real-but-uncategorized industry to 'other' and blanking true junk (a
- * URL, an email, a sentence that names no category, "N/A", a qualitative size).
+ * The extractor emits these fields in whatever words the source page used ("50
+ * employees", "France"), and size and country really do have a fixed set of
+ * codes, so those are mapped by deterministic rules — model-independent, so they
+ * do not regress if the extract model changes. Industry no longer has a fixed
+ * set: each organisation keeps its own list, so the trade is kept as written and
+ * only what was never a trade is blanked (a URL, an email, a whole sentence,
+ * "N/A", a qualitative size).
  * It runs in the phase-2 guard chain after value-provenance and before
  * applicability, so a proposal whose only field is blanked ends up empty and is
  * dropped downstream.
@@ -14,12 +16,7 @@
 
 import { isBuyingRole } from '@batuda/domain'
 
-import {
-	CRM_INDUSTRIES,
-	CRM_SIZE_RANGES,
-	type CrmIndustry,
-	type CrmSizeRange,
-} from '../domain/crm-vocabulary'
+import { CRM_SIZE_RANGES, type CrmSizeRange } from '../domain/crm-vocabulary'
 
 // Trim, lowercase, and strip accents so "Manufactura"/"manufactura" and
 // "Girona"/"girona" fold onto one keyword table.
@@ -38,94 +35,29 @@ const isHardJunk = (n: string): boolean =>
 	n.includes('@') ||
 	['n/a', 'na', 'none', 'null', 'unknown', 'tbd', '-'].includes(n)
 
-// More than five words reads as a whole sentence, not a label. This is only a
-// last-resort bail-out, checked *after* the keyword match fails — so a wordy value
-// that still names a known sector ("Third-party logistics (3PL), transportation,
-// warehousing, customs clearance") maps on its keyword instead of being discarded.
+// More than five words reads as a whole sentence rather than the name of a
+// trade. A model that answers the question in prose is saying it did not find a
+// trade, and storing the sentence would put it in the organisation's list.
 const isSentence = (n: string): boolean => n.split(/\s+/).length > 5
 
-// Industry keyword table, most specific bucket first so a broad word ("servei")
-// never shadows a specific one ("transport"). Stems span Catalan, Spanish, and
-// English so a page in any of the three maps the same way.
-const INDUSTRY_RULES: ReadonlyArray<
-	readonly [CrmIndustry, ReadonlyArray<string>]
-> = [
-	[
-		'transport',
-		[
-			'transport',
-			'logist',
-			'freight',
-			'carrier',
-			'fleet',
-			'shipping',
-			'courier',
-		],
-	],
-	[
-		'hospitality',
-		['hotel', 'hostal', 'allotjament', 'alojamiento', 'hospitality', 'turis'],
-	],
-	['restaurants', ['restaur', 'cuina', 'cocina', 'dining', 'catering', 'cafe']],
-	[
-		'construction',
-		['constru', 'obra', 'building', 'contractor', 'builder', 'reforma'],
-	],
-	[
-		'manufacturing',
-		['manufactur', 'fabric', 'factory', 'producc', 'industrial', 'maker'],
-	],
-	[
-		'distribution',
-		['distribu', 'majorista', 'mayorista', 'wholesale', 'supplier'],
-	],
-	[
-		'retail',
-		[
-			'retail',
-			'botiga',
-			'tienda',
-			'shop',
-			'store',
-			'commerce',
-			'comerc',
-			'comercio',
-			'apparel',
-			'fashion',
-			'moda',
-		],
-	],
-	[
-		'services',
-		[
-			'servei',
-			'servic',
-			'consult',
-			'assessor',
-			'software',
-			'saas',
-			'tech',
-			'financ',
-			'bank',
-			'banc',
-			'agenc',
-			'legal',
-			'marketing',
-		],
-	],
-]
-
-export const mapIndustry = (raw: string): CrmIndustry | null => {
+/**
+ * Keep the trade the evidence names, rather than deciding which of a fixed few
+ * it resembles.
+ *
+ * This used to fold every value into one of nine words the app shipped with, so
+ * "artisanal cheese production" was stored as "other" and the real trade was
+ * gone — and the keyword rules were ordered substring matches, which filed
+ * "Consultoría industrial" under manufacturing. Each organisation now keeps its
+ * own list, so the trade is worth keeping as written.
+ *
+ * What is still thrown away is what was never a trade: a URL, an address, a
+ * sentence the model wrote instead of a label.
+ */
+export const cleanIndustryLabel = (raw: string): string | null => {
 	const n = normalize(raw)
 	if (isHardJunk(n)) return null
-	if ((CRM_INDUSTRIES as readonly string[]).includes(n)) return n as CrmIndustry
-	for (const [code, keywords] of INDUSTRY_RULES) {
-		if (keywords.some(k => n.includes(k))) return code
-	}
-	// No keyword matched. A wordy value is a stray sentence with no category in it →
-	// blank; a short plausible label is a real-but-uncategorized industry → 'other'.
 	if (isSentence(n)) return null
-	return 'other'
+	return raw.trim().replace(/\s+/g, ' ')
 }
 
 export const mapSizeRange = (raw: string): CrmSizeRange | null => {
@@ -142,15 +74,15 @@ export const mapSizeRange = (raw: string): CrmSizeRange | null => {
 	if (firstInt === undefined) return null
 	const count = Number(firstInt)
 	if (!Number.isFinite(count) || count <= 0) return null
-	if (count <= 5) return '1-5'
-	if (count <= 10) return '6-10'
-	if (count <= 25) return '11-25'
-	if (count <= 50) return '26-50'
+	if (count <= 10) return '1-10'
+	if (count <= 50) return '11-50'
 	if (count <= 200) return '51-200'
 	if (count <= 500) return '201-500'
 	if (count <= 1000) return '501-1000'
 	if (count <= 5000) return '1001-5000'
-	return '5001+'
+	if (count <= 25000) return '5001-25000'
+	if (count <= 100000) return '25001-100000'
+	return '100001+'
 }
 
 // Common country names → ISO 3166-1 alpha-2, so the extractor's "France" / "United
@@ -313,7 +245,7 @@ export const mapBuyingRole = (raw: string): string | null => {
 }
 
 const MAPPERS: Record<string, (raw: string) => string | null> = {
-	industry: mapIndustry,
+	industry: cleanIndustryLabel,
 	country: mapCountry,
 	// The size band is named twice because it is reached two ways: a run's own
 	// findings spell it as the research schema does, while a proposed CRM change

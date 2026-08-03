@@ -134,7 +134,6 @@ function AddAsLeadButton({ prospect }: { readonly prospect: ProspectEntry }) {
 				name: prospect.name,
 				slug,
 				status: 'prospect',
-				source: 'research',
 				...(prospect.industry ? { industry: prospect.industry } : {}),
 				...(prospect.country ? { country: prospect.country } : {}),
 				...(prospect.website ? { website: prospect.website } : {}),

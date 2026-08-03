@@ -143,9 +143,7 @@ export {
 // ── Domain ─────────────────────────────────────────────────────────────────
 export { AcceptedCountry } from './domain/country'
 export {
-	CRM_INDUSTRIES,
 	CRM_SIZE_RANGES,
-	type CrmIndustry,
 	type CrmSizeRange,
 	SNAPSHOT_COMPANY_FIELDS,
 	SNAPSHOT_CONTACT_FIELDS,
