@@ -37,7 +37,6 @@ const CreateProduct = Tool.make('create_product', {
 		description: Schema.optional(Schema.String),
 		default_price: Schema.optional(Schema.String),
 		price_type: Schema.optional(Schema.String),
-		target_industries: Schema.optional(Schema.Array(Schema.String)),
 		metadata: Schema.optional(Schema.Unknown),
 	}),
 	success: Product.json,
@@ -58,7 +57,6 @@ const UpdateProduct = Tool.make('update_product', {
 		description: Schema.optional(Schema.String),
 		default_price: Schema.optional(Schema.String),
 		price_type: Schema.optional(Schema.String),
-		target_industries: Schema.optional(Schema.Array(Schema.String)),
 		metadata: Schema.optional(Schema.Unknown),
 	}),
 	success: Schema.NullOr(Product.json),
@@ -105,8 +103,6 @@ export const ProductHandlersLive = ProductTools.toLayer(
 						row['defaultPrice'] = params.default_price
 					if (params.price_type !== undefined)
 						row['priceType'] = params.price_type
-					if (params.target_industries !== undefined)
-						row['targetIndustries'] = params.target_industries
 					if (params.metadata !== undefined) row['metadata'] = params.metadata
 					const rows =
 						yield* sql`INSERT INTO products ${sql.insert(row)} RETURNING *`
@@ -130,8 +126,6 @@ export const ProductHandlersLive = ProductTools.toLayer(
 					if (rest.default_price !== undefined)
 						data['defaultPrice'] = rest.default_price
 					if (rest.price_type !== undefined) data['priceType'] = rest.price_type
-					if (rest.target_industries !== undefined)
-						data['targetIndustries'] = rest.target_industries
 					if (rest.metadata !== undefined) data['metadata'] = rest.metadata
 					const rows = yield* sql`
 						UPDATE products SET ${sql.update(data, ['id'])}

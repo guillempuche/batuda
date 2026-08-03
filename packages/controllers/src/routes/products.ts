@@ -14,7 +14,6 @@ const CreateProductInput = Schema.Struct({
 	description: Schema.optional(Schema.String),
 	defaultPrice: Schema.optional(Schema.String),
 	priceType: Schema.optional(Schema.String),
-	targetIndustries: Schema.optional(Schema.Array(Schema.String)),
 	metadata: Schema.optional(Schema.Unknown),
 })
 
@@ -25,7 +24,6 @@ const UpdateProductInput = Schema.Struct({
 	description: Schema.optional(Schema.String),
 	defaultPrice: Schema.optional(Schema.String),
 	priceType: Schema.optional(Schema.String),
-	targetIndustries: Schema.optional(Schema.Array(Schema.String)),
 	metadata: Schema.optional(Schema.Unknown),
 })
 
