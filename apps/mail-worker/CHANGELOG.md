@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-03 (mail-worker-v2026.8.3)
+
+### Features
+
+* a company is more than one mailbox, one place, and one decider ([247bf91](https://github.com/guillempuche/batuda/commit/247bf915739c8be4574fea8a187251ab7ea975a6)), closes [#376](https://github.com/guillempuche/batuda/issues/376)
+* carry an address name and a person's branch through the API ([ee93ba0](https://github.com/guillempuche/batuda/commit/ee93ba046366222c755258ddc3f8f79fd367b426))
+* describe mailboxes freely and decide access from who owns them ([a626db1](https://github.com/guillempuche/batuda/commit/a626db1b98848b30d5ca898ba27b4f2158ea9bde)), closes [#375](https://github.com/guillempuche/batuda/issues/375)
+* let each organisation name the trades it sells to ([fd9c998](https://github.com/guillempuche/batuda/commit/fd9c9982e9eef1db581ec8c77fccdbd156cf0340))
+* store the number a company is registered under ([d0dd2c5](https://github.com/guillempuche/batuda/commit/d0dd2c50629ec6c2ccfc7d71e127ad5086c58f22))
+
+### Bug Fixes
+
+* **observability:** stop sending tool arguments to the tracing vendor ([7a69465](https://github.com/guillempuche/batuda/commit/7a694658bf9e44c0ffd840f5f0c13abd93c71c0f))
+
+### Refactoring
+
+* stop keeping a second list of who a product is for ([4c2d5ea](https://github.com/guillempuche/batuda/commit/4c2d5ea12103b77b00bc5fe3bf7d2341bb49a7c7))
+
+### Chores
+
+* raise Effect to beta.102 and fix what the raise uncovered ([72da41c](https://github.com/guillempuche/batuda/commit/72da41cf0d4e69a002cf740a1f8f96cbbe5a80c9))
+
 ## 2026-07-28 (mail-worker-v2026.7.28)
 
 ### Features
