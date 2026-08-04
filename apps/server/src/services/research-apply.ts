@@ -3,6 +3,7 @@ import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
 import {
+	BUYING_ROLES,
 	COMPANY_PRIORITIES,
 	COMPANY_SIZE_RANGES,
 	COMPANY_STATUSES,
@@ -188,31 +189,51 @@ export const allowlistFields = (
 // model invented would otherwise reach the database and come back as a failed
 // request — telling the reviewer the server broke, when the suggestion was
 // simply unusable.
-const COMPANY_FIELD_VOCABULARIES: ReadonlyArray<{
+type FieldVocabulary = {
 	readonly field: string
 	readonly allowed: ReadonlyArray<string | number>
-}> = [
+}
+
+const COMPANY_FIELD_VOCABULARIES: ReadonlyArray<FieldVocabulary> = [
 	{ field: 'status', allowed: COMPANY_STATUSES },
 	{ field: 'priority', allowed: COMPANY_PRIORITIES },
 	{ field: 'sizeRange', allowed: COMPANY_SIZE_RANGES },
 ]
 
+// A contact's part in the buying decision reads back through a guard that only
+// knows these five words, so one the model invented is stored but belongs to no
+// group and shows up nowhere — the same quiet disappearance the company
+// vocabularies prevent.
+const CONTACT_FIELD_VOCABULARIES: ReadonlyArray<FieldVocabulary> = [
+	{ field: 'buyingRole', allowed: BUYING_ROLES },
+]
+
 // The reason a company proposal cannot be applied, or null when it can. An
 // explicit null is how a value is cleared, which these columns allow except
 // status — a company always sits at some stage.
-export const checkCompanyFieldValues = (
+export const checkFieldValues = (
+	table: 'companies' | 'contacts',
 	fields: Record<string, unknown>,
 ): string | null => {
-	for (const { field, allowed } of COMPANY_FIELD_VOCABULARIES) {
+	const vocabularies =
+		table === 'companies'
+			? COMPANY_FIELD_VOCABULARIES
+			: CONTACT_FIELD_VOCABULARIES
+	for (const { field, allowed } of vocabularies) {
 		if (!(field in fields)) continue
-		const value = fields[field]
-		if (value === null && field !== 'status') continue
+		const raw = fields[field]
+		if (raw === null && field !== 'status') continue
+		// A model writing JSON often quotes a small number, and the column takes
+		// it either way, so "2" is the priority 2 the reviewer read — not a
+		// different value to refuse them over.
+		const value =
+			typeof raw === 'string' && /^\d+$/.test(raw) ? Number(raw) : raw
 		if (
 			(typeof value === 'string' || typeof value === 'number') &&
 			allowed.includes(value)
 		)
 			continue
-		return `${field} must be one of ${allowed.join(', ')} — got ${JSON.stringify(value)}`
+		return `${field} must be one of ${allowed.join(', ')} — got ${JSON.stringify(raw)}`
 	}
 	return null
 }
@@ -308,10 +329,13 @@ export const validateCreate = (
 	const companyId = fields['company_id'] ?? fields['companyId']
 	if (typeof companyId !== 'string' || companyId === '')
 		return { ok: false, reason: 'missing company_id' }
+	const allowed = allowlistFields('contacts', fields).fields
+	const badValue = checkFieldValues('contacts', allowed)
+	if (badValue !== null) return { ok: false, reason: badValue }
 	return {
 		ok: true,
 		companyId,
-		fields: allowlistFields('contacts', fields).fields,
+		fields: allowed,
 		channels: parseChannels(fields['channels']),
 	}
 }
@@ -868,11 +892,9 @@ export const resolveResearchProposedUpdate = (
 		// The whole proposal goes back, not just the offending field: a reviewer
 		// approved the set they were shown, so quietly applying the rest would
 		// leave them believing a change landed that never did.
-		if (validated.table === 'companies') {
-			const badValue = checkCompanyFieldValues(fields)
-			if (badValue !== null)
-				return { outcome: 'invalid', reason: badValue } satisfies ResolveOutcome
-		}
+		const badValue = checkFieldValues(validated.table, fields)
+		if (badValue !== null)
+			return { outcome: 'invalid', reason: badValue } satisfies ResolveOutcome
 		const sources = yield* resolveFieldSources(sql, runId, {
 			...channelCitations,
 			...fieldCitations,

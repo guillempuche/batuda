@@ -142,10 +142,11 @@ describe('resolveResearchProposedUpdate field values', () => {
 			})
 
 			// WHEN it is applied
-			await apply(runId, proposalId)
+			const outcome = await apply(runId, proposalId)
 
-			// THEN the row is untouched — a reviewer approved the set they were
-			// shown, so a partial write would misreport what happened
+			// THEN the row is untouched for the stated reason — any other refusal
+			// would leave it untouched too, so the reason is what pins this
+			expect(outcome.outcome).toBe('invalid')
 			const row = await companyRow(companyId)
 			expect(row?.status).toBe('prospect')
 			expect(row?.industry).toBeNull()

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
 	allowlistFields,
-	checkCompanyFieldValues,
+	checkFieldValues,
 	validate,
 	validateCreate,
 } from './research-apply'
@@ -262,7 +262,7 @@ describe('checkCompanyFieldValues', () => {
 		it('should report nothing to reject', () => {
 			// GIVEN a proposal whose status, priority and size all come from the
 			// vocabularies the database constrains those columns to
-			const reason = checkCompanyFieldValues({
+			const reason = checkFieldValues('companies', {
 				status: 'contacted',
 				priority: 2,
 				sizeRange: '51-200',
@@ -277,7 +277,7 @@ describe('checkCompanyFieldValues', () => {
 	describe('when the proposal mentions none of the constrained fields', () => {
 		it('should report nothing to reject', () => {
 			// GIVEN a proposal touching only free-text columns
-			const reason = checkCompanyFieldValues({
+			const reason = checkFieldValues('companies', {
 				industry: 'logistics',
 				location: 'Sitges',
 			})
@@ -290,7 +290,7 @@ describe('checkCompanyFieldValues', () => {
 	describe('when the model invents a status outside the vocabulary', () => {
 		it('should reject it and name both the field and the value', () => {
 			// GIVEN a status from an older vocabulary the app no longer has
-			const reason = checkCompanyFieldValues({ status: 'qualified' })
+			const reason = checkFieldValues('companies', { status: 'qualified' })
 
 			// THEN the proposal is refused, and the message says what was wrong so a
 			// reviewer is not left with a bare failure
@@ -303,45 +303,50 @@ describe('checkCompanyFieldValues', () => {
 	describe('when a priority falls outside the allowed range', () => {
 		it('should reject it', () => {
 			// GIVEN a priority from the old 1-5 scale, which is now 1-3
-			expect(checkCompanyFieldValues({ priority: 5 })).not.toBeNull()
+			expect(checkFieldValues('companies', { priority: 5 })).toContain(
+				'priority',
+			)
 		})
 	})
 
 	describe('when a size range is not one of the bands', () => {
 		it('should reject it', () => {
 			// GIVEN a band the model made up rather than one of COMPANY_SIZE_RANGES
-			expect(checkCompanyFieldValues({ sizeRange: '20-30' })).not.toBeNull()
+			expect(checkFieldValues('companies', { sizeRange: '20-30' })).toContain(
+				'sizeRange',
+			)
 		})
 	})
 
 	describe('when a nullable column is explicitly cleared', () => {
 		it('should allow it, since null is how a value is removed', () => {
 			// GIVEN a proposal clearing the two columns the database lets be null
-			expect(checkCompanyFieldValues({ priority: null })).toBeNull()
-			expect(checkCompanyFieldValues({ sizeRange: null })).toBeNull()
+			expect(checkFieldValues('companies', { priority: null })).toBeNull()
+			expect(checkFieldValues('companies', { sizeRange: null })).toBeNull()
 		})
 	})
 
 	describe('when status is cleared', () => {
 		it('should reject it, since the column is NOT NULL', () => {
 			// GIVEN a proposal trying to empty a column that always holds a stage
-			expect(checkCompanyFieldValues({ status: null })).not.toBeNull()
+			expect(checkFieldValues('companies', { status: null })).toContain(
+				'status',
+			)
 		})
 	})
 
 	describe('when a value carries the right vocabulary but the wrong type', () => {
-		it('should reject it rather than coerce', () => {
-			// GIVEN a priority sent as text and a status sent as a number — the
-			// database compares by type, so neither would match its constraint
-			expect(checkCompanyFieldValues({ priority: '2' })).not.toBeNull()
-			expect(checkCompanyFieldValues({ status: 1 })).not.toBeNull()
+		it('should reject a value no reading of it could make valid', () => {
+			// GIVEN a status sent as a number — nothing it could be parsed into is
+			// one of the stages
+			expect(checkFieldValues('companies', { status: 1 })).toContain('status')
 		})
 	})
 
 	describe('when several fields are wrong at once', () => {
 		it('should report the first one, since the whole proposal goes back', () => {
 			// GIVEN a proposal with two unusable values
-			const reason = checkCompanyFieldValues({
+			const reason = checkFieldValues('companies', {
 				status: 'lead',
 				priority: 9,
 			})
@@ -363,7 +368,7 @@ describe('allowlistFields feeding checkCompanyFieldValues', () => {
 
 			// THEN the value inside the wrapper is the one judged
 			expect(fields['status']).toBe('negotiation')
-			expect(checkCompanyFieldValues(fields)).not.toBeNull()
+			expect(checkFieldValues('companies', fields)).not.toBeNull()
 		})
 	})
 
@@ -375,7 +380,7 @@ describe('allowlistFields feeding checkCompanyFieldValues', () => {
 			})
 
 			// THEN nothing is rejected
-			expect(checkCompanyFieldValues(fields)).toBeNull()
+			expect(checkFieldValues('companies', fields)).toBeNull()
 		})
 	})
 
@@ -385,7 +390,48 @@ describe('allowlistFields feeding checkCompanyFieldValues', () => {
 			const { fields } = allowlistFields('companies', { size_range: '2-7' })
 
 			// THEN the renamed field is the one checked
-			expect(checkCompanyFieldValues(fields)).toContain('sizeRange')
+			expect(checkFieldValues('companies', fields)).toContain('sizeRange')
+		})
+	})
+})
+
+describe('checkFieldValues on values a model is likely to send', () => {
+	describe('when a whole number arrives quoted', () => {
+		it('should read it as the number, since the column takes it either way', () => {
+			// GIVEN a model that wrote JSON with the priority as text
+			expect(checkFieldValues('companies', { priority: '2' })).toBeNull()
+		})
+	})
+
+	describe('when a quoted value is not a whole number', () => {
+		it('should still refuse it', () => {
+			// GIVEN text that is not any priority
+			expect(checkFieldValues('companies', { priority: 'high' })).toContain(
+				'priority',
+			)
+			expect(checkFieldValues('companies', { priority: '9' })).toContain(
+				'priority',
+			)
+		})
+	})
+
+	describe('when a contact is given a part in the decision', () => {
+		it('should accept one of the five and refuse anything else', () => {
+			// GIVEN the vocabulary the rest of the app reads buying roles through
+			expect(
+				checkFieldValues('contacts', { buyingRole: 'economic_buyer' }),
+			).toBeNull()
+			// GIVEN a plausible-sounding role that is not one of them
+			expect(
+				checkFieldValues('contacts', { buyingRole: 'decision_maker' }),
+			).toContain('buyingRole')
+		})
+	})
+
+	describe('when a contact proposal carries a company vocabulary field', () => {
+		it('should not judge it by the company rules', () => {
+			// GIVEN status, which is a company column and no part of a contact
+			expect(checkFieldValues('contacts', { status: 'nonsense' })).toBeNull()
 		})
 	})
 })
