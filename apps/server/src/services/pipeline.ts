@@ -177,8 +177,12 @@ export class PipelineService extends Context.Service<PipelineService>()(
 						const overdueTasks = yield* sql<{
 							count: number
 						}>`
-							SELECT count(*)::int as count FROM tasks
-							WHERE completed_at IS NULL AND due_at < now()
+							SELECT count(*)::int as count FROM tasks t
+							WHERE t.completed_at IS NULL AND t.due_at < now()
+								AND EXISTS (
+									SELECT 1 FROM companies c
+									WHERE c.id = t.company_id AND c.deleted_at IS NULL
+								)
 						`
 
 						const companiesWithoutNextAction = yield* sql<{
