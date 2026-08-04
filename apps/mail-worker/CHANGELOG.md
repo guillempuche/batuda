@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-04 (mail-worker-v2026.8.4)
+
+### Features
+
+* let anyone rewrite a company's account brief ([0040a0d](https://github.com/guillempuche/batuda/commit/0040a0df18607501c4e057b0c2b667c0ff65a6ff))
+
 ## 2026-08-03 (mail-worker-v2026.8.3)
 
 ### Features
