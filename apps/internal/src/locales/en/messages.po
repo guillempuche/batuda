@@ -329,6 +329,11 @@ msgstr "Across companies in stage"
 msgid "Actions"
 msgstr "Actions"
 
+#. placeholder {0}: company.name
+#: src/components/shared/company-card.tsx
+msgid "Actions for {0}"
+msgstr "Actions for {0}"
+
 #: src/components/shared/status-badge.tsx
 msgid "Active client"
 msgstr "Active client"
@@ -672,6 +677,18 @@ msgstr "as of"
 #: src/routes/settings/mcp/connections.tsx
 msgid "Ask an owner or admin to allow yours back"
 msgstr "Ask an owner or admin to allow yours back"
+
+#: src/components/shared/company-card.tsx
+msgid "Ask ChatGPT about this company"
+msgstr "Ask ChatGPT about this company"
+
+#: src/components/shared/company-card.tsx
+msgid "Ask Claude about this company"
+msgstr "Ask Claude about this company"
+
+#: src/components/shared/company-card.tsx
+msgid "Assign"
+msgstr "Assign"
 
 #: src/components/companies/company-owner-control.tsx
 msgid "Assign to me"
@@ -2980,6 +2997,11 @@ msgstr "Logging…"
 msgid "Longitude"
 msgstr "Longitude"
 
+#. placeholder {0}: company.name
+#: src/components/shared/company-card.tsx
+msgid "Look up the company \"{0}\" in Batuda and tell me where the deal stands and what I should do next."
+msgstr "Look up the company \"{0}\" in Batuda and tell me where the deal stands and what I should do next."
+
 #: src/components/research/inbox/paid-action-queue.tsx
 msgid "Lookup approved — the run is picking it up."
 msgstr "Lookup approved — the run is picking it up."
@@ -3637,6 +3659,10 @@ msgstr "No upcoming due dates"
 msgid "No upcoming meetings."
 msgstr "No upcoming meetings."
 
+#: src/components/shared/company-card.tsx
+msgid "Nobody owns this lead"
+msgstr "Nobody owns this lead"
+
 #: src/components/companies/cadence-card.tsx
 msgid "none scheduled"
 msgstr "none scheduled"
@@ -3982,6 +4008,11 @@ msgstr "Overlap"
 #: src/routes/companies/$slug.tsx
 msgid "Overview"
 msgstr "Overview"
+
+#. placeholder {0}: owner.name
+#: src/components/shared/company-card.tsx
+msgid "Owned by {0}"
+msgstr "Owned by {0}"
 
 #: src/components/companies/company-owner-control.tsx
 #: src/routes/companies/index.tsx

@@ -329,6 +329,11 @@ msgstr "A través d'empreses en l'etapa"
 msgid "Actions"
 msgstr "Accions"
 
+#. placeholder {0}: company.name
+#: src/components/shared/company-card.tsx
+msgid "Actions for {0}"
+msgstr "Accions per a {0}"
+
 #: src/components/shared/status-badge.tsx
 msgid "Active client"
 msgstr "Client actiu"
@@ -672,6 +677,18 @@ msgstr "a data de"
 #: src/routes/settings/mcp/connections.tsx
 msgid "Ask an owner or admin to allow yours back"
 msgstr "Demana a un propietari o administrador que torni a permetre el teu"
+
+#: src/components/shared/company-card.tsx
+msgid "Ask ChatGPT about this company"
+msgstr "Pregunta-ho a ChatGPT"
+
+#: src/components/shared/company-card.tsx
+msgid "Ask Claude about this company"
+msgstr "Pregunta-ho a Claude"
+
+#: src/components/shared/company-card.tsx
+msgid "Assign"
+msgstr "Assigna"
 
 #: src/components/companies/company-owner-control.tsx
 msgid "Assign to me"
@@ -2980,6 +2997,11 @@ msgstr "Registrant…"
 msgid "Longitude"
 msgstr "Longitud"
 
+#. placeholder {0}: company.name
+#: src/components/shared/company-card.tsx
+msgid "Look up the company \"{0}\" in Batuda and tell me where the deal stands and what I should do next."
+msgstr "Busca l'empresa \"{0}\" a Batuda i digue'm com està l'operació i què hauria de fer després."
+
 #: src/components/research/inbox/paid-action-queue.tsx
 msgid "Lookup approved — the run is picking it up."
 msgstr "Cerca aprovada: l'execució se n'ocupa."
@@ -3637,6 +3659,10 @@ msgstr "Sense venciments propers"
 msgid "No upcoming meetings."
 msgstr "No hi ha reunions properes."
 
+#: src/components/shared/company-card.tsx
+msgid "Nobody owns this lead"
+msgstr "Ningú no porta aquest client potencial"
+
 #: src/components/companies/cadence-card.tsx
 msgid "none scheduled"
 msgstr "cap planificat"
@@ -3982,6 +4008,11 @@ msgstr "Solapament"
 #: src/routes/companies/$slug.tsx
 msgid "Overview"
 msgstr "Resum"
+
+#. placeholder {0}: owner.name
+#: src/components/shared/company-card.tsx
+msgid "Owned by {0}"
+msgstr "El porta {0}"
 
 #: src/components/companies/company-owner-control.tsx
 #: src/routes/companies/index.tsx

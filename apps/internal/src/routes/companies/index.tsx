@@ -438,10 +438,19 @@ function CompaniesListPage() {
 										location: company.location,
 										country: company.country,
 										priority: company.priority,
+										ownerId: company.ownerId,
 										lastContactedAt: company.lastContactedAt,
 									}}
 									actions={{
 										onLogInteraction: () => handleLogInteraction(company),
+										// Changing the owner is the company's own decision to
+										// make, so the card sends the reader there rather than
+										// growing a picker of its own.
+										onAssign: () =>
+											void navigate({
+												to: '/companies/$slug',
+												params: { slug: company.slug },
+											}),
 									}}
 								/>
 							))}
