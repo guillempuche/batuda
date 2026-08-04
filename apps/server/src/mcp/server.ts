@@ -26,6 +26,7 @@ import {
 	InstructionsMcpTools,
 } from './tools/instructions-mcp'
 import { InteractionHandlersLive, InteractionTools } from './tools/interactions'
+import { MemberHandlersLive, MemberTools } from './tools/members'
 import { PageHandlersLive, PageTools } from './tools/pages'
 import { PipelineHandlersLive, PipelineTools } from './tools/pipeline'
 import { ProductHandlersLive, ProductTools } from './tools/products'
@@ -50,6 +51,7 @@ import { TimelineHandlersLive, TimelineTools } from './tools/timeline'
 export const McpToolsLive = Layer.mergeAll(
 	mcpToolkitSafe(CompanyTools),
 	mcpToolkitSafe(ContactTools),
+	mcpToolkitSafe(MemberTools),
 	mcpToolkitSafe(InteractionTools),
 	mcpToolkitSafe(TaskTools),
 	mcpToolkitSafe(DocumentTools),
@@ -82,6 +84,7 @@ export const McpToolsLive = Layer.mergeAll(
 ).pipe(
 	Layer.provide(CompanyHandlersLive),
 	Layer.provide(ContactHandlersLive),
+	Layer.provide(MemberHandlersLive),
 	Layer.provide(InteractionHandlersLive),
 	Layer.provide(TaskHandlersLive),
 	Layer.provide(DocumentHandlersLive),

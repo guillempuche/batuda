@@ -13,6 +13,7 @@ import { DocumentTools } from './documents'
 import { EmailTools } from './email'
 import { InstructionsMcpTools } from './instructions-mcp'
 import { InteractionTools } from './interactions'
+import { MemberTools } from './members'
 import { PageTools } from './pages'
 import { PipelineTools } from './pipeline'
 import { ProductTools } from './products'
@@ -33,6 +34,7 @@ const TOOLKITS = {
 	EmailTools,
 	InstructionsMcpTools,
 	InteractionTools,
+	MemberTools,
 	PageTools,
 	PipelineTools,
 	ProductTools,
@@ -56,7 +58,7 @@ const isActionParameterized = (toolName: string): boolean =>
 // A floor, not an exact figure: adding one tool should not fail this file, but
 // registering a whole toolkit in the server without listing it in TOOLKITS
 // above should, since everything below only walks what is listed there.
-const EXPECTED_TOOL_COUNT = 94
+const EXPECTED_TOOL_COUNT = 95
 
 const READ_ONLY_NAME = /^(list_|get_|search_|find_|lookup_)/
 const DESTRUCTIVE_NAME = /^(delete_|discard_|cancel_)/
