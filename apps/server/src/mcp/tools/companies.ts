@@ -167,6 +167,10 @@ const UpdateCompany = Tool.make('update_company', {
 			description:
 				'The number the company is registered or taxed under. Worth writing down once a registry lookup returns it — a later lookup can then resolve this company exactly instead of paying to search by name again.',
 		}),
+		ownerId: Schema.optional(Schema.NullOr(Schema.String)).annotate({
+			description:
+				'The colleague responsible for working this company through the pipeline, as a user id from list_members — a name or an email address is not one. Send null to release it, leaving the company unowned. Read list_members first rather than guessing an id: an id belonging to nobody here is refused, and one belonging to the wrong colleague is not.',
+		}),
 		status: Schema.optional(CompanyStatus),
 		industry: Schema.optional(Schema.String),
 		sizeRange: Schema.optional(CompanySizeRange),
@@ -405,6 +409,22 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 				}).pipe(Effect.orDie),
 			update_company: ({ id, ...fields }) =>
 				Effect.gen(function* () {
+					// An owner has to be somebody who works here. Row-level security
+					// keeps this lookup to the current organisation, so an id from
+					// another one finds nothing and is turned away — without it a
+					// company could be handed to a stranger, and the only sign would be
+					// a name nobody recognises on the lead.
+					if (fields.ownerId !== undefined && fields.ownerId !== null) {
+						const member = yield* sql`
+							SELECT 1 FROM member WHERE "userId" = ${fields.ownerId} LIMIT 1
+						`
+						if (member.length === 0)
+							return yield* Effect.die(
+								new ToolMessage(
+									'That user is not a member of this organization — call list_members for the ids of people who are.',
+								),
+							)
+					}
 					// Capture the stage before the write so an agent-driven change
 					// is recorded on the timeline too (actor unknown → null).
 					const before =
