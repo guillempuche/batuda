@@ -25,6 +25,11 @@ import { ResearchRegistryTools } from './research-registry'
 import { TaskTools } from './tasks'
 import { TimelineTools } from './timeline'
 
+// RenamedTools is left out on purpose: every rule below describes the surface a
+// client discovers, and those tools are registered precisely so they never
+// appear in it. The naming rules would read them as real — delete_email_inbox
+// as destructive, for one — and make them claim things they do not do.
+// renamed-tools.test.ts holds their rules instead.
 const TOOLKITS = {
 	CalendarTools,
 	CompanyTools,

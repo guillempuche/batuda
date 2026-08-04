@@ -31,6 +31,7 @@ import { PipelineHandlersLive, PipelineTools } from './tools/pipeline'
 import { ProductHandlersLive, ProductTools } from './tools/products'
 import { ProposalHandlersLive, ProposalTools } from './tools/proposals'
 import { RecordingHandlersLive, RecordingTools } from './tools/recordings'
+import { RenamedTools, RenamedToolsHandlersLive } from './tools/renamed-tools'
 import {
 	ResearchContactsHandlersLive,
 	ResearchContactsTools,
@@ -66,6 +67,7 @@ export const McpToolsLive = Layer.mergeAll(
 	mcpToolkitSafe(InstructionsMcpTools),
 	mcpToolkitSafe(TimelineTools),
 	mcpToolkitSafe(CalendarTools),
+	mcpToolkitSafe(RenamedTools),
 	CompanyResource,
 	PipelineResource,
 	DocumentResource,
@@ -98,4 +100,5 @@ export const McpToolsLive = Layer.mergeAll(
 	Layer.provide(InstructionsMcpHandlersLive),
 	Layer.provide(TimelineHandlersLive),
 	Layer.provide(CalendarHandlersLive),
+	Layer.provide(RenamedToolsHandlersLive),
 )
