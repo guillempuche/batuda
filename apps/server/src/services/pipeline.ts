@@ -179,9 +179,14 @@ export class PipelineService extends Context.Service<PipelineService>()(
 						}>`
 							SELECT count(*)::int as count FROM tasks t
 							WHERE t.completed_at IS NULL AND t.due_at < now()
-								AND EXISTS (
-									SELECT 1 FROM companies c
-									WHERE c.id = t.company_id AND c.deleted_at IS NULL
+								-- A task belonging to no company is somebody's own work and
+								-- still counts; only one whose company was deleted drops out.
+								AND (
+									t.company_id IS NULL
+									OR EXISTS (
+										SELECT 1 FROM companies c
+										WHERE c.id = t.company_id AND c.deleted_at IS NULL
+									)
 								)
 						`
 
