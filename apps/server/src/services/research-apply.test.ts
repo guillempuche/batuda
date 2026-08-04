@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { allowlistFields, validate, validateCreate } from './research-apply'
+import {
+	allowlistFields,
+	checkCompanyFieldValues,
+	validate,
+	validateCreate,
+} from './research-apply'
 
 describe('allowlistFields', () => {
 	describe('when a company proposal carries writable and non-writable keys', () => {
@@ -248,6 +253,139 @@ describe('validateCreate', () => {
 			expect(result.ok).toBe(true)
 			if (!result.ok) return
 			expect(result.channels).toEqual([])
+		})
+	})
+})
+
+describe('checkCompanyFieldValues', () => {
+	describe('when every constrained value is one the column accepts', () => {
+		it('should report nothing to reject', () => {
+			// GIVEN a proposal whose status, priority and size all come from the
+			// vocabularies the database constrains those columns to
+			const reason = checkCompanyFieldValues({
+				status: 'contacted',
+				priority: 2,
+				sizeRange: '51-200',
+				industry: 'logistics',
+			})
+
+			// THEN it is applicable
+			expect(reason).toBeNull()
+		})
+	})
+
+	describe('when the proposal mentions none of the constrained fields', () => {
+		it('should report nothing to reject', () => {
+			// GIVEN a proposal touching only free-text columns
+			const reason = checkCompanyFieldValues({
+				industry: 'logistics',
+				location: 'Sitges',
+			})
+
+			// THEN there is nothing to check
+			expect(reason).toBeNull()
+		})
+	})
+
+	describe('when the model invents a status outside the vocabulary', () => {
+		it('should reject it and name both the field and the value', () => {
+			// GIVEN a status from an older vocabulary the app no longer has
+			const reason = checkCompanyFieldValues({ status: 'qualified' })
+
+			// THEN the proposal is refused, and the message says what was wrong so a
+			// reviewer is not left with a bare failure
+			expect(reason).not.toBeNull()
+			expect(reason).toContain('status')
+			expect(reason).toContain('qualified')
+		})
+	})
+
+	describe('when a priority falls outside the allowed range', () => {
+		it('should reject it', () => {
+			// GIVEN a priority from the old 1-5 scale, which is now 1-3
+			expect(checkCompanyFieldValues({ priority: 5 })).not.toBeNull()
+		})
+	})
+
+	describe('when a size range is not one of the bands', () => {
+		it('should reject it', () => {
+			// GIVEN a band the model made up rather than one of COMPANY_SIZE_RANGES
+			expect(checkCompanyFieldValues({ sizeRange: '20-30' })).not.toBeNull()
+		})
+	})
+
+	describe('when a nullable column is explicitly cleared', () => {
+		it('should allow it, since null is how a value is removed', () => {
+			// GIVEN a proposal clearing the two columns the database lets be null
+			expect(checkCompanyFieldValues({ priority: null })).toBeNull()
+			expect(checkCompanyFieldValues({ sizeRange: null })).toBeNull()
+		})
+	})
+
+	describe('when status is cleared', () => {
+		it('should reject it, since the column is NOT NULL', () => {
+			// GIVEN a proposal trying to empty a column that always holds a stage
+			expect(checkCompanyFieldValues({ status: null })).not.toBeNull()
+		})
+	})
+
+	describe('when a value carries the right vocabulary but the wrong type', () => {
+		it('should reject it rather than coerce', () => {
+			// GIVEN a priority sent as text and a status sent as a number — the
+			// database compares by type, so neither would match its constraint
+			expect(checkCompanyFieldValues({ priority: '2' })).not.toBeNull()
+			expect(checkCompanyFieldValues({ status: 1 })).not.toBeNull()
+		})
+	})
+
+	describe('when several fields are wrong at once', () => {
+		it('should report the first one, since the whole proposal goes back', () => {
+			// GIVEN a proposal with two unusable values
+			const reason = checkCompanyFieldValues({
+				status: 'lead',
+				priority: 9,
+			})
+
+			// THEN one clear reason comes back rather than a merged list
+			expect(reason).toContain('status')
+		})
+	})
+})
+
+describe('allowlistFields feeding checkCompanyFieldValues', () => {
+	describe('when a bad value arrives wrapped with the page it came from', () => {
+		it('should still be caught, since the wrapper is unwrapped first', () => {
+			// GIVEN an enrichment finding carrying its provenance envelope, which is
+			// the shape the apply path unwraps before any value is checked
+			const { fields } = allowlistFields('companies', {
+				status: { value: 'negotiation', source_id: 'src-1' },
+			})
+
+			// THEN the value inside the wrapper is the one judged
+			expect(fields['status']).toBe('negotiation')
+			expect(checkCompanyFieldValues(fields)).not.toBeNull()
+		})
+	})
+
+	describe('when a good value arrives wrapped', () => {
+		it('should pass, so provenance does not make a valid value unusable', () => {
+			// GIVEN the same envelope around a stage that is in the vocabulary
+			const { fields } = allowlistFields('companies', {
+				status: { value: 'meeting', source_id: 'src-1' },
+			})
+
+			// THEN nothing is rejected
+			expect(checkCompanyFieldValues(fields)).toBeNull()
+		})
+	})
+
+	describe('when a snake_case key carries a bad value', () => {
+		it('should be caught under its camelCase column name', () => {
+			// GIVEN the model writing size_range, which the allowlist renames
+			const { fields } = allowlistFields('companies', { size_range: '2-7' })
+
+			// THEN the renamed field is the one checked
+			expect(checkCompanyFieldValues(fields)).toContain('sizeRange')
 		})
 	})
 })

@@ -2,6 +2,11 @@ import { Cause, DateTime, Effect } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
+import {
+	COMPANY_PRIORITIES,
+	COMPANY_SIZE_RANGES,
+	COMPANY_STATUSES,
+} from '@batuda/domain'
 
 export {
 	type ProvenanceEntry,
@@ -176,6 +181,40 @@ export const allowlistFields = (
 		if (read.citation !== undefined) citations[camel] = read.citation
 	}
 	return { fields: out, citations }
+}
+
+// The allowlist above says which fields may be written, not what they may be
+// set to. These three columns take only a fixed set of values, so a stage the
+// model invented would otherwise reach the database and come back as a failed
+// request — telling the reviewer the server broke, when the suggestion was
+// simply unusable.
+const COMPANY_FIELD_VOCABULARIES: ReadonlyArray<{
+	readonly field: string
+	readonly allowed: ReadonlyArray<string | number>
+}> = [
+	{ field: 'status', allowed: COMPANY_STATUSES },
+	{ field: 'priority', allowed: COMPANY_PRIORITIES },
+	{ field: 'sizeRange', allowed: COMPANY_SIZE_RANGES },
+]
+
+// The reason a company proposal cannot be applied, or null when it can. An
+// explicit null is how a value is cleared, which these columns allow except
+// status — a company always sits at some stage.
+export const checkCompanyFieldValues = (
+	fields: Record<string, unknown>,
+): string | null => {
+	for (const { field, allowed } of COMPANY_FIELD_VOCABULARIES) {
+		if (!(field in fields)) continue
+		const value = fields[field]
+		if (value === null && field !== 'status') continue
+		if (
+			(typeof value === 'string' || typeof value === 'number') &&
+			allowed.includes(value)
+		)
+			continue
+		return `${field} must be one of ${allowed.join(', ')} — got ${JSON.stringify(value)}`
+	}
+	return null
 }
 
 export type Validated =
@@ -826,6 +865,14 @@ export const resolveResearchProposedUpdate = (
 			validated.table,
 			validated.fields,
 		)
+		// The whole proposal goes back, not just the offending field: a reviewer
+		// approved the set they were shown, so quietly applying the rest would
+		// leave them believing a change landed that never did.
+		if (validated.table === 'companies') {
+			const badValue = checkCompanyFieldValues(fields)
+			if (badValue !== null)
+				return { outcome: 'invalid', reason: badValue } satisfies ResolveOutcome
+		}
 		const sources = yield* resolveFieldSources(sql, runId, {
 			...channelCitations,
 			...fieldCitations,
