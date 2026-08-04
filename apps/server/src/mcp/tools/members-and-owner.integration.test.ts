@@ -163,6 +163,41 @@ const setOwner = (
 		),
 	)
 
+// Creates companies through the tool, the way an agent would, so the owner it
+// carries goes through the same check a written owner does.
+const createCompanies = (
+	org: Org,
+	companies: ReadonlyArray<{ name: string; slug: string; ownerId?: string }>,
+): Promise<{ ok: true; created: number } | { ok: false; message: string }> =>
+	callInOrg(
+		org,
+		Effect.gen(function* () {
+			const toolkit = yield* CompanyTools
+			const stream = yield* toolkit.handle('create_companies', { companies })
+			const [first] = yield* Stream.runCollect(stream)
+			if (first === undefined)
+				return yield* Effect.die(
+					new Error('create_companies produced no result'),
+				)
+			const result = first.result as { created: ReadonlyArray<unknown> }
+			return { ok: true as const, created: result.created.length }
+		}).pipe(
+			Effect.provideService(CurrentUser, actor()),
+			Effect.provide(CompanyHandlers),
+			Effect.catchCause(cause =>
+				Effect.succeed({ ok: false as const, message: String(cause) }),
+			),
+		),
+	)
+
+const countCompanies = async (slugPrefix: string): Promise<number> => {
+	const r = await pool.query<{ n: string }>(
+		'SELECT count(*)::text AS n FROM companies WHERE slug LIKE $1',
+		[`${slugPrefix}%`],
+	)
+	return Number(r.rows[0]?.n ?? 0)
+}
+
 const seedCompany = async (orgId: string): Promise<string> => {
 	const r = await pool.query<{ id: string }>(
 		`INSERT INTO companies (organization_id, slug, name)
@@ -193,6 +228,28 @@ afterAll(async () => {
 	await runtime.dispose()
 	await pool.end()
 })
+
+// The web app does not go through the tools — it calls the service straight.
+// The check has to catch it there too, which is the whole reason it lives beside
+// the write rather than in the tool.
+const setOwnerViaService = (
+	org: Org,
+	companyId: string,
+	ownerId: string,
+): Promise<{ ok: true } | { ok: false; message: string }> =>
+	callInOrg(
+		org,
+		Effect.gen(function* () {
+			const service = yield* CompanyService
+			yield* service.update(companyId, { ownerId })
+			return { ok: true as const }
+		}).pipe(
+			Effect.provide(CompanyService.layer),
+			Effect.catchCause(cause =>
+				Effect.succeed({ ok: false as const, message: String(cause) }),
+			),
+		),
+	)
 
 describe('list_members', () => {
 	describe('when read inside an organization', () => {
@@ -252,6 +309,94 @@ describe('list_members', () => {
 	})
 })
 
+describe('create_companies owner', () => {
+	describe('when a new company names a colleague', () => {
+		it('should create it already belonging to them', async () => {
+			// GIVEN a colleague here and a company to open in their name
+			const [member] = await listMembers(taller)
+			const slug = `${MARKER}-create-${randomUUID()}`
+
+			// WHEN the company is created carrying that owner
+			const result = await createCompanies(taller, [
+				{ name: 'Created Owned', slug, ownerId: member!.user_id },
+			])
+
+			// THEN it lands owned, with nobody having to assign it afterwards
+			expect(result.ok).toBe(true)
+			const r = await pool.query<{ id: string; owner_id: string | null }>(
+				'SELECT id, owner_id FROM companies WHERE slug = $1',
+				[slug],
+			)
+			expect(r.rows[0]?.owner_id).toBe(member!.user_id)
+		})
+	})
+
+	describe('when a batch names somebody from another organization', () => {
+		it('should create none of it, not just skip the one', async () => {
+			// GIVEN a batch whose second company names an outsider — the call lands
+			// in one transaction, so a partial write would leave the caller working
+			// out which ones missed
+			const outsider = await memberOnlyIn(restaurant.id, taller.id)
+			const prefix = `${MARKER}-batch-${randomUUID()}`
+			const result = await createCompanies(taller, [
+				{ name: 'Fine', slug: `${prefix}-a` },
+				{ name: 'Stranger', slug: `${prefix}-b`, ownerId: outsider },
+			])
+
+			// THEN the whole call is refused and nothing was written
+			expect(result.ok).toBe(false)
+			if (result.ok) return
+			expect(result.message).toContain('not a member')
+			expect(await countCompanies(prefix)).toBe(0)
+		})
+	})
+
+	describe('when a company already on file is sent again with a new owner', () => {
+		it('should leave the owner it had, since a duplicate is skipped not rewritten', async () => {
+			// GIVEN a company created for one colleague, and a second colleague to
+			// try to hand it to
+			const members = await listMembers(taller)
+			const [first, second] = members
+			const slug = `${MARKER}-reassign-${randomUUID()}`
+			await createCompanies(taller, [
+				{ name: 'Already Here', slug, ownerId: first!.user_id },
+			])
+
+			// WHEN the same company is sent again naming somebody else
+			const again = await createCompanies(taller, [
+				{ name: 'Already Here', slug, ownerId: second!.user_id },
+			])
+
+			// THEN it is skipped and the original owner stands — re-sending a list is
+			// not a way to hand companies over, which is why the tool says so
+			expect(again.ok).toBe(true)
+			const r = await pool.query<{ owner_id: string | null }>(
+				'SELECT owner_id FROM companies WHERE slug = $1',
+				[slug],
+			)
+			expect(r.rows[0]?.owner_id).toBe(first!.user_id)
+		})
+	})
+
+	describe('when a new company names nobody', () => {
+		it('should create it unowned', async () => {
+			// GIVEN a company created without an owner
+			const slug = `${MARKER}-unowned-${randomUUID()}`
+			const result = await createCompanies(taller, [
+				{ name: 'Created Unowned', slug },
+			])
+
+			// THEN it exists with nobody responsible for it yet
+			expect(result.ok).toBe(true)
+			const r = await pool.query<{ owner_id: string | null }>(
+				'SELECT owner_id FROM companies WHERE slug = $1',
+				[slug],
+			)
+			expect(r.rows[0]?.owner_id).toBeNull()
+		})
+	})
+})
+
 describe('update_company owner', () => {
 	describe('when the owner works here', () => {
 		it('should record them as responsible for the company', async () => {
@@ -264,6 +409,36 @@ describe('update_company owner', () => {
 
 			// THEN the company is theirs
 			expect(result.ok).toBe(true)
+			expect(await ownerOf(companyId)).toBe(member!.user_id)
+		})
+	})
+
+	describe('when an unrelated field is updated', () => {
+		it('should leave the owner alone, since omitting is not clearing', async () => {
+			// GIVEN a company that already belongs to somebody
+			const companyId = await seedCompany(taller.id)
+			const [member] = await listMembers(taller)
+			await setOwner(taller, companyId, member!.user_id)
+
+			// WHEN something else about it changes, with no owner mentioned
+			await callInOrg(
+				taller,
+				Effect.gen(function* () {
+					const toolkit = yield* CompanyTools
+					const stream = yield* toolkit.handle('update_company', {
+						id: companyId,
+						industry: 'logistics',
+					})
+					yield* Stream.runCollect(stream)
+				}).pipe(
+					Effect.provideService(CurrentUser, actor()),
+					Effect.provide(CompanyHandlers),
+					Effect.catchCause(() => Effect.void),
+				),
+			)
+
+			// THEN they still own it — an edit that quietly unassigned the lead
+			// would be noticed by nobody
 			expect(await ownerOf(companyId)).toBe(member!.user_id)
 		})
 	})
@@ -299,6 +474,25 @@ describe('update_company owner', () => {
 			if (result.ok) return
 			expect(result.message).toContain('not a member')
 			expect(result.message).toContain('list_members')
+			expect(await ownerOf(companyId)).toBeNull()
+		})
+	})
+
+	describe('when the web app assigns an owner from another organization', () => {
+		it('should refuse there too, not only through the tools', async () => {
+			// GIVEN the path the company page itself uses, which never touches the
+			// MCP tools
+			const companyId = await seedCompany(taller.id)
+			const outsider = await memberOnlyIn(restaurant.id, taller.id)
+
+			// WHEN it is asked to hand the company to somebody from elsewhere
+			const result = await setOwnerViaService(taller, companyId, outsider)
+
+			// THEN it is refused on the same terms — a rule that only one way in
+			// obeys is not a rule
+			expect(result.ok).toBe(false)
+			if (result.ok) return
+			expect(result.message).toContain('not a member')
 			expect(await ownerOf(companyId)).toBeNull()
 		})
 	})

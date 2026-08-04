@@ -93,6 +93,10 @@ const companyInputFields = {
 			'The number the company is registered or taxed under — a Spanish NIF/CIF, a UK company number, an EU VAT number. Copy it exactly as printed; punctuation and case are ignored when matching. Supplying it is the surest way to avoid creating a company you already hold under a different name.',
 	}),
 	status: Schema.optional(CompanyStatus),
+	ownerId: Schema.optional(Schema.String).annotate({
+		description:
+			'The colleague who will work this company, as a user id from list_members — a name or an email address is not one. Leave it out to create the company unowned and assign it later with update_company.',
+	}),
 	industry: Schema.optional(Schema.String),
 	sizeRange: Schema.optional(CompanySizeRange),
 	country: Schema.optional(CompanyCountry),
@@ -124,7 +128,7 @@ const CompanyInput = Schema.Struct(companyInputFields)
 // version drifted: it offered three statuses the app has never had and a priority
 // range twice the real one, and assistants followed it into rows that show up in
 // no board column. Now the sentence cannot say anything the schema would refuse.
-export const CREATE_COMPANIES_DESCRIPTION = `Create one or more companies in a single call — pass \`companies\` as an array (a single element to create just one, the whole shortlist to load a batch). Slug: unique kebab-case from name. Status: ${COMPANY_STATUSES.join('|')} (default: prospect). Priority: ${COMPANY_PRIORITIES[0]} (highest) to ${COMPANY_PRIORITIES[COMPANY_PRIORITIES.length - 1]} (lowest, default: 2). Pass taxId whenever you know it: a company is skipped if its slug already exists OR its registration number already does, so the number catches the same firm arriving under a different trading name. Runs in one transaction; a skip is not an error, so re-running an overlapping list is safe. Returns { created, skipped, possible_duplicates }: the rows that landed, for each one left out its slug plus matched_on ("slug" or "tax_id") saying which identity already existed, and any company that looks like one already on file under a different name — reported, not blocked, so check those before treating them as new.`
+export const CREATE_COMPANIES_DESCRIPTION = `Create one or more companies in a single call — pass \`companies\` as an array (a single element to create just one, the whole shortlist to load a batch). Slug: unique kebab-case from name. Status: ${COMPANY_STATUSES.join('|')} (default: prospect). ownerId assigns the colleague who will work the company — pass a user id from list_members, or leave it out to create it unowned. It only lands on companies actually created: a skipped duplicate keeps the owner it already had, so re-sending a list is never a way to hand companies over. Use update_company for that. Priority: ${COMPANY_PRIORITIES[0]} (highest) to ${COMPANY_PRIORITIES[COMPANY_PRIORITIES.length - 1]} (lowest, default: 2). Pass taxId whenever you know it: a company is skipped if its slug already exists OR its registration number already does, so the number catches the same firm arriving under a different trading name. Runs in one transaction; a skip is not an error, so re-running an overlapping list is safe. Returns { created, skipped, possible_duplicates }: the rows that landed, for each one left out its slug plus matched_on ("slug" or "tax_id") saying which identity already existed, and any company that looks like one already on file under a different name — reported, not blocked, so check those before treating them as new.`
 
 const CreateCompanies = Tool.make('create_companies', {
 	description: CREATE_COMPANIES_DESCRIPTION,
@@ -406,25 +410,14 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 						})),
 						possible_duplicates: possibleDuplicates,
 					}
-				}).pipe(Effect.orDie),
+				}).pipe(
+					Effect.catchTag('BadRequest', e =>
+						Effect.die(new ToolMessage(e.message)),
+					),
+					Effect.orDie,
+				),
 			update_company: ({ id, ...fields }) =>
 				Effect.gen(function* () {
-					// An owner has to be somebody who works here. Row-level security
-					// keeps this lookup to the current organisation, so an id from
-					// another one finds nothing and is turned away — without it a
-					// company could be handed to a stranger, and the only sign would be
-					// a name nobody recognises on the lead.
-					if (fields.ownerId !== undefined && fields.ownerId !== null) {
-						const member = yield* sql`
-							SELECT 1 FROM member WHERE "userId" = ${fields.ownerId} LIMIT 1
-						`
-						if (member.length === 0)
-							return yield* Effect.die(
-								new ToolMessage(
-									'That user is not a member of this organization — call list_members for the ids of people who are.',
-								),
-							)
-					}
 					// Capture the stage before the write so an agent-driven change
 					// is recorded on the timeline too (actor unknown → null).
 					const before =
@@ -448,7 +441,12 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 						actorUserId: null,
 					}).pipe(Effect.provideService(TimelineActivityService, timeline))
 					return result
-				}).pipe(Effect.orDie),
+				}).pipe(
+					Effect.catchTag('BadRequest', e =>
+						Effect.die(new ToolMessage(e.message)),
+					),
+					Effect.orDie,
+				),
 			manage_company_sites: params =>
 				Effect.gen(function* () {
 					const currentOrg = yield* CurrentOrg
