@@ -58,10 +58,10 @@ export function AboutSection({
 	return (
 		<PriCollapsible.Root>
 			<TriggerWrap>
-				<Trigger data-testid='company-about-trigger'>
+				<PriCollapsible.Trigger data-testid='company-about-trigger'>
 					<ChevronRight size={14} aria-hidden />
 					<Trans>About</Trans>
-				</Trigger>
+				</PriCollapsible.Trigger>
 			</TriggerWrap>
 			<PriCollapsible.Panel>
 				<Body data-testid='company-about-panel'>
@@ -150,17 +150,6 @@ export function AboutSection({
 const TriggerWrap = styled.div`
 	display: flex;
 	justify-content: flex-start;
-`
-
-const Trigger = styled(PriCollapsible.Trigger)`
-	& > svg {
-		transition: transform 200ms ease;
-	}
-
-	&[data-open] > svg,
-	&[aria-expanded='true'] > svg {
-		transform: rotate(90deg);
-	}
 `
 
 const Body = styled.div`

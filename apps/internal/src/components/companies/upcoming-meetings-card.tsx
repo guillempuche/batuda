@@ -8,6 +8,7 @@ import styled from 'styled-components'
 
 import { calendarEventsByCompanyAtom } from '#/atoms/calendar-atoms'
 import { ErrorState } from '#/components/shared/error-state'
+import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { RelativeDate } from '#/components/shared/relative-date'
 import {
 	brushedMetalPlate,
@@ -74,9 +75,7 @@ export function UpcomingMeetingsCard({
 						<Trans>Upcoming meetings</Trans>
 					</Heading>
 				</Header>
-				<Loading>
-					<Trans>Loading…</Trans>
-				</Loading>
+				<LoadingSpinner />
 			</Panel>
 		)
 	}
@@ -431,13 +430,6 @@ const OpenLink = styled.a`
 const Empty = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
-	font-style: italic;
-	color: var(--color-on-surface-variant);
-	margin: 0;
-`
-
-const Loading = styled.p`
-	font-family: var(--font-body);
 	font-style: italic;
 	color: var(--color-on-surface-variant);
 	margin: 0;

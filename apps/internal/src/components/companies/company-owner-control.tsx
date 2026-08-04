@@ -4,7 +4,7 @@ import { Check, ChevronsUpDown, UserCircle2 } from 'lucide-react'
 import { useCallback } from 'react'
 import styled from 'styled-components'
 
-import { PriSelect, usePriToast } from '@batuda/ui/pri'
+import { PriAvatar, PriSelect, usePriToast } from '@batuda/ui/pri'
 
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import { initialFor, useOrgMembers } from '#/lib/org-members'
@@ -85,7 +85,9 @@ export function CompanyOwnerControl({
 				aria-label={t`Owner`}
 			>
 				{triggerInitial ? (
-					<Avatar aria-hidden>{triggerInitial}</Avatar>
+					<PriAvatar.Root $size='1.25rem' aria-hidden>
+						<PriAvatar.Fallback>{triggerInitial}</PriAvatar.Fallback>
+					</PriAvatar.Root>
 				) : (
 					<UserCircle2 size={16} aria-hidden />
 				)}
@@ -129,24 +131,4 @@ const OwnerName = styled.span.withConfig({ displayName: 'CompanyOwnerName' })`
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-`
-
-const Avatar = styled.span.withConfig({ displayName: 'CompanyOwnerAvatar' })`
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 1.25rem;
-	height: 1.25rem;
-	border-radius: var(--shape-full);
-	background: radial-gradient(
-		circle at 35% 30%,
-		color-mix(in oklab, var(--color-status-prospect) 88%, white) 0%,
-		var(--color-status-prospect) 60%,
-		color-mix(in oklab, var(--color-status-prospect) 68%, black) 100%
-	);
-	border: 1px solid color-mix(in oklab, var(--color-status-prospect) 60%, black);
-	color: var(--color-on-primary);
-	font-size: 0.62rem;
-	font-weight: var(--font-weight-bold);
-	flex-shrink: 0;
 `

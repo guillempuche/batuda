@@ -5,7 +5,7 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { Link } from '@tanstack/react-router'
 import { DateTime, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
-import { FileText, Pencil, Plus, X } from 'lucide-react'
+import { Check, ChevronsUpDown, FileText, Pencil, Plus, X } from 'lucide-react'
 import { type FormEvent, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 
@@ -14,6 +14,7 @@ import {
 	PriButton,
 	PriDialog,
 	PriInput,
+	PriSelect,
 	PriTextarea,
 	usePriToast,
 } from '@batuda/ui/pri'
@@ -287,6 +288,11 @@ function DocumentDialog({
 	const [content, setContent] = useState('')
 	const [busy, setBusy] = useState(false)
 
+	const typeItems = useMemo(
+		() => DOC_TYPES.map(dt => ({ value: dt.value, label: i18n._(dt.label) })),
+		[i18n],
+	)
+
 	// Re-seed the form each time the dialog opens for a different doc/mode, and
 	// again once the body has arrived for the one being edited — until then the
 	// box would hold nothing, and saving would wipe the document.
@@ -434,18 +440,44 @@ function DocumentDialog({
 									<Label htmlFor='document-type'>
 										<Trans>Type</Trans>
 									</Label>
-									<TypeSelect
-										id='document-type'
-										data-testid='document-type'
+									<PriSelect.Root
+										items={typeItems}
 										value={type}
-										onChange={e => setType(e.target.value)}
+										onValueChange={v => {
+											if (typeof v === 'string') setType(v)
+										}}
 									>
-										{DOC_TYPES.map(dt => (
-											<option key={dt.value} value={dt.value}>
-												{i18n._(dt.label)}
-											</option>
-										))}
-									</TypeSelect>
+										<PriSelect.Trigger
+											id='document-type'
+											data-testid='document-type'
+											aria-label={t`Type`}
+										>
+											<PriSelect.Value />
+											<PriSelect.Icon>
+												<ChevronsUpDown size={14} aria-hidden />
+											</PriSelect.Icon>
+										</PriSelect.Trigger>
+										<PriSelect.Portal>
+											<PriSelect.Positioner sideOffset={6}>
+												<PriSelect.Popup>
+													{typeItems.map(opt => (
+														<PriSelect.Item
+															key={opt.value}
+															value={opt.value}
+															data-testid={`document-type-option-${opt.value}`}
+														>
+															<PriSelect.ItemIndicator>
+																<Check size={12} aria-hidden />
+															</PriSelect.ItemIndicator>
+															<PriSelect.ItemText>
+																{opt.label}
+															</PriSelect.ItemText>
+														</PriSelect.Item>
+													))}
+												</PriSelect.Popup>
+											</PriSelect.Positioner>
+										</PriSelect.Portal>
+									</PriSelect.Root>
 								</Field>
 							) : null}
 							<Field>
@@ -627,16 +659,6 @@ const Label = styled.label`
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
 	color: var(--color-on-surface-variant);
-`
-
-const TypeSelect = styled.select`
-	font-family: var(--font-body);
-	font-size: var(--typescale-body-medium-size);
-	padding: var(--space-2xs) var(--space-xs);
-	border-radius: var(--shape-2xs);
-	border: 1px solid color-mix(in oklab, var(--color-on-surface) 24%, transparent);
-	background: var(--color-surface);
-	color: var(--color-on-surface);
 `
 
 const Footer = styled.div`

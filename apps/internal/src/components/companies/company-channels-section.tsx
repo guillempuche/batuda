@@ -35,12 +35,12 @@ export function CompanyChannelsSection({ channels, onEmail }: Props) {
 	return (
 		<PriCollapsible.Root defaultOpen>
 			<TriggerWrap>
-				<Trigger data-testid='company-channels-trigger'>
+				<PriCollapsible.Trigger data-testid='company-channels-trigger'>
 					<ChevronRight size={14} aria-hidden />
 					<Link2 size={14} aria-hidden />
 					<Trans>Ways to reach</Trans>
 					<Count>{channels.length}</Count>
-				</Trigger>
+				</PriCollapsible.Trigger>
 			</TriggerWrap>
 			<PriCollapsible.Panel>
 				<Body data-testid='company-channels-panel'>
@@ -102,17 +102,6 @@ export function CompanyChannelsSection({ channels, onEmail }: Props) {
 const TriggerWrap = styled.div`
 	display: flex;
 	justify-content: flex-start;
-`
-
-const Trigger = styled(PriCollapsible.Trigger)`
-	& > svg:first-child {
-		transition: transform 200ms ease;
-	}
-
-	&[data-open] > svg:first-child,
-	&[aria-expanded='true'] > svg:first-child {
-		transform: rotate(90deg);
-	}
 `
 
 const Count = styled.span`

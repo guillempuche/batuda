@@ -3,11 +3,17 @@ import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { DateTime, Schema } from 'effect'
-import { FileSignature, Plus, X } from 'lucide-react'
+import { Check, ChevronsUpDown, FileSignature, Plus, X } from 'lucide-react'
 import { type FormEvent, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 
-import { PriButton, PriDialog, PriInput, usePriToast } from '@batuda/ui/pri'
+import {
+	PriButton,
+	PriDialog,
+	PriInput,
+	PriSelect,
+	usePriToast,
+} from '@batuda/ui/pri'
 
 import { PROPOSALS_PAGE_SIZE, proposalsListAtom } from '#/atoms/company-atoms'
 import { SubjectDocuments } from '#/components/documents/subject-documents'
@@ -271,6 +277,10 @@ function ProposalDialog({
 	const editing = target !== 'new' && target !== null ? target : null
 	const [title, setTitle] = useState('')
 	const [status, setStatus] = useState('draft')
+	const statusItems = useMemo(
+		() => STATUSES.map(s => ({ value: s.value, label: i18n._(s.label) })),
+		[i18n],
+	)
 	const [currency, setCurrency] = useState('EUR')
 	const [expiresAt, setExpiresAt] = useState('')
 	const [lineItems, setLineItems] = useState<ReadonlyArray<LineItem>>([])
@@ -467,18 +477,42 @@ function ProposalDialog({
 								<Label htmlFor='proposal-status'>
 									<Trans>Status</Trans>
 								</Label>
-								<StatusSelect
-									id='proposal-status'
-									data-testid='proposal-status'
+								<PriSelect.Root
+									items={statusItems}
 									value={status}
-									onChange={e => setStatus(e.target.value)}
+									onValueChange={v => {
+										if (typeof v === 'string') setStatus(v)
+									}}
 								>
-									{STATUSES.map(s => (
-										<option key={s.value} value={s.value}>
-											{i18n._(s.label)}
-										</option>
-									))}
-								</StatusSelect>
+									<PriSelect.Trigger
+										id='proposal-status'
+										data-testid='proposal-status'
+										aria-label={t`Status`}
+									>
+										<PriSelect.Value />
+										<PriSelect.Icon>
+											<ChevronsUpDown size={14} aria-hidden />
+										</PriSelect.Icon>
+									</PriSelect.Trigger>
+									<PriSelect.Portal>
+										<PriSelect.Positioner sideOffset={6}>
+											<PriSelect.Popup>
+												{statusItems.map(opt => (
+													<PriSelect.Item
+														key={opt.value}
+														value={opt.value}
+														data-testid={`proposal-status-option-${opt.value}`}
+													>
+														<PriSelect.ItemIndicator>
+															<Check size={12} aria-hidden />
+														</PriSelect.ItemIndicator>
+														<PriSelect.ItemText>{opt.label}</PriSelect.ItemText>
+													</PriSelect.Item>
+												))}
+											</PriSelect.Popup>
+										</PriSelect.Positioner>
+									</PriSelect.Portal>
+								</PriSelect.Root>
 							</Field>
 						) : (
 							<Field>
@@ -720,16 +754,6 @@ const Label = styled.label`
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
 	color: var(--color-on-surface-variant);
-`
-
-const StatusSelect = styled.select`
-	font-family: var(--font-body);
-	font-size: var(--typescale-body-medium-size);
-	padding: var(--space-2xs) var(--space-xs);
-	border-radius: var(--shape-2xs);
-	border: 1px solid color-mix(in oklab, var(--color-on-surface) 24%, transparent);
-	background: var(--color-surface);
-	color: var(--color-on-surface);
 `
 
 const Footer = styled.div`

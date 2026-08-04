@@ -46,6 +46,7 @@ import {
 	PriButton,
 	PriCollapsible,
 	PriSelect,
+	PriSwitch,
 	PriTabs,
 	usePriToast,
 } from '@batuda/ui/pri'
@@ -1249,13 +1250,13 @@ function DetailBody({
 												<TimelinePanelInner>
 													<TimelineToolbar>
 														<SystemEventsToggle>
-															<input
-																type='checkbox'
+															<PriSwitch.Root
 																checked={showSystemEvents}
-																onChange={e =>
-																	setShowSystemEvents(e.target.checked)
-																}
-															/>
+																onCheckedChange={setShowSystemEvents}
+																data-testid='company-timeline-system-events'
+															>
+																<PriSwitch.Thumb />
+															</PriSwitch.Root>
 															<Trans>Show system events</Trans>
 														</SystemEventsToggle>
 													</TimelineToolbar>
@@ -2645,11 +2646,6 @@ const SystemEventsToggle = styled.label.withConfig({
 	opacity: 0.75;
 	cursor: pointer;
 	user-select: none;
-
-	input {
-		accent-color: var(--color-primary);
-		cursor: pointer;
-	}
 `
 
 const TimelineList = styled.div.withConfig({

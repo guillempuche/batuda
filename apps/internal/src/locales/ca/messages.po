@@ -2905,7 +2905,6 @@ msgstr "S’estan carregant les teves organitzacions…"
 msgid "Loading your research budget…"
 msgstr "Carregant el teu pressupost de recerca…"
 
-#: src/components/companies/upcoming-meetings-card.tsx
 #: src/components/shared/loading-spinner.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/settings/api-keys/index.tsx
@@ -5167,6 +5166,7 @@ msgid "STARTTLS"
 msgstr "STARTTLS"
 
 #: src/components/companies/proposals-panel.tsx
+#: src/components/companies/proposals-panel.tsx
 #: src/routes/calendar/index.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
@@ -5727,6 +5727,7 @@ msgstr "Prova amb criteris diferents o neteja els filtres."
 msgid "Trying again…"
 msgstr "S'està tornant a provar…"
 
+#: src/components/companies/documents-panel.tsx
 #: src/components/companies/documents-panel.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Type"

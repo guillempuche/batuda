@@ -79,7 +79,7 @@ export function CompanyFitSection({
 	return (
 		<PriCollapsible.Root defaultOpen={company.fitVerdict !== null}>
 			<TriggerWrap>
-				<Trigger data-testid='company-fit-trigger'>
+				<PriCollapsible.Trigger data-testid='company-fit-trigger'>
 					<ChevronRight size={14} aria-hidden />
 					<Scale size={14} aria-hidden />
 					<Trans>Fit</Trans>
@@ -91,7 +91,7 @@ export function CompanyFitSection({
 							{verdictOf(i18n, company.fitVerdict)}
 						</Verdict>
 					) : null}
-				</Trigger>
+				</PriCollapsible.Trigger>
 			</TriggerWrap>
 			<PriCollapsible.Panel>
 				<Body data-testid='company-fit-panel'>
@@ -251,17 +251,6 @@ function hostOf(url: string): string {
 const TriggerWrap = styled.div`
 	display: flex;
 	justify-content: flex-start;
-`
-
-const Trigger = styled(PriCollapsible.Trigger)`
-	& > svg:first-child {
-		transition: transform 200ms ease;
-	}
-
-	&[data-open] > svg:first-child,
-	&[aria-expanded='true'] > svg:first-child {
-		transform: rotate(90deg);
-	}
 `
 
 const Verdict = styled.span<{ $verdict: string }>`

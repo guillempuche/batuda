@@ -53,11 +53,11 @@ export function AccountBriefSection({
 	return (
 		<PriCollapsible.Root defaultOpen={brief !== ''}>
 			<TriggerWrap>
-				<Trigger data-testid='company-brief-trigger'>
+				<PriCollapsible.Trigger data-testid='company-brief-trigger'>
 					<ChevronRight size={14} aria-hidden />
 					<NotebookPen size={14} aria-hidden />
 					<Trans>Account brief</Trans>
-				</Trigger>
+				</PriCollapsible.Trigger>
 			</TriggerWrap>
 			<PriCollapsible.Panel>
 				<Body data-testid='company-brief-panel'>
@@ -125,17 +125,6 @@ export function AccountBriefSection({
 const TriggerWrap = styled.div`
 	display: flex;
 	justify-content: flex-start;
-`
-
-const Trigger = styled(PriCollapsible.Trigger)`
-	& > svg:first-child {
-		transition: transform 200ms ease;
-	}
-
-	&[data-open] > svg:first-child,
-	&[aria-expanded='true'] > svg:first-child {
-		transform: rotate(90deg);
-	}
 `
 
 const Body = styled.div`
