@@ -61,7 +61,9 @@ export function NextActionCard({
 	)
 }
 
-const Card = styled.section`
+const Card = styled.section.withConfig({
+	displayName: 'NextActionCard',
+})`
 	${agedPaperSurface}
 	display: flex;
 	flex-direction: column;
@@ -69,7 +71,9 @@ const Card = styled.section`
 	padding: var(--space-md);
 `
 
-const Header = styled.header`
+const Header = styled.header.withConfig({
+	displayName: 'NextActionCardHeader',
+})`
 	${rulerUnderRule}
 	display: flex;
 	align-items: baseline;
@@ -99,7 +103,9 @@ const Due = styled.span.withConfig({
 	}
 `
 
-const Heading = styled.h3`
+const Heading = styled.h3.withConfig({
+	displayName: 'NextActionCardHeading',
+})`
 	${stenciledTitle}
 	display: inline-flex;
 	align-items: center;
@@ -109,7 +115,9 @@ const Heading = styled.h3`
 	line-height: var(--typescale-title-medium-line);
 `
 
-const Body = styled.div`
+const Body = styled.div.withConfig({
+	displayName: 'NextActionCardBody',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-xs);

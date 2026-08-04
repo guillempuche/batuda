@@ -71,7 +71,9 @@ export function OpenTasksCard({
 	)
 }
 
-const Card = styled.section`
+const Card = styled.section.withConfig({
+	displayName: 'OpenTasksCard',
+})`
 	${agedPaperSurface}
 	display: flex;
 	flex-direction: column;
@@ -79,7 +81,9 @@ const Card = styled.section`
 	padding: var(--space-md);
 `
 
-const Header = styled.header`
+const Header = styled.header.withConfig({
+	displayName: 'OpenTasksCardHeader',
+})`
 	${rulerUnderRule}
 	display: flex;
 	align-items: center;
@@ -88,7 +92,9 @@ const Header = styled.header`
 	padding-bottom: var(--space-2xs);
 `
 
-const Heading = styled.h3`
+const Heading = styled.h3.withConfig({
+	displayName: 'OpenTasksCardHeading',
+})`
 	${stenciledTitle}
 	display: inline-flex;
 	align-items: center;
@@ -98,7 +104,9 @@ const Heading = styled.h3`
 	line-height: var(--typescale-title-medium-line);
 `
 
-const Count = styled.span`
+const Count = styled.span.withConfig({
+	displayName: 'OpenTasksCardCount',
+})`
 	font-family: var(--font-body);
 	font-weight: var(--font-weight-regular);
 	letter-spacing: 0;
@@ -107,7 +115,9 @@ const Count = styled.span`
 	margin-left: var(--space-2xs);
 `
 
-const List = styled.ul`
+const List = styled.ul.withConfig({
+	displayName: 'OpenTasksCardList',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: 0;
@@ -116,7 +126,9 @@ const List = styled.ul`
 	padding: 0;
 `
 
-const Row = styled.li`
+const Row = styled.li.withConfig({
+	displayName: 'OpenTasksCardRow',
+})`
 	${ruledLedgerRow}
 	display: flex;
 	align-items: center;
@@ -129,7 +141,9 @@ const Row = styled.li`
 	}
 `
 
-const Title = styled.span`
+const Title = styled.span.withConfig({
+	displayName: 'OpenTasksCardTitle',
+})`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	color: var(--color-on-surface);
@@ -159,7 +173,9 @@ const Meta = styled.span.withConfig({
 	}
 `
 
-const More = styled.li`
+const More = styled.li.withConfig({
+	displayName: 'OpenTasksCardMore',
+})`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	font-style: italic;
@@ -167,7 +183,9 @@ const More = styled.li`
 	padding-top: var(--space-xs);
 `
 
-const Empty = styled.p`
+const Empty = styled.p.withConfig({
+	displayName: 'OpenTasksCardEmpty',
+})`
 	margin: 0;
 	font-family: var(--font-body);
 	font-style: italic;

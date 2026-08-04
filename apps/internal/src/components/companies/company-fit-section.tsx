@@ -271,12 +271,16 @@ function hostOf(url: string): string {
 	}
 }
 
-const TriggerWrap = styled.div`
+const TriggerWrap = styled.div.withConfig({
+	displayName: 'CompanyFitTriggerWrap',
+})`
 	display: flex;
 	justify-content: flex-start;
 `
 
-const Verdict = styled.span<{ $verdict: string }>`
+const Verdict = styled.span.withConfig({
+	displayName: 'CompanyFitVerdict',
+})<{ $verdict: string }>`
 	${stenciledTitle}
 	padding: 0 var(--space-2xs);
 	border: 1px solid currentColor;
@@ -297,7 +301,9 @@ const Unjudged = styled.p.withConfig({ displayName: 'CompanyFitUnjudged' })`
 	color: var(--color-on-surface-variant);
 `
 
-const Body = styled.div`
+const Body = styled.div.withConfig({
+	displayName: 'CompanyFitBody',
+})`
 	${agedPaperSurface}
 	display: flex;
 	flex-direction: column;
@@ -306,13 +312,17 @@ const Body = styled.div`
 	margin-top: var(--space-sm);
 `
 
-const Group = styled.section`
+const Group = styled.section.withConfig({
+	displayName: 'CompanyFitGroup',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const GroupTitle = styled.h4`
+const GroupTitle = styled.h4.withConfig({
+	displayName: 'CompanyFitGroupTitle',
+})`
 	${stenciledTitle}
 	display: flex;
 	align-items: center;
@@ -323,7 +333,9 @@ const GroupTitle = styled.h4`
 	color: var(--color-on-surface-variant);
 `
 
-const List = styled.ul`
+const List = styled.ul.withConfig({
+	displayName: 'CompanyFitList',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-xs);
@@ -332,13 +344,17 @@ const List = styled.ul`
 	list-style: none;
 `
 
-const CheckRow = styled.li`
+const CheckRow = styled.li.withConfig({
+	displayName: 'CompanyFitCheckRow',
+})`
 	display: flex;
 	align-items: flex-start;
 	gap: var(--space-2xs);
 `
 
-const ResultIcon = styled.span<{ $result: string }>`
+const ResultIcon = styled.span.withConfig({
+	displayName: 'CompanyFitResultIcon',
+})<{ $result: string }>`
 	display: inline-flex;
 	flex-shrink: 0;
 	margin-top: 2px;
@@ -350,7 +366,9 @@ const ResultIcon = styled.span<{ $result: string }>`
 				: 'var(--color-on-surface-variant)'};
 `
 
-const CheckBody = styled.div`
+const CheckBody = styled.div.withConfig({
+	displayName: 'CompanyFitCheckBody',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
@@ -358,21 +376,27 @@ const CheckBody = styled.div`
 	flex: 1;
 `
 
-const ConflictRow = styled.li`
+const ConflictRow = styled.li.withConfig({
+	displayName: 'CompanyFitConflictRow',
+})`
 	display: flex;
 	flex-wrap: wrap;
 	align-items: baseline;
 	gap: var(--space-2xs);
 `
 
-const ProvenanceRow = styled.li`
+const ProvenanceRow = styled.li.withConfig({
+	displayName: 'CompanyFitProvenanceRow',
+})`
 	display: flex;
 	flex-wrap: wrap;
 	align-items: baseline;
 	gap: var(--space-2xs);
 `
 
-const Qualifier = styled.span`
+const Qualifier = styled.span.withConfig({
+	displayName: 'CompanyFitQualifier',
+})`
 	display: inline-flex;
 	align-items: baseline;
 	gap: var(--space-3xs);
@@ -381,28 +405,38 @@ const Qualifier = styled.span`
 	white-space: nowrap;
 `
 
-const Criterion = styled.span`
+const Criterion = styled.span.withConfig({
+	displayName: 'CompanyFitCriterion',
+})`
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface);
 `
 
-const ConflictValue = styled.span`
+const ConflictValue = styled.span.withConfig({
+	displayName: 'CompanyFitConflictValue',
+})`
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface-variant);
 `
 
-const Quote = styled.span`
+const Quote = styled.span.withConfig({
+	displayName: 'CompanyFitQuote',
+})`
 	font-size: var(--typescale-label-small-size);
 	font-style: italic;
 	color: var(--color-on-surface-variant);
 `
 
-const SourceLink = styled.a`
+const SourceLink = styled.a.withConfig({
+	displayName: 'CompanyFitSourceLink',
+})`
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-primary);
 `
 
-const RunLinkWrap = styled.span`
+const RunLinkWrap = styled.span.withConfig({
+	displayName: 'CompanyFitRunLinkWrap',
+})`
 	& > a {
 		font-size: var(--typescale-label-small-size);
 		color: var(--color-primary);

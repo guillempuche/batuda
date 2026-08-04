@@ -528,13 +528,17 @@ function DocumentDialog({
 	)
 }
 
-const Head = styled.div`
+const Head = styled.div.withConfig({
+	displayName: 'DocumentsPanelHead',
+})`
 	display: flex;
 	justify-content: flex-end;
 	margin-bottom: var(--space-sm);
 `
 
-const Empty = styled.p`
+const Empty = styled.p.withConfig({
+	displayName: 'DocumentsPanelEmpty',
+})`
 	display: flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -545,13 +549,17 @@ const Empty = styled.p`
 	margin: 0;
 `
 
-const List = styled.div`
+const List = styled.div.withConfig({
+	displayName: 'DocumentsPanelList',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const Row = styled.div`
+const Row = styled.div.withConfig({
+	displayName: 'DocumentsPanelRow',
+})`
 	display: flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -560,7 +568,9 @@ const Row = styled.div`
 	background: var(--color-surface);
 `
 
-const RowButton = styled.button`
+const RowButton = styled.button.withConfig({
+	displayName: 'DocumentsPanelRowButton',
+})`
 	flex: 1 1 auto;
 	display: flex;
 	flex-direction: column;
@@ -576,13 +586,17 @@ const RowButton = styled.button`
 	}
 `
 
-const RowTitle = styled.span`
+const RowTitle = styled.span.withConfig({
+	displayName: 'DocumentsPanelRowTitle',
+})`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	color: var(--color-on-surface);
 `
 
-const RowMeta = styled.span`
+const RowMeta = styled.span.withConfig({
+	displayName: 'DocumentsPanelRowMeta',
+})`
 	display: inline-flex;
 	gap: var(--space-2xs);
 	align-items: center;
@@ -590,14 +604,18 @@ const RowMeta = styled.span`
 	color: var(--color-on-surface-variant);
 `
 
-const TypeTag = styled.span`
+const TypeTag = styled.span.withConfig({
+	displayName: 'DocumentsPanelTypeTag',
+})`
 	font-family: var(--font-display);
 	letter-spacing: 0.04em;
 	text-transform: uppercase;
 	color: var(--color-primary);
 `
 
-const EditButton = styled.button`
+const EditButton = styled.button.withConfig({
+	displayName: 'DocumentsPanelEditButton',
+})`
 	display: inline-flex;
 	align-items: center;
 	padding: var(--space-2xs) var(--space-sm);
@@ -611,19 +629,25 @@ const EditButton = styled.button`
 	}
 `
 
-const DialogHead = styled.div`
+const DialogHead = styled.div.withConfig({
+	displayName: 'DocumentsPanelDialogHead',
+})`
 	display: flex;
 	align-items: flex-start;
 	justify-content: space-between;
 	gap: var(--space-sm);
 `
 
-const Heading = styled.span`
+const Heading = styled.span.withConfig({
+	displayName: 'DocumentsPanelHeading',
+})`
 	${stenciledTitle}
 	font-size: var(--typescale-title-large-size);
 `
 
-const CloseButton = styled.button`
+const CloseButton = styled.button.withConfig({
+	displayName: 'DocumentsPanelCloseButton',
+})`
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -639,7 +663,9 @@ const CloseButton = styled.button`
 
 // A document longer than the dialog scrolls here, and the region takes keyboard
 // focus so it can be read without a mouse.
-const ViewBody = styled.div`
+const ViewBody = styled.div.withConfig({
+	displayName: 'DocumentsPanelViewBody',
+})`
 	margin-top: var(--space-sm);
 	max-height: 60vh;
 	overflow-y: auto;
@@ -650,20 +676,26 @@ const ViewBody = styled.div`
 	}
 `
 
-const Form = styled.form`
+const Form = styled.form.withConfig({
+	displayName: 'DocumentsPanelForm',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
 	margin-top: var(--space-sm);
 `
 
-const Field = styled.div`
+const Field = styled.div.withConfig({
+	displayName: 'DocumentsPanelField',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const Label = styled.label`
+const Label = styled.label.withConfig({
+	displayName: 'DocumentsPanelLabel',
+})`
 	${stenciledTitle}
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.06em;
@@ -671,14 +703,18 @@ const Label = styled.label`
 	color: var(--color-on-surface-variant);
 `
 
-const Footer = styled.div`
+const Footer = styled.div.withConfig({
+	displayName: 'DocumentsPanelFooter',
+})`
 	display: flex;
 	gap: var(--space-sm);
 	justify-content: flex-end;
 	margin-top: var(--space-sm);
 `
 
-const HtmlNotice = styled.div`
+const HtmlNotice = styled.div.withConfig({
+	displayName: 'DocumentsPanelHtmlNotice',
+})`
 	display: flex;
 	flex-direction: column;
 	align-items: flex-start;
@@ -689,7 +725,9 @@ const HtmlNotice = styled.div`
 
 // Styling wraps the link rather than the router's own component, whose typed
 // route parameters do not survive being wrapped.
-const FullPageLink = styled.span`
+const FullPageLink = styled.span.withConfig({
+	displayName: 'DocumentsPanelFullPageLink',
+})`
 	align-self: center;
 
 	a {
@@ -699,7 +737,9 @@ const FullPageLink = styled.span`
 	}
 `
 
-const OpenPageLink = styled.a`
+const OpenPageLink = styled.a.withConfig({
+	displayName: 'DocumentsPanelOpenPageLink',
+})`
 	color: var(--color-primary);
 	font-size: var(--typescale-body-medium-size);
 	text-decoration: underline;

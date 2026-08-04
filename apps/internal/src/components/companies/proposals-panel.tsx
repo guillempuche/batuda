@@ -568,13 +568,17 @@ function ProposalDialog({
 	)
 }
 
-const Head = styled.div`
+const Head = styled.div.withConfig({
+	displayName: 'ProposalsPanelHead',
+})`
 	display: flex;
 	justify-content: flex-end;
 	margin-bottom: var(--space-sm);
 `
 
-const Empty = styled.p`
+const Empty = styled.p.withConfig({
+	displayName: 'ProposalsPanelEmpty',
+})`
 	display: flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -585,13 +589,17 @@ const Empty = styled.p`
 	margin: 0;
 `
 
-const List = styled.div`
+const List = styled.div.withConfig({
+	displayName: 'ProposalsPanelList',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const Row = styled.button`
+const Row = styled.button.withConfig({
+	displayName: 'ProposalsPanelRow',
+})`
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -608,20 +616,26 @@ const Row = styled.button`
 	}
 `
 
-const RowMain = styled.span`
+const RowMain = styled.span.withConfig({
+	displayName: 'ProposalsPanelRowMain',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
 	min-width: 0;
 `
 
-const RowTitle = styled.span`
+const RowTitle = styled.span.withConfig({
+	displayName: 'ProposalsPanelRowTitle',
+})`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	color: var(--color-on-surface);
 `
 
-const RowMeta = styled.span`
+const RowMeta = styled.span.withConfig({
+	displayName: 'ProposalsPanelRowMeta',
+})`
 	display: inline-flex;
 	gap: var(--space-2xs);
 	align-items: center;
@@ -629,32 +643,42 @@ const RowMeta = styled.span`
 	color: var(--color-on-surface-variant);
 `
 
-const StatusTag = styled.span`
+const StatusTag = styled.span.withConfig({
+	displayName: 'ProposalsPanelStatusTag',
+})`
 	font-family: var(--font-display);
 	letter-spacing: 0.04em;
 	text-transform: uppercase;
 	color: var(--color-primary);
 `
 
-const RowTotal = styled.span`
+const RowTotal = styled.span.withConfig({
+	displayName: 'ProposalsPanelRowTotal',
+})`
 	font-family: var(--font-display);
 	color: var(--color-on-surface);
 	white-space: nowrap;
 `
 
-const DialogHead = styled.div`
+const DialogHead = styled.div.withConfig({
+	displayName: 'ProposalsPanelDialogHead',
+})`
 	display: flex;
 	align-items: flex-start;
 	justify-content: space-between;
 	gap: var(--space-sm);
 `
 
-const Heading = styled.span`
+const Heading = styled.span.withConfig({
+	displayName: 'ProposalsPanelHeading',
+})`
 	${stenciledTitle}
 	font-size: var(--typescale-title-large-size);
 `
 
-const CloseButton = styled.button`
+const CloseButton = styled.button.withConfig({
+	displayName: 'ProposalsPanelCloseButton',
+})`
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -668,39 +692,53 @@ const CloseButton = styled.button`
 	cursor: pointer;
 `
 
-const Form = styled.form`
+const Form = styled.form.withConfig({
+	displayName: 'ProposalsPanelForm',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
 	margin-top: var(--space-sm);
 `
 
-const Lines = styled.div`
+const Lines = styled.div.withConfig({
+	displayName: 'ProposalsPanelLines',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const LineRow = styled.div`
+const LineRow = styled.div.withConfig({
+	displayName: 'ProposalsPanelLineRow',
+})`
 	display: grid;
 	grid-template-columns: 1fr 4rem 6rem auto;
 	gap: var(--space-2xs);
 	align-items: center;
 `
 
-const QtyInput = styled(PriInput)`
+const QtyInput = styled(PriInput).withConfig({
+	displayName: 'ProposalsPanelQtyInput',
+})`
 	text-align: right;
 `
 
-const PriceInput = styled(PriInput)`
+const PriceInput = styled(PriInput).withConfig({
+	displayName: 'ProposalsPanelPriceInput',
+})`
 	text-align: right;
 `
 
-const CurrencyInput = styled(PriInput)`
+const CurrencyInput = styled(PriInput).withConfig({
+	displayName: 'ProposalsPanelCurrencyInput',
+})`
 	max-width: 6rem;
 `
 
-const RemoveLine = styled.button`
+const RemoveLine = styled.button.withConfig({
+	displayName: 'ProposalsPanelRemoveLine',
+})`
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -715,7 +753,9 @@ const RemoveLine = styled.button`
 	}
 `
 
-const AddLine = styled.button`
+const AddLine = styled.button.withConfig({
+	displayName: 'ProposalsPanelAddLine',
+})`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-3xs);
@@ -733,7 +773,9 @@ const AddLine = styled.button`
 	}
 `
 
-const TotalRow = styled.div`
+const TotalRow = styled.div.withConfig({
+	displayName: 'ProposalsPanelTotalRow',
+})`
 	display: flex;
 	justify-content: space-between;
 	align-items: baseline;
@@ -746,19 +788,25 @@ const TotalRow = styled.div`
 	color: var(--color-on-surface-variant);
 `
 
-const TotalValue = styled.span`
+const TotalValue = styled.span.withConfig({
+	displayName: 'ProposalsPanelTotalValue',
+})`
 	font-size: var(--typescale-title-medium-size);
 	color: var(--color-on-surface);
 	text-transform: none;
 `
 
-const Field = styled.div`
+const Field = styled.div.withConfig({
+	displayName: 'ProposalsPanelField',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const Label = styled.label`
+const Label = styled.label.withConfig({
+	displayName: 'ProposalsPanelLabel',
+})`
 	${stenciledTitle}
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.06em;
@@ -766,7 +814,9 @@ const Label = styled.label`
 	color: var(--color-on-surface-variant);
 `
 
-const Footer = styled.div`
+const Footer = styled.div.withConfig({
+	displayName: 'ProposalsPanelFooter',
+})`
 	display: flex;
 	gap: var(--space-sm);
 	justify-content: flex-end;

@@ -1949,7 +1949,9 @@ function narrowContactProvenance(
 	return out
 }
 
-const ChannelLabel = styled.span`
+const ChannelLabel = styled.span.withConfig({
+	displayName: 'CompanyDetailChannelLabel',
+})`
 	display: inline-block;
 	padding: 0 var(--space-2xs);
 	border-radius: var(--shape-2xs);

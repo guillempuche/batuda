@@ -302,14 +302,18 @@ const Wrap = styled.section.withConfig({ displayName: 'WherePanel' })`
 	gap: var(--space-md);
 `
 
-const Header = styled.header`
+const Header = styled.header.withConfig({
+	displayName: 'WherePanelClientHeader',
+})`
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: var(--space-md);
 `
 
-const Title = styled.h3`
+const Title = styled.h3.withConfig({
+	displayName: 'WherePanelClientTitle',
+})`
 	${stenciledTitle};
 	display: inline-flex;
 	align-items: center;
@@ -327,7 +331,9 @@ const HeaderActions = styled.div.withConfig({
 	gap: var(--space-2xs);
 `
 
-const ExternalLinkButton = styled.button`
+const ExternalLinkButton = styled.button.withConfig({
+	displayName: 'WherePanelClientExternalLinkButton',
+})`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-xs);
@@ -416,7 +422,9 @@ const FullMapFrame = styled.div.withConfig({
 	}
 `
 
-const EmptyFrame = styled.div`
+const EmptyFrame = styled.div.withConfig({
+	displayName: 'WherePanelClientEmptyFrame',
+})`
 	${agedPaperSurface};
 	display: flex;
 	flex-direction: column;
@@ -426,18 +434,24 @@ const EmptyFrame = styled.div`
 	border-radius: var(--shape-md);
 `
 
-const EmptyCopy = styled.div`
+const EmptyCopy = styled.div.withConfig({
+	displayName: 'WherePanelClientEmptyCopy',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const EmptyLocation = styled.span`
+const EmptyLocation = styled.span.withConfig({
+	displayName: 'WherePanelClientEmptyLocation',
+})`
 	color: var(--color-on-surface);
 	font-weight: var(--font-weight-medium);
 `
 
-const EmptyHint = styled.span`
+const EmptyHint = styled.span.withConfig({
+	displayName: 'WherePanelClientEmptyHint',
+})`
 	color: var(--color-on-surface-variant);
 	font-size: var(--typescale-body-small-size);
 `

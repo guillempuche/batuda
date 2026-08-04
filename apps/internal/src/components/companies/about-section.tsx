@@ -168,7 +168,9 @@ export function AboutSection({
 	)
 }
 
-const TriggerWrap = styled.div`
+const TriggerWrap = styled.div.withConfig({
+	displayName: 'AboutTriggerWrap',
+})`
 	display: flex;
 	justify-content: flex-start;
 `
@@ -197,13 +199,17 @@ const Count = styled.span.withConfig({ displayName: 'AboutSectionCount' })`
 	opacity: 0.8;
 `
 
-const Group = styled.section`
+const Group = styled.section.withConfig({
+	displayName: 'AboutGroup',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-sm);
 `
 
-const GroupTitle = styled.h4`
+const GroupTitle = styled.h4.withConfig({
+	displayName: 'AboutGroupTitle',
+})`
 	${stenciledTitle}
 	margin: 0;
 	font-size: var(--typescale-label-medium-size);
@@ -211,7 +217,9 @@ const GroupTitle = styled.h4`
 	color: var(--color-on-surface-variant);
 `
 
-const Grid = styled.div`
+const Grid = styled.div.withConfig({
+	displayName: 'AboutGrid',
+})`
 	display: grid;
 	grid-template-columns: 1fr;
 	gap: var(--space-sm);

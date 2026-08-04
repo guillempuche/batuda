@@ -147,19 +147,25 @@ export function FollowupDialog({
 	)
 }
 
-const Header = styled.div`
+const Header = styled.div.withConfig({
+	displayName: 'FollowupDialogHeader',
+})`
 	display: flex;
 	align-items: flex-start;
 	justify-content: space-between;
 	gap: var(--space-sm);
 `
 
-const Heading = styled.span`
+const Heading = styled.span.withConfig({
+	displayName: 'FollowupDialogHeading',
+})`
 	${stenciledTitle}
 	font-size: var(--typescale-title-large-size);
 `
 
-const CloseButton = styled.button`
+const CloseButton = styled.button.withConfig({
+	displayName: 'FollowupDialogCloseButton',
+})`
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -173,20 +179,26 @@ const CloseButton = styled.button`
 	cursor: pointer;
 `
 
-const Form = styled.form`
+const Form = styled.form.withConfig({
+	displayName: 'FollowupDialogForm',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
 	margin-top: var(--space-sm);
 `
 
-const Field = styled.div`
+const Field = styled.div.withConfig({
+	displayName: 'FollowupDialogField',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const Label = styled.label`
+const Label = styled.label.withConfig({
+	displayName: 'FollowupDialogLabel',
+})`
 	${stenciledTitle}
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.06em;
@@ -194,14 +206,18 @@ const Label = styled.label`
 	color: var(--color-on-surface-variant);
 `
 
-const ErrorText = styled.p`
+const ErrorText = styled.p.withConfig({
+	displayName: 'FollowupDialogErrorText',
+})`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-error);
 	margin: 0;
 `
 
-const Footer = styled.div`
+const Footer = styled.div.withConfig({
+	displayName: 'FollowupDialogFooter',
+})`
 	display: flex;
 	gap: var(--space-sm);
 	justify-content: flex-end;
