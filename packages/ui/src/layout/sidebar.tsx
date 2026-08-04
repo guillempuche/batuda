@@ -38,6 +38,14 @@ export const Sidebar = styled.div.withConfig({
 	flex-wrap: wrap;
 	gap: var(--space-${p => p.$gap ?? 'md'});
 
+	/* The side keeps its width as a preference, not a floor. Once the two
+	 * columns wrap onto one, its basis is wider than the line it landed on, and
+	 * without this it would refuse to shrink past whatever is widest inside it —
+	 * pushing the whole page sideways on a phone rather than fitting on it. */
+	& > * {
+		min-inline-size: 0;
+	}
+
 	${p =>
 		(p.$side ?? 'right') === 'right'
 			? css`

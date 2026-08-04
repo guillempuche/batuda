@@ -74,7 +74,7 @@ export function FollowupDialog({
 		<PriDialog.Root open={open} onOpenChange={next => !next && onClose()}>
 			<PriDialog.Portal>
 				<PriDialog.Backdrop />
-				<PriDialog.Popup data-testid='followup-dialog'>
+				<PriDialog.Popup mobile='sheet' data-testid='followup-dialog'>
 					<Header>
 						<PriDialog.Title>
 							<Heading>

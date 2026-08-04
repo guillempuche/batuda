@@ -355,7 +355,7 @@ function DocumentDialog({
 		<PriDialog.Root open onOpenChange={next => !next && onClose()}>
 			<PriDialog.Portal>
 				<PriDialog.Backdrop />
-				<PriDialog.Popup data-testid='document-dialog'>
+				<PriDialog.Popup mobile='sheet' data-testid='document-dialog'>
 					<DialogHead>
 						<PriDialog.Title>
 							<Heading>

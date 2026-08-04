@@ -176,7 +176,7 @@ export function QuickCaptureDialog() {
 		>
 			<PriDialog.Portal>
 				<PriDialog.Backdrop />
-				<PriDialog.Popup data-testid='quick-capture'>
+				<PriDialog.Popup mobile='sheet' data-testid='quick-capture'>
 					<Header>
 						<PriDialog.Title>
 							<Trans>Log interaction</Trans>

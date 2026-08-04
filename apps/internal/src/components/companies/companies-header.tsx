@@ -2,15 +2,15 @@ import { useLingui } from '@lingui/react/macro'
 import { Columns3, LayoutGrid } from 'lucide-react'
 import styled from 'styled-components'
 
-import { KpiCounter } from '#/components/shared/kpi-counter'
 import { rulerUnderRule, stenciledTitle } from '#/lib/workshop-mixins'
 
 /**
  * Shared header for the two companies views (card list and pipeline board).
  * Both routes render this so the title, the ruler underline, and the
  * List/Board switch stay in the same place and style as the user flips
- * between views — only the body below changes. The optional KPI plate is
- * shown by the list (which knows its total); the board leaves it out.
+ * between views — only the body below changes. The count lives in the subtitle
+ * rather than in a plate of its own: it is the same number twice, and the plate
+ * cost a phone a whole screen before the first company.
  */
 export function CompaniesHeader({
 	title,
@@ -18,14 +18,12 @@ export function CompaniesHeader({
 	view,
 	listHref,
 	boardHref,
-	kpi,
 }: {
 	readonly title: string
 	readonly subtitle?: string
 	readonly view: 'list' | 'board'
 	readonly listHref: string
 	readonly boardHref: string
-	readonly kpi?: { readonly value: number; readonly label: string }
 }) {
 	const { t } = useLingui()
 	return (
@@ -56,7 +54,6 @@ export function CompaniesHeader({
 					</ViewLink>
 				</ViewToggle>
 			</TitleRow>
-			{kpi && <KpiCounter value={kpi.value} label={kpi.label} />}
 		</Intro>
 	)
 }
@@ -65,10 +62,6 @@ const Intro = styled.div.withConfig({ displayName: 'CompaniesHeaderIntro' })`
 	display: grid;
 	gap: var(--space-md);
 	align-items: end;
-
-	@media (min-width: 768px) {
-		grid-template-columns: 1fr auto;
-	}
 `
 
 const TitleRow = styled.div.withConfig({

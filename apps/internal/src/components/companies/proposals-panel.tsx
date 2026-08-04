@@ -372,7 +372,7 @@ function ProposalDialog({
 		>
 			<PriDialog.Portal>
 				<PriDialog.Backdrop />
-				<PriDialog.Popup data-testid='proposal-dialog'>
+				<PriDialog.Popup mobile='sheet' data-testid='proposal-dialog'>
 					<DialogHead>
 						<PriDialog.Title>
 							<Heading>

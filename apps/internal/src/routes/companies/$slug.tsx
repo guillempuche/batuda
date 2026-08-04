@@ -2158,6 +2158,11 @@ const HeaderMeta = styled.div.withConfig({
 	display: flex;
 	align-items: center;
 	gap: var(--space-sm);
+	/* Stage, owner and the verified mark are four controls of their own width in
+	 * a row that has to fit a phone. Let them fall onto a second line as the
+	 * screen narrows rather than picking a width to switch at — the last one was
+	 * simply off the side of the screen. */
+	flex-wrap: wrap;
 `
 
 const VerifiedControl = styled.button.withConfig({
@@ -2217,12 +2222,19 @@ const HeaderInlineButton = styled.button.withConfig({
 })`
 	display: inline-flex;
 	align-items: center;
+	justify-content: center;
 	background: transparent;
 	border: none;
 	padding: 0;
 	cursor: pointer;
 	color: inherit;
 	font: inherit;
+	/* What this holds is a 10px dot. A finger cannot land on 10px, so the
+	 * button around it is finger-sized while the dot stays the size it reads
+	 * best at. Not tied to a screen width — a small target is small on a
+	 * desktop trackpad too. */
+	min-inline-size: 2.75rem;
+	min-block-size: 2.75rem;
 `
 
 const GhostPriorityDot = styled.span.withConfig({
@@ -2267,8 +2279,10 @@ const ExternalLinkButton = styled.a.withConfig({
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 2.25rem;
-	height: 2.25rem;
+	/* The row of ways to reach a company is the most-tapped thing on the page,
+	 * so the discs are finger-sized rather than the 2.25rem they read at. */
+	width: 2.75rem;
+	height: 2.75rem;
 	border-radius: 50%;
 	color: var(--color-on-surface);
 	transition: transform 160ms ease;
