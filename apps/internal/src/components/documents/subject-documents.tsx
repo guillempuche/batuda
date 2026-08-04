@@ -75,8 +75,8 @@ const Section = styled.section`
 
 const Heading = styled.h3`
 	margin: 0;
-	color: var(--color-text-muted);
-	font-size: var(--font-size-xs);
+	color: var(--color-on-surface-variant);
+	font-size: var(--typescale-label-small-size);
 	text-transform: uppercase;
 	letter-spacing: 0.06em;
 `
@@ -91,7 +91,7 @@ const List = styled.ul`
 
 	a {
 		color: var(--color-primary);
-		font-size: var(--font-size-sm);
+		font-size: var(--typescale-body-medium-size);
 		text-decoration: underline;
 	}
 `

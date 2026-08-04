@@ -229,7 +229,7 @@ const Empty = styled.p`
 `
 
 const Freshness = styled.span`
-	font-weight: 400;
+	font-weight: var(--font-weight-regular);
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface-variant);
 `

@@ -149,8 +149,8 @@ const Title = styled.h1`
 const Meta = styled.div`
 	display: flex;
 	gap: var(--space-sm);
-	color: var(--color-text-muted);
-	font-size: var(--font-size-sm);
+	color: var(--color-on-surface-variant);
+	font-size: var(--typescale-body-medium-size);
 `
 
 const Body = styled.div`
@@ -162,8 +162,8 @@ const Notice = styled.div`
 	flex-direction: column;
 	align-items: flex-start;
 	gap: var(--space-md);
-	color: var(--color-text-muted);
-	font-size: var(--font-size-sm);
+	color: var(--color-on-surface-variant);
+	font-size: var(--typescale-body-medium-size);
 `
 
 // An ordinary link, so the address is there to copy and the browser opens it
@@ -171,6 +171,6 @@ const Notice = styled.div`
 const OpenPageLink = styled.a`
 	align-self: flex-start;
 	color: var(--color-primary);
-	font-size: var(--font-size-sm);
+	font-size: var(--typescale-body-medium-size);
 	text-decoration: underline;
 `

@@ -100,7 +100,7 @@ const Heading = styled.h3`
 
 const Count = styled.span`
 	font-family: var(--font-body);
-	font-weight: normal;
+	font-weight: var(--font-weight-regular);
 	letter-spacing: 0;
 	text-transform: none;
 	color: var(--color-on-surface-variant);

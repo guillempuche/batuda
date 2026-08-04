@@ -651,8 +651,8 @@ const HtmlNotice = styled.div`
 	flex-direction: column;
 	align-items: flex-start;
 	gap: var(--space-md);
-	color: var(--color-text-muted);
-	font-size: var(--font-size-sm);
+	color: var(--color-on-surface-variant);
+	font-size: var(--typescale-body-medium-size);
 `
 
 // Styling wraps the link rather than the router's own component, whose typed
@@ -662,13 +662,13 @@ const FullPageLink = styled.span`
 
 	a {
 		color: var(--color-primary);
-		font-size: var(--font-size-sm);
+		font-size: var(--typescale-body-medium-size);
 		text-decoration: underline;
 	}
 `
 
 const OpenPageLink = styled.a`
 	color: var(--color-primary);
-	font-size: var(--font-size-sm);
+	font-size: var(--typescale-body-medium-size);
 	text-decoration: underline;
 `

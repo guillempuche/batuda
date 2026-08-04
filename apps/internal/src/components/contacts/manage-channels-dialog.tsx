@@ -271,7 +271,7 @@ const ChannelLabel = styled.span`
 	display: inline-block;
 	margin-inline-start: var(--space-xs);
 	padding: 0 var(--space-2xs);
-	border-radius: var(--radius-xs);
+	border-radius: var(--shape-2xs);
 	background: var(--color-surface-container-high);
 	color: var(--color-on-surface-variant);
 	font-size: var(--typescale-label-small-size);

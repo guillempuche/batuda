@@ -119,7 +119,7 @@ const Count = styled.span`
 	${stenciledTitle}
 	padding: 0 var(--space-2xs);
 	border: 1px solid currentColor;
-	border-radius: var(--radius-xs);
+	border-radius: var(--shape-2xs);
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface-variant);
 `
@@ -166,7 +166,7 @@ const Address = styled.a`
 
 const Label = styled.span`
 	padding: 0 var(--space-2xs);
-	border-radius: var(--radius-xs);
+	border-radius: var(--shape-2xs);
 	background: var(--color-surface-container-high);
 	color: var(--color-on-surface-variant);
 	font-size: var(--typescale-label-small-size);

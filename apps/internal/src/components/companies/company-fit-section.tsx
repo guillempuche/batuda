@@ -268,7 +268,7 @@ const Verdict = styled.span<{ $verdict: string }>`
 	${stenciledTitle}
 	padding: 0 var(--space-2xs);
 	border: 1px solid currentColor;
-	border-radius: var(--radius-xs);
+	border-radius: var(--shape-2xs);
 	font-size: var(--typescale-label-small-size);
 	color: ${p =>
 		p.$verdict === 'strong_fit'
@@ -334,7 +334,7 @@ const ResultIcon = styled.span<{ $result: string }>`
 const CheckBody = styled.div`
 	display: flex;
 	flex-direction: column;
-	gap: 2px;
+	gap: var(--space-3xs);
 	min-width: 0;
 	flex: 1;
 `

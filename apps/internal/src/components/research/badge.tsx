@@ -5,13 +5,15 @@ import type { Tone } from './proposal-logic'
 export type { Tone }
 
 /**
- * Shared pill used by the trust and outcome badges. The two-accent workshop
- * palette (terracotta + olive) has no dedicated warning colour, so tones map
- * onto it: success/info read olive, attention reads terracotta, failure reads
- * the error red, and the rest stay muted.
+ * Shared pill used by the trust and outcome badges. A good outcome has its own
+ * name, `--color-success`, whose value sits in the olive family — so a reader
+ * of this map can tell "this passed" from "this is the second accent" without
+ * the two-accent palette gaining a third hue. Info borrows the same olive but
+ * means something else, attention reads terracotta, failure reads the error
+ * red, and the rest stay muted.
  */
 const TONE_ACCENT: Record<Tone, string> = {
-	positive: 'var(--color-secondary)',
+	positive: 'var(--color-success)',
 	info: 'var(--color-secondary)',
 	caution: 'var(--color-primary)',
 	negative: 'var(--color-error)',

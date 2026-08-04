@@ -316,7 +316,7 @@ const EmptyCopy = styled.div`
 
 const EmptyLocation = styled.span`
 	color: var(--color-on-surface);
-	font-weight: 500;
+	font-weight: var(--font-weight-medium);
 `
 
 const EmptyHint = styled.span`

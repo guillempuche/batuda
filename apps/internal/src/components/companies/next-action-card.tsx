@@ -87,7 +87,8 @@ const Due = styled.span.withConfig({
 	line-height: var(--typescale-label-medium-line);
 	color: ${p =>
 		p.$overdue ? 'var(--color-error)' : 'var(--color-on-surface-variant)'};
-	font-weight: ${p => (p.$overdue ? 600 : 400)};
+	font-weight: ${p =>
+		p.$overdue ? 'var(--font-weight-bold)' : 'var(--font-weight-regular)'};
 
 	/* The nested relative date carries its own muted colour, so the overdue
 	   emphasis has to reach it too or only the label turns red. */

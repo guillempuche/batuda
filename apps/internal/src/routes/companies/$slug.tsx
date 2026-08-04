@@ -1939,7 +1939,7 @@ function narrowContactProvenance(
 const ChannelLabel = styled.span`
 	display: inline-block;
 	padding: 0 var(--space-2xs);
-	border-radius: var(--radius-xs);
+	border-radius: var(--shape-2xs);
 	background: var(--color-surface-container-high);
 	color: var(--color-on-surface-variant);
 	font-size: var(--typescale-label-small-size);
@@ -2567,7 +2567,7 @@ const ContactLink = styled.a.withConfig({
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-3xs);
-	padding: 2px 0;
+	padding: var(--space-3xs) 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-label-medium-size);
 	color: var(--color-primary);
@@ -2585,7 +2585,7 @@ const ContactLinkButton = styled.button.withConfig({
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-3xs);
-	padding: 2px 0;
+	padding: var(--space-3xs) 0;
 	border: none;
 	background: transparent;
 	font-family: var(--font-body);
