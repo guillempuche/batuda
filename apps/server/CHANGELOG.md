@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-04 (server-v2026.8.4)
+
+### Features
+
+* let anyone rewrite a company's account brief ([0040a0d](https://github.com/guillempuche/batuda/commit/0040a0df18607501c4e057b0c2b667c0ff65a6ff))
+* **server:** let agents assign a company to a colleague ([6fe5238](https://github.com/guillempuche/batuda/commit/6fe5238459e3ee21e3937d716327b1d763b23b93))
+
+### Bug Fixes
+
+* **server:** check an assigned person wherever a company is written ([ae11569](https://github.com/guillempuche/batuda/commit/ae11569c9bbf0147abb09f5563a2df27659001a5))
+* **server:** exclude deleted companies from pipeline and planning ([e98447e](https://github.com/guillempuche/batuda/commit/e98447e2bd9a4fadfbd678837af458e6b6759cd9))
+* **server:** keep tasks that belong to no company in the overdue figure ([557fb70](https://github.com/guillempuche/batuda/commit/557fb70a20c8deda54b0c531e2fbe4bb58fad26b))
+* **server:** make the pipeline count and research values agree with themselves ([7b197d3](https://github.com/guillempuche/batuda/commit/7b197d36818bbd7eeec74136ce0ab98af2c0e408))
+* **server:** refuse research suggestions a column cannot accept ([4ae1eef](https://github.com/guillempuche/batuda/commit/4ae1eefa8fff741f458c76d813afea8549d2eac0))
+* **server:** tell a stale MCP caller where a renamed tool went ([6d89895](https://github.com/guillempuche/batuda/commit/6d8989571a67c5cd55a1612fc18196eed7a0f5ce))
+
+### CI/CD
+
+* **release:** ui v2026.8.3 ([84c0ba3](https://github.com/guillempuche/batuda/commit/84c0ba32eb115c8cc11dc43b221e3bd421c21f5a))
+
 ## 2026-08-03 (server-v2026.8.3)
 
 ### Features
