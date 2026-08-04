@@ -4,7 +4,6 @@ import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import { BatudaApi, NotFound, SessionContext } from '@batuda/controllers'
 
 import { CompanyService } from '../services/companies'
-import { withBriefOwnership } from '../services/company-brief'
 import {
 	geocodeCompany,
 	updateCompanyRegeocoding,
@@ -61,15 +60,9 @@ export const CompaniesLive = HttpApiBuilder.group(
 										),
 										Effect.catch(() => Effect.succeed(null)),
 									)
-						const actor = yield* SessionContext
-						// A person editing the notes takes ownership of them: this marker is what
-						// later research reads to decide whether to add to the notes or replace
-						// them. An agent's edit deliberately leaves the marker alone, so an agent
-						// can never make its own writing look like a person's.
-						const payload = withBriefOwnership(_.payload, actor)
 						const result = yield* updateCompanyRegeocoding(
 							_.params.id,
-							payload,
+							_.payload,
 						).pipe(
 							Effect.provideService(CompanyService, svc),
 							Effect.provideService(Geocoder, geocoder),

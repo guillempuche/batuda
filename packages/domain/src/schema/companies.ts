@@ -176,10 +176,9 @@ export class Company extends Model.Class<Company>('Company')({
 	// What research found out about this company, and where it came from.
 	//
 	// accountBrief is the running written summary of the account, in markdown.
-	// Both a person and the research pipeline write it, so briefUpdatedBy holds
-	// the id of the person who last edited it — null while nobody has, which is
-	// what makes it safe to replace wholesale. Once it is set, research is added
-	// to the end instead of overwriting what the person wrote.
+	// A person, an agent and the research pipeline all write it, and each write
+	// replaces the whole text. Nothing keeps the earlier versions or who wrote
+	// them.
 	//
 	// fieldProvenance answers "where did this come from?" for the individual
 	// facts on the row: for each field name, the page it was read from, the run
@@ -200,8 +199,6 @@ export class Company extends Model.Class<Company>('Company')({
 	// The provenance map is built entry by entry instead, so it carries this
 	// app's own names.
 	accountBrief: Schema.NullOr(Schema.String),
-	briefUpdatedBy: Schema.NullOr(Schema.String),
-	briefUpdatedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
 	lastEnrichedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
 	fieldProvenance: Schema.NullOr(
 		Schema.Record(

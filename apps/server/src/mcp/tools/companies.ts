@@ -28,7 +28,6 @@ import {
 	subjectChannelsOf,
 } from '../../services/channels'
 import { CompanyService } from '../../services/companies'
-import { withBriefOwnership } from '../../services/company-brief'
 import { findDuplicateCompanies } from '../../services/company-duplicates'
 import {
 	geocodeCompany,
@@ -193,7 +192,7 @@ const UpdateCompany = Tool.make('update_company', {
 		accountBrief: Schema.optional(
 			Schema.String.annotate({
 				description:
-					"The account's running notes, in markdown. Editing these as a person takes ownership of them, so later research adds to them instead of replacing them.",
+					"The account's running notes, in markdown. One shared page that people, agents and research runs all rewrite — what you send replaces what is there, so read it first and carry over anything still worth keeping.",
 			}),
 		),
 		metadata: Schema.optional(Schema.Unknown),
@@ -417,12 +416,7 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 									),
 									Effect.catch(() => Effect.succeed(null)),
 								)
-					const actor = yield* CurrentUser
-					// Only a person takes ownership of the notes. An agent may write them,
-					// but leaves the marker alone, so it can never make its own text look
-					// like a person's and freeze out later research.
-					const payload = withBriefOwnership(fields, actor)
-					const result = yield* updateCompanyRegeocoding(id, payload).pipe(
+					const result = yield* updateCompanyRegeocoding(id, fields).pipe(
 						Effect.provideService(CompanyService, service),
 						Effect.provideService(Geocoder, geocoder),
 						Effect.provideService(SqlClient.SqlClient, sql),

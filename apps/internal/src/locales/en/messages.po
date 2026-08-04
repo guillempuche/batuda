@@ -2144,14 +2144,6 @@ msgstr "Edit task title"
 msgid "Edit template"
 msgstr "Edit template"
 
-#: src/components/companies/account-brief-section.tsx
-msgid "Edited by hand <0/>. Research adds below your text."
-msgstr "Edited by hand <0/>. Research adds below your text."
-
-#: src/components/companies/account-brief-section.tsx
-msgid "Edited by hand. Research adds below your text."
-msgstr "Edited by hand. Research adds below your text."
-
 #: src/components/instructions/template-dialog.tsx
 msgid "Editing this template"
 msgstr "Editing this template"
@@ -4390,7 +4382,6 @@ msgstr "Recent changes"
 msgid "Recent runs"
 msgstr "Recent runs"
 
-#: src/components/companies/account-brief-section.tsx
 #: src/components/companies/research-summary-card.tsx
 msgid "recently"
 msgstr "recently"
@@ -6074,10 +6065,6 @@ msgstr "Writing the brief"
 #: src/components/research/run-progress.tsx
 msgid "Writing the brief."
 msgstr "Writing the brief."
-
-#: src/components/companies/account-brief-section.tsx
-msgid "Written by research. Editing it makes it yours."
-msgstr "Written by research. Editing it makes it yours."
 
 #: src/components/research/target-correction.tsx
 msgid "Wrong company? Enter its official website"

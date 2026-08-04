@@ -5,11 +5,10 @@ import { SqlClient } from 'effect/unstable/sql'
 // and where each piece of it came from.
 //
 // `account_brief` is the running written summary of the account, in markdown.
-// Both a person and the research pipeline write it, so two more columns record
-// who touched it last: `brief_updated_by` is the id of the person who edited it
-// (null while nobody has, which is what makes it safe to replace wholesale), and
-// `brief_updated_at` is when. Once a person has edited it, later research is
-// added to the end instead of replacing what they wrote.
+// Both a person and the research pipeline write it. `brief_updated_by` and
+// `brief_updated_at` recorded who touched it last, which decided whether a
+// research run could replace the text or had to add underneath; 0060 drops them
+// both, along with that rule.
 //
 // `field_provenance` answers "where did this come from?" for the individual
 // facts on the row — for each column, the page it was read from, the run that

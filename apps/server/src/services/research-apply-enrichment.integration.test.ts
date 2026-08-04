@@ -1,7 +1,8 @@
 // Live-DB integration test for what an apply records about a company beyond the
 // proposed values: where each value came from, the run's fit judgement, and the
-// written brief. All three are decided inside the one UPDATE statement by reading
-// the row as it is at write time, so only a real database can prove they behave.
+// written brief. All three are decided inside the one UPDATE statement, against
+// the row as it stands at write time, so only a real database can prove they
+// behave.
 //
 // Prereq: `pnpm cli services up` — this suite's globalSetup builds and migrates
 // the disposable batuda_it database it runs against.
@@ -63,7 +64,6 @@ const seedCompany = async (): Promise<string> => {
 
 type CompanyRow = {
 	account_brief: string | null
-	brief_updated_by: string | null
 	last_enriched_at: Date | null
 	field_provenance: Record<string, { sourceUrl: string; runId: string }> | null
 	industry: string | null
@@ -74,7 +74,7 @@ type CompanyRow = {
 
 const readCompany = async (id: string): Promise<CompanyRow> => {
 	const r = await pool.query<CompanyRow>(
-		`SELECT account_brief, brief_updated_by, last_enriched_at, industry,
+		`SELECT account_brief, last_enriched_at, industry,
 		        field_provenance, fit_verdict, fit_checks, version
 		 FROM companies WHERE id = $1`,
 		[id],
@@ -216,8 +216,8 @@ describe('occUpdate, on the enrichment it records for a company', () => {
 		})
 	})
 
-	describe('when nobody has edited the brief yet', () => {
-		it('should seed it from the run, and stamp the fit and freshness', async () => {
+	describe('when the company has no brief yet', () => {
+		it("should write the run's brief, and stamp the fit and freshness", async () => {
 			// GIVEN a company nobody has written notes for
 			const id = await seedCompany()
 
@@ -239,19 +239,18 @@ describe('occUpdate, on the enrichment it records for a company', () => {
 			// THEN the brief is the run's, and the judgement came with it
 			const row = await readCompany(id)
 			expect(row.account_brief).toBe('## Acme — 2026-07-23\n\nA carrier.')
-			expect(row.brief_updated_by).toBeNull()
 			expect(row.fit_verdict).toBe('strong_fit')
 			expect(row.last_enriched_at).not.toBeNull()
 		})
 	})
 
-	describe('when a person has already edited the brief', () => {
-		it('should append the run below their text instead of overwriting it', async () => {
-			// GIVEN notes a person wrote and owns
+	describe('when a person has already written the brief', () => {
+		it('should replace their text rather than adding underneath it', async () => {
+			// GIVEN notes a person wrote
 			const id = await seedCompany()
 			await pool.query(
-				`UPDATE companies SET account_brief = $2, brief_updated_by = $3 WHERE id = $1`,
-				[id, 'My own notes.', 'user_123'],
+				`UPDATE companies SET account_brief = $2 WHERE id = $1`,
+				[id, 'My own notes.'],
 			)
 
 			// WHEN a run about this company is applied
@@ -269,14 +268,39 @@ describe('occUpdate, on the enrichment it records for a company', () => {
 				},
 			)
 
-			// THEN their text is intact and the run sits below it
+			// THEN the run's text is the whole brief
 			const row = await readCompany(id)
-			expect(row.account_brief).toContain('My own notes.')
-			expect(row.account_brief).toContain('Still a carrier.')
-			expect(row.account_brief?.indexOf('My own notes.')).toBeLessThan(
-				row.account_brief?.indexOf('Still a carrier.') ?? -1,
+			expect(row.account_brief).toBe('## Acme — 2026-07-23\n\nStill a carrier.')
+		})
+	})
+
+	describe('when a run has nothing to say about the brief', () => {
+		it("should leave the person's text alone", async () => {
+			// GIVEN notes a person wrote
+			const id = await seedCompany()
+			await pool.query(
+				`UPDATE companies SET account_brief = $2 WHERE id = $1`,
+				[id, 'My own notes.'],
 			)
-			expect(row.brief_updated_by).toBe('user_123')
+
+			// WHEN a run that produced no brief is applied
+			await apply(
+				id,
+				0,
+				{ industry: 'transport' },
+				{
+					provenance: {},
+					isRunTarget: true,
+					fitVerdict: 'possible_fit',
+					fitChecks: null,
+					fitConflicts: null,
+					brief: null,
+				},
+			)
+
+			// THEN the notes are exactly as they left them
+			const row = await readCompany(id)
+			expect(row.account_brief).toBe('My own notes.')
 		})
 	})
 
@@ -358,10 +382,7 @@ describe('occUpdate, on the enrichment it records for a company', () => {
 			const id = await seedCompany()
 
 			// WHEN a person writes their own notes before the run's apply lands
-			await personEdits(id, {
-				accountBrief: 'My notes.',
-				briefUpdatedBy: 'user_123',
-			})
+			await personEdits(id, { accountBrief: 'My notes.' })
 
 			// THEN the apply, still aimed at the version it saw, writes nothing
 			const rows = await apply(
@@ -384,7 +405,6 @@ describe('occUpdate, on the enrichment it records for a company', () => {
 			// AND the person's notes are exactly as they left them
 			const row = await readCompany(id)
 			expect(row.account_brief).toBe('My notes.')
-			expect(row.brief_updated_by).toBe('user_123')
 		})
 	})
 })

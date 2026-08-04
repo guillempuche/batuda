@@ -343,13 +343,11 @@ const jsonOrNull = (value: unknown): string | null =>
 //
 // A company update also folds in what the run learned about the row. Each of
 // those clauses leaves the stored value alone when there is nothing to say, so
-// one statement serves both an ordinary field update and a full enrichment:
-//   - provenance is MERGED, never replaced — a run that fills only the phone
-//     must not erase where an earlier run found the industry;
-//   - the brief is seeded while nobody has edited it and appended once somebody
-//     has, so research can extend the brief but never overwrite it.
-// Both decisions read the row as it is at write time, inside the same statement
-// that checks the version, so a concurrent edit cannot slip between the two.
+// one statement serves both an ordinary field update and a full enrichment.
+// Provenance is the one exception to plain replacement: it is MERGED, because a
+// run that fills only the phone must not erase where an earlier run found the
+// industry. That merge reads the stored value inside the same statement that
+// checks the version, so a concurrent edit cannot slip between read and write.
 export const occUpdate = (
 	sql: SqlClient.SqlClient,
 	table: 'companies' | 'contacts',
@@ -409,11 +407,7 @@ export const occUpdate = (
 			fit_verdict = COALESCE(${fitVerdict}::text, fit_verdict),
 			fit_checks = COALESCE(${fitChecks}::jsonb, fit_checks),
 			fit_conflicts = COALESCE(${fitConflicts}::jsonb, fit_conflicts),
-			account_brief = CASE
-				WHEN ${brief}::text IS NULL THEN account_brief
-				WHEN brief_updated_by IS NULL THEN ${brief}::text
-				ELSE COALESCE(account_brief, '') || E'\n\n---\n\n' || ${brief}::text
-			END,
+			account_brief = COALESCE(${brief}::text, account_brief),
 			version = version + 1,
 			updated_at = now()
 		WHERE id = ${subjectId}

@@ -2144,14 +2144,6 @@ msgstr "Edita el títol de la tasca"
 msgid "Edit template"
 msgstr "Edita la plantilla"
 
-#: src/components/companies/account-brief-section.tsx
-msgid "Edited by hand <0/>. Research adds below your text."
-msgstr "Editat a mà <0/>. La recerca afegeix sota el teu text."
-
-#: src/components/companies/account-brief-section.tsx
-msgid "Edited by hand. Research adds below your text."
-msgstr "Editat a mà. La recerca afegeix sota el teu text."
-
 #: src/components/instructions/template-dialog.tsx
 msgid "Editing this template"
 msgstr "S’està editant aquesta plantilla"
@@ -4390,7 +4382,6 @@ msgstr "Canvis recents"
 msgid "Recent runs"
 msgstr "Execucions recents"
 
-#: src/components/companies/account-brief-section.tsx
 #: src/components/companies/research-summary-card.tsx
 msgid "recently"
 msgstr "fa poc"
@@ -6074,10 +6065,6 @@ msgstr "Redactant l'informe"
 #: src/components/research/run-progress.tsx
 msgid "Writing the brief."
 msgstr "Escrivint el resum."
-
-#: src/components/companies/account-brief-section.tsx
-msgid "Written by research. Editing it makes it yours."
-msgstr "Escrit per la recerca. Si l'edites, passa a ser teu."
 
 #: src/components/research/target-correction.tsx
 msgid "Wrong company? Enter its official website"
