@@ -55,7 +55,7 @@ export const ApplyInstructionPrompt = McpServer.prompt({
 			)
 			if (matches.length === 0) {
 				const available = templates.map(t => `"${t.name}"`).join(', ') || 'none'
-				return `No instruction "${instruction}" is available for ${agent}. Readable instructions: ${available}. Ask the user which they meant, or create it with manage_instruction_template.`
+				return `No instruction "${instruction}" is available for ${agent}. Readable instructions: ${available}. Ask the user which they meant, or create it with manage_instructions action "create_template".`
 			}
 			if (matches.length > 1) {
 				const candidates = matches
