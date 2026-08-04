@@ -6,25 +6,19 @@ import styled from 'styled-components'
 import { PriButton, PriCollapsible, PriTextarea } from '@batuda/ui/pri'
 
 import { MarkdownView } from '#/components/markdown/markdown-view'
-import { RelativeDate } from '#/components/shared/relative-date'
-import { agedPaperSurface, stenciledTitle } from '#/lib/workshop-mixins'
+import { agedPaperSurface } from '#/lib/workshop-mixins'
 
 export type AccountBriefCompany = {
 	readonly accountBrief: string | null
-	readonly briefUpdatedBy: string | null
-	readonly briefUpdatedAt: string | null
 }
 
 /**
- * The account's running notes — one shared page that both the salesperson and
- * research write to.
- *
- * Research seeds it while nobody has edited it, and only adds underneath once
- * somebody has, so the note about who last wrote here is the reassurance that
- * editing is safe: past that point nothing can overwrite what you typed.
+ * The account's running notes — one shared page that the salesperson, an agent
+ * and research all write to. Saving replaces whatever was there, and no earlier
+ * version is kept.
  *
  * Editing is a plain textarea of markdown rather than a rich editor, because
- * what research appends is markdown too — keeping one format means a person and
+ * what research writes is markdown too — keeping one format means a person and
  * a run are always writing the same kind of thing into the same page.
  */
 export function AccountBriefSection({
@@ -40,7 +34,6 @@ export function AccountBriefSection({
 	const [saving, setSaving] = useState(false)
 
 	const brief = company.accountBrief ?? ''
-	const ownedByPerson = company.briefUpdatedBy !== null
 
 	const startEditing = () => {
 		setDraft(brief)
@@ -112,28 +105,6 @@ export function AccountBriefSection({
 								</Rendered>
 							)}
 							<Footer>
-								<Attribution data-testid='company-brief-attribution'>
-									{ownedByPerson ? (
-										company.briefUpdatedAt !== null ? (
-											<Trans>
-												Edited by hand{' '}
-												<RelativeDate
-													value={company.briefUpdatedAt}
-													fallback={t`recently`}
-												/>
-												. Research adds below your text.
-											</Trans>
-										) : (
-											<Trans>
-												Edited by hand. Research adds below your text.
-											</Trans>
-										)
-									) : (
-										<Trans>
-											Written by research. Editing it makes it yours.
-										</Trans>
-									)}
-								</Attribution>
 								<PriButton
 									type='button'
 									$variant='outlined'
@@ -191,14 +162,8 @@ const Footer = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	justify-content: space-between;
+	justify-content: flex-end;
 	gap: var(--space-sm);
-`
-
-const Attribution = styled.span`
-	${stenciledTitle}
-	font-size: var(--typescale-label-small-size);
-	color: var(--color-on-surface-variant);
 `
 
 const Actions = styled.div`

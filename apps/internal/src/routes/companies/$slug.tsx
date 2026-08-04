@@ -192,8 +192,6 @@ type CompanyDetail = {
 	readonly geocodedAt: string | null
 	readonly geocodeSource: string | null
 	readonly accountBrief: string | null
-	readonly briefUpdatedBy: string | null
-	readonly briefUpdatedAt: string | null
 	readonly lastEnrichedAt: string | null
 	readonly fitVerdict: string | null
 	readonly fitChecks: ReadonlyArray<FitCheck> | null
@@ -1812,8 +1810,6 @@ function narrowCompany(raw: unknown): CompanyDetail | null {
 		geocodedAt: str('geocodedAt'),
 		geocodeSource: str('geocodeSource'),
 		accountBrief: str('accountBrief'),
-		briefUpdatedBy: str('briefUpdatedBy'),
-		briefUpdatedAt: str('briefUpdatedAt'),
 		lastEnrichedAt: str('lastEnrichedAt'),
 		fitVerdict: str('fitVerdict'),
 		fitChecks: fitCheckList(r['fitChecks']),
