@@ -209,6 +209,57 @@ const NEXT_ACTIONS = [
 	"Enviar cas d'èxit del sector",
 ] as const
 
+// Two shapes of brief, because the page treats them differently: a short one
+// sits open on the screen, a long one has to be cut off with a "show more".
+// Both carry headings, both kinds of list and bold text, so whatever renders
+// them is exercised by the seed rather than only by hand-made examples.
+const briefFor = (
+	rng: () => number,
+	name: string,
+	town: string,
+	trade: string,
+	pain: string | null,
+	tools: string | null,
+): string => {
+	const short = [
+		`**${name}** — ${trade.toLowerCase()} a ${town}.`,
+		'',
+		pain ? `El que els fa mal: ${pain}` : 'Encara no sabem què els fa mal.',
+		tools ? `Ara mateix treballen amb ${tools}.` : '',
+	]
+		.filter(Boolean)
+		.join('\n')
+
+	const long = [
+		'## Qui són',
+		'',
+		`${trade} a ${town}. Empresa familiar, la segona generació porta el dia a dia.`,
+		'',
+		'## Per què ens interessa',
+		'',
+		pain ? `- ${pain}` : '- Encara per confirmar què els fa mal.',
+		tools
+			? `- Ara mateix treballen amb **${tools}**.`
+			: '- Sense eines pròpies.',
+		'- Han preguntat pel preu dues vegades sense que els hi oferíssim.',
+		'',
+		'## Riscos',
+		'',
+		'1. Qui decideix no és qui ens atén.',
+		'2. Han provat una eina abans i no va quallar.',
+	].join('\n')
+
+	return chance(rng, 0.4) ? long : short
+}
+
+const FIT_CRITERIA = [
+	'Tanca el mes a mà',
+	'Més de deu treballadors',
+	'Ja té un programa de gestió',
+	'Pressupost aprovat',
+	'Qui decideix ens ha atès',
+] as const
+
 const slugify = (value: string): string =>
 	value
 		.normalize('NFD')
@@ -233,6 +284,11 @@ export type GeneratedCompany = {
 	readonly tags: string[]
 	readonly painPoints: string | null
 	readonly currentTools: string | null
+	// The running notes on the account, in markdown. Null on a company nobody
+	// has looked into yet.
+	readonly accountBrief: string | null
+	readonly fitVerdict: string | null
+	readonly fitChecks: string | null
 	readonly nextAction: string | null
 	readonly lastContactedAt: Date | null
 	readonly latitude: number
@@ -285,6 +341,12 @@ export const generateCompanies = (options: {
 		used.add(slug)
 
 		const status = pickStatus(rng)
+		const painPoints = chance(rng, 0.75) ? pick(rng, PAIN_POINTS) : null
+		const currentTools = chance(rng, 0.6) ? pick(rng, CURRENT_TOOLS) : null
+		// A prospect nobody has worked yet has nothing written about it, so the
+		// empty state stays reachable; past that, most accounts have notes.
+		const hasBrief = status === 'prospect' ? chance(rng, 0.3) : chance(rng, 0.8)
+		const scored = chance(rng, 0.5)
 		// Built from the slug, not the name: the slug is what carries the town
 		// suffix that made this company distinct, so two firms with the same
 		// trade and family surname no longer end up on one shared domain.
@@ -312,8 +374,29 @@ export const generateCompanies = (options: {
 				chance(rng, 0.5) ? 2 : 1,
 			),
 			tags: [trade.industry, town.name.toLowerCase()],
-			painPoints: chance(rng, 0.75) ? pick(rng, PAIN_POINTS) : null,
-			currentTools: chance(rng, 0.6) ? pick(rng, CURRENT_TOOLS) : null,
+			painPoints,
+			currentTools,
+			accountBrief: hasBrief
+				? briefFor(
+						rng,
+						name,
+						town.name,
+						trade.industry,
+						painPoints,
+						currentTools,
+					)
+				: null,
+			fitVerdict: scored
+				? pick(rng, ['strong_fit', 'possible_fit', 'no_fit'])
+				: null,
+			fitChecks: scored
+				? JSON.stringify(
+						FIT_CRITERIA.map(criterion => ({
+							criterion,
+							result: pick(rng, ['pass', 'fail', 'unknown']),
+						})),
+					)
+				: null,
 			nextAction:
 				status === 'client' || status === 'closed' || status === 'dead'
 					? null
