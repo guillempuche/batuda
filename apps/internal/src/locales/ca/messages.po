@@ -1053,6 +1053,7 @@ msgstr "Client"
 #: src/components/companies/documents-panel.tsx
 #: src/components/companies/followup-dialog.tsx
 #: src/components/companies/proposals-panel.tsx
+#: src/components/companies/where-panel-client.client.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/instructions/template-dialog.tsx
@@ -3841,6 +3842,10 @@ msgstr "Obre els detalls de la tasca"
 #: src/routes/index.tsx
 msgid "Open tasks"
 msgstr "Tasques obertes"
+
+#: src/components/companies/where-panel-client.client.tsx
+msgid "Open the map full screen"
+msgstr "Obre el mapa a pantalla completa"
 
 #: src/routes/settings/organization/index.tsx
 msgid "Open the org spend dashboard"

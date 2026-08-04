@@ -1,12 +1,12 @@
 import { useAtomRefresh, useAtomSet } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { icon } from 'leaflet'
-import { Crosshair, ExternalLink, MapPin } from 'lucide-react'
-import { useState } from 'react'
-import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet'
+import { Crosshair, ExternalLink, MapPin, Maximize2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet'
 import styled from 'styled-components'
 
-import { PriButton, usePriToast } from '@batuda/ui/pri'
+import { PriButton, PriDialog, usePriToast } from '@batuda/ui/pri'
 
 import { companyAtomFor } from '#/atoms/company-atoms'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
@@ -51,6 +51,7 @@ export function WherePanel({
 		typeof company.longitude === 'number'
 
 	const [pending, setPending] = useState(false)
+	const [expanded, setExpanded] = useState(false)
 
 	const onLocate = async () => {
 		if (pending) return
@@ -85,31 +86,76 @@ export function WherePanel({
 					<MapPin size={16} aria-hidden />
 					<Trans>Where</Trans>
 				</Title>
-				{googleHref ? (
-					<ExternalLinkButton
-						as='a'
-						href={googleHref}
-						target='_blank'
-						rel='noopener noreferrer'
-						data-testid='where-google-maps'
-					>
-						<ExternalLink size={14} aria-hidden />
-						<Trans>Open in Google Maps</Trans>
-					</ExternalLinkButton>
-				) : null}
+				<HeaderActions>
+					{hasCoords ? (
+						<ExternalLinkButton
+							type='button'
+							onClick={() => setExpanded(true)}
+							aria-label={t`Open the map full screen`}
+							data-testid='where-expand'
+						>
+							<Maximize2 size={14} aria-hidden />
+						</ExternalLinkButton>
+					) : null}
+					{googleHref ? (
+						<ExternalLinkButton
+							as='a'
+							href={googleHref}
+							target='_blank'
+							rel='noopener noreferrer'
+							data-testid='where-google-maps'
+						>
+							<ExternalLink size={14} aria-hidden />
+							<Trans>Open in Google Maps</Trans>
+						</ExternalLinkButton>
+					) : null}
+				</HeaderActions>
 			</Header>
 			{hasCoords ? (
-				<MapFrame
-					$compact={compact}
-					data-map-theme={theme === 'light' ? 'light' : 'dark'}
-				>
-					<LeafletMap
-						latitude={company.latitude as number}
-						longitude={company.longitude as number}
-						label={company.name}
-						dark={theme !== 'light'}
-					/>
-				</MapFrame>
+				<>
+					<MapFrame
+						$compact={compact}
+						data-map-theme={theme === 'light' ? 'light' : 'dark'}
+					>
+						<LeafletMap
+							latitude={company.latitude as number}
+							longitude={company.longitude as number}
+							label={company.name}
+							dark={theme !== 'light'}
+						/>
+					</MapFrame>
+					<PriDialog.Root open={expanded} onOpenChange={setExpanded}>
+						<PriDialog.Portal>
+							<PriDialog.Backdrop />
+							<PriDialog.Viewport>
+								<MapPopup mobile='sheet' data-testid='where-fullscreen'>
+									<PriDialog.Title>{company.name}</PriDialog.Title>
+									<FullMapFrame
+										data-map-theme={theme === 'light' ? 'light' : 'dark'}
+									>
+										<LeafletMap
+											latitude={company.latitude as number}
+											longitude={company.longitude as number}
+											label={company.name}
+											dark={theme !== 'light'}
+											// Room to look properly: the wheel works and it opens
+											// close enough to read a street.
+											zoom={13}
+											scrollWheelZoom
+										/>
+									</FullMapFrame>
+									<PriDialog.Close
+										render={
+											<PriButton type='button' $variant='outlined'>
+												{t`Close`}
+											</PriButton>
+										}
+									/>
+								</MapPopup>
+							</PriDialog.Viewport>
+						</PriDialog.Portal>
+					</PriDialog.Root>
+				</>
 			) : (
 				<EmptyFrame>
 					<EmptyCopy>
@@ -165,16 +211,48 @@ function buildGoogleMapsHref(company: WherePanelCompany): string | null {
 	return null
 }
 
+/**
+ * Tell the map to re-measure whenever its frame changes size.
+ *
+ * A map opened inside a dialog is built while the dialog is still animating in,
+ * so it works out which tiles to fetch against a box that is about to change —
+ * and the ones for the rest of the frame never arrive, leaving a blank band.
+ */
+function ResizeToFrame() {
+	const map = useMap()
+	useEffect(() => {
+		const frame = map.getContainer()
+		const observer = new ResizeObserver(() => {
+			map.invalidateSize()
+		})
+		observer.observe(frame)
+		return () => {
+			observer.disconnect()
+		}
+	}, [map])
+	return null
+}
+
 function LeafletMap({
 	latitude,
 	longitude,
 	label,
 	dark,
+	zoom = 6,
+	scrollWheelZoom = false,
 }: {
 	readonly latitude: number
 	readonly longitude: number
 	readonly label: string
 	readonly dark: boolean
+	/**
+	 * Where the map opens. The default answers "which part of the country is
+	 * this?", which is what the panel is for — closer in, the tiles name only
+	 * suburbs and the nearest city one has heard of is off the edge. The +/-
+	 * controls are there for anyone who wants the street.
+	 */
+	readonly zoom?: number
+	readonly scrollWheelZoom?: boolean
 }) {
 	// Leaflet ships its marker images via CSS (url()) that vite can't
 	// resolve without extra plumbing, so point the default icon at the
@@ -194,10 +272,11 @@ function LeafletMap({
 	return (
 		<MapContainer
 			center={[latitude, longitude]}
-			zoom={12}
-			scrollWheelZoom={false}
+			zoom={zoom}
+			scrollWheelZoom={scrollWheelZoom}
 			style={{ width: '100%', height: '100%' }}
 		>
+			<ResizeToFrame />
 			<TileLayer
 				attribution={
 					dark
@@ -237,6 +316,15 @@ const Title = styled.h3`
 	gap: var(--space-xs);
 	font-size: var(--typescale-body-medium-size);
 	margin: 0;
+`
+
+const HeaderActions = styled.div.withConfig({
+	displayName: 'WherePanelHeaderActions',
+})`
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-2xs);
 `
 
 const ExternalLinkButton = styled.button`
@@ -289,6 +377,36 @@ const MapFrame = styled.div.withConfig({
 	&[data-map-theme='dark'] .leaflet-control-attribution a {
 		color: var(--color-primary);
 	}
+
+	& > div,
+	& .leaflet-container {
+		width: 100%;
+		height: 100%;
+		border-radius: inherit;
+	}
+`
+
+/* A dialog holding a map wants the window, not the width a form reads best at,
+ * which is what the shared popup is sized for. */
+const MapPopup = styled(PriDialog.Popup).withConfig({
+	displayName: 'WherePanelMapPopup',
+})`
+	width: min(90vw, 80rem);
+	max-width: min(90vw, 80rem);
+`
+
+const FullMapFrame = styled.div.withConfig({
+	displayName: 'WherePanelFullMapFrame',
+})`
+	${brushedMetalPlate};
+	width: 100%;
+	/* Tall enough to be worth opening, and it gives way on a short window
+	 * instead of pushing the close button off the bottom. The dialog lays its
+	 * children out in a column, so without this the map is the one that gets
+	 * squeezed down to nothing. */
+	height: min(70vh, 40rem);
+	flex: 0 0 auto;
+	border-radius: var(--shape-md);
 
 	& > div,
 	& .leaflet-container {
