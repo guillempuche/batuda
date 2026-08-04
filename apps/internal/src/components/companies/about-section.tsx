@@ -22,6 +22,10 @@ const SIZE_OPTIONS = [
 	...COMPANY_SIZE_RANGES.map(band => ({ value: band, label: band })),
 ]
 
+// What the trigger's count is out of — the fields below, with tags and products
+// counting as one apiece however many are on them.
+const TOTAL_ABOUT_FIELDS = 8
+
 export type AboutCompany = {
 	readonly industry: string | null
 	readonly country: string | null
@@ -55,12 +59,29 @@ export function AboutSection({
 }) {
 	const { t } = useLingui()
 	const { labels, labelFor } = useCompanyIndustries()
+	// How much of this is actually filled in. Whether a lead is qualified is the
+	// question this section answers, and it used to be shut with nothing on the
+	// outside to say whether there was anything behind it.
+	const filled = [
+		company.industry,
+		company.country,
+		company.location,
+		company.sizeRange,
+		company.painPoints,
+		company.currentTools,
+		company.tags.length > 0 ? 'tags' : null,
+		company.productsFit.length > 0 ? 'fit' : null,
+	].filter(v => v !== null && v !== '').length
+
 	return (
-		<PriCollapsible.Root>
+		<PriCollapsible.Root defaultOpen>
 			<TriggerWrap>
 				<PriCollapsible.Trigger data-testid='company-about-trigger'>
 					<ChevronRight size={14} aria-hidden />
 					<Trans>About</Trans>
+					<Count data-testid='company-about-count'>
+						{filled}/{TOTAL_ABOUT_FIELDS}
+					</Count>
 				</PriCollapsible.Trigger>
 			</TriggerWrap>
 			<PriCollapsible.Panel>
@@ -152,13 +173,28 @@ const TriggerWrap = styled.div`
 	justify-content: flex-start;
 `
 
-const Body = styled.div`
+const Body = styled.div.withConfig({ displayName: 'AboutSectionBody' })`
 	${agedPaperSurface}
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
 	padding: var(--space-md);
 	margin-top: var(--space-sm);
+
+	/* The fields below ask about their own width. Without this they were asking
+	 * the whole tab panel instead — measuring over a thousand pixels while
+	 * sitting in a column of four hundred, and so laying out two columns that
+	 * squeezed a town name onto two lines. */
+	container-type: inline-size;
+`
+
+const Count = styled.span.withConfig({ displayName: 'AboutSectionCount' })`
+	padding: 0 var(--space-2xs);
+	border: 1px solid currentColor;
+	border-radius: var(--shape-2xs);
+	font-size: var(--typescale-label-small-size);
+	font-variant-numeric: tabular-nums;
+	opacity: 0.8;
 `
 
 const Group = styled.section`

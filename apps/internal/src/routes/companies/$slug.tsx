@@ -1222,6 +1222,13 @@ function DetailBody({
 								$gap='md'
 							>
 								<Stack $gap='md'>
+									{/* The notes on the account lead the tab: they are what a
+									    person came to read, and the widest column is the only
+									    one prose fits in. */}
+									<AccountBriefSection
+										company={company}
+										onSave={(field, next) => saveField(field, next)}
+									/>
 									{tasksFailed ? (
 										<ErrorState
 											data-testid='company-tasks-error'
@@ -1329,10 +1336,6 @@ function DetailBody({
 										}
 									/>
 									<WherePanel company={company} compact />
-									<AccountBriefSection
-										company={company}
-										onSave={(field, next) => saveField(field, next)}
-									/>
 									<CompanyFitSection company={company} />
 									<AboutSection
 										company={company}

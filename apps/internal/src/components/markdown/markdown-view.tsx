@@ -69,10 +69,23 @@ const Wrapper = styled.div.withConfig({ displayName: 'MarkdownView' })`
 		margin: 0 0 var(--space-sm);
 	}
 
-	ul,
-	ol {
+	/* The app's reset takes markers off every list, which is right for the menus
+	 * and toolbars built out of lists — but this is prose, where a run's bullets
+	 * and its numbered risks were arriving as unmarked indented lines. */
+	ul {
+		list-style: disc outside;
 		margin: 0 0 var(--space-sm);
 		padding-left: var(--space-md);
+	}
+
+	ol {
+		list-style: decimal outside;
+		margin: 0 0 var(--space-sm);
+		padding-left: var(--space-md);
+	}
+
+	ul ul {
+		list-style-type: circle;
 	}
 
 	li {

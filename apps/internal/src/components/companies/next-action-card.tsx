@@ -54,6 +54,7 @@ export function NextActionCard({
 					value={value}
 					onSave={onSave}
 					multiline
+					hideLabel
 				/>
 			</Body>
 		</Card>

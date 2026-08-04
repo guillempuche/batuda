@@ -468,10 +468,6 @@ msgid "All"
 msgstr "Tots"
 
 #: src/routes/companies/index.tsx
-msgid "All companies"
-msgstr "Totes les empreses"
-
-#: src/routes/companies/index.tsx
 msgid "All countries"
 msgstr "Tots els països"
 
@@ -2420,6 +2416,7 @@ msgid "First outreach sent"
 msgstr "Primer contacte enviat"
 
 #: src/components/companies/company-fit-section.tsx
+#: src/components/companies/company-fit-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
 msgid "Fit"
 msgstr "Encaix"
@@ -3082,10 +3079,6 @@ msgstr "Resum de mercat"
 msgid "Match device"
 msgstr "Segons el dispositiu"
 
-#: src/routes/companies/index.tsx
-msgid "Matching companies"
-msgstr "Empreses coincidents"
-
 #: src/components/research/findings/competitor-scan-view.tsx
 msgid "Maturity"
 msgstr "Maduresa"
@@ -3743,6 +3736,10 @@ msgstr "Res per aplicar"
 msgid "Nothing to authorize"
 msgstr "Res a autoritzar"
 
+#: src/components/companies/account-brief-section.tsx
+msgid "Nothing to preview yet."
+msgstr "Encara no hi ha res per previsualitzar."
+
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Nothing to review right now."
 msgstr "Ara mateix no hi ha res per revisar."
@@ -4207,6 +4204,7 @@ msgstr "Encaix possible"
 msgid "Preparing calendar view…"
 msgstr "S'està preparant la vista del calendari…"
 
+#: src/components/companies/account-brief-section.tsx
 #: src/routes/pages/$id.tsx
 #: src/routes/pages/index.tsx
 msgid "Preview"
@@ -4573,6 +4571,10 @@ msgstr "Pressupost de recerca"
 #: src/routes/settings/organization/policy.tsx
 msgid "Research budget saved."
 msgstr "Pressupost de recerca desat."
+
+#: src/components/companies/company-fit-section.tsx
+msgid "Research has not weighed this company up yet. Run it to get a verdict and the reasons behind it."
+msgstr "La recerca encara no ha valorat aquesta empresa. Executa-la per obtenir un veredicte i els motius que hi ha al darrere."
 
 #: src/routes/research/$id.tsx
 msgid "Research run"
@@ -4942,10 +4944,12 @@ msgstr "Compartida amb tot l'equip: sense cap propietari"
 msgid "Show Cc ({0})"
 msgstr "Mostra Cc ({0})"
 
+#: src/components/companies/account-brief-section.tsx
 #: src/components/shared/timeline-entry.tsx
 msgid "Show less"
 msgstr "Mostra menys"
 
+#: src/components/companies/account-brief-section.tsx
 #: src/components/shared/timeline-entry.tsx
 msgid "Show more"
 msgstr "Mostra més"
@@ -6087,6 +6091,14 @@ msgstr "Planta del taller — comptadors en viu al banc."
 #: src/components/research/inbox/research-inbox.tsx
 msgid "would become"
 msgstr "passaria a ser"
+
+#: src/components/companies/account-brief-section.tsx
+msgid "Write"
+msgstr "Escriu"
+
+#: src/components/companies/account-brief-section.tsx
+msgid "Write a brief"
+msgstr "Escriu un resum"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Write footer…"

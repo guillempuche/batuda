@@ -28,6 +28,12 @@ export interface EditableFieldProps {
 	readonly type?: InputKind
 	readonly multiline?: boolean
 	readonly placeholder?: string
+	/**
+	 * Drop the printed label while keeping it for anyone listening. For a field
+	 * that sits alone under a heading already saying the same word — printing it
+	 * twice reads as a mistake.
+	 */
+	readonly hideLabel?: boolean
 }
 
 /**
@@ -43,6 +49,7 @@ export function EditableField({
 	type = 'text',
 	multiline = false,
 	placeholder,
+	hideLabel = false,
 }: EditableFieldProps) {
 	const { t } = useLingui()
 	const [editing, setEditing] = useState(false)
@@ -107,7 +114,7 @@ export function EditableField({
 
 	return (
 		<Field>
-			<FieldLabel>{label}</FieldLabel>
+			{!hideLabel && <FieldLabel>{label}</FieldLabel>}
 			{editing ? (
 				multiline ? (
 					<TextArea

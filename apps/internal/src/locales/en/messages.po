@@ -468,10 +468,6 @@ msgid "All"
 msgstr "All"
 
 #: src/routes/companies/index.tsx
-msgid "All companies"
-msgstr "All companies"
-
-#: src/routes/companies/index.tsx
 msgid "All countries"
 msgstr "All countries"
 
@@ -2420,6 +2416,7 @@ msgid "First outreach sent"
 msgstr "First outreach sent"
 
 #: src/components/companies/company-fit-section.tsx
+#: src/components/companies/company-fit-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
 msgid "Fit"
 msgstr "Fit"
@@ -3082,10 +3079,6 @@ msgstr "Market summary"
 msgid "Match device"
 msgstr "Match device"
 
-#: src/routes/companies/index.tsx
-msgid "Matching companies"
-msgstr "Matching companies"
-
 #: src/components/research/findings/competitor-scan-view.tsx
 msgid "Maturity"
 msgstr "Maturity"
@@ -3743,6 +3736,10 @@ msgstr "Nothing to apply"
 msgid "Nothing to authorize"
 msgstr "Nothing to authorize"
 
+#: src/components/companies/account-brief-section.tsx
+msgid "Nothing to preview yet."
+msgstr "Nothing to preview yet."
+
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Nothing to review right now."
 msgstr "Nothing to review right now."
@@ -4207,6 +4204,7 @@ msgstr "Possible fit"
 msgid "Preparing calendar view…"
 msgstr "Preparing calendar view…"
 
+#: src/components/companies/account-brief-section.tsx
 #: src/routes/pages/$id.tsx
 #: src/routes/pages/index.tsx
 msgid "Preview"
@@ -4573,6 +4571,10 @@ msgstr "Research budget"
 #: src/routes/settings/organization/policy.tsx
 msgid "Research budget saved."
 msgstr "Research budget saved."
+
+#: src/components/companies/company-fit-section.tsx
+msgid "Research has not weighed this company up yet. Run it to get a verdict and the reasons behind it."
+msgstr "Research has not weighed this company up yet. Run it to get a verdict and the reasons behind it."
 
 #: src/routes/research/$id.tsx
 msgid "Research run"
@@ -4942,10 +4944,12 @@ msgstr "Shared with the whole team — no single owner"
 msgid "Show Cc ({0})"
 msgstr "Show Cc ({0})"
 
+#: src/components/companies/account-brief-section.tsx
 #: src/components/shared/timeline-entry.tsx
 msgid "Show less"
 msgstr "Show less"
 
+#: src/components/companies/account-brief-section.tsx
 #: src/components/shared/timeline-entry.tsx
 msgid "Show more"
 msgstr "Show more"
@@ -6087,6 +6091,14 @@ msgstr "Workshop floor — live counters on the bench."
 #: src/components/research/inbox/research-inbox.tsx
 msgid "would become"
 msgstr "would become"
+
+#: src/components/companies/account-brief-section.tsx
+msgid "Write"
+msgstr "Write"
+
+#: src/components/companies/account-brief-section.tsx
+msgid "Write a brief"
+msgstr "Write a brief"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Write footer…"

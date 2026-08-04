@@ -68,13 +68,36 @@ export function CompanyFitSection({
 	const conflicts = company.fitConflicts ?? []
 	const provenance = Object.entries(company.fieldProvenance ?? {})
 
-	if (
+	// Whether a company was judged and found wanting, or never judged at all, are
+	// two different answers. Vanishing gave the same silence to both.
+	const unjudged =
 		company.fitVerdict === null &&
 		checks.length === 0 &&
 		conflicts.length === 0 &&
 		provenance.length === 0
-	)
-		return null
+
+	if (unjudged)
+		return (
+			<PriCollapsible.Root>
+				<TriggerWrap>
+					<PriCollapsible.Trigger data-testid='company-fit-trigger'>
+						<ChevronRight size={14} aria-hidden />
+						<Scale size={14} aria-hidden />
+						<Trans>Fit</Trans>
+					</PriCollapsible.Trigger>
+				</TriggerWrap>
+				<PriCollapsible.Panel>
+					<Body data-testid='company-fit-panel'>
+						<Unjudged data-testid='company-fit-empty'>
+							<Trans>
+								Research has not weighed this company up yet. Run it to get a
+								verdict and the reasons behind it.
+							</Trans>
+						</Unjudged>
+					</Body>
+				</PriCollapsible.Panel>
+			</PriCollapsible.Root>
+		)
 
 	return (
 		<PriCollapsible.Root defaultOpen={company.fitVerdict !== null}>
@@ -265,6 +288,13 @@ const Verdict = styled.span<{ $verdict: string }>`
 			: p.$verdict === 'no_fit'
 				? 'var(--color-error)'
 				: 'var(--color-on-surface-variant)'};
+`
+
+const Unjudged = styled.p.withConfig({ displayName: 'CompanyFitUnjudged' })`
+	margin: 0;
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+	color: var(--color-on-surface-variant);
 `
 
 const Body = styled.div`
