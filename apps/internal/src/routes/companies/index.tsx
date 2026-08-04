@@ -17,6 +17,7 @@ import {
 	companiesSearchAtom,
 } from '#/atoms/companies-atoms'
 import { CompaniesHeader } from '#/components/companies/companies-header'
+import { SavedViews } from '#/components/companies/saved-views'
 import { CompanyCard } from '#/components/shared/company-card'
 import { EmptyState } from '#/components/shared/empty-state'
 import { ErrorState } from '#/components/shared/error-state'
@@ -335,6 +336,14 @@ function CompaniesListPage() {
 						</StatusFilterButton>
 					))}
 				</StatusFilters>
+
+				<SavedViews
+					current={search}
+					onApply={next => {
+						setSearchInput(next.query ?? '')
+						void navigate({ to: '/companies', search: next })
+					}}
+				/>
 
 				<DropdownRow>
 					<FilterSelect

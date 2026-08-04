@@ -2453,6 +2453,11 @@ msgstr "Follow up"
 msgid "Footers — {0}"
 msgstr "Footers — {0}"
 
+#. placeholder {0}: view.name
+#: src/components/companies/saved-views.tsx
+msgid "Forget the view {0}"
+msgstr "Forget the view {0}"
+
 #: src/routes/login.tsx
 msgid "Forgot password?"
 msgstr "Forgot password?"
@@ -3276,6 +3281,10 @@ msgstr "My stacks"
 #: src/routes/settings/api-keys/index.tsx
 msgid "Name"
 msgstr "Name"
+
+#: src/components/companies/saved-views.tsx
+msgid "Name this view"
+msgstr "Name this view"
 
 #: src/components/contacts/manage-channels-dialog.tsx
 msgid "name@company.com"
@@ -4777,6 +4786,14 @@ msgstr "Save password"
 #: src/components/instructions/stack-editor.tsx
 msgid "Save stack"
 msgstr "Save stack"
+
+#: src/components/companies/saved-views.tsx
+msgid "Save these filters"
+msgstr "Save these filters"
+
+#: src/components/companies/saved-views.tsx
+msgid "Saved views"
+msgstr "Saved views"
 
 #: src/components/instructions/stack-editor.tsx
 msgid "Saved, but not made the default"

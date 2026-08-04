@@ -2453,6 +2453,11 @@ msgstr "Fes seguiment"
 msgid "Footers — {0}"
 msgstr "Peus de pàgina — {0}"
 
+#. placeholder {0}: view.name
+#: src/components/companies/saved-views.tsx
+msgid "Forget the view {0}"
+msgstr "Oblida la vista {0}"
+
 #: src/routes/login.tsx
 msgid "Forgot password?"
 msgstr "Has oblidat la contrasenya?"
@@ -3276,6 +3281,10 @@ msgstr "Les meves piles"
 #: src/routes/settings/api-keys/index.tsx
 msgid "Name"
 msgstr "Nom"
+
+#: src/components/companies/saved-views.tsx
+msgid "Name this view"
+msgstr "Posa un nom a aquesta vista"
 
 #: src/components/contacts/manage-channels-dialog.tsx
 msgid "name@company.com"
@@ -4777,6 +4786,14 @@ msgstr "Desa la contrasenya"
 #: src/components/instructions/stack-editor.tsx
 msgid "Save stack"
 msgstr "Desa la pila"
+
+#: src/components/companies/saved-views.tsx
+msgid "Save these filters"
+msgstr "Desa aquests filtres"
+
+#: src/components/companies/saved-views.tsx
+msgid "Saved views"
+msgstr "Vistes desades"
 
 #: src/components/instructions/stack-editor.tsx
 msgid "Saved, but not made the default"
