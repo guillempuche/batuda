@@ -54,14 +54,19 @@ export class PipelineService extends Context.Service<PipelineService>()(
 
 			return {
 				getCounts: () =>
-					sql`SELECT status, count(*)::int as count FROM companies GROUP BY status`,
+					sql`
+						SELECT status, count(*)::int as count FROM companies
+						WHERE deleted_at IS NULL
+						GROUP BY status
+					`,
 
 				getOverdueTasks: (limit = 10) =>
 					sql`
 						SELECT t.id, t.title, t.type, t.due_at,
 							t.company_id, c.name as company_name, c.slug as company_slug
 						FROM tasks t
-						INNER JOIN companies c ON t.company_id = c.id
+						INNER JOIN companies c
+							ON t.company_id = c.id AND c.deleted_at IS NULL
 						WHERE t.completed_at IS NULL AND t.due_at < now()
 						ORDER BY t.due_at
 						LIMIT ${limit}
@@ -73,7 +78,8 @@ export class PipelineService extends Context.Service<PipelineService>()(
 							SELECT t.id, t.title, t.type, t.due_at,
 								t.company_id, c.name as company_name, c.slug as company_slug
 							FROM tasks t
-							INNER JOIN companies c ON t.company_id = c.id
+							INNER JOIN companies c
+								ON t.company_id = c.id AND c.deleted_at IS NULL
 							WHERE t.completed_at IS NULL
 							ORDER BY t.due_at
 							LIMIT ${probeLimit(limit)}
@@ -83,6 +89,7 @@ export class PipelineService extends Context.Service<PipelineService>()(
 							SELECT id, slug, name, next_action, next_action_at
 							FROM companies
 							WHERE next_action_at < now()
+								AND deleted_at IS NULL
 								AND status NOT IN ('closed', 'dead')
 							ORDER BY next_action_at
 							LIMIT ${probeLimit(limit)}
@@ -125,7 +132,11 @@ export class PipelineService extends Context.Service<PipelineService>()(
 									AND rl.link_kind = 'input'
 								LIMIT 1
 							) link ON true
-							LEFT JOIN companies c ON c.id = link.subject_id
+							-- Filtered in the join, not the WHERE clause: a run whose company
+							-- was deleted still belongs on the list, the same as a run that
+							-- points at no company. Only the company's name drops off.
+							LEFT JOIN companies c
+								ON c.id = link.subject_id AND c.deleted_at IS NULL
 							WHERE f.pending_update_count > 0
 								OR f.status IN ${sql.in(ATTENTION_RESEARCH_STATUSES)}
 							ORDER BY f.completed_at DESC NULLS LAST
@@ -157,7 +168,11 @@ export class PipelineService extends Context.Service<PipelineService>()(
 						const counts = yield* sql<{
 							status: string
 							count: number
-						}>`SELECT status, count(*)::int as count FROM companies GROUP BY status`
+						}>`
+							SELECT status, count(*)::int as count FROM companies
+							WHERE deleted_at IS NULL
+							GROUP BY status
+						`
 
 						const overdueTasks = yield* sql<{
 							count: number
@@ -171,6 +186,7 @@ export class PipelineService extends Context.Service<PipelineService>()(
 						}>`
 							SELECT count(*)::int as count FROM companies
 							WHERE next_action IS NULL
+								AND deleted_at IS NULL
 								AND status NOT IN ('closed', 'dead', 'client')
 						`
 
