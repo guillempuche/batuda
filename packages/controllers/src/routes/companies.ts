@@ -157,6 +157,14 @@ export const CompaniesGroup = HttpApiGroup.make('companies')
 		}),
 	)
 	.add(
+		// The countries this organisation trades with, so the list page can offer
+		// every one of them rather than only those on the page being read. Its own
+		// path, not `/companies/countries`, which a slug would answer to.
+		HttpApiEndpoint.get('countries', '/company-countries', {
+			success: Schema.Array(Schema.String),
+		}),
+	)
+	.add(
 		HttpApiEndpoint.get('get', '/companies/:slug', {
 			params: { slug: Schema.String },
 			success: CompanyDetail,

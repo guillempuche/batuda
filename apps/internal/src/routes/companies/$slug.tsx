@@ -115,12 +115,17 @@ import { TrustBadge } from '#/components/research/trust-badge'
 import { EmptyState } from '#/components/shared/empty-state'
 import { ErrorState } from '#/components/shared/error-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
-import { PriorityDot } from '#/components/shared/priority-dot'
+import {
+	PRIORITY_LEVELS,
+	PriorityDot,
+	priorityShortLabels,
+} from '#/components/shared/priority-dot'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { SrOnly } from '#/components/shared/sr-only'
 import type { CompanyStatus } from '#/components/shared/status-badge'
 import {
 	asCompanyStatus,
+	STATUS_ORDER,
 	StatusBadge,
 	statusLabels,
 } from '#/components/shared/status-badge'
@@ -134,6 +139,7 @@ import { useQuickCapture } from '#/context/quick-capture-context'
 import { useCompanyIndustries } from '#/hooks/use-company-industries'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
+import { languageName } from '#/lib/country-name'
 import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
 import type { PaginatedList } from '#/lib/paginated-list'
 import { validateSearchWith } from '#/lib/search-schema'
@@ -638,25 +644,16 @@ function DetailBody({
 	)
 
 	const statusOptions = useMemo(
-		() => [
-			{ value: 'prospect', label: t`Prospect` },
-			{ value: 'contacted', label: t`Contacted` },
-			{ value: 'responded', label: t`Responded` },
-			{ value: 'meeting', label: t`Meeting` },
-			{ value: 'proposal', label: t`Proposal` },
-			{ value: 'client', label: t`Client` },
-			{ value: 'closed', label: t`Closed` },
-			{ value: 'dead', label: t`Dead` },
-		],
-		[t],
+		() => STATUS_ORDER.map(s => ({ value: s, label: i18n._(statusLabels[s]) })),
+		[i18n],
 	)
 	const priorityOptions = useMemo(
-		() => [
-			{ value: '1', label: t`High` },
-			{ value: '2', label: t`Medium` },
-			{ value: '3', label: t`Low` },
-		],
-		[t],
+		() =>
+			PRIORITY_LEVELS.map(p => ({
+				value: String(p),
+				label: i18n._(priorityShortLabels[p]),
+			})),
+		[i18n],
 	)
 
 	const contacts = useMemo<ReadonlyArray<ContactRow>>(
@@ -1642,11 +1639,23 @@ function DetailBody({
 													</Link>
 												</PageRowTitle>
 												<PageRowMeta>
-													<PageLangBadge>{pg.lang}</PageLangBadge>
+													{/* A language chip reads as a code the world over, so
+													    it stays one, with the full name for anyone who
+													    does not recognise it. The state beside it is a
+													    word, and a word has to be in the reader's own. */}
+													<PageLangBadge
+														title={
+															languageName(pg.lang, i18n.locale) ?? undefined
+														}
+													>
+														{pg.lang.toUpperCase()}
+													</PageLangBadge>
 													<PageStatusBadge
 														$published={pg.status === 'published'}
 													>
-														{pg.status}
+														{pg.status === 'published'
+															? t`Published`
+															: t`Draft`}
 													</PageStatusBadge>
 												</PageRowMeta>
 											</PageRow>

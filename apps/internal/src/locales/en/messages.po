@@ -125,6 +125,11 @@ msgstr "{0} is now the address you send from"
 msgid "{0} is the address you send from"
 msgstr "{0} is the address you send from"
 
+#. placeholder {0}: item.row.messageCount
+#: src/components/companies/conversations-tab.tsx
+msgid "{0} messages"
+msgstr "{0} messages"
+
 #. placeholder {0}: thread.messageCount
 #: src/routes/emails/index.tsx
 msgid "{0} msgs"
@@ -246,6 +251,10 @@ msgstr "1 company"
 #: src/routes/companies/index.tsx
 msgid "1 company with filters applied"
 msgstr "1 company with filters applied"
+
+#: src/components/companies/conversations-tab.tsx
+msgid "1 message"
+msgstr "1 message"
 
 #: src/routes/emails/index.tsx
 msgid "1 msg"
@@ -645,6 +654,7 @@ msgstr "Archive"
 msgid "Archive thread"
 msgstr "Archive thread"
 
+#: src/components/companies/conversations-tab.tsx
 #: src/routes/emails/$threadId.tsx
 #: src/routes/emails/index.tsx
 msgid "Archived"
@@ -912,6 +922,7 @@ msgstr "Cancel"
 msgid "Cancel upload"
 msgstr "Cancel upload"
 
+#: src/components/companies/conversations-tab.tsx
 #: src/components/research/run-labels.ts
 msgid "Cancelled"
 msgstr "Cancelled"
@@ -1039,7 +1050,6 @@ msgid "Clicked"
 msgstr "Clicked"
 
 #: src/components/shared/status-badge.tsx
-#: src/routes/companies/$slug.tsx
 #: src/routes/oauth/consent.tsx
 msgid "Client"
 msgstr "Client"
@@ -1071,8 +1081,8 @@ msgstr "Close draft"
 msgid "Close thread"
 msgstr "Close thread"
 
+#: src/components/companies/conversations-tab.tsx
 #: src/components/shared/status-badge.tsx
-#: src/routes/companies/$slug.tsx
 #: src/routes/emails/$threadId.tsx
 #: src/routes/emails/index.tsx
 msgid "Closed"
@@ -1089,10 +1099,6 @@ msgstr "Code"
 #: src/routes/settings/mcp/index.tsx
 msgid "Coding tools (API key)"
 msgstr "Coding tools (API key)"
-
-#: src/routes/companies/index.tsx
-msgid "Cold"
-msgstr "Cold"
 
 #: src/components/shared/status-badge.tsx
 msgid "Cold lead — no contact yet"
@@ -1175,6 +1181,7 @@ msgstr "Confirm apply {0}"
 msgid "Confirm apply {verifiedToApply}"
 msgstr "Confirm apply {verifiedToApply}"
 
+#: src/components/companies/conversations-tab.tsx
 #: src/components/research/trust-badge.tsx
 msgid "Confirmed"
 msgstr "Confirmed"
@@ -1253,7 +1260,6 @@ msgid "Contact discovery"
 msgstr "Contact discovery"
 
 #: src/components/shared/status-badge.tsx
-#: src/routes/companies/$slug.tsx
 msgid "Contacted"
 msgstr "Contacted"
 
@@ -1388,6 +1394,10 @@ msgstr "Could not delete the key. Please try again."
 msgid "Could not delete the run"
 msgstr "Could not delete the run"
 
+#: src/components/companies/pipeline-board.tsx
+msgid "Could not load — retry"
+msgstr "Could not load — retry"
+
 #: src/routes/companies/$slug.tsx
 msgid "Could not load activity"
 msgstr "Could not load activity"
@@ -1399,6 +1409,10 @@ msgstr "Could not load companies"
 #: src/routes/companies/$slug.tsx
 msgid "Could not load contacts"
 msgstr "Could not load contacts"
+
+#: src/components/companies/documents-panel.tsx
+msgid "Could not load documents"
+msgstr "Could not load documents"
 
 #: src/components/companies/conversations-tab.tsx
 msgid "Could not load emails"
@@ -1421,6 +1435,10 @@ msgstr "Could not load more. The rows already here are still current."
 #: src/routes/pages/index.tsx
 msgid "Could not load pages"
 msgstr "Could not load pages"
+
+#: src/components/companies/proposals-panel.tsx
+msgid "Could not load proposals"
+msgstr "Could not load proposals"
 
 #: src/routes/companies/$slug.tsx
 msgid "Could not load research"
@@ -1827,7 +1845,6 @@ msgid "Date"
 msgstr "Date"
 
 #: src/components/shared/status-badge.tsx
-#: src/routes/companies/$slug.tsx
 msgid "Dead"
 msgstr "Dead"
 
@@ -1986,6 +2003,7 @@ msgstr "documents"
 msgid "Documents"
 msgstr "Documents"
 
+#: src/components/companies/conversations-tab.tsx
 #: src/routes/settings/api-keys/index.tsx
 msgid "Done"
 msgstr "Done"
@@ -1995,6 +2013,7 @@ msgid "Done 7d"
 msgstr "Done 7d"
 
 #: src/components/companies/proposals-panel.tsx
+#: src/routes/companies/$slug.tsx
 #: src/routes/pages/index.tsx
 msgid "Draft"
 msgstr "Draft"
@@ -2530,7 +2549,7 @@ msgstr "Hide Cc"
 msgid "Hide password"
 msgstr "Hide password"
 
-#: src/routes/companies/$slug.tsx
+#: src/components/shared/priority-dot.tsx
 msgid "High"
 msgstr "High"
 
@@ -2544,10 +2563,6 @@ msgstr "High priority"
 #: src/components/contacts/contact-edit-dialog.tsx
 msgid "Holds the budget"
 msgstr "Holds the budget"
-
-#: src/routes/companies/index.tsx
-msgid "Hot"
-msgstr "Hot"
 
 #: src/components/instructions/stack-editor.tsx
 msgid "How this stack uses the org default"
@@ -2699,6 +2714,10 @@ msgstr "Interaction"
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Interaction logged"
 msgstr "Interaction logged"
+
+#: src/components/shared/timeline-entry.tsx
+msgid "Interested"
+msgstr "Interested"
 
 #: src/components/research/proposal-outcome.tsx
 msgid "Invalid"
@@ -2971,7 +2990,7 @@ msgstr "Lookup approved — the run is picking it up."
 msgid "Lookup skipped. Nothing was spent."
 msgstr "Lookup skipped. Nothing was spent."
 
-#: src/routes/companies/$slug.tsx
+#: src/components/shared/priority-dot.tsx
 msgid "Low"
 msgstr "Low"
 
@@ -3075,8 +3094,7 @@ msgstr "Maturity"
 msgid "MCP connections"
 msgstr "MCP connections"
 
-#: src/routes/companies/$slug.tsx
-#: src/routes/companies/index.tsx
+#: src/components/shared/priority-dot.tsx
 msgid "Medium"
 msgstr "Medium"
 
@@ -3086,7 +3104,6 @@ msgstr "Medium priority"
 
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/components/shared/status-badge.tsx
-#: src/routes/companies/$slug.tsx
 msgid "Meeting"
 msgstr "Meeting"
 
@@ -3103,6 +3120,10 @@ msgstr "Meeting notes"
 #: src/components/documents/document-kinds.ts
 msgid "Meeting prep"
 msgstr "Meeting prep"
+
+#: src/components/shared/timeline-entry.tsx
+msgid "Meeting scheduled"
+msgstr "Meeting scheduled"
 
 #: src/routes/companies/$slug.tsx
 msgid "Meeting stage — set the next action (agenda, follow-up)."
@@ -3561,6 +3582,10 @@ msgstr "No research runs yet. Find companies to get started."
 msgid "No research yet."
 msgstr "No research yet."
 
+#: src/components/shared/timeline-entry.tsx
+msgid "No response"
+msgstr "No response"
+
 #: src/routes/settings/profile/templates.tsx
 msgid "No stacks yet. Create one to group your templates."
 msgstr "No stacks yet. Create one to group your templates."
@@ -3645,6 +3670,10 @@ msgstr "Not enough research budget for this run. Raise the budget or narrow the 
 #: src/components/instructions/template-library.tsx
 msgid "Not in your organization"
 msgstr "Not in your organization"
+
+#: src/components/shared/timeline-entry.tsx
+msgid "Not interested"
+msgstr "Not interested"
 
 #: src/components/contacts/contact-edit-dialog.tsx
 msgid "Not known"
@@ -3750,6 +3779,8 @@ msgstr "Only an owner or an admin can add members."
 msgid "Only machine-verified values apply on their own; free-text always waits for review."
 msgstr "Only machine-verified values apply on their own; free-text always waits for review."
 
+#: src/components/companies/conversations-tab.tsx
+#: src/components/companies/conversations-tab.tsx
 #: src/components/research/inbox/research-inbox.tsx
 #: src/routes/emails/$threadId.tsx
 #: src/routes/emails/index.tsx
@@ -3930,10 +3961,9 @@ msgstr "Outbound message to {0}"
 msgid "Outcome"
 msgstr "Outcome"
 
-#. placeholder {0}: entry.outcome
 #: src/components/shared/timeline-entry.tsx
-msgid "Outcome: {0}"
-msgstr "Outcome: {0}"
+msgid "Outcome: {outcomeLabel}"
+msgstr "Outcome: {outcomeLabel}"
 
 #: src/components/companies/next-action-card.tsx
 #: src/routes/index.tsx
@@ -4242,13 +4272,16 @@ msgstr "Profile"
 
 #: src/components/shared/channel-icon.tsx
 #: src/components/shared/status-badge.tsx
-#: src/routes/companies/$slug.tsx
 msgid "Proposal"
 msgstr "Proposal"
 
 #: src/components/shared/status-badge.tsx
 msgid "Proposal in review"
 msgstr "Proposal in review"
+
+#: src/components/shared/timeline-entry.tsx
+msgid "Proposal requested"
+msgstr "Proposal requested"
 
 #: src/routes/companies/$slug.tsx
 msgid "Proposal stage — set the next action (send it, chase a decision)."
@@ -4267,7 +4300,6 @@ msgid "Proposed updates"
 msgstr "Proposed updates"
 
 #: src/components/shared/status-badge.tsx
-#: src/routes/companies/$slug.tsx
 msgid "Prospect"
 msgstr "Prospect"
 
@@ -4291,6 +4323,7 @@ msgstr "Publish"
 msgid "Publish failed"
 msgstr "Publish failed"
 
+#: src/routes/companies/$slug.tsx
 #: src/routes/pages/index.tsx
 #: src/routes/pages/index.tsx
 msgid "Published"
@@ -4574,7 +4607,7 @@ msgid "Respond to the organizer"
 msgstr "Respond to the organizer"
 
 #: src/components/shared/status-badge.tsx
-#: src/routes/companies/$slug.tsx
+#: src/components/shared/timeline-entry.tsx
 msgid "Responded"
 msgstr "Responded"
 
@@ -5309,6 +5342,7 @@ msgstr "Templates"
 msgid "tentative"
 msgstr "tentative"
 
+#: src/components/companies/conversations-tab.tsx
 #: src/routes/calendar/index.tsx
 msgid "Tentative"
 msgstr "Tentative"
@@ -5398,6 +5432,10 @@ msgstr "The content arrived in a form the editor cannot read, so there is nothin
 msgid "The details arrived in a form this page cannot read, so there is nothing to show. Go back to the list and open the company again; report it if it keeps happening."
 msgstr "The details arrived in a form this page cannot read, so there is nothing to show. Go back to the list and open the company again; report it if it keeps happening."
 
+#: src/components/companies/documents-panel.tsx
+msgid "The documents filed here could not be fetched. Check that the session is valid, then try again."
+msgstr "The documents filed here could not be fetched. Check that the session is valid, then try again."
+
 #: src/components/companies/where-panel-client.client.tsx
 msgid "The geocoder did not return a match. Try editing the location field."
 msgstr "The geocoder did not return a match. Try editing the location field."
@@ -5454,6 +5492,10 @@ msgstr "The pages I found were about a different company, so I didn't save anyth
 #: src/routes/companies/$slug.tsx
 msgid "The people at this company could not be fetched. Check that the session is valid, then try again."
 msgstr "The people at this company could not be fetched. Check that the session is valid, then try again."
+
+#: src/components/companies/proposals-panel.tsx
+msgid "The proposals for this company could not be fetched. Check that the session is valid, then try again."
+msgstr "The proposals for this company could not be fetched. Check that the session is valid, then try again."
 
 #: src/routes/companies/$slug.tsx
 msgid "The research runs for this company could not be fetched. Check that the session is valid, then try again."

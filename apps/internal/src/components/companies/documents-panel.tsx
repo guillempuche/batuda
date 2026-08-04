@@ -24,6 +24,7 @@ import {
 	SUBJECT_DOCUMENTS_PAGE_SIZE,
 } from '#/atoms/documents-atoms'
 import { MarkdownView } from '#/components/markdown/markdown-view'
+import { ErrorState } from '#/components/shared/error-state'
 import { InfiniteListFooter } from '#/components/shared/infinite-list-footer'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { useInfiniteList } from '#/hooks/use-infinite-list'
@@ -164,9 +165,18 @@ export function DocumentsPanel({
 			</Head>
 
 			{docs.length === 0 ? (
-				// Saying "none yet" while the first ones are still arriving would
-				// be wrong, so the panel waits before saying anything.
-				list.isLoadingFirstPage ? null : (
+				// Saying "none yet" while the first ones are still arriving — or
+				// after the request failed — would both be wrong, so the panel waits,
+				// then says which of the two it is.
+				list.isLoadingFirstPage ? null : list.isError ? (
+					<ErrorState
+						data-testid='subject-documents-error'
+						variant='inline'
+						title={t`Could not load documents`}
+						description={t`The documents filed here could not be fetched. Check that the session is valid, then try again.`}
+						onRetry={list.refresh}
+					/>
+				) : (
 					<Empty>
 						<FileText size={18} aria-hidden />
 						<Trans>No documents yet.</Trans>

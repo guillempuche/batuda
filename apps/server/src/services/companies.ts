@@ -199,6 +199,23 @@ export class CompanyService extends Context.Service<CompanyService>()(
 						}
 					}),
 
+				// Every country this organisation actually trades with. The list page
+				// used to build its country filter from whichever companies happened
+				// to be on screen, so a country further down the list could not be
+				// filtered for at all.
+				countries: () =>
+					Effect.gen(function* () {
+						const currentOrg = yield* CurrentOrg
+						const rows = yield* sql<{ country: string }>`
+							SELECT DISTINCT country FROM companies
+							WHERE organization_id = ${currentOrg.id}
+								AND country IS NOT NULL
+								AND country <> ''
+							ORDER BY country
+						`
+						return rows.map(r => r.country)
+					}),
+
 				findBySlug: (slug: string) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg

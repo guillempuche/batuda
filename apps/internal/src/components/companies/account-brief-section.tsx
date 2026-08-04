@@ -40,11 +40,16 @@ export function AccountBriefSection({
 		setEditing(true)
 	}
 
+	// A rejected save has already put a message on screen, and the editor stays
+	// open holding the text. Letting it reject on would only add an unhandled
+	// rejection to the console for something already dealt with.
 	const save = async () => {
 		setSaving(true)
 		try {
 			await onSave('accountBrief', draft)
 			setEditing(false)
+		} catch {
+			// Handled by the caller's toast.
 		} finally {
 			setSaving(false)
 		}

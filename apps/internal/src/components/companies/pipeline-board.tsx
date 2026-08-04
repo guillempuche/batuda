@@ -378,10 +378,22 @@ function BoardColumn({
 				<ColumnCount data-testid={`board-count-${status}`}>{total}</ColumnCount>
 			</ColumnHeader>
 			<ColumnBody>
-				{/* A column still loading has nothing in it yet either, but saying so
-				    would be wrong — it reads as "no work at this stage". */}
+				{/* A column still loading has nothing in it yet either, and one whose
+				    request failed knows nothing at all — either read as "no work at
+				    this stage", which is the one thing they do not mean. */}
 				{loaded === 0
-					? !list.isLoadingFirstPage && <ColumnEmpty>{t`Empty`}</ColumnEmpty>
+					? !list.isLoadingFirstPage &&
+						(list.isError ? (
+							<ColumnFailed
+								type='button'
+								onClick={list.refresh}
+								data-testid={`board-error-${status}`}
+							>
+								{t`Could not load — retry`}
+							</ColumnFailed>
+						) : (
+							<ColumnEmpty>{t`Empty`}</ColumnEmpty>
+						))
 					: cards.map(card => (
 							<DraggableCard
 								key={card.id}
@@ -637,6 +649,27 @@ const ColumnEmpty = styled.p.withConfig({
 	font-style: italic;
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface-variant);
+`
+
+const ColumnFailed = styled.button.withConfig({
+	displayName: 'PipelineBoardColumnFailed',
+})`
+	margin: 0;
+	padding: var(--space-sm);
+	width: 100%;
+	border: 1px dashed var(--color-error);
+	border-radius: var(--shape-2xs);
+	background: transparent;
+	text-align: center;
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+	color: var(--color-error);
+	cursor: pointer;
+
+	&:focus-visible {
+		outline: none;
+		box-shadow: var(--glow-active);
+	}
 `
 
 const CardShell = styled.div.withConfig({

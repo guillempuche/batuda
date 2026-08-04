@@ -125,6 +125,11 @@ msgstr "{0} ara és l'adreça des d'on envies"
 msgid "{0} is the address you send from"
 msgstr "{0} és l'adreça des d'on envies"
 
+#. placeholder {0}: item.row.messageCount
+#: src/components/companies/conversations-tab.tsx
+msgid "{0} messages"
+msgstr "{0} missatges"
+
 #. placeholder {0}: thread.messageCount
 #: src/routes/emails/index.tsx
 msgid "{0} msgs"
@@ -246,6 +251,10 @@ msgstr "1 empresa"
 #: src/routes/companies/index.tsx
 msgid "1 company with filters applied"
 msgstr "1 empresa amb els filtres aplicats"
+
+#: src/components/companies/conversations-tab.tsx
+msgid "1 message"
+msgstr "1 missatge"
 
 #: src/routes/emails/index.tsx
 msgid "1 msg"
@@ -645,6 +654,7 @@ msgstr "Arxiva"
 msgid "Archive thread"
 msgstr "Arxiva el fil"
 
+#: src/components/companies/conversations-tab.tsx
 #: src/routes/emails/$threadId.tsx
 #: src/routes/emails/index.tsx
 msgid "Archived"
@@ -912,6 +922,7 @@ msgstr "Cancel·la"
 msgid "Cancel upload"
 msgstr "Cancel·la la pujada"
 
+#: src/components/companies/conversations-tab.tsx
 #: src/components/research/run-labels.ts
 msgid "Cancelled"
 msgstr "Cancel·lada"
@@ -1039,7 +1050,6 @@ msgid "Clicked"
 msgstr "Clicat"
 
 #: src/components/shared/status-badge.tsx
-#: src/routes/companies/$slug.tsx
 #: src/routes/oauth/consent.tsx
 msgid "Client"
 msgstr "Client"
@@ -1071,8 +1081,8 @@ msgstr "Tanca l'esborrany"
 msgid "Close thread"
 msgstr "Tanca el fil"
 
+#: src/components/companies/conversations-tab.tsx
 #: src/components/shared/status-badge.tsx
-#: src/routes/companies/$slug.tsx
 #: src/routes/emails/$threadId.tsx
 #: src/routes/emails/index.tsx
 msgid "Closed"
@@ -1089,10 +1099,6 @@ msgstr "Codi"
 #: src/routes/settings/mcp/index.tsx
 msgid "Coding tools (API key)"
 msgstr "Eines de programació (clau API)"
-
-#: src/routes/companies/index.tsx
-msgid "Cold"
-msgstr "Fred"
 
 #: src/components/shared/status-badge.tsx
 msgid "Cold lead — no contact yet"
@@ -1175,6 +1181,7 @@ msgstr "Confirma aplicar-ne {0}"
 msgid "Confirm apply {verifiedToApply}"
 msgstr "Confirma aplicar-ne {verifiedToApply}"
 
+#: src/components/companies/conversations-tab.tsx
 #: src/components/research/trust-badge.tsx
 msgid "Confirmed"
 msgstr "Confirmat"
@@ -1253,7 +1260,6 @@ msgid "Contact discovery"
 msgstr "Descoberta de contactes"
 
 #: src/components/shared/status-badge.tsx
-#: src/routes/companies/$slug.tsx
 msgid "Contacted"
 msgstr "Contactat"
 
@@ -1388,6 +1394,10 @@ msgstr "No s'ha pogut eliminar la clau. Torna-ho a provar."
 msgid "Could not delete the run"
 msgstr "No s'ha pogut eliminar l'execució"
 
+#: src/components/companies/pipeline-board.tsx
+msgid "Could not load — retry"
+msgstr "No s'ha pogut carregar — torna-ho a provar"
+
 #: src/routes/companies/$slug.tsx
 msgid "Could not load activity"
 msgstr "No s'ha pogut carregar l'activitat"
@@ -1399,6 +1409,10 @@ msgstr "No s'han pogut carregar les empreses"
 #: src/routes/companies/$slug.tsx
 msgid "Could not load contacts"
 msgstr "No s'han pogut carregar els contactes"
+
+#: src/components/companies/documents-panel.tsx
+msgid "Could not load documents"
+msgstr "No s'han pogut carregar els documents"
 
 #: src/components/companies/conversations-tab.tsx
 msgid "Could not load emails"
@@ -1421,6 +1435,10 @@ msgstr "No s'han pogut carregar més files. Les que ja hi ha continuen sent vàl
 #: src/routes/pages/index.tsx
 msgid "Could not load pages"
 msgstr "No s'han pogut carregar les pàgines"
+
+#: src/components/companies/proposals-panel.tsx
+msgid "Could not load proposals"
+msgstr "No s'han pogut carregar les propostes"
 
 #: src/routes/companies/$slug.tsx
 msgid "Could not load research"
@@ -1827,7 +1845,6 @@ msgid "Date"
 msgstr "Data"
 
 #: src/components/shared/status-badge.tsx
-#: src/routes/companies/$slug.tsx
 msgid "Dead"
 msgstr "Descartat"
 
@@ -1986,6 +2003,7 @@ msgstr "documents"
 msgid "Documents"
 msgstr "Documents"
 
+#: src/components/companies/conversations-tab.tsx
 #: src/routes/settings/api-keys/index.tsx
 msgid "Done"
 msgstr "Fet"
@@ -1995,6 +2013,7 @@ msgid "Done 7d"
 msgstr "Fetes 7d"
 
 #: src/components/companies/proposals-panel.tsx
+#: src/routes/companies/$slug.tsx
 #: src/routes/pages/index.tsx
 msgid "Draft"
 msgstr "Esborrany"
@@ -2530,7 +2549,7 @@ msgstr "Amaga Cc"
 msgid "Hide password"
 msgstr "Amaga la contrasenya"
 
-#: src/routes/companies/$slug.tsx
+#: src/components/shared/priority-dot.tsx
 msgid "High"
 msgstr "Alta"
 
@@ -2544,10 +2563,6 @@ msgstr "Prioritat alta"
 #: src/components/contacts/contact-edit-dialog.tsx
 msgid "Holds the budget"
 msgstr "Té el pressupost"
-
-#: src/routes/companies/index.tsx
-msgid "Hot"
-msgstr "Calent"
 
 #: src/components/instructions/stack-editor.tsx
 msgid "How this stack uses the org default"
@@ -2699,6 +2714,10 @@ msgstr "Interacció"
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Interaction logged"
 msgstr "Interacció registrada"
+
+#: src/components/shared/timeline-entry.tsx
+msgid "Interested"
+msgstr "Interessat"
 
 #: src/components/research/proposal-outcome.tsx
 msgid "Invalid"
@@ -2971,7 +2990,7 @@ msgstr "Cerca aprovada: l'execució se n'ocupa."
 msgid "Lookup skipped. Nothing was spent."
 msgstr "Cerca omesa. No s'ha gastat res."
 
-#: src/routes/companies/$slug.tsx
+#: src/components/shared/priority-dot.tsx
 msgid "Low"
 msgstr "Baixa"
 
@@ -3075,8 +3094,7 @@ msgstr "Maduresa"
 msgid "MCP connections"
 msgstr "Connexions MCP"
 
-#: src/routes/companies/$slug.tsx
-#: src/routes/companies/index.tsx
+#: src/components/shared/priority-dot.tsx
 msgid "Medium"
 msgstr "Mitjana"
 
@@ -3086,7 +3104,6 @@ msgstr "Prioritat mitjana"
 
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/components/shared/status-badge.tsx
-#: src/routes/companies/$slug.tsx
 msgid "Meeting"
 msgstr "Reunió"
 
@@ -3103,6 +3120,10 @@ msgstr "Notes de reunió"
 #: src/components/documents/document-kinds.ts
 msgid "Meeting prep"
 msgstr "Preparació de reunió"
+
+#: src/components/shared/timeline-entry.tsx
+msgid "Meeting scheduled"
+msgstr "Reunió programada"
 
 #: src/routes/companies/$slug.tsx
 msgid "Meeting stage — set the next action (agenda, follow-up)."
@@ -3561,6 +3582,10 @@ msgstr "Encara no hi ha execucions de recerca. Cerca empreses per començar."
 msgid "No research yet."
 msgstr "Encara sense recerca."
 
+#: src/components/shared/timeline-entry.tsx
+msgid "No response"
+msgstr "Sense resposta"
+
 #: src/routes/settings/profile/templates.tsx
 msgid "No stacks yet. Create one to group your templates."
 msgstr "Encara no hi ha piles. Crea'n una per agrupar les teves plantilles."
@@ -3645,6 +3670,10 @@ msgstr "No hi ha prou pressupost de recerca per a aquesta execució. Augmenta el
 #: src/components/instructions/template-library.tsx
 msgid "Not in your organization"
 msgstr "No és a la teva organització"
+
+#: src/components/shared/timeline-entry.tsx
+msgid "Not interested"
+msgstr "No interessat"
 
 #: src/components/contacts/contact-edit-dialog.tsx
 msgid "Not known"
@@ -3750,6 +3779,8 @@ msgstr "Només un propietari o un administrador pot afegir membres."
 msgid "Only machine-verified values apply on their own; free-text always waits for review."
 msgstr "Només els valors verificats per màquina s'apliquen sols; el text lliure sempre espera revisió."
 
+#: src/components/companies/conversations-tab.tsx
+#: src/components/companies/conversations-tab.tsx
 #: src/components/research/inbox/research-inbox.tsx
 #: src/routes/emails/$threadId.tsx
 #: src/routes/emails/index.tsx
@@ -3930,10 +3961,9 @@ msgstr "Missatge sortint a {0}"
 msgid "Outcome"
 msgstr "Resultat"
 
-#. placeholder {0}: entry.outcome
 #: src/components/shared/timeline-entry.tsx
-msgid "Outcome: {0}"
-msgstr "Resultat: {0}"
+msgid "Outcome: {outcomeLabel}"
+msgstr "Resultat: {outcomeLabel}"
 
 #: src/components/companies/next-action-card.tsx
 #: src/routes/index.tsx
@@ -4242,13 +4272,16 @@ msgstr "Perfil"
 
 #: src/components/shared/channel-icon.tsx
 #: src/components/shared/status-badge.tsx
-#: src/routes/companies/$slug.tsx
 msgid "Proposal"
 msgstr "Proposta"
 
 #: src/components/shared/status-badge.tsx
 msgid "Proposal in review"
 msgstr "Proposta en revisió"
+
+#: src/components/shared/timeline-entry.tsx
+msgid "Proposal requested"
+msgstr "Proposta sol·licitada"
 
 #: src/routes/companies/$slug.tsx
 msgid "Proposal stage — set the next action (send it, chase a decision)."
@@ -4267,7 +4300,6 @@ msgid "Proposed updates"
 msgstr "Actualitzacions proposades"
 
 #: src/components/shared/status-badge.tsx
-#: src/routes/companies/$slug.tsx
 msgid "Prospect"
 msgstr "Prospecte"
 
@@ -4291,6 +4323,7 @@ msgstr "Publica"
 msgid "Publish failed"
 msgstr "Ha fallat la publicació"
 
+#: src/routes/companies/$slug.tsx
 #: src/routes/pages/index.tsx
 #: src/routes/pages/index.tsx
 msgid "Published"
@@ -4574,7 +4607,7 @@ msgid "Respond to the organizer"
 msgstr "Respon a l'organitzador"
 
 #: src/components/shared/status-badge.tsx
-#: src/routes/companies/$slug.tsx
+#: src/components/shared/timeline-entry.tsx
 msgid "Responded"
 msgstr "Respost"
 
@@ -5309,6 +5342,7 @@ msgstr "Plantilles"
 msgid "tentative"
 msgstr "provisional"
 
+#: src/components/companies/conversations-tab.tsx
 #: src/routes/calendar/index.tsx
 msgid "Tentative"
 msgstr "Provisional"
@@ -5398,6 +5432,10 @@ msgstr "El contingut ha arribat en un format que l'editor no pot llegir, així q
 msgid "The details arrived in a form this page cannot read, so there is nothing to show. Go back to the list and open the company again; report it if it keeps happening."
 msgstr "Les dades han arribat en un format que aquesta pàgina no pot llegir, així que no hi ha res per mostrar. Torna a la llista i obre l'empresa de nou; informa-ho si continua passant."
 
+#: src/components/companies/documents-panel.tsx
+msgid "The documents filed here could not be fetched. Check that the session is valid, then try again."
+msgstr "No s'han pogut recuperar els documents arxivats aquí. Comprova que la sessió sigui vàlida i torna-ho a provar."
+
 #: src/components/companies/where-panel-client.client.tsx
 msgid "The geocoder did not return a match. Try editing the location field."
 msgstr "El geocodificador no ha trobat cap coincidència. Prova d'editar el camp d'ubicació."
@@ -5454,6 +5492,10 @@ msgstr "Les pàgines que he trobat eren d'una altra empresa, així que no he des
 #: src/routes/companies/$slug.tsx
 msgid "The people at this company could not be fetched. Check that the session is valid, then try again."
 msgstr "No s'han pogut recuperar les persones d'aquesta empresa. Comprova que la sessió sigui vàlida i torna-ho a provar."
+
+#: src/components/companies/proposals-panel.tsx
+msgid "The proposals for this company could not be fetched. Check that the session is valid, then try again."
+msgstr "No s'han pogut recuperar les propostes d'aquesta empresa. Comprova que la sessió sigui vàlida i torna-ho a provar."
 
 #: src/routes/companies/$slug.tsx
 msgid "The research runs for this company could not be fetched. Check that the session is valid, then try again."

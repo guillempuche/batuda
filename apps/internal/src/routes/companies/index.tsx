@@ -23,11 +23,16 @@ import { ErrorState } from '#/components/shared/error-state'
 import { InfiniteListFooter } from '#/components/shared/infinite-list-footer'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import {
+	PRIORITY_LEVELS,
+	priorityShortLabels,
+} from '#/components/shared/priority-dot'
+import {
 	type CompanyStatus,
 	STATUS_ORDER,
 	StatusBadge,
 } from '#/components/shared/status-badge'
 import { useQuickCapture } from '#/context/quick-capture-context'
+import { useCompanyCountries } from '#/hooks/use-company-countries'
 import { useCompanyIndustries } from '#/hooks/use-company-industries'
 import { useInfiniteList } from '#/hooks/use-infinite-list'
 import { dehydrateAtom } from '#/lib/atom-hydration'
@@ -137,10 +142,6 @@ const SEARCH_DEBOUNCE_MS = 300
 
 const ALL = '__all__'
 
-function isNonEmpty(value: string | null): value is string {
-	return value !== null && value !== ''
-}
-
 /** Strip `status` from the search when linking to the board — its columns are
  * the statuses, so a status filter there makes no sense. */
 function boardSearch(search: CompaniesSearch): CompaniesSearch {
@@ -149,7 +150,7 @@ function boardSearch(search: CompaniesSearch): CompaniesSearch {
 }
 
 function CompaniesListPage() {
-	const { t } = useLingui()
+	const { i18n, t } = useLingui()
 	const search = Route.useSearch()
 	const navigate = useNavigate({ from: Route.fullPath })
 	const { open: openQuickCapture } = useQuickCapture()
@@ -229,13 +230,10 @@ function CompaniesListPage() {
 		[openQuickCapture],
 	)
 
-	// Country options are the distinct values present in the loaded companies —
-	// international, never a hardcoded Spanish vocabulary. Priority and sort are
-	// fixed, geography-neutral sets.
-	const countryOptions = useMemo(
-		() => [...new Set(companies.map(c => c.country).filter(isNonEmpty))].sort(),
-		[companies],
-	)
+	// Countries come from the organisation's own set rather than from the
+	// companies on screen: a country only used further down the list was not
+	// offered at all. Same fix the trades filter already had.
+	const { countries } = useCompanyCountries()
 	// Trades come from the organisation's own list rather than from the companies
 	// on screen: a trade only used further down the list was not offered at all,
 	// so there was no way to filter for it.
@@ -258,7 +256,7 @@ function CompaniesListPage() {
 
 	const countryItems = [
 		{ value: ALL, label: t`All countries` },
-		...countryOptions.map(r => ({ value: r, label: r })),
+		...countries.map(c => ({ value: c.code, label: c.label })),
 	]
 	// Filtered by the web-address form, which is what the row carries and what a
 	// shared link keeps working with; the name is what the reader picks from.
@@ -268,9 +266,10 @@ function CompaniesListPage() {
 	]
 	const priorityItems = [
 		{ value: ALL, label: t`Any priority` },
-		{ value: '1', label: t`Hot` },
-		{ value: '2', label: t`Medium` },
-		{ value: '3', label: t`Cold` },
+		...PRIORITY_LEVELS.map(p => ({
+			value: String(p),
+			label: i18n._(priorityShortLabels[p]),
+		})),
 	]
 	const ownerItems = [
 		{ value: ALL, label: t`All owners` },

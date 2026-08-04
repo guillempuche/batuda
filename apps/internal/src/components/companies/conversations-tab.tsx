@@ -212,6 +212,40 @@ export function ConversationsTab({
 		}
 	}
 
+	const THREAD_STATUS: Record<ThreadRow['status'], string> = {
+		open: t`Open`,
+		closed: t`Closed`,
+		archived: t`Archived`,
+	}
+	const EVENT_STATUS: Record<string, string | undefined> = {
+		confirmed: t`Confirmed`,
+		tentative: t`Tentative`,
+		cancelled: t`Cancelled`,
+	}
+	const TASK_DONE = t`Done`
+	const TASK_OPEN = t`Open`
+
+	const subtitleFor = (item: UnifiedRow): string | null => {
+		switch (item.kind) {
+			case 'interaction':
+				// The channel already shows as the row's label.
+				return null
+			case 'email': {
+				const count =
+					item.row.messageCount === 1
+						? t`1 message`
+						: t`${item.row.messageCount} messages`
+				return `${count} · ${THREAD_STATUS[item.row.status]}`
+			}
+			case 'calendar':
+				// An unmapped value is a bug rather than a state a reader should
+				// meet, so it shows through instead of disappearing.
+				return EVENT_STATUS[item.row.status] ?? item.row.status
+			case 'task':
+				return item.row.completedAt !== null ? TASK_DONE : TASK_OPEN
+		}
+	}
+
 	return (
 		<Wrap data-testid='company-conversations-tab'>
 			<Toolbar>
@@ -268,7 +302,7 @@ export function ConversationsTab({
 			) : (
 				<List>
 					{visible.map(item => {
-						const subtitle = rowSubtitle(item)
+						const subtitle = subtitleFor(item)
 						const body = (
 							<>
 								<RowMain>
@@ -330,20 +364,6 @@ function narrowCalendar(
 		})
 	}
 	return out
-}
-
-function rowSubtitle(item: UnifiedRow): string | null {
-	switch (item.kind) {
-		case 'interaction':
-			// The channel already shows as the row's label.
-			return null
-		case 'email':
-			return `${item.row.messageCount} · ${item.row.status}`
-		case 'calendar':
-			return item.row.status
-		case 'task':
-			return item.row.completedAt !== null ? 'completed' : 'open'
-	}
 }
 
 const Wrap = styled.div`

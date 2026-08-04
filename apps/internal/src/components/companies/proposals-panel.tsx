@@ -17,6 +17,7 @@ import {
 
 import { PROPOSALS_PAGE_SIZE, proposalsListAtom } from '#/atoms/company-atoms'
 import { SubjectDocuments } from '#/components/documents/subject-documents'
+import { ErrorState } from '#/components/shared/error-state'
 import { InfiniteListFooter } from '#/components/shared/infinite-list-footer'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { useInfiniteList } from '#/hooks/use-infinite-list'
@@ -201,9 +202,18 @@ export function ProposalsPanel({ companyId }: { readonly companyId: string }) {
 			</Head>
 
 			{proposals.length === 0 ? (
-				// Saying "none yet" while the first ones are still arriving would
-				// be wrong, so the panel waits before saying anything.
-				list.isLoadingFirstPage ? null : (
+				// Saying "none yet" while the first ones are still arriving — or
+				// after the request failed — would both be wrong, so the panel waits,
+				// then says which of the two it is.
+				list.isLoadingFirstPage ? null : list.isError ? (
+					<ErrorState
+						data-testid='company-proposals-error'
+						variant='inline'
+						title={t`Could not load proposals`}
+						description={t`The proposals for this company could not be fetched. Check that the session is valid, then try again.`}
+						onRetry={list.refresh}
+					/>
+				) : (
 					<Empty>
 						<FileSignature size={18} aria-hidden />
 						<Trans>No proposals yet.</Trans>

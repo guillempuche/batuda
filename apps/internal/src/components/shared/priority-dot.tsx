@@ -43,10 +43,25 @@ export function PriorityDot({
 	)
 }
 
-const priorityLabels: Record<1 | 2 | 3, MessageDescriptor> = {
+export const PRIORITY_LEVELS = [1, 2, 3] as const
+export type PriorityLevel = (typeof PRIORITY_LEVELS)[number]
+
+/** Reads on its own — for a tooltip or a spoken label. */
+export const priorityLabels: Record<PriorityLevel, MessageDescriptor> = {
 	1: msg`High priority`,
 	2: msg`Medium priority`,
 	3: msg`Low priority`,
+}
+
+/**
+ * For a control that already says "Priority" beside it. Both maps live here so
+ * the filter and the picker cannot drift into calling the same stored number
+ * different things, which is how one screen came to say "Hot" and another "High".
+ */
+export const priorityShortLabels: Record<PriorityLevel, MessageDescriptor> = {
+	1: msg`High`,
+	2: msg`Medium`,
+	3: msg`Low`,
 }
 
 const Rivet = styled.span.withConfig({
