@@ -5,7 +5,9 @@ import { SqlClient } from 'effect/unstable/sql'
 import { BulkCompleteResult, CurrentOrg } from '@batuda/controllers'
 import { Task, TaskEvent } from '@batuda/domain'
 
+import { requireOrgMembers } from '../../services/org-members'
 import { TaskService } from '../../services/tasks'
+import { ToolMessage } from '../tool-message'
 import {
 	McpPageLimit,
 	McpPageOffset,
@@ -58,7 +60,10 @@ const CreateTask = Tool.make('create_task', {
 		due_at: Schema.optional(Schema.NullOr(Schema.String)),
 		priority: Schema.optional(TaskPriority),
 		source: Schema.optional(TaskSource),
-		assignee_id: Schema.optional(Schema.NullOr(Schema.String)),
+		assignee_id: Schema.optional(Schema.NullOr(Schema.String)).annotate({
+			description:
+				'The colleague this is waiting on, as a user id from list_members — a name or an email address is not one. Send null to leave it unassigned. An id belonging to nobody here is refused, so read list_members rather than guessing.',
+		}),
 		linked_interaction_id: Schema.optional(Schema.NullOr(Schema.String)),
 		linked_calendar_event_id: Schema.optional(Schema.NullOr(Schema.String)),
 		linked_thread_link_id: Schema.optional(Schema.NullOr(Schema.String)),
@@ -84,7 +89,10 @@ const ListTasks = Tool.make('list_tasks', {
 		statuses: Schema.optional(Schema.Array(TaskStatus)),
 		priority: Schema.optional(TaskPriority),
 		source: Schema.optional(TaskSource),
-		assignee_id: Schema.optional(Schema.String),
+		assignee_id: Schema.optional(Schema.String).annotate({
+			description:
+				'Only the work waiting on one colleague, as a user id from list_members.',
+		}),
 		due_before: Schema.optional(Schema.String),
 		due_after: Schema.optional(Schema.String),
 		overdue_only: Schema.optional(Schema.Boolean),
@@ -107,7 +115,10 @@ const SearchTasks = Tool.make('search_tasks', {
 	parameters: Schema.Struct({
 		query: Schema.String,
 		company_id: Schema.optional(Schema.String),
-		assignee_id: Schema.optional(Schema.String),
+		assignee_id: Schema.optional(Schema.String).annotate({
+			description:
+				'Only the work waiting on one colleague, as a user id from list_members.',
+		}),
 		status: Schema.optional(TaskStatus),
 		overdue_only: Schema.optional(Schema.Boolean),
 		include_snoozed: Schema.optional(Schema.Boolean),
@@ -134,7 +145,10 @@ const UpdateTask = Tool.make('update_task', {
 		type: Schema.optional(Schema.String),
 		priority: Schema.optional(TaskPriority),
 		due_at: Schema.optional(Schema.NullOr(Schema.String)),
-		assignee_id: Schema.optional(Schema.NullOr(Schema.String)),
+		assignee_id: Schema.optional(Schema.NullOr(Schema.String)).annotate({
+			description:
+				'The colleague this is waiting on, as a user id from list_members — a name or an email address is not one. Send null to leave it unassigned. An id belonging to nobody here is refused, so read list_members rather than guessing.',
+		}),
 		company_id: Schema.optional(Schema.NullOr(Schema.String)),
 		contact_id: Schema.optional(Schema.NullOr(Schema.String)),
 		linked_interaction_id: Schema.optional(Schema.NullOr(Schema.String)),
@@ -144,6 +158,7 @@ const UpdateTask = Tool.make('update_task', {
 		metadata: Schema.optional(Schema.NullOr(Schema.Unknown)),
 	}),
 	success: Schema.NullOr(Task.json),
+	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'Update Task')
 	.annotate(Tool.Destructive, false)
@@ -298,7 +313,14 @@ export const TaskHandlersLive = TaskTools.toLayer(
 						AGENT_ACTOR,
 					)
 					return rows[0] ?? null
-				}).pipe(Effect.orDie),
+				}).pipe(
+					// A refused assignee is something the caller can act on, so it
+					// leaves as words rather than the fixed sentence a raw fault gets.
+					Effect.catchTag('BadRequest', e =>
+						Effect.die(new ToolMessage(e.message)),
+					),
+					Effect.orDie,
+				),
 
 			list_tasks: params =>
 				taskService
@@ -351,6 +373,10 @@ export const TaskHandlersLive = TaskTools.toLayer(
 
 			update_task: params =>
 				Effect.gen(function* () {
+					// This handler writes the row itself rather than going through
+					// TaskService, so the membership rule the service applies has to be
+					// named here as well or it does not hold on this path.
+					yield* requireOrgMembers(sql, [params.assignee_id])
 					// Skip no-op UPDATEs so we do not touch updated_at for free.
 					const fields: Record<string, unknown> = {}
 					if (params.title !== undefined) fields['title'] = params.title
@@ -392,7 +418,14 @@ export const TaskHandlersLive = TaskTools.toLayer(
 					`
 					const updatedRow = rows[0]
 					return updatedRow === undefined ? null : yield* decodeTask(updatedRow)
-				}).pipe(Effect.orDie),
+				}).pipe(
+					// A refused assignee is something the caller can act on, so it
+					// leaves as words rather than the fixed sentence a raw fault gets.
+					Effect.catchTag('BadRequest', e =>
+						Effect.die(new ToolMessage(e.message)),
+					),
+					Effect.orDie,
+				),
 
 			complete_task: ({ id }) => {
 				// Branch on typeof string (not Array.isArray) because the latter

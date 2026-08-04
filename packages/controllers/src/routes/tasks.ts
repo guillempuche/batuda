@@ -182,6 +182,9 @@ export const TasksGroup = HttpApiGroup.make('tasks')
 			headers: IfMatchHeader,
 			success: Task.json,
 			error: [
+				// An assignee who does not work here is the caller's mistake, not a
+				// missing task, so it answers 400 rather than 404 or 409.
+				BadRequest.pipe(HttpApiSchema.status(400)),
 				NotFound.pipe(HttpApiSchema.status(404)),
 				Conflict.pipe(HttpApiSchema.status(409)),
 			],
