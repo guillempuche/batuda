@@ -23,6 +23,7 @@ import {
 	industryForWrite,
 	withIndustry,
 } from './company-industries'
+import { requireOrgMembers } from './org-members'
 import { researchProvenance } from './research-provenance'
 
 export interface CompanyFilters {
@@ -284,6 +285,13 @@ export class CompanyService extends Context.Service<CompanyService>()(
 				createMany: (items: ReadonlyArray<Record<string, unknown>>) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
+						// Checked before anything lands: the batch is one transaction, so
+						// a single unusable owner refuses the call rather than creating
+						// most of the list and leaving the caller to work out which.
+						yield* requireOrgMembers(
+							sql,
+							items.map(item => item['ownerId']),
+						)
 						const inserted: Array<unknown> = []
 						const skipped: Array<{
 							readonly slug: string
@@ -347,6 +355,7 @@ export class CompanyService extends Context.Service<CompanyService>()(
 				update: (id: string, data: Record<string, unknown>) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
+						yield* requireOrgMembers(sql, [data['ownerId']])
 						// Bumping the version on every edit is what lets a research apply notice
 						// that somebody changed the row while the run was thinking, so its findings
 						// can never quietly overwrite a person's edit.
