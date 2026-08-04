@@ -54,6 +54,24 @@ const statusCountFor = (status: string): Promise<number> => {
 	}).pipe(Effect.provide(deps), Effect.orDie, Effect.runPromise)
 }
 
+const overdueTaskCount = (): Promise<number> => {
+	const deps = PipelineService.layer.pipe(Layer.provideMerge(PgLive))
+	return Effect.gen(function* () {
+		const sql = yield* SqlClient.SqlClient
+		const pipeline = yield* PipelineService
+		return yield* sql.withTransaction(
+			Effect.gen(function* () {
+				yield* sql`SET LOCAL ROLE app_user`
+				yield* sql`SELECT set_config('app.current_org_id', ${orgId}, true)`
+				const summary = yield* pipeline
+					.getPipeline()
+					.pipe(Effect.provideService(CurrentOrg, { ...asOrg, id: orgId }))
+				return summary.overdueTaskCount
+			}),
+		)
+	}).pipe(Effect.provide(deps), Effect.orDie, Effect.runPromise)
+}
+
 const overdueSlugs = (): Promise<ReadonlyArray<string>> => {
 	const deps = PipelineService.layer.pipe(Layer.provideMerge(PgLive))
 	return Effect.gen(function* () {
@@ -136,6 +154,48 @@ describe('pipeline reads against a deleted company', () => {
 
 			// THEN nobody is sent to chase a company that was dropped
 			expect(await overdueSlugs()).not.toContain(slug)
+		})
+	})
+})
+
+describe('the overdue task figure', () => {
+	describe('when an overdue task belongs to no company', () => {
+		it('should still be counted, since it is somebody’s own work', async () => {
+			// GIVEN a standalone overdue task — most of the seeded ones are these
+			const before = await overdueTaskCount()
+			const r = await pool.query<{ id: string }>(
+				`INSERT INTO tasks (organization_id, title, type, due_at)
+				 VALUES ($1, $2, 'todo', now() - interval '1 day') RETURNING id`,
+				[orgId, `${SLUG_PREFIX}-standalone`],
+			)
+
+			// THEN it raises the figure rather than being filtered out with the
+			// company tasks
+			expect(await overdueTaskCount()).toBe(before + 1)
+			await pool.query('DELETE FROM tasks WHERE id = $1', [r.rows[0]!.id])
+		})
+	})
+
+	describe('when an overdue task belongs to a deleted company', () => {
+		it('should drop out of the figure', async () => {
+			// GIVEN an overdue task on a live company
+			const companyId = await seedCompany(slugFor('task-company'))
+			const r = await pool.query<{ id: string }>(
+				`INSERT INTO tasks (organization_id, company_id, title, type, due_at)
+				 VALUES ($1, $2, $3, 'todo', now() - interval '1 day') RETURNING id`,
+				[orgId, companyId, `${SLUG_PREFIX}-owned-task`],
+			)
+			const before = await overdueTaskCount()
+
+			// WHEN the company is deleted
+			await pool.query(
+				'UPDATE companies SET deleted_at = now() WHERE id = $1',
+				[companyId],
+			)
+
+			// THEN the work goes with it — nobody can reach it any more
+			expect(await overdueTaskCount()).toBe(before - 1)
+			await pool.query('DELETE FROM tasks WHERE id = $1', [r.rows[0]!.id])
 		})
 	})
 })
