@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-04 (internal-v2026.8.4)
+
+### Features
+
+* let anyone rewrite a company's account brief ([0040a0d](https://github.com/guillempuche/batuda/commit/0040a0df18607501c4e057b0c2b667c0ff65a6ff))
+
+### CI/CD
+
+* **release:** ui v2026.8.3 ([84c0ba3](https://github.com/guillempuche/batuda/commit/84c0ba32eb115c8cc11dc43b221e3bd421c21f5a))
+
 ## 2026-08-03 (internal-v2026.8.3)
 
 ### Features
