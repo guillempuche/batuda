@@ -5,10 +5,10 @@ import { motion } from 'motion/react'
 import type { ComponentType, ReactNode } from 'react'
 import styled from 'styled-components'
 
-import { PriAvatar, PriContextMenu, PriMenu } from '@batuda/ui/pri'
+import { PriAvatar, PriContextMenu, PriMenu, usePriToast } from '@batuda/ui/pri'
 
 import { useCompanyIndustries } from '#/hooks/use-company-industries'
-import { aiChatUrl } from '#/lib/ai-handoff'
+import { type AiAssistant, aiChatUrl } from '#/lib/ai-handoff'
 import { initialFor, useOrgMembers } from '#/lib/org-members'
 import { agedPaperSurface } from '#/lib/workshop-mixins'
 import { RelativeDate } from './relative-date'
@@ -60,6 +60,7 @@ export function CompanyCard({
 	// The row carries the trade's web-address form; the name is what to read.
 	const { labelFor } = useCompanyIndustries()
 	const { byUserId } = useOrgMembers()
+	const toast = usePriToast()
 	const subtitle = [company.location, labelFor(company.industry)]
 		.filter((part): part is string => Boolean(part))
 		.join(' · ')
@@ -79,8 +80,17 @@ export function CompanyCard({
 	// organisation's CRM connected, so the assistant can go and look.
 	const prompt = t`Look up the company "${company.name}" in Batuda and tell me where the deal stands and what I should do next.`
 
-	const openAssistant = (url: string) => {
-		window.open(url, '_blank', 'noopener,noreferrer')
+	// The question goes on the clipboard as well as into the address, because
+	// neither service promises to read it out of the address — see lib/ai-handoff.
+	// A chat that opens empty is then one paste away.
+	const openAssistant = (assistant: AiAssistant) => {
+		void navigator.clipboard?.writeText(prompt)
+		toast.add({
+			title: t`Question copied`,
+			description: t`If the chat opens empty, paste it.`,
+			type: 'info',
+		})
+		window.open(aiChatUrl(assistant, prompt), '_blank', 'noopener,noreferrer')
 	}
 
 	// The same actions hang off the visible button and off right-click, but the
@@ -111,10 +121,10 @@ export function CompanyCard({
 				</Item>
 			)}
 			<Separator />
-			<Item onClick={() => openAssistant(aiChatUrl('claude', prompt))}>
+			<Item onClick={() => openAssistant('claude')}>
 				{t`Ask Claude about this company`}
 			</Item>
-			<Item onClick={() => openAssistant(aiChatUrl('chatgpt', prompt))}>
+			<Item onClick={() => openAssistant('chatgpt')}>
 				{t`Ask ChatGPT about this company`}
 			</Item>
 			<Separator />

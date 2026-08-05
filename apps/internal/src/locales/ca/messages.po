@@ -2624,6 +2624,10 @@ msgstr "Jo ompliré la configuració tècnica per tu; tu només has d'afegir el 
 msgid "If <0>{submittedEmail}</0> is registered, a reset link is on its way. The link expires in 1 hour."
 msgstr "Si <0>{submittedEmail}</0> està registrat, t'arribarà un enllaç per restablir la contrasenya. L'enllaç caduca en 1 hora."
 
+#: src/components/shared/company-card.tsx
+msgid "If the chat opens empty, paste it."
+msgstr "Si el xat s'obre buit, enganxa-la."
+
 #: src/routes/emails/inboxes.tsx
 msgid "If your account has two-factor authentication, use an app-specific password — not your normal login password."
 msgstr "Si el teu compte té verificació en dos passos, fes servir una contrasenya d'aplicació, no la contrasenya d'inici de sessió habitual."
@@ -4391,6 +4395,10 @@ msgstr "Quantitat"
 #: src/components/research/research-dialog.tsx
 msgid "Question"
 msgstr "Pregunta"
+
+#: src/components/shared/company-card.tsx
+msgid "Question copied"
+msgstr "Pregunta copiada"
 
 #: src/components/research/run-labels.ts
 #: src/routes/emails/$threadId.tsx
