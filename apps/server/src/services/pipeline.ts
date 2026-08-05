@@ -12,6 +12,14 @@ import {
 	takePage,
 	totalColumn,
 } from '../lib/sql-pagination'
+import {
+	DEFAULT_PRIORITY_AT_LEAST,
+	DEFAULT_STALE_DAYS,
+	hasNoNextAction,
+	isHighPriority,
+	isOverdue,
+	isStale,
+} from './company-attention'
 
 // The extra column `totalColumn` appends. Every list below selects it, so each
 // can report how many rows matched without a second trip to the database.
@@ -61,32 +69,6 @@ const decodeNextStepResearchRuns = Schema.decodeUnknownEffect(
 	Schema.Array(NextStepResearchRunRow),
 )
 
-/**
- * How long a company still in play may go unheard from before it counts as
- * having gone quiet, when the caller does not say. Two weeks suits a trade where
- * a quote turns around in days; anyone selling on a longer cycle passes their
- * own number rather than living with this one.
- */
-const DEFAULT_STALE_DAYS = 14
-
-/** Only the hottest companies lead the high-priority list unless asked otherwise. */
-const DEFAULT_PRIORITY_AT_LEAST = 1
-
-/**
- * A company nobody is selling to any more belongs on none of these lists. Named
- * by what is excluded rather than what is included, so a status added later
- * lands on the lists by default instead of silently vanishing from them.
- */
-const TERMINAL_STATUSES = ['closed', 'dead'] as const
-
-/** The stages where silence is worth flagging — before a deal, not after it. */
-const CHASING_STATUSES = [
-	'contacted',
-	'responded',
-	'meeting',
-	'proposal',
-] as const
-
 export class PipelineService extends Context.Service<PipelineService>()(
 	'PipelineService',
 	{
@@ -112,41 +94,14 @@ export class PipelineService extends Context.Service<PipelineService>()(
 							id, slug, name, status, industry, location, country, priority,
 							last_contacted_at, next_action, next_action_at
 						`
-						// Still being sold to: not deleted, and not at a stage where the
-						// answer is already known. Every list below starts from this, so a
-						// deleted company cannot reappear through whichever rule was
-						// written last.
-						const inPlay = sql`
-							deleted_at IS NULL
-							AND status NOT IN ${sql.in(TERMINAL_STATUSES)}
-						`
-						// The three lists below are cut so that a company falls on exactly
-						// one: being chased late is one thing to do about it, not three.
-						// Written once each and reused by both the page and its count, so
-						// the number in the heading cannot drift from the rows under it.
-						const isOverdue = sql`next_action_at < now() AND ${inPlay}`
-						// The last line is what keeps a company off this list once its
-						// follow-up date has already passed: being chased late is the more
-						// urgent way of saying the same thing, so overdue wins the company.
-						//
-						// Kept as a TypeScript comment rather than a `--` one inside the
-						// query: this fragment gets embedded in `NOT (…)` below, where a
-						// trailing SQL comment would swallow the closing bracket.
-						const isStale = sql`
-							deleted_at IS NULL
-							AND status IN ${sql.in(CHASING_STATUSES)}
-							AND (
-								last_contacted_at IS NULL
-								OR last_contacted_at < now() - (${staleDays} * interval '1 day')
-							)
-							AND (next_action_at IS NULL OR next_action_at >= now())
-						`
-						const isHighPriority = sql`
-							priority <= ${priorityAtLeast}
-							AND next_action_at IS NULL
-							AND ${inPlay}
-							AND NOT (${isStale})
-						`
+						// The three lists are cut so a company falls on exactly one: being
+						// chased late is one thing to do about it, not three. The rules live
+						// in company-attention.ts because the company list filters by the
+						// same ones — a heading here that says 65 opens a list of 65 there
+						// only while both are asking the same question.
+						const overdue = isOverdue(sql)
+						const stale = isStale(sql, staleDays)
+						const hot = isHighPriority(sql, { staleDays, priorityAtLeast })
 
 						// Each list asks to be counted as it is fetched: `COUNT(*) OVER ()`
 						// is worked out before the LIMIT applies, so the full total rides
@@ -172,7 +127,7 @@ export class PipelineService extends Context.Service<PipelineService>()(
 						const overdueCompanies = yield* sql<WindowTotal>`
 							SELECT ${cardColumns}${withTotal}
 							FROM companies
-							WHERE ${isOverdue}
+							WHERE ${overdue}
 							ORDER BY next_action_at, id
 							LIMIT ${probeLimit(limit)}
 						`
@@ -182,7 +137,7 @@ export class PipelineService extends Context.Service<PipelineService>()(
 						const staleCompanies = yield* sql<WindowTotal>`
 							SELECT ${cardColumns}${withTotal}
 							FROM companies
-							WHERE ${isStale}
+							WHERE ${stale}
 							ORDER BY last_contacted_at ASC NULLS FIRST, id
 							LIMIT ${probeLimit(limit)}
 						`
@@ -192,7 +147,7 @@ export class PipelineService extends Context.Service<PipelineService>()(
 						const highPriority = yield* sql<WindowTotal>`
 							SELECT ${cardColumns}${withTotal}
 							FROM companies
-							WHERE ${isHighPriority}
+							WHERE ${hot}
 							ORDER BY updated_at DESC, id
 							LIMIT ${probeLimit(limit)}
 						`
@@ -312,13 +267,13 @@ export class PipelineService extends Context.Service<PipelineService>()(
 								)
 						`
 
+						// The same rule the company list filters by, so the counter and the
+						// page it opens can never disagree about what "needs action" means.
 						const companiesWithoutNextAction = yield* sql<{
 							count: number
 						}>`
 							SELECT count(*)::int as count FROM companies
-							WHERE next_action IS NULL
-								AND deleted_at IS NULL
-								AND status NOT IN ('closed', 'dead', 'client')
+							WHERE ${hasNoNextAction(sql)}
 						`
 
 						return {

@@ -66,6 +66,16 @@ export const COMPANY_PRIORITIES = [1, 2, 3] as const
 export const CompanyPriority = Schema.Literals(COMPANY_PRIORITIES)
 export type CompanyPriority = typeof CompanyPriority.Type
 
+// The reasons a company is worth someone's time today: `overdue` missed the
+// follow-up date somebody set, `stale` is mid-chase and has not been heard from
+// in a while, `no-next-action` has nothing written down as the next step at all.
+// The dashboard groups by these and the company list filters by them, so they are
+// spelled once here and the rules behind them once in the server's
+// company-attention module.
+export const ATTENTION_FILTERS = ['overdue', 'stale', 'no-next-action'] as const
+export const AttentionFilter = Schema.Literals(ATTENTION_FILTERS)
+export type AttentionFilter = typeof AttentionFilter.Type
+
 // The shape each written-in value has to have. They live beside the vocabularies
 // above so every way into a company row checks the same thing, and something that
 // could never be a real address or phone number is turned away where it is typed

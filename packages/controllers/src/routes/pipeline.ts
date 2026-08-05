@@ -113,7 +113,10 @@ export const PRIORITY_AT_LEAST_BOUNDS = {
 	maximum: Math.max(...COMPANY_PRIORITIES),
 } as const
 
-const StaleDays = Schema.FiniteFromString.pipe(
+// Shared with the company list, which takes the same threshold on its own
+// attention filter so a link from the dashboard carries the number it was
+// showing rather than falling back to the default.
+export const StaleDays = Schema.FiniteFromString.pipe(
 	Schema.check(Schema.isInt(), Schema.isBetween(STALE_DAYS_BOUNDS)),
 )
 
