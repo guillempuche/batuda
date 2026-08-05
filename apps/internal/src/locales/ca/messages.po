@@ -1149,6 +1149,10 @@ msgstr "Comunicació"
 msgid "Companies"
 msgstr "Empreses"
 
+#: src/routes/index.tsx
+msgid "Companies marked hot with nothing scheduled at all. One that has also gone quiet is listed above instead, so it is only asked after once."
+msgstr "Empreses marcades com a prioritàries sense res programat. Si a més ha quedat en silenci, apareix a dalt, així només se li reclama un cop."
+
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/components/research/run-labels.ts
@@ -2454,6 +2458,26 @@ msgstr "El proveïdor l'ha marcat com a brossa. El cos es mostra només per revi
 msgid "Follow up"
 msgstr "Fes seguiment"
 
+#: src/components/shared/reason-chip.tsx
+msgid "Follow-up overdue"
+msgstr "Seguiment endarrerit"
+
+#: src/components/shared/reason-chip.tsx
+msgid "Follow-up overdue by {days} days"
+msgstr "Seguiment endarrerit {days} dies"
+
+#: src/components/shared/reason-chip.tsx
+msgid "Follow-up overdue by {months} months"
+msgstr "Seguiment endarrerit {months} mesos"
+
+#: src/components/shared/reason-chip.tsx
+msgid "Follow-up overdue by {weeks} weeks"
+msgstr "Seguiment endarrerit {weeks} setmanes"
+
+#: src/components/shared/reason-chip.tsx
+msgid "Follow-up overdue by less than a day"
+msgstr "Seguiment endarrerit menys d’un dia"
+
 #. placeholder {0}: row.email
 #: src/routes/emails/inboxes.tsx
 msgid "Footers — {0}"
@@ -3338,6 +3362,10 @@ msgstr "mai"
 msgid "Never"
 msgstr "Mai"
 
+#: src/components/shared/reason-chip.tsx
+msgid "Never contacted"
+msgstr "Mai contactada"
+
 #: src/routes/settings/api-keys/index.tsx
 msgid "Never expires"
 msgstr "No caduca mai"
@@ -3472,6 +3500,22 @@ msgstr "Sense connexió al servidor. Torna-ho a provar d'aquí a uns segons."
 #: src/routes/settings/mcp/connections.tsx
 msgid "No connections yet. Add this server in your AI assistant and authorize it, then it appears here."
 msgstr "Encara no hi ha connexions. Afegeix aquest servidor al teu assistent d'IA i autoritza'l; després apareixerà aquí."
+
+#: src/components/shared/reason-chip.tsx
+msgid "No contact for less than a day"
+msgstr "Sense contacte des de fa menys d’un dia"
+
+#: src/components/shared/reason-chip.tsx
+msgid "No contact in {days} days"
+msgstr "Sense contacte des de fa {days} dies"
+
+#: src/components/shared/reason-chip.tsx
+msgid "No contact in {months} months"
+msgstr "Sense contacte des de fa {months} mesos"
+
+#: src/components/shared/reason-chip.tsx
+msgid "No contact in {weeks} weeks"
+msgstr "Sense contacte des de fa {weeks} setmanes"
 
 #: src/components/companies/cadence-card.tsx
 msgid "No contact yet."
@@ -3887,6 +3931,14 @@ msgstr "Obre els detalls de la tasca"
 #: src/routes/index.tsx
 msgid "Open tasks"
 msgstr "Tasques obertes"
+
+#: src/routes/index.tsx
+msgid "Open tasks due in the next seven days, counted from tonight rather than to the end of the calendar week."
+msgstr "Tasques obertes que vencen els propers set dies, comptats des d’aquesta nit i no fins al final de la setmana natural."
+
+#: src/routes/index.tsx
+msgid "Open tasks due today, in your own timezone. Anything already past its due date is under Needs attention instead."
+msgstr "Tasques obertes que vencen avui, en el teu fus horari. Les que ja han passat la data són a Necessita atenció."
 
 #: src/components/companies/where-panel-client.client.tsx
 msgid "Open the map full screen"
@@ -5387,6 +5439,10 @@ msgstr "Títol de la tasca"
 #: src/routes/tasks/index.tsx
 msgid "Tasks"
 msgstr "Tasques"
+
+#: src/routes/index.tsx
+msgid "Tasks past their due date, companies whose follow-up date has passed, companies mid-deal with no contact in two weeks, and finished research nobody has decided on. Each company is listed once, under its most urgent reason. Closed and dead companies are left out."
+msgstr "Tasques amb la data passada, empreses amb el seguiment vençut, empreses amb una venda en curs sense contacte des de fa dues setmanes, i recerques acabades que ningú ha resolt. Cada empresa apareix un sol cop, pel motiu més urgent. Les tancades i les descartades queden fora."
 
 #: src/components/research/findings/prospect-scan-view.tsx
 #: src/components/research/run-labels.ts

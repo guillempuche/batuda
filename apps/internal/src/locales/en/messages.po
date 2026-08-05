@@ -1149,6 +1149,10 @@ msgstr "Comms"
 msgid "Companies"
 msgstr "Companies"
 
+#: src/routes/index.tsx
+msgid "Companies marked hot with nothing scheduled at all. One that has also gone quiet is listed above instead, so it is only asked after once."
+msgstr "Companies marked hot with nothing scheduled at all. One that has also gone quiet is listed above instead, so it is only asked after once."
+
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/components/research/run-labels.ts
@@ -2454,6 +2458,26 @@ msgstr "Flagged as spam by the provider. The body is shown for review only."
 msgid "Follow up"
 msgstr "Follow up"
 
+#: src/components/shared/reason-chip.tsx
+msgid "Follow-up overdue"
+msgstr "Follow-up overdue"
+
+#: src/components/shared/reason-chip.tsx
+msgid "Follow-up overdue by {days} days"
+msgstr "Follow-up overdue by {days} days"
+
+#: src/components/shared/reason-chip.tsx
+msgid "Follow-up overdue by {months} months"
+msgstr "Follow-up overdue by {months} months"
+
+#: src/components/shared/reason-chip.tsx
+msgid "Follow-up overdue by {weeks} weeks"
+msgstr "Follow-up overdue by {weeks} weeks"
+
+#: src/components/shared/reason-chip.tsx
+msgid "Follow-up overdue by less than a day"
+msgstr "Follow-up overdue by less than a day"
+
 #. placeholder {0}: row.email
 #: src/routes/emails/inboxes.tsx
 msgid "Footers — {0}"
@@ -3338,6 +3362,10 @@ msgstr "never"
 msgid "Never"
 msgstr "Never"
 
+#: src/components/shared/reason-chip.tsx
+msgid "Never contacted"
+msgstr "Never contacted"
+
 #: src/routes/settings/api-keys/index.tsx
 msgid "Never expires"
 msgstr "Never expires"
@@ -3472,6 +3500,22 @@ msgstr "No connection to the server. Try again in a few seconds."
 #: src/routes/settings/mcp/connections.tsx
 msgid "No connections yet. Add this server in your AI assistant and authorize it, then it appears here."
 msgstr "No connections yet. Add this server in your AI assistant and authorize it, then it appears here."
+
+#: src/components/shared/reason-chip.tsx
+msgid "No contact for less than a day"
+msgstr "No contact for less than a day"
+
+#: src/components/shared/reason-chip.tsx
+msgid "No contact in {days} days"
+msgstr "No contact in {days} days"
+
+#: src/components/shared/reason-chip.tsx
+msgid "No contact in {months} months"
+msgstr "No contact in {months} months"
+
+#: src/components/shared/reason-chip.tsx
+msgid "No contact in {weeks} weeks"
+msgstr "No contact in {weeks} weeks"
 
 #: src/components/companies/cadence-card.tsx
 msgid "No contact yet."
@@ -3887,6 +3931,14 @@ msgstr "Open task details"
 #: src/routes/index.tsx
 msgid "Open tasks"
 msgstr "Open tasks"
+
+#: src/routes/index.tsx
+msgid "Open tasks due in the next seven days, counted from tonight rather than to the end of the calendar week."
+msgstr "Open tasks due in the next seven days, counted from tonight rather than to the end of the calendar week."
+
+#: src/routes/index.tsx
+msgid "Open tasks due today, in your own timezone. Anything already past its due date is under Needs attention instead."
+msgstr "Open tasks due today, in your own timezone. Anything already past its due date is under Needs attention instead."
 
 #: src/components/companies/where-panel-client.client.tsx
 msgid "Open the map full screen"
@@ -5387,6 +5439,10 @@ msgstr "Task title"
 #: src/routes/tasks/index.tsx
 msgid "Tasks"
 msgstr "Tasks"
+
+#: src/routes/index.tsx
+msgid "Tasks past their due date, companies whose follow-up date has passed, companies mid-deal with no contact in two weeks, and finished research nobody has decided on. Each company is listed once, under its most urgent reason. Closed and dead companies are left out."
+msgstr "Tasks past their due date, companies whose follow-up date has passed, companies mid-deal with no contact in two weeks, and finished research nobody has decided on. Each company is listed once, under its most urgent reason. Closed and dead companies are left out."
 
 #: src/components/research/findings/prospect-scan-view.tsx
 #: src/components/research/run-labels.ts

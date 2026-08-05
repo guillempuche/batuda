@@ -22,6 +22,7 @@ import { CompanyCard } from '#/components/shared/company-card'
 import { EmptyState } from '#/components/shared/empty-state'
 import { KpiCounter } from '#/components/shared/kpi-counter'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
+import { ReasonChip } from '#/components/shared/reason-chip'
 import { SectionHeader } from '#/components/shared/section-header'
 import {
 	type CompanyStatus,
@@ -88,7 +89,7 @@ async function loadPipelineDataOnServer() {
 				// These two have to match `nextStepsAtom` and `pipelineAtom` exactly:
 				// the browser picks up what the server already fetched by the shape of
 				// the question, so any difference means the page quietly asks again.
-				client.pipeline.nextSteps({ query: {} }),
+				client.pipeline.nextSteps({ query: { limit: ATTENTION_PREVIEW } }),
 				client.pipeline.get(),
 			],
 			{ concurrency: 2 },
@@ -327,7 +328,11 @@ function PipelinePage() {
 				whileInView={{ opacity: 1, y: 0 }}
 				viewport={{ once: true, amount: 0.2 }}
 			>
-				<SectionHeader title={t`Needs attention`} count={attentionTotal} />
+				<SectionHeader
+					title={t`Needs attention`}
+					count={attentionTotal}
+					help={t`Tasks past their due date, companies whose follow-up date has passed, companies mid-deal with no contact in two weeks, and finished research nobody has decided on. Each company is listed once, under its most urgent reason. Closed and dead companies are left out.`}
+				/>
 				{attentionEmpty ? (
 					<EmptyState
 						title={t`All under control`}
@@ -359,23 +364,41 @@ function PipelinePage() {
 								}
 							/>
 						))}
-						{[...overdueCompanies, ...staleCompanies].map(company => (
-							<CompanyCard
-								key={company.id}
-								company={{
-									slug: company.slug,
-									name: company.name,
-									status: company.status,
-									industry: company.industry,
-									location: company.location,
-									country: company.country,
-									priority: company.priority,
-									lastContactedAt: company.lastContactedAt,
-								}}
-								actions={{
-									onLogInteraction: () => handleLogInteraction(company),
-								}}
-							/>
+						{[
+							...overdueCompanies.map(company => ({
+								company,
+								reason: 'overdue' as const,
+							})),
+							...staleCompanies.map(company => ({
+								company,
+								reason: 'stale' as const,
+							})),
+						].map(({ company, reason }) => (
+							<AttentionRow key={company.id}>
+								<ReasonChip
+									reason={reason}
+									since={
+										reason === 'overdue'
+											? company.nextActionAt
+											: company.lastContactedAt
+									}
+								/>
+								<CompanyCard
+									company={{
+										slug: company.slug,
+										name: company.name,
+										status: company.status,
+										industry: company.industry,
+										location: company.location,
+										country: company.country,
+										priority: company.priority,
+										lastContactedAt: company.lastContactedAt,
+									}}
+									actions={{
+										onLogInteraction: () => handleLogInteraction(company),
+									}}
+								/>
+							</AttentionRow>
 						))}
 						{research.map(run => (
 							<ResearchRow key={run.id} data-testid='pipeline-research-row'>
@@ -409,6 +432,7 @@ function PipelinePage() {
 					<SectionHeader
 						title={t`Today`}
 						count={taskCounts?.today ?? todayTasks.length}
+						help={t`Open tasks due today, in your own timezone. Anything already past its due date is under Needs attention instead.`}
 					/>
 					{todayTasks.length === 0 ? (
 						<EmptyState title={t`No tasks for today`} />
@@ -448,6 +472,7 @@ function PipelinePage() {
 					<SectionHeader
 						title={t`This week`}
 						count={taskCounts?.thisWeek ?? weekTasks.length}
+						help={t`Open tasks due in the next seven days, counted from tonight rather than to the end of the calendar week.`}
 					/>
 					{weekTasks.length === 0 ? (
 						<EmptyState title={t`No upcoming due dates`} />
@@ -489,6 +514,7 @@ function PipelinePage() {
 				<SectionHeader
 					title={t`High priority`}
 					count={nextSteps?.counts.highPriority ?? highPriority.length}
+					help={t`Companies marked hot with nothing scheduled at all. One that has also gone quiet is listed above instead, so it is only asked after once.`}
 				/>
 				{highPriority.length === 0 ? (
 					<EmptyState
@@ -674,6 +700,15 @@ const Stack = styled.div.withConfig({ displayName: 'PipelineStack' })`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-sm);
+`
+
+/** A company card with the reason it earned its place sitting above it. */
+const AttentionRow = styled.div.withConfig({
+	displayName: 'PipelineAttentionRow',
+})`
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3xs);
 `
 
 /**
