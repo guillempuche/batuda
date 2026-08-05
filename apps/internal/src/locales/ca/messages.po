@@ -110,6 +110,11 @@ msgstr "{0} assistents"
 msgid "{0} calls"
 msgstr "{0} crides"
 
+#. placeholder {0}: run.pendingUpdateCount
+#: src/routes/index.tsx
+msgid "{0} changes to review"
+msgstr "{0} canvis per revisar"
+
 #. placeholder {0}: industry.companyCount
 #: src/routes/settings/organization/industries.tsx
 msgid "{0} companies"
@@ -279,6 +284,10 @@ msgstr "70%+"
 #: src/components/research/inbox/research-inbox.tsx
 msgid "90%+"
 msgstr "90%+"
+
+#: src/routes/index.tsx
+msgid "A high-priority company that has gone quiet is listed once, under Needs attention."
+msgstr "Una empresa prioritària que ha quedat en silenci apareix un sol cop, a Necessita atenció."
 
 #: src/components/instructions/template-dialog.tsx
 msgid "A short label. Start it with a [tag] like [research] to group related templates if you like — the brackets are just part of the name."
@@ -1145,9 +1154,6 @@ msgstr "Empreses"
 #: src/components/research/run-labels.ts
 #: src/routes/emails/$threadId.tsx
 #: src/routes/emails/$threadId.tsx
-#: src/routes/index.tsx
-#: src/routes/index.tsx
-#: src/routes/index.tsx
 msgid "Company"
 msgstr "Empresa"
 
@@ -4624,6 +4630,10 @@ msgstr "Pressupost de recerca"
 #: src/routes/settings/organization/policy.tsx
 msgid "Research budget saved."
 msgstr "Pressupost de recerca desat."
+
+#: src/routes/index.tsx
+msgid "Research finished — needs a look"
+msgstr "Recerca acabada — cal revisar-la"
 
 #: src/components/companies/company-fit-section.tsx
 msgid "Research has not weighed this company up yet. Run it to get a verdict and the reasons behind it."
