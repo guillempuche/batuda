@@ -14,7 +14,12 @@ export const PipelineLive = HttpApiBuilder.group(
 			return handlers
 				.handle('get', () => svc.getPipeline().pipe(Effect.orDie))
 				.handle('nextSteps', _ =>
-					svc.getNextSteps(_.query.limit).pipe(Effect.orDie),
+					svc
+						.getNextSteps(_.query.limit, {
+							staleDays: _.query.staleDays,
+							priorityAtLeast: _.query.priorityAtLeast,
+						})
+						.pipe(Effect.orDie),
 				)
 		}),
 )

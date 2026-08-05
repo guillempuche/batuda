@@ -54,8 +54,12 @@ export function takePage<R>(
  * along on every row as a `COUNT(*) OVER ()` column, so any one row carries it.
  * Reports `0` when no row carries one, which is only truthful for a page that
  * starts at the beginning and was asked to be counted.
+ *
+ * Exported for lists that only ever start at the beginning — a capped list with
+ * no offset to page through — where {@link resolveTotal}'s fallback query could
+ * never run and asking for one would be dead code.
  */
-function readWindowTotal(
+export function readWindowTotal(
 	rows: ReadonlyArray<{ readonly total?: string | number }>,
 ): number {
 	const first = rows[0]

@@ -54,7 +54,13 @@ export {
 export { HealthGroup } from './routes/health'
 export { InteractionsGroup } from './routes/interactions'
 export { PageSummary, PagesGroup } from './routes/pages'
-export { NextSteps, PipelineGroup, PipelineSnapshot } from './routes/pipeline'
+export {
+	NextSteps,
+	PipelineGroup,
+	PipelineSnapshot,
+	PRIORITY_AT_LEAST_BOUNDS,
+	STALE_DAYS_BOUNDS,
+} from './routes/pipeline'
 export { ProductsGroup } from './routes/products'
 export { ProposalsGroup } from './routes/proposals'
 export {
