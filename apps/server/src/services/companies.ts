@@ -373,10 +373,25 @@ export class CompanyService extends Context.Service<CompanyService>()(
 								message: `Another company is using the name "${company.slug}" now, so this one cannot come back under it. Rename that company first, then restore this one.`,
 							})
 						const at = DateTime.toDateUtc(DateTime.nowUnsafe())
-						yield* sql`
+						// The name is claimed in the same statement that frees this row,
+						// so a company created between the check above and here loses the
+						// race cleanly instead of raising a duplicate key nobody maps.
+						const revived = yield* sql`
 							UPDATE companies SET deleted_at = NULL, updated_at = ${at}
-							WHERE id = ${id} AND organization_id = ${currentOrg.id}
+							WHERE id = ${id}
+								AND organization_id = ${currentOrg.id}
+								AND NOT EXISTS (
+									SELECT 1 FROM companies live
+									WHERE live.organization_id = ${currentOrg.id}
+										AND live.slug = ${company.slug}
+										AND live.deleted_at IS NULL
+								)
+							RETURNING id
 						`
+						if (revived.length === 0)
+							return yield* new BadRequest({
+								message: `Another company is using the name "${company.slug}" now, so this one cannot come back under it. Rename that company first, then restore this one.`,
+							})
 						// Only the people this delete hid: a contact removed on its own
 						// account carries a different instant and stays gone.
 						const contacts = yield* sql`
@@ -490,6 +505,19 @@ export class CompanyService extends Context.Service<CompanyService>()(
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
 						yield* requireOrgMembers(sql, [data['ownerId']])
+						// Asked before anything is written, not just before the row is
+						// updated: the addresses and the trade are written first, so a
+						// check further down would let those land on a company nobody
+						// can see and then report the edit as having done nothing.
+						const live = yield* sql`
+							SELECT 1 FROM companies
+							WHERE id = ${id}
+								AND organization_id = ${currentOrg.id}
+								AND deleted_at IS NULL
+							LIMIT 1
+						`
+						if (live.length === 0)
+							return yield* new NotFound({ entity: 'company', id })
 						// Bumping the version on every edit is what lets a research apply notice
 						// that somebody changed the row while the run was thinking, so its findings
 						// can never quietly overwrite a person's edit.

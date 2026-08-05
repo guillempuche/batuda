@@ -59,6 +59,10 @@ const SearchCompanies = Tool.make('search_companies', {
 		fit_verdict: Schema.optional(Schema.String),
 		fit_criterion_passed: Schema.optional(Schema.String),
 		query: Schema.optional(Schema.String),
+		deleted: Schema.optional(Schema.Literals(['only', 'include'])).annotate({
+			description:
+				"Which companies to look at. Omit for the ones in use, 'only' for the ones that were deleted — that is how you find one again to restore it, since a deleted company answers to no name — or 'include' for both together.",
+		}),
 		min_lat: Schema.optional(Schema.Number),
 		max_lat: Schema.optional(Schema.Number),
 		min_lng: Schema.optional(Schema.Number),
@@ -407,6 +411,7 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 						fitVerdict: params.fit_verdict,
 						fitCriterionPassed: params.fit_criterion_passed,
 						query: params.query,
+						deleted: params.deleted,
 						minLat: params.min_lat,
 						maxLat: params.max_lat,
 						minLng: params.min_lng,
@@ -470,6 +475,13 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 						Effect.provideService(CompanyService, service),
 						Effect.provideService(Geocoder, geocoder),
 						Effect.provideService(SqlClient.SqlClient, sql),
+						Effect.catchTag('NotFound', () =>
+							Effect.die(
+								new ToolMessage(
+									'No company here with that id, or it was deleted. Look among the deleted ones with search_companies and restore it before editing.',
+								),
+							),
+						),
 					)
 					yield* recordStageChange({
 						companyId: id,

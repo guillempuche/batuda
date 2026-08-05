@@ -73,7 +73,13 @@ export const CompaniesLive = HttpApiBuilder.group(
 						).pipe(
 							Effect.provideService(CompanyService, svc),
 							Effect.provideService(Geocoder, geocoder),
+							// A company that is gone, or was taken out of view, is not an
+							// edit that failed — it is one there was nothing to make.
+							Effect.catchTag('NotFound', () => Effect.succeed(null)),
 						)
+						// Nothing happened, so nothing is written on the account's history
+						// and nothing is claimed to the caller.
+						if (result === null) return null
 						yield* Effect.logInfo('Company updated').pipe(
 							Effect.annotateLogs({
 								event: 'company.updated',

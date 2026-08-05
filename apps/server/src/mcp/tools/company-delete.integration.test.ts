@@ -112,6 +112,19 @@ const restoreCompany = (id: string): Promise<Outcome> =>
 		),
 	)
 
+const searchDeletedSlugs = (): Promise<ReadonlyArray<string>> =>
+	runInOrg(
+		Effect.gen(function* () {
+			const service = yield* CompanyService
+			const page = yield* service.search({
+				query: MARKER,
+				deleted: 'only',
+				limit: 50,
+			})
+			return page.items.map(company => company.slug)
+		}).pipe(Effect.provide(CompanyService.layer), Effect.orDie),
+	)
+
 const searchSlugs = (): Promise<ReadonlyArray<string>> =>
 	runInOrg(
 		Effect.gen(function* () {
@@ -223,6 +236,25 @@ describe('delete_company', () => {
 	})
 })
 
+describe('finding a company again after it is deleted', () => {
+	describe('when somebody needs to undo a deletion', () => {
+		it('should be findable among the deleted ones, since restore needs its id', async () => {
+			// GIVEN a company deleted a while ago, whose id nobody wrote down — a
+			// deleted company answers to no name, so if it cannot be listed there is
+			// no way back at all
+			const companyId = await seedCompany('findable')
+			await deleteCompany(companyId)
+
+			// WHEN the deleted ones are asked for
+			const deleted = await searchDeletedSlugs()
+
+			// THEN it is there to be picked, and the live list still does not show it
+			expect(deleted).toContain(`${MARKER}-findable`)
+			expect(await searchSlugs()).not.toContain(`${MARKER}-findable`)
+		})
+	})
+})
+
 describe('restore_company', () => {
 	describe('when a deleted company is restored', () => {
 		it('should bring it and its people back', async () => {
@@ -285,6 +317,59 @@ describe('restore_company', () => {
 			// THEN only the person the deletion hid returns
 			expect(await isDeleted('contacts', withCompany)).toBe(false)
 			expect(await isDeleted('contacts', earlier)).toBe(true)
+		})
+	})
+})
+
+describe('editing a company that was deleted', () => {
+	describe('when an assistant tries to change one', () => {
+		it('should refuse, write nothing, and leave no trace on its history', async () => {
+			// GIVEN a deleted company carrying an address and a trade — both are
+			// written before the row itself, so a check in the wrong place would
+			// let them land on a company nobody can see
+			const companyId = await seedCompany('noedit')
+			await deleteCompany(companyId)
+			const historyBefore = (await timelineKinds(companyId)).length
+
+			// WHEN an edit is attempted
+			const result = await runInOrg(
+				Effect.gen(function* () {
+					const toolkit = yield* CompanyTools
+					return yield* collect(
+						yield* toolkit.handle('update_company', {
+							id: companyId,
+							status: 'client',
+							industry: 'foundry-should-not-land',
+							email: 'should-not-land@example.com',
+						}),
+					)
+				}).pipe(
+					Effect.provideService(CurrentUser, actor()),
+					Effect.provide(Handlers),
+					Effect.catchCause(cause =>
+						Effect.succeed({ ok: false as const, message: String(cause) }),
+					),
+				),
+			)
+
+			// THEN it is refused
+			expect(result.ok).toBe(false)
+
+			// AND nothing was written along the way: no address, and no stage
+			// change recorded for an edit that never happened
+			const channels = await pool.query(
+				`SELECT 1 FROM channels WHERE subject_table = 'companies' AND subject_id = $1`,
+				[companyId],
+			)
+			expect(channels.rowCount).toBe(0)
+			expect((await timelineKinds(companyId)).length).toBe(historyBefore)
+
+			// AND its stage is untouched
+			const row = await pool.query<{ status: string }>(
+				'SELECT status FROM companies WHERE id = $1',
+				[companyId],
+			)
+			expect(row.rows[0]?.status).toBe('prospect')
 		})
 	})
 })

@@ -162,6 +162,10 @@ export const CompaniesGroup = HttpApiGroup.make('companies')
 				fitCriterionPassed: Schema.optional(Schema.String),
 				sort: Schema.optional(Schema.String),
 				query: Schema.optional(Schema.String),
+				// Which companies to look at. Omitted means the live ones; 'only' is
+				// how somebody finds a deleted company again in order to restore it,
+				// and without it a deletion cannot be undone from outside the code.
+				deleted: Schema.optional(Schema.Literals(['only', 'include'])),
 				minLat: Schema.optional(Schema.NumberFromString),
 				maxLat: Schema.optional(Schema.NumberFromString),
 				minLng: Schema.optional(Schema.NumberFromString),
