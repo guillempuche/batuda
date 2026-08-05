@@ -125,6 +125,8 @@ export const ResearchGroup = HttpApiGroup.make('research')
 				InsufficientBudget.pipe(HttpApiSchema.status(409)),
 				ConfirmRequired.pipe(HttpApiSchema.status(409)),
 				UnknownStack.pipe(HttpApiSchema.status(422)),
+				// A run named a company or contact this organization cannot see.
+				NotFound.pipe(HttpApiSchema.status(404)),
 			],
 		}),
 	)

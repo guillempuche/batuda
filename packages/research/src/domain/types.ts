@@ -82,6 +82,7 @@ export const RESEARCH_REASON_CODES = [
 	'site_unreadable',
 	'name_too_generic',
 	'no_sources',
+	'subject_unavailable',
 	'internal_error',
 ] as const
 export const ReasonCode = Schema.Literals(RESEARCH_REASON_CODES)

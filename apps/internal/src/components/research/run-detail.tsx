@@ -61,6 +61,7 @@ const REASON_LABEL: Record<ReasonCode, MessageDescriptor> = {
 	site_unreadable: msg`I couldn't read the company's website, so there was nothing to work from.`,
 	name_too_generic: msg`The name matched too many companies to tell them apart.`,
 	no_sources: msg`I couldn't find any usable pages for this company.`,
+	subject_unavailable: msg`The company this research was pinned to isn't here any more, so I stopped rather than research the wrong one.`,
 	internal_error: msg`Something went wrong while running this research.`,
 }
 

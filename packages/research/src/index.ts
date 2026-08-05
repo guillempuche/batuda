@@ -153,6 +153,7 @@ export {
 	NoRegistry,
 	noRegistryResult,
 	ProviderError,
+	SubjectUnavailable,
 } from './domain/errors'
 export type {
 	BudgetSnapshot,

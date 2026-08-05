@@ -12,6 +12,7 @@ import { isActiveResearchStatus } from '@batuda/domain'
 import {
 	type CreateResearchInput,
 	ResearchService,
+	type SubjectUnavailable,
 	type SystemDefaults,
 } from '@batuda/research'
 
@@ -63,6 +64,33 @@ const InvalidContext = Schema.Struct({
 	error: Schema.String,
 })
 
+// A run was pinned to a record this organization cannot see. Named as its own
+// answer rather than an error so the model is told which id was refused and can
+// say so, instead of reporting that research failed for some unstated reason.
+const SubjectNotFound = Schema.Struct({
+	_tag: Schema.Literal('subject_not_found'),
+	subjects: Schema.Array(
+		Schema.Struct({ table: Schema.String, id: Schema.String }),
+	),
+	error: Schema.String,
+})
+
+// "You cannot have that record" is handed back as an answer the model can
+// relay, not a failure. Caught before redactDbErrors so that keeps meeting only
+// the SqlError it is written for.
+//
+// An id that is not this organization's reads exactly like one that was never
+// there, and the wording covers both without saying which — telling them apart
+// would confirm that somebody else holds it.
+const subjectRefusal = (e: SubjectUnavailable) =>
+	Effect.succeed({
+		_tag: 'subject_not_found' as const,
+		subjects: e.subjects,
+		error: `No ${e.subjects.length === 1 ? 'record was' : 'records were'} found here for ${e.subjects
+			.map(s => `${s.table} ${s.id}`)
+			.join(', ')}. Check the id, or search for the company by name first.`,
+	})
+
 const decodeContext = Schema.decodeUnknownEffect(ContextInput)
 
 // The exact shape a caller's `context` must take, spelled out in the rejection so
@@ -108,6 +136,7 @@ const ResearchSyncResult = Schema.Union([
 	ConfirmRequired,
 	InstructionClarification,
 	InvalidContext,
+	SubjectNotFound,
 ])
 
 // ── start_research (async) ──
@@ -136,6 +165,7 @@ const StartResearch = Tool.make('start_research', {
 		ConfirmRequired,
 		InstructionClarification,
 		InvalidContext,
+		SubjectNotFound,
 	]),
 	dependencies: REQUEST_DEPENDENCIES,
 })
@@ -306,7 +336,9 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 						applied_instructions: resolved.instructions.templateNames,
 						...(nextPoll === undefined ? {} : { poll_after_ms: nextPoll }),
 					}
-				}).pipe(redactDbErrors),
+				})
+					.pipe(Effect.catchTag('SubjectUnavailable', subjectRefusal))
+					.pipe(redactDbErrors),
 
 			get_research: params =>
 				Effect.gen(function* () {
@@ -393,7 +425,9 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 					}
 
 					return run ? withAppliedInstructions(run) : { error: 'not found' }
-				}).pipe(redactDbErrors),
+				})
+					.pipe(Effect.catchTag('SubjectUnavailable', subjectRefusal))
+					.pipe(redactDbErrors),
 		}
 	}),
 )

@@ -152,8 +152,22 @@ export const ResearchLive = HttpApiBuilder.group(
 						}
 						return result
 					}).pipe(
+						// A record this organization cannot see reads the same as one
+						// that was never there, which is what the caller is told —
+						// naming it as a different kind of refusal would say whether
+						// somebody else holds that id.
+						Effect.catchTag('SubjectUnavailable', e =>
+							Effect.fail(
+								new NotFound({
+									entity: e.subjects[0]?.table ?? 'companies',
+									id: e.subjects[0]?.id ?? '',
+								}),
+							),
+						),
 						Effect.catch(e =>
-							e._tag === 'ConfirmRequired' || e._tag === 'UnknownStack'
+							e._tag === 'ConfirmRequired' ||
+							e._tag === 'UnknownStack' ||
+							e._tag === 'NotFound'
 								? Effect.fail(e)
 								: Effect.die(e),
 						),
