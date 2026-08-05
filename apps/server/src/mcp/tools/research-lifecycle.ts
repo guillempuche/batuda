@@ -1,5 +1,5 @@
 import { Effect, Schema } from 'effect'
-import { Tool, Toolkit } from 'effect/unstable/ai'
+import { McpSchema, Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
 import {
@@ -9,12 +9,18 @@ import {
 	SessionContext,
 } from '@batuda/controllers'
 import { RESEARCH_SUBJECT_TABLES, ResearchSubjectTable } from '@batuda/domain'
-import { ResearchService } from '@batuda/research'
+import {
+	ResearchService,
+	resolvePolicy,
+	type SystemDefaults,
+} from '@batuda/research'
 
+import { EnvVars } from '../../lib/env'
 import { CompanyService } from '../../services/companies'
 import { Geocoder } from '../../services/geocoder'
 import { resolveResearchProposedUpdate } from '../../services/research-apply'
 import { TimelineActivityService } from '../../services/timeline-activity'
+import { requireApproval } from './_elicit'
 import { redactDbErrors, Uuid } from './_research-shared'
 import {
 	ListResult,
@@ -27,7 +33,82 @@ import {
 	toTruncatable,
 } from './_result'
 
-const REQUEST_DEPENDENCIES = [SessionContext, CurrentOrg]
+// McpServerClient is what lets a tool put a question to whoever is on the
+// other end. Four tools here spend money, write to somebody's records, or
+// delete — none of which should happen unasked — so the client belongs in
+// every one of their dependency lists.
+const REQUEST_DEPENDENCIES = [
+	SessionContext,
+	CurrentOrg,
+	McpSchema.McpServerClient,
+]
+
+// What a tool answers when it could not get a person's say-so. `cancelled`
+// means somebody said no; `confirmation_required` means there was nobody to
+// ask, and names where a person can do it instead — a difference the caller
+// has to be able to see, since one is a decision and the other is not.
+const NotApproved = Schema.Struct({
+	status: Schema.Literals(['cancelled', 'confirmation_required']),
+	nextStep: Schema.String,
+})
+
+// Where in the app a person can do this themselves. Named here so a refusal
+// can point somewhere real rather than telling the model to try again.
+const RESEARCH_LIST_PAGE = '/research'
+const RESEARCH_BUDGET_PAGE = 'Research budget, under organization settings'
+
+// Put an unapproved answer into the shape the tool returns. `declined` is a
+// decision and ends there; `unaskable` is not, so it says where a person can
+// still do it — deliberately naming the app rather than another tool, since
+// pointing the model at a tool turns the gate into a step it routes around.
+const notApproved = (
+	answer: 'declined' | 'unaskable',
+	what: string,
+	where: string,
+) =>
+	answer === 'declined'
+		? {
+				status: 'cancelled' as const,
+				nextStep: `Nothing was changed — the answer was no. Ask again only if they change their mind.`,
+			}
+		: {
+				status: 'confirmation_required' as const,
+				nextStep: `This client has no way to ask anyone to ${what}, so nothing was changed. Tell whoever is reading, and they can do it from ${where}.`,
+			}
+
+// Whether this call moves any spending limit up. A cut, or a value already
+// where it is, changes nothing about how much can go out unasked, so neither
+// needs anybody's say-so.
+//
+// Compared against the limits actually in force — which fall back to the
+// system defaults when nobody has set any — rather than against a stored row.
+// Read from the row, somebody who had never touched their limits would find
+// every change treated as a raise, including cutting one, which is the
+// opposite of what the gate is for.
+const raisesALimit = (
+	params: {
+		readonly budget_cents?: number | undefined
+		readonly paid_budget_cents?: number | undefined
+		readonly auto_approve_paid_cents?: number | undefined
+		readonly paid_monthly_cap_cents?: number | undefined
+	},
+	current: {
+		readonly budgetCents?: number | null
+		readonly paidBudgetCents?: number | null
+		readonly autoApprovePaidCents?: number | null
+		readonly paidMonthlyCapCents?: number | null
+	} | null,
+): boolean =>
+	(
+		[
+			[params.budget_cents, current?.budgetCents],
+			[params.paid_budget_cents, current?.paidBudgetCents],
+			[params.auto_approve_paid_cents, current?.autoApprovePaidCents],
+			[params.paid_monthly_cap_cents, current?.paidMonthlyCapCents],
+		] as const
+	).some(
+		([asked, held]) => asked !== undefined && (held == null || asked > held),
+	)
 
 const Decision = Schema.Literals(['approve', 'skip'])
 const ProposedUpdateDecision = Schema.Literals(['apply', 'reject'])
@@ -94,15 +175,15 @@ const AttachResearch = Tool.make('attach_research', {
 
 const DeleteResearch = Tool.make('delete_research', {
 	description:
-		'Soft-delete a research run (sets status=deleted; the row stays for audit but stops appearing in list_research). Requires user approval before execution.',
+		'Soft-delete a research run (sets status=deleted; the row stays for audit but stops appearing in list_research). Asks the person first and does nothing until they agree: {status:"cancelled"} means they said no, {status:"confirmation_required"} means this client has no way to ask them — relay nextStep rather than retrying, since retrying gives the same answer.',
 	parameters: Schema.Struct({
 		id: Uuid,
 	}),
-	success: Schema.Struct({
-		status: Schema.Literal('deleted'),
-	}),
+	success: Schema.Union([
+		Schema.Struct({ status: Schema.Literal('deleted') }),
+		NotApproved,
+	]),
 	dependencies: REQUEST_DEPENDENCIES,
-	needsApproval: true,
 })
 	.annotate(Tool.Title, 'Delete Research')
 	.annotate(Tool.Destructive, true)
@@ -111,7 +192,7 @@ const DeleteResearch = Tool.make('delete_research', {
 
 const ResolveResearchPaidAction = Tool.make('resolve_research_paid_action', {
 	description:
-		'Resolve a paid-action approval gate on a research run. decision=approve spawns a follow-up run that performs the paid call (and requires user approval, since money moves); decision=skip dismisses the gate without spending. paid_action_id is the gate id surfaced by the run.',
+		'Resolve a paid-action approval gate on a research run. decision=approve spawns a follow-up run that performs the paid call — money moves, so the person is asked first and nothing is spent until they agree ({status:"cancelled"} if they said no, {status:"confirmation_required"} if this client cannot ask them; relay nextStep rather than retrying). decision=skip dismisses the gate without spending and needs no approval. paid_action_id is the gate id surfaced by the run.',
 	parameters: Schema.Struct({
 		id: Schema.String,
 		paid_action_id: Schema.String,
@@ -119,10 +200,9 @@ const ResolveResearchPaidAction = Tool.make('resolve_research_paid_action', {
 	}),
 	success: Schema.Unknown,
 	dependencies: REQUEST_DEPENDENCIES,
-	needsApproval: params => params.decision === 'approve',
 })
 	.annotate(Tool.Title, 'Resolve Research Paid Action')
-	.annotate(Tool.Destructive, false)
+	.annotate(Tool.Destructive, true)
 	.annotate(Tool.OpenWorld, false)
 
 const ListResearchProposedUpdates = Tool.make(
@@ -147,7 +227,7 @@ const ResolveResearchProposedUpdate = Tool.make(
 	'resolve_research_proposed_update',
 	{
 		description:
-			'Resolve a proposed CRM update from a research run. decision=apply writes the proposed change to the target row (requires user approval, since it mutates CRM data); decision=reject discards the proposal without changing the row.',
+			'Resolve a proposed CRM update from a research run. decision=apply writes the proposed change to the target row — it changes the customer\'s own records, so the person is asked first and nothing is written until they agree ({status:"cancelled"} if they said no, {status:"confirmation_required"} if this client cannot ask them; relay nextStep rather than retrying). decision=reject discards the proposal without changing the row and needs no approval.',
 		parameters: Schema.Struct({
 			id: Schema.String,
 			proposed_update_id: Schema.String,
@@ -155,16 +235,15 @@ const ResolveResearchProposedUpdate = Tool.make(
 		}),
 		success: Schema.Unknown,
 		dependencies: REQUEST_DEPENDENCIES,
-		needsApproval: params => params.decision === 'apply',
 	},
 )
 	.annotate(Tool.Title, 'Resolve Research Proposed Update')
-	.annotate(Tool.Destructive, false)
+	.annotate(Tool.Destructive, true)
 	.annotate(Tool.OpenWorld, false)
 
 const ResearchPolicy = Tool.make('research_policy', {
 	description:
-		"Get or update research budget limits. action=get returns the active limits: three per-run limits belonging to the calling user (free budget, paid budget, paid-action auto-approve threshold) plus paid_monthly_cap_cents, which is the ORGANIZATION's ceiling on paid research spend for the calendar month and applies to everyone in it. action=set upserts the provided fields; unspecified fields keep their current value. Cents-denominated.",
+		'Get or update research budget limits. action=get returns the active limits: three per-run limits belonging to the calling user (free budget, paid budget, paid-action auto-approve threshold) plus paid_monthly_cap_cents, which is the ORGANIZATION\'s ceiling on paid research spend for the calendar month and applies to everyone in it. action=set upserts the provided fields; unspecified fields keep their current value. Cents-denominated. Raising any limit lets more money be spent without anyone being asked, so the person is asked before a raise takes effect ({status:"cancelled"} if they said no, {status:"confirmation_required"} if this client has no way to ask them — relay nextStep rather than retrying). Lowering a limit, or leaving it where it is, needs no approval.',
 	parameters: Schema.Struct({
 		action: PolicyAction,
 		budget_cents: Schema.optional(Schema.Number),
@@ -177,6 +256,7 @@ const ResearchPolicy = Tool.make('research_policy', {
 	success: Schema.Union([
 		Schema.Struct({ policy: Schema.NullOr(ResearchPolicySchema) }),
 		ResearchPolicySchema,
+		NotApproved,
 	]),
 	dependencies: REQUEST_DEPENDENCIES,
 })
@@ -225,6 +305,18 @@ export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 		const geocoder = yield* Geocoder
 		const sql = yield* SqlClient.SqlClient
 		const timeline = yield* TimelineActivityService
+		const env = yield* EnvVars
+
+		// What the limits are when nobody has set any, so "is this a raise?"
+		// compares against the figures actually in force rather than treating a
+		// first-time change as one.
+		const systemDefaults: SystemDefaults = {
+			budgetCents: env.RESEARCH_DEFAULT_BUDGET_CENTS,
+			paidBudgetCents: env.RESEARCH_DEFAULT_PAID_BUDGET_CENTS,
+			autoApprovePaidCents: env.RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS,
+			paidMonthlyCapCents: env.RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS,
+			hardCeiling: env.RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS,
+		}
 		return {
 			list_research: filters =>
 				svc
@@ -259,12 +351,28 @@ export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 				}).pipe(redactDbErrors),
 			delete_research: ({ id }) =>
 				Effect.gen(function* () {
+					const answer = yield* requireApproval(
+						`Delete research run ${id}? It stops appearing in the research list.`,
+					)
+					if (answer !== 'confirmed')
+						return notApproved(answer, 'delete this run', RESEARCH_LIST_PAGE)
 					yield* svc.softDelete(id)
 					return { status: 'deleted' as const }
 				}).pipe(redactDbErrors),
 			resolve_research_paid_action: ({ id, paid_action_id, decision }) =>
 				Effect.gen(function* () {
+					// Skipping spends nothing and needs nobody's say-so; approving
+					// buys the data, so it does.
 					if (decision === 'approve') {
+						const answer = yield* requireApproval(
+							`Approve the paid lookup waiting on research run ${id}? This spends money from the organization's research budget.`,
+						)
+						if (answer !== 'confirmed')
+							return notApproved(
+								answer,
+								'approve this spending',
+								RESEARCH_LIST_PAGE,
+							)
 						const { userId } = yield* SessionContext
 						return yield* svc.approvePaidAction(id, paid_action_id, userId)
 					}
@@ -286,6 +394,19 @@ export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 				decision,
 			}) =>
 				Effect.gen(function* () {
+					// Rejecting changes nothing; applying writes to the customer's own
+					// records, so that is what gets asked about.
+					if (decision === 'apply') {
+						const answer = yield* requireApproval(
+							`Apply the proposed change from research run ${id} to your CRM records?`,
+						)
+						if (answer !== 'confirmed')
+							return notApproved(
+								answer,
+								'apply this change',
+								`${RESEARCH_LIST_PAGE}/${id}`,
+							)
+					}
 					const { userId } = yield* SessionContext
 					return yield* resolveResearchProposedUpdate(
 						id,
@@ -308,6 +429,39 @@ export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 						// A missing policy row must still come back as an object — the
 						// MCP contract rejects a bare `null` as structured output.
 						return { policy: policy ?? null }
+					}
+					// Raising a limit is what lets more money go out without anybody
+					// being asked, so a raise is asked about and a cut is not. Left
+					// ungated, this tool would undo every other gate here: hit one,
+					// raise the limit, ask again.
+					// The three per-run limits are this person's; the monthly ceiling
+					// is the organization's and lives elsewhere, so it is read where
+					// it actually is. Taken from the person's row instead, an
+					// organization that had set a low ceiling would read as the
+					// system default here, and raising it towards that default would
+					// slip through as a cut.
+					const mine = yield* resolvePolicy({ sql, userId, systemDefaults })
+					const [orgPolicy] = yield* sql<{ paidMonthlyCapCents: number }>`
+						SELECT paid_monthly_cap_cents
+						FROM organization_research_policy
+						WHERE organization_id = ${org.id}
+					`
+					const current = {
+						...mine,
+						paidMonthlyCapCents:
+							orgPolicy?.paidMonthlyCapCents ??
+							systemDefaults.paidMonthlyCapCents,
+					}
+					if (raisesALimit(params, current)) {
+						const answer = yield* requireApproval(
+							`Raise a research spending limit for ${org.name}? More could then be spent without anyone being asked.`,
+						)
+						if (answer !== 'confirmed')
+							return notApproved(
+								answer,
+								'raise this limit',
+								RESEARCH_BUDGET_PAGE,
+							)
 					}
 					return yield* svc.updatePolicy(userId, org.id, {
 						budgetCents: params.budget_cents,

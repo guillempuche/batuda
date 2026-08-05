@@ -1,5 +1,5 @@
 import { Config, Effect, Schema } from 'effect'
-import { McpSchema, McpServer, Tool, Toolkit } from 'effect/unstable/ai'
+import { McpSchema, Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
 import {
@@ -18,7 +18,7 @@ import {
 	type StagingRef,
 } from '../../services/email-attachment-staging'
 import { ToolMessage } from '../tool-message'
-import { canElicit } from './_elicit'
+import { requireApproval } from './_elicit'
 import {
 	ListResult,
 	McpPageLimit,
@@ -623,20 +623,7 @@ export const EmailHandlersLive = EmailTools.toLayer(
 		// the three answers are kept apart: a client that cannot show a question
 		// is not somebody saying no, and the caller is told which it was.
 		const confirmSend = (reason: string) =>
-			Effect.gen(function* () {
-				if (!(yield* canElicit)) return 'unaskable' as const
-				const { confirm } = yield* McpServer.elicit({
-					message: `${reason}. Send anyway?`,
-					schema: Schema.Struct({ confirm: Schema.Literals(['yes', 'no']) }),
-				}).pipe(
-					Effect.catchTag('ElicitationDeclined', () =>
-						Effect.succeed({ confirm: 'no' as const }),
-					),
-				)
-				return confirm === 'yes'
-					? ('confirmed' as const)
-					: ('declined' as const)
-			})
+			requireApproval(`${reason}. Send anyway?`)
 
 		// Why nothing was sent, in the caller's words. A client with no way to ask
 		// says so, rather than reporting a refusal nobody gave.

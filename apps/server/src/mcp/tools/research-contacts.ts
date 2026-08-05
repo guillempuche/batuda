@@ -1,5 +1,5 @@
 import { Effect, Schema } from 'effect'
-import { McpSchema, McpServer, Tool, Toolkit } from 'effect/unstable/ai'
+import { McpSchema, Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg, SessionContext } from '@batuda/controllers'
@@ -12,7 +12,7 @@ import {
 
 import { EnvVars } from '../../lib/env'
 import { detachFromTransaction } from '../../middleware/org'
-import { canElicit } from './_elicit'
+import { requireApproval } from './_elicit'
 import { redactDbErrors } from './_research-shared'
 
 // ── discover_contacts ──
@@ -65,32 +65,28 @@ export const ResearchContactsHandlersLive = ResearchContactsTools.toLayer(
 					// Confirm before spending above the caller's auto-approve limit.
 					const policy = yield* resolvePolicy({ sql, userId, systemDefaults })
 					if (estimateDiscoverCostCents > policy.autoApprovePaidCents) {
+						// A company with no website is named on its own — writing the
+						// domain in regardless would put the word "null" in front of
+						// whoever is being asked to approve the spending.
+						const answer = yield* requireApproval(
+							`Discovering decision-maker contacts for ${params.company_name}${params.domain === null ? '' : ` (${params.domain})`} may spend up to ~${estimateDiscoverCostCents}¢ on paid lookups, above your auto-approve limit of ${policy.autoApprovePaidCents}¢. Proceed?`,
+						)
 						// A client with no way to put the question is not somebody
-						// saying no. Say what the spending would be and how to allow
-						// it, so the lookup can still be had — reading the refusal as a
-						// decision left this unapprovable from any client that cannot ask.
-						if (!(yield* canElicit)) {
+						// saying no. Say what the spending would be and where a person
+						// can allow it, so the lookup can still be had.
+						//
+						// Where deliberately means the app, not this tool's sibling: the
+						// limit can be raised over MCP too, and pointing the model at
+						// that turns the gate into a step it routes around by itself.
+						if (answer === 'unaskable') {
 							return {
 								status: 'confirmation_required' as const,
 								estimatedCostCents: estimateDiscoverCostCents,
 								autoApproveLimitCents: policy.autoApprovePaidCents,
-								nextStep: `This lookup may spend up to ~${estimateDiscoverCostCents}¢, above your auto-approve limit of ${policy.autoApprovePaidCents}¢, and this client has no way to ask you to approve it. Say the amount out loud to whoever is reading, and if they agree, raise the limit with research_policy(action:"set", auto_approve_paid_cents:${estimateDiscoverCostCents}) — or from Research budget under organization settings — then ask again.`,
+								nextStep: `This lookup may spend up to ~${estimateDiscoverCostCents}¢, above your auto-approve limit of ${policy.autoApprovePaidCents}¢, and this client has no way to ask you to approve it. Say the amount out loud to whoever is reading; if they agree, they can raise the limit under Research budget in organization settings, and then you can ask again.`,
 							}
 						}
-						const { confirm } = yield* McpServer.elicit({
-							// A company with no website is named on its own — writing the
-							// domain in regardless would put the word "null" in front of
-							// whoever is being asked to approve the spending.
-							message: `Discovering decision-maker contacts for ${params.company_name}${params.domain === null ? '' : ` (${params.domain})`} may spend up to ~${estimateDiscoverCostCents}¢ on paid lookups, above your auto-approve limit of ${policy.autoApprovePaidCents}¢. Proceed?`,
-							schema: Schema.Struct({
-								confirm: Schema.Literals(['yes', 'no']),
-							}),
-						}).pipe(
-							Effect.catchTag('ElicitationDeclined', () =>
-								Effect.succeed({ confirm: 'no' as const }),
-							),
-						)
-						if (confirm === 'no') return { status: 'cancelled' as const }
+						if (answer === 'declined') return { status: 'cancelled' as const }
 					}
 
 					// Run outside the request's own database transaction. Discovery
