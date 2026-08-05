@@ -1,13 +1,16 @@
 import { useLingui } from '@lingui/react/macro'
 import { Link } from '@tanstack/react-router'
+import { MoreHorizontal } from 'lucide-react'
 import { motion } from 'motion/react'
+import type { ComponentType, ReactNode } from 'react'
 import styled from 'styled-components'
 
-import { PriContextMenu } from '@batuda/ui/pri'
+import { PriAvatar, PriContextMenu, PriMenu, usePriToast } from '@batuda/ui/pri'
 
 import { useCompanyIndustries } from '#/hooks/use-company-industries'
+import { type AiAssistant, aiChatUrl } from '#/lib/ai-handoff'
+import { initialFor, useOrgMembers } from '#/lib/org-members'
 import { agedPaperSurface } from '#/lib/workshop-mixins'
-import { PriorityDot } from './priority-dot'
 import { RelativeDate } from './relative-date'
 import { StatusBadge } from './status-badge'
 import { ScrewDot } from './workshop-decorations'
@@ -19,9 +22,13 @@ import { ScrewDot } from './workshop-decorations'
  * and lifts it slightly. The card shares a Motion `layoutId` with the
  * detail-page header so navigation animates as a shared element.
  *
- * Right-click opens a `PriContextMenu` with quick actions (log, add task,
- * copy slug, open in new tab) — handlers come from the `actions` prop so
- * the card stays agnostic of dialog/router wiring.
+ * The corner shows who the lead belongs to. What a card carries is what the
+ * filters above it sort by, so the two agree — priority moved to the filter bar
+ * and the company's own header, where it can be read and changed rather than
+ * guessed from a ten-pixel dot.
+ *
+ * The quick actions are on a visible button as well as the right-click menu:
+ * right-click is no help on a phone and invisible everywhere else.
  */
 export type CompanyCardData = {
 	slug: string
@@ -31,6 +38,7 @@ export type CompanyCardData = {
 	location?: string | null
 	country?: string | null
 	priority?: number | null
+	ownerId?: string | null
 	lastContactedAt?: Date | string | null
 }
 
@@ -38,6 +46,7 @@ export type CompanyCardActions = {
 	onLogInteraction?: () => void
 	onAddTask?: () => void
 	onMarkContacted?: () => void
+	onAssign?: () => void
 }
 
 export function CompanyCard({
@@ -50,9 +59,13 @@ export function CompanyCard({
 	const { t } = useLingui()
 	// The row carries the trade's web-address form; the name is what to read.
 	const { labelFor } = useCompanyIndustries()
+	const { byUserId } = useOrgMembers()
+	const toast = usePriToast()
 	const subtitle = [company.location, labelFor(company.industry)]
 		.filter((part): part is string => Boolean(part))
 		.join(' · ')
+
+	const owner = byUserId(company.ownerId)
 
 	const copySlug = () => {
 		void navigator.clipboard?.writeText(company.slug)
@@ -61,6 +74,64 @@ export function CompanyCard({
 	const openInNewTab = () => {
 		window.open(`/companies/${company.slug}`, '_blank', 'noopener')
 	}
+
+	// Written here rather than in the link builder so it is translated, and
+	// phrased as something worth asking: whoever follows it has this
+	// organisation's CRM connected, so the assistant can go and look.
+	const prompt = t`Look up the company "${company.name}" in Batuda and tell me where the deal stands and what I should do next.`
+
+	// The question goes on the clipboard as well as into the address, because
+	// neither service promises to read it out of the address — see lib/ai-handoff.
+	// A chat that opens empty is then one paste away.
+	const openAssistant = (assistant: AiAssistant) => {
+		void navigator.clipboard?.writeText(prompt)
+		toast.add({
+			title: t`Question copied`,
+			description: t`If the chat opens empty, paste it.`,
+			type: 'info',
+		})
+		window.open(aiChatUrl(assistant, prompt), '_blank', 'noopener,noreferrer')
+	}
+
+	// The same actions hang off the visible button and off right-click, but the
+	// two menus bring their own Item and Separator, so the list is built from
+	// whichever pair it is going into rather than shared as one element.
+	const items = (
+		Item: ComponentType<{
+			readonly onClick?: () => void
+			readonly children?: ReactNode
+		}>,
+		Separator: ComponentType,
+	) => (
+		<>
+			{actions?.onAssign && (
+				<Item onClick={() => actions.onAssign?.()}>{t`Assign`}</Item>
+			)}
+			{actions?.onLogInteraction && (
+				<Item onClick={() => actions.onLogInteraction?.()}>
+					{t`Log interaction`}
+				</Item>
+			)}
+			{actions?.onAddTask && (
+				<Item onClick={() => actions.onAddTask?.()}>{t`Add task`}</Item>
+			)}
+			{actions?.onMarkContacted && (
+				<Item onClick={() => actions.onMarkContacted?.()}>
+					{t`Mark contacted`}
+				</Item>
+			)}
+			<Separator />
+			<Item onClick={() => openAssistant('claude')}>
+				{t`Ask Claude about this company`}
+			</Item>
+			<Item onClick={() => openAssistant('chatgpt')}>
+				{t`Ask ChatGPT about this company`}
+			</Item>
+			<Separator />
+			<Item onClick={openInNewTab}>{t`Open in new tab`}</Item>
+			<Item onClick={copySlug}>{t`Copy slug`}</Item>
+		</>
+	)
 
 	return (
 		<PriContextMenu.Root>
@@ -90,7 +161,40 @@ export function CompanyCard({
 						<Name>{company.name}</Name>
 						{subtitle && <Subtitle>{subtitle}</Subtitle>}
 					</Identity>
-					<PriorityDot priority={company.priority ?? null} />
+					<Corner>
+						{owner ? (
+							<PriAvatar.Root
+								$size='1.5rem'
+								title={t`Owned by ${owner.name}`}
+								data-testid={`company-card-owner-${company.slug}`}
+							>
+								<PriAvatar.Fallback>
+									{initialFor(owner.name)}
+								</PriAvatar.Fallback>
+							</PriAvatar.Root>
+						) : (
+							<Unassigned
+								title={t`Nobody owns this lead`}
+								data-testid={`company-card-unowned-${company.slug}`}
+								aria-hidden
+							/>
+						)}
+						<PriMenu.Root>
+							<ActionsTrigger
+								aria-label={t`Actions for ${company.name}`}
+								data-testid={`company-card-actions-${company.slug}`}
+							>
+								<MoreHorizontal size={16} aria-hidden />
+							</ActionsTrigger>
+							<PriMenu.Portal>
+								<PriMenu.Positioner sideOffset={4} align='end'>
+									<PriMenu.Popup>
+										{items(PriMenu.Item, PriMenu.Separator)}
+									</PriMenu.Popup>
+								</PriMenu.Positioner>
+							</PriMenu.Portal>
+						</PriMenu.Root>
+					</Corner>
 				</Header>
 				<Footer>
 					<StatusBadge status={company.status} />
@@ -106,27 +210,7 @@ export function CompanyCard({
 			<PriContextMenu.Portal>
 				<PriContextMenu.Positioner>
 					<PriContextMenu.Popup>
-						{actions?.onLogInteraction && (
-							<PriContextMenu.Item onClick={() => actions.onLogInteraction?.()}>
-								{t`Log interaction`}
-							</PriContextMenu.Item>
-						)}
-						{actions?.onAddTask && (
-							<PriContextMenu.Item onClick={() => actions.onAddTask?.()}>
-								{t`Add task`}
-							</PriContextMenu.Item>
-						)}
-						{actions?.onMarkContacted && (
-							<PriContextMenu.Item onClick={() => actions.onMarkContacted?.()}>
-								{t`Mark contacted`}
-							</PriContextMenu.Item>
-						)}
-						<PriContextMenu.Item onClick={openInNewTab}>
-							{t`Open in new tab`}
-						</PriContextMenu.Item>
-						<PriContextMenu.Item onClick={copySlug}>
-							{t`Copy slug`}
-						</PriContextMenu.Item>
+						{items(PriContextMenu.Item, PriContextMenu.Separator)}
 					</PriContextMenu.Popup>
 				</PriContextMenu.Positioner>
 			</PriContextMenu.Portal>
@@ -183,6 +267,50 @@ const Header = styled.div.withConfig({ displayName: 'CompanyCardHeader' })`
 	gap: var(--space-sm);
 	padding-left: var(--space-sm);
 	pointer-events: none;
+`
+
+const Corner = styled.div.withConfig({ displayName: 'CompanyCardCorner' })`
+	display: flex;
+	align-items: center;
+	gap: var(--space-3xs);
+	flex-shrink: 0;
+	/* The card itself is a link, so only the controls take clicks back. */
+	pointer-events: auto;
+`
+
+const Unassigned = styled.span.withConfig({
+	displayName: 'CompanyCardUnassigned',
+})`
+	width: 1.5rem;
+	height: 1.5rem;
+	border-radius: 50%;
+	border: 1px dashed var(--color-outline);
+	opacity: 0.6;
+`
+
+const ActionsTrigger = styled(PriMenu.Trigger).withConfig({
+	displayName: 'CompanyCardActionsTrigger',
+})`
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-inline-size: 2.75rem;
+	min-block-size: 2.75rem;
+	margin: calc(var(--space-2xs) * -1);
+	padding: 0;
+	border: none;
+	background: transparent;
+	color: var(--color-on-surface-variant);
+	cursor: pointer;
+
+	&:hover {
+		color: var(--color-primary);
+	}
+
+	&:focus-visible {
+		outline: none;
+		box-shadow: var(--glow-active);
+	}
 `
 
 const Identity = styled.div.withConfig({ displayName: 'CompanyCardIdentity' })`

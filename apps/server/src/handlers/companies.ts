@@ -20,6 +20,7 @@ export const CompaniesLive = HttpApiBuilder.group(
 			const geocoder = yield* Geocoder
 			return handlers
 				.handle('list', _ => svc.search(_.query).pipe(Effect.orDie))
+				.handle('countries', () => svc.countries().pipe(Effect.orDie))
 				.handle('get', _ =>
 					svc.getWithRelations(_.params.slug).pipe(
 						// Keep NotFound (mapped to 404 by the route's declared error

@@ -12,6 +12,7 @@ export { PriPopover } from './pri-popover'
 export { PriPreviewCard } from './pri-preview-card'
 export { PriScrollArea } from './pri-scroll-area'
 export { PriSelect } from './pri-select'
+export { PriSwitch } from './pri-switch'
 export { PriTabs } from './pri-tabs'
 export { PriTextarea } from './pri-textarea'
 export {

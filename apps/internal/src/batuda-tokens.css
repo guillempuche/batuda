@@ -35,6 +35,20 @@
 	--color-warning-strong: #b45309;
 	--color-on-warning-container: #92400e;
 
+	/* ═══ Success — olive ══════════════════════════════════════ */
+	/*    A check that passed: a research verdict of strong fit,  */
+	/*    a criterion met. Named rather than reaching for         */
+	/*    --color-secondary at the call site, so a reader can     */
+	/*    tell "this is a good outcome" from "this is the second  */
+	/*    accent". Olive, so the two-accent palette gains a name  */
+	/*    and not a third hue.                                    */
+	/*                                                            */
+	/*    One token, unlike the warning ramp above: everything    */
+	/*    drawn in this colour sits on the ordinary page, so       */
+	/*    nothing yet asks what text on a success fill reads as.  */
+
+	--color-success: #2e6b4f;
+
 	/* Halo around an urgent task or top-priority dot — brighter than
 	   --color-error so it reads as a lit edge rather than a fill. */
 	--color-priority-urgent-glow: rgba(233, 84, 32, 0.5);
@@ -57,6 +71,8 @@
 	--color-warning-strong: #f59e0b;
 	--color-on-warning-container: #ffd9a3;
 
+	--color-success: #8ecfa8;
+
 	--color-priority-urgent-glow: rgba(255, 138, 96, 0.55);
 }
 
@@ -75,6 +91,8 @@
 	--color-warning: #ffd066;
 	--color-warning-strong: #f7b73d;
 	--color-on-warning-container: #ffeccc;
+
+	--color-success: #b6e8c9;
 
 	--color-priority-urgent-glow: rgba(255, 199, 179, 0.7);
 }

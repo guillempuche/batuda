@@ -54,13 +54,16 @@ export function NextActionCard({
 					value={value}
 					onSave={onSave}
 					multiline
+					hideLabel
 				/>
 			</Body>
 		</Card>
 	)
 }
 
-const Card = styled.section`
+const Card = styled.section.withConfig({
+	displayName: 'NextActionCard',
+})`
 	${agedPaperSurface}
 	display: flex;
 	flex-direction: column;
@@ -68,7 +71,9 @@ const Card = styled.section`
 	padding: var(--space-md);
 `
 
-const Header = styled.header`
+const Header = styled.header.withConfig({
+	displayName: 'NextActionCardHeader',
+})`
 	${rulerUnderRule}
 	display: flex;
 	align-items: baseline;
@@ -87,7 +92,8 @@ const Due = styled.span.withConfig({
 	line-height: var(--typescale-label-medium-line);
 	color: ${p =>
 		p.$overdue ? 'var(--color-error)' : 'var(--color-on-surface-variant)'};
-	font-weight: ${p => (p.$overdue ? 600 : 400)};
+	font-weight: ${p =>
+		p.$overdue ? 'var(--font-weight-bold)' : 'var(--font-weight-regular)'};
 
 	/* The nested relative date carries its own muted colour, so the overdue
 	   emphasis has to reach it too or only the label turns red. */
@@ -97,7 +103,9 @@ const Due = styled.span.withConfig({
 	}
 `
 
-const Heading = styled.h3`
+const Heading = styled.h3.withConfig({
+	displayName: 'NextActionCardHeading',
+})`
 	${stenciledTitle}
 	display: inline-flex;
 	align-items: center;
@@ -107,7 +115,9 @@ const Heading = styled.h3`
 	line-height: var(--typescale-title-medium-line);
 `
 
-const Body = styled.div`
+const Body = styled.div.withConfig({
+	displayName: 'NextActionCardBody',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-xs);

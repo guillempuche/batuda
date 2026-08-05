@@ -17,17 +17,23 @@ import {
 	companiesSearchAtom,
 } from '#/atoms/companies-atoms'
 import { CompaniesHeader } from '#/components/companies/companies-header'
+import { SavedViews } from '#/components/companies/saved-views'
 import { CompanyCard } from '#/components/shared/company-card'
 import { EmptyState } from '#/components/shared/empty-state'
 import { ErrorState } from '#/components/shared/error-state'
 import { InfiniteListFooter } from '#/components/shared/infinite-list-footer'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import {
+	PRIORITY_LEVELS,
+	priorityShortLabels,
+} from '#/components/shared/priority-dot'
+import {
 	type CompanyStatus,
 	STATUS_ORDER,
 	StatusBadge,
 } from '#/components/shared/status-badge'
 import { useQuickCapture } from '#/context/quick-capture-context'
+import { useCompanyCountries } from '#/hooks/use-company-countries'
 import { useCompanyIndustries } from '#/hooks/use-company-industries'
 import { useInfiniteList } from '#/hooks/use-infinite-list'
 import { dehydrateAtom } from '#/lib/atom-hydration'
@@ -137,10 +143,6 @@ const SEARCH_DEBOUNCE_MS = 300
 
 const ALL = '__all__'
 
-function isNonEmpty(value: string | null): value is string {
-	return value !== null && value !== ''
-}
-
 /** Strip `status` from the search when linking to the board — its columns are
  * the statuses, so a status filter there makes no sense. */
 function boardSearch(search: CompaniesSearch): CompaniesSearch {
@@ -149,7 +151,7 @@ function boardSearch(search: CompaniesSearch): CompaniesSearch {
 }
 
 function CompaniesListPage() {
-	const { t } = useLingui()
+	const { i18n, t } = useLingui()
 	const search = Route.useSearch()
 	const navigate = useNavigate({ from: Route.fullPath })
 	const { open: openQuickCapture } = useQuickCapture()
@@ -229,13 +231,10 @@ function CompaniesListPage() {
 		[openQuickCapture],
 	)
 
-	// Country options are the distinct values present in the loaded companies —
-	// international, never a hardcoded Spanish vocabulary. Priority and sort are
-	// fixed, geography-neutral sets.
-	const countryOptions = useMemo(
-		() => [...new Set(companies.map(c => c.country).filter(isNonEmpty))].sort(),
-		[companies],
-	)
+	// Countries come from the organisation's own set rather than from the
+	// companies on screen: a country only used further down the list was not
+	// offered at all. Same fix the trades filter already had.
+	const { countries } = useCompanyCountries()
 	// Trades come from the organisation's own list rather than from the companies
 	// on screen: a trade only used further down the list was not offered at all,
 	// so there was no way to filter for it.
@@ -252,13 +251,10 @@ function CompaniesListPage() {
 		: total === 1
 			? t`1 company`
 			: t`${total} companies`
-	// This counts every match, closed and dead companies included, so the label
-	// avoids "pipeline" — that word belongs to the dashboard's active-only count.
-	const countKpiLabel = activeFilters ? t`Matching companies` : t`All companies`
 
 	const countryItems = [
 		{ value: ALL, label: t`All countries` },
-		...countryOptions.map(r => ({ value: r, label: r })),
+		...countries.map(c => ({ value: c.code, label: c.label })),
 	]
 	// Filtered by the web-address form, which is what the row carries and what a
 	// shared link keeps working with; the name is what the reader picks from.
@@ -268,9 +264,10 @@ function CompaniesListPage() {
 	]
 	const priorityItems = [
 		{ value: ALL, label: t`Any priority` },
-		{ value: '1', label: t`Hot` },
-		{ value: '2', label: t`Medium` },
-		{ value: '3', label: t`Cold` },
+		...PRIORITY_LEVELS.map(p => ({
+			value: String(p),
+			label: i18n._(priorityShortLabels[p]),
+		})),
 	]
 	const ownerItems = [
 		{ value: ALL, label: t`All owners` },
@@ -294,12 +291,7 @@ function CompaniesListPage() {
 				title={t`Companies`}
 				listHref='/companies'
 				boardHref={boardHref(boardSearch(search))}
-				{...(hasResult && total !== undefined
-					? {
-							subtitle: countLabel,
-							kpi: { value: total, label: countKpiLabel },
-						}
-					: {})}
+				{...(hasResult && total !== undefined ? { subtitle: countLabel } : {})}
 			/>
 
 			<Filters role='group' aria-label={t`Filter companies`}>
@@ -344,6 +336,14 @@ function CompaniesListPage() {
 						</StatusFilterButton>
 					))}
 				</StatusFilters>
+
+				<SavedViews
+					current={search}
+					onApply={next => {
+						setSearchInput(next.query ?? '')
+						void navigate({ to: '/companies', search: next })
+					}}
+				/>
 
 				<DropdownRow>
 					<FilterSelect
@@ -447,10 +447,19 @@ function CompaniesListPage() {
 										location: company.location,
 										country: company.country,
 										priority: company.priority,
+										ownerId: company.ownerId,
 										lastContactedAt: company.lastContactedAt,
 									}}
 									actions={{
 										onLogInteraction: () => handleLogInteraction(company),
+										// Changing the owner is the company's own decision to
+										// make, so the card sends the reader there rather than
+										// growing a picker of its own.
+										onAssign: () =>
+											void navigate({
+												to: '/companies/$slug',
+												params: { slug: company.slug },
+											}),
 									}}
 								/>
 							))}
@@ -652,8 +661,11 @@ const Filters = styled.div.withConfig({ displayName: 'CompaniesListFilters' })`
 	${brushedMetalPlate}
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-sm);
-	padding: var(--space-md);
+	/* Padding and gaps shrink with the sheet rather than at a width picked in
+	 * advance: on a phone this block used to stand between the reader and the
+	 * first company for most of a screen. */
+	gap: clamp(var(--space-2xs), 1.5vw, var(--space-sm));
+	padding: clamp(var(--space-2xs), 2vw, var(--space-md));
 	border-radius: var(--shape-2xs);
 `
 
@@ -679,9 +691,34 @@ const SearchIcon = styled.span.withConfig({
 const StatusFilters = styled.div.withConfig({
 	displayName: 'CompaniesListStatusFilters',
 })`
+	/* Nine stages on one line that slides, rather than wrapping onto four rows.
+	 * Wrapped, they were most of what stood between a phone and the first
+	 * company; sliding, they cost one row at every width. The faded ends say
+	 * there is more either side, the same as the tab strip. */
 	display: flex;
-	flex-wrap: wrap;
+	flex-wrap: nowrap;
+	overflow-x: auto;
+	overflow-y: hidden;
 	gap: var(--space-2xs);
+	padding-bottom: var(--space-3xs);
+	scrollbar-width: none;
+	scroll-snap-type: x proximity;
+	mask-image: linear-gradient(
+		to right,
+		transparent 0,
+		black 1rem,
+		black calc(100% - 1rem),
+		transparent 100%
+	);
+
+	&::-webkit-scrollbar {
+		display: none;
+	}
+
+	> * {
+		flex: 0 0 auto;
+		scroll-snap-align: start;
+	}
 `
 
 const StatusFilterButton = styled.button.withConfig({
@@ -776,4 +813,14 @@ const DropdownRow = styled.div.withConfig({
 	flex-wrap: wrap;
 	align-items: center;
 	gap: var(--space-2xs);
+
+	/* Each dropdown takes a share of the line and stops shrinking once it is
+	 * still readable, so five sit on one line on a monitor and two or three per
+	 * line on a phone — continuously, with no width to cross. Aimed at the
+	 * buttons rather than at every child: each dropdown also plants a hidden
+	 * input beside its trigger, and a grid would have given those a column. */
+	> button {
+		flex: 1 1 8rem;
+		min-width: 0;
+	}
 `

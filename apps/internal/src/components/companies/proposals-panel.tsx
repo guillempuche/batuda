@@ -3,14 +3,21 @@ import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { DateTime, Schema } from 'effect'
-import { FileSignature, Plus, X } from 'lucide-react'
+import { Check, ChevronsUpDown, FileSignature, Plus, X } from 'lucide-react'
 import { type FormEvent, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 
-import { PriButton, PriDialog, PriInput, usePriToast } from '@batuda/ui/pri'
+import {
+	PriButton,
+	PriDialog,
+	PriInput,
+	PriSelect,
+	usePriToast,
+} from '@batuda/ui/pri'
 
 import { PROPOSALS_PAGE_SIZE, proposalsListAtom } from '#/atoms/company-atoms'
 import { SubjectDocuments } from '#/components/documents/subject-documents'
+import { ErrorState } from '#/components/shared/error-state'
 import { InfiniteListFooter } from '#/components/shared/infinite-list-footer'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { useInfiniteList } from '#/hooks/use-infinite-list'
@@ -195,9 +202,18 @@ export function ProposalsPanel({ companyId }: { readonly companyId: string }) {
 			</Head>
 
 			{proposals.length === 0 ? (
-				// Saying "none yet" while the first ones are still arriving would
-				// be wrong, so the panel waits before saying anything.
-				list.isLoadingFirstPage ? null : (
+				// Saying "none yet" while the first ones are still arriving — or
+				// after the request failed — would both be wrong, so the panel waits,
+				// then says which of the two it is.
+				list.isLoadingFirstPage ? null : list.isError ? (
+					<ErrorState
+						data-testid='company-proposals-error'
+						variant='inline'
+						title={t`Could not load proposals`}
+						description={t`The proposals for this company could not be fetched. Check that the session is valid, then try again.`}
+						onRetry={list.refresh}
+					/>
+				) : (
 					<Empty>
 						<FileSignature size={18} aria-hidden />
 						<Trans>No proposals yet.</Trans>
@@ -271,6 +287,10 @@ function ProposalDialog({
 	const editing = target !== 'new' && target !== null ? target : null
 	const [title, setTitle] = useState('')
 	const [status, setStatus] = useState('draft')
+	const statusItems = useMemo(
+		() => STATUSES.map(s => ({ value: s.value, label: i18n._(s.label) })),
+		[i18n],
+	)
 	const [currency, setCurrency] = useState('EUR')
 	const [expiresAt, setExpiresAt] = useState('')
 	const [lineItems, setLineItems] = useState<ReadonlyArray<LineItem>>([])
@@ -352,7 +372,7 @@ function ProposalDialog({
 		>
 			<PriDialog.Portal>
 				<PriDialog.Backdrop />
-				<PriDialog.Popup data-testid='proposal-dialog'>
+				<PriDialog.Popup mobile='sheet' data-testid='proposal-dialog'>
 					<DialogHead>
 						<PriDialog.Title>
 							<Heading>
@@ -467,18 +487,42 @@ function ProposalDialog({
 								<Label htmlFor='proposal-status'>
 									<Trans>Status</Trans>
 								</Label>
-								<StatusSelect
-									id='proposal-status'
-									data-testid='proposal-status'
+								<PriSelect.Root
+									items={statusItems}
 									value={status}
-									onChange={e => setStatus(e.target.value)}
+									onValueChange={v => {
+										if (typeof v === 'string') setStatus(v)
+									}}
 								>
-									{STATUSES.map(s => (
-										<option key={s.value} value={s.value}>
-											{i18n._(s.label)}
-										</option>
-									))}
-								</StatusSelect>
+									<PriSelect.Trigger
+										id='proposal-status'
+										data-testid='proposal-status'
+										aria-label={t`Status`}
+									>
+										<PriSelect.Value />
+										<PriSelect.Icon>
+											<ChevronsUpDown size={14} aria-hidden />
+										</PriSelect.Icon>
+									</PriSelect.Trigger>
+									<PriSelect.Portal>
+										<PriSelect.Positioner sideOffset={6}>
+											<PriSelect.Popup>
+												{statusItems.map(opt => (
+													<PriSelect.Item
+														key={opt.value}
+														value={opt.value}
+														data-testid={`proposal-status-option-${opt.value}`}
+													>
+														<PriSelect.ItemIndicator>
+															<Check size={12} aria-hidden />
+														</PriSelect.ItemIndicator>
+														<PriSelect.ItemText>{opt.label}</PriSelect.ItemText>
+													</PriSelect.Item>
+												))}
+											</PriSelect.Popup>
+										</PriSelect.Positioner>
+									</PriSelect.Portal>
+								</PriSelect.Root>
 							</Field>
 						) : (
 							<Field>
@@ -524,13 +568,17 @@ function ProposalDialog({
 	)
 }
 
-const Head = styled.div`
+const Head = styled.div.withConfig({
+	displayName: 'ProposalsPanelHead',
+})`
 	display: flex;
 	justify-content: flex-end;
 	margin-bottom: var(--space-sm);
 `
 
-const Empty = styled.p`
+const Empty = styled.p.withConfig({
+	displayName: 'ProposalsPanelEmpty',
+})`
 	display: flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -541,13 +589,17 @@ const Empty = styled.p`
 	margin: 0;
 `
 
-const List = styled.div`
+const List = styled.div.withConfig({
+	displayName: 'ProposalsPanelList',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const Row = styled.button`
+const Row = styled.button.withConfig({
+	displayName: 'ProposalsPanelRow',
+})`
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -564,20 +616,26 @@ const Row = styled.button`
 	}
 `
 
-const RowMain = styled.span`
+const RowMain = styled.span.withConfig({
+	displayName: 'ProposalsPanelRowMain',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
 	min-width: 0;
 `
 
-const RowTitle = styled.span`
+const RowTitle = styled.span.withConfig({
+	displayName: 'ProposalsPanelRowTitle',
+})`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	color: var(--color-on-surface);
 `
 
-const RowMeta = styled.span`
+const RowMeta = styled.span.withConfig({
+	displayName: 'ProposalsPanelRowMeta',
+})`
 	display: inline-flex;
 	gap: var(--space-2xs);
 	align-items: center;
@@ -585,32 +643,42 @@ const RowMeta = styled.span`
 	color: var(--color-on-surface-variant);
 `
 
-const StatusTag = styled.span`
+const StatusTag = styled.span.withConfig({
+	displayName: 'ProposalsPanelStatusTag',
+})`
 	font-family: var(--font-display);
 	letter-spacing: 0.04em;
 	text-transform: uppercase;
 	color: var(--color-primary);
 `
 
-const RowTotal = styled.span`
+const RowTotal = styled.span.withConfig({
+	displayName: 'ProposalsPanelRowTotal',
+})`
 	font-family: var(--font-display);
 	color: var(--color-on-surface);
 	white-space: nowrap;
 `
 
-const DialogHead = styled.div`
+const DialogHead = styled.div.withConfig({
+	displayName: 'ProposalsPanelDialogHead',
+})`
 	display: flex;
 	align-items: flex-start;
 	justify-content: space-between;
 	gap: var(--space-sm);
 `
 
-const Heading = styled.span`
+const Heading = styled.span.withConfig({
+	displayName: 'ProposalsPanelHeading',
+})`
 	${stenciledTitle}
 	font-size: var(--typescale-title-large-size);
 `
 
-const CloseButton = styled.button`
+const CloseButton = styled.button.withConfig({
+	displayName: 'ProposalsPanelCloseButton',
+})`
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -624,39 +692,53 @@ const CloseButton = styled.button`
 	cursor: pointer;
 `
 
-const Form = styled.form`
+const Form = styled.form.withConfig({
+	displayName: 'ProposalsPanelForm',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
 	margin-top: var(--space-sm);
 `
 
-const Lines = styled.div`
+const Lines = styled.div.withConfig({
+	displayName: 'ProposalsPanelLines',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const LineRow = styled.div`
+const LineRow = styled.div.withConfig({
+	displayName: 'ProposalsPanelLineRow',
+})`
 	display: grid;
 	grid-template-columns: 1fr 4rem 6rem auto;
 	gap: var(--space-2xs);
 	align-items: center;
 `
 
-const QtyInput = styled(PriInput)`
+const QtyInput = styled(PriInput).withConfig({
+	displayName: 'ProposalsPanelQtyInput',
+})`
 	text-align: right;
 `
 
-const PriceInput = styled(PriInput)`
+const PriceInput = styled(PriInput).withConfig({
+	displayName: 'ProposalsPanelPriceInput',
+})`
 	text-align: right;
 `
 
-const CurrencyInput = styled(PriInput)`
+const CurrencyInput = styled(PriInput).withConfig({
+	displayName: 'ProposalsPanelCurrencyInput',
+})`
 	max-width: 6rem;
 `
 
-const RemoveLine = styled.button`
+const RemoveLine = styled.button.withConfig({
+	displayName: 'ProposalsPanelRemoveLine',
+})`
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -671,7 +753,9 @@ const RemoveLine = styled.button`
 	}
 `
 
-const AddLine = styled.button`
+const AddLine = styled.button.withConfig({
+	displayName: 'ProposalsPanelAddLine',
+})`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-3xs);
@@ -689,7 +773,9 @@ const AddLine = styled.button`
 	}
 `
 
-const TotalRow = styled.div`
+const TotalRow = styled.div.withConfig({
+	displayName: 'ProposalsPanelTotalRow',
+})`
 	display: flex;
 	justify-content: space-between;
 	align-items: baseline;
@@ -702,19 +788,25 @@ const TotalRow = styled.div`
 	color: var(--color-on-surface-variant);
 `
 
-const TotalValue = styled.span`
+const TotalValue = styled.span.withConfig({
+	displayName: 'ProposalsPanelTotalValue',
+})`
 	font-size: var(--typescale-title-medium-size);
 	color: var(--color-on-surface);
 	text-transform: none;
 `
 
-const Field = styled.div`
+const Field = styled.div.withConfig({
+	displayName: 'ProposalsPanelField',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const Label = styled.label`
+const Label = styled.label.withConfig({
+	displayName: 'ProposalsPanelLabel',
+})`
 	${stenciledTitle}
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.06em;
@@ -722,17 +814,9 @@ const Label = styled.label`
 	color: var(--color-on-surface-variant);
 `
 
-const StatusSelect = styled.select`
-	font-family: var(--font-body);
-	font-size: var(--typescale-body-medium-size);
-	padding: var(--space-2xs) var(--space-xs);
-	border-radius: var(--shape-2xs);
-	border: 1px solid color-mix(in oklab, var(--color-on-surface) 24%, transparent);
-	background: var(--color-surface);
-	color: var(--color-on-surface);
-`
-
-const Footer = styled.div`
+const Footer = styled.div.withConfig({
+	displayName: 'ProposalsPanelFooter',
+})`
 	display: flex;
 	gap: var(--space-sm);
 	justify-content: flex-end;

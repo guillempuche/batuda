@@ -326,10 +326,10 @@ The `Pri` prefix marks primitive components. Two locations:
 Library primitives at the time of writing: `PriAvatar`, `PriButton`,
 `PriCheckbox`, `PriCollapsible`, `PriContextMenu`, `PriDialog`, `PriField`,
 `PriInput`, `PriMenu`, `PriNumberField`, `PriPopover`, `PriPreviewCard`,
-`PriScrollArea`, `PriSelect`, `PriTabs`, `PriTextarea`, `PriToast`,
-`PriToggle`, `PriToggleGroup`, `PriToolbar`, `PriTooltip`.
+`PriScrollArea`, `PriSelect`, `PriSwitch`, `PriTabs`, `PriTextarea`,
+`PriToast`, `PriToggle`, `PriToggleGroup`, `PriToolbar`, `PriTooltip`.
 
-App-local primitives at the time of writing: `PriCopyButton`,
+App-local primitives at the time of writing: `PriCombobox`, `PriCopyButton`,
 `PriPasswordInput`, `PriRichText`, `PriTable`.
 
 #### `PriPasswordInput` — uncontrolled only
@@ -436,7 +436,8 @@ const StatusBadge = styled.span<{ $status: string }>`
 | `PriDialog`      | `Dialog`      | Interaction log modal, company quick-edit                  |
 | `PriTabs`        | `Tabs`        | Company detail (Overview / Conversations / People / Files) |
 | `PriMenu`        | `Menu`        | Action menus on company cards                              |
-| `PriCheckbox`    | `Checkbox`    | Task completion                                            |
+| `PriCheckbox`    | `Checkbox`    | Task completion — a choice submitted with a form           |
+| `PriSwitch`      | `Switch`      | A setting that takes effect the moment it is flicked       |
 | `PriTooltip`     | `Tooltip`     | Short field explanations                                   |
 | `PriCollapsible` | `Collapsible` | Expandable sections on company detail                      |
 

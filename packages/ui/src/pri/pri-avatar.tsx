@@ -9,16 +9,25 @@ import styled from 'styled-components'
  *     <PriAvatar.Image src={…} />
  *     <PriAvatar.Fallback>GP</PriAvatar.Fallback>
  *   </PriAvatar.Root>
+ *
+ * `$size` sets the diameter; the bezel and the initials scale with it, so a
+ * row-sized avatar keeps the same proportions as a full one rather than
+ * turning into a thick ring around two unreadable letters.
+ *
+ *   <PriAvatar.Root $size='1.25rem'>…</PriAvatar.Root>
  */
 const PriRoot = styled(Avatar.Root).withConfig({
 	displayName: 'PriAvatarRoot',
-})`
+	shouldForwardProp: prop => prop !== '$size',
+})<{ $size?: string }>`
+	--pri-avatar-size: ${p => p.$size ?? '2.25rem'};
+
 	position: relative;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 2.25rem;
-	height: 2.25rem;
+	width: var(--pri-avatar-size);
+	height: var(--pri-avatar-size);
 	border-radius: 50%;
 	background: linear-gradient(
 		145deg,
@@ -27,7 +36,7 @@ const PriRoot = styled(Avatar.Root).withConfig({
 		var(--color-metal-dark) 100%
 	);
 	border: 1px solid var(--color-metal-edge);
-	padding: 3px;
+	padding: calc(var(--pri-avatar-size) / 12);
 	box-shadow:
 		inset 0 1px 0 var(--highlight-inset-bright),
 		0 1px 2px var(--shadow-color-strong);
@@ -73,7 +82,10 @@ const PriFallback = styled(Avatar.Fallback).withConfig({
 	);
 	color: var(--color-on-primary);
 	font-family: var(--font-display);
-	font-size: 0.8125rem;
+	/* Initials do not shrink all the way down with the cap: past about a
+	   row-height avatar a proportional letter stops being readable, so the
+	   floor holds it legible while the bezel keeps getting smaller. */
+	font-size: max(0.625rem, calc(var(--pri-avatar-size, 2.25rem) * 0.36));
 	font-weight: var(--font-weight-bold);
 	letter-spacing: 0.04em;
 	text-transform: uppercase;

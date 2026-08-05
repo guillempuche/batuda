@@ -244,18 +244,18 @@ const Controls = styled.div`
 `
 
 const TypeSelect = styled.select`
-	border: 1px solid var(--color-border);
-	border-radius: var(--radius-sm);
+	border: 1px solid var(--color-outline-variant);
+	border-radius: var(--shape-xs);
 	background: var(--color-surface);
-	color: var(--color-text);
+	color: var(--color-on-surface);
 	padding: var(--space-2xs) var(--space-xs);
 	font: inherit;
 `
 
 const Count = styled.p`
 	margin: 0;
-	color: var(--color-text-muted);
-	font-size: var(--font-size-sm);
+	color: var(--color-on-surface-variant);
+	font-size: var(--typescale-body-medium-size);
 `
 
 const List = styled.ul`
@@ -273,8 +273,8 @@ const Row = styled.li`
 		flex-direction: column;
 		gap: var(--space-3xs);
 		padding: var(--space-sm);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-sm);
+		border: 1px solid var(--color-outline-variant);
+		border-radius: var(--shape-xs);
 		color: inherit;
 		text-decoration: none;
 	}
@@ -289,8 +289,8 @@ const RowTitle = styled.span`
 `
 
 const RowSnippet = styled.span`
-	color: var(--color-text-muted);
-	font-size: var(--font-size-sm);
+	color: var(--color-on-surface-variant);
+	font-size: var(--typescale-body-medium-size);
 	overflow: hidden;
 	display: -webkit-box;
 	-webkit-line-clamp: 2;
@@ -305,13 +305,13 @@ const TypeTag = styled.span`
 const RowMeta = styled.span`
 	display: flex;
 	gap: var(--space-sm);
-	color: var(--color-text-muted);
-	font-size: var(--font-size-xs);
+	color: var(--color-on-surface-variant);
+	font-size: var(--typescale-label-small-size);
 `
 
 const Empty = styled.p`
 	display: flex;
 	align-items: center;
 	gap: var(--space-xs);
-	color: var(--color-text-muted);
+	color: var(--color-on-surface-variant);
 `

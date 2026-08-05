@@ -1,3 +1,5 @@
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
 import { useLingui } from '@lingui/react'
 import { useLingui as useLinguiMacro } from '@lingui/react/macro'
 import { useNavigate } from '@tanstack/react-router'
@@ -33,6 +35,20 @@ export type TimelineEntryData = {
 
 const COLLAPSE_THRESHOLD = 140
 
+/**
+ * How a call ended, in words. The column takes free text, so the six the app
+ * writes are named here and anything else shows as stored — better an odd word
+ * on screen than a row that hides what it holds.
+ */
+const OUTCOME_LABELS: Record<string, MessageDescriptor | undefined> = {
+	no_response: msg`No response`,
+	responded: msg`Responded`,
+	interested: msg`Interested`,
+	not_interested: msg`Not interested`,
+	meeting_scheduled: msg`Meeting scheduled`,
+	proposal_requested: msg`Proposal requested`,
+}
+
 export function TimelineEntry({ entry }: { entry: TimelineEntryData }) {
 	const [expanded, setExpanded] = useState(false)
 	const { i18n } = useLingui()
@@ -44,6 +60,8 @@ export function TimelineEntry({ entry }: { entry: TimelineEntryData }) {
 	const isLong = summary.length > COLLAPSE_THRESHOLD
 	const displaySummary =
 		!expanded && isLong ? `${summary.slice(0, COLLAPSE_THRESHOLD)}…` : summary
+	const known = entry.outcome ? OUTCOME_LABELS[entry.outcome] : undefined
+	const outcomeLabel = known ? i18n._(known) : entry.outcome
 
 	return (
 		<Row type='button' onClick={() => isLong && setExpanded(e => !e)}>
@@ -58,7 +76,7 @@ export function TimelineEntry({ entry }: { entry: TimelineEntryData }) {
 					</DateSpan>
 				</Title>
 				{summary && <Summary>{displaySummary}</Summary>}
-				{entry.outcome && <Meta>{t`Outcome: ${entry.outcome}`}</Meta>}
+				{outcomeLabel && <Meta>{t`Outcome: ${outcomeLabel}`}</Meta>}
 				{entry.nextAction && <Meta>{t`Next: ${entry.nextAction}`}</Meta>}
 				{entry.threadId && (
 					<ThreadLink

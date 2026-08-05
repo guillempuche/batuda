@@ -135,7 +135,9 @@ function runStatusText(
 	return label ? i18n._(label) : status
 }
 
-const Card = styled.section`
+const Card = styled.section.withConfig({
+	displayName: 'ResearchSummaryCard',
+})`
 	${agedPaperSurface}
 	display: flex;
 	flex-direction: column;
@@ -143,7 +145,9 @@ const Card = styled.section`
 	padding: var(--space-md);
 `
 
-const Header = styled.header`
+const Header = styled.header.withConfig({
+	displayName: 'ResearchSummaryCardHeader',
+})`
 	${rulerUnderRule}
 	display: flex;
 	align-items: center;
@@ -152,7 +156,9 @@ const Header = styled.header`
 	padding-bottom: var(--space-2xs);
 `
 
-const Heading = styled.h3`
+const Heading = styled.h3.withConfig({
+	displayName: 'ResearchSummaryCardHeading',
+})`
 	${stenciledTitle}
 	display: inline-flex;
 	align-items: center;
@@ -162,7 +168,9 @@ const Heading = styled.h3`
 	line-height: var(--typescale-title-medium-line);
 `
 
-const LatestRow = styled.div`
+const LatestRow = styled.div.withConfig({
+	displayName: 'ResearchSummaryCardLatestRow',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
@@ -180,7 +188,9 @@ const LatestRow = styled.div`
 	}
 `
 
-const FallbackLabel = styled.span`
+const FallbackLabel = styled.span.withConfig({
+	displayName: 'ResearchSummaryCardFallbackLabel',
+})`
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
 	font-weight: var(--font-weight-bold);
@@ -189,7 +199,9 @@ const FallbackLabel = styled.span`
 	color: var(--color-on-surface-variant);
 `
 
-const Query = styled.span`
+const Query = styled.span.withConfig({
+	displayName: 'ResearchSummaryCardQuery',
+})`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	color: var(--color-on-surface);
@@ -199,7 +211,9 @@ const Query = styled.span`
 	min-width: 0;
 `
 
-const Meta = styled.span`
+const Meta = styled.span.withConfig({
+	displayName: 'ResearchSummaryCardMeta',
+})`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -208,7 +222,9 @@ const Meta = styled.span`
 	color: var(--color-on-surface-variant);
 `
 
-const Status = styled.span`
+const Status = styled.span.withConfig({
+	displayName: 'ResearchSummaryCardStatus',
+})`
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
 	font-weight: var(--font-weight-bold);
@@ -217,19 +233,25 @@ const Status = styled.span`
 	color: var(--color-on-surface-variant);
 `
 
-const Dot = styled.span`
+const Dot = styled.span.withConfig({
+	displayName: 'ResearchSummaryCardDot',
+})`
 	color: var(--color-on-surface-variant);
 `
 
-const Empty = styled.p`
+const Empty = styled.p.withConfig({
+	displayName: 'ResearchSummaryCardEmpty',
+})`
 	margin: 0;
 	font-family: var(--font-body);
 	font-style: italic;
 	color: var(--color-on-surface-variant);
 `
 
-const Freshness = styled.span`
-	font-weight: 400;
+const Freshness = styled.span.withConfig({
+	displayName: 'ResearchSummaryCardFreshness',
+})`
+	font-weight: var(--font-weight-regular);
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface-variant);
 `

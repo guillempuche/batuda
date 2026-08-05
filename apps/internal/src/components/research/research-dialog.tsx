@@ -302,7 +302,7 @@ export function ResearchDialog({
 		>
 			<PriDialog.Portal>
 				<PriDialog.Backdrop />
-				<PriDialog.Popup data-testid='research-dialog'>
+				<PriDialog.Popup mobile='sheet' data-testid='research-dialog'>
 					<Header>
 						<PriDialog.Title>
 							<Heading>

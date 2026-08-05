@@ -111,7 +111,9 @@ export function CadenceCard({
 	)
 }
 
-const Card = styled.section`
+const Card = styled.section.withConfig({
+	displayName: 'CadenceCard',
+})`
 	${agedPaperSurface}
 	container-type: inline-size;
 	display: flex;
@@ -120,12 +122,16 @@ const Card = styled.section`
 	padding: var(--space-md);
 `
 
-const Header = styled.header`
+const Header = styled.header.withConfig({
+	displayName: 'CadenceCardHeader',
+})`
 	${rulerUnderRule}
 	padding-bottom: var(--space-2xs);
 `
 
-const Heading = styled.h3`
+const Heading = styled.h3.withConfig({
+	displayName: 'CadenceCardHeading',
+})`
 	${stenciledTitle}
 	display: inline-flex;
 	align-items: center;
@@ -135,7 +141,9 @@ const Heading = styled.h3`
 	line-height: var(--typescale-title-medium-line);
 `
 
-const Grid = styled.dl`
+const Grid = styled.dl.withConfig({
+	displayName: 'CadenceCardGrid',
+})`
 	display: grid;
 	grid-template-columns: 1fr;
 	margin: 0;
@@ -146,7 +154,9 @@ const Grid = styled.dl`
 	}
 `
 
-const Row = styled.div`
+const Row = styled.div.withConfig({
+	displayName: 'CadenceCardRow',
+})`
 	${ruledLedgerRow}
 	display: flex;
 	align-items: baseline;
@@ -168,7 +178,9 @@ const Row = styled.div`
 	}
 `
 
-const Label = styled.dt`
+const Label = styled.dt.withConfig({
+	displayName: 'CadenceCardLabel',
+})`
 	${stenciledTitle}
 	margin: 0;
 	font-size: var(--typescale-label-small-size);
@@ -176,14 +188,18 @@ const Label = styled.dt`
 	color: var(--color-on-surface-variant);
 `
 
-const EmptyState = styled.div`
+const EmptyState = styled.div.withConfig({
+	displayName: 'CadenceCardEmptyState',
+})`
 	display: flex;
 	flex-direction: column;
 	align-items: flex-start;
 	gap: var(--space-sm);
 `
 
-const EmptyText = styled.p`
+const EmptyText = styled.p.withConfig({
+	displayName: 'CadenceCardEmptyText',
+})`
 	margin: 0;
 	font-family: var(--font-body);
 	font-style: italic;

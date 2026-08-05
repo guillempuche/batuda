@@ -5,7 +5,7 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { Link } from '@tanstack/react-router'
 import { DateTime, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
-import { FileText, Pencil, Plus, X } from 'lucide-react'
+import { Check, ChevronsUpDown, FileText, Pencil, Plus, X } from 'lucide-react'
 import { type FormEvent, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 
@@ -14,6 +14,7 @@ import {
 	PriButton,
 	PriDialog,
 	PriInput,
+	PriSelect,
 	PriTextarea,
 	usePriToast,
 } from '@batuda/ui/pri'
@@ -23,6 +24,7 @@ import {
 	SUBJECT_DOCUMENTS_PAGE_SIZE,
 } from '#/atoms/documents-atoms'
 import { MarkdownView } from '#/components/markdown/markdown-view'
+import { ErrorState } from '#/components/shared/error-state'
 import { InfiniteListFooter } from '#/components/shared/infinite-list-footer'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { useInfiniteList } from '#/hooks/use-infinite-list'
@@ -163,9 +165,18 @@ export function DocumentsPanel({
 			</Head>
 
 			{docs.length === 0 ? (
-				// Saying "none yet" while the first ones are still arriving would
-				// be wrong, so the panel waits before saying anything.
-				list.isLoadingFirstPage ? null : (
+				// Saying "none yet" while the first ones are still arriving — or
+				// after the request failed — would both be wrong, so the panel waits,
+				// then says which of the two it is.
+				list.isLoadingFirstPage ? null : list.isError ? (
+					<ErrorState
+						data-testid='subject-documents-error'
+						variant='inline'
+						title={t`Could not load documents`}
+						description={t`The documents filed here could not be fetched. Check that the session is valid, then try again.`}
+						onRetry={list.refresh}
+					/>
+				) : (
 					<Empty>
 						<FileText size={18} aria-hidden />
 						<Trans>No documents yet.</Trans>
@@ -287,6 +298,11 @@ function DocumentDialog({
 	const [content, setContent] = useState('')
 	const [busy, setBusy] = useState(false)
 
+	const typeItems = useMemo(
+		() => DOC_TYPES.map(dt => ({ value: dt.value, label: i18n._(dt.label) })),
+		[i18n],
+	)
+
 	// Re-seed the form each time the dialog opens for a different doc/mode, and
 	// again once the body has arrived for the one being edited — until then the
 	// box would hold nothing, and saving would wipe the document.
@@ -339,7 +355,7 @@ function DocumentDialog({
 		<PriDialog.Root open onOpenChange={next => !next && onClose()}>
 			<PriDialog.Portal>
 				<PriDialog.Backdrop />
-				<PriDialog.Popup data-testid='document-dialog'>
+				<PriDialog.Popup mobile='sheet' data-testid='document-dialog'>
 					<DialogHead>
 						<PriDialog.Title>
 							<Heading>
@@ -434,18 +450,44 @@ function DocumentDialog({
 									<Label htmlFor='document-type'>
 										<Trans>Type</Trans>
 									</Label>
-									<TypeSelect
-										id='document-type'
-										data-testid='document-type'
+									<PriSelect.Root
+										items={typeItems}
 										value={type}
-										onChange={e => setType(e.target.value)}
+										onValueChange={v => {
+											if (typeof v === 'string') setType(v)
+										}}
 									>
-										{DOC_TYPES.map(dt => (
-											<option key={dt.value} value={dt.value}>
-												{i18n._(dt.label)}
-											</option>
-										))}
-									</TypeSelect>
+										<PriSelect.Trigger
+											id='document-type'
+											data-testid='document-type'
+											aria-label={t`Type`}
+										>
+											<PriSelect.Value />
+											<PriSelect.Icon>
+												<ChevronsUpDown size={14} aria-hidden />
+											</PriSelect.Icon>
+										</PriSelect.Trigger>
+										<PriSelect.Portal>
+											<PriSelect.Positioner sideOffset={6}>
+												<PriSelect.Popup>
+													{typeItems.map(opt => (
+														<PriSelect.Item
+															key={opt.value}
+															value={opt.value}
+															data-testid={`document-type-option-${opt.value}`}
+														>
+															<PriSelect.ItemIndicator>
+																<Check size={12} aria-hidden />
+															</PriSelect.ItemIndicator>
+															<PriSelect.ItemText>
+																{opt.label}
+															</PriSelect.ItemText>
+														</PriSelect.Item>
+													))}
+												</PriSelect.Popup>
+											</PriSelect.Positioner>
+										</PriSelect.Portal>
+									</PriSelect.Root>
 								</Field>
 							) : null}
 							<Field>
@@ -486,13 +528,17 @@ function DocumentDialog({
 	)
 }
 
-const Head = styled.div`
+const Head = styled.div.withConfig({
+	displayName: 'DocumentsPanelHead',
+})`
 	display: flex;
 	justify-content: flex-end;
 	margin-bottom: var(--space-sm);
 `
 
-const Empty = styled.p`
+const Empty = styled.p.withConfig({
+	displayName: 'DocumentsPanelEmpty',
+})`
 	display: flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -503,13 +549,17 @@ const Empty = styled.p`
 	margin: 0;
 `
 
-const List = styled.div`
+const List = styled.div.withConfig({
+	displayName: 'DocumentsPanelList',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const Row = styled.div`
+const Row = styled.div.withConfig({
+	displayName: 'DocumentsPanelRow',
+})`
 	display: flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -518,7 +568,9 @@ const Row = styled.div`
 	background: var(--color-surface);
 `
 
-const RowButton = styled.button`
+const RowButton = styled.button.withConfig({
+	displayName: 'DocumentsPanelRowButton',
+})`
 	flex: 1 1 auto;
 	display: flex;
 	flex-direction: column;
@@ -534,13 +586,17 @@ const RowButton = styled.button`
 	}
 `
 
-const RowTitle = styled.span`
+const RowTitle = styled.span.withConfig({
+	displayName: 'DocumentsPanelRowTitle',
+})`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	color: var(--color-on-surface);
 `
 
-const RowMeta = styled.span`
+const RowMeta = styled.span.withConfig({
+	displayName: 'DocumentsPanelRowMeta',
+})`
 	display: inline-flex;
 	gap: var(--space-2xs);
 	align-items: center;
@@ -548,14 +604,18 @@ const RowMeta = styled.span`
 	color: var(--color-on-surface-variant);
 `
 
-const TypeTag = styled.span`
+const TypeTag = styled.span.withConfig({
+	displayName: 'DocumentsPanelTypeTag',
+})`
 	font-family: var(--font-display);
 	letter-spacing: 0.04em;
 	text-transform: uppercase;
 	color: var(--color-primary);
 `
 
-const EditButton = styled.button`
+const EditButton = styled.button.withConfig({
+	displayName: 'DocumentsPanelEditButton',
+})`
 	display: inline-flex;
 	align-items: center;
 	padding: var(--space-2xs) var(--space-sm);
@@ -569,19 +629,25 @@ const EditButton = styled.button`
 	}
 `
 
-const DialogHead = styled.div`
+const DialogHead = styled.div.withConfig({
+	displayName: 'DocumentsPanelDialogHead',
+})`
 	display: flex;
 	align-items: flex-start;
 	justify-content: space-between;
 	gap: var(--space-sm);
 `
 
-const Heading = styled.span`
+const Heading = styled.span.withConfig({
+	displayName: 'DocumentsPanelHeading',
+})`
 	${stenciledTitle}
 	font-size: var(--typescale-title-large-size);
 `
 
-const CloseButton = styled.button`
+const CloseButton = styled.button.withConfig({
+	displayName: 'DocumentsPanelCloseButton',
+})`
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -597,7 +663,9 @@ const CloseButton = styled.button`
 
 // A document longer than the dialog scrolls here, and the region takes keyboard
 // focus so it can be read without a mouse.
-const ViewBody = styled.div`
+const ViewBody = styled.div.withConfig({
+	displayName: 'DocumentsPanelViewBody',
+})`
 	margin-top: var(--space-sm);
 	max-height: 60vh;
 	overflow-y: auto;
@@ -608,20 +676,26 @@ const ViewBody = styled.div`
 	}
 `
 
-const Form = styled.form`
+const Form = styled.form.withConfig({
+	displayName: 'DocumentsPanelForm',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
 	margin-top: var(--space-sm);
 `
 
-const Field = styled.div`
+const Field = styled.div.withConfig({
+	displayName: 'DocumentsPanelField',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const Label = styled.label`
+const Label = styled.label.withConfig({
+	displayName: 'DocumentsPanelLabel',
+})`
 	${stenciledTitle}
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.06em;
@@ -629,46 +703,44 @@ const Label = styled.label`
 	color: var(--color-on-surface-variant);
 `
 
-const TypeSelect = styled.select`
-	font-family: var(--font-body);
-	font-size: var(--typescale-body-medium-size);
-	padding: var(--space-2xs) var(--space-xs);
-	border-radius: var(--shape-2xs);
-	border: 1px solid color-mix(in oklab, var(--color-on-surface) 24%, transparent);
-	background: var(--color-surface);
-	color: var(--color-on-surface);
-`
-
-const Footer = styled.div`
+const Footer = styled.div.withConfig({
+	displayName: 'DocumentsPanelFooter',
+})`
 	display: flex;
 	gap: var(--space-sm);
 	justify-content: flex-end;
 	margin-top: var(--space-sm);
 `
 
-const HtmlNotice = styled.div`
+const HtmlNotice = styled.div.withConfig({
+	displayName: 'DocumentsPanelHtmlNotice',
+})`
 	display: flex;
 	flex-direction: column;
 	align-items: flex-start;
 	gap: var(--space-md);
-	color: var(--color-text-muted);
-	font-size: var(--font-size-sm);
+	color: var(--color-on-surface-variant);
+	font-size: var(--typescale-body-medium-size);
 `
 
 // Styling wraps the link rather than the router's own component, whose typed
 // route parameters do not survive being wrapped.
-const FullPageLink = styled.span`
+const FullPageLink = styled.span.withConfig({
+	displayName: 'DocumentsPanelFullPageLink',
+})`
 	align-self: center;
 
 	a {
 		color: var(--color-primary);
-		font-size: var(--font-size-sm);
+		font-size: var(--typescale-body-medium-size);
 		text-decoration: underline;
 	}
 `
 
-const OpenPageLink = styled.a`
+const OpenPageLink = styled.a.withConfig({
+	displayName: 'DocumentsPanelOpenPageLink',
+})`
 	color: var(--color-primary);
-	font-size: var(--font-size-sm);
+	font-size: var(--typescale-body-medium-size);
 	text-decoration: underline;
 `

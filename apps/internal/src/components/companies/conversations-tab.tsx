@@ -212,6 +212,40 @@ export function ConversationsTab({
 		}
 	}
 
+	const THREAD_STATUS: Record<ThreadRow['status'], string> = {
+		open: t`Open`,
+		closed: t`Closed`,
+		archived: t`Archived`,
+	}
+	const EVENT_STATUS: Record<string, string | undefined> = {
+		confirmed: t`Confirmed`,
+		tentative: t`Tentative`,
+		cancelled: t`Cancelled`,
+	}
+	const TASK_DONE = t`Done`
+	const TASK_OPEN = t`Open`
+
+	const subtitleFor = (item: UnifiedRow): string | null => {
+		switch (item.kind) {
+			case 'interaction':
+				// The channel already shows as the row's label.
+				return null
+			case 'email': {
+				const count =
+					item.row.messageCount === 1
+						? t`1 message`
+						: t`${item.row.messageCount} messages`
+				return `${count} · ${THREAD_STATUS[item.row.status]}`
+			}
+			case 'calendar':
+				// An unmapped value is a bug rather than a state a reader should
+				// meet, so it shows through instead of disappearing.
+				return EVENT_STATUS[item.row.status] ?? item.row.status
+			case 'task':
+				return item.row.completedAt !== null ? TASK_DONE : TASK_OPEN
+		}
+	}
+
 	return (
 		<Wrap data-testid='company-conversations-tab'>
 			<Toolbar>
@@ -268,7 +302,7 @@ export function ConversationsTab({
 			) : (
 				<List>
 					{visible.map(item => {
-						const subtitle = rowSubtitle(item)
+						const subtitle = subtitleFor(item)
 						const body = (
 							<>
 								<RowMain>
@@ -332,21 +366,9 @@ function narrowCalendar(
 	return out
 }
 
-function rowSubtitle(item: UnifiedRow): string | null {
-	switch (item.kind) {
-		case 'interaction':
-			// The channel already shows as the row's label.
-			return null
-		case 'email':
-			return `${item.row.messageCount} · ${item.row.status}`
-		case 'calendar':
-			return item.row.status
-		case 'task':
-			return item.row.completedAt !== null ? 'completed' : 'open'
-	}
-}
-
-const Wrap = styled.div`
+const Wrap = styled.div.withConfig({
+	displayName: 'ConversationsTabWrap',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
@@ -354,7 +376,9 @@ const Wrap = styled.div`
 	${agedPaperSurface}
 `
 
-const Toolbar = styled.header`
+const Toolbar = styled.header.withConfig({
+	displayName: 'ConversationsTabToolbar',
+})`
 	${rulerUnderRule}
 	display: flex;
 	flex-wrap: wrap;
@@ -364,7 +388,9 @@ const Toolbar = styled.header`
 	padding-bottom: var(--space-2xs);
 `
 
-const Chips = styled.div`
+const Chips = styled.div.withConfig({
+	displayName: 'ConversationsTabChips',
+})`
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-2xs);
@@ -399,7 +425,9 @@ const Chip = styled.button.withConfig({
 	}
 `
 
-const List = styled.ul`
+const List = styled.ul.withConfig({
+	displayName: 'ConversationsTabList',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: 0;
@@ -408,7 +436,9 @@ const List = styled.ul`
 	list-style: none;
 `
 
-const Row = styled.li`
+const Row = styled.li.withConfig({
+	displayName: 'ConversationsTabRow',
+})`
 	${ruledLedgerRow}
 	display: flex;
 	align-items: center;
@@ -444,21 +474,27 @@ const Row = styled.li`
 	}
 `
 
-const RowMain = styled.div`
+const RowMain = styled.div.withConfig({
+	displayName: 'ConversationsTabRowMain',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
 	min-width: 0;
 `
 
-const RowKind = styled.span`
+const RowKind = styled.span.withConfig({
+	displayName: 'ConversationsTabRowKind',
+})`
 	${stenciledTitle}
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.08em;
 	color: var(--color-on-surface-variant);
 `
 
-const RowTitle = styled.span`
+const RowTitle = styled.span.withConfig({
+	displayName: 'ConversationsTabRowTitle',
+})`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	color: var(--color-on-surface);
@@ -468,13 +504,17 @@ const RowTitle = styled.span`
 	min-width: 0;
 `
 
-const RowSubtitle = styled.span`
+const RowSubtitle = styled.span.withConfig({
+	displayName: 'ConversationsTabRowSubtitle',
+})`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface-variant);
 `
 
-const RowMeta = styled.span`
+const RowMeta = styled.span.withConfig({
+	displayName: 'ConversationsTabRowMeta',
+})`
 	${stenciledTitle}
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.06em;
@@ -482,7 +522,9 @@ const RowMeta = styled.span`
 	flex-shrink: 0;
 `
 
-const Empty = styled.p`
+const Empty = styled.p.withConfig({
+	displayName: 'ConversationsTabEmpty',
+})`
 	margin: 0;
 	font-family: var(--font-body);
 	font-style: italic;

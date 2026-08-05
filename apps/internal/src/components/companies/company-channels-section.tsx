@@ -35,12 +35,12 @@ export function CompanyChannelsSection({ channels, onEmail }: Props) {
 	return (
 		<PriCollapsible.Root defaultOpen>
 			<TriggerWrap>
-				<Trigger data-testid='company-channels-trigger'>
+				<PriCollapsible.Trigger data-testid='company-channels-trigger'>
 					<ChevronRight size={14} aria-hidden />
 					<Link2 size={14} aria-hidden />
 					<Trans>Ways to reach</Trans>
 					<Count>{channels.length}</Count>
-				</Trigger>
+				</PriCollapsible.Trigger>
 			</TriggerWrap>
 			<PriCollapsible.Panel>
 				<Body data-testid='company-channels-panel'>
@@ -99,32 +99,27 @@ export function CompanyChannelsSection({ channels, onEmail }: Props) {
 	)
 }
 
-const TriggerWrap = styled.div`
+const TriggerWrap = styled.div.withConfig({
+	displayName: 'CompanyChannelsTriggerWrap',
+})`
 	display: flex;
 	justify-content: flex-start;
 `
 
-const Trigger = styled(PriCollapsible.Trigger)`
-	& > svg:first-child {
-		transition: transform 200ms ease;
-	}
-
-	&[data-open] > svg:first-child,
-	&[aria-expanded='true'] > svg:first-child {
-		transform: rotate(90deg);
-	}
-`
-
-const Count = styled.span`
+const Count = styled.span.withConfig({
+	displayName: 'CompanyChannelsCount',
+})`
 	${stenciledTitle}
 	padding: 0 var(--space-2xs);
 	border: 1px solid currentColor;
-	border-radius: var(--radius-xs);
+	border-radius: var(--shape-2xs);
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface-variant);
 `
 
-const Body = styled.ul`
+const Body = styled.ul.withConfig({
+	displayName: 'CompanyChannelsBody',
+})`
 	${agedPaperSurface}
 	display: flex;
 	flex-direction: column;
@@ -137,7 +132,9 @@ const Body = styled.ul`
 // The chips after the address wrap onto their own line in a narrow column
 // rather than squeezing it — an address broken mid-word is harder to read than
 // one that takes two lines.
-const Row = styled.li`
+const Row = styled.li.withConfig({
+	displayName: 'CompanyChannelsRow',
+})`
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
@@ -145,7 +142,9 @@ const Row = styled.li`
 	color: var(--color-on-surface-variant);
 `
 
-const Address = styled.a`
+const Address = styled.a.withConfig({
+	displayName: 'CompanyChannelsAddress',
+})`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -164,21 +163,27 @@ const Address = styled.a`
 	}
 `
 
-const Label = styled.span`
+const Label = styled.span.withConfig({
+	displayName: 'CompanyChannelsLabel',
+})`
 	padding: 0 var(--space-2xs);
-	border-radius: var(--radius-xs);
+	border-radius: var(--shape-2xs);
 	background: var(--color-surface-container-high);
 	color: var(--color-on-surface-variant);
 	font-size: var(--typescale-label-small-size);
 `
 
-const Primary = styled.span`
+const Primary = styled.span.withConfig({
+	displayName: 'CompanyChannelsPrimary',
+})`
 	${stenciledTitle}
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface-variant);
 `
 
-const Compose = styled.button`
+const Compose = styled.button.withConfig({
+	displayName: 'CompanyChannelsCompose',
+})`
 	display: inline-flex;
 	align-items: center;
 	padding: var(--space-2xs);

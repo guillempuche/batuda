@@ -46,6 +46,7 @@ import {
 	PriButton,
 	PriCollapsible,
 	PriSelect,
+	PriSwitch,
 	PriTabs,
 	usePriToast,
 } from '@batuda/ui/pri'
@@ -114,12 +115,17 @@ import { TrustBadge } from '#/components/research/trust-badge'
 import { EmptyState } from '#/components/shared/empty-state'
 import { ErrorState } from '#/components/shared/error-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
-import { PriorityDot } from '#/components/shared/priority-dot'
+import {
+	PRIORITY_LEVELS,
+	PriorityDot,
+	priorityShortLabels,
+} from '#/components/shared/priority-dot'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { SrOnly } from '#/components/shared/sr-only'
 import type { CompanyStatus } from '#/components/shared/status-badge'
 import {
 	asCompanyStatus,
+	STATUS_ORDER,
 	StatusBadge,
 	statusLabels,
 } from '#/components/shared/status-badge'
@@ -133,6 +139,7 @@ import { useQuickCapture } from '#/context/quick-capture-context'
 import { useCompanyIndustries } from '#/hooks/use-company-industries'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
+import { languageName } from '#/lib/country-name'
 import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
 import type { PaginatedList } from '#/lib/paginated-list'
 import { validateSearchWith } from '#/lib/search-schema'
@@ -637,25 +644,16 @@ function DetailBody({
 	)
 
 	const statusOptions = useMemo(
-		() => [
-			{ value: 'prospect', label: t`Prospect` },
-			{ value: 'contacted', label: t`Contacted` },
-			{ value: 'responded', label: t`Responded` },
-			{ value: 'meeting', label: t`Meeting` },
-			{ value: 'proposal', label: t`Proposal` },
-			{ value: 'client', label: t`Client` },
-			{ value: 'closed', label: t`Closed` },
-			{ value: 'dead', label: t`Dead` },
-		],
-		[t],
+		() => STATUS_ORDER.map(s => ({ value: s, label: i18n._(statusLabels[s]) })),
+		[i18n],
 	)
 	const priorityOptions = useMemo(
-		() => [
-			{ value: '1', label: t`High` },
-			{ value: '2', label: t`Medium` },
-			{ value: '3', label: t`Low` },
-		],
-		[t],
+		() =>
+			PRIORITY_LEVELS.map(p => ({
+				value: String(p),
+				label: i18n._(priorityShortLabels[p]),
+			})),
+		[i18n],
 	)
 
 	const contacts = useMemo<ReadonlyArray<ContactRow>>(
@@ -1224,6 +1222,13 @@ function DetailBody({
 								$gap='md'
 							>
 								<Stack $gap='md'>
+									{/* The notes on the account lead the tab: they are what a
+									    person came to read, and the widest column is the only
+									    one prose fits in. */}
+									<AccountBriefSection
+										company={company}
+										onSave={(field, next) => saveField(field, next)}
+									/>
 									{tasksFailed ? (
 										<ErrorState
 											data-testid='company-tasks-error'
@@ -1249,13 +1254,13 @@ function DetailBody({
 												<TimelinePanelInner>
 													<TimelineToolbar>
 														<SystemEventsToggle>
-															<input
-																type='checkbox'
+															<PriSwitch.Root
 																checked={showSystemEvents}
-																onChange={e =>
-																	setShowSystemEvents(e.target.checked)
-																}
-															/>
+																onCheckedChange={setShowSystemEvents}
+																data-testid='company-timeline-system-events'
+															>
+																<PriSwitch.Thumb />
+															</PriSwitch.Root>
 															<Trans>Show system events</Trans>
 														</SystemEventsToggle>
 													</TimelineToolbar>
@@ -1331,10 +1336,6 @@ function DetailBody({
 										}
 									/>
 									<WherePanel company={company} compact />
-									<AccountBriefSection
-										company={company}
-										onSave={(field, next) => saveField(field, next)}
-									/>
 									<CompanyFitSection company={company} />
 									<AboutSection
 										company={company}
@@ -1641,11 +1642,23 @@ function DetailBody({
 													</Link>
 												</PageRowTitle>
 												<PageRowMeta>
-													<PageLangBadge>{pg.lang}</PageLangBadge>
+													{/* A language chip reads as a code the world over, so
+													    it stays one, with the full name for anyone who
+													    does not recognise it. The state beside it is a
+													    word, and a word has to be in the reader's own. */}
+													<PageLangBadge
+														title={
+															languageName(pg.lang, i18n.locale) ?? undefined
+														}
+													>
+														{pg.lang.toUpperCase()}
+													</PageLangBadge>
 													<PageStatusBadge
 														$published={pg.status === 'published'}
 													>
-														{pg.status}
+														{pg.status === 'published'
+															? t`Published`
+															: t`Draft`}
 													</PageStatusBadge>
 												</PageRowMeta>
 											</PageRow>
@@ -1936,10 +1949,12 @@ function narrowContactProvenance(
 	return out
 }
 
-const ChannelLabel = styled.span`
+const ChannelLabel = styled.span.withConfig({
+	displayName: 'CompanyDetailChannelLabel',
+})`
 	display: inline-block;
 	padding: 0 var(--space-2xs);
-	border-radius: var(--radius-xs);
+	border-radius: var(--shape-2xs);
 	background: var(--color-surface-container-high);
 	color: var(--color-on-surface-variant);
 	font-size: var(--typescale-label-small-size);
@@ -2148,6 +2163,11 @@ const HeaderMeta = styled.div.withConfig({
 	display: flex;
 	align-items: center;
 	gap: var(--space-sm);
+	/* Stage, owner and the verified mark are four controls of their own width in
+	 * a row that has to fit a phone. Let them fall onto a second line as the
+	 * screen narrows rather than picking a width to switch at — the last one was
+	 * simply off the side of the screen. */
+	flex-wrap: wrap;
 `
 
 const VerifiedControl = styled.button.withConfig({
@@ -2207,12 +2227,19 @@ const HeaderInlineButton = styled.button.withConfig({
 })`
 	display: inline-flex;
 	align-items: center;
+	justify-content: center;
 	background: transparent;
 	border: none;
 	padding: 0;
 	cursor: pointer;
 	color: inherit;
 	font: inherit;
+	/* What this holds is a 10px dot. A finger cannot land on 10px, so the
+	 * button around it is finger-sized while the dot stays the size it reads
+	 * best at. Not tied to a screen width — a small target is small on a
+	 * desktop trackpad too. */
+	min-inline-size: 2.75rem;
+	min-block-size: 2.75rem;
 `
 
 const GhostPriorityDot = styled.span.withConfig({
@@ -2257,8 +2284,10 @@ const ExternalLinkButton = styled.a.withConfig({
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 2.25rem;
-	height: 2.25rem;
+	/* The row of ways to reach a company is the most-tapped thing on the page,
+	 * so the discs are finger-sized rather than the 2.25rem they read at. */
+	width: 2.75rem;
+	height: 2.75rem;
 	border-radius: 50%;
 	color: var(--color-on-surface);
 	transition: transform 160ms ease;
@@ -2567,7 +2596,7 @@ const ContactLink = styled.a.withConfig({
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-3xs);
-	padding: 2px 0;
+	padding: var(--space-3xs) 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-label-medium-size);
 	color: var(--color-primary);
@@ -2585,7 +2614,7 @@ const ContactLinkButton = styled.button.withConfig({
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-3xs);
-	padding: 2px 0;
+	padding: var(--space-3xs) 0;
 	border: none;
 	background: transparent;
 	font-family: var(--font-body);
@@ -2645,11 +2674,6 @@ const SystemEventsToggle = styled.label.withConfig({
 	opacity: 0.75;
 	cursor: pointer;
 	user-select: none;
-
-	input {
-		accent-color: var(--color-primary);
-		cursor: pointer;
-	}
 `
 
 const TimelineList = styled.div.withConfig({
