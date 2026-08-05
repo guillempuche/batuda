@@ -151,7 +151,7 @@ afterAll(async () => {
 
 describe('discover_contacts for a company with no website', () => {
 	describe('when the country has a national registry', () => {
-		it('should return the officers it names, with no address and nothing paid to a vendor', async () => {
+		it('should return the officers it names, with no address and no vendor paid', async () => {
 			// GIVEN a Spanish company with no domain at all
 			const result = await discover(null, 'ES')
 
@@ -173,7 +173,13 @@ describe('discover_contacts for a company with no website', () => {
 			// AND no enrichment vendor was asked or charged for a lookup keyed on a
 			// domain this company does not have
 			expect(vendorCalls).toEqual([])
-			expect(charges).toEqual([])
+
+			// AND the one thing that was paid for is the register lookup itself,
+			// which bills per call however the answer is used — leaving it off the
+			// bill was money the run's budget and the month's total never saw
+			expect(charges).toEqual([
+				'registry:run-no-domain:registry:ES:Taller Puig SL',
+			])
 
 			// AND nothing tried to resolve mail servers or verify an address, because
 			// there is no domain to ask about and no address to check

@@ -19,7 +19,11 @@ import { redactDbErrors } from './_research-shared'
 
 const DiscoverContacts = Tool.make('discover_contacts', {
 	description:
+<<<<<<< HEAD
 		'Find decision-maker contacts for a company. Returns ranked candidates, each with a buying_role saying what part they play in a purchase (economic_buyer holds the budget, champion argues for it inside, gatekeeper controls access, technical_evaluator judges whether it works, user lives with it; null when the title does not say) and, where an address was found, a deliverability verdict on its email channel (channels[].verification) — or an explicit no_reliable_contact result, never an unverified blast list. Pass domain:null for a company with no website at all (a market stall, a family workshop, a jobbing builder): no address can be guessed and no enrichment vendor is paid, so what comes back is names and job titles from the national registry, which is still worth having — say plainly that those people have no address rather than implying one. Result is one of: {status:"ok", contacts:[...]}, {status:"no_reliable_contact"}, {status:"budget_exceeded"}, {status:"cancelled"} (somebody was asked to approve the spending and said no), or {status:"confirmation_required"} (the spending needs approval and this client has no way to ask for it — the result carries the estimate, the current limit and what to do about it; relay that instead of retrying, since retrying gives the same answer). A result may also carry degraded, saying why the search came up short: "monthly_cap_reached" (the organization spent its monthly research budget partway through), "vendor_quota_exhausted" (the contact vendor has no paid allowance left this month), or "vendor_unavailable" (it could not be reached); "verification_limit_reached" (the call hit its ceiling on how many addresses it pays to check); or "already_paid_this_run" (the run was resumed and had already paid for that step, so it was skipped rather than bought twice). All three mean a thin or empty list is a fact about us, not about the company — say so rather than reporting that the company has nobody to find. Under "monthly_cap_reached" specifically, verification stopped partway, so a verification of "unknown" was left unchecked for want of budget rather than checked and found doubtful; under the other two, verification ran normally. Paid lookups are metered against the research budget; spend above the auto-approve threshold asks for confirmation first.',
+=======
+		'Find decision-maker contacts for a company. Returns ranked candidates, each with a buying_role saying what part they play in a purchase (economic_buyer holds the budget, champion argues for it inside, gatekeeper controls access, technical_evaluator judges whether it works, user lives with it; null when the title does not say) and, where an address was found, a deliverability verdict (email_verification) — or an explicit no_reliable_contact result, never an unverified blast list. Pass domain:null for a company with no website at all (a market stall, a family workshop, a jobbing builder): no address can be guessed and no enrichment vendor is paid, so what comes back is names and job titles from the national registry, which is still worth having — say plainly that those people have no address rather than implying one. Result is one of: {status:"ok", contacts:[...]}, {status:"no_reliable_contact"}, {status:"budget_exceeded"}, {status:"cancelled"} (somebody was asked to approve the spending and said no), or {status:"confirmation_required"} (the spending needs approval and this client has no way to ask for it — the result carries the estimate, the current limit and what to do about it; relay that instead of retrying, since retrying gives the same answer). An "ok" result may also carry verificationStopped:"monthly_cap_reached", meaning the organization spent its monthly research budget partway through: the contacts are real, but any email_verification of "unknown" was left unchecked for lack of budget rather than checked and found doubtful — say so rather than presenting those addresses as verified. Paid lookups are metered against the research budget. What one costs depends on what is asked for — a national register lookup where the country has one, the enrichment vendors only where there is a domain to work from, and a capped number of address checks — and the most it can come to is well under the usual auto-approve limit, so being asked to confirm is the exception rather than the rule.',
+>>>>>>> ee6ca2e6cf (fix(research): charge and quote what finding contacts really costs)
 	parameters: Schema.Struct({
 		company_name: Schema.String,
 		// Required + nullable, never optional: a nullable field inside `optionalKey`
@@ -63,13 +67,20 @@ export const ResearchContactsHandlersLive = ResearchContactsTools.toLayer(
 					const orgId = (yield* CurrentOrg).id
 
 					// Confirm before spending above the caller's auto-approve limit.
+					// What this particular lookup can cost, not a flat figure: a
+					// company with no website cannot reach the paid finders at all,
+					// and a country with no national register cannot pay for one.
+					const ceiling = estimateDiscoverCostCents({
+						country: params.country,
+						domain: params.domain,
+					})
 					const policy = yield* resolvePolicy({ sql, userId, systemDefaults })
-					if (estimateDiscoverCostCents > policy.autoApprovePaidCents) {
+					if (ceiling > policy.autoApprovePaidCents) {
 						// A company with no website is named on its own — writing the
 						// domain in regardless would put the word "null" in front of
 						// whoever is being asked to approve the spending.
 						const answer = yield* requireApproval(
-							`Discovering decision-maker contacts for ${params.company_name}${params.domain === null ? '' : ` (${params.domain})`} may spend up to ~${estimateDiscoverCostCents}¢ on paid lookups, above your auto-approve limit of ${policy.autoApprovePaidCents}¢. Proceed?`,
+							`Discovering decision-maker contacts for ${params.company_name}${params.domain === null ? '' : ` (${params.domain})`} may spend up to ~${ceiling}¢ on paid lookups, above your auto-approve limit of ${policy.autoApprovePaidCents}¢. Proceed?`,
 						)
 						// A client with no way to put the question is not somebody
 						// saying no. Say what the spending would be and where a person
@@ -81,9 +92,9 @@ export const ResearchContactsHandlersLive = ResearchContactsTools.toLayer(
 						if (answer === 'unaskable') {
 							return {
 								status: 'confirmation_required' as const,
-								estimatedCostCents: estimateDiscoverCostCents,
+								estimatedCostCents: ceiling,
 								autoApproveLimitCents: policy.autoApprovePaidCents,
-								nextStep: `This lookup may spend up to ~${estimateDiscoverCostCents}¢, above your auto-approve limit of ${policy.autoApprovePaidCents}¢, and this client has no way to ask you to approve it. Say the amount out loud to whoever is reading; if they agree, they can raise the limit under Research budget in organization settings, and then you can ask again.`,
+								nextStep: `This lookup may spend up to ~${ceiling}¢, above your auto-approve limit of ${policy.autoApprovePaidCents}¢, and this client has no way to ask you to approve it. Say the amount out loud to whoever is reading; if they agree, they can raise the limit under Research budget in organization settings, and then you can ask again.`,
 							}
 						}
 						if (answer === 'declined') return { status: 'cancelled' as const }

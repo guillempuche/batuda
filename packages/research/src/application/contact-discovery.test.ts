@@ -12,8 +12,16 @@ import {
 	type DiscoveredContact,
 	dedupePeople,
 	emailChannel,
+	estimateDiscoverCostCents,
+	MAX_VERIFICATIONS,
 	runEnrichmentChain,
 } from './contact-discovery'
+import {
+	ENRICH_COST_CENTS,
+	FULLENRICH_COST_CENTS,
+	REGISTRY_LOOKUP_COST_CENTS,
+	VERIFY_COST_CENTS,
+} from './tool-costs'
 
 const contact = (over: {
 	buying_role?: string | null
@@ -597,4 +605,67 @@ describe('ContactDiscovery.discover (integration)', () => {
 	it.todo(
 		'should never return an undeliverable-only contact — the email channel is filtered and a person with no other channel is dropped',
 	)
+})
+
+describe('what a discovery says it may cost', () => {
+	// The figure is shown to whoever is asked to approve the spending, so it has
+	// to be a ceiling. These pin it to what the run can actually reach.
+	describe('when the country has a national register and the company a website', () => {
+		it('should allow for the register, both finders and the capped checks', () => {
+			// GIVEN the most expensive shape: a register to pay for, a domain the
+			// paid finders can work from, and addresses to check
+			const quote = estimateDiscoverCostCents({
+				country: 'ES',
+				domain: 'acme.example',
+			})
+
+			// THEN the quote covers every one of them
+			expect(quote).toBe(
+				REGISTRY_LOOKUP_COST_CENTS +
+					ENRICH_COST_CENTS +
+					FULLENRICH_COST_CENTS +
+					MAX_VERIFICATIONS * VERIFY_COST_CENTS,
+			)
+		})
+	})
+
+	describe('when the country has no national register', () => {
+		it('should not quote for a lookup that cannot happen', () => {
+			// GIVEN a country Batuda has no register for
+			const quote = estimateDiscoverCostCents({
+				country: 'NL',
+				domain: 'acme.example',
+			})
+
+			// THEN the register's price is left out — quoting it would ask
+			// somebody to approve money that could never be spent
+			expect(quote).toBe(
+				ENRICH_COST_CENTS +
+					FULLENRICH_COST_CENTS +
+					MAX_VERIFICATIONS * VERIFY_COST_CENTS,
+			)
+		})
+	})
+
+	describe('when the company has no website', () => {
+		it('should not quote for the finders, which are all keyed on a domain', () => {
+			// GIVEN a company with no website at all
+			const quote = estimateDiscoverCostCents({ country: 'ES', domain: null })
+
+			// THEN only the register and the checks are quoted for
+			expect(quote).toBe(
+				REGISTRY_LOOKUP_COST_CENTS + MAX_VERIFICATIONS * VERIFY_COST_CENTS,
+			)
+		})
+	})
+
+	describe('when neither a register nor a website is in play', () => {
+		it('should quote only what checking addresses can cost', () => {
+			// GIVEN nothing paid to reach — no register, no domain
+			// THEN the quote is only the capped verification
+			expect(estimateDiscoverCostCents({ domain: null })).toBe(
+				MAX_VERIFICATIONS * VERIFY_COST_CENTS,
+			)
+		})
+	})
 })

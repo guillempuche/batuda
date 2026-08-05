@@ -20,3 +20,12 @@ export const SCRAPE_COST_CENTS = 1
 export const CHEAP_MIN_COST_CENTS = 1
 
 export const REGISTRY_LOOKUP_COST_CENTS = 29
+
+// Finding decision-makers for a company. Hunter and FullEnrich sell credits
+// rather than per-call prices, so these are flat figures that meter the run's
+// budget and the month's cap without mirroring a credit sheet. Kept per-vendor
+// so a spend row names the finder that actually ran.
+export const ENRICH_COST_CENTS = 5
+export const FULLENRICH_COST_CENTS = 6
+export const VERIFY_COST_CENTS = 1
+

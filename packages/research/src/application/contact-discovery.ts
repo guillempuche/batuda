@@ -39,6 +39,12 @@ import {
 	type PaidCall,
 	RegistryRouter,
 } from './ports'
+import {
+	ENRICH_COST_CENTS,
+	FULLENRICH_COST_CENTS,
+	REGISTRY_LOOKUP_COST_CENTS,
+	VERIFY_COST_CENTS,
+} from './tool-costs'
 
 // A person from either name source (registry directors or the enrichment
 // vendor). Registry directors arrive with just a name + role; enrichment adds
@@ -178,14 +184,6 @@ const registryCountry = (
 	return upper && isRegistryCountry(upper) ? upper : undefined
 }
 
-// Fixed per-call cost estimates (cents). Hunter/FullEnrich are credit-based;
-// these meter the run budget + monthly cap without mirroring exact credit
-// pricing. Kept per-vendor so the spend row (and the eval's cost metric) names
-// the finder that actually ran.
-const ENRICH_COST_CENTS = 5
-const FULLENRICH_COST_CENTS = 6
-const VERIFY_COST_CENTS = 1
-
 const ENRICH_COST_BY_VENDOR: Record<string, number> = {
 	hunter: ENRICH_COST_CENTS,
 	fullenrich: FULLENRICH_COST_CENTS,
@@ -201,17 +199,28 @@ const enrichCostFor = (label: string): number =>
  * guessed address checked. Without a ceiling the spend follows the company's board
  * size, which is nobody's intention and nothing the caller was quoted.
  */
-const MAX_VERIFICATIONS = 10
+export const MAX_VERIFICATIONS = 10
 
 /**
- * Rough up-front cost the MCP handler compares to its auto-approve threshold.
- * Worst case: both paid finders run (a registry miss, or union mode) and every
- * verification allowed is spent — so a real run never costs more than the
- * confirm-gate saw. The ceiling below is what makes that true rather than hopeful.
+ * The most one call can spend, for the gate that asks a person before it does.
+ *
+ * Worked out per request rather than as one figure for every company, because
+ * what a call can reach differs: a country with a national register pays for
+ * that lookup and one without cannot, and a company with no website never
+ * reaches the paid finders at all, since every one of them is keyed on the
+ * domain. Quoting a flat figure asks somebody to approve money that could not
+ * be spent, and hides the register's price behind an answer that never named it.
+ *
+ * A real call usually costs less: a register hit skips the finders, and
+ * `fallback` mode stops at the first vendor that finds anybody. The ceiling on
+ * verifications is what keeps this a ceiling rather than a hope.
  */
-export const estimateDiscoverCostCents =
-	ENRICH_COST_CENTS +
-	FULLENRICH_COST_CENTS +
+export const estimateDiscoverCostCents = (input: {
+	readonly country?: string | undefined
+	readonly domain: string | null
+}): number =>
+	(registryCountry(input.country) ? REGISTRY_LOOKUP_COST_CENTS : 0) +
+	(input.domain === null ? 0 : ENRICH_COST_CENTS + FULLENRICH_COST_CENTS) +
 	MAX_VERIFICATIONS * VERIFY_COST_CENTS
 
 // Lower is better — deliverable first, undeliverable last (and then dropped).
@@ -465,6 +474,7 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 					const verifierAlreadyPaid = yield* Ref.make(false)
 					let enrichmentAlreadyPaid = false
 
+
 					const core = Effect.gen(function* () {
 						const budget = yield* Budget
 
@@ -475,19 +485,32 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 						const countryWithRegistry = registryCountry(input.country)
 						let people: ReadonlyArray<SourcePerson> = []
 						if (countryWithRegistry) {
-							const record = yield* registry
-								.lookup({
-									country: countryWithRegistry,
-									query: input.companyName,
-								})
-								.pipe(
-									// Registry is best-effort here; any miss (provider failure
-									// or a country with no registry) falls through to enrichment.
-									Effect.catchTags({
-										ProviderError: () => Effect.succeed(null),
-										NoRegistry: () => Effect.succeed(null),
-									}),
-								)
+							// The register bills per lookup, the same as it does for the
+							// agent's own registry_lookup tool. Left uncharged, a discovery
+							// spent real money that neither the run's budget nor the
+							// month's total ever saw.
+							const looked = yield* budget.withPaidCharge(
+								'registry',
+								REGISTRY_LOOKUP_COST_CENTS,
+								'discover_contacts',
+								`${researchId}:registry:${countryWithRegistry}:${input.companyName}`,
+							)(() =>
+								registry
+									.lookup({
+										country: countryWithRegistry,
+										query: input.companyName,
+									})
+									.pipe(
+										// Registry is best-effort here; any miss (provider failure
+										// or a country with no registry) falls through to enrichment.
+										Effect.catchTags({
+											ProviderError: () => Effect.succeed(null),
+											NoRegistry: () => Effect.succeed(null),
+										}),
+									),
+							)
+							const record =
+								looked._tag === 'already_charged' ? null : looked.value
 							people = (record?.directors ?? []).map(d => {
 								const { firstName, lastName } = splitPersonName(d.name)
 								return { firstName, lastName, position: d.role }
