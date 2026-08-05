@@ -348,6 +348,7 @@ msgid "Active client"
 msgstr "Client actiu"
 
 #: src/routes/index.tsx
+#: src/routes/index.tsx
 msgid "Active companies"
 msgstr "Empreses actives"
 
@@ -3329,6 +3330,7 @@ msgid "name@example.com, another@example.com"
 msgstr "nom@exemple.cat, altre@exemple.cat"
 
 #: src/routes/index.tsx
+#: src/routes/index.tsx
 msgid "Needs action"
 msgstr "Necessita acció"
 
@@ -3929,6 +3931,7 @@ msgstr "Obre els detalls de la tasca"
 
 #: src/components/companies/open-tasks-card.tsx
 #: src/routes/index.tsx
+#: src/routes/index.tsx
 msgid "Open tasks"
 msgstr "Tasques obertes"
 
@@ -4065,6 +4068,7 @@ msgid "Outcome: {outcomeLabel}"
 msgstr "Resultat: {outcomeLabel}"
 
 #: src/components/companies/next-action-card.tsx
+#: src/routes/index.tsx
 #: src/routes/index.tsx
 #: src/routes/tasks/index.tsx
 #: src/routes/tasks/index.tsx
@@ -5061,6 +5065,16 @@ msgstr "Compartida amb l'equip"
 #: src/routes/emails/inboxes.tsx
 msgid "Shared with the whole team — no single owner"
 msgstr "Compartida amb tot l'equip: sense cap propietari"
+
+#: src/routes/index.tsx
+#: src/routes/index.tsx
+#: src/routes/index.tsx
+msgid "Show all"
+msgstr "Mostra-ho tot"
+
+#: src/routes/index.tsx
+msgid "Show all quiet companies"
+msgstr "Mostra totes les empreses en silenci"
 
 #. placeholder {0}: msg.cc.length
 #: src/routes/emails/$threadId.tsx

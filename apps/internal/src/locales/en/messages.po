@@ -348,6 +348,7 @@ msgid "Active client"
 msgstr "Active client"
 
 #: src/routes/index.tsx
+#: src/routes/index.tsx
 msgid "Active companies"
 msgstr "Active companies"
 
@@ -3329,6 +3330,7 @@ msgid "name@example.com, another@example.com"
 msgstr "name@example.com, another@example.com"
 
 #: src/routes/index.tsx
+#: src/routes/index.tsx
 msgid "Needs action"
 msgstr "Needs action"
 
@@ -3929,6 +3931,7 @@ msgstr "Open task details"
 
 #: src/components/companies/open-tasks-card.tsx
 #: src/routes/index.tsx
+#: src/routes/index.tsx
 msgid "Open tasks"
 msgstr "Open tasks"
 
@@ -4065,6 +4068,7 @@ msgid "Outcome: {outcomeLabel}"
 msgstr "Outcome: {outcomeLabel}"
 
 #: src/components/companies/next-action-card.tsx
+#: src/routes/index.tsx
 #: src/routes/index.tsx
 #: src/routes/tasks/index.tsx
 #: src/routes/tasks/index.tsx
@@ -5061,6 +5065,16 @@ msgstr "Shared with the team"
 #: src/routes/emails/inboxes.tsx
 msgid "Shared with the whole team — no single owner"
 msgstr "Shared with the whole team — no single owner"
+
+#: src/routes/index.tsx
+#: src/routes/index.tsx
+#: src/routes/index.tsx
+msgid "Show all"
+msgstr "Show all"
+
+#: src/routes/index.tsx
+msgid "Show all quiet companies"
+msgstr "Show all quiet companies"
 
 #. placeholder {0}: msg.cc.length
 #: src/routes/emails/$threadId.tsx

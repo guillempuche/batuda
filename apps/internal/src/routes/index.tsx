@@ -304,19 +304,43 @@ function PipelinePage() {
 
 			<SetPasswordNudge />
 
+			{/* Every counter opens the list it counted. A number nobody can follow
+			    is a dead end: the reader has to go and rebuild the same filter by
+			    hand on another screen, and usually gets a different number. */}
 			<KpiRow>
-				<KpiCounter value={activeCompanyCount} label={t`Active companies`} />
-				<KpiCounter value={openTaskCount} label={t`Open tasks`} />
-				<KpiCounter value={taskCounts?.overdue ?? 0} label={t`Overdue`} />
-				<KpiCounter
-					value={snapshot?.companiesWithoutNextAction ?? 0}
-					label={t`Needs action`}
-				/>
+				<KpiLink>
+					<Link to='/companies' aria-label={t`Active companies`} />
+					<KpiCounter value={activeCompanyCount} label={t`Active companies`} />
+				</KpiLink>
+				<KpiLink>
+					<Link to='/tasks' aria-label={t`Open tasks`} />
+					<KpiCounter value={openTaskCount} label={t`Open tasks`} />
+				</KpiLink>
+				<KpiLink>
+					<Link
+						to='/tasks'
+						search={{ shelf: 'overdue' }}
+						aria-label={t`Overdue`}
+					/>
+					<KpiCounter value={taskCounts?.overdue ?? 0} label={t`Overdue`} />
+				</KpiLink>
+				<KpiLink>
+					<Link
+						to='/companies'
+						search={{ attention: 'no-next-action' }}
+						aria-label={t`Needs action`}
+					/>
+					<KpiCounter
+						value={snapshot?.companiesWithoutNextAction ?? 0}
+						label={t`Needs action`}
+					/>
+				</KpiLink>
 			</KpiRow>
 
 			<StatusStrip>
 				{STATUS_ORDER.map(status => (
 					<StatusChip key={status} data-testid={`pipeline-column-${status}`}>
+						<Link to='/companies' search={{ status }} aria-label={status} />
 						<StatusBadge status={status} size='lg' />
 						<StatusCount>{countFor(status)}</StatusCount>
 					</StatusChip>
@@ -332,6 +356,15 @@ function PipelinePage() {
 					title={t`Needs attention`}
 					count={attentionTotal}
 					help={t`Tasks past their due date, companies whose follow-up date has passed, companies mid-deal with no contact in two weeks, and finished research nobody has decided on. Each company is listed once, under its most urgent reason. Closed and dead companies are left out.`}
+					action={
+						attentionTotal > attentionShown ? (
+							<ShowAll data-testid='pipeline-show-all-attention'>
+								<Link to='/companies' search={{ attention: 'stale' }}>
+									{t`Show all quiet companies`}
+								</Link>
+							</ShowAll>
+						) : undefined
+					}
 				/>
 				{attentionEmpty ? (
 					<EmptyState
@@ -433,6 +466,15 @@ function PipelinePage() {
 						title={t`Today`}
 						count={taskCounts?.today ?? todayTasks.length}
 						help={t`Open tasks due today, in your own timezone. Anything already past its due date is under Needs attention instead.`}
+						action={
+							(taskCounts?.today ?? 0) > todayTasks.length ? (
+								<ShowAll>
+									<Link to='/tasks' search={{ shelf: 'today' }}>
+										{t`Show all`}
+									</Link>
+								</ShowAll>
+							) : undefined
+						}
 					/>
 					{todayTasks.length === 0 ? (
 						<EmptyState title={t`No tasks for today`} />
@@ -473,6 +515,15 @@ function PipelinePage() {
 						title={t`This week`}
 						count={taskCounts?.thisWeek ?? weekTasks.length}
 						help={t`Open tasks due in the next seven days, counted from tonight rather than to the end of the calendar week.`}
+						action={
+							(taskCounts?.thisWeek ?? 0) > weekTasks.length ? (
+								<ShowAll>
+									<Link to='/tasks' search={{ shelf: 'thisWeek' }}>
+										{t`Show all`}
+									</Link>
+								</ShowAll>
+							) : undefined
+						}
 					/>
 					{weekTasks.length === 0 ? (
 						<EmptyState title={t`No upcoming due dates`} />
@@ -515,6 +566,18 @@ function PipelinePage() {
 					title={t`High priority`}
 					count={nextSteps?.counts.highPriority ?? highPriority.length}
 					help={t`Companies marked hot with nothing scheduled at all. One that has also gone quiet is listed above instead, so it is only asked after once.`}
+					action={
+						(nextSteps?.counts.highPriority ?? 0) > highPriority.length ? (
+							<ShowAll>
+								<Link
+									to='/companies'
+									search={{ priority: 1, sort: 'recent_update' }}
+								>
+									{t`Show all`}
+								</Link>
+							</ShowAll>
+						) : undefined
+					}
 				/>
 				{highPriority.length === 0 ? (
 					<EmptyState
@@ -672,10 +735,95 @@ const StatusStrip = styled.div.withConfig({
 	gap: var(--space-sm);
 `
 
-const StatusChip = styled.div.withConfig({ displayName: 'PipelineStatusChip' })`
+/**
+ * A status count that opens the list it counted.
+ *
+ * The link is a bare child stretched over the chip rather than the chip itself:
+ * `styled(Link)` keeps the styling but drops the router's typing of `to` and
+ * `search`, which is what turns a wrong destination into a compile error
+ * instead of a dead click.
+ */
+const StatusChip = styled.div.withConfig({
+	displayName: 'PipelineStatusChip',
+})`
+	position: relative;
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
+	padding: var(--space-3xs) var(--space-2xs);
+	border-radius: var(--shape-2xs);
+	transition: background 140ms ease;
+
+	&:hover {
+		background: var(--color-surface-container-high);
+	}
+
+	&:focus-within {
+		box-shadow: var(--glow-active);
+	}
+
+	> a {
+		position: absolute;
+		inset: 0;
+		text-indent: -9999px;
+		overflow: hidden;
+		border-radius: inherit;
+	}
+
+	> a:focus-visible {
+		outline: none;
+	}
+`
+
+/**
+ * The way out of a section that shows only its first few rows. Without it the
+ * heading states a total the reader has no way of reaching.
+ */
+const ShowAll = styled.span.withConfig({ displayName: 'PipelineShowAll' })`
+	> a {
+		font-family: var(--font-display);
+		font-size: var(--typescale-label-small-size);
+		line-height: var(--typescale-label-small-line);
+		font-weight: var(--font-weight-bold);
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--color-primary);
+		text-decoration: none;
+		white-space: nowrap;
+	}
+
+	> a:hover {
+		text-decoration: underline;
+	}
+
+	> a:focus-visible {
+		outline: none;
+		border-radius: var(--shape-2xs);
+		box-shadow: var(--glow-active);
+	}
+`
+
+/** Wraps a counter plate so the whole plate is the target, not just its digits. */
+const KpiLink = styled.div.withConfig({ displayName: 'PipelineKpiLink' })`
+	position: relative;
+	border-radius: var(--shape-2xs);
+
+	&:focus-within {
+		box-shadow: var(--glow-active);
+	}
+
+	> a {
+		position: absolute;
+		inset: 0;
+		z-index: 1;
+		text-indent: -9999px;
+		overflow: hidden;
+		border-radius: inherit;
+	}
+
+	> a:focus-visible {
+		outline: none;
+	}
 `
 
 const StatusCount = styled.span.withConfig({

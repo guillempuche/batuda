@@ -20,6 +20,7 @@ import {
 	reopenTaskAtom,
 	rescheduleTaskAtom,
 	snoozeTaskAtom,
+	TASK_SHELVES,
 	TASKS_PAGE_SIZE,
 	type TaskShelf,
 	taskCountsAtom,
@@ -207,7 +208,12 @@ const tasksDlgSchema = Schema.Union([
 const ADDRESS_CATCH_UP_MS = 200
 
 export const Route = createFileRoute('/tasks/')({
-	validateSearch: validateSearchWith({ dlg: tasksDlgSchema }),
+	validateSearch: validateSearchWith({
+		dlg: tasksDlgSchema,
+		// Which shelf to open on. The dashboard's sections link straight to the
+		// matching one; without this every link landed on Today whatever it said.
+		shelf: Schema.Literals(TASK_SHELVES),
+	}),
 	loader: async () => {
 		if (!import.meta.env.SSR) {
 			return { dehydrated: [] as const }
@@ -230,7 +236,13 @@ export const Route = createFileRoute('/tasks/')({
 
 function TasksPage() {
 	const { t } = useLingui()
-	const [selectedShelf, setSelectedShelf] = useState<TaskShelf>('today')
+	// The shelf named in the URL only seeds the rail; from then on the reader's
+	// clicks own it, so arriving from a dashboard link opens where it said and
+	// still moves freely afterwards.
+	const { shelf: shelfFromUrl } = Route.useSearch()
+	const [selectedShelf, setSelectedShelf] = useState<TaskShelf>(
+		shelfFromUrl ?? 'today',
+	)
 	// Which day it is where the reader sits. Held in state rather than read on
 	// every render, which would hand every render a different atom to fetch —
 	// but a tab left open overnight would then keep filing work under

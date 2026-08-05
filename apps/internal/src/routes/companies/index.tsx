@@ -7,6 +7,10 @@ import { LayoutGroup, motion } from 'motion/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
+import {
+	type AttentionFilter,
+	AttentionFilter as AttentionFilterSchema,
+} from '@batuda/domain'
 import { PriButton, PriInput, PriSelect } from '@batuda/ui/pri'
 
 import {
@@ -78,6 +82,10 @@ const validateSearch = validateSearchWith({
 	owner: Schema.NonEmptyString,
 	sort: Schema.NonEmptyString,
 	query: Schema.NonEmptyString,
+	// Set when arriving from a dashboard heading, so the list opens on exactly
+	// what that heading was counting rather than on everything.
+	attention: AttentionFilterSchema,
+	staleDays: Schema.Union([Schema.Number, Schema.NumberFromString]),
 })
 
 /**
@@ -554,6 +562,8 @@ function mergeSearch(
 		owner: string | undefined
 		sort: string | undefined
 		query: string | undefined
+		attention: AttentionFilter | undefined
+		staleDays: number | undefined
 	}>,
 ): CompaniesSearch {
 	const result: {
@@ -564,6 +574,8 @@ function mergeSearch(
 		owner?: string
 		sort?: string
 		query?: string
+		attention?: AttentionFilter
+		staleDays?: number
 	} = {}
 
 	const status = 'status' in next ? next.status : prev.status
@@ -587,6 +599,12 @@ function mergeSearch(
 	const sort = 'sort' in next ? next.sort : prev.sort
 	if (sort !== undefined && sort !== '') result.sort = sort
 
+	const attention = 'attention' in next ? next.attention : prev.attention
+	if (attention !== undefined) result.attention = attention
+
+	const staleDays = 'staleDays' in next ? next.staleDays : prev.staleDays
+	if (staleDays !== undefined) result.staleDays = staleDays
+
 	return result
 }
 
@@ -597,6 +615,7 @@ function hasActiveFilters(search: CompaniesSearch): boolean {
 		search.industry !== undefined ||
 		search.priority !== undefined ||
 		search.owner !== undefined ||
+		search.attention !== undefined ||
 		search.query !== undefined
 	)
 }

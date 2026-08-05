@@ -21,15 +21,23 @@ import {
  *   - Module-level mutation setters for the inline/row actions.
  */
 
-/** The shelves the inbox rail sorts work onto. */
-export type TaskShelf =
-	| 'overdue'
-	| 'today'
-	| 'thisWeek'
-	| 'later'
-	| 'noDue'
-	| 'snoozed'
-	| 'doneRecent'
+/**
+ * The shelves the inbox rail sorts work onto. Spelled as a list as well as a
+ * type so a shelf arriving in a URL can be checked against it — the dashboard
+ * links straight to one, and an unknown word has to fall back rather than leave
+ * the rail on nothing.
+ */
+export const TASK_SHELVES = [
+	'overdue',
+	'today',
+	'thisWeek',
+	'later',
+	'noDue',
+	'snoozed',
+	'doneRecent',
+] as const
+
+export type TaskShelf = (typeof TASK_SHELVES)[number]
 
 /**
  * How many tasks one shelf shows before asking, and how many more each
