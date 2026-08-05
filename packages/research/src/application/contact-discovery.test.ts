@@ -294,14 +294,17 @@ const anInput = { domain: 'acme.example' }
 // payment for this vendor in this run.
 const recordCharge =
 	(charged: string[]) =>
-	(label: string): Effect.Effect<boolean> =>
-		Effect.sync(() => {
+	(label: string) =>
+	<A>(call: () => Effect.Effect<A>) =>
+		Effect.gen(function* () {
 			charged.push(label)
-			return true
+			return { _tag: 'bought' as const, value: yield* Effect.suspend(call) }
 		})
 
-// A charge the budget refuses as already paid — what a resumed run sees.
-const alreadyCharged = (): Effect.Effect<boolean> => Effect.succeed(false)
+// A charge the budget refuses as already paid — what a resumed run sees. The
+// vendor is never called, so the answer is not bought a second time.
+const alreadyCharged = () => () =>
+	Effect.succeed({ _tag: 'already_charged' as const })
 
 describe('runEnrichmentChain', () => {
 	describe('when this run already paid a vendor for this company', () => {
@@ -498,7 +501,7 @@ describe('runEnrichmentChain', () => {
 						mode: 'fallback',
 					},
 					anInput,
-					() =>
+					() => () =>
 						Effect.fail(
 							new BudgetExceeded({ tier: 'paid-run', needed: 6, remaining: 0 }),
 						),

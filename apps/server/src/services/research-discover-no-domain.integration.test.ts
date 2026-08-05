@@ -103,6 +103,11 @@ const budget: BudgetService = {
 			charges.push(`${provider}:${idempotencyKey}`)
 			return true
 		}),
+	withPaidCharge: (provider, _cents, _tool, idempotencyKey) => call =>
+		Effect.gen(function* () {
+			charges.push(`${provider}:${idempotencyKey}`)
+			return { _tag: 'bought' as const, value: yield* Effect.suspend(call) }
+		}),
 	snapshot: () => Effect.succeed({} as never),
 }
 

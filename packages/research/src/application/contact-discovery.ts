@@ -18,6 +18,11 @@ import type { VerificationVerdict } from '@batuda/domain'
 import { decidesPurchase } from '@batuda/domain'
 
 import { isRegistryCountry, type RegistryCountry } from '../domain/country'
+import type {
+	ApprovalRequired,
+	BudgetExceeded,
+	MonthlyCapExceeded,
+} from '../domain/errors'
 import { EnrichmentResult } from '../domain/types'
 import { makeBudgetLayer } from './budget'
 import { guessEmails, splitPersonName } from './email-guess'
@@ -31,6 +36,7 @@ import {
 	type EnrichmentInput,
 	type EnrichmentMode,
 	MxResolver,
+	type PaidCall,
 	RegistryRouter,
 } from './ports'
 
@@ -85,6 +91,10 @@ export const dedupePeople = (
  * mode, where the vendors are alternatives, a refusal only counts when nobody
  * answered; in union mode they are additive, so a refusal always cost recall.
  */
+// What paying for a vendor call can go wrong with: the run is out of money, the
+// company's month is spent, or the amount needs somebody's approval first.
+type PaidRail = BudgetExceeded | MonthlyCapExceeded | ApprovalRequired
+
 export interface EnrichmentChainOutcome {
 	readonly people: ReadonlyArray<SourcePerson>
 	/** A vendor's paid allowance is spent, and that is why people are missing. */
@@ -102,42 +112,50 @@ export interface EnrichmentChainOutcome {
 // the next vendor is still tried. Generic over the charge's error so the budget
 // rails propagate unchanged.
 
-export const runEnrichmentChain = <E>(
+export const runEnrichmentChain = (
 	chain: {
 		readonly attempts: ReadonlyArray<EnrichmentAttempt>
 		readonly mode: EnrichmentMode
 	},
 	input: EnrichmentInput,
-	charge: (label: string) => Effect.Effect<boolean, E>,
-): Effect.Effect<EnrichmentChainOutcome, E> =>
+	// Pays for the vendor and calls it in one step, so a vendor that fails hands
+	// this run's allowance back and the vendor after it still has room to be
+	// tried. `already_charged` means this run paid for that vendor before, in
+	// which case the vendor is not called again — the answer would be bought a
+	// second time for real money that this run's record deliberately will not
+	// count twice.
+	buy: (
+		label: string,
+	) => <A>(call: () => Effect.Effect<A>) => Effect.Effect<PaidCall<A>, PaidRail>,
+): Effect.Effect<EnrichmentChainOutcome, PaidRail> =>
 	Effect.gen(function* () {
 		const collected: SourcePerson[] = []
 		let quotaExhausted = false
 		let vendorFailed = false
 		let alreadyPaid = false
 		for (const attempt of chain.attempts) {
-			// The charge says whether this vendor has already been paid for this
-			// company in this run — which happens when a run is resumed after a
-			// deploy. Calling it again would buy the same answer a second time, so
-			// the call is skipped and the shortfall reported instead.
-			if (!(yield* charge(attempt.label))) {
+			// A vendor already paid for in this run — which happens when a run is
+			// resumed after a deploy — is not called again, and the shortfall is
+			// reported instead.
+			const outcome = yield* buy(attempt.label)(() =>
+				attempt.findPeople(input).pipe(
+					// A vendor that could not answer is remembered, not just swallowed.
+					// "Nobody works here" and "we are out of credit" produce the same
+					// empty list, and only one of them is an answer about the company.
+					Effect.catchTag('ProviderError', error =>
+						Effect.sync(() => {
+							if (error.quotaExhausted === true) quotaExhausted = true
+							else vendorFailed = true
+							return new EnrichmentResult({ people: [], units: 0 })
+						}),
+					),
+				),
+			)
+			if (outcome._tag === 'already_charged') {
 				alreadyPaid = true
 				continue
 			}
-			const found = yield* attempt.findPeople(input).pipe(
-				// A vendor that could not answer is remembered, not just swallowed.
-				// "Nobody works here" and "we are out of credit" produce the same empty
-				// list, and only one of them is an answer about the company.
-				Effect.catchTag('ProviderError', error =>
-					Effect.sync(() => {
-						if (error.quotaExhausted === true) quotaExhausted = true
-						else vendorFailed = true
-						return new EnrichmentResult({ people: [], units: 0 })
-					}),
-				),
-				Effect.map(r => r.people),
-			)
-			collected.push(...found)
+			collected.push(...outcome.value.people)
 			if (chain.mode === 'fallback' && collected.length > 0) break
 		}
 		// In fallback mode the vendors are alternatives, so a refusal only cost us
@@ -495,7 +513,7 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 									country: input.country,
 								},
 								label =>
-									budget.chargePaid(
+									budget.withPaidCharge(
 										`${label}-enrich`,
 										enrichCostFor(label),
 										'discover_contacts',
@@ -525,20 +543,20 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 								// costs real money for nothing, so the check is skipped. The
 								// verdict is left unknown, which for a guessed address means
 								// it is dropped rather than asserted on a check we did not do.
-								const fresh = yield* budget.chargePaid(
+								const checked = yield* budget.withPaidCharge(
 									'hunter-verify',
 									VERIFY_COST_CENTS,
 									'discover_contacts',
 									`${researchId}:hunter-verify:${email}`,
-								)
-								if (!fresh) {
+								)(() => verifier.verify({ email }))
+								if (checked._tag === 'already_charged') {
 									yield* Ref.set(verifierAlreadyPaid, true)
 									return {
 										verdict: 'unknown' as VerificationVerdict,
 										confidence: undefined as number | undefined,
 									}
 								}
-								const v = yield* verifier.verify({ email })
+								const v = checked.value
 								return {
 									verdict: v.result,
 									confidence: v.score as number | undefined,

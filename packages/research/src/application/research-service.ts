@@ -3781,17 +3781,19 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									// lookup by tax id or a different spelling is a different
 									// purchase, so the register costs a small, limit-capped handful
 									// per run.
-									const paid = yield* budget.chargePaid(
+									const looked = yield* budget.withPaidCharge(
 										'registry',
 										REGISTRY_LOOKUP_COST_CENTS,
 										'registry_lookup',
 										`${researchId}:registry:${registryCountry}:${registryQuery}`,
+									)(() =>
+										registry.lookup({
+											country: registryCountry,
+											query: registryQuery,
+										}),
 									)
-									if (!paid) return
-									const record = yield* registry.lookup({
-										country: registryCountry,
-										query: registryQuery,
-									})
+									if (looked._tag === 'already_charged') return
+									const record = looked.value
 									const hash = urlHashForScrape(record.sourceUrl)
 									// A record read from a national register sits in `sources`
 									// alongside the fetched pages, so a value taken from it grounds

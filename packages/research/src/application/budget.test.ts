@@ -2,6 +2,7 @@ import { Effect, Fiber, Layer } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 import { describe, expect, it } from 'vitest'
 
+import { ProviderError } from '../domain/errors'
 import { ResolvedPolicy } from '../domain/types'
 import { makeBudgetLayer } from './budget'
 import { Budget } from './ports'
@@ -317,6 +318,84 @@ describe('what a company may spend on paid calls in a month', () => {
 			// THEN the system ceiling is what refuses it, so one setting can never
 			// authorise unlimited spending
 			expect((outcome as { capCents: number }).capCents).toBe(10_000)
+		})
+	})
+})
+
+describe('paying for a vendor call that then fails', () => {
+	describe('when the vendor call fails after the money was set aside', () => {
+		it('should give the run its allowance back', async () => {
+			// GIVEN a run with 100c of paid allowance
+			// WHEN it pays 20c for a call and that call fails
+			const left = await withBudget(budget =>
+				budget
+					.withPaidCharge(
+						'hunter',
+						20,
+						'discover_contacts',
+						'k1',
+					)(() =>
+						Effect.fail(
+							new ProviderError({
+								provider: 'hunter',
+								message: 'upstream 503',
+								recoverable: true,
+							}),
+						),
+					)
+					.pipe(
+						Effect.ignore,
+						Effect.andThen(budget.snapshot()),
+						Effect.map(s => s.paidRemaining),
+					),
+			)
+
+			// THEN the allowance is untouched, so the rest of the run still has the
+			// room it would have had — it bought nothing
+			expect(left).toBe(100)
+		})
+	})
+
+	describe('when the vendor call succeeds', () => {
+		it('should keep the money spent and hand back what was bought', async () => {
+			// GIVEN the same run
+			// WHEN it pays 20c for a call that answers
+			const outcome = await withBudget(budget =>
+				budget.withPaidCharge(
+					'hunter',
+					20,
+					'discover_contacts',
+					'k1',
+				)(() => Effect.succeed('the answer')),
+			)
+
+			// THEN the answer comes back marked as bought, not as a replay
+			expect(outcome).toStrictEqual({ _tag: 'bought', value: 'the answer' })
+		})
+	})
+
+	describe('when the same call was already paid for in this run', () => {
+		it('should not ask the vendor again', async () => {
+			// GIVEN a ledger that reports this call as one already recorded
+			let asked = 0
+			const outcome = await withBudget(
+				budget =>
+					budget.withPaidCharge(
+						'hunter',
+						20,
+						'discover_contacts',
+						'k1',
+					)(() => {
+						asked += 1
+						return Effect.succeed('second')
+					}),
+				{ charge: Effect.succeed([]) },
+			)
+
+			// THEN the vendor is never reached and the caller is told why, so it
+			// uses the answer it already has rather than buying it twice
+			expect(asked).toBe(0)
+			expect(outcome).toStrictEqual({ _tag: 'already_charged' })
 		})
 	})
 })

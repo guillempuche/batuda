@@ -25,7 +25,7 @@ import {
 	Toolkit,
 } from 'effect/unstable/ai'
 
-import { AcceptedCountry } from '../domain/country'
+import { AcceptedCountry, isRegistryCountry } from '../domain/country'
 import {
 	alreadyLookedUpResult,
 	approvalRequiredResult,
@@ -447,26 +447,32 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 			registry_lookup: params =>
 				Effect.gen(function* () {
 					const country = params.country.toUpperCase()
+					// Find out whether there is a register to ask before paying to ask
+					// it. Charging first meant a country Batuda has no register for
+					// cost the run real money to be told so.
+					if (!isRegistryCountry(country)) return noRegistryResult(country)
 					// Deterministic key: a resumed run re-charging the same lookup is
 					// a DB no-op, so a crash mid-run never double-charges for it.
 					const idempotencyKey = `${researchId}:registry:${country}:${params.tax_id ?? params.query ?? ''}`
-					const paid = yield* budget.chargePaid(
+					const outcome = yield* budget.withPaidCharge(
 						'registry',
 						REGISTRY_LOOKUP_COST_CENTS,
 						'registry_lookup',
 						idempotencyKey,
+					)(() =>
+						registry.lookup({
+							country,
+							query: params.query ?? undefined,
+							taxId: params.tax_id ?? undefined,
+						}),
 					)
 					// The register charges per lookup, so a repeat of one this run
 					// already bought would be paid for twice for the same answer.
-					if (!paid)
-						return alreadyLookedUpResult(
-							`${params.tax_id ?? params.query ?? ''} (${country})`,
-						)
-					return yield* registry.lookup({
-						country,
-						query: params.query ?? undefined,
-						taxId: params.tax_id ?? undefined,
-					})
+					return outcome._tag === 'already_charged'
+						? alreadyLookedUpResult(
+								`${params.tax_id ?? params.query ?? ''} (${country})`,
+							)
+						: outcome.value
 				}).pipe(
 					// A registry-less country is a routing answer, not a failure:
 					// hand it back as data so the model can switch to discover_contacts.
