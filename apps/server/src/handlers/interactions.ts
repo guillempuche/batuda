@@ -119,7 +119,7 @@ export const InteractionsLive = HttpApiBuilder.group(
 							if (payload.nextAction)
 								companyUpdate['nextAction'] = payload.nextAction
 							if (nextActionAt) companyUpdate['nextActionAt'] = nextActionAt
-							yield* sql`UPDATE companies SET ${sql.update(companyUpdate, ['id'])} WHERE id = ${payload.companyId}`
+							yield* sql`UPDATE companies SET ${sql.update(companyUpdate, ['id'])} WHERE id = ${payload.companyId} AND deleted_at IS NULL`
 						}
 
 						const rows = yield* sql`

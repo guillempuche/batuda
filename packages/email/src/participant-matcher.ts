@@ -68,7 +68,8 @@ export class ParticipantMatcher extends Context.Service<ParticipantMatcher>()(
 							companyId: string
 						}>`
 							SELECT c.id, c.company_id FROM channels ch
-							JOIN contacts c ON c.id = ch.subject_id
+							JOIN contacts c
+								ON c.id = ch.subject_id AND c.deleted_at IS NULL
 							WHERE ch.subject_table = 'contacts'
 							  AND ch.channel = 'email'
 							  AND lower(ch.address) = ${email}
@@ -104,6 +105,11 @@ export class ParticipantMatcher extends Context.Service<ParticipantMatcher>()(
 							JOIN channels ch
 								ON ch.subject_table = 'companies' AND ch.subject_id = c.id
 							WHERE c.organization_id = ${currentOrg.id}
+								-- A company nobody can open must not keep claiming its
+								-- domain: mail arriving for it would be filed against a
+								-- record that shows nowhere, and nobody is watching this
+								-- path to notice.
+								AND c.deleted_at IS NULL
 								AND (
 									(ch.channel = 'email' AND lower(ch.address) LIKE ${`%@${domain}`})
 									OR (ch.channel = 'website' AND lower(ch.address) LIKE ${`%${domain}%`})

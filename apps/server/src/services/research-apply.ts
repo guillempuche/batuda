@@ -475,6 +475,10 @@ export const occUpdate = (
 			updated_at = now()
 		WHERE id = ${subjectId}
 			AND organization_id = ${orgId}
+			-- The run finished before the company was taken out of view, so the
+			-- suggestion is about a record nobody can open any more. Applying it
+			-- would be work with nothing to show for it.
+			AND deleted_at IS NULL
 			AND version = ${expectedVersion}
 		RETURNING version
 	`

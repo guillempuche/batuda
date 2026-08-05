@@ -126,6 +126,7 @@ export const ContactHandlersLive = ContactTools.toLayer(
 						SELECT c.*, ${channelsJsonFor(sql, 'contacts')} AS channels
 						FROM contacts c
 						WHERE c.company_id = ${company_id}
+						  AND c.deleted_at IS NULL
 						ORDER BY c.name, c.id
 						LIMIT ${limit + 1}
 					`

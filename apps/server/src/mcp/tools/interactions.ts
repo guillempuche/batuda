@@ -110,7 +110,7 @@ export const InteractionHandlersLive = InteractionTools.toLayer(
 						if (params.next_action)
 							companyUpdate['nextAction'] = params.next_action
 						if (nextActionAt) companyUpdate['nextActionAt'] = nextActionAt
-						yield* sql`UPDATE companies SET ${sql.update(companyUpdate, [])} WHERE id = ${params.company_id}`
+						yield* sql`UPDATE companies SET ${sql.update(companyUpdate, [])} WHERE id = ${params.company_id} AND deleted_at IS NULL`
 					}
 
 					const rows = yield* sql`

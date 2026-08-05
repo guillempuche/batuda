@@ -317,7 +317,7 @@ export const persistMessage = (args: {
 					last_email_at = GREATEST(last_email_at, ${args.parsed.receivedAt}),
 					last_contacted_at = GREATEST(last_contacted_at, ${args.parsed.receivedAt}),
 					updated_at = now()
-				WHERE id = ${companyId}
+				WHERE id = ${companyId} AND deleted_at IS NULL
 			`
 		}
 

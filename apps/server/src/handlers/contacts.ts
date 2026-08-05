@@ -39,7 +39,10 @@ export const ContactsLive = HttpApiBuilder.group(
 				.handle('list', _ =>
 					Effect.gen(function* () {
 						const page = pageOf(_.query, 100)
-						const conditions: Array<Statement.Fragment> = []
+						// People hidden with their company stay hidden here too.
+						const conditions: Array<Statement.Fragment> = [
+							sql`c.deleted_at IS NULL`,
+						]
 						if (_.query.companyId)
 							conditions.push(sql`c.company_id = ${_.query.companyId}`)
 						// `provenance` traces a contact back to the research runs that
