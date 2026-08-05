@@ -104,7 +104,9 @@ For type descriptions and filing details, consult `references/documents.md`.
 
 Tasks are the action queue. `get_next_steps` returns them sorted by due date, alongside companies with an overdue `next_action_at` and finished research awaiting review. After completing a task, always check if a new task should be created for the next step.
 
-`researchAwaitingReview` is how finished research gets noticed at all — a run takes 2-5 minutes, so whoever asked for it is rarely still waiting. Each entry carries `pendingUpdateCount` (CRM changes still undecided — read them with `list_research_proposed_updates`, decide each with `resolve_research_proposed_update`) and a `status`; `failed`, `no_reliable_data` or `succeeded_low_confidence` means the run itself needs a look.
+`researchAwaitingReview` is how finished research gets noticed at all — a run takes 2-5 minutes, so whoever asked for it is rarely still waiting. Each entry carries `pendingUpdateCount` (CRM changes still undecided — read them with `list_research_proposed_updates`) and a `status`; `failed`, `no_reliable_data` or `succeeded_low_confidence` means the run itself needs a look.
+
+Reading the proposals is yours; **deciding them is not**. `resolve_research_proposed_update` writes to the customer's own records, so it asks the person first — and Claude.ai and ChatGPT cannot show that question, so from either of those it always answers `confirmation_required` and changes nothing. Summarise what the run proposes and point the person at `/research/<run id>`, where they can apply or reject each one. The same holds for `resolve_research_paid_action` (it spends money), `delete_research`, and raising a limit with `research_policy` — relay the `nextStep` rather than retrying, since retrying gives the same answer.
 
 ## Pages
 
