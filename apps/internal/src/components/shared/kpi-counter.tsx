@@ -14,25 +14,32 @@ import { brushedMetalPlate } from '#/lib/workshop-mixins'
  * counter flipping through numbers.
  *
  * Used sparingly — only for dashboard hero KPIs and list-intro totals.
+ *
+ * `density='compact'` keeps the plate and its digits but takes far less height,
+ * for a screen showing several at once. At full size four of these fill a phone
+ * for more than a screen and a short laptop almost entirely, which pushes
+ * everything worth acting on below the fold.
  */
 export function KpiCounter({
 	value,
 	label,
 	suffix,
+	density = 'comfortable',
 }: {
 	value: number
 	label: string
 	suffix?: string
+	density?: 'comfortable' | 'compact'
 }) {
 	const ref = useRef<HTMLDivElement>(null)
 	const inView = useInView(ref, { once: true, amount: 0.4 })
 	return (
-		<MetalPlate ref={ref}>
+		<MetalPlate ref={ref} $compact={density === 'compact'}>
 			<ScrewDot $position='top-left' $size={6} aria-hidden />
 			<ScrewDot $position='top-right' $size={6} aria-hidden />
 			<ScrewDot $position='bottom-left' $size={6} aria-hidden />
 			<ScrewDot $position='bottom-right' $size={6} aria-hidden />
-			<Digits>
+			<Digits $compact={density === 'compact'}>
 				<AnimateNumber
 					format={{ useGrouping: true }}
 					transition={{
@@ -49,23 +56,33 @@ export function KpiCounter({
 	)
 }
 
-const MetalPlate = styled.div.withConfig({ displayName: 'KpiCounterPlate' })`
+const MetalPlate = styled.div.withConfig({
+	displayName: 'KpiCounterPlate',
+	shouldForwardProp: prop => prop !== '$compact',
+})<{ $compact?: boolean }>`
 	${brushedMetalPlate}
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-xs);
-	padding: var(--space-lg) var(--space-lg) var(--space-md);
+	gap: ${p => (p.$compact ? 'var(--space-3xs)' : 'var(--space-xs)')};
+	padding: ${p =>
+		p.$compact
+			? 'var(--space-sm) var(--space-md)'
+			: 'var(--space-lg) var(--space-lg) var(--space-md)'};
 	border-radius: var(--shape-2xs);
 	box-shadow: var(--elevation-workshop-md);
 	min-width: 0;
 `
 
-const Digits = styled.div.withConfig({ displayName: 'KpiCounterDigits' })`
+const Digits = styled.div.withConfig({
+	displayName: 'KpiCounterDigits',
+	shouldForwardProp: prop => prop !== '$compact',
+})<{ $compact?: boolean }>`
 	display: inline-flex;
 	align-items: baseline;
 	gap: var(--space-3xs);
 	font-family: var(--font-display);
-	font-size: clamp(2.5rem, 6vw, 4rem);
+	font-size: ${p =>
+		p.$compact ? 'clamp(1.5rem, 3.5vw, 2rem)' : 'clamp(2.5rem, 6vw, 4rem)'};
 	font-weight: var(--font-weight-bold);
 	line-height: 1;
 	letter-spacing: 0.02em;

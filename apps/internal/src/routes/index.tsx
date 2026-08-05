@@ -310,11 +310,19 @@ function PipelinePage() {
 			<KpiRow>
 				<KpiLink>
 					<Link to='/companies' aria-label={t`Active companies`} />
-					<KpiCounter value={activeCompanyCount} label={t`Active companies`} />
+					<KpiCounter
+						value={activeCompanyCount}
+						label={t`Active companies`}
+						density='compact'
+					/>
 				</KpiLink>
 				<KpiLink>
 					<Link to='/tasks' aria-label={t`Open tasks`} />
-					<KpiCounter value={openTaskCount} label={t`Open tasks`} />
+					<KpiCounter
+						value={openTaskCount}
+						label={t`Open tasks`}
+						density='compact'
+					/>
 				</KpiLink>
 				<KpiLink>
 					<Link
@@ -322,7 +330,11 @@ function PipelinePage() {
 						search={{ shelf: 'overdue' }}
 						aria-label={t`Overdue`}
 					/>
-					<KpiCounter value={taskCounts?.overdue ?? 0} label={t`Overdue`} />
+					<KpiCounter
+						value={taskCounts?.overdue ?? 0}
+						label={t`Overdue`}
+						density='compact'
+					/>
 				</KpiLink>
 				<KpiLink>
 					<Link
@@ -333,6 +345,7 @@ function PipelinePage() {
 					<KpiCounter
 						value={snapshot?.companiesWithoutNextAction ?? 0}
 						label={t`Needs action`}
+						density='compact'
 					/>
 				</KpiLink>
 			</KpiRow>
@@ -717,13 +730,18 @@ const Subtitle = styled.p.withConfig({ displayName: 'PipelineSubtitle' })`
 	font-style: italic;
 `
 
+/**
+ * Two across, never more. Four counters in a three-column grid left the fourth
+ * stranded on a row of its own at every width, and a single column stacked them
+ * into more than a phone screen of counters before any work appeared.
+ */
 const KpiRow = styled.div.withConfig({ displayName: 'PipelineKpiRow' })`
 	display: grid;
-	grid-template-columns: 1fr;
-	gap: var(--space-md);
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: var(--space-sm);
 
-	@media (min-width: 640px) {
-		grid-template-columns: repeat(3, 1fr);
+	@media (min-width: 768px) {
+		gap: var(--space-md);
 	}
 `
 
@@ -936,13 +954,15 @@ const ResearchNote = styled.span.withConfig({
 	color: var(--color-on-surface-variant);
 `
 
+// Splits at the same width the card grid does, so a tablet stops stacking these
+// full-width and pushing everything below them off the screen.
 const TwoColumn = styled.div.withConfig({ displayName: 'PipelineTwoColumn' })`
 	display: grid;
-	grid-template-columns: 1fr;
+	grid-template-columns: minmax(0, 1fr);
 	gap: var(--space-lg);
 
-	@media (min-width: 1024px) {
-		grid-template-columns: 1fr 1fr;
+	@media (min-width: 768px) {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 `
 
@@ -950,15 +970,13 @@ const CompanyGrid = styled.div.withConfig({
 	displayName: 'PipelineCompanyGrid',
 })`
 	display: grid;
-	grid-template-columns: 1fr;
+	/* Two at most, matching the companies list, which caps there on purpose: a
+	 * single card already fills a desktop column comfortably. */
+	grid-template-columns: minmax(0, 1fr);
 	gap: var(--space-sm);
 
 	@media (min-width: 768px) {
-		grid-template-columns: 1fr 1fr;
-	}
-
-	@media (min-width: 1024px) {
-		grid-template-columns: 1fr 1fr 1fr;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 
 	/* Micro-rotate file cards to break grid rhythm — each card straightens
