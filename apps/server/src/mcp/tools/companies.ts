@@ -36,7 +36,11 @@ import {
 import { listIndustries } from '../../services/company-industries'
 import { recordStageChange } from '../../services/company-stage-change'
 import { Geocoder } from '../../services/geocoder'
-import { TimelineActivityService } from '../../services/timeline-activity'
+import {
+	CompanyDeleted,
+	CompanyRestored,
+	TimelineActivityService,
+} from '../../services/timeline-activity'
 import { CurrentUser } from '../current-user'
 import { ToolMessage } from '../tool-message'
 import { McpPageLimit, McpPageOffset, PageResult, toPage } from './_result'
@@ -337,12 +341,45 @@ const ListIndustries = Tool.make('list_industries', {
 	.annotate(Tool.Destructive, false)
 	.annotate(Tool.OpenWorld, false)
 
+const DeleteCompany = Tool.make('delete_company', {
+	description:
+		'Take a company out of view — off the lists, out of the pipeline figures, and away from the people working it. Its contacts go with it, and its history is kept rather than thrown away, so restore_company puts the lot back. The name is released, so the same firm can be added again afterwards; if somebody does that, restoring the old one needs it renamed first. Nothing is lost, but nobody sees it until it comes back, so say what you are about to remove and let the person confirm before calling this.',
+	parameters: Schema.Struct({
+		id: Schema.String,
+	}),
+	success: Schema.Struct({
+		contacts_affected: Schema.Number,
+	}),
+	dependencies: REQUEST_DEPENDENCIES,
+})
+	.annotate(Tool.Title, 'Delete Company')
+	.annotate(Tool.Destructive, true)
+	.annotate(Tool.OpenWorld, false)
+
+const RestoreCompany = Tool.make('restore_company', {
+	description:
+		'Put a deleted company back, along with the people that deletion hid. Use the company id; a deleted company cannot be found by name, because its name was released when it went. Refused when another company is using that name now — rename that one first, then try again.',
+	parameters: Schema.Struct({
+		id: Schema.String,
+	}),
+	success: Schema.Struct({
+		contacts_affected: Schema.Number,
+	}),
+	dependencies: REQUEST_DEPENDENCIES,
+})
+	.annotate(Tool.Title, 'Restore Company')
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.Idempotent, true)
+	.annotate(Tool.OpenWorld, false)
+
 export const CompanyTools = Toolkit.make(
 	SearchCompanies,
 	GetCompany,
 	CreateCompanies,
 	UpdateCompany,
 	GeocodeCompany,
+	DeleteCompany,
+	RestoreCompany,
 	ManageCompanySites,
 	ManageCompanyChannels,
 	ManageCompanyRelations,
@@ -663,6 +700,58 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 					}
 					return { relations: yield* list() }
 				}).pipe(Effect.orDie),
+			delete_company: ({ id }) =>
+				Effect.gen(function* () {
+					const currentUser = yield* CurrentUser
+					const result = yield* service.softDelete(id)
+					yield* timeline
+						.record(
+							new CompanyDeleted({
+								companyId: id,
+								contactsAffected: result.contactsAffected,
+								actorUserId: currentUser.userId,
+								occurredAt: result.at,
+							}),
+						)
+						.pipe(Effect.provideService(TimelineActivityService, timeline))
+					return { contacts_affected: result.contactsAffected }
+				}).pipe(
+					Effect.catchTag('NotFound', () =>
+						Effect.die(
+							new ToolMessage(
+								'No company here with that id, or it is already deleted.',
+							),
+						),
+					),
+					Effect.orDie,
+				),
+			restore_company: ({ id }) =>
+				Effect.gen(function* () {
+					const currentUser = yield* CurrentUser
+					const result = yield* service.restore(id)
+					yield* timeline
+						.record(
+							new CompanyRestored({
+								companyId: id,
+								contactsAffected: result.contactsAffected,
+								actorUserId: currentUser.userId,
+								occurredAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
+							}),
+						)
+						.pipe(Effect.provideService(TimelineActivityService, timeline))
+					return { contacts_affected: result.contactsAffected }
+				}).pipe(
+					// Both of these are the caller's to act on, so they leave as words.
+					Effect.catchTag('BadRequest', e =>
+						Effect.die(new ToolMessage(e.message)),
+					),
+					Effect.catchTag('NotFound', () =>
+						Effect.die(
+							new ToolMessage('No deleted company here with that id.'),
+						),
+					),
+					Effect.orDie,
+				),
 			geocode_company: ({ id }) =>
 				geocodeCompany(id).pipe(
 					Effect.provideService(CompanyService, service),

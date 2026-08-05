@@ -53,6 +53,9 @@ export interface CompanyFilters {
 	// How long counts as gone quiet, for `attention: 'stale'`. Carried on the
 	// link so the list matches the threshold the dashboard was showing.
 	readonly staleDays?: number | undefined
+	// Which companies to look at: the live ones by default, 'only' for the ones
+	// taken out of view (how somebody finds one to put back), 'include' for both.
+	readonly deleted?: 'only' | 'include' | undefined
 	// One of the whitelisted sort keys below; anything else falls back to priority.
 	readonly sort?: string | undefined
 	readonly query?: string | undefined
@@ -92,6 +95,13 @@ export class CompanyService extends Context.Service<CompanyService>()(
 						const conditions: Array<Statement.Fragment> = [
 							sql`organization_id = ${currentOrg.id}`,
 						]
+						// Deleted companies are out of view unless they are what was
+						// asked for. The count below reads the same list, so this covers
+						// the total a page shows as well as its rows.
+						if (filters.deleted === 'only')
+							conditions.push(sql`deleted_at IS NOT NULL`)
+						else if (filters.deleted !== 'include')
+							conditions.push(sql`deleted_at IS NULL`)
 						if (filters.status) conditions.push(sql`status = ${filters.status}`)
 						if (filters.country)
 							conditions.push(sql`country = ${filters.country}`)
