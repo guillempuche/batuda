@@ -224,14 +224,33 @@ describe('delete_company', () => {
 	})
 
 	describe('when it is already deleted', () => {
-		it('should say so rather than pretend to delete it twice', async () => {
+		it('should report it as already gone rather than as a failure', async () => {
+			// GIVEN a company deleted once — a caller whose connection dropped has
+			// no way to know whether the first call landed, so a second one has to
+			// be safe to make
 			const companyId = await seedCompany('twice')
 			await deleteCompany(companyId)
 
+			// WHEN the same delete is sent again
 			const again = await deleteCompany(companyId)
-			expect(again.ok).toBe(false)
-			if (again.ok) return
-			expect(again.message).toContain('already deleted')
+
+			// THEN it succeeds, saying plainly that nothing was left to do
+			expect(again.ok).toBe(true)
+			if (!again.ok) return
+			expect(again.result?.['already_deleted']).toBe(true)
+			expect(again.result?.['contacts_affected']).toBe(0)
+		})
+	})
+
+	describe('when the id belongs to no company at all', () => {
+		it('should say so, which is a different thing from already gone', async () => {
+			// GIVEN an id nobody here has
+			const result = await deleteCompany(randomUUID())
+
+			// THEN it is refused, so a typo is not mistaken for work already done
+			expect(result.ok).toBe(false)
+			if (result.ok) return
+			expect(result.message).toContain('No company here with that id')
 		})
 	})
 })
@@ -266,8 +285,11 @@ describe('restore_company', () => {
 			// WHEN it is restored
 			const result = await restoreCompany(companyId)
 
-			// THEN the company and the person hidden with it are both back
+			// THEN the company and the person hidden with it are both back, and the
+			// count says so rather than quietly reporting nobody
 			expect(result.ok).toBe(true)
+			if (!result.ok) return
+			expect(result.result?.['contacts_affected']).toBe(1)
 			expect(await searchSlugs()).toContain(`${MARKER}-restore`)
 			expect(await isDeleted('contacts', contactId)).toBe(false)
 		})

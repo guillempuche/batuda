@@ -353,6 +353,9 @@ const DeleteCompany = Tool.make('delete_company', {
 	}),
 	success: Schema.Struct({
 		contacts_affected: Schema.Number,
+		// True when it was already gone before this call, so retrying a delete
+		// that may not have landed reads as done rather than as a failure.
+		already_deleted: Schema.Boolean,
 	}),
 	dependencies: REQUEST_DEPENDENCIES,
 })
@@ -716,6 +719,9 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 				Effect.gen(function* () {
 					const currentUser = yield* CurrentUser
 					const result = yield* service.softDelete(id)
+					// Nothing happened, so nothing is written onto its history.
+					if (result.alreadyDeleted)
+						return { contacts_affected: 0, already_deleted: true }
 					yield* timeline
 						.record(
 							new CompanyDeleted({
@@ -726,14 +732,13 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 							}),
 						)
 						.pipe(Effect.provideService(TimelineActivityService, timeline))
-					return { contacts_affected: result.contactsAffected }
+					return {
+						contacts_affected: result.contactsAffected,
+						already_deleted: false,
+					}
 				}).pipe(
 					Effect.catchTag('NotFound', () =>
-						Effect.die(
-							new ToolMessage(
-								'No company here with that id, or it is already deleted.',
-							),
-						),
+						Effect.die(new ToolMessage('No company here with that id.')),
 					),
 					Effect.orDie,
 				),

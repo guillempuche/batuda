@@ -165,6 +165,8 @@ export const CompaniesLive = HttpApiBuilder.group(
 					Effect.gen(function* () {
 						const session = yield* SessionContext
 						const result = yield* svc.softDelete(_.params.id)
+						if (result.alreadyDeleted)
+							return { contactsAffected: 0, alreadyDeleted: true }
 						yield* timeline.record(
 							new CompanyDeleted({
 								companyId: _.params.id,
@@ -180,7 +182,10 @@ export const CompaniesLive = HttpApiBuilder.group(
 								contactsAffected: result.contactsAffected,
 							}),
 						)
-						return { contactsAffected: result.contactsAffected }
+						return {
+							contactsAffected: result.contactsAffected,
+							alreadyDeleted: false,
+						}
 					}).pipe(
 						Effect.catch(e =>
 							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),

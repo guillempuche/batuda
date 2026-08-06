@@ -104,6 +104,8 @@ export const CreateCompanyInput = Schema.Struct({
 // and the edit came back as a rejected change with nothing to explain it.
 export const DeleteCompanyResult = Schema.Struct({
 	contactsAffected: Schema.Number,
+	// True when it was already gone, so a retried delete reads as done.
+	alreadyDeleted: Schema.optional(Schema.Boolean),
 })
 
 export const UpdateCompanyInput = Schema.Struct({

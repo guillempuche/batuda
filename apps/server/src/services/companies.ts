@@ -324,14 +324,27 @@ export class CompanyService extends Context.Service<CompanyService>()(
 						const currentOrg = yield* CurrentOrg
 						const at = DateTime.toDateUtc(DateTime.nowUnsafe())
 						const rows = yield* sql`
-							UPDATE companies SET deleted_at = ${at}, updated_at = ${at}
+							UPDATE companies
+							SET deleted_at = ${at}, updated_at = ${at},
+								version = version + 1
 							WHERE id = ${id}
 								AND organization_id = ${currentOrg.id}
 								AND deleted_at IS NULL
 							RETURNING id
 						`
-						if (rows.length === 0)
-							return yield* new NotFound({ entity: 'company', id })
+						if (rows.length === 0) {
+							// Nothing changed, but the reason matters to the caller: a
+							// company already gone is the outcome they wanted, while one
+							// that never existed is a mistake worth telling them about.
+							const existing = yield* sql`
+								SELECT deleted_at FROM companies
+								WHERE id = ${id} AND organization_id = ${currentOrg.id}
+								LIMIT 1
+							`
+							return existing.length > 0
+								? { contactsAffected: 0, at, alreadyDeleted: true as const }
+								: yield* new NotFound({ entity: 'company', id })
+						}
 						const contacts = yield* sql`
 							UPDATE contacts SET deleted_at = ${at}, updated_at = ${at}
 							WHERE company_id = ${id}
@@ -339,7 +352,11 @@ export class CompanyService extends Context.Service<CompanyService>()(
 								AND deleted_at IS NULL
 							RETURNING id
 						`
-						return { contactsAffected: contacts.length, at }
+						return {
+							contactsAffected: contacts.length,
+							at,
+							alreadyDeleted: false as const,
+						}
 					}),
 
 				// Put it back. The name has to be free first: deleting released it,
@@ -377,7 +394,9 @@ export class CompanyService extends Context.Service<CompanyService>()(
 						// so a company created between the check above and here loses the
 						// race cleanly instead of raising a duplicate key nobody maps.
 						const revived = yield* sql`
-							UPDATE companies SET deleted_at = NULL, updated_at = ${at}
+							UPDATE companies
+							SET deleted_at = NULL, updated_at = ${at},
+								version = version + 1
 							WHERE id = ${id}
 								AND organization_id = ${currentOrg.id}
 								AND NOT EXISTS (
@@ -598,7 +617,8 @@ export class CompanyService extends Context.Service<CompanyService>()(
 								'outgoing' AS direction,
 								c2.id AS "companyId", c2.name, c2.slug
 							FROM company_relations r
-							JOIN companies c2 ON c2.id = r.related_company_id
+							JOIN companies c2
+								ON c2.id = r.related_company_id AND c2.deleted_at IS NULL
 							WHERE r.company_id = ${companyId}
 								AND r.organization_id = ${currentOrg.id}
 							UNION ALL

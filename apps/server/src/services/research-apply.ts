@@ -448,6 +448,9 @@ export const occUpdate = (
 				updated_at = now()
 			WHERE id = ${subjectId}
 				AND organization_id = ${orgId}
+				-- Hidden with their company, so a suggestion about them has nowhere
+				-- to show either.
+				AND deleted_at IS NULL
 				AND version = ${expectedVersion}
 			RETURNING version
 		`
