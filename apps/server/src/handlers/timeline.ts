@@ -13,6 +13,7 @@ import {
 	takePage,
 	totalColumn,
 } from '../lib/sql-pagination'
+import { companyVisible } from '../services/company-liveness'
 
 const decodeActivities = Schema.decodeUnknownEffect(
 	Schema.Array(TimelineActivity),
@@ -26,7 +27,10 @@ export const TimelineLive = HttpApiBuilder.group(
 			const sql = yield* SqlClient.SqlClient
 			return handlers.handle('list', _ =>
 				Effect.gen(function* () {
-					const conditions: Array<Statement.Fragment> = []
+					const conditions: Array<Statement.Fragment> = [
+						// History belonging to a company nobody can open goes with it.
+						companyVisible(sql, sql`company_id`),
+					]
 					if (_.query.companyId)
 						conditions.push(sql`company_id = ${_.query.companyId}`)
 					if (_.query.contactId)

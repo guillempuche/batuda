@@ -5,6 +5,7 @@ import { SqlClient } from 'effect/unstable/sql'
 
 import { TimelineActivity, TimelineEntityType } from '@batuda/domain'
 
+import { companyVisible } from '../../services/company-liveness'
 import { McpPageLimit, TruncatableResult, toTruncatable } from './_result'
 
 const decodeActivities = Schema.decodeUnknownEffect(
@@ -39,7 +40,10 @@ export const TimelineHandlersLive = TimelineTools.toLayer(
 		return {
 			list_timeline: params =>
 				Effect.gen(function* () {
-					const conditions: Array<Statement.Fragment> = []
+					const conditions: Array<Statement.Fragment> = [
+						// History belonging to a company nobody can open goes with it.
+						companyVisible(sql, sql`company_id`),
+					]
 					if (params.company_id)
 						conditions.push(sql`company_id = ${params.company_id}`)
 					if (params.contact_id)

@@ -3,6 +3,7 @@ import { McpServer } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { CompanyService } from '../../services/companies'
+import { companyVisible } from '../../services/company-liveness'
 import { completeCompanySlug } from './_completions'
 import { LangParam, langDirective } from './_lang'
 
@@ -28,8 +29,12 @@ export const CompanyResearchPrompt = McpServer.prompt({
 				WHERE dl.subject_table = 'companies' AND dl.subject_id = ${companyId}
 				ORDER BY d.updated_at DESC
 			`
-			const tasks =
-				yield* sql`SELECT * FROM tasks WHERE company_id = ${companyId} AND completed_at IS NULL ORDER BY due_at`
+			const tasks = yield* sql`
+					SELECT * FROM tasks
+					WHERE company_id = ${companyId} AND completed_at IS NULL
+						AND ${companyVisible(sql, sql`company_id`)}
+					ORDER BY due_at
+				`
 
 			return `${langDirective(lang)}
 

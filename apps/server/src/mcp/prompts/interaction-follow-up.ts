@@ -3,6 +3,7 @@ import { McpServer } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { CompanyService } from '../../services/companies'
+import { companyVisible } from '../../services/company-liveness'
 import { completeCompanySlug } from './_completions'
 import { LangParam, langDirective } from './_lang'
 
@@ -26,10 +27,12 @@ export const InteractionFollowUpPrompt = McpServer.prompt({
 				SELECT i.*, ct.name as contact_name, ct.role as contact_role
 				FROM interactions i LEFT JOIN contacts ct ON i.contact_id = ct.id
 				WHERE i.company_id = ${companyId}
+					AND ${companyVisible(sql, sql`i.company_id`)}
 				ORDER BY i.date DESC LIMIT 10`
 			const openTasks = yield* sql`
 				SELECT * FROM tasks
 				WHERE company_id = ${companyId} AND completed_at IS NULL
+					AND ${companyVisible(sql, sql`company_id`)}
 				ORDER BY due_at`
 
 			return `${langDirective(lang)}

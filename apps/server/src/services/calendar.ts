@@ -34,6 +34,7 @@ import {
 	ParticipantMatcher,
 } from '@batuda/email/participant-matcher'
 
+import { companyVisible } from './company-liveness'
 import {
 	MeetingCancelled,
 	MeetingRescheduled,
@@ -1416,6 +1417,7 @@ export class CalendarService extends Context.Service<CalendarService>()(
 					FROM calendar_events e
 					JOIN calendar_event_attendees a ON a.event_id = e.id
 					WHERE lower(a.email) = ${args.attendeeEmail.toLowerCase()}
+						AND ${companyVisible(sql, sql`e.company_id`)}
 						AND a.rsvp = 'needs-action'
 						AND e.start_at > now()
 						AND e.status <> 'cancelled'
