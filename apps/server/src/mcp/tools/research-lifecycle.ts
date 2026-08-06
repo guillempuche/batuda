@@ -53,9 +53,13 @@ const NotApproved = Schema.Struct({
 })
 
 // Where in the app a person can do this themselves. Named here so a refusal
-// can point somewhere real rather than telling the model to try again.
+// points somewhere real rather than telling the model to try again. A run's own
+// page carries both deleting it and deciding its proposed changes; the pending
+// paid lookups are on the research list; the limits are in settings.
 const RESEARCH_LIST_PAGE = '/research'
-const RESEARCH_BUDGET_PAGE = 'Research budget, under organization settings'
+const runPage = (id: string) => `/research/${id}`
+const RESEARCH_BUDGET_PAGE =
+	'Settings → Organization → Research budget (/settings/organization/policy)'
 
 // Put an unapproved answer into the shape the tool returns. `declined` is a
 // decision and ends there; `unaskable` is not, so it says where a person can
@@ -175,12 +179,13 @@ const AttachResearch = Tool.make('attach_research', {
 
 const DeleteResearch = Tool.make('delete_research', {
 	description:
-		'Soft-delete a research run (sets status=deleted; the row stays for audit but stops appearing in list_research). Asks the person first and does nothing until they agree: {status:"cancelled"} means they said no, {status:"confirmation_required"} means this client has no way to ask them — relay nextStep rather than retrying, since retrying gives the same answer.',
+		'Soft-delete a research run (sets status=deleted; the row stays for audit but stops appearing in list_research). Returns {error:"not_found"} for a run this organization does not have. Otherwise asks the person first and does nothing until they agree: {status:"cancelled"} means they said no, {status:"confirmation_required"} means this client has no way to ask them — relay nextStep rather than retrying, since retrying gives the same answer.',
 	parameters: Schema.Struct({
 		id: Uuid,
 	}),
 	success: Schema.Union([
 		Schema.Struct({ status: Schema.Literal('deleted') }),
+		Schema.Struct({ error: Schema.Literal('not_found') }),
 		NotApproved,
 	]),
 	dependencies: REQUEST_DEPENDENCIES,
@@ -351,11 +356,17 @@ export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 				}).pipe(redactDbErrors),
 			delete_research: ({ id }) =>
 				Effect.gen(function* () {
+					// Established before anybody is asked. A run belonging to another
+					// organization is invisible here, and the delete would quietly do
+					// nothing — so without this a person is asked to confirm deleting
+					// something that is not there, and then told it was deleted.
+					if ((yield* svc.get(id)) === null)
+						return { error: 'not_found' as const }
 					const answer = yield* requireApproval(
 						`Delete research run ${id}? It stops appearing in the research list.`,
 					)
 					if (answer !== 'confirmed')
-						return notApproved(answer, 'delete this run', RESEARCH_LIST_PAGE)
+						return notApproved(answer, 'delete this run', runPage(id))
 					yield* svc.softDelete(id)
 					return { status: 'deleted' as const }
 				}).pipe(redactDbErrors),
@@ -401,11 +412,7 @@ export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 							`Apply the proposed change from research run ${id} to your CRM records?`,
 						)
 						if (answer !== 'confirmed')
-							return notApproved(
-								answer,
-								'apply this change',
-								`${RESEARCH_LIST_PAGE}/${id}`,
-							)
+							return notApproved(answer, 'apply this change', runPage(id))
 					}
 					const { userId } = yield* SessionContext
 					return yield* resolveResearchProposedUpdate(
