@@ -30,6 +30,9 @@ export type CompaniesSearch = {
 	// dashboard heading sets this, and the threshold it was showing rides along.
 	readonly attention?: AttentionFilter
 	readonly staleDays?: number
+	// 'only' asks for the companies taken out of view, which is how one is found
+	// again to be put back. Absent means the ones in use.
+	readonly deleted?: 'only' | 'include'
 }
 
 /**
@@ -130,6 +133,12 @@ export function canonicalSearchKey(search: CompaniesSearch): string {
 	}
 	if (search.staleDays !== undefined) {
 		entries.push(['staleDays', search.staleDays])
+	}
+	// Part of the key, not just the query: the deleted companies and the ones in
+	// use are two different lists. Left out, both answer to the same key and
+	// asking for one serves whatever the other last fetched.
+	if (search.deleted !== undefined) {
+		entries.push(['deleted', search.deleted])
 	}
 	entries.sort(([a], [b]) => a.localeCompare(b))
 	return JSON.stringify(Object.fromEntries(entries))

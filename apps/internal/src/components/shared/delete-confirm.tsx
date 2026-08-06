@@ -4,14 +4,12 @@ import styled from 'styled-components'
 
 import { PriButton, PriDialog } from '@batuda/ui/pri'
 
-import { DialogActions } from './instruction-page-chrome'
-
-// Delete-confirmation dialog shared by the personal and org template pages.
-// The plumbing is identical — a focus-trapped popup, a Delete button that
-// disables while the delete runs, and Cancel — so each page passes only its
-// own wording and a test id. The dialog stays open mid-delete so a row can't
-// disappear under a half-finished action.
-export function TemplateDeleteConfirm({
+// Asking before something is removed. The plumbing is the same wherever it is
+// asked — a focus-trapped popup, a confirm button that disables while the work
+// runs, and Cancel — so each caller passes only its own wording and a test id.
+// The dialog stays open mid-action so a row cannot disappear under a
+// half-finished one.
+export function DeleteConfirm({
 	open,
 	deleting,
 	onConfirm,
@@ -19,6 +17,9 @@ export function TemplateDeleteConfirm({
 	testId,
 	title,
 	description,
+	confirmLabel,
+	busyLabel,
+	destructive,
 }: {
 	readonly open: boolean
 	readonly deleting: boolean
@@ -27,6 +28,11 @@ export function TemplateDeleteConfirm({
 	readonly testId: string
 	readonly title: ReactNode
 	readonly description: ReactNode
+	// What the confirm button says. Defaults to Delete; a caller undoing
+	// something rather than removing it passes its own word.
+	readonly confirmLabel?: ReactNode
+	readonly busyLabel?: ReactNode
+	readonly destructive?: boolean
 }) {
 	return (
 		<PriDialog.Root
@@ -56,12 +62,14 @@ export function TemplateDeleteConfirm({
 						{/* Confirm button gets its own selector so tests can click it apart from the popup. */}
 						<PriButton
 							type='button'
-							$variant='destructive'
+							$variant={destructive === false ? 'filled' : 'destructive'}
 							data-testid={`${testId}-button`}
 							disabled={deleting}
 							onClick={onConfirm}
 						>
-							{deleting ? <Trans>Deleting…</Trans> : <Trans>Delete</Trans>}
+							{deleting
+								? (busyLabel ?? <Trans>Deleting…</Trans>)
+								: (confirmLabel ?? <Trans>Delete</Trans>)}
 						</PriButton>
 					</SheetActions>
 				</PriDialog.Popup>
@@ -73,7 +81,12 @@ export function TemplateDeleteConfirm({
 // On the phone action sheet the buttons stack full-width in the thumb zone.
 // column-reverse puts the destructive Delete on top and Cancel at the bottom
 // (most reachable, the safe default) while Cancel stays first in the DOM.
-const SheetActions = styled(DialogActions)`
+const SheetActions = styled.div`
+	display: flex;
+	gap: var(--space-sm);
+	justify-content: flex-end;
+	margin-top: var(--space-md);
+
 	@media (max-width: 40rem) {
 		flex-direction: column-reverse;
 		align-items: stretch;

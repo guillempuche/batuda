@@ -192,6 +192,10 @@ msgstr "{entered} entered the records, {leftover} still need you."
 msgid "{groupLabel} sections"
 msgstr "{groupLabel} sections"
 
+#: src/routes/companies/index.tsx
+msgid "{name} is back"
+msgstr "{name} is back"
+
 #: src/components/research/research-dialog.tsx
 msgid "{scoped} (default)"
 msgstr "{scoped} (default)"
@@ -574,6 +578,10 @@ msgstr "An owner removed this one. Ask them to allow it again."
 msgid "and {hidden} more on the run"
 msgstr "and {hidden} more on the run"
 
+#: src/routes/companies/index.tsx
+msgid "Another company may be using its name now."
+msgstr "Another company may be using its name now."
+
 #: src/routes/settings/organization/industries.tsx
 msgid "Another industry may already go by that name — merge them instead."
 msgstr "Another industry may already go by that name — merge them instead."
@@ -931,7 +939,6 @@ msgstr "Calls"
 #: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/instructions/stack-editor.tsx
-#: src/components/instructions/template-delete-confirm.tsx
 #: src/components/instructions/template-dialog.tsx
 #: src/components/instructions/template-transfer-dialog.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
@@ -939,6 +946,7 @@ msgstr "Calls"
 #: src/components/research/research-dialog.tsx
 #: src/components/research/review/proposed-updates-review.tsx
 #: src/components/research/run-actions.tsx
+#: src/components/shared/delete-confirm.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/settings/api-keys/index.tsx
@@ -1170,6 +1178,7 @@ msgstr "Companies marked hot with nothing scheduled at all. One that has also go
 msgid "Company"
 msgstr "Company"
 
+#: src/routes/companies/$slug.tsx
 #: src/routes/companies/$slug.tsx
 msgid "Company deleted"
 msgstr "Company deleted"
@@ -1440,6 +1449,10 @@ msgid "Could not load — retry"
 msgstr "Could not load — retry"
 
 #: src/routes/companies/$slug.tsx
+msgid "Could not delete this company"
+msgstr "Could not delete this company"
+
+#: src/routes/companies/$slug.tsx
 msgid "Could not load activity"
 msgstr "Could not load activity"
 
@@ -1585,6 +1598,10 @@ msgstr "Could not rename {0}"
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Could not resolve this proposal."
 msgstr "Could not resolve this proposal."
+
+#: src/routes/companies/index.tsx
+msgid "Could not restore {name}"
+msgstr "Could not restore {name}"
 
 #: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/connections.tsx
@@ -1914,10 +1931,11 @@ msgstr "Defaults to the email address."
 msgid "Defaults to you when omitted."
 msgstr "Defaults to you when omitted."
 
-#: src/components/instructions/template-delete-confirm.tsx
 #: src/components/instructions/template-dialog.tsx
 #: src/components/instructions/template-library.tsx
 #: src/components/research/run-actions.tsx
+#: src/components/shared/delete-confirm.tsx
+#: src/routes/companies/$slug.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/settings/api-keys/index.tsx
 msgid "Delete"
@@ -1952,6 +1970,10 @@ msgstr "Delete inbox {0}? Stored messages stay; the connection stops."
 msgid "Delete key"
 msgstr "Delete key"
 
+#: src/routes/companies/$slug.tsx
+msgid "Delete this company?"
+msgstr "Delete this company?"
+
 #: src/routes/emails/inboxes.tsx
 msgid "Delete this footer? This cannot be undone."
 msgstr "Delete this footer? This cannot be undone."
@@ -1973,11 +1995,12 @@ msgid "Delete this template?"
 msgstr "Delete this template?"
 
 #: src/components/research/run-labels.ts
+#: src/routes/companies/index.tsx
 msgid "Deleted"
 msgstr "Deleted"
 
-#: src/components/instructions/template-delete-confirm.tsx
 #: src/components/research/run-actions.tsx
+#: src/components/shared/delete-confirm.tsx
 #: src/routes/settings/api-keys/index.tsx
 #: src/routes/settings/api-keys/index.tsx
 msgid "Deleting…"
@@ -2801,6 +2824,10 @@ msgstr "It can no longer reach this organization."
 #: src/routes/settings/mcp/connections.tsx
 msgid "It can reach this organization from its next request."
 msgstr "It can reach this organization from its next request."
+
+#: src/routes/companies/$slug.tsx
+msgid "It comes off the lists and the pipeline, and its people go with it. Its history is kept, and you can put it back from the Deleted filter on the companies page."
+msgstr "It comes off the lists and the pipeline, and its people go with it. Its history is kept, and you can put it back from the Deleted filter on the companies page."
 
 #: src/routes/login.tsx
 msgid "It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it? Check spam."
@@ -4748,6 +4775,14 @@ msgstr "Respond to the organizer"
 msgid "Responded"
 msgstr "Responded"
 
+#: src/routes/companies/index.tsx
+msgid "Restore"
+msgstr "Restore"
+
+#: src/routes/companies/index.tsx
+msgid "Restoring…"
+msgstr "Restoring…"
+
 #. placeholder {0}: drafts.length
 #: src/routes/emails/index.tsx
 msgid "Resume drafting ({0})"
@@ -5455,6 +5490,10 @@ msgstr "Tags filter (comma-separated)"
 #: src/components/instructions/template-library.tsx
 msgid "Take \"{0}\" out of your stacks first — they would lose it once somebody else owns it."
 msgstr "Take \"{0}\" out of your stacks first — they would lose it once somebody else owns it."
+
+#: src/routes/companies/$slug.tsx
+msgid "Take this company out of view"
+msgstr "Take this company out of view"
 
 #: src/components/companies/conversations-tab.tsx
 #: src/components/shared/channel-icon.tsx

@@ -16,6 +16,7 @@ import {
 	deleteTemplateAtom,
 	transferTemplateAtom,
 } from '#/atoms/instruction-atoms'
+import { DeleteConfirm } from '#/components/shared/delete-confirm'
 import { ErrorState } from '#/components/shared/error-state'
 import { authClient } from '#/lib/auth-client'
 import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
@@ -33,7 +34,6 @@ import {
 	TemplateRowItem,
 } from './instruction-page-chrome'
 import { outcomeOf, type TemplateShape } from './instruction-shapes'
-import { TemplateDeleteConfirm } from './template-delete-confirm'
 import { TemplateDialog } from './template-dialog'
 import { TemplateTransferDialog } from './template-transfer-dialog'
 
@@ -360,7 +360,7 @@ export function TemplateLibrary({
 				testId={testIds.dialog}
 			/>
 
-			<TemplateDeleteConfirm
+			<DeleteConfirm
 				open={confirmDelete !== null}
 				deleting={deleting}
 				onConfirm={() => {

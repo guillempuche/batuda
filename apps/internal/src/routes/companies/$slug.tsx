@@ -7,6 +7,7 @@ import {
 	Link,
 	notFound,
 	stripSearchParams,
+	useNavigate,
 } from '@tanstack/react-router'
 import { DateTime, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
@@ -30,6 +31,7 @@ import {
 	Phone,
 	Plus,
 	Settings2,
+	Trash2,
 } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useCallback, useMemo, useState } from 'react'
@@ -55,6 +57,7 @@ import {
 	companyAtomFor,
 	companyTasksAtomFor,
 	contactsAtomFor,
+	deleteCompanyAtom,
 	timelineAtomFor,
 } from '#/atoms/company-atoms'
 import { emailsSearchAtom } from '#/atoms/emails-atoms'
@@ -112,6 +115,7 @@ import {
 	type ResearchRunRow,
 } from '#/components/research/run-shapes'
 import { TrustBadge } from '#/components/research/trust-badge'
+import { DeleteConfirm } from '#/components/shared/delete-confirm'
 import { EmptyState } from '#/components/shared/empty-state'
 import { ErrorState } from '#/components/shared/error-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
@@ -620,6 +624,27 @@ function DetailBody({
 		[verifyCompany, company.id, refreshCompany, toast, t],
 	)
 
+	const navigate = useNavigate()
+	const deleteCompany = useAtomSet(deleteCompanyAtom, { mode: 'promiseExit' })
+	const [deleteOpen, setDeleteOpen] = useState(false)
+	const [deleting, setDeleting] = useState(false)
+	const handleDelete = useCallback(async () => {
+		setDeleting(true)
+		const exit = await deleteCompany({
+			params: { id: company.id },
+		} as never)
+		setDeleting(false)
+		if (exit._tag === 'Success') {
+			setDeleteOpen(false)
+			// Back to the list: the page this was on no longer has anything to show,
+			// and staying on it would leave a company open that is no longer there.
+			toast.add({ title: t`Company deleted`, type: 'success' })
+			void navigate({ to: '/companies' })
+			return
+		}
+		toast.add({ title: t`Could not delete this company`, type: 'error' })
+	}, [deleteCompany, company.id, navigate, toast, t])
+
 	const handleStatusChange = useCallback(
 		async (next: string) => {
 			const prev = company.status
@@ -1060,6 +1085,15 @@ function DetailBody({
 								<Trans>Mark as verified</Trans>
 							</VerifiedControl>
 						)}
+						<VerifiedControl
+							type='button'
+							data-testid='company-delete'
+							onClick={() => setDeleteOpen(true)}
+							title={t`Take this company out of view`}
+						>
+							<Trash2 size={14} aria-hidden />
+							<Trans>Delete</Trans>
+						</VerifiedControl>
 					</HeaderMeta>
 				</IdentityRow>
 
@@ -1147,6 +1181,22 @@ function DetailBody({
 						<RelativeDate value={company.lastContactedAt} fallback={t`never`} />
 					</LastContact>
 				</HeaderChrome>
+
+				<DeleteConfirm
+					open={deleteOpen}
+					deleting={deleting}
+					onConfirm={() => void handleDelete()}
+					onClose={() => setDeleteOpen(false)}
+					testId='company-delete-confirm'
+					title={<Trans>Delete this company?</Trans>}
+					description={
+						<Trans>
+							It comes off the lists and the pipeline, and its people go with
+							it. Its history is kept, and you can put it back from the Deleted
+							filter on the companies page.
+						</Trans>
+					}
+				/>
 
 				<PrimaryActions>
 					<motion.div whileTap={{ scale: 0.96 }}>

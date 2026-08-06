@@ -192,6 +192,10 @@ msgstr "{entered} han entrat als registres, {leftover} encara et necessiten."
 msgid "{groupLabel} sections"
 msgstr "Seccions de {groupLabel}"
 
+#: src/routes/companies/index.tsx
+msgid "{name} is back"
+msgstr "{name} ha tornat"
+
 #: src/components/research/research-dialog.tsx
 msgid "{scoped} (default)"
 msgstr "{scoped} (per defecte)"
@@ -574,6 +578,10 @@ msgstr "Un propietari l’ha tret. Demana-li que hi torni a permetre l’accés.
 msgid "and {hidden} more on the run"
 msgstr "i {hidden} més a l'execució"
 
+#: src/routes/companies/index.tsx
+msgid "Another company may be using its name now."
+msgstr "Pot ser que una altra empresa n'estigui fent servir el nom."
+
 #: src/routes/settings/organization/industries.tsx
 msgid "Another industry may already go by that name — merge them instead."
 msgstr "Pot ser que ja hi hagi una altra indústria amb aquest nom: fusiona-les."
@@ -931,7 +939,6 @@ msgstr "Crides"
 #: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/instructions/stack-editor.tsx
-#: src/components/instructions/template-delete-confirm.tsx
 #: src/components/instructions/template-dialog.tsx
 #: src/components/instructions/template-transfer-dialog.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
@@ -939,6 +946,7 @@ msgstr "Crides"
 #: src/components/research/research-dialog.tsx
 #: src/components/research/review/proposed-updates-review.tsx
 #: src/components/research/run-actions.tsx
+#: src/components/shared/delete-confirm.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/settings/api-keys/index.tsx
@@ -1170,6 +1178,7 @@ msgstr "Empreses marcades com a prioritàries sense res programat. Si a més ha 
 msgid "Company"
 msgstr "Empresa"
 
+#: src/routes/companies/$slug.tsx
 #: src/routes/companies/$slug.tsx
 msgid "Company deleted"
 msgstr "Empresa suprimida"
@@ -1440,6 +1449,10 @@ msgid "Could not load — retry"
 msgstr "No s'ha pogut carregar — torna-ho a provar"
 
 #: src/routes/companies/$slug.tsx
+msgid "Could not delete this company"
+msgstr "No s'ha pogut suprimir aquesta empresa"
+
+#: src/routes/companies/$slug.tsx
 msgid "Could not load activity"
 msgstr "No s'ha pogut carregar l'activitat"
 
@@ -1585,6 +1598,10 @@ msgstr "No s’ha pogut reanomenar {0}"
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Could not resolve this proposal."
 msgstr "No s'ha pogut resoldre aquesta proposta."
+
+#: src/routes/companies/index.tsx
+msgid "Could not restore {name}"
+msgstr "No s'ha pogut restaurar {name}"
 
 #: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/connections.tsx
@@ -1914,10 +1931,11 @@ msgstr "Per defecte, l'adreça electrònica."
 msgid "Defaults to you when omitted."
 msgstr "Per defecte ets tu si s'omet."
 
-#: src/components/instructions/template-delete-confirm.tsx
 #: src/components/instructions/template-dialog.tsx
 #: src/components/instructions/template-library.tsx
 #: src/components/research/run-actions.tsx
+#: src/components/shared/delete-confirm.tsx
+#: src/routes/companies/$slug.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/settings/api-keys/index.tsx
 msgid "Delete"
@@ -1952,6 +1970,10 @@ msgstr "Suprimir la bústia {0}? Els missatges desats es mantenen; la connexió 
 msgid "Delete key"
 msgstr "Elimina la clau"
 
+#: src/routes/companies/$slug.tsx
+msgid "Delete this company?"
+msgstr "Voleu suprimir aquesta empresa?"
+
 #: src/routes/emails/inboxes.tsx
 msgid "Delete this footer? This cannot be undone."
 msgstr "Eliminar aquest peu de pàgina? Aquesta acció no es pot desfer."
@@ -1973,11 +1995,12 @@ msgid "Delete this template?"
 msgstr "Vols eliminar aquesta plantilla?"
 
 #: src/components/research/run-labels.ts
+#: src/routes/companies/index.tsx
 msgid "Deleted"
 msgstr "Eliminada"
 
-#: src/components/instructions/template-delete-confirm.tsx
 #: src/components/research/run-actions.tsx
+#: src/components/shared/delete-confirm.tsx
 #: src/routes/settings/api-keys/index.tsx
 #: src/routes/settings/api-keys/index.tsx
 msgid "Deleting…"
@@ -2801,6 +2824,10 @@ msgstr "Ja no pot accedir a aquesta organització."
 #: src/routes/settings/mcp/connections.tsx
 msgid "It can reach this organization from its next request."
 msgstr "Podrà accedir a aquesta organització a partir de la petició següent."
+
+#: src/routes/companies/$slug.tsx
+msgid "It comes off the lists and the pipeline, and its people go with it. Its history is kept, and you can put it back from the Deleted filter on the companies page."
+msgstr "Desapareix de les llistes i de l'embut, i les seves persones hi van amb ella. L'historial es conserva, i la podeu recuperar des del filtre Suprimides a la pàgina d'empreses."
 
 #: src/routes/login.tsx
 msgid "It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it? Check spam."
@@ -4748,6 +4775,14 @@ msgstr "Respon a l'organitzador"
 msgid "Responded"
 msgstr "Respost"
 
+#: src/routes/companies/index.tsx
+msgid "Restore"
+msgstr "Restaura"
+
+#: src/routes/companies/index.tsx
+msgid "Restoring…"
+msgstr "S'està restaurant…"
+
 #. placeholder {0}: drafts.length
 #: src/routes/emails/index.tsx
 msgid "Resume drafting ({0})"
@@ -5455,6 +5490,10 @@ msgstr "Filtre d'etiquetes (separades per comes)"
 #: src/components/instructions/template-library.tsx
 msgid "Take \"{0}\" out of your stacks first — they would lose it once somebody else owns it."
 msgstr "Primer treu \"{0}\" de les teves piles: la perdrien quan passés a ser d’algú altre."
+
+#: src/routes/companies/$slug.tsx
+msgid "Take this company out of view"
+msgstr "Treu aquesta empresa de la vista"
 
 #: src/components/companies/conversations-tab.tsx
 #: src/components/shared/channel-icon.tsx
