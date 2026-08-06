@@ -28,6 +28,8 @@ export {
 	WEBSITE_ADDRESS_PATTERN,
 } from './channel-address'
 export {
+	ATTENTION_FILTERS,
+	AttentionFilter,
 	COMPANY_PRIORITIES,
 	COMPANY_SIZE_RANGES,
 	COMPANY_STATUSES,

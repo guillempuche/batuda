@@ -18,6 +18,7 @@ import {
 	splitCompanyChannelFields,
 	writeChannels,
 } from './channels'
+import { type AttentionFilter, attentionCondition } from './company-attention'
 import {
 	findIndustryByName,
 	industryForWrite,
@@ -40,6 +41,13 @@ export interface CompanyFilters {
 	readonly fitCriterionPassed?: string | undefined
 	// Owner id to match, or the literal 'none' to match only unassigned companies.
 	readonly owner?: string | undefined
+	// Narrows to what needs doing: a missed follow-up, a company gone quiet, or
+	// one with nothing written down as the next step. Same rules the dashboard
+	// counts by, so a heading there opens a list of the same size here.
+	readonly attention?: AttentionFilter | undefined
+	// How long counts as gone quiet, for `attention: 'stale'`. Carried on the
+	// link so the list matches the threshold the dashboard was showing.
+	readonly staleDays?: number | undefined
 	// One of the whitelisted sort keys below; anything else falls back to priority.
 	readonly sort?: string | undefined
 	readonly query?: string | undefined
@@ -111,6 +119,10 @@ export class CompanyService extends Context.Service<CompanyService>()(
 									WHERE fc->>'result' = 'pass'
 										AND fc->>'criterion' ILIKE ${`%${filters.fitCriterionPassed}%`}
 								)`,
+							)
+						if (filters.attention)
+							conditions.push(
+								attentionCondition(sql, filters.attention, filters.staleDays),
 							)
 						if (filters.query)
 							conditions.push(sql`name ILIKE ${`%${filters.query}%`}`)

@@ -1,5 +1,7 @@
 import { Atom } from 'effect/unstable/reactivity'
 
+import type { AttentionFilter } from '@batuda/domain'
+
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import {
 	firstPage,
@@ -23,6 +25,11 @@ export type CompaniesSearch = {
 	readonly owner?: string
 	readonly sort?: string
 	readonly query?: string
+	// What needs doing, in the dashboard's own words: a missed follow-up, a
+	// company gone quiet, or one with nothing planned. Arriving here from a
+	// dashboard heading sets this, and the threshold it was showing rides along.
+	readonly attention?: AttentionFilter
+	readonly staleDays?: number
 }
 
 /**
@@ -117,6 +124,12 @@ export function canonicalSearchKey(search: CompaniesSearch): string {
 	}
 	if (search.query !== undefined && search.query !== '') {
 		entries.push(['query', search.query])
+	}
+	if (search.attention !== undefined) {
+		entries.push(['attention', search.attention])
+	}
+	if (search.staleDays !== undefined) {
+		entries.push(['staleDays', search.staleDays])
 	}
 	entries.sort(([a], [b]) => a.localeCompare(b))
 	return JSON.stringify(Object.fromEntries(entries))

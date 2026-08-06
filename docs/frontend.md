@@ -332,6 +332,13 @@ Library primitives at the time of writing: `PriAvatar`, `PriButton`,
 App-local primitives at the time of writing: `PriCombobox`, `PriCopyButton`,
 `PriPasswordInput`, `PriRichText`, `PriTable`.
 
+**Styling a router `Link`.** `styled(Link)` keeps the styling but drops
+TanStack Router's typing of `to`, `params` and `search`, so a wrong destination
+becomes a dead click instead of a compile error. Style a wrapper and put a bare
+`<Link>` inside it — stretched over the box with `position: absolute; inset: 0`
+when the whole row should navigate. `company-card.tsx` and the pipeline's status
+chips both do this.
+
 #### `PriPasswordInput` — uncontrolled only
 
 Use this primitive as **uncontrolled**: omit `value=` / `onChange=` and
@@ -793,11 +800,14 @@ const CardHead = styled.div`
 
 ### Pipeline dashboard (`/`)
 
-- Status lane counts: prospect, contacted, responded, meeting, proposal, client
-- "Overdue" section: tasks past due + companies with `next_action_at` in the past
-- "This week" section: tasks due within 7 days
-- Top 5 priority companies without a scheduled next action
-- Mobile: stacked cards. Desktop: 2-column grid.
+Every list on this page is decided by the server, not assembled in the browser. `nextStepsAtom` (`/v1/pipeline/next-steps`) returns the company lists already sorted by urgency and already counted; the task buckets come from the same shelf atoms `/tasks` uses, which take the edges of the reader's own day from the browser because the server cannot know their timezone.
+
+- Four counters and eight status counts, each a link to the list it counted.
+- **Needs attention** — overdue tasks, companies past their follow-up date, companies mid-deal gone quiet, and finished research awaiting a decision. A company appears on **exactly one** of these; the rules and their precedence live in `apps/server/src/services/company-attention.ts`, shared with the `attention` filter on `/companies` so a count here opens a list of the same size there.
+- **Today** / **This week** — the `today` and `thisWeek` task shelves.
+- **High priority** — hot companies with nothing scheduled, minus any already listed above.
+- Each section shows the first few rows with the true total beside it and a way through to the rest; each row carries a chip saying why it is there.
+- Nothing on the page goes above two columns at any width.
 
 ### Company list (`/companies`)
 

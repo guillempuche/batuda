@@ -6,6 +6,7 @@ import {
 } from 'effect/unstable/httpapi'
 
 import {
+	ATTENTION_FILTERS,
 	Company,
 	CompanyCountry,
 	CompanyEmail,
@@ -28,6 +29,7 @@ import { NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 import { PaginatedList, pageQuery } from '../pagination'
+import { StaleDays } from './pipeline'
 
 // One research run whose findings were applied to a company, with the pages its
 // citations point at — so a reader can trace a fact on the row back to the run
@@ -143,6 +145,15 @@ export const CompaniesGroup = HttpApiGroup.make('companies')
 				industry: Schema.optional(Schema.String),
 				priority: Schema.optional(Schema.NumberFromString),
 				owner: Schema.optional(Schema.String),
+				// Narrows to what needs doing, in the same words the dashboard uses:
+				// `overdue` missed its follow-up date, `stale` is mid-chase and has
+				// gone quiet, `no-next-action` has nothing written down at all. The
+				// rules are shared with the dashboard's own lists, so a count there
+				// opens a list of the same size here.
+				attention: Schema.optional(Schema.Literals(ATTENTION_FILTERS)),
+				// How long counts as quiet, for `attention=stale`. Rides along on the
+				// link so the list matches whatever the dashboard was showing.
+				staleDays: Schema.optional(StaleDays),
 				fitVerdict: Schema.optional(Schema.String),
 				fitCriterionPassed: Schema.optional(Schema.String),
 				sort: Schema.optional(Schema.String),

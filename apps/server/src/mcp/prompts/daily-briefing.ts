@@ -41,9 +41,13 @@ Produce:
 1. Pipeline health (bottlenecks, status changes)
 2. Urgent: overdue tasks needing immediate action
 3. Research awaiting review, from researchAwaitingReview — name the company each run is about, or quote its query when it belongs to no company; say how many changes are still undecided, and call out any that failed or came back unreliable
-4. Today's priorities
-5. Companies at risk (stale, no recent contact)
+4. Today's priorities, from highPriority — hot companies with nothing scheduled at all
+5. Companies at risk, from staleCompanies — mid-chase and gone quiet, longest silence first
 6. Quick wins
-7. Suggested schedule`
+7. Suggested schedule
+
+Each company appears on one attention list only, so report it once, under that
+heading. Quote totals from counts rather than counting the rows quoted above:
+each list is capped, and the matching *Truncated flag says which were cut short.`
 		}),
 })

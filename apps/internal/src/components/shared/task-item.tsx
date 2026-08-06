@@ -369,6 +369,22 @@ function SourceBadge({ source }: { source: TaskSourceLabel }) {
 
 // ── Styles ────────────────────────────────────────────────────────
 
+const Body = styled.div.withConfig({ displayName: 'TaskItemBody' })`
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3xs);
+`
+
+const Meta = styled.span.withConfig({ displayName: 'TaskItemMeta' })`
+	display: inline-flex;
+	align-items: center;
+	font-family: var(--font-body);
+	font-size: var(--typescale-label-small-size);
+	color: var(--color-on-surface-variant);
+	font-style: italic;
+`
+
 const Row = styled(motion.div).withConfig({
 	displayName: 'TaskItemRow',
 	shouldForwardProp: prop => !prop.startsWith('$'),
@@ -385,19 +401,33 @@ const Row = styled(motion.div).withConfig({
 	transition: opacity 200ms ease;
 	min-width: 0;
 
+	/* Below the tablet breakpoint the seven columns stop fitting. Six of them
+	 * size to their content, so the only flexible one — the company and the task
+	 * title, the two things that say which task this is — was squeezed to around
+	 * 55px against ten times that much text, while the date beside it kept its
+	 * full width and wrapped over three lines. Here the text takes the whole
+	 * first line and the date drops beneath it. */
+	@media (max-width: 767px) {
+		grid-template-columns: auto 1fr auto auto;
+		row-gap: var(--space-3xs);
+		column-gap: var(--space-xs);
+
+		${Body} {
+			grid-column: 2 / -1;
+		}
+
+		${Meta} {
+			grid-column: 2 / -1;
+			grid-row: 2;
+		}
+	}
+
 	${p =>
 		p.$overdue &&
 		`
 			border-left: 3px solid var(--color-error);
 			box-shadow: inset 4px 0 8px -4px color-mix(in srgb, var(--color-error) 60%, transparent);
 		`}
-`
-
-const Body = styled.div.withConfig({ displayName: 'TaskItemBody' })`
-	min-width: 0;
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-3xs);
 `
 
 const Company = styled.span.withConfig({ displayName: 'TaskItemCompany' })`
@@ -486,15 +516,6 @@ const InlineInput = styled(PriInput).withConfig({
 	font-size: var(--typescale-body-small-size);
 	line-height: var(--typescale-body-small-line);
 	padding: var(--space-3xs) var(--space-xs);
-`
-
-const Meta = styled.span.withConfig({ displayName: 'TaskItemMeta' })`
-	display: inline-flex;
-	align-items: center;
-	font-family: var(--font-body);
-	font-size: var(--typescale-label-small-size);
-	color: var(--color-on-surface-variant);
-	font-style: italic;
 `
 
 const DueTrigger = styled.button.withConfig({

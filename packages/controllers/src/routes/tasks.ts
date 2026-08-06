@@ -100,6 +100,16 @@ const IfMatchHeader = Schema.Struct({
 	'if-match': Schema.optional(Schema.String),
 })
 
+// A task as a list shows it: the stored row plus the name and address of the
+// company it belongs to, which are on another table. Both are null for a task
+// that belongs to nobody in particular.
+export const TaskListItem = Schema.Struct({
+	...Task.json.fields,
+	companyName: Schema.NullOr(Schema.String),
+	companySlug: Schema.NullOr(Schema.String),
+})
+export type TaskListItem = typeof TaskListItem.Type
+
 // ── Route group ──
 
 export const TasksGroup = HttpApiGroup.make('tasks')
@@ -133,7 +143,10 @@ export const TasksGroup = HttpApiGroup.make('tasks')
 				sort: Schema.optional(Schema.Literals(['recent', 'due', 'completed'])),
 				...pageQuery,
 			},
-			success: PaginatedList(Task.json),
+			// The company each task belongs to travels with it. A task row shows
+			// whose task it is, and every screen that draws one was otherwise
+			// fetching the whole company list just to look the name up.
+			success: PaginatedList(TaskListItem),
 		}),
 	)
 	.add(

@@ -57,9 +57,22 @@ export const openTasksAtom = BatudaApiAtom.query('tasks', 'list', {
 export const pipelineAtom = BatudaApiAtom.query('pipeline', 'get', {})
 
 /**
- * Server-computed next steps: the open-task queue (ordered by due date) and the
- * companies past their next-action date. Feeds the dashboard's "needs attention".
+ * How many rows of each attention list the dashboard shows. The lists are meant
+ * to be worked from the top, not read end to end — the server sorts them by
+ * urgency and reports how many there are in total, so a handful plus a real
+ * count says more than a wall of rows.
+ */
+export const ATTENTION_PREVIEW = 5
+
+/**
+ * Server-computed next steps: the companies needing chasing, split into a
+ * missed follow-up, gone quiet, and hot with nothing booked, plus research
+ * waiting on a decision. Feeds the dashboard's "needs attention".
+ *
+ * Asking for only the preview keeps the whole list off the wire — the totals
+ * come back regardless, so the heading stays truthful either way.
  */
 export const nextStepsAtom = BatudaApiAtom.query('pipeline', 'nextSteps', {
-	query: {},
+	query: { limit: ATTENTION_PREVIEW },
+	serializationKey: `pipeline:next-steps:${ATTENTION_PREVIEW}`,
 })
