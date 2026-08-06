@@ -1,8 +1,11 @@
 /**
  * Shared HTTP plumbing for the Hunter.io v2 endpoints (Domain Search, Email
- * Verifier). Auth is the API key as a `?api_key=` query parameter — NOT HTTP
- * Basic like libreBORME. 429/5xx are transient (retried by the harness); any
- * other non-2xx status is terminal for the request.
+ * Verifier). Auth is the API key in the `X-API-KEY` header — Hunter also takes
+ * it as an `?api_key=` query parameter, but the HTTP client records the whole
+ * URL on the trace and blanks out only a few header names, `x-api-key` among
+ * them, so the header is the one place the key stays private. 429/5xx are
+ * transient (retried by the harness); any other non-2xx status is terminal for
+ * the request.
  *
  * @see https://hunter.io/api-documentation/v2
  */
@@ -69,11 +72,16 @@ export const makeHunterClient = (envBase: string, slot: number) =>
 		const key = Redacted.value(apiKey)
 
 		// One authenticated GET, decoded against `schema`. `query` is the
-		// endpoint-specific querystring (already encoded); the api_key is appended.
+		// endpoint-specific querystring (already encoded) and never the key.
 		const getJson = <A>(path: string, query: string, schema: Schema.Codec<A>) =>
 			Effect.gen(function* () {
-				const url = `${HUNTER_BASE_URL}/${path}?${query}&api_key=${encodeURIComponent(key)}`
-				const response = yield* client.execute(HttpClientRequest.get(url)).pipe(
+				const url = `${HUNTER_BASE_URL}/${path}?${query}`
+				const request = HttpClientRequest.setHeader(
+					HttpClientRequest.get(url),
+					'X-API-KEY',
+					key,
+				)
+				const response = yield* client.execute(request).pipe(
 					Effect.mapError(
 						e =>
 							new ProviderError({
