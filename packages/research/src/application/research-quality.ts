@@ -8,12 +8,14 @@
  * run already produced. The flag is deliberately conservative: it should catch the
  * clearly-thin runs, not second-guess a solid one.
  *
- * Two signals raise it. Whenever a run was pinned to one company, anything short
+ * Three signals raise it. Whenever a run was pinned to one company, anything short
  * of clearly reaching that company counts — which covers an enrichment filling
  * that company's profile and equally a scan launched from it, since a scan can be
  * pinned to a subject too and a wrong one there is just as misleading. On top of
  * that, a prospect scan reports a list of third parties, so vetting that list
- * against a single source is thin however well the company itself was found.
+ * against a single source is thin however well the company itself was found. And
+ * a run whose every citation was rejected reached none of the pages it claimed to
+ * read, whatever else it did.
  */
 
 export interface RunQualityInput {
@@ -34,15 +36,27 @@ export interface RunQualityInput {
 	readonly fieldsGrounded: number
 	/** Enrichment: profile fields in scope (0 for a scan). */
 	readonly fieldsTotal: number
+	/** Citations the run offered for its findings. */
+	readonly citationsSeen: number
+	/** Of those, how many resolved to a page the run actually reached. */
+	readonly citationsKept: number
 }
 
 export interface RunQuality {
 	readonly rounds: number
 	/** Sources on the company's own domain — the ones most trusted to speak for it. */
 	readonly sources_matched: number
-	readonly fields_grounded: number
-	/** Share of the profile that is grounded, 0–1 (0 when nothing was in scope). */
-	readonly grounding_ratio: number
+	/** Profile fields that survived the guards with a value; absent for a scan. */
+	readonly fields_grounded?: number
+	/**
+	 * Share of the profile that is grounded, 0–1. Absent for a scan, as is
+	 * `fields_grounded`: a scan fills no profile, so both would read 0 on every
+	 * scan ever run and look like a failing grade rather than "does not apply".
+	 */
+	readonly grounding_ratio?: number
+	readonly citations_seen: number
+	/** Of those, how many pointed at a page the run actually reached. */
+	readonly citations_kept: number
 	/** True when the result is thin enough that an automation should not act on it unreviewed. */
 	readonly low_confidence: boolean
 }
@@ -63,13 +77,25 @@ export const computeRunQuality = (input: RunQualityInput): RunQuality => {
 	// And a scan that vetted its list of other firms against a single source
 	// hasn't done enough to act on unread, however well it found the company.
 	const thinlyVetted = isScan && input.sourcesTotal <= 1
-	const lowConfidence = unsureOfTheCompany || thinlyVetted
+	// The findings may well be right, but every page the run cited is one it never
+	// reached, so nothing it did backs them. Citing nothing at all is a different
+	// shortfall, left to the two signals above.
+	const nothingStandsBehindIt =
+		input.citationsSeen > 0 && input.citationsKept === 0
+	const lowConfidence =
+		unsureOfTheCompany || thinlyVetted || nothingStandsBehindIt
 
 	return {
 		rounds: input.rounds,
 		sources_matched: input.sourcesFirstParty,
-		fields_grounded: input.fieldsGrounded,
-		grounding_ratio: Math.round(groundingRatio * 100) / 100,
+		...(isScan
+			? {}
+			: {
+					fields_grounded: input.fieldsGrounded,
+					grounding_ratio: Math.round(groundingRatio * 100) / 100,
+				}),
+		citations_seen: input.citationsSeen,
+		citations_kept: input.citationsKept,
 		low_confidence: lowConfidence,
 	}
 }

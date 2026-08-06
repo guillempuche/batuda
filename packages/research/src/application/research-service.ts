@@ -2314,6 +2314,13 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						)
 					}
 
+					// How the citation guard fared on the last extraction. A run can extract
+					// more than once — a discovery scan retries, gap rounds re-extract — and
+					// what matters is the tally behind the findings that actually ship, so
+					// the guard overwrites them each time rather than adding them up.
+					let citationsSeen = 0
+					let citationsKept = 0
+
 					// Phase-2 extraction + every grounding guard, shared so both the
 					// normal path and the discovery-scan retry run the same logic. Returns
 					// the cleaned findings; the caller writes the single phase-2 checkpoint.
@@ -2613,6 +2620,8 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													...searchResultHosts,
 												]),
 											)
+											citationsSeen = check.total
+											citationsKept = check.kept
 											if (check.total > check.kept) {
 												yield* Effect.logWarning(
 													'research.citations.dropped',
@@ -4599,6 +4608,8 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						sourcesFirstParty,
 						fieldsGrounded: fill.filled,
 						fieldsTotal: fill.total,
+						citationsSeen,
+						citationsKept,
 					})
 					const findingsWithQuality = {
 						...withRegistryFlag(findings as Record<string, unknown>),
