@@ -21,6 +21,15 @@ import {
 
 const decodeTask = Schema.decodeUnknownEffect(Task)
 const decodeTasks = Schema.decodeUnknownEffect(Schema.Array(Task))
+const decodeTaskListItems = Schema.decodeUnknownEffect(
+	Schema.Array(
+		Schema.Struct({
+			...Task.fields,
+			companyName: Schema.NullOr(Schema.String),
+			companySlug: Schema.NullOr(Schema.String),
+		}),
+	),
+)
 
 export interface TaskFilters {
 	readonly companyId?: string | undefined
@@ -300,8 +309,26 @@ export class TaskService extends Context.Service<TaskService>()('TaskService', {
 						page.sort === 'recent'
 							? sql`COALESCE(due_at, created_at) DESC`
 							: sql`due_at ASC NULLS LAST, created_at ASC`
+					// The company rides along rather than being looked up afterwards:
+					// a screen showing a handful of tasks was fetching every company
+					// in the organisation to turn an id into a name.
+					//
+					// Looked up per row rather than joined: a join brings the whole
+					// companies table into scope, and the filters below name their
+					// columns bare, so `organization_id` stops meaning one thing.
+					// Both read null for a task that belongs to nobody in particular.
+					const companyName = sql`(
+						SELECT c.name FROM companies c
+						WHERE c.id = tasks.company_id AND c.deleted_at IS NULL
+					) AS company_name`
+					const companySlug = sql`(
+						SELECT c.slug FROM companies c
+						WHERE c.id = tasks.company_id AND c.deleted_at IS NULL
+					) AS company_slug`
 					const probed = yield* sql<{ readonly total?: string | number }>`
-							SELECT *${totalColumn(sql, page.count)} FROM tasks
+							SELECT tasks.*, ${companyName}, ${companySlug}
+								${totalColumn(sql, page.count)}
+							FROM tasks
 							WHERE ${sql.and(conditions)}
 							ORDER BY ${order}
 							LIMIT ${probeLimit(page.limit)} OFFSET ${page.offset}
@@ -318,7 +345,7 @@ export class TaskService extends Context.Service<TaskService>()('TaskService', {
 						`,
 					).pipe(Effect.orDie)
 
-					const items = yield* decodeTasks(rows).pipe(Effect.orDie)
+					const items = yield* decodeTaskListItems(rows).pipe(Effect.orDie)
 					return {
 						items,
 						total,

@@ -77,6 +77,6 @@ export {
 	ResearchRunSummary,
 	ResearchSpendBucket,
 } from './routes/research-schemas'
-export { BulkCompleteResult, TasksGroup } from './routes/tasks'
+export { BulkCompleteResult, TaskListItem, TasksGroup } from './routes/tasks'
 export { TimelineGroup } from './routes/timeline'
 export { WebhooksGroup } from './routes/webhooks'

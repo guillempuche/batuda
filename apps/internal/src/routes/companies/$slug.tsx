@@ -38,8 +38,8 @@ import styled from 'styled-components'
 import type {
 	CompanyDetail as CompanyDetailResponse,
 	ContactListItem,
+	TaskListItem,
 } from '@batuda/controllers'
-import type { Task } from '@batuda/domain'
 import { decidesPurchase } from '@batuda/domain'
 import { Sidebar, Stack, Switcher } from '@batuda/ui'
 import {
@@ -254,7 +254,7 @@ type TaskEntry = {
 type DetailPayload = {
 	readonly company: (typeof CompanyDetailResponse)['Type']
 	readonly contacts: PaginatedList<(typeof ContactListItem)['Type']>
-	readonly tasks: PaginatedList<Task>
+	readonly tasks: PaginatedList<TaskListItem>
 }
 
 /**

@@ -691,8 +691,9 @@ function toAttentionTasks(result: unknown): ReadonlyArray<AttentionTask> {
 			title: r['title'],
 			dueAt: dateToIsoOrNull(r['dueAt']),
 			companyId: r['companyId'],
+			// A task with no company of its own is somebody's own to-do.
 			companyName:
-				typeof r['companyName'] === 'string' ? r['companyName'] : 'Company',
+				typeof r['companyName'] === 'string' ? r['companyName'] : 'Personal',
 			companySlug: typeof r['companySlug'] === 'string' ? r['companySlug'] : '',
 		})
 	}
