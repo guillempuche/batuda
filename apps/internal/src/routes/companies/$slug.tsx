@@ -794,7 +794,10 @@ function DetailBody({
 			timelineEntries
 				.filter(
 					entry =>
-						entry.kind !== 'system_event' && entry.kind !== 'stage_changed',
+						entry.kind !== 'system_event' &&
+						entry.kind !== 'stage_changed' &&
+						entry.kind !== 'company_deleted' &&
+						entry.kind !== 'company_restored',
 				)
 				.map(entry => ({
 					id: entry.id,
@@ -854,7 +857,12 @@ function DetailBody({
 		() =>
 			showSystemEvents
 				? timelineEntries
-				: timelineEntries.filter(entry => entry.kind !== 'system_event'),
+				: timelineEntries.filter(
+						entry =>
+							entry.kind !== 'system_event' &&
+							entry.kind !== 'company_deleted' &&
+							entry.kind !== 'company_restored',
+					),
 		[timelineEntries, showSystemEvents],
 	)
 
@@ -1297,6 +1305,12 @@ function DetailBody({
 																	key={row.id}
 																	entry={toTimelineEntry(row, {
 																		stageChangedLabel: t`Stage changed`,
+																		companyDeletedLabel: t`Company deleted`,
+																		companyRestoredLabel: t`Company restored`,
+																		describePeopleAffected: count =>
+																			count === 1
+																				? t`1 person went with it`
+																				: t`${count} people went with it`,
 																		describeStageChange: (from, to) =>
 																			`${i18n._(statusLabels[from])} → ${i18n._(statusLabels[to])}`,
 																	})}
@@ -1972,6 +1986,9 @@ function toTimelineEntry(
 	row: TimelineRow,
 	labels: {
 		readonly stageChangedLabel: string
+		readonly companyDeletedLabel: string
+		readonly companyRestoredLabel: string
+		readonly describePeopleAffected: (count: number) => string
 		readonly describeStageChange: (
 			from: CompanyStatus,
 			to: CompanyStatus,
@@ -1979,6 +1996,23 @@ function toTimelineEntry(
 	},
 ): TimelineEntryData {
 	const payload = row.payload ?? {}
+
+	if (row.kind === 'company_deleted' || row.kind === 'company_restored') {
+		const affected = Number(payload['contactsAffected'] ?? 0)
+		return {
+			id: row.id,
+			channel: row.channel,
+			subject:
+				row.kind === 'company_deleted'
+					? labels.companyDeletedLabel
+					: labels.companyRestoredLabel,
+			summary: labels.describePeopleAffected(affected),
+			outcome: null,
+			nextAction: null,
+			date: row.date,
+			threadId: null,
+		}
+	}
 
 	if (row.kind === 'stage_changed') {
 		return {
@@ -2041,6 +2075,8 @@ function timelineKindToChannel(kind: string, fallback: string | null): string {
 			return 'task'
 		case 'system_event':
 		case 'stage_changed':
+		case 'company_deleted':
+		case 'company_restored':
 			return 'system'
 		default:
 			return fallback ?? 'other'

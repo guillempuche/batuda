@@ -176,6 +176,10 @@ msgstr "{addedEmail} ja és membre. Se li ha enviat un correu."
 msgid "{confirmLabel}'s assistant stops reaching this organization on its next request. It keeps working in any other organization they belong to, and they can't undo this themselves."
 msgstr "L'assistent de {confirmLabel} deixarà d'accedir a aquesta organització a la següent petició. Continuarà funcionant a qualsevol altra organització de la qual formi part, i no ho podrà desfer pel seu compte."
 
+#: src/routes/companies/$slug.tsx
+msgid "{count} people went with it"
+msgstr "S'hi han endut {count} persones"
+
 #: src/components/research/inbox/research-inbox.tsx
 msgid "{entered} changes entered the records."
 msgstr "{entered} canvis han entrat als registres."
@@ -264,6 +268,10 @@ msgstr "1 missatge"
 #: src/routes/emails/index.tsx
 msgid "1 msg"
 msgstr "1 missatge"
+
+#: src/routes/companies/$slug.tsx
+msgid "1 person went with it"
+msgstr "S'hi ha endut 1 persona"
 
 #: src/routes/emails/index.tsx
 msgid "1 thread"
@@ -1162,9 +1170,17 @@ msgstr "Empreses marcades com a prioritàries sense res programat. Si a més ha 
 msgid "Company"
 msgstr "Empresa"
 
+#: src/routes/companies/$slug.tsx
+msgid "Company deleted"
+msgstr "Empresa suprimida"
+
 #: src/components/research/research-dialog.tsx
 msgid "Company enrichment"
 msgstr "Enriquiment d'empresa"
+
+#: src/routes/companies/$slug.tsx
+msgid "Company restored"
+msgstr "Empresa restaurada"
 
 #: src/components/research/research-dialog.tsx
 msgid "Competitor scan"
