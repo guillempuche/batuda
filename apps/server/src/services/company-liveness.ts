@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import type { SqlClient } from 'effect/unstable/sql'
+import type { SqlClient, Statement } from 'effect/unstable/sql'
 
 import { NotFound } from '@batuda/controllers'
 
@@ -33,3 +33,27 @@ export const requireLiveCompany = (
 		if (rows.length === 0)
 			return yield* new NotFound({ entity: 'company', id: companyId })
 	})
+
+/**
+ * Whether the company a row belongs to is one anybody can still see.
+ *
+ * Tasks, interactions, proposals and the rest carry a company id but have no
+ * deleted mark of their own, so they are hidden by asking about the company they
+ * belong to. Written once and pushed into each read rather than spelled out at
+ * every query: fifteen hand-written joins are fifteen chances to forget one, and
+ * the one forgotten shows work against a company nobody can open.
+ *
+ * A row belonging to no company is somebody's own work and stays visible — the
+ * predicate says nothing about it.
+ */
+export const companyVisible = (
+	sql: SqlClient.SqlClient,
+	companyIdColumn: Statement.Fragment,
+) => sql`(
+	${companyIdColumn} IS NULL
+	OR EXISTS (
+		SELECT 1 FROM companies visible_company
+		WHERE visible_company.id = ${companyIdColumn}
+			AND visible_company.deleted_at IS NULL
+	)
+)`

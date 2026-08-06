@@ -13,6 +13,7 @@ import {
 	takePage,
 	totalColumn,
 } from '../lib/sql-pagination'
+import { companyVisible } from '../services/company-liveness'
 import {
 	InteractionLogged,
 	TimelineActivityService,
@@ -32,7 +33,10 @@ export const InteractionsLive = HttpApiBuilder.group(
 				.handle('list', _ =>
 					Effect.gen(function* () {
 						const page = pageOf(_.query, 20)
-						const conditions: Array<Statement.Fragment> = []
+						// Records belonging to a company nobody can open go with it.
+						const conditions: Array<Statement.Fragment> = [
+							companyVisible(sql, sql`company_id`),
+						]
 						if (_.query.companyId)
 							conditions.push(sql`company_id = ${_.query.companyId}`)
 						const probed = yield* sql<{ readonly total?: string | number }>`

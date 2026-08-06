@@ -5,6 +5,7 @@ import { SqlClient } from 'effect/unstable/sql'
 import { CurrentOrg } from '@batuda/controllers'
 import { Proposal } from '@batuda/domain'
 
+import { companyVisible } from '../../services/company-liveness'
 import {
 	ProposalEvent,
 	TimelineActivityService,
@@ -101,8 +102,17 @@ export const ProposalHandlersLive = ProposalTools.toLayer(
 				Effect.gen(function* () {
 					const limit = params.limit ?? 100
 					const rows = params.company_id
-						? yield* sql`SELECT * FROM proposals WHERE company_id = ${params.company_id} ORDER BY created_at DESC LIMIT ${limit + 1}`
-						: yield* sql`SELECT * FROM proposals ORDER BY created_at DESC LIMIT ${limit + 1}`
+						? yield* sql`
+								SELECT * FROM proposals
+								WHERE company_id = ${params.company_id}
+									AND ${companyVisible(sql, sql`company_id`)}
+								ORDER BY created_at DESC LIMIT ${limit + 1}
+							`
+						: yield* sql`
+								SELECT * FROM proposals
+								WHERE ${companyVisible(sql, sql`company_id`)}
+								ORDER BY created_at DESC LIMIT ${limit + 1}
+							`
 					return toTruncatable(yield* decodeProposals(rows), limit)
 				}).pipe(Effect.orDie),
 			create_proposal: params =>

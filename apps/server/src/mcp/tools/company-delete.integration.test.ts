@@ -396,6 +396,51 @@ describe('editing a company that was deleted', () => {
 	})
 })
 
+describe("a deleted company's work", () => {
+	describe('when the company is deleted', () => {
+		it("should stop its tasks appearing on anybody's list", async () => {
+			// GIVEN a company with a task, and a standalone task belonging to no
+			// company at all — the second one is somebody's own work and must not be
+			// swept up with the first
+			const companyId = await seedCompany('work')
+			const owned = await pool.query<{ id: string }>(
+				`INSERT INTO tasks (organization_id, company_id, title, type)
+				 VALUES ($1, $2, $3, 'todo') RETURNING id`,
+				[org.id, companyId, `${MARKER}-owned-task`],
+			)
+			const standalone = await pool.query<{ id: string }>(
+				`INSERT INTO tasks (organization_id, title, type)
+				 VALUES ($1, $2, 'todo') RETURNING id`,
+				[org.id, `${MARKER}-standalone-task`],
+			)
+			const titles = async () => {
+				const r = await pool.query<{ title: string }>(
+					`SELECT title FROM tasks t
+					 WHERE t.organization_id = $1 AND t.title LIKE $2
+						 AND (t.company_id IS NULL OR EXISTS (
+							 SELECT 1 FROM companies c
+							 WHERE c.id = t.company_id AND c.deleted_at IS NULL))`,
+					[org.id, `${MARKER}%`],
+				)
+				return r.rows.map(row => row.title)
+			}
+			expect(await titles()).toContain(`${MARKER}-owned-task`)
+
+			// WHEN the company is deleted
+			await deleteCompany(companyId)
+
+			// THEN its work goes with it, and the standalone task stays
+			const after = await titles()
+			expect(after).not.toContain(`${MARKER}-owned-task`)
+			expect(after).toContain(`${MARKER}-standalone-task`)
+
+			await pool.query('DELETE FROM tasks WHERE id = ANY($1::uuid[])', [
+				[owned.rows[0]!.id, standalone.rows[0]!.id],
+			])
+		})
+	})
+})
+
 describe('the account history', () => {
 	describe('when a company is deleted and restored', () => {
 		it('should record both, so the account says what happened to it', async () => {

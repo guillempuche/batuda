@@ -5,6 +5,7 @@ import { SqlClient } from 'effect/unstable/sql'
 import { CurrentOrg } from '@batuda/controllers'
 import { Interaction } from '@batuda/domain'
 
+import { companyVisible } from '../../services/company-liveness'
 import {
 	InteractionLogged,
 	TimelineActivityService,
@@ -120,7 +121,10 @@ export const InteractionHandlersLive = InteractionTools.toLayer(
 				}).pipe(Effect.orDie),
 			list_interactions: params =>
 				Effect.gen(function* () {
-					const conditions = [sql`company_id = ${params.company_id}`]
+					const conditions = [
+						sql`company_id = ${params.company_id}`,
+						companyVisible(sql, sql`company_id`),
+					]
 					if (params.channel) conditions.push(sql`channel = ${params.channel}`)
 					if (params.type) conditions.push(sql`type = ${params.type}`)
 					const limit = params.limit ?? 20

@@ -12,6 +12,7 @@ import {
 	takePage,
 	totalColumn,
 } from '../lib/sql-pagination'
+import { companyVisible } from './company-liveness'
 import { requireOrgMembers } from './org-members'
 import {
 	TaskCompleted,
@@ -172,6 +173,9 @@ export class TaskService extends Context.Service<TaskService>()('TaskService', {
 		): Array<Statement.Fragment> => {
 			const conditions: Array<Statement.Fragment> = [
 				sql`organization_id = ${orgId}`,
+				// Work on a company nobody can open belongs on nobody's list. Work
+				// that belongs to no company is somebody's own and stays.
+				companyVisible(sql, sql`company_id`),
 			]
 			if (filters.companyId)
 				conditions.push(sql`company_id = ${filters.companyId}`)
