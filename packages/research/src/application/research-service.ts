@@ -1576,6 +1576,13 @@ export class ResearchService extends Context.Service<ResearchService>()(
 				Effect.gen(function* () {
 					const missing: Array<{ table: string; id: string }> = []
 					for (const s of subjects) {
+						// A record id is always a uuid. Anything else cannot name a row
+						// here, and handing it to a uuid column raises a cast error the
+						// caller would meet as a 500 rather than as "no such record".
+						if (!isValidUuid(s.id)) {
+							missing.push(s)
+							continue
+						}
 						const [row] =
 							s.table === 'companies'
 								? yield* sql<{ id: string }>`

@@ -392,6 +392,17 @@ export const ResearchLive = HttpApiBuilder.group(
 							)
 						return result
 					}).pipe(
+						// The run being re-run may still name a record this organization
+						// cannot see, and that reads as a missing record here the same
+						// way it does when a run is first created.
+						Effect.catchTag('SubjectUnavailable', e =>
+							Effect.fail(
+								new NotFound({
+									entity: e.subjects[0]?.table ?? 'companies',
+									id: e.subjects[0]?.id ?? '',
+								}),
+							),
+						),
 						Effect.catch(e =>
 							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
 						),
