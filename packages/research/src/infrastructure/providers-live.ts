@@ -10,6 +10,7 @@
  */
 
 import { Config, Effect, Layer, Option, Schema } from 'effect'
+import { Headers } from 'effect/unstable/http'
 
 import { priceUnitsMicrocents } from '../application/cost-rates'
 import {
@@ -552,6 +553,18 @@ const reportLayer = Layer.effect(
 
 // ── Merged layer ──
 
+// The HTTP client blanks these header names out before it records a request on
+// the trace. Brave's API key rides in `X-Subscription-Token`, which the client
+// does not know about; the four names above it are the client's own defaults,
+// repeated because setting this list replaces them rather than adds to them.
+const redactedHeadersLayer = Layer.succeed(Headers.CurrentRedactedNames)([
+	'authorization',
+	'cookie',
+	'set-cookie',
+	'x-api-key',
+	'x-subscription-token',
+])
+
 export const makeResearchProvidersLive = Layer.mergeAll(
 	cachedSearchLayer,
 	cachedScrapeLayer.pipe(Layer.provide(scrapeLayer)),
@@ -561,4 +574,5 @@ export const makeResearchProvidersLive = Layer.mergeAll(
 	MxResolverLive,
 	registryLayer,
 	reportLayer,
+	redactedHeadersLayer,
 )
