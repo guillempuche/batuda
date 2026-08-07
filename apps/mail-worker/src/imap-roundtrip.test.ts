@@ -177,6 +177,7 @@ describe.skipIf(!process.env['MAIL_CATCHER_LIVE'])(
 							organizationId: orgId,
 							inboxId,
 							folder: 'INBOX',
+							direction: 'inbound',
 							uidvalidity,
 							sinceUid: 0,
 						}).pipe(
@@ -236,6 +237,7 @@ describe.skipIf(!process.env['MAIL_CATCHER_LIVE'])(
 							organizationId: orgId,
 							inboxId,
 							folder: 'INBOX',
+							direction: 'inbound',
 							uidvalidity,
 							sinceUid: 0,
 						}).pipe(
@@ -253,6 +255,7 @@ describe.skipIf(!process.env['MAIL_CATCHER_LIVE'])(
 							organizationId: orgId,
 							inboxId,
 							folder: 'INBOX',
+							direction: 'inbound',
 							uidvalidity,
 							sinceUid: 0,
 						}).pipe(
@@ -303,6 +306,7 @@ describe.skipIf(!process.env['MAIL_CATCHER_LIVE'])(
 							organizationId: orgId,
 							inboxId,
 							folder: 'INBOX',
+							direction: 'inbound',
 							uidvalidity,
 							sinceUid: 0,
 						}).pipe(

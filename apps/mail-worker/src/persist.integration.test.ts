@@ -1,5 +1,5 @@
 // Live-DB integration test for the matcher → persist auto-link wiring.
-// Verifies that `persistInboundMessage` populates `company_id` and
+// Verifies that `persistMessage` populates `company_id` and
 // `contact_id` on both `email_messages` and `email_thread_links` based
 // on the inbound sender address.
 //
@@ -19,7 +19,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { ParticipantMatcher } from '@batuda/email/participant-matcher'
 
-import { type ParsedInbound, persistInboundMessage } from './persist.js'
+import { type ParsedInbound, persistMessage } from './persist.js'
 
 const DATABASE_URL =
 	process.env['DATABASE_URL'] ??
@@ -106,20 +106,31 @@ const buildParsed = (overrides: Partial<ParsedInbound>): ParsedInbound => ({
 	...overrides,
 })
 
-// Per-test imap_uid so the (inbox_id, uidvalidity, uid) dedupe index
+// Per-test imap_uid so the (inbox_id, folder, uidvalidity, uid) dedupe index
 // doesn't swallow inserts. uidvalidity stays constant for the suite.
 let nextUid = 1
-const persist = (parsed: ParsedInbound) =>
-	persistInboundMessage({
+const persistIn = (
+	parsed: ParsedInbound,
+	where: {
+		folder: string
+		direction: 'inbound' | 'outbound'
+		imapUid?: number
+	},
+) =>
+	persistMessage({
 		organizationId: ORG_ID,
 		inboxId,
-		folder: 'INBOX',
-		imapUid: nextUid++,
+		folder: where.folder,
+		direction: where.direction,
+		imapUid: where.imapUid ?? nextUid++,
 		imapUidvalidity: 100,
 		rawRfc822Ref: 'sentinel',
 		parsed,
 		attachments: [],
 	}).pipe(Effect.provide(ParticipantMatcher.layer), Effect.provide(PgLive))
+
+const persist = (parsed: ParsedInbound) =>
+	persistIn(parsed, { folder: 'INBOX', direction: 'inbound' })
 
 beforeAll(async () => {
 	pool = new pg.Pool({ connectionString: DATABASE_URL, max: 4 })
@@ -171,10 +182,12 @@ afterAll(async () => {
 
 const fetchMessage = async (messageId: string) => {
 	const rows = await pool.query<{
+		id: string
 		company_id: string | null
 		contact_id: string | null
+		direction: string
 	}>(
-		`SELECT company_id, contact_id FROM email_messages WHERE message_id = $1`,
+		`SELECT id, company_id, contact_id, direction FROM email_messages WHERE message_id = $1`,
 		[messageId],
 	)
 	return rows.rows[0]
@@ -191,7 +204,7 @@ const fetchThreadLink = async (externalThreadId: string) => {
 	return rows.rows[0]
 }
 
-describe('persistInboundMessage — CRM auto-link', () => {
+describe('persistMessage — CRM auto-link', () => {
 	describe('when the sender matches an existing contact', () => {
 		it('should populate company_id and contact_id on email_messages', async () => {
 			// GIVEN an inbound email from alice@acme (a seeded contact)
@@ -342,6 +355,235 @@ describe('persistInboundMessage — CRM auto-link', () => {
 			expect(row?.company_id).toBeNull()
 			expect(row?.contact_id).toBeNull()
 			// [apps/mail-worker/src/persist.ts — `args.parsed.fromAddress ? matcher.match(…) : new NoMatch(…)` null-guard]
+		})
+	})
+})
+
+describe('persistMessage — which way a message went', () => {
+	const historyRowsFor = async (messageDbId: string) =>
+		(
+			await pool.query<{ kind: string; direction: string }>(
+				`SELECT kind, direction FROM timeline_activity WHERE entity_id = $1`,
+				[messageDbId],
+			)
+		).rows
+
+	describe('when the message was found in the sent folder', () => {
+		it('should record it as one we sent', async () => {
+			// GIVEN a message sitting in the sent folder — one we sent, whatever
+			// the address it came from happens to match
+			const messageId = `<sent-${randomUUID()}@example>`
+			const parsed = buildParsed({
+				messageId,
+				fromAddress: `alice@${ACME_DOMAIN}`,
+			})
+
+			// WHEN it is taken in from that folder
+			await runIngest(
+				persistIn(parsed, { folder: 'Sent', direction: 'outbound' }),
+			)
+
+			// THEN it is stored as outbound, so the thread does not show our own
+			// message as something the company said to us
+			const row = await fetchMessage(messageId)
+			expect(row?.direction).toBe('outbound')
+		})
+
+		it('should stay out of the company history', async () => {
+			// GIVEN a sent message whose address does match a company
+			// [apps/mail-worker/src/persist.ts — the timeline insert is skipped
+			// unless the message arrived]
+			const messageId = `<sent-history-${randomUUID()}@example>`
+			const parsed = buildParsed({
+				messageId,
+				fromAddress: `alice@${ACME_DOMAIN}`,
+			})
+
+			// WHEN it is taken in from the sent folder
+			await runIngest(
+				persistIn(parsed, { folder: 'Sent', direction: 'outbound' }),
+			)
+
+			// THEN nothing is filed as mail that arrived
+			const row = await fetchMessage(messageId)
+			expect(await historyRowsFor(row!.id)).toEqual([])
+		})
+	})
+
+	describe('when the message arrived in the inbox', () => {
+		it('should be filed as mail that arrived', async () => {
+			// GIVEN a message from a known company landing in the inbox
+			const messageId = `<received-${randomUUID()}@example>`
+			const parsed = buildParsed({
+				messageId,
+				fromAddress: `alice@${ACME_DOMAIN}`,
+			})
+
+			// WHEN it is taken in
+			await runIngest(persist(parsed))
+
+			// THEN it is inbound, and it shows on the company's history
+			const row = await fetchMessage(messageId)
+			expect(row?.direction).toBe('inbound')
+			expect(await historyRowsFor(row!.id)).toEqual([
+				{ kind: 'email_received', direction: 'inbound' },
+			])
+		})
+	})
+})
+
+describe('persistMessage — a message we already hold', () => {
+	const rowsFor = async (messageId: string) =>
+		(
+			await pool.query<{
+				id: string
+				direction: string
+				folder: string
+				imap_uid: number | null
+				text_body: string | null
+			}>(
+				`SELECT id, direction, folder, imap_uid, text_body FROM email_messages WHERE message_id = $1`,
+				[messageId],
+			)
+		).rows
+
+	describe('when our own sent message comes back from the sent folder', () => {
+		it('should fill in where it lives rather than store it again', async () => {
+			// GIVEN a message already recorded because we sent it — no folder
+			// position yet, because it had not been read back from the server
+			const messageId = `<ours-${randomUUID()}@example>`
+			await pool.query(
+				`INSERT INTO email_messages
+				 (organization_id, inbox_id, message_id, direction, folder, raw_rfc822_ref,
+				  status, text_body, imap_uid, imap_uidvalidity)
+				 VALUES ($1, $2, $3, 'outbound', 'Sent', 'sent-ref', 'normal', $4, NULL, NULL)`,
+				[ORG_ID, inboxId, messageId, 'What we actually sent.'],
+			)
+
+			// WHEN the sent folder is read and the same message is found there
+			await runIngest(
+				persistIn(
+					buildParsed({ messageId, textBody: 'What we actually sent.' }),
+					{
+						folder: 'Sent',
+						direction: 'outbound',
+						imapUid: 4242,
+					},
+				),
+			)
+
+			// THEN it is still the one message, still ours, now knowing where it
+			// sits on the server — rather than being turned away for reusing a
+			// Message-ID, which would undo everything read alongside it
+			const rows = await rowsFor(messageId)
+			expect(rows).toHaveLength(1)
+			expect(rows[0]?.direction).toBe('outbound')
+			expect(rows[0]?.imap_uid).toBe(4242)
+			expect(rows[0]?.text_body).toBe('What we actually sent.')
+		})
+	})
+
+	describe('when the same folder position is read twice', () => {
+		it('should keep one copy', async () => {
+			// GIVEN a message taken in from the inbox
+			const messageId = `<twice-${randomUUID()}@example>`
+			const parsed = buildParsed({ messageId })
+			await runIngest(
+				persistIn(parsed, {
+					folder: 'INBOX',
+					direction: 'inbound',
+					imapUid: 5150,
+				}),
+			)
+
+			// WHEN the same position is read again, as it is after a restart
+			await runIngest(
+				persistIn(parsed, {
+					folder: 'INBOX',
+					direction: 'inbound',
+					imapUid: 5150,
+				}),
+			)
+
+			// THEN it is stored once
+			expect(await rowsFor(messageId)).toHaveLength(1)
+		})
+	})
+
+	describe('when two folders number their messages the same', () => {
+		it('should keep both, because they are different messages', async () => {
+			// GIVEN two genuinely different messages that happen to sit at the same
+			// position in two folders — which a server is free to do
+			const inboxMessage = `<inbox-${randomUUID()}@example>`
+			const sentMessage = `<sent-${randomUUID()}@example>`
+
+			// WHEN both are taken in
+			await runIngest(
+				persistIn(buildParsed({ messageId: inboxMessage }), {
+					folder: 'INBOX',
+					direction: 'inbound',
+					imapUid: 9001,
+				}),
+			)
+			await runIngest(
+				persistIn(buildParsed({ messageId: sentMessage }), {
+					folder: 'Sent',
+					direction: 'outbound',
+					imapUid: 9001,
+				}),
+			)
+
+			// THEN neither is mistaken for the other and lost
+			expect(await rowsFor(inboxMessage)).toHaveLength(1)
+			expect(await rowsFor(sentMessage)).toHaveLength(1)
+		})
+	})
+})
+
+describe('persistMessage — whose conversation it is', () => {
+	describe('when we wrote to a company', () => {
+		it('should file it under whom we wrote to, not under ourselves', async () => {
+			// GIVEN a message we sent to a known contact, found in the sent folder.
+			// Its sender is our own mailbox, which belongs to no company.
+			const messageId = `<to-acme-${randomUUID()}@example>`
+			const parsed = buildParsed({
+				messageId,
+				fromAddress: `inbox@${ACME_DOMAIN}`,
+				toAddresses: [`alice@${ACME_DOMAIN}`],
+			})
+
+			// WHEN it is taken in
+			await runIngest(
+				persistIn(parsed, { folder: 'Sent', direction: 'outbound' }),
+			)
+
+			// THEN it belongs to the company we wrote to, and so does the
+			// conversation it opens — which is never re-homed later, so getting
+			// this wrong would keep the whole thread off their page for good
+			const row = await fetchMessage(messageId)
+			expect(row?.company_id).toBe(acmeCompanyId)
+			expect(row?.contact_id).toBe(aliceContactId)
+			expect((await fetchThreadLink(messageId))?.company_id).toBe(acmeCompanyId)
+		})
+	})
+
+	describe('when a company wrote to us', () => {
+		it('should still file it under the sender', async () => {
+			// GIVEN a message that arrived from that contact
+			const messageId = `<from-acme-${randomUUID()}@example>`
+			const parsed = buildParsed({
+				messageId,
+				fromAddress: `alice@${ACME_DOMAIN}`,
+				toAddresses: [`inbox@${ACME_DOMAIN}`],
+			})
+
+			// WHEN it is taken in
+			await runIngest(persist(parsed))
+
+			// THEN it is filed under them
+			const row = await fetchMessage(messageId)
+			expect(row?.company_id).toBe(acmeCompanyId)
+			expect(row?.contact_id).toBe(aliceContactId)
 		})
 	})
 })

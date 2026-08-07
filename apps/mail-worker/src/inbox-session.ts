@@ -7,6 +7,7 @@ import type { ClaimedInbox } from './claim.js'
 import { CredentialDecryptor } from './decrypt.js'
 import { WorkerEnvVars } from './env.js'
 import {
+	type FolderState,
 	fetchAndIngestNewerThan,
 	markExpunged,
 	readFolderState,
@@ -30,11 +31,46 @@ export const onImapClientError =
 		)
 	}
 
-// Folders we monitor per inbox. Most providers have INBOX + Sent;
+// Folders we monitor per inbox, and what finding a message in one means.
 // Gmail's "All Mail" duplicates everything (covered by IMAP \All
-// special-use), so we skip it. Outbound rows we APPEND to "Sent" still
-// land here on the next sync — `idx_email_messages_msgid` dedupes.
-const TRACKED_FOLDERS: readonly string[] = ['INBOX', 'Sent']
+// special-use), so we skip it.
+//
+// Providers disagree on names — Gmail calls its sent folder
+// "[Gmail]/Sent Mail" and Outlook "Sent Items", so matching on the name alone
+// finds no sent mail on either. We ask the server which folder serves which
+// purpose and only fall back to the conventional name.
+const FOLDER_ROLES = [
+	{ specialUse: '\\Inbox', fallbackPath: 'INBOX', direction: 'inbound' },
+	{ specialUse: '\\Sent', fallbackPath: 'Sent', direction: 'outbound' },
+] as const
+
+export type TrackedFolder = {
+	readonly path: string
+	// Settled once from the folder's purpose and handed down, so nothing
+	// further along has to read it back out of a folder name.
+	readonly direction: 'inbound' | 'outbound'
+}
+
+// Pure so it can be tested without a server: the dev catcher (GreenMail) has
+// only INBOX, and a provider's real folder list is awkward to stand up.
+export const resolveTrackedFolders = (
+	boxes: ReadonlyArray<{
+		readonly path: string
+		readonly specialUse?: string | undefined
+	}>,
+): ReadonlyArray<TrackedFolder> => {
+	const tracked: Array<TrackedFolder> = []
+	for (const role of FOLDER_ROLES) {
+		const bySpecialUse = boxes.find(box => box.specialUse === role.specialUse)
+		const box =
+			bySpecialUse ?? boxes.find(entry => entry.path === role.fallbackPath)
+		if (box === undefined) continue
+		// A server that flags one folder twice would otherwise be synced twice.
+		if (tracked.some(entry => entry.path === box.path)) continue
+		tracked.push({ path: box.path, direction: role.direction })
+	}
+	return tracked
+}
 
 // Flip an inbox's grant_status when authentication or connection
 // proves broken across retries. Worker writes this; UI surfaces it via
@@ -67,29 +103,31 @@ const markHealthy = (inboxId: string) =>
 		`
 	})
 
-// Open a single mailbox, sync from folder_state.lastUid forward (or
-// backfill if we have no resume point / uidvalidity drifted), drain
-// any EXPUNGE events accumulated since the last tick, then idle until
-// the server reports a change. Returns when idle resolves; the caller
-// loops.
+// Open a single mailbox, sync forward from where `progress` says this
+// folder was last read (or backfill if we have no resume point /
+// uidvalidity drifted) and drain any EXPUNGE events accumulated since
+// the last tick. Waiting for the server to report a change happens once
+// per pass, in the caller.
 const syncOneFolderTick = (args: {
 	readonly client: ImapFlow
 	readonly inbox: ClaimedInbox
-	readonly folder: string
+	readonly folder: TrackedFolder
 	readonly backfillDays: number
 	readonly expungedQueue: Array<{ uid: number; uidValidity: number }>
-	readonly waitForChange: Effect.Effect<void>
+	readonly progress: Map<string, FolderState>
 }) =>
 	Effect.gen(function* () {
 		const opened = yield* Effect.tryPromise({
-			try: () => args.client.mailboxOpen(args.folder),
+			try: () => args.client.mailboxOpen(args.folder.path),
 			catch: err =>
-				new Error(`mailboxOpen(${args.folder}) failed: ${String(err)}`),
+				new Error(`mailboxOpen(${args.folder.path}) failed: ${String(err)}`),
 		})
 		const serverUidvalidity = Number(opened.uidValidity)
 		if (!Number.isFinite(serverUidvalidity)) {
 			return yield* Effect.fail(
-				new Error(`bad uidvalidity from ${args.folder}: ${opened.uidValidity}`),
+				new Error(
+					`bad uidvalidity from ${args.folder.path}: ${opened.uidValidity}`,
+				),
 			)
 		}
 
@@ -105,49 +143,46 @@ const syncOneFolderTick = (args: {
 			}).pipe(Effect.catchCause(cause => Effect.logError(cause)))
 		}
 
-		const known = readFolderState(args.inbox.folderState, args.folder)
+		const known = args.progress.get(args.folder.path) ?? null
 		const needsBackfill =
 			known === null || known.uidvalidity !== serverUidvalidity
 
+		const highest = needsBackfill
+			? yield* backfillSinceDate({
+					client: args.client,
+					organizationId: args.inbox.organizationId,
+					inboxId: args.inbox.id,
+					folder: args.folder.path,
+					direction: args.folder.direction,
+					uidvalidity: serverUidvalidity,
+					sinceDate: new Date(
+						Date.now() - args.backfillDays * 24 * 60 * 60 * 1000,
+					),
+				})
+			: yield* fetchAndIngestNewerThan({
+					client: args.client,
+					organizationId: args.inbox.organizationId,
+					inboxId: args.inbox.id,
+					folder: args.folder.path,
+					direction: args.folder.direction,
+					uidvalidity: serverUidvalidity,
+					sinceUid: known.lastUid,
+				})
+
 		if (needsBackfill) {
-			const sinceDate = new Date(
-				Date.now() - args.backfillDays * 24 * 60 * 60 * 1000,
-			)
-			const highest = yield* backfillSinceDate({
-				client: args.client,
-				organizationId: args.inbox.organizationId,
-				inboxId: args.inbox.id,
-				folder: args.folder,
-				uidvalidity: serverUidvalidity,
-				sinceDate,
-			})
 			yield* recordFolderHead({
 				inboxId: args.inbox.id,
-				folder: args.folder,
+				folder: args.folder.path,
 				uidvalidity: serverUidvalidity,
 				lastUid: highest,
 			})
-		} else {
-			yield* fetchAndIngestNewerThan({
-				client: args.client,
-				organizationId: args.inbox.organizationId,
-				inboxId: args.inbox.id,
-				folder: args.folder,
-				uidvalidity: serverUidvalidity,
-				sinceUid: known.lastUid,
-			})
 		}
 
-		// Hold IMAP IDLE so the server can push `exists`/`expunge` mid-IDLE.
-		// imapflow surfaces those as events rather than resolving idle(), so we
-		// start it fire-and-forget — the promise settles when the next tick's
-		// mailboxOpen breaks IDLE — and park until an event wakes us, or the
-		// poll timeout elapses. The poll is the reliable re-sync floor; the
-		// event is a low-latency optimization where the server delivers it.
-		yield* Effect.sync(() => {
-			void args.client.idle().catch(() => {})
+		args.progress.set(args.folder.path, {
+			uidvalidity: serverUidvalidity,
+			lastUid: highest,
+			syncedAt: null,
 		})
-		yield* args.waitForChange
 	})
 
 // One inbox = one IMAP connection per tracked folder. We keep things
@@ -248,22 +283,40 @@ export const runInboxSession = (claimed: ClaimedInbox) =>
 		// Per inbox we sync each tracked folder in a round-robin, parking on
 		// server change-events (or a poll timeout) between passes.
 		//
-		// Only sync folders the server actually exposes. Providers vary —
-		// the dev catcher (GreenMail) has just INBOX, Gmail names Sent
-		// "[Gmail]/Sent Mail" — so opening a hardcoded "Sent" would error
-		// every tick. INBOX is guaranteed by the IMAP spec; bail if even
-		// that is missing so the retry backoff handles it, not a hot loop.
+		// Only sync folders the server actually exposes, and take each one's
+		// purpose from the server rather than its name. The dev catcher
+		// (GreenMail) has just INBOX, so a missing sent folder is normal.
+		// Recognising none of them means we cannot usefully read this mailbox
+		// at all, so we give up and let the retry backoff handle it rather
+		// than spinning.
 		const available = yield* Effect.tryPromise({
 			try: () => client.list(),
 			catch: err => new Error(`list mailboxes failed: ${String(err)}`),
 		})
-		const availablePaths = new Set(available.map(box => box.path))
-		const folders = TRACKED_FOLDERS.filter(f => availablePaths.has(f))
-		if (folders.length === 0) {
+		const folders = resolveTrackedFolders(available)
+		const [firstFolder] = folders
+		if (firstFolder === undefined) {
 			return yield* Effect.fail(
 				new Error(`no tracked folders available for inbox=${claimed.id}`),
 			)
 		}
+
+		// How far each folder has been read, carried across passes. Seeded from
+		// where the last session left off and kept up to date as we go, so a
+		// pass resumes rather than starting the window again.
+		const progress = new Map<string, FolderState>()
+		for (const folder of folders) {
+			const known = readFolderState(claimed.folderState, folder.path)
+			if (known !== null) progress.set(folder.path, known)
+		}
+
+		// The server can only tell us about the folder we are holding open, so
+		// the one we wait on is the one that decides how quickly arriving mail
+		// is noticed. We wait on the inbox: a message we sent is already ours
+		// and can be picked up on the next pass, but one that arrives is
+		// somebody waiting for an answer.
+		const folderToWaitOn =
+			folders.find(folder => folder.direction === 'inbound') ?? firstFolder
 
 		yield* Effect.gen(function* () {
 			while (true) {
@@ -274,16 +327,35 @@ export const runInboxSession = (claimed: ClaimedInbox) =>
 						folder,
 						backfillDays: env.EMAIL_WORKER_BACKFILL_DAYS,
 						expungedQueue,
-						waitForChange,
+						progress,
 					}).pipe(
 						Effect.catchCause(cause =>
 							Effect.logWarning(
-								`mail-worker: folder tick failed inbox=${claimed.id} folder=${folder}`,
+								`mail-worker: folder tick failed inbox=${claimed.id} folder=${folder.path}`,
 							).pipe(Effect.andThen(Effect.logError(cause))),
 						),
 					)
 				}
 				yield* markHealthy(claimed.id)
+
+				// Hold IMAP IDLE so the server can push `exists`/`expunge` mid-IDLE.
+				// imapflow surfaces those as events rather than resolving idle(), so
+				// we start it fire-and-forget — the promise settles when the next
+				// pass's mailboxOpen breaks IDLE — and park until an event wakes us,
+				// or the poll timeout elapses. The poll is the reliable re-sync
+				// floor; the event is a low-latency optimization where the server
+				// delivers it.
+				yield* Effect.tryPromise({
+					try: () => client.mailboxOpen(folderToWaitOn.path),
+					catch: err =>
+						new Error(
+							`mailboxOpen(${folderToWaitOn.path}) failed: ${String(err)}`,
+						),
+				}).pipe(Effect.catchCause(cause => Effect.logError(cause)))
+				yield* Effect.sync(() => {
+					void client.idle().catch(() => {})
+				})
+				yield* waitForChange
 			}
 		}).pipe(
 			Effect.ensuring(
