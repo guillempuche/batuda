@@ -1,6 +1,6 @@
 {
 	"name": "@batuda/mail-worker",
-	"version": "2026.8.4",
+	"version": "2026.8.7",
 	"type": "module",
 	"scripts": {
 		"dev": "node --watch --env-file=../../.env --import tsx src/main.ts",

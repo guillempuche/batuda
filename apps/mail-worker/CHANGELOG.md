@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-07 (mail-worker-v2026.8.7)
+
+### Features
+
+* make the pipeline page a work queue rather than a noticeboard ([be21c14](https://github.com/guillempuche/batuda/commit/be21c147f605e1d5ea99fe7daa391ec26ab46847))
+
+### Bug Fixes
+
+* **mail-worker:** read the sent folder without losing or mis-filing mail ([c674682](https://github.com/guillempuche/batuda/commit/c674682008bbdacd111fa01355f23c0493a03652))
+
 ## 2026-08-04 (mail-worker-v2026.8.4)
 
 ### Features
