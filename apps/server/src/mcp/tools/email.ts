@@ -562,12 +562,19 @@ export const EmailTools = Toolkit.make(
 	ManageInboxFooter,
 )
 
-// The soft send guard fires when an email channel has a verdict that isn't a
-// confirmed `deliverable` (risky / catch_all / undeliverable / unknown, or any
-// unrecognised value). A missing verdict (null) is not gated — there is no
-// evidence the address is bad.
+// The verdicts that make an assistant's send stop and ask first: the two that
+// say something against the address. `catch_all` means the domain answers to
+// every name, so the check learned nothing about this particular mailbox, and
+// `unknown` means a check ran and settled nothing — which is what having no
+// verdict at all already says, and that has never been gated.
+//
+// A word outside the list still stops a send. The column takes free text, so
+// anything unrecognised is something nobody vetted, and letting it through is
+// the costly way to be wrong.
+const NEVER_GATED = new Set(['deliverable', 'catch_all', 'unknown'])
+
 export const isRiskyEmailVerdict = (verification: string | null): boolean =>
-	verification !== null && verification !== 'deliverable'
+	verification !== null && !NEVER_GATED.has(verification)
 
 export const EmailHandlersLive = EmailTools.toLayer(
 	Effect.gen(function* () {
@@ -579,9 +586,58 @@ export const EmailHandlersLive = EmailTools.toLayer(
 			'EMAIL_AGENT_SOFT_THREAD_LIMIT',
 		).pipe(Config.withDefault(3))
 
+		// Every address a message is going to, folded to one spelling so a
+		// difference in case cannot walk past the check below.
+		const recipientAddresses = (
+			...lists: ReadonlyArray<string | ReadonlyArray<string> | undefined>
+		): string[] => [
+			...new Set(
+				lists
+					.flatMap(list =>
+						list === undefined
+							? []
+							: typeof list === 'string'
+								? [list]
+								: [...list],
+					)
+					.map(address => address.trim().toLowerCase())
+					.filter(address => address !== ''),
+			),
+		]
+
+		// An address being written to that carries a verdict worth stopping for.
+		//
+		// The question is put to the addresses, the way the suppression check
+		// upstream puts it, rather than to whoever they belong to. `contact_id` is
+		// optional and names a person, not the mailbox — so a message to somebody's
+		// second address used to be judged by the verdict on their first, and a
+		// message sent without naming anybody was never judged at all. Any address
+		// carrying one stops the send, and the answer says which — the first in
+		// alphabetical order, so a message to two of them names the same one twice
+		// rather than whichever the database happened to return.
+		const riskyRecipient = (addresses: ReadonlyArray<string>) =>
+			addresses.length === 0
+				? Effect.succeed(null)
+				: Effect.gen(function* () {
+						const currentOrg = yield* CurrentOrg
+						const rows = yield* sql<{
+							address: string
+							verification: string
+						}>`
+							SELECT lower(address) AS address, verification FROM channels
+							WHERE organization_id = ${currentOrg.id}
+								AND channel = 'email'
+								AND lower(address) = ANY(${addresses})
+								AND verification IS NOT NULL
+							ORDER BY lower(address)
+						`
+						return (
+							rows.find(row => isRiskyEmailVerdict(row.verification)) ?? null
+						)
+					})
+
 		// A known-risky deliverability verdict on the contact's primary email
-		// channel (catch-all / undeliverable / unknown). null when the email is
-		// deliverable or has no verdict to act on.
+		// channel. null when the email is deliverable or has no verdict to act on.
 		const riskyEmailVerdict = (contactId: string) =>
 			sql<{ verification: string | null }>`
 				SELECT verification FROM channels
@@ -651,18 +707,22 @@ export const EmailHandlersLive = EmailTools.toLayer(
 		return {
 			send_email: params =>
 				Effect.gen(function* () {
-					// Soft guard (agent-only): a known-risky recipient asks first.
-					if (params.contact_id) {
-						const risky = yield* riskyEmailVerdict(params.contact_id)
-						if (risky) {
-							const answer = yield* confirmSend(
-								`This contact's email is not confirmed deliverable (verification: ${risky})`,
-							)
-							if (answer !== 'confirmed') {
-								return {
-									_tag: 'cancelled' as const,
-									reason: notSentReason(answer, `email verification: ${risky}`),
-								}
+					// Soft guard (agent-only): an address with something recorded
+					// against it asks first.
+					const risky = yield* riskyRecipient(
+						recipientAddresses(params.to, params.cc, params.bcc),
+					)
+					if (risky) {
+						const answer = yield* confirmSend(
+							`${risky.address} is not confirmed deliverable (verification: ${risky.verification})`,
+						)
+						if (answer !== 'confirmed') {
+							return {
+								_tag: 'cancelled' as const,
+								reason: notSentReason(
+									answer,
+									`email verification for ${risky.address}: ${risky.verification}`,
+								),
 							}
 						}
 					}
@@ -717,6 +777,10 @@ export const EmailHandlersLive = EmailTools.toLayer(
 						org.id,
 					)
 					const reasons: string[] = []
+					// A reply is addressed to a thread, not to a list, so the address
+					// it lands on is the one the conversation is already with — and
+					// only the person it is linked to names it here. Anyone added to
+					// this reply is named outright, so those are judged by address.
 					if (contactId) {
 						const risky = yield* riskyEmailVerdict(contactId)
 						if (risky) {
@@ -724,6 +788,14 @@ export const EmailHandlersLive = EmailTools.toLayer(
 								`the contact's email is not confirmed deliverable (verification: ${risky})`,
 							)
 						}
+					}
+					const riskyAdded = yield* riskyRecipient(
+						recipientAddresses(params.cc, params.bcc),
+					)
+					if (riskyAdded) {
+						reasons.push(
+							`${riskyAdded.address} is not confirmed deliverable (verification: ${riskyAdded.verification})`,
+						)
 					}
 					if (count >= softThreadLimit) {
 						reasons.push(
