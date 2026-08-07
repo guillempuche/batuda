@@ -135,3 +135,4 @@ For detailed field values, workflows, and examples, consult:
 - **`references/contacts.md`** — Correcting and removing one channel, primary election, how far an address is trusted vs whether it bounced
 - **`references/interactions.md`** — Channel/direction/type/outcome values, log_interaction example, next_action workflow
 - **`references/documents.md`** — Document types, research workflow, pages (Tiptap JSON, publish flow), tasks
+- **`references/email.md`** — The three outcomes of a send, which deliverability verdicts stop one and which do not, and how to see a stopped send coming
