@@ -55,6 +55,25 @@ const orgIdBySlug = async (slug: string): Promise<string> => {
 	return id
 }
 
+// A colleague invented for one test, so its rows cannot be confused with
+// another's. Registered as a real member of the organisation, because a task
+// can only be handed to somebody who works there — the same rule the app
+// applies, rather than one the fixtures are excused from.
+const fixtureColleague = async (orgId: string): Promise<string> => {
+	const id = `fixture-colleague-${randomUUID()}`
+	await pool.query(
+		`INSERT INTO "user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
+		 VALUES ($1, 'List Fixture', $2, false, now(), now())`,
+		[id, `${id}@fixture.local`],
+	)
+	await pool.query(
+		`INSERT INTO member (id, "organizationId", "userId", role, "createdAt")
+		 VALUES ($1, $2, $1, 'member', now())`,
+		[id, orgId],
+	)
+	return id
+}
+
 beforeAll(async () => {
 	pool = new pg.Pool({ connectionString: DATABASE_URL, max: 4 })
 	// `SET LOCAL ROLE app_user` (below) needs the connecting user to be a
@@ -65,6 +84,10 @@ beforeAll(async () => {
 }, 30_000)
 
 afterAll(async () => {
+	await pool.query(
+		`DELETE FROM member WHERE "userId" LIKE 'fixture-colleague-%'`,
+	)
+	await pool.query(`DELETE FROM "user" WHERE id LIKE 'fixture-colleague-%'`)
 	// Run as the connecting superuser (no role switch) so RLS doesn't gate
 	// cleanup. timeline_activity has no FK to tasks, so clear it and the
 	// task_events trail by the fixture title before the tasks themselves.
@@ -257,7 +280,7 @@ describe('TaskService.list', () => {
 	describe('when filtering by completed status', () => {
 		it('should treat completed=false as open work, excluding done AND cancelled', async () => {
 			// GIVEN one open, one done, and one cancelled task for a unique assignee
-			const assignee = `list-fixture-${randomUUID()}`
+			const assignee = await fixtureColleague(tallerOrgId)
 			await createWith(tallerOrgId, tallerOrgId, {
 				type: 'follow_up',
 				title: FIXTURE_TITLE,
@@ -293,7 +316,7 @@ describe('TaskService.list', () => {
 
 		it('should map completed=true to status=done', async () => {
 			// GIVEN an open and a done task for a unique assignee
-			const assignee = `list-fixture-${randomUUID()}`
+			const assignee = await fixtureColleague(tallerOrgId)
 			await createWith(tallerOrgId, tallerOrgId, {
 				type: 'follow_up',
 				title: FIXTURE_TITLE,
@@ -324,7 +347,7 @@ describe('TaskService.list', () => {
 	describe('when reporting how many tasks match', () => {
 		it('should count every match, not just the ones on the page', async () => {
 			// GIVEN three tasks for a unique assignee
-			const assignee = `page-fixture-${randomUUID()}`
+			const assignee = await fixtureColleague(tallerOrgId)
 			for (const title of ['first', 'second', 'third']) {
 				await createWith(tallerOrgId, tallerOrgId, {
 					type: 'follow_up',
@@ -350,7 +373,7 @@ describe('TaskService.list', () => {
 
 		it('should say more follow without being asked to count', async () => {
 			// GIVEN three tasks for a unique assignee
-			const assignee = `page-fixture-${randomUUID()}`
+			const assignee = await fixtureColleague(tallerOrgId)
 			for (const title of ['first', 'second', 'third']) {
 				await createWith(tallerOrgId, tallerOrgId, {
 					type: 'follow_up',
@@ -377,7 +400,7 @@ describe('TaskService.list', () => {
 
 		it('should not claim more when the page ends exactly on the last match', async () => {
 			// GIVEN two tasks for a unique assignee
-			const assignee = `page-fixture-${randomUUID()}`
+			const assignee = await fixtureColleague(tallerOrgId)
 			for (const title of ['first', 'second']) {
 				await createWith(tallerOrgId, tallerOrgId, {
 					type: 'follow_up',
@@ -402,7 +425,7 @@ describe('TaskService.list', () => {
 
 		it('should hand back only the rows asked for when more exist', async () => {
 			// GIVEN three tasks for a unique assignee
-			const assignee = `page-fixture-${randomUUID()}`
+			const assignee = await fixtureColleague(tallerOrgId)
 			for (const title of ['first', 'second', 'third']) {
 				await createWith(tallerOrgId, tallerOrgId, {
 					type: 'follow_up',
@@ -427,7 +450,7 @@ describe('TaskService.list', () => {
 
 		it('should still report the total for a page past the last match', async () => {
 			// GIVEN two tasks for a unique assignee
-			const assignee = `page-fixture-${randomUUID()}`
+			const assignee = await fixtureColleague(tallerOrgId)
 			for (const title of ['first', 'second']) {
 				await createWith(tallerOrgId, tallerOrgId, {
 					type: 'follow_up',
@@ -452,7 +475,7 @@ describe('TaskService.list', () => {
 
 		it('should report nothing matching when the filters exclude everything', async () => {
 			// GIVEN an assignee with no tasks at all
-			const assignee = `page-fixture-${randomUUID()}`
+			const assignee = await fixtureColleague(tallerOrgId)
 
 			// WHEN listing their work
 			const page = await listWith(tallerOrgId, { assigneeId: assignee })
@@ -464,7 +487,7 @@ describe('TaskService.list', () => {
 
 		it('should report nothing matching for a page past an empty result', async () => {
 			// GIVEN an assignee with no tasks at all
-			const assignee = `page-fixture-${randomUUID()}`
+			const assignee = await fixtureColleague(tallerOrgId)
 
 			// WHEN asking for a page beyond the (empty) result
 			const page = await listWith(
@@ -482,7 +505,7 @@ describe('TaskService.list', () => {
 	describe('when a shelf is asked for without the day it refers to', () => {
 		it('should go on hiding sleeping tasks rather than returning everything', async () => {
 			// GIVEN one awake and one sleeping task for a unique assignee
-			const assignee = `shelf-fixture-${randomUUID()}`
+			const assignee = await fixtureColleague(tallerOrgId)
 			await createWith(tallerOrgId, tallerOrgId, {
 				type: 'follow_up',
 				title: `${FIXTURE_TITLE} awake`,
@@ -520,7 +543,7 @@ describe('TaskService.list', () => {
 	describe('when listing one shelf of the inbox', () => {
 		it('should return only the tasks nobody has dated for noDue', async () => {
 			// GIVEN one dated and one undated task for a unique assignee
-			const assignee = `shelf-fixture-${randomUUID()}`
+			const assignee = await fixtureColleague(tallerOrgId)
 			const boundaries = boundariesAround(Date.now())
 			await createWith(tallerOrgId, tallerOrgId, {
 				type: 'follow_up',
@@ -552,7 +575,7 @@ describe('TaskService.list', () => {
 
 		it('should keep a task due earlier today on today rather than overdue', async () => {
 			// GIVEN a task that was due this morning, with the day already underway
-			const assignee = `shelf-fixture-${randomUUID()}`
+			const assignee = await fixtureColleague(tallerOrgId)
 			const boundaries = boundariesAround(Date.now())
 			await createWith(tallerOrgId, tallerOrgId, {
 				type: 'follow_up',
@@ -642,7 +665,7 @@ describe('TaskService.list', () => {
 	describe('when ordering the page', () => {
 		it('should put the soonest deadline first for sort=due', async () => {
 			// GIVEN three tasks dated out of order
-			const assignee = `sort-fixture-${randomUUID()}`
+			const assignee = await fixtureColleague(tallerOrgId)
 			const now = Date.now()
 			for (const [label, offset] of [
 				['middle', 2 * DAY_MS],
@@ -673,7 +696,7 @@ describe('TaskService.list', () => {
 
 		it('should put the furthest deadline first for sort=recent', async () => {
 			// GIVEN three tasks dated out of order
-			const assignee = `sort-fixture-${randomUUID()}`
+			const assignee = await fixtureColleague(tallerOrgId)
 			const now = Date.now()
 			for (const [label, offset] of [
 				['middle', 2 * DAY_MS],

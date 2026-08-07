@@ -155,7 +155,10 @@ beforeAll(async () => {
 			const companies = yield* sql<{ id: string }>`
 				INSERT INTO companies (organization_id, name, slug)
 				VALUES (${ORG}, 'Recipient Co', 'recipient-co')
-				ON CONFLICT (organization_id, slug) DO UPDATE SET name = EXCLUDED.name
+				-- The predicate is repeated because the company name is unique only
+				-- among the ones still in use.
+				ON CONFLICT (organization_id, slug) WHERE deleted_at IS NULL
+				DO UPDATE SET name = EXCLUDED.name
 				RETURNING id
 			`
 			companyId = companies[0]!.id
