@@ -915,6 +915,11 @@ export class EmailService extends Context.Service<EmailService>()(
 					externalThreadId: string
 				} | null
 				rawRfc822Ref: string
+				// What the recipient was sent. Kept on the row because the only
+				// other copies are the wire bytes in object storage and whatever
+				// sits in their mailbox.
+				textBody: string | null
+				htmlBody: string | null
 			}) =>
 				Effect.gen(function* () {
 					const currentOrg = yield* CurrentOrg
@@ -970,9 +975,12 @@ export class EmailService extends Context.Service<EmailService>()(
 									rawRfc822Ref: args.rawRfc822Ref,
 									subject: args.subject,
 									receivedAt: sentAt,
-									textPreview: null,
-									textBody: null,
-									htmlBody: null,
+									// Same 200-character cut arriving mail uses, so a message
+									// summarises the same way whichever way it went.
+									textPreview:
+										args.textBody === null ? null : args.textBody.slice(0, 200),
+									textBody: args.textBody,
+									htmlBody: args.htmlBody,
 									companyId: args.companyId,
 									contactId: args.contactId,
 									recipients: JSON.stringify({
@@ -1128,6 +1136,8 @@ export class EmailService extends Context.Service<EmailService>()(
 							bcc,
 							existingThreadLink: null,
 							rawRfc822Ref: dispatched.rawRef,
+							textBody: rendered.text,
+							htmlBody: rendered.html,
 						})
 
 						if (staged.length > 0) {
@@ -1308,6 +1318,8 @@ export class EmailService extends Context.Service<EmailService>()(
 								externalThreadId: link.externalThreadId,
 							},
 							rawRfc822Ref: dispatched.rawRef,
+							textBody: rendered.text,
+							htmlBody: rendered.html,
 						})
 
 						if (staged.length > 0) {
@@ -2783,6 +2795,8 @@ export class EmailService extends Context.Service<EmailService>()(
 							bcc: draft.bccAddresses as string[],
 							existingThreadLink,
 							rawRfc822Ref: dispatched.rawRef,
+							textBody: rendered.text,
+							htmlBody: rendered.html,
 						})
 
 						if (staged.length > 0) {
