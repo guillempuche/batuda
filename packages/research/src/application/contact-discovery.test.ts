@@ -289,14 +289,45 @@ const vendorFails = (label: string, calls: string[]) => ({
 })
 
 const anInput = { domain: 'acme.example' }
+// A charge that goes through. Returns true, the way the budget reports a first
+// payment for this vendor in this run.
 const recordCharge =
 	(charged: string[]) =>
-	(label: string): Effect.Effect<void> =>
+	(label: string): Effect.Effect<boolean> =>
 		Effect.sync(() => {
 			charged.push(label)
+			return true
 		})
 
+// A charge the budget refuses as already paid — what a resumed run sees.
+const alreadyCharged = (): Effect.Effect<boolean> => Effect.succeed(false)
+
 describe('runEnrichmentChain', () => {
+	describe('when this run already paid a vendor for this company', () => {
+		it('should skip the call rather than buy the same answer twice', async () => {
+			// GIVEN a resumed run: the budget reports the vendor as already paid
+			const calls: string[] = []
+			const outcome = await Effect.runPromise(
+				runEnrichmentChain(
+					{
+						attempts: [
+							vendorReturns('hunter', [somePerson('Ada', 'One')], calls),
+						],
+						mode: 'fallback',
+					},
+					anInput,
+					alreadyCharged,
+				),
+			)
+
+			// THEN the vendor is never called — the money is already spent and buying
+			// the same answer again would spend it twice — and the thin result says so
+			expect(calls).toEqual([])
+			expect(outcome.people).toEqual([])
+			expect(outcome.alreadyPaid).toBe(true)
+		})
+	})
+
 	describe('when a vendor turns us away', () => {
 		it('should say its credit ran out, not that nobody works there', async () => {
 			// GIVEN the only vendor refuses because its paid allowance is spent

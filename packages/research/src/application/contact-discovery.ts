@@ -90,6 +90,8 @@ export interface EnrichmentChainOutcome {
 	readonly quotaExhausted: boolean
 	/** A vendor failed for another reason — down, rate-limited, refusing the domain. */
 	readonly vendorFailed: boolean
+	/** A vendor was skipped because this run already paid it for this company. */
+	readonly alreadyPaid: boolean
 }
 
 // Run the enrichment chain when the registry found nobody: bill each configured
@@ -105,14 +107,22 @@ export const runEnrichmentChain = <E>(
 		readonly mode: EnrichmentMode
 	},
 	input: EnrichmentInput,
-	charge: (label: string) => Effect.Effect<void, E>,
+	charge: (label: string) => Effect.Effect<boolean, E>,
 ): Effect.Effect<EnrichmentChainOutcome, E> =>
 	Effect.gen(function* () {
 		const collected: SourcePerson[] = []
 		let quotaExhausted = false
 		let vendorFailed = false
+		let alreadyPaid = false
 		for (const attempt of chain.attempts) {
-			yield* charge(attempt.label)
+			// The charge says whether this vendor has already been paid for this
+			// company in this run — which happens when a run is resumed after a
+			// deploy. Calling it again would buy the same answer a second time, so
+			// the call is skipped and the shortfall reported instead.
+			if (!(yield* charge(attempt.label))) {
+				alreadyPaid = true
+				continue
+			}
 			const found = yield* attempt.findPeople(input).pipe(
 				// A vendor that could not answer is remembered, not just swallowed.
 				// "Nobody works here" and "we are out of credit" produce the same empty
@@ -137,6 +147,7 @@ export const runEnrichmentChain = <E>(
 			people: chain.mode === 'union' ? dedupePeople(collected) : collected,
 			quotaExhausted: quotaExhausted && refusalCostUs,
 			vendorFailed: vendorFailed && refusalCostUs,
+			alreadyPaid: alreadyPaid && refusalCostUs,
 		}
 	})
 
@@ -164,12 +175,25 @@ const enrichCostFor = (label: string): number =>
 	ENRICH_COST_BY_VENDOR[label] ?? ENRICH_COST_CENTS
 
 /**
+ * How many addresses one call will pay to check.
+ *
+ * Both paid finders return about ten people, so ten covers them — but a national
+ * registry can name more directors than that, and every one of them needs a
+ * guessed address checked. Without a ceiling the spend follows the company's board
+ * size, which is nobody's intention and nothing the caller was quoted.
+ */
+const MAX_VERIFICATIONS = 10
+
+/**
  * Rough up-front cost the MCP handler compares to its auto-approve threshold.
- * Worst case: both paid finders run (a registry miss, or union mode) before a
- * few verifies — so a real run never costs more than the confirm-gate saw.
+ * Worst case: both paid finders run (a registry miss, or union mode) and every
+ * verification allowed is spent — so a real run never costs more than the
+ * confirm-gate saw. The ceiling below is what makes that true rather than hopeful.
  */
 export const estimateDiscoverCostCents =
-	ENRICH_COST_CENTS + FULLENRICH_COST_CENTS + 5 * VERIFY_COST_CENTS
+	ENRICH_COST_CENTS +
+	FULLENRICH_COST_CENTS +
+	MAX_VERIFICATIONS * VERIFY_COST_CENTS
 
 // Lower is better — deliverable first, undeliverable last (and then dropped).
 const VERDICT_RANK: Record<VerificationVerdict, number> = {
@@ -245,6 +269,8 @@ export type DiscoverContactsOutcome =
 				| 'monthly_cap_reached'
 				| 'vendor_quota_exhausted'
 				| 'vendor_unavailable'
+				| 'verification_limit_reached'
+				| 'already_paid_this_run'
 				| undefined
 	  }
 	| {
@@ -254,6 +280,8 @@ export type DiscoverContactsOutcome =
 				| 'monthly_cap_reached'
 				| 'vendor_quota_exhausted'
 				| 'vendor_unavailable'
+				| 'verification_limit_reached'
+				| 'already_paid_this_run'
 				| undefined
 	  }
 	| { readonly status: 'budget_exceeded'; readonly researchId: string }
@@ -410,6 +438,13 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 					let enrichmentUnavailable = false
 					const verifierQuotaSpent = yield* Ref.make(false)
 					const verifierUnavailable = yield* Ref.make(false)
+					// Addresses checked so far, against the ceiling the caller was quoted.
+					// A Ref because the people are worked through concurrently.
+					const verificationsSpent = yield* Ref.make(0)
+					const verificationsCapped = yield* Ref.make(false)
+					// Work this run already paid for, skipped rather than bought again.
+					const verifierAlreadyPaid = yield* Ref.make(false)
+					let enrichmentAlreadyPaid = false
 
 					const core = Effect.gen(function* () {
 						const budget = yield* Budget
@@ -469,6 +504,7 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 								Effect.map(outcome => {
 									if (outcome.quotaExhausted) enrichmentQuotaSpent = true
 									else if (outcome.vendorFailed) enrichmentUnavailable = true
+									if (outcome.alreadyPaid) enrichmentAlreadyPaid = true
 									return outcome.people
 								}),
 							)
@@ -483,14 +519,24 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 						// to 'unknown' so a hit cap returns what was gathered.
 						const verifyEmail = (email: string) =>
 							Effect.gen(function* () {
-								yield* budget.chargePaid(
+								// This address was already checked and paid for earlier in the
+								// run — a resume after a deploy. Buying the same answer twice
+								// costs real money for nothing, so the check is skipped. The
+								// verdict is left unknown, which for a guessed address means
+								// it is dropped rather than asserted on a check we did not do.
+								const fresh = yield* budget.chargePaid(
 									'hunter-verify',
 									VERIFY_COST_CENTS,
 									'discover_contacts',
-									// Idempotency key so a resumed run does not re-pay to
-									// verify the same address.
 									`${researchId}:hunter-verify:${email}`,
 								)
+								if (!fresh) {
+									yield* Ref.set(verifierAlreadyPaid, true)
+									return {
+										verdict: 'unknown' as VerificationVerdict,
+										confidence: undefined as number | undefined,
+									}
+								}
 								const v = yield* verifier.verify({ email })
 								return {
 									verdict: v.result,
@@ -570,10 +616,23 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 											// paying for a redundant verification call.
 											verdict = person.verification
 											confidence = person.emailConfidence
-										} else {
+										} else if (
+											(yield* Ref.getAndUpdate(
+												verificationsSpent,
+												n => n + 1,
+											)) < MAX_VERIFICATIONS
+										) {
 											const r = yield* verifyEmail(chosen)
 											verdict = r.verdict
 											confidence = r.confidence ?? person.emailConfidence
+										} else {
+											// The call's allowance for checking addresses is spent.
+											// Left unchecked rather than asserted: a guessed address
+											// is only ever claimed when a check backs it, so this
+											// person comes back without one.
+											yield* Ref.set(verificationsCapped, true)
+											verdict = 'unknown'
+											confidence = person.emailConfidence
 										}
 										// A guessed address (no vendor-provided email) is only
 										// asserted when the verifier positively confirms it. An
@@ -646,13 +705,20 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 						// caller can do something about today. A spent allowance comes next,
 						// since it is a bill somebody can pay, and an unreachable vendor
 						// last, since it usually fixes itself.
+						const capped = yield* Ref.get(verificationsCapped)
+						const alreadyPaidSomething =
+							enrichmentAlreadyPaid || (yield* Ref.get(verifierAlreadyPaid))
 						const degraded = stopped
 							? ('monthly_cap_reached' as const)
 							: enrichmentQuotaSpent || verifyQuota
 								? ('vendor_quota_exhausted' as const)
 								: enrichmentUnavailable || verifyDown
 									? ('vendor_unavailable' as const)
-									: undefined
+									: capped
+										? ('verification_limit_reached' as const)
+										: alreadyPaidSomething
+											? ('already_paid_this_run' as const)
+											: undefined
 						return contacts.length === 0
 							? ({
 									status: 'no_reliable_contact',
