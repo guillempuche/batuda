@@ -28,4 +28,3 @@ export const REGISTRY_LOOKUP_COST_CENTS = 29
 export const ENRICH_COST_CENTS = 5
 export const FULLENRICH_COST_CENTS = 6
 export const VERIFY_COST_CENTS = 1
-

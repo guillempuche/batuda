@@ -132,7 +132,9 @@ export const runEnrichmentChain = (
 	// count twice.
 	buy: (
 		label: string,
-	) => <A>(call: () => Effect.Effect<A>) => Effect.Effect<PaidCall<A>, PaidRail>,
+	) => <A>(
+		call: () => Effect.Effect<A>,
+	) => Effect.Effect<PaidCall<A>, PaidRail>,
 ): Effect.Effect<EnrichmentChainOutcome, PaidRail> =>
 	Effect.gen(function* () {
 		const collected: SourcePerson[] = []
@@ -474,7 +476,6 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 					const verifierAlreadyPaid = yield* Ref.make(false)
 					let enrichmentAlreadyPaid = false
 
-
 					const core = Effect.gen(function* () {
 						const budget = yield* Budget
 
@@ -509,6 +510,13 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 										}),
 									),
 							)
+							// Already paid for on an earlier attempt at this run, which is
+							// what a resume after a deploy looks like. The register is not
+							// asked again — it bills per call, and this run's record of
+							// what it spent deliberately will not count the same key twice,
+							// so a second call would be money nothing recorded. The cost is
+							// that the paid finders below are reached instead, which is
+							// dearer than the register would have been.
 							const record =
 								looked._tag === 'already_charged' ? null : looked.value
 							people = (record?.directors ?? []).map(d => {
