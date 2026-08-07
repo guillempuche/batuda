@@ -26,7 +26,7 @@ import { companiesBackfillGeocode } from './commands/companies'
 import { dataInspect, ENTITY_NAMES } from './commands/data'
 import { dbMigrate, dbReset } from './commands/db'
 import { doctor } from './commands/doctor'
-import { emailInject } from './commands/email'
+import { emailBackfillBodies, emailInject } from './commands/email'
 import {
 	researchCap,
 	researchEval,
@@ -934,11 +934,33 @@ const emailClearCommand = Command.make('clear', {}, () => emailClear).pipe(
 	),
 )
 
+const emailBackfillBodiesCommand = Command.make(
+	'backfill-bodies',
+	{
+		dryRun: Flag.boolean('dry-run').pipe(
+			Flag.withDescription(
+				'List the messages that would be filled in, without writing anything',
+			),
+			Flag.withDefault(false),
+		),
+	},
+	({ dryRun }) => withDb(emailBackfillBodies({ dryRun })),
+).pipe(
+	Command.withShortDescription('Fill in the body of already-sent messages'),
+	Command.withDescription(
+		'Fill in the body of messages sent before the send path stored one, reading each message back from object storage. Only touches messages that still have no body, so it is safe to run twice; a message whose stored copy is missing is counted and skipped. Needs DATABASE_URL and the STORAGE_* settings for the environment being fixed',
+	),
+)
+
 const emailCommand = Command.make('email').pipe(
 	Command.withDescription(
-		'Email: inject canned messages into the mail catcher, or empty it',
+		'Email: inject canned messages into the mail catcher, empty it, or fill in missing message bodies',
 	),
-	Command.withSubcommands([emailInjectCommand, emailClearCommand]),
+	Command.withSubcommands([
+		emailInjectCommand,
+		emailClearCommand,
+		emailBackfillBodiesCommand,
+	]),
 )
 
 // ── Research ───────────────────────────────────────────────
