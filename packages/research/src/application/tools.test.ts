@@ -89,7 +89,7 @@ const webSearchInput = async (params: {
 	query: string
 	limit?: number | null
 	recency_days?: number | null
-	location?: string | null
+	country?: string | null
 }): Promise<SearchInput> => {
 	let captured: SearchInput | undefined
 	const ports = Layer.mergeAll(
@@ -110,7 +110,7 @@ const webSearchInput = async (params: {
 			const stream = yield* toolkit.handle('web_search', {
 				limit: null,
 				recency_days: null,
-				location: null,
+				country: null,
 				...params,
 			})
 			yield* Stream.runDrain(stream)
@@ -168,7 +168,7 @@ const webSearchInputForTarget = async (
 			const stream = yield* toolkit.handle('web_search', {
 				limit: null,
 				recency_days: null,
-				location: null,
+				country: null,
 				...params,
 			})
 			yield* Stream.runDrain(stream)
@@ -313,7 +313,7 @@ const webSearchResult = async (
 			const stream = yield* toolkit.handle('web_search', {
 				limit: null,
 				recency_days: null,
-				location: null,
+				country: null,
 				...params,
 			})
 			return yield* Stream.runCollect(stream)
@@ -461,7 +461,7 @@ describe('researchToolkit tool params — null and quoted numbers are read, not 
 					query: 'acme corp',
 					limit: null,
 					recency_days: null,
-					location: null,
+					country: null,
 				})
 
 				// THEN the required query still arrives
@@ -469,7 +469,7 @@ describe('researchToolkit tool params — null and quoted numbers are read, not 
 				// AND each optional null is folded to "not provided"
 				expect(input.limit).toBeUndefined()
 				expect(input.recency).toBeUndefined()
-				expect(input.location).toBeUndefined()
+				expect(input.country).toBeUndefined()
 			})
 		})
 
@@ -481,13 +481,13 @@ describe('researchToolkit tool params — null and quoted numbers are read, not 
 					query: 'acme corp',
 					limit: 5,
 					recency_days: 7,
-					location: 'ES',
+					country: 'ES',
 				})
 
 				// THEN the values reach the provider unchanged, recency as a { days } object
 				expect(input.limit).toBe(5)
 				expect(input.recency).toEqual({ days: 7 })
-				expect(input.location).toBe('ES')
+				expect(input.country).toBe('ES')
 			})
 		})
 
@@ -500,7 +500,7 @@ describe('researchToolkit tool params — null and quoted numbers are read, not 
 				// THEN the absent keys behave exactly like the null case
 				expect(input.limit).toBeUndefined()
 				expect(input.recency).toBeUndefined()
-				expect(input.location).toBeUndefined()
+				expect(input.country).toBeUndefined()
 			})
 		})
 
@@ -530,10 +530,10 @@ describe('researchToolkit tool params — null and quoted numbers are read, not 
 			it('should keep location as an empty string — only nullish is folded', async () => {
 				// GIVEN an empty-string location
 				// WHEN handled
-				const input = await webSearchInput({ query: 'acme corp', location: '' })
+				const input = await webSearchInput({ query: 'acme corp', country: '' })
 
 				// THEN the empty string is a real value and is preserved
-				expect(input.location).toBe('')
+				expect(input.country).toBe('')
 			})
 		})
 	})
@@ -662,11 +662,11 @@ describe('researchToolkit tool params — null and quoted numbers are read, not 
 					query: 'acme',
 					limit: null,
 					recency_days: null,
-					location: null,
+					country: null,
 				})
 				expect(web.limit).toBeNull()
 				expect(web.recency_days).toBeNull()
-				expect(web.location).toBeNull()
+				expect(web.country).toBeNull()
 
 				const registry = Schema.decodeUnknownSync(
 					RegistryLookupTool.parametersSchema,
@@ -684,7 +684,7 @@ describe('researchToolkit tool params — null and quoted numbers are read, not 
 						query: 'acme',
 						limit: '10',
 						recency_days: '7',
-						location: null,
+						country: null,
 					},
 				)
 
@@ -700,7 +700,7 @@ describe('researchToolkit tool params — null and quoted numbers are read, not 
 						query: 'acme',
 						limit: null,
 						recency_days: '0',
-						location: null,
+						country: null,
 					},
 				)
 
@@ -715,7 +715,7 @@ describe('researchToolkit tool params — null and quoted numbers are read, not 
 						query: 'acme',
 						limit: 'ten',
 						recency_days: '',
-						location: null,
+						country: null,
 					},
 				)
 
@@ -734,7 +734,7 @@ describe('researchToolkit tool params — null and quoted numbers are read, not 
 						query: 'acme',
 						limit: true,
 						recency_days: null,
-						location: null,
+						country: null,
 					}),
 				).toThrow()
 				expect(() =>
@@ -742,7 +742,7 @@ describe('researchToolkit tool params — null and quoted numbers are read, not 
 						query: 'acme',
 						limit: null,
 						recency_days: [],
-						location: null,
+						country: null,
 					}),
 				).toThrow()
 			})
@@ -757,7 +757,7 @@ describe('researchToolkit tool params — null and quoted numbers are read, not 
 						query: null,
 						limit: null,
 						recency_days: null,
-						location: null,
+						country: null,
 					}),
 				).toThrow()
 				expect(() =>
@@ -1130,8 +1130,8 @@ describe('researchToolkitWireFormat', () => {
 			expect(search.description).toContain('Search the public web')
 			expect(search.parameters.type).toBe('object')
 			expect(Object.keys(search.parameters.properties).sort()).toEqual([
+				'country',
 				'limit',
-				'location',
 				'query',
 				'recency_days',
 			])
@@ -1208,7 +1208,7 @@ describe('what a tool call charges the run', () => {
 						query: 'acme',
 						limit: null,
 						recency_days: null,
-						location: null,
+						country: null,
 					})
 					yield* Stream.runDrain(stream)
 				}).pipe(Effect.provide(chargingToolkit(charged)), Effect.orDie),
@@ -1483,7 +1483,7 @@ describe('a run that spends its budget', () => {
 				query: 'acme corp',
 				limit: null,
 				recency_days: null,
-				location: null,
+				country: null,
 			})
 
 			// THEN the model reads one tool name in front of one sentence
@@ -1499,7 +1499,7 @@ describe('a run that spends its budget', () => {
 				query: 'acme corp',
 				limit: null,
 				recency_days: null,
-				location: null,
+				country: null,
 			})
 
 			// THEN it is logged once, at warning — an investigation into error-level
@@ -1617,7 +1617,7 @@ describe('a run that spends its budget', () => {
 						query: 'acme corp',
 						limit: null,
 						recency_days: null,
-						location: null,
+						country: null,
 					})
 					return yield* Stream.runCollect(stream)
 				}).pipe(

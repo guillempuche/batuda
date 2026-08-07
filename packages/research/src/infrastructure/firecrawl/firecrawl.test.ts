@@ -678,7 +678,7 @@ describe('makeFirecrawlSearch', () => {
 		const { exit, log } = runSearch(
 			200,
 			{ data: { web: [] } },
-			{ location: 'en-US' },
+			{ country: 'en-US' },
 		)
 		await exit
 
@@ -691,7 +691,7 @@ describe('makeFirecrawlSearch', () => {
 		const { exit, log } = runSearch(
 			200,
 			{ data: { web: [] } },
-			{ location: 'United States' },
+			{ country: 'United States' },
 		)
 		await exit
 

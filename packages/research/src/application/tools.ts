@@ -76,8 +76,9 @@ const WebSearchParams = Schema.Struct({
 	recency_days: describedLenientNumber(
 		'Restrict to results published within the last N days. Null for no filter.',
 	),
-	location: Schema.NullOr(Schema.String).annotate({
-		description: 'Geographic locale hint (e.g. "ES", "es-ES")',
+	country: Schema.NullOr(Schema.String).annotate({
+		description:
+			'Country to search from, as an ISO 3166-1 alpha-2 code (e.g. "ES", "US"). A place in words belongs in the query itself, not here.',
 	}),
 })
 
@@ -299,7 +300,7 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 		const {
 			researchId,
 			language: hintLanguage,
-			location: hintLocation,
+			country: hintCountry,
 			entityTargets,
 			entityName,
 		} = yield* ResearchRunContext
@@ -414,10 +415,10 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 							params.recency_days != null
 								? { days: params.recency_days }
 								: undefined,
-						// Fall back to the run's location hint when the model gives none, and
+						// Fall back to the run's country when the model gives none, and
 						// carry the run's language so the provider searches in the target's
 						// own language rather than defaulting to English.
-						location: params.location ?? hintLocation ?? undefined,
+						country: params.country ?? hintCountry ?? undefined,
 						languages: hintLanguage ? [hintLanguage] : undefined,
 					})
 				}).pipe(

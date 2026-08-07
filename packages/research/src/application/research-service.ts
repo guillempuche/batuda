@@ -149,7 +149,6 @@ import {
 	WriterLanguageModel,
 } from './ports'
 import {
-	countryFromPlaceHint,
 	filterProspectsByCriteria,
 	prospectCriteriaFromHints,
 } from './prospect-criteria-guard'
@@ -171,6 +170,7 @@ import {
 import { computeRunQuality } from './research-quality'
 import { type RunWords, runWordsOf } from './run-words'
 import { guardScalarFields } from './scalar-field-guard'
+import { guardScanEvidence } from './scan-evidence-guard'
 import {
 	type FreeformSchema,
 	isSchemaName,
@@ -1583,7 +1583,8 @@ export interface CreateResearchInput {
 					| {
 							language?: 'ca' | 'es' | 'en' | undefined
 							recency_days?: number | undefined
-							location?: string | undefined
+							country?: string | undefined
+							place?: string | undefined
 							min_employees?: number | undefined
 							max_employees?: number | undefined
 					  }
@@ -2521,18 +2522,22 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								typeof row['website'] === 'string' ? row['website'] : undefined,
 						}
 					})
-					// The caller's location hint, folded into the entity targets' place keys
-					// so the city verification below can tell the queried company "in that
-					// city" from a same-named company (or a stale mention) elsewhere.
-					const hintLocation = (
-						context?.hints as { location?: string } | undefined
-					)?.location
+					// The caller's place hint in words, folded into the entity targets' place
+					// keys so the city verification below can tell the queried company "in
+					// that city" from a same-named company (or a stale mention) elsewhere,
+					// and appended to a search where naming the place helps. Prose only —
+					// the country a provider searches from is its own field.
+					const hintPlace = (context?.hints as { place?: string } | undefined)
+						?.place
+					const hintCountryCode = (
+						context?.hints as { country?: string } | undefined
+					)?.country
 					const subjectReading = deriveEntityTargets({
 						schemaName,
 						anchorDomain: context?.anchorDomain,
 						query: (run as { query: string }).query,
 						subjects: subjectTargets,
-						location: hintLocation,
+						location: hintPlace,
 					})
 					// `let`, not `const`: when the seeded anchor domain redirects to a
 					// different host (a rebrand), the seed below folds that destination
@@ -2680,10 +2685,15 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							? `\n\nSubject data (frozen snapshot):\n${JSON.stringify(subjectsForPrompt(subjects), null, 2)}`
 							: ''
 					const hints = context?.hints as
-						| { language?: string; recency_days?: number; location?: string }
+						| {
+								language?: string
+								recency_days?: number
+								country?: string
+								place?: string
+						  }
 						| undefined
 					const hintsContext = hints
-						? `\n\nHints: language=${hints.language ?? 'en'}, recency=${hints.recency_days ?? 'any'}, location=${hints.location ?? 'any'}`
+						? `\n\nHints: language=${hints.language ?? 'en'}, recency=${hints.recency_days ?? 'any'}, country=${hints.country ?? 'any'}, place=${hints.place ?? 'any'}`
 						: ''
 					const systemPrompt = buildResearchSystemPrompt({
 						schemaName,
@@ -3789,6 +3799,33 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										}),
 								},
 								{
+									// A scanned company whose whole case is a social post is not a
+									// company anyone can look up, write to, or visit. Judged before the
+									// criteria below, which ask about size and place — questions that
+									// presume the company is real.
+									name: 'scan-evidence',
+									run: findings =>
+										Effect.gen(function* () {
+											const check = guardScanEvidence(schemaName, findings)
+											if (check.dropped > 0) {
+												yield* Effect.logWarning(
+													'research.scan.sole_social_evidence',
+												).pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														dropped: check.dropped,
+													}),
+												)
+											}
+											return {
+												findings: check.findings,
+												spanCounts: {
+													'research.scan.dropped_social_only': check.dropped,
+												},
+											}
+										}),
+								},
+								{
 									// Prospect criteria: a scan sometimes returns a company outside the
 									// size or place the request asked for, because the page it came from
 									// was about the right sector. Drop one that states a size or country
@@ -3800,13 +3837,34 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									run: findings =>
 										Effect.gen(function* () {
 											if (schemaName !== 'prospect_scan_v1') return { findings }
-											const hintCountry = countryFromPlaceHint(hints?.location)
+											// Only the country field. A place in words is prose, and reading it as
+											// a code is what turned "MD" for Baltimore into Moldova and dropped
+											// every US company the scan had found.
+											const hintCountry = parseCountryAlpha2(hints?.country)
 											const prospectCriteria = prospectCriteriaFromHints(
 												hints as
 													| { min_employees?: number; max_employees?: number }
 													| undefined,
 												hintCountry ? [hintCountry] : [],
 											)
+											// A scan whose caller named no size and no country filters
+											// nothing, and used to look identical to one that filtered and
+											// kept everything. Saying so is what makes a request whose
+											// qualifiers never left the query text visible.
+											const hasCriteria =
+												(prospectCriteria.countries?.length ?? 0) > 0 ||
+												prospectCriteria.minEmployees !== undefined ||
+												prospectCriteria.maxEmployees !== undefined
+											if (!hasCriteria) {
+												yield* Effect.logInfo(
+													'research.prospects.no_criteria',
+												).pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														hints_given: hints === undefined ? 'none' : 'other',
+													}),
+												)
+											}
 											const check = filterProspectsByCriteria(
 												findings,
 												prospectCriteria,
@@ -4328,13 +4386,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											// query like "Acme, find their CEO" is "find".
 											const found = yield* anchorSearch.search({
 												query:
-													hintLocation === undefined
+													hintPlace === undefined
 														? entityName
-														: `${entityName} ${hintLocation}`,
+														: `${entityName} ${hintPlace}`,
 												limit: 5,
-												...(hints?.location
-													? { location: hints.location }
-													: {}),
+												...(hints?.country ? { country: hints.country } : {}),
 											})
 											for (const item of found.items) {
 												const host = domainHost(item.url)
@@ -4677,7 +4733,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												typeof registrySnapshot?.['country'] === 'string'
 													? registrySnapshot['country']
 													: undefined,
-											locationHint: hints?.location,
+											locationHint: hints?.country ?? hints?.place,
 											// An address the run found points at a country's
 											// register just as well as one the caller gave.
 											anchorHost: ownHost,
@@ -5148,7 +5204,8 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								Layer.succeed(ResearchRunContext)({
 									researchId,
 									language: hints?.language,
-									location: hints?.location,
+									country: hints?.country,
+									place: hints?.place,
 									entityTargets,
 									entityName,
 								}),
@@ -5630,11 +5687,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											.search({
 												query: perFieldSearchQuery(
 													target.name,
-													hintLocation,
+													hintPlace,
 													target.field,
 												),
 												limit: 3,
-												location: hintLocation,
+												country: hintCountryCode,
 											})
 											.pipe(
 												// Let a pure interruption (cancel/deploy) unwind the run instead of
@@ -5992,9 +6049,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										searchesFired++
 										const found = yield* verifySearch
 											.search({
-												query: verificationQuery(rowName(row), hintLocation),
+												query: verificationQuery(rowName(row), hintPlace),
 												limit: 3,
-												location: hintLocation,
+												country: hintCountryCode,
 											})
 											.pipe(
 												// A provider that is down says nothing about whether a

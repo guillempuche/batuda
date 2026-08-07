@@ -14,10 +14,14 @@ export const ProspectScanV1Schema = Schema.Struct({
 	prospects: Schema.Array(
 		Schema.Struct({
 			name: Schema.String,
-			website: Schema.optionalKey(Schema.String).annotate({
-				description:
-					"The prospect's own official website — the site the company itself runs. It must belong to the named company: not a directory/aggregator profile page, not another company that happened to appear in search results, and not a page on a social platform. A company's Facebook, Instagram or LinkedIn page goes in `social_profiles`, never here, even when it is the only web presence you can find.",
-			}),
+			website: Schema.optionalKey(
+				Sourced(
+					Schema.String.annotate({
+						description:
+							"The prospect's own official website, and the page you read it on — the site the company itself runs. It must belong to the named company: not a directory/aggregator profile page, not another company that happened to appear in search results, and not a page on a social platform. A company's Facebook, Instagram or LinkedIn page goes in `social_profiles`, never here, even when it is the only web presence you can find. Leave it out rather than assembling an address from the company's name: a guessed domain is worse than none.",
+					}),
+				),
+			),
 			// Where the company can be found on a platform, which is not the same
 			// question as its website and must not be answered in that field: a page
 			// on Facebook belongs to whoever opened the account, and a reader sent
@@ -25,9 +29,14 @@ export const ProspectScanV1Schema = Schema.Struct({
 			social_profiles: Schema.optionalKey(Schema.Array(SocialProfile)),
 			tax_id: Schema.optionalKey(Schema.String),
 			industry: Schema.optionalKey(Schema.String),
-			country: Schema.optionalKey(
-				Schema.String.annotate({
-					description: 'ISO 3166-1 alpha-2 country code, e.g. US, ES, DE.',
+			countries: Schema.optionalKey(
+				Schema.Array(
+					Schema.String.annotate({
+						description: 'ISO 3166-1 alpha-2 country code, e.g. US, ES, DE.',
+					}),
+				).annotate({
+					description:
+						'Every country the company has a place in — a plant, an office, a depot — not only the one it is registered in, and listed with the registered one first. A firm headquartered in one country and manufacturing in another belongs in both: a request for one of them is asking about a company that operates there, and naming only the registration would read as a company that does not.',
 				}),
 			),
 			// A request confined to one country puts the same code on every row, which

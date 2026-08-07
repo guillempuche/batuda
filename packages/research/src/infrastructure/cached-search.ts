@@ -41,7 +41,7 @@ export const computeSearchCacheKey = (
 		input.query,
 		String(input.limit ?? ''),
 		String(input.recency?.days ?? ''),
-		input.location ?? '',
+		input.country ?? '',
 		(input.languages ?? []).slice().sort().join(','),
 	]
 	return sha256Hex(parts.join('|'))

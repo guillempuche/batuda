@@ -167,10 +167,14 @@ export const CompanyEnrichmentV1Schema = Schema.Struct({
 		Schema.Array(
 			Schema.Struct({
 				name: Schema.String,
-				website: Schema.optionalKey(Schema.String).annotate({
-					description:
-						"The competitor's own official website. It must belong to the named competitor — not a directory/aggregator profile page and not another company that happened to appear in search results.",
-				}),
+				website: Schema.optionalKey(
+					Sourced(
+						Schema.String.annotate({
+							description:
+								"The competitor's own official website, and the page you read it on. It must belong to the named competitor — not a directory/aggregator profile page and not another company that happened to appear in search results. Leave it out rather than assembling an address from the company's name: a guessed domain is worse than none.",
+						}),
+					),
+				),
 				why: Schema.optionalKey(Schema.String),
 				citations: Schema.Array(Citation),
 			}),
