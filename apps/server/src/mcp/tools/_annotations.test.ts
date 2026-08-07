@@ -63,7 +63,7 @@ const isActionParameterized = (toolName: string): boolean =>
 // A floor, not an exact figure: adding one tool should not fail this file, but
 // registering a whole toolkit in the server without listing it in TOOLKITS
 // above should, since everything below only walks what is listed there.
-const EXPECTED_TOOL_COUNT = 95
+const EXPECTED_TOOL_COUNT = 97
 
 const READ_ONLY_NAME = /^(list_|get_|search_|find_|lookup_)/
 const DESTRUCTIVE_NAME = /^(delete_|discard_|cancel_)/

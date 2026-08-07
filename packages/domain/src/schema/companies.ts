@@ -147,6 +147,12 @@ export class Company extends Model.Class<Company>('Company')({
 	// stage — a company can be verified at any status, and a research-discovered
 	// one stays unverified until someone vouches for it.
 	verifiedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
+	// When this company was taken out of view, or null while it is in use.
+	// Carried on the record itself because a company that was deleted still gets
+	// read — to show what is about to be restored, and to list the deleted ones
+	// so somebody can pick it. Without it those reads look exactly like a live
+	// company, and the next write against it fails for no visible reason.
+	deletedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
 	verifiedBy: Schema.NullOr(Schema.String),
 
 	// Classification. `industry` is the web-address form of an entry in the

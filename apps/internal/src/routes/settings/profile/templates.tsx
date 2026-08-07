@@ -41,8 +41,8 @@ import {
 import { StackEditor } from '#/components/instructions/stack-editor'
 import { StackList } from '#/components/instructions/stack-list'
 import type { StackOption } from '#/components/instructions/stack-picker'
-import { TemplateDeleteConfirm } from '#/components/instructions/template-delete-confirm'
 import { TemplateLibrary } from '#/components/instructions/template-library'
+import { DeleteConfirm } from '#/components/shared/delete-confirm'
 import { ErrorState } from '#/components/shared/error-state'
 import { authClient } from '#/lib/auth-client'
 import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
@@ -395,7 +395,7 @@ function TemplatesPage() {
 				)}
 			</Section>
 
-			<TemplateDeleteConfirm
+			<DeleteConfirm
 				open={confirmStack !== null}
 				deleting={deletingStack}
 				onConfirm={() => {

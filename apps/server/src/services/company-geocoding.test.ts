@@ -32,6 +32,8 @@ const companyServiceWith = (
 			}),
 		search: () => Effect.die(unused),
 		countries: () => Effect.die(unused),
+		softDelete: () => Effect.die(unused),
+		restore: () => Effect.die(unused),
 		findBySlug: () => Effect.die(unused),
 		create: () => Effect.die(unused),
 		createMany: () => Effect.die(unused),

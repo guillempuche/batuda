@@ -23,6 +23,10 @@ export const TimelineKind = Schema.Literals([
 	'research_applied',
 	'system_event',
 	'stage_changed',
+	// A company taken out of view, and put back. Its people, work and history
+	// go with it, so the account's own log is where that has to be visible.
+	'company_deleted',
+	'company_restored',
 	'meeting_scheduled',
 	'meeting_rescheduled',
 	'meeting_cancelled',

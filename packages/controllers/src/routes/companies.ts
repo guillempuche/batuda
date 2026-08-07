@@ -25,7 +25,7 @@ import {
 	Interaction,
 } from '@batuda/domain'
 
-import { NotFound } from '../errors'
+import { BadRequest, NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 import { PaginatedList, pageQuery } from '../pagination'
@@ -102,6 +102,12 @@ export const CreateCompanyInput = Schema.Struct({
 // Every field a person can empty from the company page is nullable here. The page
 // sends null for a field cleared to blank, so a plain optional refused the write
 // and the edit came back as a rejected change with nothing to explain it.
+export const DeleteCompanyResult = Schema.Struct({
+	contactsAffected: Schema.Number,
+	// True when it was already gone, so a retried delete reads as done.
+	alreadyDeleted: Schema.optional(Schema.Boolean),
+})
+
 export const UpdateCompanyInput = Schema.Struct({
 	// The account's running notes, in markdown. A person editing them takes
 	// ownership of them, which is what stops later research replacing their text.
@@ -158,6 +164,10 @@ export const CompaniesGroup = HttpApiGroup.make('companies')
 				fitCriterionPassed: Schema.optional(Schema.String),
 				sort: Schema.optional(Schema.String),
 				query: Schema.optional(Schema.String),
+				// Which companies to look at. Omitted means the live ones; 'only' is
+				// how somebody finds a deleted company again in order to restore it,
+				// and without it a deletion cannot be undone from outside the code.
+				deleted: Schema.optional(Schema.Literals(['only', 'include'])),
 				minLat: Schema.optional(Schema.NumberFromString),
 				maxLat: Schema.optional(Schema.NumberFromString),
 				minLng: Schema.optional(Schema.NumberFromString),
@@ -211,6 +221,28 @@ export const CompaniesGroup = HttpApiGroup.make('companies')
 			payload: Schema.Struct({ verified: Schema.Boolean }),
 			success: Company.json,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
+		}),
+	)
+	.add(
+		// Take a company out of view. Its people go with it, and its name is
+		// released so the same firm can be added again later.
+		HttpApiEndpoint.delete('delete', '/companies/:id', {
+			params: { id: Schema.String },
+			success: DeleteCompanyResult,
+			error: NotFound.pipe(HttpApiSchema.status(404)),
+		}),
+	)
+	.add(
+		// Put one back, with the people that deletion hid. Answers 400 when the
+		// name has since been taken by another company, because the caller has to
+		// rename that one first.
+		HttpApiEndpoint.post('restore', '/companies/:id/restore', {
+			params: { id: Schema.String },
+			success: DeleteCompanyResult,
+			error: [
+				BadRequest.pipe(HttpApiSchema.status(400)),
+				NotFound.pipe(HttpApiSchema.status(404)),
+			],
 		}),
 	)
 	.middleware(SessionMiddleware)

@@ -7,6 +7,7 @@ import {
 	Link,
 	notFound,
 	stripSearchParams,
+	useNavigate,
 } from '@tanstack/react-router'
 import { DateTime, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
@@ -30,6 +31,7 @@ import {
 	Phone,
 	Plus,
 	Settings2,
+	Trash2,
 } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useCallback, useMemo, useState } from 'react'
@@ -55,6 +57,7 @@ import {
 	companyAtomFor,
 	companyTasksAtomFor,
 	contactsAtomFor,
+	deleteCompanyAtom,
 	timelineAtomFor,
 } from '#/atoms/company-atoms'
 import { emailsSearchAtom } from '#/atoms/emails-atoms'
@@ -112,6 +115,7 @@ import {
 	type ResearchRunRow,
 } from '#/components/research/run-shapes'
 import { TrustBadge } from '#/components/research/trust-badge'
+import { DeleteConfirm } from '#/components/shared/delete-confirm'
 import { EmptyState } from '#/components/shared/empty-state'
 import { ErrorState } from '#/components/shared/error-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
@@ -620,6 +624,27 @@ function DetailBody({
 		[verifyCompany, company.id, refreshCompany, toast, t],
 	)
 
+	const navigate = useNavigate()
+	const deleteCompany = useAtomSet(deleteCompanyAtom, { mode: 'promiseExit' })
+	const [deleteOpen, setDeleteOpen] = useState(false)
+	const [deleting, setDeleting] = useState(false)
+	const handleDelete = useCallback(async () => {
+		setDeleting(true)
+		const exit = await deleteCompany({
+			params: { id: company.id },
+		} as never)
+		setDeleting(false)
+		if (exit._tag === 'Success') {
+			setDeleteOpen(false)
+			// Back to the list: the page this was on no longer has anything to show,
+			// and staying on it would leave a company open that is no longer there.
+			toast.add({ title: t`Company deleted`, type: 'success' })
+			void navigate({ to: '/companies' })
+			return
+		}
+		toast.add({ title: t`Could not delete this company`, type: 'error' })
+	}, [deleteCompany, company.id, navigate, toast, t])
+
 	const handleStatusChange = useCallback(
 		async (next: string) => {
 			const prev = company.status
@@ -794,7 +819,10 @@ function DetailBody({
 			timelineEntries
 				.filter(
 					entry =>
-						entry.kind !== 'system_event' && entry.kind !== 'stage_changed',
+						entry.kind !== 'system_event' &&
+						entry.kind !== 'stage_changed' &&
+						entry.kind !== 'company_deleted' &&
+						entry.kind !== 'company_restored',
 				)
 				.map(entry => ({
 					id: entry.id,
@@ -854,7 +882,12 @@ function DetailBody({
 		() =>
 			showSystemEvents
 				? timelineEntries
-				: timelineEntries.filter(entry => entry.kind !== 'system_event'),
+				: timelineEntries.filter(
+						entry =>
+							entry.kind !== 'system_event' &&
+							entry.kind !== 'company_deleted' &&
+							entry.kind !== 'company_restored',
+					),
 		[timelineEntries, showSystemEvents],
 	)
 
@@ -1052,6 +1085,19 @@ function DetailBody({
 								<Trans>Mark as verified</Trans>
 							</VerifiedControl>
 						)}
+						<VerifiedControl
+							type='button'
+							data-testid='company-delete'
+							// Named with the company, so it is clear what is about to go.
+							// No title: it only appears on hover, which leaves it out of
+							// reach on a phone and for anybody on the keyboard, and the
+							// dialog says the same thing where everybody can read it.
+							aria-label={t`Delete ${company.name}`}
+							onClick={() => setDeleteOpen(true)}
+						>
+							<Trash2 size={14} aria-hidden />
+							<Trans>Delete</Trans>
+						</VerifiedControl>
 					</HeaderMeta>
 				</IdentityRow>
 
@@ -1139,6 +1185,22 @@ function DetailBody({
 						<RelativeDate value={company.lastContactedAt} fallback={t`never`} />
 					</LastContact>
 				</HeaderChrome>
+
+				<DeleteConfirm
+					open={deleteOpen}
+					deleting={deleting}
+					onConfirm={() => void handleDelete()}
+					onClose={() => setDeleteOpen(false)}
+					testId='company-delete-confirm'
+					title={<Trans>Delete this company?</Trans>}
+					description={
+						<Trans>
+							It comes off the lists and the pipeline, and its people go with
+							it. Its history is kept, and you can put it back from the Deleted
+							filter on the companies page.
+						</Trans>
+					}
+				/>
 
 				<PrimaryActions>
 					<motion.div whileTap={{ scale: 0.96 }}>
@@ -1297,6 +1359,12 @@ function DetailBody({
 																	key={row.id}
 																	entry={toTimelineEntry(row, {
 																		stageChangedLabel: t`Stage changed`,
+																		companyDeletedLabel: t`Company deleted`,
+																		companyRestoredLabel: t`Company restored`,
+																		describePeopleAffected: count =>
+																			count === 1
+																				? t`1 person went with it`
+																				: t`${count} people went with it`,
 																		describeStageChange: (from, to) =>
 																			`${i18n._(statusLabels[from])} → ${i18n._(statusLabels[to])}`,
 																	})}
@@ -1972,6 +2040,9 @@ function toTimelineEntry(
 	row: TimelineRow,
 	labels: {
 		readonly stageChangedLabel: string
+		readonly companyDeletedLabel: string
+		readonly companyRestoredLabel: string
+		readonly describePeopleAffected: (count: number) => string
 		readonly describeStageChange: (
 			from: CompanyStatus,
 			to: CompanyStatus,
@@ -1979,6 +2050,23 @@ function toTimelineEntry(
 	},
 ): TimelineEntryData {
 	const payload = row.payload ?? {}
+
+	if (row.kind === 'company_deleted' || row.kind === 'company_restored') {
+		const affected = Number(payload['contactsAffected'] ?? 0)
+		return {
+			id: row.id,
+			channel: row.channel,
+			subject:
+				row.kind === 'company_deleted'
+					? labels.companyDeletedLabel
+					: labels.companyRestoredLabel,
+			summary: labels.describePeopleAffected(affected),
+			outcome: null,
+			nextAction: null,
+			date: row.date,
+			threadId: null,
+		}
+	}
 
 	if (row.kind === 'stage_changed') {
 		return {
@@ -2041,6 +2129,8 @@ function timelineKindToChannel(kind: string, fallback: string | null): string {
 			return 'task'
 		case 'system_event':
 		case 'stage_changed':
+		case 'company_deleted':
+		case 'company_restored':
 			return 'system'
 		default:
 			return fallback ?? 'other'

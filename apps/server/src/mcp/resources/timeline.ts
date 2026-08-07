@@ -2,6 +2,8 @@ import { Effect, Schema } from 'effect'
 import { McpSchema, McpServer } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
+import { companyVisible } from '../../services/company-liveness'
+
 const companyIdParam = McpSchema.param('companyId', Schema.String)
 
 export const TimelineResource =
@@ -16,6 +18,7 @@ export const TimelineResource =
 			const rows = yield* sql`
 				SELECT * FROM timeline_activity
 				WHERE company_id = ${companyId}
+					AND ${companyVisible(sql, sql`company_id`)}
 				ORDER BY occurred_at DESC
 				LIMIT 100
 			`

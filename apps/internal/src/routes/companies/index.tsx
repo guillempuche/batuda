@@ -1,4 +1,5 @@
-import { useLingui } from '@lingui/react/macro'
+import { useAtomSet } from '@effect/atom-react'
+import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { DateTime, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
@@ -11,7 +12,7 @@ import {
 	type AttentionFilter,
 	AttentionFilter as AttentionFilterSchema,
 } from '@batuda/domain'
-import { PriButton, PriInput, PriSelect } from '@batuda/ui/pri'
+import { PriButton, PriInput, PriSelect, usePriToast } from '@batuda/ui/pri'
 
 import {
 	COMPANIES_FIRST_PAGE,
@@ -20,6 +21,7 @@ import {
 	canonicalSearchKey,
 	companiesSearchAtom,
 } from '#/atoms/companies-atoms'
+import { restoreCompanyAtom } from '#/atoms/company-atoms'
 import { CompaniesHeader } from '#/components/companies/companies-header'
 import { SavedViews } from '#/components/companies/saved-views'
 import { CompanyCard } from '#/components/shared/company-card'
@@ -86,6 +88,11 @@ const validateSearch = validateSearchWith({
 	// what that heading was counting rather than on everything.
 	attention: AttentionFilterSchema,
 	staleDays: Schema.Union([Schema.Number, Schema.NumberFromString]),
+	// 'only' shows the ones taken out of view, so somebody can put one back.
+	// Absent means the companies in use, which is the page's ordinary job. A URL
+	// carrying anything else is dropped rather than passed on as a filter the
+	// server would not recognise.
+	deleted: Schema.Literals(['only', 'include']),
 })
 
 /**
@@ -226,6 +233,30 @@ function CompaniesListPage() {
 		},
 		[applyPatch],
 	)
+	const toast = usePriToast()
+	const restoreCompany = useAtomSet(restoreCompanyAtom, { mode: 'promiseExit' })
+	const [restoringId, setRestoringId] = useState<string | null>(null)
+	const handleRestore = useCallback(
+		async (id: string, name: string) => {
+			setRestoringId(id)
+			const exit = await restoreCompany({ params: { id } } as never)
+			setRestoringId(null)
+			if (exit._tag === 'Success') {
+				toast.add({ title: t`${name} is back`, type: 'success' })
+				list.refresh()
+				return
+			}
+			// The usual reason is that the name was taken while it was away, and
+			// that is the caller's to sort out, so it is said rather than swallowed.
+			toast.add({
+				title: t`Could not restore ${name}`,
+				description: t`Another company may be using its name now.`,
+				type: 'error',
+			})
+		},
+		[restoreCompany, toast, t, list],
+	)
+
 	const handleClearFilters = useCallback(() => {
 		setSearchInput('')
 		void navigate({ to: '/companies', search: {} })
@@ -343,6 +374,24 @@ function CompaniesListPage() {
 							<StatusBadge status={status} />
 						</StatusFilterButton>
 					))}
+					{/* Separate from the stages on purpose: a deleted company has a
+					    stage too, so this is a different question about the same list. */}
+					<StatusFilterButton
+						type='button'
+						$active={search.deleted === 'only'}
+						onClick={() =>
+							applyPatch({
+								deleted: search.deleted === 'only' ? undefined : 'only',
+								// A stage filter would narrow the deleted ones by a stage
+								// nobody is working, which reads as "none of them".
+								status: undefined,
+							})
+						}
+						aria-pressed={search.deleted === 'only'}
+						data-testid='companies-filter-deleted'
+					>
+						{t`Deleted`}
+					</StatusFilterButton>
 				</StatusFilters>
 
 				<SavedViews
@@ -442,37 +491,73 @@ function CompaniesListPage() {
 				/>
 			) : (
 				<>
-					<LayoutGroup>
-						<Grid layout>
+					{search.deleted === 'only' ? (
+						// Deliberately not the usual card: a deleted company's page is
+						// closed, so a card linking to it would be a dead end. What is
+						// useful here is its name and a way back.
+						<DeletedList role='list'>
 							{companies.map(company => (
-								<CompanyCard
+								<DeletedRow
 									key={company.id}
-									company={{
-										slug: company.slug,
-										name: company.name,
-										status: company.status,
-										industry: company.industry,
-										location: company.location,
-										country: company.country,
-										priority: company.priority,
-										ownerId: company.ownerId,
-										lastContactedAt: company.lastContactedAt,
-									}}
-									actions={{
-										onLogInteraction: () => handleLogInteraction(company),
-										// Changing the owner is the company's own decision to
-										// make, so the card sends the reader there rather than
-										// growing a picker of its own.
-										onAssign: () =>
-											void navigate({
-												to: '/companies/$slug',
-												params: { slug: company.slug },
-											}),
-									}}
-								/>
+									role='listitem'
+									data-testid='company-deleted-row'
+								>
+									<DeletedName>{company.name}</DeletedName>
+									<PriButton
+										type='button'
+										$variant='text'
+										// Every one of these says "Restore", so without the name
+										// a screen reader listing the buttons reads the same word
+										// over and over with nothing to tell them apart.
+										aria-label={t`Restore ${company.name}`}
+										disabled={restoringId === company.id}
+										focusableWhenDisabled
+										aria-busy={restoringId === company.id}
+										onClick={() => void handleRestore(company.id, company.name)}
+										data-testid={`company-restore-${company.slug}`}
+									>
+										{restoringId === company.id ? (
+											<Trans>Restoring…</Trans>
+										) : (
+											<Trans>Restore</Trans>
+										)}
+									</PriButton>
+								</DeletedRow>
 							))}
-						</Grid>
-					</LayoutGroup>
+						</DeletedList>
+					) : (
+						<LayoutGroup>
+							<Grid layout>
+								{companies.map(company => (
+									<CompanyCard
+										key={company.id}
+										company={{
+											slug: company.slug,
+											name: company.name,
+											status: company.status,
+											industry: company.industry,
+											location: company.location,
+											country: company.country,
+											priority: company.priority,
+											ownerId: company.ownerId,
+											lastContactedAt: company.lastContactedAt,
+										}}
+										actions={{
+											onLogInteraction: () => handleLogInteraction(company),
+											// Changing the owner is the company's own decision to
+											// make, so the card sends the reader there rather than
+											// growing a picker of its own.
+											onAssign: () =>
+												void navigate({
+													to: '/companies/$slug',
+													params: { slug: company.slug },
+												}),
+										}}
+									/>
+								))}
+							</Grid>
+						</LayoutGroup>
+					)}
 					<InfiniteListFooter list={list} testId='companies' />
 				</>
 			)}
@@ -564,6 +649,7 @@ function mergeSearch(
 		query: string | undefined
 		attention: AttentionFilter | undefined
 		staleDays: number | undefined
+		deleted: 'only' | 'include' | undefined
 	}>,
 ): CompaniesSearch {
 	const result: {
@@ -576,6 +662,7 @@ function mergeSearch(
 		query?: string
 		attention?: AttentionFilter
 		staleDays?: number
+		deleted?: 'only' | 'include'
 	} = {}
 
 	const status = 'status' in next ? next.status : prev.status
@@ -604,6 +691,9 @@ function mergeSearch(
 
 	const staleDays = 'staleDays' in next ? next.staleDays : prev.staleDays
 	if (staleDays !== undefined) result.staleDays = staleDays
+
+	const deleted = 'deleted' in next ? next.deleted : prev.deleted
+	if (deleted !== undefined) result.deleted = deleted
 
 	return result
 }
@@ -842,4 +932,28 @@ const DropdownRow = styled.div.withConfig({
 		flex: 1 1 8rem;
 		min-width: 0;
 	}
+`
+
+// A deleted company shows as a line rather than a card: there is no page to
+// open behind it, so the only thing worth offering is putting it back.
+const DeletedList = styled.div`
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2xs);
+`
+
+const DeletedRow = styled.div`
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-sm);
+	padding: var(--space-sm) var(--space-md);
+	border: 1px solid var(--color-outline-variant);
+	border-radius: var(--radius-md);
+	background: var(--color-surface-container-low);
+`
+
+const DeletedName = styled.span`
+	font: var(--type-body-medium);
+	color: var(--color-on-surface-variant);
 `

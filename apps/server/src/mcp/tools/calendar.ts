@@ -10,6 +10,7 @@ import { withAttendees } from '../../lib/calendar-attendees'
 import { CalendarService } from '../../services/calendar'
 import { dispatchForwardInvitation } from '../../services/calendar-forward-dispatch'
 import { dispatchRsvpReply } from '../../services/calendar-rsvp-dispatch'
+import { companyVisible } from '../../services/company-liveness'
 import { EmailService } from '../../services/email'
 import { ToolMessage } from '../tool-message'
 import {
@@ -414,6 +415,8 @@ export const CalendarHandlersLive = CalendarTools.toLayer(
 			list_upcoming_meetings: params =>
 				Effect.gen(function* () {
 					const conditions: Array<Statement.Fragment> = [
+						// Meetings for a company nobody can open go with it.
+						companyVisible(sql, sql`company_id`),
 						sql`start_at > now()`,
 						sql`status <> 'cancelled'`,
 					]
@@ -437,7 +440,9 @@ export const CalendarHandlersLive = CalendarTools.toLayer(
 			manage_event_types: params =>
 				Effect.gen(function* () {
 					if (params.action === 'sync') return yield* svc.syncEventTypes()
-					const conditions: Array<Statement.Fragment> = []
+					const conditions: Array<Statement.Fragment> = [
+						companyVisible(sql, sql`company_id`),
+					]
 					if (params.active === true) conditions.push(sql`active = true`)
 					if (params.active === false) conditions.push(sql`active = false`)
 					const rows = yield* sql`

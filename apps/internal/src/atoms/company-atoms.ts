@@ -115,6 +115,10 @@ export function timelineAtomFor(companyId: string) {
 	return atom
 }
 
+/** Taking a company out of view, and putting it back. */
+export const deleteCompanyAtom = BatudaApiAtom.mutation('companies', 'delete')
+export const restoreCompanyAtom = BatudaApiAtom.mutation('companies', 'restore')
+
 /** How many of a company's offers the Files tab reads at a time. */
 export const PROPOSALS_PAGE_SIZE = 20
 

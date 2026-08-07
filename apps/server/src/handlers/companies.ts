@@ -10,6 +10,11 @@ import {
 } from '../services/company-geocoding'
 import { recordStageChange } from '../services/company-stage-change'
 import { Geocoder } from '../services/geocoder'
+import {
+	CompanyDeleted,
+	CompanyRestored,
+	TimelineActivityService,
+} from '../services/timeline-activity'
 
 export const CompaniesLive = HttpApiBuilder.group(
 	BatudaApi,
@@ -18,6 +23,7 @@ export const CompaniesLive = HttpApiBuilder.group(
 		Effect.gen(function* () {
 			const svc = yield* CompanyService
 			const geocoder = yield* Geocoder
+			const timeline = yield* TimelineActivityService
 			return handlers
 				.handle('list', _ => svc.search(_.query).pipe(Effect.orDie))
 				.handle('countries', () => svc.countries().pipe(Effect.orDie))
@@ -67,7 +73,13 @@ export const CompaniesLive = HttpApiBuilder.group(
 						).pipe(
 							Effect.provideService(CompanyService, svc),
 							Effect.provideService(Geocoder, geocoder),
+							// A company that is gone, or was taken out of view, is not an
+							// edit that failed — it is one there was nothing to make.
+							Effect.catchTag('NotFound', () => Effect.succeed(null)),
 						)
+						// Nothing happened, so nothing is written on the account's history
+						// and nothing is claimed to the caller.
+						if (result === null) return null
 						yield* Effect.logInfo('Company updated').pipe(
 							Effect.annotateLogs({
 								event: 'company.updated',
@@ -146,6 +158,67 @@ export const CompaniesLive = HttpApiBuilder.group(
 					}).pipe(
 						Effect.catch(e =>
 							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
+						),
+					),
+				)
+				.handle('delete', _ =>
+					Effect.gen(function* () {
+						const session = yield* SessionContext
+						const result = yield* svc.softDelete(_.params.id)
+						if (result.alreadyDeleted)
+							return { contactsAffected: 0, alreadyDeleted: true }
+						yield* timeline.record(
+							new CompanyDeleted({
+								companyId: _.params.id,
+								contactsAffected: result.contactsAffected,
+								actorUserId: session.userId,
+								occurredAt: result.at,
+							}),
+						)
+						yield* Effect.logInfo('Company deleted').pipe(
+							Effect.annotateLogs({
+								event: 'company.deleted',
+								companyId: _.params.id,
+								contactsAffected: result.contactsAffected,
+							}),
+						)
+						return {
+							contactsAffected: result.contactsAffected,
+							alreadyDeleted: false,
+						}
+					}).pipe(
+						Effect.catch(e =>
+							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
+						),
+					),
+				)
+				.handle('restore', _ =>
+					Effect.gen(function* () {
+						const session = yield* SessionContext
+						const result = yield* svc.restore(_.params.id)
+						yield* timeline.record(
+							new CompanyRestored({
+								companyId: _.params.id,
+								contactsAffected: result.contactsAffected,
+								actorUserId: session.userId,
+								occurredAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
+							}),
+						)
+						yield* Effect.logInfo('Company restored').pipe(
+							Effect.annotateLogs({
+								event: 'company.restored',
+								companyId: _.params.id,
+								contactsAffected: result.contactsAffected,
+							}),
+						)
+						return { contactsAffected: result.contactsAffected }
+					}).pipe(
+						// A name already taken is the caller's to resolve, so it keeps
+						// its own answer rather than becoming a server fault.
+						Effect.catch(e =>
+							e._tag === 'NotFound' || e._tag === 'BadRequest'
+								? Effect.fail(e)
+								: Effect.die(e),
 						),
 					),
 				)

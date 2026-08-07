@@ -12,6 +12,8 @@ import {
 	takePage,
 	totalColumn,
 } from '../lib/sql-pagination'
+import { companyVisible } from './company-liveness'
+import { requireOrgMembers } from './org-members'
 import {
 	TaskCompleted,
 	TaskCreated,
@@ -171,6 +173,9 @@ export class TaskService extends Context.Service<TaskService>()('TaskService', {
 		): Array<Statement.Fragment> => {
 			const conditions: Array<Statement.Fragment> = [
 				sql`organization_id = ${orgId}`,
+				// Work on a company nobody can open belongs on nobody's list. Work
+				// that belongs to no company is somebody's own and stays.
+				companyVisible(sql, sql`company_id`),
 			]
 			if (filters.companyId)
 				conditions.push(sql`company_id = ${filters.companyId}`)
@@ -276,6 +281,7 @@ export class TaskService extends Context.Service<TaskService>()('TaskService', {
 			create: (data: Record<string, unknown>, actor: TaskActor) =>
 				Effect.gen(function* () {
 					const currentOrg = yield* CurrentOrg
+					yield* requireOrgMembers(sql, [data['assigneeId']])
 					const rows =
 						yield* sql<TaskRow>`INSERT INTO tasks ${sql.insert({ ...data, organizationId: currentOrg.id })} RETURNING *`.pipe(
 							Effect.orDie,
@@ -608,6 +614,7 @@ export class TaskService extends Context.Service<TaskService>()('TaskService', {
 							})
 					}
 
+					yield* requireOrgMembers(sql, [input.assigneeId])
 					const updates: Record<string, unknown> = {}
 					if (input.title !== undefined) updates['title'] = input.title
 					if (input.status !== undefined) updates['status'] = input.status

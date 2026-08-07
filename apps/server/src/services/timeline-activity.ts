@@ -195,6 +195,20 @@ export class StageChanged extends Data.TaggedClass('StageChanged')<{
 	readonly occurredAt: Date
 }> {}
 
+export class CompanyDeleted extends Data.TaggedClass('CompanyDeleted')<{
+	readonly companyId: string
+	readonly contactsAffected: number
+	readonly actorUserId: string | null
+	readonly occurredAt: Date
+}> {}
+
+export class CompanyRestored extends Data.TaggedClass('CompanyRestored')<{
+	readonly companyId: string
+	readonly contactsAffected: number
+	readonly actorUserId: string | null
+	readonly occurredAt: Date
+}> {}
+
 export type TimelineEvent =
 	| EmailSent
 	| EmailReceived
@@ -205,6 +219,8 @@ export type TimelineEvent =
 	| ResearchProposalApplied
 	| SystemEvent
 	| StageChanged
+	| CompanyDeleted
+	| CompanyRestored
 	| MeetingScheduled
 	| MeetingRescheduled
 	| MeetingCancelled
@@ -246,6 +262,8 @@ export const denormColumnFor = (
 		case 'TaskCreated':
 		case 'TaskUpdated':
 		case 'TaskCompleted':
+		case 'CompanyDeleted':
+		case 'CompanyRestored':
 			return null
 	}
 }
@@ -406,6 +424,23 @@ const rowBase = (event: TimelineEvent): TimelineRowBase => {
 				occurredAt: event.occurredAt,
 				summary: event.summary,
 				payload: event.payload,
+			}
+		case 'CompanyDeleted':
+		case 'CompanyRestored':
+			return {
+				kind:
+					event._tag === 'CompanyDeleted'
+						? 'company_deleted'
+						: 'company_restored',
+				entityType: 'system',
+				companyId: event.companyId,
+				contactId: null,
+				channel: null,
+				direction: null,
+				actorUserId: event.actorUserId,
+				occurredAt: event.occurredAt,
+				summary: null,
+				payload: { contactsAffected: event.contactsAffected },
 			}
 		case 'StageChanged':
 			return {
@@ -613,6 +648,8 @@ export const mapEventToInteraction = (
 				durationMin: event.durationMin,
 				metadata: null,
 			}
+		case 'CompanyDeleted':
+		case 'CompanyRestored':
 		case 'StageChanged': {
 			return null
 		}
@@ -659,6 +696,8 @@ const entityIdFor = (
 		case 'SystemEvent':
 			return event.entityId
 		case 'StageChanged':
+		case 'CompanyDeleted':
+		case 'CompanyRestored':
 			return event.companyId
 		case 'MeetingScheduled':
 		case 'MeetingRescheduled':
@@ -683,6 +722,9 @@ export class TimelineActivityService extends Context.Service<TimelineActivitySer
 		make: Effect.gen(function* () {
 			const sql = yield* SqlClient.SqlClient
 
+			// A company out of view is not brought forward by anything arriving
+			// for it — mail, calls and meetings all leave its dates where they were,
+			// so restoring it shows the account as it was when it was dropped.
 			const bumpCompany = (
 				column: DenormColumn,
 				companyId: string,
@@ -695,21 +737,21 @@ export class TimelineActivityService extends Context.Service<TimelineActivitySer
 								last_email_at = GREATEST(last_email_at, ${at}),
 								last_contacted_at = GREATEST(last_contacted_at, ${at}),
 								updated_at = now()
-							WHERE id = ${companyId}`
+							WHERE id = ${companyId} AND deleted_at IS NULL`
 					case 'last_call_at':
 						return sql`
 							UPDATE companies SET
 								last_call_at = GREATEST(last_call_at, ${at}),
 								last_contacted_at = GREATEST(last_contacted_at, ${at}),
 								updated_at = now()
-							WHERE id = ${companyId}`
+							WHERE id = ${companyId} AND deleted_at IS NULL`
 					case 'last_meeting_at':
 						return sql`
 							UPDATE companies SET
 								last_meeting_at = GREATEST(last_meeting_at, ${at}),
 								last_contacted_at = GREATEST(last_contacted_at, ${at}),
 								updated_at = now()
-							WHERE id = ${companyId}`
+							WHERE id = ${companyId} AND deleted_at IS NULL`
 				}
 			}
 
@@ -749,7 +791,7 @@ export class TimelineActivityService extends Context.Service<TimelineActivitySer
 							AND start_at > now()
 					),
 					updated_at = now()
-				WHERE id = ${companyId}`
+				WHERE id = ${companyId} AND deleted_at IS NULL`
 
 			const recomputeContactNextMeeting = (contactId: string) => sql`
 				UPDATE contacts SET

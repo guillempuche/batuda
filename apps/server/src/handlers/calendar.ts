@@ -24,6 +24,7 @@ import {
 	totalColumn,
 } from '../lib/sql-pagination'
 import { dispatchRsvpReply } from '../services/calendar-rsvp-dispatch.js'
+import { companyVisible } from '../services/company-liveness'
 
 const decodeEventTypes = Schema.decodeUnknownEffect(
 	Schema.Array(CalendarEventType),
@@ -82,7 +83,9 @@ export const CalendarLive = HttpApiBuilder.group(
 			return handlers
 				.handle('listEventTypes', _ =>
 					Effect.gen(function* () {
-						const conditions: Array<Statement.Fragment> = []
+						const conditions: Array<Statement.Fragment> = [
+							companyVisible(sql, sql`company_id`),
+						]
 						if (_.query.active === 'true') conditions.push(sql`active = true`)
 						else if (_.query.active === 'false')
 							conditions.push(sql`active = false`)
@@ -112,7 +115,9 @@ export const CalendarLive = HttpApiBuilder.group(
 				)
 				.handle('listEvents', _ =>
 					Effect.gen(function* () {
-						const conditions: Array<Statement.Fragment> = []
+						const conditions: Array<Statement.Fragment> = [
+							companyVisible(sql, sql`company_id`),
+						]
 						if (_.query.from) conditions.push(sql`start_at >= ${_.query.from}`)
 						if (_.query.to) conditions.push(sql`start_at <= ${_.query.to}`)
 						if (_.query.companyId)

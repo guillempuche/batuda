@@ -6,9 +6,14 @@ import { CurrentOrg } from '@batuda/controllers'
 import { Interaction } from '@batuda/domain'
 
 import {
+	companyVisible,
+	requireLiveCompany,
+} from '../../services/company-liveness'
+import {
 	InteractionLogged,
 	TimelineActivityService,
 } from '../../services/timeline-activity'
+import { ToolMessage } from '../tool-message'
 import { McpPageLimit, TruncatableResult, toTruncatable } from './_result'
 
 const REQUEST_DEPENDENCIES = [CurrentOrg]
@@ -71,6 +76,10 @@ export const InteractionHandlersLive = InteractionTools.toLayer(
 		return {
 			log_interaction: params =>
 				Effect.gen(function* () {
+					const currentOrg = yield* CurrentOrg
+					// A note about a company nobody can open would be written and then
+					// never read back, since it is hidden along with the company.
+					yield* requireLiveCompany(sql, currentOrg.id, params.company_id)
 					const occurredAt = DateTime.toDateUtc(DateTime.nowUnsafe())
 					const nextActionAt = params.next_action_at
 						? new Date(params.next_action_at)
@@ -110,17 +119,29 @@ export const InteractionHandlersLive = InteractionTools.toLayer(
 						if (params.next_action)
 							companyUpdate['nextAction'] = params.next_action
 						if (nextActionAt) companyUpdate['nextActionAt'] = nextActionAt
-						yield* sql`UPDATE companies SET ${sql.update(companyUpdate, [])} WHERE id = ${params.company_id}`
+						yield* sql`UPDATE companies SET ${sql.update(companyUpdate, [])} WHERE id = ${params.company_id} AND deleted_at IS NULL`
 					}
 
 					const rows = yield* sql`
 						SELECT * FROM interactions WHERE id = ${interactionId} LIMIT 1
 					`
 					return yield* decodeInteraction(rows[0])
-				}).pipe(Effect.orDie),
+				}).pipe(
+					Effect.catchTag('NotFound', () =>
+						Effect.die(
+							new ToolMessage(
+								'That company is not here, or it was deleted — restore it before logging against it.',
+							),
+						),
+					),
+					Effect.orDie,
+				),
 			list_interactions: params =>
 				Effect.gen(function* () {
-					const conditions = [sql`company_id = ${params.company_id}`]
+					const conditions = [
+						sql`company_id = ${params.company_id}`,
+						companyVisible(sql, sql`company_id`),
+					]
 					if (params.channel) conditions.push(sql`channel = ${params.channel}`)
 					if (params.type) conditions.push(sql`type = ${params.type}`)
 					const limit = params.limit ?? 20

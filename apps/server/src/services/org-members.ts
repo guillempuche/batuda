@@ -34,11 +34,14 @@ export const requireOrgMembers = (
 		// Named in the query as well as left to row-level security: this is the
 		// check that decides whether a person is one of ours, so it should not
 		// depend on the caller having entered org scope correctly.
+		// The lookup failing is the database being unreachable, not the caller
+		// naming somebody who does not work here, so it dies rather than joining
+		// the refusal every route has to answer for.
 		const rows = yield* sql<{ userId: string }>`
 			SELECT "userId" FROM member
 			WHERE "organizationId" = ${currentOrg.id}
 				AND "userId" IN ${sql.in(wanted)}
-		`
+		`.pipe(Effect.orDie)
 		const known = new Set(rows.map(row => row.userId))
 		const stranger = wanted.find(id => !known.has(id))
 		if (stranger !== undefined)

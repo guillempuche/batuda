@@ -12,10 +12,13 @@ import { normalizeTaxId } from './companies'
 
 // SQL-contract test for the batch INSERT that CompanyService.createMany runs
 // from the create_companies MCP tool: one INSERT per row, each with
-// `ON CONFLICT (organization_id, slug) DO NOTHING RETURNING *`, so a duplicate
-// slug is skipped rather than failing the whole batch. Pins that the conflict
-// target names the real unique constraint (organization_id, slug); a wrong
-// target would either error or stop skipping duplicates, and this catches both.
+// `ON CONFLICT (organization_id, slug) WHERE deleted_at IS NULL DO NOTHING
+// RETURNING *`, so a duplicate slug is skipped rather than failing the whole
+// batch. Pins that the conflict target names the real unique index, predicate
+// included: the index covers live rows only, and a target that omits the
+// predicate matches no index at all, so Postgres refuses the statement outright.
+// A wrong target either errors or stops skipping duplicates, and this catches
+// both.
 //
 // It also pins the second identity a company is deduped on: its registration
 // number. That one cannot ride on `ON CONFLICT` — a statement watches for one
@@ -88,7 +91,7 @@ describe('companies batch INSERT — ON CONFLICT contract', () => {
 		client.query<{ id: string }>(
 			`INSERT INTO companies (id, organization_id, slug, name)
 			 VALUES ($1::uuid, $2, $3, $4)
-			 ON CONFLICT (organization_id, slug) DO NOTHING
+			 ON CONFLICT (organization_id, slug) WHERE deleted_at IS NULL DO NOTHING
 			 RETURNING id`,
 			[id, orgId, slug, name],
 		)
@@ -157,7 +160,7 @@ describe('companies batch INSERT — ON CONFLICT contract', () => {
 		client.query<{ id: string }>(
 			`INSERT INTO companies (id, organization_id, slug, name, tax_id)
 			 VALUES ($1::uuid, $2, $3, $4, $5)
-			 ON CONFLICT (organization_id, slug) DO NOTHING
+			 ON CONFLICT (organization_id, slug) WHERE deleted_at IS NULL DO NOTHING
 			 RETURNING id`,
 			[id, orgId, slug, name, taxId],
 		)

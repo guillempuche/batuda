@@ -15,8 +15,10 @@ import {
 	clearEmailSuppression,
 	writeChannels,
 } from '../../services/channels'
+import { requireLiveCompany } from '../../services/company-liveness'
 import { unlinkSubject } from '../../services/documents'
 import { ownedSiteId } from '../../services/sites'
+import { ToolMessage } from '../tool-message'
 import { McpPageLimit, TruncatableResult, toTruncatable } from './_result'
 
 const decodeContact = Schema.decodeUnknownEffect(Contact)
@@ -126,6 +128,7 @@ export const ContactHandlersLive = ContactTools.toLayer(
 						SELECT c.*, ${channelsJsonFor(sql, 'contacts')} AS channels
 						FROM contacts c
 						WHERE c.company_id = ${company_id}
+						  AND c.deleted_at IS NULL
 						ORDER BY c.name, c.id
 						LIMIT ${limit + 1}
 					`
@@ -146,6 +149,7 @@ export const ContactHandlersLive = ContactTools.toLayer(
 			create_contact: ({ company_id, site_id, channels, ...fields }) =>
 				Effect.gen(function* () {
 					const currentOrg = yield* CurrentOrg
+					yield* requireLiveCompany(sql, currentOrg.id, company_id)
 					const siteId = yield* ownedSiteId(
 						sql,
 						currentOrg.id,
@@ -174,7 +178,16 @@ export const ContactHandlersLive = ContactTools.toLayer(
 					const decoded = yield* decodeContact(rows[0])
 					const decodedChannels = yield* decodeChannels(ch)
 					return { ...decoded, channels: decodedChannels }
-				}).pipe(Effect.orDie),
+				}).pipe(
+					Effect.catchTag('NotFound', () =>
+						Effect.die(
+							new ToolMessage(
+								'That company is not here, or it was deleted — restore it before adding people to it.',
+							),
+						),
+					),
+					Effect.orDie,
+				),
 
 			update_contact: ({
 				id,
