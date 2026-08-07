@@ -1,6 +1,6 @@
 {
 	"name": "@batuda/ui",
-	"version": "2026.8.3",
+	"version": "2026.8.7",
 	"type": "module",
 	"types": "./dist/index.d.mts",
 	"main": "./dist/index.mjs",

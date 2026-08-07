@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-07 (ui-v2026.8.7)
+
+### Features
+
+* make the companies pages fit a phone and lead with the notes ([fd8f64c](https://github.com/guillempuche/batuda/commit/fd8f64c9c25405620b3a31ece165e12e3e75ee72))
+
 ## 2026-08-03 (ui-v2026.8.3)
 
 ### Bug Fixes
