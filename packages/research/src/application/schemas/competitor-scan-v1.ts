@@ -6,16 +6,21 @@ import {
 	LenientNumber,
 	PendingPaidAction,
 	ProposedUpdate,
+	Sourced,
 } from './_shared'
 
 export const CompetitorScanV1Schema = Schema.Struct({
 	competitors: Schema.Array(
 		Schema.Struct({
 			name: Schema.String,
-			website: Schema.optionalKey(Schema.String).annotate({
-				description:
-					"The competitor's own official website. It must belong to the named competitor — not a directory/aggregator profile page and not another company that happened to appear in search results.",
-			}),
+			website: Schema.optionalKey(
+				Sourced(
+					Schema.String.annotate({
+						description:
+							"The competitor's own official website, and the page you read it on. It must belong to the named competitor — not a directory/aggregator profile page and not another company that happened to appear in search results. Leave it out rather than assembling an address from the company's name: a guessed domain is worse than none.",
+					}),
+				),
+			),
 			description: Schema.optionalKey(Schema.String),
 			strengths: Schema.optionalKey(Schema.Array(Schema.String)),
 			weaknesses: Schema.optionalKey(Schema.Array(Schema.String)),

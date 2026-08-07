@@ -25,6 +25,7 @@ import {
 	Section,
 	Sections,
 	SectionTitle,
+	sourcedText,
 } from './shared'
 
 /**
@@ -34,7 +35,7 @@ import {
 
 type ProspectEntry = {
 	readonly name: string
-	readonly website?: string
+	readonly website?: unknown
 	readonly tax_id?: string
 	readonly industry?: string
 	readonly country?: string
@@ -61,45 +62,48 @@ export function ProspectScanView({
 						<Trans>Prospects</Trans>
 					</SectionTitle>
 					<List>
-						{prospects.map(p => (
-							<ListItem key={`${p.name}|${p.tax_id ?? p.website ?? ''}`}>
-								<RowHead>
-									<Pill>{p.name}</Pill>
-									{p.website !== undefined ? (
-										<SafeLink href={p.website}>{p.website}</SafeLink>
-									) : null}
-								</RowHead>
-								<Reason>{p.why_relevant}</Reason>
-								<FieldsTable>
-									{p.industry !== undefined ? (
-										<FieldRow>
-											<FieldKey>
-												<Trans>Industry</Trans>
-											</FieldKey>
-											<FieldValue>{p.industry}</FieldValue>
-										</FieldRow>
-									) : null}
-									{p.country !== undefined ? (
-										<FieldRow>
-											<FieldKey>
-												<Trans>Country</Trans>
-											</FieldKey>
-											<FieldValue>{p.country}</FieldValue>
-										</FieldRow>
-									) : null}
-									{p.tax_id !== undefined ? (
-										<FieldRow>
-											<FieldKey>
-												<Trans>Tax ID</Trans>
-											</FieldKey>
-											<FieldValue>{p.tax_id}</FieldValue>
-										</FieldRow>
-									) : null}
-								</FieldsTable>
-								<CitationList citations={p.citations} />
-								<AddAsLeadButton prospect={p} />
-							</ListItem>
-						))}
+						{prospects.map(p => {
+							const site = sourcedText(p.website)
+							return (
+								<ListItem key={`${p.name}|${p.tax_id ?? site ?? ''}`}>
+									<RowHead>
+										<Pill>{p.name}</Pill>
+										{site !== undefined ? (
+											<SafeLink href={site}>{site}</SafeLink>
+										) : null}
+									</RowHead>
+									<Reason>{p.why_relevant}</Reason>
+									<FieldsTable>
+										{p.industry !== undefined ? (
+											<FieldRow>
+												<FieldKey>
+													<Trans>Industry</Trans>
+												</FieldKey>
+												<FieldValue>{p.industry}</FieldValue>
+											</FieldRow>
+										) : null}
+										{p.country !== undefined ? (
+											<FieldRow>
+												<FieldKey>
+													<Trans>Country</Trans>
+												</FieldKey>
+												<FieldValue>{p.country}</FieldValue>
+											</FieldRow>
+										) : null}
+										{p.tax_id !== undefined ? (
+											<FieldRow>
+												<FieldKey>
+													<Trans>Tax ID</Trans>
+												</FieldKey>
+												<FieldValue>{p.tax_id}</FieldValue>
+											</FieldRow>
+										) : null}
+									</FieldsTable>
+									<CitationList citations={p.citations} />
+									<AddAsLeadButton prospect={p} />
+								</ListItem>
+							)
+						})}
 					</List>
 				</Section>
 			) : null}
@@ -136,7 +140,9 @@ function AddAsLeadButton({ prospect }: { readonly prospect: ProspectEntry }) {
 				status: 'prospect',
 				...(prospect.industry ? { industry: prospect.industry } : {}),
 				...(prospect.country ? { country: prospect.country } : {}),
-				...(prospect.website ? { website: prospect.website } : {}),
+				...(sourcedText(prospect.website)
+					? { website: sourcedText(prospect.website) }
+					: {}),
 			},
 		})
 		if (exit._tag !== 'Success') {
