@@ -57,13 +57,18 @@ const statedEmployees = (
 	return typeof value === 'number' ? value : undefined
 }
 
-// A prospect's stated country as a canonical code, or "not stated" when it is absent
-// or written as something we cannot pin to a country.
-const statedCountry = (
+// The countries a prospect says it has a place in, as canonical codes. Empty when
+// it named none, or none we can pin to a country.
+const statedCountries = (
 	prospect: Record<string, unknown>,
-): string | undefined => {
-	const country = prospect['country']
-	return typeof country === 'string' ? canonicalCountry(country) : undefined
+): ReadonlyArray<string> => {
+	const raw = prospect['countries']
+	if (!Array.isArray(raw)) return []
+	return raw
+		.map(entry =>
+			typeof entry === 'string' ? canonicalCountry(entry) : undefined,
+		)
+		.filter((code): code is string => code !== undefined)
 }
 
 export const filterProspectsByCriteria = (
@@ -100,8 +105,16 @@ export const filterProspectsByCriteria = (
 			)
 				return true
 		}
-		const country = statedCountry(prospect)
-		if (hasCountries && country !== undefined && !wantedCountries.has(country))
+		// A company trades from more than one country, and the CRM models it that
+		// way — so ruling one out takes every country it named missing the request,
+		// not just the first. A firm registered abroad with a plant in the country
+		// asked for is exactly what the request wanted.
+		const countries = statedCountries(prospect)
+		if (
+			hasCountries &&
+			countries.length > 0 &&
+			!countries.some(code => wantedCountries.has(code))
+		)
 			return true
 		return false
 	}
