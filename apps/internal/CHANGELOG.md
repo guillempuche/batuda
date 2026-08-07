@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-07 (internal-v2026.8.7)
+
+### Features
+
+* make the companies pages fit a phone and lead with the notes ([fd8f64c](https://github.com/guillempuche/batuda/commit/fd8f64c9c25405620b3a31ece165e12e3e75ee72))
+* make the pipeline page a work queue rather than a noticeboard ([be21c14](https://github.com/guillempuche/batuda/commit/be21c147f605e1d5ea99fe7daa391ec26ab46847))
+
+### Bug Fixes
+
+* **research:** keep vendor API keys out of our tracing data ([2a940d3](https://github.com/guillempuche/batuda/commit/2a940d3f4d53dcc662a0c3326017d6a9a2b4cd57))
+
 ## 2026-08-04 (internal-v2026.8.4)
 
 ### Features
