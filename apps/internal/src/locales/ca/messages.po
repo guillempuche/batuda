@@ -1763,9 +1763,12 @@ msgstr "No he pogut desar la teva preferència. Prova-ho de nou."
 msgid "count loading"
 msgstr "carregant el recompte"
 
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Countries"
+msgstr "Països"
+
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
-#: src/components/research/findings/prospect-scan-view.tsx
 #: src/components/research/run-labels.ts
 #: src/routes/companies/index.tsx
 msgid "Country"

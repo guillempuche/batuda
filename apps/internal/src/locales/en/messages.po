@@ -1763,9 +1763,12 @@ msgstr "Couldn't update your preference. Try again."
 msgid "count loading"
 msgstr "count loading"
 
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Countries"
+msgstr "Countries"
+
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
-#: src/components/research/findings/prospect-scan-view.tsx
 #: src/components/research/run-labels.ts
 #: src/routes/companies/index.tsx
 msgid "Country"

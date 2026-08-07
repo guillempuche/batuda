@@ -30,7 +30,7 @@ import {
 
 /**
  * Renders a `prospect_scan_v1` research finding. Each prospect carries
- * a `why_relevant` rationale + optional industry/country/tax_id + citations.
+ * a `why_relevant` rationale + optional industry/countries/tax_id + citations.
  */
 
 type ProspectEntry = {
@@ -38,7 +38,7 @@ type ProspectEntry = {
 	readonly website?: unknown
 	readonly tax_id?: string
 	readonly industry?: string
-	readonly country?: string
+	readonly countries?: ReadonlyArray<string>
 	readonly why_relevant: string
 	readonly citations?: ReadonlyArray<Citation>
 }
@@ -82,12 +82,12 @@ export function ProspectScanView({
 												<FieldValue>{p.industry}</FieldValue>
 											</FieldRow>
 										) : null}
-										{p.country !== undefined ? (
+										{p.countries !== undefined && p.countries.length > 0 ? (
 											<FieldRow>
 												<FieldKey>
-													<Trans>Country</Trans>
+													<Trans>Countries</Trans>
 												</FieldKey>
-												<FieldValue>{p.country}</FieldValue>
+												<FieldValue>{p.countries.join(', ')}</FieldValue>
 											</FieldRow>
 										) : null}
 										{p.tax_id !== undefined ? (
@@ -139,7 +139,9 @@ function AddAsLeadButton({ prospect }: { readonly prospect: ProspectEntry }) {
 				slug,
 				status: 'prospect',
 				...(prospect.industry ? { industry: prospect.industry } : {}),
-				...(prospect.country ? { country: prospect.country } : {}),
+				// A company row holds one country, and a scan may have named several. The
+				// first is the one it is registered in, which is what the row means.
+				...(prospect.countries?.[0] ? { country: prospect.countries[0] } : {}),
 				...(sourcedText(prospect.website)
 					? { website: sourcedText(prospect.website) }
 					: {}),
