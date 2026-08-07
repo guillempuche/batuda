@@ -11,7 +11,7 @@
 
 import { randomUUID } from 'node:crypto'
 
-import { Effect, Layer, ManagedRuntime, Stream } from 'effect'
+import { Cause, Effect, Layer, ManagedRuntime, Stream } from 'effect'
 import { FetchHttpClient } from 'effect/unstable/http'
 import { SqlClient } from 'effect/unstable/sql'
 import pg from 'pg'
@@ -27,6 +27,7 @@ import { Geocoder } from '../../services/geocoder'
 import { TimelineActivityService } from '../../services/timeline-activity'
 import { applyTestEnv } from '../../test-env'
 import { CurrentUser } from '../current-user'
+import { isToolMessage } from '../tool-message'
 import { CompanyHandlersLive, CompanyTools } from './companies'
 
 applyTestEnv()
@@ -54,6 +55,16 @@ type Outcome =
 	| { ok: true; result: Record<string, unknown> | null }
 	| { ok: false; message: string }
 
+// What the tool actually said, rather than the whole failure printed out. A
+// stringified cause carries stack frames and SQL, so a substring check against
+// it passes on almost any error — including the ones a test is meant to catch.
+const toolMessageOf = (cause: Cause.Cause<unknown>): string => {
+	const spoken = Cause.squash(cause)
+	return isToolMessage(spoken)
+		? spoken.message
+		: `not a message written for the caller: ${String(spoken)}`
+}
+
 const runInOrg = <A, E>(
 	body: Effect.Effect<A, E, CurrentOrg | SqlClient.SqlClient>,
 ): Promise<A> =>
@@ -80,7 +91,7 @@ const collect = <E, R>(
 			result: (first?.result ?? null) as Record<string, unknown> | null,
 		})),
 		Effect.catchCause(cause =>
-			Effect.succeed({ ok: false as const, message: String(cause) }),
+			Effect.succeed({ ok: false as const, message: toolMessageOf(cause) }),
 		),
 	)
 
@@ -93,7 +104,7 @@ const deleteCompany = (id: string): Promise<Outcome> =>
 			Effect.provideService(CurrentUser, actor()),
 			Effect.provide(Handlers),
 			Effect.catchCause(cause =>
-				Effect.succeed({ ok: false as const, message: String(cause) }),
+				Effect.succeed({ ok: false as const, message: toolMessageOf(cause) }),
 			),
 		),
 	)
@@ -107,7 +118,7 @@ const restoreCompany = (id: string): Promise<Outcome> =>
 			Effect.provideService(CurrentUser, actor()),
 			Effect.provide(Handlers),
 			Effect.catchCause(cause =>
-				Effect.succeed({ ok: false as const, message: String(cause) }),
+				Effect.succeed({ ok: false as const, message: toolMessageOf(cause) }),
 			),
 		),
 	)
@@ -369,7 +380,10 @@ describe('editing a company that was deleted', () => {
 					Effect.provideService(CurrentUser, actor()),
 					Effect.provide(Handlers),
 					Effect.catchCause(cause =>
-						Effect.succeed({ ok: false as const, message: String(cause) }),
+						Effect.succeed({
+							ok: false as const,
+							message: toolMessageOf(cause),
+						}),
 					),
 				),
 			)
@@ -441,6 +455,42 @@ describe("a deleted company's work", () => {
 	})
 })
 
+describe('asking for both the deleted and the ones in use', () => {
+	describe('when a caller wants the whole picture', () => {
+		it('should return each of them, which neither of the other two views does', async () => {
+			// GIVEN one company deleted and one still in use
+			const goneId = await seedCompany('include-gone')
+			await seedCompany('include-live')
+			await deleteCompany(goneId)
+
+			const slugsFor = (mode: 'only' | 'include' | undefined) =>
+				runInOrg(
+					Effect.gen(function* () {
+						const service = yield* CompanyService
+						const page = yield* service.search(
+							mode === undefined
+								? { query: MARKER, limit: 50 }
+								: { query: MARKER, deleted: mode, limit: 50 },
+						)
+						return page.items.map(c => c.slug)
+					}).pipe(Effect.provide(CompanyService.layer), Effect.orDie),
+				)
+
+			// THEN each view answers its own question
+			const live = await slugsFor(undefined)
+			const gone = await slugsFor('only')
+			const both = await slugsFor('include')
+
+			expect(live).toContain(`${MARKER}-include-live`)
+			expect(live).not.toContain(`${MARKER}-include-gone`)
+			expect(gone).toContain(`${MARKER}-include-gone`)
+			expect(gone).not.toContain(`${MARKER}-include-live`)
+			expect(both).toContain(`${MARKER}-include-gone`)
+			expect(both).toContain(`${MARKER}-include-live`)
+		})
+	})
+})
+
 describe('the account history', () => {
 	describe('when a company is deleted and restored', () => {
 		it('should record both, so the account says what happened to it', async () => {
@@ -452,6 +502,42 @@ describe('the account history', () => {
 			const kinds = await timelineKinds(companyId)
 			expect(kinds).toContain('company_deleted')
 			expect(kinds).toContain('company_restored')
+		})
+	})
+
+	describe('when a delete does nothing because it already happened', () => {
+		it('should write no second entry, since nothing happened to record', async () => {
+			// GIVEN a company deleted once
+			const companyId = await seedCompany('history-once')
+			await deleteCompany(companyId)
+			const afterFirst = await timelineKinds(companyId)
+
+			// WHEN the same delete arrives again
+			await deleteCompany(companyId)
+
+			// THEN its history is unchanged: a retry is not an event
+			expect(await timelineKinds(companyId)).toEqual(afterFirst)
+		})
+	})
+
+	describe('when a restore is refused', () => {
+		it('should write nothing, so the history holds no restore that failed', async () => {
+			// GIVEN a deleted company whose name has since been taken
+			const companyId = await seedCompany('history-refused')
+			await deleteCompany(companyId)
+			await pool.query(
+				`INSERT INTO companies (organization_id, slug, name)
+				 VALUES ($1, $2, 'Took The Name')`,
+				[org.id, `${MARKER}-history-refused`],
+			)
+			const before = await timelineKinds(companyId)
+
+			// WHEN restoring it is attempted and refused
+			const result = await restoreCompany(companyId)
+			expect(result.ok).toBe(false)
+
+			// THEN nothing was added
+			expect(await timelineKinds(companyId)).toEqual(before)
 		})
 	})
 })
