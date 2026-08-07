@@ -81,15 +81,18 @@ export interface AttachmentMetadata {
 	readonly storageKey: string
 }
 
-// Insert a parsed inbound message + its participants + (re)link to a
-// thread. Caller is responsible for `SET LOCAL app.current_org_id`
-// inside the surrounding transaction; the worker connects as
-// `app_service` (BYPASSRLS) and resolves org from the inbox row before
-// each insert batch.
-export const persistInboundMessage = (args: {
+// Insert a parsed message + its participants + (re)link to a thread.
+// Caller is responsible for `SET LOCAL app.current_org_id` inside the
+// surrounding transaction; the worker connects as `app_service`
+// (BYPASSRLS) and resolves org from the inbox row before each insert batch.
+//
+// Which way the message went is the caller's to say, because only it knows
+// what the folder it was read from is for.
+export const persistMessage = (args: {
 	readonly organizationId: string
 	readonly inboxId: string
 	readonly folder: string
+	readonly direction: 'inbound' | 'outbound'
 	readonly imapUid: number
 	readonly imapUidvalidity: number
 	readonly rawRfc822Ref: string
@@ -100,6 +103,38 @@ export const persistInboundMessage = (args: {
 		const sql = yield* SqlClient.SqlClient
 		const matcher = yield* ParticipantMatcher
 
+		// A message we sent, coming back to us out of the sent folder. It is
+		// already recorded, with no folder position yet, and all that is new is
+		// where it now lives on the server, so we fill that in rather than
+		// storing it a second time. Trying to insert it would be turned away
+		// for reusing a Message-ID, and that refusal would undo the whole
+		// batch, not just this message.
+		//
+		// Such a row already has its participants and its place in the
+		// company's history, so this stops here.
+		const enriched = yield* sql<{ id: string }>`
+			UPDATE email_messages
+			SET imap_uid = ${args.imapUid},
+			    imap_uidvalidity = ${args.imapUidvalidity},
+			    folder = ${args.folder},
+			    attachments = CASE
+			      WHEN attachments = '[]'::jsonb
+			      THEN ${JSON.stringify(args.attachments)}::jsonb
+			      ELSE attachments
+			    END,
+			    text_body = COALESCE(text_body, ${args.parsed.textBody}),
+			    html_body = COALESCE(html_body, ${args.parsed.htmlBody}),
+			    text_preview = COALESCE(text_preview, ${args.parsed.textPreview})
+			WHERE organization_id = ${args.organizationId}
+			  AND message_id = ${args.parsed.messageId}
+			  AND inbox_id = ${args.inboxId}
+			  AND direction = 'outbound'
+			  AND imap_uid IS NULL
+			RETURNING id
+		`
+		const enrichedId = enriched[0]?.id
+		if (enrichedId !== undefined) return { messageId: enrichedId }
+
 		const externalThreadId = yield* resolveThreadId({
 			organizationId: args.organizationId,
 			messageId: args.parsed.messageId,
@@ -107,16 +142,26 @@ export const persistInboundMessage = (args: {
 			references: args.parsed.references,
 		})
 
-		// Resolve sender → contact/company once, then carry the IDs onto
+		// Whose conversation this is comes from the other side of it: who wrote
+		// to us, or who we wrote to. Reading the sender of a message we sent
+		// would only ever find ourselves, and a conversation that starts
+		// unmatched is never re-homed — so a thread first seen in the sent
+		// folder would stay off that company's page even after they reply.
+		const counterpartAddress =
+			args.direction === 'outbound'
+				? (args.parsed.toAddresses[0] ?? null)
+				: args.parsed.fromAddress
+
+		// Resolve that address → contact/company once, then carry the IDs onto
 		// both the thread link and the message row. `createPolicy: 'never'`
-		// keeps inbound passive: an unknown sender stays an orphan, never
+		// keeps this passive: an unknown address stays an orphan, never
 		// auto-creates a contact. The matcher only reads `currentOrg.id`
 		// (not name/slug), so a thin record is sufficient — providing the
 		// full org would mean a second round-trip we don't need.
-		const match = args.parsed.fromAddress
+		const match = counterpartAddress
 			? yield* matcher
 					.match({
-						email: args.parsed.fromAddress,
+						email: counterpartAddress,
 						createPolicy: 'never',
 					})
 					.pipe(
@@ -164,9 +209,12 @@ export const persistInboundMessage = (args: {
 		`
 		const threadLinkId = threadLinks[0]?.id ?? null
 
-		// `idx_email_messages_imap_dedupe` makes the (inbox_id,
-		// uidvalidity, uid) tuple unique, so re-fetches of the same UID
-		// after a worker restart are no-ops.
+		// A message we already hold is left alone. Which rule says so is
+		// deliberately not named: reading the same folder position twice is one
+		// way, and meeting a Message-ID the organization already has is another
+		// — the same address on two mailboxes, say. Naming one of them would
+		// mean the other is refused instead, and a refusal here undoes the
+		// whole batch rather than skipping the one message.
 		const inserted = yield* sql<{ id: string }>`
 			INSERT INTO email_messages (
 				organization_id, inbox_id, folder, imap_uid, imap_uidvalidity,
@@ -190,11 +238,9 @@ export const persistInboundMessage = (args: {
 				})}::jsonb,
 				${JSON.stringify(args.attachments)}::jsonb,
 				'normal', now(),
-				'inbound', ${companyId}, ${contactId}
+				${args.direction}, ${companyId}, ${contactId}
 			)
-			ON CONFLICT (inbox_id, imap_uidvalidity, imap_uid)
-			  WHERE imap_uid IS NOT NULL
-			DO NOTHING
+			ON CONFLICT DO NOTHING
 			RETURNING id
 		`
 		const messageDbId = inserted[0]?.id
@@ -240,7 +286,11 @@ export const persistInboundMessage = (args: {
 		// matched no company: the history is read one company at a time, and
 		// a thread that starts unmatched is never re-homed, so nobody could
 		// ever reach such a row. The message itself is still stored.
-		if (companyId) {
+		//
+		// Only for mail that arrived: the sender of a message in the sent
+		// folder is us, so filing it here would show our own message as
+		// something the company said to us.
+		if (companyId && args.direction === 'inbound') {
 			yield* sql`
 				INSERT INTO timeline_activity (
 					organization_id, kind, entity_type, entity_id, company_id, contact_id,

@@ -244,22 +244,23 @@ export class MailTransport extends Context.Service<MailTransport>()(
 					})
 					yield* Effect.tryPromise({
 						try: async () => {
-							// Most providers expose a "Sent" mailbox; Gmail uses
-							// "[Gmail]/Sent Mail" — imapflow's special-use lookup
-							// resolves either via the SPECIAL-USE attribute. Dev mail
-							// catchers (GreenMail) and providers without a Sent folder
-							// resolve neither; skip the APPEND (the message already went
-							// out over SMTP) instead of erroring.
-							const box =
-								(await imap
-									.getMailboxLock('Sent', { readOnly: false })
-									.catch(() => null)) ??
-								(await imap
-									.getMailboxLock('[Gmail]/Sent Mail', { readOnly: false })
-									.catch(() => null))
+							// Ask the server which of its folders holds sent mail rather
+							// than guessing at the name: Gmail calls it
+							// "[Gmail]/Sent Mail" and Outlook "Sent Items". Dev mail
+							// catchers (GreenMail) and providers without one have no
+							// answer; skip the APPEND (the message already went out over
+							// SMTP) instead of erroring.
+							const boxes = await imap.list().catch(() => [])
+							const sentPath =
+								boxes.find(entry => entry.specialUse === '\\Sent')?.path ??
+								boxes.find(entry => entry.path === 'Sent')?.path
+							if (sentPath === undefined) return
+							const box = await imap
+								.getMailboxLock(sentPath, { readOnly: false })
+								.catch(() => null)
 							if (!box) return
 							try {
-								await imap.append('Sent', Buffer.from(raw), ['\\Seen'])
+								await imap.append(sentPath, Buffer.from(raw), ['\\Seen'])
 							} finally {
 								box.release()
 							}

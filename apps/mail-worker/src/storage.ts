@@ -5,17 +5,27 @@ import { Context, Effect, Layer, Redacted } from 'effect'
 
 import { WorkerEnvVars } from './env.js'
 
+// A message's number is only its own within one folder, and two folders on the
+// same server can be handed the same starting point — so the folder has to be
+// part of what names a message here. Without it, message 7 of the sent folder
+// is stored over message 7 of the inbox, and one of them is gone for good.
+// Folder names travel over the wire and can hold anything, so they are reduced
+// to what is safe in a key before use.
+const folderSegment = (folder: string): string =>
+	folder.replace(/[^a-zA-Z0-9._-]/g, '_')
+
 // S3-compatible object store (R2 in prod, MinIO in dev). The worker
-// uploads raw RFC822 bytes under a stable key derived from inbox +
+// uploads raw RFC822 bytes under a stable key derived from inbox + folder +
 // uidvalidity + uid so a re-fetch of the same UID overwrites in place
 // (the bytes are identical) without spawning a duplicate object.
 export const rawMessageKey = (args: {
 	readonly organizationId: string
 	readonly inboxId: string
+	readonly folder: string
 	readonly uidValidity: number
 	readonly uid: number
 }): string =>
-	`messages/${args.organizationId}/${args.inboxId}/${args.uidValidity}/${args.uid}.eml`
+	`messages/${args.organizationId}/${args.inboxId}/${folderSegment(args.folder)}/${args.uidValidity}/${args.uid}.eml`
 
 // Per-attachment object key. Sibling of the raw RFC822 under the same
 // message prefix, so a download is one GET (the read path never reaches
@@ -25,11 +35,12 @@ export const rawMessageKey = (args: {
 export const attachmentKey = (args: {
 	readonly organizationId: string
 	readonly inboxId: string
+	readonly folder: string
 	readonly uidValidity: number
 	readonly uid: number
 	readonly index: number
 }): string =>
-	`messages/${args.organizationId}/${args.inboxId}/${args.uidValidity}/${args.uid}/attachment-${args.index}.bin`
+	`messages/${args.organizationId}/${args.inboxId}/${folderSegment(args.folder)}/${args.uidValidity}/${args.uid}/attachment-${args.index}.bin`
 
 export class RawMessageStorage extends Context.Service<RawMessageStorage>()(
 	'RawMessageStorage',

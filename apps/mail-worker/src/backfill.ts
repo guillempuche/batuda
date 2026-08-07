@@ -17,6 +17,7 @@ export const backfillSinceDate = (args: {
 	readonly organizationId: string
 	readonly inboxId: string
 	readonly folder: string
+	readonly direction: 'inbound' | 'outbound'
 	readonly uidvalidity: number
 	readonly sinceDate: Date
 }) =>
@@ -51,6 +52,7 @@ export const backfillSinceDate = (args: {
 				organizationId: args.organizationId,
 				inboxId: args.inboxId,
 				folder: args.folder,
+				direction: args.direction,
 				imapUid: m.uid,
 				imapUidvalidity: args.uidvalidity,
 				raw: new Uint8Array(m.source),

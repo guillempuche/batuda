@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer'
+import { createHash } from 'node:crypto'
 
 import { Effect } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
@@ -8,9 +9,16 @@ import { applyBounce, parseBounce } from './bounces.js'
 import {
 	type AttachmentMetadata,
 	fromParsedMail,
-	persistInboundMessage,
+	persistMessage,
 } from './persist.js'
 import { attachmentKey, RawMessageStorage, rawMessageKey } from './storage.js'
+
+// Taken from the message itself rather than from where it was found, so the
+// same message read again — after a folder is re-numbered, or from a second
+// mailbox — is recognised as the one already stored. Shaped like a real
+// Message-ID so nothing downstream has to tell them apart.
+const syntheticMessageId = (raw: Uint8Array): string =>
+	`<${createHash('sha256').update(raw).digest('hex').slice(0, 40)}@no-message-id.batuda>`
 
 // One transactional ingest step per fetched UID. Wraps:
 //  1. mailparser.simpleParser → ParsedMail
@@ -29,6 +37,7 @@ export const ingestRawMessage = (args: {
 	readonly organizationId: string
 	readonly inboxId: string
 	readonly folder: string
+	readonly direction: 'inbound' | 'outbound'
 	readonly imapUid: number
 	readonly imapUidvalidity: number
 	readonly raw: Uint8Array
@@ -44,6 +53,7 @@ export const ingestRawMessage = (args: {
 		const key = rawMessageKey({
 			organizationId: args.organizationId,
 			inboxId: args.inboxId,
+			folder: args.folder,
 			uidValidity: args.imapUidvalidity,
 			uid: args.imapUid,
 		})
@@ -63,6 +73,7 @@ export const ingestRawMessage = (args: {
 			const aKey = attachmentKey({
 				organizationId: args.organizationId,
 				inboxId: args.inboxId,
+				folder: args.folder,
 				uidValidity: args.imapUidvalidity,
 				uid: args.imapUid,
 				index: i,
@@ -81,7 +92,16 @@ export const ingestRawMessage = (args: {
 			})
 		}
 
+		// A message is known by its Message-ID everywhere below: threads are
+		// pivoted on it, bounces are matched on it, and one is allowed per
+		// organization. A message that arrives without one would take the empty
+		// string, so the first such message claims it and every later one is
+		// turned away.
 		const parsed = fromParsedMail(mail)
+		const withMessageId =
+			parsed.messageId === ''
+				? { ...parsed, messageId: syntheticMessageId(args.raw) }
+				: parsed
 
 		yield* sql.withTransaction(
 			Effect.gen(function* () {
@@ -105,14 +125,15 @@ export const ingestRawMessage = (args: {
 					})
 				}
 
-				yield* persistInboundMessage({
+				yield* persistMessage({
 					organizationId: args.organizationId,
 					inboxId: args.inboxId,
 					folder: args.folder,
+					direction: args.direction,
 					imapUid: args.imapUid,
 					imapUidvalidity: args.imapUidvalidity,
 					rawRfc822Ref: key,
-					parsed,
+					parsed: withMessageId,
 					attachments: attachmentsMeta,
 				})
 			}),
