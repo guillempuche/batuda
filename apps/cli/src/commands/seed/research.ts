@@ -571,7 +571,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 						source_id: 'src_firecrawl_002',
 					},
 					industry: 'manufacturing',
-					country: 'ES',
+					countries: ['ES'],
 					why_relevant:
 						'Sells exclusively in physical store; Instagram catalogue suggests latent online demand.',
 					citations: [{ source_id: 'src_firecrawl_002' }],
@@ -579,7 +579,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				{
 					name: 'Forja Empordà',
 					industry: 'manufacturing',
-					country: 'ES',
+					countries: ['ES'],
 					why_relevant:
 						'Wrought-iron workshop next to La Bisbal; potential ecommerce-local fit.',
 					citations: [{ source_id: 'src_firecrawl_002', confidence: 0.7 }],
@@ -676,7 +676,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				{
 					name: 'Taller Mecànic Jove',
 					industry: 'services',
-					country: 'ES',
+					countries: ['ES'],
 					why_relevant:
 						'Existing prospect — last contact 2025-09. Worth a follow-up DM via Instagram.',
 					citations: [],
@@ -908,7 +908,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 						source_id: 'src_firecrawl_002',
 					},
 					industry: 'manufacturing',
-					country: 'ES',
+					countries: ['ES'],
 					why_relevant:
 						'Posted on LinkedIn about "tancar mes amb errors" — direct match for our automation pitch.',
 					citations: [{ source_id: 'src_registry_001' }],
@@ -916,7 +916,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				{
 					name: 'Foneria Marina',
 					industry: 'manufacturing',
-					country: 'ES',
+					countries: ['ES'],
 					why_relevant:
 						'Family foundry north of Mataró. Heavy Contaplus + Excel. No visible IT vendor.',
 					citations: [{ source_id: 'src_registry_001' }],
@@ -924,7 +924,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				{
 					name: 'Acer Inoxidable Vallès',
 					industry: 'manufacturing',
-					country: 'ES',
+					countries: ['ES'],
 					why_relevant:
 						'Mid-size stainless-steel fabricator. Existing finance manager publicly looking for ERP help.',
 					citations: [],
@@ -1052,7 +1052,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				{
 					name: 'Forn La Coloma',
 					industry: 'restaurants',
-					country: 'ES',
+					countries: ['ES'],
 					why_relevant:
 						'Berguedà obrador, similar size; runs Saturday market in Berga next to Forn Queralt.',
 					citations: [],
@@ -1060,7 +1060,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				{
 					name: 'Pa de Cardona',
 					industry: 'restaurants',
-					country: 'ES',
+					countries: ['ES'],
 					why_relevant:
 						'Bages obrador with Instagram preorder via DM — overwhelmed weekly.',
 					citations: [],
@@ -1422,7 +1422,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				{
 					name: 'Consultoria Vega',
 					industry: 'other',
-					country: 'ES',
+					countries: ['ES'],
 					why_relevant:
 						'Adjacent niche to Beta; same target customer (boutique B2B firms).',
 					citations: [],
@@ -1430,7 +1430,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				{
 					name: 'Asesores Riba',
 					industry: 'other',
-					country: 'ES',
+					countries: ['ES'],
 					why_relevant:
 						'Tax + ops consultancy in València; same buyer profile.',
 					citations: [],
@@ -1674,7 +1674,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				{
 					name: 'Estudi Marró',
 					industry: 'comerç',
-					country: 'ES',
+					countries: ['ES'],
 					why_relevant: 'Gràcia concept store with own brand; sells via DMs.',
 					citations: [{ source_id: 'src_exa_002' }],
 				},
@@ -1685,7 +1685,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 						source_id: 'src_firecrawl_002',
 					},
 					industry: 'comerç',
-					country: 'ES',
+					countries: ['ES'],
 					why_relevant:
 						'Born sustainable-textile boutique; broken cart, no payment integration.',
 					citations: [{ source_id: 'src_exa_002' }],
@@ -1693,28 +1693,28 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				{
 					name: 'Casa Petita',
 					industry: 'comerç',
-					country: 'ES',
+					countries: ['ES'],
 					why_relevant: 'Eixample kids brand. Pop-ups but no online channel.',
 					citations: [],
 				},
 				{
 					name: 'Prendes Vell',
 					industry: 'comerç',
-					country: 'ES',
+					countries: ['ES'],
 					why_relevant: 'Gòtic vintage shop selling via Wallapop links.',
 					citations: [],
 				},
 				{
 					name: 'El Modisto',
 					industry: 'comerç',
-					country: 'ES',
+					countries: ['ES'],
 					why_relevant: 'Sant Antoni bespoke menswear; deposits via Bizum.',
 					citations: [],
 				},
 				{
 					name: 'Florín',
 					industry: 'comerç',
-					country: 'ES',
+					countries: ['ES'],
 					why_relevant: 'Poble Sec florist + lifestyle; ships via WhatsApp.',
 					citations: [],
 				},
@@ -2822,7 +2822,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 						source_id: 'src_firecrawl_002',
 					},
 					industry: 'manufacturing',
-					country: 'ES',
+					countries: ['ES'],
 					why_relevant:
 						'CNC shop in Sant Boi with manual invoicing; not yet contacted.',
 					citations: [{ source_id: 'src_registry_001' }],

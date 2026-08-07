@@ -32,7 +32,7 @@ import {
 
 /**
  * Renders a `prospect_scan_v1` research finding. Each prospect carries
- * a `why_relevant` rationale + optional industry/country/location/tax_id +
+ * a `why_relevant` rationale + optional industry/countries/location/tax_id +
  * citations.
  *
  * A prospect the run could not confirm as a real trading company still belongs on
@@ -54,7 +54,7 @@ type ProspectEntry = {
 	}>
 	readonly tax_id?: string
 	readonly industry?: string
-	readonly country?: string
+	readonly countries?: ReadonlyArray<string>
 	readonly location?: string
 	readonly why_relevant: string
 	readonly unconfirmed_reason?: string
@@ -130,9 +130,7 @@ function ProspectRow({ prospect }: { readonly prospect: ProspectEntry }) {
 						<Trans>Unconfirmed company</Trans>
 					</CandidatePill>
 				) : null}
-				{site !== undefined ? (
-					<SafeLink href={site}>{site}</SafeLink>
-				) : null}
+				{site !== undefined ? <SafeLink href={site}>{site}</SafeLink> : null}
 			</RowHead>
 			<Reason>{prospect.why_relevant}</Reason>
 			{unconfirmed ? (
@@ -162,12 +160,12 @@ function ProspectRow({ prospect }: { readonly prospect: ProspectEntry }) {
 						<FieldValue>{prospect.industry}</FieldValue>
 					</FieldRow>
 				) : null}
-				{prospect.country !== undefined ? (
+				{prospect.countries !== undefined && prospect.countries.length > 0 ? (
 					<FieldRow>
 						<FieldKey>
-							<Trans>Country</Trans>
+							<Trans>Countries</Trans>
 						</FieldKey>
-						<FieldValue>{prospect.country}</FieldValue>
+						<FieldValue>{prospect.countries.join(', ')}</FieldValue>
 					</FieldRow>
 				) : null}
 				{prospect.tax_id !== undefined ? (
@@ -264,7 +262,9 @@ function AddAsLeadButton({
 				slug,
 				status: 'prospect',
 				...(prospect.industry ? { industry: prospect.industry } : {}),
-				...(prospect.country ? { country: prospect.country } : {}),
+				// A company row holds one country, and a scan may have named several. The
+				// first is the one it is registered in, which is what the row means.
+				...(prospect.countries?.[0] ? { country: prospect.countries[0] } : {}),
 				...(prospect.location ? { location: prospect.location } : {}),
 				...(sourcedText(prospect.website)
 					? { website: sourcedText(prospect.website) }
