@@ -3,9 +3,13 @@
  * Verifier). Auth is the API key in the `X-API-KEY` header — Hunter also takes
  * it as an `?api_key=` query parameter, but the HTTP client records the whole
  * URL on the trace and blanks out only a few header names, `x-api-key` among
- * them, so the header is the one place the key stays private. 429/5xx are
- * transient (retried by the harness); any other non-2xx status is terminal for
- * the request.
+ * them, so the header is the one place the key stays private.
+ *
+ * Hunter's two rejection codes are the reverse of the usual convention, so they
+ * are easy to read backwards: 403 is the per-second rate limit and is worth
+ * retrying, while 429 means the plan's monthly allowance is spent and retrying
+ * only burns time. 5xx is transient as anywhere else; every other non-2xx is
+ * terminal.
  *
  * @see https://hunter.io/api-documentation/v2
  */
@@ -35,7 +39,10 @@ export const HunterNullableBoolean = Schema.optional(
 )
 
 const statusRecoverable = (status: number): boolean =>
-	status === 429 || status >= 500
+	status === 403 || status >= 500
+
+/** True when Hunter refused because the plan's allowance for the month is spent. */
+export const isQuotaExhausted = (status: number): boolean => status === 429
 
 // Hunter's per-email verification status (from Domain Search) → pipeline verdict.
 // `undefined` when Hunter has no status yet, so the caller falls through to a
@@ -95,6 +102,7 @@ export const makeHunterClient = (envBase: string, slot: number) =>
 					return yield* Effect.fail(
 						new ProviderError({
 							provider: 'hunter',
+							quotaExhausted: isQuotaExhausted(response.status),
 							message: `Hunter ${path} failed: HTTP ${response.status}`,
 							recoverable: statusRecoverable(response.status),
 						}),

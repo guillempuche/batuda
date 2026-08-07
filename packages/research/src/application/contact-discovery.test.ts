@@ -255,6 +255,23 @@ const vendorReturns = (
 		}),
 })
 
+// An attempt that refuses because the vendor's own paid allowance is spent.
+const vendorOutOfCredit = (label: string, calls: string[]) => ({
+	label,
+	findPeople: () =>
+		Effect.suspend(() => {
+			calls.push(label)
+			return Effect.fail(
+				new ProviderError({
+					provider: label,
+					message: 'quota',
+					recoverable: false,
+					quotaExhausted: true,
+				}),
+			)
+		}),
+})
+
 // An attempt that fails the way a real provider outage does.
 const vendorFails = (label: string, calls: string[]) => ({
 	label,
@@ -280,12 +297,49 @@ const recordCharge =
 		})
 
 describe('runEnrichmentChain', () => {
+	describe('when a vendor turns us away', () => {
+		it('should say its credit ran out, not that nobody works there', async () => {
+			// GIVEN the only vendor refuses because its paid allowance is spent
+			const calls: string[] = []
+			const outcome = await Effect.runPromise(
+				runEnrichmentChain(
+					{ attempts: [vendorOutOfCredit('hunter', calls)], mode: 'fallback' },
+					anInput,
+					recordCharge([]),
+				),
+			)
+
+			// THEN the empty list carries the reason: an unpaid bill and a company
+			// with nobody to find look identical without it
+			expect(outcome.people).toEqual([])
+			expect(outcome.quotaExhausted).toBe(true)
+			expect(outcome.vendorFailed).toBe(false)
+		})
+
+		it('should tell an outage apart from an exhausted allowance', async () => {
+			// GIVEN the only vendor is simply down
+			const calls: string[] = []
+			const outcome = await Effect.runPromise(
+				runEnrichmentChain(
+					{ attempts: [vendorFails('hunter', calls)], mode: 'fallback' },
+					anInput,
+					recordCharge([]),
+				),
+			)
+
+			// THEN it reads as unreachable, which is worth retrying later, rather
+			// than as a bill to pay
+			expect(outcome.vendorFailed).toBe(true)
+			expect(outcome.quotaExhausted).toBe(false)
+		})
+	})
+
 	describe('when mode is fallback', () => {
 		it('should stop at the first vendor that finds anyone', async () => {
 			// GIVEN two vendors that both have people
 			const calls: string[] = []
 			const charged: string[] = []
-			const people = await Effect.runPromise(
+			const outcome = await Effect.runPromise(
 				runEnrichmentChain(
 					{
 						attempts: [
@@ -301,14 +355,14 @@ describe('runEnrichmentChain', () => {
 			// THEN only the first vendor ran, was billed, and shaped the result
 			expect(calls).toEqual(['hunter'])
 			expect(charged).toEqual(['hunter'])
-			expect(people.map(p => p.firstName)).toEqual(['Ada'])
+			expect(outcome.people.map(p => p.firstName)).toEqual(['Ada'])
 		})
 
 		it('should advance to the next vendor when one finds nobody', async () => {
 			// GIVEN the first vendor returns nobody
 			const calls: string[] = []
 			const charged: string[] = []
-			const people = await Effect.runPromise(
+			const outcome = await Effect.runPromise(
 				runEnrichmentChain(
 					{
 						attempts: [
@@ -324,14 +378,14 @@ describe('runEnrichmentChain', () => {
 			// THEN both vendors were billed (Hunter missed → FullEnrich) and the
 			// second vendor's people came back
 			expect(charged).toEqual(['hunter', 'fullenrich'])
-			expect(people.map(p => p.firstName)).toEqual(['Bo'])
+			expect(outcome.people.map(p => p.firstName)).toEqual(['Bo'])
 		})
 
 		it('should bill and skip past a vendor that errors', async () => {
 			// GIVEN the first vendor is down
 			const calls: string[] = []
 			const charged: string[] = []
-			const people = await Effect.runPromise(
+			const outcome = await Effect.runPromise(
 				runEnrichmentChain(
 					{
 						attempts: [
@@ -347,7 +401,7 @@ describe('runEnrichmentChain', () => {
 			// THEN its error degrades to no people, so the next vendor still runs
 			expect(calls).toEqual(['hunter', 'fullenrich'])
 			expect(charged).toEqual(['hunter', 'fullenrich'])
-			expect(people.map(p => p.firstName)).toEqual(['Bo'])
+			expect(outcome.people.map(p => p.firstName)).toEqual(['Bo'])
 		})
 	})
 
@@ -356,7 +410,7 @@ describe('runEnrichmentChain', () => {
 			// GIVEN two vendors that each find a different person
 			const calls: string[] = []
 			const charged: string[] = []
-			const people = await Effect.runPromise(
+			const outcome = await Effect.runPromise(
 				runEnrichmentChain(
 					{
 						attempts: [
@@ -371,12 +425,12 @@ describe('runEnrichmentChain', () => {
 			)
 			// THEN every vendor ran and was billed, and the union holds both people
 			expect(charged).toEqual(['hunter', 'fullenrich'])
-			expect(people.map(p => p.firstName).sort()).toEqual(['Ada', 'Bo'])
+			expect(outcome.people.map(p => p.firstName).sort()).toEqual(['Ada', 'Bo'])
 		})
 
 		it('should collapse the same person found by two vendors, keeping the email', async () => {
 			// GIVEN both vendors return the same person, only one with an email
-			const people = await Effect.runPromise(
+			const outcome = await Effect.runPromise(
 				runEnrichmentChain(
 					{
 						attempts: [
@@ -394,8 +448,8 @@ describe('runEnrichmentChain', () => {
 				),
 			)
 			// THEN one entry survives, carrying the vendor-found address
-			expect(people).toHaveLength(1)
-			expect(people[0]?.email).toBe('ada@acme.example')
+			expect(outcome.people).toHaveLength(1)
+			expect(outcome.people[0]?.email).toBe('ada@acme.example')
 		})
 	})
 
