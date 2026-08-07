@@ -735,6 +735,10 @@ Sign-in is unaffected: `POST /auth/sign-in/email` still works for any existing u
 
 Outbound email (outreach, follow-ups, replies) goes through a bring-your-own IMAP/SMTP mailbox — `nodemailer` over SMTP for the send, then an IMAP `APPEND` into the Sent folder. Inbound + bounce handling runs in `apps/mail-worker` (one IMAP `IDLE` per inbox); per-inbox credentials are AES-256-GCM-encrypted on the `inboxes` row. Authoring on both ends — humans in the web app's compose form, AI agents via MCP — converges on a single typed block tree, rendered through shared primitives in `packages/email`. SMTP carries the final MIME; Batuda owns the authoring surface and the rendering pipeline.
 
+The send path stores the rendered `text` and `html` on the `email_messages` row alongside the wire bytes it puts in object storage. It has to: SMTP is one-way, so a message whose body is only in the recipient's mailbox cannot be read back here, and the thread view would show an empty card. `pnpm cli email backfill-bodies` fills in messages sent before this was true, reading each one back from storage.
+
+The worker syncs two folders per inbox, and which one a message came from decides its direction — inbox means it arrived, sent folder means we sent it. Folders are matched on the IMAP special-use flags the server reports (`\Inbox`, `\Sent`) rather than their names, because Gmail calls its sent folder `[Gmail]/Sent Mail` and Outlook `Sent Items`; matching by name syncs no sent mail at all on either. `resolveTrackedFolders` in `apps/mail-worker/src/inbox-session.ts` settles this once per session and hands the answer down, so nothing lower has to re-derive it from a folder name. Only mail that arrived is written to a company's history — what we send is recorded where it is sent from.
+
 ### Package layout — `packages/email`
 
 Shared Node+browser library, consumed by `apps/server` (render at send time), `apps/internal` (compose + footer editors), and `packages/controllers` (HTTP schema).
