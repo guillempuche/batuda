@@ -117,7 +117,7 @@ const AttachmentRef = Schema.Struct({
 
 const SendEmail = Tool.make('send_email', {
 	description:
-		'Send a new email. The body is a structured block tree (paragraph / heading / list / quote / divider / image) — not raw html/text. Omit inbox_id to use the calling member’s primary inbox in the active org. Attachments reference staging_ids returned by stage_email_attachment; set inline=true for cid-referenced inline images. Before composing, read the member’s standing email instructions (writing style, sign-off, do/don’t rules) from the batuda://instructions/email resource and write the body to follow them. Returns {_tag:"sent"} on success or {_tag:"suppressed"} if a recipient is suppressed. Set skip_footer=true to omit the inbox default footer.',
+		'Send a new email. The body is a structured block tree (paragraph / heading / list / quote / divider / image) — not raw html/text. Omit inbox_id to use the calling member’s primary inbox in the active org. Attachments reference staging_ids returned by stage_email_attachment; set inline=true for cid-referenced inline images. Before composing, read the member’s standing email instructions (writing style, sign-off, do/don’t rules) from the batuda://instructions/email resource and write the body to follow them. Returns {_tag:"sent"} on success; {_tag:"suppressed"} if a recipient once hard-bounced or reported spam, which is a hard block on every path; or {_tag:"cancelled"} if an address being written to carries a deliverability verdict of "undeliverable" or "risky" and nobody confirmed it — either the answer was no, or this client cannot put a question to anybody, and the reason says which. Verdicts of "catch_all" and "unknown", and addresses nobody has checked, are not gated. Read `verification` on a contact\'s channels (list_contacts) before composing to see this coming. Set skip_footer=true to omit the inbox default footer.',
 	parameters: Schema.Struct({
 		inbox_id: Schema.optional(Schema.String),
 		to: Recipients,
@@ -141,7 +141,7 @@ const SendEmail = Tool.make('send_email', {
 
 const ReplyEmail = Tool.make('reply_email', {
 	description:
-		'Reply to the latest message in an existing email thread. Body is a structured block tree — if you want the parent quoted, emit a `quote` block wrapping sanitized parent blocks (you can read the parent via get_email_thread). Optional Cc/Bcc extend the thread. Attachments reference staging_ids from stage_email_attachment. Before composing, read the member’s standing email instructions from the batuda://instructions/email resource and write the reply to follow them. Returns {_tag:"sent"} or {_tag:"suppressed"}. Set skip_footer=true to omit the inbox default footer.',
+		'Reply to the latest message in an existing email thread. Body is a structured block tree — if you want the parent quoted, emit a `quote` block wrapping sanitized parent blocks (you can read the parent via get_email_thread). Optional Cc/Bcc extend the thread. Attachments reference staging_ids from stage_email_attachment. Before composing, read the member’s standing email instructions from the batuda://instructions/email resource and write the reply to follow them. Returns {_tag:"sent"}; {_tag:"suppressed"} if a recipient once hard-bounced or reported spam; or {_tag:"cancelled"} when a confirmation was needed and not obtained — because the contact\'s address (or one added in cc/bcc) carries an "undeliverable" or "risky" verdict, or because the thread already has EMAIL_AGENT_SOFT_THREAD_LIMIT outbound messages (default 3) and this reply would be one more. The reason names which, and says when the client had no way to ask anybody. Set skip_footer=true to omit the inbox default footer.',
 	parameters: Schema.Struct({
 		thread_id: Schema.String,
 		body_json: EmailBlocks,
@@ -420,7 +420,7 @@ const ManageEmailInbox = Tool.make('manage_email_inbox', {
 
 const ManageEmailDraft = Tool.make('manage_email_draft', {
 	description:
-		'Manage an email draft a human can review before sending. action=create makes a new draft (optionally linked to CRM via company_id/contact_id/mode); update changes fields on an existing draft_id; send dispatches draft_id through the same thread-link/interaction/message pipeline as a direct send (returns {_tag:"sent"} or {_tag:"suppressed"}); delete permanently removes draft_id. body_json is the typed block tree preserved for lossless editor re-hydration.',
+		'Manage an email draft a human can review before sending. action=create makes a new draft (optionally linked to CRM via company_id/contact_id/mode); update changes fields on an existing draft_id; send dispatches draft_id through the same thread-link/interaction/message pipeline as a direct send, and runs the same deliverability guard, so writing a message down first is not a way past it (returns {_tag:"sent"}, {_tag:"suppressed"}, or {_tag:"cancelled"} — see send_email for what each means); delete permanently removes draft_id. body_json is the typed block tree preserved for lossless editor re-hydration.',
 	parameters: Schema.Struct({
 		action: Schema.Literals(['create', 'update', 'send', 'delete']),
 		inbox_id: Schema.String,
@@ -1165,15 +1165,51 @@ export const EmailHandlersLive = EmailTools.toLayer(
 						return svc
 							.updateDraft(params.inbox_id, params.draft_id, fields)
 							.pipe(Effect.catchTag('NotFound', dieNotFound), Effect.orDie)
-					case 'send':
+					case 'send': {
 						if (params.draft_id === undefined)
 							return dieMissing('draft_id is required to send a draft')
-						return svc.sendDraft(params.inbox_id, params.draft_id).pipe(
-							Effect.map(r => ({
-								_tag: 'sent' as const,
-								messageId: r.messageId,
-								threadId: r.threadId,
-							})),
+						const draftId = params.draft_id
+						return Effect.gen(function* () {
+							// The same guard the direct sends run. A draft dispatched from
+							// here is an assistant sending, so writing the message down
+							// first and posting it afterwards must not be the way past a
+							// question the direct path would have asked.
+							const draft = yield* svc
+								.getDraft(params.inbox_id, draftId)
+								.pipe(Effect.catchTag('NotFound', asNothing))
+							if (draft) {
+								const risky = yield* riskyRecipient(
+									recipientAddresses(
+										[...draft.to],
+										[...draft.cc],
+										[...draft.bcc],
+									),
+								)
+								if (risky) {
+									const answer = yield* confirmSend(
+										`${risky.address} is not confirmed deliverable (verification: ${risky.verification})`,
+									)
+									if (answer !== 'confirmed')
+										return {
+											_tag: 'cancelled' as const,
+											reason: notSentReason(
+												answer,
+												`email verification for ${risky.address}: ${risky.verification}`,
+											),
+										}
+								}
+							}
+							return yield* svc.sendDraft(params.inbox_id, draftId)
+						}).pipe(
+							Effect.map(r =>
+								'_tag' in r
+									? r
+									: {
+											_tag: 'sent' as const,
+											messageId: r.messageId,
+											threadId: r.threadId,
+										},
+							),
 							Effect.catchTag('EmailSuppressed', e =>
 								Effect.succeed({
 									_tag: 'suppressed' as const,
@@ -1185,6 +1221,7 @@ export const EmailHandlersLive = EmailTools.toLayer(
 							Effect.catchTag('NotFound', dieNotFound),
 							Effect.orDie,
 						)
+					}
 					case 'delete':
 						if (params.draft_id === undefined)
 							return dieMissing('draft_id is required to delete a draft')
