@@ -12,6 +12,13 @@ export class ProviderError extends Schema.TaggedErrorClass<ProviderError>()(
 		provider: Schema.String,
 		message: Schema.String,
 		recoverable: Schema.Boolean,
+		/**
+		 * The vendor refused because the account's paid allowance is spent, rather
+		 * than because it had nothing to say. The two look identical to a caller
+		 * that only sees an empty result, and they mean opposite things: one is a
+		 * bill to pay, the other is an answer.
+		 */
+		quotaExhausted: Schema.optional(Schema.Boolean),
 	},
 ) {}
 

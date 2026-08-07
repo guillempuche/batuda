@@ -74,12 +74,31 @@ export const dedupePeople = (
 	return [...byPerson.values()]
 }
 
+/**
+ * What a pass over the enrichment vendors found, and whether one turning us away
+ * is why the answer is thin.
+ *
+ * Both flags mean "this is why we came up short", not merely "this happened". A
+ * vendor whose allowance is spent while the next one answers in full cost nothing
+ * — saying so would have the caller apologise for a complete list. So in fallback
+ * mode, where the vendors are alternatives, a refusal only counts when nobody
+ * answered; in union mode they are additive, so a refusal always cost recall.
+ */
+export interface EnrichmentChainOutcome {
+	readonly people: ReadonlyArray<SourcePerson>
+	/** A vendor's paid allowance is spent, and that is why people are missing. */
+	readonly quotaExhausted: boolean
+	/** A vendor failed for another reason — down, rate-limited, refusing the domain. */
+	readonly vendorFailed: boolean
+}
+
 // Run the enrichment chain when the registry found nobody: bill each configured
 // vendor (via `charge`) and call it in turn. 'fallback' stops at the first
 // vendor that returns anyone (cheapest); 'union' runs every vendor and merges
 // the people (more cost, more recall). A vendor error degrades to no people, so
 // the next vendor is still tried. Generic over the charge's error so the budget
 // rails propagate unchanged.
+
 export const runEnrichmentChain = <E>(
 	chain: {
 		readonly attempts: ReadonlyArray<EnrichmentAttempt>
@@ -87,21 +106,38 @@ export const runEnrichmentChain = <E>(
 	},
 	input: EnrichmentInput,
 	charge: (label: string) => Effect.Effect<void, E>,
-): Effect.Effect<ReadonlyArray<SourcePerson>, E> =>
+): Effect.Effect<EnrichmentChainOutcome, E> =>
 	Effect.gen(function* () {
 		const collected: SourcePerson[] = []
+		let quotaExhausted = false
+		let vendorFailed = false
 		for (const attempt of chain.attempts) {
 			yield* charge(attempt.label)
 			const found = yield* attempt.findPeople(input).pipe(
-				Effect.catchTag('ProviderError', () =>
-					Effect.succeed(new EnrichmentResult({ people: [], units: 0 })),
+				// A vendor that could not answer is remembered, not just swallowed.
+				// "Nobody works here" and "we are out of credit" produce the same empty
+				// list, and only one of them is an answer about the company.
+				Effect.catchTag('ProviderError', error =>
+					Effect.sync(() => {
+						if (error.quotaExhausted === true) quotaExhausted = true
+						else vendorFailed = true
+						return new EnrichmentResult({ people: [], units: 0 })
+					}),
 				),
 				Effect.map(r => r.people),
 			)
 			collected.push(...found)
 			if (chain.mode === 'fallback' && collected.length > 0) break
 		}
-		return chain.mode === 'union' ? dedupePeople(collected) : collected
+		// In fallback mode the vendors are alternatives, so a refusal only cost us
+		// something when nobody answered at all. In union mode they add up, so one
+		// missing vendor is missing people however many the others found.
+		const refusalCostUs = chain.mode === 'union' || collected.length === 0
+		return {
+			people: chain.mode === 'union' ? dedupePeople(collected) : collected,
+			quotaExhausted: quotaExhausted && refusalCostUs,
+			vendorFailed: vendorFailed && refusalCostUs,
+		}
 	})
 
 // Narrow a free-text country hint to a country that has a national registry.
@@ -200,12 +236,26 @@ export type DiscoverContactsOutcome =
 			readonly status: 'ok'
 			readonly researchId: string
 			readonly contacts: ReadonlyArray<DiscoveredContact>
-			// Set when the month's spending ran out partway through, so addresses
-			// left unchecked are known to be unchecked for want of money rather
-			// than because checking them said nothing.
-			readonly verificationStopped?: 'monthly_cap_reached' | undefined
+			// Why the search came up short, when it did. Without this a thin list
+			// reads as a fact about the company, and three of these are facts about
+			// us instead: our own month's spending ran out, the vendor's paid
+			// allowance ran out, or the vendor could not be reached. Only silence
+			// here means the company really has little to find.
+			readonly degraded?:
+				| 'monthly_cap_reached'
+				| 'vendor_quota_exhausted'
+				| 'vendor_unavailable'
+				| undefined
 	  }
-	| { readonly status: 'no_reliable_contact'; readonly researchId: string }
+	| {
+			readonly status: 'no_reliable_contact'
+			readonly researchId: string
+			readonly degraded?:
+				| 'monthly_cap_reached'
+				| 'vendor_quota_exhausted'
+				| 'vendor_unavailable'
+				| undefined
+	  }
 	| { readonly status: 'budget_exceeded'; readonly researchId: string }
 	// A paid step would spend past the caller's auto-approve limit: no charge
 	// was made, and the model records it as a pending paid action to approve.
@@ -353,6 +403,13 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 					// so the answer can say the addresses left over went unchecked for
 					// want of money.
 					const verificationStopped = yield* Ref.make(false)
+					// Raised when a vendor turned us away rather than answering: its own
+					// allowance spent, or it could not be reached at all. The verifier's
+					// two are Refs because addresses are checked concurrently.
+					let enrichmentQuotaSpent = false
+					let enrichmentUnavailable = false
+					const verifierQuotaSpent = yield* Ref.make(false)
+					const verifierUnavailable = yield* Ref.make(false)
 
 					const core = Effect.gen(function* () {
 						const budget = yield* Budget
@@ -408,6 +465,12 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 										'discover_contacts',
 										`${researchId}:${label}-enrich:${domain}`,
 									),
+							).pipe(
+								Effect.map(outcome => {
+									if (outcome.quotaExhausted) enrichmentQuotaSpent = true
+									else if (outcome.vendorFailed) enrichmentUnavailable = true
+									return outcome.people
+								}),
 							)
 						}
 
@@ -434,10 +497,23 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 									confidence: v.score as number | undefined,
 								}
 							}).pipe(
-								Effect.catchTag('ProviderError', () =>
-									Effect.succeed({
-										verdict: 'unknown' as VerificationVerdict,
-										confidence: undefined as number | undefined,
+								// The verifier turning us away is the case that hides worst. A
+								// guessed address survives only on a positive verdict, so an
+								// unchecked one is dropped and the person comes back with no way
+								// to reach them — which reads as "this company publishes no
+								// address" when the truth is that our verifications ran out.
+								Effect.catchTag('ProviderError', error =>
+									Effect.gen(function* () {
+										yield* Ref.set(
+											error.quotaExhausted === true
+												? verifierQuotaSpent
+												: verifierUnavailable,
+											true,
+										)
+										return {
+											verdict: 'unknown' as VerificationVerdict,
+											confidence: undefined as number | undefined,
+										}
 									}),
 								),
 								Effect.catchTags({
@@ -564,15 +640,30 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 							.sort(compareContacts)
 
 						const stopped = yield* Ref.get(verificationStopped)
+						const verifyQuota = yield* Ref.get(verifierQuotaSpent)
+						const verifyDown = yield* Ref.get(verifierUnavailable)
+						// Our own month runs out first in the telling: it is the one the
+						// caller can do something about today. A spent allowance comes next,
+						// since it is a bill somebody can pay, and an unreachable vendor
+						// last, since it usually fixes itself.
+						const degraded = stopped
+							? ('monthly_cap_reached' as const)
+							: enrichmentQuotaSpent || verifyQuota
+								? ('vendor_quota_exhausted' as const)
+								: enrichmentUnavailable || verifyDown
+									? ('vendor_unavailable' as const)
+									: undefined
 						return contacts.length === 0
-							? ({ status: 'no_reliable_contact', researchId } as const)
+							? ({
+									status: 'no_reliable_contact',
+									researchId,
+									...(degraded ? { degraded } : {}),
+								} as const)
 							: ({
 									status: 'ok',
 									researchId,
 									contacts,
-									...(stopped
-										? { verificationStopped: 'monthly_cap_reached' as const }
-										: {}),
+									...(degraded ? { degraded } : {}),
 								} as const)
 					})
 
