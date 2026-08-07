@@ -52,10 +52,11 @@ describe('ContextInput', () => {
 			// THEN it succeeds
 			const out = decode(ContextInput, {
 				subjects: [{ table: 'companies', id: 'abc' }],
-				hints: { language: 'en', location: 'Dallas, TX' },
+				hints: { language: 'en', country: 'US', place: 'Dallas, TX' },
 			})
 			expect(out.subjects?.[0]?.id).toBe('abc')
-			expect(out.hints?.location).toBe('Dallas, TX')
+			expect(out.hints?.country).toBe('US')
+			expect(out.hints?.place).toBe('Dallas, TX')
 		})
 
 		it('should accept an empty context', () => {

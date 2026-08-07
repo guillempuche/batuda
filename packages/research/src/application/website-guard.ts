@@ -313,6 +313,15 @@ const hostBelongsTo = (
 			) || ownSiteHostVerdict({ name, host, runWords }) === 'established',
 	)
 
+// The address itself, whether the model gave it bare or paired with the page it
+// was read on. A field a guard already emptied reads as no address at all.
+const websiteAddress = (website: unknown): string | undefined => {
+	if (typeof website === 'string') return website
+	if (isPlainObject(website) && typeof website['value'] === 'string')
+		return website['value']
+	return undefined
+}
+
 type WebsiteVerdict =
 	| 'keep'
 	| 'not_an_address'
@@ -608,28 +617,37 @@ export const guardCompanyWebsites = (args: {
 			return value
 		}
 
+		// An entry that names a company and gives its website — a scanned prospect or
+		// competitor. Judged here, against that entry's own name, and settled here:
+		// letting the address descend to the branch above would judge it against the
+		// run's target instead, which for a scan is nobody in particular.
 		const name = value['name']
-		const website = value['website']
-		if (typeof name === 'string' && typeof website === 'string') {
+		const address = websiteAddress(value['website'])
+		if (typeof name === 'string' && address !== undefined) {
 			countNamedNobodyInParticular(name)
 			const verdict = classifyWebsite({
 				name,
-				website,
+				website: address,
 				citedSources: citedSourceIds(value),
 				hostClaims,
 				directorySites,
 				runWords,
 			})
+			const { website: judged, ...rest } = value
+			const walkedRest = Object.entries(rest).map(
+				([k, v]) => [k, walkChild(k, v)] as const,
+			)
 			if (verdict !== 'keep') {
 				count(verdict)
 				// Drop the key entirely, so the value reads as one the model never
 				// gave — the same as any other field a guard removes.
-				const { website: _dropped, ...rest } = value
-				return Object.fromEntries(
-					Object.entries(rest).map(([k, v]) => [k, walkChild(k, v)] as const),
-				)
+				return Object.fromEntries(walkedRest)
 			}
-			countOwnSite(name, website)
+			countOwnSite(name, address)
+			// Put back as it came rather than walked again: this row's address has
+			// just been judged against this row's name, and walking it would send it
+			// through the rule meant for the run's own target — a different company.
+			return Object.fromEntries([...walkedRest, ['website', judged] as const])
 		}
 
 		return Object.fromEntries(

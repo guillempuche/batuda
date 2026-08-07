@@ -60,6 +60,9 @@ const SCAN_FINDINGS = {
 	},
 	competitors: [
 		{
+			// Deliberately the bare address, with no source beside it: this is a run
+			// stored before a scanned website carried the page it came from. Those rows
+			// are never rewritten, so the view has to keep rendering them.
 			name: 'Can Ticus',
 			website: 'https://canticus.example',
 			citations: [{ source_id: 'src-fixture-1' }],
@@ -165,6 +168,20 @@ test.describe('research findings', () => {
 			await expect(summary).toBeVisible()
 			await expect(summary).toContainText('fragmented')
 			await expect(summary).toContainText('Local sourcing')
+		})
+
+		test('should show a competitor stored before websites carried a source', async ({
+			page,
+		}) => {
+			// GIVEN the same scan, whose competitor holds a bare address
+			// WHEN its detail page is opened
+			await page.goto(`/research/${SCAN_RUN_ID}`, { waitUntil: 'networkidle' })
+
+			// THEN the address still renders as a link — a stored run is never
+			// rewritten, so the older shape has to keep working
+			await expect(
+				page.getByRole('link', { name: 'https://canticus.example' }),
+			).toBeVisible()
 		})
 	})
 })

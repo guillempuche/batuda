@@ -42,6 +42,23 @@ export type Citation = {
 	readonly confidence?: number
 }
 
+/**
+ * A field the run paired with the page it read it on, read back as plain text.
+ *
+ * Runs stored before a field started carrying its source hold the bare value, and
+ * those rows are never rewritten — so both shapes arrive here forever, and a run
+ * from last year has to render the same as one from today. A field a guard emptied
+ * reads as absent rather than as an empty string.
+ */
+export const sourcedText = (field: unknown): string | undefined => {
+	if (typeof field === 'string') return field
+	if (field !== null && typeof field === 'object') {
+		const inner = (field as { value?: unknown }).value
+		if (typeof inner === 'string') return inner
+	}
+	return undefined
+}
+
 export type ProposedUpdate = {
 	readonly subject_table: string
 	readonly subject_id?: string

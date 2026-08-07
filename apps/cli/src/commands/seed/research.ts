@@ -337,7 +337,10 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			competitors: [
 				{
 					name: 'Industria Metall Llobregat',
-					website: 'https://imetalllobregat.es',
+					website: {
+						value: 'https://imetalllobregat.es',
+						source_id: 'src_firecrawl_002',
+					},
 					why: 'Direct competitor in steel fabrication for the same Baix Llobregat industrial belt.',
 					citations: [{ source_id: 'src_registry_001' }],
 				},
@@ -563,7 +566,10 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			prospects: [
 				{
 					name: 'Vidres Palafrugell',
-					website: 'https://vidrespalafrugell.cat',
+					website: {
+						value: 'https://vidrespalafrugell.cat',
+						source_id: 'src_firecrawl_002',
+					},
 					industry: 'manufacturing',
 					country: 'ES',
 					why_relevant:
@@ -781,13 +787,19 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			competitors: [
 				{
 					name: 'Maritim Vilanova',
-					website: 'https://maritimvilanova.cat',
+					website: {
+						value: 'https://maritimvilanova.cat',
+						source_id: 'src_firecrawl_002',
+					},
 					why: 'Same town, uses TheFork — pays 15% commission.',
 					citations: [{ source_id: 'src_firecrawl_001', confidence: 0.7 }],
 				},
 				{
 					name: 'Restaurant Sumat',
-					website: 'https://sumat.cat',
+					website: {
+						value: 'https://sumat.cat',
+						source_id: 'src_firecrawl_002',
+					},
 					why: 'Adjacent gastrobar, owns its booking flow + prepayment.',
 					citations: [{ source_id: 'src_firecrawl_001', confidence: 0.6 }],
 				},
@@ -891,7 +903,10 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			prospects: [
 				{
 					name: 'Galvanitzats Penedès',
-					website: 'https://galvanitzatspenedes.cat',
+					website: {
+						value: 'https://galvanitzatspenedes.cat',
+						source_id: 'src_firecrawl_002',
+					},
 					industry: 'manufacturing',
 					country: 'ES',
 					why_relevant:
@@ -937,7 +952,10 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			competitors: [
 				{
 					name: 'Galeria Lola',
-					website: 'https://galerialola.com',
+					website: {
+						value: 'https://galerialola.com',
+						source_id: 'src_firecrawl_002',
+					},
 					description:
 						'Barri Gòtic boutique with Shopify storefront and Instagram Shop integration.',
 					strengths: ['Shopify-backed', 'multi-currency', 'fast checkout'],
@@ -947,7 +965,10 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				},
 				{
 					name: 'Studio Petit',
-					website: 'https://studiopetit.cat',
+					website: {
+						value: 'https://studiopetit.cat',
+						source_id: 'src_firecrawl_002',
+					},
 					description:
 						'Gràcia boutique selling locally designed garments. WooCommerce, narrow catalogue.',
 					strengths: ['local-designer story'],
@@ -1192,7 +1213,10 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			competitors: [
 				{
 					name: 'Cloudbeds',
-					website: 'https://cloudbeds.com',
+					website: {
+						value: 'https://cloudbeds.com',
+						source_id: 'src_firecrawl_002',
+					},
 					description:
 						'PMS + booking engine bundle; popular with mid-size hostals.',
 					strengths: ['mature PMS', 'channel manager'],
@@ -1202,7 +1226,10 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				},
 				{
 					name: 'SmartHotel',
-					website: 'https://smarthotel.com',
+					website: {
+						value: 'https://smarthotel.com',
+						source_id: 'src_firecrawl_002',
+					},
 					description:
 						'Spain-focused PMS + booking engine, Spanish-speaking support.',
 					strengths: ['local support'],
@@ -1255,7 +1282,10 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			competitors: [
 				{
 					name: 'Frutas Hermanos Pérez',
-					website: 'https://fruperez.es',
+					website: {
+						value: 'https://fruperez.es',
+						source_id: 'src_firecrawl_002',
+					},
 					description:
 						'Major Ribera Alta distributor; 50+ employees; runs SAP.',
 					strengths: ['scale', 'mature ERP'],
@@ -1484,7 +1514,10 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			competitors: [
 				{
 					name: 'Maritim Vilanova',
-					website: 'https://maritimvilanova.cat',
+					website: {
+						value: 'https://maritimvilanova.cat',
+						source_id: 'src_firecrawl_002',
+					},
 					description:
 						'Direct rival on the same paseo; books via TheFork at 15% commission.',
 					strengths: ['TheFork volume', 'beachfront terrace'],
@@ -1494,7 +1527,10 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				},
 				{
 					name: 'Restaurant Sumat',
-					website: 'https://sumat.cat',
+					website: {
+						value: 'https://sumat.cat',
+						source_id: 'src_firecrawl_002',
+					},
 					description:
 						'Adjacent gastrobar; runs its own booking + 10€ deposit.',
 					strengths: ['low no-show rate', 'direct channel'],
@@ -1504,7 +1540,10 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				},
 				{
 					name: 'Bodega 1900',
-					website: 'https://bodega1900.cat',
+					website: {
+						value: 'https://bodega1900.cat',
+						source_id: 'src_firecrawl_002',
+					},
 					description:
 						'Tapas bodega in Sant Pere de Ribes; SMS reminders, no deposit.',
 					strengths: ['SMS reminders', 'review velocity'],
@@ -1523,7 +1562,10 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				},
 				{
 					name: 'Can Pinxo',
-					website: 'https://canpinxo.cat',
+					website: {
+						value: 'https://canpinxo.cat',
+						source_id: 'src_firecrawl_002',
+					},
 					description:
 						'Sitges-side seafood place; Shopify-style site, takeaway via Glovo.',
 					strengths: ['takeaway channel'],
@@ -1638,7 +1680,10 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				},
 				{
 					name: 'Tela Cruda',
-					website: 'https://telacruda.cat',
+					website: {
+						value: 'https://telacruda.cat',
+						source_id: 'src_firecrawl_002',
+					},
 					industry: 'comerç',
 					country: 'ES',
 					why_relevant:
@@ -1727,7 +1772,10 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			competitors: [
 				{
 					name: 'Instal·lacions Bages',
-					website: 'https://instalbages.cat',
+					website: {
+						value: 'https://instalbages.cat',
+						source_id: 'src_firecrawl_002',
+					},
 					why: 'Bages-area peer, ahead on paid ads.',
 					citations: [{ source_id: 'src_registry_001', confidence: 0.7 }],
 				},
@@ -1986,7 +2034,10 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			competitors: [
 				{
 					name: 'Drivin',
-					website: 'https://drivin.com',
+					website: {
+						value: 'https://drivin.com',
+						source_id: 'src_firecrawl_002',
+					},
 					description:
 						'Spain-first fleet management platform; popular with mid-size carriers.',
 					strengths: ['routing engine', 'Spanish support'],
@@ -1996,7 +2047,10 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				},
 				{
 					name: 'Routeique',
-					website: 'https://routeique.com',
+					website: {
+						value: 'https://routeique.com',
+						source_id: 'src_firecrawl_002',
+					},
 					description:
 						'EN-focused fleet + delivery suite; integrates with Sage Intacct.',
 					strengths: ['Sage integration', 'PoD module'],
@@ -2006,7 +2060,10 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				},
 				{
 					name: 'Onfleet',
-					website: 'https://onfleet.com',
+					website: {
+						value: 'https://onfleet.com',
+						source_id: 'src_firecrawl_002',
+					},
 					description:
 						'Last-mile delivery platform; popular with retail logistics.',
 					strengths: ['driver app UX'],
@@ -2235,7 +2292,10 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			competitors: [
 				{
 					name: 'Vidres Palafrugell',
-					website: 'https://vidrespalafrugell.cat',
+					website: {
+						value: 'https://vidrespalafrugell.cat',
+						source_id: 'src_firecrawl_002',
+					},
 					description: 'Glass workshop; Instagram catalogue but no web shop.',
 					strengths: ['Instagram engagement'],
 					weaknesses: ['no shop', 'no preorder'],
@@ -2244,7 +2304,10 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				},
 				{
 					name: 'Forja Empordà',
-					website: 'https://forjaemporda.cat',
+					website: {
+						value: 'https://forjaemporda.cat',
+						source_id: 'src_firecrawl_002',
+					},
 					description:
 						'Wrought-iron workshop, La Bisbal area; static Wordpress.',
 					strengths: ['regional brand'],
@@ -2262,7 +2325,10 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				},
 				{
 					name: 'Ferro Forjat Begur',
-					website: 'https://ferroforjatbegur.cat',
+					website: {
+						value: 'https://ferroforjatbegur.cat',
+						source_id: 'src_firecrawl_002',
+					},
 					description: 'Ironwork in Begur; static brochure, gallery only.',
 					strengths: ['boutique location'],
 					weaknesses: ['no commerce'],
@@ -2561,7 +2627,10 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			competitors: [
 				{
 					name: 'Pneumàtics Selva',
-					website: 'https://pneumaticsselva.cat',
+					website: {
+						value: 'https://pneumaticsselva.cat',
+						source_id: 'src_firecrawl_002',
+					},
 					why: 'Granollers leader; runs Wix-based booking flow.',
 					citations: [],
 				},
@@ -2603,7 +2672,10 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			competitors: [
 				{
 					name: 'Pneumàtics Selva',
-					website: 'https://pneumaticsselva.cat',
+					website: {
+						value: 'https://pneumaticsselva.cat',
+						source_id: 'src_firecrawl_002',
+					},
 					description:
 						'Granollers leader; Wix-based booking flow; ~5.8k Instagram followers.',
 					strengths: ['booking flow', 'follower count'],
@@ -2745,7 +2817,10 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			prospects: [
 				{
 					name: 'Mecanitzats Sant Boi',
-					website: 'https://mecanitzatssantboi.cat',
+					website: {
+						value: 'https://mecanitzatssantboi.cat',
+						source_id: 'src_firecrawl_002',
+					},
 					industry: 'manufacturing',
 					country: 'ES',
 					why_relevant:

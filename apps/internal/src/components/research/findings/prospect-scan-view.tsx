@@ -27,6 +27,7 @@ import {
 	Section,
 	Sections,
 	SectionTitle,
+	sourcedText,
 } from './shared'
 
 /**
@@ -43,7 +44,7 @@ import {
 
 type ProspectEntry = {
 	readonly name: string
-	readonly website?: string
+	readonly website?: unknown
 	// A company with no site of its own often has one of these and nothing else,
 	// so they travel with the lead rather than staying in a finding nobody opens
 	// again.
@@ -84,7 +85,7 @@ export function ProspectScanView({
 					<List>
 						{prospects.map(p => (
 							<ProspectRow
-								key={`${p.name}|${p.tax_id ?? p.website ?? ''}`}
+								key={`${p.name}|${p.tax_id ?? sourcedText(p.website) ?? ''}`}
 								prospect={p}
 							/>
 						))}
@@ -116,6 +117,9 @@ function ProspectRow({ prospect }: { readonly prospect: ProspectEntry }) {
 	const nameOnly = prospect.unconfirmed_evidence === NAME_ONLY_EVIDENCE
 	const spoken = doubt !== undefined && doubt !== ''
 	const unconfirmed = spoken || nameOnly
+	// The address on its own: a scan reports it paired with the page it was read
+	// on, so the value here is not the string a link needs.
+	const site = sourcedText(prospect.website)
 
 	return (
 		<ListItem>
@@ -126,8 +130,8 @@ function ProspectRow({ prospect }: { readonly prospect: ProspectEntry }) {
 						<Trans>Unconfirmed company</Trans>
 					</CandidatePill>
 				) : null}
-				{prospect.website !== undefined ? (
-					<SafeLink href={prospect.website}>{prospect.website}</SafeLink>
+				{site !== undefined ? (
+					<SafeLink href={site}>{site}</SafeLink>
 				) : null}
 			</RowHead>
 			<Reason>{prospect.why_relevant}</Reason>
@@ -262,7 +266,9 @@ function AddAsLeadButton({
 				...(prospect.industry ? { industry: prospect.industry } : {}),
 				...(prospect.country ? { country: prospect.country } : {}),
 				...(prospect.location ? { location: prospect.location } : {}),
-				...(prospect.website ? { website: prospect.website } : {}),
+				...(sourcedText(prospect.website)
+					? { website: sourcedText(prospect.website) }
+					: {}),
 				...(usableProfiles.length > 0
 					? { socialProfiles: usableProfiles }
 					: {}),

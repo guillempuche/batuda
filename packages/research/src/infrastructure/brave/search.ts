@@ -67,7 +67,7 @@ export const makeBraveSearch = (slot: number) =>
 					Effect.gen(function* () {
 						// Brave's `country` wants an upper-case two-letter code; a raw model
 						// hint like "en-US" is invalid, so normalize it or leave it out.
-						const country = parseCountryAlpha2(input.location)
+						const country = parseCountryAlpha2(input.country)
 						const response = yield* client
 							.get('https://api.search.brave.com/res/v1/web/search', {
 								headers: {

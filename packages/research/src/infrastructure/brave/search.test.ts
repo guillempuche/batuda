@@ -81,7 +81,7 @@ interface SearchArgs {
 	readonly query: string
 	readonly recency?: { days: number }
 	readonly languages?: string[]
-	readonly location?: string
+	readonly country?: string
 }
 
 const runSearch = (
@@ -162,11 +162,11 @@ describe('makeBraveSearch', () => {
 	})
 
 	it('should send a normalized upper-case country for a locale hint', async () => {
-		// GIVEN the model passes a language-and-region locale as the location
+		// GIVEN the run's country arrives as a language-and-region locale
 		const { exit, log } = runSearch(
 			200,
 			{ web: { results: [] } },
-			{ query: 'acme', location: 'en-US' },
+			{ query: 'acme', country: 'en-US' },
 		)
 		await exit
 
@@ -175,12 +175,12 @@ describe('makeBraveSearch', () => {
 		expect(params.some(([k, v]) => k === 'country' && v === 'US')).toBe(true)
 	})
 
-	it('should omit country when the location hint is not a country', async () => {
-		// GIVEN a free-form place name Brave would reject
+	it('should omit country when the hint is not a country code', async () => {
+		// GIVEN a place written in words where a code belongs — Brave would reject it
 		const { exit, log } = runSearch(
 			200,
 			{ web: { results: [] } },
-			{ query: 'acme', location: 'United States' },
+			{ query: 'acme', country: 'United States' },
 		)
 		await exit
 

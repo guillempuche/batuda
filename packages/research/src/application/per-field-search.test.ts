@@ -1519,7 +1519,11 @@ describe('the fields each shape rescues', () => {
 			// put through the very schema the model fills
 			const sample: Record<string, unknown> = {
 				name: 'Acme',
-				website: 'https://acme.test',
+				website: {
+					value: 'https://acme.test',
+					source_id: 'https://acme.test',
+					confidence: null,
+				},
 				employee_estimate: {
 					value: 42,
 					source_id: 'https://acme.test',
