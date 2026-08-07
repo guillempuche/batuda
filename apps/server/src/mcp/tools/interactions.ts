@@ -5,11 +5,15 @@ import { SqlClient } from 'effect/unstable/sql'
 import { CurrentOrg } from '@batuda/controllers'
 import { Interaction } from '@batuda/domain'
 
-import { companyVisible } from '../../services/company-liveness'
+import {
+	companyVisible,
+	requireLiveCompany,
+} from '../../services/company-liveness'
 import {
 	InteractionLogged,
 	TimelineActivityService,
 } from '../../services/timeline-activity'
+import { ToolMessage } from '../tool-message'
 import { McpPageLimit, TruncatableResult, toTruncatable } from './_result'
 
 const REQUEST_DEPENDENCIES = [CurrentOrg]
@@ -72,6 +76,10 @@ export const InteractionHandlersLive = InteractionTools.toLayer(
 		return {
 			log_interaction: params =>
 				Effect.gen(function* () {
+					const currentOrg = yield* CurrentOrg
+					// A note about a company nobody can open would be written and then
+					// never read back, since it is hidden along with the company.
+					yield* requireLiveCompany(sql, currentOrg.id, params.company_id)
 					const occurredAt = DateTime.toDateUtc(DateTime.nowUnsafe())
 					const nextActionAt = params.next_action_at
 						? new Date(params.next_action_at)
@@ -118,7 +126,16 @@ export const InteractionHandlersLive = InteractionTools.toLayer(
 						SELECT * FROM interactions WHERE id = ${interactionId} LIMIT 1
 					`
 					return yield* decodeInteraction(rows[0])
-				}).pipe(Effect.orDie),
+				}).pipe(
+					Effect.catchTag('NotFound', () =>
+						Effect.die(
+							new ToolMessage(
+								'That company is not here, or it was deleted — restore it before logging against it.',
+							),
+						),
+					),
+					Effect.orDie,
+				),
 			list_interactions: params =>
 				Effect.gen(function* () {
 					const conditions = [

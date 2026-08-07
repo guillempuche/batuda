@@ -64,7 +64,12 @@ export function DeleteConfirm({
 							type='button'
 							$variant={destructive === false ? 'filled' : 'destructive'}
 							data-testid={`${testId}-button`}
+							// Stays focusable while it runs: taking focus away mid-action
+							// drops the reader at the top of the page with no idea whether
+							// anything happened.
 							disabled={deleting}
+							focusableWhenDisabled
+							aria-busy={deleting}
 							onClick={onConfirm}
 						>
 							{deleting

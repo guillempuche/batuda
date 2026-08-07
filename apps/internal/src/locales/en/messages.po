@@ -1444,13 +1444,13 @@ msgstr "Could not delete the key. Please try again."
 msgid "Could not delete the run"
 msgstr "Could not delete the run"
 
-#: src/components/companies/pipeline-board.tsx
-msgid "Could not load — retry"
-msgstr "Could not load — retry"
-
 #: src/routes/companies/$slug.tsx
 msgid "Could not delete this company"
 msgstr "Could not delete this company"
+
+#: src/components/companies/pipeline-board.tsx
+msgid "Could not load — retry"
+msgstr "Could not load — retry"
 
 #: src/routes/companies/$slug.tsx
 msgid "Could not load activity"
@@ -1941,10 +1941,12 @@ msgstr "Defaults to you when omitted."
 msgid "Delete"
 msgstr "Delete"
 
+#. placeholder {0}: company.name
 #. placeholder {0}: row.name
 #. placeholder {0}: stack.name
 #: src/components/instructions/stack-list.tsx
 #: src/components/instructions/template-library.tsx
+#: src/routes/companies/$slug.tsx
 msgid "Delete {0}"
 msgstr "Delete {0}"
 
@@ -4779,6 +4781,11 @@ msgstr "Responded"
 msgid "Restore"
 msgstr "Restore"
 
+#. placeholder {0}: company.name
+#: src/routes/companies/index.tsx
+msgid "Restore {0}"
+msgstr "Restore {0}"
+
 #: src/routes/companies/index.tsx
 msgid "Restoring…"
 msgstr "Restoring…"
@@ -5490,10 +5497,6 @@ msgstr "Tags filter (comma-separated)"
 #: src/components/instructions/template-library.tsx
 msgid "Take \"{0}\" out of your stacks first — they would lose it once somebody else owns it."
 msgstr "Take \"{0}\" out of your stacks first — they would lose it once somebody else owns it."
-
-#: src/routes/companies/$slug.tsx
-msgid "Take this company out of view"
-msgstr "Take this company out of view"
 
 #: src/components/companies/conversations-tab.tsx
 #: src/components/shared/channel-icon.tsx

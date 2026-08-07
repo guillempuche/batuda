@@ -12,9 +12,17 @@ import { NotFound } from '@batuda/controllers'
  * hidden by the deletion that hid the rest — stay behind when the company comes
  * back, leaving the account holding people nobody deleted and nobody expected.
  *
- * One place rather than one check per writer: every way of adding to a company
- * has to ask the same question, and a check written out at each of them is one
- * somebody eventually forgets.
+ * Written once so each writer asks the same question, but it only holds where
+ * it is actually called — today that is adding a person and logging a note.
+ * Creating a task, a proposal or a meeting against a deleted company still
+ * succeeds, and the row is then hidden by the reads: written, and never read
+ * back. Those are worth guarding too; this is not yet the complete rule its
+ * name suggests.
+ *
+ * Leans on the caller having entered organisation scope. Every call site today
+ * runs as `app_user`, where row-level security applies; used from a path that
+ * bypasses it — the mail worker, org resolution — it would answer about a
+ * company in somebody else's organisation.
  */
 export const requireLiveCompany = (
 	sql: SqlClient.SqlClient,
@@ -45,6 +53,10 @@ export const requireLiveCompany = (
  *
  * A row belonging to no company is somebody's own work and stays visible — the
  * predicate says nothing about it.
+ *
+ * Names no organisation, because row-level security supplies that wherever this
+ * is used today. On a connection that bypasses it, this would let one
+ * organisation's companies decide what another's rows show.
  */
 export const companyVisible = (
 	sql: SqlClient.SqlClient,

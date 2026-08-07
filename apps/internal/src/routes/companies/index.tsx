@@ -495,14 +495,24 @@ function CompaniesListPage() {
 						// Deliberately not the usual card: a deleted company's page is
 						// closed, so a card linking to it would be a dead end. What is
 						// useful here is its name and a way back.
-						<DeletedList>
+						<DeletedList role='list'>
 							{companies.map(company => (
-								<DeletedRow key={company.id} data-testid='company-deleted-row'>
+								<DeletedRow
+									key={company.id}
+									role='listitem'
+									data-testid='company-deleted-row'
+								>
 									<DeletedName>{company.name}</DeletedName>
 									<PriButton
 										type='button'
 										$variant='text'
+										// Every one of these says "Restore", so without the name
+										// a screen reader listing the buttons reads the same word
+										// over and over with nothing to tell them apart.
+										aria-label={t`Restore ${company.name}`}
 										disabled={restoringId === company.id}
+										focusableWhenDisabled
+										aria-busy={restoringId === company.id}
 										onClick={() => void handleRestore(company.id, company.name)}
 										data-testid={`company-restore-${company.slug}`}
 									>

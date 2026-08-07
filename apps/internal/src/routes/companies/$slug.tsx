@@ -1088,8 +1088,12 @@ function DetailBody({
 						<VerifiedControl
 							type='button'
 							data-testid='company-delete'
+							// Named with the company, so it is clear what is about to go.
+							// No title: it only appears on hover, which leaves it out of
+							// reach on a phone and for anybody on the keyboard, and the
+							// dialog says the same thing where everybody can read it.
+							aria-label={t`Delete ${company.name}`}
 							onClick={() => setDeleteOpen(true)}
-							title={t`Take this company out of view`}
 						>
 							<Trash2 size={14} aria-hidden />
 							<Trans>Delete</Trans>

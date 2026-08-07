@@ -391,8 +391,10 @@ export class CompanyService extends Context.Service<CompanyService>()(
 							})
 						const at = DateTime.toDateUtc(DateTime.nowUnsafe())
 						// The name is claimed in the same statement that frees this row,
-						// so a company created between the check above and here loses the
-						// race cleanly instead of raising a duplicate key nobody maps.
+						// which settles it against anything already committed. A company
+						// being inserted right now is invisible to that check, so the
+						// index is what catches it, and its complaint is turned into the
+						// same sentence rather than left as a fault.
 						const revived = yield* sql`
 							UPDATE companies
 							SET deleted_at = NULL, updated_at = ${at},
@@ -406,7 +408,11 @@ export class CompanyService extends Context.Service<CompanyService>()(
 										AND live.deleted_at IS NULL
 								)
 							RETURNING id
-						`
+						`.pipe(
+							Effect.catchTag('SqlError', () =>
+								Effect.succeed([] as ReadonlyArray<{ readonly id: string }>),
+							),
+						)
 						if (revived.length === 0)
 							return yield* new BadRequest({
 								message: `Another company is using the name "${company.slug}" now, so this one cannot come back under it. Rename that company first, then restore this one.`,

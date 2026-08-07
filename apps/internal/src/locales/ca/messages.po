@@ -1444,13 +1444,13 @@ msgstr "No s'ha pogut eliminar la clau. Torna-ho a provar."
 msgid "Could not delete the run"
 msgstr "No s'ha pogut eliminar l'execució"
 
-#: src/components/companies/pipeline-board.tsx
-msgid "Could not load — retry"
-msgstr "No s'ha pogut carregar — torna-ho a provar"
-
 #: src/routes/companies/$slug.tsx
 msgid "Could not delete this company"
 msgstr "No s'ha pogut suprimir aquesta empresa"
+
+#: src/components/companies/pipeline-board.tsx
+msgid "Could not load — retry"
+msgstr "No s'ha pogut carregar — torna-ho a provar"
 
 #: src/routes/companies/$slug.tsx
 msgid "Could not load activity"
@@ -1941,10 +1941,12 @@ msgstr "Per defecte ets tu si s'omet."
 msgid "Delete"
 msgstr "Elimina"
 
+#. placeholder {0}: company.name
 #. placeholder {0}: row.name
 #. placeholder {0}: stack.name
 #: src/components/instructions/stack-list.tsx
 #: src/components/instructions/template-library.tsx
+#: src/routes/companies/$slug.tsx
 msgid "Delete {0}"
 msgstr "Elimina {0}"
 
@@ -4779,6 +4781,11 @@ msgstr "Respost"
 msgid "Restore"
 msgstr "Restaura"
 
+#. placeholder {0}: company.name
+#: src/routes/companies/index.tsx
+msgid "Restore {0}"
+msgstr "Restaura {0}"
+
 #: src/routes/companies/index.tsx
 msgid "Restoring…"
 msgstr "S'està restaurant…"
@@ -5490,10 +5497,6 @@ msgstr "Filtre d'etiquetes (separades per comes)"
 #: src/components/instructions/template-library.tsx
 msgid "Take \"{0}\" out of your stacks first — they would lose it once somebody else owns it."
 msgstr "Primer treu \"{0}\" de les teves piles: la perdrien quan passés a ser d’algú altre."
-
-#: src/routes/companies/$slug.tsx
-msgid "Take this company out of view"
-msgstr "Treu aquesta empresa de la vista"
 
 #: src/components/companies/conversations-tab.tsx
 #: src/components/shared/channel-icon.tsx
