@@ -415,6 +415,16 @@ A read answers with nothing: `success: Schema.NullOr(...)`. An action says what 
 
 Two traps. `Effect.orDie` maps the whole error channel to `never`, so catching an error and re-failing it *before* an `orDie` puts it straight back and kills it — the endpoint answers 500 while type-checking perfectly. Write `Effect.catch(e => e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e))` with no trailing `orDie`. And wrapping a success in `NullOr` makes the flat-result rule in `_annotations.test.ts` pass vacuously unless it looks through the null branch, because the top level stops being an object.
 
+### Ways of reaching a company, a branch or a person
+
+They all live in one `channels` table, named by `subject_table` + `subject_id`. One key cannot point at two tables, so there is no foreign key — which means nothing cascades, and a subject's channels are deleted by hand when the subject goes. `deleteSubjectChannels` is that hand. Left behind, the rows outlive whoever they belonged to and keep answering: the send gate looks a bounced address up across the whole organisation without asking whose it is.
+
+A bulk write (`channels[]` on create/update contact, and the research apply path) only ever adds or refreshes. Correcting or removing one goes through `manage_contact_channels` / `manage_company_channels`, and both scope every edit to the subject as well as the id — an id alone only proves a row exists, not whose it is. Renaming an address onto one the subject already holds is refused rather than merged, because merging would delete a row the caller never named; the refusal is a `BadRequest` mapped from the unique violation, raised inside its own transaction so it does not poison the request it arrived on.
+
+Exactly one channel of each kind is the primary, and removing the one holding it hands it to the oldest left rather than leaving the kind headless — otherwise the readers disagree about which address is "the" one, and disagree differently on the next page load.
+
+`verification` is what a deliverability check found, and only `deliverable` lets the send path through unremarked — no verdict at all also passes, because there is no evidence against the address. So a write that says nothing about a verdict keeps the one on file rather than clearing it. The vocabulary lives in `packages/domain`; callers may only ever lower a verdict, since saying an address is good is something only a mailbox probe finds out. The suppression `status` is a separate axis, written by the bounce handler and never by a caller.
+
 ### How a list endpoint answers
 
 A list endpoint answers with the same envelope, built by `PaginatedList` in `packages/controllers/src/pagination.ts`. Not every list has been moved onto it yet — several short ones (an org's API keys, an inbox's footers, the instruction templates) still answer with a bare array — but any list that grows with the business belongs on the envelope, and a new one should start there.

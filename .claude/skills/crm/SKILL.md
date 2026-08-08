@@ -1,6 +1,6 @@
 ---
 name: crm
-description: This skill should be used when the user asks to "add a company", "update a company", "log an interaction", "create a document", "check the pipeline", "get next steps", "check overdue tasks", "create a page", "publish a page", "research a company", or mentions CRM data, MCP tools, companies, interactions, documents, tasks, or pages.
+description: This skill should be used when the user asks to "add a company", "update a company", "add a contact", "fix a contact's email", "change somebody's phone number", "remove an address", "log an interaction", "create a document", "check the pipeline", "get next steps", "check overdue tasks", "create a page", "publish a page", "research a company", or mentions CRM data, MCP tools, companies, contacts, channels, interactions, documents, tasks, or pages.
 ---
 
 # CRM Operations
@@ -33,7 +33,9 @@ Always call `search_companies` before `get_company`. Fetch document content only
 
 All IDs are UUIDs. All timestamps are UTC.
 
-Fields that take one of a fixed set of words (status, priority, size range, channel kind) are plain strings, not Postgres enums; the sets they take are in `packages/domain/src/schema/`.
+Fields that take one of a fixed set of words (status, priority, size range, email verification) are plain strings, not Postgres enums; the sets they take are in `packages/domain/src/schema/`.
+
+A channel's `kind` is not one of them — it is deliberately open, so a platform nobody has heard of yet needs no change. `CHANNEL_KINDS` lists the ones the web app knows how to draw and name; anything else is stored and shown as it arrived.
 
 `industry` is not one of them. A company's trade is whatever the organisation calls it, so send the words a person would write (`Serralleria`, `Freight forwarding`) and the server files it under that organisation's own entry, creating one the first time anybody uses it. What comes back on the row is that entry's web-address form, which is what a filter and a shared link use.
 
@@ -49,10 +51,15 @@ Status moves forward only: `prospect → contacted → responded → meeting →
 
 - **Slug**: kebab-case from name. If duplicate, append city: `can-joan-girona`
 - **Priority**: 1 = hot (contact this week), 2 = medium, 3 = cold (backlog)
-- **source**: always set when creating. Values: `firecrawl | exa | google_maps | referral | linkedin | instagram | manual`
 - **metadata**: use for data that doesn't fit existing columns (fiscal data, employee names, social stats, competitor notes)
 
 For detailed field values, status flow diagram, and examples, consult `references/companies.md`.
+
+## Contacts
+
+A wrong email is corrected with `manage_contact_channels`, never by deleting the person and starting over — deleting detaches every interaction, proposal and thread they were attached to. `update_contact`'s `channels[]` only ever adds or refreshes, so a correction made there leaves the old address beside the new one.
+
+For adding, correcting, removing and re-electing a channel, and for how far an address is trusted, consult `references/contacts.md`.
 
 ## Interactions
 
@@ -125,5 +132,6 @@ For page structure details, consult `references/documents.md`.
 For detailed field values, workflows, and examples, consult:
 
 - **`references/companies.md`** — Status flow, slug format, priority, size ranges, how a trade is named, metadata patterns
+- **`references/contacts.md`** — Correcting and removing one channel, primary election, how far an address is trusted vs whether it bounced
 - **`references/interactions.md`** — Channel/direction/type/outcome values, log_interaction example, next_action workflow
 - **`references/documents.md`** — Document types, research workflow, pages (Tiptap JSON, publish flow), tasks
