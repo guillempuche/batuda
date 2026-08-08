@@ -37,6 +37,17 @@ export interface ChannelInput {
 	readonly is_primary?: boolean | undefined
 }
 
+/**
+ * The one spelling a kind is stored in.
+ *
+ * `channelAddressIsValid` lowercases before it looks up a shape, so `Email`
+ * validates as an email — and then everything that reads by kind looks for
+ * `channel = 'email'` and never finds it. An address stored that way is invisible
+ * to the send gate, to the suppression clear, and to the check that strips a
+ * bounce off a row that stops being an email.
+ */
+export const foldKind = (kind: string): string => kind.trim().toLowerCase()
+
 /** What a way of reaching someone can hang off. */
 export type ChannelSubject = 'companies' | 'contacts' | 'sites'
 
@@ -132,7 +143,7 @@ export const writeChannels = (
 			INSERT INTO channels
 				(organization_id, subject_table, subject_id, channel, address, label, verification, confidence, is_primary)
 			VALUES (
-				${orgId}, ${subject.table}, ${subject.id}, ${c.kind}, ${c.value}, ${c.label ?? null},
+				${orgId}, ${subject.table}, ${subject.id}, ${foldKind(c.kind)}, ${c.value}, ${c.label ?? null},
 				${c.verification ?? null}, ${clampConfidence(c.confidence)}, COALESCE(${c.is_primary ?? null}, false)
 			)
 			ON CONFLICT (subject_table, subject_id, channel, address) DO UPDATE SET
@@ -327,7 +338,7 @@ export const addChannel = (
 			INSERT INTO channels
 				(organization_id, subject_table, subject_id, channel, address, label, verification, confidence, is_primary)
 			VALUES (
-				${orgId}, ${subject.table}, ${subject.id}, ${c.kind}, ${c.value}, ${c.label ?? null},
+				${orgId}, ${subject.table}, ${subject.id}, ${foldKind(c.kind)}, ${c.value}, ${c.label ?? null},
 				${c.verification ?? null}, ${clampConfidence(c.confidence)}, COALESCE(${wantsPrimary}, false)
 			)
 			ON CONFLICT (subject_table, subject_id, channel, address) DO UPDATE SET
@@ -385,20 +396,26 @@ export const patchChannel = (
 		`)[0]
 		if (stored === undefined) return undefined
 
+		// Folded once, here, and read everywhere below. Comparing the kind as it
+		// arrived is how `Email` reads as *leaving* email — which strips the bounce
+		// record off an address that never stopped being one, and hides it from the
+		// send gate in the same call.
+		const nextKind = patch.kind === undefined ? undefined : foldKind(patch.kind)
+
 		// Changing one half says nothing about the other, so whichever half is not
 		// being changed comes off the row. Checking only when the address moves
 		// would let a phone number be relabelled an email and walk into the send
 		// path, where no verdict reads as nothing known against it.
-		if (patch.kind !== undefined || patch.value !== undefined) {
+		if (nextKind !== undefined || patch.value !== undefined) {
 			yield* assertAddressLooksRight(
-				patch.kind ?? stored.channel,
+				nextKind ?? stored.channel,
 				patch.value ?? stored.address,
 			)
 		}
 
 		const now = DateTime.toDateUtc(DateTime.nowUnsafe())
 		const data: Record<string, unknown> = { updatedAt: now }
-		if (patch.kind !== undefined) data['channel'] = patch.kind
+		if (nextKind !== undefined) data['channel'] = nextKind
 		if (patch.value !== undefined) data['address'] = patch.value
 		if (patch.label !== undefined) data['label'] = patch.label
 		if (patch.is_primary !== undefined) data['isPrimary'] = patch.is_primary
@@ -411,9 +428,9 @@ export const patchChannel = (
 		// blocking mail while sitting on something that is no longer an address at
 		// all, and no screen would show it.
 		const leavingEmail =
-			patch.kind !== undefined &&
+			nextKind !== undefined &&
 			stored.channel === 'email' &&
-			patch.kind !== 'email'
+			nextKind !== 'email'
 		if (leavingEmail) {
 			data['verification'] = null
 			data['confidence'] = null
@@ -442,7 +459,7 @@ export const patchChannel = (
 						pgErrorCode(error) === '23505'
 							? Effect.fail(
 									new BadRequest({
-										message: `"${patch.value ?? stored.address}" is already on file as a ${patch.kind ?? stored.channel}. Remove the one you meant to replace rather than renaming onto it.`,
+										message: `"${patch.value ?? stored.address}" is already on file as a ${nextKind ?? stored.channel}. Remove the one you meant to replace rather than renaming onto it.`,
 									}),
 								)
 							: Effect.fail(error),
@@ -451,13 +468,18 @@ export const patchChannel = (
 
 		// A row carrying the default into another kind would leave two there and
 		// none behind it.
-		const kindChanged =
-			patch.kind !== undefined && patch.kind !== stored.channel
+		const kindChanged = nextKind !== undefined && nextKind !== stored.channel
 		if (patch.is_primary === true || (kindChanged && stored.isPrimary)) {
 			yield* standDownOtherPrimaries(sql, channelId)
 		}
-		if (kindChanged && stored.isPrimary) {
+		// Wherever the default just left, somebody has to hold it. Both ways of
+		// putting it down are the same problem: a kind with addresses and no
+		// default is read differently by each screen that reads it.
+		if (stored.isPrimary && (kindChanged || patch.is_primary === false)) {
 			yield* electPrimaryIfNone(sql, orgId, subject, stored.channel)
+		}
+		if (patch.is_primary === false && kindChanged) {
+			yield* electPrimaryIfNone(sql, orgId, subject, nextKind ?? stored.channel)
 		}
 		return rows[0]
 	})

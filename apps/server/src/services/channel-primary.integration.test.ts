@@ -274,18 +274,36 @@ describe('putting a wrong address right', () => {
 			])
 		})
 
-		it('should leave the connection usable afterwards', async () => {
-			// GIVEN the refusal above happened inside the caller's transaction
-			// WHEN anything else is asked on the same connection
-			const rows = await run(
+		it('should leave the transaction it was refused inside still usable', async () => {
+			// GIVEN a refusal raised inside a transaction the caller opened — which
+			// is every request, since the org scope wraps each one in one. Postgres
+			// will not accept another statement on a transaction whose last write it
+			// rejected, so this has to be asked inside the same one to mean anything.
+			const wrong = await idOf('w@netegespla.cat')
+
+			const after = await run(
 				Effect.gen(function* () {
 					const sql = yield* SqlClient.SqlClient
-					return yield* subjectChannelsOf(sql, subject())
+					return yield* sql.withTransaction(
+						Effect.gen(function* () {
+							const refusal = yield* patchChannel(sql, ORG, subject(), wrong, {
+								value: 'wattie@netegespla.cat',
+							}).pipe(
+								Effect.catchTag('BadRequest', e => Effect.succeed(e.message)),
+							)
+							// WHEN the same transaction is asked something else
+							const rows = yield* subjectChannelsOf(sql, subject())
+							return { refusal, count: rows.length }
+						}),
+					)
 				}),
 			)
-			// THEN it answers — a rejected write that poisoned the transaction would
-			// take every later statement down with it
-			expect((rows as ReadonlyArray<unknown>).length).toBeGreaterThan(0)
+
+			// THEN the refusal came back in words and the transaction carried on —
+			// without the savepoint around the attempt, this second statement is the
+			// one that dies
+			expect(String(after.refusal)).toContain('wattie@netegespla.cat')
+			expect(after.count).toBeGreaterThan(0)
 		})
 	})
 
@@ -510,6 +528,148 @@ describe('a channel that belongs to somebody else', () => {
 				otherChannel,
 			])
 			expect(after.rowCount).toBe(1)
+		})
+	})
+})
+
+describe('the two ways a kind is left with nobody holding the default', () => {
+	describe('when the address holding it is simply unmarked', () => {
+		it('should hand it to another rather than leave the kind headless', async () => {
+			// GIVEN a kind whose default is settled, with another address behind it
+			const firm = await pool.query<{ id: string }>(
+				`INSERT INTO companies (organization_id, slug, name)
+				 VALUES ($1, $2, 'Unmark SL') RETURNING id`,
+				[ORG, `unmark-${randomUUID()}`],
+			)
+			const at = { table: 'companies' as const, id: firm.rows[0]!.id }
+			const first = await run(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					yield* addChannel(sql, ORG, at, {
+						kind: 'email',
+						value: 'un@unmark.cat',
+					})
+					return yield* addChannel(sql, ORG, at, {
+						kind: 'email',
+						value: 'dos@unmark.cat',
+						is_primary: true,
+					})
+				}),
+			)
+
+			// WHEN whoever holds it is unmarked, rather than another being marked
+			await run(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* patchChannel(
+						sql,
+						ORG,
+						at,
+						(first as { readonly id: string }).id,
+						{ is_primary: false },
+					)
+				}),
+			)
+
+			// THEN somebody still holds it. Left with none, the compose box, the card
+			// and the send gate each pick a different address — and a different one
+			// again on the next load.
+			const held = await pool.query<{ address: string }>(
+				`SELECT address FROM channels
+				 WHERE subject_id = $1 AND channel = 'email' AND is_primary`,
+				[at.id],
+			)
+			expect(held.rows.map(r => r.address)).toEqual(['un@unmark.cat'])
+		})
+	})
+})
+
+describe('how a kind is spelled when it is stored', () => {
+	describe('when a caller names one with a capital', () => {
+		it('should store the one spelling everything else reads by', async () => {
+			// GIVEN somebody adds an address calling its kind "Email"
+			const firm = await pool.query<{ id: string }>(
+				`INSERT INTO companies (organization_id, slug, name)
+				 VALUES ($1, $2, 'Case SL') RETURNING id`,
+				[ORG, `case-${randomUUID()}`],
+			)
+			const at = { table: 'companies' as const, id: firm.rows[0]!.id }
+			await run(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* addChannel(sql, ORG, at, {
+						kind: '  Email ',
+						value: 'hola@case.cat',
+					})
+				}),
+			)
+
+			// THEN it is filed as an email. Stored as typed, it would pass the check
+			// that an address looks like an email — that one folds the case — and
+			// then be invisible to the send gate, which asks for channel = 'email'.
+			const stored = await pool.query<{ channel: string }>(
+				`SELECT channel FROM channels WHERE subject_id = $1`,
+				[at.id],
+			)
+			expect(stored.rows.map(r => r.channel)).toEqual(['email'])
+		})
+	})
+})
+
+describe('a bounce that a capital letter could have washed off', () => {
+	describe('when an email row is retyped with the same kind, capitalised', () => {
+		it('should keep the bounce record, because nothing actually changed', async () => {
+			// GIVEN a mailbox the send gate is holding back
+			const firm = await pool.query<{ id: string }>(
+				`INSERT INTO companies (organization_id, slug, name)
+				 VALUES ($1, $2, 'Launder SL') RETURNING id`,
+				[ORG, `launder-${randomUUID()}`],
+			)
+			const at = { table: 'companies' as const, id: firm.rows[0]!.id }
+			const added = (await run(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* addChannel(sql, ORG, at, {
+						kind: 'email',
+						value: 'rebot@launder.cat',
+					})
+				}),
+			)) as { readonly id: string }
+			await pool.query(
+				`UPDATE channels SET status = 'bounced', status_reason = 'mailbox unavailable',
+				 soft_bounce_count = 3, verification = 'undeliverable' WHERE id = $1`,
+				[added.id],
+			)
+
+			// WHEN somebody sets its kind to "Email"
+			await run(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* patchChannel(sql, ORG, at, added.id, { kind: 'Email' })
+				}),
+			)
+
+			// THEN it is still an email and still held back. Read as typed, "Email"
+			// is not "email", so this counted as leaving email — which clears the
+			// bounce, the verdict and the counter, and files the row under a kind
+			// the send gate does not look at. One call, and a dead address is clean
+			// and invisible.
+			const after = await pool.query<{
+				channel: string
+				status: string
+				verification: string | null
+				soft_bounce_count: number
+			}>(
+				`SELECT channel, status, verification, soft_bounce_count
+				 FROM channels WHERE id = $1`,
+				[added.id],
+			)
+			expect(after.rows[0]).toMatchObject({
+				channel: 'email',
+				status: 'bounced',
+				verification: 'undeliverable',
+				soft_bounce_count: 3,
+			})
 		})
 	})
 })
