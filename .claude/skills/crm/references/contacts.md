@@ -58,5 +58,11 @@ anything in its place. Saying an address is good is something a check finds out
 by reaching the mailbox, so `deliverable` is refused from a caller. A later check
 can raise it again.
 
+To get a send out that a verdict is holding back, use `action: "vouch"` rather
+than trying to argue with the verdict. It records that a person stands behind the
+address and leaves the check's own finding alone — the two are different claims,
+and only one of them is something a human can make. It is refused on an address
+that hard-bounced or reported spam; see `references/email.md`.
+
 This is a different thing from a bounce. `status` records what happened *after*
 a send; `clear_email_suppression` on `update_contact` is what resets that.
