@@ -5,23 +5,32 @@ import {
 	HttpApiSchema,
 } from 'effect/unstable/httpapi'
 
-import { Contact, ContactChannel } from '@batuda/domain'
+import {
+	Contact,
+	ContactChannel,
+	HandSetVerificationVerdict,
+} from '@batuda/domain'
 
-import { BadRequest } from '../errors'
+import { BadRequest, NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 import { PaginatedList, pageQuery } from '../pagination'
 
 // A reachable channel supplied in bulk (agent/import path). `kind` is open
 // (email, phone, linkedin, x, website, bluesky, …); only the email channel
-// carries a deliverability `verification`. Suppression status is
-// system-managed and never accepted from a client.
+// carries a deliverability `verification`.
+//
+// A verdict here may only ever lower how far an address is trusted: saying one
+// is good is a thing a mailbox probe finds out, and `deliverable` is the single
+// word the send gate lets through, so a caller able to write it could clear its
+// own way. The confidence score that goes with a verdict is not accepted at all
+// — it belongs to whatever established the verdict. Suppression status is
+// system-managed and never accepted from a client either.
 const ChannelInput = Schema.Struct({
 	kind: Schema.String,
 	value: Schema.String,
 	label: Schema.optional(Schema.String),
-	verification: Schema.optional(Schema.String),
-	confidence: Schema.optional(Schema.Number),
+	verification: Schema.optional(HandSetVerificationVerdict),
 	is_primary: Schema.optional(Schema.Boolean),
 })
 
@@ -45,8 +54,8 @@ const UpdateContactInput = Schema.Struct({
 	channels: Schema.optional(Schema.Array(ChannelInput)),
 })
 
-// Granular channel edits (the human UI). Value/kind/primary only — never the
-// system-derived verification or suppression status.
+// Granular channel edits (the human UI). Never the suppression status, and
+// never a verdict that says an address is good — see `ChannelInput` above.
 const AddChannelInput = Schema.Struct({
 	kind: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
 	value: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
@@ -58,11 +67,16 @@ const AddChannelInput = Schema.Struct({
 
 const PatchChannelInput = Schema.Struct({
 	kind: Schema.optional(Schema.String),
-	value: Schema.optional(Schema.String),
+	// Held to the same minimum as adding one: most kinds have no shape to check
+	// against, so without this a blank would be stored as an address.
+	value: Schema.optional(
+		Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
+	),
 	// Nullable so a name given by mistake can be taken back off; leaving it out
 	// keeps whatever is there.
 	label: Schema.optional(Schema.NullOr(Schema.String)),
 	is_primary: Schema.optional(Schema.Boolean),
+	verification: Schema.optional(HandSetVerificationVerdict),
 })
 
 // A contact plus its reachable channels. `channels` stays open (`Unknown`):
@@ -139,7 +153,13 @@ export const ContactsGroup = HttpApiGroup.make('contacts')
 				params: { id: Schema.String, channelId: Schema.String },
 				payload: PatchChannelInput,
 				success: ContactChannel.json,
-				error: BadRequest.pipe(HttpApiSchema.status(400)),
+				// Every channel of every company, branch and person lives in one
+				// table, so a channel id that is not this contact's is a wrong
+				// address rather than a server fault — and must not be edited.
+				error: Schema.Union([
+					BadRequest.pipe(HttpApiSchema.status(400)),
+					NotFound.pipe(HttpApiSchema.status(404)),
+				]),
 			},
 		),
 	)
@@ -150,6 +170,7 @@ export const ContactsGroup = HttpApiGroup.make('contacts')
 			{
 				params: { id: Schema.String, channelId: Schema.String },
 				success: Schema.Void,
+				error: NotFound.pipe(HttpApiSchema.status(404)),
 			},
 		),
 	)

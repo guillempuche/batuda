@@ -208,11 +208,33 @@ describe('validateCreate', () => {
 				{
 					kind: 'email',
 					value: 'ada@acme.es',
-					verification: 'valid',
+					// The proposal said 'valid', which is not one of the deliverability
+					// verdicts. The word goes and the address stays: these fields come
+					// out of a model's free-form JSON, and losing a found address over a
+					// stray word about it would throw away the part worth having.
+					verification: undefined,
 					confidence: 90,
 					is_primary: true,
 				},
 			])
+		})
+
+		it('should keep a verdict the vocabulary knows', () => {
+			// GIVEN the same proposal with a real deliverability verdict
+			const result = validateCreate({
+				...base,
+				fields: {
+					...(base['fields'] as Record<string, unknown>),
+					channels: [
+						{ kind: 'email', value: 'ada@acme.es', verification: 'risky' },
+					],
+				},
+			})
+
+			// THEN it survives — only words nothing understands are dropped
+			expect(result.ok).toBe(true)
+			if (!result.ok) return
+			expect(result.channels[0]?.verification).toBe('risky')
 		})
 	})
 

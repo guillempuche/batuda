@@ -7,6 +7,7 @@ import {
 	COMPANY_PRIORITIES,
 	COMPANY_SIZE_RANGES,
 	COMPANY_STATUSES,
+	isVerificationVerdict,
 } from '@batuda/domain'
 
 export {
@@ -14,6 +15,7 @@ export {
 	researchProvenance,
 } from './research-provenance'
 
+import { pgErrorCode } from '../lib/pg-error'
 import {
 	type ChannelInput,
 	splitCompanyChannelFields,
@@ -276,6 +278,13 @@ export const validate = (proposal: Record<string, unknown>): Validated => {
 // Channels arrive from contact discovery as { kind, value, verification?,
 // confidence?, is_primary? }. Keep only well-formed entries — a channel needs
 // both a kind and a value to be reachable.
+//
+// A verdict nobody recognises is dropped and the address kept, rather than the
+// whole proposal being refused. These fields come out of a model's free-form
+// JSON, and a found address is the part that was worth having: throwing it away
+// over a stray word about its deliverability loses the finding to protect a
+// footnote. The tools a person or an assistant calls do the opposite and refuse
+// outright, because there the caller can be told which words are allowed.
 const parseChannels = (raw: unknown): ReadonlyArray<ChannelInput> => {
 	if (!Array.isArray(raw)) return []
 	const channels: ChannelInput[] = []
@@ -291,7 +300,10 @@ const parseChannels = (raw: unknown): ReadonlyArray<ChannelInput> => {
 		channels.push({
 			kind,
 			value,
-			verification: typeof verification === 'string' ? verification : undefined,
+			verification:
+				typeof verification === 'string' && isVerificationVerdict(verification)
+					? verification
+					: undefined,
 			confidence: typeof confidence === 'number' ? confidence : undefined,
 			is_primary: typeof isPrimary === 'boolean' ? isPrimary : undefined,
 		})
@@ -359,23 +371,6 @@ const setProposalStatus = (
 			updated_at = now()
 		WHERE id = ${runId} AND organization_id = ${orgId}
 	`
-
-// The Postgres error code (e.g. '22P02' bad-uuid, '23503' fk-violation) can sit a
-// couple of `cause` levels down inside a wrapped SqlError, so walk the chain
-// rather than reading only the top cause.
-const pgErrorCode = (error: unknown): string | undefined => {
-	let cursor: unknown = error
-	for (
-		let depth = 0;
-		depth < 6 && cursor != null && typeof cursor === 'object';
-		depth++
-	) {
-		const code = (cursor as { code?: unknown }).code
-		if (typeof code === 'string') return code
-		cursor = (cursor as { cause?: unknown }).cause
-	}
-	return undefined
-}
 
 // What an apply records about a company beyond the proposed values themselves:
 // where each value came from, and — when this company is the one the run was
