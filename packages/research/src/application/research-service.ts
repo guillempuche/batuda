@@ -31,6 +31,7 @@ import {
 	SNAPSHOT_COMPANY_FIELDS,
 	SNAPSHOT_CONTACT_FIELDS,
 } from '../domain/crm-vocabulary'
+import { SubjectUnavailable } from '../domain/errors'
 import type { ReasonCode, ResolvedPolicy } from '../domain/types'
 import { aboutPageCandidates } from './about-pages'
 import { canAffordAnotherRound, runAgentResearchLoop } from './agent-loop'
@@ -190,6 +191,22 @@ const decodeResearchPolicy = Schema.decodeUnknownEffect(ResearchPolicyRow)
 // counts as a failure worth recording.
 export const shouldMarkRunFailed = (cause: Cause.Cause<unknown>): boolean =>
 	!Cause.hasInterruptsOnly(cause)
+
+// What to write in the run's reason_code when the fiber ends badly. Most ways a
+// run can break say nothing a reader could act on, so they share one code; the
+// ones that do carry a reason name it, because "the company you asked about
+// could not be read" and "something went wrong" send a person to different
+// places.
+export const reasonCodeFor = (cause: Cause.Cause<unknown>): ReasonCode =>
+	cause.reasons.some(
+		reason =>
+			Cause.isFailReason(reason) &&
+			typeof reason.error === 'object' &&
+			reason.error !== null &&
+			(reason.error as { _tag?: unknown })._tag === 'SubjectUnavailable',
+	)
+		? 'subject_unavailable'
+		: 'internal_error'
 
 const sha256Hex = (input: string): string =>
 	createHash('sha256').update(input).digest('hex')
@@ -1547,7 +1564,51 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					})
 				})
 
+			// Which of the records a caller named are not this organization's to
+			// read. Record ids are not secret — they turn up in exports, old links
+			// and earlier answers — so naming one is not proof of being allowed it.
+			// The table name is chosen between two written-out statements rather
+			// than interpolated, the same way `attach` does it.
+			const subjectsNotOwned = (
+				organizationId: string,
+				subjects: ReadonlyArray<{ table: string; id: string }>,
+			) =>
+				Effect.gen(function* () {
+					const missing: Array<{ table: string; id: string }> = []
+					for (const s of subjects) {
+						// A record id is always a uuid. Anything else cannot name a row
+						// here, and handing it to a uuid column raises a cast error the
+						// caller would meet as a 500 rather than as "no such record".
+						if (!isValidUuid(s.id)) {
+							missing.push(s)
+							continue
+						}
+						const [row] =
+							s.table === 'companies'
+								? yield* sql<{ id: string }>`
+									SELECT id FROM companies
+									WHERE id = ${s.id}
+									  AND organization_id = ${organizationId}
+									  AND deleted_at IS NULL
+									LIMIT 1
+								`
+								: yield* sql<{ id: string }>`
+									SELECT id FROM contacts
+									WHERE id = ${s.id}
+									  AND organization_id = ${organizationId}
+									  AND deleted_at IS NULL
+									LIMIT 1
+								`
+						if (!row) missing.push(s)
+					}
+					return missing
+				})
+
+			// The run's own connection is not scoped to an organization, so every
+			// query here says which one it is reading for. Without that, an id from
+			// another organization reads back that organization's row.
 			const snapshotSubjects = (
+				organizationId: string,
 				subjects: Array<{ table: string; id: string }>,
 			) =>
 				Effect.gen(function* () {
@@ -1565,20 +1626,25 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								? sql`,
 										(SELECT ch.address FROM channels ch
 											WHERE ch.subject_table = 'companies' AND ch.subject_id = t.id
+												AND ch.organization_id = ${organizationId}
 												AND ch.channel = 'website'
 											ORDER BY ch.is_primary DESC LIMIT 1) AS website,
 										(SELECT ch.address FROM channels ch
 											WHERE ch.subject_table = 'companies' AND ch.subject_id = t.id
+												AND ch.organization_id = ${organizationId}
 												AND ch.channel = 'email'
 											ORDER BY ch.is_primary DESC LIMIT 1) AS email,
 										(SELECT ch.address FROM channels ch
 											WHERE ch.subject_table = 'companies' AND ch.subject_id = t.id
+												AND ch.organization_id = ${organizationId}
 												AND ch.channel = 'phone'
 											ORDER BY ch.is_primary DESC LIMIT 1) AS phone`
 								: sql``
 						const [row] = yield* sql`
 							SELECT t.*, t.version${reachable} FROM ${sql(s.table)} t
-							WHERE t.id = ${s.id} AND t.deleted_at IS NULL
+							WHERE t.id = ${s.id}
+								AND t.organization_id = ${organizationId}
+								AND t.deleted_at IS NULL
 							LIMIT 1
 						`
 						if (row) {
@@ -1924,6 +1990,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 
 			// ── Core: run a single research fiber ──
 
+			// Runs on the service's own connection, outside any request, so nothing
+			// has told the database which organization this is for. Anything here
+			// that reads a company, a contact or their channels has to say so
+			// itself — `AND organization_id = …`, taken off the run row. The rest of
+			// what this reads is keyed on the run's own id, which belongs to one
+			// organization already and never comes from a caller.
 			const runFiber = (researchId: string, userId: string) =>
 				Effect.gen(function* () {
 					// Claim the run: proceed only if it is still queued. The consumer
@@ -2013,10 +2085,27 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						)
 					})
 
-					// Snapshot subjects if anchored
-					const subjects = context?.subjects
-						? yield* snapshotSubjects(context.subjects)
-						: []
+					// Snapshot subjects if anchored. A subject that does not read back
+					// stops the run rather than leaving it to carry on unanchored: the
+					// snapshot is what tells the run which company it was asked about,
+					// so without it the run would search on the free text alone and
+					// report the result as though the record had been read.
+					const askedSubjects = context?.subjects ?? []
+					const subjects =
+						askedSubjects.length > 0
+							? yield* snapshotSubjects(
+									(run as { organizationId: string }).organizationId,
+									askedSubjects,
+								)
+							: []
+					if (subjects.length !== askedSubjects.length) {
+						const read = new Set(subjects.map(s => `${s.table}:${s.id}`))
+						return yield* new SubjectUnavailable({
+							subjects: askedSubjects.filter(
+								s => !read.has(`${s.table}:${s.id}`),
+							),
+						})
+					}
 
 					// The keys that prove the fetched evidence is about the requested
 					// company (its name or its own domain). A scan or freeform run with
@@ -3699,17 +3788,19 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									// lookup by tax id or a different spelling is a different
 									// purchase, so the register costs a small, limit-capped handful
 									// per run.
-									const paid = yield* budget.chargePaid(
+									const looked = yield* budget.withPaidCharge(
 										'registry',
 										REGISTRY_LOOKUP_COST_CENTS,
 										'registry_lookup',
 										`${researchId}:registry:${registryCountry}:${registryQuery}`,
+									)(() =>
+										registry.lookup({
+											country: registryCountry,
+											query: registryQuery,
+										}),
 									)
-									if (!paid) return
-									const record = yield* registry.lookup({
-										country: registryCountry,
-										query: registryQuery,
-									})
+									if (looked._tag === 'already_charged') return
+									const record = looked.value
 									const hash = urlHashForScrape(record.sourceUrl)
 									// A record read from a national register sits in `sources`
 									// alongside the fetched pages, so a value taken from it grounds
@@ -4714,7 +4805,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								const [failedRun] = yield* sql<{ id: string }>`
 									UPDATE research_runs
 									SET status = 'failed',
-										reason_code = ${'internal_error' satisfies ReasonCode},
+										reason_code = ${reasonCodeFor(cause)},
 										findings = ${JSON.stringify({ error: detail })},
 										completed_at = now(),
 										updated_at = now()
@@ -4853,6 +4944,29 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								has_selector: !!input.context?.selector,
 							}),
 						)
+
+						// A run pinned to a record only makes sense if the record is
+						// this organization's. Checked before the cache is consulted,
+						// because a cache hit links the same subjects to a new run and
+						// would carry a foreign id through untouched. Refused rather
+						// than returned as a result, so a caller cannot read past it:
+						// every other way out of here starts a run.
+						const asked = input.context?.subjects ?? []
+						if (asked.length > 0) {
+							const missing = yield* subjectsNotOwned(organizationId, asked)
+							if (missing.length > 0) {
+								yield* Effect.logWarning(
+									'research.create.subject_unavailable',
+								).pipe(
+									Effect.annotateLogs({
+										user_id: userId,
+										organization_id: organizationId,
+										missing_count: missing.length,
+									}),
+								)
+								return yield* new SubjectUnavailable({ subjects: missing })
+							}
+						}
 
 						// ── Outer research-run cache check ──
 						// Identical (user, query, schema, subjects, hints, templates)
@@ -5560,6 +5674,29 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							origin.context != null && typeof origin.context === 'object'
 								? (origin.context as Record<string, unknown>)
 								: {}
+
+						// The origin's subjects are carried into the new run as they were
+						// stored, so they are checked again here rather than trusted. A run
+						// created before subjects were checked at all, or one whose company
+						// has since been deleted, must not become runnable by re-running it.
+						const originSubjects = Array.isArray(originContext['subjects'])
+							? (originContext['subjects'] as ReadonlyArray<unknown>).filter(
+									(s): s is { table: string; id: string } =>
+										typeof s === 'object' &&
+										s !== null &&
+										typeof (s as { table?: unknown }).table === 'string' &&
+										typeof (s as { id?: unknown }).id === 'string',
+								)
+							: []
+						if (originSubjects.length > 0) {
+							const missing = yield* subjectsNotOwned(
+								organizationId,
+								originSubjects,
+							)
+							if (missing.length > 0)
+								return yield* new SubjectUnavailable({ subjects: missing })
+						}
+
 						const mergedContext: Record<string, unknown> = {
 							...originContext,
 							anchorDomain: host,
@@ -5691,6 +5828,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									// rather than a column, so it is read from there. A company
 									// with none simply yields no domain, which the discovery
 									// call now accepts.
+									// The subject id comes off the run's stored context, so it
+									// is named by whoever asked for the run rather than looked
+									// up here. It is read for this run's own organization —
+									// the same rule the fiber follows — so a stored id from
+									// somewhere else reads as no company at all.
 									const [row] = yield* sql<{
 										name: string | null
 										website: string | null
@@ -5698,10 +5840,13 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										SELECT c.name,
 											(SELECT ch.address FROM channels ch
 												WHERE ch.subject_table = 'companies' AND ch.subject_id = c.id
+													AND ch.organization_id = ${origin.organizationId}
 													AND ch.channel = 'website'
 												ORDER BY ch.is_primary DESC LIMIT 1) AS website
 										FROM companies c
-										WHERE c.id = ${subject.id} AND c.deleted_at IS NULL
+										WHERE c.id = ${subject.id}
+											AND c.organization_id = ${origin.organizationId}
+											AND c.deleted_at IS NULL
 										LIMIT 1
 									`
 									const domain = row?.website

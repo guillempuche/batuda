@@ -569,21 +569,27 @@ export const CompanyResearchPrompt = McpServer.prompt({
 })
 ```
 
-### Elicitation
+### Asking a person before acting
 
-Tool handlers can request user confirmation for destructive operations via `McpServer.elicit()`:
+A tool that spends money, writes to somebody's records, or cannot be undone asks first, through `requireApproval` in `apps/server/src/mcp/tools/_elicit.ts`. It answers one of three things, and the third is the one that matters: **`unaskable` is not a no.**
 
 ```typescript
 publish_page: ({ id }) => Effect.gen(function* () {
   const page = yield* service.getById(id)
-  const { confirm } = yield* McpServer.elicit({
-    message: `Publish "${page.title}"? This makes it publicly visible.`,
-    schema: Schema.Struct({ confirm: Schema.Literals(['yes', 'no']) }),
-  }).pipe(Effect.catchTag('ElicitationDeclined', () => Effect.succeed({ confirm: 'no' as const })))
-  if (confirm === 'no') return { status: 'cancelled' }
+  const answer = yield* requireApproval(
+    `Publish "${page.title}"? This makes it publicly visible.`,
+  )
+  if (answer === 'unaskable')
+    return { status: 'cancelled', reason: 'this client cannot ask anyone; publish it from the app instead' }
+  if (answer === 'declined')
+    return { status: 'cancelled', reason: 'the answer was no' }
   return yield* service.publish(id)
 }).pipe(Effect.orDie),
 ```
+
+The tool must list `McpSchema.McpServerClient` in its `dependencies`, and its `success` schema must be able to carry the refusal — a closed `Schema.Struct` cannot, and the refusal then fails to encode.
+
+Two things not to do. Do not call `McpServer.elicit()` without asking `canElicit` first: a client that cannot show a question answers the request with a refusal, and reading that as "the person said no" reports a decision nobody made. Neither Claude.ai nor ChatGPT can show one today, so on those clients every such question used to answer itself. And do not use `Tool.make`'s `needsApproval` field — Effect reads it only in its AI client loop, never in the MCP server, so a tool declaring it runs anyway while its description promises otherwise. A test in `_annotations.test.ts` fails if one reappears.
 
 ### Auth on behalf of user (CurrentUser)
 

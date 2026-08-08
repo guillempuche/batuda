@@ -32,6 +32,22 @@ export class BudgetExceeded extends Schema.TaggedErrorClass<BudgetExceeded>()(
 	},
 ) {}
 
+/**
+ * A run named a company or contact it cannot read — it belongs to another
+ * organization, or it was deleted between the run being asked for and the run
+ * starting. Terminal: the record it was pinned to is what grounds the whole
+ * run, so carrying on would research whatever the free text alone suggests
+ * and report it as if the record had been read.
+ */
+export class SubjectUnavailable extends Schema.TaggedErrorClass<SubjectUnavailable>()(
+	'SubjectUnavailable',
+	{
+		subjects: Schema.Array(
+			Schema.Struct({ table: Schema.String, id: Schema.String }),
+		),
+	},
+) {}
+
 /** Per-user monthly paid spend cap exceeded. Terminal for the run. */
 export class MonthlyCapExceeded extends Schema.TaggedErrorClass<MonthlyCapExceeded>()(
 	'MonthlyCapExceeded',

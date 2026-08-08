@@ -186,6 +186,113 @@ export const makeBudgetLayer = (config: BudgetConfig) =>
 				remaining: config.policy.paidBudgetCents,
 			})
 
+			// Give this run back the room it set aside for a call that did not
+			// happen. This is the run's own allowance — how much more work it may
+			// do — and is not the same thing as the record of money that may have
+			// left the building, which lives in the paid-spend ledger and is left
+			// alone: the vendor may well have billed for a call that failed on the
+			// way back, and a run's allowance is not the place to guess about that.
+			const releaseRunAllowance = (cents: number) =>
+				Ref.update(paidRef, s => ({
+					...s,
+					spent: s.spent - cents,
+					remaining: s.remaining + cents,
+				}))
+
+			// Named rather than written straight into the service object, so
+			// withPaidCharge below can pay through exactly the same path instead of
+			// keeping a second copy of the rules.
+			const chargePaidImpl = (
+				provider: string,
+				cents: number,
+				tool: string,
+				idempotencyKey: string,
+			) =>
+				Effect.gen(function* () {
+					// Set the money aside in one indivisible step that also decides both
+					// refusals. Several paid tool calls can run at once, so deciding and
+					// then deducting as two steps lets two of them clear the same limit
+					// and both spend past it — which holds for the approval limit too.
+					//
+					// Stopping at the auto-approve limit hands back an approval gate the
+					// agent surfaces as a pending paid action for the user to approve,
+					// rather than charging. Only when enforced (the in-run agent
+					// budget) — the standalone tool gates interactively and an approved
+					// follow-up must charge.
+					const reservation = yield* Ref.modify(
+						paidRef,
+						(s): readonly [PaidReservation, TierState] => {
+							if (s.remaining < cents)
+								return [
+									{ _tag: 'exceeded' as const, remaining: s.remaining },
+									s,
+								]
+							if (
+								config.enforceAutoApprove &&
+								s.spent + cents > config.policy.autoApprovePaidCents
+							)
+								return [{ _tag: 'approval' as const }, s]
+							return [
+								{ _tag: 'reserved' as const },
+								{
+									...s,
+									spent: s.spent + cents,
+									remaining: s.remaining - cents,
+								},
+							]
+						},
+					)
+					if (reservation._tag === 'exceeded')
+						return yield* new BudgetExceeded({
+							tier: 'paid-run',
+							needed: cents,
+							remaining: reservation.remaining,
+						})
+					if (reservation._tag === 'approval')
+						return yield* new ApprovalRequired({
+							tool,
+							estimatedCents: cents,
+						})
+
+					// Hand the money back when the charge does not land: the cap refused
+					// it, the database failed, or the run was cancelled mid-charge — an
+					// interrupted charge must not leave the run looking as if it spent.
+					const release = releaseRunAllowance(cents)
+
+					const charged = yield* chargeWithinCap({
+						sql,
+						organizationId: config.organizationId,
+						userId: config.userId,
+						cents,
+						researchId: config.researchId,
+						provider,
+						// The calling tool's name, so a spend breakdown by tool is real.
+						tool,
+						idempotencyKey,
+						args: {},
+						autoApproved: true,
+						defaultCapCents: config.defaultCapCents,
+						systemCeiling: config.systemCeiling,
+					}).pipe(
+						Effect.onExit(exit =>
+							Exit.isSuccess(exit) ? Effect.void : release,
+						),
+					)
+
+					// A repeat of a call this run already paid for is a no-op in the
+					// record, so give the reserved money back rather than counting the
+					// same charge twice — and tell the caller, so it does not buy the
+					// same answer from the vendor a second time.
+					if (!charged) yield* release
+					return charged
+				}).pipe(
+					Effect.tap(() =>
+						Effect.logDebug('budget.chargePaid').pipe(
+							Effect.annotateLogs({ provider, tool, cents }),
+						),
+					),
+				)
+
 			return Budget.of({
 				chargeCheap: (provider: string, cents: number) =>
 					// Check and deduct in one indivisible step. Several tool calls run at
@@ -219,100 +326,35 @@ export const makeBudgetLayer = (config: BudgetConfig) =>
 						),
 					),
 
-				chargePaid: (
-					provider: string,
-					cents: number,
-					tool: string,
-					idempotencyKey: string,
-				) =>
-					Effect.gen(function* () {
-						// Set the money aside in one indivisible step that also decides both
-						// refusals. Several paid tool calls can run at once, so deciding and
-						// then deducting as two steps lets two of them clear the same limit
-						// and both spend past it — which holds for the approval limit too.
-						//
-						// Stopping at the auto-approve limit hands back an approval gate the
-						// agent surfaces as a pending paid action for the user to approve,
-						// rather than charging. Only when enforced (the in-run agent
-						// budget) — the standalone tool gates interactively and an approved
-						// follow-up must charge.
-						const reservation = yield* Ref.modify(
-							paidRef,
-							(s): readonly [PaidReservation, TierState] => {
-								if (s.remaining < cents)
-									return [
-										{ _tag: 'exceeded' as const, remaining: s.remaining },
-										s,
-									]
-								if (
-									config.enforceAutoApprove &&
-									s.spent + cents > config.policy.autoApprovePaidCents
-								)
-									return [{ _tag: 'approval' as const }, s]
-								return [
-									{ _tag: 'reserved' as const },
-									{
-										...s,
-										spent: s.spent + cents,
-										remaining: s.remaining - cents,
-									},
-								]
-							},
-						)
-						if (reservation._tag === 'exceeded')
-							return yield* new BudgetExceeded({
-								tier: 'paid-run',
-								needed: cents,
-								remaining: reservation.remaining,
-							})
-						if (reservation._tag === 'approval')
-							return yield* new ApprovalRequired({
+				chargePaid: chargePaidImpl,
+
+				withPaidCharge:
+					(
+						provider: string,
+						cents: number,
+						tool: string,
+						idempotencyKey: string,
+					) =>
+					<A, E, R>(vendorCall: () => Effect.Effect<A, E, R>) =>
+						Effect.gen(function* () {
+							const charged = yield* chargePaidImpl(
+								provider,
+								cents,
 								tool,
-								estimatedCents: cents,
-							})
-
-						// Hand the money back when the charge does not land: the cap refused
-						// it, the database failed, or the run was cancelled mid-charge — an
-						// interrupted charge must not leave the run looking as if it spent.
-						const release = Ref.update(paidRef, s => ({
-							...s,
-							spent: s.spent - cents,
-							remaining: s.remaining + cents,
-						}))
-
-						const charged = yield* chargeWithinCap({
-							sql,
-							organizationId: config.organizationId,
-							userId: config.userId,
-							cents,
-							researchId: config.researchId,
-							provider,
-							// The calling tool's name, so a spend breakdown by tool is real.
-							tool,
-							idempotencyKey,
-							args: {},
-							autoApproved: true,
-							defaultCapCents: config.defaultCapCents,
-							systemCeiling: config.systemCeiling,
-						}).pipe(
-							Effect.onExit(exit =>
-								Exit.isSuccess(exit) ? Effect.void : release,
-							),
-						)
-
-						// A repeat of a call this run already paid for is a no-op in the
-						// record, so give the reserved money back rather than counting the
-						// same charge twice — and tell the caller, so it does not buy the
-						// same answer from the vendor a second time.
-						if (!charged) yield* release
-						return charged
-					}).pipe(
-						Effect.tap(() =>
-							Effect.logDebug('budget.chargePaid').pipe(
-								Effect.annotateLogs({ provider, tool, cents }),
-							),
-						),
-					),
+								idempotencyKey,
+							)
+							// Already paid for in this run: the answer is somewhere the
+							// caller already has, and calling again would buy it twice.
+							if (!charged) return { _tag: 'already_charged' as const }
+							const value = yield* Effect.suspend(vendorCall).pipe(
+								Effect.onExit(exit =>
+									Exit.isSuccess(exit)
+										? Effect.void
+										: releaseRunAllowance(cents),
+								),
+							)
+							return { _tag: 'bought' as const, value }
+						}),
 
 				snapshot: () =>
 					Effect.gen(function* () {

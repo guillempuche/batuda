@@ -5670,6 +5670,10 @@ msgstr "The changes could not be applied."
 msgid "The company could not be fetched. Check that the session is valid, then try again."
 msgstr "The company could not be fetched. Check that the session is valid, then try again."
 
+#: src/components/research/run-detail.tsx
+msgid "The company this research was pinned to isn't here any more, so I stopped rather than research the wrong one."
+msgstr "The company this research was pinned to isn't here any more, so I stopped rather than research the wrong one."
+
 #: src/routes/pages/$id.tsx
 msgid "The content arrived in a form the editor cannot read, so there is nothing to edit. Go back to the list and open the page again; report it if it keeps happening."
 msgstr "The content arrived in a form the editor cannot read, so there is nothing to edit. Go back to the list and open the page again; report it if it keeps happening."

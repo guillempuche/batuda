@@ -18,6 +18,11 @@ import type { VerificationVerdict } from '@batuda/domain'
 import { decidesPurchase } from '@batuda/domain'
 
 import { isRegistryCountry, type RegistryCountry } from '../domain/country'
+import type {
+	ApprovalRequired,
+	BudgetExceeded,
+	MonthlyCapExceeded,
+} from '../domain/errors'
 import { EnrichmentResult } from '../domain/types'
 import { makeBudgetLayer } from './budget'
 import { guessEmails, splitPersonName } from './email-guess'
@@ -31,8 +36,15 @@ import {
 	type EnrichmentInput,
 	type EnrichmentMode,
 	MxResolver,
+	type PaidCall,
 	RegistryRouter,
 } from './ports'
+import {
+	ENRICH_COST_CENTS,
+	FULLENRICH_COST_CENTS,
+	REGISTRY_LOOKUP_COST_CENTS,
+	VERIFY_COST_CENTS,
+} from './tool-costs'
 
 // A person from either name source (registry directors or the enrichment
 // vendor). Registry directors arrive with just a name + role; enrichment adds
@@ -85,6 +97,10 @@ export const dedupePeople = (
  * mode, where the vendors are alternatives, a refusal only counts when nobody
  * answered; in union mode they are additive, so a refusal always cost recall.
  */
+// What paying for a vendor call can go wrong with: the run is out of money, the
+// company's month is spent, or the amount needs somebody's approval first.
+type PaidRail = BudgetExceeded | MonthlyCapExceeded | ApprovalRequired
+
 export interface EnrichmentChainOutcome {
 	readonly people: ReadonlyArray<SourcePerson>
 	/** A vendor's paid allowance is spent, and that is why people are missing. */
@@ -102,42 +118,52 @@ export interface EnrichmentChainOutcome {
 // the next vendor is still tried. Generic over the charge's error so the budget
 // rails propagate unchanged.
 
-export const runEnrichmentChain = <E>(
+export const runEnrichmentChain = (
 	chain: {
 		readonly attempts: ReadonlyArray<EnrichmentAttempt>
 		readonly mode: EnrichmentMode
 	},
 	input: EnrichmentInput,
-	charge: (label: string) => Effect.Effect<boolean, E>,
-): Effect.Effect<EnrichmentChainOutcome, E> =>
+	// Pays for the vendor and calls it in one step, so a vendor that fails hands
+	// this run's allowance back and the vendor after it still has room to be
+	// tried. `already_charged` means this run paid for that vendor before, in
+	// which case the vendor is not called again — the answer would be bought a
+	// second time for real money that this run's record deliberately will not
+	// count twice.
+	buy: (
+		label: string,
+	) => <A>(
+		call: () => Effect.Effect<A>,
+	) => Effect.Effect<PaidCall<A>, PaidRail>,
+): Effect.Effect<EnrichmentChainOutcome, PaidRail> =>
 	Effect.gen(function* () {
 		const collected: SourcePerson[] = []
 		let quotaExhausted = false
 		let vendorFailed = false
 		let alreadyPaid = false
 		for (const attempt of chain.attempts) {
-			// The charge says whether this vendor has already been paid for this
-			// company in this run — which happens when a run is resumed after a
-			// deploy. Calling it again would buy the same answer a second time, so
-			// the call is skipped and the shortfall reported instead.
-			if (!(yield* charge(attempt.label))) {
+			// A vendor already paid for in this run — which happens when a run is
+			// resumed after a deploy — is not called again, and the shortfall is
+			// reported instead.
+			const outcome = yield* buy(attempt.label)(() =>
+				attempt.findPeople(input).pipe(
+					// A vendor that could not answer is remembered, not just swallowed.
+					// "Nobody works here" and "we are out of credit" produce the same
+					// empty list, and only one of them is an answer about the company.
+					Effect.catchTag('ProviderError', error =>
+						Effect.sync(() => {
+							if (error.quotaExhausted === true) quotaExhausted = true
+							else vendorFailed = true
+							return new EnrichmentResult({ people: [], units: 0 })
+						}),
+					),
+				),
+			)
+			if (outcome._tag === 'already_charged') {
 				alreadyPaid = true
 				continue
 			}
-			const found = yield* attempt.findPeople(input).pipe(
-				// A vendor that could not answer is remembered, not just swallowed.
-				// "Nobody works here" and "we are out of credit" produce the same empty
-				// list, and only one of them is an answer about the company.
-				Effect.catchTag('ProviderError', error =>
-					Effect.sync(() => {
-						if (error.quotaExhausted === true) quotaExhausted = true
-						else vendorFailed = true
-						return new EnrichmentResult({ people: [], units: 0 })
-					}),
-				),
-				Effect.map(r => r.people),
-			)
-			collected.push(...found)
+			collected.push(...outcome.value.people)
 			if (chain.mode === 'fallback' && collected.length > 0) break
 		}
 		// In fallback mode the vendors are alternatives, so a refusal only cost us
@@ -160,14 +186,6 @@ const registryCountry = (
 	return upper && isRegistryCountry(upper) ? upper : undefined
 }
 
-// Fixed per-call cost estimates (cents). Hunter/FullEnrich are credit-based;
-// these meter the run budget + monthly cap without mirroring exact credit
-// pricing. Kept per-vendor so the spend row (and the eval's cost metric) names
-// the finder that actually ran.
-const ENRICH_COST_CENTS = 5
-const FULLENRICH_COST_CENTS = 6
-const VERIFY_COST_CENTS = 1
-
 const ENRICH_COST_BY_VENDOR: Record<string, number> = {
 	hunter: ENRICH_COST_CENTS,
 	fullenrich: FULLENRICH_COST_CENTS,
@@ -183,17 +201,28 @@ const enrichCostFor = (label: string): number =>
  * guessed address checked. Without a ceiling the spend follows the company's board
  * size, which is nobody's intention and nothing the caller was quoted.
  */
-const MAX_VERIFICATIONS = 10
+export const MAX_VERIFICATIONS = 10
 
 /**
- * Rough up-front cost the MCP handler compares to its auto-approve threshold.
- * Worst case: both paid finders run (a registry miss, or union mode) and every
- * verification allowed is spent — so a real run never costs more than the
- * confirm-gate saw. The ceiling below is what makes that true rather than hopeful.
+ * The most one call can spend, for the gate that asks a person before it does.
+ *
+ * Worked out per request rather than as one figure for every company, because
+ * what a call can reach differs: a country with a national register pays for
+ * that lookup and one without cannot, and a company with no website never
+ * reaches the paid finders at all, since every one of them is keyed on the
+ * domain. Quoting a flat figure asks somebody to approve money that could not
+ * be spent, and hides the register's price behind an answer that never named it.
+ *
+ * A real call usually costs less: a register hit skips the finders, and
+ * `fallback` mode stops at the first vendor that finds anybody. The ceiling on
+ * verifications is what keeps this a ceiling rather than a hope.
  */
-export const estimateDiscoverCostCents =
-	ENRICH_COST_CENTS +
-	FULLENRICH_COST_CENTS +
+export const estimateDiscoverCostCents = (input: {
+	readonly country?: string | undefined
+	readonly domain: string | null
+}): number =>
+	(registryCountry(input.country) ? REGISTRY_LOOKUP_COST_CENTS : 0) +
+	(input.domain === null ? 0 : ENRICH_COST_CENTS + FULLENRICH_COST_CENTS) +
 	MAX_VERIFICATIONS * VERIFY_COST_CENTS
 
 // Lower is better — deliverable first, undeliverable last (and then dropped).
@@ -457,19 +486,39 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 						const countryWithRegistry = registryCountry(input.country)
 						let people: ReadonlyArray<SourcePerson> = []
 						if (countryWithRegistry) {
-							const record = yield* registry
-								.lookup({
-									country: countryWithRegistry,
-									query: input.companyName,
-								})
-								.pipe(
-									// Registry is best-effort here; any miss (provider failure
-									// or a country with no registry) falls through to enrichment.
-									Effect.catchTags({
-										ProviderError: () => Effect.succeed(null),
-										NoRegistry: () => Effect.succeed(null),
-									}),
-								)
+							// The register bills per lookup, the same as it does for the
+							// agent's own registry_lookup tool. Left uncharged, a discovery
+							// spent real money that neither the run's budget nor the
+							// month's total ever saw.
+							const looked = yield* budget.withPaidCharge(
+								'registry',
+								REGISTRY_LOOKUP_COST_CENTS,
+								'discover_contacts',
+								`${researchId}:registry:${countryWithRegistry}:${input.companyName}`,
+							)(() =>
+								registry
+									.lookup({
+										country: countryWithRegistry,
+										query: input.companyName,
+									})
+									.pipe(
+										// Registry is best-effort here; any miss (provider failure
+										// or a country with no registry) falls through to enrichment.
+										Effect.catchTags({
+											ProviderError: () => Effect.succeed(null),
+											NoRegistry: () => Effect.succeed(null),
+										}),
+									),
+							)
+							// Already paid for on an earlier attempt at this run, which is
+							// what a resume after a deploy looks like. The register is not
+							// asked again — it bills per call, and this run's record of
+							// what it spent deliberately will not count the same key twice,
+							// so a second call would be money nothing recorded. The cost is
+							// that the paid finders below are reached instead, which is
+							// dearer than the register would have been.
+							const record =
+								looked._tag === 'already_charged' ? null : looked.value
 							people = (record?.directors ?? []).map(d => {
 								const { firstName, lastName } = splitPersonName(d.name)
 								return { firstName, lastName, position: d.role }
@@ -495,7 +544,7 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 									country: input.country,
 								},
 								label =>
-									budget.chargePaid(
+									budget.withPaidCharge(
 										`${label}-enrich`,
 										enrichCostFor(label),
 										'discover_contacts',
@@ -525,20 +574,20 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 								// costs real money for nothing, so the check is skipped. The
 								// verdict is left unknown, which for a guessed address means
 								// it is dropped rather than asserted on a check we did not do.
-								const fresh = yield* budget.chargePaid(
+								const checked = yield* budget.withPaidCharge(
 									'hunter-verify',
 									VERIFY_COST_CENTS,
 									'discover_contacts',
 									`${researchId}:hunter-verify:${email}`,
-								)
-								if (!fresh) {
+								)(() => verifier.verify({ email }))
+								if (checked._tag === 'already_charged') {
 									yield* Ref.set(verifierAlreadyPaid, true)
 									return {
 										verdict: 'unknown' as VerificationVerdict,
 										confidence: undefined as number | undefined,
 									}
 								}
-								const v = yield* verifier.verify({ email })
+								const v = checked.value
 								return {
 									verdict: v.result,
 									confidence: v.score as number | undefined,

@@ -2,7 +2,7 @@ import { Effect, Layer } from 'effect'
 import { McpSchema } from 'effect/unstable/ai'
 import { describe, expect, it } from 'vitest'
 
-import { canElicit } from './_elicit'
+import { canElicit, requireApproval } from './_elicit'
 
 // A client on the other end of the connection, described the way it described
 // itself when it opened one. Only the capabilities matter here, so the rest of
@@ -56,6 +56,72 @@ describe('canElicit', () => {
 			// WHEN asking whether a question can be put
 			// THEN it cannot
 			expect(await ask({})).toBe(false)
+		})
+	})
+})
+
+// A client that can be asked, and answers the way the argument says. Only the
+// one call a question makes is built; anything else is a bug in the test.
+const clientAnswering = (
+	answer: { action: 'accept'; content: unknown } | { action: 'decline' },
+) =>
+	Layer.succeed(McpSchema.McpServerClient, {
+		clientId: 1,
+		initializePayload: { capabilities: { elicitation: {} } },
+		getClient: Effect.succeed({
+			'elicitation/create': () => Effect.succeed(answer),
+		}),
+	} as never)
+
+const askFor = (layer: Layer.Layer<McpSchema.McpServerClient>) =>
+	Effect.runPromise(
+		requireApproval('Do the thing?').pipe(Effect.provide(layer)),
+	)
+
+describe('requireApproval', () => {
+	describe('when somebody is asked and agrees', () => {
+		it('should report that they confirmed it', async () => {
+			// GIVEN a client that can put the question, whose person answers yes
+			// WHEN approval is asked for
+			// THEN the caller is cleared to act
+			expect(
+				await askFor(
+					clientAnswering({ action: 'accept', content: { confirm: 'yes' } }),
+				),
+			).toBe('confirmed')
+		})
+	})
+
+	describe('when somebody is asked and says no', () => {
+		it('should report a decision, not a missing one', async () => {
+			// GIVEN the same client, whose person answers no
+			// WHEN approval is asked for
+			// THEN it is a decision — the caller must not retry or route around it
+			expect(
+				await askFor(
+					clientAnswering({ action: 'accept', content: { confirm: 'no' } }),
+				),
+			).toBe('declined')
+		})
+
+		it('should treat dismissing the question as a no', async () => {
+			// GIVEN a client whose person closed the question without answering
+			// WHEN approval is asked for
+			// THEN nothing was agreed to, so nothing may happen
+			expect(await askFor(clientAnswering({ action: 'decline' }))).toBe(
+				'declined',
+			)
+		})
+	})
+
+	describe('when there is nobody to ask', () => {
+		it('should say so rather than reporting a refusal nobody gave', async () => {
+			// GIVEN a client that never named the capability — which is what both
+			// of the clients people actually use do
+			// WHEN approval is asked for
+			// THEN the caller is told there was nobody to ask, so it can point the
+			// person somewhere they can decide instead of claiming they said no
+			expect(await askFor(clientSaying({ sampling: {} }))).toBe('unaskable')
 		})
 	})
 })

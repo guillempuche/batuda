@@ -1,12 +1,12 @@
 import { Effect, Schema } from 'effect'
-import { McpSchema, McpServer, Tool, Toolkit } from 'effect/unstable/ai'
+import { McpSchema, Tool, Toolkit } from 'effect/unstable/ai'
 
 import { CurrentOrg, PageSummary } from '@batuda/controllers'
 import { Page } from '@batuda/domain'
 import { BlockNode, TiptapDocument } from '@batuda/ui/blocks'
 
 import { PageService } from '../../services/pages'
-import { canElicit } from './_elicit'
+import { requireApproval } from './_elicit'
 import { McpPageLimit, McpPageOffset, PageResult, toPage } from './_result'
 
 // `publish_page` returns the published page, or a cancelled marker saying why
@@ -155,23 +155,16 @@ export const PageHandlersLive = PageTools.toLayer(
 					// Making a page public is not something to do unasked, so a client
 					// that cannot put the question stops here — and says that is why,
 					// rather than reporting a refusal nobody gave.
-					if (!(yield* canElicit))
+					const answer = yield* requireApproval(
+						`Publish page "${page['title']}" (${page['slug']}/${page['lang']})? This makes it publicly visible.`,
+					)
+					if (answer === 'unaskable')
 						return {
 							status: 'cancelled' as const,
 							reason:
 								'this client cannot ask anyone to confirm making the page public; publish it from the app instead',
 						}
-					const { confirm } = yield* McpServer.elicit({
-						message: `Publish page "${page['title']}" (${page['slug']}/${page['lang']})? This makes it publicly visible.`,
-						schema: Schema.Struct({
-							confirm: Schema.Literals(['yes', 'no']),
-						}),
-					}).pipe(
-						Effect.catchTag('ElicitationDeclined', () =>
-							Effect.succeed({ confirm: 'no' as const }),
-						),
-					)
-					if (confirm === 'no')
+					if (answer === 'declined')
 						return {
 							status: 'cancelled' as const,
 							reason: 'the page was not published because the answer was no',

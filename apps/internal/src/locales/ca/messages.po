@@ -5670,6 +5670,10 @@ msgstr "No s'han pogut aplicar els canvis."
 msgid "The company could not be fetched. Check that the session is valid, then try again."
 msgstr "No s'ha pogut carregar l'empresa. Comprova que la sessió sigui vàlida i torna-ho a provar."
 
+#: src/components/research/run-detail.tsx
+msgid "The company this research was pinned to isn't here any more, so I stopped rather than research the wrong one."
+msgstr "L'empresa a què estava lligada aquesta recerca ja no hi és, així que m'he aturat en comptes d'investigar-ne una altra."
+
 #: src/routes/pages/$id.tsx
 msgid "The content arrived in a form the editor cannot read, so there is nothing to edit. Go back to the list and open the page again; report it if it keeps happening."
 msgstr "El contingut ha arribat en un format que l'editor no pot llegir, així que no hi ha res per editar. Torna a la llista i obre la pàgina de nou; informa-ho si continua passant."

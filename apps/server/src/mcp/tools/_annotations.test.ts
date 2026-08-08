@@ -82,6 +82,22 @@ const IDEMPOTENT_NAME =
 // work is what removes it.
 const KNOWN_NESTED_CHOICE = new Set(['log_interaction'])
 
+// Tools that ask a person before they act, because they spend money, write to
+// somebody's records, or cannot be undone. Listed by hand: what a handler does
+// is invisible to a walk over tool definitions, so this names the promise and
+// the rule below checks each one can still report a refusal.
+//
+// It is not the whole set of tools that ought to ask — several more act on the
+// world with no gate at all, and finding those is its own piece of work.
+const GATED_TOOLS = [
+	'delete_research',
+	'discover_contacts',
+	'publish_page',
+	'research_policy',
+	'resolve_research_paid_action',
+	'resolve_research_proposed_update',
+] as const
+
 // The published shape of a result, with "or nothing" peeled off. A read that
 // answers with nothing publishes a choice between its shape and null, and
 // reading the fields off that outer choice finds none — which would quietly
@@ -114,6 +130,62 @@ describe('MCP tool annotation coverage', () => {
 			)
 			expect(walked.length).toBe(new Set(walked).size)
 			expect(walked.length).toBeGreaterThanOrEqual(EXPECTED_TOOL_COUNT)
+		})
+
+		it('should let no tool declare an approval nothing reads', () => {
+			// GIVEN `needsApproval`, which Effect reads only in its AI client loop
+			// WHEN looking for it on the tools this MCP server publishes
+			// THEN none declares it — on this surface the field does nothing, so a
+			//      tool carrying it runs unasked while its description promises
+			//      otherwise. Ask with `requireApproval` in the handler instead.
+			const declaring = Object.values(TOOLKITS).flatMap(toolkit =>
+				Object.entries(toolkit.tools)
+					// Present on every tool and usually undefined — it is a declared
+					// value that matters, not the key.
+					.filter(
+						([, tool]) =>
+							(tool as { needsApproval?: unknown }).needsApproval !== undefined,
+					)
+					.map(([name]) => name),
+			)
+			expect(
+				declaring,
+				`${declaring.join(', ')} declare needsApproval, which this server never reads`,
+			).toEqual([])
+		})
+
+		it('should let a gated tool say it was not approved', () => {
+			// GIVEN the tools that ask a person before they act
+			// WHEN reading the shape each one promises to answer with
+			// THEN every one can carry a refusal. A closed success schema cannot,
+			//      so the refusal would fail to encode and the caller would meet a
+			//      crash where it should read "nobody approved this".
+			//
+			//      This checks the shape, not the asking — a static walk sees tool
+			//      definitions, never their handlers, so it cannot tell whether a
+			//      handler calls requireApproval. It keeps a gated tool able to
+			//      report a refusal; it does not discover an ungated one.
+			for (const name of GATED_TOOLS) {
+				const tool = Object.values(TOOLKITS)
+					.flatMap(toolkit => Object.entries(toolkit.tools))
+					.find(([toolName]) => toolName === name)?.[1]
+				expect(
+					tool,
+					`${name} is gated but no toolkit here publishes it`,
+				).toBeDefined()
+				const published = JSON.stringify(
+					Tool.getJsonSchemaFromSchema((tool as Tool.Any).successSchema),
+				)
+				// Either the tool names a refusal outright — `confirmation_required`
+				// where there was nobody to ask, `cancelled` where the answer was
+				// no — or its result is unconstrained and any shape fits.
+				expect(
+					published.includes('confirmation_required') ||
+						published.includes('cancelled') ||
+						published === '{}',
+					`${name} asks for approval but cannot answer that it did not get it`,
+				).toBe(true)
+			}
 		})
 
 		it('should exempt only tools that still exist', () => {

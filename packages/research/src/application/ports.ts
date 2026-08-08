@@ -271,6 +271,16 @@ export class ResearchEventSink extends Context.Service<
 
 // ── Budget ──
 
+/**
+ * What came of paying for a vendor call: the answer that was bought, or word
+ * that this run already paid for the same call and holds the answer somewhere
+ * — never a bare value, so a caller cannot spend twice by mistaking the second
+ * for the first.
+ */
+export type PaidCall<A> =
+	| { readonly _tag: 'bought'; readonly value: A }
+	| { readonly _tag: 'already_charged' }
+
 export interface BudgetService {
 	readonly chargeCheap: (
 		provider: string,
@@ -290,6 +300,31 @@ export interface BudgetService {
 	) => Effect.Effect<
 		boolean,
 		BudgetExceeded | MonthlyCapExceeded | ApprovalRequired
+	>
+	/**
+	 * Pay for one vendor call and make it, so the run is not left paying for an
+	 * answer it never got. A call that fails hands the run's own allowance back;
+	 * a repeat of one already paid for in this run comes back as
+	 * `already_charged` and the vendor is not called again.
+	 *
+	 * The call is passed as a function, not as a ready-made effect, so nothing
+	 * of it is built until the money is actually set aside.
+	 *
+	 * Prefer this to `chargePaid` wherever the vendor call is right there.
+	 * Charging and calling as two steps means nothing gives the money back when
+	 * the second one fails.
+	 */
+	readonly withPaidCharge: (
+		provider: string,
+		cents: number,
+		tool: string,
+		idempotencyKey: string,
+	) => <A, E, R>(
+		vendorCall: () => Effect.Effect<A, E, R>,
+	) => Effect.Effect<
+		PaidCall<A>,
+		E | BudgetExceeded | MonthlyCapExceeded | ApprovalRequired,
+		R
 	>
 	readonly snapshot: () => Effect.Effect<BudgetSnapshot>
 }

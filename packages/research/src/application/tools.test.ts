@@ -40,6 +40,11 @@ const stubBudget = Layer.succeed(Budget)(
 	Budget.of({
 		chargeCheap: () => Effect.void,
 		chargePaid: () => Effect.succeed(true),
+		withPaidCharge: () => call =>
+			Effect.map(Effect.suspend(call), value => ({
+				_tag: 'bought' as const,
+				value,
+			})),
 		snapshot: () =>
 			Effect.succeed({
 				cheapBudget: 1000,
@@ -1142,6 +1147,11 @@ describe('what a tool call charges the run', () => {
 						charged.push([provider, cents])
 					}),
 				chargePaid: () => Effect.succeed(true),
+				withPaidCharge: () => call =>
+					Effect.map(Effect.suspend(call), value => ({
+						_tag: 'bought' as const,
+						value,
+					})),
 				snapshot: () =>
 					Effect.succeed({
 						cheapBudget: 1000,
@@ -1217,6 +1227,9 @@ describe('looking the same company up twice in one run', () => {
 			Budget.of({
 				chargeCheap: () => Effect.void,
 				chargePaid: () => Effect.succeed(false),
+				// Already paid for in this run, so the vendor is never called.
+				withPaidCharge: () => () =>
+					Effect.succeed({ _tag: 'already_charged' as const }),
 				snapshot: () =>
 					Effect.succeed({
 						cheapBudget: 1000,
@@ -1275,5 +1288,84 @@ describe('looking the same company up twice in one run', () => {
 		expect(JSON.stringify(results[results.length - 1])).toContain(
 			'already_looked_up',
 		)
+	})
+})
+
+describe('looking up a country Batuda has no register for', () => {
+	// The register costs real money per lookup. A country with no adapter has
+	// nothing to look up in, so finding that out must not be something the run
+	// pays for.
+	it('should say so without charging for the answer', async () => {
+		// GIVEN a budget that records every paid charge, and a register that
+		// records every time it is asked
+		const charged: string[] = []
+		let asked = 0
+		const countingBudget = Layer.succeed(Budget)(
+			Budget.of({
+				chargeCheap: () => Effect.void,
+				chargePaid: provider =>
+					Effect.sync(() => {
+						charged.push(provider)
+						return true
+					}),
+				withPaidCharge: provider => call =>
+					Effect.gen(function* () {
+						charged.push(provider)
+						return {
+							_tag: 'bought' as const,
+							value: yield* Effect.suspend(call),
+						}
+					}),
+				snapshot: () =>
+					Effect.succeed({
+						cheapBudget: 1000,
+						cheapSpent: 0,
+						cheapRemaining: 1000,
+						paidBudget: 1000,
+						paidSpent: 0,
+						paidRemaining: 1000,
+					}),
+			}),
+		)
+		const ports = Layer.mergeAll(
+			Layer.succeed(RegistryRouter)(
+				RegistryRouter.of({
+					lookup: () => {
+						asked++
+						return Effect.die('a country with no register must not be asked')
+					},
+				}),
+			),
+			StubSearchProvider,
+			StubScrapeProvider,
+			countingBudget,
+			stubRunContext,
+			Layer.succeed(ContactDiscovery)({
+				discover: () =>
+					Effect.succeed({
+						status: 'no_reliable_contact' as const,
+						researchId: 'test-run',
+					}),
+			}),
+		)
+
+		// WHEN the tool is asked about a country with no national register
+		const results = await Effect.runPromise(
+			Effect.gen(function* () {
+				const toolkit = yield* researchToolkit
+				const stream = yield* toolkit.handle('registry_lookup', {
+					country: 'NL',
+					query: 'Acme BV',
+					tax_id: null,
+				})
+				return yield* Stream.runCollect(stream)
+			}).pipe(Effect.provide(researchToolkitLayer.pipe(Layer.provide(ports)))),
+		)
+
+		// THEN nothing was charged and nothing was asked — the model is simply
+		// told there is no register, so it can move on to another way
+		expect(charged).toEqual([])
+		expect(asked).toBe(0)
+		expect(JSON.stringify(results[results.length - 1])).toContain('no_registry')
 	})
 })
