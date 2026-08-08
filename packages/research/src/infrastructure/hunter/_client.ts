@@ -21,8 +21,9 @@ import {
 	HttpClientResponse,
 } from 'effect/unstable/http'
 
+import type { VerificationVerdict } from '@batuda/domain'
+
 import { ProviderError } from '../../domain/errors'
-import type { VerificationVerdict } from '../../domain/types'
 import { keyForSlot } from '../_config'
 import { hardenHttp } from '../_http-harden'
 

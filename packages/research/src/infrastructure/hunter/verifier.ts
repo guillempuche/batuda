@@ -8,8 +8,10 @@
 
 import { Effect, Schema } from 'effect'
 
+import type { VerificationVerdict } from '@batuda/domain'
+
 import { EmailVerifier, type EmailVerifyInput } from '../../application/ports'
-import { EmailVerification, type VerificationVerdict } from '../../domain/types'
+import { EmailVerification } from '../../domain/types'
 import {
 	HunterNullableBoolean,
 	HunterNullableNumber,

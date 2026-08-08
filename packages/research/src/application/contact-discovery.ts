@@ -14,10 +14,11 @@
 import { Config, Context, Effect, Layer, Ref } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
+import type { VerificationVerdict } from '@batuda/domain'
 import { decidesPurchase } from '@batuda/domain'
 
 import { isRegistryCountry, type RegistryCountry } from '../domain/country'
-import { EnrichmentResult, type VerificationVerdict } from '../domain/types'
+import { EnrichmentResult } from '../domain/types'
 import { makeBudgetLayer } from './budget'
 import { guessEmails, splitPersonName } from './email-guess'
 import { resolvePolicy, type SystemDefaults } from './policy'

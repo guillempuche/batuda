@@ -19,6 +19,8 @@ export {
 	TranscriptStatus,
 } from './call-recordings'
 export {
+	CHANNEL_KINDS,
+	type ChannelKind,
 	channelAddressIsValid,
 	EMAIL_ADDRESS_PATTERN,
 	INSTAGRAM_ADDRESS_PATTERN,
@@ -27,6 +29,12 @@ export {
 	PHONE_ADDRESS_PATTERN,
 	WEBSITE_ADDRESS_PATTERN,
 } from './channel-address'
+export {
+	HandSetVerificationVerdict,
+	isVerificationVerdict,
+	VERIFICATION_VERDICTS,
+	VerificationVerdict,
+} from './channel-verification'
 export {
 	ATTENTION_FILTERS,
 	AttentionFilter,

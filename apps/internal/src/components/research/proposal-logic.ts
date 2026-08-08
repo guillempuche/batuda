@@ -5,13 +5,7 @@
  * import from here; the human-readable labels live in those components.
  */
 
-/** Email deliverability verdicts the research agent can attach to a channel. */
-export type VerificationVerdict =
-	| 'deliverable'
-	| 'risky'
-	| 'catch_all'
-	| 'undeliverable'
-	| 'unknown'
+import type { VerificationVerdict } from '@batuda/domain'
 
 /** Outcome of trying to apply or reject one proposal (single or in a batch). */
 export type ProposalOutcome =

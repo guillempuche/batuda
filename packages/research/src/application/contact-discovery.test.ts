@@ -1,10 +1,11 @@
 import { Effect, Exit } from 'effect'
 import { describe, expect, it } from 'vitest'
 
+import type { VerificationVerdict } from '@batuda/domain'
 import { decidesPurchase } from '@batuda/domain'
 
 import { BudgetExceeded, ProviderError } from '../domain/errors'
-import { EnrichmentResult, type VerificationVerdict } from '../domain/types'
+import { EnrichmentResult } from '../domain/types'
 import {
 	buyingRoleFromTitle,
 	compareContacts,
