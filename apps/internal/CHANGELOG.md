@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-08 (internal-v2026.8.8)
+
+### Features
+
+* **internal:** correct a contact's address from the web app ([f828289](https://github.com/guillempuche/batuda/commit/f828289ccedc5a06fe803e7d9f18ea33816a08fa))
+* let a company be deleted, and check who work is handed to ([86688c1](https://github.com/guillempuche/batuda/commit/86688c17af1aeb08f92aa6d01b98d3eb43827df2))
+* let a wrong address on a contact be corrected or removed ([7499f7c](https://github.com/guillempuche/batuda/commit/7499f7c698317ee89d435ca1c03cf4ad68e5735a))
+
+### Bug Fixes
+
+* **research:** say when a contact search was cut short by a vendor ([d04c6e8](https://github.com/guillempuche/batuda/commit/d04c6e8a0a2c3d169c56dea7697e1a2e8624513a))
+* **research:** stop a contact search spending past what it quoted ([29e3fb3](https://github.com/guillempuche/batuda/commit/29e3fb35f2e87c139d7eef0f563546bb8d4d0b30))
+* **research:** stop a run with no surviving citations reading as clean ([bee79e5](https://github.com/guillempuche/batuda/commit/bee79e5285867e7ca5868123d4c48e7efdc1bbb5))
+
+### Refactoring
+
+* keep the email-check verdicts and channel kinds in one place ([e5d31c2](https://github.com/guillempuche/batuda/commit/e5d31c25554edacc34362313eaef0e70e74c789a))
+
+### CI/CD
+
+* **release:** ui v2026.8.7 ([137771c](https://github.com/guillempuche/batuda/commit/137771c4e93163e322df2a5aa9a4f6c249565a2d))
+
 ## 2026-08-07 (internal-v2026.8.7)
 
 ### Features
