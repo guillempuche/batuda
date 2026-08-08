@@ -1,5 +1,7 @@
 import { Schema } from 'effect'
 
+import { VerificationVerdict } from '@batuda/domain'
+
 // ── Shared value types across all research providers ──
 
 /** A single search result from any search provider. */
@@ -67,20 +69,6 @@ export class RegistryRecord extends Schema.Class<RegistryRecord>(
 	sourceUrl: Schema.String,
 	units: Schema.Number,
 }) {}
-
-/**
- * Deliverability verdict for a guessed or found email, shared across the
- * enrichment and verification steps of contact discovery.
- */
-export const VERIFICATION_VERDICTS = [
-	'deliverable',
-	'risky',
-	'catch_all',
-	'undeliverable',
-	'unknown',
-] as const
-export const VerificationVerdict = Schema.Literals(VERIFICATION_VERDICTS)
-export type VerificationVerdict = (typeof VERIFICATION_VERDICTS)[number]
 
 /**
  * Why a run ended without usable data — a structured code the UI localizes and

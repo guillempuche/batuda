@@ -1,5 +1,7 @@
 import { useLingui } from '@lingui/react/macro'
 
+import type { ChannelKind } from '@batuda/domain'
+
 /**
  * What kind of way of being reached this is, in words.
  *
@@ -13,28 +15,19 @@ import { useLingui } from '@lingui/react/macro'
  */
 export const useChannelKindLabel = (): ((kind: string) => string) => {
 	const { t } = useLingui()
-	return kind => {
-		switch (kind) {
-			case 'email':
-				return t`Email`
-			case 'phone':
-				return t`Phone`
-			case 'whatsapp':
-				return t`WhatsApp`
-			case 'website':
-				return t`Website`
-			case 'linkedin':
-				return t`LinkedIn`
-			case 'instagram':
-				return t`Instagram`
-			case 'x':
-				return t`X`
-			case 'bluesky':
-				return t`Bluesky`
-			// A platform this app has no word for is announced as it was stored,
-			// which is more use than saying nothing.
-			default:
-				return kind
-		}
-	}
+	// Checked against CHANNEL_KINDS so a kind the picker offers cannot end up
+	// without a word, while the lookup itself stays open.
+	const labels: Record<string, string> = {
+		email: t`Email`,
+		phone: t`Phone`,
+		whatsapp: t`WhatsApp`,
+		website: t`Website`,
+		linkedin: t`LinkedIn`,
+		instagram: t`Instagram`,
+		x: t`X`,
+		bluesky: t`Bluesky`,
+	} satisfies Record<ChannelKind, string>
+	// A platform this app has no word for is announced as it was stored, which is
+	// more use than saying nothing.
+	return kind => labels[kind] ?? kind
 }

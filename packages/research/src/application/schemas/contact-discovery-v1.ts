@@ -1,6 +1,7 @@
 import { Schema } from 'effect'
 
-import { VerificationVerdict } from '../../domain/types'
+import { VerificationVerdict } from '@batuda/domain'
+
 import {
 	Citation,
 	DiscoveredExisting,

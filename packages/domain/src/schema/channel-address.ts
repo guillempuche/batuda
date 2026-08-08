@@ -13,6 +13,32 @@
  * same thing as a wrong value.
  */
 
+/**
+ * The kinds the app knows how to show: what the picker offers, and what has an
+ * icon and a name to be read out. Storage still takes any kind — this is
+ * presentation, not permission, and one arriving from elsewhere is shown as it
+ * was stored rather than refused.
+ *
+ * It is one list because it was three, and they could drift: a kind could be
+ * offered with no icon, or given a name nothing offered. The icon and name maps
+ * are checked against this, so a gap is a build error rather than a blank space
+ * on screen. The address shapes below and the link-building elsewhere stay
+ * deliberately partial — most kinds need no shape, and most links are just the
+ * value.
+ */
+export const CHANNEL_KINDS = [
+	'email',
+	'phone',
+	'whatsapp',
+	'linkedin',
+	'x',
+	'instagram',
+	'website',
+	'bluesky',
+] as const
+
+export type ChannelKind = (typeof CHANNEL_KINDS)[number]
+
 export const EMAIL_ADDRESS_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 export const PHONE_ADDRESS_PATTERN = /^\+?[0-9][0-9 ().-]{5,19}$/
 // A bare host ("acme.com") counts as well as a full address, because that is how

@@ -27,12 +27,14 @@ import {
 	HttpClientResponse,
 } from 'effect/unstable/http'
 
+import type { VerificationVerdict } from '@batuda/domain'
+
 import {
 	type EnrichmentInput,
 	EnrichmentProvider,
 } from '../../application/ports'
 import { ProviderError } from '../../domain/errors'
-import { EnrichmentResult, type VerificationVerdict } from '../../domain/types'
+import { EnrichmentResult } from '../../domain/types'
 import { keyForSlot } from '../_config'
 import { hardenHttp } from '../_http-harden'
 

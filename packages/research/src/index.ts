@@ -168,8 +168,6 @@ export {
 	ReasonCode,
 	SearchResult,
 	SearchResultItem,
-	VERIFICATION_VERDICTS,
-	VerificationVerdict,
 } from './domain/types'
 export { makeCachedScrape } from './infrastructure/cached-scrape'
 export { makeCachedSearch } from './infrastructure/cached-search'
