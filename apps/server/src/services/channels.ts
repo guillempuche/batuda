@@ -396,20 +396,26 @@ export const patchChannel = (
 		`)[0]
 		if (stored === undefined) return undefined
 
+		// Folded once, here, and read everywhere below. Comparing the kind as it
+		// arrived is how `Email` reads as *leaving* email — which strips the bounce
+		// record off an address that never stopped being one, and hides it from the
+		// send gate in the same call.
+		const nextKind = patch.kind === undefined ? undefined : foldKind(patch.kind)
+
 		// Changing one half says nothing about the other, so whichever half is not
 		// being changed comes off the row. Checking only when the address moves
 		// would let a phone number be relabelled an email and walk into the send
 		// path, where no verdict reads as nothing known against it.
-		if (patch.kind !== undefined || patch.value !== undefined) {
+		if (nextKind !== undefined || patch.value !== undefined) {
 			yield* assertAddressLooksRight(
-				patch.kind ?? stored.channel,
+				nextKind ?? stored.channel,
 				patch.value ?? stored.address,
 			)
 		}
 
 		const now = DateTime.toDateUtc(DateTime.nowUnsafe())
 		const data: Record<string, unknown> = { updatedAt: now }
-		if (patch.kind !== undefined) data['channel'] = foldKind(patch.kind)
+		if (nextKind !== undefined) data['channel'] = nextKind
 		if (patch.value !== undefined) data['address'] = patch.value
 		if (patch.label !== undefined) data['label'] = patch.label
 		if (patch.is_primary !== undefined) data['isPrimary'] = patch.is_primary
@@ -422,9 +428,9 @@ export const patchChannel = (
 		// blocking mail while sitting on something that is no longer an address at
 		// all, and no screen would show it.
 		const leavingEmail =
-			patch.kind !== undefined &&
+			nextKind !== undefined &&
 			stored.channel === 'email' &&
-			patch.kind !== 'email'
+			nextKind !== 'email'
 		if (leavingEmail) {
 			data['verification'] = null
 			data['confidence'] = null
@@ -453,7 +459,7 @@ export const patchChannel = (
 						pgErrorCode(error) === '23505'
 							? Effect.fail(
 									new BadRequest({
-										message: `"${patch.value ?? stored.address}" is already on file as a ${patch.kind ?? stored.channel}. Remove the one you meant to replace rather than renaming onto it.`,
+										message: `"${patch.value ?? stored.address}" is already on file as a ${nextKind ?? stored.channel}. Remove the one you meant to replace rather than renaming onto it.`,
 									}),
 								)
 							: Effect.fail(error),
@@ -462,8 +468,7 @@ export const patchChannel = (
 
 		// A row carrying the default into another kind would leave two there and
 		// none behind it.
-		const kindChanged =
-			patch.kind !== undefined && patch.kind !== stored.channel
+		const kindChanged = nextKind !== undefined && nextKind !== stored.channel
 		if (patch.is_primary === true || (kindChanged && stored.isPrimary)) {
 			yield* standDownOtherPrimaries(sql, channelId)
 		}
@@ -474,12 +479,7 @@ export const patchChannel = (
 			yield* electPrimaryIfNone(sql, orgId, subject, stored.channel)
 		}
 		if (patch.is_primary === false && kindChanged) {
-			yield* electPrimaryIfNone(
-				sql,
-				orgId,
-				subject,
-				patch.kind ?? stored.channel,
-			)
+			yield* electPrimaryIfNone(sql, orgId, subject, nextKind ?? stored.channel)
 		}
 		return rows[0]
 	})
