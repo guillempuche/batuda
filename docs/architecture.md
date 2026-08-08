@@ -572,8 +572,14 @@ Non-secret deployed config does **not** ride this path: boot-required non-secret
 
 ```
 companies           — core entity, all prospect/client data
-contacts            — people at companies (email stays the canonical send address)
-contact_channels    — open per-contact channel list (email, phone, linkedin, x, website, bluesky...)
+contacts            — people at companies
+sites               — a company's branches (each with its own channels and people)
+channels            — open ways of reaching a company, a branch or a person
+                      (email, phone, linkedin, x, website, bluesky...); one table
+                      keyed by subject_table + subject_id, with no foreign key,
+                      so a subject's rows are deleted by hand when it goes
+company_relations   — how two companies are connected (group, supplier, ...)
+company_industries  — the trades an organisation files its companies under
 interactions        — every touchpoint (call, visit, email, DM...)
 tasks               — follow-up queue
 products            — service/product catalog

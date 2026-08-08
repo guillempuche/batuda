@@ -439,6 +439,7 @@ const StatusBadge = styled.span<{ $status: string }>`
 | ---------------- | ------------- | ---------------------------------------------------------- |
 | `PriButton`      | `Button`      | All interactive buttons                                    |
 | `PriInput`       | `Input`       | Text inputs in forms                                       |
+| `PriField`       | `Field`       | Labelled fields with their validation text                 |
 | `PriSelect`      | `Select`      | Status and size dropdowns                                  |
 | `PriDialog`      | `Dialog`      | Interaction log modal, company quick-edit                  |
 | `PriTabs`        | `Tabs`        | Company detail (Overview / Conversations / People / Files) |
@@ -447,6 +448,8 @@ const StatusBadge = styled.span<{ $status: string }>`
 | `PriSwitch`      | `Switch`      | A setting that takes effect the moment it is flicked       |
 | `PriTooltip`     | `Tooltip`     | Short field explanations                                   |
 | `PriCollapsible` | `Collapsible` | Expandable sections on company detail                      |
+
+`PriField` is where a validation message belongs. It ties the label, the control and `PriField.Error` together, so what the server said is announced with the input rather than floating beside it, and the label is visible as well as spoken — three unlabelled boxes in a row say nothing about which is the address. Reach for it instead of an `aria-label`ed bare `PriInput` and a hand-rolled error paragraph. A message the server sent rather than the browser needs `match={true}` on the error, which is what tells Base UI to show it.
 
 A folded `PriCollapsible` panel keeps its text on the page rather than dropping it, so the browser's own find-in-page reaches it and opens the section on a match. That is `hiddenUntilFound`, defaulted on in the wrapper — pass `hiddenUntilFound={false}` where content should not linger while folded, as the company timeline does because it holds a status line read aloud by screen readers. It relies on Tailwind's reset scoping `display: none` to `[hidden]:where(:not([hidden='until-found']))`; without that carve-out a folded section would be permanently invisible rather than merely unfindable.
 
@@ -710,6 +713,8 @@ const update = useAtomSet(updateTemplateAtom, { mode: 'promiseExit' })
 
 A query resolves to an `AsyncResult` — narrow it with `AsyncResult.isSuccess` / `isFailure`. `useAtomRefresh` keeps serving the **previous** value while the new one is in flight, so a component that must show what was just written should read the mutation's own reply rather than waiting on the refreshed list.
 
+A mutation run with `mode: 'promiseExit'` fails with a cause rather than the error itself, and the client buries the decoded error inside it — so without digging, every failure looks alike and a screen can only say "try again". `taggedFailure(cause, tag)` in `src/lib/tagged-failure.ts` pulls a named one back out, and `badRequestMessage(cause)` gets straight to the sentence the server wrote for the reader.
+
 Auth is the exception: it goes through `authClient` (Better Auth). `createServerFn` is used in exactly one place, `src/lib/server-cookie.ts`, for cookie access during SSR — not for reaching the API.
 
 ---
@@ -824,6 +829,12 @@ Every list on this page is decided by the server, not assembled in the browser. 
 - **Conversations tab:** emails, calls, meetings and logged interactions in one feed
 - **People tab:** the company's contacts; the tab badge counts everyone on file, not the rows fetched
 - **Files tab:** documents, offers and landing pages, each loading further rows as you reach the end of them
+
+"Manage channels", on a contact in the People tab, is where a person's ways of being reached are put right: added, corrected in place, removed, and told which of a kind is the main one. Rows edit one at a time and only the row being saved is disabled, so a slow write on one address never freezes the rest. An address the contact already holds is refused rather than merged — the server says so in words, shown beside the box with what was typed still in it — because merging would delete a row nobody named.
+
+How far an address is trusted and whether it bounced are two different facts, shown in two different places. The trust badge says what is expected before sending; the suppression banner and its Clear action say what happened after. Trust can only be lowered by hand — `deliverable` is what a check establishes, so nobody at a keyboard may write it — and a later research check can raise it again.
+
+The three verbs do two different jobs, which the wording has to keep apart. Risky and undeliverable record doubt about an address. Unverified asserts nothing — it takes a wrong verdict back off, leaving the address reading as one nobody has checked. The dialog deliberately says only that, and does not promise what a send will do about it: which verdicts stop a send is the sending side's rule, it has changed, and copy that enumerated it would go stale here. Nothing in the web app reads a verdict before sending in any case.
 
 Documents also have a screen of their own at `/documents`, and one page each at `/documents/$id`.
 
