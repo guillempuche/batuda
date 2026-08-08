@@ -37,6 +37,17 @@ export interface ChannelInput {
 	readonly is_primary?: boolean | undefined
 }
 
+/**
+ * The one spelling a kind is stored in.
+ *
+ * `channelAddressIsValid` lowercases before it looks up a shape, so `Email`
+ * validates as an email — and then everything that reads by kind looks for
+ * `channel = 'email'` and never finds it. An address stored that way is invisible
+ * to the send gate, to the suppression clear, and to the check that strips a
+ * bounce off a row that stops being an email.
+ */
+export const foldKind = (kind: string): string => kind.trim().toLowerCase()
+
 /** What a way of reaching someone can hang off. */
 export type ChannelSubject = 'companies' | 'contacts' | 'sites'
 
@@ -132,7 +143,7 @@ export const writeChannels = (
 			INSERT INTO channels
 				(organization_id, subject_table, subject_id, channel, address, label, verification, confidence, is_primary)
 			VALUES (
-				${orgId}, ${subject.table}, ${subject.id}, ${c.kind}, ${c.value}, ${c.label ?? null},
+				${orgId}, ${subject.table}, ${subject.id}, ${foldKind(c.kind)}, ${c.value}, ${c.label ?? null},
 				${c.verification ?? null}, ${clampConfidence(c.confidence)}, COALESCE(${c.is_primary ?? null}, false)
 			)
 			ON CONFLICT (subject_table, subject_id, channel, address) DO UPDATE SET
@@ -327,7 +338,7 @@ export const addChannel = (
 			INSERT INTO channels
 				(organization_id, subject_table, subject_id, channel, address, label, verification, confidence, is_primary)
 			VALUES (
-				${orgId}, ${subject.table}, ${subject.id}, ${c.kind}, ${c.value}, ${c.label ?? null},
+				${orgId}, ${subject.table}, ${subject.id}, ${foldKind(c.kind)}, ${c.value}, ${c.label ?? null},
 				${c.verification ?? null}, ${clampConfidence(c.confidence)}, COALESCE(${wantsPrimary}, false)
 			)
 			ON CONFLICT (subject_table, subject_id, channel, address) DO UPDATE SET
@@ -398,7 +409,7 @@ export const patchChannel = (
 
 		const now = DateTime.toDateUtc(DateTime.nowUnsafe())
 		const data: Record<string, unknown> = { updatedAt: now }
-		if (patch.kind !== undefined) data['channel'] = patch.kind
+		if (patch.kind !== undefined) data['channel'] = foldKind(patch.kind)
 		if (patch.value !== undefined) data['address'] = patch.value
 		if (patch.label !== undefined) data['label'] = patch.label
 		if (patch.is_primary !== undefined) data['isPrimary'] = patch.is_primary
@@ -456,8 +467,19 @@ export const patchChannel = (
 		if (patch.is_primary === true || (kindChanged && stored.isPrimary)) {
 			yield* standDownOtherPrimaries(sql, channelId)
 		}
-		if (kindChanged && stored.isPrimary) {
+		// Wherever the default just left, somebody has to hold it. Both ways of
+		// putting it down are the same problem: a kind with addresses and no
+		// default is read differently by each screen that reads it.
+		if (stored.isPrimary && (kindChanged || patch.is_primary === false)) {
 			yield* electPrimaryIfNone(sql, orgId, subject, stored.channel)
+		}
+		if (patch.is_primary === false && kindChanged) {
+			yield* electPrimaryIfNone(
+				sql,
+				orgId,
+				subject,
+				patch.kind ?? stored.channel,
+			)
 		}
 		return rows[0]
 	})

@@ -105,9 +105,12 @@ test.describe('a contact’s ways of being reached', () => {
 			)
 	})
 
-	test('should correct a wrong address in place, on the card as well as in the dialog', async ({
-		page,
-	}) => {
+	// Tagged so it gates a pull request: CI's smoke subset is `--grep @smoke`, and
+	// an untagged spec only ever runs on main, after the merge it should have
+	// stopped. This is the one that fails if correcting an address breaks.
+	test('should correct a wrong address in place, on the card as well as in the dialog', {
+		tag: '@smoke',
+	}, async ({ page }) => {
 		// GIVEN the address on file is wrong
 		const id = channelId(SEEDED_EMAIL)
 
