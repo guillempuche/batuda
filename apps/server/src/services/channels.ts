@@ -1,25 +1,38 @@
 import { DateTime, Effect } from 'effect'
-import type { SqlClient } from 'effect/unstable/sql'
+import type { SqlClient, SqlError } from 'effect/unstable/sql'
 
 import { BadRequest } from '@batuda/controllers'
-import { channelAddressIsValid } from '@batuda/domain'
+import {
+	channelAddressIsValid,
+	type HandSetVerificationVerdict,
+	type VerificationVerdict,
+} from '@batuda/domain'
 
-// The open channel shape both the MCP tool and the HTTP API accept. `kind` and
-// `value` are the names the outside world uses; storage calls them `channel` and
-// `address`. The two are mapped explicitly in one place (see `channelsJsonFor`),
-// so renaming a column never silently changes what a caller receives.
+import { pgErrorCode } from '../lib/pg-error'
+
+// The shape a bulk channel write takes. `kind` and `value` are the names the
+// outside world uses; storage calls them `channel` and `address`. The two are
+// mapped explicitly in one place (see `channelsJsonFor`), so renaming a column
+// never silently changes what a caller receives.
 //
 // `kind` is free text — email, phone, linkedin, x, website, bluesky, … — so a new
 // platform needs no schema change; only the email channel carries a
-// deliverability `verification`. The send-suppression `status` is
-// system-managed (the send gate + the bounce handler), never set by callers
-// here, so re-discovering a bounced address never silently un-suppresses it.
+// deliverability `verification`.
+//
+// The full verdict vocabulary is allowed here because the research pipeline
+// writes through this shape and a mailbox probe is the one thing that may say an
+// address is good. The doors a person or an assistant reaches take the narrower
+// hand-set list instead, so nobody can claim a verdict nobody earned.
+//
+// The send-suppression `status` is system-managed (the send gate + the bounce
+// handler) and is never accepted from a caller, so re-discovering a bounced
+// address cannot quietly un-suppress it.
 export interface ChannelInput {
 	readonly kind: string
 	readonly value: string
 	/** Which of several this is, in a person's words: "Girona shop". */
 	readonly label?: string | undefined
-	readonly verification?: string | undefined
+	readonly verification?: VerificationVerdict | undefined
 	readonly confidence?: number | undefined
 	readonly is_primary?: boolean | undefined
 }
@@ -92,8 +105,20 @@ export const clampConfidence = (
 
 /**
  * Upsert channels for one company or person — additive: re-discovering a handle
- * refreshes it in place and never deletes the others. `status` is deliberately
- * left out of the conflict update so a prior bounced/complained verdict survives.
+ * refreshes it in place and never deletes the others.
+ *
+ * Nothing a write leaves unsaid is erased. A verdict, once established, is only
+ * replaced by another verdict; a write that mentions the address but says nothing
+ * about its deliverability keeps what is on file. That matters because saying
+ * nothing used to mean "no verdict", and no verdict is the one state the send
+ * gate lets straight through — so re-saving a contact's addresses quietly made a
+ * known-dead one sendable again. `addChannel` already worked this way; this is
+ * the two of them agreeing.
+ *
+ * The score follows the verdict that earned it: a fresh verdict brings its own
+ * (even none), while a write carrying only a score refreshes the score alone.
+ * `status` stays out of the conflict update entirely, so a prior
+ * bounced/complained result survives.
  */
 export const writeChannels = (
 	sql: Sql,
@@ -112,8 +137,11 @@ export const writeChannels = (
 			)
 			ON CONFLICT (subject_table, subject_id, channel, address) DO UPDATE SET
 				label = COALESCE(EXCLUDED.label, channels.label),
-				verification = EXCLUDED.verification,
-				confidence = EXCLUDED.confidence,
+				verification = COALESCE(EXCLUDED.verification, channels.verification),
+				confidence = CASE
+					WHEN EXCLUDED.verification IS NOT NULL THEN EXCLUDED.confidence
+					ELSE COALESCE(EXCLUDED.confidence, channels.confidence)
+				END,
 				is_primary = COALESCE(${c.is_primary ?? null}, channels.is_primary),
 				updated_at = now()
 		`,
@@ -147,7 +175,7 @@ export const channelsJsonFor = (sql: Sql, subject: ChannelSubject) =>
 				'isPrimary', ch.is_primary,
 				'status', ch.status,
 				'statusReason', ch.status_reason
-			) ORDER BY ch.is_primary DESC, ch.channel)
+			) ORDER BY ch.is_primary DESC, ch.channel, ch.created_at, ch.id)
 			FROM channels ch
 			WHERE ch.subject_table = ${subject} AND ch.subject_id = c.id
 		), '[]'::json)
@@ -180,7 +208,7 @@ export const channelsOf = (
 	sql`
 		SELECT ${channelRowColumns(sql)} FROM channels
 		WHERE subject_table = ${subject.table} AND subject_id = ${subject.id}
-		ORDER BY is_primary DESC, channel
+		ORDER BY is_primary DESC, channel, created_at, id
 	`
 
 /**
@@ -198,7 +226,7 @@ export const subjectChannelsOf = (
 		SELECT id, subject_table, subject_id, ${channelColumnsWithoutSubject(sql)}
 		FROM channels
 		WHERE subject_table = ${subject.table} AND subject_id = ${subject.id}
-		ORDER BY is_primary DESC, channel
+		ORDER BY is_primary DESC, channel, created_at, id
 	`
 
 /**
@@ -224,7 +252,45 @@ const standDownOtherPrimaries = (sql: Sql, channelId: string) =>
 			)
 	`
 
-/** Add a single channel (the UI's "add"), returning the stored row. */
+/**
+ * Hand the default to the oldest surviving address of a kind, when whatever held
+ * it is gone.
+ *
+ * Taking the default away and putting it nowhere leaves the kind headless, and
+ * the readers do not agree on what happens then — one takes the first row of a
+ * sort, another the first of a different sort. So a screen, a compose box and the
+ * send gate could each name a different address, and a different one again on the
+ * next load. Handing it on immediately is what keeps them saying the same thing.
+ *
+ * The oldest one takes it, and addresses recorded together — which share a
+ * timestamp — are settled by id, so the answer is always the same one rather
+ * than whichever the sort happens to surface.
+ *
+ * Does nothing when the kind still has a default or has no addresses left, so it
+ * is safe to call after any removal.
+ */
+const electPrimaryIfNone = (
+	sql: Sql,
+	orgId: string,
+	subject: { readonly table: ChannelSubject; readonly id: string },
+	kind: string,
+) =>
+	sql`
+		UPDATE channels SET is_primary = true, updated_at = now()
+		WHERE id = (
+			SELECT id FROM channels
+			WHERE subject_table = ${subject.table} AND subject_id = ${subject.id}
+				AND organization_id = ${orgId} AND channel = ${kind}
+			ORDER BY created_at, id
+			LIMIT 1
+		)
+		AND NOT EXISTS (
+			SELECT 1 FROM channels
+			WHERE subject_table = ${subject.table} AND subject_id = ${subject.id}
+				AND organization_id = ${orgId} AND channel = ${kind} AND is_primary
+		)
+	`
+
 /**
  * Turn away an address that could never be one of its kind.
  *
@@ -244,6 +310,7 @@ const assertAddressLooksRight = (kind: string, value: string) =>
 				}),
 			)
 
+/** Add a single channel (the UI's "add"), returning the stored row. */
 export const addChannel = (
 	sql: Sql,
 	orgId: string,
@@ -277,54 +344,169 @@ export const addChannel = (
 	})
 
 /**
- * Edit a channel's reachable value / kind / label / primary flag. Never touches
- * `verification` or the suppression `status` — those are system-derived, so a
- * human rename can't drop the email channel's deliverability verdict.
+ * Edit one of a subject's channels — its address, kind, label, whether it is the
+ * default, and how far its deliverability is trusted.
+ *
+ * The subject is part of the lookup, not something the caller is trusted to have
+ * checked. An id on its own only proves a row exists, and every channel of every
+ * company, branch and person lives in one table, so an unscoped edit would let a
+ * request about one person reach somebody else's address — or a company's
+ * switchboard. Answers `undefined` when the id is not this subject's, which reads
+ * the same as "no such channel" and is what the caller reports.
+ *
+ * `verification` may only ever be lowered here (the type says which words), and
+ * the score goes with it: it belonged to the verdict being replaced, and nobody
+ * setting a verdict by hand has a score to offer. The suppression `status` stays
+ * out of a caller's reach.
  */
 export const patchChannel = (
 	sql: Sql,
+	orgId: string,
+	subject: { readonly table: ChannelSubject; readonly id: string },
 	channelId: string,
 	patch: {
 		readonly kind?: string | undefined
 		readonly value?: string | undefined
 		readonly label?: string | null | undefined
 		readonly is_primary?: boolean | undefined
+		readonly verification?: HandSetVerificationVerdict | undefined
 	},
 ) =>
 	Effect.gen(function* () {
-		// Changing only the address says nothing about what kind it is, so the kind
-		// on file is what decides whether the new address is plausible.
-		if (patch.value !== undefined) {
-			const kind =
-				patch.kind ??
-				(yield* sql<{
-					channel: string
-				}>`SELECT channel FROM channels WHERE id = ${channelId} LIMIT 1`)[0]
-					?.channel
-			if (kind !== undefined) {
-				yield* assertAddressLooksRight(kind, patch.value)
-			}
+		const stored = (yield* sql<{
+			channel: string
+			address: string
+			isPrimary: boolean
+		}>`
+			SELECT channel, address, is_primary FROM channels
+			WHERE id = ${channelId} AND subject_table = ${subject.table}
+				AND subject_id = ${subject.id} AND organization_id = ${orgId}
+			LIMIT 1
+		`)[0]
+		if (stored === undefined) return undefined
+
+		// Changing one half says nothing about the other, so whichever half is not
+		// being changed comes off the row. Checking only when the address moves
+		// would let a phone number be relabelled an email and walk into the send
+		// path, where no verdict reads as nothing known against it.
+		if (patch.kind !== undefined || patch.value !== undefined) {
+			yield* assertAddressLooksRight(
+				patch.kind ?? stored.channel,
+				patch.value ?? stored.address,
+			)
 		}
-		const data: Record<string, unknown> = {
-			updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
-		}
+
+		const now = DateTime.toDateUtc(DateTime.nowUnsafe())
+		const data: Record<string, unknown> = { updatedAt: now }
 		if (patch.kind !== undefined) data['channel'] = patch.kind
 		if (patch.value !== undefined) data['address'] = patch.value
 		if (patch.label !== undefined) data['label'] = patch.label
 		if (patch.is_primary !== undefined) data['isPrimary'] = patch.is_primary
-		const rows = yield* sql`
-			UPDATE channels SET ${sql.update(data)}
-			WHERE id = ${channelId} RETURNING ${channelRowColumns(sql)}
-		`
-		if (patch.is_primary === true) {
+		if (patch.verification !== undefined) {
+			data['verification'] = patch.verification
+			data['confidence'] = null
+		}
+		// A row that stops being an email takes the email-only bookkeeping with it.
+		// Left behind, a bounce recorded against the old address would go on
+		// blocking mail while sitting on something that is no longer an address at
+		// all, and no screen would show it.
+		const leavingEmail =
+			patch.kind !== undefined &&
+			stored.channel === 'email' &&
+			patch.kind !== 'email'
+		if (leavingEmail) {
+			data['verification'] = null
+			data['confidence'] = null
+			data['status'] = 'unknown'
+			data['statusReason'] = null
+			data['statusUpdatedAt'] = now
+			data['softBounceCount'] = 0
+		}
+
+		// One address of a kind per subject, so renaming onto one already on file
+		// is a collision rather than a merge. Wrapped in its own transaction: the
+		// whole request runs inside one, and a rejected write poisons it until
+		// something rolls back — this rolls back only as far as the attempt, so
+		// the refusal can still be answered with the list it was asked about.
+		const rows = yield* sql
+			.withTransaction(
+				sql`
+					UPDATE channels SET ${sql.update(data)}
+					WHERE id = ${channelId} RETURNING ${channelRowColumns(sql)}
+				`,
+			)
+			.pipe(
+				Effect.catchTag(
+					'SqlError',
+					(error): Effect.Effect<never, BadRequest | SqlError.SqlError> =>
+						pgErrorCode(error) === '23505'
+							? Effect.fail(
+									new BadRequest({
+										message: `"${patch.value ?? stored.address}" is already on file as a ${patch.kind ?? stored.channel}. Remove the one you meant to replace rather than renaming onto it.`,
+									}),
+								)
+							: Effect.fail(error),
+				),
+			)
+
+		// A row carrying the default into another kind would leave two there and
+		// none behind it.
+		const kindChanged =
+			patch.kind !== undefined && patch.kind !== stored.channel
+		if (patch.is_primary === true || (kindChanged && stored.isPrimary)) {
 			yield* standDownOtherPrimaries(sql, channelId)
+		}
+		if (kindChanged && stored.isPrimary) {
+			yield* electPrimaryIfNone(sql, orgId, subject, stored.channel)
 		}
 		return rows[0]
 	})
 
-/** Remove a channel by id. */
-export const deleteChannel = (sql: Sql, channelId: string) =>
-	sql`DELETE FROM channels WHERE id = ${channelId}`
+/**
+ * Remove one of a subject's channels, scoped the same way an edit is. Answers
+ * whether a row went, so a caller can tell a wrong id from a repeat.
+ */
+export const deleteChannel = (
+	sql: Sql,
+	orgId: string,
+	subject: { readonly table: ChannelSubject; readonly id: string },
+	channelId: string,
+) =>
+	Effect.gen(function* () {
+		const removed = yield* sql<{ channel: string; isPrimary: boolean }>`
+			DELETE FROM channels
+			WHERE id = ${channelId} AND subject_table = ${subject.table}
+				AND subject_id = ${subject.id} AND organization_id = ${orgId}
+			RETURNING channel, is_primary
+		`
+		const gone = removed[0]
+		if (gone === undefined) return false
+		if (gone.isPrimary) {
+			yield* electPrimaryIfNone(sql, orgId, subject, gone.channel)
+		}
+		return true
+	})
+
+/**
+ * Remove every way of reaching one company, branch or person — for when the
+ * subject itself is going.
+ *
+ * Nothing in the database does this on its own: a channel names its subject by a
+ * pair of plain columns, because one key cannot point at two tables, so there is
+ * no foreign key to cascade. Left behind, the rows outlive whoever they belonged
+ * to and keep answering — a bounce recorded against one of them goes on blocking
+ * that address for the whole organisation, with nobody left to lift it from.
+ */
+export const deleteSubjectChannels = (
+	sql: Sql,
+	orgId: string,
+	subject: { readonly table: ChannelSubject; readonly id: string },
+) =>
+	sql`
+		DELETE FROM channels
+		WHERE subject_table = ${subject.table} AND subject_id = ${subject.id}
+			AND organization_id = ${orgId}
+	`
 
 /**
  * Reset a person's email suppression to `unknown` — used after a

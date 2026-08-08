@@ -24,6 +24,8 @@ import {
 
 import {
 	addChannel,
+	deleteChannel,
+	deleteSubjectChannels,
 	patchChannel,
 	subjectChannelsOf,
 } from '../../services/channels'
@@ -275,7 +277,7 @@ const ManageCompanySites = Tool.make('manage_company_sites', {
 // switchboard only by `site_id`, so a second tool would duplicate the lot.
 const ManageCompanyChannels = Tool.make('manage_company_channels', {
 	description:
-		"The ways of reaching a company — its mailboxes, phones, website, social handles. A company can hold several of a kind, which is the point of this tool: `update_company` writes one email and one phone, and a firm with an orders mailbox, an accounts mailbox and a switchboard needs all of them kept apart. Give each one a `label` in the words somebody would actually use — 'orders', 'accounts', 'Girona shop' — because two addresses with no labels are indistinguishable a month later. Pass `site_id` to hang the channel off one branch instead of the company as a whole. action: 'list' (all of them; add site_id to see one branch's), 'add' (kind plus value, and a label whenever there is more than one of that kind), 'update' (by channel_id, only the fields to change), 'remove' (by channel_id). kind is open — email, phone, linkedin, instagram, website, x, bluesky, … — and `is_primary` marks the one to use when nothing says otherwise; the primary email is the address mail is sent to.",
+		"The ways of reaching a company — its mailboxes, phones, website, social handles. A company can hold several of a kind, which is the point of this tool: `update_company` writes one email and one phone, and a firm with an orders mailbox, an accounts mailbox and a switchboard needs all of them kept apart. Give each one a `label` in the words somebody would actually use — 'orders', 'accounts', 'Girona shop' — because two addresses with no labels are indistinguishable a month later. Pass `site_id` to hang the channel off one branch instead of the company as a whole. action: 'list' (all of them; add site_id to see one branch's), 'add' (kind plus value, and a label whenever there is more than one of that kind), 'update' (by channel_id, only the fields to change), 'remove' (by channel_id). An address the company already holds is refused rather than merged, so correcting one onto another means removing the spare instead. kind is open — email, phone, linkedin, instagram, website, x, bluesky, … — and `is_primary` marks the one to use when nothing says otherwise; the primary email is the address mail is sent to, and removing it hands that over to the oldest one left of the same kind.",
 	parameters: Schema.Struct({
 		action: Schema.Literals(['list', 'add', 'update', 'remove']),
 		company_id: Schema.String,
@@ -568,17 +570,14 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 								AND organization_id = ${currentOrg.id}
 							RETURNING id
 						`
-						// A channel says what it hangs off by table and id, with no
-						// foreign key to follow, so nothing clears these on its own —
-						// they would sit there for good, pointing at a place that is
-						// closed.
+						// Only once the branch really went: the delete above is scoped by
+						// company as well, and this is not, so an id paired with the wrong
+						// company would otherwise strip a branch that is still trading.
 						if (removed.length > 0) {
-							yield* sql`
-								DELETE FROM channels
-								WHERE subject_table = 'sites'
-									AND subject_id = ${params.site_id}
-									AND organization_id = ${currentOrg.id}
-							`
+							yield* deleteSubjectChannels(sql, currentOrg.id, {
+								table: 'sites',
+								id: params.site_id,
+							})
 						}
 					}
 					return { sites: yield* list() }
@@ -625,33 +624,21 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 						})
 					}
 					if (params.action === 'update' && params.channel_id !== undefined) {
-						// Scoped to the subject we just proved is theirs, so a channel id
-						// belonging to another company cannot be edited through it.
-						const mine = yield* sql`
-							SELECT id FROM channels
-							WHERE id = ${params.channel_id}
-								AND subject_table = ${subject.table}
-								AND subject_id = ${subject.id}
-								AND organization_id = ${currentOrg.id}
-							LIMIT 1
-						`
-						if (mine.length > 0) {
-							yield* patchChannel(sql, params.channel_id, {
+						yield* patchChannel(
+							sql,
+							currentOrg.id,
+							subject,
+							params.channel_id,
+							{
 								kind: params.kind,
 								value: params.value,
 								label: params.label,
 								is_primary: params.is_primary,
-							})
-						}
+							},
+						)
 					}
 					if (params.action === 'remove' && params.channel_id !== undefined) {
-						yield* sql`
-							DELETE FROM channels
-							WHERE id = ${params.channel_id}
-								AND subject_table = ${subject.table}
-								AND subject_id = ${subject.id}
-								AND organization_id = ${currentOrg.id}
-						`
+						yield* deleteChannel(sql, currentOrg.id, subject, params.channel_id)
 					}
 					return { channels: yield* subjectChannelsOf(sql, subject) }
 				}).pipe(

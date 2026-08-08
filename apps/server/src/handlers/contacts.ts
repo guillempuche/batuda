@@ -3,7 +3,7 @@ import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { BatudaApi, CurrentOrg } from '@batuda/controllers'
+import { BatudaApi, CurrentOrg, NotFound } from '@batuda/controllers'
 import { Contact, ContactChannel } from '@batuda/domain'
 
 import {
@@ -19,6 +19,7 @@ import {
 	channelsOf,
 	clearEmailSuppression,
 	deleteChannel,
+	deleteSubjectChannels,
 	patchChannel,
 	writeChannels,
 } from '../services/channels'
@@ -194,14 +195,34 @@ export const ContactsLive = HttpApiBuilder.group(
 				)
 				.handle('remove', _ =>
 					Effect.gen(function* () {
-						// No foreign key clears these, so they would outlive the
-						// person and point at nobody.
-						yield* unlinkSubject(sql, 'contacts', _.params.id)
-						yield* sql`DELETE FROM contacts WHERE id = ${_.params.id}`
+						const currentOrg = yield* CurrentOrg
+						const subject = { table: 'contacts' as const, id: _.params.id }
+						// How many of their addresses were being kept out of the send
+						// path. Read before the delete, because afterwards there is
+						// nothing left to count, and worth recording: the block is
+						// organisation-wide by address, so it goes with them.
+						const suppressed = yield* sql<{ n: number }>`
+							SELECT count(*)::int AS n FROM channels
+							WHERE subject_table = 'contacts' AND subject_id = ${_.params.id}
+								AND organization_id = ${currentOrg.id}
+								AND status IN ('bounced', 'complained')
+						`
+						const removed = yield* sql`
+							DELETE FROM contacts
+							WHERE id = ${_.params.id} AND organization_id = ${currentOrg.id}
+							RETURNING id
+						`
+						// Only once the person really went, and after them: nothing in the
+						// database clears either of these on its own.
+						if (removed.length > 0) {
+							yield* unlinkSubject(sql, 'contacts', _.params.id)
+							yield* deleteSubjectChannels(sql, currentOrg.id, subject)
+						}
 						yield* Effect.logInfo('Contact removed').pipe(
 							Effect.annotateLogs({
 								event: 'contact.removed',
 								contactId: _.params.id,
+								suppressedChannelsRemoved: suppressed[0]?.n ?? 0,
 							}),
 						)
 					}).pipe(Effect.orDie),
@@ -225,17 +246,51 @@ export const ContactsLive = HttpApiBuilder.group(
 					),
 				)
 				.handle('updateChannel', _ =>
-					patchChannel(sql, _.params.channelId, _.payload).pipe(
-						Effect.flatMap(decodeChannel),
+					Effect.gen(function* () {
+						const currentOrg = yield* CurrentOrg
+						const patched = yield* patchChannel(
+							sql,
+							currentOrg.id,
+							{ table: 'contacts' as const, id: _.params.id },
+							_.params.channelId,
+							_.payload,
+						)
+						if (patched === undefined)
+							return yield* new NotFound({
+								entity: 'channel',
+								id: _.params.channelId,
+							})
+						return yield* decodeChannel(patched)
+					}).pipe(
+						// Only the two answers reach the caller; everything else is a
+						// fault. Re-failing and then calling orDie would put them back and
+						// kill them, which reads as a server error rather than an answer.
 						Effect.catch(e =>
-							e._tag === 'BadRequest' ? Effect.fail(e) : Effect.die(e),
+							e._tag === 'BadRequest' || e._tag === 'NotFound'
+								? Effect.fail(e)
+								: Effect.die(e),
 						),
 					),
 				)
 				.handle('deleteChannel', _ =>
 					Effect.gen(function* () {
-						yield* deleteChannel(sql, _.params.channelId)
-					}).pipe(Effect.orDie),
+						const currentOrg = yield* CurrentOrg
+						const removed = yield* deleteChannel(
+							sql,
+							currentOrg.id,
+							{ table: 'contacts' as const, id: _.params.id },
+							_.params.channelId,
+						)
+						if (!removed)
+							return yield* new NotFound({
+								entity: 'channel',
+								id: _.params.channelId,
+							})
+					}).pipe(
+						Effect.catch(e =>
+							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
+						),
+					),
 				)
 				.handle('clearSuppression', _ =>
 					Effect.gen(function* () {
