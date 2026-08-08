@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-08 (mail-worker-v2026.8.8)
+
+### Features
+
+* let a company be deleted, and check who work is handed to ([86688c1](https://github.com/guillempuche/batuda/commit/86688c17af1aeb08f92aa6d01b98d3eb43827df2))
+
+### Refactoring
+
+* keep the email-check verdicts and channel kinds in one place ([e5d31c2](https://github.com/guillempuche/batuda/commit/e5d31c25554edacc34362313eaef0e70e74c789a))
+
 ## 2026-08-07 (mail-worker-v2026.8.7)
 
 ### Features
