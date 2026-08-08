@@ -31,6 +31,7 @@ import {
 } from '#/components/instructions/stack-picker'
 import { STATUS_ORDER, statusLabels } from '#/components/shared/status-badge'
 import { formatMoneyCents } from '#/lib/format-money'
+import { taggedFailure } from '#/lib/tagged-failure'
 import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
 
 // Type-only import; adding a schema server-side forces an option here.
@@ -645,30 +646,6 @@ export function ResearchDialog({
 			</PriDialog.Portal>
 		</PriDialog.Root>
 	)
-}
-
-// Pull a specific tagged error out of a promiseExit failure cause. The atom
-// client fails with the decoded API error, so it sits as `error` on one of the
-// cause's reasons; anything else (or a success) reads as null.
-function taggedFailure(
-	cause: unknown,
-	tag: string,
-): Record<string, unknown> | null {
-	if (!cause || typeof cause !== 'object') return null
-	const reasons = (cause as { reasons?: unknown }).reasons
-	if (!Array.isArray(reasons)) return null
-	for (const reason of reasons) {
-		if (!reason || typeof reason !== 'object') continue
-		const error = (reason as { error?: unknown }).error
-		if (
-			error !== null &&
-			typeof error === 'object' &&
-			(error as { _tag?: unknown })._tag === tag
-		) {
-			return error as Record<string, unknown>
-		}
-	}
-	return null
 }
 
 function narrowOptions(value: unknown): ReadonlyArray<StackOption> {

@@ -1595,6 +1595,7 @@ function DetailBody({
 											</ContactLinkButton>
 											<ContactLinkButton
 												type='button'
+												data-testid={`contact-channels-${contact.id}`}
 												onClick={() =>
 													openDlg({ kind: 'channels', id: contact.id })
 												}

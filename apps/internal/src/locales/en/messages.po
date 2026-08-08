@@ -130,6 +130,12 @@ msgstr "{0} is now the address you send from"
 msgid "{0} is the address you send from"
 msgstr "{0} is the address you send from"
 
+#. placeholder {0}: ch.value
+#. placeholder {1}: kindLabel(ch.kind)
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "{0} is the main {1}"
+msgstr "{0} is the main {1}"
+
 #. placeholder {0}: item.row.messageCount
 #: src/components/companies/conversations-tab.tsx
 msgid "{0} messages"
@@ -468,6 +474,8 @@ msgstr "Added as a verified lead"
 msgid "Adding…"
 msgstr "Adding…"
 
+#: src/components/contacts/manage-channels-dialog.tsx
+#: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/research/run-labels.ts
 msgid "Address"
 msgstr "Address"
@@ -561,6 +569,10 @@ msgstr "Already resolved"
 #: src/components/companies/company-fit-section.tsx
 msgid "also reported as {0}"
 msgstr "also reported as {0}"
+
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "An address can't be blank."
+msgstr "An address can't be blank."
 
 #: src/routes/oauth/consent.tsx
 msgid "An AI assistant wants to connect to your Batuda account over MCP and act on your behalf. Only approve assistants you trust."
@@ -938,6 +950,7 @@ msgstr "Calls"
 #: src/components/companies/followup-dialog.tsx
 #: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
+#: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/instructions/stack-editor.tsx
 #: src/components/instructions/template-dialog.tsx
 #: src/components/instructions/template-transfer-dialog.tsx
@@ -1015,18 +1028,6 @@ msgstr "Changes have been saved."
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Channel"
 msgstr "Channel"
-
-#: src/components/contacts/manage-channels-dialog.tsx
-msgid "Channel kind"
-msgstr "Channel kind"
-
-#: src/components/contacts/manage-channels-dialog.tsx
-msgid "Channel label"
-msgstr "Channel label"
-
-#: src/components/contacts/manage-channels-dialog.tsx
-msgid "Channel value"
-msgstr "Channel value"
 
 #: src/components/contacts/manage-channels-dialog.tsx
 msgid "Channels — {contactName}"
@@ -1395,6 +1396,10 @@ msgstr "Could not accept {0}"
 msgid "Could not add {trimmed}. Please try again."
 msgstr "Could not add {trimmed}. Please try again."
 
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Could not add {value}"
+msgstr "Could not add {value}"
+
 #: src/components/research/findings/prospect-scan-view.tsx
 msgid "Could not add as a lead"
 msgstr "Could not add as a lead"
@@ -1411,6 +1416,11 @@ msgstr "Could not apply the batch."
 #: src/components/research/run-actions.tsx
 msgid "Could not cancel the run"
 msgstr "Could not cancel the run"
+
+#. placeholder {0}: ch.value
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Could not change {0}"
+msgstr "Could not change {0}"
 
 #: src/components/companies/company-owner-control.tsx
 msgid "Could not change owner"
@@ -1674,10 +1684,6 @@ msgstr "Could not start the research run. Please try again."
 #: src/components/layout/org-switcher.tsx
 msgid "Could not switch organization. Please try again."
 msgstr "Could not switch organization. Please try again."
-
-#: src/components/contacts/manage-channels-dialog.tsx
-msgid "Could not update channels"
-msgstr "Could not update channels"
 
 #: src/components/research/findings/shared.tsx
 msgid "Could not update the paid action"
@@ -2187,6 +2193,12 @@ msgstr "Edit"
 msgid "Edit {0}"
 msgstr "Edit {0}"
 
+#. placeholder {0}: kindLabel(ch.kind)
+#. placeholder {1}: ch.value
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Edit {0} {1}"
+msgstr "Edit {0} {1}"
+
 #: src/components/shared/editable-field.tsx
 #: src/components/shared/editable-field.tsx
 msgid "Edit {label}"
@@ -2656,6 +2668,11 @@ msgstr "High priority"
 msgid "Holds the budget"
 msgstr "Holds the budget"
 
+#. placeholder {0}: ch.value
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "How far {0} is trusted"
+msgstr "How far {0} is trusted"
+
 #: src/components/instructions/stack-editor.tsx
 msgid "How this stack uses the org default"
 msgstr "How this stack uses the org default"
@@ -2879,6 +2896,11 @@ msgstr "Key differentiators"
 #: src/routes/settings/api-keys/index.tsx
 msgid "Keys let AI agents and MCP clients act on behalf of this organization."
 msgstr "Keys let AI agents and MCP clients act on behalf of this organization."
+
+#: src/components/contacts/manage-channels-dialog.tsx
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Kind"
+msgstr "Kind"
 
 #: src/routes/pages/index.tsx
 msgid "Lang"
@@ -3104,11 +3126,6 @@ msgstr "Low"
 msgid "Low priority"
 msgstr "Low priority"
 
-#. placeholder {0}: ch.value
-#: src/components/contacts/manage-channels-dialog.tsx
-msgid "Make {0} primary"
-msgstr "Make {0} primary"
-
 #. placeholder {0}: row.email
 #: src/routes/emails/inboxes.tsx
 msgid "Make {0} the address you send from"
@@ -3156,6 +3173,18 @@ msgstr "Mark \"{0}\" as complete"
 #: src/components/shared/task-item.tsx
 msgid "Mark \"{0}\" as pending"
 msgstr "Mark \"{0}\" as pending"
+
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Mark as risky"
+msgstr "Mark as risky"
+
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Mark as undeliverable"
+msgstr "Mark as undeliverable"
+
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Mark as unverified"
+msgstr "Mark as unverified"
 
 #: src/routes/companies/$slug.tsx
 msgid "Mark as verified"
@@ -3354,6 +3383,8 @@ msgid "My stacks"
 msgstr "My stacks"
 
 #: src/components/contacts/contact-edit-dialog.tsx
+#: src/components/contacts/manage-channels-dialog.tsx
+#: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/instructions/stack-editor.tsx
 #: src/components/instructions/template-dialog.tsx
 #: src/routes/companies/index.tsx
@@ -4035,6 +4066,7 @@ msgid "opens in a new tab"
 msgstr "opens in a new tab"
 
 #: src/components/contacts/manage-channels-dialog.tsx
+#: src/components/contacts/manage-channels-dialog.tsx
 msgid "orders, Girona shop…"
 msgstr "orders, Girona shop…"
 
@@ -4648,14 +4680,19 @@ msgid "Remove \"{0}\" from the stacks that use it first, then delete it."
 msgstr "Remove \"{0}\" from the stacks that use it first, then delete it."
 
 #. placeholder {0}: att.filename
-#. placeholder {0}: ch.value
 #. placeholder {0}: industry.label
-#: src/components/contacts/manage-channels-dialog.tsx
+#. placeholder {0}: o.name
 #: src/components/emails/attachment-picker.tsx
 #: src/components/instructions/stack-picker.tsx
 #: src/routes/settings/organization/industries.tsx
 msgid "Remove {0}"
 msgstr "Remove {0}"
+
+#. placeholder {0}: kindLabel(ch.kind)
+#. placeholder {1}: ch.value
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Remove {0} {1}"
+msgstr "Remove {0} {1}"
 
 #: src/components/shared/editable-field.tsx
 msgid "Remove {chip}"
@@ -4829,6 +4866,10 @@ msgstr "Revoke {0}"
 msgid "Risky"
 msgstr "Risky"
 
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Risky and undeliverable record doubt about an address. Unverified takes a wrong verdict back off without putting anything in its place. Only a check can confirm an address again."
+msgstr "Risky and undeliverable record doubt about an address. Unverified takes a wrong verdict back off without putting anything in its place. Only a check can confirm an address again."
+
 #: src/components/research/run-labels.ts
 #: src/routes/settings/organization/members.tsx
 msgid "Role"
@@ -4890,6 +4931,7 @@ msgstr "Sales context"
 #: src/components/companies/documents-panel.tsx
 #: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
+#: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/instructions/template-dialog.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
@@ -5615,6 +5657,7 @@ msgid "The board could not be fetched. Check that the session is valid, then try
 msgstr "The board could not be fetched. Check that the session is valid, then try again."
 
 #: src/components/contacts/manage-channels-dialog.tsx
+#: src/components/contacts/manage-channels-dialog.tsx
 #: src/routes/companies/$slug.tsx
 msgid "The change didn't go through. Try again."
 msgstr "The change didn't go through. Try again."
@@ -5833,6 +5876,10 @@ msgstr "This is not the same as having none. Try again to see what is scheduled.
 #: src/routes/settings/api-keys/index.tsx
 msgid "This is the only time the full key is shown. Store it somewhere safe — I can't show it again."
 msgstr "This is the only time the full key is shown. Store it somewhere safe — I can't show it again."
+
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "This is what we expect before sending. A bounce is what happened after."
+msgstr "This is what we expect before sending. A bounce is what happened after."
 
 #: src/routes/reset-password.tsx
 #: src/routes/reset-password.tsx
@@ -6090,6 +6137,12 @@ msgstr "Uploading…"
 #: src/routes/emails/inboxes.tsx
 msgid "Use {0} as primary"
 msgstr "Use {0} as primary"
+
+#. placeholder {0}: ch.value
+#. placeholder {1}: kindLabel(ch.kind)
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Use {0} as the main {1}"
+msgstr "Use {0} as the main {1}"
 
 #: src/routes/settings/mcp/index.tsx
 msgid "Use <0>httpUrl</0>, not <1>url</1> — plain <2>url</2> selects the old SSE transport."
