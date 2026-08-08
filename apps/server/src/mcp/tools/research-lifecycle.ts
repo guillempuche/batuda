@@ -80,6 +80,38 @@ const notApproved = (
 				nextStep: `This client has no way to ask anyone to ${what}, so nothing was changed. Tell whoever is reading, and they can do it from ${where}.`,
 			}
 
+// Whether the thing about to be approved is actually there, established before
+// anybody is asked about it. Without this a person is put in front of "approve
+// this spending" for a run that does not exist or belongs to somebody else, and
+// the answer they give decides nothing — which is how a prompt stops being read
+// and starts being clicked through.
+//
+// Reading the run is enough for both: a run this organization cannot see comes
+// back empty, and the item is named inside that run's own findings.
+const findingsHas = (
+	run: unknown,
+	list: 'pending_paid_actions' | 'proposed_updates',
+	itemId: string,
+	// Proposals are matched on being pending as well as on the id, the way the
+	// apply path itself matches them — one already decided is not there to
+	// decide again, and asking about it would be asking about nothing.
+	mustBePending = false,
+): boolean => {
+	const findings = (run as { findings?: unknown } | null)?.findings as
+		| Record<string, unknown>
+		| null
+		| undefined
+	const rows = findings?.[list]
+	return (
+		Array.isArray(rows) &&
+		rows.some(row => {
+			if (typeof row !== 'object' || row === null) return false
+			const item = row as { id?: unknown; status?: unknown }
+			return item.id === itemId && (!mustBePending || item.status === 'pending')
+		})
+	)
+}
+
 // Whether this call moves any spending limit up. A cut, or a value already
 // where it is, changes nothing about how much can go out unasked, so neither
 // needs anybody's say-so.
@@ -375,6 +407,10 @@ export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 					// Skipping spends nothing and needs nobody's say-so; approving
 					// buys the data, so it does.
 					if (decision === 'approve') {
+						const run = yield* svc.get(id)
+						if (run === null) return { status: 'run_not_found' as const }
+						if (!findingsHas(run, 'pending_paid_actions', paid_action_id))
+							return { status: 'action_not_found' as const }
 						const answer = yield* requireApproval(
 							`Approve the paid lookup waiting on research run ${id}? This spends money from the organization's research budget.`,
 						)
@@ -408,6 +444,10 @@ export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 					// Rejecting changes nothing; applying writes to the customer's own
 					// records, so that is what gets asked about.
 					if (decision === 'apply') {
+						const run = yield* svc.get(id)
+						if (run === null) return { outcome: 'run_not_found' as const }
+						if (!findingsHas(run, 'proposed_updates', proposed_update_id, true))
+							return { outcome: 'proposal_not_found' as const }
 						const answer = yield* requireApproval(
 							`Apply the proposed change from research run ${id} to your CRM records?`,
 						)

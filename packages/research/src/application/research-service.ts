@@ -5828,6 +5828,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									// rather than a column, so it is read from there. A company
 									// with none simply yields no domain, which the discovery
 									// call now accepts.
+									// The subject id comes off the run's stored context, so it
+									// is named by whoever asked for the run rather than looked
+									// up here. It is read for this run's own organization —
+									// the same rule the fiber follows — so a stored id from
+									// somewhere else reads as no company at all.
 									const [row] = yield* sql<{
 										name: string | null
 										website: string | null
@@ -5835,10 +5840,13 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										SELECT c.name,
 											(SELECT ch.address FROM channels ch
 												WHERE ch.subject_table = 'companies' AND ch.subject_id = c.id
+													AND ch.organization_id = ${origin.organizationId}
 													AND ch.channel = 'website'
 												ORDER BY ch.is_primary DESC LIMIT 1) AS website
 										FROM companies c
-										WHERE c.id = ${subject.id} AND c.deleted_at IS NULL
+										WHERE c.id = ${subject.id}
+											AND c.organization_id = ${origin.organizationId}
+											AND c.deleted_at IS NULL
 										LIMIT 1
 									`
 									const domain = row?.website
