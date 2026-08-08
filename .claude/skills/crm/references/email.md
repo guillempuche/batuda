@@ -38,6 +38,23 @@ A deliverability verdict is not a verdict on the address unless it says somethin
 | `undeliverable` | Yes          | The mailbox is not there.                                                |
 | anything else   | Yes          | The column takes free text, so an unrecognised word is unvetted.         |
 
+## Getting a held-back send out
+
+When a verdict does stop a send and you know the address is fine, vouch for it:
+
+```
+manage_contact_channels({ action: "vouch", contact_id, channel_id, note: "confirmed on the phone" })
+manage_company_channels({ action: "vouch", company_id, channel_id, note: "..." })
+```
+
+That records a person standing behind the address, and the guard stops asking about it.
+It does not touch what the check found — the two are different claims, and only one of them is something a human can make.
+It settles the address rather than the row, so vouching once covers the same mailbox wherever else it is recorded.
+
+A vouch is refused on an address that hard-bounced or reported spam.
+That block is real, it lives in the same place a vouch is written, and lifting it by vouching would quietly re-open the address for the whole organisation.
+Use `update_contact` with `clear_email_suppression=true` once the person confirms the address works again — that returns it to "nobody has checked", not to "somebody vouched".
+
 ## Seeing it coming
 
 Read `verification` on the channels a contact carries (`list_contacts`) before composing, rather than discovering it on the send.
