@@ -605,7 +605,8 @@ export const EmailHandlersLive = EmailTools.toLayer(
 			),
 		]
 
-		// An address being written to that carries a verdict worth stopping for.
+		// An address being written to that carries a verdict worth stopping for and
+		// that nobody has stood behind.
 		//
 		// The question is put to the addresses, the way the suppression check
 		// upstream puts it, rather than to whoever they belong to. `contact_id` is
@@ -622,17 +623,29 @@ export const EmailHandlersLive = EmailTools.toLayer(
 						const currentOrg = yield* CurrentOrg
 						const rows = yield* sql<{
 							address: string
-							verification: string
+							verification: string | null
+							status: string
 						}>`
-							SELECT lower(address) AS address, verification FROM channels
+							SELECT lower(address) AS address, verification, status
+							FROM channels
 							WHERE organization_id = ${currentOrg.id}
 								AND channel = 'email'
 								AND lower(address) = ANY(${addresses})
-								AND verification IS NOT NULL
+								AND (verification IS NOT NULL OR status = 'valid')
 							ORDER BY lower(address)
 						`
+						// A vouch settles the address, not the row it was written on:
+						// the same mailbox can sit on a person and on their company,
+						// and somebody standing behind it meant the address either way.
+						const vouchedFor = new Set(
+							rows.filter(row => row.status === 'valid').map(r => r.address),
+						)
 						return (
-							rows.find(row => isRiskyEmailVerdict(row.verification)) ?? null
+							rows.find(
+								row =>
+									!vouchedFor.has(row.address) &&
+									isRiskyEmailVerdict(row.verification),
+							) ?? null
 						)
 					})
 
