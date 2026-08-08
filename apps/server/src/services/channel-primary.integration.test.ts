@@ -615,3 +615,61 @@ describe('how a kind is spelled when it is stored', () => {
 		})
 	})
 })
+
+describe('a bounce that a capital letter could have washed off', () => {
+	describe('when an email row is retyped with the same kind, capitalised', () => {
+		it('should keep the bounce record, because nothing actually changed', async () => {
+			// GIVEN a mailbox the send gate is holding back
+			const firm = await pool.query<{ id: string }>(
+				`INSERT INTO companies (organization_id, slug, name)
+				 VALUES ($1, $2, 'Launder SL') RETURNING id`,
+				[ORG, `launder-${randomUUID()}`],
+			)
+			const at = { table: 'companies' as const, id: firm.rows[0]!.id }
+			const added = (await run(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* addChannel(sql, ORG, at, {
+						kind: 'email',
+						value: 'rebot@launder.cat',
+					})
+				}),
+			)) as { readonly id: string }
+			await pool.query(
+				`UPDATE channels SET status = 'bounced', status_reason = 'mailbox unavailable',
+				 soft_bounce_count = 3, verification = 'undeliverable' WHERE id = $1`,
+				[added.id],
+			)
+
+			// WHEN somebody sets its kind to "Email"
+			await run(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* patchChannel(sql, ORG, at, added.id, { kind: 'Email' })
+				}),
+			)
+
+			// THEN it is still an email and still held back. Read as typed, "Email"
+			// is not "email", so this counted as leaving email — which clears the
+			// bounce, the verdict and the counter, and files the row under a kind
+			// the send gate does not look at. One call, and a dead address is clean
+			// and invisible.
+			const after = await pool.query<{
+				channel: string
+				status: string
+				verification: string | null
+				soft_bounce_count: number
+			}>(
+				`SELECT channel, status, verification, soft_bounce_count
+				 FROM channels WHERE id = $1`,
+				[added.id],
+			)
+			expect(after.rows[0]).toMatchObject({
+				channel: 'email',
+				status: 'bounced',
+				verification: 'undeliverable',
+				soft_bounce_count: 3,
+			})
+		})
+	})
+})
