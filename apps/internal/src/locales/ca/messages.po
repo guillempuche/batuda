@@ -130,6 +130,12 @@ msgstr "{0} ara és l'adreça des d'on envies"
 msgid "{0} is the address you send from"
 msgstr "{0} és l'adreça des d'on envies"
 
+#. placeholder {0}: ch.value
+#. placeholder {1}: kindLabel(ch.kind)
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "{0} is the main {1}"
+msgstr "{1} principal: {0}"
+
 #. placeholder {0}: item.row.messageCount
 #: src/components/companies/conversations-tab.tsx
 msgid "{0} messages"
@@ -468,6 +474,8 @@ msgstr "Afegit com a oportunitat verificada"
 msgid "Adding…"
 msgstr "S'està afegint…"
 
+#: src/components/contacts/manage-channels-dialog.tsx
+#: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/research/run-labels.ts
 msgid "Address"
 msgstr "Adreça"
@@ -561,6 +569,10 @@ msgstr "Ja resolt"
 #: src/components/companies/company-fit-section.tsx
 msgid "also reported as {0}"
 msgstr "també indicat com a {0}"
+
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "An address can't be blank."
+msgstr "Una adreça no pot estar en blanc."
 
 #: src/routes/oauth/consent.tsx
 msgid "An AI assistant wants to connect to your Batuda account over MCP and act on your behalf. Only approve assistants you trust."
@@ -938,6 +950,7 @@ msgstr "Crides"
 #: src/components/companies/followup-dialog.tsx
 #: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
+#: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/instructions/stack-editor.tsx
 #: src/components/instructions/template-dialog.tsx
 #: src/components/instructions/template-transfer-dialog.tsx
@@ -1015,18 +1028,6 @@ msgstr "S'han desat els canvis."
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Channel"
 msgstr "Canal"
-
-#: src/components/contacts/manage-channels-dialog.tsx
-msgid "Channel kind"
-msgstr "Tipus de canal"
-
-#: src/components/contacts/manage-channels-dialog.tsx
-msgid "Channel label"
-msgstr "Etiqueta del canal"
-
-#: src/components/contacts/manage-channels-dialog.tsx
-msgid "Channel value"
-msgstr "Valor del canal"
 
 #: src/components/contacts/manage-channels-dialog.tsx
 msgid "Channels — {contactName}"
@@ -1395,6 +1396,10 @@ msgstr "No s’ha pogut acceptar {0}"
 msgid "Could not add {trimmed}. Please try again."
 msgstr "No s'ha pogut afegir {trimmed}. Torna-ho a provar."
 
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Could not add {value}"
+msgstr "No s'ha pogut afegir {value}"
+
 #: src/components/research/findings/prospect-scan-view.tsx
 msgid "Could not add as a lead"
 msgstr "No s'ha pogut afegir com a oportunitat"
@@ -1411,6 +1416,11 @@ msgstr "No s'ha pogut aplicar el lot."
 #: src/components/research/run-actions.tsx
 msgid "Could not cancel the run"
 msgstr "No s'ha pogut cancel·lar l'execució"
+
+#. placeholder {0}: ch.value
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Could not change {0}"
+msgstr "No s'ha pogut canviar {0}"
 
 #: src/components/companies/company-owner-control.tsx
 msgid "Could not change owner"
@@ -1674,10 +1684,6 @@ msgstr "No s'ha pogut iniciar la recerca. Torna-ho a provar."
 #: src/components/layout/org-switcher.tsx
 msgid "Could not switch organization. Please try again."
 msgstr "No s'ha pogut canviar d'organització. Torna-ho a provar."
-
-#: src/components/contacts/manage-channels-dialog.tsx
-msgid "Could not update channels"
-msgstr "No s'han pogut actualitzar els canals"
 
 #: src/components/research/findings/shared.tsx
 msgid "Could not update the paid action"
@@ -2187,6 +2193,12 @@ msgstr "Edita"
 msgid "Edit {0}"
 msgstr "Edita {0}"
 
+#. placeholder {0}: kindLabel(ch.kind)
+#. placeholder {1}: ch.value
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Edit {0} {1}"
+msgstr "Edita {0} {1}"
+
 #: src/components/shared/editable-field.tsx
 #: src/components/shared/editable-field.tsx
 msgid "Edit {label}"
@@ -2656,6 +2668,11 @@ msgstr "Prioritat alta"
 msgid "Holds the budget"
 msgstr "Té el pressupost"
 
+#. placeholder {0}: ch.value
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "How far {0} is trusted"
+msgstr "Fins a quin punt es confia en {0}"
+
 #: src/components/instructions/stack-editor.tsx
 msgid "How this stack uses the org default"
 msgstr "Com fa servir aquesta pila el valor per defecte de l'organització"
@@ -2879,6 +2896,11 @@ msgstr "Diferenciadors clau"
 #: src/routes/settings/api-keys/index.tsx
 msgid "Keys let AI agents and MCP clients act on behalf of this organization."
 msgstr "Les claus permeten que els agents d'IA i els clients MCP actuïn en nom d'aquesta organització."
+
+#: src/components/contacts/manage-channels-dialog.tsx
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Kind"
+msgstr "Tipus"
 
 #: src/routes/pages/index.tsx
 msgid "Lang"
@@ -3104,11 +3126,6 @@ msgstr "Baixa"
 msgid "Low priority"
 msgstr "Prioritat baixa"
 
-#. placeholder {0}: ch.value
-#: src/components/contacts/manage-channels-dialog.tsx
-msgid "Make {0} primary"
-msgstr "Fes {0} principal"
-
 #. placeholder {0}: row.email
 #: src/routes/emails/inboxes.tsx
 msgid "Make {0} the address you send from"
@@ -3156,6 +3173,18 @@ msgstr "Marca «{0}» com a completada"
 #: src/components/shared/task-item.tsx
 msgid "Mark \"{0}\" as pending"
 msgstr "Marca «{0}» com a pendent"
+
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Mark as risky"
+msgstr "Marca com a arriscat"
+
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Mark as undeliverable"
+msgstr "Marca com a no lliurable"
+
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Mark as unverified"
+msgstr "Marca com a sense verificar"
 
 #: src/routes/companies/$slug.tsx
 msgid "Mark as verified"
@@ -3354,6 +3383,8 @@ msgid "My stacks"
 msgstr "Les meves piles"
 
 #: src/components/contacts/contact-edit-dialog.tsx
+#: src/components/contacts/manage-channels-dialog.tsx
+#: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/instructions/stack-editor.tsx
 #: src/components/instructions/template-dialog.tsx
 #: src/routes/companies/index.tsx
@@ -4035,6 +4066,7 @@ msgid "opens in a new tab"
 msgstr "s'obre en una pestanya nova"
 
 #: src/components/contacts/manage-channels-dialog.tsx
+#: src/components/contacts/manage-channels-dialog.tsx
 msgid "orders, Girona shop…"
 msgstr "comandes, botiga de Girona…"
 
@@ -4648,14 +4680,19 @@ msgid "Remove \"{0}\" from the stacks that use it first, then delete it."
 msgstr "Treu «{0}» de les piles que la fan servir abans d'eliminar-la."
 
 #. placeholder {0}: att.filename
-#. placeholder {0}: ch.value
 #. placeholder {0}: industry.label
-#: src/components/contacts/manage-channels-dialog.tsx
+#. placeholder {0}: o.name
 #: src/components/emails/attachment-picker.tsx
 #: src/components/instructions/stack-picker.tsx
 #: src/routes/settings/organization/industries.tsx
 msgid "Remove {0}"
 msgstr "Elimina {0}"
+
+#. placeholder {0}: kindLabel(ch.kind)
+#. placeholder {1}: ch.value
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Remove {0} {1}"
+msgstr "Elimina {0} {1}"
 
 #: src/components/shared/editable-field.tsx
 msgid "Remove {chip}"
@@ -4829,6 +4866,10 @@ msgstr "Revoca {0}"
 msgid "Risky"
 msgstr "Arriscat"
 
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Risky and undeliverable record doubt about an address. Unverified takes a wrong verdict back off without putting anything in its place. Only a check can confirm an address again."
+msgstr "Arriscada i no lliurable registren dubtes sobre una adreça. Sense verificar treu un veredicte equivocat sense posar-hi res al seu lloc. Només una comprovació pot tornar a confirmar una adreça."
+
 #: src/components/research/run-labels.ts
 #: src/routes/settings/organization/members.tsx
 msgid "Role"
@@ -4890,6 +4931,7 @@ msgstr "Context comercial"
 #: src/components/companies/documents-panel.tsx
 #: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
+#: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/instructions/template-dialog.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
@@ -5615,6 +5657,7 @@ msgid "The board could not be fetched. Check that the session is valid, then try
 msgstr "No s'ha pogut carregar el tauler. Comprova que la sessió sigui vàlida i torna-ho a provar."
 
 #: src/components/contacts/manage-channels-dialog.tsx
+#: src/components/contacts/manage-channels-dialog.tsx
 #: src/routes/companies/$slug.tsx
 msgid "The change didn't go through. Try again."
 msgstr "El canvi no s'ha completat. Torna-ho a provar."
@@ -5833,6 +5876,10 @@ msgstr "Això no vol dir que no n'hi hagi cap. Torna-ho a provar per veure què 
 #: src/routes/settings/api-keys/index.tsx
 msgid "This is the only time the full key is shown. Store it somewhere safe — I can't show it again."
 msgstr "Aquest és l'únic moment en què es mostra la clau sencera. Desa-la en un lloc segur — no te la puc tornar a mostrar."
+
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "This is what we expect before sending. A bounce is what happened after."
+msgstr "Això és el que esperem abans d'enviar. Un rebot és el que ha passat després."
 
 #: src/routes/reset-password.tsx
 #: src/routes/reset-password.tsx
@@ -6090,6 +6137,12 @@ msgstr "Pujant…"
 #: src/routes/emails/inboxes.tsx
 msgid "Use {0} as primary"
 msgstr "Fes servir {0} com a principal"
+
+#. placeholder {0}: ch.value
+#. placeholder {1}: kindLabel(ch.kind)
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Use {0} as the main {1}"
+msgstr "Fes servir {0} com a {1} principal"
 
 #: src/routes/settings/mcp/index.tsx
 msgid "Use <0>httpUrl</0>, not <1>url</1> — plain <2>url</2> selects the old SSE transport."
