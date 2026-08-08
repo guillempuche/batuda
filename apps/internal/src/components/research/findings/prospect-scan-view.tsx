@@ -25,19 +25,20 @@ import {
 	Section,
 	Sections,
 	SectionTitle,
+	sourcedText,
 } from './shared'
 
 /**
  * Renders a `prospect_scan_v1` research finding. Each prospect carries
- * a `why_relevant` rationale + optional industry/country/tax_id + citations.
+ * a `why_relevant` rationale + optional industry/countries/tax_id + citations.
  */
 
 type ProspectEntry = {
 	readonly name: string
-	readonly website?: string
+	readonly website?: unknown
 	readonly tax_id?: string
 	readonly industry?: string
-	readonly country?: string
+	readonly countries?: ReadonlyArray<string>
 	readonly why_relevant: string
 	readonly citations?: ReadonlyArray<Citation>
 }
@@ -61,45 +62,48 @@ export function ProspectScanView({
 						<Trans>Prospects</Trans>
 					</SectionTitle>
 					<List>
-						{prospects.map(p => (
-							<ListItem key={`${p.name}|${p.tax_id ?? p.website ?? ''}`}>
-								<RowHead>
-									<Pill>{p.name}</Pill>
-									{p.website !== undefined ? (
-										<SafeLink href={p.website}>{p.website}</SafeLink>
-									) : null}
-								</RowHead>
-								<Reason>{p.why_relevant}</Reason>
-								<FieldsTable>
-									{p.industry !== undefined ? (
-										<FieldRow>
-											<FieldKey>
-												<Trans>Industry</Trans>
-											</FieldKey>
-											<FieldValue>{p.industry}</FieldValue>
-										</FieldRow>
-									) : null}
-									{p.country !== undefined ? (
-										<FieldRow>
-											<FieldKey>
-												<Trans>Country</Trans>
-											</FieldKey>
-											<FieldValue>{p.country}</FieldValue>
-										</FieldRow>
-									) : null}
-									{p.tax_id !== undefined ? (
-										<FieldRow>
-											<FieldKey>
-												<Trans>Tax ID</Trans>
-											</FieldKey>
-											<FieldValue>{p.tax_id}</FieldValue>
-										</FieldRow>
-									) : null}
-								</FieldsTable>
-								<CitationList citations={p.citations} />
-								<AddAsLeadButton prospect={p} />
-							</ListItem>
-						))}
+						{prospects.map(p => {
+							const site = sourcedText(p.website)
+							return (
+								<ListItem key={`${p.name}|${p.tax_id ?? site ?? ''}`}>
+									<RowHead>
+										<Pill>{p.name}</Pill>
+										{site !== undefined ? (
+											<SafeLink href={site}>{site}</SafeLink>
+										) : null}
+									</RowHead>
+									<Reason>{p.why_relevant}</Reason>
+									<FieldsTable>
+										{p.industry !== undefined ? (
+											<FieldRow>
+												<FieldKey>
+													<Trans>Industry</Trans>
+												</FieldKey>
+												<FieldValue>{p.industry}</FieldValue>
+											</FieldRow>
+										) : null}
+										{p.countries !== undefined && p.countries.length > 0 ? (
+											<FieldRow>
+												<FieldKey>
+													<Trans>Countries</Trans>
+												</FieldKey>
+												<FieldValue>{p.countries.join(', ')}</FieldValue>
+											</FieldRow>
+										) : null}
+										{p.tax_id !== undefined ? (
+											<FieldRow>
+												<FieldKey>
+													<Trans>Tax ID</Trans>
+												</FieldKey>
+												<FieldValue>{p.tax_id}</FieldValue>
+											</FieldRow>
+										) : null}
+									</FieldsTable>
+									<CitationList citations={p.citations} />
+									<AddAsLeadButton prospect={p} />
+								</ListItem>
+							)
+						})}
 					</List>
 				</Section>
 			) : null}
@@ -135,8 +139,12 @@ function AddAsLeadButton({ prospect }: { readonly prospect: ProspectEntry }) {
 				slug,
 				status: 'prospect',
 				...(prospect.industry ? { industry: prospect.industry } : {}),
-				...(prospect.country ? { country: prospect.country } : {}),
-				...(prospect.website ? { website: prospect.website } : {}),
+				// A company row holds one country, and a scan may have named several. The
+				// first is the one it is registered in, which is what the row means.
+				...(prospect.countries?.[0] ? { country: prospect.countries[0] } : {}),
+				...(sourcedText(prospect.website)
+					? { website: sourcedText(prospect.website) }
+					: {}),
 			},
 		})
 		if (exit._tag !== 'Success') {

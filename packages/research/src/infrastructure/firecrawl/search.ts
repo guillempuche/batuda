@@ -75,7 +75,7 @@ export const makeFirecrawlSearch = (slot: number) =>
 					Effect.gen(function* () {
 						// Firecrawl's `country` wants a lower-case two-letter code; a raw
 						// model hint like "en-US" is rejected (422), so normalize or drop it.
-						const country = parseCountryAlpha2(input.location)
+						const country = parseCountryAlpha2(input.country)
 						const request = HttpClientRequest.post(SEARCH_URL).pipe(
 							HttpClientRequest.setHeaders({
 								Authorization: `Bearer ${Redacted.value(apiKey)}`,

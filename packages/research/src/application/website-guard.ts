@@ -68,6 +68,15 @@ const pathSegmentsOf = (website: string): ReadonlyArray<string> => {
 	}
 }
 
+// The address itself, whether the model gave it bare or paired with the page it
+// read it on. A field a guard already emptied reads as no address at all.
+const websiteAddress = (website: unknown): string | undefined => {
+	if (typeof website === 'string') return website
+	if (isPlainObject(website) && typeof website['value'] === 'string')
+		return website['value']
+	return undefined
+}
+
 type WebsiteVerdict = 'keep' | 'directory' | 'profile_page'
 
 // Where a website really points, for a company by this name.
@@ -150,19 +159,25 @@ export const guardCompanyWebsites = (
 			return value
 		}
 
+		// An entry that names a company and gives its website — a scanned prospect or
+		// competitor. Judged here, against that entry's own name, and settled here:
+		// letting the address descend to the branch above would judge it against the
+		// run's target instead, which for a scan is nobody in particular.
 		const name = value['name']
-		const website = value['website']
-		if (typeof name === 'string' && typeof website === 'string') {
-			const verdict = classifyWebsite(name, website)
+		const address = websiteAddress(value['website'])
+		if (typeof name === 'string' && address !== undefined) {
+			const verdict = classifyWebsite(name, address)
+			const { website: judged, ...rest } = value
+			const walkedRest = Object.entries(rest).map(
+				([k, v]) => [k, walkChild(k, v)] as const,
+			)
 			if (verdict !== 'keep') {
 				count(verdict)
 				// Drop the key entirely, so the value reads as one the model never
 				// gave — the same as any other field a guard removes.
-				const { website: _dropped, ...rest } = value
-				return Object.fromEntries(
-					Object.entries(rest).map(([k, v]) => [k, walkChild(k, v)] as const),
-				)
+				return Object.fromEntries(walkedRest)
 			}
+			return Object.fromEntries([...walkedRest, ['website', judged] as const])
 		}
 
 		return Object.fromEntries(

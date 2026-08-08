@@ -20,6 +20,7 @@ import {
 	Section,
 	Sections,
 	SectionTitle,
+	sourcedText,
 	Tag,
 	TagList,
 } from './shared'
@@ -108,7 +109,7 @@ type QualityBlock = {
 
 type CompetitorEntry = {
 	readonly name: string
-	readonly website?: string
+	readonly website?: unknown
 	readonly why?: string
 	readonly citations?: ReadonlyArray<Citation>
 }
@@ -175,6 +176,13 @@ const ENRICHMENT_FIELDS: ReadonlyArray<{
 	{ key: 'location', label: <Trans>Location</Trans> },
 	{ key: 'current_tools', label: <Trans>Current tools</Trans> },
 ]
+
+// A competitor's address, whether the run paired it with its source or, on an
+// older run, stored it bare.
+const CompetitorSite = ({ website }: { readonly website?: unknown }) => {
+	const site = sourcedText(website)
+	return site === undefined ? null : <SafeLink href={site}>{site}</SafeLink>
+}
 
 export function CompanyEnrichmentView({
 	findings,
@@ -310,9 +318,7 @@ export function CompanyEnrichmentView({
 							<ListItem key={c.name}>
 								<RowHead>
 									<Pill>{c.name}</Pill>
-									{c.website !== undefined ? (
-										<SafeLink href={c.website}>{c.website}</SafeLink>
-									) : null}
+									<CompetitorSite website={c.website} />
 								</RowHead>
 								{c.why !== undefined ? <Reason>{c.why}</Reason> : null}
 								<CitationList citations={c.citations} />

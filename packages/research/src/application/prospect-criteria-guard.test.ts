@@ -6,13 +6,20 @@ import {
 } from './prospect-criteria-guard'
 
 // A prospect as it reaches the filter: a name, and optionally a stated headcount
-// (paired with its source) and country.
-const prospect = (name: string, employees?: number, country?: string) => ({
+// (paired with its source) and the countries it trades from. A bare string is the
+// single-country case, which is most of them.
+const prospect = (
+	name: string,
+	employees?: number,
+	countries?: string | ReadonlyArray<string>,
+) => ({
 	name,
 	...(employees !== undefined
 		? { employee_estimate: { value: employees, source_id: 's1' } }
 		: {}),
-	...(country !== undefined ? { country } : {}),
+	...(countries !== undefined
+		? { countries: typeof countries === 'string' ? [countries] : countries }
+		: {}),
 })
 
 const namesOf = (findings: unknown): string[] =>
@@ -80,6 +87,36 @@ describe('filterProspectsByCriteria', () => {
 			// country is kept (silence is not a conflict)
 			const result = filterProspectsByCriteria(findings, { countries: ['ES'] })
 			expect(namesOf(result.findings)).toEqual(['Spanish', 'Unstated'])
+		})
+	})
+
+	describe('when a prospect trades from more than one country', () => {
+		it('should keep it when any of them is the one asked for', () => {
+			// GIVEN a US request and a company registered in Germany with a plant in
+			// the US — the shape a multinational actually has
+			const findings = {
+				prospects: [
+					prospect('German parent, US plant', undefined, ['DE', 'US']),
+					prospect('German only', undefined, ['DE']),
+				],
+			}
+
+			// WHEN filtered — THEN the multinational survives: a company that operates
+			// where the request asked is what the request wanted, whatever its
+			// registration says
+			const result = filterProspectsByCriteria(findings, { countries: ['US'] })
+			expect(namesOf(result.findings)).toEqual(['German parent, US plant'])
+		})
+
+		it('should drop it only when none of them match', () => {
+			// GIVEN a US request and a company trading across three other countries
+			const findings = {
+				prospects: [prospect('Europe only', undefined, ['DE', 'FR', 'ES'])],
+			}
+
+			// WHEN filtered — THEN it is dropped: every place it named is elsewhere
+			const result = filterProspectsByCriteria(findings, { countries: ['US'] })
+			expect(namesOf(result.findings)).toEqual([])
 		})
 	})
 

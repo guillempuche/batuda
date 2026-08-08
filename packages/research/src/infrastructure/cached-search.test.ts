@@ -13,7 +13,7 @@ describe('search cache key computation', () => {
 		})
 		const byLocation = computeSearchCacheKey('search', {
 			query: 'q',
-			location: 'es',
+			country: 'es',
 		})
 		const byLanguage = computeSearchCacheKey('search', {
 			query: 'q',

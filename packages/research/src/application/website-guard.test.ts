@@ -14,6 +14,24 @@ const websitesOf = (findings: unknown): Array<string | undefined> =>
 		c => c.website,
 	)
 
+// The same entry as a scan returns it: the address paired with the page it was
+// read on, which is the shape the citation guard can judge.
+const sourcedScan = (
+	prospects: ReadonlyArray<{ name: string; website?: string }>,
+) => ({
+	prospects: prospects.map(p => ({
+		name: p.name,
+		...(p.website === undefined
+			? {}
+			: { website: { value: p.website, source_id: 'src_1' } }),
+	})),
+})
+
+const sourcedWebsitesOf = (findings: unknown): Array<string | undefined> =>
+	(
+		findings as { prospects: Array<{ website?: { value?: string } }> }
+	).prospects.map(p => p.website?.value)
+
 describe('guardCompanyWebsites', () => {
 	describe('when the website is a known directory', () => {
 		it('should blank a company-profile page and count it as a directory', () => {
@@ -346,6 +364,41 @@ describe('guardCompanyWebsites', () => {
 			const result = guardCompanyWebsites(findings)
 			expect(result.findings).toEqual(findings)
 			expect(result.blankedDirectory + result.blankedProfilePage).toBe(0)
+		})
+	})
+	describe('when a scanned prospect carries the page its website came from', () => {
+		it('should judge the address against that prospect, not the run target', () => {
+			// GIVEN a prospect whose "website" is a listing about it on someone else's
+			// directory, given as a value paired with its source
+			const findings = sourcedScan([
+				{
+					name: 'Redwood Logistics',
+					website:
+						'https://some-unknown-directory.io/company/redwood-logistics',
+				},
+			])
+
+			// WHEN checked — THEN it is still caught. The name to match sits beside the
+			// address in the entry; a scan has no single company to fall back on, so
+			// judging against the run instead would let every listing through
+			const result = guardCompanyWebsites(findings)
+			expect(sourcedWebsitesOf(result.findings)).toEqual([undefined])
+			expect(result.blankedProfilePage).toBe(1)
+		})
+
+		it('should keep a prospect on its own site', () => {
+			// GIVEN a prospect whose address is its own domain
+			const findings = sourcedScan([
+				{ name: 'Redwood Logistics', website: 'https://redwoodlogistics.com' },
+			])
+
+			// WHEN checked — THEN it survives with its source intact
+			const result = guardCompanyWebsites(findings)
+			expect(sourcedWebsitesOf(result.findings)).toEqual([
+				'https://redwoodlogistics.com',
+			])
+			expect(result.blankedProfilePage).toBe(0)
+			expect(result.blankedDirectory).toBe(0)
 		})
 	})
 })

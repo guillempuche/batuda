@@ -76,7 +76,7 @@ export const makeBraveLlmContextSearch = (slot: number) =>
 			search: (input: SearchInput) =>
 				harden(
 					Effect.gen(function* () {
-						const country = parseCountryAlpha2(input.location)
+						const country = parseCountryAlpha2(input.country)
 						const response = yield* client
 							.get('https://api.search.brave.com/res/v1/llm/context', {
 								headers: {
