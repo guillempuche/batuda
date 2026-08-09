@@ -278,7 +278,7 @@ const ManageCompanySites = Tool.make('manage_company_sites', {
 // switchboard only by `site_id`, so a second tool would duplicate the lot.
 const ManageCompanyChannels = Tool.make('manage_company_channels', {
 	description:
-		"The ways of reaching a company — its mailboxes, phones, website, social handles. A company can hold several of a kind, which is the point of this tool: `update_company` writes one email and one phone, and a firm with an orders mailbox, an accounts mailbox and a switchboard needs all of them kept apart. Give each one a `label` in the words somebody would actually use — 'orders', 'accounts', 'Girona shop' — because two addresses with no labels are indistinguishable a month later. Pass `site_id` to hang the channel off one branch instead of the company as a whole. action: 'list' (all of them; add site_id to see one branch's), 'add' (kind plus value, and a label whenever there is more than one of that kind), 'update' (by channel_id, only the fields to change), 'remove' (by channel_id). An address the company already holds is refused rather than merged, so correcting one onto another means removing the spare instead. kind is open — email, phone, linkedin, instagram, website, x, bluesky, … — and `is_primary` marks the one to use when nothing says otherwise; the primary email is the address mail is sent to, and removing it hands that over to the oldest one left of the same kind. `verification` only ever lowers how far an address is trusted, and only on 'update'; a later check can raise it again.",
+		"The ways of reaching a company — its mailboxes, phones, website, social handles. A company can hold several of a kind, which is the point of this tool: `update_company` writes one email and one phone, and a firm with an orders mailbox, an accounts mailbox and a switchboard needs all of them kept apart. Give each one a `label` in the words somebody would actually use — 'orders', 'accounts', 'Girona shop' — because two addresses with no labels are indistinguishable a month later. Pass `site_id` to hang the channel off one branch instead of the company as a whole. action: 'list' (all of them; add site_id to see one branch's), 'add' (kind plus value, and a label whenever there is more than one of that kind), 'update' (by channel_id, only the fields to change), 'remove' (by channel_id). An address the company already holds is refused rather than merged, so correcting one onto another means removing the spare instead. kind is open — email, phone, linkedin, instagram, website, x, bluesky, … — and `is_primary` marks the one to use when nothing says otherwise; the primary email is the address mail is sent to, and removing it hands that over to the oldest one left of the same kind. `verification` only ever lowers how far an address is trusted, and only on 'update' — pass null to take a verdict back off entirely, which says nobody has checked rather than that a check came back doubtful. A later check can raise it again.",
 	parameters: Schema.Struct({
 		action: Schema.Literals(['list', 'add', 'update', 'remove']),
 		company_id: Schema.String,
@@ -288,9 +288,11 @@ const ManageCompanyChannels = Tool.make('manage_company_channels', {
 		value: Schema.optional(Schema.String),
 		label: Schema.optional(Schema.NullOr(Schema.String)),
 		is_primary: Schema.optional(Schema.Boolean),
-		verification: Schema.optional(HandSetVerificationVerdict).annotate({
+		verification: Schema.optional(
+			Schema.NullOr(HandSetVerificationVerdict),
+		).annotate({
 			description:
-				"How far this address is trusted, and only ever downwards: 'risky', 'undeliverable', or 'unknown' to withdraw a verdict that looks wrong. An address is only ever called deliverable by a check that reached the mailbox.",
+				"How far this address is trusted, and only ever downwards: 'risky' or 'undeliverable' to record doubt, 'unknown' for a check that settled nothing, or null to take a verdict back off entirely. An address is only ever called deliverable by a check that reached the mailbox.",
 		}),
 	}),
 	success: Schema.Struct({

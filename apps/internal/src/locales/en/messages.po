@@ -3182,10 +3182,6 @@ msgstr "Mark as risky"
 msgid "Mark as undeliverable"
 msgstr "Mark as undeliverable"
 
-#: src/components/contacts/manage-channels-dialog.tsx
-msgid "Mark as unverified"
-msgstr "Mark as unverified"
-
 #: src/routes/companies/$slug.tsx
 msgid "Mark as verified"
 msgstr "Mark as verified"
@@ -4706,6 +4702,10 @@ msgstr "Remove {email} from this organization?"
 msgid "Remove line"
 msgstr "Remove line"
 
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Remove this verdict"
+msgstr "Remove this verdict"
+
 #: src/routes/settings/organization/members.tsx
 msgid "Removing…"
 msgstr "Removing…"
@@ -4867,8 +4867,8 @@ msgid "Risky"
 msgstr "Risky"
 
 #: src/components/contacts/manage-channels-dialog.tsx
-msgid "Risky and undeliverable record doubt about an address. Unverified takes a wrong verdict back off without putting anything in its place. Only a check can confirm an address again."
-msgstr "Risky and undeliverable record doubt about an address. Unverified takes a wrong verdict back off without putting anything in its place. Only a check can confirm an address again."
+msgid "Risky and undeliverable record doubt about an address. Removing a verdict says nobody has checked, which is the truth about one that was written down rather than found out. Only a check can confirm an address again."
+msgstr "Risky and undeliverable record doubt about an address. Removing a verdict says nobody has checked, which is the truth about one that was written down rather than found out. Only a check can confirm an address again."
 
 #: src/components/research/run-labels.ts
 #: src/routes/settings/organization/members.tsx

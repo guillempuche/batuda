@@ -53,10 +53,12 @@ verdict at all says. Which of them stop a send is the sending side's rule — re
 it there rather than assuming, because it has changed.
 
 A tool call may only ever **lower** it: `risky` or `undeliverable` to record
-doubt, or `unknown` to withdraw a verdict that looks wrong without putting
-anything in its place. Saying an address is good is something a check finds out
-by reaching the mailbox, so `deliverable` is refused from a caller. A later check
-can raise it again.
+doubt, `unknown` for a check that came back with nothing, or **null** to take a
+verdict back off entirely. Null is the honest record for a word that was written
+down rather than found out — it says nobody has checked, which is different from
+a check that settled nothing. Saying an address is good is something a check
+finds out by reaching the mailbox, so `deliverable` is refused from a caller. A
+later check can raise it again.
 
 This is a different thing from a bounce. `status` records what happened *after*
 a send; `clear_email_suppression` on `update_contact` is what resets that.

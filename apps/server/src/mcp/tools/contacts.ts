@@ -46,7 +46,7 @@ const ChannelInput = Schema.Struct({
 	}),
 	verification: Schema.optional(HandSetVerificationVerdict).annotate({
 		description:
-			"How far this address is trusted, and only ever downwards: 'risky', 'undeliverable', or 'unknown' to withdraw a verdict that looks wrong. An address is only ever called deliverable by a check that reached the mailbox.",
+			"How far this address is trusted, and only ever downwards: 'risky' or 'undeliverable' to record doubt, 'unknown' for a check that settled nothing, or null to take a verdict back off entirely. An address is only ever called deliverable by a check that reached the mailbox.",
 	}),
 	is_primary: Schema.optional(Schema.Boolean),
 })
@@ -128,7 +128,7 @@ const DeleteContact = Tool.make('delete_contact', {
 // union serialises to.
 const ManageContactChannels = Tool.make('manage_contact_channels', {
 	description:
-		"The ways of reaching one person — their mailboxes, phones, social handles — one at a time. This is where a wrong address is put right: update_contact's channels[] only ever adds, so an address corrected there leaves the old one sitting beside it, and deleting the person to start over detaches every email, meeting and interaction ever logged against them. action: 'list' (all of them), 'add' (kind plus value, and a label whenever there is more than one of that kind), 'update' (by channel_id, only the fields to change), 'remove' (by channel_id). Renaming an address onto one this person already holds is refused rather than merged — remove the spare instead. `is_primary` marks the one to use when nothing says otherwise; the primary email is the address mail is sent to, and removing it hands that over to the oldest one left of the same kind. `verification` only ever lowers how far an address is trusted, and only on 'update'; a later check can raise it again. Leaving somebody with no email address at all means a later research run or an inbound reply will not recognise them and may create a second copy of the same person.",
+		"The ways of reaching one person — their mailboxes, phones, social handles — one at a time. This is where a wrong address is put right: update_contact's channels[] only ever adds, so an address corrected there leaves the old one sitting beside it, and deleting the person to start over detaches every email, meeting and interaction ever logged against them. action: 'list' (all of them), 'add' (kind plus value, and a label whenever there is more than one of that kind), 'update' (by channel_id, only the fields to change), 'remove' (by channel_id). Renaming an address onto one this person already holds is refused rather than merged — remove the spare instead. `is_primary` marks the one to use when nothing says otherwise; the primary email is the address mail is sent to, and removing it hands that over to the oldest one left of the same kind. `verification` only ever lowers how far an address is trusted, and only on 'update' — pass null to take a verdict back off entirely, which says nobody has checked rather than that a check came back doubtful. A later check can raise it again. Leaving somebody with no email address at all means a later research run or an inbound reply will not recognise them and may create a second copy of the same person.",
 	parameters: Schema.Struct({
 		action: Schema.Literals(['list', 'add', 'update', 'remove']),
 		contact_id: Schema.String,
@@ -138,7 +138,7 @@ const ManageContactChannels = Tool.make('manage_contact_channels', {
 		// Nullable so a name given by mistake can be taken back off.
 		label: Schema.optional(Schema.NullOr(Schema.String)),
 		is_primary: Schema.optional(Schema.Boolean),
-		verification: Schema.optional(HandSetVerificationVerdict),
+		verification: Schema.optional(Schema.NullOr(HandSetVerificationVerdict)),
 	}),
 	success: Schema.Struct({
 		channels: Schema.Array(ContactChannel.json),

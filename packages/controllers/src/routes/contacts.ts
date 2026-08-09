@@ -76,7 +76,10 @@ const PatchChannelInput = Schema.Struct({
 	// keeps whatever is there.
 	label: Schema.optional(Schema.NullOr(Schema.String)),
 	is_primary: Schema.optional(Schema.Boolean),
-	verification: Schema.optional(HandSetVerificationVerdict),
+	// Nullable so a verdict recorded in error can be taken back off, the way a
+	// label can. Null says nobody ever checked, which is the truth about a word
+	// that was never a check; it is not a way of calling an address good.
+	verification: Schema.optional(Schema.NullOr(HandSetVerificationVerdict)),
 })
 
 // A contact plus its reachable channels. `channels` stays open (`Unknown`):

@@ -465,3 +465,53 @@ describe('an action missing what it needs', () => {
 		})
 	})
 })
+
+describe('a verdict that was written down rather than found out', () => {
+	describe('when it is taken back off', () => {
+		it('should leave the address reading as one nobody has checked', async () => {
+			// GIVEN an address carrying a verdict, and a score alongside it — the
+			// state the repair migration left every unrecognised word in
+			const list = await manage({ action: 'list', contact_id: pep })
+			const target = list.find(c => c.kind === 'email')!
+			await pool.query(
+				`UPDATE channels SET verification = 'risky', confidence = 55 WHERE id = $1`,
+				[target.id],
+			)
+
+			// WHEN somebody who knows it was never a check removes it
+			const after = await manage({
+				action: 'update',
+				contact_id: pep,
+				channel_id: target.id,
+				verification: null,
+			})
+
+			// THEN nothing is claimed about the address either way, and the score
+			// goes with the verdict it belonged to. Marking it "unverified" instead
+			// would have recorded a check that came back with nothing, which is a
+			// different thing and not what happened.
+			const cleared = after.find(c => c.id === target.id)
+			expect(cleared?.verification).toBeNull()
+			expect(cleared?.confidence).toBeNull()
+		})
+	})
+
+	describe('when a caller still tries to call an address good', () => {
+		it('should refuse, clearing or not', async () => {
+			const list = await manage({ action: 'list', contact_id: pep })
+			const refusal = await refusalFrom(
+				manageRaw({
+					action: 'update',
+					contact_id: pep,
+					channel_id: list[0]!.id,
+					verification: 'deliverable',
+				}),
+			)
+			expect(refusal.length).toBeGreaterThan(0)
+			const after = await manage({ action: 'list', contact_id: pep })
+			expect(after.find(c => c.id === list[0]!.id)?.verification).not.toBe(
+				'deliverable',
+			)
+		})
+	})
+})

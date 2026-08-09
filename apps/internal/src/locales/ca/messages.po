@@ -3182,10 +3182,6 @@ msgstr "Marca com a arriscat"
 msgid "Mark as undeliverable"
 msgstr "Marca com a no lliurable"
 
-#: src/components/contacts/manage-channels-dialog.tsx
-msgid "Mark as unverified"
-msgstr "Marca com a sense verificar"
-
 #: src/routes/companies/$slug.tsx
 msgid "Mark as verified"
 msgstr "Marca com a verificada"
@@ -4706,6 +4702,10 @@ msgstr "Vols eliminar {email} d'aquesta organització?"
 msgid "Remove line"
 msgstr "Elimina la línia"
 
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Remove this verdict"
+msgstr "Treu aquest veredicte"
+
 #: src/routes/settings/organization/members.tsx
 msgid "Removing…"
 msgstr "Eliminant…"
@@ -4867,8 +4867,8 @@ msgid "Risky"
 msgstr "Arriscat"
 
 #: src/components/contacts/manage-channels-dialog.tsx
-msgid "Risky and undeliverable record doubt about an address. Unverified takes a wrong verdict back off without putting anything in its place. Only a check can confirm an address again."
-msgstr "Arriscada i no lliurable registren dubtes sobre una adreça. Sense verificar treu un veredicte equivocat sense posar-hi res al seu lloc. Només una comprovació pot tornar a confirmar una adreça."
+msgid "Risky and undeliverable record doubt about an address. Removing a verdict says nobody has checked, which is the truth about one that was written down rather than found out. Only a check can confirm an address again."
+msgstr "Arriscada i no lliurable registren dubtes sobre una adreça. Treure un veredicte diu que ningú no ho ha comprovat, que és la veritat sobre un que es va escriure en comptes de comprovar-se. Només una comprovació pot tornar a confirmar una adreça."
 
 #: src/components/research/run-labels.ts
 #: src/routes/settings/organization/members.tsx
