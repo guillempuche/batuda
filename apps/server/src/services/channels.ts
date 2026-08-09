@@ -380,7 +380,15 @@ export const patchChannel = (
 		readonly value?: string | undefined
 		readonly label?: string | null | undefined
 		readonly is_primary?: boolean | undefined
-		readonly verification?: HandSetVerificationVerdict | undefined
+		/**
+		 * A verdict to record, or null to say none was ever reached.
+		 *
+		 * Clearing is not the same as lowering. A word that was never a check —
+		 * a guess somebody wrote down — is more honestly recorded as nothing than
+		 * as a check that came back doubtful, and only a person looking at the
+		 * address knows which it was. Leaving it out changes nothing.
+		 */
+		readonly verification?: HandSetVerificationVerdict | null | undefined
 	},
 ) =>
 	Effect.gen(function* () {
@@ -421,6 +429,8 @@ export const patchChannel = (
 		if (patch.is_primary !== undefined) data['isPrimary'] = patch.is_primary
 		if (patch.verification !== undefined) {
 			data['verification'] = patch.verification
+			// The score belonged to the verdict being replaced, and neither a
+			// hand-set one nor an empty one has a score of its own.
 			data['confidence'] = null
 		}
 		// A row that stops being an email takes the email-only bookkeeping with it.

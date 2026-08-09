@@ -373,17 +373,14 @@ export function ManageChannelsDialog({
 																gender a slot cannot carry — and each reuses
 																the word the badge already shows, so the row
 																and the card never say two things about one
-																address. */}
-																	<PriMenu.Item
-																		data-testid='channel-trust-option-unknown'
-																		onClick={() =>
-																			void patchRow(ch, {
-																				verification: 'unknown',
-																			})
-																		}
-																	>
-																		<span>{t`Mark as unverified`}</span>
-																	</PriMenu.Item>
+																address.
+
+																"Unverified" is deliberately not offered: it
+																records a check that settled nothing, which
+																reads identically to removing a verdict and
+																leaves a reader picking between two controls
+																that look the same. Removing shows only when
+																there is one to remove. */}
 																	<PriMenu.Item
 																		data-testid='channel-trust-option-risky'
 																		onClick={() =>
@@ -404,6 +401,18 @@ export function ManageChannelsDialog({
 																	>
 																		<span>{t`Mark as undeliverable`}</span>
 																	</PriMenu.Item>
+																	{ch.verification !== null ? (
+																		<PriMenu.Item
+																			data-testid='channel-trust-option-clear'
+																			onClick={() =>
+																				void patchRow(ch, {
+																					verification: null,
+																				})
+																			}
+																		>
+																			<span>{t`Remove this verdict`}</span>
+																		</PriMenu.Item>
+																	) : null}
 																	<MenuNote>
 																		<Trans>
 																			This is what we expect before sending. A
@@ -474,9 +483,10 @@ export function ManageChannelsDialog({
 					    send is the sending side's rule to state, not this dialog's. */}
 					<Note>
 						<Trans>
-							Risky and undeliverable record doubt about an address. Unverified
-							takes a wrong verdict back off without putting anything in its
-							place. Only a check can confirm an address again.
+							Risky and undeliverable record doubt about an address. Removing a
+							verdict says nobody has checked, which is the truth about one that
+							was written down rather than found out. Only a check can confirm
+							an address again.
 						</Trans>
 					</Note>
 
