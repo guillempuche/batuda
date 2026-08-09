@@ -120,6 +120,11 @@ msgstr "{0} canvis per revisar"
 msgid "{0} companies"
 msgstr "{0} empreses"
 
+#. placeholder {0}: existing.value
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "{0} is already on file. Edit that one instead."
+msgstr "{0} ja hi és. Edita aquella en comptes d’afegir-la."
+
 #. placeholder {0}: row.email
 #: src/routes/emails/inboxes.tsx
 msgid "{0} is now the address you send from"
