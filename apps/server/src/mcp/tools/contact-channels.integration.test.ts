@@ -324,22 +324,25 @@ describe('a channel that is not this person’s', () => {
 	})
 
 	describe('when the person belongs to another organisation', () => {
-		it('should answer with nothing rather than reach across', async () => {
+		it('should say there is no such person, in the words a stranger would get', async () => {
 			// GIVEN a contact id from outside this organisation
 			const outsider = await pool.query<{ id: string }>(
 				`SELECT id FROM contacts WHERE organization_id <> $1 LIMIT 1`,
 				[taller.id],
 			)
-			if (!outsider.rows[0]) return
+			expect(outsider.rows[0]).toBeDefined()
+			const id = outsider.rows[0]!.id
 
 			// WHEN their channels are asked for
-			const channels = await manage({
-				action: 'list',
-				contact_id: outsider.rows[0].id,
-			})
+			const refusal = await refusalFrom(
+				manage({ action: 'list', contact_id: id }),
+			)
 
-			// THEN nothing comes back — an id alone never proves whose it is
-			expect(channels).toEqual([])
+			// THEN it says there is no such person — the same answer an id that
+			// never existed gets, so it tells a caller nothing about another
+			// organisation. Handing back an empty list instead read as "this person
+			// has no addresses", which is a different and wrong thing to believe.
+			expect(refusal).toContain(id)
 		})
 	})
 })
@@ -434,6 +437,31 @@ describe('deleting a person', () => {
 			// blocking that address for the whole organisation with nobody to lift
 			// it from.
 			expect(await rowsOf(doomed)).toEqual([])
+		})
+	})
+})
+
+describe('an action missing what it needs', () => {
+	describe('when add names no address', () => {
+		it('should say what is missing rather than report success', async () => {
+			// GIVEN an add with the kind but no value — half a call
+			const refusal = await refusalFrom(
+				manageRaw({ action: 'add', contact_id: pep, kind: 'email' }),
+			)
+			// THEN it names both arguments. It used to fall through to the list at
+			// the end and come back as a success, which reads exactly like asking
+			// for the list — so the caller reports an address it never added.
+			expect(refusal).toContain('kind')
+			expect(refusal).toContain('value')
+		})
+	})
+
+	describe('when remove names no channel', () => {
+		it('should say which argument it wanted and where to find it', async () => {
+			const refusal = await refusalFrom(
+				manageRaw({ action: 'remove', contact_id: pep }),
+			)
+			expect(refusal).toContain('channel_id')
 		})
 	})
 })
