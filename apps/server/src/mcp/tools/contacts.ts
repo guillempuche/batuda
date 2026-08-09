@@ -332,7 +332,14 @@ export const ContactHandlersLive = ContactTools.toLayer(
 							AND organization_id = ${currentOrg.id}
 						LIMIT 1
 					`
-					if (owned.length === 0) return { channels: [] }
+					// Same words whether the person does not exist or belongs to another
+					// organisation, so the answer never tells a caller which. Handing
+					// back an empty list instead reads as "this person has no addresses",
+					// which is a different and wrong thing to believe.
+					if (owned.length === 0)
+						return yield* Effect.die(
+							new ToolMessage(`No contact ${params.contact_id}.`),
+						)
 
 					// A verdict on any other action would work or not depending on
 					// whether the address was already on file, which is invisible from
@@ -341,6 +348,28 @@ export const ContactHandlersLive = ContactTools.toLayer(
 						return yield* Effect.die(
 							new ToolMessage(
 								'verification is only set by action: "update", on a channel already on file.',
+							),
+						)
+
+					// An action missing what it needs used to fall through to the list
+					// below and come back as a success — indistinguishable from asking
+					// for the list, and the caller reports the address as added.
+					if (
+						params.action === 'add' &&
+						(params.kind === undefined || params.value === undefined)
+					)
+						return yield* Effect.die(
+							new ToolMessage(
+								'add needs both kind and value — kind for what sort of address it is, value for the address itself.',
+							),
+						)
+					if (
+						(params.action === 'update' || params.action === 'remove') &&
+						params.channel_id === undefined
+					)
+						return yield* Effect.die(
+							new ToolMessage(
+								`${params.action} needs channel_id — the id of the one address to change, which action: "list" hands back.`,
 							),
 						)
 
