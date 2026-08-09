@@ -120,6 +120,21 @@ export function ManageChannelsDialog({
 	const handleAdd = async () => {
 		const value = newValue.trim()
 		if (!contactId || value === '' || adding) return
+
+		// Sending one the contact already has renames that one instead of adding a
+		// row, and nothing on screen would say so.
+		const existing = channels.find(
+			ch =>
+				ch.kind === newKind &&
+				ch.value.trim().toLowerCase() === value.toLowerCase(),
+		)
+		if (existing !== undefined) {
+			setAddError(
+				t`${existing.value} is already on file. Edit that one instead.`,
+			)
+			return
+		}
+
 		setAdding(true)
 		setAddError(null)
 		const label = newLabel.trim()

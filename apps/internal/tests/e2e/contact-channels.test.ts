@@ -174,6 +174,32 @@ test.describe('a contact’s ways of being reached', () => {
 		expect(addressesOf(pep)).toContain(SEEDED_EMAIL)
 	})
 
+	test('should say an address is already on file rather than quietly relabelling it', async ({
+		page,
+	}) => {
+		// GIVEN the address the contact already has, typed in again under a new name
+		await page.getByTestId('channel-add-value').fill(SEEDED_EMAIL)
+		await page.getByTestId('channel-add-label').fill('Feina')
+
+		// WHEN it is submitted
+		await page.getByTestId('channel-add-submit').click()
+
+		// THEN it is turned away in words instead of silently overwriting the name
+		// on the one already there, and what was typed stays put to be corrected
+		await expect(page.getByTestId('channel-add-error')).toContainText(
+			'already on file',
+			{ timeout: 10_000 },
+		)
+		await expect(page.getByTestId('channel-add-value')).toHaveValue(
+			SEEDED_EMAIL,
+		)
+		expect(
+			psql(
+				`SELECT count(*) FROM channels WHERE subject_table='contacts' AND subject_id='${pep}' AND address='${SEEDED_EMAIL}' AND label='Feina'`,
+			),
+		).toBe('0')
+	})
+
 	test('should remove an address that should not be there', async ({
 		page,
 	}) => {
