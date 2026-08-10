@@ -303,6 +303,16 @@ export function ManageChannelsDialog({
 														setRowError(null)
 													}}
 												/>
+												{/* The browser checks nothing here, so `match` is what shows the message.
+												    Inside the field is what points a screen reader at it. */}
+												{rowError?.id === ch.id ? (
+													<PriField.Error
+														match={true}
+														data-testid={`channel-error-${ch.id}`}
+													>
+														{rowError.message}
+													</PriField.Error>
+												) : null}
 											</PriField.Root>
 											<PriField.Root>
 												<PriField.Label htmlFor={`channel-label-${ch.id}`}>
@@ -336,14 +346,6 @@ export function ManageChannelsDialog({
 													<Trans>Cancel</Trans>
 												</PriButton>
 											</EditActions>
-											{rowError?.id === ch.id ? (
-												<RowError
-													role='alert'
-													data-testid={`channel-error-${ch.id}`}
-												>
-													{rowError.message}
-												</RowError>
-											) : null}
 										</EditForm>
 									) : (
 										<>
@@ -532,6 +534,11 @@ export function ManageChannelsDialog({
 									setAddError(null)
 								}}
 							/>
+							{addError ? (
+								<PriField.Error match={true} data-testid='channel-add-error'>
+									{addError}
+								</PriField.Error>
+							) : null}
 						</PriField.Root>
 						<PriField.Root>
 							<PriField.Label htmlFor='channel-add-label'>
@@ -552,11 +559,6 @@ export function ManageChannelsDialog({
 						>
 							<Trans>Add</Trans>
 						</PriButton>
-						{addError ? (
-							<RowError role='alert' data-testid='channel-add-error'>
-								{addError}
-							</RowError>
-						) : null}
 					</AddForm>
 				</PriDialog.Popup>
 			</PriDialog.Portal>

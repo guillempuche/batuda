@@ -172,6 +172,19 @@ test.describe('a contact’s ways of being reached', () => {
 			{ timeout: 10_000 },
 		)
 		expect(addressesOf(pep)).toContain(SEEDED_EMAIL)
+
+		// AND the box itself carries the message, so somebody who reaches the
+		// address by keyboard is told why it was refused rather than having to
+		// find the sentence elsewhere on the row
+		const describedBy = await page
+			.getByTestId(`channel-value-${id}`)
+			.getAttribute('aria-describedby')
+		expect(describedBy).not.toBeNull()
+		const errorId = await page
+			.getByTestId(`channel-error-${id}`)
+			.getAttribute('id')
+		expect(errorId).not.toBeNull()
+		expect(describedBy?.split(' ')).toContain(errorId)
 	})
 
 	test('should say an address is already on file rather than quietly relabelling it', async ({

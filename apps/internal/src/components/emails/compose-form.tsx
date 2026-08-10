@@ -290,6 +290,7 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 	const [suppressed, setSuppressed] = useState<
 		ReadonlyArray<SuppressedAddress>
 	>([])
+	const [checkFailed, setCheckFailed] = useState(false)
 
 	const canSend = useMemo(() => {
 		if (sendState === 'sending') return false
@@ -525,6 +526,50 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 				</>
 			)}
 
+			<SuppressionGuard
+				to={form.to}
+				cc={form.cc}
+				bcc={form.bcc}
+				onSuppressedChange={setSuppressed}
+				onCheckFailedChange={setCheckFailed}
+			/>
+
+			{/* Sits by the addresses it names: down by Send it would be off the
+			    bottom of the form, leaving a greyed-out button and no reason for
+			    it. It waits its turn to be read out, since it lands while an
+			    address is still being typed. */}
+			{suppressed.length > 0 ? (
+				<SuppressionBanner
+					role='status'
+					aria-live='polite'
+					data-testid='compose-suppressed'
+				>
+					<AlertTriangle size={14} aria-hidden />
+					<SuppressionList>
+						<SuppressionTitle>
+							{t`Send blocked: these recipients cannot receive email`}
+						</SuppressionTitle>
+						{suppressed.map(s => (
+							<li key={s.email}>
+								<strong>{s.email}</strong>
+								{' — '}
+								{s.reason === 'bounced' ? t`bounced` : t`complained`}
+							</li>
+						))}
+					</SuppressionList>
+				</SuppressionBanner>
+			) : null}
+
+			{checkFailed && suppressed.length === 0 ? (
+				<CheckUnavailable
+					role='status'
+					aria-live='polite'
+					data-testid='compose-check-unavailable'
+				>
+					{t`Couldn't check whether these addresses can receive email. Sending will still be stopped if one of them can't.`}
+				</CheckUnavailable>
+			) : null}
+
 			{!isReply ? (
 				<Field>
 					<FieldLabel htmlFor={`subject-${draft.id}`}>{t`Subject`}</FieldLabel>
@@ -551,31 +596,6 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 					placeholder={t`Write your message…`}
 				/>
 			</BodyField>
-
-			<SuppressionGuard
-				to={form.to}
-				cc={form.cc}
-				bcc={form.bcc}
-				onChange={setSuppressed}
-			/>
-
-			{suppressed.length > 0 ? (
-				<SuppressionBanner role='alert'>
-					<AlertTriangle size={14} aria-hidden />
-					<SuppressionList>
-						<SuppressionTitle>
-							{t`Send blocked: these recipients cannot receive email`}
-						</SuppressionTitle>
-						{suppressed.map(s => (
-							<li key={s.email}>
-								<strong>{s.email}</strong>
-								{' — '}
-								{s.reason === 'bounced' ? t`bounced` : t`complained`}
-							</li>
-						))}
-					</SuppressionList>
-				</SuppressionBanner>
-			) : null}
 
 			{errorMessage !== null ? (
 				<ErrorBanner role='alert'>
@@ -625,18 +645,21 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 // mailbox, a contact's second address, one typed by hand — so it is asked
 // rather than guessed at from whatever this screen happens to have loaded.
 //
-// A check that fails clears the warning instead of raising one: the send is the
-// real refusal, and a warning nobody can explain is worse than none.
+// A check that fails raises no warning but says so, since a screen that could
+// not ask looks exactly like one that asked and found nothing. The send is
+// still the real refusal.
 function SuppressionGuard({
 	to,
 	cc,
 	bcc,
-	onChange,
+	onSuppressedChange,
+	onCheckFailedChange,
 }: {
 	readonly to: string
 	readonly cc: string
 	readonly bcc: string
-	readonly onChange: (next: ReadonlyArray<SuppressedAddress>) => void
+	readonly onSuppressedChange: (next: ReadonlyArray<SuppressedAddress>) => void
+	readonly onCheckFailedChange: (failed: boolean) => void
 }) {
 	const check = useAtomSet(checkSuppressedAtom, { mode: 'promiseExit' })
 
@@ -645,7 +668,8 @@ function SuppressionGuard({
 		// them the same way the send does — one place decides what an address is.
 		const recipientFields = [to, cc, bcc].filter(field => field.trim() !== '')
 		if (recipientFields.length === 0) {
-			onChange([])
+			onSuppressedChange([])
+			onCheckFailedChange(false)
 			return
 		}
 		let cancelled = false
@@ -654,10 +678,12 @@ function SuppressionGuard({
 				const exit = await check({ payload: { recipientFields } })
 				if (cancelled) return
 				if (exit._tag !== 'Success') {
-					onChange([])
+					onSuppressedChange([])
+					onCheckFailedChange(true)
 					return
 				}
-				onChange(
+				onCheckFailedChange(false)
+				onSuppressedChange(
 					exit.value.suppressed.map(row => ({
 						email: row.address,
 						reason: row.status,
@@ -669,7 +695,7 @@ function SuppressionGuard({
 			cancelled = true
 			clearTimeout(timer)
 		}
-	}, [to, cc, bcc, check, onChange])
+	}, [to, cc, bcc, check, onSuppressedChange, onCheckFailedChange])
 
 	return null
 }
@@ -851,6 +877,18 @@ const SuppressionTitle = styled.div.withConfig({
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
 	margin-bottom: var(--space-3xs);
+`
+
+const CheckUnavailable = styled.p.withConfig({
+	displayName: 'ComposeCheckUnavailable',
+})`
+	margin: 0;
+	padding: var(--space-2xs) var(--space-sm);
+	border: 1px dashed var(--color-outline-variant);
+	border-radius: var(--shape-xs);
+	color: var(--color-on-surface-variant);
+	font-size: var(--typescale-body-small-size);
+	line-height: var(--typescale-body-small-line);
 `
 
 const ErrorBanner = styled.div.withConfig({

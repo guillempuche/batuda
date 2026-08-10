@@ -1707,6 +1707,10 @@ msgstr "Could not update this lookup."
 msgid "Could not update verification"
 msgstr "Could not update verification"
 
+#: src/components/emails/compose-form.tsx
+msgid "Couldn't check whether these addresses can receive email. Sending will still be stopped if one of them can't."
+msgstr "Couldn't check whether these addresses can receive email. Sending will still be stopped if one of them can't."
+
 #: src/routes/settings/organization/templates.tsx
 msgid "Couldn't clear the default"
 msgstr "Couldn't clear the default"
