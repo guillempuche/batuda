@@ -25,6 +25,7 @@ import {
 
 import {
 	addChannel,
+	clearEmailSuppression,
 	deleteChannel,
 	deleteSubjectChannels,
 	patchChannel,
@@ -176,9 +177,10 @@ const CreateCompanies = Tool.make('create_companies', {
 
 const UpdateCompany = Tool.make('update_company', {
 	description:
-		'Update one or more fields on an existing company by UUID. Only include fields to change; omitted fields stay unchanged.',
+		"Update one or more fields on an existing company by UUID. Only include fields to change; omitted fields stay unchanged. Set clear_email_suppression=true to let mail go to the company's own mailboxes again after a bounce or a spam report turns out to have been wrong — a role address like info@ or orders@ has nobody listed under it, so nothing on a contact can lift its block. It frees every one of the company's own mailboxes at once, and any that bounces again is held straight back. A branch's mailbox — one added with site_id — is held separately and is not freed by this; there is no way to lift one yet.",
 	parameters: Schema.Struct({
 		id: Schema.String,
+		clear_email_suppression: Schema.optional(Schema.Boolean),
 		name: Schema.optional(Schema.String),
 		taxId: Schema.optional(Schema.String).annotate({
 			description:
@@ -280,7 +282,7 @@ const ManageCompanySites = Tool.make('manage_company_sites', {
 // switchboard only by `site_id`, so a second tool would duplicate the lot.
 const ManageCompanyChannels = Tool.make('manage_company_channels', {
 	description:
-		"The ways of reaching a company — its mailboxes, phones, website, social handles. A company can hold several of a kind, which is the point of this tool: `update_company` writes one email and one phone, and a firm with an orders mailbox, an accounts mailbox and a switchboard needs all of them kept apart. Give each one a `label` in the words somebody would actually use — 'orders', 'accounts', 'Girona shop' — because two addresses with no labels are indistinguishable a month later. Pass `site_id` to hang the channel off one branch instead of the company as a whole. action: 'list' (all of them; add site_id to see one branch's), 'add' (kind plus value, and a label whenever there is more than one of that kind), 'update' (by channel_id, only the fields to change), 'remove' (by channel_id). An address the company already holds is refused rather than merged, so correcting one onto another means removing the spare instead. kind is open — email, phone, linkedin, instagram, website, x, bluesky, … — and `is_primary` marks the one to use when nothing says otherwise; the primary email is the address mail is sent to, and removing it hands that over to the oldest one left of the same kind. `verification` only ever lowers how far an address is trusted, and only on 'update' — pass null to take a verdict back off entirely, which says nobody has checked rather than that a check came back doubtful. A later check can raise it again. 'vouch' (by channel_id, email only) is the way to get a held-back send out: it records that a person stands behind the address, so send_email stops asking about it, while leaving what a deliverability check found on file — unlike clearing the verdict, which lifts the stop by throwing the finding away. Pass `note` to say what that rests on. It is refused on an address that hard-bounced or reported spam, which no vouch lifts. 'unvouch' takes a vouch back; it only ever lifts a vouch and never clears a bounce.",
+		"The ways of reaching a company — its mailboxes, phones, website, social handles. A company can hold several of a kind, which is the point of this tool: `update_company` writes one email and one phone, and a firm with an orders mailbox, an accounts mailbox and a switchboard needs all of them kept apart. Give each one a `label` in the words somebody would actually use — 'orders', 'accounts', 'Girona shop' — because two addresses with no labels are indistinguishable a month later. Pass `site_id` to hang the channel off one branch instead of the company as a whole. action: 'list' (all of them; add site_id to see one branch's), 'add' (kind plus value, and a label whenever there is more than one of that kind), 'update' (by channel_id, only the fields to change), 'remove' (by channel_id). An address the company already holds is refused rather than merged, so correcting one onto another means removing the spare instead. kind is open — email, phone, linkedin, instagram, website, x, bluesky, … — and `is_primary` marks the one to use when nothing says otherwise; the primary email is the address mail is sent to, and removing it hands that over to the oldest one left of the same kind. `verification` only ever lowers how far an address is trusted, and only on 'update' — pass null to take a verdict back off entirely, which says nobody has checked rather than that a check came back doubtful. A later check can raise it again. 'vouch' (by channel_id, email only) is the way to get a held-back send out: it records that a person stands behind the address, so send_email stops asking about it, while leaving what a deliverability check found on file — unlike clearing the verdict, which lifts the stop by throwing the finding away. Pass `note` to say what that rests on. It is refused on an address that hard-bounced or reported spam — that block is real, and lifting it is update_company's clear_email_suppression, which reaches the company's own mailboxes but not a branch's. 'unvouch' takes a vouch back; it only ever lifts a vouch and never clears a bounce.",
 	parameters: Schema.Struct({
 		action: Schema.Literals([
 			'list',
@@ -482,7 +484,7 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 					),
 					Effect.orDie,
 				),
-			update_company: ({ id, ...fields }) =>
+			update_company: ({ id, clear_email_suppression, ...fields }) =>
 				Effect.gen(function* () {
 					// Capture the stage before the write so an agent-driven change
 					// is recorded on the timeline too (actor unknown → null).
@@ -513,6 +515,13 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 						to: fields.status,
 						actorUserId: null,
 					}).pipe(Effect.provideService(TimelineActivityService, timeline))
+					// Runs after the update, so an edit that fails lifts nothing.
+					if (clear_email_suppression) {
+						yield* clearEmailSuppression(sql, {
+							table: 'companies' as const,
+							id,
+						})
+					}
 					return result
 				}).pipe(
 					Effect.catchTag('BadRequest', e =>
