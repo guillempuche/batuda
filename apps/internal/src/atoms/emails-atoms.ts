@@ -136,6 +136,12 @@ export const createDraftAtom = BatudaApiAtom.mutation('email', 'createDraft')
 export const updateDraftAtom = BatudaApiAtom.mutation('email', 'updateDraft')
 export const deleteDraftAtom = BatudaApiAtom.mutation('email', 'deleteDraft')
 export const sendDraftAtom = BatudaApiAtom.mutation('email', 'sendDraft')
+// Which addresses in a draft a send would be refused over, so the compose
+// screen can warn while the message is being written rather than on send.
+export const checkSuppressedAtom = BatudaApiAtom.mutation(
+	'email',
+	'checkSuppressed',
+)
 
 // ── Footers ──
 export const createFooterAtom = BatudaApiAtom.mutation('email', 'createFooter')

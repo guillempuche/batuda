@@ -8,8 +8,8 @@ import styled from 'styled-components'
 import type { EmailBlocks } from '@batuda/email/schema'
 import { PriButton, PriInput, PriSelect } from '@batuda/ui/pri'
 
-import { contactsAtomFor } from '#/atoms/company-atoms'
 import {
+	checkSuppressedAtom,
 	createDraftAtom,
 	deleteDraftAtom,
 	emailsSearchAtom,
@@ -18,16 +18,13 @@ import {
 	threadAtomFor,
 	updateDraftAtom,
 } from '#/atoms/emails-atoms'
-import {
-	narrowChannels,
-	primaryEmailChannel,
-} from '#/components/contacts/display-channels'
 import { AttachmentPicker } from '#/components/emails/attachment-picker'
 import { EmailEditor } from '#/components/emails/email-editor'
 import { SrOnly } from '#/components/shared/sr-only'
 import { type Draft, useComposeEmail } from '#/context/compose-email-context'
 import { authClient } from '#/lib/auth-client'
 import type { StagedAttachment } from '#/lib/email-attachments'
+import { badRequestMessage, suppressedRecipient } from '#/lib/tagged-failure'
 
 type InboxOption = {
 	readonly id: string
@@ -55,11 +52,12 @@ type SendState = 'idle' | 'sending' | 'error'
 
 type SuppressedAddress = {
 	readonly email: string
-	readonly name: string
 	readonly reason: 'bounced' | 'complained'
 }
 
 const SAVE_DEBOUNCE_MS = 300
+// Typing an address should not put a request on the wire per keystroke.
+const SUPPRESSION_CHECK_DEBOUNCE_MS = 400
 
 export function ComposeForm({ draft }: { readonly draft: Draft }) {
 	const { t } = useLingui()
@@ -154,11 +152,9 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 	// with paired 200 + 499 (InterruptError) entries. Setting this
 	// flag inside the effect body ensures only one POST goes out.
 	const draftCreationStartedRef = useRef(false)
-	// Reset on every effect run + tear down on cleanup. The previous
-	// "() => () => false" shape only flipped to false in cleanup and
-	// never re-asserted true on the StrictMode re-run, leaving the
-	// createDraft `.then` handler convinced the form had unmounted
-	// and skipping the setServerId call.
+	// Set true on every run, not just the first: StrictMode tears the first
+	// run down, and without re-asserting it the createDraft reply would look
+	// like it arrived after the form closed and its id would be dropped.
 	useEffect(() => {
 		mountedRef.current = true
 		return () => {
@@ -212,13 +208,10 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 		updateMeta,
 	])
 
-	// `pendingPatchRef` accumulates every patch issued since the last
-	// timer fire. The previous version captured only the latest patch in
-	// the closure and discarded earlier keys when a new patchForm call
-	// reset the timer — a Send click that landed before the timer fired
-	// would push only the most recent field, leaving `to`/`subject`/body
-	// out of the saved draft and the server rejecting with EENVELOPE
-	// "No recipients defined".
+	// Every field touched since the last save is kept, not only the newest
+	// one: each keystroke restarts the timer, so a Send landing before it
+	// fires would otherwise save one field and leave the recipient, subject
+	// and body behind — and the server refuses a draft with no recipient.
 	const pendingPatchRef = useRef<Partial<DraftForm>>({})
 	const debouncedSave = useCallback(
 		(patch: Partial<DraftForm>) => {
@@ -356,16 +349,29 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 				payload: { inboxId: effectiveInboxId },
 			})
 			if (exit._tag !== 'Success') {
-				throw new Error('Send failed')
+				// With several recipients, only the server knows which one it turned
+				// away and why, so say that rather than a bare "Send failed" the
+				// reader cannot act on.
+				const blocked = suppressedRecipient(exit.cause)
+				if (blocked !== null) {
+					const why =
+						blocked.status === 'bounced'
+							? t`Mail to ${blocked.recipient} bounced, so it is blocked.`
+							: t`${blocked.recipient} reported a message as spam, so it is blocked.`
+					throw new Error(
+						blocked.reason === null
+							? why
+							: `${why} ${t`The receiving server said: ${blocked.reason}`}`,
+					)
+				}
+				throw new Error(badRequestMessage(exit.cause) ?? t`Send failed`)
 			}
 			refreshList()
 			if (draft.threadId) refreshThread()
 			close(draft.id)
 		} catch (error) {
 			setSendState('error')
-			setErrorMessage(
-				error instanceof Error ? error.message : 'Failed to send email',
-			)
+			setErrorMessage(error instanceof Error ? error.message : t`Send failed`)
 		}
 	}, [
 		effectiveInboxId,
@@ -381,6 +387,7 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 		close,
 		draft.id,
 		draft.threadId,
+		t,
 	])
 
 	const handleDiscard = useCallback(async () => {
@@ -545,15 +552,12 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 				/>
 			</BodyField>
 
-			{draft.companyId !== undefined ? (
-				<SuppressionGuard
-					companyId={draft.companyId}
-					to={form.to}
-					cc={form.cc}
-					bcc={form.bcc}
-					onChange={setSuppressed}
-				/>
-			) : null}
+			<SuppressionGuard
+				to={form.to}
+				cc={form.cc}
+				bcc={form.bcc}
+				onChange={setSuppressed}
+			/>
 
 			{suppressed.length > 0 ? (
 				<SuppressionBanner role='alert'>
@@ -616,63 +620,58 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 	)
 }
 
+// Warns that an address will be refused while the message is still being
+// written. Only the server knows every blocked address — a company's own
+// mailbox, a contact's second address, one typed by hand — so it is asked
+// rather than guessed at from whatever this screen happens to have loaded.
+//
+// A check that fails clears the warning instead of raising one: the send is the
+// real refusal, and a warning nobody can explain is worse than none.
 function SuppressionGuard({
-	companyId,
 	to,
 	cc,
 	bcc,
 	onChange,
 }: {
-	readonly companyId: string
 	readonly to: string
 	readonly cc: string
 	readonly bcc: string
 	readonly onChange: (next: ReadonlyArray<SuppressedAddress>) => void
 }) {
-	const contactsResult = useAtomValue(contactsAtomFor(companyId))
-	const contacts = useMemo(
-		() =>
-			AsyncResult.isSuccess(contactsResult)
-				? contactsResult.value.items
-				: undefined,
-		[contactsResult],
-	)
+	const check = useAtomSet(checkSuppressedAtom, { mode: 'promiseExit' })
 
 	useEffect(() => {
-		if (contacts === undefined) {
-			onChange([])
-			return
-		}
-		const suppressedMap = new Map<string, SuppressedAddress>()
-		for (const raw of contacts) {
-			if (raw === null || typeof raw !== 'object') continue
-			const r = raw as Record<string, unknown>
-			// A contact's email and suppression state live on its primary email
-			// channel, not as top-level `email`/`emailStatus` fields, so derive
-			// both from that channel.
-			const primaryEmail = primaryEmailChannel(narrowChannels(r['channels']))
-			const email = primaryEmail?.value ?? null
-			const status = primaryEmail?.status
-			if (email === null) continue
-			if (status !== 'bounced' && status !== 'complained') continue
-			const name = typeof r['name'] === 'string' ? r['name'] : email
-			suppressedMap.set(email.toLowerCase(), { email, name, reason: status })
-		}
-		const seen = new Set<string>()
-		const out: SuppressedAddress[] = []
-		for (const raw of [
+		const addresses = [
 			...splitAddresses(to),
 			...splitAddresses(cc),
 			...splitAddresses(bcc),
-		]) {
-			const key = raw.toLowerCase()
-			if (seen.has(key)) continue
-			seen.add(key)
-			const match = suppressedMap.get(key)
-			if (match !== undefined) out.push(match)
+		]
+		if (addresses.length === 0) {
+			onChange([])
+			return
 		}
-		onChange(out)
-	}, [contacts, to, cc, bcc, onChange])
+		let cancelled = false
+		const timer = setTimeout(() => {
+			void (async () => {
+				const exit = await check({ payload: { addresses } })
+				if (cancelled) return
+				if (exit._tag !== 'Success') {
+					onChange([])
+					return
+				}
+				onChange(
+					exit.value.suppressed.map(row => ({
+						email: row.address,
+						reason: row.status,
+					})),
+				)
+			})()
+		}, SUPPRESSION_CHECK_DEBOUNCE_MS)
+		return () => {
+			cancelled = true
+			clearTimeout(timer)
+		}
+	}, [to, cc, bcc, check, onChange])
 
 	return null
 }
