@@ -71,4 +71,5 @@ describe('search cache layer (integration)', () => {
 		'should return cached search results on the second identical query within TTL',
 	)
 	it.todo('should refuse to serve rows where expires_at is in the past')
+	it.todo('should run the search for real when a stored row cannot be read')
 })

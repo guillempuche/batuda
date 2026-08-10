@@ -20,7 +20,7 @@
 
 import { createHash } from 'node:crypto'
 
-import { Effect, Layer, Schema } from 'effect'
+import { Cause, Effect, Layer, Option, Schema } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { type SearchInput, SearchProvider } from '../application/ports'
@@ -99,14 +99,11 @@ export const makeCachedSearch = () =>
 							}),
 						)
 
-					const hits = yield* lookup(keyHash)
-					if (hits[0]) {
-						yield* sql`
-							UPDATE search_cache
-							SET hit_count = hit_count + 1
-							WHERE key_hash = ${keyHash}
-						`
-						const decoded = yield* decodeSearchResult(hits[0].items).pipe(
+					// The vendor fallback sits inside this wrapper, so a stored row we
+					// can no longer read would sink the whole run without a single
+					// vendor being asked. Both reads below go through here.
+					const readCachedRow = (items: unknown) =>
+						decodeSearchResult(items).pipe(
 							Effect.mapError(
 								e =>
 									new ProviderError({
@@ -115,35 +112,61 @@ export const makeCachedSearch = () =>
 										recoverable: false,
 									}),
 							),
+							Effect.map(Option.some),
+							Effect.catchCause(cause =>
+								// A cancelled run stays cancelled — only a row we cannot read
+								// falls through to a live search.
+								Cause.hasInterruptsOnly(cause)
+									? Effect.failCause(cause)
+									: Effect.logWarning('cache.read_failed').pipe(
+											Effect.annotateLogs({
+												event: 'cache.read_failed',
+												port: 'search',
+												cache_table: 'search_cache',
+												key_hash: keyHash,
+												cause: Cause.pretty(cause),
+											}),
+											Effect.as(Option.none<SearchResult>()),
+										),
+							),
 						)
-						yield* Effect.logDebug('cache.hit').pipe(
-							Effect.annotateLogs({
-								event: 'cache.hit',
-								port: 'search',
-								cache_table: 'search_cache',
-								key_hash: keyHash,
-							}),
-						)
-						yield* recordResultSources(decoded)
-						return new SearchResult({ items: decoded.items, units: 0 })
+
+					const hits = yield* lookup(keyHash)
+					const cachedRow = hits[0]
+					if (cachedRow) {
+						const cached = yield* readCachedRow(cachedRow.items)
+						if (Option.isSome(cached)) {
+							yield* sql`
+								UPDATE search_cache
+								SET hit_count = hit_count + 1
+								WHERE key_hash = ${keyHash}
+							`
+							yield* Effect.logDebug('cache.hit').pipe(
+								Effect.annotateLogs({
+									event: 'cache.hit',
+									port: 'search',
+									cache_table: 'search_cache',
+									key_hash: keyHash,
+								}),
+							)
+							yield* recordResultSources(cached.value)
+							return new SearchResult({ items: cached.value.items, units: 0 })
+						}
 					}
 
 					return yield* Effect.gen(function* () {
 						yield* sql`SELECT pg_advisory_xact_lock(hashtext(${`search:${keyHash}`}))`
 						const rehits = yield* lookup(keyHash)
-						if (rehits[0]) {
-							const decoded = yield* decodeSearchResult(rehits[0].items).pipe(
-								Effect.mapError(
-									e =>
-										new ProviderError({
-											provider: 'cache',
-											message: `search_cache decode failed: ${String(e)}`,
-											recoverable: false,
-										}),
-								),
-							)
-							yield* recordResultSources(decoded)
-							return new SearchResult({ items: decoded.items, units: 0 })
+						const rehitRow = rehits[0]
+						if (rehitRow) {
+							const decoded = yield* readCachedRow(rehitRow.items)
+							if (Option.isSome(decoded)) {
+								yield* recordResultSources(decoded.value)
+								return new SearchResult({
+									items: decoded.value.items,
+									units: 0,
+								})
+							}
 						}
 
 						const result = yield* inner.search(input)
