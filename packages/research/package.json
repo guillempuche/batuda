@@ -17,6 +17,10 @@
 		"./application/paid-action-tool": {
 			"types": "./src/application/paid-action-tool.ts",
 			"import": "./src/application/paid-action-tool.ts"
+		},
+		"./application/schemas": {
+			"types": "./src/application/schemas/index.ts",
+			"import": "./src/application/schemas/index.ts"
 		}
 	},
 	"scripts": {
