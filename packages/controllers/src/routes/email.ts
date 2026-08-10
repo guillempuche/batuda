@@ -568,6 +568,36 @@ export const EmailGroup = HttpApiGroup.make('email')
 			success: Schema.Void,
 		}),
 	)
+	.add(
+		// Which of these addresses a send would be refused over, so a caller can say
+		// so while a message is being written rather than after it is sent. The same
+		// question the send path asks, answered by the same query, so the warning
+		// and the refusal cannot disagree.
+		//
+		// A POST for a read, because the addresses are somebody's personal data and
+		// a query string is the one place they would be logged and cached.
+		HttpApiEndpoint.post('checkSuppressed', '/email/suppressed', {
+			payload: Schema.Struct({
+				// 320 is as long as one address gets: 64 before the @, 255 after. The
+				// list is capped because a caller may ask on every keystroke and every
+				// address in it costs another index lookup on the connection other
+				// requests are waiting for. A list longer than this is a mail-merge,
+				// which is a different feature.
+				addresses: Schema.Array(
+					Schema.String.pipe(Schema.check(Schema.isMaxLength(320))),
+				).pipe(Schema.check(Schema.isMaxLength(200))),
+			}),
+			success: Schema.Struct({
+				suppressed: Schema.Array(
+					Schema.Struct({
+						address: Schema.String,
+						status: Schema.Literals(['bounced', 'complained']),
+						reason: Schema.NullOr(Schema.String),
+					}),
+				),
+			}),
+		}),
+	)
 	.middleware(SessionMiddleware)
 	.middleware(OrgMiddleware)
 	.prefix('/v1')

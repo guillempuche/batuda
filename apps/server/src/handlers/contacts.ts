@@ -294,7 +294,10 @@ export const ContactsLive = HttpApiBuilder.group(
 				)
 				.handle('clearSuppression', _ =>
 					Effect.gen(function* () {
-						yield* clearEmailSuppression(sql, _.params.id)
+						yield* clearEmailSuppression(sql, {
+							table: 'contacts' as const,
+							id: _.params.id,
+						})
 						const ch = yield* channelsOf(sql, {
 							table: 'contacts' as const,
 							id: _.params.id,

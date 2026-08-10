@@ -48,6 +48,7 @@ const UUID_PATTERN =
 	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 import { CalendarService } from './calendar.js'
+import { suppressedAmong } from './channels.js'
 import { CredentialCrypto } from './credential-crypto.js'
 import type { ResolvedStaging, StagingRef } from './email-attachment-staging.js'
 import { EmailAttachmentStaging } from './email-attachment-staging.js'
@@ -137,17 +138,6 @@ export const retrySmtpSend = <A, E>(
 // PgClient.transformResultNames in apps/server/src/db/client.ts converts
 // snake_case columns to camelCase on read, so every row type in this file
 // is camelCase even though the SQL selects use snake_case.
-// The suppression query filters to these two, so the row type narrows to them.
-// The contact is whoever happens to hold the address, and is null when it is a
-// company's own mailbox — which is exactly the case the check used to miss.
-type SuppressionRow = {
-	status: 'bounced' | 'complained'
-	statusReason: string | null
-	contactId: string | null
-}
-
-const firstRecipient = (to: string | string[]): string =>
-	Array.isArray(to) ? (to[0] ?? '') : to
 
 const encodeClientId = (ctx: {
 	companyId?: string
@@ -494,9 +484,8 @@ export class EmailService extends Context.Service<EmailService>()(
 			 * That matters because two ways of writing an email name no person at
 			 * all: a reply to a thread that arrived from a shared mailbox — inbound
 			 * mail deliberately invents nobody for a role address — and the "email
-			 * this company" button, which opens on a company. Both used to skip the
-			 * check entirely, so a company mailbox that hard-bounced was written to
-			 * again, and again, by design.
+			 * this company" button, which opens on a company. A check that started
+			 * from a person would let both write to a hard-bounced mailbox.
 			 *
 			 * It is asked of every recipient, and of the whole organisation's
 			 * addresses rather than one record's: an address that bounced is the
@@ -513,21 +502,17 @@ export class EmailService extends Context.Service<EmailService>()(
 						.map(r => r.trim().toLowerCase())
 						.filter(r => r !== '')
 					if (recipients.length === 0) return
-					const rows = yield* sql<SuppressionRow>`
-						SELECT status, status_reason,
-							CASE WHEN subject_table = 'contacts' THEN subject_id END AS contact_id
-						FROM channels
-						WHERE organization_id = ${currentOrg.id}
-						  AND channel = 'email'
-						  AND lower(address) = ANY(${recipients})
-						  AND status IN ('bounced', 'complained')
-						LIMIT 1
-					`
+					// The same lookup `checkSuppressed` answers with, so a warning given
+					// beforehand and the refusal here cannot disagree.
+					const rows = yield* suppressedAmong(sql, currentOrg.id, recipients)
 					const row = rows[0]
 					if (row) {
 						return yield* new EmailSuppressed({
 							contactId: row.contactId,
-							recipient: firstRecipient(recipient),
+							// Name the blocked address, not the first recipient: with several
+							// recipients they are rarely the same, and the wrong name sends
+							// somebody off to fix an address that is fine.
+							recipient: row.address,
 							status: row.status,
 							reason: row.statusReason,
 						})
@@ -1895,6 +1880,22 @@ export class EmailService extends Context.Service<EmailService>()(
 						return yield* decodeMessage(
 							projectAttachmentsForWire(rows[0] as Record<string, unknown>),
 						).pipe(Effect.orDie)
+					}),
+
+				/**
+				 * Which of these addresses a send would be refused over — the same
+				 * question `assertRecipientsNotSuppressed` asks, so a caller can warn
+				 * while a message is being written rather than after it is sent.
+				 */
+				checkSuppressed: (addresses: ReadonlyArray<string>) =>
+					Effect.gen(function* () {
+						const currentOrg = yield* CurrentOrg
+						const rows = yield* suppressedAmong(sql, currentOrg.id, addresses)
+						return rows.map(row => ({
+							address: row.address,
+							status: row.status,
+							reason: row.statusReason,
+						}))
 					}),
 
 				// ── Inbox CRUD ────────────────────────────────────────────────

@@ -263,7 +263,11 @@ export const ContactHandlersLive = ContactTools.toLayer(
 						...(siteId === undefined ? {} : { siteId }),
 						updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 					})} WHERE id = ${id} RETURNING *`
-					if (clear_email_suppression) yield* clearEmailSuppression(sql, id)
+					if (clear_email_suppression)
+						yield* clearEmailSuppression(sql, {
+							table: 'contacts' as const,
+							id,
+						})
 					if (channels && channels.length > 0) {
 						yield* writeChannels(
 							sql,
