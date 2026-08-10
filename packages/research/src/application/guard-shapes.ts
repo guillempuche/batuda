@@ -32,6 +32,17 @@ export const isValueWrapper = (
 	isPlainObject(value) && 'value' in value
 
 /**
+ * The value itself, whether or not it arrived paired with the page it was read
+ * on. A run is asked to send every changed value paired that way, so a guard that
+ * reads the field flat is reading a wrapper, not text — and every check that
+ * expects text then passes it without looking. Ask for the value through here
+ * rather than unwrapping in place, so a guard added later gets it right by
+ * default.
+ */
+export const unwrapValue = (value: unknown): unknown =>
+	isValueWrapper(value) ? value.value : value
+
+/**
  * A per-field Sourced wrapper: `{ value, source_id?, quote?, confidence? }`.
  * The provenance key is what separates it from an arbitrary `{ value }` object.
  */

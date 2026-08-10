@@ -134,6 +134,12 @@ export {
 	SchemaNameSchema,
 	schemaRegistry,
 } from './application/schemas/index'
+export {
+	canonicalizeUrl,
+	isWebAddress,
+	sourceIdFor,
+	urlHashForScrape,
+} from './application/source-key'
 export { AUTO_APPLY_CONFIDENCE_FLOOR } from './application/source-tier-guard'
 export {
 	researchToolkit,

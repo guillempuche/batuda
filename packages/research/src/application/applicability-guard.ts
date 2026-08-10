@@ -24,7 +24,7 @@
  * supplies it so this module stays free of a database.
  */
 
-import { isPlainObject } from './guard-shapes'
+import { isPlainObject, unwrapValue } from './guard-shapes'
 
 export interface ApplicabilityResult {
 	readonly findings: unknown
@@ -82,7 +82,11 @@ export const filterApplicableProposals = (
 		// whoever clicks accept.
 		if (operation === 'create') {
 			if (subject_table !== 'contacts') return false
-			const companyId = fields['company_id'] ?? fields['companyId']
+			// Read through a wrapper: a run is asked to pair a changed value with the
+			// page it came from, and it tends to wrap the company here too. Wrapped,
+			// the id is not a string, and the person would be dropped for belonging
+			// to nobody.
+			const companyId = unwrapValue(fields['company_id'] ?? fields['companyId'])
 			return typeof companyId === 'string' && companyId.trim() !== ''
 		}
 		// Anything else is an update, which also needs a subject that resolves to a

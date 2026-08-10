@@ -112,6 +112,61 @@ describe('verifyValueProvenance', () => {
 			expect(result.droppedProposals).toBe(1)
 		})
 
+		it('should drop it just the same when it arrives wrapped with a page', () => {
+			// GIVEN the same invented city, this time paired with the page it claims
+			// to come from — the shape a run is asked to send every changed value in.
+			// Read flat, the wrapper is not text, and the check that catches a
+			// made-up place would wave it through for that reason alone
+			const corpus = 'Redwood Logistics is a Chicago-based logistics provider.'
+			const findings = {
+				proposed_updates: [
+					{
+						subject_id: 'c1',
+						fields: {
+							location: {
+								value: 'Pittsburgh, PA',
+								source_id: 'https://redwood.test/about',
+							},
+						},
+					},
+				],
+			}
+
+			// WHEN checked
+			const result = verifyValueProvenance(findings, corpus)
+
+			// THEN carrying its provenance buys it nothing: the value inside is still
+			// held to the evidence
+			expect(proposals(result.findings)).toHaveLength(0)
+			expect(result.droppedProposals).toBe(1)
+		})
+
+		it('should keep a wrapped location the evidence does state', () => {
+			// GIVEN a real place in the same wrapper, so the unwrapping is not simply
+			// dropping everything it reads
+			const corpus = 'Redwood Logistics is headquartered in Chicago, Illinois.'
+			const findings = {
+				proposed_updates: [
+					{
+						subject_id: 'c1',
+						fields: {
+							location: {
+								value: 'Chicago, IL',
+								source_id: 'https://redwood.test/about',
+							},
+						},
+					},
+				],
+			}
+
+			// WHEN checked
+			const result = verifyValueProvenance(findings, corpus)
+
+			// THEN it survives with its page intact
+			expect(proposals(result.findings)).toHaveLength(1)
+			expect(result.droppedProposals).toBe(0)
+		})
+
 		it('should keep a location the evidence does state', () => {
 			// GIVEN a proposal whose location is on the page
 			const corpus = 'Redwood Logistics is headquartered in Chicago, Illinois.'

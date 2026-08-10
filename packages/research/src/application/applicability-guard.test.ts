@@ -108,6 +108,47 @@ describe('filterApplicableProposals', () => {
 			expect(result.dropped).toBe(0)
 		})
 
+		it('should keep a create whose company arrived wrapped with a page', () => {
+			// GIVEN a run asked to pair each changed value with the page it came
+			// from, which carries that habit over to the company it attaches a new
+			// person to
+			const findings = withProposals([
+				{
+					subject_table: 'contacts',
+					operation: 'create',
+					fields: {
+						name: 'Jane Doe',
+						company_id: { value: 'co-1', source_id: 'https://acme.es/team' },
+					},
+				},
+			])
+			// WHEN filtered
+			const result = filterApplicableProposals(findings, () => false)
+			// THEN the person survives: the company is there, just wrapped — read flat
+			// it would look like nobody at all, and every discovered person would go
+			expect(survivors(result)).toHaveLength(1)
+			expect(result.dropped).toBe(0)
+		})
+
+		it('should still drop a create whose wrapper holds no company', () => {
+			// GIVEN the same wrapper with nothing inside it
+			const findings = withProposals([
+				{
+					subject_table: 'contacts',
+					operation: 'create',
+					fields: {
+						name: 'Jane Doe',
+						company_id: { value: '', source_id: 'https://acme.es/team' },
+					},
+				},
+			])
+			// WHEN filtered
+			const result = filterApplicableProposals(findings, () => false)
+			// THEN reading through the wrapper does not soften the rule it guards
+			expect(survivors(result)).toHaveLength(0)
+			expect(result.dropped).toBe(1)
+		})
+
 		it('should keep a create that names its company in camelCase', () => {
 			// GIVEN the other spelling the apply path also accepts
 			const findings = withProposals([
