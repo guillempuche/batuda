@@ -399,4 +399,55 @@ describe('research subject scoping', () => {
 				expect(outcome.failure._tag).toBe('SubjectUnavailable')
 		}, 30_000)
 	})
+
+	describe('when re-running a run whose kind of research is gone', () => {
+		it('should refuse it rather than queue a run that can only fail', async () => {
+			// GIVEN a run naming a schema this build no longer has — what every run
+			//   started under a schema becomes once that schema is retired
+			// WHEN somebody re-runs it against a corrected domain
+			// THEN it is refused outright. Copying the name through would queue a run
+			//   that flips to running and announces itself before dying on a name it
+			//   was never going to resolve.
+			const [retired] = await run(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* sql<{ id: string }>`
+						INSERT INTO research_runs (organization_id, query, schema_name, status, context, created_by)
+						VALUES (
+							${ctx.org.id}, 'run under a retired schema', 'retired_shape_v1', 'failed',
+							${JSON.stringify({})}::jsonb,
+							${userId}
+						)
+						RETURNING id
+					`
+				}),
+			)
+			createdRunIds.push(retired!.id)
+
+			const outcome = await Effect.runPromise(
+				Effect.gen(function* () {
+					const svc = yield* ResearchService
+					const sql = yield* SqlClient.SqlClient
+					return yield* enterOrgScope(sql, { org: ctx.org, userId })(
+						svc.rerun(userId, ctx.org.id, retired!.id, 'example.com'),
+					)
+				}).pipe(Effect.provide(ResearchLive), Effect.orDie),
+			)
+
+			expect(outcome.status).toBe('schema_unavailable')
+
+			// AND nothing was written on the way to refusing.
+			const queued = await run(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* sql<{ count: number }>`
+						SELECT count(*)::int AS count FROM research_runs
+						WHERE organization_id = ${ctx.org.id}
+						  AND schema_name = 'retired_shape_v1'
+					`
+				}),
+			)
+			expect(queued[0]?.count).toBe(1)
+		}, 30_000)
+	})
 })

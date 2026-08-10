@@ -127,8 +127,9 @@ import { computeRunQuality } from './research-quality'
 import { guardScalarFields } from './scalar-field-guard'
 import {
 	type FreeformSchema,
+	isSchemaName,
+	resolveSchema,
 	schemaFieldNames,
-	schemaRegistry,
 } from './schemas/index'
 import { hostOf, sourceIdFor, urlHashForScrape } from './source-key'
 import { recordSeenSource } from './source-record'
@@ -2173,8 +2174,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						return
 					}
 
-					// Resolve the schema
-					const outputSchema = schemaRegistry[schemaName]
+					// Resolve the schema. The name comes off the run row, so it is only
+					// a string here however tightly the boundaries checked it — a run
+					// queued before a schema was retired still names it.
+					const outputSchema = resolveSchema(schemaName)
 					if (!outputSchema) {
 						yield* sql`
 							UPDATE research_runs
@@ -5669,6 +5672,18 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							LIMIT 1
 						`
 						if (!origin) return { status: 'run_not_found' as const }
+
+						// The origin's schema name is copied into the new run as it was
+						// stored, and a run outlives the schema it was started under. Left
+						// unchecked, a retired name would be queued again and only die once
+						// the run had flipped to running and announced itself, so it is
+						// refused here while nothing has been written.
+						if (
+							origin.schemaName !== null &&
+							!isSchemaName(origin.schemaName)
+						) {
+							return { status: 'schema_unavailable' as const }
+						}
 
 						const originContext =
 							origin.context != null && typeof origin.context === 'object'
