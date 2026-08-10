@@ -180,5 +180,56 @@ describe('makeBraveLlmContextSearch', () => {
 			const result = Exit.isSuccess(resolved) ? resolved.value : undefined
 			expect(result?.items).toEqual([])
 		})
+
+		it('should return an empty result when grounding is explicitly null', async () => {
+			// GIVEN a 200 whose grounding block is null rather than missing
+			const { exit } = runSearch(200, { grounding: null })
+
+			// THEN that reads the same way — a zero-hit, not a lost search
+			const resolved = await exit
+			const result = Exit.isSuccess(resolved) ? resolved.value : undefined
+			expect(result?.items).toEqual([])
+		})
+	})
+
+	describe('when an item is missing fields the endpoint does not document', () => {
+		it('should drop an item with no URL and keep the rest', async () => {
+			// GIVEN one source with no address and one with everything. This
+			// endpoint is the last search provider in the chain, so there is nothing
+			// to fall through to — one odd item must not fail the whole search
+			const { exit } = runSearch(200, {
+				grounding: {
+					generic: [
+						{ title: 'No address', snippets: ['Acme was founded in 2011.'] },
+						{
+							url: 'https://acme.com/about',
+							title: null,
+							snippets: ['HQ in Chicago, IL.'],
+						},
+					],
+				},
+			})
+
+			// THEN the addressless item goes, the search itself stands, and the
+			// item with a null title falls back to its own URL
+			const resolved = await exit
+			const result = Exit.isSuccess(resolved) ? resolved.value : undefined
+			expect(result?.items.map(i => i.url)).toEqual(['https://acme.com/about'])
+			expect(result?.items[0]?.title).toBe('https://acme.com/about')
+		})
+
+		it('should drop an item whose snippets are explicitly null', async () => {
+			// GIVEN a source carrying an address but a null passage list
+			const { exit } = runSearch(200, {
+				grounding: {
+					generic: [{ url: 'https://acme.com', title: 'Acme', snippets: null }],
+				},
+			})
+
+			// THEN there is nothing to cite, so the item goes — not the answer
+			const resolved = await exit
+			const result = Exit.isSuccess(resolved) ? resolved.value : undefined
+			expect(result?.items).toEqual([])
+		})
 	})
 })

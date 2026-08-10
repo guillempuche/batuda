@@ -28,27 +28,34 @@ import { ProviderError } from '../../domain/errors'
 import { SearchResult, SearchResultItem } from '../../domain/types'
 import { keyForSlot } from '../_config'
 import { hardenHttp } from '../_http-harden'
+import { NullableOptional } from '../_schema'
 
 const SEARCH_URL = 'https://api.firecrawl.dev/v2/search'
 
 // Subset of the Firecrawl search response we read. Unknown fields are ignored.
 const SearchResponse = Schema.Struct({
-	data: Schema.Struct({
-		web: Schema.optional(
-			Schema.Array(
-				Schema.Struct({
-					url: Schema.String,
-					title: Schema.optional(Schema.String),
-					// The passage of the page that matched the query, picked by
-					// Firecrawl. Falls back to the site's own blurb when the page has
-					// no matching passage.
-					description: Schema.optional(Schema.String),
-				}),
+	// Firecrawl's own verdict on the search, which a 2xx does not guarantee.
+	success: NullableOptional(Schema.Boolean),
+	// A search that turned nothing up can answer with no `data` block at all.
+	// That is zero hits, not a broken response.
+	data: NullableOptional(
+		Schema.Struct({
+			web: NullableOptional(
+				Schema.Array(
+					Schema.Struct({
+						url: Schema.String,
+						title: NullableOptional(Schema.String),
+						// The passage of the page that matched the query, picked by
+						// Firecrawl. Falls back to the site's own blurb when the page has
+						// no matching passage.
+						description: NullableOptional(Schema.String),
+					}),
+				),
 			),
-		),
-	}),
+		}),
+	),
 	// Total credits this call actually cost.
-	creditsUsed: Schema.optional(Schema.Number),
+	creditsUsed: NullableOptional(Schema.Number),
 })
 
 // 429 + 5xx are transient (retry); other 4xx are auth/quota/bad-request (fail fast).
@@ -131,8 +138,19 @@ export const makeFirecrawlSearch = (slot: number) =>
 									}),
 							),
 						)
+						// A 2xx that says the search itself did not work is their side
+						// failing and worth another try, not a clean zero-hit answer.
+						if (body.success === false) {
+							return yield* Effect.fail(
+								new ProviderError({
+									provider: 'firecrawl',
+									message: 'search failed: provider reported success=false',
+									recoverable: true,
+								}),
+							)
+						}
 						return new SearchResult({
-							items: (body.data.web ?? []).map(r => {
+							items: (body.data?.web ?? []).map(r => {
 								// The passage is real text off the page, so the run can cite
 								// it and count it as evidence without paying to open the
 								// page. A result with no passage still keeps its place: the

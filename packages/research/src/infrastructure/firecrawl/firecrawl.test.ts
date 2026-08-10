@@ -211,6 +211,20 @@ describe('firecrawl map', () => {
 				limit: 50,
 			})
 		})
+
+		it('should read a walk that returns an explicitly null link list', async () => {
+			// GIVEN a map response whose links are null rather than missing
+			const { exit } = runMap(200, { creditsUsed: null, links: null })
+
+			// WHEN it settles — THEN it is a site with nothing found, not a failure,
+			// and the unreported credits count as one
+			const settled = await exit
+			expect(Exit.isSuccess(settled)).toBe(true)
+			if (Exit.isSuccess(settled)) {
+				expect(settled.value.links).toEqual([])
+				expect(settled.value.units).toBe(1)
+			}
+		})
 	})
 
 	describe('when the API rejects the request', () => {
@@ -386,9 +400,77 @@ describe('makeFirecrawlScrape', () => {
 		expect(err).toBeInstanceOf(UnsupportedSite)
 	})
 
-	it('should fail non-recoverably on a malformed body', async () => {
-		// GIVEN a 2xx response missing the `data` envelope
-		const { exit, log } = runScrape(200, { wrong: 'shape' })
+	it('should read a response carrying no `data` block as an empty page', async () => {
+		// GIVEN a 2xx answer with no page block at all — a shape Firecrawl really
+		// sends, and one whose fetch was already paid for
+		const { exit, log } = runScrape(200, { success: true })
+
+		// WHEN it settles
+		const settled = await exit
+
+		// THEN the answer stands, as a page with no content rather than a failure
+		expect(Exit.isSuccess(settled)).toBe(true)
+		if (Exit.isSuccess(settled)) expect(settled.value.markdown).toBe('')
+		expect(log.count).toBe(1)
+	})
+
+	it('should keep a page whose metadata fields are explicitly null', async () => {
+		// GIVEN a page whose metadata sends null where a string is documented
+		const { exit } = runScrape(200, {
+			data: {
+				markdown: '# Acme',
+				metadata: { title: null, language: null, url: null },
+			},
+		})
+
+		// WHEN it settles
+		const settled = await exit
+
+		// THEN the page is read, with the null fields simply carrying nothing
+		expect(Exit.isSuccess(settled)).toBe(true)
+		if (Exit.isSuccess(settled)) {
+			expect(settled.value.markdown).toBe('# Acme')
+			expect(settled.value.title).toBeUndefined()
+			expect(settled.value.language).toBeUndefined()
+			expect(settled.value.resolvedUrl).toBeUndefined()
+		}
+	})
+
+	it('should take the first entry when a page declares its language twice', async () => {
+		// GIVEN a Spanish page declaring its language in both an <html lang>
+		// attribute and a <meta name="language"> tag, which Firecrawl reports as a
+		// list rather than as one value — ordinary markup, not an oddity
+		const { exit } = runScrape(200, {
+			data: {
+				markdown: '# Acme',
+				metadata: { language: ['es-ES', 'ES'], title: ['Acme', 'Acme SL'] },
+			},
+		})
+
+		// WHEN it settles
+		const settled = await exit
+
+		// THEN the page is read and the first entry is what it carries
+		expect(Exit.isSuccess(settled)).toBe(true)
+		if (Exit.isSuccess(settled)) {
+			expect(settled.value.language).toBe('es-ES')
+			expect(settled.value.title).toBe('Acme')
+		}
+	})
+
+	it('should retry when the provider reports the fetch itself did not work', async () => {
+		// GIVEN a 2xx whose body says the fetch failed on Firecrawl's side
+		const { exit, log } = runScrape(200, { success: false })
+
+		// WHEN it settles — THEN that is worth another try, so it retries to the max
+		const resolved = await exit
+		expect(errorOf(resolved)?.recoverable).toBe(true)
+		expect(log.count).toBe(3)
+	})
+
+	it('should fail non-recoverably on a body it cannot read at all', async () => {
+		// GIVEN a 2xx whose `data` is not a page block
+		const { exit, log } = runScrape(200, { data: 'nonsense' })
 
 		// THEN the decode error is non-recoverable and not retried
 		const resolved = await exit
@@ -588,9 +670,54 @@ describe('makeFirecrawlSearch', () => {
 		expect(errorOf(resolved)?.recoverable).toBe(false)
 	})
 
-	it('should fail non-recoverably on a malformed body', async () => {
-		// GIVEN a 2xx response missing the `data` envelope
-		const { exit, log } = runSearch(200, { wrong: 'shape' })
+	it('should read a response carrying no `data` block as zero hits', async () => {
+		// GIVEN a 2xx answer with no data block — a search that turned nothing up,
+		// not a broken response
+		const { exit, log } = runSearch(200, { success: true })
+
+		// WHEN it settles
+		const settled = await exit
+
+		// THEN the search succeeds with nothing found
+		expect(Exit.isSuccess(settled)).toBe(true)
+		if (Exit.isSuccess(settled)) expect(settled.value.items).toEqual([])
+		expect(log.count).toBe(1)
+	})
+
+	it('should keep a result whose title and passage are explicitly null', async () => {
+		// GIVEN a result sending null where a string is documented
+		const { exit } = runSearch(200, {
+			data: {
+				web: [{ url: 'https://acme.es', title: null, description: null }],
+			},
+		})
+
+		// WHEN it settles
+		const settled = await exit
+
+		// THEN the result keeps its place: the URL alone is worth scraping later
+		expect(Exit.isSuccess(settled)).toBe(true)
+		if (Exit.isSuccess(settled)) {
+			expect(settled.value.items).toHaveLength(1)
+			expect(settled.value.items[0]?.url).toBe('https://acme.es')
+			expect(settled.value.items[0]?.title).toBe('')
+			expect(settled.value.items[0]?.snippet).toBe('')
+		}
+	})
+
+	it('should retry when the provider reports the search itself did not work', async () => {
+		// GIVEN a 2xx whose body says the search failed on Firecrawl's side
+		const { exit, log } = runSearch(200, { success: false })
+
+		// WHEN it settles — THEN that is worth another try, so it retries to the max
+		const resolved = await exit
+		expect(errorOf(resolved)?.recoverable).toBe(true)
+		expect(log.count).toBe(3)
+	})
+
+	it('should fail non-recoverably on a body it cannot read at all', async () => {
+		// GIVEN a 2xx whose `data` is not a result block
+		const { exit, log } = runSearch(200, { data: 'nonsense' })
 
 		// THEN the decode error is non-recoverable and not retried
 		const resolved = await exit
