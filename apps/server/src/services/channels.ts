@@ -396,8 +396,9 @@ export const patchChannel = (
 			channel: string
 			address: string
 			isPrimary: boolean
+			status: string
 		}>`
-			SELECT channel, address, is_primary FROM channels
+			SELECT channel, address, is_primary, status FROM channels
 			WHERE id = ${channelId} AND subject_table = ${subject.table}
 				AND subject_id = ${subject.id} AND organization_id = ${orgId}
 			LIMIT 1
@@ -448,6 +449,19 @@ export const patchChannel = (
 			data['statusReason'] = null
 			data['statusUpdatedAt'] = now
 			data['softBounceCount'] = 0
+		}
+		// Somebody vouching stood behind one address, not behind this row for
+		// good. Correcting the address is exactly the moment that stops being
+		// true, and the send path reads a vouch by address across the whole
+		// organisation — so carrying it over would quietly clear whatever a check
+		// had found about the new address, wherever else it is on file.
+		const addressChanged =
+			patch.value !== undefined &&
+			patch.value.trim().toLowerCase() !== stored.address.trim().toLowerCase()
+		if (addressChanged && !leavingEmail && stored.status === 'valid') {
+			data['status'] = 'unknown'
+			data['statusReason'] = null
+			data['statusUpdatedAt'] = now
 		}
 
 		// One address of a kind per subject, so renaming onto one already on file
@@ -548,6 +562,112 @@ export interface SuppressedAddress {
 	/** The person holding it, when one does — a company mailbox answers null. */
 	readonly contactId: string | null
 }
+
+/**
+ * Record that somebody stands behind an address, so an assistant stops asking
+ * about it.
+ *
+ * A deliverability verdict is what a check found, and nobody at a keyboard can
+ * obtain one — which is why a caller may only ever lower it. This is the other
+ * half of that: a person who knows the address is good says so here, and it is
+ * kept apart from the verdict rather than overwriting it. The check's finding
+ * stays on file and stays true; what changes is whether it stops a send.
+ *
+ * Refused on an address that hard-bounced or reported spam. That state is the
+ * one real block, and it is keyed on exactly the column this writes — so
+ * vouching for such an address would not merely disagree with the bounce, it
+ * would silently lift it for the whole organisation. Whoever wants that wants
+ * `clearEmailSuppression`, which says so plainly and returns the address to
+ * "nobody has checked" rather than to "somebody vouched".
+ *
+ * Answers what happened, so the caller can tell a refusal from a wrong id
+ * rather than reporting a success nobody got.
+ */
+export const vouchForChannel = (
+	sql: Sql,
+	orgId: string,
+	subject: { readonly table: ChannelSubject; readonly id: string },
+	channelId: string,
+	reason?: string | undefined,
+): Effect.Effect<
+	'vouched' | 'suppressed' | 'not_email' | 'not_found',
+	SqlError.SqlError
+> =>
+	Effect.gen(function* () {
+		const rows = yield* sql<{ channel: string; status: string }>`
+			SELECT channel, status FROM channels
+			WHERE id = ${channelId} AND subject_table = ${subject.table}
+				AND subject_id = ${subject.id} AND organization_id = ${orgId}
+			LIMIT 1
+		`
+		const stored = rows[0]
+		if (stored === undefined) return 'not_found' as const
+		// Only an email address is ever held back by a verdict, so vouching for a
+		// phone number would write a state nothing reads.
+		if (stored.channel !== 'email') return 'not_email' as const
+		if (stored.status === 'bounced' || stored.status === 'complained')
+			return 'suppressed' as const
+
+		yield* sql`
+			UPDATE channels
+			SET status = 'valid',
+			    status_reason = ${reason ?? null},
+			    status_updated_at = now()
+			WHERE id = ${channelId} AND organization_id = ${orgId}
+				AND status NOT IN ('bounced', 'complained')
+		`
+		// The check above and this write are two statements, and a bounce landing
+		// between them commits in that gap — so the condition is repeated here
+		// rather than trusted from a moment ago. Without it the write would lift a
+		// block that arrived while the request was in flight, for the whole
+		// organisation, and overwrite the mail server's own reason with this note.
+		const updated = yield* sql<{ status: string }>`
+			SELECT status FROM channels WHERE id = ${channelId}
+		`
+		if (updated[0]?.status !== 'valid') return 'suppressed' as const
+		return 'vouched' as const
+	})
+
+/**
+ * Take back a vouch, returning the address to nobody having stood behind it.
+ *
+ * Somebody changing their mind is ordinary, and until this existed there was no
+ * way back: a vouch is written to the same column a bounce uses, and the only
+ * other thing that clears it is correcting the address itself. Left without a
+ * door, the way out would have been to write a verdict nobody earned.
+ *
+ * Only ever lifts a vouch. A bounce sits in the same column and is not a thing
+ * a caller may clear from here — that is `clearEmailSuppression`, which says so
+ * — and an address nobody vouched for is left exactly as it is rather than
+ * quietly stamped.
+ */
+export const withdrawVouch = (
+	sql: Sql,
+	orgId: string,
+	subject: { readonly table: ChannelSubject; readonly id: string },
+	channelId: string,
+): Effect.Effect<
+	'withdrawn' | 'not_vouched' | 'not_found',
+	SqlError.SqlError
+> =>
+	Effect.gen(function* () {
+		const rows = yield* sql<{ status: string }>`
+			SELECT status FROM channels
+			WHERE id = ${channelId} AND subject_table = ${subject.table}
+				AND subject_id = ${subject.id} AND organization_id = ${orgId}
+			LIMIT 1
+		`
+		const stored = rows[0]
+		if (stored === undefined) return 'not_found' as const
+		if (stored.status !== 'valid') return 'not_vouched' as const
+		yield* sql`
+			UPDATE channels
+			SET status = 'unknown', status_reason = NULL, status_updated_at = now()
+			WHERE id = ${channelId} AND organization_id = ${orgId}
+				AND status = 'valid'
+		`
+		return 'withdrawn' as const
+	})
 
 /**
  * Which of these addresses the organisation is holding mail back from.
