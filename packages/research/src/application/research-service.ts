@@ -59,8 +59,11 @@ import {
 	readDiscoveredEntry,
 } from './discovered-existing-guard'
 import {
+	discoveryResultCount,
+	emptyScanFindings,
+	isDiscoveryScan,
 	isDiscoveryScanEmpty,
-	isRetryEligible,
+	isDiscoveryScanThin,
 	REFINE_HINT,
 } from './discovery-scan'
 import {
@@ -2323,6 +2326,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// Findings the discovery-scan retry path extracts under the shared
 					// budget; undefined on every other path (which extracts in phase 2).
 					let retryFindings: unknown
+					// Whether the scan's one refined retry fired. Carried out of phase 1
+					// so every terminal path can say so, rather than leaving the retry —
+					// the main lever on a thin list — to be reconstructed from logs.
+					let refinedRetry = false
 					// What the run's spending limit was charged for cheap work in phase 1,
 					// read off the budget once phase 1 ends. Feeds the gap rounds' check
 					// that there is still room for another one. Stays 0 on a resume that
@@ -4082,15 +4089,23 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								`${systemPrompt}\n\n${query}${anchorInstruction}`,
 							)
 
-							// A non-anchored discovery scan (prospect / competitor) that comes
-							// back empty gets ONE refined retry before we accept "found
-							// nothing": only here does an empty primary list mean the search —
-							// not the data — fell short, and only here is the entity gate a
-							// no-op. Extraction runs now so the emptiness check sees real
+							// A discovery scan (prospect / competitor) that comes back with too
+							// few results gets ONE refined retry before we accept the list:
+							// only here does a short primary list mean the search — not the
+							// data — fell short. Extraction runs now so that check sees real
 							// structured findings; the retry reuses this pass's budget.
+							//
+							// A scan pinned to a company earns the retry just as an open-ended
+							// one does — "find this company's competitors" that finds none has
+							// searched badly, not proved the company has no rivals — but it
+							// keeps phase 2's own extraction, which orders its own site first,
+							// re-judges the pages it cited, and can downgrade the entity
+							// verdict. So the findings below are handed on only when there is
+							// no anchor; an anchored scan probes for thinness here and extracts
+							// again there, over everything both passes gathered.
 							let findings: unknown
 							let refined = false
-							if (isRetryEligible(schemaName) && entityTargets === null) {
+							if (isDiscoveryScan(schemaName)) {
 								yield* linkRunSources(loop.scrapedUrlHashes)
 								let extracted = yield* extractStructuredFindings(
 									loop.researchText,
@@ -4102,7 +4117,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								)
 								findings = extracted.findings
 								if (
-									isDiscoveryScanEmpty(schemaName, findings) &&
+									isDiscoveryScanThin(schemaName, findings) &&
 									canAffordAnotherRound(yield* budget.snapshot())
 								) {
 									refined = true
@@ -4115,8 +4130,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									yield* publishEvent(researchId, 'run.refining', {
 										schema: schemaName,
 									})
+									// Carries the anchor instruction the first pass had: a
+									// re-search that drops it looks for anyone's competitors.
 									const retryLoop = yield* runPass(
-										`${systemPrompt}\n\n${query}\n\n${REFINE_HINT}`,
+										`${systemPrompt}\n\n${query}${anchorInstruction}\n\n${REFINE_HINT}`,
 									)
 									loop = {
 										researchText: [loop.researchText, retryLoop.researchText]
@@ -4152,7 +4169,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							const cheapCents = (yield* budget.snapshot()).cheapSpent
 							return {
 								loop,
-								findings,
+								// Only an unanchored scan hands its findings on; an anchored one
+								// extracted here to measure the list and lets phase 2 do the
+								// grounded extraction it needs.
+								findings: entityTargets === null ? findings : undefined,
 								refined,
 								cheapCents,
 							}
@@ -4178,10 +4198,13 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						// Why the searching stopped. A run that ran out of room to think,
 						// rather than finishing what it set out to do, had more it wanted
 						// to read — so a thin profile there is a ceiling to raise, not a
-						// prompt to reword.
+						// prompt to reword. Whether the refined retry fired rides along:
+						// it is the main lever on a thin list, and a run that ends with
+						// nothing to report keeps no findings to record it in.
 						yield* Effect.annotateCurrentSpan({
 							'research.phase1.stop_reason': loopResult.stopReason,
 							'research.phase1.rounds': loopResult.rounds,
+							'research.phase1.refined': phaseOutcome.refined,
 						})
 						// Prepend the anchor site's content so phase-2 extraction reads the
 						// official page first; empty when nothing was seeded.
@@ -4190,6 +4213,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							.join('\n\n')
 						evidenceText = loopResult.evidenceText
 						retryFindings = phaseOutcome.findings
+						refinedRetry = phaseOutcome.refined
 						cheapSpentCents = phaseOutcome.cheapCents
 
 						// Entity grounding gate: from the fetched evidence alone (never the
@@ -4668,12 +4692,13 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						return
 					}
 
-					// An open-ended discovery scan that came back empty even after a
-					// refined retry has no reliable findings to report — mark it
-					// no_reliable_data instead of a green success over an empty list.
+					// A discovery scan that came back empty has no reliable findings to
+					// report — mark it no_reliable_data instead of a green success over
+					// an empty list. A scan pinned to a company is no exception: "find
+					// this company's competitors" that names none has found nothing,
+					// whatever it learned about the company it started from.
 					if (
-						entityTargets === null &&
-						isRetryEligible(schemaName) &&
+						isDiscoveryScan(schemaName) &&
 						isDiscoveryScanEmpty(schemaName, findings)
 					) {
 						yield* sql`
@@ -4681,11 +4706,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							SET status = 'no_reliable_data',
 								reason_code = ${'no_sources' satisfies ReasonCode},
 								phase = 3,
-								findings = ${JSON.stringify({
-									error:
-										'The search found no companies matching the criteria, even after a refined retry, so there are no reliable findings to report.',
-									reason: 'no_reliable_data',
-								})},
+								findings = ${JSON.stringify(emptyScanFindings(refinedRetry))},
 								tool_log = ${JSON.stringify(finalToolLog)},
 								completed_at = now(),
 								updated_at = now()
@@ -4735,6 +4756,8 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						fieldsTotal: fill.total,
 						citationsSeen,
 						citationsKept,
+						scanResults: discoveryResultCount(schemaName, findings),
+						refined: refinedRetry,
 					})
 					const findingsWithQuality = {
 						...withRegistryFlag(findings as Record<string, unknown>),
