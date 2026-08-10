@@ -117,8 +117,9 @@ If the directory was removed manually before `worktree down`, run `pnpm cli work
 - **`git worktree remove` does NOT auto-tear-down** — the `WorktreeRemove` hook only fires when
   *Claude* removes the worktree. After a manual `git worktree remove`, the DB + bucket leak; run
   `pnpm cli worktree down` **first**, or `pnpm cli worktree prune` later. `prune` only *lists*
-  orphans by default (pass `--yes` to drop) and keys ownership off each live worktree's `.env`,
-  so it never reaps a live worktree — even one whose branch was switched.
+  orphans by default (pass `--yes` to drop) and keys ownership off each live worktree's `.env`
+  **and its directory name**, so it never reaps a live worktree — even one whose branch was
+  switched, or one that was never provisioned at all.
 - **Teardown stops the worktree's dev server too.** `worktree down`/`done` (and the `WorktreeRemove`
   hook) kill any `pnpm dev` servers running inside the worktree before its data + directory go away,
   so nothing is left serving a deleted checkout and holding its port. The shared portless proxy is
@@ -134,6 +135,10 @@ If the directory was removed manually before `worktree down`, run `pnpm cli work
   `batuda_it__<slug>` (main: `batuda_it`) fresh each run; `worktree down`/`done` and the
   `WorktreeRemove` hook drop it alongside the dev DB, and `prune` reaps it for a worktree that's
   gone. You never manage it by hand — and it never touches another worktree's `batuda_it__…`.
+  Run the suite **before** `worktree up` and the `<slug>` is your worktree's directory name
+  instead, since there is no `.env` to read a dev DB from yet — so one worktree can end up with
+  two of these over its life. Teardown drops both, and `prune` treats both as owned; you still
+  never manage either by hand.
 - **`pnpm cli services down` from a worktree** stops the *shared* stack (every worktree + main),
   so it refuses unless run from the main checkout or given `--force`. To remove just your
   worktree's data, use `worktree down`.
