@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-10 (server-v2026.8.10)
+
+### Features
+
+* let a verdict be taken back off an address, not only lowered ([519e309](https://github.com/guillempuche/batuda/commit/519e30916140d24eaa5521c728d39e56be601ee2))
+* **server:** let somebody stand behind an address ([e19ed71](https://github.com/guillempuche/batuda/commit/e19ed719db7a03547c2d12b84f6e111dbf77536a))
+
+### Bug Fixes
+
+* ask one question about a blocked address, in one place ([32be485](https://github.com/guillempuche/batuda/commit/32be485c1e6c27a22d8185d44523c8a49f1ddf48))
+* keep research to its own organization and make its gates real ([ab2db3c](https://github.com/guillempuche/batuda/commit/ab2db3cef62a457e63fc96024d3df8a78f001c33)), closes [#377](https://github.com/guillempuche/batuda/issues/377)
+* **server:** answer a channel call that cannot be carried out, rather than reporting success ([c79178d](https://github.com/guillempuche/batuda/commit/c79178d5ce951b92354c8fa90c8a14c944e7a237))
+* **server:** hold an address's verdict to the five words it can be ([345d920](https://github.com/guillempuche/batuda/commit/345d920bf4cfda0cb480824d4c78e446636f73c3))
+* **server:** judge a send by the address it is going to ([d93a81c](https://github.com/guillempuche/batuda/commit/d93a81cc43af6aff0873498f79fc0aedc90e18a6))
+* **server:** keep a kind's default held, and store a kind one way ([9c59199](https://github.com/guillempuche/batuda/commit/9c591994fb4e29aedf1b80b9d07df98178d8c51e))
+* **server:** read a channel's kind folded everywhere, not only where it is stored ([23d71a5](https://github.com/guillempuche/batuda/commit/23d71a54b506829a2c4fe18cfdf91cbc27685690))
+* **server:** send a reply to whoever wrote in ([5e1dd20](https://github.com/guillempuche/batuda/commit/5e1dd205da2d6fbb7710179ff349927070bf0883))
+
 ## 2026-08-08 (server-v2026.8.8)
 
 ### Features
