@@ -2,7 +2,14 @@ import { createHash } from 'node:crypto'
 
 import { describe, expect, it } from 'vitest'
 
-import { canonicalizeUrl, hostOf, pathOf, urlHashForScrape } from './source-key'
+import {
+	canonicalizeUrl,
+	hostOf,
+	isWebAddress,
+	pathOf,
+	sourceIdFor,
+	urlHashForScrape,
+} from './source-key'
 
 describe('canonicalizeUrl', () => {
 	it('should lowercase the hostname', () => {
@@ -175,6 +182,82 @@ describe('pathOf', () => {
 
 		it('should return null for text that is not a URL', () => {
 			expect(pathOf('just a title')).toBeNull()
+		})
+	})
+})
+
+describe('isWebAddress', () => {
+	describe('when the string is a page somebody could open', () => {
+		it('should accept it however the model tidied it', () => {
+			// GIVEN the same site written with a scheme, without one, and with www
+			// THEN each is an address worth fetching and worth placing by host
+			expect(isWebAddress('https://acme.es/contact')).toBe(true)
+			expect(isWebAddress('acme.es')).toBe(true)
+			expect(isWebAddress('www.acme.es/careers')).toBe(true)
+			expect(isWebAddress('HTTP://ACME.es/a/b?x=1')).toBe(true)
+			expect(isWebAddress('https://careers.acme.co.uk:8443/x')).toBe(true)
+		})
+
+		it('should accept a non-Latin address, ending and all', () => {
+			// GIVEN domains the parser hands back as punycode — one with a Latin
+			// ending, one whose ending is non-Latin too
+			expect(isWebAddress('ñandú.es')).toBe(true)
+			expect(isWebAddress('пример.рф')).toBe(true)
+			expect(isWebAddress('https://例え.テスト')).toBe(true)
+			// The punycode is what the check actually sees, either way
+			expect(isWebAddress('https://xn--e1afmkfd.xn--p1ai')).toBe(true)
+		})
+
+		it('should accept hosts spelled unusually rather than call them unreadable', () => {
+			// GIVEN two legal but uncommon spellings — saying "not an address" here
+			// would let a third party's page skip the confidence cap
+			expect(isWebAddress('https://acme.es./about')).toBe(true)
+			expect(isWebAddress('https://my_data.example.com/acme')).toBe(true)
+		})
+	})
+
+	describe('when the string is one of our own source ids', () => {
+		it('should reject it, so no run pays to fetch a page it already holds', () => {
+			// GIVEN the id a harvested contact page is cited to
+			const sourceId = sourceIdFor(urlHashForScrape('https://acme.es/contact'))
+
+			// WHEN asked whether it is a web address
+			// THEN no — even though gluing a scheme on the front parses it as a host
+			expect(sourceId).toMatch(/^src_/)
+			expect(isWebAddress(sourceId)).toBe(false)
+			expect(hostOf(sourceId)).not.toBeNull()
+		})
+	})
+
+	describe('when the string is not a web address', () => {
+		it('should reject prose, empty text, and a bare word', () => {
+			// GIVEN citations a model wrote as a title or left blank
+			expect(isWebAddress('Monzo Bank plc')).toBe(false)
+			expect(isWebAddress('')).toBe(false)
+			expect(isWebAddress('   ')).toBe(false)
+			// A single label is nothing on the public web
+			expect(isWebAddress('localhost')).toBe(false)
+			expect(isWebAddress('intranet')).toBe(false)
+		})
+
+		it('should reject a mailbox, so a gap round never fetches an address', () => {
+			// GIVEN an email written bare and with its scheme — both would otherwise
+			// read as the site acme.es
+			expect(isWebAddress('info@acme.es')).toBe(false)
+			expect(isWebAddress('mailto:info@acme.es')).toBe(false)
+		})
+
+		it('should reject a scheme no scraper opens', () => {
+			// GIVEN a file or transfer URL rather than a page
+			expect(isWebAddress('ftp://acme.es/pub')).toBe(false)
+			expect(isWebAddress('file:///etc/hosts')).toBe(false)
+		})
+
+		it('should reject hosts that are not domain names', () => {
+			// GIVEN a numeric host and a malformed one — neither is a site to judge
+			expect(isWebAddress('https://192.168.1.1/x')).toBe(false)
+			expect(isWebAddress('https://acme-.es')).toBe(false)
+			expect(isWebAddress('https://acme.e')).toBe(false)
 		})
 	})
 })
