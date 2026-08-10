@@ -578,14 +578,16 @@ export const EmailGroup = HttpApiGroup.make('email')
 		// a query string is the one place they would be logged and cached.
 		HttpApiEndpoint.post('checkSuppressed', '/email/suppressed', {
 			payload: Schema.Struct({
-				// 320 is as long as one address gets: 64 before the @, 255 after. The
-				// list is capped because a caller may ask on every keystroke and every
-				// address in it costs another index lookup on the connection other
-				// requests are waiting for. A list longer than this is a mail-merge,
-				// which is a different feature.
-				addresses: Schema.Array(
-					Schema.String.pipe(Schema.check(Schema.isMaxLength(320))),
-				).pipe(Schema.check(Schema.isMaxLength(200))),
+				// One entry per recipient field, however the sender wrote it: the
+				// server takes the addresses out of them the same way the send does,
+				// so a name written the way a mail client shows it ("Núria Pla
+				// <nuria@…>") is judged here exactly as it is judged there. The bound
+				// is on the text a field can hold, not on how many addresses it comes
+				// to — the send puts no limit on recipients, and a check that stopped
+				// short of one would leave the refusal to the send.
+				recipientFields: Schema.Array(
+					Schema.String.pipe(Schema.check(Schema.isMaxLength(8_000))),
+				).pipe(Schema.check(Schema.isMaxLength(8))),
 			}),
 			success: Schema.Struct({
 				suppressed: Schema.Array(

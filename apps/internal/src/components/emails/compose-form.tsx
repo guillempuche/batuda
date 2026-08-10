@@ -641,19 +641,17 @@ function SuppressionGuard({
 	const check = useAtomSet(checkSuppressedAtom, { mode: 'promiseExit' })
 
 	useEffect(() => {
-		const addresses = [
-			...splitAddresses(to),
-			...splitAddresses(cc),
-			...splitAddresses(bcc),
-		]
-		if (addresses.length === 0) {
+		// The fields go over as typed, and the server takes the addresses out of
+		// them the same way the send does — one place decides what an address is.
+		const recipientFields = [to, cc, bcc].filter(field => field.trim() !== '')
+		if (recipientFields.length === 0) {
 			onChange([])
 			return
 		}
 		let cancelled = false
 		const timer = setTimeout(() => {
 			void (async () => {
-				const exit = await check({ payload: { addresses } })
+				const exit = await check({ payload: { recipientFields } })
 				if (cancelled) return
 				if (exit._tag !== 'Success') {
 					onChange([])
@@ -676,6 +674,9 @@ function SuppressionGuard({
 	return null
 }
 
+// Shapes the cc and bcc fields into the list a saved draft holds. Not an
+// address reader: a recipient written the way a mail client shows it comes
+// apart here into pieces that are not addresses.
 function splitAddresses(raw: string): ReadonlyArray<string> {
 	if (raw.trim() === '') return []
 	return raw

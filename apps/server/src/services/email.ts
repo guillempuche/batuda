@@ -1892,14 +1892,22 @@ export class EmailService extends Context.Service<EmailService>()(
 					}),
 
 				/**
-				 * Which of these addresses a send would be refused over — the same
-				 * question `assertRecipientsNotSuppressed` asks, so a caller can warn
-				 * while a message is being written rather than after it is sent.
+				 * Which of the addresses named in these recipient fields a send would
+				 * be refused over — the same question `assertRecipientsNotSuppressed`
+				 * asks, so a caller can warn while a message is being written rather
+				 * than after it is sent.
 				 */
-				checkSuppressed: (addresses: ReadonlyArray<string>) =>
+				checkSuppressed: (recipientFields: ReadonlyArray<string>) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
-						const rows = yield* suppressedAmong(sql, currentOrg.id, addresses)
+						// The addresses come out of the fields the same way the send
+						// takes them out — judging a different set from the send is
+						// worse than not warning at all.
+						const rows = yield* suppressedAmong(
+							sql,
+							currentOrg.id,
+							recipientAddresses(...recipientFields),
+						)
 						return rows.map(row => ({
 							address: row.address,
 							status: row.status,
