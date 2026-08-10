@@ -9,6 +9,12 @@ import {
 	COMPANY_STATUSES,
 	isVerificationVerdict,
 } from '@batuda/domain'
+import {
+	canonicalizeUrl,
+	isWebAddress,
+	sourceIdFor,
+	urlHashForScrape,
+} from '@batuda/research'
 
 export {
 	type ProvenanceEntry,
@@ -104,12 +110,15 @@ const readSourced = (
 		value === null ||
 		typeof value !== 'object' ||
 		Array.isArray(value) ||
-		!('value' in value) ||
-		!('source_id' in (value as Record<string, unknown>))
+		!('value' in value)
 	)
 		return { value }
 	const wrapper = value as Record<string, unknown>
 	const sourceId = wrapper['source_id']
+	// A wrapper is still a wrapper when the run named no page for it. The value
+	// inside is what belongs in the column either way, and only the note about
+	// where it came from is lost. Left wrapped, the whole object would go into the
+	// column in place of the text it holds.
 	if (typeof sourceId !== 'string' || sourceId === '')
 		return { value: wrapper['value'] }
 	const confidence = wrapper['confidence']
@@ -125,9 +134,14 @@ const readSourced = (
 }
 
 /**
- * Swap each cited page id for the page's real address, and stamp the run that
- * cited it. A citation naming a page this run never fetched is dropped: a stored
- * note about where a fact came from has to point somewhere a reader can open.
+ * Swap each cited page for the page's real address, and stamp the run that cited
+ * it. A run names a page either by its address — which is what the model is asked
+ * for, and all it is ever shown — or by the id we hold that page under, which is
+ * what our own harvested values carry. Both are read.
+ *
+ * Only pages THIS run fetched count: a citation naming a page the run never
+ * opened is dropped, because a stored note about where a fact came from has to
+ * point somewhere a reader can open.
  */
 const resolveFieldSources = (
 	sql: SqlClient.SqlClient,
@@ -137,17 +151,56 @@ const resolveFieldSources = (
 	Effect.gen(function* () {
 		const entries = Object.entries(citations)
 		if (entries.length === 0) return {} as Record<string, FieldSource>
-		const citedIds = [...new Set(entries.map(([, cited]) => cited.sourceId))]
-		const rows = yield* sql<{ id: string; url: string }>`
-			SELECT s.id, s.url
+		// The run's own pages, matched here rather than in the query: one page gets
+		// written a dozen ways — a trailing slash, a capital in the host, a
+		// fragment — and tidying both sides down to one spelling is not something
+		// the database can do for us. A run holds tens of pages, so reading them all
+		// costs less than a lookup per citation.
+		//
+		// The page store is shared by every organisation, so it is the run's own link
+		// rows that hold this to pages this run really fetched. Take that join away
+		// and an address a run merely mentioned would resolve against somebody else's
+		// page.
+		const rows = yield* sql<{ id: string; url: string; localRef: string }>`
+			SELECT s.id, s.url, rs.local_ref AS "localRef"
 			FROM research_run_sources rs
 			JOIN sources s ON s.id = rs.source_id
-			WHERE rs.research_id = ${runId} AND s.id IN ${sql.in(citedIds)}
+			WHERE rs.research_id = ${runId}
+			ORDER BY s.id
 		`
-		const urlById = new Map(rows.map(row => [row.id, row.url]))
+		// Every way one of this run's pages can be named, each pointing at the one
+		// address on file. What gets stored is always that address, never the text
+		// the run happened to write down. Two pages can tidy down to the same name
+		// and the first of them wins, so the rows are read in a fixed order — the
+		// same citation then always resolves to the same page.
+		const urlByName = new Map<string, string>()
+		for (const row of rows) {
+			// A page with no address on file cannot be pointed at, so it never becomes
+			// a way of naming one. Left in, it would answer a lookup with an empty
+			// string — which is a found value as far as the search below is concerned,
+			// and would store a note leading nowhere.
+			if (row.url === '') continue
+			for (const name of [
+				row.id,
+				canonicalizeUrl(row.url),
+				canonicalizeUrl(row.localRef),
+			])
+				if (!urlByName.has(name)) urlByName.set(name, row.url)
+		}
 		const out: Record<string, FieldSource> = {}
 		for (const [field, cited] of entries) {
-			const sourceUrl = urlById.get(cited.sourceId)
+			// Exactly as written first, so an id we minted is never put through
+			// address-tidying it was never meant for. Then the tidied address. Then
+			// the id that address itself maps to, which is what still finds the page
+			// when a fetch was redirected off-site and the row kept where it landed.
+			// That last one only makes sense for an address: asked of an id it would
+			// hash the id itself, which names no page anybody holds.
+			const sourceUrl =
+				urlByName.get(cited.sourceId) ??
+				urlByName.get(canonicalizeUrl(cited.sourceId)) ??
+				(isWebAddress(cited.sourceId)
+					? urlByName.get(sourceIdFor(urlHashForScrape(cited.sourceId)))
+					: undefined)
 			if (sourceUrl === undefined) continue
 			out[field] = {
 				sourceUrl,
@@ -317,6 +370,7 @@ export type ValidatedCreate =
 			readonly companyId: string
 			readonly fields: Record<string, unknown>
 			readonly channels: ReadonlyArray<ChannelInput>
+			readonly citations: Record<string, FieldCitation>
 	  }
 	| { readonly ok: false; readonly reason: string }
 
@@ -335,13 +389,19 @@ export const validateCreate = (
 	)
 		return { ok: false, reason: 'fields is not an object' }
 	const fields = fieldsRaw as Record<string, unknown>
-	const name = fields['name']
+	// Read through a wrapper here too. A run asked to pair each changed value with
+	// the page it came from tends to do the same for the person it is offering, and
+	// a wrapped name read as-is is not a string — which would throw the whole
+	// person away for being nameless.
+	const name = readSourced(fields['name']).value
 	if (typeof name !== 'string' || name.trim() === '')
 		return { ok: false, reason: 'missing name' }
-	const companyId = fields['company_id'] ?? fields['companyId']
+	const companyId = readSourced(
+		fields['company_id'] ?? fields['companyId'],
+	).value
 	if (typeof companyId !== 'string' || companyId === '')
 		return { ok: false, reason: 'missing company_id' }
-	const allowed = allowlistFields('contacts', fields).fields
+	const { fields: allowed, citations } = allowlistFields('contacts', fields)
 	const badValue = checkFieldValues('contacts', allowed)
 	if (badValue !== null) return { ok: false, reason: badValue }
 	return {
@@ -349,6 +409,7 @@ export const validateCreate = (
 		companyId,
 		fields: allowed,
 		channels: parseChannels(fields['channels']),
+		citations,
 	}
 }
 
@@ -803,11 +864,22 @@ export const resolveResearchProposedUpdate = (
 					subject_id: existingId,
 				} satisfies ResolveOutcome
 			}
+			// Where each of the new person's values was read — the same note an
+			// update keeps, so a person the research found can be asked "where did
+			// this job title come from?" like any other row.
+			const createdSources = yield* resolveFieldSources(
+				sql,
+				runId,
+				created.citations,
+			)
 			const inserted = yield* sql<{ id: string; version: number }>`
 				INSERT INTO contacts ${sql.insert({
 					...created.fields,
 					companyId: created.companyId,
 					organizationId: org.id,
+					...(Object.keys(createdSources).length > 0
+						? { fieldProvenance: createdSources }
+						: {}),
 				})}
 				RETURNING id, version
 			`.pipe(

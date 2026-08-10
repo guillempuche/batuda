@@ -29,6 +29,7 @@
 
 import { EMAIL_ADDRESS_PATTERN } from '@batuda/domain'
 
+import { unwrapValue } from './guard-shapes'
 import {
 	isInCorpus,
 	PAGE_LITERAL_FIELDS,
@@ -132,12 +133,17 @@ export const verifyValueProvenance = (
 	// model could fabricate, so they pass untouched.
 	const fieldGrounded = (key: string, raw: unknown): boolean => {
 		if (STRUCTURAL_KEYS.has(key)) return true
-		if (typeof raw !== 'string') return true
+		// A run is asked to pair each changed value with the page it came from, so
+		// what arrives here is usually wrapped. The checks below all read text, and a
+		// wrapper is not text — read past it, or a made-up town would pass simply for
+		// arriving with its provenance attached.
+		const value = unwrapValue(raw)
+		if (typeof value !== 'string') return true
 		// Any email, phone, or tax id it carries must appear in the evidence.
-		if (!stringSupported(ev, raw)) return false
+		if (!stringSupported(ev, value)) return false
 		// A location must name a place, not how far the company reaches ("15
 		// countries throughout the world"); this holds whatever the evidence says.
-		if (!valueIsRightKind(key, raw)) return false
+		if (!valueIsRightKind(key, value)) return false
 		// A value that is meant to read off a page — a place, a tool's name — carries
 		// no email or digits for the check above to catch, so a made-up one (a wrong
 		// city, a company that never operated there) would otherwise sail through.
@@ -145,7 +151,7 @@ export const verifyValueProvenance = (
 		// check against, as on a resumed run, so a real value is never dropped for
 		// want of a corpus.
 		if (PAGE_LITERAL_FIELDS.has(key) && ev.lowerCorpus.length > 0) {
-			return isInCorpus(raw, ev.lowerCorpus)
+			return isInCorpus(value, ev.lowerCorpus)
 		}
 		return true
 	}

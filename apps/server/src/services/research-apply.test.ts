@@ -98,6 +98,19 @@ describe('allowlistFields', () => {
 			expect(fields).toEqual({ industry: 'transport' })
 			expect(citations).toEqual({})
 		})
+
+		it('should still write the value when the page was left out entirely', () => {
+			// GIVEN a wrapper with no source key at all — what a run sends when it is
+			// asked for the pairing and names no page for one field
+			const { fields, citations } = allowlistFields('companies', {
+				industry: { value: 'transport' },
+			})
+
+			// THEN the column gets the text, not the wrapper around it: stored whole,
+			// the record would read "[object Object]" where its industry should be
+			expect(fields).toEqual({ industry: 'transport' })
+			expect(citations).toEqual({})
+		})
 	})
 
 	describe('when a dropped field carries a source', () => {
@@ -217,6 +230,50 @@ describe('validateCreate', () => {
 					is_primary: true,
 				},
 			])
+		})
+
+		it('should carry the page each value of a new person was read on', () => {
+			// GIVEN a discovered person whose name and job title arrive paired with
+			// the page that names them
+			const result = validateCreate({
+				...base,
+				fields: {
+					...base.fields,
+					name: { value: 'Ada Lovelace', source_id: 'https://acme.es/team' },
+					role: { value: 'CTO', source_id: 'https://acme.es/team' },
+				},
+			})
+
+			// THEN the pages come back beside the values, so the person can be asked
+			// where their job title came from once they are on file
+			expect(result.ok).toBe(true)
+			if (!result.ok) return
+			expect(result.citations['name']).toEqual({
+				sourceId: 'https://acme.es/team',
+			})
+			expect(result.citations['role']).toEqual({
+				sourceId: 'https://acme.es/team',
+			})
+		})
+
+		it('should read the person and their company through a wrapper', () => {
+			// GIVEN a run asked to pair each changed value with the page it came from,
+			// carrying that habit over to the person it is offering
+			const result = validateCreate({
+				...base,
+				fields: {
+					...base.fields,
+					name: { value: 'Ada Lovelace', source_id: 'https://acme.es/team' },
+					company_id: { value: 'co-1', source_id: 'https://acme.es/team' },
+				},
+			})
+
+			// THEN the person still lands: read flat, a wrapped name is not a string,
+			// and every discovered person would be turned away as nameless
+			expect(result.ok).toBe(true)
+			if (!result.ok) return
+			expect(result.companyId).toBe('co-1')
+			expect(result.fields['name']).toBe('Ada Lovelace')
 		})
 
 		it('should keep a verdict the vocabulary knows', () => {
