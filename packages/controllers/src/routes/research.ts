@@ -53,7 +53,13 @@ const SelectorRef = Schema.Struct({
 const Hints = Schema.Struct({
 	language: Schema.optional(Schema.Literals(['ca', 'es', 'en'])),
 	recency_days: Schema.optional(Schema.Number),
-	location: Schema.optional(Schema.String),
+	// The country as a code, and the place in words. Two fields because they answer
+	// two questions: a code can be matched against a company's own country and sets
+	// the search provider's locale, while a place is prose for the searcher to read.
+	// One field doing both is how "MD" for Baltimore became Moldova and dropped
+	// every US company a scan found.
+	country: Schema.optional(Schema.String),
+	place: Schema.optional(Schema.String),
 	// The employee-count band a prospecting request asked for, so a scan can leave
 	// out a company outside it.
 	min_employees: Schema.optional(Schema.Number),

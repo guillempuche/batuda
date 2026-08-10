@@ -346,19 +346,28 @@ export const TOOL_LOG_FAILED = [
 export const RICH_COMPETITORS = [
 	{
 		name: 'Industria Metall Llobregat',
-		website: 'https://imetalllobregat.es',
+		website: {
+			value: 'https://imetalllobregat.es',
+			source_id: 'src_registry_001',
+		},
 		why: 'Direct competitor in steel fabrication for the same Baix Llobregat industrial belt.',
 		citations: [{ source_id: 'src_registry_001' }],
 	},
 	{
 		name: 'Galvanitzats Penedès',
-		website: 'https://galvanitzatspenedes.cat',
+		website: {
+			value: 'https://galvanitzatspenedes.cat',
+			source_id: 'src_registry_001',
+		},
 		why: 'Adjacent treatment vertical; serves the same automotive supply chain as Ferros BL.',
 		citations: [{ source_id: 'src_registry_001', confidence: 0.81 }],
 	},
 	{
 		name: 'Foneria Marina',
-		website: 'https://foneriamarina.com',
+		website: {
+			value: 'https://foneriamarina.com',
+			source_id: 'src_registry_001',
+		},
 		why: 'Smaller foundry north of Mataró; weaker digital presence, easier displacement.',
 		citations: [{ source_id: 'src_registry_001', confidence: 0.6 }],
 	},
@@ -399,18 +408,24 @@ export const RICH_CONTACTS_HOSTAL = [
 export const RICH_PROSPECTS_GIRONA = [
 	{
 		name: 'Cal Forn de Banyoles',
-		website: 'https://calforn-banyoles.cat',
+		website: {
+			value: 'https://calforn-banyoles.cat',
+			source_id: 'src_registry_001',
+		},
 		industry: 'restaurants',
-		country: 'ES',
+		countries: ['ES'],
 		why_relevant:
 			'Family restaurant in Banyoles with 40 covers; phone-only reservations; recently posted on Instagram about "no donar a l\'abast els caps de setmana".',
 		citations: [],
 	},
 	{
 		name: 'Hostal Empordà',
-		website: 'https://hostalemporda.cat',
+		website: {
+			value: 'https://hostalemporda.cat',
+			source_id: 'src_registry_001',
+		},
 		industry: 'hospitality',
-		country: 'ES',
+		countries: ['ES'],
 		why_relevant:
 			'12-room hostal in Figueres; rate-parity clause friction with Booking.com; identical pattern to Hostal del Pirineu.',
 		citations: [],
@@ -418,16 +433,19 @@ export const RICH_PROSPECTS_GIRONA = [
 	{
 		name: 'Botiga del Pa',
 		industry: 'restaurants',
-		country: 'ES',
+		countries: ['ES'],
 		why_relevant:
 			'Artisan bakery chain (3 locations) in Girona. Sell-out by 11:00 every Saturday; preorder via WhatsApp is unmanageable for them.',
 		citations: [],
 	},
 	{
 		name: 'Mas Silencis',
-		website: 'https://massilencis.cat',
+		website: {
+			value: 'https://massilencis.cat',
+			source_id: 'src_registry_001',
+		},
 		industry: 'hospitality',
-		country: 'ES',
+		countries: ['ES'],
 		why_relevant:
 			'Boutique 6-room agroturisme; growing French customer base; no FR localisation today.',
 		citations: [],
@@ -784,7 +802,10 @@ export const RICH_CONTACTS_TANCAMENTS = [
 export const RICH_COMPETITORS_BAKERIES = [
 	{
 		name: 'Forn La Coloma',
-		website: 'https://fornlacoloma.cat',
+		website: {
+			value: 'https://fornlacoloma.cat',
+			source_id: 'src_registry_001',
+		},
 		description:
 			'Berguedà obrador with a static Wordpress; sells at three weekly markets.',
 		strengths: ['multi-market presence', 'family-recipe story'],
@@ -803,7 +824,10 @@ export const RICH_COMPETITORS_BAKERIES = [
 	},
 	{
 		name: 'El Pa de Solsona',
-		website: 'https://padesolsona.cat',
+		website: {
+			value: 'https://padesolsona.cat',
+			source_id: 'src_registry_001',
+		},
 		description:
 			'Solsonès chain with three locations; runs a basic Shopify catalogue.',
 		strengths: ['multi-location', 'Shopify discipline'],
@@ -816,7 +840,10 @@ export const RICH_COMPETITORS_BAKERIES = [
 export const RICH_COMPETITORS_VALENCIA = [
 	{
 		name: 'Asesores Riba',
-		website: 'https://asesoresriba.es',
+		website: {
+			value: 'https://asesoresriba.es',
+			source_id: 'src_registry_001',
+		},
 		description:
 			'Tax + ops consulting in València; older buyer profile; brochure WP site.',
 		strengths: ['tenure', 'CFO-network'],
@@ -826,7 +853,10 @@ export const RICH_COMPETITORS_VALENCIA = [
 	},
 	{
 		name: 'Consultoria Vega',
-		website: 'https://consultoriavega.es',
+		website: {
+			value: 'https://consultoriavega.es',
+			source_id: 'src_registry_001',
+		},
 		description:
 			'Generalist boutique; same target customer; recently hired a marketer.',
 		strengths: ['marketing motion'],
@@ -848,18 +878,21 @@ export const RICH_COMPETITORS_VALENCIA = [
 export const RICH_PROSPECTS_LOGISTICS = [
 	{
 		name: 'Transports Ferrer',
-		website: 'https://transportsferrer.cat',
+		website: {
+			value: 'https://transportsferrer.cat',
+			source_id: 'src_registry_001',
+		},
 		industry: 'transport',
-		country: 'ES',
+		countries: ['ES'],
 		why_relevant:
 			'Mid-size carrier in Maresme with same paper-PoD pain. Recent LinkedIn post about "perdem albarans cada setmana".',
 		citations: [],
 	},
 	{
 		name: 'Logística Vallès',
-		website: 'https://logvalles.cat',
+		website: { value: 'https://logvalles.cat', source_id: 'src_registry_001' },
 		industry: 'transport',
-		country: 'ES',
+		countries: ['ES'],
 		why_relevant:
 			'Vallès Oriental fleet, 22 vehicles. Hiring a "responsable digitalització" per public job post.',
 		citations: [],
@@ -867,16 +900,19 @@ export const RICH_PROSPECTS_LOGISTICS = [
 	{
 		name: 'Distribució Maresme',
 		industry: 'transport',
-		country: 'ES',
+		countries: ['ES'],
 		why_relevant:
 			'Adjacent SME in Maresme. Sage 200 user — same integration shape as Coastal.',
 		citations: [],
 	},
 	{
 		name: 'Trans Garraf',
-		website: 'https://transgarraf.cat',
+		website: {
+			value: 'https://transgarraf.cat',
+			source_id: 'src_registry_001',
+		},
 		industry: 'transport',
-		country: 'ES',
+		countries: ['ES'],
 		why_relevant:
 			'Smaller fleet (8 vehicles) but rapidly growing; clean field for a fleet-app rollout.',
 		citations: [],
@@ -886,9 +922,12 @@ export const RICH_PROSPECTS_LOGISTICS = [
 export const RICH_PROSPECTS_ELECTRICAL = [
 	{
 		name: 'Instal·lacions Bages',
-		website: 'https://instalbages.cat',
+		website: {
+			value: 'https://instalbages.cat',
+			source_id: 'src_registry_001',
+		},
 		industry: 'manufacturing',
-		country: 'ES',
+		countries: ['ES'],
 		why_relevant:
 			'Bages-area electrical contractor; pulled three Google ads for "electricista urgent" — paying for leads they can\'t qualify.',
 		citations: [],
@@ -896,16 +935,19 @@ export const RICH_PROSPECTS_ELECTRICAL = [
 	{
 		name: 'Electricitat Osona',
 		industry: 'manufacturing',
-		country: 'ES',
+		countries: ['ES'],
 		why_relevant:
 			'Vic-based; similar size to Electricitat del Vallès; weak digital posture.',
 		citations: [],
 	},
 	{
 		name: 'Electrosolucions Penedès',
-		website: 'https://electroso-penedes.cat',
+		website: {
+			value: 'https://electroso-penedes.cat',
+			source_id: 'src_registry_001',
+		},
 		industry: 'manufacturing',
-		country: 'ES',
+		countries: ['ES'],
 		why_relevant: 'New entrant; has a fast site but no booking flow.',
 		citations: [],
 	},
@@ -915,7 +957,7 @@ export const RICH_PROSPECTS_FANTASMA = [
 	{
 		name: 'Magatzem Bages',
 		industry: 'distribution',
-		country: 'ES',
+		countries: ['ES'],
 		why_relevant:
 			"Small distributor in same Manresa industrial belt. Same low-signal profile as L'Ànec d'Or; worth a postal-mail touch.",
 		citations: [],
@@ -923,7 +965,7 @@ export const RICH_PROSPECTS_FANTASMA = [
 	{
 		name: 'Distribució Cardona',
 		industry: 'distribution',
-		country: 'ES',
+		countries: ['ES'],
 		why_relevant:
 			'Family distributor; runs on phone + paper. Postal mail and a cold visit may unlock dialogue.',
 		citations: [],

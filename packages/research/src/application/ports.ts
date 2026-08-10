@@ -18,11 +18,14 @@ export class ResearchRunContext extends Context.Service<
 	ResearchRunContext,
 	{
 		readonly researchId: string
-		// The run's language + location hints, so a search reaches the provider in
+		// The run's language + place hints, so a search reaches the provider in
 		// the target's own language instead of defaulting to English — the company's
-		// own pages are rarely in English for a non-English target.
+		// own pages are rarely in English for a non-English target. `country` is the
+		// code a provider takes as its locale; `place` is prose and is never read as
+		// a code.
 		readonly language?: string | undefined
-		readonly location?: string | undefined
+		readonly country?: string | undefined
+		readonly place?: string | undefined
 		// The run's target company, so a web search that dropped the company name can
 		// be re-anchored to it before it reaches the provider. `entityTargets` is the
 		// match keys used to tell an already-anchored query from one that drifted off
@@ -89,7 +92,10 @@ export interface SearchInput {
 	readonly query: string
 	readonly limit?: number | undefined
 	readonly recency?: { days: number } | undefined
-	readonly location?: string | undefined
+	// The provider's locale, as a country code. Never derived from `place`: a place
+	// written in words is not a country, and reading it as one sends a search to
+	// the wrong side of the world.
+	readonly country?: string | undefined
 	readonly languages?: string[] | undefined
 }
 
@@ -110,7 +116,6 @@ export interface ScrapeInput {
 		| ('markdown' | 'html' | 'links' | 'screenshot')[]
 		| undefined
 	readonly waitForSelector?: string | undefined
-	readonly location?: string | undefined
 }
 
 export class ScrapeProvider extends Context.Service<

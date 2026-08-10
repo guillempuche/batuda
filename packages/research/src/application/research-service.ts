@@ -125,6 +125,7 @@ import {
 } from './prospect-criteria-guard'
 import { computeRunQuality } from './research-quality'
 import { guardScalarFields } from './scalar-field-guard'
+import { guardScanEvidence } from './scan-evidence-guard'
 import {
 	type FreeformSchema,
 	schemaFieldNames,
@@ -1262,7 +1263,8 @@ export interface CreateResearchInput {
 					| {
 							language?: 'ca' | 'es' | 'en' | undefined
 							recency_days?: number | undefined
-							location?: string | undefined
+							country?: string | undefined
+							place?: string | undefined
 							min_employees?: number | undefined
 							max_employees?: number | undefined
 					  }
@@ -2121,12 +2123,16 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								typeof row['website'] === 'string' ? row['website'] : undefined,
 						}
 					})
-					// The caller's location hint, folded into the entity targets' place keys
-					// so the city verification below can tell the queried company "in that
-					// city" from a same-named company (or a stale mention) elsewhere.
-					const hintLocation = (
-						context?.hints as { location?: string } | undefined
-					)?.location
+					// The caller's place hint in words, folded into the entity targets' place
+					// keys so the city verification below can tell the queried company "in
+					// that city" from a same-named company (or a stale mention) elsewhere,
+					// and appended to a search where naming the place helps. Prose only —
+					// the country a provider searches from is its own field.
+					const hintPlace = (context?.hints as { place?: string } | undefined)
+						?.place
+					const hintCountryCode = (
+						context?.hints as { country?: string } | undefined
+					)?.country
 					// `let`, not `const`: when the seeded anchor domain redirects to a
 					// different host (a rebrand), the seed below folds that destination
 					// in as a strong-match key so the run grounds on the live site.
@@ -2135,7 +2141,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						anchorDomain: context?.anchorDomain,
 						query: (run as { query: string }).query,
 						subjects: subjectTargets,
-						location: hintLocation,
+						location: hintPlace,
 					})
 					let entityMatch: EntityMatch | null =
 						(run as { entityMatch?: EntityMatch | null }).entityMatch ?? null
@@ -2253,10 +2259,15 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							? `\n\nSubject data (frozen snapshot):\n${JSON.stringify(subjectsForPrompt(subjects), null, 2)}`
 							: ''
 					const hints = context?.hints as
-						| { language?: string; recency_days?: number; location?: string }
+						| {
+								language?: string
+								recency_days?: number
+								country?: string
+								place?: string
+						  }
 						| undefined
 					const hintsContext = hints
-						? `\n\nHints: language=${hints.language ?? 'en'}, recency=${hints.recency_days ?? 'any'}, location=${hints.location ?? 'any'}`
+						? `\n\nHints: language=${hints.language ?? 'en'}, recency=${hints.recency_days ?? 'any'}, country=${hints.country ?? 'any'}, place=${hints.place ?? 'any'}`
 						: ''
 					const systemPrompt = buildResearchSystemPrompt({
 						schemaName,
@@ -3101,6 +3112,33 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										}),
 								},
 								{
+									// A scanned company whose whole case is a social post is not a
+									// company anyone can look up, write to, or visit. Judged before the
+									// criteria below, which ask about size and place — questions that
+									// presume the company is real.
+									name: 'scan-evidence',
+									run: findings =>
+										Effect.gen(function* () {
+											const check = guardScanEvidence(schemaName, findings)
+											if (check.dropped > 0) {
+												yield* Effect.logWarning(
+													'research.scan.sole_social_evidence',
+												).pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														dropped: check.dropped,
+													}),
+												)
+											}
+											return {
+												findings: check.findings,
+												spanCounts: {
+													'research.scan.dropped_social_only': check.dropped,
+												},
+											}
+										}),
+								},
+								{
 									// Prospect criteria: a scan sometimes returns a company outside the
 									// size or place the request asked for, because the page it came from
 									// was about the right sector. Drop one that states a size or country
@@ -3112,13 +3150,34 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									run: findings =>
 										Effect.gen(function* () {
 											if (schemaName !== 'prospect_scan_v1') return { findings }
-											const hintCountry = parseCountryAlpha2(hints?.location)
+											// Only the country field. A place in words is prose, and reading it as
+											// a code is what turned "MD" for Baltimore into Moldova and dropped
+											// every US company the scan had found.
+											const hintCountry = parseCountryAlpha2(hints?.country)
 											const prospectCriteria = prospectCriteriaFromHints(
 												hints as
 													| { min_employees?: number; max_employees?: number }
 													| undefined,
 												hintCountry ? [hintCountry] : [],
 											)
+											// A scan whose caller named no size and no country filters
+											// nothing, and used to look identical to one that filtered and
+											// kept everything. Saying so is what makes a request whose
+											// qualifiers never left the query text visible.
+											const hasCriteria =
+												(prospectCriteria.countries?.length ?? 0) > 0 ||
+												prospectCriteria.minEmployees !== undefined ||
+												prospectCriteria.maxEmployees !== undefined
+											if (!hasCriteria) {
+												yield* Effect.logInfo(
+													'research.prospects.no_criteria',
+												).pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														hints_given: hints === undefined ? 'none' : 'other',
+													}),
+												)
+											}
 											const check = filterProspectsByCriteria(
 												findings,
 												prospectCriteria,
@@ -3461,13 +3520,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											// query like "Acme, find their CEO" is "find".
 											const found = yield* anchorSearch.search({
 												query:
-													hintLocation === undefined
+													hintPlace === undefined
 														? entityName
-														: `${entityName} ${hintLocation}`,
+														: `${entityName} ${hintPlace}`,
 												limit: 5,
-												...(hints?.location
-													? { location: hints.location }
-													: {}),
+												...(hints?.country ? { country: hints.country } : {}),
 											})
 											for (const item of found.items) {
 												const host = domainHost(item.url)
@@ -3770,7 +3827,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												typeof registrySnapshot?.['country'] === 'string'
 													? registrySnapshot['country']
 													: undefined,
-											locationHint: hints?.location,
+											locationHint: hints?.country ?? hints?.place,
 											// An address the run found points at a country's
 											// register just as well as one the caller gave.
 											anchorHost: ownHost,
@@ -4049,15 +4106,18 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								`${systemPrompt}\n\n${query}${anchorInstruction}`,
 							)
 
-							// A non-anchored discovery scan (prospect / competitor) that comes
-							// back empty gets ONE refined retry before we accept "found
-							// nothing": only here does an empty primary list mean the search —
-							// not the data — fell short, and only here is the entity gate a
-							// no-op. Extraction runs now so the emptiness check sees real
-							// structured findings; the retry reuses this pass's budget.
+							// A discovery scan (prospect / competitor) that comes back empty gets
+							// ONE refined retry before we accept "found nothing": for these
+							// schemas alone an empty primary list means the search — not the
+							// data — fell short. Asked of a scan pinned to a company too: the
+							// entity gate only judges whether the run reached that company, so
+							// it says nothing about a list that came back empty, and a scan
+							// fanned out over a filter is pinned to one company per leaf.
+							// Extraction runs now so the emptiness check sees real structured
+							// findings; the retry reuses this pass's budget.
 							let findings: unknown
 							let refined = false
-							if (isRetryEligible(schemaName) && entityTargets === null) {
+							if (isRetryEligible(schemaName)) {
 								yield* linkRunSources(loop.scrapedUrlHashes)
 								let extracted = yield* extractStructuredFindings(
 									loop.researchText,
@@ -4130,7 +4190,8 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								Layer.succeed(ResearchRunContext)({
 									researchId,
 									language: hints?.language,
-									location: hints?.location,
+									country: hints?.country,
+									place: hints?.place,
 									entityTargets,
 									entityName,
 								}),
@@ -4455,11 +4516,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												.search({
 													query: perFieldSearchQuery(
 														perFieldTargetName,
-														hintLocation,
+														hintPlace,
 														field,
 													),
 													limit: 3,
-													location: hintLocation,
+													country: hintCountryCode,
 												})
 												.pipe(
 													// Let a pure interruption (cancel/deploy) unwind the run instead of
@@ -4634,11 +4695,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						return
 					}
 
-					// An open-ended discovery scan that came back empty even after a
-					// refined retry has no reliable findings to report — mark it
-					// no_reliable_data instead of a green success over an empty list.
+					// A discovery scan that came back empty even after a refined retry has
+					// no reliable findings to report — mark it no_reliable_data instead of a
+					// green success over an empty list. True of a scan pinned to a company
+					// as much as an open-ended one: reaching that company says nothing about
+					// whether the list it was asked for came back.
 					if (
-						entityTargets === null &&
 						isRetryEligible(schemaName) &&
 						isDiscoveryScanEmpty(schemaName, findings)
 					) {
