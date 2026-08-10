@@ -29,6 +29,7 @@ import { AcceptedCountry, isRegistryCountry } from '../domain/country'
 import {
 	alreadyLookedUpResult,
 	approvalRequiredResult,
+	BudgetExceeded,
 	noRegistryResult,
 } from '../domain/errors'
 import { ScrapedPage } from '../domain/types'
@@ -303,6 +304,12 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 			entityName,
 		} = yield* ResearchRunContext
 
+		// Each tool below reports a failure in three steps, in this order: log an
+		// unexpected one, turn an expected stop into the sentence the model should
+		// read, then put the tool's name in front of whatever is left. Only that
+		// last step names the tool, so a message an earlier step wrote reaches the
+		// model with its tool named once.
+
 		// Charged against the run before each vendor call (cheap tier for
 		// search/scrape, paid tier for the registry). When the budget
 		// refuses, the refusal is handed back to the model as a tool result so it
@@ -318,7 +325,7 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 						remaining_cents: e.remaining,
 					}),
 					Effect.andThen(
-						mapToolError(toolName)(
+						Effect.fail(
 							`cheap budget exhausted (${e.remaining}¢ left) — stop searching and summarize what you have`,
 						),
 					),
@@ -331,15 +338,22 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 		// tool result, so it shows up in Honeycomb regardless of what kind of
 		// failure it was.
 		const logToolFailure =
-			(toolName: string) => (cause: Cause.Cause<unknown>) =>
+			(toolName: string) =>
+			<E>(cause: Cause.Cause<E>) =>
 				Effect.logError('research.tool.failed').pipe(
 					Effect.annotateLogs({
 						tool: toolName,
 						'research.run_id': researchId,
 						cause: Cause.pretty(cause),
 					}),
-					Effect.andThen(mapToolError(toolName)(cause)),
 				)
+
+		// Which causes that logger is for. The budget refusing a call is the run
+		// working as intended and is reported at warning by the handler above, so
+		// logging it here as well would send every ordinary budget stop to the
+		// telemetry as an error.
+		const isUnexpectedFailure = <E>(cause: Cause.Cause<E>): boolean =>
+			!(Cause.squash(cause) instanceof BudgetExceeded)
 
 		// A scrape the provider refuses (or one of the known people directories) is
 		// logged as a skip, not a failure, so it stays queryable without the
@@ -398,8 +412,9 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 						languages: hintLanguage ? [hintLanguage] : undefined,
 					})
 				}).pipe(
+					Effect.tapCauseIf(isUnexpectedFailure, logToolFailure('web_search')),
 					Effect.catchTag('BudgetExceeded', cheapExhausted('web_search')),
-					Effect.catchCause(logToolFailure('web_search')),
+					Effect.catchCause(mapToolError('web_search')),
 					Effect.withSpan('research.tool.web_search', {
 						attributes: {
 							'research.tool': 'web_search',
@@ -433,8 +448,9 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 					// skip the URL and let the loop keep going, rather than logging a
 					// failure and handing the model an error it can't act on.
 					Effect.catchTag('UnsupportedSite', e => skipUnsupportedScrape(e.url)),
+					Effect.tapCauseIf(isUnexpectedFailure, logToolFailure('scrape_page')),
 					Effect.catchTag('BudgetExceeded', cheapExhausted('scrape_page')),
-					Effect.catchCause(logToolFailure('scrape_page')),
+					Effect.catchCause(mapToolError('scrape_page')),
 					Effect.withSpan('research.tool.scrape_page', {
 						attributes: {
 							'research.tool': 'scrape_page',
@@ -479,13 +495,16 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 					Effect.catchTag('NoRegistry', e =>
 						Effect.succeed(noRegistryResult(e.country)),
 					),
+					// Both stops fail with the bare sentence and let the catch-all below
+					// put the tool's name in front of it, so the model reads that name
+					// once rather than once from here and again from there.
 					Effect.catchTag('BudgetExceeded', e =>
-						mapToolError('registry_lookup')(
+						Effect.fail(
 							`paid budget exhausted (${e.remaining}¢ left) — stop using registry_lookup`,
 						),
 					),
 					Effect.catchTag('MonthlyCapExceeded', e =>
-						mapToolError('registry_lookup')(
+						Effect.fail(
 							`monthly paid cap reached (${e.spentCents}/${e.capCents}¢) — stop using registry_lookup`,
 						),
 					),
