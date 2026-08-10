@@ -8,15 +8,18 @@
  * run already produced. The flag is deliberately conservative: it should catch the
  * clearly-thin runs, not second-guess a solid one.
  *
- * Three signals raise it. Whenever a run was pinned to one company, anything short
+ * Four signals raise it. Whenever a run was pinned to one company, anything short
  * of clearly reaching that company counts — which covers an enrichment filling
  * that company's profile and equally a scan launched from it, since a scan can be
  * pinned to a subject too and a wrong one there is just as misleading. On top of
- * that, a prospect scan reports a list of third parties, so vetting that list
- * against a single source is thin however well the company itself was found. And
- * a run whose every citation was rejected reached none of the pages it claimed to
- * read, whatever else it did.
+ * that, a scan reports a list of third parties, so vetting that list against a
+ * single source is thin however well the company itself was found, and coming
+ * back with a handful of results where a list was asked for is thin whatever it
+ * was vetted against. And a run whose every citation was rejected reached none of
+ * the pages it claimed to read, whatever else it did.
  */
+
+import { DISCOVERY_THIN_RESULT_COUNT, isDiscoveryScan } from './discovery-scan'
 
 export interface RunQualityInput {
 	readonly schemaName: string
@@ -40,6 +43,10 @@ export interface RunQualityInput {
 	readonly citationsSeen: number
 	/** Of those, how many resolved to a page the run actually reached. */
 	readonly citationsKept: number
+	/** Scan: how many results its primary list carries (null for a non-scan). */
+	readonly scanResults: number | null
+	/** Whether the one refined retry fired after a thin first pass. */
+	readonly refined: boolean
 }
 
 export interface RunQuality {
@@ -54,6 +61,12 @@ export interface RunQuality {
 	 * scan ever run and look like a failing grade rather than "does not apply".
 	 */
 	readonly grounding_ratio?: number
+	/**
+	 * Whether the scan's one refined retry fired; absent for a non-scan, which
+	 * never has one. Reported so the retry's worth can be read off finished runs
+	 * rather than reconstructed from logs — it is the main lever on a thin list.
+	 */
+	readonly refined?: boolean
 	readonly citations_seen: number
 	/** Of those, how many pointed at a page the run actually reached. */
 	readonly citations_kept: number
@@ -64,7 +77,7 @@ export interface RunQuality {
 export const computeRunQuality = (input: RunQualityInput): RunQuality => {
 	const groundingRatio =
 		input.fieldsTotal > 0 ? input.fieldsGrounded / input.fieldsTotal : 0
-	const isScan = input.schemaName === 'prospect_scan_v1'
+	const isScan = isDiscoveryScan(input.schemaName)
 
 	// Anything short of clearly reaching the company the run was pinned to. Asked
 	// of every run kind on purpose: a scan launched from one company is pinned to
@@ -77,19 +90,28 @@ export const computeRunQuality = (input: RunQualityInput): RunQuality => {
 	// And a scan that vetted its list of other firms against a single source
 	// hasn't done enough to act on unread, however well it found the company.
 	const thinlyVetted = isScan && input.sourcesTotal <= 1
+	// A scan asked for a list that came back a handful long has searched too
+	// narrowly far more often than it has found a small market, so one result
+	// must not finish as green as forty.
+	const thinResultList =
+		input.scanResults !== null &&
+		input.scanResults < DISCOVERY_THIN_RESULT_COUNT
 	// The findings may well be right, but every page the run cited is one it never
 	// reached, so nothing it did backs them. Citing nothing at all is a different
-	// shortfall, left to the two signals above.
+	// shortfall, left to the signals above.
 	const nothingStandsBehindIt =
 		input.citationsSeen > 0 && input.citationsKept === 0
 	const lowConfidence =
-		unsureOfTheCompany || thinlyVetted || nothingStandsBehindIt
+		unsureOfTheCompany ||
+		thinlyVetted ||
+		thinResultList ||
+		nothingStandsBehindIt
 
 	return {
 		rounds: input.rounds,
 		sources_matched: input.sourcesFirstParty,
 		...(isScan
-			? {}
+			? { refined: input.refined }
 			: {
 					fields_grounded: input.fieldsGrounded,
 					grounding_ratio: Math.round(groundingRatio * 100) / 100,
