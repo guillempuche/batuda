@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-10 (mail-worker-v2026.8.10)
+
+### Bug Fixes
+
+* **mail-worker:** suppress a bounced address whoever holds it ([149c68c](https://github.com/guillempuche/batuda/commit/149c68caf0248631c945cb897664ca5e45649ed3))
+* **server:** send a reply to whoever wrote in ([5e1dd20](https://github.com/guillempuche/batuda/commit/5e1dd205da2d6fbb7710179ff349927070bf0883))
+
 ## 2026-08-08 (mail-worker-v2026.8.8)
 
 ### Features
