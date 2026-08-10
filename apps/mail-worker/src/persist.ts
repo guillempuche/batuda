@@ -232,6 +232,11 @@ export const persistMessage = (args: {
 				${args.parsed.textBody}, ${args.parsed.htmlBody}, ${args.parsed.textPreview},
 				${args.rawRfc822Ref},
 				${JSON.stringify({
+					// Who it came from, kept alongside who it went to. A reply is
+					// addressed to the sender of what it answers, and on an inbound
+					// message the `to` is our own mailbox — so without this the only
+					// address on file to reply to is ours.
+					from: args.parsed.fromAddress,
 					to: args.parsed.toAddresses,
 					cc: args.parsed.ccAddresses,
 					bcc: args.parsed.bccAddresses,

@@ -62,6 +62,7 @@ import type {
 	OutboundMessage,
 } from './mail-transport.js'
 import { MailTransport } from './mail-transport.js'
+import { recipientAddresses, replyAddressees } from './recipient-address.js'
 import { StorageProvider } from './storage-provider.js'
 import { EmailSent, TimelineActivityService } from './timeline-activity.js'
 
@@ -493,14 +494,25 @@ export class EmailService extends Context.Service<EmailService>()(
 			 * organisation both by its own condition and by row-level security, so
 			 * one company's bounce can never speak for another's.
 			 */
-			const assertRecipientsNotSuppressed = (recipient: string | string[]) =>
+			const assertRecipientsNotSuppressed = (
+				recipient: string | string[],
+				also?: {
+					readonly cc?: ReadonlyArray<string> | undefined
+					readonly bcc?: ReadonlyArray<string> | undefined
+				},
+			) =>
 				Effect.gen(function* () {
 					const currentOrg = yield* CurrentOrg
-					const recipients = (
-						Array.isArray(recipient) ? recipient : [recipient]
-					)
-						.map(r => r.trim().toLowerCase())
-						.filter(r => r !== '')
+					// Copied and blind-copied addresses are delivered to exactly like
+					// the ones in `to`, so a block that only read `to` let a bounced
+					// address be reached by writing it in `bcc` instead — on every
+					// path, including a person composing in the web app.
+					//
+					// The addresses are pulled out of whatever form the caller wrote
+					// them in, because a recipient written the way a mail client shows
+					// it ("Núria <nuria@…>") is delivered to just the same and matched
+					// nothing at all when compared whole.
+					const recipients = recipientAddresses(recipient, also?.cc, also?.bcc)
 					if (recipients.length === 0) return
 					// The same lookup `checkSuppressed` answers with, so a warning given
 					// beforehand and the refusal here cannot disagree.
@@ -1058,7 +1070,7 @@ export class EmailService extends Context.Service<EmailService>()(
 							: yield* resolveDefaultInboxForCurrentUser()
 						yield* assertInboxUsable(inbox)
 
-						yield* assertRecipientsNotSuppressed(to)
+						yield* assertRecipientsNotSuppressed(to, { cc, bcc })
 
 						const staged = yield* staging.resolve(inbox.id, attachmentRefs)
 						let blocks: EmailBlocks = bodyJson
@@ -1205,9 +1217,10 @@ export class EmailService extends Context.Service<EmailService>()(
 						// `external_thread_id = ANY(references)` (any reply).
 						const lastMessages = yield* sql<{
 							messageId: string
-							recipients: { from?: string; to?: string[] }
+							direction: string
+							recipients: { from?: string | null; to?: string[] }
 						}>`
-							SELECT message_id, recipients
+							SELECT message_id, direction, recipients
 							FROM email_messages
 							WHERE organization_id = ${currentOrg.id}
 							  AND (
@@ -1224,13 +1237,9 @@ export class EmailService extends Context.Service<EmailService>()(
 							})
 						}
 
-						// The reply addressee list is whatever sat on the most recent
-						// inbound. For now we keep it conservative (anyone listed in the
-						// recipients snapshot's `to`); refining once mail-worker stores
-						// parsed From/To/Cc separately.
-						const replyRecipients = lastMessage.recipients?.to ?? []
+						const replyRecipients = [...replyAddressees(lastMessage)]
 
-						yield* assertRecipientsNotSuppressed(replyRecipients)
+						yield* assertRecipientsNotSuppressed(replyRecipients, { cc, bcc })
 
 						const staged = yield* staging.resolve(inbox.id, attachmentRefs)
 						let blocks: EmailBlocks = bodyJson
@@ -2686,7 +2695,13 @@ export class EmailService extends Context.Service<EmailService>()(
 						const draft = yield* reachableDraft(inboxId, draftId)
 						const ctx = parseClientId(draft.clientId ?? undefined)
 
-						yield* assertRecipientsNotSuppressed(draft.toAddresses as string[])
+						yield* assertRecipientsNotSuppressed(
+							draft.toAddresses as string[],
+							{
+								cc: draft.ccAddresses as string[],
+								bcc: draft.bccAddresses as string[],
+							},
+						)
 
 						// Reply path needs the parent thread's external_thread_id +
 						// references chain so the new message lands inside that
