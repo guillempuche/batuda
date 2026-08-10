@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-10 (internal-v2026.8.10)
+
+### Features
+
+* **internal:** warn about a blocked address the screen could not see ([b6a785f](https://github.com/guillempuche/batuda/commit/b6a785f886c1235941974466a87ce3285ebf1306))
+* let a verdict be taken back off an address, not only lowered ([519e309](https://github.com/guillempuche/batuda/commit/519e30916140d24eaa5521c728d39e56be601ee2))
+* say an address is already on file instead of quietly renaming it ([350b689](https://github.com/guillempuche/batuda/commit/350b689e5f560e3bbc6aa426d96c79618939d010))
+
+### Bug Fixes
+
+* ask one question about a blocked address, in one place ([32be485](https://github.com/guillempuche/batuda/commit/32be485c1e6c27a22d8185d44523c8a49f1ddf48))
+* keep research to its own organization and make its gates real ([ab2db3c](https://github.com/guillempuche/batuda/commit/ab2db3cef62a457e63fc96024d3df8a78f001c33)), closes [#377](https://github.com/guillempuche/batuda/issues/377)
+* **server:** keep a kind's default held, and store a kind one way ([9c59199](https://github.com/guillempuche/batuda/commit/9c591994fb4e29aedf1b80b9d07df98178d8c51e))
+
 ## 2026-08-08 (internal-v2026.8.8)
 
 ### Features
