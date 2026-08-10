@@ -12,6 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { PgLive } from '../db/client'
 import { clearEmailSuppression, suppressedAmong } from './channels'
+import { recipientAddresses } from './recipient-address'
 
 // SQL-contract test for the question the send gate asks before every email:
 // "has this address hard-bounced or reported spam?"
@@ -220,6 +221,36 @@ describe('the lookup the send gate and the pre-send check share', () => {
 			expect(found.map(row => row.address).sort()).toEqual(
 				[COMPANY_MAILBOX, PERSON_ADDRESS].sort(),
 			)
+		})
+
+		it('should read a recipient field the way the send reads it', async () => {
+			// GIVEN a recipient field as somebody actually pastes it — a display
+			// name around the address, a comma inside the quoted name, and a second
+			// recipient after it
+			const written = `"Pla, Núria" <${COMPANY_MAILBOX}>, fine@tallerpuig.example`
+
+			// WHEN the pre-send check is asked about it
+			const found = await run(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* suppressedAmong(sql, ORG, recipientAddresses(written))
+				}),
+			)
+
+			// THEN the blocked mailbox inside it comes back, the same one the send
+			// gate refuses over
+			expect(found.map(row => row.address)).toEqual([COMPANY_MAILBOX])
+
+			// AND the field compared whole finds nothing: a stored address is bare,
+			// so a check that skipped the reading would say a blocked recipient is
+			// fine and leave the refusal to the send
+			const comparedWhole = await run(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* suppressedAmong(sql, ORG, [written])
+				}),
+			)
+			expect(comparedWhole).toEqual([])
 		})
 
 		it('should not care how the address was spelled', async () => {

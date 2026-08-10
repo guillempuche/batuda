@@ -136,5 +136,33 @@ test.describe('compose and send via the mail catcher', () => {
 			await expect(page.getByTestId('compose-send')).toBeDisabled()
 			await expectNoMessage(SUPPRESSED_EMAIL, blockedSubject)
 		})
+
+		test('should disable Send when the address carries a display name', async ({
+			page,
+		}) => {
+			// GIVEN Alice opens compose from Pep Casals' company, as above
+			await page.goto('/companies/cal-pep-fonda', { waitUntil: 'networkidle' })
+			await openCompose(page, 'action-compose-email')
+
+			// WHEN she writes the same blocked address with a display name around
+			// it, the way a recipient arrives when it is copied out of another
+			// message — the comma inside the quoted name is what a plain split on
+			// separators breaks apart
+			const blockedSubject = `blocked display name ${Date.now()}`
+			await page
+				.getByTestId('compose-to')
+				.fill(`"Casals, Pep" <${SUPPRESSED_EMAIL}>`)
+			await page.getByTestId('compose-subject').fill(blockedSubject)
+			await fillBody(page, 'should not arrive')
+
+			// THEN the warning names the bare address and Send stays disabled, the
+			// same as when it was typed bare — the check answers on the address
+			// inside the field, which is the one the send would refuse over
+			await expect(page.getByRole('alert')).toContainText(SUPPRESSED_EMAIL, {
+				timeout: 10_000,
+			})
+			await expect(page.getByTestId('compose-send')).toBeDisabled()
+			await expectNoMessage(SUPPRESSED_EMAIL, blockedSubject)
+		})
 	})
 })

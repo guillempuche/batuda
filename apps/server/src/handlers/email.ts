@@ -434,7 +434,7 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 				)
 				.handle('deleteFooter', _ => svc.deleteFooter(_.params.id))
 				.handle('checkSuppressed', _ =>
-					svc.checkSuppressed(_.payload.addresses).pipe(
+					svc.checkSuppressed(_.payload.recipientFields).pipe(
 						Effect.map(suppressed => ({ suppressed })),
 						Effect.catchTag('SqlError', e => Effect.die(e)),
 					),
