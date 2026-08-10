@@ -21,6 +21,8 @@ import {
 	deleteChannel,
 	deleteSubjectChannels,
 	patchChannel,
+	vouchForChannel,
+	withdrawVouch,
 	writeChannels,
 } from '../../services/channels'
 import { requireLiveCompany } from '../../services/company-liveness'
@@ -128,9 +130,16 @@ const DeleteContact = Tool.make('delete_contact', {
 // union serialises to.
 const ManageContactChannels = Tool.make('manage_contact_channels', {
 	description:
-		"The ways of reaching one person — their mailboxes, phones, social handles — one at a time. This is where a wrong address is put right: update_contact's channels[] only ever adds, so an address corrected there leaves the old one sitting beside it, and deleting the person to start over detaches every email, meeting and interaction ever logged against them. action: 'list' (all of them), 'add' (kind plus value, and a label whenever there is more than one of that kind), 'update' (by channel_id, only the fields to change), 'remove' (by channel_id). Renaming an address onto one this person already holds is refused rather than merged — remove the spare instead. `is_primary` marks the one to use when nothing says otherwise; the primary email is the address mail is sent to, and removing it hands that over to the oldest one left of the same kind. `verification` only ever lowers how far an address is trusted, and only on 'update' — pass null to take a verdict back off entirely, which says nobody has checked rather than that a check came back doubtful. A later check can raise it again. Leaving somebody with no email address at all means a later research run or an inbound reply will not recognise them and may create a second copy of the same person.",
+		"The ways of reaching one person — their mailboxes, phones, social handles — one at a time. This is where a wrong address is put right: update_contact's channels[] only ever adds, so an address corrected there leaves the old one sitting beside it, and deleting the person to start over detaches every email, meeting and interaction ever logged against them. action: 'list' (all of them), 'add' (kind plus value, and a label whenever there is more than one of that kind), 'update' (by channel_id, only the fields to change), 'remove' (by channel_id). Renaming an address onto one this person already holds is refused rather than merged — remove the spare instead. `is_primary` marks the one to use when nothing says otherwise; the primary email is the address mail is sent to, and removing it hands that over to the oldest one left of the same kind. `verification` only ever lowers how far an address is trusted, and only on 'update' — pass null to take a verdict back off entirely, which says nobody has checked rather than that a check came back doubtful. A later check can raise it again. Leaving somebody with no email address at all means a later research run or an inbound reply will not recognise them and may create a second copy of the same person. action: 'vouch' (by channel_id, email only) is the way to get a held-back send out: it records that a person stands behind the address, so send_email stops asking about it, while leaving the check's own finding on file — unlike clearing the verdict, which lifts the stop by throwing the finding away. Pass `note` to say what that rests on. It is refused on an address that hard-bounced or reported spam — that block is real, and clearing it is update_contact's clear_email_suppression. action: 'unvouch' takes a vouch back; it only ever lifts a vouch and never clears a bounce.",
 	parameters: Schema.Struct({
-		action: Schema.Literals(['list', 'add', 'update', 'remove']),
+		action: Schema.Literals([
+			'list',
+			'add',
+			'update',
+			'remove',
+			'vouch',
+			'unvouch',
+		]),
 		contact_id: Schema.String,
 		channel_id: Schema.optional(Schema.String),
 		kind: Schema.optional(Schema.String),
@@ -139,6 +148,9 @@ const ManageContactChannels = Tool.make('manage_contact_channels', {
 		label: Schema.optional(Schema.NullOr(Schema.String)),
 		is_primary: Schema.optional(Schema.Boolean),
 		verification: Schema.optional(Schema.NullOr(HandSetVerificationVerdict)),
+		// Why somebody stands behind the address, kept with the vouch so a later
+		// reader knows what it rested on.
+		note: Schema.optional(Schema.String),
 	}),
 	success: Schema.Struct({
 		channels: Schema.Array(ContactChannel.json),
@@ -412,6 +424,57 @@ export const ContactHandlersLive = ContactTools.toLayer(
 							return yield* Effect.die(
 								new ToolMessage(
 									`No channel ${params.channel_id} on this contact.`,
+								),
+							)
+					}
+					if (params.action === 'vouch' && params.channel_id !== undefined) {
+						const outcome = yield* vouchForChannel(
+							sql,
+							currentOrg.id,
+							subject,
+							params.channel_id,
+							params.note,
+						)
+						if (outcome === 'not_found')
+							return yield* Effect.die(
+								new ToolMessage(
+									`No channel ${params.channel_id} on this contact.`,
+								),
+							)
+						if (outcome === 'not_email')
+							return yield* Effect.die(
+								new ToolMessage(
+									'Only an email address is ever held back by a verdict, so only one can be vouched for.',
+								),
+							)
+						if (outcome === 'suppressed')
+							return yield* Effect.die(
+								new ToolMessage(
+									'That address hard-bounced or reported spam, which no vouch lifts. Use update_contact with clear_email_suppression=true once the person confirms it works again.',
+								),
+							)
+					}
+					if (params.action === 'unvouch') {
+						if (params.channel_id === undefined)
+							return yield* Effect.die(
+								new ToolMessage('channel_id is required to take back a vouch.'),
+							)
+						const outcome = yield* withdrawVouch(
+							sql,
+							currentOrg.id,
+							subject,
+							params.channel_id,
+						)
+						if (outcome === 'not_found')
+							return yield* Effect.die(
+								new ToolMessage(
+									`No channel ${params.channel_id} on this contact.`,
+								),
+							)
+						if (outcome === 'not_vouched')
+							return yield* Effect.die(
+								new ToolMessage(
+									'Nobody had vouched for that address, so there is nothing to take back. A bounce is not a vouch and is not cleared from here.',
 								),
 							)
 					}

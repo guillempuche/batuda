@@ -29,6 +29,8 @@ import {
 	deleteSubjectChannels,
 	patchChannel,
 	subjectChannelsOf,
+	vouchForChannel,
+	withdrawVouch,
 } from '../../services/channels'
 import { CompanyService } from '../../services/companies'
 import { findDuplicateCompanies } from '../../services/company-duplicates'
@@ -278,9 +280,16 @@ const ManageCompanySites = Tool.make('manage_company_sites', {
 // switchboard only by `site_id`, so a second tool would duplicate the lot.
 const ManageCompanyChannels = Tool.make('manage_company_channels', {
 	description:
-		"The ways of reaching a company — its mailboxes, phones, website, social handles. A company can hold several of a kind, which is the point of this tool: `update_company` writes one email and one phone, and a firm with an orders mailbox, an accounts mailbox and a switchboard needs all of them kept apart. Give each one a `label` in the words somebody would actually use — 'orders', 'accounts', 'Girona shop' — because two addresses with no labels are indistinguishable a month later. Pass `site_id` to hang the channel off one branch instead of the company as a whole. action: 'list' (all of them; add site_id to see one branch's), 'add' (kind plus value, and a label whenever there is more than one of that kind), 'update' (by channel_id, only the fields to change), 'remove' (by channel_id). An address the company already holds is refused rather than merged, so correcting one onto another means removing the spare instead. kind is open — email, phone, linkedin, instagram, website, x, bluesky, … — and `is_primary` marks the one to use when nothing says otherwise; the primary email is the address mail is sent to, and removing it hands that over to the oldest one left of the same kind. `verification` only ever lowers how far an address is trusted, and only on 'update' — pass null to take a verdict back off entirely, which says nobody has checked rather than that a check came back doubtful. A later check can raise it again.",
+		"The ways of reaching a company — its mailboxes, phones, website, social handles. A company can hold several of a kind, which is the point of this tool: `update_company` writes one email and one phone, and a firm with an orders mailbox, an accounts mailbox and a switchboard needs all of them kept apart. Give each one a `label` in the words somebody would actually use — 'orders', 'accounts', 'Girona shop' — because two addresses with no labels are indistinguishable a month later. Pass `site_id` to hang the channel off one branch instead of the company as a whole. action: 'list' (all of them; add site_id to see one branch's), 'add' (kind plus value, and a label whenever there is more than one of that kind), 'update' (by channel_id, only the fields to change), 'remove' (by channel_id). An address the company already holds is refused rather than merged, so correcting one onto another means removing the spare instead. kind is open — email, phone, linkedin, instagram, website, x, bluesky, … — and `is_primary` marks the one to use when nothing says otherwise; the primary email is the address mail is sent to, and removing it hands that over to the oldest one left of the same kind. `verification` only ever lowers how far an address is trusted, and only on 'update' — pass null to take a verdict back off entirely, which says nobody has checked rather than that a check came back doubtful. A later check can raise it again. 'vouch' (by channel_id, email only) is the way to get a held-back send out: it records that a person stands behind the address, so send_email stops asking about it, while leaving what a deliverability check found on file — unlike clearing the verdict, which lifts the stop by throwing the finding away. Pass `note` to say what that rests on. It is refused on an address that hard-bounced or reported spam, which no vouch lifts. 'unvouch' takes a vouch back; it only ever lifts a vouch and never clears a bounce.",
 	parameters: Schema.Struct({
-		action: Schema.Literals(['list', 'add', 'update', 'remove']),
+		action: Schema.Literals([
+			'list',
+			'add',
+			'update',
+			'remove',
+			'vouch',
+			'unvouch',
+		]),
 		company_id: Schema.String,
 		site_id: Schema.optional(Schema.String),
 		channel_id: Schema.optional(Schema.String),
@@ -294,6 +303,9 @@ const ManageCompanyChannels = Tool.make('manage_company_channels', {
 			description:
 				"How far this address is trusted, and only ever downwards: 'risky' or 'undeliverable' to record doubt, 'unknown' for a check that settled nothing, or null to take a verdict back off entirely. An address is only ever called deliverable by a check that reached the mailbox.",
 		}),
+		// Why somebody stands behind the address, kept with the vouch so a later
+		// reader knows what it rested on.
+		note: Schema.optional(Schema.String),
 	}),
 	success: Schema.Struct({
 		channels: Schema.Array(Schema.Unknown),
@@ -647,6 +659,66 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 					}
 					if (params.action === 'remove' && params.channel_id !== undefined) {
 						yield* deleteChannel(sql, currentOrg.id, subject, params.channel_id)
+					}
+					if (params.action === 'unvouch') {
+						if (params.channel_id === undefined)
+							return yield* Effect.die(
+								new ToolMessage('channel_id is required to take back a vouch.'),
+							)
+						const outcome = yield* withdrawVouch(
+							sql,
+							currentOrg.id,
+							subject,
+							params.channel_id,
+						)
+						if (outcome === 'not_found')
+							return yield* Effect.die(
+								new ToolMessage(
+									`No channel ${params.channel_id} on this company.`,
+								),
+							)
+						if (outcome === 'not_vouched')
+							return yield* Effect.die(
+								new ToolMessage(
+									'Nobody had vouched for that address, so there is nothing to take back. A bounce is not a vouch and is not cleared from here.',
+								),
+							)
+					}
+					// Vouching is the documented way past a held-back send, so a call
+					// that names no channel must say so rather than hand back a normal
+					// list the caller reads as success before being stopped again.
+					if (params.action === 'vouch' && params.channel_id === undefined)
+						return yield* Effect.die(
+							new ToolMessage(
+								'channel_id is required to vouch for an address.',
+							),
+						)
+					if (params.action === 'vouch' && params.channel_id !== undefined) {
+						const outcome = yield* vouchForChannel(
+							sql,
+							currentOrg.id,
+							subject,
+							params.channel_id,
+							params.note,
+						)
+						if (outcome === 'not_found')
+							return yield* Effect.die(
+								new ToolMessage(
+									`No channel ${params.channel_id} on this company.`,
+								),
+							)
+						if (outcome === 'not_email')
+							return yield* Effect.die(
+								new ToolMessage(
+									'Only an email address is ever held back by a verdict, so only one can be vouched for.',
+								),
+							)
+						if (outcome === 'suppressed')
+							return yield* Effect.die(
+								new ToolMessage(
+									'That address hard-bounced or reported spam, which no vouch lifts.',
+								),
+							)
 					}
 					return { channels: yield* subjectChannelsOf(sql, subject) }
 				}).pipe(
