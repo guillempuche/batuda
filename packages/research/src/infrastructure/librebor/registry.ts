@@ -33,7 +33,7 @@ const BASE_URL = 'https://api.librebor.me/v2'
 const NullableString = Schema.optional(Schema.NullOr(Schema.String))
 
 const Company = Schema.Struct({
-	name: Schema.String,
+	name: NullableString,
 	nif: NullableString,
 	status: NullableString,
 	capital: Schema.optional(Schema.NullOr(Schema.Number)),
@@ -55,7 +55,11 @@ const Company = Schema.Struct({
 
 const CompanyResponse = Schema.Struct({ company: Company })
 const SearchResponse = Schema.Struct({
-	companies: Schema.Array(Schema.Struct({ slug: Schema.String })),
+	// An answer with no list at all is a search that matched nothing, not a
+	// broken response.
+	companies: Schema.optional(
+		Schema.NullOr(Schema.Array(Schema.Struct({ slug: Schema.String }))),
+	),
 })
 
 // 429 + 5xx are transient (retry); 401/402 (bad key / no credit), 404 (not
@@ -113,25 +117,44 @@ export const makeLibreborRegistry = (slot: number) =>
 				)
 			})
 
-		const toRecord = (company: Schema.Schema.Type<typeof Company>) =>
-			new RegistryRecord({
-				legalName: company.name,
-				taxId: company.nif ?? undefined,
-				status: company.status ?? undefined,
-				incorporationDate: company.date_creation ?? undefined,
-				capital: company.capital != null ? `${company.capital}` : undefined,
-				address: company.address ?? undefined,
-				municipality: company.municipality ?? undefined,
-				province: company.province ?? undefined,
-				sector: company.cnae ?? undefined,
-				directors: (company.active_positions ?? []).map(p => ({
-					name: p.name_person ?? '',
-					role: p.role ?? undefined,
-					since: p.date_from ?? undefined,
-				})),
-				sourceUrl: `https://libreborme.net/borme/empresa/${company.nif ?? ''}`,
-				units: 1,
-			})
+		// The register sometimes leaves the company name off a record, so the name
+		// the caller searched for stands in rather than waste a paid lookup that
+		// brought back the tax id, address and directors.
+		const toRecord = (
+			company: Schema.Schema.Type<typeof Company>,
+			searchedName: string | undefined,
+		) => {
+			const legalName = company.name ?? searchedName
+			if (legalName === undefined) {
+				return Effect.fail(
+					new ProviderError({
+						provider: 'librebor',
+						message: 'registry record carries no company name',
+						recoverable: false,
+					}),
+				)
+			}
+			return Effect.succeed(
+				new RegistryRecord({
+					legalName,
+					taxId: company.nif ?? undefined,
+					status: company.status ?? undefined,
+					incorporationDate: company.date_creation ?? undefined,
+					capital: company.capital != null ? `${company.capital}` : undefined,
+					address: company.address ?? undefined,
+					municipality: company.municipality ?? undefined,
+					province: company.province ?? undefined,
+					sector: company.cnae ?? undefined,
+					directors: (company.active_positions ?? []).map(p => ({
+						name: p.name_person ?? '',
+						role: p.role ?? undefined,
+						since: p.date_from ?? undefined,
+					})),
+					sourceUrl: `https://libreborme.net/borme/empresa/${company.nif ?? ''}`,
+					units: 1,
+				}),
+			)
+		}
 
 		return RegistryRouter.of({
 			lookup: (input: RegistryInput) =>
@@ -144,14 +167,14 @@ export const makeLibreborRegistry = (slot: number) =>
 								`${BASE_URL}/company/by-nif/${encodeURIComponent(input.taxId)}/`,
 								CompanyResponse,
 							)
-							return toRecord(body.company)
+							return yield* toRecord(body.company, input.query)
 						}
 						if (input.query) {
 							const search = yield* getJson(
 								`${BASE_URL}/company/search/?query=${encodeURIComponent(input.query)}&page=1`,
 								SearchResponse,
 							)
-							const top = search.companies[0]
+							const top = (search.companies ?? [])[0]
 							if (!top) {
 								return yield* new ProviderError({
 									provider: 'librebor',
@@ -163,7 +186,7 @@ export const makeLibreborRegistry = (slot: number) =>
 								`${BASE_URL}/company/by-slug/${encodeURIComponent(top.slug)}/`,
 								CompanyResponse,
 							)
-							return toRecord(body.company)
+							return yield* toRecord(body.company, input.query)
 						}
 						return yield* new ProviderError({
 							provider: 'librebor',

@@ -228,6 +228,49 @@ describe('makeLibreborRegistry', () => {
 		expect(log.count).toBe(1)
 	})
 
+	it('should read a search carrying no company list as no match', async () => {
+		// GIVEN a search whose company list is absent rather than empty
+		const { exit, log } = runLookup(
+			{ country: 'ES', query: 'Nonexistent' },
+			() => ({ status: 200, body: {} }),
+		)
+
+		// THEN that reads the same way as an empty list, not as a broken response
+		const resolved = await exit
+		expect(errorOf(resolved)?.message).toContain('no company matched')
+		expect(log.count).toBe(1)
+	})
+
+	it('should keep a paid record whose company name is null', async () => {
+		// GIVEN a register answer with everything but the company's own name
+		const { exit } = runLookup({ country: 'ES', query: 'Mercadona' }, url =>
+			url.includes('/company/search/')
+				? { status: 200, body: { companies: [{ slug: 'mercadona' }] } }
+				: { status: 200, body: companyBody({ name: null }) },
+		)
+
+		// THEN the record stands, with the searched name standing in for the one
+		// the register left out, so the tax id and directors are not thrown away
+		const rec = recordOf(await exit)
+		expect(rec?.legalName).toBe('Mercadona')
+		expect(rec?.taxId).toBe('A46103834')
+		expect(rec?.directors?.[0]?.name).toBe('ROIG ALFONSO JUAN')
+	})
+
+	it('should fail when there is no name in the record nor in the request', async () => {
+		// GIVEN a by-NIF lookup — no searched name to stand in — whose record has
+		// no company name either
+		const { exit } = runLookup({ country: 'ES', taxId: 'A46103834' }, () => ({
+			status: 200,
+			body: companyBody({ name: null }),
+		}))
+
+		// THEN it says so plainly rather than failing as an unreadable response
+		const resolved = await exit
+		expect(errorOf(resolved)?.message).toContain('carries no company name')
+		expect(errorOf(resolved)?.recoverable).toBe(false)
+	})
+
 	it('should fail non-recoverably with neither taxId nor query', async () => {
 		// GIVEN an input missing both selectors
 		const { exit, log } = runLookup({ country: 'ES' }, () => ({
