@@ -1,7 +1,9 @@
 import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
 
-import { ContextInput } from './research'
+import { schemaNames } from '@batuda/research/application/schemas'
+
+import { ContextInput, CreateResearchInput } from './research'
 
 // Decode through the canonical JSON codec so the check mirrors what the MCP tool
 // and HTTP route actually run on a caller's payload.
@@ -104,6 +106,63 @@ describe('ContextInput', () => {
 			// GIVEN a selector aimed at contacts (only companies fan out)
 			const exit = decodeExit(ContextInput, {
 				selector: { table: 'contacts', filter: {} },
+			})
+			expect(exit._tag).toBe('Failure')
+		})
+	})
+})
+
+describe('CreateResearchInput', () => {
+	describe('when schema_name is one the server can resolve', () => {
+		it('should accept every name the registry holds', () => {
+			// GIVEN each shape a run can be asked to come back in
+			// WHEN decode runs
+			// THEN none of them is turned away at the door
+			for (const name of schemaNames) {
+				const exit = decodeExit(CreateResearchInput, {
+					query: 'who are their competitors',
+					schema_name: name,
+				})
+				expect(exit._tag).toBe('Success')
+			}
+		})
+
+		it('should accept a request that names no schema at all', () => {
+			// GIVEN schema_name left out, which the service reads as freeform
+			const exit = decodeExit(CreateResearchInput, { query: 'a question' })
+			expect(exit._tag).toBe('Success')
+		})
+	})
+
+	describe('when schema_name is not one the server can resolve', () => {
+		it('should refuse it, so no run row is written for a doomed request', () => {
+			// GIVEN a name the registry does not hold. Decoding is what the route
+			// runs before the handler, so refusing here is refusing before the run
+			// exists — rather than after it has flipped to running and said so.
+			const exit = decodeExit(CreateResearchInput, {
+				query: 'a question',
+				schema_name: 'bogus_schema_v9',
+			})
+			expect(exit._tag).toBe('Failure')
+		})
+
+		it('should refuse a fan-out too, so one bad name creates no runs', () => {
+			// GIVEN a selector, which would otherwise write a batch row plus one run
+			// per matched company before any of them reached the point of failing
+			const exit = decodeExit(CreateResearchInput, {
+				query: 'find me freight brokers',
+				schema_name: 'prospect_scan_v2',
+				context: {
+					selector: { table: 'companies', filter: { country: 'US' } },
+				},
+			})
+			expect(exit._tag).toBe('Failure')
+		})
+
+		it('should refuse an empty name rather than read it as freeform', () => {
+			const exit = decodeExit(CreateResearchInput, {
+				query: 'a question',
+				schema_name: '',
 			})
 			expect(exit._tag).toBe('Failure')
 		})

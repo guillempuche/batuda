@@ -34,7 +34,10 @@ import { formatMoneyCents } from '#/lib/format-money'
 import { taggedFailure } from '#/lib/tagged-failure'
 import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
 
-// Type-only import; adding a schema server-side forces an option here.
+// The registry's own names, so a schema retired or renamed server-side fails the
+// build here until its card goes too. Adding one does not force a card: an
+// option only exists once someone has written what to call it and when to pick
+// it, and until then the schema is simply not offered.
 type SchemaOption = SchemaName
 
 // `msg` so the labels + descriptions extract into the catalog;

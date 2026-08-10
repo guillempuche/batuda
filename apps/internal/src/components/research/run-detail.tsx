@@ -42,7 +42,8 @@ import {
 	stenciledTitle,
 } from '#/lib/workshop-mixins'
 
-// `Record<SchemaName, …>` keeps the dispatch table exhaustive against the schema registry.
+// Keyed by the schema registry's own names, so retiring or renaming one there
+// fails the build here until this table follows.
 type FindingsViewProps = { readonly findings: never }
 const FINDINGS_VIEWS: Record<SchemaName, ComponentType<FindingsViewProps>> = {
 	freeform: FreeformView,
@@ -51,6 +52,13 @@ const FINDINGS_VIEWS: Record<SchemaName, ComponentType<FindingsViewProps>> = {
 	contact_discovery_v1: ContactDiscoveryView,
 	prospect_scan_v1: ProspectScanView,
 }
+
+// The same table, looked up by whatever name a run row happens to carry — which
+// is a plain string, and on a run from a newer bundle may name no view here.
+const findingsViewFor: Record<
+	string,
+	ComponentType<FindingsViewProps> | undefined
+> = FINDINGS_VIEWS
 
 // Localized sentence for each terminal failure reason, keyed by the run's
 // reason_code so the backend stays language-free — it returns the code, the UI
@@ -361,8 +369,7 @@ function FindingsView({
 		)
 	}
 	// `null` predates the schemaName column; treat as freeform.
-	const key = (schemaName ?? 'freeform') as SchemaName
-	const View = FINDINGS_VIEWS[key]
+	const View = findingsViewFor[schemaName ?? 'freeform']
 	if (View) {
 		return <View findings={findings as never} />
 	}

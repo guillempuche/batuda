@@ -588,6 +588,9 @@ importers:
       '@batuda/email':
         specifier: workspace:*
         version: link:../email
+      '@batuda/research':
+        specifier: workspace:*
+        version: link:../research
       '@batuda/ui':
         specifier: workspace:*
         version: link:../ui
