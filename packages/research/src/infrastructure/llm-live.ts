@@ -40,7 +40,7 @@ import {
 } from '../application/ports'
 import { keyForSlot, providerListConfig } from './_config'
 import { hardenLanguageModel, withFallbackLanguageModel } from './_harden'
-import { tolerateNullServiceTier } from './_service-tier'
+import { tolerateVendorReplyShape } from './_reply-shape'
 import { type LlmTier, makeCachedLanguageModel } from './cached-llm'
 import { stubLanguageModelService } from './stub/llm'
 
@@ -182,9 +182,10 @@ const buildSlot = (
 				OpenAiClient.layer({
 					apiKey,
 					apiUrl: baseUrl,
-					// Qwen's OpenAI-compatible endpoint returns `service_tier: null`,
-					// which the client's response schema rejects; strip it before decode.
-					transformClient: tolerateNullServiceTier,
+					// OpenAI-compatible endpoints vary on fields the client's response
+					// schema demands (Qwen's returns `service_tier: null`); normalize
+					// the reply before decode so a usable answer is not thrown away.
+					transformClient: tolerateVendorReplyShape,
 				}).pipe(Layer.provide(FetchHttpClient.layer)),
 			),
 		)
