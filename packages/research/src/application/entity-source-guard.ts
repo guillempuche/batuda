@@ -40,7 +40,7 @@
 import type { EntityTargets } from './entity-guard'
 import { classifyEntityMatchPerSource } from './entity-guard'
 import { isPlainObject, isValueWrapper } from './guard-shapes'
-import { hostOf, pathOf } from './source-key'
+import { hostOf, isWebAddress, pathOf } from './source-key'
 
 type NamespaceTier = 'ugc' | 'profile' | null
 
@@ -53,7 +53,9 @@ const hostMatches = (host: string, site: string): boolean =>
 // only); null is an ordinary page, left alone here — the tier and entity guards
 // judge it on its merits.
 export const classifyNamespace = (sourceId: string): NamespaceTier => {
-	const host = hostOf(sourceId)
+	// Only a real web address has a namespace to read: a bare word, or an internal
+	// id for a page the run already holds, is nothing anybody posted.
+	const host = isWebAddress(sourceId) ? hostOf(sourceId) : null
 	if (host === null) return null
 	const path = pathOf(sourceId) ?? ''
 
@@ -205,12 +207,15 @@ export const guardEntitySources = (
 	if (Array.isArray(contacts)) {
 		out['contacts'] = contacts.filter(contact => {
 			const ids = contactSourceIds(contact)
-			if (ids.some(id => classifyNamespace(id) === 'ugc')) {
-				droppedContacts++
-				return false
-			}
 			if (ids.length === 0) {
 				droppedUncited++
+				return false
+			}
+			// Every tie, not any one of them: a person the company also names on its
+			// own team page is a real contact whom a post happens to mention too, and
+			// the post is not what we are leaning on.
+			if (ids.every(id => classifyNamespace(id) === 'ugc')) {
+				droppedContacts++
 				return false
 			}
 			return true

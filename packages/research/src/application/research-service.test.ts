@@ -953,8 +953,10 @@ describe('citedUnscrapedSources', () => {
 	})
 
 	describe('when a citation is already fetched or cannot help', () => {
-		it('should skip fetched pages, blocked namespaces, and unparseable ids', () => {
-			// GIVEN a fetched page, a person profile, and a junk citation id
+		it('should skip fetched pages, blocked namespaces, and ids that are not addresses', () => {
+			// GIVEN a fetched page, a person profile, a junk citation id, and one of
+			// our own source ids — the mailbox harvested off a company's contact page
+			// is cited to exactly that, and no amount of paying can fetch it
 			const findings = {
 				enrichment: {
 					industry: { value: 't', source_id: 'https://fetched.com/p' },
@@ -963,6 +965,7 @@ describe('citedUnscrapedSources', () => {
 						source_id: 'https://www.zoominfo.com/p/Someone/1',
 					},
 					location: { value: 'x', source_id: 'not a url' },
+					email: { value: 'info@acme.es', source_id: 'src_1f7b0e8ff733b5d2' },
 				},
 			}
 

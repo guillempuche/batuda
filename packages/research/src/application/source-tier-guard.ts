@@ -15,12 +15,21 @@
  * It never drops a value — third-party data is still useful — it just stops the
  * caller from trusting an outside estimate like the company's own word.
  *
+ * A citation that is not a web address at all sits on neither side of that line and
+ * is left alone: an internal id for a page the run already holds is not somebody
+ * else's site, and a value read off such a page keeps the confidence it came with.
+ *
+ * The change a person is offered to accept — a proposed update — is graded like
+ * everything else. Its confidence is the one written to the record on approval, so
+ * it is held to the same line as the copy in the company profile; one set of
+ * findings never states two different confidences for a single fact.
+ *
  * It applies only when the run has a known target (an entity-grounded run with
  * target domains); a discovery scan with no single subject is left untouched.
  */
 
 import { isSourcedField } from './guard-shapes'
-import { hostOf } from './source-key'
+import { hostOf, isWebAddress } from './source-key'
 
 // Confidence a third-party-sourced value is held to: kept and usable, but marked
 // no better than medium so it reads as "reported elsewhere", not "the company says
@@ -35,9 +44,9 @@ export const THIRD_PARTY_CONFIDENCE_CAP = 0.6
  */
 export const AUTO_APPLY_CONFIDENCE_FLOOR = THIRD_PARTY_CONFIDENCE_CAP + 0.05
 
-// Subtrees that are not per-field values: block-level citation arrays and the
-// freeform proposed-update blob, whose contents could otherwise look like a field.
-const SKIP_KEYS = new Set(['citations', 'proposed_updates'])
+// A block-level citation array is not a per-field value: an entry there records
+// where a claim came from, not a claim to grade.
+const SKIP_KEYS = new Set(['citations'])
 
 // The value came from one of the target's own hosts — the company's own domain or
 // a subdomain of it. A look-alike or aggregator host never ends with ".<target>".
@@ -76,7 +85,14 @@ export const enforceSourceTier = (
 				source_id?: unknown
 				confidence?: unknown
 			}
-			if (typeof wrapper.source_id === 'string') {
+			// Only a citation that is a web address has a host to place on one side of
+			// the line or the other. An internal id for a page the run already holds —
+			// what a mailbox read off the company's own contact page is cited to — is
+			// left at the confidence it arrived with.
+			if (
+				typeof wrapper.source_id === 'string' &&
+				isWebAddress(wrapper.source_id)
+			) {
 				const host = hostOf(wrapper.source_id)
 				if (host !== null && !isFirstPartyHost(host, targetHosts)) {
 					const current =

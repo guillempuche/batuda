@@ -131,7 +131,12 @@ import {
 	resolveSchema,
 	schemaFieldNames,
 } from './schemas/index'
-import { hostOf, sourceIdFor, urlHashForScrape } from './source-key'
+import {
+	hostOf,
+	isWebAddress,
+	sourceIdFor,
+	urlHashForScrape,
+} from './source-key'
 import { recordSeenSource } from './source-record'
 import { enforceSourceTier, isFirstPartyHost } from './source-tier-guard'
 import { stripReasoning } from './strip-reasoning'
@@ -371,7 +376,9 @@ export const openedPages = <
 // citations the per-source entity check had to fail open on. A gap round
 // scrapes these first: fetching the cited page turns fail-open into a real
 // verdict, and the page often carries the very facts still missing. Blocked
-// namespaces (posts, person pages) are skipped — fetching one changes nothing.
+// namespaces (posts, person pages) are skipped — fetching one changes nothing —
+// and so is anything that is not a web address, such as an internal id naming a
+// page the run already holds.
 export const citedUnscrapedSources = (
 	findings: unknown,
 	hasPage: (urlHash: string) => boolean,
@@ -389,7 +396,7 @@ export const citedUnscrapedSources = (
 		if (seen.has(id)) continue
 		seen.add(id)
 		if (classifyNamespace(id) !== null) continue
-		if (hostOf(id) === null) continue
+		if (!isWebAddress(id)) continue
 		if (hasPage(urlHashForScrape(id))) continue
 		out.push(id)
 		if (out.length >= cap) break
@@ -4370,15 +4377,16 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									citedUrl =>
 										Effect.gen(function* () {
 											// Mark the attempt (fetched, empty, or errored) so a page that
-											// yields nothing is not re-fetched next round; charge only a real
-											// fetch against the gap budget.
+											// yields nothing is not re-fetched next round.
 											citedAttempted.add(urlHashForScrape(citedUrl))
 											if (isUnsupportedScrapeUrl(citedUrl)) return
-											gapSpentCents += SCRAPE_COST_CENTS
 											const cited = yield* gapScrape.scrape({
 												url: citedUrl,
 												formats: ['markdown'],
 											})
+											// Charged once the fetch is back, so a URL that errors out
+											// leaves the round's remaining budget intact.
+											gapSpentCents += SCRAPE_COST_CENTS
 											if (
 												cited.markdown !== undefined &&
 												cited.markdown.trim().length > 0

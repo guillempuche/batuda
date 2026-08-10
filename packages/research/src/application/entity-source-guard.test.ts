@@ -128,6 +128,56 @@ describe('guardEntitySources', () => {
 		})
 	})
 
+	describe('when a contact is cited to a user post AND to a first-party page', () => {
+		it('should keep them — a post is only disqualifying as the sole tie', () => {
+			// GIVEN a named executive the company lists on its own team page and also
+			// announces on its Instagram, so their sources are one of each
+			const findings = {
+				contacts: [
+					{
+						name: 'Scott Barbour',
+						role: sourced('CEO', 'https://acmefreight.com/team'),
+						citations: [
+							{ source_id: 'https://acmefreight.com/team' },
+							{ source_id: 'https://www.instagram.com/reel/DavToL1gq3i/' },
+						],
+					},
+				],
+			}
+
+			// WHEN the guard runs
+			const out = guardEntitySources(findings, targets)
+
+			// THEN the contact survives, and nothing is reported as a drop — the post
+			// is not what the contact rests on
+			const contacts = (out.findings as { contacts: { name: string }[] })
+				.contacts
+			expect(contacts).toHaveLength(1)
+			expect(contacts[0]?.name).toBe('Scott Barbour')
+			expect(out.droppedContacts).toBe(0)
+			expect(out.droppedUncited).toBe(0)
+		})
+
+		it('should still drop a contact whose every source is a post', () => {
+			// GIVEN a contact cited to two posts and nothing else — different hosts,
+			// but not one page the company stands behind
+			const findings = {
+				contacts: [
+					{
+						name: 'Reel Person',
+						role: sourced('CEO', 'https://www.instagram.com/reel/DavToL1gq3i/'),
+						citations: [{ source_id: 'https://x.com/acme/status/1789' }],
+					},
+				],
+			}
+
+			// WHEN the guard runs — THEN it goes, counted as the drop it is
+			const out = guardEntitySources(findings, targets)
+			expect((out.findings as { contacts: unknown[] }).contacts).toHaveLength(0)
+			expect(out.droppedContacts).toBe(1)
+		})
+	})
+
 	describe('when a contact is cited to their own professional profile', () => {
 		it('should keep it (a person page is fine for that person)', () => {
 			// GIVEN a contact whose role is cited to their own LinkedIn profile
