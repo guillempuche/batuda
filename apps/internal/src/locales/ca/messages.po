@@ -885,6 +885,7 @@ msgstr "Reserva una reunió des d'una pàgina d'empresa o reenvia una invitació
 msgid "bounced"
 msgstr "rebotat"
 
+#: src/components/companies/company-channels-section.tsx
 #: src/routes/companies/$slug.tsx
 #: src/routes/emails/$threadId.tsx
 msgid "Bounced"
@@ -1215,6 +1216,7 @@ msgstr "Competidors"
 msgid "complained"
 msgstr "marcat com a brossa"
 
+#: src/components/companies/company-channels-section.tsx
 #: src/routes/companies/$slug.tsx
 #: src/routes/emails/$threadId.tsx
 msgid "Complained"
@@ -1436,6 +1438,7 @@ msgstr "No s'ha pogut canviar {0}"
 msgid "Could not change owner"
 msgstr "No s'ha pogut canviar el responsable"
 
+#: src/routes/companies/$slug.tsx
 #: src/routes/companies/$slug.tsx
 msgid "Could not clear suppression"
 msgstr "No s'''ha pogut esborrar la supressió"
@@ -2989,6 +2992,10 @@ msgstr "Latitud"
 msgid "Layered after the stack, in order."
 msgstr "S'apliquen després de la pila, en ordre."
 
+#: src/components/companies/company-channels-section.tsx
+msgid "Let mail through again"
+msgstr "Deixa passar el correu"
+
 #: src/components/profile/theme-select.tsx
 msgid "Light"
 msgstr "Clar"
@@ -3144,6 +3151,10 @@ msgstr "Prioritat baixa"
 #: src/components/emails/compose-form.tsx
 msgid "Mail to {0} bounced, so it is blocked."
 msgstr "El correu a {0} ha rebotat, així que està bloquejada."
+
+#: src/components/companies/company-channels-section.tsx
+msgid "Mail to these addresses is being held back. Letting mail through lifts all of them at once, and any that bounces again is held straight back."
+msgstr "El correu cap a aquestes adreces està aturat. Deixar-lo passar les allibera totes alhora, i qualsevol que torni a rebotar queda aturada de seguida."
 
 #. placeholder {0}: row.email
 #: src/routes/emails/inboxes.tsx
@@ -5682,6 +5693,7 @@ msgstr "No s'ha pogut carregar el tauler. Comprova que la sessió sigui vàlida 
 
 #: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/contacts/manage-channels-dialog.tsx
+#: src/routes/companies/$slug.tsx
 #: src/routes/companies/$slug.tsx
 msgid "The change didn't go through. Try again."
 msgstr "El canvi no s'ha completat. Torna-ho a provar."

@@ -67,6 +67,13 @@ export const CompanyDetail = Schema.Struct({
 	researchRuns: Schema.Array(CompanyResearchRun),
 })
 
+// The company's channels as they read once the block is lifted, so a caller can
+// update what it holds without asking for the whole company again.
+const CompanySuppressionCleared = Schema.Struct({
+	id: Schema.String,
+	channels: Schema.Array(Schema.Unknown),
+})
+
 // What a caller may write. The shapes come from the domain so the browser, the
 // agent tools and the research apply path all turn away the same values — and
 // they sit here rather than on `Company`, which has to keep reading rows written
@@ -231,6 +238,20 @@ export const CompaniesGroup = HttpApiGroup.make('companies')
 			success: DeleteCompanyResult,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
+	)
+	.add(
+		// Let mail go to the company's own mailbox again, after a bounce or a spam
+		// report turns out to have been wrong. An `info@` or `orders@` belongs to
+		// nobody, so the way back cannot run through a person. Only ever lifts the
+		// block: no status can be set from here.
+		HttpApiEndpoint.post(
+			'clearSuppression',
+			'/companies/:id/email-suppression/clear',
+			{
+				params: { id: Schema.String },
+				success: CompanySuppressionCleared,
+			},
+		),
 	)
 	.add(
 		// Put one back, with the people that deletion hid. Answers 400 when the

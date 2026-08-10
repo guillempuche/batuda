@@ -1,5 +1,11 @@
 import { Trans, useLingui } from '@lingui/react/macro'
-import { ChevronRight, ExternalLink, Link2, Send } from 'lucide-react'
+import {
+	AlertTriangle,
+	ChevronRight,
+	ExternalLink,
+	Link2,
+	Send,
+} from 'lucide-react'
 import styled from 'styled-components'
 
 import { PriCollapsible } from '@batuda/ui/pri'
@@ -16,7 +22,16 @@ type Props = {
 	readonly channels: ReadonlyArray<DisplayChannel>
 	/** Opens a new message to this address. Only offered for mailboxes. */
 	readonly onEmail: (address: string) => void
+	/** Lets mail go to the company's mailboxes again. */
+	readonly onClearSuppression: () => void
 }
+
+/**
+ * Whether the send gate is holding mail back from this address. Read in both
+ * places that say so, so a mark can never appear without the note explaining it.
+ */
+const isHeldBack = (ch: DisplayChannel): boolean =>
+	ch.kind === 'email' && (ch.status === 'bounced' || ch.status === 'complained')
 
 /**
  * Every way of reaching the company, not just the first of each kind.
@@ -27,10 +42,19 @@ type Props = {
  * listed here under the name somebody gave it, so "orders" and "accounts" can be
  * told apart before one of them is written to.
  */
-export function CompanyChannelsSection({ channels, onEmail }: Props) {
+export function CompanyChannelsSection({
+	channels,
+	onEmail,
+	onClearSuppression,
+}: Props) {
 	const { t } = useLingui()
 	const kindLabel = useChannelKindLabel()
 	if (channels.length === 0) return null
+
+	// A mailbox nobody is listed under is held back the same as anybody's, and
+	// this is the only place it is shown — so a block left unsaid here is a block
+	// with no way off it.
+	const heldBack = channels.filter(isHeldBack)
 
 	return (
 		<PriCollapsible.Root defaultOpen>
@@ -81,6 +105,17 @@ export function CompanyChannelsSection({ channels, onEmail }: Props) {
 										<Trans>primary</Trans>
 									</Primary>
 								) : null}
+								{isHeldBack(ch) ? (
+									<Held
+										data-testid={`company-channel-held-${ch.id}`}
+										title={ch.statusReason ?? undefined}
+									>
+										<AlertTriangle size={10} aria-hidden />
+										<span>
+											{ch.status === 'bounced' ? t`Bounced` : t`Complained`}
+										</span>
+									</Held>
+								) : null}
 								{ch.kind === 'email' ? (
 									<Compose
 										type='button'
@@ -93,6 +128,20 @@ export function CompanyChannelsSection({ channels, onEmail }: Props) {
 							</Row>
 						)
 					})}
+					{heldBack.length > 0 ? (
+						<HeldNote>
+							<span>
+								{t`Mail to these addresses is being held back. Letting mail through lifts all of them at once, and any that bounces again is held straight back.`}
+							</span>
+							<ClearButton
+								type='button'
+								data-testid='company-clear-suppression'
+								onClick={onClearSuppression}
+							>
+								<Trans>Let mail through again</Trans>
+							</ClearButton>
+						</HeldNote>
+					) : null}
 				</Body>
 			</PriCollapsible.Panel>
 		</PriCollapsible.Root>
@@ -179,6 +228,57 @@ const Primary = styled.span.withConfig({
 	${stenciledTitle}
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface-variant);
+`
+
+const Held = styled.span.withConfig({
+	displayName: 'CompanyChannelHeld',
+})`
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-3xs);
+	padding: 0 var(--space-2xs);
+	border-radius: var(--shape-full);
+	background: color-mix(in oklab, var(--color-error) 12%, transparent);
+	color: var(--color-error);
+	font-size: var(--typescale-label-small-size);
+	line-height: var(--typescale-label-small-line);
+	white-space: nowrap;
+`
+
+const HeldNote = styled.div.withConfig({
+	displayName: 'CompanyChannelsHeldNote',
+})`
+	/* Stacked at every width: the panel sits in a narrow column, so even a wide
+	   window leaves the sentence wrapping to two words a line beside the
+	   button. */
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: var(--space-2xs);
+	margin-top: var(--space-2xs);
+	padding: var(--space-2xs) var(--space-xs);
+	border: 1px solid color-mix(in oklab, var(--color-error) 40%, transparent);
+	border-radius: var(--shape-xs);
+	color: var(--color-on-surface-variant);
+	font-size: var(--typescale-body-small-size);
+	line-height: var(--typescale-body-small-line);
+`
+
+const ClearButton = styled.button.withConfig({
+	displayName: 'CompanyClearSuppression',
+})`
+	flex: 0 0 auto;
+	padding: var(--space-3xs) var(--space-xs);
+	border: 1px solid var(--color-outline);
+	border-radius: var(--shape-full);
+	background: transparent;
+	color: var(--color-primary);
+	font-size: var(--typescale-label-medium-size);
+	cursor: pointer;
+
+	&:hover {
+		background: color-mix(in oklab, var(--color-primary) 8%, transparent);
+	}
 `
 
 const Compose = styled.button.withConfig({
