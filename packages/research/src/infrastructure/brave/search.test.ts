@@ -235,4 +235,38 @@ describe('makeBraveSearch', () => {
 		expect(result?.items).toEqual([])
 		expect(log.count).toBe(1)
 	})
+
+	it('should return an empty result when the web section is explicitly null', async () => {
+		// GIVEN a 200 whose web section is null rather than missing
+		const { exit } = runSearch(200, { web: null })
+
+		// THEN that reads the same way — a zero-hit, not a lost search
+		const resolved = await exit
+		const result = Exit.isSuccess(resolved) ? resolved.value : undefined
+		expect(result?.items).toEqual([])
+	})
+
+	it('should keep a result whose blurb and title are explicitly null', async () => {
+		// GIVEN a result with no blurb — which Brave documents as optional
+		const { exit } = runSearch(200, {
+			web: {
+				results: [
+					{
+						url: 'https://acme.es',
+						title: null,
+						description: null,
+						extra_snippets: null,
+					},
+				],
+			},
+		})
+
+		// THEN the result keeps its place: the URL alone is worth scraping later
+		const resolved = await exit
+		const result = Exit.isSuccess(resolved) ? resolved.value : undefined
+		expect(result?.items).toHaveLength(1)
+		expect(result?.items[0]?.url).toBe('https://acme.es')
+		expect(result?.items[0]?.title).toBe('')
+		expect(result?.items[0]?.snippet).toBe('')
+	})
 })

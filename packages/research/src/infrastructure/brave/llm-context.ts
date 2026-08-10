@@ -29,6 +29,7 @@ import { ProviderError } from '../../domain/errors'
 import { SearchResult, SearchResultItem } from '../../domain/types'
 import { keyForSlot } from '../_config'
 import { hardenHttp } from '../_http-harden'
+import { NullableOptional } from '../_schema'
 
 // Context budget returned per request and per source page. Set to Brave's own
 // defaults (total 8192 of 1024–32768; per-url 4096 of 512–8192): billing is
@@ -43,16 +44,18 @@ const MAX_TOKENS_PER_URL = 4096
 
 // One source's extracted passages. `snippets` may hold plain prose or
 // JSON-serialized structured data (an FAQ block, a table); both read as text.
+// Every field may arrive absent or null, `url` included: one odd source is
+// dropped below rather than sinking a search that was already paid for.
 const GroundingItem = Schema.Struct({
-	url: Schema.String,
-	title: Schema.optional(Schema.String),
-	snippets: Schema.optional(Schema.Array(Schema.String)),
+	url: NullableOptional(Schema.String),
+	title: NullableOptional(Schema.String),
+	snippets: NullableOptional(Schema.Array(Schema.String)),
 })
 
 const LlmContextResponse = Schema.Struct({
-	grounding: Schema.optional(
+	grounding: NullableOptional(
 		Schema.Struct({
-			generic: Schema.optional(Schema.Array(GroundingItem)),
+			generic: NullableOptional(Schema.Array(GroundingItem)),
 		}),
 	),
 })
@@ -144,10 +147,14 @@ export const makeBraveLlmContextSearch = (slot: number) =>
 									.filter(s => s.length > 0)
 									.join('\n\n')
 								if (content.length === 0) return []
+								// Nothing to cite or open later without an address, so the
+								// item goes rather than the whole answer.
+								const url = item.url
+								if (url === undefined || url === null) return []
 								return [
 									new SearchResultItem({
-										url: item.url,
-										title: item.title ?? item.url,
+										url,
+										title: item.title ?? url,
 										snippet: content.slice(0, 300),
 										content,
 									}),

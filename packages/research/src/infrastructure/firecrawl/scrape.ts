@@ -24,30 +24,41 @@ import { ProviderError, UnsupportedSite } from '../../domain/errors'
 import { ScrapedPage } from '../../domain/types'
 import { keyForSlot } from '../_config'
 import { hardenHttp } from '../_http-harden'
+import {
+	firstText,
+	NullableOptional,
+	NullableOptionalTextOrList,
+} from '../_schema'
 import { cleanScrapedMarkdown } from './clean-scraped-markdown'
 
 const SCRAPE_URL = 'https://api.firecrawl.dev/v2/scrape'
 
 // Subset of the Firecrawl scrape response we read. Unknown fields are ignored.
 const ScrapeResponse = Schema.Struct({
+	// Firecrawl's own verdict on the fetch, which a 2xx does not guarantee.
+	success: NullableOptional(Schema.Boolean),
 	// The credits Firecrawl says this fetch consumed. Optional because the field
 	// is not on every response shape; a fetch that stays quiet counts as one.
-	creditsUsed: Schema.optional(Schema.Number),
-	data: Schema.Struct({
-		markdown: Schema.optional(Schema.String),
-		html: Schema.optional(Schema.String),
-		links: Schema.optional(Schema.Array(Schema.String)),
-		metadata: Schema.optional(
-			Schema.Struct({
-				title: Schema.optional(Schema.String),
-				language: Schema.optional(Schema.String),
-				// The address the page finally resolved to after Firecrawl followed
-				// any redirects; `sourceURL` is what we asked for. They differ when
-				// the requested domain 301s elsewhere (a rebrand).
-				url: Schema.optional(Schema.String),
-			}),
-		),
-	}),
+	creditsUsed: NullableOptional(Schema.Number),
+	// Firecrawl can answer successfully with no `data` at all. That is an empty
+	// page, not a broken response, so it must not sink the whole answer.
+	data: NullableOptional(
+		Schema.Struct({
+			markdown: NullableOptional(Schema.String),
+			html: NullableOptional(Schema.String),
+			links: NullableOptional(Schema.Array(Schema.String)),
+			metadata: NullableOptional(
+				Schema.Struct({
+					title: NullableOptionalTextOrList,
+					language: NullableOptionalTextOrList,
+					// The address the page finally resolved to after Firecrawl followed
+					// any redirects; `sourceURL` is what we asked for. They differ when
+					// the requested domain 301s elsewhere (a rebrand).
+					url: NullableOptional(Schema.String),
+				}),
+			),
+		}),
+	),
 })
 
 const sha256Hex = (input: string): string =>
@@ -155,18 +166,32 @@ export const makeFirecrawlScrape = (slot: number) =>
 									}),
 							),
 						)
+						// Firecrawl can answer 2xx while saying the fetch itself did not
+						// work. That is their side failing and worth another try, so it
+						// surfaces as an error rather than as a page that came back empty.
+						if (body.success === false) {
+							return yield* Effect.fail(
+								new ProviderError({
+									provider: 'firecrawl',
+									message: 'scrape failed: provider reported success=false',
+									recoverable: true,
+								}),
+							)
+						}
+						const page = body.data
+						const metadata = page?.metadata
 						// Clean page-builder markup out of the fetched markdown; an empty
 						// result means the page was mostly scaffolding, so it carries no
 						// content and the loop's grounding check skips it.
-						const markdown = cleanScrapedMarkdown(body.data.markdown ?? '')
+						const markdown = cleanScrapedMarkdown(page?.markdown ?? '')
 						return new ScrapedPage({
 							url: input.url,
-							resolvedUrl: body.data.metadata?.url,
+							resolvedUrl: metadata?.url ?? undefined,
 							markdown,
-							html: body.data.html,
-							links: body.data.links,
-							title: body.data.metadata?.title,
-							language: body.data.metadata?.language,
+							html: page?.html ?? undefined,
+							links: page?.links ?? undefined,
+							title: firstText(metadata?.title),
+							language: firstText(metadata?.language),
 							contentHash: sha256Hex(markdown),
 							// The credits Firecrawl charged, not a flat one per fetch.
 							units: body.creditsUsed ?? 1,

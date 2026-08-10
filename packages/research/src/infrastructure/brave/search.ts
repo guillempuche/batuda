@@ -17,23 +17,28 @@ import { ProviderError } from '../../domain/errors'
 import { SearchResult, SearchResultItem } from '../../domain/types'
 import { keyForSlot } from '../_config'
 import { hardenHttp } from '../_http-harden'
+import { NullableOptional } from '../_schema'
 
 // ── Brave API response schema (subset we care about) ──
+// Only the URL is worth failing a whole result over: without it there is
+// nothing to cite or scrape later.
 
 const BraveWebResult = Schema.Struct({
-	title: Schema.String,
+	title: NullableOptional(Schema.String),
 	url: Schema.String,
-	description: Schema.String,
-	page_age: Schema.optional(Schema.String),
+	// Brave documents the blurb as optional, and a result with none is still a
+	// URL worth opening.
+	description: NullableOptional(Schema.String),
+	page_age: NullableOptional(Schema.String),
 	// Up to 5 additional excerpts from the page (requested via extra_snippets) —
 	// richer grounding context than the single description line.
-	extra_snippets: Schema.optional(Schema.Array(Schema.String)),
+	extra_snippets: NullableOptional(Schema.Array(Schema.String)),
 })
 
 const BraveSearchResponse = Schema.Struct({
-	web: Schema.optional(
+	web: NullableOptional(
 		Schema.Struct({
-			results: Schema.Array(BraveWebResult),
+			results: NullableOptional(Schema.Array(BraveWebResult)),
 		}),
 	),
 })
@@ -125,8 +130,8 @@ export const makeBraveSearch = (slot: number) =>
 								const extra = (r.extra_snippets ?? []).join('\n')
 								return new SearchResultItem({
 									url: r.url,
-									title: r.title,
-									snippet: r.description,
+									title: r.title ?? '',
+									snippet: r.description ?? '',
 									...(extra.length > 0 ? { content: extra } : {}),
 								})
 							}),

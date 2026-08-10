@@ -22,6 +22,7 @@ import { MapProvider, type SiteMapInput } from '../../application/ports'
 import { ProviderError } from '../../domain/errors'
 import { keyForSlot } from '../_config'
 import { hardenHttp } from '../_http-harden'
+import { NullableOptional } from '../_schema'
 import { statusRecoverable } from './scrape'
 
 const MAP_URL = 'https://api.firecrawl.dev/v2/map'
@@ -29,8 +30,8 @@ const MAP_URL = 'https://api.firecrawl.dev/v2/map'
 // The API has answered with both bare URL strings and {url} objects across
 // versions; accept either so a format change doesn't break discovery.
 const MapResponse = Schema.Struct({
-	creditsUsed: Schema.optional(Schema.Number),
-	links: Schema.optional(
+	creditsUsed: NullableOptional(Schema.Number),
+	links: NullableOptional(
 		Schema.Array(
 			Schema.Union([Schema.String, Schema.Struct({ url: Schema.String })]),
 		),
