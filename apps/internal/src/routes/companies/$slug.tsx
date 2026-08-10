@@ -930,6 +930,26 @@ function DetailBody({
 		[clearSuppression, refreshContacts, toast, t],
 	)
 
+	const clearCompanySuppression = useAtomSet(
+		BatudaApiAtom.mutation('companies', 'clearSuppression'),
+		{ mode: 'promiseExit' },
+	)
+	const handleClearCompanySuppression = useCallback(async () => {
+		const exit = await clearCompanySuppression({
+			params: { id: company.id },
+		} as never)
+		if (exit._tag === 'Success') {
+			refreshCompany()
+			return
+		}
+		toast.add({
+			title: t`Could not clear suppression`,
+			description: t`The change didn't go through. Try again.`,
+			type: 'error',
+		})
+		console.error('[batuda] companies.clearSuppression failed', exit.cause)
+	}, [clearCompanySuppression, company.id, refreshCompany, toast, t])
+
 	// Both the interactions feed and the company row become stale after
 	// Quick Capture submits — the server copies nextAction + lastContactedAt
 	// onto the company in the same transaction as the interaction insert.
@@ -1395,6 +1415,7 @@ function DetailBody({
 									)}
 									<CompanyChannelsSection
 										channels={company.channels}
+										onClearSuppression={handleClearCompanySuppression}
 										onEmail={address =>
 											openCompose({
 												mode: 'new',

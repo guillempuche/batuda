@@ -7,7 +7,8 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 // Bounce visibility on the contact page: the suppression banner (and inline
 // badge) render on company → Contacts when a contact's primary email channel
-// carries a `bounced` or `complained` status.
+// carries a `bounced` or `complained` status. A company's own mailbox carries
+// the same status and is shown, and cleared, in the channels panel instead.
 //
 // We seed the bounced state directly via psql instead of driving the
 // mail-worker's DSN parser end-to-end — the worker is a separate process
@@ -19,10 +20,16 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 // Selectors verified against:
 //   apps/internal/src/routes/companies/$slug.tsx (suppression banner +
 //   badge + clear action; testids: contact-suppression-{badge,banner,clear}-{id})
+//   apps/internal/src/components/companies/company-channels-section.tsx
+//   (held-back badge + clear action; testids: company-channel-held-{id},
+//   company-clear-suppression)
 
 const TARGET_EMAIL = 'pep@calpepfonda.cat'
 const TARGET_REASON = '550 5.1.1 mailbox not found (e2e fixture)'
 const COMPANY_SLUG = 'cal-pep-fonda'
+// The company's own mailbox: nobody is listed under it, so no contact row can
+// speak for it.
+const COMPANY_MAILBOX = 'info@calpepfonda.cat'
 
 const psql = (sqlText: string): string =>
 	execSync(`psql "${DATABASE_URL}" -tA -c "${sqlText.replace(/"/g, '\\"')}"`, {
@@ -101,5 +108,59 @@ test.describe('contact suppression banner', () => {
 			`SELECT status FROM channels WHERE channel='email' AND address='${TARGET_EMAIL}'`,
 		)
 		expect(row).toBe('unknown')
+	})
+})
+
+test.describe('a company mailbox nobody is listed under', () => {
+	test.beforeEach(async ({ page }) => {
+		// GIVEN Alice's session is active and pointed at Taller (where the seed
+		// puts Cal Pep Fonda).
+		await page.goto('/', { waitUntil: 'commit' })
+		await setActiveOrgBySlug(page, 'taller')
+
+		// AND the company's own mailbox is forced to bounced state.
+		psql(
+			`UPDATE channels SET status='bounced', status_reason='${TARGET_REASON}', status_updated_at=now() WHERE channel='email' AND subject_table='companies' AND address='${COMPANY_MAILBOX}'`,
+		)
+	})
+
+	test.afterEach(() => {
+		// Revert the seeded bounce so other runs and suites don't see leftover
+		// state.
+		psql(
+			`UPDATE channels SET status='unknown', status_reason=NULL, status_updated_at=now(), soft_bounce_count=0 WHERE channel='email' AND subject_table='companies' AND address='${COMPANY_MAILBOX}'`,
+		)
+	})
+
+	test('should say it is held back, and let mail through again', async ({
+		page,
+	}) => {
+		// GIVEN the company page is open. `networkidle` rather than `commit`: the
+		// panel renders from the server, so a click can land before React has
+		// attached anything to the button and quietly do nothing.
+		await page.goto(`/companies/${COMPANY_SLUG}`, { waitUntil: 'networkidle' })
+
+		// THEN the badge should say so beside the address in the channels panel.
+		const heldBadge = page.getByTestId(/^company-channel-held-/).first()
+		await expect(heldBadge).toBeVisible({ timeout: 15_000 })
+
+		// WHEN the user lifts the block from that same panel.
+		const cleared = page.waitForResponse(
+			r =>
+				r.url().includes('/email-suppression/clear') &&
+				r.request().method() === 'POST',
+		)
+		await page.getByTestId('company-clear-suppression').click()
+		expect((await cleared).status()).toBe(200)
+
+		// THEN the badge should go, and the channel row should be back to nobody
+		// having judged the address — which is what makes the send gate let mail
+		// through again.
+		await expect(heldBadge).toBeHidden({ timeout: 10_000 })
+		expect(
+			psql(
+				`SELECT status FROM channels WHERE channel='email' AND subject_table='companies' AND address='${COMPANY_MAILBOX}'`,
+			),
+		).toBe('unknown')
 	})
 })

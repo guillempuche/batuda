@@ -1,8 +1,10 @@
 import { DateTime, Effect } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
+import { SqlClient } from 'effect/unstable/sql'
 
 import { BatudaApi, NotFound, SessionContext } from '@batuda/controllers'
 
+import { channelsJsonFor, clearEmailSuppression } from '../services/channels'
 import { CompanyService } from '../services/companies'
 import {
 	geocodeCompany,
@@ -24,6 +26,7 @@ export const CompaniesLive = HttpApiBuilder.group(
 			const svc = yield* CompanyService
 			const geocoder = yield* Geocoder
 			const timeline = yield* TimelineActivityService
+			const sql = yield* SqlClient.SqlClient
 			return handlers
 				.handle('list', _ => svc.search(_.query).pipe(Effect.orDie))
 				.handle('countries', () => svc.countries().pipe(Effect.orDie))
@@ -221,6 +224,33 @@ export const CompaniesLive = HttpApiBuilder.group(
 								: Effect.die(e),
 						),
 					),
+				)
+				.handle('clearSuppression', _ =>
+					Effect.gen(function* () {
+						yield* clearEmailSuppression(sql, {
+							table: 'companies' as const,
+							id: _.params.id,
+						})
+
+						// Built into JSON by Postgres, like every other channel answer:
+						// reading the rows straight back brings their dates along, and a
+						// date is not something this answer knows how to write out.
+						const rows = yield* sql<{
+							readonly channels: ReadonlyArray<unknown>
+						}>`
+							SELECT ${channelsJsonFor(sql, 'companies')} AS channels
+							FROM companies c
+							WHERE c.id = ${_.params.id}::uuid
+						`
+
+						yield* Effect.logInfo('Company suppression cleared').pipe(
+							Effect.annotateLogs({
+								event: 'company.suppression_cleared',
+								companyId: _.params.id,
+							}),
+						)
+						return { id: _.params.id, channels: rows[0]?.channels ?? [] }
+					}).pipe(Effect.orDie),
 				)
 		}),
 )
