@@ -540,19 +540,76 @@ export const deleteSubjectChannels = (
 			AND organization_id = ${orgId}
 	`
 
+/** One address the organisation is holding back, and what it did. */
+export interface SuppressedAddress {
+	readonly address: string
+	readonly status: 'bounced' | 'complained'
+	readonly statusReason: string | null
+	/** The person holding it, when one does — a company mailbox answers null. */
+	readonly contactId: string | null
+}
+
 /**
- * Reset a person's email suppression to `unknown` — used after a
- * bounced/complained contact confirms the address is good again, re-enabling
- * outbound mail to it.
+ * Which of these addresses the organisation is holding mail back from.
+ *
+ * Keyed on the address and the organisation, never on a subject: an address that
+ * bounced is the same address whichever record happens to hold it. Asking by
+ * subject instead walks past company mailboxes, second addresses, and anything
+ * typed in by hand.
  */
-export const clearEmailSuppression = (sql: Sql, contactId: string) =>
+export const suppressedAmong = (
+	sql: Sql,
+	orgId: string,
+	addresses: ReadonlyArray<string>,
+): Effect.Effect<ReadonlyArray<SuppressedAddress>, SqlError.SqlError> =>
+	Effect.gen(function* () {
+		const normalised = [
+			...new Set(
+				addresses
+					.map(address => address.trim().toLowerCase())
+					.filter(address => address !== ''),
+			),
+		]
+		if (normalised.length === 0) return []
+
+		// One row per address, not per record holding it: a bounce is recorded
+		// against every record with that address, so a mailbox two people are
+		// listed under would otherwise answer twice and read as two problems. The
+		// most recently updated record is the one that answers.
+		const rows = yield* sql<SuppressedAddress>`
+			SELECT DISTINCT ON (lower(address))
+				lower(address) AS address, status, status_reason,
+				CASE WHEN subject_table = 'contacts' THEN subject_id END AS contact_id
+			FROM channels
+			WHERE organization_id = ${orgId}
+				AND channel = 'email'
+				AND lower(address) = ANY(${normalised})
+				AND status IN ('bounced', 'complained')
+			ORDER BY lower(address), status_updated_at DESC NULLS LAST
+		`
+		return rows
+	})
+
+/**
+ * Let mail go to one company's, branch's or person's addresses again, after a
+ * bounce or a complaint turns out to have been a false alarm.
+ *
+ * Clears one subject's rows, which is narrower than the block it lifts: the send
+ * gate asks whether an address has bounced anywhere in the organisation, and a
+ * bounce is recorded against every record holding it. So an address two people
+ * are both listed under stays blocked until both are cleared.
+ */
+export const clearEmailSuppression = (
+	sql: Sql,
+	subject: { readonly table: ChannelSubject; readonly id: string },
+) =>
 	sql`
 		UPDATE channels
 		SET status = 'unknown',
 		    status_reason = NULL,
 		    status_updated_at = now(),
 		    soft_bounce_count = 0
-		WHERE subject_table = 'contacts'
-			AND subject_id = ${contactId}
+		WHERE subject_table = ${subject.table}
+			AND subject_id = ${subject.id}
 			AND channel = 'email'
 	`

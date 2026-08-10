@@ -5,23 +5,27 @@ process.env['DATABASE_URL'] ??=
 
 import { randomUUID } from 'node:crypto'
 
+import { Effect } from 'effect'
+import { SqlClient } from 'effect/unstable/sql'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+
+import { PgLive } from '../db/client'
+import { clearEmailSuppression, suppressedAmong } from './channels'
 
 // SQL-contract test for the question the send gate asks before every email:
 // "has this address hard-bounced or reported spam?"
 //
-// It used to be asked of a *person* — "is this contact's address suppressed?" —
-// and only when the send named one. Two ordinary ways of writing an email name
-// no person at all: replying to a thread that arrived from a shared mailbox
-// (inbound mail deliberately invents nobody for a role address), and the "email
-// this company" button. Both skipped the check entirely, so a company mailbox
-// that hard-bounced was written to again, and again.
+// It is asked of the address, not of whoever holds it. Two ordinary ways of
+// writing an email name no person at all — replying to a thread that arrived
+// from a shared mailbox (inbound mail deliberately invents nobody for a role
+// address), and the "email this company" button — so a check that starts from a
+// person walks straight past a company mailbox that hard-bounced.
 //
-// The rows this seeds are the ones that used to be unreachable: a bounced address
-// belonging to a company rather than to a person. What is pinned is that the
-// address-keyed lookup finds them, that the old contact-keyed one could not, and
-// that the lookup cannot reach across organisations.
+// The rows this seeds are the ones only an address-keyed lookup reaches: a
+// bounced address belonging to a company rather than to a person. What is
+// pinned is that the lookup finds them, and that it cannot reach across
+// organisations.
 //
 // Prereq: `pnpm cli services up` so Postgres is reachable.
 
@@ -186,6 +190,102 @@ describe('suppression keyed on the address rather than on a person', () => {
 		it('should find nothing, so the send proceeds', async () => {
 			const found = await suppressionFor(ORG, ['fine@tallerpuig.example'])
 			expect(found.rows).toHaveLength(0)
+		})
+	})
+})
+
+const run = <A>(effect: Effect.Effect<A, unknown, SqlClient.SqlClient>) =>
+	effect.pipe(Effect.provide(PgLive), Effect.runPromise)
+
+// Everything above runs a hand-written copy of the query. What follows drives
+// the shipped functions, so the copy and the code cannot quietly diverge.
+describe('the lookup the send gate and the pre-send check share', () => {
+	describe('when asked about a mix of addresses', () => {
+		it('should name only the ones being held back', async () => {
+			// GIVEN a company mailbox that bounced, a person's that bounced, and one
+			// that never did — the shape a real recipient list has
+			const found = await run(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* suppressedAmong(sql, ORG, [
+						COMPANY_MAILBOX,
+						'fine@tallerpuig.example',
+						PERSON_ADDRESS,
+					])
+				}),
+			)
+
+			// THEN both blocked ones come back and the good one does not, so a
+			// caller can name exactly which recipient is the problem
+			expect(found.map(row => row.address).sort()).toEqual(
+				[COMPANY_MAILBOX, PERSON_ADDRESS].sort(),
+			)
+		})
+
+		it('should not care how the address was spelled', async () => {
+			// GIVEN the same address typed with capitals and stray spacing, which is
+			// how somebody pastes one in
+			const found = await run(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* suppressedAmong(sql, ORG, [
+						`  ${COMPANY_MAILBOX.toUpperCase()} `,
+					])
+				}),
+			)
+
+			// THEN it is still found — a block a different capitalisation walks past
+			// is not a block
+			expect(found).toHaveLength(1)
+		})
+
+		it('should answer nothing for an empty list without asking the database', async () => {
+			// GIVEN nothing usable to ask about: an empty entry and one that is only
+			// spacing
+			const found = await run(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* suppressedAmong(sql, ORG, ['', '   '])
+				}),
+			)
+
+			// THEN nothing is held back
+			expect(found).toEqual([])
+		})
+	})
+
+	describe('when a company mailbox is cleared', () => {
+		it('should let mail go to it again', async () => {
+			// GIVEN a company mailbox being held back
+			// WHEN the clear is asked for by company rather than by person
+			await run(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* clearEmailSuppression(sql, {
+						table: 'companies',
+						id: companyId,
+					})
+				}),
+			)
+
+			// THEN the gate stops finding it
+			const found = await run(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* suppressedAmong(sql, ORG, [COMPANY_MAILBOX])
+				}),
+			)
+			expect(found).toEqual([])
+
+			// AND the person's own block is untouched — clearing one subject's
+			// addresses says nothing about anybody else's
+			const others = await run(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* suppressedAmong(sql, ORG, [PERSON_ADDRESS])
+				}),
+			)
+			expect(others).toHaveLength(1)
 		})
 	})
 })
