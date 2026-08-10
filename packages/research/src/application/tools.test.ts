@@ -1,7 +1,13 @@
-import { Effect, Layer, Schema, Stream } from 'effect'
+import { Effect, Layer, Logger, Schema, Stream } from 'effect'
 import { describe, expect, it } from 'vitest'
 
-import { NoRegistry, ProviderError, UnsupportedSite } from '../domain/errors'
+import {
+	BudgetExceeded,
+	MonthlyCapExceeded,
+	NoRegistry,
+	ProviderError,
+	UnsupportedSite,
+} from '../domain/errors'
 import { RegistryRecord, ScrapedPage, SearchResult } from '../domain/types'
 import { StubRegistryEsProvider } from '../infrastructure/stub/registry-es'
 import { StubScrapeProvider } from '../infrastructure/stub/scrape'
@@ -1367,5 +1373,271 @@ describe('looking up a country Batuda has no register for', () => {
 		expect(charged).toEqual([])
 		expect(asked).toBe(0)
 		expect(JSON.stringify(results[results.length - 1])).toContain('no_registry')
+	})
+})
+
+describe('a run that spends its budget', () => {
+	// Running out of budget is how a run is meant to stop, so it must be reported
+	// as the ordinary stop it is: at warning, and with the tool named once. Catch
+	// it as an expected stop and then again as a failure and the telemetry fills
+	// with errors for something normal, while the model reads
+	// "web_search: web_search: cheap budget exhausted".
+
+	// Every log line written while a tool runs, so what was recorded — and at what
+	// level — can be asserted rather than inferred.
+	const capturedLogs = (
+		lines: Array<{ level: string; message: string }>,
+	): Layer.Layer<never> =>
+		Logger.layer([
+			Logger.make(options => {
+				lines.push({
+					level: String(options.logLevel),
+					message: String(options.message),
+				})
+			}),
+		])
+
+	// A budget with nothing left in either tier, so any tool that charges before
+	// calling its vendor is refused.
+	const spentBudget = (remaining: number) =>
+		Layer.succeed(Budget)(
+			Budget.of({
+				chargeCheap: (_provider, cents) =>
+					Effect.fail(
+						new BudgetExceeded({
+							tier: 'cheap',
+							needed: cents,
+							remaining,
+						}),
+					),
+				chargePaid: () => Effect.succeed(true),
+				withPaidCharge: (_provider, cents) => () =>
+					Effect.fail(
+						new BudgetExceeded({
+							tier: 'paid-run',
+							needed: cents,
+							remaining,
+						}),
+					),
+				snapshot: () =>
+					Effect.succeed({
+						cheapBudget: 1000,
+						cheapSpent: 1000 - remaining,
+						cheapRemaining: remaining,
+						paidBudget: 1000,
+						paidSpent: 1000 - remaining,
+						paidRemaining: remaining,
+					}),
+			}),
+		)
+
+	// Drive one tool against a spent budget and report both what the model was
+	// handed and everything that was logged on the way.
+	const exhausted = async (
+		tool: 'web_search' | 'scrape_page' | 'registry_lookup',
+		params: Record<string, unknown>,
+		budget: Layer.Layer<Budget> = spentBudget(7),
+	): Promise<{
+		description: string
+		isFailure: boolean
+		logs: ReadonlyArray<{ level: string; message: string }>
+	}> => {
+		const logs: Array<{ level: string; message: string }> = []
+		const ports = Layer.mergeAll(
+			StubSearchProvider,
+			StubScrapeProvider,
+			StubRegistryEsProvider,
+			budget,
+			stubRunContext,
+			Layer.succeed(ContactDiscovery)({
+				discover: () =>
+					Effect.succeed({
+						status: 'no_reliable_contact' as const,
+						researchId: 'test-run',
+					}),
+			}),
+		)
+		const results = await Effect.runPromise(
+			Effect.gen(function* () {
+				const toolkit = yield* researchToolkit
+				const stream = yield* toolkit.handle(tool, params as never)
+				return yield* Stream.runCollect(stream)
+			}).pipe(
+				Effect.provide(researchToolkitLayer.pipe(Layer.provide(ports))),
+				Effect.provide(capturedLogs(logs)),
+			),
+		)
+		const last = results[results.length - 1]
+		return {
+			description: (last?.result as { reason?: { description?: string } })
+				?.reason?.description as string,
+			isFailure: last?.isFailure ?? false,
+			logs,
+		}
+	}
+
+	describe('when the cheap budget refuses a search', () => {
+		it('should tell the model to stop, naming the tool once', async () => {
+			// GIVEN a run with 7¢ of cheap budget left and a search to make
+			const { description, isFailure } = await exhausted('web_search', {
+				query: 'acme corp',
+				limit: null,
+				recency_days: null,
+				location: null,
+			})
+
+			// THEN the model reads one tool name in front of one sentence
+			expect(isFailure).toBe(true)
+			expect(description).toBe(
+				'web_search: cheap budget exhausted (7¢ left) — stop searching and summarize what you have',
+			)
+		})
+
+		it('should record the stop at warning and not as a failure', async () => {
+			// GIVEN the same refused search
+			const { logs } = await exhausted('web_search', {
+				query: 'acme corp',
+				limit: null,
+				recency_days: null,
+				location: null,
+			})
+
+			// THEN it is logged once, at warning — an investigation into error-level
+			// tool failures never has to sift ordinary budget stops out of them
+			expect(logs).toContainEqual({
+				level: 'Warn',
+				message: 'research.tool.budget_exhausted',
+			})
+			expect(
+				logs.filter(line => line.message.includes('research.tool.failed')),
+			).toEqual([])
+		})
+	})
+
+	describe('when the cheap budget refuses a page fetch', () => {
+		it('should report it the same way it reports a refused search', async () => {
+			// GIVEN a run with 7¢ left and a page to fetch
+			const { description, isFailure, logs } = await exhausted('scrape_page', {
+				url: 'https://acme.example',
+			})
+
+			// THEN the message names scrape_page once and the stop is a warning
+			expect(isFailure).toBe(true)
+			expect(description).toBe(
+				'scrape_page: cheap budget exhausted (7¢ left) — stop searching and summarize what you have',
+			)
+			expect(logs).toContainEqual({
+				level: 'Warn',
+				message: 'research.tool.budget_exhausted',
+			})
+			expect(
+				logs.filter(line => line.message.includes('research.tool.failed')),
+			).toEqual([])
+		})
+	})
+
+	describe('when the paid budget refuses a register lookup', () => {
+		it('should name the tool once', async () => {
+			// GIVEN a run whose paid tier has 7¢ left and a register to ask
+			const { description, isFailure } = await exhausted('registry_lookup', {
+				country: 'ES',
+				query: 'Acme SL',
+				tax_id: null,
+			})
+
+			// THEN the model reads the tool's name once, as it does on the cheap tier
+			expect(isFailure).toBe(true)
+			expect(description).toBe(
+				'registry_lookup: paid budget exhausted (7¢ left) — stop using registry_lookup',
+			)
+		})
+	})
+
+	describe('when the month’s paid cap is reached', () => {
+		it('should name the tool once', async () => {
+			// GIVEN an organization that has spent its whole monthly paid allowance
+			const cappedBudget = Layer.succeed(Budget)(
+				Budget.of({
+					chargeCheap: () => Effect.void,
+					chargePaid: () => Effect.succeed(true),
+					withPaidCharge: () => () =>
+						Effect.fail(
+							new MonthlyCapExceeded({ capCents: 5000, spentCents: 5000 }),
+						),
+					snapshot: () =>
+						Effect.succeed({
+							cheapBudget: 1000,
+							cheapSpent: 0,
+							cheapRemaining: 1000,
+							paidBudget: 1000,
+							paidSpent: 0,
+							paidRemaining: 1000,
+						}),
+				}),
+			)
+			const { description, isFailure } = await exhausted(
+				'registry_lookup',
+				{ country: 'ES', query: 'Acme SL', tax_id: null },
+				cappedBudget,
+			)
+
+			// THEN the cap is reported like every other stop: one tool name
+			expect(isFailure).toBe(true)
+			expect(description).toBe(
+				'registry_lookup: monthly paid cap reached (5000/5000¢) — stop using registry_lookup',
+			)
+		})
+	})
+
+	describe('when a vendor genuinely fails', () => {
+		it('should still be logged as a failure, named once', async () => {
+			// GIVEN a search provider that returns a 422 while the budget is healthy
+			const logs: Array<{ level: string; message: string }> = []
+			const ports = Layer.mergeAll(
+				Layer.succeed(SearchProvider)(
+					SearchProvider.of({
+						search: () =>
+							Effect.fail(
+								new ProviderError({
+									provider: 'brave',
+									message: 'search failed: HTTP 422',
+									recoverable: false,
+								}),
+							),
+					}),
+				),
+				StubScrapeProvider,
+				StubRegistryEsProvider,
+				testInfra,
+			)
+			const results = await Effect.runPromise(
+				Effect.gen(function* () {
+					const toolkit = yield* researchToolkit
+					const stream = yield* toolkit.handle('web_search', {
+						query: 'acme corp',
+						limit: null,
+						recency_days: null,
+						location: null,
+					})
+					return yield* Stream.runCollect(stream)
+				}).pipe(
+					Effect.provide(researchToolkitLayer.pipe(Layer.provide(ports))),
+					Effect.provide(capturedLogs(logs)),
+				),
+			)
+
+			// THEN letting the budget stop past the failure logger has not made it
+			// blind to a real failure, and the message still names the tool once
+			const last = results[results.length - 1]
+			expect(last?.isFailure).toBe(true)
+			expect(
+				(last?.result as { reason?: { description?: string } })?.reason
+					?.description,
+			).toBe('web_search: search failed: HTTP 422')
+			expect(logs).toContainEqual({
+				level: 'Error',
+				message: 'research.tool.failed',
+			})
+		})
 	})
 })
