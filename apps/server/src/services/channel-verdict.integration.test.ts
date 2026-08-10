@@ -10,6 +10,8 @@ import { SqlClient } from 'effect/unstable/sql'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import type { VerificationVerdict } from '@batuda/domain'
+
 import { PgLive } from '../db/client'
 import repairVerdicts from '../db/migrations/0063_channel_verification_vocabulary'
 import { writeChannels } from './channels'
@@ -39,7 +41,7 @@ const subject = () => ({ table: 'companies' as const, id: company })
 const write = (channel: {
 	kind: string
 	value: string
-	verification?: 'deliverable' | 'risky' | 'undeliverable' | 'unknown'
+	verification?: VerificationVerdict
 	confidence?: number
 }) =>
 	run(
@@ -143,28 +145,47 @@ describe('putting stored verdicts right', () => {
 	let orphan: string
 
 	beforeAll(async () => {
-		// Words that reached the column while it was free text, plus the two that
-		// must come through untouched.
+		// Nothing can write a wrong word while the check is on, so it comes off to
+		// build the state the repair exists to put right. Test files run one at a
+		// time, so nothing else is writing while it is off.
 		await pool.query(
-			`INSERT INTO channels (organization_id, subject_table, subject_id, channel, address, verification, confidence)
-			 VALUES
-			   ($1, 'companies', $2, 'email', 'a@repair.cat', 'inferred', 55),
-			   ($1, 'companies', $2, 'email', 'b@repair.cat', 'Deliverable', 80),
-			   ($1, 'companies', $2, 'email', 'c@repair.cat', NULL, NULL),
-			   ($1, 'companies', $2, 'email', 'd@repair.cat', 'risky', 30)`,
-			[ORG, company],
+			`ALTER TABLE channels DROP CONSTRAINT channels_verification_chk`,
 		)
-		// A channel whose contact is already gone — what deleting somebody used to
-		// leave behind.
-		const gone = randomUUID()
-		const o = await pool.query<{ id: string }>(
-			`INSERT INTO channels (organization_id, subject_table, subject_id, channel, address, status)
-			 VALUES ($1, 'contacts', $2, 'email', 'orfe@repair.cat', 'bounced') RETURNING id`,
-			[ORG, gone],
-		)
-		orphan = o.rows[0]!.id
 
-		await run(repairVerdicts)
+		try {
+			// Words that reached the column while it was free text, plus the two
+			// that must come through untouched.
+			await pool.query(
+				`INSERT INTO channels (organization_id, subject_table, subject_id, channel, address, verification, confidence)
+				 VALUES
+				   ($1, 'companies', $2, 'email', 'a@repair.cat', 'inferred', 55),
+				   ($1, 'companies', $2, 'email', 'b@repair.cat', 'Deliverable', 80),
+				   ($1, 'companies', $2, 'email', 'c@repair.cat', NULL, NULL),
+				   ($1, 'companies', $2, 'email', 'd@repair.cat', 'risky', 30)`,
+				[ORG, company],
+			)
+			// A channel whose contact is already gone — what deleting somebody
+			// leaves behind, since nothing cascades off a polymorphic key.
+			const gone = randomUUID()
+			const o = await pool.query<{ id: string }>(
+				`INSERT INTO channels (organization_id, subject_table, subject_id, channel, address, status)
+				 VALUES ($1, 'contacts', $2, 'email', 'orfe@repair.cat', 'bounced') RETURNING id`,
+				[ORG, gone],
+			)
+			orphan = o.rows[0]!.id
+
+			await run(repairVerdicts)
+		} finally {
+			// Back on whatever happened above, so a throw midway cannot leave the
+			// database open for every suite that runs after this one. Putting it
+			// back is itself a check that the repair left nothing it refuses — and
+			// failing here still fails the suite.
+			await pool.query(
+				`ALTER TABLE channels ADD CONSTRAINT channels_verification_chk
+				 CHECK (verification IS NULL OR verification IN
+				   ('deliverable','risky','catch_all','undeliverable','unknown'))`,
+			)
+		}
 	})
 
 	describe('when a verdict is only mis-spelled', () => {
@@ -230,6 +251,56 @@ describe('putting stored verdicts right', () => {
 				[ORG],
 			)
 			expect(live.rowCount).toBeGreaterThan(0)
+		})
+	})
+})
+
+describe('a word the vocabulary does not contain', () => {
+	describe('when something writes one straight to the table', () => {
+		it('should be refused by the database, not stored', async () => {
+			// GIVEN an address with a verdict on it
+			await write({
+				kind: 'email',
+				value: 'backstop@cristalls.cat',
+				verification: 'risky',
+			})
+
+			// WHEN a verdict outside the five words is written past the app — a
+			// hand-run repair or a one-off script, which is how the wrong words the
+			// repair had to clean up got in
+			const badWrite = pool.query(
+				`UPDATE channels SET verification = 'Deliverable'
+				 WHERE subject_id = $1 AND address = $2`,
+				[company, 'backstop@cristalls.cat'],
+			)
+
+			// THEN it does not land, and the verdict already there is untouched
+			await expect(badWrite).rejects.toThrow(
+				/channels_verification_chk|check constraint/i,
+			)
+			expect(await stored('backstop@cristalls.cat')).toEqual({
+				verification: 'risky',
+				confidence: null,
+			})
+		})
+	})
+
+	describe('when the verdict is taken off entirely', () => {
+		it('should allow it, since no verdict is a state an address can be in', async () => {
+			// GIVEN the same address, still carrying a verdict
+			// WHEN the verdict is cleared
+			await pool.query(
+				`UPDATE channels SET verification = NULL
+				 WHERE subject_id = $1 AND address = $2`,
+				[company, 'backstop@cristalls.cat'],
+			)
+
+			// THEN nothing objects — "nobody has checked" is not a bad word, it is
+			// the absence of one, and the check has to leave room for it
+			expect(await stored('backstop@cristalls.cat')).toEqual({
+				verification: null,
+				confidence: null,
+			})
 		})
 	})
 })

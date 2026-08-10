@@ -15,9 +15,8 @@ import { SqlClient } from 'effect/unstable/sql'
 // picks a different address, and a different one again on the next load.
 //
 // The app now folds a kind on the way in and hands the mark on when it is put
-// down. This puts right what was stored before that, and adds the index so the
-// pair cannot come back — a unique index as a race guard is one of the two things
-// docs/backend.md allows the database to decide.
+// down. This puts right what was stored before that. Nothing yet holds a kind to
+// a single mark — the note at the end of the file says why.
 
 export default Effect.gen(function* () {
 	const sql = yield* SqlClient.SqlClient
