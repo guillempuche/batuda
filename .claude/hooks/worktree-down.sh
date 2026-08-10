@@ -25,6 +25,28 @@ fi
 # teardown uses; self-guarding and always exits 0.
 bash "${CLAUDE_PROJECT_DIR:-.}/scripts/worktree-stop-procs.sh" "$wt" "$$" 2>/dev/null || true
 
+# The integration-test database named after the worktree itself, which the pre-push
+# suite uses before `up` writes an `.env` (see scripts/integration-db.ts). A worktree
+# can hold one whether or not it was ever provisioned, and its name does not follow
+# from the dev database, so it is dropped here rather than alongside the pair below —
+# an unprovisioned worktree exits at the `.env` check and would otherwise leak it.
+# `.git` in a linked worktree is a file reading `gitdir: <main>/.git/worktrees/<name>`.
+# The name is only built when the sanitized suffix is non-empty, so this can never
+# collapse to the main checkout's bare `batuda_it`.
+before_up_db=""
+if [ -f "$wt/.git" ]; then
+	wt_name="$(sed -nE 's#^gitdir:.*/worktrees/([^/[:space:]]+)/?[[:space:]]*$#\1#p' "$wt/.git" | head -1)"
+	if [ -n "$wt_name" ]; then
+		suffix="$(printf '%s' "$wt_name" | tr '[:upper:]' '[:lower:]' \
+			| sed -E 's#[^a-z0-9]+#_#g; s#^_+##; s#_+$##' | cut -c1-52)"
+		[ -n "$suffix" ] && before_up_db="batuda_it__${suffix}"
+	fi
+fi
+if [ -n "$before_up_db" ]; then
+	docker exec batuda-db psql -U batuda -d postgres \
+		-c "DROP DATABASE IF EXISTS ${before_up_db} WITH (FORCE)" >/dev/null 2>&1 || true
+fi
+
 # Read this worktree's real database + bucket from the `.env` it generated at
 # provision time — never re-derive them from the live branch. `gh pr merge
 # --delete-branch` checks `main` out into the worktree, and switching branches

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, resolve } from 'node:path'
@@ -44,6 +44,9 @@ const MAX_DNS_LABEL = 63
 // A bucket name caps at 63 chars and ours carries a `batuda-assets-` (14) prefix, so
 // the shared slug is bounded to 49 — also safe for the `batuda_` database prefix.
 const MAX_SLUG = 49
+// Postgres caps identifiers at 63 bytes and `batuda_it__` takes 11, leaving 52 for a
+// worktree-name-derived integration database. Mirrors scripts/integration-db.ts.
+const MAX_IT_SUFFIX = 52
 
 const dnsLabel = (raw: string, max: number): string => {
 	const sane = raw
@@ -103,6 +106,43 @@ const bucketName = (slug: string) => `batuda-assets-${slug}`
 // colliding with real dev data.
 const integrationDbFromDevDb = (db: string): string =>
 	db === 'batuda' ? 'batuda_it' : db.replace(/^batuda_/, 'batuda_it__')
+
+// The other integration-test database a worktree can own. Before `up` writes an
+// `.env` there is no dev database to derive from, so the pre-push suite names the
+// database after the worktree's own directory instead — and a directory is only
+// conventionally named for its branch, so that name and the `.env`-derived one
+// above are usually different. A worktree that ran the suite before it was
+// provisioned therefore has one of each: `down` drops both, and `prune` counts both
+// as owned so it never reaps the database a live worktree is still testing against.
+// Mirrors integrationDbFromWorktreeName in scripts/integration-db.ts.
+const integrationDbFromWorktreeName = (name: string): string => {
+	const suffix = name
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, '_')
+		.replace(/^_+|_+$/g, '')
+		.slice(0, MAX_IT_SUFFIX)
+	return suffix ? `batuda_it__${suffix}` : 'batuda_it'
+}
+
+// A linked worktree's `.git` is a file reading `gitdir: <main>/.git/worktrees/<name>`.
+// That registered name is what the suite keys off, and it is not always the directory
+// basename — git appends a suffix when two worktrees would collide — so it is read
+// here rather than guessed. Returns null for the main checkout, whose `.git` is a
+// directory and whose integration database is the shared `batuda_it`.
+const worktreeIntegrationDb = (worktreePath: string): string | null => {
+	const dotGit = resolve(worktreePath, '.git')
+	if (!existsSync(dotGit) || !statSync(dotGit).isFile()) return null
+	const name = readFileSync(dotGit, 'utf-8').match(
+		/\/worktrees\/([^/\s]+)\/?\s*$/,
+	)?.[1]
+	if (!name) return null
+	const db = integrationDbFromWorktreeName(name)
+	// A name with nothing alphanumeric in it sanitizes away to the bare
+	// `batuda_it`, which is the MAIN checkout's integration-test database. Teardown
+	// drops what this returns, so hand back nothing rather than a name that would
+	// destroy another checkout's data.
+	return db === 'batuda_it' ? null : db
+}
 
 // Last path segment of a `.env` DATABASE_URL — the database name, any `?sslmode=…`
 // query stripped. The one place worktree.ts parses that URL; `identityFromEnv` and
@@ -413,6 +453,12 @@ const liveOwnedResources = execSilent(
 			// `identityFromEnv` null, but the integration sibling must stay owned.
 			const devDb = dbFromEnv(envPath)
 			if (devDb?.startsWith('batuda')) dbs.add(integrationDbFromDevDb(devDb))
+			// And the one it uses before it is provisioned, which is named after the
+			// worktree rather than the dev database. Without this a live worktree that
+			// ran the suite before `up` — or that never runs `up` at all — has its
+			// integration database reported as orphaned and reaped out from under it.
+			const beforeUp = worktreeIntegrationDb(entry.path)
+			if (beforeUp) dbs.add(beforeUp)
 		}
 		return { dbs, buckets }
 	}),
@@ -688,7 +734,28 @@ export const worktreeDown = Effect.gen(function* () {
 	// live branch — after a `gh pr merge --delete-branch` the branch is `main`,
 	// so a branch-derived slug would miss the real database (or hit main's).
 	const identity = identityFromEnv(resolve(ROOT, '.env'))
+	// The integration-test database named after this worktree rather than its dev
+	// database — what the pre-push suite uses before `up` has written an `.env`.
+	// Dropped on both paths below, because a worktree can hold one whether or not
+	// it was ever provisioned, and nothing else will ever come back for it.
+	const beforeUpDb = worktreeIntegrationDb(ROOT)
 	if (!identity) {
+		// Never provisioned, but the suite may still have run here and left its
+		// database behind. Drop that rather than refusing and leaking it. Checked
+		// for existence first so the line below reports what actually happened
+		// instead of naming a database that was never there.
+		const leftover =
+			beforeUpDb && (yield* listDatabases).includes(beforeUpDb)
+				? beforeUpDb
+				: null
+		if (leftover) {
+			yield* stopWorktreeDevServers(ROOT)
+			yield* dropDatabase(leftover)
+			yield* Console.log(
+				`✓ Removed ${leftover} (never provisioned — no dev database or bucket to drop).`,
+			)
+			return
+		}
 		return yield* Effect.fail(
 			new Error(
 				'No provisioned .env here — nothing to drop. Run `pnpm cli worktree up` first, or it was already torn down.',
@@ -708,9 +775,14 @@ export const worktreeDown = Effect.gen(function* () {
 	yield* stopWorktreeDevServers(ROOT)
 	yield* Effect.logInfo(`Dropping database ${db} + bucket ${bucket}…`)
 	yield* dropDatabase(db)
-	// Drop this worktree's integration-test database too — the pre-push suite creates
-	// it lazily (never recorded in `.env`); `IF EXISTS` no-ops if it never ran here.
+	// Drop this worktree's integration-test databases too — the pre-push suite creates
+	// them lazily (never recorded in `.env`); `IF EXISTS` no-ops if it never ran here.
+	// Both names, because a worktree that ran the suite before it was provisioned owns
+	// one keyed off its own directory as well as one keyed off its dev database.
 	yield* dropDatabase(integrationDbFromDevDb(db))
+	if (beforeUpDb && beforeUpDb !== integrationDbFromDevDb(db)) {
+		yield* dropDatabase(beforeUpDb)
+	}
 	// The bucket may already be gone (or never created) — don't fail teardown on it.
 	yield* mc(`mc rb --force local/${bucket}`).pipe(
 		Effect.catch(() => Effect.void),

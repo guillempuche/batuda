@@ -60,9 +60,24 @@ const devDbFromEnv = (): string | null => {
 // capped tighter); only the bare-worktree fallback below needs trimming.
 const MAX_SUFFIX = 52
 
+// The integration database a worktree uses before it is provisioned, keyed off its
+// registered git-worktree name (`<main>/.git/worktrees/<name>`) and sanitized to a
+// valid, collision-free identifier. A worktree directory is usually named for its
+// branch but need not be, so this name and the `.env`-derived one above are
+// generally DIFFERENT — a worktree that ran the suite before `pnpm cli worktree up`
+// therefore owns one of each over its life, and teardown has to drop both. apps/cli's
+// worktree.ts and .claude/hooks/worktree-down.sh mirror this for exactly that reason.
+export const integrationDbFromWorktreeName = (name: string): string => {
+	const suffix = name
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, '_')
+		.replace(/^_+|_+$/g, '')
+		.slice(0, MAX_SUFFIX)
+	return suffix ? `batuda_it__${suffix}` : 'batuda_it'
+}
+
 // A bare `git worktree add` (never `pnpm cli worktree up`) has no `.env`, so key the
-// name off the registered git-worktree name instead — `<main>/.git/worktrees/<name>`
-// — sanitized to a valid, collision-free identifier so even an unprovisioned
+// name off the registered git-worktree name instead, so even an unprovisioned
 // worktree stays off the main checkout's `batuda_it`. The main checkout's git dir
 // has no `/worktrees/` segment, so it falls through to the shared `batuda_it`.
 const nameFromGitWorktree = (): string => {
@@ -72,13 +87,7 @@ const nameFromGitWorktree = (): string => {
 		'--absolute-git-dir',
 	)
 	const name = gitDir?.match(/\/worktrees\/([^/]+)\/?$/)?.[1]
-	if (!name) return 'batuda_it'
-	const suffix = name
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, '_')
-		.replace(/^_+|_+$/g, '')
-		.slice(0, MAX_SUFFIX)
-	return suffix ? `batuda_it__${suffix}` : 'batuda_it'
+	return name ? integrationDbFromWorktreeName(name) : 'batuda_it'
 }
 
 // The integration database name for the current checkout.
