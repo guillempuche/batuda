@@ -6,6 +6,10 @@ import {
 } from 'effect/unstable/httpapi'
 
 import { ResearchSubjectTable } from '@batuda/domain'
+// Straight from the schemas file rather than the package entry point: that entry
+// point also reaches the research service and the providers it talks to, and this
+// spec is what the browser builds its API client from.
+import { SchemaNameSchema } from '@batuda/research/application/schemas'
 
 import {
 	ConfirmRequired,
@@ -70,11 +74,17 @@ export const ContextInput = Schema.Struct({
 	hints: Schema.optional(Hints),
 })
 
-const CreateResearchInput = Schema.Struct({
+// Exported for the test next door, which pins schema_name to the closed set —
+// widening it back to a bare string is what let a doomed run be created.
+export const CreateResearchInput = Schema.Struct({
 	query: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
 	mode: Schema.optional(Schema.String),
 	context: Schema.optional(ContextInput),
-	schema_name: Schema.optional(Schema.String),
+	// The closed set, not a bare string: an unknown name is refused as a bad
+	// request before the handler runs, so nothing is written. A selector request
+	// would otherwise write a batch row and one run per matched company, every
+	// one of them doomed.
+	schema_name: Schema.optional(SchemaNameSchema),
 	budget_cents: Schema.optional(Schema.Number),
 	paid_budget_cents: Schema.optional(Schema.Number),
 	auto_approve_paid_cents: Schema.optional(Schema.Number),

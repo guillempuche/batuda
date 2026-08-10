@@ -5910,6 +5910,14 @@ msgstr "This is the only time the full key is shown. Store it somewhere safe —
 msgid "This is what we expect before sending. A bounce is what happened after."
 msgstr "This is what we expect before sending. A bounce is what happened after."
 
+#: src/components/research/run-actions.tsx
+msgid "This kind of research isn't available any more"
+msgstr "This kind of research isn't available any more"
+
+#: src/components/research/target-correction.tsx
+msgid "This kind of research isn't available any more, so it can't be re-run. Start a new one instead."
+msgstr "This kind of research isn't available any more, so it can't be re-run. Start a new one instead."
+
 #: src/routes/reset-password.tsx
 #: src/routes/reset-password.tsx
 msgid "This link is no longer valid"

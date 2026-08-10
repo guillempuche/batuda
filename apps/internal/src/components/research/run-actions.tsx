@@ -6,6 +6,10 @@ import { useState } from 'react'
 import styled from 'styled-components'
 
 import { isActiveResearchStatus } from '@batuda/domain'
+// Straight from the schemas file rather than the package entry point: that entry
+// point also reaches the services that talk to the database and the outside
+// world, and pulling those into the browser breaks this page outright.
+import { isSchemaName } from '@batuda/research/application/schemas'
 import { PriButton, usePriToast } from '@batuda/ui/pri'
 
 import {
@@ -111,6 +115,16 @@ export function RunActions({
 	}
 
 	const onRerun = async () => {
+		// A run outlives the kind of research it was. Sending the name anyway is
+		// refused, and dropping it would quietly run something else — a brief where
+		// a profile was asked for — so say so instead of doing either.
+		if (run.schemaName !== null && !isSchemaName(run.schemaName)) {
+			toast.add({
+				title: t`This kind of research isn't available any more`,
+				type: 'error',
+			})
+			return
+		}
 		setBusy('rerun')
 		// Repeat the whole setup, not just the question. Sending only the question
 		// and its subjects quietly dropped how thorough the run was, the

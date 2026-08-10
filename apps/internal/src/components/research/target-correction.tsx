@@ -46,9 +46,13 @@ export function TargetCorrection({
 				void navigate({ to: '/research/$id', params: { id: newId } })
 				return
 			}
-			// The backend rejected the domain (unparseable).
 			setErrorMessage(
-				t`That does not look like a website. Try the company's domain, like acme.com.`,
+				value?.['status'] === 'schema_unavailable'
+					? // The kind of research this run was is no longer one I offer, so
+						// re-running it would only fail. Nothing the domain can fix.
+						t`This kind of research isn't available any more, so it can't be re-run. Start a new one instead.`
+					: // The backend rejected the domain (unparseable).
+						t`That does not look like a website. Try the company's domain, like acme.com.`,
 			)
 			setSubmitting(false)
 			return
