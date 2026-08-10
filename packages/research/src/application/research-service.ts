@@ -3544,65 +3544,88 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							) {
 								yield* Effect.gen(function* () {
 									yield* budget.chargeCheap('scrape', SCRAPE_COST_CENTS)
-									const page = yield* scrape.scrape({
-										url: `https://${ownHost}`,
-										formats: ['markdown', 'links'],
-									})
-									if (
-										page.markdown !== undefined &&
-										page.markdown.trim().length > 0
-									) {
-										const hash = urlHashForScrape(page.url)
-										// The company's own domain may 301 to a different host (a
-										// rebrand); the fetch followed it, so the destination is the
-										// same company's official site. Fold that host in as a
-										// strong-match key and put the reached URL in the corpus, so
-										// grounding lands on the live site instead of failing closed
-										// when the rebranded page never names the old domain.
-										const resolvedUrl = page.resolvedUrl ?? page.url
-										const destHost = domainHost(resolvedUrl)
-										const followedRedirect =
-											destHost !== undefined && destHost !== ownHost
-										scrapeCorpus.push({
-											urlHash: hash,
-											text: followedRedirect
-												? `${resolvedUrl}\n${page.markdown}`
-												: page.markdown,
-											host: destHost,
-											kind: 'page',
+									// The homepage fetch keeps its own error handler so a site
+									// that cannot be reached or cannot be read costs only
+									// itself: the about pages and the sitemap walk below still
+									// run, reaching the same site by their own routes.
+									const homepage = yield* Effect.gen(function* () {
+										const page = yield* scrape.scrape({
+											url: `https://${ownHost}`,
+											formats: ['markdown', 'links'],
 										})
-										if (followedRedirect && entityTargets !== null) {
-											entityTargets = withRedirectDomain(
-												entityTargets,
-												destHost,
+										if (
+											page.markdown !== undefined &&
+											page.markdown.trim().length > 0
+										) {
+											const hash = urlHashForScrape(page.url)
+											// The company's own domain may 301 to a different host (a
+											// rebrand); the fetch followed it, so the destination is the
+											// same company's official site. Fold that host in as a
+											// strong-match key and put the reached URL in the corpus, so
+											// grounding lands on the live site instead of failing closed
+											// when the rebranded page never names the old domain.
+											const resolvedUrl = page.resolvedUrl ?? page.url
+											const destHost = domainHost(resolvedUrl)
+											const followedRedirect =
+												destHost !== undefined && destHost !== ownHost
+											scrapeCorpus.push({
+												urlHash: hash,
+												text: followedRedirect
+													? `${resolvedUrl}\n${page.markdown}`
+													: page.markdown,
+												host: destHost,
+												kind: 'page',
+											})
+											if (followedRedirect && entityTargets !== null) {
+												entityTargets = withRedirectDomain(
+													entityTargets,
+													destHost,
+												)
+											}
+											seededAnchorHashes.push(hash)
+											seededTranscriptParts.push(
+												`[scrape_page] ${boundedToolResult({ url: page.url, markdown: page.markdown })}`,
+											)
+											yield* Effect.logInfo(
+												followedRedirect
+													? 'research.anchor.redirect_followed'
+													: 'research.anchor.seeded',
+											).pipe(
+												Effect.annotateLogs({
+													research_id: researchId,
+													host: ownHost,
+													...(followedRedirect
+														? { resolved_host: destHost }
+														: {}),
+												}),
 											)
 										}
-										seededAnchorHashes.push(hash)
-										seededTranscriptParts.push(
-											`[scrape_page] ${boundedToolResult({ url: page.url, markdown: page.markdown })}`,
-										)
-										yield* Effect.logInfo(
-											followedRedirect
-												? 'research.anchor.redirect_followed'
-												: 'research.anchor.seeded',
-										).pipe(
-											Effect.annotateLogs({
-												research_id: researchId,
-												host: ownHost,
-												...(followedRedirect
-													? { resolved_host: destHost }
-													: {}),
-											}),
-										)
-									}
+										return page
+									}).pipe(
+										Effect.catchCause(cause =>
+											Cause.hasInterruptsOnly(cause)
+												? Effect.failCause(cause)
+												: Effect.logWarning('research.anchor.seed_failed').pipe(
+														Effect.annotateLogs({
+															research_id: researchId,
+															host: ownHost,
+															cause: Cause.pretty(cause),
+														}),
+														Effect.as(undefined),
+													),
+										),
+									)
 									// About / contact / team pages carry the location and the named leaders a homepage
 									// rarely spells; fetch a few, chosen from the homepage's own links so no path is
 									// guessed, and let own-host grounding keep what they hold. Each fetch is isolated
 									// so one failure never sinks the rest, and bounded by MAX_ABOUT_PAGES.
 									const reachedHost =
-										domainHost(page.resolvedUrl ?? page.url) ?? ownHost
+										(homepage === undefined
+											? undefined
+											: domainHost(homepage.resolvedUrl ?? homepage.url)) ??
+										ownHost
 									for (const aboutUrl of aboutPageCandidates(
-										page.links ?? [],
+										homepage?.links ?? [],
 										reachedHost,
 										MAX_ABOUT_PAGES,
 									)) {
