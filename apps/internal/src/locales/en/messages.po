@@ -162,6 +162,11 @@ msgstr "{0} no longer allows password sign-in for mail apps, so it can't be conn
 msgid "{0} ready to apply, {1} need reading, {attentionTotal} runs need attention."
 msgstr "{0} ready to apply, {1} need reading, {attentionTotal} runs need attention."
 
+#. placeholder {0}: blocked.recipient
+#: src/components/emails/compose-form.tsx
+msgid "{0} reported a message as spam, so it is blocked."
+msgstr "{0} reported a message as spam, so it is blocked."
+
 #. placeholder {0}: selection.selectedCount
 #: src/components/companies/pipeline-board.tsx
 msgid "{0} selected"
@@ -3131,6 +3136,11 @@ msgstr "Low"
 msgid "Low priority"
 msgstr "Low priority"
 
+#. placeholder {0}: blocked.recipient
+#: src/components/emails/compose-form.tsx
+msgid "Mail to {0} bounced, so it is blocked."
+msgstr "Mail to {0} bounced, so it is blocked."
+
 #. placeholder {0}: row.email
 #: src/routes/emails/inboxes.tsx
 msgid "Make {0} the address you send from"
@@ -5077,6 +5087,11 @@ msgstr "Send blocked: these recipients cannot receive email"
 msgid "Send email"
 msgstr "Send email"
 
+#: src/components/emails/compose-form.tsx
+#: src/components/emails/compose-form.tsx
+msgid "Send failed"
+msgstr "Send failed"
+
 #: src/routes/forgot-password.tsx
 msgid "Send reset link"
 msgstr "Send reset link"
@@ -5751,6 +5766,11 @@ msgstr "The people at this company could not be fetched. Check that the session 
 #: src/components/companies/proposals-panel.tsx
 msgid "The proposals for this company could not be fetched. Check that the session is valid, then try again."
 msgstr "The proposals for this company could not be fetched. Check that the session is valid, then try again."
+
+#. placeholder {0}: blocked.reason
+#: src/components/emails/compose-form.tsx
+msgid "The receiving server said: {0}"
+msgstr "The receiving server said: {0}"
 
 #: src/routes/companies/$slug.tsx
 msgid "The research runs for this company could not be fetched. Check that the session is valid, then try again."

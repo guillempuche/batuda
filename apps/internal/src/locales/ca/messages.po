@@ -162,6 +162,11 @@ msgstr "{0} ja no permet iniciar la sessió amb contrasenya a les aplicacions de
 msgid "{0} ready to apply, {1} need reading, {attentionTotal} runs need attention."
 msgstr "{0} a punt d’aplicar, {1} per llegir, {attentionTotal} execucions requereixen atenció."
 
+#. placeholder {0}: blocked.recipient
+#: src/components/emails/compose-form.tsx
+msgid "{0} reported a message as spam, so it is blocked."
+msgstr "{0} ha marcat un missatge com a brossa, així que està bloquejada."
+
 #. placeholder {0}: selection.selectedCount
 #: src/components/companies/pipeline-board.tsx
 msgid "{0} selected"
@@ -3131,6 +3136,11 @@ msgstr "Baixa"
 msgid "Low priority"
 msgstr "Prioritat baixa"
 
+#. placeholder {0}: blocked.recipient
+#: src/components/emails/compose-form.tsx
+msgid "Mail to {0} bounced, so it is blocked."
+msgstr "El correu a {0} ha rebotat, així que està bloquejada."
+
 #. placeholder {0}: row.email
 #: src/routes/emails/inboxes.tsx
 msgid "Make {0} the address you send from"
@@ -5077,6 +5087,11 @@ msgstr "Enviament bloquejat: aquests destinataris no poden rebre correu"
 msgid "Send email"
 msgstr "Envia correu"
 
+#: src/components/emails/compose-form.tsx
+#: src/components/emails/compose-form.tsx
+msgid "Send failed"
+msgstr "No s’ha pogut enviar"
+
 #: src/routes/forgot-password.tsx
 msgid "Send reset link"
 msgstr "Envia l'enllaç"
@@ -5751,6 +5766,11 @@ msgstr "No s'han pogut recuperar les persones d'aquesta empresa. Comprova que la
 #: src/components/companies/proposals-panel.tsx
 msgid "The proposals for this company could not be fetched. Check that the session is valid, then try again."
 msgstr "No s'han pogut recuperar les propostes d'aquesta empresa. Comprova que la sessió sigui vàlida i torna-ho a provar."
+
+#. placeholder {0}: blocked.reason
+#: src/components/emails/compose-form.tsx
+msgid "The receiving server said: {0}"
+msgstr "El servidor que el rep ha dit: {0}"
 
 #: src/routes/companies/$slug.tsx
 msgid "The research runs for this company could not be fetched. Check that the session is valid, then try again."

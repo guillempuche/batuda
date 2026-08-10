@@ -40,3 +40,33 @@ export function badRequestMessage(cause: unknown): string | null {
 	const message = taggedFailure(cause, 'BadRequest')?.['message']
 	return typeof message === 'string' && message !== '' ? message : null
 }
+
+/** Why a send was refused: the address that is blocked, and what it did. */
+export type SuppressedRecipient = {
+	readonly recipient: string
+	readonly status: 'bounced' | 'complained'
+	readonly reason: string | null
+}
+
+/**
+ * The address a send was refused over, or null when the failure was something
+ * else. The server names the address, says whether it bounced or was reported
+ * as spam, and passes on whatever the receiving server said, so a screen can
+ * point at the one recipient at fault instead of blaming the whole send.
+ */
+export function suppressedRecipient(
+	cause: unknown,
+): SuppressedRecipient | null {
+	const error = taggedFailure(cause, 'EmailSuppressed')
+	if (error === null) return null
+	const recipient = error['recipient']
+	const status = error['status']
+	if (typeof recipient !== 'string' || recipient === '') return null
+	if (status !== 'bounced' && status !== 'complained') return null
+	const reason = error['reason']
+	return {
+		recipient,
+		status,
+		reason: typeof reason === 'string' && reason !== '' ? reason : null,
+	}
+}
