@@ -174,7 +174,18 @@ export const applyBounce = (args: {
 		const recipients = bounce.recipients as unknown as string[]
 		// Suppression lives on the email channel now; match by address and
 		// scope to this org explicitly (the worker runs BYPASSRLS).
-		const updatedContacts = yield* sql<{ id: string; companyId: string }>`
+		//
+		// Asked of the address, not of whoever holds it. A company's orders
+		// mailbox and a branch's own address bounce exactly like a person's, and
+		// while this only marked the rows belonging to contacts, those never came
+		// back suppressed — so mail kept going to a mailbox the far end had
+		// already said was not there. The send gate looks a bounced address up
+		// across the whole organisation without asking whose it is, so marking
+		// them all is what it was expecting to find.
+		const suppressed = yield* sql<{
+			subjectTable: string
+			subjectId: string
+		}>`
 			UPDATE channels ch
 			SET status = ${isHard ? 'bounced' : sql.literal('status')},
 			    status_reason = ${bounce.diagnostic},
@@ -183,14 +194,26 @@ export const applyBounce = (args: {
 			      WHEN ${isHard} THEN ch.soft_bounce_count
 			      ELSE ch.soft_bounce_count + 1
 			    END
-			FROM contacts c
-			WHERE ch.subject_table = 'contacts'
-			  AND ch.subject_id = c.id
-			  AND ch.channel = 'email'
+			WHERE ch.channel = 'email'
 			  AND ch.organization_id = ${organizationId}
 			  AND lower(ch.address) = ANY(${recipients})
-			RETURNING c.id, c.company_id
+			RETURNING ch.subject_table, ch.subject_id
 		`
+
+		// A bounce shows on a person's timeline, so the people among them are
+		// picked out here. An address belonging to a company or a branch is
+		// suppressed just the same and simply has no personal timeline to appear
+		// on; the contact-less row below is what carries it.
+		const bouncedContactIds = suppressed
+			.filter(row => row.subjectTable === 'contacts')
+			.map(row => row.subjectId)
+		const updatedContacts =
+			bouncedContactIds.length === 0
+				? []
+				: yield* sql<{ id: string; companyId: string }>`
+						SELECT c.id, c.company_id FROM contacts c
+						WHERE c.id = ANY(${bouncedContactIds as unknown as string[]})
+					`
 
 		// Soft-bounce promotion: if the rolling 7-day soft bounce count
 		// crosses 3, promote to hard bounce. Threshold is checked here

@@ -204,6 +204,49 @@ describe('applyBounce', () => {
 			expect(rows.rows.length).toBe(1)
 			expect(rows.rows[0]?.contact_id).toBeNull()
 		})
+
+		it('should suppress a company mailbox, which belongs to nobody', async () => {
+			// GIVEN a company's own orders mailbox — no person holds it — and a
+			// message to it that came back undelivered. Marking only the addresses
+			// belonging to contacts left this one unsuppressed, so mail kept going
+			// to a mailbox the far end had already said was not there.
+			const orders = `comandes@${DOMAIN}`
+			await pool.query(
+				`INSERT INTO channels (organization_id, subject_table, subject_id, channel, address)
+				 VALUES ($1, 'companies', $2, 'email', $3)`,
+				[ORG_ID, companyId, orders],
+			)
+			const messageId = await seedOutbound()
+
+			// WHEN the bounce is applied
+			await apply(bounceFor(messageId, [orders]))
+
+			// THEN the address is suppressed, so the send path refuses it from now
+			// on — the same question it asks of a person's address
+			const row = await pool.query<{ status: string; reason: string }>(
+				`SELECT status, status_reason AS reason FROM channels
+				 WHERE organization_id = $1 AND lower(address) = $2`,
+				[ORG_ID, orders],
+			)
+			expect(row.rows[0]?.status).toBe('bounced')
+			expect(row.rows[0]?.reason).not.toBeNull()
+		})
+
+		it('should count only people as contacts touched', async () => {
+			// GIVEN a company mailbox bouncing, with no person holding it
+			const depot = `depot@${DOMAIN}`
+			await pool.query(
+				`INSERT INTO channels (organization_id, subject_table, subject_id, channel, address)
+				 VALUES ($1, 'companies', $2, 'email', $3)`,
+				[ORG_ID, companyId, depot],
+			)
+			const messageId = await seedOutbound()
+
+			// THEN suppressing it touches nobody's timeline, and says so, rather
+			// than reporting a person who was never involved
+			const result = await apply(bounceFor(messageId, [depot]))
+			expect(result.contactsTouched).toBe(0)
+		})
 	})
 
 	describe('when the bounce names nothing we sent', () => {
