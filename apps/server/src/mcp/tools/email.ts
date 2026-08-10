@@ -1,5 +1,6 @@
 import { Config, Effect, Schema } from 'effect'
 import { McpSchema, Tool, Toolkit } from 'effect/unstable/ai'
+import type { SqlError } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
 import {
@@ -17,6 +18,10 @@ import {
 	EmailAttachmentStaging,
 	type StagingRef,
 } from '../../services/email-attachment-staging'
+import {
+	recipientAddresses,
+	replyAddressees,
+} from '../../services/recipient-address'
 import { ToolMessage } from '../tool-message'
 import { requireApproval } from './_elicit'
 import {
@@ -117,7 +122,7 @@ const AttachmentRef = Schema.Struct({
 
 const SendEmail = Tool.make('send_email', {
 	description:
-		'Send a new email. The body is a structured block tree (paragraph / heading / list / quote / divider / image) — not raw html/text. Omit inbox_id to use the calling member’s primary inbox in the active org. Attachments reference staging_ids returned by stage_email_attachment; set inline=true for cid-referenced inline images. Before composing, read the member’s standing email instructions (writing style, sign-off, do/don’t rules) from the batuda://instructions/email resource and write the body to follow them. Returns {_tag:"sent"} on success or {_tag:"suppressed"} if a recipient is suppressed. Set skip_footer=true to omit the inbox default footer.',
+		'Send a new email. The body is a structured block tree (paragraph / heading / list / quote / divider / image) — not raw html/text. Omit inbox_id to use the calling member’s primary inbox in the active org. Attachments reference staging_ids returned by stage_email_attachment; set inline=true for cid-referenced inline images. Before composing, read the member’s standing email instructions (writing style, sign-off, do/don’t rules) from the batuda://instructions/email resource and write the body to follow them. Returns {_tag:"sent"} on success; {_tag:"suppressed"} if a recipient once hard-bounced or reported spam, which is a hard block on every path; or {_tag:"cancelled"} if an address being written to carries a deliverability verdict of "undeliverable" or "risky" and nobody confirmed it — either the answer was no, or this client cannot put a question to anybody, and the reason says which. Verdicts of "catch_all" and "unknown", and addresses nobody has checked, are not gated. Read `verification` on a contact\'s channels (list_contacts) before composing to see this coming; when a send is stopped, the reason names the exact call that lifts it. Set skip_footer=true to omit the inbox default footer.',
 	parameters: Schema.Struct({
 		inbox_id: Schema.optional(Schema.String),
 		to: Recipients,
@@ -141,7 +146,7 @@ const SendEmail = Tool.make('send_email', {
 
 const ReplyEmail = Tool.make('reply_email', {
 	description:
-		'Reply to the latest message in an existing email thread. Body is a structured block tree — if you want the parent quoted, emit a `quote` block wrapping sanitized parent blocks (you can read the parent via get_email_thread). Optional Cc/Bcc extend the thread. Attachments reference staging_ids from stage_email_attachment. Before composing, read the member’s standing email instructions from the batuda://instructions/email resource and write the reply to follow them. Returns {_tag:"sent"} or {_tag:"suppressed"}. Set skip_footer=true to omit the inbox default footer.',
+		'Reply to the latest message in an existing email thread. Body is a structured block tree — if you want the parent quoted, emit a `quote` block wrapping sanitized parent blocks (you can read the parent via get_email_thread). Optional Cc/Bcc extend the thread. Attachments reference staging_ids from stage_email_attachment. Before composing, read the member’s standing email instructions from the batuda://instructions/email resource and write the reply to follow them. Returns {_tag:"sent"}; {_tag:"suppressed"} if a recipient once hard-bounced or reported spam; or {_tag:"cancelled"} when a confirmation was needed and not obtained — because the contact\'s address (or one added in cc/bcc) carries an "undeliverable" or "risky" verdict, or because the thread already has EMAIL_AGENT_SOFT_THREAD_LIMIT outbound messages (default 3) and this reply would be one more. The reason names which, and says when the client had no way to ask anybody — and for an address it names the call that lifts the stop. Pass acknowledge_thread_length: true to answer the message-count reason without a prompt; an address with something recorded against it is answered by vouching for it instead. Set skip_footer=true to omit the inbox default footer.',
 	parameters: Schema.Struct({
 		thread_id: Schema.String,
 		body_json: EmailBlocks,
@@ -150,6 +155,10 @@ const ReplyEmail = Tool.make('reply_email', {
 		bcc: Schema.optional(Schema.Array(Schema.String)),
 		attachments: Schema.optional(Schema.Array(AttachmentRef)),
 		skip_footer: Schema.optional(Schema.Boolean),
+		acknowledge_thread_length: Schema.optional(Schema.Boolean).annotate({
+			description:
+				'Set true to go ahead on a thread that already holds several outbound messages, when the person has said to keep going. It answers only that count — an address with something recorded against it still stops the send, and an address that bounced is still refused outright. Nothing is remembered: a later reply on the same thread asks again.',
+		}),
 	}),
 	success: SendEmailResult,
 	dependencies: REQUEST_DEPENDENCIES,
@@ -420,7 +429,7 @@ const ManageEmailInbox = Tool.make('manage_email_inbox', {
 
 const ManageEmailDraft = Tool.make('manage_email_draft', {
 	description:
-		'Manage an email draft a human can review before sending. action=create makes a new draft (optionally linked to CRM via company_id/contact_id/mode); update changes fields on an existing draft_id; send dispatches draft_id through the same thread-link/interaction/message pipeline as a direct send (returns {_tag:"sent"} or {_tag:"suppressed"}); delete permanently removes draft_id. body_json is the typed block tree preserved for lossless editor re-hydration.',
+		'Manage an email draft a human can review before sending. action=create makes a new draft (optionally linked to CRM via company_id/contact_id/mode); update changes fields on an existing draft_id; send dispatches draft_id through the same thread-link/interaction/message pipeline as a direct send, and runs the same deliverability guard on the addresses, so writing a message down first is not a way past that (it does not re-count how many outbound messages a thread already holds, which only reply_email does) (returns {_tag:"sent"}, {_tag:"suppressed"}, or {_tag:"cancelled"} — see send_email for what each means); delete permanently removes draft_id. body_json is the typed block tree preserved for lossless editor re-hydration.',
 	parameters: Schema.Struct({
 		action: Schema.Literals(['create', 'update', 'send', 'delete']),
 		inbox_id: Schema.String,
@@ -562,12 +571,92 @@ export const EmailTools = Toolkit.make(
 	ManageInboxFooter,
 )
 
-// The soft send guard fires when an email channel has a verdict that isn't a
-// confirmed `deliverable` (risky / catch_all / undeliverable / unknown, or any
-// unrecognised value). A missing verdict (null) is not gated — there is no
-// evidence the address is bad.
+// The verdicts that make an assistant's send stop and ask first: the two that
+// say something against the address. `catch_all` means the domain answers to
+// every name, so the check learned nothing about this particular mailbox, and
+// `unknown` means a check ran and settled nothing — which is what having no
+// verdict at all already says, and that has never been gated.
+//
+// A word outside the list still stops a send. The column takes free text, so
+// anything unrecognised is something nobody vetted, and letting it through is
+// the costly way to be wrong.
+const NEVER_GATED = new Set(['deliverable', 'catch_all', 'unknown'])
+
 export const isRiskyEmailVerdict = (verification: string | null): boolean =>
-	verification !== null && verification !== 'deliverable'
+	verification !== null && !NEVER_GATED.has(verification)
+
+/**
+ * An address a message is going to that carries a verdict worth stopping for
+ * and that nobody has stood behind.
+ *
+ * The question is put to the addresses, the way the block on bounced addresses
+ * puts it, rather than to whoever they belong to. Naming a contact is optional
+ * and names a person, not the mailbox — so a message to somebody's second
+ * address used to be judged by the verdict on their first, and a message that
+ * named nobody was never judged at all.
+ *
+ * A vouch settles the address rather than the row it was written on, since the
+ * same mailbox commonly sits on a person and on their company, and somebody
+ * standing behind it meant the address either way.
+ *
+ * Answers with one address when several are doubtful, since the send stops on
+ * the first thing wrong with it either way. Which one is settled by address so
+ * two calls about the same message say the same thing.
+ */
+export const riskyRecipientFor = (
+	sql: SqlClient.SqlClient,
+	orgId: string,
+	addresses: ReadonlyArray<string>,
+): Effect.Effect<
+	{
+		id: string
+		address: string
+		subjectTable: string
+		subjectId: string
+		verification: string | null
+		owningCompanyId: string | null
+	} | null,
+	SqlError.SqlError
+> =>
+	addresses.length === 0
+		? Effect.succeed(null)
+		: Effect.gen(function* () {
+				const rows = yield* sql<{
+					id: string
+					address: string
+					subjectTable: string
+					subjectId: string
+					verification: string | null
+					status: string
+					owningCompanyId: string | null
+				}>`
+					SELECT c.id, lower(c.address) AS address, c.subject_table,
+						c.subject_id, c.verification, c.status,
+						-- A branch's address is managed through the company that owns
+						-- it, so the answer has to name the company as well as the
+						-- branch. Without this the caller is handed a branch id where a
+						-- company id belongs, and the call it was told to make fails.
+						s.company_id AS owning_company_id
+					FROM channels c
+					LEFT JOIN sites s
+						ON c.subject_table = 'sites' AND s.id = c.subject_id
+					WHERE c.organization_id = ${orgId}
+						AND c.channel = 'email'
+						AND lower(c.address) = ANY(${addresses})
+						AND (c.verification IS NOT NULL OR c.status = 'valid')
+					ORDER BY lower(c.address), c.verification
+				`
+				const vouchedFor = new Set(
+					rows.filter(row => row.status === 'valid').map(row => row.address),
+				)
+				return (
+					rows.find(
+						row =>
+							!vouchedFor.has(row.address) &&
+							isRiskyEmailVerdict(row.verification),
+					) ?? null
+				)
+			})
 
 export const EmailHandlersLive = EmailTools.toLayer(
 	Effect.gen(function* () {
@@ -579,25 +668,15 @@ export const EmailHandlersLive = EmailTools.toLayer(
 			'EMAIL_AGENT_SOFT_THREAD_LIMIT',
 		).pipe(Config.withDefault(3))
 
-		// A known-risky deliverability verdict on the contact's primary email
-		// channel (catch-all / undeliverable / unknown). null when the email is
-		// deliverable or has no verdict to act on.
-		const riskyEmailVerdict = (contactId: string) =>
-			sql<{ verification: string | null }>`
-				SELECT verification FROM channels
-				WHERE subject_table = 'contacts'
-					AND subject_id = ${contactId}
-					AND channel = 'email'
-				ORDER BY is_primary DESC NULLS LAST
-				LIMIT 1
-			`.pipe(
-				Effect.map(rows => {
-					const v = rows[0]?.verification ?? null
-					return isRiskyEmailVerdict(v) ? v : null
-				}),
-			)
+		// The same question as `riskyRecipientFor`, with the organisation the
+		// request resolved to filled in.
+		const riskyRecipient = (addresses: ReadonlyArray<string>) =>
+			Effect.gen(function* () {
+				const currentOrg = yield* CurrentOrg
+				return yield* riskyRecipientFor(sql, currentOrg.id, addresses)
+			})
 
-		// Outbound count + linked contact for a thread, for the reply guard.
+		// Outbound count + where a reply lands, for the reply guard.
 		const threadSendState = (threadLinkId: string, orgId: string) =>
 			Effect.gen(function* () {
 				const links = yield* sql<{
@@ -609,14 +688,39 @@ export const EmailHandlersLive = EmailTools.toLayer(
 					LIMIT 1
 				`
 				const link = links[0]
-				if (!link) return { count: 0, contactId: null as string | null }
+				if (!link) return { count: 0, replyingTo: [] as string[] }
 				const counts = yield* sql<{ n: number }>`
 					SELECT count(*)::int AS n FROM email_messages
 					WHERE direction = 'outbound' AND organization_id = ${orgId}
 					AND (message_id = ${link.externalThreadId}
 					     OR ${link.externalThreadId} = ANY("references"))
 				`
-				return { count: counts[0]?.n ?? 0, contactId: link.contactId }
+				// Where a reply will actually land. This has to pick the same
+				// addresses the send itself picks, or the guard judges one mailbox
+				// while the message goes to another — so it repeats the send path's
+				// choice: the sender of an inbound message, the addressees of an
+				// outbound one, ordered the same way.
+				//
+				// Judging the linked person's default address instead answered about
+				// a different mailbox whenever the conversation was with any other
+				// one of theirs, and left a vouched address still blocked, since a
+				// vouch is recorded against an address and that lookup never saw one.
+				const latest = yield* sql<{
+					direction: string
+					recipients: { from?: string | null; to?: string[] } | null
+				}>`
+					SELECT direction, recipients FROM email_messages
+					WHERE organization_id = ${orgId}
+						AND (message_id = ${link.externalThreadId}
+						     OR ${link.externalThreadId} = ANY("references"))
+					ORDER BY received_at DESC NULLS LAST, status_updated_at DESC
+					LIMIT 1
+				`
+				const newest = latest[0]
+				return {
+					count: counts[0]?.n ?? 0,
+					replyingTo: newest ? replyAddressees(newest) : [],
+				}
 			})
 
 		// Ask the agent to confirm. Nothing is sent unless the answer is yes, but
@@ -627,6 +731,36 @@ export const EmailHandlersLive = EmailTools.toLayer(
 
 		// Why nothing was sent, in the caller's words. A client with no way to ask
 		// says so, rather than reporting a refusal nobody gave.
+		// What was wrong, and enough to act on it. The address alone leaves a
+		// caller stuck: nothing on this surface turns an address back into the
+		// record holding it, so without the channel named here the one way past
+		// the stop cannot be reached at all.
+		const vouchCall = (risky: {
+			id: string
+			subjectTable: string
+			subjectId: string
+			owningCompanyId: string | null
+		}): string => {
+			if (risky.subjectTable === 'contacts')
+				return `manage_contact_channels(action:"vouch", contact_id:"${risky.subjectId}", channel_id:"${risky.id}")`
+			// A branch's address is reached through its company, naming the branch
+			// as well; the branch id alone is not a company id and the call fails.
+			if (risky.subjectTable === 'sites' && risky.owningCompanyId !== null)
+				return `manage_company_channels(action:"vouch", company_id:"${risky.owningCompanyId}", site_id:"${risky.subjectId}", channel_id:"${risky.id}")`
+			return `manage_company_channels(action:"vouch", company_id:"${risky.subjectId}", channel_id:"${risky.id}")`
+		}
+
+		const riskyReason = (risky: {
+			id: string
+			address: string
+			subjectTable: string
+			subjectId: string
+			verification: string | null
+			owningCompanyId: string | null
+		}): string =>
+			`${risky.address} is not confirmed deliverable (verification: ${risky.verification}). ` +
+			`If you know the address is good, vouch for it: ${vouchCall(risky)}`
+
 		const notSentReason = (
 			answer: 'declined' | 'unaskable',
 			reasons: string,
@@ -638,18 +772,20 @@ export const EmailHandlersLive = EmailTools.toLayer(
 		return {
 			send_email: params =>
 				Effect.gen(function* () {
-					// Soft guard (agent-only): a known-risky recipient asks first.
-					if (params.contact_id) {
-						const risky = yield* riskyEmailVerdict(params.contact_id)
-						if (risky) {
-							const answer = yield* confirmSend(
-								`This contact's email is not confirmed deliverable (verification: ${risky})`,
-							)
-							if (answer !== 'confirmed') {
-								return {
-									_tag: 'cancelled' as const,
-									reason: notSentReason(answer, `email verification: ${risky}`),
-								}
+					// Soft guard (agent-only): an address with something recorded
+					// against it asks first.
+					const risky = yield* riskyRecipient(
+						recipientAddresses(params.to, params.cc, params.bcc),
+					)
+					if (risky) {
+						const answer = yield* confirmSend(riskyReason(risky))
+						if (answer !== 'confirmed') {
+							return {
+								_tag: 'cancelled' as const,
+								reason: notSentReason(
+									answer,
+									`email verification for ${risky.address}: ${risky.verification}`,
+								),
 							}
 						}
 					}
@@ -699,22 +835,27 @@ export const EmailHandlersLive = EmailTools.toLayer(
 					// Soft guards (agent-only): risky recipient and/or an
 					// over-the-soft-limit thread ask for confirmation first.
 					const org = yield* CurrentOrg
-					const { count, contactId } = yield* threadSendState(
+					const { count, replyingTo } = yield* threadSendState(
 						params.thread_id,
 						org.id,
 					)
 					const reasons: string[] = []
-					if (contactId) {
-						const risky = yield* riskyEmailVerdict(contactId)
-						if (risky) {
-							reasons.push(
-								`the contact's email is not confirmed deliverable (verification: ${risky})`,
-							)
-						}
+					// Everyone this reply reaches, judged the same way: where the
+					// thread already goes, plus anybody added to this message.
+					const risky = yield* riskyRecipient(
+						recipientAddresses(replyingTo, params.cc, params.bcc),
+					)
+					if (risky) {
+						reasons.push(riskyReason(risky))
 					}
-					if (count >= softThreadLimit) {
+					// A count is not evidence about anybody, so unlike a verdict there
+					// is nothing to record against an address and nothing to carry to
+					// the next reply. Saying so on the call is the whole of it, and it
+					// answers only this: an address with something against it still
+					// stops the send.
+					if (count >= softThreadLimit && !params.acknowledge_thread_length) {
 						reasons.push(
-							`this thread already has ${count} outbound messages (soft limit ${softThreadLimit})`,
+							`this thread already has ${count} outbound messages (soft limit ${softThreadLimit}); pass acknowledge_thread_length: true to go ahead`,
 						)
 					}
 					if (reasons.length > 0) {
@@ -1080,15 +1221,49 @@ export const EmailHandlersLive = EmailTools.toLayer(
 						return svc
 							.updateDraft(params.inbox_id, params.draft_id, fields)
 							.pipe(Effect.catchTag('NotFound', dieNotFound), Effect.orDie)
-					case 'send':
+					case 'send': {
 						if (params.draft_id === undefined)
 							return dieMissing('draft_id is required to send a draft')
-						return svc.sendDraft(params.inbox_id, params.draft_id).pipe(
-							Effect.map(r => ({
-								_tag: 'sent' as const,
-								messageId: r.messageId,
-								threadId: r.threadId,
-							})),
+						const draftId = params.draft_id
+						return Effect.gen(function* () {
+							// The same guard the direct sends run. A draft dispatched from
+							// here is an assistant sending, so writing the message down
+							// first and posting it afterwards must not be the way past a
+							// question the direct path would have asked.
+							const draft = yield* svc
+								.getDraft(params.inbox_id, draftId)
+								.pipe(Effect.catchTag('NotFound', asNothing))
+							if (draft) {
+								const risky = yield* riskyRecipient(
+									recipientAddresses(
+										[...draft.to],
+										[...draft.cc],
+										[...draft.bcc],
+									),
+								)
+								if (risky) {
+									const answer = yield* confirmSend(riskyReason(risky))
+									if (answer !== 'confirmed')
+										return {
+											_tag: 'cancelled' as const,
+											reason: notSentReason(
+												answer,
+												`email verification for ${risky.address}: ${risky.verification}`,
+											),
+										}
+								}
+							}
+							return yield* svc.sendDraft(params.inbox_id, draftId)
+						}).pipe(
+							Effect.map(r =>
+								'_tag' in r
+									? r
+									: {
+											_tag: 'sent' as const,
+											messageId: r.messageId,
+											threadId: r.threadId,
+										},
+							),
 							Effect.catchTag('EmailSuppressed', e =>
 								Effect.succeed({
 									_tag: 'suppressed' as const,
@@ -1100,6 +1275,7 @@ export const EmailHandlersLive = EmailTools.toLayer(
 							Effect.catchTag('NotFound', dieNotFound),
 							Effect.orDie,
 						)
+					}
 					case 'delete':
 						if (params.draft_id === undefined)
 							return dieMissing('draft_id is required to delete a draft')
