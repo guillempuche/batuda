@@ -1707,6 +1707,10 @@ msgstr "No s'ha pogut actualitzar aquesta cerca."
 msgid "Could not update verification"
 msgstr "No s'ha pogut actualitzar la verificació"
 
+#: src/components/emails/compose-form.tsx
+msgid "Couldn't check whether these addresses can receive email. Sending will still be stopped if one of them can't."
+msgstr "No s’ha pogut comprovar si aquestes adreces poden rebre correu. Si alguna no pot, l’enviament es continuarà aturant."
+
 #: src/routes/settings/organization/templates.tsx
 msgid "Couldn't clear the default"
 msgstr "No s’ha pogut esborrar el valor per defecte"

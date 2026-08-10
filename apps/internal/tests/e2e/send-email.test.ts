@@ -158,9 +158,10 @@ test.describe('compose and send via the mail catcher', () => {
 			// THEN the warning names the bare address and Send stays disabled, the
 			// same as when it was typed bare — the check answers on the address
 			// inside the field, which is the one the send would refuse over
-			await expect(page.getByRole('alert')).toContainText(SUPPRESSED_EMAIL, {
-				timeout: 10_000,
-			})
+			await expect(page.getByTestId('compose-suppressed')).toContainText(
+				SUPPRESSED_EMAIL,
+				{ timeout: 10_000 },
+			)
 			await expect(page.getByTestId('compose-send')).toBeDisabled()
 			await expectNoMessage(SUPPRESSED_EMAIL, blockedSubject)
 		})
