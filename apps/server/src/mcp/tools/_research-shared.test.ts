@@ -1,17 +1,21 @@
 import { Cause, Effect, Exit, Schema } from 'effect'
+import { Tool } from 'effect/unstable/ai'
 import { SqlError } from 'effect/unstable/sql'
 import { describe, expect, it } from 'vitest'
 
 import { TERMINAL_RESEARCH_STATUSES } from '@batuda/domain'
+import { schemaNames } from '@batuda/research/application/schemas'
 
 import {
 	MaxWaitSeconds,
 	pollAfterMs,
 	ResearchQuery,
 	redactDbErrors,
+	SCHEMA_GUIDANCE,
 	SchemaNameParam,
 	Uuid,
 } from './_research-shared'
+import { ResearchMcpTools } from './research-mcp'
 
 // True when the value passes the schema's validation (refinement checks included).
 const accepts = (schema: Schema.Codec<unknown>, value: unknown): boolean =>
@@ -101,6 +105,74 @@ describe('SchemaNameParam', () => {
 			// GIVEN a schema name the registry does not define
 			// THEN it is refused at the boundary
 			expect(accepts(SchemaNameParam, 'bogus_schema_v9')).toBe(false)
+		})
+	})
+
+	describe('when a client reads the parameter on its own', () => {
+		it('should say what the parameter is for beside the names it accepts', () => {
+			// GIVEN the list of names, which tells a caller the five words exist and
+			// nothing about which to pick
+			const published = Tool.getJsonSchemaFromSchema(SchemaNameParam) as {
+				description?: string
+			}
+
+			// THEN the parameter says what it decides, so the choice is an informed
+			// one rather than a guess between five words
+			expect(published.description).toContain('freeform')
+		})
+	})
+})
+
+describe('SCHEMA_GUIDANCE', () => {
+	describe('when a caller reads a research tool description', () => {
+		it('should say what each kind of run is for, one sentence each', () => {
+			// GIVEN the five kinds a run can come back in
+			// WHEN a caller reads the guidance to choose between them
+			// THEN each is named and described, so none is picked blind
+			for (const name of schemaNames) {
+				expect(SCHEMA_GUIDANCE).toContain(`\`${name}\``)
+			}
+		})
+
+		it('should warn what a brief leaves out', () => {
+			// GIVEN freeform, the one kind with no list of companies in it — picking
+			// it for a question about which companies exist is what produced a run
+			// that found nothing and called itself a success
+			// THEN the guidance says so rather than describing it as one of five
+			// equal choices
+			expect(SCHEMA_GUIDANCE).toContain('no structured list')
+		})
+	})
+})
+
+describe('the research tools that start a run', () => {
+	const starters = [
+		ResearchMcpTools.tools.start_research,
+		ResearchMcpTools.tools.research_sync,
+	]
+
+	describe('when a caller starts a run', () => {
+		it('should make them say which kind of run they want', () => {
+			// GIVEN a caller who names no kind
+			// WHEN the call is validated
+			// THEN it is refused. Omitting it used to mean a brief, so a question
+			// about which companies exist came back as prose with nowhere to put
+			// them — and every check for a thin result reads that missing list
+			for (const tool of starters) {
+				const published = Tool.getJsonSchemaFromSchema(
+					tool.parametersSchema,
+				) as { required?: ReadonlyArray<string> }
+				expect(published.required).toContain('schema_name')
+			}
+		})
+
+		it('should tell them what each kind is for in the same words', () => {
+			// GIVEN two tools that start the same run and face the same choice
+			// THEN both carry the guidance, and neither can come to describe the
+			// choice differently from the other
+			for (const tool of starters) {
+				expect(tool.description).toContain(SCHEMA_GUIDANCE)
+			}
 		})
 	})
 })

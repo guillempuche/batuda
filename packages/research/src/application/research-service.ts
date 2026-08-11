@@ -133,6 +133,7 @@ import {
 	isSchemaName,
 	resolveSchema,
 	schemaFieldNames,
+	schemaNameFor,
 } from './schemas/index'
 import {
 	hostOf,
@@ -1341,7 +1342,7 @@ export const cloneCacheHitRun = (params: {
 				${organizationId},
 				${input.query},
 				${input.mode ?? 'deep'},
-				${input.schemaName ?? null},
+				${schemaNameFor(input)},
 				'cache_hit',
 				'succeeded',
 				${JSON.stringify(input.context ?? {})}::jsonb,
@@ -2055,8 +2056,13 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							.templateFingerprint ?? ''
 
 					const context = run['context'] as CreateResearchInput['context']
-					const schemaName =
-						(run as { schemaName: string | null }).schemaName ?? 'freeform'
+					// A run created here always carries the kind it was resolved to;
+					// only a row written before that did could arrive with nothing, and
+					// its own shape says what it was asking for.
+					const schemaName = schemaNameFor({
+						schemaName: (run as { schemaName: string | null }).schemaName,
+						context,
+					})
 
 					// ── Checkpoint state from any prior partial run ──
 					// `phase` + `research_text` + `findings` are persisted after each
@@ -4990,12 +4996,17 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					instructions?: ResolvedInstructions,
 				) =>
 					Effect.gen(function* () {
+						// Settled once, here, and then written onto every row this
+						// creates: the key looked up below and the key the finished run
+						// writes back are built from it separately, and a run whose two
+						// keys disagree can never be served from the cache again.
+						const schemaName = schemaNameFor(input)
 						yield* Effect.logInfo('research.create').pipe(
 							Effect.annotateLogs({
 								user_id: userId,
 								organization_id: organizationId,
 								query_length: input.query.length,
-								schema: input.schemaName ?? 'freeform',
+								schema: schemaName,
 								mode: input.mode ?? 'deep',
 								has_subjects: !!input.context?.subjects?.length,
 								has_selector: !!input.context?.selector,
@@ -5037,12 +5048,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						const templateFingerprint = instructions?.fingerprint ?? ''
 						const templateIds = instructions?.templateIds ?? []
 						const templateNames = instructions?.templateNames ?? []
-						const schemaNameForKey = input.schemaName ?? 'freeform'
 						const cacheKey = computeResearchCacheKey({
 							userId,
 							query: input.query,
-							schemaName: schemaNameForKey,
-							schemaVersion: schemaVersionFor(schemaNameForKey),
+							schemaName,
+							schemaVersion: schemaVersionFor(schemaName),
 							subjects: input.context?.subjects,
 							hints: input.context?.hints,
 							templateFingerprint,
@@ -5186,7 +5196,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									template_fingerprint, instruction_segments
 								) VALUES (
 									${organizationId}, ${input.query}, ${input.mode ?? 'deep'},
-									${input.schemaName ?? null}, 'group', 'running',
+									${schemaName}, 'group', 'running',
 									${JSON.stringify(input.context ?? {})},
 									${policy.budgetCents}, ${policy.paidBudgetCents},
 									${JSON.stringify(policy)}, ${userId},
@@ -5213,7 +5223,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											template_fingerprint, instruction_segments
 										) VALUES (
 											${organizationId}, ${groupId}, ${input.query},
-											${input.mode ?? 'deep'}, ${input.schemaName ?? null},
+											${input.mode ?? 'deep'}, ${schemaName},
 											'leaf', 'queued', ${JSON.stringify(leafContext)},
 											${policy.budgetCents}, ${policy.paidBudgetCents},
 											${JSON.stringify(policy)}, ${userId},
@@ -5263,7 +5273,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								${organizationId},
 								${input.query},
 								${input.mode ?? 'deep'},
-								${input.schemaName ?? null},
+								${schemaName},
 								'queued',
 								${JSON.stringify(input.context ?? {})},
 								${policy.budgetCents},

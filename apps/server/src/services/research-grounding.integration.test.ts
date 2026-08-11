@@ -220,6 +220,10 @@ const systemDefaults: SystemDefaults = {
 
 const researchInput: CreateResearchInput = {
 	query: 'Acme Logistics grounding test',
+	// A brief, which is what this has always exercised: the proposed updates it
+	// checks are plumbing every kind of run carries, and asking for a list of
+	// companies instead would end the run on the empty list it never fills.
+	schemaName: 'freeform',
 	// Skip the outer research_cache lookup so a fresh fiber always runs.
 	forceFresh: true,
 }

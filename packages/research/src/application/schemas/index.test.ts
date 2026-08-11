@@ -6,6 +6,7 @@ import {
 	resolveSchema,
 	SchemaNameSchema,
 	schemaFieldNames,
+	schemaNameFor,
 	schemaNames,
 	schemaRegistry,
 } from './index'
@@ -163,6 +164,137 @@ describe('resolveSchema', () => {
 		it('should return nothing for a name every object carries', () => {
 			expect(resolveSchema('toString')).toBeUndefined()
 			expect(resolveSchema('__proto__')).toBeUndefined()
+		})
+	})
+})
+
+describe('schemaNameFor', () => {
+	describe('when the request says which kind of run it wants', () => {
+		it('should take the caller at their word for every kind', () => {
+			// GIVEN each kind a caller can ask for, alongside a shape that would have
+			// implied a different one
+			// WHEN the kind is settled
+			// THEN what was asked for is what runs — the shape of the request never
+			// overrules it
+			for (const name of schemaNames) {
+				expect(schemaNameFor({ schemaName: name })).toBe(name)
+				expect(
+					schemaNameFor({
+						schemaName: name,
+						context: { subjects: [{ table: 'companies', id: 'a' }] },
+					}),
+				).toBe(name)
+			}
+		})
+
+		it('should still let a brief be asked for outright', () => {
+			// GIVEN a question that fits no fixed shape, asked with nothing pinned —
+			// the exact combination that used to happen by accident
+			// THEN asking for it on purpose still works, because only silence is
+			// being reinterpreted
+			expect(schemaNameFor({ schemaName: 'freeform' })).toBe('freeform')
+		})
+	})
+
+	describe('when the request asks about records already held', () => {
+		it('should fill in the profile of a company that was named', () => {
+			// GIVEN a request pinned to a company
+			// THEN it is a question about that company, so its own card is what gets
+			// filled in
+			expect(
+				schemaNameFor({
+					context: { subjects: [{ table: 'companies', id: 'a' }] },
+				}),
+			).toBe('company_enrichment_v1')
+		})
+
+		it('should treat a filter over existing companies the same as naming them', () => {
+			// GIVEN a filter, which picks out companies already here and researches
+			// one at a time rather than asking for new ones
+			// THEN it lands on the same kind naming them outright would
+			expect(
+				schemaNameFor({
+					context: { selector: { table: 'companies', filter: {} } },
+				}),
+			).toBe('company_enrichment_v1')
+		})
+
+		it('should settle a filter and the companies it picks out on one kind', () => {
+			// GIVEN the two shapes one filtered request passes through: the request
+			// as it arrives, and each company it fans out to
+			const asked = schemaNameFor({
+				context: {
+					selector: { table: 'companies', filter: { country: 'ES' } },
+				},
+			})
+			const fannedOut = schemaNameFor({
+				context: { subjects: [{ table: 'companies', id: 'a' }] },
+			})
+
+			// THEN both settle on the same kind. One of these keys the answer put
+			// away for reuse and the other keys the lookup that finds it again, so
+			// were they to disagree the run would never be reused at all
+			expect(asked).toBe(fannedOut)
+		})
+	})
+
+	describe('when the request asks for companies not held yet', () => {
+		it('should go looking for companies rather than write about none', () => {
+			// GIVEN a question with nothing pinned to it — go and find companies in
+			// a sector
+			// WHEN no kind was named
+			// THEN it goes looking for them. Answering as a brief left the companies
+			// nowhere to go, and every check for a thin result reads that list, so
+			// an answer holding nothing reported itself a success
+			expect(schemaNameFor({})).toBe('prospect_scan_v1')
+		})
+
+		it('should read an empty list of records as pinning nothing', () => {
+			// GIVEN a request carrying the field but nothing in it
+			// THEN it pins no company, so it is asking for ones not held yet
+			expect(schemaNameFor({ context: { subjects: [] } })).toBe(
+				'prospect_scan_v1',
+			)
+		})
+
+		it('should read a context that says nothing at all the same way', () => {
+			// GIVEN each way a request can carry no shape — absent, empty, or
+			// explicitly nothing
+			// THEN none of them pins anything, so all land together
+			for (const context of [undefined, null, {}, { subjects: undefined }]) {
+				expect(schemaNameFor({ context })).toBe('prospect_scan_v1')
+			}
+		})
+	})
+
+	describe('when the request names no kind', () => {
+		it('should read every way of saying nothing as saying nothing', () => {
+			// GIVEN the field left out, sent as nothing, or sent empty — an empty
+			// name resolves to no schema, so treating it as a name would leave a run
+			// that starts and then dies
+			for (const schemaName of [undefined, null, '']) {
+				expect(schemaNameFor({ schemaName })).toBe('prospect_scan_v1')
+			}
+		})
+	})
+
+	describe('when the kind named is not one this build has', () => {
+		it('should hand the name back rather than quietly run something else', () => {
+			// GIVEN a run queued under a kind that has since been retired, its name
+			// still on the row
+			// WHEN the kind is settled
+			// THEN the name survives untouched, so the run still stops and says the
+			// kind is gone — swapping in a working one would answer a question
+			// nobody asked
+			expect(schemaNameFor({ schemaName: 'retired_shape_v1' })).toBe(
+				'retired_shape_v1',
+			)
+			expect(
+				schemaNameFor({
+					schemaName: 'retired_shape_v1',
+					context: { subjects: [{ table: 'companies', id: 'a' }] },
+				}),
+			).toBe('retired_shape_v1')
 		})
 	})
 })

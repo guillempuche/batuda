@@ -128,7 +128,8 @@ describe('CreateResearchInput', () => {
 		})
 
 		it('should accept a request that names no schema at all', () => {
-			// GIVEN schema_name left out, which the service reads as freeform
+			// GIVEN schema_name left out, which the service settles from the shape of
+			// the request rather than turning away at the door
 			const exit = decodeExit(CreateResearchInput, { query: 'a question' })
 			expect(exit._tag).toBe('Success')
 		})

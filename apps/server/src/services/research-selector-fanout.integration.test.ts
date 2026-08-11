@@ -141,13 +141,14 @@ const seedCompany = () =>
 		`
 	})
 
-const createSelectorRun = (tag: string) =>
+// `asked` carries whatever the caller states; leaving schemaName out of it is
+// how a request that names no kind of run is exercised.
+const createSelectorRun = (tag: string, asked: CreateResearchInput) =>
 	Effect.gen(function* () {
 		const svc = yield* ResearchService
 		const sql = yield* SqlClient.SqlClient
 		const input: CreateResearchInput = {
-			query: 'fan-out',
-			schemaName: 'company_enrichment_v1',
+			...asked,
 			// Confirm up front so the fan-out actually launches; the unconfirmed
 			// path (which returns a cost estimate instead) is covered separately.
 			confirm: true,
@@ -178,9 +179,20 @@ const createSelectorRun = (tag: string) =>
 				return yield* poll(attemptsLeft - 1)
 			})
 
-		return yield* poll(60)
+		const settled = yield* poll(60)
+		// The kind written onto the group and onto every company it fanned out to.
+		const rows = yield* enterOrgScope(sql, { org: ctx.org, userId })(
+			sql<{ kind: string; schemaName: string | null }>`
+				SELECT kind, schema_name AS "schemaName" FROM research_runs
+				WHERE id = ${created.id} OR parent_id = ${created.id}
+			`,
+		)
+		return {
+			...settled,
+			kinds: rows.map(row => `${row.kind}:${row.schemaName}`),
+		}
 	}).pipe(Effect.provide(ResearchLive)) as Effect.Effect<
-		{ status: string; children: number },
+		{ status: string; children: number; kinds: Array<string> },
 		never,
 		never
 	>
@@ -388,7 +400,12 @@ describe('selector fan-out', () => {
 		it('should create a leaf per company and roll the group up when none succeed', async () => {
 			// GIVEN two companies matching the selector tag
 			// WHEN a selector run is created and its leaves run to completion
-			const result = await Effect.runPromise(createSelectorRun(TAG))
+			const result = await Effect.runPromise(
+				createSelectorRun(TAG, {
+					query: 'fan-out',
+					schemaName: 'company_enrichment_v1',
+				}),
+			)
 
 			// THEN the group has a leaf per company
 			expect(result.children).toBe(2)
@@ -396,6 +413,27 @@ describe('selector fan-out', () => {
 			// leaf ended no_reliable_data under the stub) — the rollup fired on a
 			// non-success terminal, not only on success.
 			expect(result.status).toBe('failed')
+		})
+	})
+
+	describe('when a selector request names no kind of run', () => {
+		it('should settle on one kind and write it onto the group and every leaf', async () => {
+			// GIVEN a filtered request that says nothing about the shape of answer
+			// it wants
+			// WHEN it is created and fans out
+			const result = await Effect.runPromise(
+				createSelectorRun(TAG, { query: 'fan-out naming no kind' }),
+			)
+
+			// THEN the group and each company it covers were all written down as the
+			// same kind of run — the kind the request settled on is what the answer
+			// is filed under and what the lookup for it is built from, so a leaf
+			// disagreeing with its group would put an answer somewhere nothing looks
+			expect([...result.kinds].sort()).toEqual([
+				'group:company_enrichment_v1',
+				'leaf:company_enrichment_v1',
+				'leaf:company_enrichment_v1',
+			])
 		})
 	})
 
@@ -443,7 +481,12 @@ describe('selector fan-out', () => {
 		it('should resolve the group immediately with no leaves', async () => {
 			// GIVEN a selector tag no company carries
 			// WHEN the run is created
-			const result = await Effect.runPromise(createSelectorRun(EMPTY_TAG))
+			const result = await Effect.runPromise(
+				createSelectorRun(EMPTY_TAG, {
+					query: 'fan-out',
+					schemaName: 'company_enrichment_v1',
+				}),
+			)
 
 			// THEN the group has no children and completes right away
 			expect(result.children).toBe(0)

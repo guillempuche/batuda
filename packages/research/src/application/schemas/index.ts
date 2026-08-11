@@ -49,6 +49,48 @@ export const isSchemaName = (name: string): name is SchemaName =>
 export const resolveSchema = (name: string): Schema.Top | undefined =>
 	isSchemaName(name) ? schemaRegistry[name] : undefined
 
+/**
+ * The kind of research a request asked for, or — when it did not say — the kind
+ * its own shape implies.
+ *
+ * Saying nothing used to mean a brief, the one shape with no list of companies
+ * in it. Every check that catches a thin result looks for that list, so a
+ * request to go and find companies came back holding none and still called
+ * itself a success.
+ *
+ * A request pinned to records we already hold is asking about those; one pinned
+ * to nothing is asking for companies we do not have yet. A brief is neither, and
+ * stays something a caller has to ask for by name.
+ *
+ * A name we do not recognise is handed back untouched rather than swapped for a
+ * guess, so a run asking for a kind of research this build no longer has still
+ * stops and says so.
+ */
+export const schemaNameFor = (request: {
+	readonly schemaName?: string | null | undefined
+	readonly context?:
+		| {
+				readonly subjects?: ReadonlyArray<unknown> | undefined
+				readonly selector?: unknown
+		  }
+		| null
+		| undefined
+}): string => {
+	if (request.schemaName) return request.schemaName
+	const context = request.context
+	// A filter counts as pinned as much as a list of ids does: it picks out
+	// companies already here, one run each, rather than asking for new ones.
+	const pinned =
+		(context?.subjects?.length ?? 0) > 0 ||
+		(context?.selector !== undefined && context.selector !== null)
+	// Named as a registry key on the way out, so a typo here is a build error
+	// rather than a run that starts and then finds no such schema.
+	const inferred: SchemaName = pinned
+		? 'company_enrichment_v1'
+		: 'prospect_scan_v1'
+	return inferred
+}
+
 // Fields every schema carries that are not something to go and find out: they
 // are how a run hands work back to the CRM, and the prompt covers them where it
 // explains that work.
