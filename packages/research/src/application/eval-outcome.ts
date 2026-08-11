@@ -19,6 +19,7 @@ import {
 	type TerminalStatus,
 } from './eval-scoring'
 import { contactFill, enrichmentFill } from './extraction-fill'
+import { unwrapValue } from './guard-shapes'
 import { hostOf } from './source-key'
 
 const TERMINAL_STATUSES: ReadonlySet<string> = new Set<TerminalStatus>([
@@ -42,12 +43,8 @@ const toTerminalStatus = (status: string): TerminalStatus =>
  * scorer behind it — is indifferent to which shape produced the run.
  */
 const readFieldValue = (raw: unknown): string | null => {
-	if (typeof raw === 'string') return raw
-	if (raw !== null && typeof raw === 'object' && 'value' in raw) {
-		const inner = (raw as { value: unknown }).value
-		return typeof inner === 'string' ? inner : null
-	}
-	return null
+	const inner = unwrapValue(raw)
+	return typeof inner === 'string' ? inner : null
 }
 
 const enrichmentOf = (

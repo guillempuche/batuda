@@ -4,6 +4,11 @@
  * only the new value. Kept free of JSX so it can be unit-tested plainly.
  */
 
+// From the module itself, not the package's front door: the front door carries
+// the whole research context — the service, its database client, its providers —
+// and pulling that into a browser bundle stops the page coming alive.
+import { unwrapValue } from '@batuda/research/application/guard-shapes'
+
 /** Handled elsewhere on the row, so they are left out of the value list. */
 const SKIPPED_FIELDS = new Set(['name', 'channels', 'companyId', 'company_id'])
 
@@ -16,22 +21,12 @@ export type FieldChange = {
 	readonly unchanged: boolean
 }
 
-/**
- * A value can arrive on its own, or wrapped together with the page it was read
- * from. Both mean the same thing to a reader, so the wrapper is unwrapped before
- * anything is shown — otherwise the row displays the wrapper itself.
- */
-function unwrap(value: unknown): unknown {
-	if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-		const o = value as Record<string, unknown>
-		if ('value' in o) return o['value']
-	}
-	return value
-}
-
 /** A value as a person would read it, or null when there is nothing to show. */
 export function displayValue(value: unknown): string | null {
-	const v = unwrap(value)
+	// A value can arrive on its own, or paired with the page it was read from.
+	// Both mean the same thing to a reader, so the pairing is read past before
+	// anything is shown — otherwise the row displays the pairing itself.
+	const v = unwrapValue(value)
 	if (v === null || v === undefined) return null
 	if (typeof v === 'string') return v.trim() === '' ? null : v
 	if (typeof v === 'number' || typeof v === 'boolean') return String(v)

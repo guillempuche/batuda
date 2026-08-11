@@ -38,14 +38,10 @@ export interface ApplicabilityResult {
 // earlier check replaces a value it cannot support with nothing at all, and a field
 // in that state must not travel on: writing it would clear what the record holds.
 const holdsAValue = (value: unknown): boolean => {
-	if (value === null || value === undefined) return false
-	// The per-field shape a value travels in — a value with the page it came from.
-	// The same rule applies one level in, since that is where a check empties it.
-	if (isPlainObject(value) && 'value' in value) {
-		const inner = value['value']
-		return inner !== null && inner !== undefined
-	}
-	return true
+	// Read past the page a value is paired with, since it is the value underneath
+	// that a check empties.
+	const held = unwrapValue(value)
+	return held !== null && held !== undefined
 }
 
 export const filterApplicableProposals = (
