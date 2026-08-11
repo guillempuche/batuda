@@ -141,14 +141,19 @@ const seedCompany = () =>
 		`
 	})
 
-// `asked` carries whatever the caller states; leaving schemaName out of it is
-// how a request that names no kind of run is exercised.
-const createSelectorRun = (tag: string, asked: CreateResearchInput) =>
+// Takes the caller's request whole, so a case can leave schemaName out of it
+// and exercise a request that names no kind of run. The selector and the
+// confirmation are this helper's own, so they are kept out of what a case may
+// state — passing either would read as taking effect when it cannot.
+const createSelectorRun = (
+	tag: string,
+	request: Omit<CreateResearchInput, 'context' | 'confirm'>,
+) =>
 	Effect.gen(function* () {
 		const svc = yield* ResearchService
 		const sql = yield* SqlClient.SqlClient
 		const input: CreateResearchInput = {
-			...asked,
+			...request,
 			// Confirm up front so the fan-out actually launches; the unconfirmed
 			// path (which returns a cost estimate instead) is covered separately.
 			confirm: true,
@@ -193,6 +198,34 @@ const createSelectorRun = (tag: string, asked: CreateResearchInput) =>
 		}
 	}).pipe(Effect.provide(ResearchLive)) as Effect.Effect<
 		{ status: string; children: number; kinds: Array<string> },
+		never,
+		never
+	>
+
+// Create an ordinary run — no filter, no fan-out — and read back the kind
+// written onto its row, so the plain write path is held to the same rule the
+// fan-out is.
+const createPlainRun = (request: Omit<CreateResearchInput, 'context'>) =>
+	Effect.gen(function* () {
+		const svc = yield* ResearchService
+		const sql = yield* SqlClient.SqlClient
+		const created = yield* enterOrgScope(sql, { org: ctx.org, userId })(
+			svc.create(userId, ctx.org.id, request, systemDefaults),
+		)
+		if (created.status === 'confirm_required')
+			return yield* Effect.die(
+				new Error('a run with no filter should never need confirmation'),
+			)
+		groupIds.push(created.id)
+		const [row] = yield* enterOrgScope(sql, { org: ctx.org, userId })(
+			sql<{ schemaName: string | null }>`
+				SELECT schema_name AS "schemaName" FROM research_runs
+				WHERE id = ${created.id}
+			`,
+		)
+		return row?.schemaName ?? null
+	}).pipe(Effect.provide(ResearchLive)) as Effect.Effect<
+		string | null,
 		never,
 		never
 	>
@@ -434,6 +467,22 @@ describe('selector fan-out', () => {
 				'leaf:company_enrichment_v1',
 				'leaf:company_enrichment_v1',
 			])
+		})
+	})
+
+	describe('when an ordinary request names no kind of run', () => {
+		it('should write the kind it settled on rather than leave the row blank', async () => {
+			// GIVEN a question with nothing pinned to it and no kind named — the
+			// shape of the request behind the 2026-08-10 incident
+			// WHEN the run is created
+			const schemaName = await Effect.runPromise(
+				createPlainRun({ query: 'companies in a sector, no kind named' }),
+			)
+
+			// THEN the row says it is going looking for companies. A blank here is
+			// what let the answer come back as prose with nowhere to put them, and
+			// it is also what the findings view reads to choose how to show it
+			expect(schemaName).toBe('prospect_scan_v1')
 		})
 	})
 

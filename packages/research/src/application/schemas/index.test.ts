@@ -188,10 +188,10 @@ describe('schemaNameFor', () => {
 		})
 
 		it('should still let a brief be asked for outright', () => {
-			// GIVEN a question that fits no fixed shape, asked with nothing pinned —
-			// the exact combination that used to happen by accident
-			// THEN asking for it on purpose still works, because only silence is
-			// being reinterpreted
+			// GIVEN a question that fits no fixed shape, asked for by name with
+			// nothing pinned
+			// THEN it still runs as a brief: only silence is filled in, never a
+			// stated choice
 			expect(schemaNameFor({ schemaName: 'freeform' })).toBe('freeform')
 		})
 	})
@@ -243,9 +243,9 @@ describe('schemaNameFor', () => {
 			// GIVEN a question with nothing pinned to it — go and find companies in
 			// a sector
 			// WHEN no kind was named
-			// THEN it goes looking for them. Answering as a brief left the companies
-			// nowhere to go, and every check for a thin result reads that list, so
-			// an answer holding nothing reported itself a success
+			// THEN it goes looking for them: a brief leaves the companies nowhere to
+			// go, and every check for a thin result reads that list, so an answer
+			// holding nothing would report itself a success
 			expect(schemaNameFor({})).toBe('prospect_scan_v1')
 		})
 
@@ -269,12 +269,37 @@ describe('schemaNameFor', () => {
 
 	describe('when the request names no kind', () => {
 		it('should read every way of saying nothing as saying nothing', () => {
-			// GIVEN the field left out, sent as nothing, or sent empty — an empty
-			// name resolves to no schema, so treating it as a name would leave a run
-			// that starts and then dies
-			for (const schemaName of [undefined, null, '']) {
+			// GIVEN the field left out, sent as nothing, sent empty, or holding only
+			// blank space — none of them is a name, and treating one as a name would
+			// leave a run that starts, announces itself, and only then finds there is
+			// no such kind
+			for (const schemaName of [undefined, null, '', '   ', '\t\n']) {
 				expect(schemaNameFor({ schemaName })).toBe('prospect_scan_v1')
 			}
+		})
+
+		it('should still read a pinned request as being about what it pinned', () => {
+			// GIVEN a blank name alongside a company
+			// THEN the blank is ignored and the company decides, the same as if the
+			// field had been left out entirely
+			expect(
+				schemaNameFor({
+					schemaName: '  ',
+					context: { subjects: [{ table: 'companies', id: 'a' }] },
+				}),
+			).toBe('company_enrichment_v1')
+		})
+	})
+
+	describe('when the kind named is padded with space', () => {
+		it('should take the name inside it', () => {
+			// GIVEN a name that arrived with space around it — off a hand-edited row,
+			// or a caller that trimmed nothing
+			// THEN the name inside is what runs, rather than a string no schema
+			// registry will ever match
+			expect(schemaNameFor({ schemaName: ' prospect_scan_v1 ' })).toBe(
+				'prospect_scan_v1',
+			)
 		})
 	})
 

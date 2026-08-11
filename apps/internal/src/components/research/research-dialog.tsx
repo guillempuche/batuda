@@ -76,6 +76,15 @@ const SCHEMA_CARDS: ReadonlyArray<SchemaCard> = [
 	},
 ]
 
+// Which card is already chosen when the dialog opens, read the same way the
+// server reads a request that names no kind: pinned to a company means the
+// question is about that company, pinned to nothing means it is asking for
+// companies we do not have yet. The two are kept in step so the same question
+// asked here and over the API does not start two different kinds of run — and
+// it is one function so opening the dialog and reopening it cannot disagree.
+const defaultSchema = (isDiscovery: boolean): SchemaOption =>
+	isDiscovery ? 'prospect_scan_v1' : 'company_enrichment_v1'
+
 // Keep free-text inputs to sane lengths so a runaway paste can't be submitted.
 const QUERY_MAX_LENGTH = 2000
 const FILTER_MAX_LENGTH = 120
@@ -102,9 +111,7 @@ export function ResearchDialog({
 	const isDiscovery = companyId === undefined
 	const createResearch = useAtomSet(createResearchAtom, { mode: 'promiseExit' })
 	const [query, setQuery] = useState('')
-	const [schema, setSchema] = useState<SchemaOption>(
-		isDiscovery ? 'prospect_scan_v1' : 'freeform',
-	)
+	const [schema, setSchema] = useState<SchemaOption>(defaultSchema(isDiscovery))
 	const [submitting, setSubmitting] = useState(false)
 	const [errorMessage, setErrorMessage] = useState<string | null>(null)
 	const [templateIds, setTemplateIds] = useState<ReadonlyArray<string>>([])
@@ -162,7 +169,7 @@ export function ResearchDialog({
 	useEffect(() => {
 		if (!open) return
 		setQuery('')
-		setSchema(isDiscovery ? 'prospect_scan_v1' : 'freeform')
+		setSchema(defaultSchema(isDiscovery))
 		setSubmitting(false)
 		setErrorMessage(null)
 		setTemplateIds([])

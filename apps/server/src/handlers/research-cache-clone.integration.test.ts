@@ -112,6 +112,7 @@ describe('cloneCacheHitRun', () => {
 								mode: 'deep',
 								schemaName: 'company_enrichment_v1',
 							},
+							schemaName: 'company_enrichment_v1',
 							templateIds: [],
 							templateNames: [],
 							templateFingerprint: '',
@@ -121,11 +122,13 @@ describe('cloneCacheHitRun', () => {
 							eq: boolean
 							cloneText: string
 							kind: string
+							schemaName: string | null
 						}>`
 							SELECT
 								(c.findings = s.findings) AS eq,
 								c.findings::text AS clone_text,
-								c.kind AS kind
+								c.kind AS kind,
+								c.schema_name AS schema_name
 							FROM research_runs c, research_runs s
 							WHERE c.id = ${cloned.id} AND s.id = ${sourceId}
 						`
@@ -142,6 +145,11 @@ describe('cloneCacheHitRun', () => {
 			// The clone is recorded as a cache_hit and its findings are jsonb-equal.
 			expect(cmp.kind).toBe('cache_hit')
 			expect(cmp.eq).toBe(true)
+
+			// AND it is filed under the kind it was reused for. A reused answer that
+			// went down as a different kind from the one that was asked for would be
+			// read back through the wrong shape, and shown through the wrong view.
+			expect(cmp.schemaName).toBe('company_enrichment_v1')
 
 			// The stored keys survive the clone exactly as written.
 			const findings = JSON.parse(cmp.cloneText) as Record<string, unknown>
