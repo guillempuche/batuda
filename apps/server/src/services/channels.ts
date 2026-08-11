@@ -718,6 +718,11 @@ export const suppressedAmong = (
  * gate asks whether an address has bounced anywhere in the organisation, and a
  * bounce is recorded against every record holding it. So an address two people
  * are both listed under stays blocked until both are cleared.
+ *
+ * Only an address a bounce or a complaint holds back is touched. A vouch —
+ * somebody standing behind an address a check doubted — sits in this same
+ * column, and one company or person often holds several mailboxes, so the vouch
+ * on one stays put while the block on another is lifted.
  */
 export const clearEmailSuppression = (
 	sql: Sql,
@@ -732,4 +737,5 @@ export const clearEmailSuppression = (
 		WHERE subject_table = ${subject.table}
 			AND subject_id = ${subject.id}
 			AND channel = 'email'
+			AND status IN ('bounced', 'complained')
 	`

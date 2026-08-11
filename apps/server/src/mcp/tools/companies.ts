@@ -177,7 +177,7 @@ const CreateCompanies = Tool.make('create_companies', {
 
 const UpdateCompany = Tool.make('update_company', {
 	description:
-		"Update one or more fields on an existing company by UUID. Only include fields to change; omitted fields stay unchanged. Set clear_email_suppression=true to let mail go to the company's own mailboxes again after a bounce or a spam report turns out to have been wrong — a role address like info@ or orders@ has nobody listed under it, so nothing on a contact can lift its block. It frees every one of the company's own mailboxes at once, and any that bounces again is held straight back. A branch's mailbox — one added with site_id — is held separately and is not freed by this; there is no way to lift one yet.",
+		"Update one or more fields on an existing company by UUID. Only include fields to change; omitted fields stay unchanged. Set clear_email_suppression=true to let mail go to the company's own mailboxes again after a bounce or a spam report turns out to have been wrong — a role address like info@ or orders@ has nobody listed under it, so nothing on a contact can lift its block. It frees all of the company's own held-back mailboxes in one go, and any that bounces again is held straight back. An address somebody has vouched for is left as it is — that is not a block, and this does not throw the vouch away. A block is recorded against every record in the organisation holding that address, and this speaks only for the company's own — so if a contact or a branch holds the same address, their copy goes on refusing the send until it is cleared too. A branch's copy cannot be cleared at all yet.",
 	parameters: Schema.Struct({
 		id: Schema.String,
 		clear_email_suppression: Schema.optional(Schema.Boolean),
@@ -722,10 +722,15 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 									'Only an email address is ever held back by a verdict, so only one can be vouched for.',
 								),
 							)
+						// A caller acts on the answer it just got rather than on the tool's
+						// description, so the refusal names the way out — and a branch's
+						// mailbox has none yet.
 						if (outcome === 'suppressed')
 							return yield* Effect.die(
 								new ToolMessage(
-									'That address hard-bounced or reported spam, which no vouch lifts.',
+									subject.table === 'companies'
+										? 'That address hard-bounced or reported spam, which no vouch lifts. Use update_company with clear_email_suppression=true once the mailbox works again.'
+										: "That address hard-bounced or reported spam, which no vouch lifts. It belongs to a branch, and nothing can lift a branch's block yet. Say so rather than trying another way round: the block follows the address itself, so putting the same one somewhere else stays blocked too.",
 								),
 							)
 					}
