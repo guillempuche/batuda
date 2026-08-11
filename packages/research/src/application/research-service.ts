@@ -2315,9 +2315,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						(run as { entityMatch?: EntityMatch | null }).entityMatch ?? null
 
 					// The target's display name, to re-anchor a web search that dropped it:
-					// an anchored subject's own name, else the name read from the query. Used
-					// only when `entityTargets` is set (an enrichment/contact run with one
-					// subject); a scan/freeform run never scopes its searches to a name.
+					// an anchored subject's own name, else the name read from the query. It
+					// is what a run with one subject searches under. A scan is handed it too
+					// and ignores it, since every company a scan found carries its own name.
 					const entityName =
 						subjectTargets
 							.map(s => s.name)
@@ -4543,6 +4543,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						// so one that yields nothing is not re-fetched every round — otherwise
 						// it never enters the corpus and keeps reappearing as cited-but-unscraped.
 						const citedAttempted = new Set<string>()
+						// Every gap already searched for, so a round moves on to the
+						// companies behind it. A round takes the first few gaps it finds, and
+						// a headcount a small firm never publishes stays a gap however often
+						// it is asked — without this, those first few would take every round's
+						// searches and the rest of a long list would never be reached at all.
+						const gapsSearched = new Set<string>()
 						for (let gapRound = 1; gapRound <= MAX_GAP_ROUNDS; gapRound++) {
 							// Who the focused searches are about. A company profile searches
 							// under the anchored subject's name, which is the same name the
@@ -4553,10 +4559,14 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								schemaName,
 								subjectName: entityName,
 							})
-							const perFieldTargets = perFieldGaps.slice(
-								0,
-								perFieldSearchCap(schemaName),
-							)
+							const perFieldTargets = perFieldGaps
+								.filter(
+									target => !gapsSearched.has(`${target.name} ${target.field}`),
+								)
+								.slice(0, perFieldSearchCap(schemaName))
+							for (const target of perFieldTargets) {
+								gapsSearched.add(`${target.name} ${target.field}`)
+							}
 							const openedHashes = new Set(
 								openedPages(scrapeCorpus).map(page => page.urlHash),
 							)
@@ -4732,20 +4742,56 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// as absent and the quality signal reports the thinness.
 							if (roundHashes.length === 0) break
 							yield* linkRunSources(roundHashes)
-							const perFieldAnchorFirst = [...scrapeCorpus].sort(
-								(a, b) =>
-									(anchorHashes.has(a.urlHash) ? 0 : 1) -
-									(anchorHashes.has(b.urlHash) ? 0 : 1),
-							)
+							// What this round just bought goes to the front, then the
+							// company's own pages. The extraction prompt fills to a character
+							// budget and stops, and a broad scan's corpus reaches that budget
+							// on the pages phase 1 already gathered — so evidence appended at
+							// the end is paid for and then never read.
+							const roundFirst = new Set(roundHashes)
+							const perFieldAnchorFirst = [...scrapeCorpus].sort((a, b) => {
+								const rank = (page: (typeof scrapeCorpus)[number]): number =>
+									roundFirst.has(page.urlHash)
+										? 0
+										: anchorHashes.has(page.urlHash)
+											? 1
+											: 2
+								return rank(a) - rank(b)
+							})
+							// A scan's answer is a list of other companies, so holding its
+							// evidence against the anchor's name would drop exactly the pages
+							// these searches went and bought — a competitor's own site does not
+							// mention the company it competes with.
+							const roundTargets = isDiscoveryScan(schemaName)
+								? null
+								: entityTargets
 							const refreshed = yield* extractStructuredFindings(
 								researchText,
 								[
 									evidenceText,
 									...seededEvidenceParts,
-									...groundedPageTexts(entityTargets, scrapeCorpus),
+									...groundedPageTexts(roundTargets, scrapeCorpus),
 								].join('\n'),
-								labelledGroundedPages(entityTargets, perFieldAnchorFirst),
+								labelledGroundedPages(roundTargets, perFieldAnchorFirst),
+							).pipe(
+								// A round is a best-effort extra. A vendor that times out on the
+								// enlarged evidence must not take the run down with it: what the
+								// run already found is worth keeping, and it is what a person
+								// asked for. A cancel or a deploy still unwinds the run.
+								Effect.catchCause(cause =>
+									Cause.hasInterruptsOnly(cause)
+										? Effect.failCause(cause)
+										: Effect.logWarning('research.gap_rounds.refresh_failed')
+												.pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														round: gapRound,
+														cause: Cause.pretty(cause),
+													}),
+												)
+												.pipe(Effect.as(null)),
+								),
 							)
+							if (refreshed === null) break
 							const merged = mergePerFieldSearch(
 								findings,
 								refreshed.findings,
@@ -4771,15 +4817,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									added: merged.added,
 								}),
 							)
-							// A round that filled nothing, found nobody new and resolved no
-							// cited page has stopped closing gaps — stop before burning the
-							// remaining rounds on the same result.
-							if (
-								merged.filled === 0 &&
-								merged.added === 0 &&
-								citedUnscraped.length === 0
-							)
-								break
+							// This round put new evidence in front of the model and it still
+							// filled nothing and found nobody — so the gaps that are left are
+							// not going to close, and another round would buy the same
+							// nothing. A scan cites a page or three per company, so waiting
+							// for the cited pages to run out first would never stop it.
+							if (merged.filled === 0 && merged.added === 0) break
 						}
 						yield* Ref.update(toolLog, log => [
 							...log,
