@@ -13,6 +13,7 @@
  * in every findings schema, so it filters wherever it finds a `citations` array.
  */
 
+import { isCitedField } from './guard-shapes'
 import { canonicalizeUrl, hostOf } from './source-key'
 
 /**
@@ -120,17 +121,16 @@ export const validateFindingCitations = (
 			// cannot survive. (A descriptive finding's citations array still keeps its
 			// value and drops only the bad citation — that rule is for prose, not a
 			// scalar fact.)
-			const record = value as { source_id?: unknown; value?: unknown }
-			if (typeof record.source_id === 'string' && 'value' in record) {
+			if (isCitedField(value)) {
 				total++
-				if (isGrounded(record.source_id)) {
+				if (isGrounded(value.source_id)) {
 					kept++
 					return value
 				}
 				drops.push({
 					field: key ?? 'field',
-					value: boundDropValue(record.value),
-					sourceId: record.source_id,
+					value: boundDropValue(value.value),
+					sourceId: value.source_id,
 				})
 				return null
 			}

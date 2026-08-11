@@ -14,6 +14,10 @@
 			"types": "./src/domain/types.ts",
 			"import": "./src/domain/types.ts"
 		},
+		"./application/guard-shapes": {
+			"types": "./src/application/guard-shapes.ts",
+			"import": "./src/application/guard-shapes.ts"
+		},
 		"./application/paid-action-tool": {
 			"types": "./src/application/paid-action-tool.ts",
 			"import": "./src/application/paid-action-tool.ts"

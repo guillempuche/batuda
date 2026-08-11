@@ -29,7 +29,7 @@
 
 import { EMAIL_ADDRESS_PATTERN } from '@batuda/domain'
 
-import { unwrapValue } from './guard-shapes'
+import { isCitedField, unwrapValue } from './guard-shapes'
 import {
 	isInCorpus,
 	PAGE_LITERAL_FIELDS,
@@ -210,10 +210,9 @@ export const verifyValueProvenance = (
 			// value the same way as a dedicated field, but blank the WHOLE field to
 			// null when the email/phone is invented, rather than leaving a
 			// sourced-but-empty { value: null } behind.
-			const wrapper = value as { value?: unknown; source_id?: unknown }
-			if ('value' in wrapper && typeof wrapper.source_id === 'string') {
-				if (typeof wrapper.value === 'string') {
-					const t = wrapper.value.trim()
+			if (isCitedField(value)) {
+				if (typeof value.value === 'string') {
+					const t = value.value.trim()
 					if (EMAIL_RE.test(t) && !emailSupported(ev, t)) {
 						strippedValues++
 						return null
