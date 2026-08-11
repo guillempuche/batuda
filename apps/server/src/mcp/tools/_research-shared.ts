@@ -10,8 +10,8 @@ import { SchemaNameSchema } from '@batuda/research'
 export const Uuid = Schema.String.check(Schema.isUUID())
 
 // What each kind of run is for, in the words the web app already offers a
-// person picking between them. Written once so the two research tools cannot
-// come to describe the same choice differently.
+// person picking between them. Written once so the two tools that start a run
+// cannot drift into describing the same choice differently.
 export const SCHEMA_GUIDANCE =
 	'Pick schema_name for the shape of answer you need. ' +
 	'`prospect_scan_v1` finds companies matching a profile — industry, size, location — when you want net-new companies to add as leads. ' +
@@ -22,8 +22,9 @@ export const SCHEMA_GUIDANCE =
 
 // schema_name constrained to the server's closed set, so an unknown name is
 // rejected up front instead of creating a run that only fails at phase 0.
-// Required, not optional: a caller who said nothing used to get a brief, and a
-// question about which companies exist has nowhere to put them in one.
+// Required, not optional: the choice decides whether the answer can hold a list
+// of companies at all, so a caller states it rather than leaving it to be
+// guessed from the question.
 export const SchemaNameParam = SchemaNameSchema.annotate({
 	description:
 		'The shape of answer this run produces; see the tool description for what each one is for. There is no default — a question about which companies exist, answered as `freeform`, comes back as prose with no list of companies in it.',

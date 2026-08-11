@@ -110,14 +110,14 @@ describe('SchemaNameParam', () => {
 
 	describe('when a client reads the parameter on its own', () => {
 		it('should say what the parameter is for beside the names it accepts', () => {
-			// GIVEN the list of names, which tells a caller the five words exist and
-			// nothing about which to pick
+			// GIVEN a client that shows the parameter without the tool description
+			// around it
 			const published = Tool.getJsonSchemaFromSchema(SchemaNameParam) as {
 				description?: string
 			}
 
-			// THEN the parameter says what it decides, so the choice is an informed
-			// one rather than a guess between five words
+			// THEN the parameter itself says what it decides, so the choice is an
+			// informed one rather than a guess between five words
 			expect(published.description).toContain('freeform')
 		})
 	})
@@ -135,9 +135,9 @@ describe('SCHEMA_GUIDANCE', () => {
 		})
 
 		it('should warn what a brief leaves out', () => {
-			// GIVEN freeform, the one kind with no list of companies in it — picking
-			// it for a question about which companies exist is what produced a run
-			// that found nothing and called itself a success
+			// GIVEN freeform, the one kind with no list of companies in it — picked
+			// for a question about which companies exist, it comes back holding none
+			// and still reports success
 			// THEN the guidance says so rather than describing it as one of five
 			// equal choices
 			expect(SCHEMA_GUIDANCE).toContain('no structured list')
@@ -155,9 +155,10 @@ describe('the research tools that start a run', () => {
 		it('should make them say which kind of run they want', () => {
 			// GIVEN a caller who names no kind
 			// WHEN the call is validated
-			// THEN it is refused. Omitting it used to mean a brief, so a question
-			// about which companies exist came back as prose with nowhere to put
-			// them — and every check for a thin result reads that missing list
+			// THEN it is refused, because no kind is safe to assume on their behalf:
+			// answered as a brief, a question about which companies exist comes back
+			// with nowhere to put them, and every check for a thin result reads that
+			// missing list
 			for (const tool of starters) {
 				const published = Tool.getJsonSchemaFromSchema(
 					tool.parametersSchema,

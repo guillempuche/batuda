@@ -1312,6 +1312,10 @@ export const cloneCacheHitRun = (params: {
 	readonly organizationId: string
 	readonly userId: string
 	readonly input: CreateResearchInput
+	// The kind of run, already settled by the caller. Passed in rather than worked
+	// out again here: the clone has to be filed under the same kind the answer was
+	// found under, and two places settling it apart is how they come to disagree.
+	readonly schemaName: string
 	readonly templateIds: ReadonlyArray<string>
 	readonly templateNames: ReadonlyArray<string>
 	readonly templateFingerprint: string
@@ -1323,6 +1327,7 @@ export const cloneCacheHitRun = (params: {
 			organizationId,
 			userId,
 			input,
+			schemaName,
 			templateIds,
 			templateNames,
 			templateFingerprint,
@@ -1342,7 +1347,7 @@ export const cloneCacheHitRun = (params: {
 				${organizationId},
 				${input.query},
 				${input.mode ?? 'deep'},
-				${schemaNameFor(input)},
+				${schemaName},
 				'cache_hit',
 				'succeeded',
 				${JSON.stringify(input.context ?? {})}::jsonb,
@@ -2056,9 +2061,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							.templateFingerprint ?? ''
 
 					const context = run['context'] as CreateResearchInput['context']
-					// A run created here always carries the kind it was resolved to;
-					// only a row written before that did could arrive with nothing, and
-					// its own shape says what it was asking for.
+					// Every run is written down with the kind it settled on, so only an
+					// older row arrives with nothing named — and its own shape says what
+					// it was asking for.
 					const schemaName = schemaNameFor({
 						schemaName: (run as { schemaName: string | null }).schemaName,
 						context,
@@ -4996,10 +5001,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					instructions?: ResolvedInstructions,
 				) =>
 					Effect.gen(function* () {
-						// Settled once, here, and then written onto every row this
-						// creates: the key looked up below and the key the finished run
-						// writes back are built from it separately, and a run whose two
-						// keys disagree can never be served from the cache again.
+						// Settled once and written onto every row this creates, so the
+						// cache key built below and the one the finished run writes back
+						// agree: a run filed under one kind and looked up under another is
+						// never found again.
 						const schemaName = schemaNameFor(input)
 						yield* Effect.logInfo('research.create').pipe(
 							Effect.annotateLogs({
@@ -5077,6 +5082,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									organizationId,
 									userId,
 									input,
+									schemaName,
 									templateIds,
 									templateNames,
 									templateFingerprint,
@@ -5781,6 +5787,16 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							anchorDomain: host,
 						}
 
+						// An older origin can carry no kind at all, and copying that
+						// straight across would put a run on the table saying it is a
+						// brief while it goes on to run as something else — filed under
+						// one kind and looked up under another. Settled from the same
+						// shape every other new run is settled from.
+						const schemaName = schemaNameFor({
+							schemaName: origin.schemaName,
+							context: mergedContext as CreateResearchInput['context'],
+						})
+
 						const [row] = yield* sql<{ id: string }>`
 							INSERT INTO research_runs (
 								organization_id,
@@ -5793,7 +5809,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								${organizationId},
 								${origin.query},
 								${origin.mode ?? 'deep'},
-								${origin.schemaName},
+								${schemaName},
 								'queued',
 								${JSON.stringify(mergedContext)},
 								${origin.budgetCents},
