@@ -14,13 +14,42 @@
 
 import { type ChildProcess, spawn } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-const PORT = 34_040
+/**
+ * A port nothing else on this machine is listening on.
+ *
+ * Asking the operating system beats naming a number: a fixed one is taken by
+ * whatever else happens to be up — another run of this suite, a dev server, an
+ * unrelated job sharing a CI runner — and the server then boots, fails to bind,
+ * and sits there saying nothing until the health wait gives up twenty seconds
+ * later. That reads as a slow boot rather than as the collision it is.
+ *
+ * The port is released before the server claims it, so something else could in
+ * principle take it in that gap. That window is a moment wide, against a fixed
+ * number that clashes for as long as the other holder is up.
+ */
+const freePort = (): Promise<number> =>
+	new Promise((resolve, reject) => {
+		const probe = createServer()
+		probe.on('error', reject)
+		probe.listen(0, '127.0.0.1', () => {
+			const found = probe.address()
+			if (found === null || typeof found === 'string') {
+				probe.close()
+				reject(new Error('the operating system named no port'))
+				return
+			}
+			probe.close(() => resolve(found.port))
+		})
+	})
+
+const PORT = await freePort()
 
 // The env the deployed instance actually boots with is the union of two
 // sources: the non-secret config baked into `config.production.json`, and the
