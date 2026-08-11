@@ -60,6 +60,7 @@ import {
 } from './discovered-existing-guard'
 import {
 	discoveryResultCount,
+	discoveryResultField,
 	emptyScanFindings,
 	isDiscoveryScan,
 	isDiscoveryScanEmpty,
@@ -104,9 +105,9 @@ import {
 import { type GuardLink, runGuardChain } from './guard-chain'
 import { normalizePaidActionTool } from './paid-action-tool'
 import {
-	MAX_PER_FIELD_SEARCHES,
 	mergePerFieldSearch,
 	needsPerFieldSearch,
+	perFieldSearchCap,
 	perFieldSearchQuery,
 } from './per-field-search'
 import { resolvePolicy, type SystemDefaults } from './policy'
@@ -394,27 +395,58 @@ export const openedPages = <
 	corpus: ReadonlyArray<Entry>,
 ): ReadonlyArray<Entry> => corpus.filter(entry => entry.kind === 'page')
 
-// The cited-but-never-fetched sources of an enrichment's company fields — the
-// citations the per-source entity check had to fail open on. A gap round
-// scrapes these first: fetching the cited page turns fail-open into a real
-// verdict, and the page often carries the very facts still missing. Blocked
-// namespaces (posts, person pages) are skipped — fetching one changes nothing —
-// and so is anything that is not a web address, such as an internal id naming a
-// page the run already holds.
+/**
+ * Every source a set of findings leans on, in the order it cites them. A company
+ * profile cites one source per field; a discovery scan cites them per company it
+ * found, and both shapes are read here.
+ */
+const citedSourceIds = (
+	schemaName: string,
+	findings: unknown,
+): ReadonlyArray<string> => {
+	if (findings === null || typeof findings !== 'object') return []
+	const out: string[] = []
+	const enrichment = (findings as { enrichment?: unknown }).enrichment
+	if (enrichment !== null && typeof enrichment === 'object') {
+		for (const value of Object.values(enrichment as Record<string, unknown>)) {
+			if (value === null || typeof value !== 'object') continue
+			const id = (value as { source_id?: unknown }).source_id
+			if (typeof id === 'string') out.push(id)
+		}
+	}
+	const listField = discoveryResultField(schemaName)
+	if (listField === undefined) return out
+	const rows = (findings as Record<string, unknown>)[listField]
+	if (!Array.isArray(rows)) return out
+	for (const row of rows) {
+		if (row === null || typeof row !== 'object') continue
+		const citations = (row as { citations?: unknown }).citations
+		if (!Array.isArray(citations)) continue
+		for (const citation of citations) {
+			if (citation === null || typeof citation !== 'object') continue
+			const id = (citation as { source_id?: unknown }).source_id
+			if (typeof id === 'string') out.push(id)
+		}
+	}
+	return out
+}
+
+// The cited sources the run never fetched — the citations the per-source entity
+// check had to fail open on. A gap round scrapes these first: fetching the cited
+// page turns fail-open into a real verdict, and the page often carries the very
+// facts still missing. Blocked namespaces (posts, person pages) are skipped —
+// fetching one changes nothing — and so is anything that is not a web address,
+// such as an internal id naming a page the run already holds.
 export const citedUnscrapedSources = (
+	schemaName: string,
 	findings: unknown,
 	hasPage: (urlHash: string) => boolean,
 	cap: number,
 ): ReadonlyArray<string> => {
-	if (findings === null || typeof findings !== 'object') return []
-	const enrichment = (findings as { enrichment?: unknown }).enrichment
-	if (enrichment === null || typeof enrichment !== 'object') return []
 	const out: string[] = []
 	const seen = new Set<string>()
-	for (const value of Object.values(enrichment as Record<string, unknown>)) {
-		if (value === null || typeof value !== 'object') continue
-		const id = (value as { source_id?: unknown }).source_id
-		if (typeof id !== 'string' || id.trim() === '') continue
+	for (const id of citedSourceIds(schemaName, findings)) {
+		if (id.trim() === '') continue
 		if (seen.has(id)) continue
 		seen.add(id)
 		if (classifyNamespace(id) !== null) continue
@@ -1069,6 +1101,16 @@ export const computeResearchCacheKey = (args: {
 	)
 }
 
+// What a discovery scan is told about covering a request that has several parts
+// to it. A request naming five trades across seventeen regions is roughly eighty
+// searches; handed no plan, a scan fires a handful and stops of its own accord
+// with rounds still unspent, because nothing tells it what finished looks like.
+// The rounds and the budget are not the constraint, so this is guidance rather
+// than machinery: the loop lets the model choose each search, and this gives it a
+// reason to keep choosing.
+const DISCOVERY_PLAN_DIRECTIVE =
+	'Before searching, break the request into its parts — each sector, trade, speciality, region, or country it names — and hold that list for the whole run. Work through it: a request naming several parts is not answered by results for one or two of them, however many companies those turn up. Prefer a search aimed at one part over a single broad search meant to cover them all, since a broad one returns the same well-known names every time. Before you finish, check the list: where a part has no companies yet, search for that part specifically rather than stopping.'
+
 // Assemble the phase-1 system prompt. Resolved instruction segments are fenced
 // and placed BELOW the invariants (never fabricate sources, etc.) so a template
 // can't override them — fencing is mitigation, not a guarantee.
@@ -1094,6 +1136,7 @@ export const buildResearchSystemPrompt = (args: {
 		'Name the people who run the company — each with the exact title they are given — and treat that as part of the job, not an extra. They are listed on a team, leadership, management or "equipo" page, almost never on the homepage, so open one when the site has it. When reading the pages turns up nobody with a title, discover_contacts is the tool that finds them.',
 		'A search result quotes only the one sentence of a page that matched your query. When a page looks like it holds more than that sentence, open it with scrape_page rather than settling for the snippet.',
 		'For discovery or prospecting queries, prefer authoritative sources — business directories, industry association member lists, and sector registries — over social media, forums, or glossary pages. Treat such a page as somewhere to find candidates, not as the answer: a "top N" or "largest" ranking lists the biggest firms in a sector, which is the opposite of what most prospecting asks for. Carry every qualifier in the request — size, place, and niche — into each search, and check each candidate against all of them before returning it; leave out one that fails any, however prominently a directory listed it.',
+		...(isDiscoveryScan(args.schemaName) ? [DISCOVERY_PLAN_DIRECTIVE] : []),
 		schemaFields.length === 0
 			? `Output schema: ${args.schemaName}`
 			: `Output schema: ${args.schemaName}. Come back with everything it holds, not only the facts named above: ${schemaFields.join(', ')}. Leave a field out when the evidence does not support it — never fill one by guessing.`,
@@ -1182,6 +1225,23 @@ const proposeContactDirective = (companyId: string): string =>
 		'Offer a person even when no address for them can be found: the name and the job title are the useful part on their own. Still list them in the people list as well — the offer is in addition to that list, not instead of it. Never offer somebody the evidence describes as a client, a partner, a supplier, or a competitor.',
 	].join('\n')
 
+// The breadth ask for a discovery scan. A scan is asked for a list to work
+// through, and nothing else in the pipeline says so — the other discovery-shaped
+// lines all narrow. It names the source kinds that carry many companies at once,
+// and asks for the website and headcount by name, since those are what a list is
+// asked for and what it most often comes back missing. The closing line carries
+// as much weight as the opening one: a company whose site the evidence never
+// gives must still be listed, or asking for the site would quietly shrink the
+// list.
+const DISCOVERY_BREADTH_DIRECTIVE =
+	'List EVERY company the evidence identifies that matches the request — every one named on a directory page, an association or trade-body member list, a sector ranking, a news article, a register extract, or a search result — not only the ones the evidence describes at length. The evidence routinely names far more companies than a first pass returns, and coming back with a handful while it names dozens is an incomplete extraction, not a small market. Cover every part of the request: where it asks about several sectors, trades, regions, or countries, each one needs its own companies in the list rather than whichever the evidence happened to describe first. For each company give its own official website wherever the evidence states one, and its employee count wherever a source states one. Never drop a company for want of a website or a headcount — list it by name with the fields the evidence does support.'
+
+// Asks the model to land the fit judgement in the structured output, not only in
+// the brief. Applies only to the enrichment schema, which is the one that
+// carries the verdict/disqualifiers/fit_checks fields.
+const FIT_VERDICT_DIRECTIVE =
+	'Decide whether this company fits the target customer profile using the fit rules in the instructions above, and record it: set `verdict` (strong_fit / possible_fit / weak_fit / no_fit) with a short `verdict_rationale`; for a company that fails a rule, list each failure in `disqualifiers` with the rule and the evidence quote that shows it. Also fill `fit_checks` with one row per fit rule in the instructions — every rule, including the ones the company passes — each marked pass, fail, or unknown per the evidence, with the quote and source URL that decide it.'
+
 /**
  * The instruction for the structured-extraction pass: read the gathered evidence
  * and fill the output schema from it.
@@ -1199,29 +1259,34 @@ const proposeContactDirective = (companyId: string): string =>
  * an instruction to propose a correction wherever the evidence disagrees — the only
  * way a run turns up an edit for a company it was handed rather than one it found.
  */
-// Asks the model to land the fit judgement in the structured output, not only in
-// the brief. Applies only to the enrichment schema, which is the one that
-// carries the verdict/disqualifiers/fit_checks fields.
-const FIT_VERDICT_DIRECTIVE =
-	'Decide whether this company fits the target customer profile using the fit rules in the instructions above, and record it: set `verdict` (strong_fit / possible_fit / weak_fit / no_fit) with a short `verdict_rationale`; for a company that fails a rule, list each failure in `disqualifiers` with the rule and the evidence quote that shows it. Also fill `fit_checks` with one row per fit rule in the instructions — every rule, including the ones the company passes — each marked pass, fail, or unknown per the evidence, with the quote and source URL that decide it.'
-
 export const buildExtractionPrompt = (args: {
 	readonly citationInstruction: string
 	readonly evidenceBlock: string
 	readonly subjects: ReadonlyArray<SubjectForPrompt>
 	readonly fitVerdict?: boolean
+	/** Whether this run is a discovery scan, whose answer is a list of companies. */
+	readonly discoveryScan?: boolean
 }): string => {
 	const lines = [
 		'Produce structured findings STRICTLY from the evidence below (the fetched pages and the research transcript).',
 		'',
 		"Read ALL of the evidence to the end — every fetched page and every search result in the transcript — and report every fact it states; the evidence routinely states far more than a first pass returns. Report the industry, employee-count band, location, country, and the company's own operational software wherever the evidence states them — including on a third-party page rather than the company's own site.",
 		'',
-		"Name EVERY person the evidence identifies as this company's own leader or employee — a titled executive on the team page, a quoted founder, a signed author — each with the exact job title the evidence gives them. Leaving the people list empty while the evidence names the company's own staff is an incomplete extraction.",
+	]
+	// The breadth ask, addressed to whichever list this run's answer actually is.
+	// A scan is asked for companies and has no people list to fill; saying both
+	// would push it to invent one.
+	lines.push(
+		args.discoveryScan
+			? DISCOVERY_BREADTH_DIRECTIVE
+			: "Name EVERY person the evidence identifies as this company's own leader or employee — a titled executive on the team page, a quoted founder, a signed author — each with the exact job title the evidence gives them. Leaving the people list empty while the evidence names the company's own staff is an incomplete extraction.",
 		'',
+	)
+	lines.push(
 		"Report ONLY what the evidence states. If it does not support a field, omit it or leave it null — never fill a field from prior knowledge, never guess, and never put a placeholder or the field's own name as its value. Leaving a field empty is always better than inventing a value for it.",
 		'',
 		"When sources disagree on a time-sensitive fact (employee count, tools in use, leadership), fill the field from the most recently published reading among sources of equal standing — the company's own site still outranks an aggregator — and record each reading the field did not take in `conflicts`, with its value and the URL of the source that stated it.",
-	]
+	)
 	if (args.subjects.length > 0) {
 		lines.push(
 			'',
@@ -2594,6 +2659,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									evidenceBlock,
 									subjects: subjectsForPrompt(subjects),
 									fitVerdict: schemaName === 'company_enrichment_v1',
+									discoveryScan: isDiscoveryScan(schemaName),
 								}),
 							})
 							// Fold the harvested role mailbox in before the ids are stamped, so
@@ -4409,6 +4475,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						// so tick once to show the run is moving.
 						yield* recordProgress
 					} else {
+						// The company's own (anchor-seeded) pages. Both the first extraction
+						// and the gap rounds below put them ahead of everything else, so the
+						// set is built once here rather than inside either.
+						const anchorHashes = new Set(seededAnchorHashes)
 						if (retryFindings !== undefined) {
 							// The discovery-scan retry path already ran extraction under the
 							// shared budget — reuse those findings.
@@ -4417,7 +4487,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// Fill the phase-2 page budget with the company's own
 							// (anchor-seeded) pages first, so if the budget truncates it drops
 							// third-party pages, never the official site the run grounds on.
-							const anchorHashes = new Set(seededAnchorHashes)
 							const anchorFirstCorpus = [...scrapeCorpus].sort(
 								(a, b) =>
 									(anchorHashes.has(a.urlHash) ? 0 : 1) -
@@ -4446,247 +4515,271 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									'research.entity.downgraded_source',
 								).pipe(Effect.annotateLogs({ research_id: researchId }))
 							}
-							// Gap rounds: for each high-value firmographic the broad pass and
-							// the focused rescues still left empty, first fetch the cited
-							// pages the run never opened (turning the per-source check's
-							// fail-open into a real verdict on the cited page), then fire one
-							// focused web search per missing field, and re-extract over the
-							// enlarged evidence. Loops while the gaps keep closing —
-							// hard-capped, and every round first checks the wall-clock and
-							// budget margin, because finishing low-confidence is a result
-							// while riding into the terminal run deadline loses the run.
-							// Phase-2 runs outside the loop's Budget scope, so each round
-							// tallies its scrape/search cost into gapSpentCents to keep the
-							// margin check and the stamped cost honest.
-							const gapSearch = yield* SearchProvider
-							const gapScrape = yield* ScrapeProvider
-							const perFieldTargetName =
-								(run as { query: string }).query.split(',')[0]?.trim() ||
-								(run as { query: string }).query
-							// Cited pages already attempted this run (fetched, empty, or errored),
-							// so one that yields nothing is not re-fetched every round — otherwise
-							// it never enters the corpus and keeps reappearing as cited-but-unscraped.
-							const citedAttempted = new Set<string>()
-							for (let gapRound = 1; gapRound <= MAX_GAP_ROUNDS; gapRound++) {
-								const perFieldMissing = needsPerFieldSearch(findings).slice(
-									0,
-									MAX_PER_FIELD_SEARCHES,
-								)
-								const openedHashes = new Set(
-									openedPages(scrapeCorpus).map(page => page.urlHash),
-								)
-								const citedUnscraped = citedUnscrapedSources(
-									findings,
-									hash => openedHashes.has(hash) || citedAttempted.has(hash),
-									MAX_CITED_SCRAPES_PER_ROUND,
-								)
-								// Grounded and fully fetched — nothing left to close.
-								if (perFieldMissing.length === 0 && citedUnscraped.length === 0)
-									break
-								const elapsedMs =
-									DateTime.toEpochMillis(DateTime.nowUnsafe()) - runStartedAtMs
-								const thinDeadline =
-									elapsedMs >
-									runDeadlineSeconds * 1000 * GAP_ROUND_DEADLINE_FRACTION
-								// Phase 2 has no live budget scope; the margin reads the run's
-								// policy budget less everything spent so far — phase 1 plus the
-								// gap rounds already run — so it actually tightens each round.
-								const gapPolicy = (run as { paidPolicy: ResolvedPolicy | null })
-									.paidPolicy
-								const thinBudget =
-									(gapPolicy?.budgetCents ?? 0) -
-										cheapSpentCents -
-										gapSpentCents <
-									SCRAPE_COST_CENTS * 2
-								if (thinDeadline || thinBudget) {
-									yield* Effect.logInfo('research.gap_rounds.stopped').pipe(
-										Effect.annotateLogs({
-											research_id: researchId,
-											round: gapRound,
-											reason: thinDeadline
-												? 'deadline_margin'
-												: 'budget_margin',
-										}),
-									)
-									break
-								}
-								// Counted here, past both stop checks: the body below can leave
-								// by several different exits, so a round counted at the end
-								// would go unreported whenever it takes one of them.
-								yield* recordProgress
-								const roundHashes: string[] = []
-								// Fetch the cited pages first: cheap certainty about sources
-								// the run already leans on.
-								yield* Effect.forEach(
-									citedUnscraped,
-									citedUrl =>
-										Effect.gen(function* () {
-											// Mark the attempt (fetched, empty, or errored) so a page that
-											// yields nothing is not re-fetched next round.
-											citedAttempted.add(urlHashForScrape(citedUrl))
-											if (isUnsupportedScrapeUrl(citedUrl)) return
-											const cited = yield* gapScrape.scrape({
-												url: citedUrl,
-												formats: ['markdown'],
-											})
-											// Charged once the fetch is back, so a URL that errors out
-											// leaves the round's remaining budget intact.
-											gapSpentCents += SCRAPE_COST_CENTS
-											if (
-												cited.markdown !== undefined &&
-												cited.markdown.trim().length > 0
-											) {
-												const citedHash = urlHashForScrape(cited.url)
-												roundHashes.push(citedHash)
-												scrapeCorpus.push({
-													urlHash: citedHash,
-													text: cited.markdown,
-													host: domainHost(cited.resolvedUrl ?? cited.url),
-													kind: 'page',
-												})
-											}
-										}).pipe(
-											// Let a pure interruption (cancel/deploy) unwind the run instead of
-											// being logged as a skip while the loop keeps spending.
-											Effect.catchCause(cause =>
-												Cause.hasInterruptsOnly(cause)
-													? Effect.failCause(cause)
-													: Effect.logInfo(
-															'research.gap_rounds.cited_scrape_skipped',
-														).pipe(
-															Effect.annotateLogs({
-																research_id: researchId,
-																url: citedUrl,
-																cause: Cause.pretty(cause),
-															}),
-														),
-											),
-										),
-									{ concurrency: GAP_ROUND_CONCURRENCY },
-								)
-								// Cited pages fetched: re-judge the kept fields against them
-								// right away — the point of fetching is that a wrong-company
-								// page can now void the field it sourced, no LLM call needed.
-								if (roundHashes.length > 0 && entityTargets) {
-									const gapOpenedByHash = new Map(
-										openedPages(scrapeCorpus).map(
-											page =>
-												[
-													page.urlHash,
-													{ text: page.text, host: page.host },
-												] as const,
-										),
-									)
-									const recheck = guardEntitySources(
-										findings,
-										entityTargets,
-										sourceId => gapOpenedByHash.get(urlHashForScrape(sourceId)),
-									)
-									findings = recheck.findings
-									if (recheck.droppedOffEntity > 0) {
-										if (entityMatch === 'strong') entityMatch = 'weak'
-										yield* Effect.logWarning(
-											'research.gap_rounds.cited_voided',
-										).pipe(
-											Effect.annotateLogs({
-												research_id: researchId,
-												dropped: recheck.droppedOffEntity,
-											}),
-										)
-									}
-								}
-								// Nothing missing: the cited fetches were the whole round —
-								// link them and let the next round's top check close the loop.
-								if (perFieldMissing.length === 0) {
-									if (roundHashes.length > 0) yield* linkRunSources(roundHashes)
-									continue
-								}
-								const perFieldFired = perFieldMissing.length
-								yield* Effect.forEach(
-									perFieldMissing,
-									field =>
-										Effect.gen(function* () {
-											gapSpentCents += SEARCH_COST_CENTS
-											const searched = yield* gapSearch
-												.search({
-													query: perFieldSearchQuery(
-														perFieldTargetName,
-														hintLocation,
-														field,
-													),
-													limit: 3,
-													location: hintLocation,
-												})
-												.pipe(
-													// Let a pure interruption (cancel/deploy) unwind the run instead of
-													// being swallowed as an empty result while the loop keeps spending.
-													Effect.catchCause(cause =>
-														Cause.hasInterruptsOnly(cause)
-															? Effect.failCause(cause)
-															: Effect.succeed(null),
-													),
-												)
-											for (const item of searched?.items ?? []) {
-												const host = domainHost(item.url)
-												if (host !== undefined) searchResultHosts.add(host)
-												if (item.content && item.content.trim().length > 0) {
-													const hash = urlHashForScrape(item.url)
-													roundHashes.push(hash)
-													scrapeCorpus.push({
-														urlHash: hash,
-														text: item.content,
-														host,
-														kind: 'passage',
-													})
-												}
-											}
-										}),
-									{ concurrency: GAP_ROUND_CONCURRENCY },
-								)
-								// Nothing new reached the evidence — more rounds would only
-								// repeat the same searches, so the remaining gaps are treated
-								// as absent and the quality signal reports the thinness.
-								if (roundHashes.length === 0) break
-								yield* linkRunSources(roundHashes)
-								const perFieldAnchorFirst = [...scrapeCorpus].sort(
-									(a, b) =>
-										(anchorHashes.has(a.urlHash) ? 0 : 1) -
-										(anchorHashes.has(b.urlHash) ? 0 : 1),
-								)
-								const refreshed = yield* extractStructuredFindings(
-									researchText,
-									[
-										evidenceText,
-										...seededEvidenceParts,
-										...groundedPageTexts(entityTargets, scrapeCorpus),
-									].join('\n'),
-									labelledGroundedPages(entityTargets, perFieldAnchorFirst),
-								)
-								const merged = mergePerFieldSearch(findings, refreshed.findings)
-								findings = merged.findings
-								yield* Effect.annotateCurrentSpan({
-									'research.gap_rounds.round': gapRound,
-									'research.per_field_search.fired': perFieldFired,
-									'research.per_field_search.filled': merged.filled,
-									'research.gap_rounds.contacts_kept':
-										contactFill(findings).named,
-									'research.gap_rounds.titled_kept':
-										contactFill(findings).titled,
-								})
-								yield* Effect.logInfo('research.gap_rounds.closed').pipe(
+						}
+						// Gap rounds: for each high-value fact the broad pass and the
+						// focused rescues still left empty, first fetch the cited
+						// pages the run never opened (turning the per-source check's
+						// fail-open into a real verdict on the cited page), then fire one
+						// focused web search per missing fact, and re-extract over the
+						// enlarged evidence.
+						//
+						// The gaps are read per subject, so a scan's list is reached the
+						// same way a single company profile is: one company missing its
+						// website is a gap exactly as a profile missing its country is.
+						// This sits outside the branch above so a scan that came back thin
+						// gets its rounds too — it takes the refined-retry path, and it is
+						// the run with the most left to fill in.
+						//
+						// Loops while the gaps keep closing — hard-capped, and every round
+						// first checks the wall-clock and budget margin, because finishing
+						// low-confidence is a result while riding into the terminal run
+						// deadline loses the run. Phase-2 runs outside the loop's Budget
+						// scope, so each round tallies its scrape/search cost into
+						// gapSpentCents to keep the margin check and the stamped cost
+						// honest.
+						const gapSearch = yield* SearchProvider
+						const gapScrape = yield* ScrapeProvider
+						// Cited pages already attempted this run (fetched, empty, or errored),
+						// so one that yields nothing is not re-fetched every round — otherwise
+						// it never enters the corpus and keeps reappearing as cited-but-unscraped.
+						const citedAttempted = new Set<string>()
+						for (let gapRound = 1; gapRound <= MAX_GAP_ROUNDS; gapRound++) {
+							// Who the focused searches are about. A company profile searches
+							// under the anchored subject's name, which is the same name the
+							// entity guard holds the run's evidence to. A scan is handed it
+							// and ignores it: every company it found carries its own name.
+							const perFieldGaps = needsPerFieldSearch({
+								findings,
+								schemaName,
+								subjectName: entityName,
+							})
+							const perFieldTargets = perFieldGaps.slice(
+								0,
+								perFieldSearchCap(schemaName),
+							)
+							const openedHashes = new Set(
+								openedPages(scrapeCorpus).map(page => page.urlHash),
+							)
+							const citedUnscraped = citedUnscrapedSources(
+								schemaName,
+								findings,
+								hash => openedHashes.has(hash) || citedAttempted.has(hash),
+								MAX_CITED_SCRAPES_PER_ROUND,
+							)
+							// Grounded and fully fetched — nothing left to close.
+							if (perFieldTargets.length === 0 && citedUnscraped.length === 0)
+								break
+							const elapsedMs =
+								DateTime.toEpochMillis(DateTime.nowUnsafe()) - runStartedAtMs
+							const thinDeadline =
+								elapsedMs >
+								runDeadlineSeconds * 1000 * GAP_ROUND_DEADLINE_FRACTION
+							// Phase 2 has no live budget scope; the margin reads the run's
+							// policy budget less everything spent so far — phase 1 plus the
+							// gap rounds already run — so it actually tightens each round.
+							const gapPolicy = (run as { paidPolicy: ResolvedPolicy | null })
+								.paidPolicy
+							const thinBudget =
+								(gapPolicy?.budgetCents ?? 0) -
+									cheapSpentCents -
+									gapSpentCents <
+								SCRAPE_COST_CENTS * 2
+							if (thinDeadline || thinBudget) {
+								yield* Effect.logInfo('research.gap_rounds.stopped').pipe(
 									Effect.annotateLogs({
 										research_id: researchId,
 										round: gapRound,
-										cited_fetched: citedUnscraped.length,
-										fired: perFieldFired,
-										filled: merged.filled,
+										reason: thinDeadline ? 'deadline_margin' : 'budget_margin',
 									}),
 								)
-								// A round that filled nothing and resolved no cited page has
-								// stopped closing gaps — stop before burning the remaining
-								// rounds on the same result.
-								if (merged.filled === 0 && citedUnscraped.length === 0) break
+								break
 							}
+							// Counted here, past both stop checks: the body below can leave
+							// by several different exits, so a round counted at the end
+							// would go unreported whenever it takes one of them.
+							yield* recordProgress
+							const roundHashes: string[] = []
+							// Fetch the cited pages first: cheap certainty about sources
+							// the run already leans on.
+							yield* Effect.forEach(
+								citedUnscraped,
+								citedUrl =>
+									Effect.gen(function* () {
+										// Mark the attempt (fetched, empty, or errored) so a page that
+										// yields nothing is not re-fetched next round.
+										citedAttempted.add(urlHashForScrape(citedUrl))
+										if (isUnsupportedScrapeUrl(citedUrl)) return
+										const cited = yield* gapScrape.scrape({
+											url: citedUrl,
+											formats: ['markdown'],
+										})
+										// Charged once the fetch is back, so a URL that errors out
+										// leaves the round's remaining budget intact.
+										gapSpentCents += SCRAPE_COST_CENTS
+										if (
+											cited.markdown !== undefined &&
+											cited.markdown.trim().length > 0
+										) {
+											const citedHash = urlHashForScrape(cited.url)
+											roundHashes.push(citedHash)
+											scrapeCorpus.push({
+												urlHash: citedHash,
+												text: cited.markdown,
+												host: domainHost(cited.resolvedUrl ?? cited.url),
+												kind: 'page',
+											})
+										}
+									}).pipe(
+										// Let a pure interruption (cancel/deploy) unwind the run instead of
+										// being logged as a skip while the loop keeps spending.
+										Effect.catchCause(cause =>
+											Cause.hasInterruptsOnly(cause)
+												? Effect.failCause(cause)
+												: Effect.logInfo(
+														'research.gap_rounds.cited_scrape_skipped',
+													).pipe(
+														Effect.annotateLogs({
+															research_id: researchId,
+															url: citedUrl,
+															cause: Cause.pretty(cause),
+														}),
+													),
+										),
+									),
+								{ concurrency: GAP_ROUND_CONCURRENCY },
+							)
+							// Cited pages fetched: re-judge the kept fields against them
+							// right away — the point of fetching is that a wrong-company
+							// page can now void the field it sourced, no LLM call needed.
+							if (roundHashes.length > 0 && entityTargets) {
+								const gapOpenedByHash = new Map(
+									openedPages(scrapeCorpus).map(
+										page =>
+											[
+												page.urlHash,
+												{ text: page.text, host: page.host },
+											] as const,
+									),
+								)
+								const recheck = guardEntitySources(
+									findings,
+									entityTargets,
+									sourceId => gapOpenedByHash.get(urlHashForScrape(sourceId)),
+								)
+								findings = recheck.findings
+								if (recheck.droppedOffEntity > 0) {
+									if (entityMatch === 'strong') entityMatch = 'weak'
+									yield* Effect.logWarning(
+										'research.gap_rounds.cited_voided',
+									).pipe(
+										Effect.annotateLogs({
+											research_id: researchId,
+											dropped: recheck.droppedOffEntity,
+										}),
+									)
+								}
+							}
+							// Nothing missing: the cited fetches were the whole round —
+							// link them and let the next round's top check close the loop.
+							if (perFieldTargets.length === 0) {
+								if (roundHashes.length > 0) yield* linkRunSources(roundHashes)
+								continue
+							}
+							const perFieldFired = perFieldTargets.length
+							yield* Effect.forEach(
+								perFieldTargets,
+								target =>
+									Effect.gen(function* () {
+										gapSpentCents += SEARCH_COST_CENTS
+										const searched = yield* gapSearch
+											.search({
+												query: perFieldSearchQuery(
+													target.name,
+													hintLocation,
+													target.field,
+												),
+												limit: 3,
+												location: hintLocation,
+											})
+											.pipe(
+												// Let a pure interruption (cancel/deploy) unwind the run instead of
+												// being swallowed as an empty result while the loop keeps spending.
+												Effect.catchCause(cause =>
+													Cause.hasInterruptsOnly(cause)
+														? Effect.failCause(cause)
+														: Effect.succeed(null),
+												),
+											)
+										for (const item of searched?.items ?? []) {
+											const host = domainHost(item.url)
+											if (host !== undefined) searchResultHosts.add(host)
+											if (item.content && item.content.trim().length > 0) {
+												const hash = urlHashForScrape(item.url)
+												roundHashes.push(hash)
+												scrapeCorpus.push({
+													urlHash: hash,
+													text: item.content,
+													host,
+													kind: 'passage',
+												})
+											}
+										}
+									}),
+								{ concurrency: GAP_ROUND_CONCURRENCY },
+							)
+							// Nothing new reached the evidence — more rounds would only
+							// repeat the same searches, so the remaining gaps are treated
+							// as absent and the quality signal reports the thinness.
+							if (roundHashes.length === 0) break
+							yield* linkRunSources(roundHashes)
+							const perFieldAnchorFirst = [...scrapeCorpus].sort(
+								(a, b) =>
+									(anchorHashes.has(a.urlHash) ? 0 : 1) -
+									(anchorHashes.has(b.urlHash) ? 0 : 1),
+							)
+							const refreshed = yield* extractStructuredFindings(
+								researchText,
+								[
+									evidenceText,
+									...seededEvidenceParts,
+									...groundedPageTexts(entityTargets, scrapeCorpus),
+								].join('\n'),
+								labelledGroundedPages(entityTargets, perFieldAnchorFirst),
+							)
+							const merged = mergePerFieldSearch(
+								findings,
+								refreshed.findings,
+								schemaName,
+							)
+							findings = merged.findings
+							yield* Effect.annotateCurrentSpan({
+								'research.gap_rounds.round': gapRound,
+								'research.per_field_search.fired': perFieldFired,
+								'research.per_field_search.filled': merged.filled,
+								'research.per_field_search.added': merged.added,
+								'research.gap_rounds.contacts_kept':
+									contactFill(findings).named,
+								'research.gap_rounds.titled_kept': contactFill(findings).titled,
+							})
+							yield* Effect.logInfo('research.gap_rounds.closed').pipe(
+								Effect.annotateLogs({
+									research_id: researchId,
+									round: gapRound,
+									cited_fetched: citedUnscraped.length,
+									fired: perFieldFired,
+									filled: merged.filled,
+									added: merged.added,
+								}),
+							)
+							// A round that filled nothing, found nobody new and resolved no
+							// cited page has stopped closing gaps — stop before burning the
+							// remaining rounds on the same result.
+							if (
+								merged.filled === 0 &&
+								merged.added === 0 &&
+								citedUnscraped.length === 0
+							)
+								break
 						}
 						yield* Ref.update(toolLog, log => [
 							...log,

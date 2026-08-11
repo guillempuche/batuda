@@ -30,6 +30,14 @@ export const isDiscoveryScan = (schemaName: string): boolean =>
 	schemaName in DISCOVERY_RESULT_FIELD
 
 /**
+ * Which list holds a discovery scan's companies, or undefined for a schema that
+ * is not a scan. Anything that needs to reach inside a scan's results asks here,
+ * so the mapping above stays the only place the two schemas are named.
+ */
+export const discoveryResultField = (schemaName: string): string | undefined =>
+	DISCOVERY_RESULT_FIELD[schemaName]
+
+/**
  * How many results a discovery scan's primary list carries. Null for a schema
  * that is not a discovery scan, whose result count is a different question its
  * own guards answer; zero when the list is missing, unusable, or empty.
