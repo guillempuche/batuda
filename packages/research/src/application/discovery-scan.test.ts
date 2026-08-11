@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
 	DISCOVERY_THIN_RESULT_COUNT,
 	discoveryResultCount,
+	discoveryResultField,
 	emptyScanFindings,
 	isDiscoveryScan,
 	isDiscoveryScanEmpty,
@@ -313,6 +314,28 @@ describe('emptyScanFindings', () => {
 				/found no companies matching the criteria/i,
 			)
 			expect(findings.error).not.toMatch(/retry/i)
+		})
+	})
+})
+
+describe('discoveryResultField', () => {
+	describe('when the schema is a discovery scan', () => {
+		it('should name the list its companies live in', () => {
+			// GIVEN each of the two scan schemas
+			// THEN anything needing to reach inside a scan's results is told where
+			// they are, rather than naming the list a second time for itself
+			expect(discoveryResultField('prospect_scan_v1')).toBe('prospects')
+			expect(discoveryResultField('competitor_scan_v1')).toBe('competitors')
+		})
+	})
+
+	describe('when the schema is not a discovery scan', () => {
+		it('should name no list', () => {
+			// GIVEN a schema whose answer is not a list of companies, or none at all
+			// THEN there is no list to reach into
+			expect(discoveryResultField('company_enrichment_v1')).toBeUndefined()
+			expect(discoveryResultField('freeform')).toBeUndefined()
+			expect(discoveryResultField('')).toBeUndefined()
 		})
 	})
 })

@@ -290,6 +290,38 @@ describe('buildResearchSystemPrompt', () => {
 		})
 	})
 
+	describe('when the run is a discovery scan', () => {
+		it('should tell it to break a many-part request up and work through it', () => {
+			// GIVEN a prospect scan, a competitor scan, and a run that is neither
+			const scan = buildResearchSystemPrompt({
+				schemaName: 'prospect_scan_v1',
+				subjectContext: '',
+				hintsContext: '',
+				segments: [],
+			})
+			const competitors = buildResearchSystemPrompt({
+				schemaName: 'competitor_scan_v1',
+				subjectContext: '',
+				hintsContext: '',
+				segments: [],
+			})
+			const profile = buildResearchSystemPrompt({
+				schemaName: 'company_enrichment_v1',
+				subjectContext: '',
+				hintsContext: '',
+				segments: [],
+			})
+
+			// THEN a scan is told to list the request's parts up front and to check
+			// them off before finishing, so it has a way to tell when it is done
+			expect(scan).toContain('break the request into its parts')
+			expect(scan).toContain('where a part has no companies yet')
+			expect(competitors).toContain('break the request into its parts')
+			// AND a run that is not a scan is not given a plan it has no use for
+			expect(profile).not.toContain('break the request into its parts')
+		})
+	})
+
 	describe('when segments are present', () => {
 		it('should place them below the invariants, each fenced', () => {
 			// GIVEN two resolved segments
@@ -407,6 +439,49 @@ describe('buildExtractionPrompt', () => {
 			expect(withVerdict).toContain('set `verdict`')
 			expect(withVerdict).toContain('disqualifiers')
 			expect(withoutVerdict).not.toContain('set `verdict`')
+		})
+
+		it('should ask a scan for breadth, as it already asks for every person', () => {
+			// GIVEN a discovery scan versus a run that profiles one company
+			const scan = buildExtractionPrompt({
+				citationInstruction: '',
+				evidenceBlock: '',
+				subjects: [],
+				discoveryScan: true,
+			})
+			const profile = buildExtractionPrompt({
+				citationInstruction: '',
+				evidenceBlock: '',
+				subjects: [],
+			})
+
+			// THEN the scan is pushed to list every company the evidence names, and to
+			// cover each part of a request that named several — nothing else in the
+			// pipeline ever asks a scan for breadth
+			expect(scan).toContain('List EVERY company')
+			expect(scan).toContain('not a small market')
+			expect(scan).toContain('Cover every part of the request')
+			// AND it is told to keep a company it could not find a website for, so
+			// asking for the site cannot quietly shorten the list
+			expect(scan).toContain('Never drop a company for want of a website')
+			// AND a run that profiles one company is still asked for its people
+			expect(profile).toContain('Name EVERY person')
+			expect(profile).not.toContain('List EVERY company')
+		})
+
+		it('should not ask a scan to fill a people list it does not have', () => {
+			// GIVEN a discovery scan, whose schema holds companies and no contacts
+			const scan = buildExtractionPrompt({
+				citationInstruction: '',
+				evidenceBlock: '',
+				subjects: [],
+				discoveryScan: true,
+			})
+
+			// THEN it is never told that leaving the people list empty is incomplete —
+			// there is no such list on a scan, and saying so invites an invented one
+			expect(scan).not.toContain('Name EVERY person')
+			expect(scan).not.toContain('Leaving the people list empty')
 		})
 
 		it('should carry the anti-fabrication rules the guards depend on', () => {
@@ -1273,6 +1348,8 @@ describe('openedPages', () => {
 
 describe('citedUnscrapedSources', () => {
 	const hasNone = () => false
+	const PROFILE = 'company_enrichment_v1'
+	const SCAN = 'prospect_scan_v1'
 
 	describe('when company fields cite pages the run never fetched', () => {
 		it('should return each ordinary citation once, up to the cap', () => {
@@ -1286,11 +1363,11 @@ describe('citedUnscrapedSources', () => {
 			}
 
 			// WHEN collected — THEN deduped, in field order, and capped
-			expect(citedUnscrapedSources(findings, hasNone, 3)).toEqual([
+			expect(citedUnscrapedSources(PROFILE, findings, hasNone, 3)).toEqual([
 				'https://a.com/x',
 				'https://b.com/y',
 			])
-			expect(citedUnscrapedSources(findings, hasNone, 1)).toEqual([
+			expect(citedUnscrapedSources(PROFILE, findings, hasNone, 1)).toEqual([
 				'https://a.com/x',
 			])
 		})
@@ -1316,6 +1393,7 @@ describe('citedUnscrapedSources', () => {
 			// WHEN collected — THEN none qualify for a fetch
 			expect(
 				citedUnscrapedSources(
+					PROFILE,
 					findings,
 					hash => hash === urlHashForScrape('https://fetched.com/p'),
 					5,
@@ -1324,10 +1402,75 @@ describe('citedUnscrapedSources', () => {
 		})
 	})
 
-	describe('when findings are not an enrichment object', () => {
+	describe('when a discovery scan cites pages the run never fetched', () => {
+		it('should reach the pages the companies it found were read from', () => {
+			// GIVEN a scan whose companies cite pages, one of them twice
+			const findings = {
+				prospects: [
+					{
+						name: 'Acme',
+						citations: [
+							{ source_id: 'https://dir.test/acme' },
+							{ source_id: 'https://dir.test/list' },
+						],
+					},
+					{ name: 'Beta', citations: [{ source_id: 'https://dir.test/list' }] },
+				],
+			}
+
+			// WHEN collected
+			// THEN a scan's cited pages are reachable exactly as a profile's are,
+			// each one offered once
+			expect(citedUnscrapedSources(SCAN, findings, hasNone, 5)).toEqual([
+				'https://dir.test/acme',
+				'https://dir.test/list',
+			])
+		})
+
+		it('should ignore rows and citations that hold no source', () => {
+			// GIVEN a list carrying a row that is not an object, a row with no
+			// citations, a citations value that is not a list, and a citation with no id
+			const findings = {
+				prospects: [
+					'not a row',
+					{ name: 'A' },
+					{ name: 'B', citations: 'nope' },
+					{ name: 'C', citations: [{ quote: 'no id here' }, null] },
+					{ name: 'D', citations: [{ source_id: 'https://ok.test' }] },
+				],
+			}
+
+			// WHEN collected — THEN only the real citation survives
+			expect(citedUnscrapedSources(SCAN, findings, hasNone, 5)).toEqual([
+				'https://ok.test',
+			])
+		})
+	})
+
+	describe('when the schema is not a scan', () => {
+		it('should not read a list the schema does not have', () => {
+			// GIVEN a profile run whose findings happen to carry a prospects list
+			const findings = {
+				prospects: [
+					{ name: 'A', citations: [{ source_id: 'https://stray.test' }] },
+				],
+			}
+			// WHEN collected under the profile schema
+			// THEN the stray list is not read — the schema says which shape this is
+			expect(citedUnscrapedSources(PROFILE, findings, hasNone, 5)).toEqual([])
+		})
+	})
+
+	describe('when findings hold nothing to cite', () => {
 		it('should return nothing', () => {
-			expect(citedUnscrapedSources({ error: 'x' }, hasNone, 3)).toEqual([])
-			expect(citedUnscrapedSources(null, hasNone, 3)).toEqual([])
+			expect(
+				citedUnscrapedSources(PROFILE, { error: 'x' }, hasNone, 3),
+			).toEqual([])
+			expect(citedUnscrapedSources(PROFILE, null, hasNone, 3)).toEqual([])
+			expect(citedUnscrapedSources(SCAN, null, hasNone, 3)).toEqual([])
+			expect(
+				citedUnscrapedSources(SCAN, { prospects: 'x' }, hasNone, 3),
+			).toEqual([])
 		})
 	})
 })
