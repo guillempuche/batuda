@@ -22,8 +22,9 @@
 
 import { mergeContacts } from './contacts-rescue'
 import { discoveryResultField, isDiscoveryScan } from './discovery-scan'
+import { collapse } from './entity-guard'
 import { enrichmentFill } from './extraction-fill'
-import { isValueWrapper, unwrapValue } from './guard-shapes'
+import { isPlainObject, isValueWrapper, unwrapValue } from './guard-shapes'
 
 // The company-profile facts worth spending an extra search on. `size_range` is
 // also nudged during the loop (headcount is rarely on the homepage); for the
@@ -35,15 +36,23 @@ export const HIGH_VALUE_FIELDS: ReadonlyArray<string> = [
 	'size_range',
 ]
 
-// The facts worth an extra search on one company a scan found. A scan is asked
-// for a list to work through, and a name alone cannot be worked with: the site is
-// how someone reaches the company, and the headcount is how they decide whether
-// it is worth reaching. Website comes first because it is the one a scan is most
-// often asked for and most often misses.
-export const SCAN_ROW_FIELDS: ReadonlyArray<string> = [
-	'website',
-	'employee_estimate',
-]
+// The facts worth an extra search on one company a scan found, per kind of scan.
+// A scan is asked for a list to work through, and a name alone cannot be worked
+// with: the site is how someone reaches the company, and the headcount is how
+// they decide whether it is worth reaching.
+//
+// Each field named here has to exist on that scan's own schema, or the search is
+// paid for and the answer has nowhere to land — a competitor is never asked for a
+// headcount, so asking the web for one would buy nothing. The test next door
+// checks each name against the real schema so the two cannot drift apart.
+const SCAN_ROW_FIELDS_BY_SCHEMA: Record<string, ReadonlyArray<string>> = {
+	prospect_scan_v1: ['website', 'employee_estimate'],
+	competitor_scan_v1: ['website'],
+}
+
+/** The facts worth searching for on one company this kind of scan found. */
+export const scanRowFields = (schemaName: string): ReadonlyArray<string> =>
+	SCAN_ROW_FIELDS_BY_SCHEMA[schemaName] ?? []
 
 // At most this many extra searches per round for a company profile: an all-empty
 // profile would otherwise fire one per field. Any missing field beyond the cap is
@@ -107,10 +116,7 @@ const scanRowsOf = (
 	if (findings === null || typeof findings !== 'object') return []
 	const rows = (findings as Record<string, unknown>)[field]
 	if (!Array.isArray(rows)) return []
-	return rows.filter(
-		(row): row is Record<string, unknown> =>
-			row !== null && typeof row === 'object' && !Array.isArray(row),
-	)
+	return rows.filter(isPlainObject)
 }
 
 /** The name a scan row goes by, or undefined when it names no company. */
@@ -125,14 +131,13 @@ const rowName = (row: Record<string, unknown>): string | undefined => {
  * The key two mentions of the same company share.
  *
  * A re-extraction reads the same company off a different page and writes the name
- * with different spacing or punctuation — `Acme S.L.` against `Acme S.L`. Folding
- * those together keeps one company from becoming two rows. It stops at
- * punctuation and case on purpose: dropping a legal suffix would fold `Acme` and
- * `Acme Holding` into one, and putting a recovered website on the wrong company
- * is far worse than listing it twice.
+ * differently — `Transports Munné, S.L.` against `Transports Munne SL`. Folding
+ * those together keeps one company from becoming two rows. The fold keeps the
+ * legal suffix, which is what has to happen here: dropping it would fold `Acme`
+ * and `Acme Holding` into one, and putting a recovered website on the wrong
+ * company is far worse than listing it twice.
  */
-const nameKey = (name: string): string =>
-	name.toLowerCase().replace(/[.,]/g, '').replace(/\s+/g, ' ').trim()
+const nameKey = (name: string): string => collapse(name)
 
 /**
  * The still-empty high-value facts worth a focused search, in a stable order.
@@ -155,7 +160,7 @@ export const needsPerFieldSearch = (args: {
 		for (const row of scanRowsOf(args.schemaName, args.findings)) {
 			const name = rowName(row)
 			if (name === undefined) continue
-			for (const field of SCAN_ROW_FIELDS) {
+			for (const field of scanRowFields(args.schemaName)) {
 				if (!hasRowValue(row[field])) targets.push({ name, field })
 			}
 		}
@@ -265,7 +270,7 @@ const mergeScanRows = (
 		if (match === undefined) return row
 		const next: Record<string, unknown> = { ...row }
 		let filledHere = 0
-		for (const key of SCAN_ROW_FIELDS) {
+		for (const key of scanRowFields(schemaName)) {
 			if (!hasRowValue(row[key]) && hasRowValue(match[key])) {
 				next[key] = match[key]
 				filledHere++
@@ -274,7 +279,11 @@ const mergeScanRows = (
 		filled += filledHere
 		return filledHere === 0 ? row : next
 	})
-	const knownNames = new Set(
+	// Grows as companies are taken, so one re-extraction naming the same new
+	// company twice appends it once. A duplicate would not only read badly — the
+	// list's length is what decides whether a scan came back too thin to trust,
+	// so counting one company twice can pass a scan off as healthier than it is.
+	const takenNames = new Set(
 		known.flatMap(row => {
 			const name = rowName(row)
 			return name === undefined ? [] : [nameKey(name)]
@@ -282,7 +291,9 @@ const mergeScanRows = (
 	)
 	const additions = found.filter(row => {
 		const name = rowName(row)
-		return name !== undefined && !knownNames.has(nameKey(name))
+		if (name === undefined || takenNames.has(nameKey(name))) return false
+		takenNames.add(nameKey(name))
+		return true
 	})
 	if (filled === 0 && additions.length === 0) {
 		return { findings, filled: 0, contactsChanged: false, added: 0 }

@@ -1,3 +1,4 @@
+import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -8,8 +9,10 @@ import {
 	needsPerFieldSearch,
 	perFieldSearchCap,
 	perFieldSearchQuery,
-	SCAN_ROW_FIELDS,
+	scanRowFields,
 } from './per-field-search'
+import { CompetitorScanV1Schema } from './schemas/competitor-scan-v1'
+import { ProspectScanV1Schema } from './schemas/prospect-scan-v1'
 
 // A per-field-citation value the way the enrichment schema stores one.
 const sourced = (value: string) => ({ value, source_id: 'https://x.test' })
@@ -109,14 +112,15 @@ describe('needsPerFieldSearch', () => {
 			])
 		})
 
-		it('should read a competitor scan the same way as a prospect scan', () => {
+		it('should reach a competitor list, but only for facts it can hold', () => {
 			// GIVEN a competitor scan's own list
 			const findings = { competitors: [{ name: 'Rival' }] }
 			// WHEN computed
-			// THEN it is reached exactly as a prospect list is
+			// THEN the list is reached exactly as a prospect list is, but a headcount
+			// is never asked about: a competitor row has no place to put one, so the
+			// search would be paid for and the answer thrown away
 			expect(forScan(findings, COMPETITORS)).toEqual([
 				{ name: 'Rival', field: 'website' },
-				{ name: 'Rival', field: 'employee_estimate' },
 			])
 		})
 
@@ -470,6 +474,27 @@ describe('mergePerFieldSearch', () => {
 			expect(merged.added).toBe(0)
 		})
 
+		it('should fold two spellings that differ only by an accent', () => {
+			// GIVEN a Catalan company name carrying its accent and legal suffix
+			const findings = { prospects: [{ name: 'Transports Munné, S.L.' }] }
+			// AND a second look that read the same company off a page that dropped both
+			const refreshed = {
+				prospects: [
+					{ name: 'Transports Munne SL', website: 'https://munne.test' },
+				],
+			}
+			// WHEN merged
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const rows = prospectsOf(merged.findings)
+			// THEN it is still one company — most of the market this searches writes
+			// names with accents, and matching on the letters alone would have listed
+			// the same firm twice and counted the duplicate as a new find
+			expect(rows).toHaveLength(1)
+			expect(rows[0]?.['name']).toBe('Transports Munné, S.L.')
+			expect(rows[0]?.['website']).toBe('https://munne.test')
+			expect(merged.added).toBe(0)
+		})
+
 		it('should not fold two genuinely different companies together', () => {
 			// GIVEN a company whose name is a prefix of another's
 			const findings = { prospects: [{ name: 'Acme' }] }
@@ -484,6 +509,25 @@ describe('mergePerFieldSearch', () => {
 			// smaller harm than a website on the wrong company
 			expect(rows[0]?.['website']).toBeUndefined()
 			expect(rows.map(row => row['name'])).toEqual(['Acme', 'Acme Holding'])
+			expect(merged.added).toBe(1)
+		})
+
+		it('should append a company the second look names twice only once', () => {
+			// GIVEN a re-extraction that names the same NEW company in two rows
+			const findings = { prospects: [{ name: 'Zeta' }] }
+			const refreshed = {
+				prospects: [
+					{ name: 'Acme', website: 'https://a.test' },
+					{ name: 'Acme', website: 'https://b.test' },
+				],
+			}
+			// WHEN merged
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const rows = prospectsOf(merged.findings)
+			// THEN it joins the list once — the list's length decides whether a scan
+			// came back too thin to trust, so counting one company twice would pass a
+			// thin scan off as a healthy one
+			expect(rows.map(row => row['name'])).toEqual(['Zeta', 'Acme'])
 			expect(merged.added).toBe(1)
 		})
 
@@ -608,16 +652,54 @@ describe('mergePerFieldSearch', () => {
 })
 
 describe('the fields each shape rescues', () => {
-	it('should name the facts a profile and a scan are each worth searching for', () => {
-		// GIVEN the two field lists the rescue works from
-		// THEN a profile rescues its firmographics, and a scan rescues what makes a
-		// company on a list reachable and worth reaching
-		expect(HIGH_VALUE_FIELDS).toEqual([
-			'country',
-			'industry',
-			'location',
-			'size_range',
-		])
-		expect(SCAN_ROW_FIELDS).toEqual(['website', 'employee_estimate'])
+	describe('when a run goes looking for what it left empty', () => {
+		it('should name the facts a profile and a scan are each worth searching for', () => {
+			// GIVEN the two field lists the rescue works from
+			// WHEN a run of either shape reaches the gap rounds
+			// THEN a profile rescues its firmographics, and a scan rescues what makes
+			// a company on a list reachable and worth reaching
+			expect(HIGH_VALUE_FIELDS).toEqual([
+				'country',
+				'industry',
+				'location',
+				'size_range',
+			])
+			expect(scanRowFields(SCAN)).toEqual(['website', 'employee_estimate'])
+			expect(scanRowFields(COMPETITORS)).toEqual(['website'])
+			expect(scanRowFields('freeform')).toEqual([])
+		})
+
+		it('should only name facts the scan schema can actually carry', () => {
+			// GIVEN a company row carrying every fact the rescue would search for,
+			// put through the very schema the model fills
+			const sample: Record<string, unknown> = {
+				name: 'Acme',
+				website: 'https://acme.test',
+				employee_estimate: {
+					value: 42,
+					source_id: 'https://acme.test',
+					confidence: null,
+				},
+				why_relevant: 'matches',
+				description: 'a rival',
+				citations: [],
+			}
+			for (const [schemaName, schema, listField] of [
+				[SCAN, ProspectScanV1Schema, 'prospects'],
+				[COMPETITORS, CompetitorScanV1Schema, 'competitors'],
+			] as const) {
+				const decoded = Schema.decodeUnknownSync(schema)({
+					[listField]: [sample],
+				}) as Record<string, ReadonlyArray<Record<string, unknown>>>
+				const row = decoded[listField]?.[0] ?? {}
+				// WHEN each fact the rescue searches for is looked for on the way out
+				// THEN it survived — a fact the schema drops would be searched for
+				// every round and merged back nowhere, which is the same waste this
+				// rescue was rewritten to stop doing on a company profile
+				for (const field of scanRowFields(schemaName)) {
+					expect(row).toHaveProperty(field)
+				}
+			}
+		})
 	})
 })
