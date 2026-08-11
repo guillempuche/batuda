@@ -136,6 +136,9 @@ const systemDefaults: SystemDefaults = {
 
 const researchInput: CreateResearchInput = {
 	query: 'heartbeat advance test',
+	// Whether the run reports it is still alive has nothing to do with the shape
+	// of its answer; a brief is the cheapest one to get there.
+	schemaName: 'freeform',
 	forceFresh: true,
 }
 

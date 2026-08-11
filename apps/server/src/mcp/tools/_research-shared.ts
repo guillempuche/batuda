@@ -9,9 +9,25 @@ import { SchemaNameSchema } from '@batuda/research'
 // would otherwise surface a raw Postgres error to the caller.
 export const Uuid = Schema.String.check(Schema.isUUID())
 
+// What each kind of run is for, in the words the web app already offers a
+// person picking between them. Written once so the two research tools cannot
+// come to describe the same choice differently.
+export const SCHEMA_GUIDANCE =
+	'Pick schema_name for the shape of answer you need. ' +
+	'`prospect_scan_v1` finds companies matching a profile — industry, size, location — when you want net-new companies to add as leads. ' +
+	'`company_enrichment_v1` fills industry, size, location, contacts, competitors and proposed CRM updates for a company you already have. ' +
+	'`contact_discovery_v1` finds decision-makers and operational contacts at one company, when you need names, emails, phones and roles to reach out. ' +
+	'`competitor_scan_v1` maps direct competitors with strengths, weaknesses, and a market-maturity summary. ' +
+	'`freeform` writes an open-ended brief and returns no structured list — pick it only when the question fits no fixed shape, such as a history, a market trend, or an opinion piece.'
+
 // schema_name constrained to the server's closed set, so an unknown name is
 // rejected up front instead of creating a run that only fails at phase 0.
-export const SchemaNameParam = SchemaNameSchema
+// Required, not optional: a caller who said nothing used to get a brief, and a
+// question about which companies exist has nowhere to put them in one.
+export const SchemaNameParam = SchemaNameSchema.annotate({
+	description:
+		'The shape of answer this run produces; see the tool description for what each one is for. There is no default — a question about which companies exist, answered as `freeform`, comes back as prose with no list of companies in it.',
+})
 
 // A research query: present and length-bounded. Stops empty prompts from
 // creating junk runs and caps oversized input that would otherwise waste spend

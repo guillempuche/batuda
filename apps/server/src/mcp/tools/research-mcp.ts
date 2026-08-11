@@ -28,6 +28,7 @@ import {
 	pollAfterMs,
 	ResearchQuery,
 	redactDbErrors,
+	SCHEMA_GUIDANCE,
 	SchemaNameParam,
 	Uuid,
 } from './_research-shared'
@@ -143,11 +144,13 @@ const ResearchSyncResult = Schema.Union([
 
 const StartResearch = Tool.make('start_research', {
 	description:
-		"Start a research run; returns {_tag:'started', id, status, applied_instructions, poll_after_ms?} immediately — then call get_research for results. Fresh research takes 2-5 minutes, so status comes back 'queued' and poll_after_ms says how many milliseconds to wait before the first check; unless the same question was answered before, in which case status is already 'succeeded' and poll_after_ms is absent, meaning the findings are ready and there is nothing to wait for. applied_instructions lists the instruction templates that shaped the run. The user's default research instructions apply automatically; pass `stack` (a named stack, by name or id) to run a specific saved stack, and/or `instructions` (template names or ids) to layer extra templates after it for this run. An unknown or ambiguous `stack`/`instructions` ref returns {_tag:'instruction_clarification'} with candidates instead of starting. A `context.selector` — shaped `{ table: \"companies\", filter: { status?, industry?, country?, tags? } }` — researches every matching company (one run each); without `confirm:true` it returns {_tag:'confirm_required', subject_count, estimated_cost_cents} first so you can preview the scale — re-submit with confirm:true to launch (or narrow the filter). A malformed context returns {_tag:'invalid_context', error} without starting a run. If the user states a new standing preference, save it with manage_instructions.",
+		"Start a research run; returns {_tag:'started', id, status, applied_instructions, poll_after_ms?} immediately — then call get_research for results. Fresh research takes 2-5 minutes, so status comes back 'queued' and poll_after_ms says how many milliseconds to wait before the first check; unless the same question was answered before, in which case status is already 'succeeded' and poll_after_ms is absent, meaning the findings are ready and there is nothing to wait for. " +
+		SCHEMA_GUIDANCE +
+		" applied_instructions lists the instruction templates that shaped the run. The user's default research instructions apply automatically; pass `stack` (a named stack, by name or id) to run a specific saved stack, and/or `instructions` (template names or ids) to layer extra templates after it for this run. An unknown or ambiguous `stack`/`instructions` ref returns {_tag:'instruction_clarification'} with candidates instead of starting. A `context.selector` — shaped `{ table: \"companies\", filter: { status?, industry?, country?, tags? } }` — researches every matching company (one run each); without `confirm:true` it returns {_tag:'confirm_required', subject_count, estimated_cost_cents} first so you can preview the scale — re-submit with confirm:true to launch (or narrow the filter). A malformed context returns {_tag:'invalid_context', error} without starting a run. If the user states a new standing preference, save it with manage_instructions.",
 	parameters: Schema.Struct({
 		query: ResearchQuery,
 		context: Schema.optional(Schema.Unknown),
-		schema_name: Schema.optional(SchemaNameParam),
+		schema_name: SchemaNameParam,
 		stack: Schema.optional(Schema.String),
 		instructions: Schema.optional(InstructionsOverride),
 		confirm: Schema.optional(Schema.Boolean),
@@ -198,11 +201,13 @@ const GetResearch = Tool.make('get_research', {
 
 const ResearchSync = Tool.make('research_sync', {
 	description:
-		"Run research and return full findings inline when it finishes quickly; best for a question likely asked before, since only a cached answer comes back inline. Waits up to ~10s: a cached run returns completed findings; anything else returns the run still going — status 'queued' or 'running' — with poll_after_ms, for you to call get_research after that many milliseconds. The run keeps going regardless and is never lost. Prefer start_research when you expect fresh research: a real run takes 2-5 minutes and will never finish inside this wait, so expect no findings and a null progressSteps here. Pass max_wait_seconds (whole seconds, 1-10; larger values are treated as 10) to wait less if your own request timeout is shorter. The returned run includes applied_instructions — the instruction templates that shaped it. The user's default research instructions apply automatically; pass `stack` (a named stack, by name or id) to run a specific saved stack, and/or `instructions` (template names or ids) to layer extra templates after it for this run. An unknown or ambiguous `stack`/`instructions` ref returns {_tag:'instruction_clarification'} with candidates instead of running. A `context.selector` — shaped `{ table: \"companies\", filter: { status?, industry?, country?, tags? } }` — fans out one run per matching company; without `confirm:true` it returns {_tag:'confirm_required', subject_count, estimated_cost_cents} first. A malformed context returns {_tag:'invalid_context', error} without starting a run.",
+		"Run research and return full findings inline when it finishes quickly; best for a question likely asked before, since only a cached answer comes back inline. Waits up to ~10s: a cached run returns completed findings; anything else returns the run still going — status 'queued' or 'running' — with poll_after_ms, for you to call get_research after that many milliseconds. The run keeps going regardless and is never lost. Prefer start_research when you expect fresh research: a real run takes 2-5 minutes and will never finish inside this wait, so expect no findings and a null progressSteps here. Pass max_wait_seconds (whole seconds, 1-10; larger values are treated as 10) to wait less if your own request timeout is shorter. " +
+		SCHEMA_GUIDANCE +
+		" The returned run includes applied_instructions — the instruction templates that shaped it. The user's default research instructions apply automatically; pass `stack` (a named stack, by name or id) to run a specific saved stack, and/or `instructions` (template names or ids) to layer extra templates after it for this run. An unknown or ambiguous `stack`/`instructions` ref returns {_tag:'instruction_clarification'} with candidates instead of running. A `context.selector` — shaped `{ table: \"companies\", filter: { status?, industry?, country?, tags? } }` — fans out one run per matching company; without `confirm:true` it returns {_tag:'confirm_required', subject_count, estimated_cost_cents} first. A malformed context returns {_tag:'invalid_context', error} without starting a run.",
 	parameters: Schema.Struct({
 		query: ResearchQuery,
 		context: Schema.optional(Schema.Unknown),
-		schema_name: Schema.optional(SchemaNameParam),
+		schema_name: SchemaNameParam,
 		stack: Schema.optional(Schema.String),
 		instructions: Schema.optional(InstructionsOverride),
 		max_wait_seconds: Schema.optional(MaxWaitSeconds),
