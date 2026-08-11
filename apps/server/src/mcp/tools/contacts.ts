@@ -89,7 +89,7 @@ const CreateContact = Tool.make('create_contact', {
 
 const UpdateContact = Tool.make('update_contact', {
 	description:
-		'Update one or more fields on an existing contact by UUID. Only include fields to change. channels[] only adds an address or refreshes one already on file — it never removes or replaces one, so correcting an address here leaves the old one behind and the person ends up holding both. Use manage_contact_channels to correct, remove, label or re-elect a single channel. Set clear_email_suppression=true to reset the email channel to "unknown" (use after a bounced/complained contact confirms their address is good again — this re-enables outbound mail to that address).',
+		'Update one or more fields on an existing contact by UUID. Only include fields to change. channels[] only adds an address or refreshes one already on file — it never removes or replaces one, so correcting an address here leaves the old one behind and the person ends up holding both. Use manage_contact_channels to correct, remove, label or re-elect a single channel. Set clear_email_suppression=true to let mail go again to every held-back address on this contact, after a bounce or a spam report turns out to have been wrong — it lifts blocks and nothing else, so an address somebody has vouched for is left as it is. A block is recorded against every record in the organisation holding that address, and this speaks only for the rows on this contact — so if a company or a branch holds the same address, the block stays in place until those are cleared too.',
 	parameters: Schema.Struct({
 		id: Schema.String,
 		site_id: Schema.optional(Schema.NullOr(Schema.String)).annotate({
