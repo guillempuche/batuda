@@ -1,12 +1,13 @@
 import { expect, test } from '@playwright/test'
 
+import { closeAboutSection, openAboutSection } from './helpers/about-section'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 // Asserts the redesigned company-detail Overview tab — Slice 1 of the
 // company-detail UX overhaul. The Overview replaces the flat 11-field
 // Profile tab with a deal dashboard: Next action / Cadence / Upcoming
 // at a glance; Open tasks + Timeline as the activity column; Research
-// summary + About (collapsed) as the sidebar column.
+// summary + About as the sidebar column.
 //
 // Selectors verified against:
 //   apps/internal/src/components/companies/next-action-card.tsx
@@ -105,42 +106,22 @@ test.describe('company-detail Overview tab', () => {
 		})
 	})
 
-	test.describe('when the user opens the About section', () => {
-		test('should reveal the nine editable fields grouped by concern', async ({
+	test.describe('when the Overview shows the About section', () => {
+		test('should show the eight editable fields grouped by concern', async ({
 			page,
 		}) => {
-			// GIVEN the Overview rendered with About collapsed by default
-			//   [components/companies/about-section.tsx — PriCollapsible.Root, no defaultOpen]
-			const trigger = page.getByTestId('company-about-trigger')
-			await expect(trigger).toBeVisible()
-			// AND the panel content is not visible before the trigger is clicked,
-			// but is still on the page — marked so the browser's Find can reach it.
-			// Checking the mark too: "hidden" alone would also pass if the panel
-			// were not rendered at all. The mark sits on the parent, because the
-			// test id is on the inner body.
+			// GIVEN the Overview as it renders, nothing clicked
 			const panel = page.getByTestId('company-about-panel')
-			await expect(panel).toBeHidden()
-			await expect(panel.locator('xpath=..')).toHaveAttribute(
-				'hidden',
-				'until-found',
-			)
 
-			// WHEN the user clicks the About trigger.
-			// The header runs a shared-layout animation and the dev server applies
-			// styles after first paint, so the trigger slides roughly 900px over the
-			// first second and a click sent mid-flight lands on empty space. Retry
-			// until it lands, and only while still closed so a click that did
-			// register is never undone by the next attempt.
-			await expect(async () => {
-				if ((await trigger.getAttribute('aria-expanded')) !== 'true') {
-					await trigger.click()
-				}
-				await expect(panel).toBeVisible({ timeout: 1_000 })
-			}).toPass({ timeout: 15_000 })
+			// WHEN the user reads down the sidebar column
+			// THEN the section is already open — whether this lead is qualified is
+			// the question it answers, so it is not worth a click to find out.
+			// Asserted here rather than through the helper, which tolerates either
+			// state: this is the one place that holds the default to what it is.
+			//   [components/companies/about-section.tsx — PriCollapsible.Root defaultOpen]
+			await expect(panel).toBeVisible()
 
-			// THEN the panel becomes visible
-
-			// AND every grouped field label is reachable inside the panel
+			// AND every grouped field label is reachable inside it
 			//   Sales context (4)
 			await expect(panel.getByText('Industry', { exact: true })).toBeVisible()
 			await expect(panel.getByText('Country', { exact: true })).toBeVisible()
@@ -158,6 +139,27 @@ test.describe('company-detail Overview tab', () => {
 			await expect(
 				panel.getByText('Products fit', { exact: true }),
 			).toBeVisible()
+		})
+
+		test('should hide the fields when shut but keep them where the browser can find them', async ({
+			page,
+		}) => {
+			// GIVEN the About section open, as the Overview renders it
+			await openAboutSection(page)
+
+			// WHEN the user shuts it
+			const panel = await closeAboutSection(page)
+
+			// THEN the fields go off screen but stay on the page, marked so the
+			// browser's own find can reach them and open the section back up.
+			// Checking the mark as well as the hiding: hidden on its own would pass
+			// just as well if the panel had been dropped from the page. The mark
+			// sits on the parent, because the test id is on the inner body.
+			await expect(panel).toBeHidden()
+			await expect(panel.locator('xpath=..')).toHaveAttribute(
+				'hidden',
+				'until-found',
+			)
 		})
 	})
 })
