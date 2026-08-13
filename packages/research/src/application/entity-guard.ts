@@ -49,6 +49,10 @@ const LEGAL_SUFFIXES = new Set([
 	'as',
 	'nv',
 	'kft',
+	// The second half of "S.A. de C.V.", which is how a Mexican company writes its
+	// form. Without it the connector rule below has nothing to start from and the
+	// whole form stays in the name.
+	'cv',
 ])
 
 // Generic words that do not prove a page is about the target — a page about any
@@ -121,10 +125,57 @@ const foldTokens = (value: string): string[] =>
 		.split(/[^a-z0-9]+/)
 		.filter(Boolean)
 
-// The whole name minus its legal suffix, collapsed — "Acme Logistics S.L." →
+// Words that join two halves of a legal form — "S.A. de C.V.", "Serveis i
+// Manteniments S.L." — skipped over while reading a form off the end, never
+// dropped on their own.
+const FORM_CONNECTORS = new Set(['de', 'y', 'i', 'and'])
+
+// Where a name's legal form ends and the name itself begins, read from the right.
+// A form sits at the end of a name, so anything before the trailing run is the
+// company's own name and stays in the key — two letters at the front that happen
+// to spell a legal form ("KG Motors") are part of what the company is called.
+const nameEnd = (tokens: ReadonlyArray<string>): number => {
+	let end = tokens.length
+	let at = tokens.length
+	while (at > 0) {
+		const token = tokens[at - 1] ?? ''
+		if (LEGAL_SUFFIXES.has(token)) {
+			at--
+			end = at
+			continue
+		}
+		// A connector counts only between two halves of one form, which is why it
+		// moves the cursor and never the end.
+		if (end < tokens.length && FORM_CONNECTORS.has(token)) {
+			at--
+			continue
+		}
+		break
+	}
+	return end
+}
+
+// The whole name minus its legal form, collapsed — "Acme Logistics S.L." →
 // "acmelogistics". This is the strong-match key: it appears verbatim on the
-// company's own pages but is long enough not to hit by coincidence.
-export const nameCore = (name: string): string =>
+// company's own pages but is long enough not to hit by coincidence. A key that
+// is only an industry word would match any page in that industry, so the form is
+// read off the end rather than picked out wherever it appears.
+export const nameCore = (name: string): string => {
+	const tokens = foldTokens(name)
+	return tokens.slice(0, nameEnd(tokens)).join('')
+}
+
+/**
+ * The name with every legal-form word taken out, wherever it sits — "SARL
+ * Transports Dupont" → "transportsdupont".
+ *
+ * This answers a different question from `nameCore`: not "who is this company"
+ * but "does this piece of text name it". A directory writes the trading name
+ * into its address and leaves the form out, so a key that keeps the form finds
+ * nothing there. Being loose is the safe direction for that question — the worst
+ * it does is spot the company's name in one more place.
+ */
+export const nameWithoutForms = (name: string): string =>
 	foldTokens(name)
 		.filter(t => !LEGAL_SUFFIXES.has(t))
 		.join('')
@@ -418,9 +469,13 @@ export const reachedOwnSite = (
 		const label = domainLabelOf(page.host)
 		if (label === undefined) return false
 		const folded = collapse(label)
+		// The host's label has to carry the whole name, not merely be carried by it.
+		// A company named after its trade contains the trade as a word, so reading
+		// the test the other way would hand it the trade's own domain — and whoever
+		// really owns that domain would have their mailbox read as this company's.
 		return (
 			targets.words.includes(label) ||
-			targets.cores.some(core => core.includes(folded) || folded.includes(core))
+			targets.cores.some(core => folded.includes(core))
 		)
 	})
 
