@@ -269,11 +269,12 @@ describe('pollAfterMs', () => {
 	})
 
 	describe('when the run is working', () => {
-		it('should ask for a wait on the order of one round of work', () => {
-			// GIVEN a run part-way through, where a round takes roughly half a minute
+		it('should ask for a wait of tens of seconds, not the length of a round', () => {
+			// GIVEN a run part-way through, whose next round may take anywhere from
+			// half a minute to several minutes
 			// WHEN the wait is asked for
-			// THEN it is close to that, so a caller asks about as often as there is
-			// something new to hear rather than burning turns on unchanged answers
+			// THEN it is tens of seconds — the soonest there could be something new
+			// to hear, rather than burning turns on unchanged answers
 			expect(pollAfterMs('running')).toBe(20_000)
 		})
 

@@ -57,9 +57,10 @@ export const redactDbErrors = <A, R>(
 ): Effect.Effect<A, never, R> =>
 	effect.pipe(Effect.catchTag('SqlError', () => Effect.die('internal error')))
 
-// A run waiting for a free slot starts the moment one of the few that run at
-// once frees up, so it is worth checking back sooner; a run already working
-// gets through a round in roughly half a minute.
+// Both are the soonest it is worth asking again, not how long the work takes: a
+// round closing the gaps left across a long list of companies spends minutes
+// scraping and searching. A queued run gets the shorter of the two, since all
+// that has to happen is one of the few slots that run at once coming free.
 const POLL_AFTER_QUEUED_MS = 15_000
 const POLL_AFTER_RUNNING_MS = 20_000
 
