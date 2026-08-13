@@ -12,8 +12,10 @@ describe('computeRunQuality', () => {
 		const base = {
 			schemaName: 'company_enrichment_v1',
 			rounds: 6,
+			gapRounds: 0,
 			sourcesTotal: 5,
 			sourcesFirstParty: 3,
+			ownDomainKnown: true,
 			fieldsGrounded: 4,
 			fieldsTotal: 6,
 			citationsSeen: 4,
@@ -54,6 +56,33 @@ describe('computeRunQuality', () => {
 			expect(quality.grounding_ratio).toBeCloseTo(0.17)
 		})
 
+		it('should report no own-site pages as zero rather than leaving it out', () => {
+			// GIVEN a run pinned to a company whose own site it never reached
+			const quality = computeRunQuality({
+				...base,
+				entityMatch: 'weak',
+				sourcesFirstParty: 0,
+			})
+			// THEN zero is what happened rather than "does not apply": this run had
+			// a domain to hold its sources against and none of them was on it
+			expect(quality.sources_matched).toBe(0)
+		})
+
+		it('should leave out the own-site count for a company with no site on record', () => {
+			// GIVEN a run that clearly reached the company it was pinned to, but
+			// whose website nobody has filled in — so there was no domain to hold a
+			// source against
+			const quality = computeRunQuality({
+				...base,
+				entityMatch: 'strong',
+				sourcesFirstParty: 0,
+				ownDomainKnown: false,
+			})
+			// THEN it is left out: with no site anyone could have read, the count can
+			// only ever be 0, exactly as on a search about no one company
+			expect(quality.sources_matched).toBeUndefined()
+		})
+
 		it('should leave out the retry marker a run with no retry cannot have', () => {
 			// GIVEN an enrichment run, which is never given the discovery retry
 			const quality = computeRunQuality({ ...base, entityMatch: 'strong' })
@@ -67,8 +96,10 @@ describe('computeRunQuality', () => {
 		const scan = {
 			entityMatch: null,
 			rounds: 3,
+			gapRounds: 0,
 			sourcesTotal: 6,
 			sourcesFirstParty: 0,
+			ownDomainKnown: false,
 			fieldsGrounded: 0,
 			fieldsTotal: 0,
 			citationsSeen: 10,
@@ -110,6 +141,17 @@ describe('computeRunQuality', () => {
 			// would read as a failing grade on every scan ever run
 			expect(quality.grounding_ratio).toBeUndefined()
 			expect(quality.fields_grounded).toBeUndefined()
+		})
+
+		it('should leave out the own-site count a search about nobody cannot have', () => {
+			// GIVEN an open-ended search, which is about no one company
+			const quality = computeRunQuality({
+				...scan,
+				schemaName: 'prospect_scan_v1',
+			})
+			// THEN there is no own domain to hold a source against, so the count is
+			// absent rather than the 0 it read on every search ever run
+			expect(quality.sources_matched).toBeUndefined()
 		})
 
 		it('should grade a competitor scan exactly as it grades a prospect scan', () => {
@@ -158,8 +200,10 @@ describe('computeRunQuality', () => {
 			schemaName: 'prospect_scan_v1',
 			entityMatch: null,
 			rounds: 4,
+			gapRounds: 0,
 			sourcesTotal: 6,
 			sourcesFirstParty: 0,
+			ownDomainKnown: false,
 			fieldsGrounded: 0,
 			fieldsTotal: 0,
 			citationsSeen: 10,
@@ -203,8 +247,10 @@ describe('computeRunQuality', () => {
 				schemaName: 'company_enrichment_v1',
 				entityMatch: 'strong',
 				rounds: 6,
+				gapRounds: 0,
 				sourcesTotal: 5,
 				sourcesFirstParty: 3,
+				ownDomainKnown: true,
 				fieldsGrounded: 4,
 				fieldsTotal: 6,
 				citationsSeen: 4,
@@ -223,8 +269,10 @@ describe('computeRunQuality', () => {
 			schemaName: 'prospect_scan_v1',
 			entityMatch: null,
 			rounds: 5,
+			gapRounds: 0,
 			sourcesTotal: 2,
 			sourcesFirstParty: 0,
+			ownDomainKnown: false,
 			fieldsGrounded: 0,
 			fieldsTotal: 0,
 			scanResults: FULL_LIST,
@@ -276,8 +324,10 @@ describe('computeRunQuality', () => {
 				schemaName: 'prospect_scan_v1',
 				entityMatch,
 				rounds: 3,
+				gapRounds: 0,
 				sourcesTotal: 6,
 				sourcesFirstParty: 2,
+				ownDomainKnown: true,
 				fieldsGrounded: 0,
 				fieldsTotal: 0,
 				citationsSeen: 8,
@@ -298,6 +348,138 @@ describe('computeRunQuality', () => {
 		it('should trust one that clearly reached it', () => {
 			// GIVEN the same scan, this time clearly about the right company
 			expect(anchoredScan('strong')).toBe(false)
+		})
+
+		it('should keep its own-site count even when the evidence missed it', () => {
+			// GIVEN a scan pinned to a company, two of whose own pages it did reach,
+			// but whose evidence never clearly landed on that company
+			const quality = computeRunQuality({
+				schemaName: 'prospect_scan_v1',
+				entityMatch: 'absent',
+				rounds: 3,
+				gapRounds: 0,
+				sourcesTotal: 6,
+				sourcesFirstParty: 2,
+				ownDomainKnown: true,
+				fieldsGrounded: 0,
+				fieldsTotal: 0,
+				citationsSeen: 8,
+				citationsKept: 8,
+				scanResults: FULL_LIST,
+				refined: false,
+			})
+			// THEN the count still stands: 'absent' is a verdict on what the evidence
+			// showed, not the run having no company to be about
+			expect(quality.sources_matched).toBe(2)
+		})
+	})
+
+	describe('for a freeform brief', () => {
+		it('should leave out the own-site count as an open-ended search does', () => {
+			// GIVEN a brief, which is pinned to no company and asked for no list
+			const quality = computeRunQuality({
+				schemaName: 'freeform',
+				entityMatch: null,
+				rounds: 2,
+				gapRounds: 0,
+				sourcesTotal: 4,
+				sourcesFirstParty: 0,
+				ownDomainKnown: false,
+				fieldsGrounded: 0,
+				fieldsTotal: 0,
+				citationsSeen: 3,
+				citationsKept: 3,
+				scanResults: null,
+				refined: false,
+			})
+			// THEN it is left out here too: a brief has no company to hold a source
+			// against, as squarely as an open-ended search has none
+			expect(quality.sources_matched).toBeUndefined()
+		})
+	})
+
+	describe('when a run gathered and then went back for what was missing', () => {
+		const searchRun = {
+			schemaName: 'prospect_scan_v1',
+			entityMatch: null,
+			sourcesTotal: 131,
+			sourcesFirstParty: 0,
+			ownDomainKnown: false,
+			fieldsGrounded: 0,
+			fieldsTotal: 0,
+			citationsSeen: 60,
+			citationsKept: 60,
+			scanResults: FULL_LIST,
+			refined: true,
+		} as const
+
+		it('should report each phase of rounds as its own number', () => {
+			// GIVEN the reported run: three gathering rounds, then four more spent
+			// closing the gaps the first extraction left
+			const quality = computeRunQuality({
+				...searchRun,
+				rounds: 3,
+				gapRounds: 4,
+			})
+			// THEN each phase keeps its own count: the run did seven rounds of work
+			// across two phases, and no single number says that
+			expect(quality.rounds).toBe(3)
+			expect(quality.gap_rounds).toBe(4)
+		})
+
+		it('should report zero gap rounds rather than leaving them out', () => {
+			// GIVEN an enrichment whose first extraction left nothing to go back for
+			const quality = computeRunQuality({
+				schemaName: 'company_enrichment_v1',
+				entityMatch: 'strong',
+				rounds: 6,
+				gapRounds: 0,
+				sourcesTotal: 5,
+				sourcesFirstParty: 3,
+				ownDomainKnown: true,
+				fieldsGrounded: 6,
+				fieldsTotal: 6,
+				citationsSeen: 4,
+				citationsKept: 4,
+				scanResults: null,
+				refined: false,
+			})
+			// THEN zero is reported rather than left out: a run that went back for
+			// nothing is a run that needed nothing, which is worth knowing
+			expect(quality.gap_rounds).toBe(0)
+		})
+
+		it('should report both as zero for a run resumed from finished work', () => {
+			// GIVEN a run resumed from a checkpoint that already held its findings, so
+			// it neither gathered nor went back for anything this time
+			const quality = computeRunQuality({
+				...searchRun,
+				rounds: 0,
+				gapRounds: 0,
+			})
+			// THEN both read zero for this attempt — the earlier attempt's rounds
+			// belong to that attempt, and the run's own step count carries them over
+			expect(quality.rounds).toBe(0)
+			expect(quality.gap_rounds).toBe(0)
+		})
+
+		it('should not let either round count sway the confidence flag', () => {
+			// GIVEN the same run counted as having done no rounds at all and as
+			// having gathered and gone back many times over
+			const none = computeRunQuality({
+				...searchRun,
+				rounds: 0,
+				gapRounds: 0,
+			})
+			const many = computeRunQuality({
+				...searchRun,
+				rounds: 6,
+				gapRounds: 4,
+			})
+			// THEN both read the same: the counts are there to be read, and how many
+			// rounds a run took says nothing about whether its answer is thin
+			expect(many.low_confidence).toBe(none.low_confidence)
+			expect(many.low_confidence).toBe(false)
 		})
 	})
 })
