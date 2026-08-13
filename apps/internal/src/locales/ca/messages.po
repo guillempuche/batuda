@@ -480,6 +480,10 @@ msgid "Added as a verified lead"
 msgstr "Afegit com a oportunitat verificada"
 
 #: src/components/research/findings/prospect-scan-view.tsx
+msgid "Added as an unverified lead"
+msgstr "Afegit com a oportunitat sense verificar"
+
+#: src/components/research/findings/prospect-scan-view.tsx
 #: src/routes/settings/organization/members.tsx
 msgid "Adding…"
 msgstr "S'està afegint…"
@@ -3092,6 +3096,7 @@ msgstr "Localitzant…"
 
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
+#: src/components/research/findings/prospect-scan-view.tsx
 #: src/components/research/research-dialog.tsx
 #: src/components/research/run-labels.ts
 #: src/routes/calendar/index.tsx
@@ -6094,6 +6099,10 @@ msgstr "Desassigna"
 #: src/routes/companies/index.tsx
 msgid "Unassigned"
 msgstr "Sense assignar"
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Unconfirmed"
+msgstr "Sense confirmar"
 
 #: src/components/research/trust-badge.tsx
 msgid "Undeliverable"
