@@ -1128,6 +1128,7 @@ msgstr "Client"
 #: src/components/instructions/template-dialog.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/components/research/research-dialog.tsx
+#: src/routes/__root.tsx
 #: src/routes/calendar/index.tsx
 #: src/routes/emails/$threadId.tsx
 #: src/routes/emails/inboxes.tsx
@@ -3964,6 +3965,10 @@ msgstr "Nothing to show in this range."
 #: src/routes/documents/index.tsx
 msgid "Nothing written down matches that."
 msgstr "Nothing written down matches that."
+
+#: src/routes/__root.tsx
+msgid "Notifications"
+msgstr "Notifications"
 
 #: src/components/primitives/pri-rich-text.tsx
 msgid "Numbered list"

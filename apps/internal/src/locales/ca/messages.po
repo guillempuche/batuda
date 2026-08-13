@@ -1128,6 +1128,7 @@ msgstr "Client"
 #: src/components/instructions/template-dialog.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/components/research/research-dialog.tsx
+#: src/routes/__root.tsx
 #: src/routes/calendar/index.tsx
 #: src/routes/emails/$threadId.tsx
 #: src/routes/emails/inboxes.tsx
@@ -3964,6 +3965,10 @@ msgstr "Res a mostrar en aquest interval."
 #: src/routes/documents/index.tsx
 msgid "Nothing written down matches that."
 msgstr "No hi ha res escrit que hi coincideixi."
+
+#: src/routes/__root.tsx
+msgid "Notifications"
+msgstr "Notificacions"
 
 #: src/components/primitives/pri-rich-text.tsx
 msgid "Numbered list"

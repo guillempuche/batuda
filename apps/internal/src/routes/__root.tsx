@@ -1,4 +1,5 @@
 import { HydrationBoundary, RegistryProvider } from '@effect/atom-react'
+import { useLingui } from '@lingui/react/macro'
 import {
 	createRootRoute,
 	HeadContent,
@@ -250,7 +251,7 @@ function RootComponent() {
 												</ComposeEmailProvider>
 											</QuickCaptureProvider>
 										)}
-										<PriToast.Viewport />
+										<ToastChrome />
 									</PriToast.Provider>
 								</LayoutGroup>
 							</BatudaMotionConfig>
@@ -276,6 +277,19 @@ var m=document.querySelector('meta[name="theme-color"]')
 var s=getComputedStyle(r).getPropertyValue('--color-surface').trim()
 if(m&&s)m.setAttribute('content',s)
 }catch(e){}})()`
+
+// The raised toasts, and the two labels Base UI would otherwise write in English
+// on its own. It is a component rather than markup inline above because the
+// translations only exist inside the language provider, which the root renders
+// below itself — reading them any higher gets a hook with no provider.
+function ToastChrome() {
+	const { t } = useLingui()
+	return (
+		<PriToast.Viewport aria-label={t`Notifications`}>
+			<PriToast.List closeLabel={t`Close`} />
+		</PriToast.Viewport>
+	)
+}
 
 function RootDocument({
 	lang,

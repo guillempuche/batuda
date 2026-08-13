@@ -93,7 +93,12 @@ export function ProspectScanView({
 // write a company nobody has vouched for.
 function ProspectRow({ prospect }: { readonly prospect: ProspectEntry }) {
 	const doubtId = useId()
-	const unconfirmed = prospect.unconfirmed_reason !== undefined
+	// A reason with nothing written in it is not a doubt anybody can weigh, and runs
+	// stored before the engine started taking those back still carry them. Read as a
+	// mark it would badge the row and hold back the vouching step while naming no
+	// cause at all.
+	const doubt = prospect.unconfirmed_reason?.trim()
+	const unconfirmed = doubt !== undefined && doubt !== ''
 
 	return (
 		<ListItem>
@@ -114,7 +119,7 @@ function ProspectRow({ prospect }: { readonly prospect: ProspectEntry }) {
 					<ReasonLabel>
 						<Trans>Could not be confirmed:</Trans>
 					</ReasonLabel>{' '}
-					{prospect.unconfirmed_reason}
+					{doubt}
 				</Reason>
 			) : null}
 			<FieldsTable>
@@ -154,6 +159,7 @@ function ProspectRow({ prospect }: { readonly prospect: ProspectEntry }) {
 			<CitationList citations={prospect.citations} />
 			<AddAsLeadButton
 				prospect={prospect}
+				unconfirmed={unconfirmed}
 				describedBy={unconfirmed ? doubtId : undefined}
 			/>
 		</ListItem>
@@ -196,9 +202,12 @@ const ReasonLabel = styled.strong`
 // the one step where it still shows.
 function AddAsLeadButton({
 	prospect,
+	unconfirmed,
 	describedBy,
 }: {
 	readonly prospect: ProspectEntry
+	/** Whether the run left a real reason it could not confirm this company. */
+	readonly unconfirmed: boolean
 	/** The reason this company could not be confirmed, for a reader to be pointed at. */
 	readonly describedBy?: string | undefined
 }) {
@@ -237,7 +246,7 @@ function AddAsLeadButton({
 		const row = exit.value as Record<string, unknown>
 		const id = typeof row['id'] === 'string' ? row['id'] : null
 		const newSlug = typeof row['slug'] === 'string' ? row['slug'] : slug
-		const confirmed = prospect.unconfirmed_reason === undefined
+		const confirmed = !unconfirmed
 		if (id !== null && confirmed) {
 			await verifyCompany({
 				params: { id },
@@ -261,9 +270,9 @@ function AddAsLeadButton({
 			// Every row carries this button, so the visible words alone leave a reader
 			// moving between them with no idea which company each one adds.
 			aria-label={
-				prospect.unconfirmed_reason === undefined
-					? t`Add ${prospect.name} as lead`
-					: t`Add ${prospect.name} as an unverified lead`
+				unconfirmed
+					? t`Add ${prospect.name} as an unverified lead`
+					: t`Add ${prospect.name} as lead`
 			}
 			{...(describedBy === undefined
 				? {}
