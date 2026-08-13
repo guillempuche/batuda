@@ -37,6 +37,57 @@ describe('deriveEntityTargets', () => {
 		})
 	})
 
+	describe('when a legal form opens the name instead of closing it', () => {
+		it('should keep it, so the key is more than an industry word', () => {
+			// GIVEN a company whose name opens with two letters that also spell a
+			// legal form, and closes with a real one
+			const targets = deriveEntityTargets({
+				schemaName: 'company_enrichment_v1',
+				query: 'KG Motors Inc.',
+				subjects: [{ table: 'companies', name: 'KG Motors Inc.' }],
+			})
+
+			// THEN only the trailing form comes off, so the key is the company's own
+			// name. A key of just "motors" would be carried by any page about any car
+			// maker, and the run would confirm one of those as readily as this company
+			expect(targets?.cores).toContain('kgmotors')
+			expect(targets?.cores).not.toContain('motors')
+			expect(
+				classifyEntityMatch(
+					targets as EntityTargets,
+					'General Motors reported record sales in Detroit.',
+				),
+			).not.toBe('strong')
+		})
+
+		it('should read a form written in two halves off the end', () => {
+			// GIVEN a Mexican company whose form is joined by a connecting word
+			const targets = deriveEntityTargets({
+				schemaName: 'company_enrichment_v1',
+				query: 'Grupo Ejemplo SA de CV',
+				subjects: [{ table: 'companies', name: 'Grupo Ejemplo SA de CV' }],
+			})
+
+			// THEN both halves come off, so a page writing the trading name matches.
+			// The connecting word is only stepped over between two halves of a form —
+			// on its own it stays, or "Serveis i Manteniments" would lose its middle
+			expect(targets?.cores).toContain('grupoejemplo')
+		})
+
+		it('should still drop a trailing form so both spellings agree', () => {
+			// GIVEN the same company written with and without its legal form
+			const withForm = deriveEntityTargets({
+				schemaName: 'company_enrichment_v1',
+				query: 'Acme Logistics SL',
+				subjects: [{ table: 'companies', name: 'Acme Logistics SL' }],
+			})
+
+			// THEN the form at the end is still dropped, so a page writing the bare
+			// name matches the company as filed
+			expect(withForm?.cores).toContain('acmelogistics')
+		})
+	})
+
 	describe('when the run is entity-centric', () => {
 		it('should derive keys from the query for a query-only enrichment', () => {
 			// GIVEN a company_enrichment_v1 run identified only by a free-text query
@@ -647,6 +698,42 @@ describe('reachedOwnSite', () => {
 			// GIVEN a page on a country domain the caller never supplied
 			// THEN the "deliveroo" label still identifies the company's own site
 			expect(reachedOwnSite(targets, [{ host: 'deliveroo.co.uk' }])).toBe(true)
+		})
+	})
+
+	describe('when the host is the trade the company is named after', () => {
+		it('should not read a trade domain as the company own site', () => {
+			// GIVEN a company whose name opens with its trade, and the trade's own
+			// domain — a company Batuda has never heard of owns that address
+			const named: EntityTargets = {
+				cores: ['transportesgarcia'],
+				words: ['garcia'],
+				domains: [],
+				places: [],
+			}
+
+			// WHEN the trade's domain is offered as a page the run reached
+			// THEN it is not the company's site. The name contains the word, not the
+			// other way round, and reading it either way handed every company named
+			// after its trade the trade's own address — which the mailbox harvester
+			// then read a stranger's email off
+			expect(reachedOwnSite(named, [{ host: 'transportes.com' }])).toBe(false)
+			expect(isOwnSiteHost(named, 'transportes.com')).toBe(false)
+		})
+
+		it('should still recognise a host that carries the whole name', () => {
+			// GIVEN the same company and a domain that spells its full name
+			const named: EntityTargets = {
+				cores: ['transportesgarcia'],
+				words: ['garcia'],
+				domains: [],
+				places: [],
+			}
+
+			// WHEN checked — THEN the company's own site is unaffected
+			expect(reachedOwnSite(named, [{ host: 'transportesgarcia.es' }])).toBe(
+				true,
+			)
 		})
 	})
 

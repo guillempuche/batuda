@@ -25,7 +25,7 @@
  * with no name beside it and so is judged against the target's name passed in.
  */
 
-import { collapse, nameCore } from './entity-guard'
+import { collapse, nameWithoutForms } from './entity-guard'
 import { isPlainObject } from './guard-shapes'
 import { hostOf } from './source-key'
 
@@ -76,7 +76,11 @@ const classifyWebsite = (name: string, website: string): WebsiteVerdict => {
 	// An address we cannot even read the host of is left alone — nothing to judge.
 	if (host === null) return 'keep'
 	if (isAggregatorHost(host)) return 'directory'
-	const core = nameCore(name)
+	// The name as an address would write it: a directory files a company under its
+	// trading name and leaves the legal form out, so the form is taken out here
+	// too, wherever in the name it sits. This asks whether the address names the
+	// company, which is a looser question than who the company is.
+	const core = nameWithoutForms(name)
 	// With no distinctive name to look for, there is no way to tell a listing from
 	// the company's own site, so keep it.
 	if (core === '') return 'keep'

@@ -81,6 +81,28 @@ describe('guardCompanyWebsites', () => {
 		})
 	})
 
+	describe('when the company legal form leads its name', () => {
+		it('should still catch a listing that files it under its trading name', () => {
+			// GIVEN a French company whose form opens the name, on a directory that
+			// files it under the trading name alone
+			const findings = scan([
+				{
+					name: 'SARL Transports Dupont',
+					website: 'https://dir.example/company/transports-dupont',
+				},
+			])
+
+			// WHEN checked
+			// THEN it is blanked. A directory writes the trading name and leaves the
+			// form out, so the name is matched with every form taken out wherever it
+			// sits — which is a looser question than who the company is, and the safe
+			// direction for a guard whose job is spotting listings
+			expect(websitesOf(guardCompanyWebsites(findings).findings)).toEqual([
+				undefined,
+			])
+		})
+	})
+
 	describe('when the website is the company own site', () => {
 		it('should keep a host that carries the company name', () => {
 			// GIVEN the company's own domain
