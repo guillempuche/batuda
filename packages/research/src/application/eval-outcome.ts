@@ -11,6 +11,7 @@
  * so a per-field-citation schema change lands here and the scorer's metrics stay put.
  */
 
+import { discoveryRows } from './discovery-scan'
 import {
 	type RunOutcome,
 	type RunUsage,
@@ -65,6 +66,11 @@ export const outcomeFromRun = (input: {
 	readonly fetchedUrls: ReadonlyArray<string>
 	/** What the run was billed, read off its own row; absent when not read back. */
 	readonly usage?: RunUsage
+	/**
+	 * Which shape the run answered in. A scan keeps its answer in a list of
+	 * companies rather than a profile, and the shape is what says where to look.
+	 */
+	readonly schemaName?: string
 }): RunOutcome => {
 	const findings = input.findings
 	const enrichment = enrichmentOf(findings)
@@ -105,6 +111,19 @@ export const outcomeFromRun = (input: {
 		typeof findings === 'object' &&
 		(findings as { registry_confirmed?: unknown }).registry_confirmed === true
 
+	// The companies a scan came back with, which is the whole of a scan's answer
+	// and so the only thing a scan can be scored on.
+	const companies: Array<{ name: string; hasWebsite: boolean }> = []
+	for (const row of discoveryRows(input.schemaName, findings)) {
+		const name = (row as { name?: unknown }).name
+		if (typeof name !== 'string' || name.trim() === '') continue
+		const website = (row as { website?: unknown }).website
+		companies.push({
+			name: name.trim(),
+			hasWebsite: typeof website === 'string' && website.trim() !== '',
+		})
+	}
+
 	const profileFill = enrichmentFill(findings)
 	const people = contactFill(findings)
 
@@ -113,6 +132,7 @@ export const outcomeFromRun = (input: {
 		reachedDomains,
 		fields,
 		contacts,
+		companies,
 		registryConfirmed,
 		profile: {
 			fieldsTotal: profileFill.total,

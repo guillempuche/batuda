@@ -150,6 +150,15 @@ export interface RunOutcome {
 		readonly role: string | null
 	}>
 	/**
+	 * The companies a discovery scan came back with, and whether each carries a
+	 * website. Empty for a run that answers with a profile rather than a list.
+	 * This is what a scan is asked for, so it is what a scan has to be scored on.
+	 */
+	readonly companies: ReadonlyArray<{
+		readonly name: string
+		readonly hasWebsite: boolean
+	}>
+	/**
 	 * Whether an official-registry lookup this run resolved the target company by
 	 * its legal name. Independent of the fetched pages: a company confirmed in the
 	 * register was reached even if its own site was never scraped.
@@ -566,7 +575,12 @@ export const scoreRun = (
 	const anyFilled = SCORABLE_FIELDS.some(field =>
 		isFilled(outcome.fields[field]),
 	)
-	const empty = !isSucceeded(outcome.status) || !anyFilled
+	// A run has found something when it filled a profile field OR came back with
+	// companies: a scan answers with a list and never fills a profile, so asking
+	// only about fields files every scan alongside the runs that found nothing.
+	const empty =
+		!isSucceeded(outcome.status) ||
+		(!anyFilled && outcome.companies.length === 0)
 
 	// Contact recall: of the people we know the company publishes, how many the run
 	// returned WITH a title — a named person with no title doesn't count, since a
@@ -594,8 +608,18 @@ export const scoreRun = (
 	// a global capital is too generic to qualify.
 	const agreesWithGolden =
 		anyContactMatched || specificLocationAgrees(expected, outcome)
+	// Only a run that answered about one company can have answered about the wrong
+	// one. Both halves of the test below — reaching the golden domain, and matching
+	// its contacts or its city — are written against a single expected company, so
+	// a scan's list of others has nothing here to be judged against and would read
+	// as wrong simply for being a list.
+	const aboutOneCompany = outcome.companies.length === 0
 	const wrongCompany =
-		isSucceeded(outcome.status) && !empty && !grounded && !agreesWithGolden
+		aboutOneCompany &&
+		isSucceeded(outcome.status) &&
+		!empty &&
+		!grounded &&
+		!agreesWithGolden
 
 	// The same look-alike, narrowed to the runs that finished clean. A run marked
 	// as needing review is caught by the person reading it, so it cannot be in the

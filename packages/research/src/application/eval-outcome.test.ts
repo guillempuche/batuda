@@ -161,4 +161,47 @@ describe('outcomeFromRun', () => {
 			expect(outcome.registryConfirmed).toBe(false)
 		})
 	})
+
+	describe('when the run answered with a list of companies', () => {
+		it('should read the companies a scan found, and whether each has a site', () => {
+			// GIVEN a prospect scan that came back with three companies, two of them
+			// carrying a website
+			const outcome = outcomeFromRun({
+				status: 'succeeded',
+				schemaName: 'prospect_scan_v1',
+				findings: {
+					prospects: [
+						{ name: 'Acme', website: 'https://acme.test' },
+						{ name: 'Beta', website: '   ' },
+						{ name: 'Gamma', website: 'https://gamma.test' },
+						{ website: 'https://nameless.test' },
+					],
+				},
+				fetchedUrls: [],
+			})
+
+			// WHEN adapted
+			// THEN the scan's own answer is visible to the scorer. Reading only the
+			// profile block made every scan look like a run that found nothing, which
+			// is why no scan could ever be measured
+			expect(outcome.companies).toEqual([
+				{ name: 'Acme', hasWebsite: true },
+				{ name: 'Beta', hasWebsite: false },
+				{ name: 'Gamma', hasWebsite: true },
+			])
+		})
+
+		it('should read no companies when the run answers with a profile', () => {
+			// GIVEN an enrichment run, whose answer is a profile rather than a list
+			const outcome = outcomeFromRun({
+				status: 'succeeded',
+				schemaName: 'company_enrichment_v1',
+				findings: { enrichment: { industry: 'transport' } },
+				fetchedUrls: [],
+			})
+
+			// WHEN adapted — THEN there is no list to read, and the shape decides that
+			expect(outcome.companies).toEqual([])
+		})
+	})
 })
