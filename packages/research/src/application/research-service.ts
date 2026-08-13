@@ -4561,11 +4561,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							})
 							const perFieldTargets = perFieldGaps
 								.filter(
-									target => !gapsSearched.has(`${target.name} ${target.field}`),
+									target =>
+										!gapsSearched.has(`${target.name}\u001F${target.field}`),
 								)
 								.slice(0, perFieldSearchCap(schemaName))
 							for (const target of perFieldTargets) {
-								gapsSearched.add(`${target.name} ${target.field}`)
+								gapsSearched.add(`${target.name}\u001F${target.field}`)
 							}
 							const openedHashes = new Set(
 								openedPages(scrapeCorpus).map(page => page.urlHash),
