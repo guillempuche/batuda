@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 
+import { openAboutSection } from './helpers/about-section'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 // The organisation's own list of trades, from both ends: writing one on a
@@ -25,7 +26,7 @@ test.describe('company industries', () => {
 
 			// GIVEN a company whose About panel is open
 			await page.goto('/companies/cal-pep-fonda', { waitUntil: 'networkidle' })
-			await page.getByTestId('company-about-trigger').click()
+			await openAboutSection(page)
 			const field = page.getByTestId('company-industry')
 			await expect(field).toBeVisible()
 			const before = (await field.innerText()).trim()
@@ -46,7 +47,7 @@ test.describe('company industries', () => {
 			await page.goto('/companies/ferros-baix-llobregat', {
 				waitUntil: 'networkidle',
 			})
-			await page.getByTestId('company-about-trigger').click()
+			await openAboutSection(page)
 			const other = page.getByTestId('company-industry')
 			await other.click()
 			await other.fill(trade.slice(0, 8))
@@ -57,7 +58,7 @@ test.describe('company industries', () => {
 
 			// Put the first company back where it started.
 			await page.goto('/companies/cal-pep-fonda', { waitUntil: 'networkidle' })
-			await page.getByTestId('company-about-trigger').click()
+			await openAboutSection(page)
 			await page.getByTestId('company-industry').click()
 			await page.getByTestId('company-industry').fill(before)
 			await page.getByTestId('company-industry').press('Enter')
@@ -74,7 +75,7 @@ test.describe('company industries', () => {
 			// GIVEN a trade written onto a company and then taken off again, so
 			// the organisation has one nothing is on
 			await page.goto('/companies/cal-pep-fonda', { waitUntil: 'networkidle' })
-			await page.getByTestId('company-about-trigger').click()
+			await openAboutSection(page)
 			const field = page.getByTestId('company-industry')
 			await expect(field).toBeVisible()
 			const before = (await field.innerText()).trim()
@@ -124,7 +125,7 @@ test.describe('company industries', () => {
 
 			// GIVEN two companies given two different trades
 			await page.goto('/companies/cal-pep-fonda', { waitUntil: 'networkidle' })
-			await page.getByTestId('company-about-trigger').click()
+			await openAboutSection(page)
 			const first = page.getByTestId('company-industry')
 			await expect(first).toBeVisible()
 			const firstBefore = (await first.innerText()).trim()
@@ -138,7 +139,7 @@ test.describe('company industries', () => {
 			await page.goto('/companies/ferros-baix-llobregat', {
 				waitUntil: 'networkidle',
 			})
-			await page.getByTestId('company-about-trigger').click()
+			await openAboutSection(page)
 			const second = page.getByTestId('company-industry')
 			await expect(second).toBeVisible()
 			const secondBefore = (await second.innerText()).trim()
@@ -172,7 +173,7 @@ test.describe('company industries', () => {
 			await page.goto('/companies/ferros-baix-llobregat', {
 				waitUntil: 'networkidle',
 			})
-			await page.getByTestId('company-about-trigger').click()
+			await openAboutSection(page)
 			await expect(page.getByTestId('company-industry')).toHaveText(kept, {
 				timeout: 10_000,
 			})
@@ -186,7 +187,7 @@ test.describe('company industries', () => {
 				{ timeout: 10_000 },
 			)
 			await page.goto('/companies/cal-pep-fonda', { waitUntil: 'networkidle' })
-			await page.getByTestId('company-about-trigger').click()
+			await openAboutSection(page)
 			await page.getByTestId('company-industry').click()
 			await page.getByTestId('company-industry').fill(firstBefore)
 			await page.getByTestId('company-industry').press('Enter')

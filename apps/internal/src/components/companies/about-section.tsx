@@ -38,10 +38,11 @@ export type AboutCompany = {
 }
 
 /**
- * "About" — the long tail of editable fields the user only touches when
- * setting up or qualifying a company. Collapsed by default so the
- * Overview leads with deal-driving signals (next action, cadence,
- * tasks, timeline). Three subsections:
+ * "About" — the editable fields a user fills in when setting up or qualifying
+ * a company. Open by default, since whether a lead is qualified is the question
+ * it answers and that is worth seeing beside the deal-driving signals (next
+ * action, cadence, tasks, timeline) rather than behind a click. Three
+ * subsections:
  *
  *   - Sales context (industry, country, location, size)
  *   - Discovery (pain points, current tools)
@@ -59,9 +60,8 @@ export function AboutSection({
 }) {
 	const { t } = useLingui()
 	const { labels, labelFor } = useCompanyIndustries()
-	// How much of this is actually filled in. Whether a lead is qualified is the
-	// question this section answers, and it used to be shut with nothing on the
-	// outside to say whether there was anything behind it.
+	// How much of this is actually filled in, shown on the header so the count
+	// still says whether there is anything behind it once the section is shut.
 	const filled = [
 		company.industry,
 		company.country,

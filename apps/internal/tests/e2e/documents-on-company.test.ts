@@ -5,6 +5,7 @@ import { expect, test } from '@playwright/test'
 
 import { DATABASE_URL } from './helpers/database-url'
 import { waitForInteractive } from './helpers/hydration'
+import { chooseSelectOption } from './helpers/pri-select'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 // Covers the documents panel on the company Files tab: list, read, create and
@@ -300,7 +301,11 @@ test.describe('documents on the company Files tab', () => {
 
 			// AND fills in every field the form offers
 			await page.getByTestId('document-title').fill(CREATED_TITLE)
-			await page.getByTestId('document-type').selectOption('visit_notes')
+			await chooseSelectOption(
+				page,
+				'document-type',
+				'document-type-option-visit_notes',
+			)
 			await page
 				.getByTestId('document-content')
 				.fill('Notes taken during the e2e visit.')
