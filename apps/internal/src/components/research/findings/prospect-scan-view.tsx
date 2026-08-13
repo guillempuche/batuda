@@ -2,7 +2,7 @@ import { useAtomSet } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { useNavigate } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import styled from 'styled-components'
 
 import { PriButton, usePriToast } from '@batuda/ui/pri'
@@ -35,9 +35,9 @@ import {
  *
  * A prospect the run could not confirm as a real trading company still belongs on
  * the list — the small firms a scan is really for are the ones with the thinnest
- * trail — so it arrives carrying the reason it could not be confirmed. That reason
- * is shown beside the name, and it is what holds back the one-click handoff from
- * vouching for the company on somebody's behalf.
+ * trail — so it arrives carrying the reason it could not be confirmed. The row is
+ * badged, the reason is spelled out under it, and it is what holds back the
+ * one-click handoff from vouching for the company on somebody's behalf.
  */
 
 type ProspectEntry = {
@@ -72,59 +72,10 @@ export function ProspectScanView({
 					</SectionTitle>
 					<List>
 						{prospects.map(p => (
-							<ListItem key={`${p.name}|${p.tax_id ?? p.website ?? ''}`}>
-								<RowHead>
-									<Pill>{p.name}</Pill>
-									{p.unconfirmed_reason !== undefined ? (
-										<CandidatePill data-testid='prospect-candidate'>
-											<Trans>Unconfirmed</Trans>
-										</CandidatePill>
-									) : null}
-									{p.website !== undefined ? (
-										<SafeLink href={p.website}>{p.website}</SafeLink>
-									) : null}
-								</RowHead>
-								<Reason>{p.why_relevant}</Reason>
-								{p.unconfirmed_reason !== undefined ? (
-									<Reason>{p.unconfirmed_reason}</Reason>
-								) : null}
-								<FieldsTable>
-									{p.location !== undefined ? (
-										<FieldRow>
-											<FieldKey>
-												<Trans>Location</Trans>
-											</FieldKey>
-											<FieldValue>{p.location}</FieldValue>
-										</FieldRow>
-									) : null}
-									{p.industry !== undefined ? (
-										<FieldRow>
-											<FieldKey>
-												<Trans>Industry</Trans>
-											</FieldKey>
-											<FieldValue>{p.industry}</FieldValue>
-										</FieldRow>
-									) : null}
-									{p.country !== undefined ? (
-										<FieldRow>
-											<FieldKey>
-												<Trans>Country</Trans>
-											</FieldKey>
-											<FieldValue>{p.country}</FieldValue>
-										</FieldRow>
-									) : null}
-									{p.tax_id !== undefined ? (
-										<FieldRow>
-											<FieldKey>
-												<Trans>Tax ID</Trans>
-											</FieldKey>
-											<FieldValue>{p.tax_id}</FieldValue>
-										</FieldRow>
-									) : null}
-								</FieldsTable>
-								<CitationList citations={p.citations} />
-								<AddAsLeadButton prospect={p} />
-							</ListItem>
+							<ProspectRow
+								key={`${p.name}|${p.tax_id ?? p.website ?? ''}`}
+								prospect={p}
+							/>
 						))}
 					</List>
 				</Section>
@@ -135,11 +86,104 @@ export function ProspectScanView({
 	)
 }
 
-// The same shape as Pill, in the warning colour: a row the run could not confirm
-// reads as a lead like any other until something on it says otherwise.
+// One company in the list. It is its own component so the reason it could not be
+// confirmed can carry an id, which the row's button points at — a reader moving
+// button to button otherwise meets a column of identical "Add as lead" controls
+// with nothing saying which company each belongs to, let alone which of them will
+// write a company nobody has vouched for.
+function ProspectRow({ prospect }: { readonly prospect: ProspectEntry }) {
+	const doubtId = useId()
+	const unconfirmed = prospect.unconfirmed_reason !== undefined
+
+	return (
+		<ListItem>
+			<RowHead>
+				<Pill>{prospect.name}</Pill>
+				{unconfirmed ? (
+					<CandidatePill data-testid='prospect-candidate'>
+						<Trans>Unconfirmed company</Trans>
+					</CandidatePill>
+				) : null}
+				{prospect.website !== undefined ? (
+					<SafeLink href={prospect.website}>{prospect.website}</SafeLink>
+				) : null}
+			</RowHead>
+			<Reason>{prospect.why_relevant}</Reason>
+			{unconfirmed ? (
+				<Reason id={doubtId}>
+					<ReasonLabel>
+						<Trans>Could not be confirmed:</Trans>
+					</ReasonLabel>{' '}
+					{prospect.unconfirmed_reason}
+				</Reason>
+			) : null}
+			<FieldsTable>
+				{prospect.location !== undefined ? (
+					<FieldRow>
+						<FieldKey>
+							<Trans>Location</Trans>
+						</FieldKey>
+						<FieldValue>{prospect.location}</FieldValue>
+					</FieldRow>
+				) : null}
+				{prospect.industry !== undefined ? (
+					<FieldRow>
+						<FieldKey>
+							<Trans>Industry</Trans>
+						</FieldKey>
+						<FieldValue>{prospect.industry}</FieldValue>
+					</FieldRow>
+				) : null}
+				{prospect.country !== undefined ? (
+					<FieldRow>
+						<FieldKey>
+							<Trans>Country</Trans>
+						</FieldKey>
+						<FieldValue>{prospect.country}</FieldValue>
+					</FieldRow>
+				) : null}
+				{prospect.tax_id !== undefined ? (
+					<FieldRow>
+						<FieldKey>
+							<Trans>Tax ID</Trans>
+						</FieldKey>
+						<FieldValue>{prospect.tax_id}</FieldValue>
+					</FieldRow>
+				) : null}
+			</FieldsTable>
+			<CitationList citations={prospect.citations} />
+			<AddAsLeadButton
+				prospect={prospect}
+				describedBy={unconfirmed ? doubtId : undefined}
+			/>
+		</ListItem>
+	)
+}
+
+// The same shape as Pill, in the warning colour, with an outline so it is not just
+// a differently-tinted twin of the name chip beside it. The fill is mixed into a
+// surface rather than into transparency: mixed into transparency it takes the
+// colour of whatever it lands on, and what it lands on is the section's metal
+// plate, which in the light theme is the same amber-beige as the warning colour —
+// the badge came out at 1:1 against it, which is to say invisible in the theme
+// most people use.
 const CandidatePill = styled(Pill)`
-	background: color-mix(in oklab, var(--color-warning) 16%, transparent);
-	color: var(--color-warning);
+	background: color-mix(
+		in oklab,
+		var(--color-warning) 18%,
+		var(--color-surface-container-lowest)
+	);
+	color: var(--color-on-warning-container);
+	border: 1px solid color-mix(in oklab, var(--color-warning) 45%, transparent);
+`
+
+// The label on the reason a company could not be confirmed. Without it the reason
+// is a second italic paragraph directly under the first, and nothing — not the
+// wording, which the model writes, nor the styling, which is identical — says which
+// one is why the company matches and which is why nobody could vouch for it.
+const ReasonLabel = styled.strong`
+	font-style: normal;
+	color: var(--color-on-warning-container);
 `
 
 // One-click handoff: turn a discovered prospect into a lead (a new company at the
@@ -150,7 +194,14 @@ const CandidatePill = styled(Pill)`
 // Verified means a person vouched for this being a real lead, and stamping it on a
 // company the run itself said it could not confirm would launder the doubt away at
 // the one step where it still shows.
-function AddAsLeadButton({ prospect }: { readonly prospect: ProspectEntry }) {
+function AddAsLeadButton({
+	prospect,
+	describedBy,
+}: {
+	readonly prospect: ProspectEntry
+	/** The reason this company could not be confirmed, for a reader to be pointed at. */
+	readonly describedBy?: string | undefined
+}) {
 	const { t } = useLingui()
 	const toast = usePriToast()
 	const navigate = useNavigate()
@@ -207,7 +258,22 @@ function AddAsLeadButton({ prospect }: { readonly prospect: ProspectEntry }) {
 			type='button'
 			$variant='outlined'
 			data-testid='prospect-add-lead'
+			// Every row carries this button, so the visible words alone leave a reader
+			// moving between them with no idea which company each one adds.
+			aria-label={
+				prospect.unconfirmed_reason === undefined
+					? t`Add ${prospect.name} as lead`
+					: t`Add ${prospect.name} as an unverified lead`
+			}
+			{...(describedBy === undefined
+				? {}
+				: { 'aria-describedby': describedBy })}
 			disabled={busy}
+			// Kept reachable while it works: a natively disabled button drops focus to
+			// nowhere mid-click, so the label changing to "Adding…" is announced to
+			// nobody.
+			focusableWhenDisabled
+			aria-busy={busy}
 			onClick={() => void add()}
 		>
 			<Plus size={14} aria-hidden />
