@@ -1722,7 +1722,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						yield* PubSub.publish(maybePubSub.value, {
 							type,
 							researchId,
-							timestamp: DateTime.nowUnsafe().toString(),
+							timestamp: DateTime.formatIso(DateTime.nowUnsafe()),
 							data,
 						})
 					}
@@ -2453,6 +2453,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// How many reflect-loop rounds phase 1 ran, for the run's quality
 					// signal; stays 0 on a resume that skips phase 1.
 					let runRounds = 0
+					// And how many gap rounds phase 2 ran after it, counted apart because
+					// gathering and gap-closing are different work; stays 0 on a resume
+					// that reuses the earlier attempt's findings.
+					let gapRounds = 0
 					// Every piece of real page text gathered this run — the corpus the value
 					// guard checks findings against. Kept separate from the model-facing
 					// transcript (capped per page); empty on a resume that skips phase 1.
@@ -3575,7 +3579,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								yield* Ref.update(toolLog, log => [
 									...log,
 									{
-										timestamp: DateTime.nowUnsafe().toString(),
+										timestamp: DateTime.formatIso(DateTime.nowUnsafe()),
 										type: 'call' as const,
 										tool: 'llm.generateText',
 										// The query is on the run's own row; repeating it every round
@@ -3583,7 +3587,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										input: { phase: 1, round },
 									},
 									{
-										timestamp: DateTime.nowUnsafe().toString(),
+										timestamp: DateTime.formatIso(DateTime.nowUnsafe()),
 										type: 'result' as const,
 										tool: 'llm.generateText',
 										output: { round, toolCalls, textLength },
@@ -4154,7 +4158,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												yield* Ref.update(toolLog, log => [
 													...log,
 													{
-														timestamp: DateTime.nowUnsafe().toString(),
+														timestamp: DateTime.formatIso(DateTime.nowUnsafe()),
 														type: 'result' as const,
 														tool: tr.name,
 														error: boundedToolResult(
@@ -4608,6 +4612,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// Counted here, past both stop checks: the body below can leave
 							// by several different exits, so a round counted at the end
 							// would go unreported whenever it takes one of them.
+							gapRounds++
 							yield* recordProgress
 							const roundHashes: string[] = []
 							// Fetch the cited pages first: cheap certainty about sources
@@ -4828,7 +4833,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						yield* Ref.update(toolLog, log => [
 							...log,
 							{
-								timestamp: DateTime.nowUnsafe().toString(),
+								timestamp: DateTime.formatIso(DateTime.nowUnsafe()),
 								type: 'result' as const,
 								tool: 'llm.generateObject',
 								output: { schema: schemaName },
@@ -4882,7 +4887,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						yield* Ref.update(toolLog, log => [
 							...log,
 							{
-								timestamp: DateTime.nowUnsafe().toString(),
+								timestamp: DateTime.formatIso(DateTime.nowUnsafe()),
 								type: 'result' as const,
 								tool: 'llm.generateText',
 								output: { phase: 3, briefLength: briefText.length },
@@ -4995,8 +5000,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						schemaName,
 						entityMatch,
 						rounds: runRounds,
+						gapRounds,
 						sourcesTotal: sources?.n ?? 0,
 						sourcesFirstParty,
+						ownDomainKnown: targetDomains.length > 0,
 						fieldsGrounded: fill.filled,
 						fieldsTotal: fill.total,
 						citationsSeen,

@@ -2912,6 +2912,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			},
 			quality: {
 				rounds: 4,
+				gap_rounds: 2,
 				sources_matched: 0,
 				fields_grounded: 3,
 				grounding_ratio: 0.5,

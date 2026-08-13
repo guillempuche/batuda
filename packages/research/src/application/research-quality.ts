@@ -31,10 +31,18 @@ export interface RunQualityInput {
 	readonly entityMatch: 'strong' | 'weak' | 'absent' | null
 	/** Reflect-loop rounds phase 1 ran (0 on a resume). */
 	readonly rounds: number
+	/** Gap-closing rounds phase 2 ran after the first extraction (0 on a resume). */
+	readonly gapRounds: number
 	/** Distinct sources the run fetched. */
 	readonly sourcesTotal: number
 	/** Of those, how many are on the company's own domain. */
 	readonly sourcesFirstParty: number
+	/**
+	 * Whether the run had a company website to hold those sources against. An
+	 * open-ended search is about no one company, and a company with no website on
+	 * record has no site anyone could have read, so neither can count above zero.
+	 */
+	readonly ownDomainKnown: boolean
 	/** Enrichment: profile fields that survived the guards with a value. */
 	readonly fieldsGrounded: number
 	/** Enrichment: profile fields in scope (0 for a scan). */
@@ -51,8 +59,21 @@ export interface RunQualityInput {
 
 export interface RunQuality {
 	readonly rounds: number
-	/** Sources on the company's own domain — the ones most trusted to speak for it. */
-	readonly sources_matched: number
+	/**
+	 * Rounds spent closing the gaps the first extraction left, counted apart from
+	 * `rounds`, which covers the gathering loop alone. Two numbers because they
+	 * are two pieces of work, and either one on its own makes the run look like
+	 * it did less than it did.
+	 */
+	readonly gap_rounds: number
+	/**
+	 * Sources on the company's own domain — the ones most trusted to speak for
+	 * it. Absent when there was no such domain to hold them against — an
+	 * open-ended search, or a company with no website on record — since then it
+	 * can only read 0 however well the run went, which looks like a failing grade
+	 * rather than "does not apply".
+	 */
+	readonly sources_matched?: number
 	/** Profile fields that survived the guards with a value; absent for a scan. */
 	readonly fields_grounded?: number
 	/**
@@ -109,7 +130,10 @@ export const computeRunQuality = (input: RunQualityInput): RunQuality => {
 
 	return {
 		rounds: input.rounds,
-		sources_matched: input.sourcesFirstParty,
+		gap_rounds: input.gapRounds,
+		...(input.ownDomainKnown
+			? { sources_matched: input.sourcesFirstParty }
+			: {}),
 		...(isScan
 			? { refined: input.refined }
 			: {
