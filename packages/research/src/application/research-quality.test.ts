@@ -150,7 +150,7 @@ describe('computeRunQuality', () => {
 				schemaName: 'prospect_scan_v1',
 			})
 			// THEN there is no own domain to hold a source against, so the count is
-			// absent rather than the 0 it read on every search ever run
+			// absent rather than the 0 it could only ever read on such a search
 			expect(quality.sources_matched).toBeUndefined()
 		})
 
@@ -167,9 +167,9 @@ describe('computeRunQuality', () => {
 			})
 
 			// THEN the competitor scan is flagged like the prospect scan, and neither
-			// reports a profile it never filled — a competitor scan used to escape
-			// the single-source check and report a grounding ratio of zero, which
-			// read as a failing grade on every competitor scan ever run
+			// reports a profile it never filled — the two are one kind of run as far
+			// as grading goes, so neither escapes the single-source check the other
+			// is held to, and neither is graded on a profile it was never asked for
 			expect(competitor.low_confidence).toBe(prospect.low_confidence)
 			expect(competitor.low_confidence).toBe(true)
 			expect(competitor.grounding_ratio).toBeUndefined()
