@@ -3,6 +3,39 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-13 (internal-v2026.8.13)
+
+### Features
+
+* let a company's own mailbox be unblocked ([8365eec](https://github.com/guillempuche/batuda/commit/8365eec753913dfd1c25c3a8fc3681dc71420b8f))
+
+### Bug Fixes
+
+* **internal:** put the reason where the address is ([ad6c210](https://github.com/guillempuche/batuda/commit/ad6c210734d9b0e1d53e66aaae33627ef797bc45))
+* read a recipient before deciding whether it can be written to ([c66723f](https://github.com/guillempuche/batuda/commit/c66723f7efd62bcd80e9f54e5523f70f760de175))
+* refuse an unknown research schema name at the HTTP boundary ([c7362a4](https://github.com/guillempuche/batuda/commit/c7362a4aa2b85c6a4bc3fa530cfd581cd1376d4e))
+* **research:** accept the chat-completion replies vendors actually send ([c2394e5](https://github.com/guillempuche/batuda/commit/c2394e57bff8d299804c38d9a9c7964eec1f511c)), closes [#436](https://github.com/guillempuche/batuda/issues/436)
+* **research:** ask a scan for breadth, and fill in what it missed ([e5976bb](https://github.com/guillempuche/batuda/commit/e5976bbd56e18440a4ed91a0cda66629c7eb47ed)), closes [#438](https://github.com/guillempuche/batuda/issues/438)
+* **research:** file every run under the kind it settled on ([7f0e0ba](https://github.com/guillempuche/batuda/commit/7f0e0bae1c7303a84f7ee528a81959328e67a508))
+* **research:** give the brief and a proposed change what they need ([053dd6b](https://github.com/guillempuche/batuda/commit/053dd6b9c1240e5d7c2ef78b46fc966e22b9fb9e)), closes [#435](https://github.com/guillempuche/batuda/issues/435)
+* **research:** keep a paid Spanish register lookup that omits a name ([b6b336b](https://github.com/guillempuche/batuda/commit/b6b336b7bf3c21f52cf68d7a4641272b7101b045))
+* **research:** keep vendor answers the response checks were discarding ([9dfd21a](https://github.com/guillempuche/batuda/commit/9dfd21ad0173983cd2dfaea592fc1b32a8528c04))
+* **research:** make a scan's second look safe and worth its cost ([0220729](https://github.com/guillempuche/batuda/commit/0220729400edcab30978f1713e1e5372b5afea35))
+* **research:** make the run service searchable again ([722872f](https://github.com/guillempuche/batuda/commit/722872fc86cc04ab80cc60e408db7393157ef483))
+* **research:** make the schema registry break the build when it changes ([64004e6](https://github.com/guillempuche/batuda/commit/64004e644642f90b8045e225571b479bc268820d))
+* **research:** report a spent budget as the ordinary stop it is ([b58c516](https://github.com/guillempuche/batuda/commit/b58c516fc4966b2a0cbd5b000519626f7f08c881))
+* **research:** report what a discovery scan actually found ([f430b89](https://github.com/guillempuche/batuda/commit/f430b890518f005b3a9a9c1405ca2e8d1aedc9a5))
+* **research:** search for real when a stored result cannot be read ([e7ffda6](https://github.com/guillempuche/batuda/commit/e7ffda6766f80e25fdd75516746aa34ccf1e8238))
+* **research:** settle the shape of an answer instead of assuming a brief ([27d27c0](https://github.com/guillempuche/batuda/commit/27d27c04588b8a8bb5b99e5b1546c88ee1b126ea)), closes [#433](https://github.com/guillempuche/batuda/issues/433)
+* **research:** stop a bad homepage costing a company's whole site ([6e874c2](https://github.com/guillempuche/batuda/commit/6e874c277261b27d1c2bafda07fd51e1b3e04739))
+* **research:** tell a company apart by its own name, not its trade ([f7ac5b3](https://github.com/guillempuche/batuda/commit/f7ac5b311364786f8ed100a578e76f4cf93cfbc2)), closes [#454](https://github.com/guillempuche/batuda/issues/454)
+* **research:** tell a stored page's id apart from a web address ([45ddb4a](https://github.com/guillempuche/batuda/commit/45ddb4a8e22bbaf4df040aa97c66fb0cc594ab8a)), closes [#434](https://github.com/guillempuche/batuda/issues/434)
+* score a search on the companies it came back with ([0857615](https://github.com/guillempuche/batuda/commit/0857615c1fba17f632d49d4c80e6e17184f57311))
+
+### Refactoring
+
+* **research:** read a value and its page in one place ([75c832e](https://github.com/guillempuche/batuda/commit/75c832e6fcc7b8976bc8f03e5d86fb6f43eeb679)), closes [#435](https://github.com/guillempuche/batuda/issues/435)
+
 ## 2026-08-10 (internal-v2026.8.10)
 
 ### Features
