@@ -374,27 +374,72 @@ describe('computeRunQuality', () => {
 		})
 	})
 
-	describe('for a freeform brief', () => {
+	describe('for a run that was asked for no company profile', () => {
+		// Every schema but an enrichment arrives with 0 of 0 profile fields.
+		const noProfile = {
+			entityMatch: null,
+			rounds: 2,
+			gapRounds: 0,
+			sourcesTotal: 4,
+			sourcesFirstParty: 0,
+			ownDomainKnown: false,
+			fieldsGrounded: 0,
+			fieldsTotal: 0,
+			citationsSeen: 3,
+			citationsKept: 3,
+			scanResults: null,
+			refined: false,
+		} as const
+
+		it('should leave out the profile numbers a brief never fills', () => {
+			// GIVEN a brief, which writes prose and fills no profile at all
+			const quality = computeRunQuality({
+				...noProfile,
+				schemaName: 'freeform',
+			})
+			// THEN neither is reported: with no fields to fill, a 0 would grade the
+			// run for work it was never asked to do
+			expect(quality.fields_grounded).toBeUndefined()
+			expect(quality.grounding_ratio).toBeUndefined()
+		})
+
+		it('should leave out the profile numbers a hunt for contacts never fills', () => {
+			// GIVEN a contact search, which comes back with people rather than a
+			// filled-in company profile
+			const quality = computeRunQuality({
+				...noProfile,
+				schemaName: 'contact_discovery_v1',
+			})
+			// THEN the same holds: what leaves the numbers meaningless is the missing
+			// profile, not which kind of run went looking
+			expect(quality.fields_grounded).toBeUndefined()
+			expect(quality.grounding_ratio).toBeUndefined()
+		})
+
 		it('should leave out the own-site count as an open-ended search does', () => {
 			// GIVEN a brief, which is pinned to no company and asked for no list
 			const quality = computeRunQuality({
+				...noProfile,
 				schemaName: 'freeform',
-				entityMatch: null,
-				rounds: 2,
-				gapRounds: 0,
-				sourcesTotal: 4,
-				sourcesFirstParty: 0,
-				ownDomainKnown: false,
-				fieldsGrounded: 0,
-				fieldsTotal: 0,
-				citationsSeen: 3,
-				citationsKept: 3,
-				scanResults: null,
-				refined: false,
 			})
 			// THEN it is left out here too: a brief has no company to hold a source
 			// against, as squarely as an open-ended search has none
 			expect(quality.sources_matched).toBeUndefined()
+		})
+
+		it('should keep the retry marker on a scan that fills no profile', () => {
+			// GIVEN a scan, which fills no profile either but was given the refined
+			// retry
+			const quality = computeRunQuality({
+				...noProfile,
+				schemaName: 'prospect_scan_v1',
+				scanResults: FULL_LIST,
+				refined: true,
+			})
+			// THEN the marker still stands: it says whether the scan went back for
+			// more, which has nothing to do with a profile
+			expect(quality.refined).toBe(true)
+			expect(quality.fields_grounded).toBeUndefined()
 		})
 	})
 

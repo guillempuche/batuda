@@ -45,7 +45,7 @@ export interface RunQualityInput {
 	readonly ownDomainKnown: boolean
 	/** Enrichment: profile fields that survived the guards with a value. */
 	readonly fieldsGrounded: number
-	/** Enrichment: profile fields in scope (0 for a scan). */
+	/** Profile fields in scope — 0 for any run that fills no company profile. */
 	readonly fieldsTotal: number
 	/** Citations the run offered for its findings. */
 	readonly citationsSeen: number
@@ -74,12 +74,16 @@ export interface RunQuality {
 	 * rather than "does not apply".
 	 */
 	readonly sources_matched?: number
-	/** Profile fields that survived the guards with a value; absent for a scan. */
+	/**
+	 * Profile fields that survived the guards with a value. Reported on the same
+	 * runs as `grounding_ratio`.
+	 */
 	readonly fields_grounded?: number
 	/**
-	 * Share of the profile that is grounded, 0–1. Absent for a scan, as is
-	 * `fields_grounded`: a scan fills no profile, so both would read 0 on every
-	 * scan ever run and look like a failing grade rather than "does not apply".
+	 * Share of the profile that is grounded, 0–1. This and `fields_grounded` are
+	 * reported only when the run had profile fields to fill: a scan, a brief and
+	 * a hunt for contacts have none, so both would read 0 on every one of those
+	 * runs and look like a failing grade rather than "does not apply".
 	 */
 	readonly grounding_ratio?: number
 	/**
@@ -96,8 +100,6 @@ export interface RunQuality {
 }
 
 export const computeRunQuality = (input: RunQualityInput): RunQuality => {
-	const groundingRatio =
-		input.fieldsTotal > 0 ? input.fieldsGrounded / input.fieldsTotal : 0
 	const isScan = isDiscoveryScan(input.schemaName)
 
 	// Anything short of clearly reaching the company the run was pinned to. Asked
@@ -134,12 +136,14 @@ export const computeRunQuality = (input: RunQualityInput): RunQuality => {
 		...(input.ownDomainKnown
 			? { sources_matched: input.sourcesFirstParty }
 			: {}),
-		...(isScan
-			? { refined: input.refined }
-			: {
+		...(input.fieldsTotal > 0
+			? {
 					fields_grounded: input.fieldsGrounded,
-					grounding_ratio: Math.round(groundingRatio * 100) / 100,
-				}),
+					grounding_ratio:
+						Math.round((input.fieldsGrounded / input.fieldsTotal) * 100) / 100,
+				}
+			: {}),
+		...(isScan ? { refined: input.refined } : {}),
 		citations_seen: input.citationsSeen,
 		citations_kept: input.citationsKept,
 		low_confidence: lowConfidence,
