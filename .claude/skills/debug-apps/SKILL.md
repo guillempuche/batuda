@@ -104,6 +104,8 @@ Auth spans server + internal. Both must be running.
 4. Verify seed user exists: `pnpm cli seed --preset minimal` (idempotent)
 5. **Active org:** logging in does not set an active organization. If org-scoped pages (companies, emails, templates…) render "Couldn't load … Refresh to try again." and the switcher shows "NO ACTIVE ORGANIZATION", select one: `agent-browser find testid "org-switcher" click` then `find testid "org-switcher-option-<slug>" click` (Better Auth `setActive` + reload). The available `<slug>`s are the `org-switcher-option-*` entries in the open switcher's snapshot — one per membership, or run `pnpm cli data members`.
 
+**Sign in with the seeded password, and leave it alone.** It is `batuda-dev-2026`. Resetting it — for a screenshot session, say — breaks the next `git push`: the pre-push `e2e-smoke` hook signs in with that exact literal (`apps/internal/tests/e2e/auth.setup.ts`), so the hook fails on a login it cannot explain and the push is refused with no mention of a password. Resetting it also invalidates every live session, so a browser you already had open starts 404-ing on org-scoped routes until you sign in again and re-pick the org.
+
 ### Local dev email
 
 When `EMAIL_PROVIDER=local-inbox`, all outgoing email is written to `apps/server/.dev-inbox/` as markdown files with YAML frontmatter instead of hitting the network. Each file is named `<YYYYMMDD-HHMMSS-mmm>__<recipient>__<subject>.md`.
