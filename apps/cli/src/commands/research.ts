@@ -368,6 +368,7 @@ const driveOne = (
 		const outcome = outcomeFromRun({
 			status: run?.status ?? 'failed',
 			findings: run?.findings,
+			schemaName,
 			fetchedUrls: sourceRows.map(row => row.url),
 			...(run ? { usage: usageOf(run) } : {}),
 		})
@@ -732,6 +733,7 @@ const driveFramed = (
 		const outcome = outcomeFromRun({
 			status: run?.status ?? 'failed',
 			findings: run?.findings,
+			schemaName,
 			fetchedUrls: [],
 		})
 		// entity_match is a top-level run column (camelCased by the client), never

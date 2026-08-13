@@ -38,6 +38,28 @@ export const discoveryResultField = (schemaName: string): string | undefined =>
 	DISCOVERY_RESULT_FIELD[schemaName]
 
 /**
+ * The companies a discovery scan came back with, as rows to read fields off.
+ * Empty for anything that is not a scan, and for a scan whose list is missing or
+ * unusable — so a caller reads a scan's answer without naming the list itself,
+ * which keeps the mapping above the only place the two schemas are named.
+ */
+export const discoveryRows = (
+	schemaName: string | undefined,
+	findings: unknown,
+): ReadonlyArray<Record<string, unknown>> => {
+	const field =
+		schemaName === undefined ? undefined : DISCOVERY_RESULT_FIELD[schemaName]
+	if (field === undefined) return []
+	if (findings === null || typeof findings !== 'object') return []
+	const rows = (findings as Record<string, unknown>)[field]
+	if (!Array.isArray(rows)) return []
+	return rows.filter(
+		(row): row is Record<string, unknown> =>
+			row !== null && typeof row === 'object' && !Array.isArray(row),
+	)
+}
+
+/**
  * How many results a discovery scan's primary list carries. Null for a schema
  * that is not a discovery scan, whose result count is a different question its
  * own guards answer; zero when the list is missing, unusable, or empty.

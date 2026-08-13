@@ -25,6 +25,7 @@ const outcome = (over: Partial<RunOutcome>): RunOutcome => ({
 	reachedDomains: ['acme.es'],
 	fields: {},
 	contacts: [],
+	companies: [],
 	...over,
 })
 
@@ -969,6 +970,46 @@ describe('scoreRun for the company shapes this measures', () => {
 			expect(result.fieldsExpected).toBe(3)
 			expect(result.fieldsScored).toBe(3)
 			expect(result.fieldsCorrect).toBe(3)
+		})
+	})
+})
+
+describe('scoring a run that answered with a list of companies', () => {
+	describe('when a scan came back with companies but no profile fields', () => {
+		it('should not be counted as a run that found nothing', () => {
+			// GIVEN a scan that returned companies, which is what a scan is asked for,
+			// and no profile scalars, which a scan never fills
+			const score = scoreRun(
+				acme,
+				outcome({
+					status: 'succeeded',
+					fields: {},
+					companies: [
+						{ name: 'Acme', hasWebsite: true },
+						{ name: 'Beta', hasWebsite: false },
+					],
+				}),
+			)
+
+			// WHEN scored
+			// THEN it is not empty. Counting only profile fields filed every scan
+			// alongside the runs that found nothing — and an empty run is excused from
+			// the wrong-company measure, so the shape returning the most companies
+			// could never be measured at all
+			expect(score.empty).toBe(false)
+		})
+	})
+
+	describe('when a scan came back with nothing', () => {
+		it('should still count as a run that found nothing', () => {
+			// GIVEN a scan with neither companies nor fields
+			const score = scoreRun(
+				acme,
+				outcome({ status: 'succeeded', fields: {}, companies: [] }),
+			)
+
+			// WHEN scored — THEN nothing found is still nothing found
+			expect(score.empty).toBe(true)
 		})
 	})
 })
