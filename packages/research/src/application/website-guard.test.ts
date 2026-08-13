@@ -195,13 +195,15 @@ describe('guardCompanyWebsites', () => {
 	})
 
 	describe('when the input is degenerate', () => {
-		it('should keep an unparseable website rather than guess', () => {
+		it('should blank a website that is not a URL at all', () => {
 			// GIVEN a website that is not a URL at all
 			const findings = scan([{ name: 'Acme', website: 'not a url' }])
 
-			// WHEN checked — THEN with no host to read, it is left alone
+			// WHEN checked — THEN it goes: a website field nobody can open is worse
+			// than an empty one, because it reads as a real site downstream
 			const result = guardCompanyWebsites(findings)
-			expect(websitesOf(result.findings)).toEqual(['not a url'])
+			expect(websitesOf(result.findings)).toEqual([undefined])
+			expect(result.blankedNotAnAddress).toBe(1)
 		})
 
 		it('should keep a website when the name is empty', () => {
@@ -225,8 +227,10 @@ describe('guardCompanyWebsites', () => {
 			const result = guardCompanyWebsites(findings)
 			expect(result).toEqual({
 				findings,
+				blankedNotAnAddress: 0,
 				blankedDirectory: 0,
 				blankedProfilePage: 0,
+				blankedSharedHost: 0,
 			})
 		})
 
@@ -345,6 +349,223 @@ describe('guardCompanyWebsites', () => {
 			// THEN the pair rule wins for a named company, so the site is kept
 			expect(result.findings).toEqual(findings)
 			expect(result.blankedDirectory + result.blankedProfilePage).toBe(0)
+		})
+	})
+
+	describe('when the value is not a web address', () => {
+		it('should blank a website with an aside written next to it', () => {
+			// GIVEN the two shapes a scan actually came back with: an address with the
+			// model's own note glued on the end
+			const findings = scan([
+				{
+					name: 'ADIME',
+					website:
+						'https://adime.org/ (not directly provided, inferred from name)',
+				},
+				{
+					name: 'SEA Empresas Alavesas',
+					website: 'https://sea.es/ (derived from SEA Empresas Alavesas page)',
+				},
+			])
+
+			// WHEN checked
+			// THEN both go. The parser folds the trailing words into the path and hands
+			// back a clean host, so nothing that reads the host alone can catch this
+			const result = guardCompanyWebsites(findings)
+			expect(websitesOf(result.findings)).toEqual([undefined, undefined])
+			expect(result.blankedNotAnAddress).toBe(2)
+		})
+
+		it('should keep an address whose spaces are properly escaped', () => {
+			// GIVEN a real page whose path holds an escaped space
+			const findings = scan([
+				{ name: 'Acme', website: 'https://acme.es/quienes%20somos' },
+			])
+
+			// WHEN checked — THEN it is one address and nothing else, so it stands
+			const result = guardCompanyWebsites(findings)
+			expect(websitesOf(result.findings)).toEqual([
+				'https://acme.es/quienes%20somos',
+			])
+		})
+
+		it("should blank the run's own answer for the target when it carries an aside", () => {
+			// GIVEN the profile's website field holding an address plus a note
+			const findings = {
+				enrichment: {
+					website: {
+						value: 'https://acme.es (inferred from the company name)',
+						source_id: 'src_a',
+						confidence: null,
+					},
+				},
+			}
+
+			// WHEN checked — THEN the same rule reaches the field that arrives alone
+			const result = guardCompanyWebsites(findings, 'Acme')
+			expect(
+				(result.findings as { enrichment: Record<string, unknown> }).enrichment[
+					'website'
+				],
+			).toBeNull()
+			expect(result.blankedNotAnAddress).toBe(1)
+		})
+	})
+
+	describe('when several companies in one answer claim the same host', () => {
+		it('should blank a trade body member-directory page given as a company site', () => {
+			// GIVEN four installers each handed the page an association gives them in
+			// its member list, at the top level of the association's own host
+			const findings = scan([
+				{ name: 'Electricidad Mora', website: 'https://aemiat.com/e-mora/' },
+				{ name: 'Instalaciones Rubio', website: 'https://aemiat.com/rubio/' },
+				{ name: 'Montajes Tejero', website: 'https://aemiat.com/tejero/' },
+				{ name: 'Clima Alavesa', website: 'https://aemiat.com/clima-alavesa/' },
+			])
+
+			// WHEN checked
+			// THEN all four go. The listing sits in the first path segment, which the
+			// deeper-path rule deliberately exempts — what settles it is that one host
+			// cannot be four different companies' own site
+			const result = guardCompanyWebsites(findings)
+			expect(websitesOf(result.findings)).toEqual([
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+			])
+			expect(result.blankedSharedHost).toBe(4)
+		})
+
+		it('should keep a company describing itself in the first path segment', () => {
+			// GIVEN the shape the first-segment exemption exists to protect: companies
+			// whose own site describes them right there
+			const findings = scan([
+				{
+					name: 'XPO Logistics',
+					website: 'https://xpo.com/about-xpo-logistics',
+				},
+				{ name: 'SEUR', website: 'https://seur.com/sobre-seur' },
+				{ name: 'DSV', website: 'https://dsv.com/about-dsv' },
+				{
+					name: 'GLS Spain',
+					website: 'https://gls-spain.es/gls-spain-quienes',
+				},
+			])
+
+			// WHEN checked — THEN every one stands: each host carries its own company's
+			// name, and no host is claimed by anybody else
+			const result = guardCompanyWebsites(findings)
+			expect(websitesOf(result.findings)).toEqual([
+				'https://xpo.com/about-xpo-logistics',
+				'https://seur.com/sobre-seur',
+				'https://dsv.com/about-dsv',
+				'https://gls-spain.es/gls-spain-quienes',
+			])
+			expect(result.blankedSharedHost).toBe(0)
+		})
+
+		it('should stand down entirely once the host names one of the claimants', () => {
+			// GIVEN a company's own site, handed to a differently-named row as well
+			const findings = scan([
+				{ name: 'Acme SL', website: 'https://acme.es' },
+				{ name: 'Instalaciones Rubio', website: 'https://acme.es/rubio' },
+			])
+
+			// WHEN checked
+			// THEN both keep it, including the row the host does not name. From the
+			// addresses alone this is the same shape as one company met under two
+			// names, and blanking on the difference would blank that case too — so a
+			// host that belongs to somebody here takes this rule out of play, and what
+			// the two rows are to each other is settled by the de-duplication after it
+			const result = guardCompanyWebsites(findings)
+			expect(websitesOf(result.findings)).toEqual([
+				'https://acme.es',
+				'https://acme.es/rubio',
+			])
+			expect(result.blankedSharedHost).toBe(0)
+		})
+
+		it('should keep a site the host names, for every row claiming it', () => {
+			// GIVEN one company met twice — under its trade name and its legal one —
+			// both correctly citing the site the trade name is in
+			const findings = scan([
+				{ name: 'SICE', website: 'https://www.sice.com' },
+				{
+					name: 'Sociedad Ibérica de Construcciones Eléctricas',
+					website: 'https://sice.com/es',
+				},
+			])
+
+			// WHEN checked
+			// THEN both keep it. The host plainly belongs to somebody in the list, so
+			// this is one company met twice rather than a directory — and the shared
+			// site is the only thing that says the two rows are the same company, so
+			// blanking it would leave them as two
+			const result = guardCompanyWebsites(findings)
+			expect(websitesOf(result.findings)).toEqual([
+				'https://www.sice.com',
+				'https://sice.com/es',
+			])
+			expect(result.blankedSharedHost).toBe(0)
+		})
+
+		it('should keep a host only one company in the answer claims', () => {
+			// GIVEN a single company on a host nobody else gives
+			const findings = scan([
+				{ name: 'Electricidad Mora', website: 'https://aemiat.com/e-mora/' },
+				{ name: 'Montajes Tejero', website: 'https://tejero.es' },
+			])
+
+			// WHEN checked
+			// THEN it stands: one row claiming a host is not evidence the host is
+			// somebody else's, and a blank costs a real website
+			const result = guardCompanyWebsites(findings)
+			expect(websitesOf(result.findings)).toEqual([
+				'https://aemiat.com/e-mora/',
+				'https://tejero.es',
+			])
+			expect(result.blankedSharedHost).toBe(0)
+		})
+
+		it('should still report a listing shape as the profile page it is', () => {
+			// GIVEN two companies filed one level down on a shared directory host
+			const findings = scan([
+				{ name: 'Acme', website: 'https://directorio.es/empresa/acme' },
+				{
+					name: 'Beta Instal',
+					website: 'https://directorio.es/empresa/beta-instal',
+				},
+			])
+
+			// WHEN checked — THEN the more exact diagnosis wins, so the counters keep
+			// telling apart a listing from a host several rows merely share
+			const result = guardCompanyWebsites(findings)
+			expect(websitesOf(result.findings)).toEqual([undefined, undefined])
+			expect(result.blankedProfilePage).toBe(2)
+			expect(result.blankedSharedHost).toBe(0)
+		})
+
+		it('should not count a person website in a proposal as a claim on the host', () => {
+			// GIVEN a company on a host, and a contact proposal naming the same host
+			const findings = {
+				prospects: [{ name: 'Acme', website: 'https://acme.es' }],
+				proposed_updates: [
+					{
+						operation: 'create',
+						fields: { name: 'Ada Lovelace', website: 'https://acme.es/ada' },
+					},
+				],
+			}
+
+			// WHEN checked — THEN the proposal subtree is skipped when the claims are
+			// gathered too, so a person never costs a company its site
+			const result = guardCompanyWebsites(findings)
+			expect(
+				(result.findings as { prospects: Array<{ website?: string }> })
+					.prospects[0]?.website,
+			).toBe('https://acme.es')
+			expect(result.blankedSharedHost).toBe(0)
 		})
 	})
 

@@ -103,6 +103,7 @@ import {
 	withRoleMailbox,
 } from './generic-emails'
 import { type GuardLink, runGuardChain } from './guard-chain'
+import { dropNonCompanies } from './organisation-kind-guard'
 import { normalizePaidActionTool } from './paid-action-tool'
 import {
 	mergePerFieldSearch,
@@ -127,6 +128,7 @@ import {
 	filterProspectsByCriteria,
 	prospectCriteriaFromHints,
 } from './prospect-criteria-guard'
+import { dedupeDiscoveryRows } from './prospect-dedupe-guard'
 import { computeRunQuality } from './research-quality'
 import { guardScalarFields } from './scalar-field-guard'
 import {
@@ -155,6 +157,7 @@ import {
 	researchToolkit,
 	researchToolkitLayer,
 } from './tools'
+import { clearFieldOnlyDoubt } from './unconfirmed-mark-guard'
 import { makeUsageMeter, UsageMeter } from './usage-meter'
 import { verifyValueProvenance } from './value-guard'
 import { constrainVocabulary } from './vocabulary-guard'
@@ -1236,6 +1239,29 @@ const proposeContactDirective = (companyId: string): string =>
 const DISCOVERY_BREADTH_DIRECTIVE =
 	'List EVERY company the evidence identifies that matches the request — every one named on a directory page, an association or trade-body member list, a sector ranking, a news article, a register extract, or a search result — not only the ones the evidence describes at length. The evidence routinely names far more companies than a first pass returns, and coming back with a handful while it names dozens is an incomplete extraction, not a small market. Cover every part of the request: where it asks about several sectors, trades, regions, or countries, each one needs its own companies in the list rather than whichever the evidence happened to describe first. For each company give its own official website wherever the evidence states one, and its employee count wherever a source states one. Never drop a company for want of a website or a headcount — list it by name with the fields the evidence does support.'
 
+// What a scan's list is not allowed to hold. The breadth directive above sends the
+// search onto association and federation pages on purpose, because that is where a
+// trade's companies are named — and what comes back is the members AND the body that
+// published the list. Nothing anywhere else says the body is not an answer, and from
+// the fields alone nothing can tell: a federation states neither a size nor a place
+// for the size-and-place filter to catch. So the ask is made here, and each row is
+// asked to say what it is, which is what the check downstream reads.
+const DISCOVERY_ORGANISATION_KIND_DIRECTIVE =
+	"A list holds companies and nothing else. An association, a federation, a guild, an employers' body, a chamber of commerce, a professional college, a regulator or the sector's own system operator is not a company however squarely it sits in the subject — it represents or oversees the companies being asked for, so read its member list to find them and never list the body itself. The same goes for a public administration and for a trade magazine or directory that merely writes about the trade."
+
+// The other half of not listing a body: a company the run could not confirm still
+// belongs on the list. Left unsaid, a run told to be strict about what it reports
+// answers by quietly dropping the thinly-documented small firms a scan is actually
+// for, which is the opposite of the ask — so the field to record the doubt in is
+// named, and the instruction not to drop is spelled out beside it.
+//
+// The doubt it records is about the company, not about any one field. A request
+// often asks for a marker on a field it expects to be hard to pin down, and the
+// nearest-looking field wins unless the difference is spelled out — which would
+// mark every row and leave the mark saying nothing.
+const DISCOVERY_UNCONFIRMED_DIRECTIVE =
+	'Never leave a company out because you could not confirm it exists: list it and fill `unconfirmed_reason` with what is missing, in a few words. Not being able to prove a company exists is not proof that it does not. That field is only ever about whether the company is real and trading — a company the evidence confirms leaves it out, and a FIELD you could not confirm is not a reason to fill it: leave that field empty instead, whatever wording the request asks you to put in an unconfirmed field.'
+
 // Asks the model to land the fit judgement in the structured output, not only in
 // the brief. Applies only to the enrichment schema, which is the one that
 // carries the verdict/disqualifiers/fit_checks fields.
@@ -1258,17 +1284,32 @@ const FIT_VERDICT_DIRECTIVE =
  * When the run already holds the subjects on file, they are shown to the model with
  * an instruction to propose a correction wherever the evidence disagrees — the only
  * way a run turns up an edit for a company it was handed rather than one it found.
+ *
+ * The request itself is shown too. A request that names a field to fill, or says what
+ * to do with a company that cannot be confirmed, is only acted on by the step that
+ * writes the rows, so telling that step what to read and what shape to answer in is
+ * one step short of what it needs.
  */
 export const buildExtractionPrompt = (args: {
+	readonly query: string
 	readonly citationInstruction: string
 	readonly evidenceBlock: string
 	readonly subjects: ReadonlyArray<SubjectForPrompt>
 	readonly fitVerdict?: boolean
 	/** Whether this run is a discovery scan, whose answer is a list of companies. */
 	readonly discoveryScan?: boolean
+	/**
+	 * Whether this run's schema carries a field for marking a company the evidence
+	 * did not confirm. Only a schema that has one can be asked to fill it; asking
+	 * the rest would name a field their answer has nowhere to put.
+	 */
+	readonly marksUnconfirmed?: boolean
 }): string => {
 	const lines = [
 		'Produce structured findings STRICTLY from the evidence below (the fetched pages and the research transcript).',
+		'',
+		`The request you are answering, in the requester's own words:\n${args.query}`,
+		'Answer that request: where it asks for something in particular, report it in the field that holds it; where it says what to do with a company you cannot confirm, do that. It never licenses a fact the evidence does not state.',
 		'',
 		"Read ALL of the evidence to the end — every fetched page and every search result in the transcript — and report every fact it states; the evidence routinely states far more than a first pass returns. Report the industry, employee-count band, location, country, and the company's own operational software wherever the evidence states them — including on a third-party page rather than the company's own site.",
 		'',
@@ -1276,12 +1317,16 @@ export const buildExtractionPrompt = (args: {
 	// The breadth ask, addressed to whichever list this run's answer actually is.
 	// A scan is asked for companies and has no people list to fill; saying both
 	// would push it to invent one.
-	lines.push(
-		args.discoveryScan
-			? DISCOVERY_BREADTH_DIRECTIVE
-			: "Name EVERY person the evidence identifies as this company's own leader or employee — a titled executive on the team page, a quoted founder, a signed author — each with the exact job title the evidence gives them. Leaving the people list empty while the evidence names the company's own staff is an incomplete extraction.",
-		'',
-	)
+	if (args.discoveryScan) {
+		lines.push(DISCOVERY_BREADTH_DIRECTIVE, '')
+		lines.push(DISCOVERY_ORGANISATION_KIND_DIRECTIVE, '')
+		if (args.marksUnconfirmed) lines.push(DISCOVERY_UNCONFIRMED_DIRECTIVE, '')
+	} else {
+		lines.push(
+			"Name EVERY person the evidence identifies as this company's own leader or employee — a titled executive on the team page, a quoted founder, a signed author — each with the exact job title the evidence gives them. Leaving the people list empty while the evidence names the company's own staff is an incomplete extraction.",
+			'',
+		)
+	}
 	lines.push(
 		"Report ONLY what the evidence states. If it does not support a field, omit it or leave it null — never fill a field from prior knowledge, never guess, and never put a placeholder or the field's own name as its value. Leaving a field empty is always better than inventing a value for it.",
 		'',
@@ -2659,11 +2704,13 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							const structuredResponse = yield* extractLlm.generateObject({
 								schema: outputSchema as typeof FreeformSchema,
 								prompt: buildExtractionPrompt({
+									query: (run as { query: string }).query,
 									citationInstruction,
 									evidenceBlock,
 									subjects: subjectsForPrompt(subjects),
 									fitVerdict: schemaName === 'company_enrichment_v1',
 									discoveryScan: isDiscoveryScan(schemaName),
+									marksUnconfirmed: schemaName === 'prospect_scan_v1',
 								}),
 							})
 							// Fold the harvested role mailbox in before the ids are stamped, so
@@ -2882,6 +2929,48 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								.organizationId
 							const guardChain: ReadonlyArray<GuardLink> = [
 								{
+									// Organisation kind: a search for a trade's companies runs through
+									// that trade's association and federation pages, because that is
+									// where the companies are named — and the body that published the
+									// list comes back as one of the answers. Drop a row whose own words
+									// say it is a body of another kind, and only then: a row that says
+									// nothing about its kind is kept, unconfirmed or not.
+									//
+									// First in the chain, because it reads a row's own words and the
+									// links below rewrite them — the vocabulary link blanks an industry
+									// it reads as a sentence, which is how a body most often names
+									// itself there. Everything after it also works on a shorter list.
+									name: 'organisation-kind',
+									run: findings =>
+										Effect.gen(function* () {
+											const check = dropNonCompanies(
+												findings,
+												discoveryResultField(schemaName),
+											)
+											for (const row of check.dropped.slice(
+												0,
+												MAX_LOGGED_FIELD_DROPS,
+											)) {
+												yield* Effect.logWarning(
+													'research.prospects.not_a_company',
+												).pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														name: row.name,
+														kind: row.kind,
+													}),
+												)
+											}
+											return {
+												findings: check.findings,
+												spanCounts: {
+													'research.prospects.not_a_company':
+														check.dropped.length,
+												},
+											}
+										}),
+								},
+								{
 									// Drop citations the model invented: keep only source_ids that
 									// map to a page this run actually fetched. A proposed CRM update
 									// left with no valid citation is dropped whole.
@@ -3023,9 +3112,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								{
 									// Website sanity: a scanned competitor or prospect sometimes comes
 									// back with a directory's profile page ("cbinsights.com/company/…")
-									// where its own site belongs. Blank that, so a stranger's URL never
-									// lands in the CRM's website field. Deterministic and evidence-free,
-									// so it runs here among the plain checks, ahead of the model critics.
+									// where its own site belongs, with a note glued to the address, or
+									// with the page a trade body gives it in its member list. Blank all
+									// of those, so nothing but a company's own site lands in the CRM's
+									// website field. Deterministic and evidence-free, so it runs here
+									// among the plain checks, ahead of the model critics.
 									name: 'websites',
 									run: findings =>
 										Effect.gen(function* () {
@@ -3033,25 +3124,28 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												findings,
 												rescueTarget.name,
 											)
-											if (
-												check.blankedDirectory > 0 ||
-												check.blankedProfilePage > 0
-											) {
+											const blanked =
+												check.blankedNotAnAddress +
+												check.blankedDirectory +
+												check.blankedProfilePage +
+												check.blankedSharedHost
+											if (blanked > 0) {
 												yield* Effect.logWarning(
 													'research.websites.blanked',
 												).pipe(
 													Effect.annotateLogs({
 														research_id: researchId,
+														blanked_not_an_address: check.blankedNotAnAddress,
 														blanked_directory: check.blankedDirectory,
 														blanked_profile_page: check.blankedProfilePage,
+														blanked_shared_host: check.blankedSharedHost,
 													}),
 												)
 											}
 											return {
 												findings: check.findings,
 												spanCounts: {
-													'research.websites.blanked':
-														check.blankedDirectory + check.blankedProfilePage,
+													'research.websites.blanked': blanked,
 												},
 											}
 										}),
@@ -3319,6 +3413,70 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												)
 											}
 											return { findings: check.findings }
+										}),
+								},
+								{
+									// Same company twice: a broad search meets one company on a
+									// directory, in a ranking and in a news piece, and each meeting can
+									// spell it differently. Fold those rows into one — after the website
+									// check, so an address several rows shared is already gone before a
+									// host counts as evidence two rows are the same company.
+									name: 'prospect-dedupe',
+									run: findings =>
+										Effect.gen(function* () {
+											const check = dedupeDiscoveryRows(
+												findings,
+												discoveryResultField(schemaName),
+											)
+											if (check.merged > 0) {
+												yield* Effect.logInfo(
+													'research.prospects.deduplicated',
+												).pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														merged: check.merged,
+													}),
+												)
+											}
+											return {
+												findings: check.findings,
+												spanCounts: {
+													'research.prospects.deduplicated': check.merged,
+												},
+											}
+										}),
+								},
+								{
+									// The "could not confirm" mark means one thing: the evidence does
+									// not establish this is a real, trading company. A run asked for
+									// it beside a request wanting that wording on some hard-to-pin
+									// field writes "no website, no employee figure" instead, which is
+									// the row reading its own blanks back. Take those marks away, so
+									// the ones left mean what they say. Last, because whether a field
+									// is empty is only settled once every link above has had its say.
+									name: 'unconfirmed-mark',
+									run: findings =>
+										Effect.gen(function* () {
+											const check = clearFieldOnlyDoubt(
+												findings,
+												discoveryResultField(schemaName),
+											)
+											if (check.cleared > 0) {
+												yield* Effect.logInfo(
+													'research.prospects.doubt_cleared',
+												).pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														cleared: check.cleared,
+													}),
+												)
+											}
+											return {
+												findings: check.findings,
+												spanCounts: {
+													'research.prospects.doubt_cleared': check.cleared,
+												},
+											}
 										}),
 								},
 							]

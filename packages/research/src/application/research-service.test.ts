@@ -404,6 +404,7 @@ describe('buildExtractionPrompt', () => {
 		it('should keep the grounding rule ahead of the citation guidance and the evidence', () => {
 			// GIVEN the two parts the extraction pass composes around
 			const prompt = buildExtractionPrompt({
+				query: '',
 				citationInstruction: 'CITE-GUIDANCE',
 				evidenceBlock: 'THE-EVIDENCE',
 				subjects: [],
@@ -423,12 +424,14 @@ describe('buildExtractionPrompt', () => {
 		it('should ask for a fit verdict only when the schema carries the fields', () => {
 			// GIVEN an enrichment run (fitVerdict on) versus any other schema (off)
 			const withVerdict = buildExtractionPrompt({
+				query: '',
 				citationInstruction: '',
 				evidenceBlock: '',
 				subjects: [],
 				fitVerdict: true,
 			})
 			const withoutVerdict = buildExtractionPrompt({
+				query: '',
 				citationInstruction: '',
 				evidenceBlock: '',
 				subjects: [],
@@ -444,12 +447,14 @@ describe('buildExtractionPrompt', () => {
 		it('should ask a scan for breadth, as it already asks for every person', () => {
 			// GIVEN a discovery scan versus a run that profiles one company
 			const scan = buildExtractionPrompt({
+				query: '',
 				citationInstruction: '',
 				evidenceBlock: '',
 				subjects: [],
 				discoveryScan: true,
 			})
 			const profile = buildExtractionPrompt({
+				query: '',
 				citationInstruction: '',
 				evidenceBlock: '',
 				subjects: [],
@@ -469,9 +474,83 @@ describe('buildExtractionPrompt', () => {
 			expect(profile).not.toContain('List EVERY company')
 		})
 
+		it('should show extraction the request it is answering', () => {
+			// GIVEN a request that asks for a field by name and says what to do with a
+			// company it cannot confirm
+			const prompt = buildExtractionPrompt({
+				query:
+					'Empresas instaladoras en España; dame la provincia de cada una y escribe "no confirmado" en vez de descartar la empresa.',
+				citationInstruction: '',
+				evidenceBlock: '',
+				subjects: [],
+				discoveryScan: true,
+			})
+
+			// THEN the request reaches the step that writes the rows, which is the only
+			// place that can act on an ask like this — shaping the search alone leaves
+			// it one step short
+			expect(prompt).toContain('dame la provincia de cada una')
+			expect(prompt).toContain('no confirmado')
+			// AND it is bounded: answering the request never licenses an invented fact
+			expect(prompt).toContain(
+				'It never licenses a fact the evidence does not state',
+			)
+		})
+
+		it('should tell a scan that a trade body is not one of the companies', () => {
+			// GIVEN a discovery scan versus a run that profiles one company
+			const scan = buildExtractionPrompt({
+				query: '',
+				citationInstruction: '',
+				evidenceBlock: '',
+				subjects: [],
+				discoveryScan: true,
+				marksUnconfirmed: true,
+			})
+			const profile = buildExtractionPrompt({
+				query: '',
+				citationInstruction: '',
+				evidenceBlock: '',
+				subjects: [],
+			})
+
+			// THEN the scan is told to read a member list without listing the body that
+			// published it — the breadth ask above sends it to those pages on purpose,
+			// and nothing else anywhere says the body is not an answer
+			expect(scan).toContain('A list holds companies and nothing else')
+			expect(scan).toContain('read its member list to find them')
+			// AND it is told to mark a company it could not confirm rather than drop it,
+			// which is the other half: strictness alone quietly removes the small firms
+			// a scan is for
+			expect(scan).toContain('`unconfirmed_reason`')
+			expect(scan).toContain('is not proof that it does not')
+			// AND a run that profiles one named company was told who to research, so it
+			// gets neither
+			expect(profile).not.toContain('A list holds companies and nothing else')
+			expect(profile).not.toContain('`unconfirmed_reason`')
+		})
+
+		it('should name the unconfirmed field only to a schema that carries one', () => {
+			// GIVEN the other discovery scan, whose rows have nowhere to record a doubt
+			const scan = buildExtractionPrompt({
+				query: '',
+				citationInstruction: '',
+				evidenceBlock: '',
+				subjects: [],
+				discoveryScan: true,
+			})
+
+			// THEN it is still told a trade body is not one of the companies — that
+			// holds for any list — but never asked to fill a field its answer has
+			// nowhere to put
+			expect(scan).toContain('A list holds companies and nothing else')
+			expect(scan).not.toContain('`unconfirmed_reason`')
+		})
+
 		it('should not ask a scan to fill a people list it does not have', () => {
 			// GIVEN a discovery scan, whose schema holds companies and no contacts
 			const scan = buildExtractionPrompt({
+				query: '',
 				citationInstruction: '',
 				evidenceBlock: '',
 				subjects: [],
@@ -487,6 +566,7 @@ describe('buildExtractionPrompt', () => {
 		it('should carry the anti-fabrication rules the guards depend on', () => {
 			// GIVEN any extraction prompt
 			const prompt = buildExtractionPrompt({
+				query: '',
 				citationInstruction: '',
 				evidenceBlock: '',
 				subjects: [],
@@ -504,6 +584,7 @@ describe('buildExtractionPrompt', () => {
 		it('should push the model to read all the evidence and report every fact', () => {
 			// GIVEN any extraction prompt
 			const prompt = buildExtractionPrompt({
+				query: '',
 				citationInstruction: '',
 				evidenceBlock: '',
 				subjects: [],
@@ -527,6 +608,7 @@ describe('buildExtractionPrompt', () => {
 			// instruction channel at all, so a framing can steer where the agent
 			// searches but never what counts as evidence
 			const extraction = buildExtractionPrompt({
+				query: '',
 				citationInstruction: '',
 				evidenceBlock: 'EVIDENCE',
 				subjects: [],
@@ -540,6 +622,7 @@ describe('buildExtractionPrompt', () => {
 		it('should not push exhaustiveness on the fields no guard can check', () => {
 			// GIVEN any extraction prompt
 			const prompt = buildExtractionPrompt({
+				query: '',
 				citationInstruction: '',
 				evidenceBlock: '',
 				subjects: [],
@@ -561,6 +644,7 @@ describe('buildExtractionPrompt', () => {
 		it('should show the on-file values and ask for a correction where the evidence disagrees', () => {
 			// GIVEN a company already on file that the run was handed
 			const prompt = buildExtractionPrompt({
+				query: '',
 				citationInstruction: '',
 				evidenceBlock: '',
 				subjects: [
@@ -585,6 +669,7 @@ describe('buildExtractionPrompt', () => {
 		it('should tell the model the stored value is not itself evidence', () => {
 			// GIVEN any run with a subject on file
 			const prompt = buildExtractionPrompt({
+				query: '',
 				citationInstruction: '',
 				evidenceBlock: '',
 				subjects: [
@@ -607,6 +692,7 @@ describe('buildExtractionPrompt', () => {
 			// shape, an accepted change reaches the record with no note of where its
 			// value came from
 			const prompt = buildExtractionPrompt({
+				query: '',
 				citationInstruction: '',
 				evidenceBlock: '',
 				subjects: [
@@ -632,6 +718,7 @@ describe('buildExtractionPrompt', () => {
 			// GIVEN a run that only ever sees its pages by address — no stored page
 			// id reaches any prompt, so asking for one could only invite an invention
 			const prompt = buildExtractionPrompt({
+				query: '',
 				citationInstruction: '',
 				evidenceBlock: '',
 				subjects: [
@@ -653,6 +740,7 @@ describe('buildExtractionPrompt', () => {
 			// GIVEN the assembled prompt, where the list of fetched pages is part of
 			// the citation guidance and lands after the proposal rules
 			const prompt = buildExtractionPrompt({
+				query: '',
 				citationInstruction: 'THE-FETCHED-PAGES',
 				evidenceBlock: '',
 				subjects: [
@@ -676,6 +764,7 @@ describe('buildExtractionPrompt', () => {
 			// GIVEN a run holding the company, which is the only run offered a new
 			// person to add — and so the only one told how to name them
 			const prompt = buildExtractionPrompt({
+				query: '',
 				citationInstruction: '',
 				evidenceBlock: '',
 				subjects: [
@@ -706,6 +795,7 @@ describe('buildExtractionPrompt', () => {
 		it('should add no on-file block at all', () => {
 			// GIVEN a run with no subject (a free-text or scan run)
 			const prompt = buildExtractionPrompt({
+				query: '',
 				citationInstruction: '',
 				evidenceBlock: '',
 				subjects: [],
