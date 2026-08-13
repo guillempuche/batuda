@@ -16,6 +16,7 @@
 
 import { parseCountryAlpha2 } from '../domain/country'
 import { isPlainObject } from './guard-shapes'
+import { mapCountry } from './vocabulary-guard'
 
 // A country read as a canonical two-letter code, or nothing when it is not clearly
 // a country. Both the request's countries and a prospect's stated country pass
@@ -126,6 +127,26 @@ export const filterProspectsByCriteria = (
 	}
 
 	return { findings: walk(findings), dropped }
+}
+
+/**
+ * The country a caller's place hint names, or nothing when it names none.
+ *
+ * A hint is free text about where to search — "ES", "Spain", "España",
+ * "Barcelona" — and only the first of those is a country code. Reading it as a
+ * code alone means a request that plainly said Spain gets no country filter at
+ * all, and the check reports nothing dropped and looks healthy while never having
+ * run. A place that is a town and not a country still yields nothing, which is
+ * right: a town is not a country to hold a prospect to.
+ */
+export const countryFromPlaceHint = (
+	raw: string | undefined,
+): string | undefined => {
+	if (raw === undefined) return undefined
+	const code = parseCountryAlpha2(raw)
+	if (code !== undefined) return code
+	const named = mapCountry(raw)
+	return named === null ? undefined : parseCountryAlpha2(named)
 }
 
 /** The size and place a run's stored hints amount to; empty when it asked for none. */

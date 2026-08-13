@@ -125,6 +125,7 @@ import {
 	WriterLanguageModel,
 } from './ports'
 import {
+	countryFromPlaceHint,
 	filterProspectsByCriteria,
 	prospectCriteriaFromHints,
 } from './prospect-criteria-guard'
@@ -3391,7 +3392,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									run: findings =>
 										Effect.gen(function* () {
 											if (schemaName !== 'prospect_scan_v1') return { findings }
-											const hintCountry = parseCountryAlpha2(hints?.location)
+											const hintCountry = countryFromPlaceHint(hints?.location)
 											const prospectCriteria = prospectCriteriaFromHints(
 												hints as
 													| { min_employees?: number; max_employees?: number }

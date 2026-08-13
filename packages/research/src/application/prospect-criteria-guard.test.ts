@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+	countryFromPlaceHint,
 	filterProspectsByCriteria,
 	prospectCriteriaFromHints,
 } from './prospect-criteria-guard'
@@ -202,6 +203,44 @@ describe('prospectCriteriaFromHints', () => {
 			expect(criteria.minEmployees).toBeUndefined()
 			expect(criteria.maxEmployees).toBeUndefined()
 			expect(criteria.countries).toEqual(['GB'])
+		})
+	})
+})
+
+describe('countryFromPlaceHint', () => {
+	describe('when the hint is already a country code', () => {
+		it('should read it as that country', () => {
+			// GIVEN the shape a caller most often sends
+			// THEN it is used as it stands
+			expect(countryFromPlaceHint('ES')).toBe('ES')
+			expect(countryFromPlaceHint('es-ES')).toBe('ES')
+		})
+	})
+
+	describe('when the hint names the country in words', () => {
+		it('should still reach the country, in either language', () => {
+			// GIVEN a request that says the country the way a person writes it
+			// THEN the filter runs. Read as a code alone this yields nothing, and a
+			// request that plainly said Spain gets no country filter at all — with the
+			// check reporting nothing dropped, which reads exactly like a clean run
+			expect(countryFromPlaceHint('Spain')).toBe('ES')
+			expect(countryFromPlaceHint('España')).toBe('ES')
+			expect(countryFromPlaceHint('United Kingdom')).toBe('GB')
+		})
+	})
+
+	describe('when the hint is not a country', () => {
+		it('should yield nothing for a town, so nothing is filtered on', () => {
+			// GIVEN a place hint that is somewhere inside a country
+			// THEN no country comes back: a town is not a country to hold a prospect
+			// to, and inventing one would drop companies the request never ruled out
+			expect(countryFromPlaceHint('Barcelona')).toBeUndefined()
+			expect(countryFromPlaceHint('the north of the country')).toBeUndefined()
+		})
+
+		it('should yield nothing when there is no hint at all', () => {
+			expect(countryFromPlaceHint(undefined)).toBeUndefined()
+			expect(countryFromPlaceHint('')).toBeUndefined()
 		})
 	})
 })

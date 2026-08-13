@@ -193,12 +193,14 @@ const namesAField = (clause: string): boolean => {
 	return FIELD_WORDS.some(([, names]) => names.some(name => words.has(name)))
 }
 
-// Whether the whole reason is the row reading its own columns back.
+// Whether the whole reason is the row reading its own columns back — or says
+// nothing at all, which is the same for a reader and worse for the row: it wears
+// the mark, loses the vouching step, and names no cause anybody can weigh.
 const readsOwnGaps = (reason: string): boolean => {
 	const clauses = reason
 		.split(CLAUSE_BREAK)
 		.filter(clause => clause !== undefined && wordsOf(clause).length > 0)
-	if (clauses.length === 0) return false
+	if (clauses.length === 0) return true
 	return clauses.every(
 		clause =>
 			namesAField(clause) &&

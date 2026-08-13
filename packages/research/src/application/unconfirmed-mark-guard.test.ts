@@ -143,18 +143,21 @@ describe('clearFieldOnlyDoubt', () => {
 			expect(marksOf(result.findings)).toEqual([undefined])
 		})
 
-		it('should keep a mark that says nothing at all', () => {
-			// GIVEN a reason that is blank or only punctuation
+		it('should take back a mark that says nothing at all', () => {
+			// GIVEN a reason that is blank or only punctuation — a shape real runs do
+			// produce, having filled the field and then written nothing in it
 			const findings = scan([
 				{ name: 'Acme', unconfirmed_reason: '   ' },
 				{ name: 'Beta', unconfirmed_reason: '—' },
 			])
 
 			// WHEN checked
-			// THEN both stay. Nothing in them names a field, so there is no ground to
-			// call them the row reading itself back
+			// THEN both go. A mark with no cause behind it is the worst of both: the
+			// row is flagged and held back from being vouched for, and the reader is
+			// given nothing to weigh
 			const result = clearFieldOnlyDoubt(findings, 'prospects')
-			expect(result.cleared).toBe(0)
+			expect(marksOf(result.findings)).toEqual([undefined, undefined])
+			expect(result.cleared).toBe(2)
 		})
 
 		it('should pass a run through untouched when it has no list', () => {
