@@ -17,7 +17,10 @@
  *    of the address — the shape of "someone-else.com/company/<the-company>", which
  *    is a listing, never a company's own home page, or
  *  - its host does not carry the company's name AND other companies in the same
- *    answer claim that host as theirs too.
+ *    answer claim that host as theirs too, or
+ *  - nothing in the address names the company anywhere AND the address is the one
+ *    page every source the row cites points at — the field holding the page the
+ *    claim was read from rather than the site that page sits on.
  * Anything else is kept: a company's own site names it in the host ("acme.com") or
  * describes itself in the first path segment ("xpo.com/about-xpo-logistics"), and a
  * blank costs a real website, so the bar to blank is deliberately high.
@@ -26,22 +29,37 @@
  * need no evidence corpus and no database. They fire on any object carrying both —
  * a scanned competitor or prospect — and on the run's own answer for the target's
  * website, which arrives on its own with no name beside it and so is judged against
- * the target's name passed in. The shared-host rule asks about the whole answer
- * rather than one row, which is why the walk below is preceded by a reading pass
- * that gathers who claims which host; the directory rule asks about the whole RUN,
- * and is handed its answer from outside (see `directory-sites.ts`).
+ * the target's name passed in. The read-page rule reads one more thing off the same
+ * row, the sources it cites, which travel with it. The shared-host rule asks about
+ * the whole answer rather than one row, which is why the walk below is preceded by
+ * a reading pass that gathers who claims which host; the directory rule asks about
+ * the whole RUN, and is handed its answer from outside (see `directory-sites.ts`).
  */
 
 import { type DirectorySites, siteVerdict } from './directory-sites'
 import {
 	collapse,
 	DISTINCTIVE_NAME_LENGTH,
+	distinctiveWords,
 	nameWithoutForms,
 } from './entity-guard'
 import { isPlainObject } from './guard-shapes'
-import { hostOf, isBareWebAddress } from './source-key'
+import { hostOf, isBareWebAddress, pathOf } from './source-key'
 
 const SKIP_KEYS = new Set(['citations', 'proposed_updates'])
+
+// A part of an address put back into letters. A Spanish or Catalan listing writes
+// the accents of a name it files as escapes, and a name looked for through them
+// spells nothing; a part that was never valid escaping is read as it stands rather
+// than dropped. Decoded part by part, so an escaped slash cannot invent a part
+// that was never there.
+const withoutEscapes = (segment: string): string => {
+	try {
+		return decodeURIComponent(segment)
+	} catch {
+		return segment
+	}
+}
 
 // The parts of the address after the host — ["company", "redwood-logistics"] from
 // "cbinsights.com/company/redwood-logistics". A scheme is added when missing, since
@@ -51,10 +69,83 @@ const pathSegmentsOf = (website: string): ReadonlyArray<string> => {
 		? website
 		: `https://${website}`
 	try {
-		return new URL(withScheme).pathname.split('/').filter(Boolean)
+		return new URL(withScheme).pathname
+			.split('/')
+			.filter(Boolean)
+			.map(withoutEscapes)
 	} catch {
 		return []
 	}
+}
+
+// Whether the address mentions the company anywhere in it — in the host or in any
+// part of the path, the first part included. Read as loosely as anything here reads
+// a name: the whole name with its legal form taken out, or any one distinctive word
+// of it, found anywhere inside. Loose on purpose, because a mention only ever
+// withholds the blank below: reading it loosely costs that rule its reach, never a
+// company its site.
+//
+// The host and the parts are handed in rather than read again, so this cannot come
+// to a different reading of the same address than the rules above did.
+const addressNamesCompany = (
+	name: string,
+	host: string,
+	segments: ReadonlyArray<string>,
+): boolean => {
+	const parts = [collapse(host), ...segments.map(collapse)]
+	const core = nameWithoutForms(name)
+	const words = distinctiveWords(name)
+	return parts.some(
+		part =>
+			(core !== '' && part.includes(core)) ||
+			words.some(word => part.includes(word)),
+	)
+}
+
+// A page, told from the site it sits on: the path with any trailing slash off. The
+// query is left out, because a page is the same page whichever tracking parameters
+// were on the link that reached it.
+const pageOf = (url: string): string => (pathOf(url) ?? '').replace(/\/+$/, '')
+
+// Whether two addresses are the same page, however each side spelled it — a model
+// writes the site with a scheme and cites it without one, or one of the two keeps
+// its trailing slash.
+//
+// Not `canonicalizeUrl`, which is how the rest of the package settles whether two
+// addresses are one: it hands back the string untouched when the address has no
+// scheme, so a citation tidied down to "acme.es/x" would never be found to be the
+// same page as "https://acme.es/x" — the very spelling a model reaches for. Reading
+// the host and the path apart handles both spellings, because both readers add a
+// scheme when one is missing.
+const samePage = (one: string, other: string): boolean => {
+	const host = hostOf(one)
+	return (
+		host !== null && host === hostOf(other) && pageOf(one) === pageOf(other)
+	)
+}
+
+// Whether the row cites nothing but this one page: the website field holding where
+// the claim came from, with nothing else having mentioned the company at all. A row
+// that cites nothing says nothing either way.
+const citesNothingButThisPage = (
+	website: string,
+	citedSources: ReadonlyArray<string>,
+): boolean =>
+	citedSources.length > 0 &&
+	citedSources.every(source => samePage(website, source))
+
+// The sources a row cites, as the model wrote them. Read off the row here because
+// the walk below copies the citation subtree through untouched.
+const citedSourcesOf = (
+	value: Record<string, unknown>,
+): ReadonlyArray<string> => {
+	const citations = value['citations']
+	if (!Array.isArray(citations)) return []
+	return citations.flatMap(entry =>
+		isPlainObject(entry) && typeof entry['source_id'] === 'string'
+			? [entry['source_id']]
+			: [],
+	)
 }
 
 // Who claims which host, across a whole answer: a host mapped to the name cores of
@@ -103,14 +194,17 @@ type WebsiteVerdict =
 	| 'directory'
 	| 'profile_page'
 	| 'shared_host'
+	| 'read_page'
 
 // Where a website really points, for a company by this name.
-const classifyWebsite = (
-	name: string,
-	website: string,
-	hostClaims: HostClaims,
-	directorySites: DirectorySites,
-): WebsiteVerdict => {
+const classifyWebsite = (args: {
+	readonly name: string
+	readonly website: string
+	readonly citedSources: ReadonlyArray<string>
+	readonly hostClaims: HostClaims
+	readonly directorySites: DirectorySites
+}): WebsiteVerdict => {
+	const { name, website, citedSources, hostClaims, directorySites } = args
 	const host = hostOf(website)
 	// Not an address at all: a value with words written next to it ("https://acme.es
 	// (inferred from the name)"), or something that was never a URL. A website field
@@ -136,8 +230,8 @@ const classifyWebsite = (
 	// excluded, because a company's own site describes itself right there
 	// ("xpo.com/about-xpo-logistics") while a directory files it one level down
 	// ("company/<name>").
-	const deeperSegments = pathSegmentsOf(website).slice(1)
-	if (deeperSegments.some(segment => collapse(segment).includes(core))) {
+	const segments = pathSegmentsOf(website)
+	if (segments.slice(1).some(segment => collapse(segment).includes(core))) {
 		return 'profile_page'
 	}
 	// A host several companies in this answer call their own, and that none of them
@@ -160,6 +254,30 @@ const classifyWebsite = (
 	) {
 		return 'shared_host'
 	}
+	// A page on somebody's host, which is the very page this row's claim was read
+	// from, and which names the company nowhere. Reading a page and writing down the
+	// site it sits on is the ordinary case — "acme.com/about" read, "acme.com"
+	// recorded — and what is missing here is exactly that step: what was recorded is
+	// the reading material itself, on a host that says nothing about who owns it. So
+	// nothing in the row establishes that the company owns the address, and its own
+	// citation says only that the run read the page.
+	//
+	// That is what a directory's listing page looks like from inside the answer, and
+	// every rule above needs something it withholds: one company on the host, a slug
+	// naming a trade instead of a company, and the first-segment
+	// exemption letting that slug through without ever asking whether it names the
+	// company at all. This asks.
+	//
+	// A bare host is left alone even when it is the page that was read. With no path
+	// there is no page to tell apart from the site, so the tell is absent and what
+	// is left is the ordinary case again.
+	if (
+		segments.length > 0 &&
+		citesNothingButThisPage(website, citedSources) &&
+		!addressNamesCompany(name, host, segments)
+	) {
+		return 'read_page'
+	}
 	return 'keep'
 }
 
@@ -174,15 +292,17 @@ export interface WebsiteGuardResult {
 	readonly blankedProfilePage: number
 	/** Websites blanked because other companies in the answer claim the same host. */
 	readonly blankedSharedHost: number
+	/** Websites blanked because they were the page the row's claim was read from. */
+	readonly blankedReadPage: number
 }
 
 /**
  * `targetName` is the company the run is about, for the one website that is the
  * run's own answer for it rather than a scanned stranger's. That field sits alone —
  * a value with the page it came from and no company name beside it — so without the
- * name told from outside, the two name-based rules have nothing to compare and only
- * the address rule and the directory rule are left. Pass it: a run about one named
- * company observes no directories either, since telling one takes a list of
+ * name told from outside, every rule that reads a name has nothing to compare and
+ * only the address rule and the directory rule are left. Pass it: a run about one
+ * named company observes no directories either, since telling one takes a list of
  * companies to watch a host file, and such a run has one company.
  *
  * `directorySites` are the hosts the run itself watched behave like a listing. It
@@ -198,13 +318,17 @@ export const guardCompanyWebsites = (
 	let blankedDirectory = 0
 	let blankedProfilePage = 0
 	let blankedSharedHost = 0
+	let blankedReadPage = 0
 	const hostClaims = collectHostClaims(findings)
 
 	const count = (verdict: Exclude<WebsiteVerdict, 'keep'>): void => {
 		if (verdict === 'not_an_address') blankedNotAnAddress++
 		else if (verdict === 'directory') blankedDirectory++
 		else if (verdict === 'profile_page') blankedProfilePage++
-		else blankedSharedHost++
+		else if (verdict === 'shared_host') blankedSharedHost++
+		// Named rather than left as the remaining case, so a verdict added later is
+		// not quietly added to this one's total.
+		else if (verdict === 'read_page') blankedReadPage++
 	}
 
 	// Walk one child, honouring the key it sits under: the proposed-update and
@@ -218,18 +342,28 @@ export const guardCompanyWebsites = (
 		if (!isPlainObject(value)) return value
 
 		// The run's own answer for the target's website: a value carrying the page it
-		// was read from, under the `website` key, with no company name beside it.
+		// was read from, under the `website` key, with no company name beside it. The
+		// page it came from is that one source, so the field is its own citation list.
+		//
+		// Which makes the read-page rule stricter here than it is on a scanned row: a
+		// row with a second source elsewhere stands that rule down, and this field can
+		// never have one, so the address naming the company is the only thing holding
+		// the value. A company whose own domain spells no part of its name loses a real
+		// page it published — the cost this file keeps paying for a high bar elsewhere,
+		// and the one place the bar is lower than the rest.
 		if (
 			key === 'website' &&
 			typeof value['value'] === 'string' &&
 			typeof value['name'] !== 'string'
 		) {
-			const verdict = classifyWebsite(
-				targetName ?? '',
-				value['value'],
+			const verdict = classifyWebsite({
+				name: targetName ?? '',
+				website: value['value'],
+				citedSources:
+					typeof value['source_id'] === 'string' ? [value['source_id']] : [],
 				hostClaims,
 				directorySites,
-			)
+			})
 			if (verdict !== 'keep') {
 				count(verdict)
 				// Emptied rather than removed: the field is the whole object here, and
@@ -242,7 +376,13 @@ export const guardCompanyWebsites = (
 		const name = value['name']
 		const website = value['website']
 		if (typeof name === 'string' && typeof website === 'string') {
-			const verdict = classifyWebsite(name, website, hostClaims, directorySites)
+			const verdict = classifyWebsite({
+				name,
+				website,
+				citedSources: citedSourcesOf(value),
+				hostClaims,
+				directorySites,
+			})
 			if (verdict !== 'keep') {
 				count(verdict)
 				// Drop the key entirely, so the value reads as one the model never
@@ -265,5 +405,6 @@ export const guardCompanyWebsites = (
 		blankedDirectory,
 		blankedProfilePage,
 		blankedSharedHost,
+		blankedReadPage,
 	}
 }

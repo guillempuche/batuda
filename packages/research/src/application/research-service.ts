@@ -3121,11 +3121,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								{
 									// Website sanity: a scanned competitor or prospect sometimes comes
 									// back with a directory's profile page ("cbinsights.com/company/…")
-									// where its own site belongs, with a note glued to the address, or
-									// with the page a trade body gives it in its member list. Blank all
-									// of those, so nothing but a company's own site lands in the CRM's
-									// website field. Deterministic and evidence-free, so it runs here
-									// among the plain checks, ahead of the model critics.
+									// where its own site belongs, with a note glued to the address,
+									// with the page a trade body gives it in its member list, or with
+									// the very page its claim was read from. Blank all of those, so
+									// nothing but a company's own site lands in the CRM's website
+									// field. Deterministic and evidence-free, so it runs here among the
+									// plain checks, ahead of the model critics.
 									name: 'websites',
 									run: findings =>
 										Effect.gen(function* () {
@@ -3148,7 +3149,8 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												check.blankedNotAnAddress +
 												check.blankedDirectory +
 												check.blankedProfilePage +
-												check.blankedSharedHost
+												check.blankedSharedHost +
+												check.blankedReadPage
 											if (blanked > 0) {
 												yield* Effect.logWarning(
 													'research.websites.blanked',
@@ -3159,6 +3161,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														blanked_directory: check.blankedDirectory,
 														blanked_profile_page: check.blankedProfilePage,
 														blanked_shared_host: check.blankedSharedHost,
+														blanked_read_page: check.blankedReadPage,
 													}),
 												)
 											}
