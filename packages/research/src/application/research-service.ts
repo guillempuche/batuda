@@ -53,6 +53,7 @@ import {
 	criticPrompt,
 	critiqueFieldSupport,
 } from './critic-guard'
+import { linkedAddresses, observeDirectorySites } from './directory-sites'
 import {
 	discoveredEntryKey,
 	filterDiscoveredExisting,
@@ -2523,6 +2524,13 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// was never fetched — the scalar/value guards still hold each value to the
 					// gathered evidence, so this recovers real facts without loosening truth.
 					const searchResultHosts = new Set<string>()
+					// Every address this run met, as written — each result its searches
+					// returned, each page it fetched, and the addresses those pages link to.
+					// Full addresses rather than hosts, because what says a site is a
+					// directory is which companies it files and where, and only the path
+					// shows that. Empty on a resume that skips phase 1, which leaves every
+					// host unknown — the safe direction.
+					const gatheredAddresses = new Set<string>()
 					// The anchor site fetched up front (see below): its url hash to link as
 					// a source, and its capped rendered text to prepend to the transcript so
 					// phase-2 extraction reads the official site even if the model never did.
@@ -3121,9 +3129,20 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									name: 'websites',
 									run: findings =>
 										Effect.gen(function* () {
+											// Which sites this run watched file several of its own
+											// companies. Worked out here rather than once for the chain,
+											// because the organisation-kind link drops the rows that are
+											// not companies at all, and a trade body's own name must not
+											// be one of the names a host is judged by.
+											const directories = observeDirectorySites({
+												findings,
+												listField: discoveryResultField(schemaName),
+												addresses: [...gatheredAddresses],
+											})
 											const check = guardCompanyWebsites(
 												findings,
 												rescueTarget.name,
+												directories.sites,
 											)
 											const blanked =
 												check.blankedNotAnAddress +
@@ -3147,6 +3166,13 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												findings: check.findings,
 												spanCounts: {
 													'research.websites.blanked': blanked,
+													// Both numbers, because they say different things: no
+													// directory found out of no addresses read is plumbing
+													// broken, out of two hundred it is a real quiet answer.
+													'research.directories.observed':
+														directories.sites.size,
+													'research.directories.addresses_read':
+														directories.addressesRead,
 												},
 											}
 										}),
@@ -4261,6 +4287,16 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														typeof page.markdown === 'string' &&
 														page.markdown.trim().length > 0
 													) {
+														gatheredAddresses.add(page.url)
+														// And where this page points. A listing found by a
+														// search is met at its category page, which names no
+														// company; the addresses that do are the ones it links
+														// to, and they are already in the text.
+														for (const linked of linkedAddresses(
+															page.markdown,
+														)) {
+															gatheredAddresses.add(linked)
+														}
 														scrapeUrlHashes.push(urlHashForScrape(page.url))
 														scrapeCorpus.push({
 															urlHash: urlHashForScrape(page.url),
@@ -4290,6 +4326,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														const resultHost = domainHost(item.url)
 														if (resultHost !== undefined)
 															searchResultHosts.add(resultHost)
+														// A result the search returned without any text still
+														// shows WHERE a site filed a company, which is all the
+														// directory check reads, so it is gathered here even
+														// though it grounds nothing.
+														gatheredAddresses.add(item.url)
 														if (
 															typeof item.content === 'string' &&
 															item.content.trim().length > 0
@@ -4795,6 +4836,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											cited.markdown !== undefined &&
 											cited.markdown.trim().length > 0
 										) {
+											gatheredAddresses.add(cited.url)
+											for (const linked of linkedAddresses(cited.markdown)) {
+												gatheredAddresses.add(linked)
+											}
 											const citedHash = urlHashForScrape(cited.url)
 											roundHashes.push(citedHash)
 											scrapeCorpus.push({
@@ -4888,6 +4933,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										for (const item of searched?.items ?? []) {
 											const host = domainHost(item.url)
 											if (host !== undefined) searchResultHosts.add(host)
+											gatheredAddresses.add(item.url)
 											if (item.content && item.content.trim().length > 0) {
 												const hash = urlHashForScrape(item.url)
 												roundHashes.push(hash)

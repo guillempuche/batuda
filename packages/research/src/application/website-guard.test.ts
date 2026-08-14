@@ -15,9 +15,52 @@ const websitesOf = (findings: unknown): Array<string | undefined> =>
 	)
 
 describe('guardCompanyWebsites', () => {
-	describe('when the website is a known directory', () => {
-		it('should blank a company-profile page and count it as a directory', () => {
-			// GIVEN a competitor whose "website" is a CB Insights profile page
+	describe('when the run watched the host file several of its companies', () => {
+		it('should blank the website and count it as a directory', () => {
+			// GIVEN a company whose "website" is its page on a host the run itself
+			// judged a listing, filed under a name the address does not spell out
+			const findings = scan([
+				{ name: 'Acme Freight', website: 'https://research.owler.com/c/8812' },
+			])
+
+			// WHEN the websites are checked against what the run observed
+			const result = guardCompanyWebsites(
+				findings,
+				undefined,
+				new Set(['research.owler.com']),
+			)
+
+			// THEN the listing is removed, which the rules reading only this one
+			// address could not have done: nothing here names the company
+			expect(websitesOf(result.findings)).toEqual([undefined])
+			expect(result.blankedDirectory).toBe(1)
+			expect(result.blankedProfilePage).toBe(0)
+		})
+
+		it('should leave a host the run never watched alone', () => {
+			// GIVEN the same address, with the run having observed a different host
+			const findings = scan([
+				{ name: 'Acme Freight', website: 'https://research.owler.com/c/8812' },
+			])
+
+			// WHEN checked
+			const result = guardCompanyWebsites(
+				findings,
+				undefined,
+				new Set(['aemiat.com']),
+			)
+
+			// THEN it is kept: an unwatched host is unknown, and unknown is no reason
+			// to take a website away
+			expect(websitesOf(result.findings)).toEqual([
+				'https://research.owler.com/c/8812',
+			])
+			expect(result.blankedDirectory).toBe(0)
+		})
+
+		it('should still blank a profile page with nothing observed at all', () => {
+			// GIVEN a directory's page about the company, and a run that watched
+			// nothing — a resume, or a run whose searches met each host once
 			const findings = scan([
 				{
 					name: 'Redwood Logistics',
@@ -25,28 +68,14 @@ describe('guardCompanyWebsites', () => {
 				},
 			])
 
-			// WHEN the websites are checked
+			// WHEN checked with no observation to go on
 			const result = guardCompanyWebsites(findings)
 
-			// THEN the directory URL is removed and the reason is recorded
+			// THEN the address naming the company one level down is enough on its
+			// own, so losing the list of known directories costs this case nothing
 			expect(websitesOf(result.findings)).toEqual([undefined])
-			expect(result.blankedDirectory).toBe(1)
-			expect(result.blankedProfilePage).toBe(0)
-		})
-
-		it('should blank a page on a subdomain of a known directory', () => {
-			// GIVEN a research subdomain of a listed aggregator
-			const findings = scan([
-				{
-					name: 'Acme Freight',
-					website: 'https://research.owler.com/company/acme',
-				},
-			])
-
-			// WHEN checked — THEN the subdomain is treated as the directory it is
-			const result = guardCompanyWebsites(findings)
-			expect(websitesOf(result.findings)).toEqual([undefined])
-			expect(result.blankedDirectory).toBe(1)
+			expect(result.blankedProfilePage).toBe(1)
+			expect(result.blankedDirectory).toBe(0)
 		})
 	})
 
@@ -187,8 +216,25 @@ describe('guardCompanyWebsites', () => {
 				},
 			])
 
-			// WHEN checked — THEN the missing scheme does not hide the directory
+			// WHEN checked — THEN the missing scheme does not hide the listing
 			const result = guardCompanyWebsites(findings)
+			expect(websitesOf(result.findings)).toEqual([undefined])
+			expect(result.blankedProfilePage).toBe(1)
+		})
+
+		it('should match an observed host with no scheme written', () => {
+			// GIVEN a bare host the run judged a listing, filed under an address that
+			// names nobody
+			const findings = scan([
+				{ name: 'Acme Freight', website: 'owler.com/c/8' },
+			])
+
+			// WHEN checked — THEN the observed verdict is found without a scheme too
+			const result = guardCompanyWebsites(
+				findings,
+				undefined,
+				new Set(['owler.com']),
+			)
 			expect(websitesOf(result.findings)).toEqual([undefined])
 			expect(result.blankedDirectory).toBe(1)
 		})
@@ -265,8 +311,8 @@ describe('guardCompanyWebsites', () => {
 	})
 
 	describe('when the run answers with the target company own website', () => {
-		it('should blank a known directory even with no name to compare', () => {
-			// GIVEN the profile's website field pointing at an aggregator listing
+		it('should blank an observed directory even with no name to compare', () => {
+			// GIVEN the profile's website field pointing at a listing the run watched
 			const findings = {
 				enrichment: {
 					website: {
@@ -278,9 +324,14 @@ describe('guardCompanyWebsites', () => {
 			}
 
 			// WHEN checked with no target name supplied
-			const result = guardCompanyWebsites(findings)
+			const result = guardCompanyWebsites(
+				findings,
+				undefined,
+				new Set(['crunchbase.com']),
+			)
 
-			// THEN the known-directory rule still fires, which is the whole point
+			// THEN the directory rule still fires, which is the whole point: it is the
+			// one rule that needs no name beside the address
 			expect(
 				(result.findings as { enrichment: Record<string, unknown> }).enrichment[
 					'website'

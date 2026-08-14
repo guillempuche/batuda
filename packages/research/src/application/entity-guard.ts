@@ -180,11 +180,36 @@ export const nameWithoutForms = (name: string): string =>
 		.filter(t => !LEGAL_SUFFIXES.has(t))
 		.join('')
 
-// The distinctive words of a name: each ≥4 chars and neither a legal suffix nor a
-// generic industry term. These drive the weak match.
-const distinctiveWords = (name: string): string[] =>
+/**
+ * The shortest run of letters that may stand for a company on its own. Two or
+ * three turn up inside unrelated text by coincidence — "it" sits inside
+ * "digital.es", "roca" inside "barroca" — and every check that goes on a name
+ * fragment pays for that coincidence in the same way.
+ */
+export const DISTINCTIVE_NAME_LENGTH = 4
+
+/**
+ * A legal form written with dots — "Muñoz S.L." — comes apart into single letters
+ * that read as two more words of the name, so the same company written both ways
+ * lands under two different keys. Taking the dots out first puts the form back
+ * together. Two rows of one Spanish list spelling the form differently is the
+ * ordinary case here, not an exotic one.
+ */
+export const withoutFormDots = (name: string): string => name.replace(/\./g, '')
+
+/**
+ * The distinctive words of a name: each long enough to stand for the company and
+ * neither a legal suffix nor a generic industry term. These drive the weak match,
+ * and they are also how most firms register a domain — "Transportes García" at
+ * garcia.es — which is why a caller asking whether a host is a company's own
+ * needs them beside its cores.
+ */
+export const distinctiveWords = (name: string): string[] =>
 	foldTokens(name).filter(
-		t => t.length >= 4 && !LEGAL_SUFFIXES.has(t) && !GENERIC_WORDS.has(t),
+		t =>
+			t.length >= DISTINCTIVE_NAME_LENGTH &&
+			!LEGAL_SUFFIXES.has(t) &&
+			!GENERIC_WORDS.has(t),
 	)
 
 // The bare host of a website — "acme.co.uk" from "https://www.acme.co.uk/about".
