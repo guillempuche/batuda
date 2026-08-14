@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-14 (server-v2026.8.14)
+
+### Bug Fixes
+
+* make a finished research run describe itself accurately ([7c740fb](https://github.com/guillempuche/batuda/commit/7c740fba6bc163a40cc20c6674d4dccde30658a1))
+* make a research scan's list one usable row per company ([35f2865](https://github.com/guillempuche/batuda/commit/35f2865661976157c648dcac2395cbf197f423db)), closes [#459](https://github.com/guillempuche/batuda/issues/459)
+* **research:** stop grading a run on a profile it was never asked to fill ([39ff15e](https://github.com/guillempuche/batuda/commit/39ff15e18d2c9fb561ad78ecf6f7b242fa8ed5f8))
+* **server:** stop telling an assistant to cancel a healthy research run ([7215bce](https://github.com/guillempuche/batuda/commit/7215bce8505dac51167c842d116318e344e2b8b1))
+
+### Tests
+
+* **research:** say what the quality tests check, not what they used to catch ([bc75594](https://github.com/guillempuche/batuda/commit/bc755946713d05f9292f7369cd0794fccefa144e))
+
 ## 2026-08-13 (server-v2026.8.13)
 
 ### Features
