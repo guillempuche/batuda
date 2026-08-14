@@ -17,6 +17,22 @@
  *                        is judged against the golden rather than counted here.
  *   empty rate           did it return no usable data at all?
  *
+ * A search for a whole market answers with a list rather than a profile, so none of
+ * the above is the question it should be graded on. Counting how many companies came
+ * back would have called a 62-row list healthy when 23 of the rows were trade bodies,
+ * 10 were the same company twice, and four of the five trades asked for were missing.
+ * A market is graded on what was actually wrong with that list instead:
+ *
+ *   organisation kind    how many rows are the kind of organisation that was asked for
+ *   request coverage     how many of the parts the request named came back with a row
+ *   duplicate rate       whether the fold that joins two rows of one company still
+ *                        holds — see its own note for what it cannot see
+ *   location fill        how many rows say what town or province the company is in
+ *
+ * The row count is still reported, as the scale those four read against rather than
+ * as the grade — it is also what checking that every row is a real company would
+ * cost, so it needs a reading of its own before that check exists.
+ *
  * Grounding is judged by which pages the run *fetched*, not which its findings cite:
  * once per-field citations point at whichever page stated each fact, a run that
  * correctly reached the target's own site still cites third-party pages per field,
@@ -27,6 +43,8 @@
  */
 
 import { foldLabel } from '@batuda/domain'
+
+import { discoveryRowIdentityKeys } from './prospect-dedupe-guard'
 
 /**
  * The enrichment scalars we can check against an objective golden answer. Free-text
@@ -82,6 +100,57 @@ export const isSucceeded = (status: TerminalStatus): boolean =>
 	status === 'succeeded' || status === 'succeeded_low_confidence'
 
 /**
+ * Whether the run got far enough to say something about what it was asked.
+ *
+ * Wider than succeeding. A search that looked and found nothing ends as no
+ * reliable data, and that is an answer about the market — the one a change that
+ * empties a search has to be caught by. A run that died or was stopped never
+ * reached an answer, and reading its empty hands as "this market has nothing in
+ * it" would blame the market for an outage.
+ */
+const endedWithAnAnswer = (status: TerminalStatus): boolean =>
+	status !== 'failed' && status !== 'cancelled'
+
+/**
+ * One part of a request that asks for several — a trade, a service, a segment —
+ * with the wordings that place a returned row in it.
+ *
+ * The wordings are golden data, never a list in here. Which trades a market has is
+ * a fact about the world, so no list of the trades or countries expected of a run
+ * belongs in code. A golden set is where the expected answers already live, so they
+ * cost nothing there.
+ */
+export interface MarketPart {
+	readonly id: string
+	/** Wordings that place a row in this part, in whichever languages the market answers in. */
+	readonly terms: ReadonlyArray<string>
+}
+
+/**
+ * What a request for a whole market asks for, when a golden row is a market rather
+ * than one company. A scan answers with a list, so nothing a profile is graded on —
+ * reaching one company's site, filling that company's fields — is a question here.
+ */
+export interface MarketExpectation {
+	/** What this market is called, and the key a per-market breakdown groups on. */
+	readonly name: string
+	/** The parts the request names; coverage is how many came back with a row. */
+	readonly parts: ReadonlyArray<MarketPart>
+	/**
+	 * Organisations known not to be companies in this market — the trade bodies,
+	 * federations and system operators a search for a trade runs straight through
+	 * on its way to the members.
+	 *
+	 * Naming them is what makes the count evidence rather than an opinion, and it is
+	 * the only thing that can see past the organisation-kind guard's own languages:
+	 * that guard reads Spanish, Catalan and English, so asking it again here would
+	 * agree with itself and report every market clean. A body this list does not name
+	 * still passes unmeasured, which is the honest limit of the figure.
+	 */
+	readonly notCompanies: ReadonlyArray<string>
+}
+
+/**
  * One company's known-correct answer. This lives in code as a type; the actual
  * rows live in the eval dataset (Latitude), so a new company is added there, not
  * here.
@@ -106,6 +175,12 @@ export interface GoldenExpectation {
 	readonly contacts?: ReadonlyArray<{ readonly name: string }>
 	/** Size/reach segment, so quality can be reported per bucket, not just overall. */
 	readonly bucket?: GoldenBucket
+	/**
+	 * Present when this row asks for a market rather than one company. The two are
+	 * one type because a pass runs one or the other and every figure below already
+	 * reports nothing when it had nothing to judge.
+	 */
+	readonly market?: MarketExpectation
 }
 
 /**
@@ -150,13 +225,20 @@ export interface RunOutcome {
 		readonly role: string | null
 	}>
 	/**
-	 * The companies a discovery scan came back with, and whether each carries a
-	 * website. Empty for a run that answers with a profile rather than a list.
-	 * This is what a scan is asked for, so it is what a scan has to be scored on.
+	 * The companies a discovery scan came back with. Empty for a run that answers
+	 * with a profile rather than a list. This is what a scan is asked for, so it is
+	 * what a scan has to be scored on — each row carrying the four things the market
+	 * figures read: who it is, where it is, what it says it does, and its web
+	 * address, which is one of the two things that tell two rows apart.
 	 */
 	readonly companies: ReadonlyArray<{
 		readonly name: string
-		readonly hasWebsite: boolean
+		/** The address the row carries, as written, or null when it carries none. */
+		readonly website: string | null
+		/** The town or province the row states, or null when it states none. */
+		readonly location: string | null
+		/** The row's own words about what it is and why it matched, run together. */
+		readonly describedAs: string
 	}>
 	/**
 	 * Whether an official-registry lookup this run resolved the target company by
@@ -188,11 +270,51 @@ export interface RunUsage {
 	readonly callsByModel?: Record<string, number>
 }
 
+/**
+ * What one scan's list got right, counted against the market it was asked for.
+ *
+ * Counts rather than rates, so a pass adds them up and then divides once: a market
+ * that came back with sixty rows then weighs sixty rows against a six-row market's
+ * six, instead of each contributing one equal rate to an average.
+ */
+export interface MarketScore {
+	/** Which market this run answered for — the key a per-market breakdown groups on. */
+	readonly name: string
+	/**
+	 * Rows the scan came back with. The scale the figures below read against, and
+	 * what checking that every row is a real company would cost, so it is reported
+	 * in its own right rather than only as a denominator.
+	 */
+	readonly rowsReturned: number
+	/** Of those, how many are not an organisation the golden names as not a company. */
+	readonly rowsRightKind: number
+	/**
+	 * Of the rows returned — every one of them, including any the golden names as not
+	 * a company — how many say where the company is. The field is asked for a town or
+	 * a province, but any stated place counts here — a row answering with the country
+	 * alone is filled as far as this can tell, and the request having named that
+	 * country is not something a count of rows can know.
+	 */
+	readonly rowsLocated: number
+	/** How many rows are another row's company written a second time. */
+	readonly rowsDuplicated: number
+	/** Parts the request named — the trades, services or segments it asked for. */
+	readonly partsExpected: number
+	/** Of those, how many came back with at least one row. */
+	readonly partsAnswered: number
+}
+
 export interface RunScore {
 	readonly id: string
 	/** What this run cost, carried through so a pass can be totalled and compared. */
 	readonly usage?: RunUsage
 	readonly grounded: boolean
+	/**
+	 * Whether reaching a particular company was a question for this row at all. A
+	 * market names no company to reach, so counting it as a grounding failure would
+	 * report a whole scan pass at zero for answering the question it was asked.
+	 */
+	readonly groundable: boolean
 	readonly wrongCompany: boolean
 	/**
 	 * Whether a wrong company got as far as finishing clean — the most that could
@@ -223,18 +345,31 @@ export interface RunScore {
 	readonly country?: string
 	/** How full the profile came back, independent of the golden answers. */
 	readonly profile?: ProfileFullness
+	/** What the list got right, present only for a row that asked for a market. */
+	readonly market?: MarketScore
 }
 
 export interface EvalSummary {
 	readonly runs: number
-	readonly groundingAccuracy: number
-	readonly wrongCompanyRate: number
+	/**
+	 * Of the runs that were asked to reach a particular company, the share that
+	 * reached it. Null for a pass of market requests, which name no company to reach
+	 * — the alternative reads zero and says the pass failed at something nobody asked
+	 * it to do.
+	 */
+	readonly groundingAccuracy: number | null
+	/**
+	 * The look-alike figures, over the same runs as grounding and null for the same
+	 * reason: a market request answers with a list, so there is no other company it
+	 * could have come back with instead.
+	 */
+	readonly wrongCompanyRate: number | null
 	/**
 	 * Share of runs that shipped another company's data and finished clean — the
 	 * most that could ever be written with nobody looking. An upper bound: see
 	 * `wrongCompanyAutoApplicable` for the conditions it cannot see.
 	 */
-	readonly wrongCompanyAutoApplicableRate: number
+	readonly wrongCompanyAutoApplicableRate: number | null
 	/** Share of runs that finished flagged as needing somebody to read them. */
 	readonly lowConfidenceRate: number
 	readonly emptyRate: number
@@ -246,6 +381,27 @@ export interface EvalSummary {
 	 * runs; null when no golden row listed expected contacts. */
 	readonly contactRecall: number | null
 	/**
+	 * The four market figures, each micro-averaged over every market request in the
+	 * pass rather than averaged across markets, so a sixty-row market weighs sixty
+	 * rows against a six-row one's six.
+	 *
+	 * Null means there was nothing to divide by, which happens two ways, and the row
+	 * count below tells them apart: no market request in the pass at all, where the
+	 * row count is null too, or markets that ran and came back with no rows, where it
+	 * is nought. Coverage is the exception — it divides by the parts a request named,
+	 * so a market that found nothing still reads nought rather than nothing.
+	 */
+	readonly organisationKindPrecision: number | null
+	readonly requestCoverage: number | null
+	readonly duplicateRate: number | null
+	readonly locationFill: number | null
+	/**
+	 * Rows one market request came back with on average. Not a quality figure —
+	 * it is the scale the four above read against, and the reading that says what
+	 * a change bought or cost in results.
+	 */
+	readonly rowsPerScan: number | null
+	/**
 	 * Profile fields filled per run, averaged over the runs that reported it, and
 	 * the shape's own field count to read it against.
 	 */
@@ -256,8 +412,13 @@ export interface EvalSummary {
 	readonly contactsTitledPerRun: number | null
 	/** What one run cost on average, in cents; null when no run reported a cost. */
 	readonly costPerRun: number | null
-	/** What one usable run cost — the total spread over the runs that grounded,
-	 * so the runs that found nothing are counted as waste rather than ignored. */
+	/**
+	 * What one usable run cost: what the runs asked to reach a company spent, over
+	 * how many of them reached it, so the ones that found nothing count as waste
+	 * rather than being ignored. A market request is outside both halves — it is not
+	 * asked to reach anybody, and its spend billed to the company runs would read as
+	 * a cost blow-up rather than as the different job it is.
+	 */
 	readonly costPerGroundedRun: number | null
 	/** Of the average run cost, what the metered per-call lookups accounted for. */
 	readonly paidCostPerRun: number | null
@@ -533,6 +694,175 @@ const specificLocationAgrees = (
 	return fieldMatches('location', goldenLocation, actual)
 }
 
+/**
+ * A value's words with the accents taken off, so "Instalación" and "instalacion" are
+ * one word and punctuation between two words never runs them into one.
+ *
+ * Exported so the golden data can be held to the same reading: a wording that folds
+ * to no words can never place a row or name an organisation, and refusing it where it
+ * is written beats accepting it and silently measuring nothing.
+ */
+export const termTokens = (value: string): ReadonlyArray<string> =>
+	foldDiacritics(value)
+		.toLowerCase()
+		.split(/[^a-z0-9]+/)
+		.filter(token => token.length > 0)
+
+// Below this length a term's word has to match a whole word. A three-letter word is
+// the opening of far too many unrelated ones — "gas" starts "gasto" — while a longer
+// one is long enough that only its own endings follow it, so "instalacion electrica"
+// reaches "instalaciones eléctricas" without the golden listing every ending of
+// every trade in every language.
+const TERM_PREFIX_MIN_CHARS = 5
+
+// Whether a term's words appear among a row's words, in order and next to each
+// other. A long enough word matches as an opening, because Spanish, Catalan and
+// French put an ending on every word of a phrase, not only on the last one.
+const termAppearsIn = (
+	term: ReadonlyArray<string>,
+	words: ReadonlyArray<string>,
+): boolean => {
+	if (term.length === 0) return false
+	for (let at = 0; at + term.length <= words.length; at++) {
+		const matches = term.every((token, offset) => {
+			const word = words[at + offset] ?? ''
+			return token.length >= TERM_PREFIX_MIN_CHARS
+				? word.startsWith(token)
+				: word === token
+		})
+		if (matches) return true
+	}
+	return false
+}
+
+/**
+ * How many of a request's parts came back with at least one row that answers them.
+ *
+ * Only rows that are the kind of organisation asked for are read. A trade's own
+ * federation names that trade in its title, so counting it would mark the part
+ * answered by the very body that has no work to sell — and a list holding the solar
+ * association and no solar company is the answer this figure exists to catch.
+ */
+const partsAnsweredBy = (
+	rows: RunOutcome['companies'],
+	parts: ReadonlyArray<MarketPart>,
+): number => {
+	const rowWords = rows.map(row => termTokens(`${row.name} ${row.describedAs}`))
+	return parts.filter(part =>
+		part.terms.some(term => {
+			const tokens = termTokens(term)
+			return rowWords.some(words => termAppearsIn(tokens, words))
+		}),
+	).length
+}
+
+/**
+ * Whether a row is one of the organisations the golden names as not a company.
+ *
+ * The listed name has to appear in the row's name as those words, in that order,
+ * next to each other. A run writes a body's name longer than the golden does —
+ * "FENIE — Federación Nacional de Empresarios de Instalaciones" — so the listed name
+ * sitting inside the row's is what catches it.
+ *
+ * Whole words rather than a run of letters, because a body is usually known by its
+ * initials and three letters land inside an unrelated name by accident: "RTE" sits
+ * in the middle of "Norte Instalaciones", and "FFB" inside "Groupe FFBat".
+ *
+ * Next to each other rather than merely present, because the words of a body's name
+ * are the trade's ordinary words scattered through many a company's: an unordered
+ * test reads "Eléctrica del Norte, Red de Instaladores" as the grid operator. Order
+ * does not save every case — a listed name short enough to sit inside a real company
+ * name still matches it — which is why the golden lists the name a body is known by
+ * rather than a fragment of it. And only in that direction — asking whether the row's words all
+ * sit inside the listed name marks any company named after its own trade as a body,
+ * from "Instalaciones y Energía" to a French "Génie Électrique et Climatique".
+ * Counting a body where there is none marks a real company as the wrong kind, which
+ * overstates the very problem being measured.
+ *
+ * Two rules on the golden data follow. List the name a body is actually known by,
+ * specific enough to be its own — "Red Eléctrica" alone names half the installers in
+ * the country — and list its initials as an entry of their own, because an acronym
+ * shares no words with what it stands for.
+ *
+ * What is left over, and cannot be read off a name: a company trading under a body's
+ * initials, like the retailer FENIE Energía beside the federation FENIE. It reads as
+ * the body. Asking the model what an organisation is would settle it; a name cannot.
+ */
+const isKnownNonCompany = (
+	name: string,
+	notCompanies: ReadonlyArray<string>,
+): boolean => {
+	const words = termTokens(name)
+	return notCompanies.some(listed => {
+		const listedWords = termTokens(listed)
+		if (listedWords.length === 0) return false
+		// A body known by its initials shares that word with the companies trading
+		// under it — the retailer FENIE Energía beside the federation FENIE, Grupo
+		// Unef Solar beside UNEF, RTE Ascenseurs beside the grid operator. One word
+		// on its own is only conclusive when it is the whole of what the row is
+		// called; spelled-out names carry enough words to be found inside a longer
+		// one safely.
+		if (listedWords.length === 1)
+			return words.length === 1 && words[0] === listedWords[0]
+		return words.some((_, at) =>
+			listedWords.every((word, offset) => words[at + offset] === word),
+		)
+	})
+}
+
+/**
+ * How many rows are another row's company a second time: the rows, less the
+ * companies they turn out to be.
+ *
+ * Two rows are one company when they share a name with the legal form off the end or
+ * share a site host, and sameness carries — the same keys the scan itself folds rows
+ * on.
+ *
+ * Reusing those keys is what this number is worth and what bounds it. The list it
+ * reads has already been folded on them, so nothing it can see should be left: it
+ * answers "is that fold still running and still doing its job", and it moves the
+ * moment the answer is no. It cannot answer whether the keys are the right ones.
+ *
+ * That bound is wider than it sounds, and a live market search shows it: a company
+ * came back once under its own name and four more times as that name plus the town
+ * of a branch office, none of the four carrying a site. Neither key sees them — the
+ * name is not the same name and there is no host to share — so the fold leaves all
+ * five and this reads zero duplicates over a list that plainly repeats one company.
+ * Reading it as "no repeats in this list" is wrong; it means "no repeats of the kind
+ * these keys can tell". Counting those needs a hand-marked answer to score against,
+ * which is a different measurement from this one.
+ *
+ * A row nothing can be read from — a name that is all punctuation, no address —
+ * files under no key and so counts as its own company. That is the safe direction:
+ * it never claims a duplicate it cannot show.
+ */
+const duplicatedRows = (rows: RunOutcome['companies']): number => {
+	// Each company found so far, as the keys its rows filed under. A row meeting one
+	// of them is that company again; a row meeting two proves those two were one
+	// company all along, so they merge.
+	const companies: Array<Set<string>> = []
+	for (const row of rows) {
+		const keys = discoveryRowIdentityKeys({
+			name: row.name,
+			...(row.website === null ? {} : { website: row.website }),
+		})
+		const matched = companies.filter(company =>
+			keys.some(key => company.has(key)),
+		)
+		const mergeInto = matched[0]
+		if (mergeInto === undefined) {
+			companies.push(new Set(keys))
+			continue
+		}
+		for (const key of keys) mergeInto.add(key)
+		for (const other of matched.slice(1)) {
+			for (const key of other) mergeInto.add(key)
+			companies.splice(companies.indexOf(other), 1)
+		}
+	}
+	return rows.length - companies.length
+}
+
 /** Score one run against its golden expectation. */
 export const scoreRun = (
 	expected: GoldenExpectation,
@@ -627,9 +957,46 @@ export const scoreRun = (
 	const lowConfidence = outcome.status === 'succeeded_low_confidence'
 	const wrongCompanyAutoApplicable = wrongCompany && !lowConfidence
 
+	// What the list got right, for a row that asked for a market.
+	//
+	// Only a run that reached an answer is measured. A run that died — a provider
+	// outage, or the whole-run time limit cutting a long search short — returns no
+	// rows, and counting it would put the parts it was asked for into the denominator
+	// with nothing in the numerator: one crashed run out of two halves the coverage
+	// figure and reads as a regression the research never had.
+	//
+	// A search that looked and found nothing is the opposite case and has to count.
+	// It ends as no reliable data rather than a success, so asking only whether the
+	// run succeeded would throw away the very reading that catches a change which
+	// empties a market — and with one run per market, throw away the whole market
+	// with it.
+	const expectedMarket = expected.market
+	const rightKindRows = outcome.companies.filter(
+		row =>
+			expectedMarket === undefined ||
+			!isKnownNonCompany(row.name, expectedMarket.notCompanies),
+	)
+	const market: MarketScore | undefined =
+		expectedMarket === undefined || !endedWithAnAnswer(outcome.status)
+			? undefined
+			: {
+					name: expectedMarket.name,
+					rowsReturned: outcome.companies.length,
+					rowsRightKind: rightKindRows.length,
+					rowsLocated: outcome.companies.filter(row => isFilled(row.location))
+						.length,
+					rowsDuplicated: duplicatedRows(outcome.companies),
+					partsExpected: expectedMarket.parts.length,
+					// Coverage counts the parts the request named rather than the rows, so
+					// a market that came back with nothing still reports it — none of them
+					// answered — instead of dropping out of the figure.
+					partsAnswered: partsAnsweredBy(rightKindRows, expectedMarket.parts),
+				}
+
 	return {
 		id: expected.id,
 		grounded,
+		groundable: expected.market === undefined,
 		wrongCompany,
 		wrongCompanyAutoApplicable,
 		lowConfidence,
@@ -641,6 +1008,7 @@ export const scoreRun = (
 		contactsFound,
 		...(outcome.profile !== undefined ? { profile: outcome.profile } : {}),
 		...(outcome.usage !== undefined ? { usage: outcome.usage } : {}),
+		...(market !== undefined ? { market } : {}),
 		...(expected.bucket !== undefined ? { bucket: expected.bucket } : {}),
 		...(expected.fields.country !== undefined
 			? { country: expected.fields.country }
@@ -656,14 +1024,19 @@ export const summarizeScores = (
 	if (runs === 0) {
 		return {
 			runs: 0,
-			groundingAccuracy: 0,
-			wrongCompanyRate: 0,
-			wrongCompanyAutoApplicableRate: 0,
+			groundingAccuracy: null,
+			wrongCompanyRate: null,
+			wrongCompanyAutoApplicableRate: null,
 			lowConfidenceRate: 0,
 			emptyRate: 0,
 			fieldPrecision: null,
 			fieldRecall: null,
 			contactRecall: null,
+			organisationKindPrecision: null,
+			requestCoverage: null,
+			duplicateRate: null,
+			locationFill: null,
+			rowsPerScan: null,
 			fieldsFilledPerRun: null,
 			profileFieldsTotal: null,
 			contactsNamedPerRun: null,
@@ -679,6 +1052,7 @@ export const summarizeScores = (
 	}
 
 	let grounded = 0
+	let groundable = 0
 	let wrong = 0
 	let wrongAutoApplicable = 0
 	let lowConfidence = 0
@@ -699,14 +1073,41 @@ export const summarizeScores = (
 	// never read them back shows no figure rather than a misleadingly low one.
 	let runsWithUsage = 0
 	let totalCostCents = 0
+	let groundableCostCents = 0
+	let groundedRunsWithUsage = 0
 	let totalPaidCostCents = 0
 	let totalTokensIn = 0
 	let totalTokensOut = 0
 	let totalCredits = 0
+	// The market figures, totalled as counts and divided once at the end, so a
+	// sixty-row market weighs sixty rows against a six-row one's six.
+	let scansScored = 0
+	let totalRowsReturned = 0
+	let totalRowsRightKind = 0
+	let totalRowsLocated = 0
+	let totalRowsDuplicated = 0
+	let totalPartsExpected = 0
+	let totalPartsAnswered = 0
 	for (const score of scores) {
-		if (score.grounded) grounded++
-		if (score.wrongCompany) wrong++
-		if (score.wrongCompanyAutoApplicable) wrongAutoApplicable++
+		// Only a run that was asked to reach a particular company can be counted for
+		// having reached it.
+		if (score.groundable) {
+			groundable++
+			if (score.grounded) grounded++
+		}
+		// The cost figure below divides by this rather than by every grounded run,
+		// so that a run whose spend was never read back cannot sit in the divisor
+		// with nothing above the line and drag the figure under the plain per-run cost.
+		if (score.groundable && score.grounded && score.usage !== undefined)
+			groundedRunsWithUsage++
+		// The look-alike counts ask the same question grounding does — was this the
+		// company we sent it after — so a market request is outside them too. It can
+		// never be a look-alike, and leaving it in the denominator quietly waters the
+		// rate down with runs that had no way to fail it.
+		if (score.groundable) {
+			if (score.wrongCompany) wrong++
+			if (score.wrongCompanyAutoApplicable) wrongAutoApplicable++
+		}
 		if (score.lowConfidence) lowConfidence++
 		if (score.empty) empty++
 		if (score.profile !== undefined) {
@@ -719,6 +1120,15 @@ export const summarizeScores = (
 			totalContactsNamed += score.profile.contactsNamed
 			totalContactsTitled += score.profile.contactsTitled
 		}
+		if (score.market !== undefined) {
+			scansScored++
+			totalRowsReturned += score.market.rowsReturned
+			totalRowsRightKind += score.market.rowsRightKind
+			totalRowsLocated += score.market.rowsLocated
+			totalRowsDuplicated += score.market.rowsDuplicated
+			totalPartsExpected += score.market.partsExpected
+			totalPartsAnswered += score.market.partsAnswered
+		}
 		totalExpected += score.fieldsExpected
 		totalScored += score.fieldsScored
 		totalCorrect += score.fieldsCorrect
@@ -727,6 +1137,11 @@ export const summarizeScores = (
 		if (score.usage !== undefined) {
 			runsWithUsage++
 			totalCostCents += score.usage.costCents
+			// What a usable run cost divides by the runs that grounded, so only what
+			// those runs spent belongs on top of it. A market request grounds nothing
+			// and can cost more than a profile run, so counting its spend here would
+			// bill it to the handful of company runs and read as a cost blow-up.
+			if (score.groundable) groundableCostCents += score.usage.costCents
 			totalPaidCostCents += score.usage.paidCostCents
 			totalTokensIn += score.usage.tokensIn
 			totalTokensOut += score.usage.tokensOut
@@ -746,11 +1161,18 @@ export const summarizeScores = (
 		}
 	}
 
+	// A market that came back with no rows at all has nothing to judge per row, but
+	// its coverage still reads — none of the parts was answered, which is the whole
+	// point of the figure.
+	const perRow = (total: number): number | null =>
+		totalRowsReturned === 0 ? null : total / totalRowsReturned
+
 	return {
 		runs,
-		groundingAccuracy: grounded / runs,
-		wrongCompanyRate: wrong / runs,
-		wrongCompanyAutoApplicableRate: wrongAutoApplicable / runs,
+		groundingAccuracy: groundable === 0 ? null : grounded / groundable,
+		wrongCompanyRate: groundable === 0 ? null : wrong / groundable,
+		wrongCompanyAutoApplicableRate:
+			groundable === 0 ? null : wrongAutoApplicable / groundable,
 		lowConfidenceRate: lowConfidence / runs,
 		emptyRate: empty / runs,
 		fieldPrecision: totalScored === 0 ? null : totalCorrect / totalScored,
@@ -759,6 +1181,12 @@ export const summarizeScores = (
 			totalContactsExpected === 0
 				? null
 				: totalContactsFound / totalContactsExpected,
+		organisationKindPrecision: perRow(totalRowsRightKind),
+		requestCoverage:
+			totalPartsExpected === 0 ? null : totalPartsAnswered / totalPartsExpected,
+		duplicateRate: perRow(totalRowsDuplicated),
+		locationFill: perRow(totalRowsLocated),
+		rowsPerScan: scansScored === 0 ? null : totalRowsReturned / scansScored,
 		fieldsFilledPerRun:
 			runsWithProfile === 0 ? null : totalFieldsFilled / runsWithProfile,
 		profileFieldsTotal: runsWithProfile === 0 ? null : profileFieldsTotal,
@@ -768,7 +1196,9 @@ export const summarizeScores = (
 			runsWithProfile === 0 ? null : totalContactsTitled / runsWithProfile,
 		costPerRun: runsWithUsage === 0 ? null : totalCostCents / runsWithUsage,
 		costPerGroundedRun:
-			runsWithUsage === 0 || grounded === 0 ? null : totalCostCents / grounded,
+			groundedRunsWithUsage === 0
+				? null
+				: groundableCostCents / groundedRunsWithUsage,
 		paidCostPerRun:
 			runsWithUsage === 0 ? null : totalPaidCostCents / runsWithUsage,
 		tokensPerRun:

@@ -66,6 +66,9 @@ export {
 export {
 	type EvalSummary,
 	type GoldenExpectation,
+	type MarketExpectation,
+	type MarketPart,
+	type MarketScore,
 	type RunOutcome,
 	type RunScore,
 	type RunUsage,

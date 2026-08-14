@@ -6,11 +6,12 @@ import {
 	evalSummaryAttributes,
 	scorePayloadsForRun,
 } from './eval-report'
-import type { RunScore } from './eval-scoring'
+import type { EvalSummary, RunScore } from './eval-scoring'
 
 const score = (over: Partial<RunScore>): RunScore => ({
 	id: 'r',
 	grounded: true,
+	groundable: true,
 	wrongCompany: false,
 	wrongCompanyAutoApplicable: false,
 	lowConfidence: false,
@@ -171,6 +172,11 @@ describe('evalSummaryAttributes', () => {
 				contactsTitledPerRun: null,
 				lowConfidenceRate: 0,
 				wrongCompanyAutoApplicableRate: 0,
+				organisationKindPrecision: null,
+				requestCoverage: null,
+				duplicateRate: null,
+				locationFill: null,
+				rowsPerScan: null,
 				callsByModel: {},
 				cascadedRunRate: 0,
 			})
@@ -208,6 +214,11 @@ describe('evalSummaryAttributes', () => {
 				contactsTitledPerRun: null,
 				lowConfidenceRate: 0,
 				wrongCompanyAutoApplicableRate: 0,
+				organisationKindPrecision: null,
+				requestCoverage: null,
+				duplicateRate: null,
+				locationFill: null,
+				rowsPerScan: null,
 				callsByModel: {},
 				cascadedRunRate: null,
 			})
@@ -263,6 +274,226 @@ describe('buildEvalReport', () => {
 			// THEN it falls into the explicit fallback groups, never dropped
 			expect(Object.keys(report.byBucket)).toEqual(['untagged'])
 			expect(Object.keys(report.byCountry)).toEqual(['unknown'])
+		})
+	})
+})
+
+describe('reporting a pass that held market requests', () => {
+	const marketScore = (over: Partial<RunScore['market']> = {}): RunScore =>
+		score({
+			groundable: false,
+			grounded: false,
+			market: {
+				name: 'ES',
+				rowsReturned: 62,
+				rowsRightKind: 39,
+				rowsLocated: 25,
+				rowsDuplicated: 10,
+				partsExpected: 5,
+				partsAnswered: 1,
+				...over,
+			},
+		})
+
+	describe('when a market run is turned into per-run scores', () => {
+		it('should score the list and leave out the questions it was never asked', () => {
+			// GIVEN a market request, which names no company to have reached
+			const payloads = byName(scorePayloadsForRun(marketScore()))
+
+			// WHEN mapped
+			// THEN the list is graded on what was wrong with it, and grounding is
+			// absent rather than scored nought — a market run cannot fail to reach a
+			// company nobody named
+			expect(payloads.get('organisation_kind_precision')).toMatchObject({
+				value: 39 / 62,
+				passed: false,
+			})
+			expect(payloads.get('request_coverage')).toMatchObject({
+				value: 0.2,
+				passed: false,
+			})
+			expect(payloads.get('not_duplicated')).toMatchObject({
+				value: 1 - 10 / 62,
+				passed: false,
+			})
+			expect(payloads.get('location_fill')).toMatchObject({ value: 25 / 62 })
+			expect(payloads.has('grounding')).toBe(false)
+			expect(payloads.has('not_wrong_company')).toBe(false)
+		})
+
+		it('should still score a clean list as passed', () => {
+			// GIVEN a market whose every row is a company, located, and unique
+			const payloads = byName(
+				scorePayloadsForRun(
+					marketScore({
+						rowsReturned: 10,
+						rowsRightKind: 10,
+						rowsLocated: 10,
+						rowsDuplicated: 0,
+						partsAnswered: 5,
+					}),
+				),
+			)
+
+			// WHEN mapped — THEN every market metric is 1 and passed, the same
+			// direction as every other metric here
+			for (const name of [
+				'organisation_kind_precision',
+				'request_coverage',
+				'not_duplicated',
+				'location_fill',
+			]) {
+				expect(payloads.get(name)).toMatchObject({ value: 1, passed: true })
+			}
+		})
+	})
+
+	describe('when a market came back with no rows', () => {
+		it('should still report the coverage and leave out the per-row scores', () => {
+			// GIVEN a market request that returned nothing
+			const payloads = byName(
+				scorePayloadsForRun(
+					marketScore({
+						rowsReturned: 0,
+						rowsRightKind: 0,
+						rowsLocated: 0,
+						rowsDuplicated: 0,
+						partsAnswered: 0,
+					}),
+				),
+			)
+
+			// WHEN mapped
+			// THEN "none of the five parts was answered" is a reading worth sending;
+			// the other three have nothing to divide by, so they are absent rather
+			// than a zero that reads as a quality collapse
+			expect(payloads.get('request_coverage')).toMatchObject({ value: 0 })
+			expect(payloads.has('organisation_kind_precision')).toBe(false)
+			expect(payloads.has('not_duplicated')).toBe(false)
+			expect(payloads.has('location_fill')).toBe(false)
+		})
+	})
+
+	describe('when a market run becomes span attributes', () => {
+		it('should carry the market and its counts for grouping', () => {
+			// GIVEN a market run's score
+			const attrs = evalSpanAttributes(marketScore())
+
+			// WHEN flattened — THEN a chart can group by market and read both the
+			// counts and the rates off one span
+			expect(attrs['eval.market']).toBe('ES')
+			expect(attrs['eval.rows_returned']).toBe(62)
+			expect(attrs['eval.rows_right_kind']).toBe(39)
+			expect(attrs['eval.rows_duplicated']).toBe(10)
+			expect(attrs['eval.rows_located']).toBe(25)
+			expect(attrs['eval.parts_answered']).toBe(1)
+			expect(attrs['eval.request_coverage']).toBe(0.2)
+		})
+
+		it('should carry no market attributes for a company run', () => {
+			// GIVEN an ordinary company run
+			const attrs = evalSpanAttributes(score({}))
+
+			// WHEN flattened — THEN nothing about a market rides along
+			expect('eval.market' in attrs).toBe(false)
+			expect('eval.rows_returned' in attrs).toBe(false)
+		})
+	})
+
+	describe('when the whole-pass summary becomes span attributes', () => {
+		const summary = (over: Partial<EvalSummary>): EvalSummary => ({
+			runs: 2,
+			groundingAccuracy: null,
+			wrongCompanyRate: 0,
+			wrongCompanyAutoApplicableRate: 0,
+			lowConfidenceRate: 0,
+			emptyRate: 0,
+			fieldPrecision: null,
+			fieldRecall: null,
+			contactRecall: null,
+			organisationKindPrecision: null,
+			requestCoverage: null,
+			duplicateRate: null,
+			locationFill: null,
+			rowsPerScan: null,
+			fieldsFilledPerRun: null,
+			profileFieldsTotal: null,
+			contactsNamedPerRun: null,
+			contactsTitledPerRun: null,
+			costPerRun: null,
+			costPerGroundedRun: null,
+			paidCostPerRun: null,
+			tokensPerRun: null,
+			creditsPerRun: null,
+			callsByModel: {},
+			cascadedRunRate: null,
+			...over,
+		})
+
+		it('should omit grounding accuracy when no run was asked to reach a company', () => {
+			// GIVEN a pass made only of market requests
+			const attrs = evalSummaryAttributes(summary({ groundingAccuracy: null }))
+
+			// WHEN flattened — THEN grounding is left off rather than charted as a nought
+			expect('eval.grounding_accuracy' in attrs).toBe(false)
+		})
+
+		it('should carry each market rate that has a reading', () => {
+			// GIVEN a market pass with figures
+			const attrs = evalSummaryAttributes(
+				summary({
+					organisationKindPrecision: 0.63,
+					requestCoverage: 0.2,
+					duplicateRate: 0.16,
+					locationFill: 0.4,
+					rowsPerScan: 62,
+				}),
+			)
+
+			// WHEN flattened — THEN the drift chart has every market figure
+			expect(attrs['eval.organisation_kind_precision']).toBe(0.63)
+			expect(attrs['eval.request_coverage']).toBe(0.2)
+			expect(attrs['eval.duplicate_rate']).toBe(0.16)
+			expect(attrs['eval.location_fill']).toBe(0.4)
+			expect(attrs['eval.rows_per_scan']).toBe(62)
+		})
+
+		it('should omit every market rate on a pass that held no market', () => {
+			// GIVEN an ordinary pass of company profiles
+			const attrs = evalSummaryAttributes(summary({ groundingAccuracy: 1 }))
+
+			// WHEN flattened — THEN no market figure is charted as a zero
+			expect('eval.organisation_kind_precision' in attrs).toBe(false)
+			expect('eval.request_coverage' in attrs).toBe(false)
+			expect('eval.duplicate_rate' in attrs).toBe(false)
+			expect('eval.location_fill' in attrs).toBe(false)
+			expect('eval.rows_per_scan' in attrs).toBe(false)
+		})
+	})
+
+	describe('when the report is built', () => {
+		it('should break the figures out per market', () => {
+			// GIVEN two markets in one pass, one of which the shipped kind check reads
+			// and one of which it does not
+			const report = buildEvalReport([
+				marketScore({ name: 'ES', rowsReturned: 10, rowsRightKind: 10 }),
+				marketScore({ name: 'FR', rowsReturned: 10, rowsRightKind: 4 }),
+			])
+
+			// WHEN built
+			// THEN each market keeps its own reading. Averaged together they read 70%
+			// and the gap that matters — a check that reads three languages — disappears
+			expect(report.byMarket['ES']?.organisationKindPrecision).toBe(1)
+			expect(report.byMarket['FR']?.organisationKindPrecision).toBe(0.4)
+		})
+
+		it('should hold no markets for a pass of company profiles', () => {
+			// GIVEN an ordinary pass
+			const report = buildEvalReport([score({}), score({})])
+
+			// WHEN built — THEN there is no market breakdown at all, rather than one
+			// bucket of company rows pretending to be a market
+			expect(report.byMarket).toEqual({})
 		})
 	})
 })

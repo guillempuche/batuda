@@ -29,10 +29,11 @@ Two different things have to be present, and they come from two different places
 If the routing is missing from the run environment, that provider silently falls back to `stub` and the run reports **100% empty** over canned data. So the run has to carry the committed routing in explicitly:
 
 ```bash
-# Every RESEARCH_* setting except the keys, as `NAME=value` arguments to `env`.
+# Every RESEARCH_* setting except the keys, space-separated, as `NAME=value` arguments to `env`.
 ROUTING=$(node -e 'const c=require("./apps/server/config.production.json");
-  for (const [k, v] of Object.entries(c))
-    if (k.startsWith("RESEARCH_") && !k.includes("API_KEY")) process.stdout.write(k + "=" + v + "\n")')
+  const out=[]; for (const [k, v] of Object.entries(c))
+    if (k.startsWith("RESEARCH_") && !k.includes("API_KEY")) out.push(k + "=" + v);
+  process.stdout.write(out.join(" "))')
 ```
 
 Feed it after `infisical run` so it wins over anything the environment carries, together with the worktree's own database (a dev Infisical env ships its own `DATABASE_URL` and would otherwise win):
@@ -45,7 +46,21 @@ infisical run --env=<env> -- env $ROUTING DATABASE_URL="$DB" \
 
 This is the same trick `.github/workflows/model_capability.yml` uses to probe the models: committed routing plus injected keys.
 
-**Turn the registries off for a pass that measures quality** — the two `=none` above. A registry hands back a company's directors, who are named people with titles, so leaving it on feeds the contact numbers from a source the change under test has nothing to do with. It costs money and does not fire on every pass. Keep one registries-on pass separately as the figure that represents production.
+**Expand `$ROUTING` in the shell that runs `env`, never in the one that writes the command.** It holds one `NAME=value` per line, so interpolating it into a double-quoted `sh -c "…"` embeds those newlines and `sh` reads them as command separators: the first line runs `env` with a single variable, the middle lines run as commands of their own, and the *last* line runs the eval — outside `infisical`, with no keys at all. Every provider then falls back to `stub` and the pass reports 100% empty over canned data, which reads as a total quality collapse rather than as a quoting mistake. Export it and single-quote the command so the inner shell does the splitting:
+
+```bash
+export ROUTING="$(node -e '…' )"   # space-separated
+export DB="postgresql://batuda:batuda@localhost:5433/<worktree-db>"
+nix develop --command sh -c 'infisical run --env=dev -- env $ROUTING DATABASE_URL="$DB" … pnpm cli research eval …'
+```
+
+**Turn off every tier the dev environment has no key for**, or config validation refuses to boot with a bare `ConfigError`. The committed routing points `enrich` at `hunter,fullenrich`, `map` at `firecrawl` and `verify` at a vendor, and `RESEARCH_API_KEY_ENRICH`, `_MAP` and `_VERIFY` are absent from dev. A scan uses the search, scrape and LLM tiers, so none of the three is needed:
+
+```bash
+RESEARCH_PROVIDER_ENRICH=none RESEARCH_PROVIDER_MAP=none RESEARCH_PROVIDER_VERIFY=none
+```
+
+**Turn the registries off for a pass that measures quality** — `RESEARCH_PROVIDER_REGISTRY_ES=none RESEARCH_PROVIDER_REGISTRY_GB=none`. A registry hands back a company's directors, who are named people with titles, so leaving it on feeds the contact numbers from a source the change under test has nothing to do with. It costs money and does not fire on every pass. Keep one registries-on pass separately as the figure that represents production.
 
 **Never print a secret.** `infisical secrets` prints values in plain text — it has no redacted mode, and its `--json` output is preceded by the shell banner, so a naive parse returns nothing and tempts you into the plain form. If you need to know which keys exist, list names only:
 
@@ -100,6 +115,21 @@ infisical run --env=dev -- env DATABASE_URL="postgresql://batuda:batuda@localhos
 ```
 
 `STORAGE_*` is genuinely absent from the dev env and comes from the worktree by itself. The eval refuses to start against a non-local database, so a forgotten pin stops the run instead of writing a pass into a shared one.
+
+## A whole-market pass needs the run deadline raised, or it measures a timeout
+
+`RESEARCH_RUN_DEADLINE_SEC` is a hard wall-clock cap on one run, applied inside the pipeline. It defaults to **1200 (20 min)** and `.env.example` sets the same, which is *below* how long a search for a whole market takes — the Spanish installations scan runs 20–32 minutes over ~300 pages. Production sets 2400, but an eval builds the pipeline in-process, so a worktree pass gets the default.
+
+Past that deadline the run is killed and marked `failed`, and a killed run is left out of the market figures rather than counted as a market with nothing in it. So the symptom is not a zero — it is the market's line reading `no run reached an answer`, or `By market` showing fewer runs than you asked for while the figures themselves look untroubled. Read the run count before the rates.
+
+So pass it explicitly, above the longest run you expect, and keep it *below* the CLI's own poll ceiling (45 min) so the poll outlives the run and reads its answer:
+
+```bash
+… -- env $ROUTING DATABASE_URL="$DB" RESEARCH_RUN_DEADLINE_SEC=2400 \
+  pnpm cli research eval --schema prospect_scan_v1 --golden eval/golden-markets.json …
+```
+
+`--schema prospect_scan_v1` is required for a market golden set — only a search shape answers with a list. The eval refuses to start without it rather than scoring every market at zero.
 
 ## Validate one company first, then the full pass
 

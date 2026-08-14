@@ -33,6 +33,8 @@ import {
 	evalSummaryAttributes,
 	type FramingOutcome,
 	type GoldenExpectation,
+	type MarketExpectation,
+	type MarketScore,
 	type ModelProbeResult,
 	makeResearchLlmLive,
 	makeResearchProvidersLive,
@@ -311,23 +313,40 @@ const pollToTerminal = (runId: string, maxAttempts: number) =>
 		return run
 	})
 
+// How long to wait for one run, in one-second polls: three quarters of an hour. A
+// search for a whole market is a long job — the one this measures ran for 32 minutes
+// over some 300 pages — and a run still going when the poll gives up is read as a
+// run that failed, which would score every market request as having found nothing.
+//
+// This has to stay above `RESEARCH_RUN_DEADLINE_SEC`, which is what actually bounds
+// a run: the run ends itself at that deadline, and waiting past it is what lets the
+// poll read the answer rather than time out alongside it. That setting defaults to
+// twenty minutes, which is *below* a market search's normal length, so a market pass
+// has to raise it — otherwise the run is killed mid-search and the list it had so
+// far is thrown away, which reads as a market with nothing in it.
+const MARKET_RUN_POLL_ATTEMPTS = 2_700
+
+// What a run answering about one company gets. A profile run finishes in minutes, so
+// a market-sized wait here only lengthens how long a wedged one holds its slot.
+const COMPANY_RUN_POLL_ATTEMPTS = 900
+
 // Create a fresh eval run and poll it to a terminal status. A single golden
 // company never fans out, so a confirm-required result is a bug — die on it.
-// A deep run does several search/scrape/LLM rounds, so allow ~15 minutes (900
-// one-second polls). Returns the run id (for source lookups) and the finished run.
+// Returns the run id (for source lookups) and the finished run.
 const createRunToTerminal = (
 	user: string,
 	org: string,
 	input: CreateResearchInput,
 	defaults: SystemDefaults,
-	instructions?: ResolvedInstructions,
+	instructions: ResolvedInstructions | undefined,
+	pollAttempts: number,
 ) =>
 	Effect.gen(function* () {
 		const svc = yield* ResearchService
 		const created = yield* svc.create(user, org, input, defaults, instructions)
 		if (created.status === 'confirm_required')
 			return yield* Effect.die(new Error('eval run should not fan out'))
-		const run = yield* pollToTerminal(created.id, 900)
+		const run = yield* pollToTerminal(created.id, pollAttempts)
 		return { runId: created.id, run }
 	})
 
@@ -351,11 +370,16 @@ const driveOne = (
 			// language — the seam for testing a non-English company end to end.
 			...(lang ? { context: { hints: { language: lang } } } : {}),
 		}
+		// A market request is the long job; anything else answers about one company.
 		const { runId, run } = yield* createRunToTerminal(
 			user,
 			org,
 			input,
 			defaults,
+			undefined,
+			golden.market === undefined
+				? COMPANY_RUN_POLL_ATTEMPTS
+				: MARKET_RUN_POLL_ATTEMPTS,
 		)
 		// Grounding is judged by the pages the run reached, so pull its fetched
 		// source URLs — per-field citations may point at third-party fact-sources.
@@ -375,12 +399,51 @@ const driveOne = (
 		return scoreRun(golden, outcome)
 	})
 
-// Aggregate a company's repeated runs into shares (grounded 3/5, …). Per-run
-// grounding is noisy, so the fraction across runs is the trustworthy signal.
-const formatCompanyRuns = (
+// A market request's repeated runs, as what its list got right. Nothing a company
+// row reports applies — there is no company to have reached and no field of its own
+// to have filled — so this is a separate line rather than the same one with most of
+// it reading "n/a".
+const formatMarketRuns = (
 	id: string,
+	market: MarketExpectation,
 	scores: ReadonlyArray<RunScore>,
 ): string => {
+	const markets = scores.flatMap(score => score.market ?? [])
+	// Every run died or was stopped, so there is nothing to divide. Saying so is the
+	// point: falling through to the company line would report a market request as
+	// having failed to reach a company nobody named.
+	if (markets.length === 0)
+		return `${id.padEnd(20)} market ${market.name.padEnd(6)}  no run reached an answer (${scores.length} attempted)`
+	const total = (pick: (market: MarketScore) => number): number =>
+		markets.reduce((sum, market) => sum + pick(market), 0)
+	const rows = total(market => market.rowsReturned)
+	const share = (matched: number): string =>
+		rows === 0 ? 'n/a' : `${matched}/${rows}`
+	const parts = total(market => market.partsExpected)
+	// The shares divide by their own totals, so summing across repeats is right for
+	// them. The row count is not a share: printing the sum would read 186 rows for one
+	// 62-row list asked for three times, so it is the rows one run came back with.
+	const rowsPerRun = rows / markets.length
+	return [
+		`${id.padEnd(20)} market ${market.name.padEnd(6)}`,
+		`rows ${rowsPerRun.toFixed(0).padStart(3)}`,
+		`right kind ${share(total(market => market.rowsRightKind))}`,
+		`duplicates ${share(total(market => market.rowsDuplicated))}`,
+		`located ${share(total(market => market.rowsLocated))}`,
+		`parts ${parts === 0 ? 'n/a' : `${total(market => market.partsAnswered)}/${parts}`}`,
+	].join('  ')
+}
+
+// Aggregate one golden row's repeated runs into shares (grounded 3/5, …). Per-run
+// grounding is noisy, so the fraction across runs is the trustworthy signal. A row
+// that asked for a market answers none of those questions and prints its own line.
+const formatGoldenRuns = (
+	golden: GoldenExpectation,
+	scores: ReadonlyArray<RunScore>,
+): string => {
+	const id = golden.id
+	if (golden.market !== undefined)
+		return formatMarketRuns(id, golden.market, scores)
 	const total = scores.length
 	const share = (matched: number): string => `${matched}/${total}`
 	const grounded = scores.filter(score => score.grounded).length
@@ -424,6 +487,7 @@ const formatSummary = (summary: EvalSummary): string =>
 		`Field precision:        ${pct(summary.fieldPrecision)}`,
 		`Field recall:           ${pct(summary.fieldRecall)}`,
 		`Titled-contact recall:  ${pct(summary.contactRecall)}`,
+		...formatMarketFigures(summary),
 		`Profile fields filled:  ${decimal(summary.fieldsFilledPerRun)} of ${count(summary.profileFieldsTotal)}`,
 		`People named per run:   ${decimal(summary.contactsNamedPerRun)}`,
 		`  of those, titled:     ${decimal(summary.contactsTitledPerRun)}`,
@@ -438,6 +502,20 @@ const formatSummary = (summary: EvalSummary): string =>
 		`Credits per run:        ${count(summary.creditsPerRun)}`,
 		...formatAnsweringModels(summary),
 	].join('\n')
+
+// What a pass of market requests got right. Silent for a pass of company profiles,
+// which has no list to judge — the figures are all null there, and printing five
+// "n/a" lines on every ordinary pass buries the ones that mean something.
+const formatMarketFigures = (summary: EvalSummary): ReadonlyArray<string> =>
+	summary.rowsPerScan === null
+		? []
+		: [
+				`Rows per market:        ${decimal(summary.rowsPerScan)}`,
+				`  right kind:           ${pct(summary.organisationKindPrecision)}`,
+				`  duplicates:           ${pct(summary.duplicateRate)}`,
+				`  with a location:      ${pct(summary.locationFill)}`,
+				`Request coverage:       ${pct(summary.requestCoverage)}`,
+			]
 
 // Which models actually did the work. A tier is configured with a first choice
 // and a second one for when the first falters, so a pass can quietly be carried
@@ -479,6 +557,51 @@ const formatGroups = (
 			),
 	].join('\n')
 
+// One line per market. This is the breakdown the market figures exist for rather
+// than a nicety: the organisation-kind guard reads Spanish, Catalan and English, so
+// a market answering in one of those scores near 100% while a market answering in
+// French or German scores far lower. Averaged together that difference vanishes,
+// and it is the whole thing worth watching.
+const formatMarketGroups = (groups: Record<string, EvalSummary>): string =>
+	[
+		'',
+		'── By market ──',
+		...Object.entries(groups)
+			.sort(([a], [b]) => a.localeCompare(b))
+			.map(
+				([key, s]) =>
+					`${key.padEnd(10)} runs ${String(s.runs).padStart(3)}  rows ${decimal(
+						s.rowsPerScan,
+					)}  right kind ${pct(
+						s.organisationKindPrecision,
+					)}  dupes ${pct(s.duplicateRate)}  located ${pct(
+						s.locationFill,
+					)}  coverage ${pct(s.requestCoverage)}  cost ${cents(s.costPerRun)}`,
+			),
+	].join('\n')
+
+// The one shape that answers a market request. Both scan shapes return a list, but
+// only a prospect row carries a place, so a market scored against the competitor
+// shape reads nought location fill for a field that shape never had. Run a market
+// against the profile shape — which is what --schema defaults to — and every row
+// scores nought rows and nought coverage, which looks exactly like a pipeline that
+// found nothing rather than like the wrong flag.
+const MARKET_SCHEMA = 'prospect_scan_v1'
+
+const requireMarketSchema = (
+	golden: ReadonlyArray<GoldenExpectation>,
+	schemaName: string,
+) => {
+	const markets = golden.filter(row => row.market !== undefined).length
+	return markets > 0 && schemaName !== MARKET_SCHEMA
+		? Effect.fail(
+				new Error(
+					`${markets} golden row(s) ask for a whole market, which only ${MARKET_SCHEMA} answers; --schema is "${schemaName}". Re-run with --schema ${MARKET_SCHEMA}.`,
+				),
+			)
+		: Effect.void
+}
+
 /**
  * Run the golden set through the live research pipeline and report the four quality
  * metrics. This drives real runs (LLM + providers + DB), so it needs the research
@@ -510,6 +633,7 @@ export const researchEval = (opts: {
 		if (golden.length === 0) {
 			return yield* Effect.fail(new Error('golden set has no valid rows'))
 		}
+		yield* requireMarketSchema(golden, opts.schemaName)
 		yield* Console.log(`Evaluating ${golden.length} companies…\n`)
 
 		// Tag the run's spans so a drift chart can group quality by which models
@@ -564,8 +688,8 @@ export const researchEval = (opts: {
 
 		for (const company of golden) {
 			yield* Console.log(
-				formatCompanyRuns(
-					company.id,
+				formatGoldenRuns(
+					company,
 					scores.filter(score => score.id === company.id),
 				),
 			)
@@ -576,6 +700,11 @@ export const researchEval = (opts: {
 		if (opts.byBucket) {
 			yield* Console.log(formatGroups('By bucket', report.byBucket))
 			yield* Console.log(formatGroups('By country', report.byCountry))
+		}
+		// Not behind the breakdown flag: a market pass is run to read this, and one
+		// market's figures averaged with another's is the reading it exists to replace.
+		if (Object.keys(report.byMarket).length > 0) {
+			yield* Console.log(formatMarketGroups(report.byMarket))
 		}
 		yield* Effect.annotateCurrentSpan(evalSummaryAttributes(report.summary))
 		yield* Option.match(opts.out, {
@@ -729,6 +858,7 @@ const driveFramed = (
 			input,
 			defaults,
 			instructions,
+			COMPANY_RUN_POLL_ATTEMPTS,
 		)
 		const outcome = outcomeFromRun({
 			status: run?.status ?? 'failed',
@@ -766,6 +896,10 @@ export const researchEvalInvariance = (opts: {
 		if (golden.length === 0) {
 			return yield* Effect.fail(new Error('golden set has no valid rows'))
 		}
+		// This command asks whether two wordings of the same question reach the same
+		// company, which a market request has no answer to — and it would spend two
+		// live runs per row finding that out.
+		yield* requireMarketSchema(golden, opts.schemaName)
 		yield* Console.log(
 			`Framing-invariance eval on ${golden.length} companies (2 runs each)…\n`,
 		)

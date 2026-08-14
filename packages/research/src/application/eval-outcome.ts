@@ -11,7 +11,7 @@
  * so a per-field-citation schema change lands here and the scorer's metrics stay put.
  */
 
-import { discoveryRows } from './discovery-scan'
+import { discoveryRows, isDiscoveryScan } from './discovery-scan'
 import {
 	type RunOutcome,
 	type RunUsage,
@@ -47,6 +47,37 @@ const readFieldValue = (raw: unknown): string | null => {
 	const inner = unwrapValue(raw)
 	return typeof inner === 'string' ? inner : null
 }
+
+/** A field's value, or null when it is missing or says nothing. */
+const readFilled = (raw: unknown): string | null => {
+	const value = readFieldValue(raw)
+	return value === null || value.trim() === '' ? null : value.trim()
+}
+
+/**
+ * Where a scan's row says what it does, run together so a row counts towards its
+ * trade whichever field the run wrote that trade into. A prospect gives the trade it
+ * was filed under and why it matched; a competitor gives a description instead.
+ *
+ * The relevance note is read even though it is the field most likely to repeat the
+ * request back, because leaving it out measured something worse. It is the only one
+ * of the three a prospect must fill: on a live pass 24 of 53 rows stated a trade and
+ * every other row said what it did only there, so without it more than half the list
+ * counted for nothing and the coverage figure turned into a reading of how often an
+ * optional field got filled.
+ *
+ * What that costs is stated plainly: a row naming several trades counts towards each
+ * one. That is right for an installer who genuinely does them all — the live pass has
+ * rows authorised for four — and generous towards a row that merely lists back what
+ * was asked for. The failure this figure has to catch survives either way, because a
+ * trade no row mentions at all still reads unanswered.
+ */
+const TRADE_FIELDS = ['industry', 'why_relevant', 'description'] as const
+
+const describedAs = (row: Record<string, unknown>): string =>
+	TRADE_FIELDS.map(field => readFilled(row[field]))
+		.filter(value => value !== null)
+		.join(' ')
 
 const enrichmentOf = (
 	findings: unknown,
@@ -85,7 +116,10 @@ export const outcomeFromRun = (input: {
 	// title it found or null — so the scorer can measure how many known contacts
 	// came back with a title.
 	const contacts: Array<{ name: string; role: string | null }> = []
-	const rawContacts = (findings as { contacts?: unknown }).contacts
+	const rawContacts =
+		findings !== null && typeof findings === 'object'
+			? (findings as { contacts?: unknown }).contacts
+			: undefined
 	if (Array.isArray(rawContacts)) {
 		for (const contact of rawContacts) {
 			if (contact === null || typeof contact !== 'object') continue
@@ -112,20 +146,30 @@ export const outcomeFromRun = (input: {
 		(findings as { registry_confirmed?: unknown }).registry_confirmed === true
 
 	// The companies a scan came back with, which is the whole of a scan's answer
-	// and so the only thing a scan can be scored on.
-	const companies: Array<{ name: string; hasWebsite: boolean }> = []
+	// and so the only thing a scan can be scored on. A row with no name is left out:
+	// there is nothing to tell it from another row, so counting it would make every
+	// nameless row a company of its own.
+	const companies: Array<{
+		name: string
+		website: string | null
+		location: string | null
+		describedAs: string
+	}> = []
 	for (const row of discoveryRows(input.schemaName, findings)) {
-		const name = (row as { name?: unknown }).name
-		if (typeof name !== 'string' || name.trim() === '') continue
-		const website = (row as { website?: unknown }).website
+		const name = readFieldValue(row['name'])
+		if (name === null || name.trim() === '') continue
 		companies.push({
 			name: name.trim(),
-			hasWebsite: typeof website === 'string' && website.trim() !== '',
+			website: readFilled(row['website']),
+			location: readFilled(row['location']),
+			describedAs: describedAs(row),
 		})
 	}
 
 	const profileFill = enrichmentFill(findings)
 	const people = contactFill(findings)
+	const isScan =
+		input.schemaName !== undefined && isDiscoveryScan(input.schemaName)
 
 	return {
 		status: toTerminalStatus(input.status),
@@ -134,12 +178,23 @@ export const outcomeFromRun = (input: {
 		contacts,
 		companies,
 		registryConfirmed,
-		profile: {
-			fieldsTotal: profileFill.total,
-			fieldsFilled: profileFill.filled,
-			contactsNamed: people.named,
-			contactsTitled: people.titled,
-		},
+		// Only a run that was asked for a profile is measured on how full it came back.
+		// A search answers with a list and is never given one, so counting it reports
+		// every search as having filled none of a shape nobody asked it for — a failing
+		// grade where the honest answer is that it does not apply. What decides it is
+		// the shape the run answered in, not whether the findings happen to carry a
+		// profile: a run that was asked and came back with nothing has no block either,
+		// and dropping it would lift the average by hiding the worst runs.
+		...(isScan
+			? {}
+			: {
+					profile: {
+						fieldsTotal: profileFill.total,
+						fieldsFilled: profileFill.filled,
+						contactsNamed: people.named,
+						contactsTitled: people.titled,
+					},
+				}),
 		...(input.usage !== undefined ? { usage: input.usage } : {}),
 	}
 }

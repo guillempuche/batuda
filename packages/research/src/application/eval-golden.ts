@@ -9,14 +9,24 @@
  * reason per bad row — a typo in the golden data (a mis-spelled field, a missing
  * official domain) has to fail loudly, because a wrong "correct answer" silently
  * poisons every number the harness reports.
+ *
+ * A row asks for a company or for a market, and the answer says which. A company row
+ * names the company's own address, which is the proof a run reached the right one. A
+ * market row names a whole market instead — the parts it asks for and the
+ * organisations known not to be companies there — and needs no address, because there
+ * is no single company for the run to have reached. A row that asks for neither
+ * still fails.
  */
 
 import {
 	GOLDEN_BUCKETS,
 	type GoldenBucket,
 	type GoldenExpectation,
+	type MarketExpectation,
+	type MarketPart,
 	SCORABLE_FIELDS,
 	type ScorableField,
+	termTokens,
 } from './eval-scoring'
 
 /**
@@ -55,6 +65,81 @@ const parseExpectedOutput = (raw: unknown): Record<string, unknown> | null => {
 const isStringArray = (value: unknown): value is ReadonlyArray<string> =>
 	Array.isArray(value) && value.every(item => typeof item === 'string')
 
+type MarketParseResult =
+	| { readonly ok: true; readonly value: MarketExpectation }
+	| { readonly ok: false; readonly error: string }
+
+/**
+ * Validate the block that makes a row a request for a whole market rather than for
+ * one company: what the market is called, the parts it asks for, and the
+ * organisations known not to be companies there.
+ *
+ * As strict as the rest of this file, and for the same reason. Every figure a market
+ * is graded on divides by something this block states, so a mis-typed key does not
+ * make a number wrong in a way anyone would notice — it makes a whole market's
+ * organisation-kind score read a clean 100% for want of anything to check against.
+ */
+const parseMarket = (raw: unknown): MarketParseResult => {
+	const market = asRecord(raw)
+	if (market === null)
+		return { ok: false, error: 'market must be a JSON object' }
+
+	const name = market['name']
+	if (typeof name !== 'string' || name.trim() === '') {
+		return { ok: false, error: 'market needs a name' }
+	}
+
+	const rawParts = market['parts']
+	if (!Array.isArray(rawParts) || rawParts.length === 0) {
+		return { ok: false, error: 'market needs a non-empty parts array' }
+	}
+	const parts: Array<MarketPart> = []
+	for (const item of rawParts) {
+		const part = asRecord(item)
+		const id = part?.['id']
+		if (typeof id !== 'string' || id.trim() === '') {
+			return { ok: false, error: 'each market part needs an id' }
+		}
+		const terms = part?.['terms']
+		if (!isStringArray(terms) || terms.length === 0) {
+			return {
+				ok: false,
+				error: `market part "${id}" needs a non-empty terms array`,
+			}
+		}
+		// Held to the words the scorer reads, not to whether the string looks empty: a
+		// term of punctuation alone survives a blank check and still folds to nothing,
+		// so it could never place a row and the part would read unanswered for good.
+		if (terms.some(term => termTokens(term).length === 0)) {
+			return {
+				ok: false,
+				error: `market part "${id}" has a term with no words in it`,
+			}
+		}
+		parts.push({ id, terms })
+	}
+
+	// Required, not optional, and empty is a legitimate answer that has to be typed
+	// out. A market whose trade bodies nobody has listed yet scores a perfect
+	// organisation-kind precision, and that reading has to be a stated "none known"
+	// rather than something a forgotten key produces by accident.
+	const notCompanies = market['notCompanies']
+	if (!isStringArray(notCompanies)) {
+		return {
+			ok: false,
+			error:
+				'market needs a notCompanies array of the organisations known not to be companies (empty if none are known yet)',
+		}
+	}
+	// Same reading as the terms above. An entry that folds to no words matches
+	// nothing, so it quietly raises the very figure it was typed in to lower.
+	if (notCompanies.some(entry => termTokens(entry).length === 0)) {
+		return { ok: false, error: 'a notCompanies entry has no words in it' }
+	}
+
+	return { ok: true, value: { name, parts, notCompanies } }
+}
+
 /** Validate one raw row into a `GoldenExpectation`, or explain why it can't be. */
 export const parseGoldenRow = (row: RawGoldenRow): GoldenParseResult => {
 	if (row.query.trim().length === 0) {
@@ -65,9 +150,48 @@ export const parseGoldenRow = (row: RawGoldenRow): GoldenParseResult => {
 		return { ok: false, error: 'expected output is not a JSON object' }
 	}
 
+	// Which question this row asks is settled before anything else is checked, so a
+	// row that asks the wrong two at once is told that first rather than being sent
+	// away to correct the spelling of a key it should not carry at all.
+	//
+	// A row asks about one company or about a market, never both. Every company key
+	// beside a market block turns a correct "does not apply" into a wrong number: an
+	// address makes the search graded on reaching a company nobody named, so it
+	// reports nought grounding, and a `fields: { country: "ES" }` written next to a
+	// market already called ES reports nought field recall and invents a country
+	// group. Both read as the pipeline failing, which is why this refuses rather than
+	// picking one meaning. A key present but carrying nothing claims nothing, so it
+	// is not the conflict.
+	const rawMarket = answer['market']
+	const claimsSomething = (value: unknown): boolean =>
+		value !== undefined && (!Array.isArray(value) || value.length > 0)
+	if (rawMarket !== undefined) {
+		const alsoNamed = [
+			'officialDomain',
+			'altDomains',
+			'fields',
+			'contacts',
+		].filter(key => claimsSomething(answer[key]))
+		if (alsoNamed.length > 0) {
+			return {
+				ok: false,
+				error: `a market row cannot also carry ${alsoNamed.join(', ')} — those grade a run against one named company`,
+			}
+		}
+	}
+
 	const rawAltDomains = answer['altDomains']
 	if (rawAltDomains !== undefined && !isStringArray(rawAltDomains)) {
 		return { ok: false, error: 'altDomains must be an array of strings' }
+	}
+
+	// A row asking for a whole market names no one company, so there is no company
+	// site for the run to have reached and no address to demand of it below.
+	let market: MarketExpectation | undefined
+	if (rawMarket !== undefined) {
+		const parsed = parseMarket(rawMarket)
+		if (!parsed.ok) return { ok: false, error: parsed.error }
+		market = parsed.value
 	}
 
 	// A row has to name at least one address that proves the run reached the right
@@ -82,11 +206,15 @@ export const parseGoldenRow = (row: RawGoldenRow): GoldenParseResult => {
 			? rawOfficialDomain
 			: null
 	const altDomains = rawAltDomains ?? []
-	if (officialDomain === null && altDomains.length === 0) {
+	if (
+		market === undefined &&
+		officialDomain === null &&
+		altDomains.length === 0
+	) {
 		return {
 			ok: false,
 			error:
-				'expected output needs an officialDomain, or altDomains for a company with no website of its own',
+				'expected output needs an officialDomain, or altDomains for a company with no website of its own, or a market block for a request that asks for a whole market',
 		}
 	}
 
@@ -155,6 +283,7 @@ export const parseGoldenRow = (row: RawGoldenRow): GoldenParseResult => {
 			fields,
 			...(contacts.length > 0 ? { contacts } : {}),
 			...(rawBucket !== undefined ? { bucket: rawBucket as GoldenBucket } : {}),
+			...(market !== undefined ? { market } : {}),
 		},
 	}
 }

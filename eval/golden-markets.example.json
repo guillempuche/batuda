@@ -1,0 +1,153 @@
+[
+	{
+		"id": "es-installations",
+		"query": "Empresas instaladoras en España: instalaciones eléctricas, fontanería y climatización, energía solar fotovoltaica, protección contra incendios y ascensores. Para cada empresa, indica la provincia.",
+		"expectedOutput": {
+			"market": {
+				"name": "ES",
+				"parts": [
+					{
+						"id": "electrical",
+						"terms": [
+							"instalacion electrica",
+							"instalaciones electricas",
+							"instalador electrico",
+							"instaladora electrica",
+							"electricista",
+							"electricidad",
+							"installacions electriques",
+							"instal lacions electriques",
+							"electrical",
+							"electrical installation"
+						]
+					},
+					{
+						"id": "plumbing-heating",
+						"terms": [
+							"fontaneria",
+							"fontanero",
+							"lampisteria",
+							"lampista",
+							"climatizacion",
+							"climatitzacio",
+							"calefaccion",
+							"calefaccio",
+							"plumbing",
+							"hvac"
+						]
+					},
+					{
+						"id": "solar",
+						"terms": [
+							"fotovoltaic",
+							"energia solar",
+							"placas solares",
+							"plaques solars",
+							"autoconsum",
+							"solar energy"
+						]
+					},
+					{
+						"id": "fire-protection",
+						"terms": [
+							"contra incendios",
+							"contra incendis",
+							"contra el fuego",
+							"proteccion pasiva",
+							"fire protection"
+						]
+					},
+					{
+						"id": "lifts",
+						"terms": ["ascensor", "elevador", "elevator"]
+					}
+				],
+				"notCompanies": [
+					"FENIE",
+					"Federacion Nacional de Empresarios de Instalaciones",
+					"CONAIF",
+					"Confederacion Nacional de Asociaciones de Empresas de Fontaneria",
+					"AGREMIA",
+					"ASEFOSAM",
+					"UNEF",
+					"Union Espanola Fotovoltaica",
+					"TECNIFUEGO",
+					"Asociacion Espanola de Sociedades de Proteccion contra Incendios",
+					"Asociacion de Instaladores Electricos y Telecomunicaciones de Ourense",
+					"Red Electrica de Espana"
+				]
+			}
+		}
+	},
+	{
+		"id": "fr-installations",
+		"query": "Entreprises d'installation en France : installations électriques, plomberie et chauffage, solaire photovoltaïque, protection incendie et ascenseurs. Pour chaque entreprise, indiquez le département.",
+		"expectedOutput": {
+			"market": {
+				"name": "FR",
+				"parts": [
+					{
+						"id": "electrical",
+						"terms": [
+							"installation electrique",
+							"installations electriques",
+							"genie electrique",
+							"electricien",
+							"electricite",
+							"electrical installation"
+						]
+					},
+					{
+						"id": "plumbing-heating",
+						"terms": [
+							"plomberie",
+							"plombier",
+							"chauffage",
+							"chauffagiste",
+							"climatisation",
+							"plumbing"
+						]
+					},
+					{
+						"id": "solar",
+						"terms": [
+							"photovoltaique",
+							"energie solaire",
+							"panneaux solaires",
+							"solar energy"
+						]
+					},
+					{
+						"id": "fire-protection",
+						"terms": [
+							"protection incendie",
+							"securite incendie",
+							"fire protection"
+						]
+					},
+					{
+						"id": "lifts",
+						"terms": ["ascensoriste", "ascenseur", "elevateur", "elevator"]
+					}
+				],
+				"notCompanies": [
+					"CAPEB",
+					"Confederation de l'Artisanat et des Petites Entreprises du Batiment",
+					"FFB",
+					"Federation Francaise du Batiment",
+					"FFIE",
+					"Federation Francaise des Entreprises de Genie Electrique et Energetique",
+					"SERCE",
+					"Syndicat des Entreprises de Genie Electrique et Climatique",
+					"Enerplan",
+					"FFMI",
+					"Federation Francaise des Metiers de l'Incendie",
+					"Federation des Ascenseurs",
+					"Enedis",
+					"RTE",
+					"Reseau de Transport d'Electricite"
+				]
+			}
+		}
+	}
+]

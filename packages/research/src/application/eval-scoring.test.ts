@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
 	type GoldenExpectation,
 	groupSummaries,
+	type MarketExpectation,
 	type RunOutcome,
 	type RunScore,
 	scoreRun,
@@ -27,6 +28,35 @@ const outcome = (over: Partial<RunOutcome>): RunOutcome => ({
 	contacts: [],
 	companies: [],
 	...over,
+})
+
+// One row of a scan's list. Named and otherwise blank by default, so each test
+// states only the field it is about.
+const company = (
+	over: Partial<RunOutcome['companies'][number]> & { name: string },
+): RunOutcome['companies'][number] => ({
+	website: null,
+	location: null,
+	describedAs: '',
+	...over,
+})
+
+// A golden row that asks for a whole market rather than one company: no site of its
+// own to have been reached, and a list of parts and known non-companies instead.
+const marketGolden = (
+	market: Partial<MarketExpectation> = {},
+): GoldenExpectation => ({
+	id: 'es-installations',
+	query: 'Empresas instaladoras en España',
+	officialDomain: null,
+	fields: {},
+	market: {
+		name: market.name ?? 'ES',
+		parts: market.parts ?? [
+			{ id: 'electrical', terms: ['instalacion electrica'] },
+		],
+		notCompanies: market.notCompanies ?? [],
+	},
 })
 
 describe('scoreRun', () => {
@@ -508,10 +538,501 @@ describe('scoreRun', () => {
 	})
 })
 
+describe('scoring a run that answered for a whole market', () => {
+	describe('when the golden row names a market rather than a company', () => {
+		it('should not count reaching a company as a question it failed', () => {
+			// GIVEN a market request, which names no company to reach
+			const score = scoreRun(
+				marketGolden(),
+				outcome({ reachedDomains: [], companies: [company({ name: 'Alfa' })] }),
+			)
+
+			// WHEN scored
+			// THEN grounding is marked as not asked rather than not achieved. Counting
+			// it would report a whole market pass at nought for answering the question
+			// it was actually given
+			expect(score.groundable).toBe(false)
+			expect(score.grounded).toBe(false)
+		})
+
+		it('should count the rows the scan came back with', () => {
+			// GIVEN a scan that returned two rows
+			const score = scoreRun(
+				marketGolden(),
+				outcome({
+					companies: [company({ name: 'Alfa' }), company({ name: 'Beta' })],
+				}),
+			)
+
+			// WHEN scored — THEN the row count is carried, which is the scale every
+			// other market figure reads against
+			expect(score.market?.rowsReturned).toBe(2)
+			expect(score.market?.name).toBe('ES')
+		})
+	})
+
+	describe('when the golden row names a company', () => {
+		it('should count reaching it as a question that was asked', () => {
+			// GIVEN an ordinary company row, which names the site that proves the run
+			// reached the right one
+			const score = scoreRun(acme, outcome({}))
+
+			// WHEN scored — THEN grounding still counts, unchanged
+			expect(score.groundable).toBe(true)
+			expect(score.market).toBeUndefined()
+		})
+	})
+
+	describe('when a returned row is an organisation the golden knows is not a company', () => {
+		it('should not count a row whose name carries every word of a listed body', () => {
+			// GIVEN a trade body the golden names, returned under a longer name than
+			// the golden gives it
+			const score = scoreRun(
+				marketGolden({
+					notCompanies: ['Federación Nacional de Empresarios de Instalaciones'],
+				}),
+				outcome({
+					companies: [
+						company({
+							name: 'FENIE — Federación Nacional de Empresarios de Instalaciones',
+						}),
+						company({ name: 'Instalaciones Alfa SL' }),
+					],
+				}),
+			)
+
+			// WHEN scored — THEN one of the two rows is the kind of organisation asked
+			// for. This is the fault that made a 62-row list unusable
+			expect(score.market?.rowsRightKind).toBe(1)
+		})
+
+		it('should match a body a row gives only by its initials', () => {
+			// GIVEN the initials listed as an entry of their own
+			const score = scoreRun(
+				marketGolden({ notCompanies: ['CONAIF', 'FENIE'] }),
+				outcome({ companies: [company({ name: 'CONAIF' })] }),
+			)
+
+			// WHEN scored — THEN the row is not counted as a company
+			expect(score.market?.rowsRightKind).toBe(0)
+		})
+
+		it('should not read a body into a name that merely contains its letters', () => {
+			// GIVEN a body known by three initials, and a real company whose name
+			// happens to spell them: "RTE" sits inside "Norte"
+			const score = scoreRun(
+				marketGolden({ notCompanies: ['RTE', 'FFB'] }),
+				outcome({
+					companies: [
+						company({ name: 'Norte Instalaciones' }),
+						company({ name: 'Groupe FFBat' }),
+					],
+				}),
+			)
+
+			// WHEN scored
+			// THEN both are still companies. A body counted where there is none marks a
+			// real company as the wrong kind, which overstates the problem being measured
+			expect(score.market?.rowsRightKind).toBe(2)
+		})
+
+		it('should not read a body into a company named after the trade it works in', () => {
+			// GIVEN a listed body whose name is made of the trade's ordinary words, and
+			// a real installer whose whole name sits inside it
+			const score = scoreRun(
+				marketGolden({
+					notCompanies: [
+						'Asociación de Empresas del Sector de las Instalaciones y la Energía',
+					],
+				}),
+				outcome({
+					companies: [company({ name: 'Instalaciones y Energía' })],
+				}),
+			)
+
+			// WHEN scored
+			// THEN it stays a company. Reading the words the other way round — the row's
+			// name sitting inside the listed one — would call every installer named after
+			// its own trade a trade body, which overstates the problem being measured
+			expect(score.market?.rowsRightKind).toBe(1)
+		})
+
+		it('should count every row when the golden names no bodies at all', () => {
+			// GIVEN a market whose trade bodies nobody has written down yet
+			const score = scoreRun(
+				marketGolden({ notCompanies: [] }),
+				outcome({
+					companies: [
+						company({ name: 'Asociación de Instaladores de Ourense' }),
+						company({ name: 'Instalaciones Alfa SL' }),
+					],
+				}),
+			)
+
+			// WHEN scored
+			// THEN it reads a clean 2 of 2 — which is the honest limit of this figure,
+			// and why an empty list has to be typed out rather than left off
+			expect(score.market?.rowsRightKind).toBe(2)
+		})
+
+		it('should leave a row with no readable name counted as a company', () => {
+			// GIVEN a row whose name is punctuation only, so there are no words to
+			// compare against anything
+			const score = scoreRun(
+				marketGolden({ notCompanies: ['FENIE'] }),
+				outcome({ companies: [company({ name: '—' })] }),
+			)
+
+			// WHEN scored — THEN it is not called a body on the strength of nothing
+			expect(score.market?.rowsRightKind).toBe(1)
+		})
+	})
+
+	describe('when the request named several parts', () => {
+		const fiveParts: MarketExpectation['parts'] = [
+			{ id: 'electrical', terms: ['instalacion electrica'] },
+			{ id: 'plumbing', terms: ['fontaneria'] },
+			{ id: 'solar', terms: ['fotovoltaica'] },
+			{ id: 'fire', terms: ['contra incendios'] },
+			{ id: 'lifts', terms: ['ascensor'] },
+		]
+
+		it('should count only the parts a row came back for', () => {
+			// GIVEN five trades asked for and rows for one of them, which is what the
+			// 13 August run actually did
+			const score = scoreRun(
+				marketGolden({ parts: fiveParts }),
+				outcome({
+					companies: [
+						company({
+							name: 'Alfa SL',
+							describedAs: 'Instalaciones eléctricas para industria',
+						}),
+						company({ name: 'Beta SL', describedAs: 'Instalación eléctrica' }),
+					],
+				}),
+			)
+
+			// WHEN scored — THEN one of five, rather than a healthy-looking row count
+			expect(score.market?.partsExpected).toBe(5)
+			expect(score.market?.partsAnswered).toBe(1)
+		})
+
+		it('should count a row that answers two parts for both of them', () => {
+			// GIVEN one company that does two of the trades asked for
+			const score = scoreRun(
+				marketGolden({ parts: fiveParts }),
+				outcome({
+					companies: [
+						company({
+							name: 'Alfa SL',
+							describedAs: 'Fontanería y energía fotovoltaica',
+						}),
+					],
+				}),
+			)
+
+			// WHEN scored — THEN both parts are answered
+			expect(score.market?.partsAnswered).toBe(2)
+		})
+
+		it('should read a trade named in the row name alone', () => {
+			// GIVEN a row that says what it does only in its name
+			const score = scoreRun(
+				marketGolden({ parts: fiveParts }),
+				outcome({ companies: [company({ name: 'Ascensores del Sur SL' })] }),
+			)
+
+			// WHEN scored — THEN the part still counts as answered
+			expect(score.market?.partsAnswered).toBe(1)
+		})
+
+		it('should hold a short term to a whole word', () => {
+			// GIVEN a three-letter trade term, which is the opening of many unrelated
+			// words
+			const score = scoreRun(
+				marketGolden({ parts: [{ id: 'gas', terms: ['gas'] }] }),
+				outcome({
+					companies: [
+						company({ name: 'Alfa SL', describedAs: 'Control del gasto' }),
+					],
+				}),
+			)
+
+			// WHEN scored — THEN "gasto" does not answer the gas part
+			expect(score.market?.partsAnswered).toBe(0)
+		})
+
+		it('should require a term of several words to appear as those words in order', () => {
+			// GIVEN a two-word term whose words both appear, but with another between
+			const score = scoreRun(
+				marketGolden({
+					parts: [{ id: 'fire', terms: ['proteccion incendios'] }],
+				}),
+				outcome({
+					companies: [
+						company({
+							name: 'Alfa SL',
+							describedAs: 'Protección contra incendios',
+						}),
+					],
+				}),
+			)
+
+			// WHEN scored
+			// THEN it is not answered. The golden has to write the wording a row would
+			// actually use, and under-reading is the safe direction for a measurement
+			expect(score.market?.partsAnswered).toBe(0)
+		})
+
+		it('should not let a trade body answer the part it represents', () => {
+			// GIVEN a market whose only solar row is the solar trade body, which names
+			// the trade in its own title
+			const score = scoreRun(
+				marketGolden({
+					parts: [{ id: 'solar', terms: ['fotovoltaica'] }],
+					notCompanies: ['Union Espanola Fotovoltaica'],
+				}),
+				outcome({
+					companies: [
+						company({
+							name: 'Unión Española Fotovoltaica',
+							describedAs: 'Asociación del sector fotovoltaico',
+						}),
+					],
+				}),
+			)
+
+			// WHEN scored
+			// THEN the part is not answered. A list holding the trade's federation and
+			// no company that does the work is the answer this figure exists to catch,
+			// and the body names the trade as surely as a company would
+			expect(score.market?.rowsRightKind).toBe(0)
+			expect(score.market?.partsAnswered).toBe(0)
+		})
+
+		it('should report no coverage when the request named no parts', () => {
+			// GIVEN a market row that lists no parts at all
+			const score = scoreRun(
+				marketGolden({ parts: [] }),
+				outcome({ companies: [company({ name: 'Alfa SL' })] }),
+			)
+
+			// WHEN scored — THEN there is nothing to divide by, so both read zero
+			expect(score.market?.partsExpected).toBe(0)
+			expect(score.market?.partsAnswered).toBe(0)
+		})
+	})
+
+	describe('when the same company came back more than once', () => {
+		it('should count a row whose name differs only by its legal form', () => {
+			// GIVEN the pair the 13 August list actually carried
+			const score = scoreRun(
+				marketGolden(),
+				outcome({
+					companies: [
+						company({ name: 'Cobra Instalaciones y Servicios' }),
+						company({ name: 'COBRA INSTALACIONES Y SERVICIOS SA' }),
+					],
+				}),
+			)
+
+			// WHEN scored — THEN two rows are one company
+			expect(score.market?.rowsDuplicated).toBe(1)
+		})
+
+		it('should count two differently-named rows sharing a website', () => {
+			// GIVEN a rename or a trading name hiding one company behind two names
+			const score = scoreRun(
+				marketGolden(),
+				outcome({
+					companies: [
+						company({ name: 'Alfa SL', website: 'https://alfa.example' }),
+						company({
+							name: 'Instalaciones Alfa',
+							website: 'https://alfa.example/es',
+						}),
+					],
+				}),
+			)
+
+			// WHEN scored — THEN the shared site is enough
+			expect(score.market?.rowsDuplicated).toBe(1)
+		})
+
+		it('should carry sameness across a chain of rows', () => {
+			// GIVEN A meeting B by name and B meeting C by website
+			const score = scoreRun(
+				marketGolden(),
+				outcome({
+					companies: [
+						company({ name: 'Alfa Instalaciones' }),
+						company({
+							name: 'Alfa Instalaciones SL',
+							website: 'https://alfa.example',
+						}),
+						company({ name: 'Grupo Beta', website: 'https://alfa.example' }),
+					],
+				}),
+			)
+
+			// WHEN scored — THEN all three are one company, which is what they are
+			expect(score.market?.rowsDuplicated).toBe(2)
+		})
+
+		it('should not fold two rows on a website that is not an address', () => {
+			// GIVEN two rows whose website field carries prose beside the URL
+			const score = scoreRun(
+				marketGolden(),
+				outcome({
+					companies: [
+						company({
+							name: 'Alfa SL',
+							website: 'https://alfa.example (inferred from name)',
+						}),
+						company({
+							name: 'Beta SL',
+							website: 'https://alfa.example (inferred from name)',
+						}),
+					],
+				}),
+			)
+
+			// WHEN scored — THEN nothing is folded on a value that is not an address
+			expect(score.market?.rowsDuplicated).toBe(0)
+		})
+
+		it('should leave rows nothing can be read from as companies of their own', () => {
+			// GIVEN two rows with no readable name and no address
+			const score = scoreRun(
+				marketGolden(),
+				outcome({
+					companies: [company({ name: '—' }), company({ name: '···' })],
+				}),
+			)
+
+			// WHEN scored — THEN no duplicate is claimed, because none can be shown
+			expect(score.market?.rowsDuplicated).toBe(0)
+		})
+
+		it('should fold a row that meets two companies already found', () => {
+			// GIVEN a row that shares its name with the first row and its site with the
+			// second, which proves those two were one company all along
+			const score = scoreRun(
+				marketGolden(),
+				outcome({
+					companies: [
+						company({ name: 'Alfa SL' }),
+						company({ name: 'Beta SL', website: 'https://beta.example' }),
+						company({ name: 'Alfa SL', website: 'https://beta.example' }),
+					],
+				}),
+			)
+
+			// WHEN scored — THEN all three are one company, not two
+			expect(score.market?.rowsDuplicated).toBe(2)
+		})
+
+		it('should count no duplicates in a list of distinct companies', () => {
+			// GIVEN three unrelated companies
+			const score = scoreRun(
+				marketGolden(),
+				outcome({
+					companies: [
+						company({ name: 'Alfa SL' }),
+						company({ name: 'Beta SL' }),
+						company({ name: 'Gamma SL' }),
+					],
+				}),
+			)
+
+			// WHEN scored — THEN the list is what it says it is
+			expect(score.market?.rowsDuplicated).toBe(0)
+		})
+	})
+
+	describe('when the run never reached an answer', () => {
+		it.each([
+			'failed',
+			'cancelled',
+		] as const)('should score no market at all for a %s run', status => {
+			// GIVEN a market request whose run died — an outage, or the time limit
+			// cutting a long search short — so it returned nothing for that reason
+			const score = scoreRun(
+				marketGolden({
+					parts: [
+						{ id: 'electrical', terms: ['instalacion electrica'] },
+						{ id: 'solar', terms: ['fotovoltaica'] },
+					],
+				}),
+				outcome({ status, companies: [] }),
+			)
+
+			// WHEN scored
+			// THEN there is no market reading to fold into the pass. Counting it
+			// would put the parts it was asked for into the denominator with
+			// nothing above the line, so one crashed run in two would halve the
+			// coverage figure and read as a regression the research never had
+			expect(score.market).toBeUndefined()
+		})
+	})
+
+	describe('when rows say where the company is', () => {
+		it('should count only the rows that state a town or province', () => {
+			// GIVEN three rows, one located, one blank, one absent
+			const score = scoreRun(
+				marketGolden(),
+				outcome({
+					companies: [
+						company({ name: 'Alfa SL', location: 'Alcobendas, Madrid' }),
+						company({ name: 'Beta SL', location: '   ' }),
+						company({ name: 'Gamma SL' }),
+					],
+				}),
+			)
+
+			// WHEN scored — THEN the field the request asked for on every company is
+			// counted where it actually arrived
+			expect(score.market?.rowsLocated).toBe(1)
+		})
+	})
+
+	describe('when the scan came back with nothing', () => {
+		it('should report an answered-nothing market rather than dropping out', () => {
+			// GIVEN a market request that looked and found no rows at all, which the
+			// pipeline ends as no reliable data rather than as a success
+			const score = scoreRun(
+				marketGolden({
+					parts: [
+						{ id: 'electrical', terms: ['instalacion electrica'] },
+						{ id: 'solar', terms: ['fotovoltaica'] },
+					],
+				}),
+				outcome({ status: 'no_reliable_data', companies: [] }),
+			)
+
+			// WHEN scored
+			// THEN every count reads zero and coverage says none of the two parts was
+			// answered — the answer, rather than the absence of one
+			expect(score.market).toEqual({
+				name: 'ES',
+				rowsReturned: 0,
+				rowsRightKind: 0,
+				rowsLocated: 0,
+				rowsDuplicated: 0,
+				partsExpected: 2,
+				partsAnswered: 0,
+			})
+			expect(score.empty).toBe(true)
+		})
+	})
+})
+
 describe('summarizeScores', () => {
 	const score = (over: Partial<RunScore>): RunScore => ({
 		id: 'r',
 		grounded: true,
+		groundable: true,
 		wrongCompany: false,
 		wrongCompanyAutoApplicable: false,
 		lowConfidence: false,
@@ -533,14 +1054,19 @@ describe('summarizeScores', () => {
 			// would need a run to divide by stays null rather than reading as zero
 			expect(summary).toEqual({
 				runs: 0,
-				groundingAccuracy: 0,
-				wrongCompanyRate: 0,
-				wrongCompanyAutoApplicableRate: 0,
+				groundingAccuracy: null,
+				wrongCompanyRate: null,
+				wrongCompanyAutoApplicableRate: null,
 				lowConfidenceRate: 0,
 				emptyRate: 0,
 				fieldPrecision: null,
 				fieldRecall: null,
 				contactRecall: null,
+				organisationKindPrecision: null,
+				requestCoverage: null,
+				duplicateRate: null,
+				locationFill: null,
+				rowsPerScan: null,
 				fieldsFilledPerRun: null,
 				profileFieldsTotal: null,
 				contactsNamedPerRun: null,
@@ -787,6 +1313,167 @@ describe('summarizeScores', () => {
 	})
 })
 
+describe('summarizing a pass that held market requests', () => {
+	const score = (over: Partial<RunScore>): RunScore => ({
+		id: 'r',
+		grounded: true,
+		groundable: true,
+		wrongCompany: false,
+		wrongCompanyAutoApplicable: false,
+		lowConfidence: false,
+		empty: false,
+		fieldsExpected: 0,
+		fieldsScored: 0,
+		fieldsCorrect: 0,
+		contactsExpected: 0,
+		contactsFound: 0,
+		...over,
+	})
+
+	const marketScore = (
+		over: Partial<RunScore['market']> = {},
+		alsoOnScore: Partial<RunScore> = {},
+	): RunScore =>
+		score({
+			groundable: false,
+			grounded: false,
+			...alsoOnScore,
+			market: {
+				name: 'ES',
+				rowsReturned: 10,
+				rowsRightKind: 10,
+				rowsLocated: 10,
+				rowsDuplicated: 0,
+				partsExpected: 5,
+				partsAnswered: 5,
+				...over,
+			},
+		})
+
+	describe('when no run in the pass was asked to reach a company', () => {
+		it('should report no grounding accuracy rather than nought', () => {
+			// GIVEN a pass made only of market requests
+			const summary = summarizeScores([marketScore(), marketScore()])
+
+			// WHEN summarized
+			// THEN all three are absent, not failed. Nought would say the pass failed at
+			// three things nobody asked it to do
+			expect(summary.groundingAccuracy).toBeNull()
+			expect(summary.wrongCompanyRate).toBeNull()
+			expect(summary.wrongCompanyAutoApplicableRate).toBeNull()
+		})
+	})
+
+	describe('when a pass mixes market requests with company rows', () => {
+		it('should judge grounding only over the runs it was a question for', () => {
+			// GIVEN one company row that reached its target, and one market request
+			const summary = summarizeScores([
+				score({ grounded: true, groundable: true }),
+				marketScore(),
+			])
+
+			// WHEN summarized — THEN grounding reads 1 of 1, not 1 of 2
+			expect(summary.groundingAccuracy).toBe(1)
+
+			// AND a market run carrying a look-alike verdict stays out of that count
+			// too, which would otherwise put a rate above 1 on the board
+			const withStrayVerdict = summarizeScores([
+				score({ grounded: true, groundable: true }),
+				marketScore(
+					{},
+					{ wrongCompany: true, wrongCompanyAutoApplicable: true },
+				),
+			])
+			expect(withStrayVerdict.wrongCompanyRate).toBe(0)
+			expect(withStrayVerdict.wrongCompanyAutoApplicableRate).toBe(0)
+
+			// AND the row count is per scan, not per run of the pass
+			expect(summary.rowsPerScan).toBe(10)
+		})
+	})
+
+	describe('when the pass held no market request at all', () => {
+		it('should report nothing for every market figure', () => {
+			// GIVEN an ordinary pass of company profiles
+			const summary = summarizeScores([score({}), score({})])
+
+			// WHEN summarized
+			// THEN each market figure is absent rather than a flattering full marks
+			expect(summary.organisationKindPrecision).toBeNull()
+			expect(summary.requestCoverage).toBeNull()
+			expect(summary.duplicateRate).toBeNull()
+			expect(summary.locationFill).toBeNull()
+			expect(summary.rowsPerScan).toBeNull()
+		})
+	})
+
+	describe('when two markets came back with lists of different sizes', () => {
+		it('should weigh each market by the rows it actually returned', () => {
+			// GIVEN a sixty-row market where 30 rows are the right kind, and a six-row
+			// market where all six are
+			const summary = summarizeScores([
+				marketScore({
+					name: 'ES',
+					rowsReturned: 60,
+					rowsRightKind: 30,
+					rowsLocated: 15,
+					rowsDuplicated: 6,
+				}),
+				marketScore({
+					name: 'FR',
+					rowsReturned: 6,
+					rowsRightKind: 6,
+					rowsLocated: 6,
+					rowsDuplicated: 0,
+				}),
+			])
+
+			// WHEN summarized
+			// THEN the figures are per row across the pass (36 of 66), not the mean of
+			// the two markets' own rates, which would read a far kinder 75%
+			expect(summary.organisationKindPrecision).toBeCloseTo(36 / 66)
+			expect(summary.duplicateRate).toBeCloseTo(6 / 66)
+			expect(summary.locationFill).toBeCloseTo(21 / 66)
+			expect(summary.rowsPerScan).toBe(33)
+		})
+
+		it('should divide coverage by the parts the pass asked for', () => {
+			// GIVEN two markets of five parts each, answering one and four
+			const summary = summarizeScores([
+				marketScore({ partsExpected: 5, partsAnswered: 1 }),
+				marketScore({ name: 'FR', partsExpected: 5, partsAnswered: 4 }),
+			])
+
+			// WHEN summarized — THEN five of the ten parts asked for were answered
+			expect(summary.requestCoverage).toBe(0.5)
+		})
+	})
+
+	describe('when every market in the pass came back empty', () => {
+		it('should report no per-row figures but a coverage of nought', () => {
+			// GIVEN a market request that returned nothing
+			const summary = summarizeScores([
+				marketScore({
+					rowsReturned: 0,
+					rowsRightKind: 0,
+					rowsLocated: 0,
+					rowsDuplicated: 0,
+					partsAnswered: 0,
+				}),
+			])
+
+			// WHEN summarized
+			// THEN there is nothing to judge per row, but "none of the five parts was
+			// answered" is a reading, and the empty scan still counts as a scan
+			expect(summary.organisationKindPrecision).toBeNull()
+			expect(summary.duplicateRate).toBeNull()
+			expect(summary.locationFill).toBeNull()
+			expect(summary.requestCoverage).toBe(0)
+			expect(summary.rowsPerScan).toBe(0)
+		})
+	})
+})
+
 describe('scoreRun — bucket and country', () => {
 	describe('when the golden row is tagged with a bucket', () => {
 		it('should carry the bucket and expected country onto the score', () => {
@@ -985,8 +1672,8 @@ describe('scoring a run that answered with a list of companies', () => {
 					status: 'succeeded',
 					fields: {},
 					companies: [
-						{ name: 'Acme', hasWebsite: true },
-						{ name: 'Beta', hasWebsite: false },
+						company({ name: 'Acme', website: 'https://acme.example' }),
+						company({ name: 'Beta' }),
 					],
 				}),
 			)
