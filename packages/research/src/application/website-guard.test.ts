@@ -14,6 +14,36 @@ const websitesOf = (findings: unknown): Array<string | undefined> =>
 		c => c.website,
 	)
 
+// A prospect row the way a scan really returns one: a name, the website the model
+// gave for it, and the sources it cited for the company.
+const cited = (
+	rows: ReadonlyArray<{
+		name: string
+		website?: string
+		sources?: ReadonlyArray<unknown>
+	}>,
+) => ({
+	prospects: rows.map(({ name, website, sources }) => ({
+		name,
+		...(website === undefined ? {} : { website }),
+		citations: (sources ?? []).map(source =>
+			typeof source === 'string'
+				? { source_id: source, confidence: 0.6 }
+				: source,
+		),
+	})),
+})
+
+const prospectWebsites = (findings: unknown): Array<string | undefined> =>
+	(findings as { prospects: Array<{ website?: string }> }).prospects.map(
+		p => p.website,
+	)
+
+// The address the French solar directory files a company at: a slug naming a trade
+// and a role, ending in the listing's own record number, and naming no company.
+const TECSOL_LISTING =
+	'https://annuaire.tecsol.fr/liste-fournisseur-solaire-installateurs-epc-339615/'
+
 describe('guardCompanyWebsites', () => {
 	describe('when the run watched the host file several of its companies', () => {
 		it('should blank the website and count it as a directory', () => {
@@ -96,6 +126,63 @@ describe('guardCompanyWebsites', () => {
 			expect(websitesOf(result.findings)).toEqual([undefined])
 			expect(result.blankedProfilePage).toBe(1)
 			expect(result.blankedDirectory).toBe(0)
+		})
+
+		it('should find a name the address writes with escaped accents', () => {
+			// GIVEN a Spanish directory filing a company whose name carries an accent,
+			// which the address spells as an escape the way such a site does
+			const findings = scan([
+				{
+					name: 'Grupo Muñoz',
+					website: 'https://directorio.es/empresa/grupo-mu%C3%B1oz',
+				},
+			])
+
+			// WHEN checked
+			// THEN it is caught. The address is put back into letters before the name is
+			// looked for, so the escaping does not hide the listing — and a run over a
+			// Spanish or Catalan market meets this spelling constantly
+			const result = guardCompanyWebsites(findings)
+			expect(websitesOf(result.findings)).toEqual([undefined])
+			expect(result.blankedProfilePage).toBe(1)
+		})
+
+		it('should read a part whose escaping was never valid as it stands', () => {
+			// GIVEN a listing path carrying a stray percent sign, which is not escaping
+			// anything
+			const findings = scan([
+				{
+					name: 'Redwood Logistics',
+					website: 'https://dir.example/empresa/redwood-logistics%zz',
+				},
+			])
+
+			// WHEN checked — THEN the part is read as written rather than thrown away,
+			// so a path that was never valid escaping still gets judged
+			const result = guardCompanyWebsites(findings)
+			expect(websitesOf(result.findings)).toEqual([undefined])
+			expect(result.blankedProfilePage).toBe(1)
+		})
+
+		it('should not let an escaped slash invent a deeper part', () => {
+			// GIVEN a company's own first-level page whose name holds an escaped slash
+			const findings = scan([
+				{
+					name: 'XPO Logistics',
+					website: 'https://xpo.com/about%2Fxpo-logistics',
+				},
+			])
+
+			// WHEN checked
+			// THEN it stands. The address has one part, and putting it back into letters
+			// must not split it into two — read the other way round, the name would land
+			// in a "deeper" part that the address never had, and the company would lose
+			// its own page
+			const result = guardCompanyWebsites(findings)
+			expect(websitesOf(result.findings)).toEqual([
+				'https://xpo.com/about%2Fxpo-logistics',
+			])
+			expect(result.blankedProfilePage).toBe(0)
 		})
 
 		it('should blank one even when the company name is short', () => {
@@ -277,6 +364,7 @@ describe('guardCompanyWebsites', () => {
 				blankedDirectory: 0,
 				blankedProfilePage: 0,
 				blankedSharedHost: 0,
+				blankedReadPage: 0,
 			})
 		})
 
@@ -383,6 +471,77 @@ describe('guardCompanyWebsites', () => {
 				],
 			).toEqual(website)
 			expect(result.blankedDirectory + result.blankedProfilePage).toBe(0)
+		})
+
+		it('should blank the answer when it is the page it was read from', () => {
+			// GIVEN the profile's website field holding a listing page, with the source
+			// beside it naming that same page — the field is its own citation list
+			const findings = {
+				enrichment: {
+					website: {
+						value: TECSOL_LISTING,
+						source_id: TECSOL_LISTING,
+						confidence: null,
+					},
+				},
+			}
+
+			// WHEN checked against the company the run is about
+			const result = guardCompanyWebsites(findings, 'KBE Energy')
+
+			// THEN the same reading reaches the field that arrives alone: nothing in
+			// the address names the company, and its source is the address itself
+			expect(
+				(result.findings as { enrichment: Record<string, unknown> }).enrichment[
+					'website'
+				],
+			).toBeNull()
+			expect(result.blankedReadPage).toBe(1)
+		})
+
+		it('should blank the target own deep page when nothing names it — the cost', () => {
+			// GIVEN a real company page on a domain that spells no part of its name, read
+			// and recorded as the one page behind the answer
+			const url = 'https://gd-holding.fr/qui-sommes-nous'
+			const findings = {
+				enrichment: {
+					website: { value: url, source_id: url, confidence: null },
+				},
+			}
+
+			// WHEN checked against the company the run is about
+			const result = guardCompanyWebsites(findings, 'Groupe Dupont SA')
+
+			// THEN it goes, and this is the price of the rule rather than a bug: the
+			// field carries one source and can never carry a second, so nothing here can
+			// tell this apart from a listing page recorded the same way. Pinned so the
+			// cost stays visible instead of being discovered in a run
+			expect(
+				(result.findings as { enrichment: Record<string, unknown> }).enrichment[
+					'website'
+				],
+			).toBeNull()
+			expect(result.blankedReadPage).toBe(1)
+		})
+
+		it('should keep the answer when it was read from another page', () => {
+			// GIVEN the run's answer for the target's site, read from a page elsewhere
+			const website = {
+				value: 'https://kbe-groupe.example/nos-activites',
+				source_id: 'https://www.lemoniteur.fr/kbe-energy',
+				confidence: null,
+			}
+			const findings = { enrichment: { website } }
+
+			// WHEN checked — THEN the address is not where the claim came from, so this
+			// rule has nothing to say about it
+			const result = guardCompanyWebsites(findings, 'KBE Energy')
+			expect(
+				(result.findings as { enrichment: Record<string, unknown> }).enrichment[
+					'website'
+				],
+			).toEqual(website)
+			expect(result.blankedReadPage).toBe(0)
 		})
 
 		it('should leave a competitor website judged against its own name', () => {
@@ -617,6 +776,348 @@ describe('guardCompanyWebsites', () => {
 					.prospects[0]?.website,
 			).toBe('https://acme.es')
 			expect(result.blankedSharedHost).toBe(0)
+		})
+	})
+
+	describe('when the website is the page the row claim was read from', () => {
+		it('should blank a listing page that names the company nowhere', () => {
+			// GIVEN a French solar directory's listing page handed back as a company's
+			// own website, cited as the one page the company was read on — the shape
+			// every other rule here misses: one company on the host, and a slug in the
+			// first path segment that names a trade instead of a company
+			const findings = cited([
+				{
+					name: 'KBE Energy',
+					website: TECSOL_LISTING,
+					sources: [TECSOL_LISTING],
+				},
+			])
+
+			// WHEN checked
+			const result = guardCompanyWebsites(findings)
+
+			// THEN the address goes: nothing in it names the company, and its own
+			// citation says only that the run read the page
+			expect(prospectWebsites(result.findings)).toEqual([undefined])
+			expect(result.blankedReadPage).toBe(1)
+			// AND no other rule claims it, so the counters stay diagnostic
+			expect(
+				result.blankedDirectory +
+					result.blankedProfilePage +
+					result.blankedSharedHost +
+					result.blankedNotAnAddress,
+			).toBe(0)
+		})
+
+		it('should leave the rest of the row it blanks alone', () => {
+			// GIVEN the same row, carrying the fields that are not the website
+			const findings = cited([
+				{
+					name: 'KBE Energy',
+					website: TECSOL_LISTING,
+					sources: [TECSOL_LISTING],
+				},
+			])
+
+			// WHEN checked
+			// THEN only the website key is dropped — the company and its evidence stay,
+			// because what was wrong was the address, not the company
+			expect(guardCompanyWebsites(findings).findings).toEqual({
+				prospects: [
+					{
+						name: 'KBE Energy',
+						citations: [{ source_id: TECSOL_LISTING, confidence: 0.6 }],
+					},
+				],
+			})
+		})
+
+		it('should keep a company own site read from that very page', () => {
+			// GIVEN the ordinary case this rule must never touch: a company's own site,
+			// with the run having read the claim from that same page
+			const own = 'https://redwoodlogistics.com/about-us'
+			const findings = cited([
+				{ name: 'Redwood Logistics', website: own, sources: [own] },
+			])
+
+			// WHEN checked — THEN the host carries the name, which settles it long
+			// before the page it was read from is asked about
+			const result = guardCompanyWebsites(findings)
+			expect(prospectWebsites(result.findings)).toEqual([own])
+			expect(result.blankedReadPage).toBe(0)
+		})
+
+		it('should keep an about-us page in the first segment read from itself', () => {
+			// GIVEN the exemption that protects the large carriers: a company
+			// describing itself in the first path segment of its own host, cited as the
+			// page it was read on
+			const own = 'https://xpo.com/about-xpo-logistics'
+			const findings = cited([
+				{ name: 'XPO Logistics', website: own, sources: [own] },
+			])
+
+			// WHEN checked
+			// THEN it stands. The host names nobody and the page is the one that was
+			// read, so what separates this from the listing above is the single thing
+			// this rule adds: the first segment spells the company out
+			const result = guardCompanyWebsites(findings)
+			expect(prospectWebsites(result.findings)).toEqual([own])
+			expect(result.blankedReadPage).toBe(0)
+		})
+
+		it('should keep a host carrying one distinctive word of the name', () => {
+			// GIVEN a company whose own domain holds part of its name rather than all
+			// of it, on the page the claim was read from
+			const own = 'https://gopenske.com/logistics'
+			const findings = cited([
+				{ name: 'Penske Logistics', website: own, sources: [own] },
+			])
+
+			// WHEN checked — THEN one distinctive word inside the host is a mention,
+			// and a mention anywhere withholds the blank
+			const result = guardCompanyWebsites(findings)
+			expect(prospectWebsites(result.findings)).toEqual([own])
+			expect(result.blankedReadPage).toBe(0)
+		})
+
+		it('should keep a bare host even when that is the page that was read', () => {
+			// GIVEN a plain host given as a website and cited as the page read, naming
+			// the company nowhere
+			const findings = cited([
+				{
+					name: 'KBE Energy',
+					website: 'https://annuaire.tecsol.fr',
+					sources: ['https://annuaire.tecsol.fr'],
+				},
+			])
+
+			// WHEN checked
+			// THEN it stays. With no path there is no page to tell apart from the site,
+			// so the tell this rule reads is absent and what is left is the ordinary
+			// case — a run that read a home page and wrote the site down
+			const result = guardCompanyWebsites(findings)
+			expect(prospectWebsites(result.findings)).toEqual([
+				'https://annuaire.tecsol.fr',
+			])
+			expect(result.blankedReadPage).toBe(0)
+		})
+
+		it('should keep a page whose accented name the address writes as escapes', () => {
+			// GIVEN a company's own page filed under its accented name, which the
+			// address spells in escapes the way a Spanish or Catalan site does
+			const own = 'https://serveis.example/grupo-mu%C3%B1oz'
+			const findings = cited([
+				{ name: 'Grupo Muñoz', website: own, sources: [own] },
+			])
+
+			// WHEN checked — THEN the name is found through the escaping, so the page
+			// is read as naming the company and kept
+			const result = guardCompanyWebsites(findings)
+			expect(prospectWebsites(result.findings)).toEqual([own])
+			expect(result.blankedReadPage).toBe(0)
+		})
+
+		it('should blank when every citation the row has is that one page', () => {
+			// GIVEN a row citing the listing page three times, once per quote it took
+			const findings = cited([
+				{
+					name: 'KBE Energy',
+					website: TECSOL_LISTING,
+					sources: [TECSOL_LISTING, TECSOL_LISTING, TECSOL_LISTING],
+				},
+			])
+
+			// WHEN checked — THEN the same page cited repeatedly is still one page, and
+			// still the only thing that mentioned the company
+			const result = guardCompanyWebsites(findings)
+			expect(prospectWebsites(result.findings)).toEqual([undefined])
+			expect(result.blankedReadPage).toBe(1)
+		})
+
+		it('should keep the address when another source mentions the company too', () => {
+			// GIVEN a row backed by a second, separate page as well
+			const findings = cited([
+				{
+					name: 'KBE Energy',
+					website: TECSOL_LISTING,
+					sources: [TECSOL_LISTING, 'https://www.lemoniteur.fr/kbe-energy'],
+				},
+			])
+
+			// WHEN checked
+			// THEN it stands. This rule speaks only for a row whose whole evidence is
+			// the address itself; once something else has mentioned the company, what
+			// the address is stops being a question this rule can answer
+			const result = guardCompanyWebsites(findings)
+			expect(prospectWebsites(result.findings)).toEqual([TECSOL_LISTING])
+			expect(result.blankedReadPage).toBe(0)
+		})
+
+		it('should keep an address the row cites nothing at all for', () => {
+			// GIVEN the same listing address on a row with no citations
+			const findings = cited([
+				{ name: 'KBE Energy', website: TECSOL_LISTING, sources: [] },
+			])
+
+			// WHEN checked — THEN a row citing nothing says nothing either way, so
+			// there is no provenance to read and the address is left alone
+			const result = guardCompanyWebsites(findings)
+			expect(prospectWebsites(result.findings)).toEqual([TECSOL_LISTING])
+			expect(result.blankedReadPage).toBe(0)
+		})
+
+		it('should read a citation written without a scheme as the same page', () => {
+			// GIVEN the website with its scheme and the citation without one, and a
+			// trailing slash on only one of the two
+			const findings = cited([
+				{
+					name: 'KBE Energy',
+					website: TECSOL_LISTING,
+					sources: [
+						'annuaire.tecsol.fr/liste-fournisseur-solaire-installateurs-epc-339615',
+					],
+				},
+			])
+
+			// WHEN checked — THEN the two spellings are one page, so tidying the
+			// citation does not hide where the claim came from
+			const result = guardCompanyWebsites(findings)
+			expect(prospectWebsites(result.findings)).toEqual([undefined])
+			expect(result.blankedReadPage).toBe(1)
+		})
+
+		it('should read past a tracking parameter on the citation', () => {
+			// GIVEN the citation carrying the parameters of the link that reached it
+			const findings = cited([
+				{
+					name: 'KBE Energy',
+					website: TECSOL_LISTING,
+					sources: [`${TECSOL_LISTING}?utm_source=serp`],
+				},
+			])
+
+			// WHEN checked — THEN a page is the same page whichever link led to it
+			const result = guardCompanyWebsites(findings)
+			expect(prospectWebsites(result.findings)).toEqual([undefined])
+			expect(result.blankedReadPage).toBe(1)
+		})
+
+		it('should keep an address cited at the same path on another host', () => {
+			// GIVEN a citation whose path matches but whose host does not
+			const findings = cited([
+				{
+					name: 'KBE Energy',
+					website: TECSOL_LISTING,
+					sources: [
+						'https://autre-annuaire.fr/liste-fournisseur-solaire-installateurs-epc-339615/',
+					],
+				},
+			])
+
+			// WHEN checked — THEN a matching path on a different site is a different
+			// page, so the website is not where the claim came from
+			const result = guardCompanyWebsites(findings)
+			expect(prospectWebsites(result.findings)).toEqual([TECSOL_LISTING])
+			expect(result.blankedReadPage).toBe(0)
+		})
+
+		it('should keep an address whose only citation is an internal source id', () => {
+			// GIVEN a row citing a page by the id the run stored it under
+			const findings = cited([
+				{
+					name: 'KBE Energy',
+					website: TECSOL_LISTING,
+					sources: ['src_9f2a1b3c4d5e6f70'],
+				},
+			])
+
+			// WHEN checked
+			// THEN nothing fires: an opaque id names no host, so it can neither match
+			// the address nor be mistaken for it. The rule reads a citation only when
+			// the model wrote it as the address it is
+			const result = guardCompanyWebsites(findings)
+			expect(prospectWebsites(result.findings)).toEqual([TECSOL_LISTING])
+			expect(result.blankedReadPage).toBe(0)
+		})
+
+		it('should skip a citation entry that names no source', () => {
+			// GIVEN a row whose citations are a quote with no source beside it and the
+			// listing page itself
+			const findings = cited([
+				{
+					name: 'KBE Energy',
+					website: TECSOL_LISTING,
+					sources: [
+						{ quote: 'KBE Energy, installateur EPC', confidence: 0.4 },
+						TECSOL_LISTING,
+					],
+				},
+			])
+
+			// WHEN checked — THEN an entry naming no source has mentioned the company
+			// nowhere, so it neither counts as another source nor blocks the rule
+			const result = guardCompanyWebsites(findings)
+			expect(prospectWebsites(result.findings)).toEqual([undefined])
+			expect(result.blankedReadPage).toBe(1)
+		})
+
+		it('should keep an address on a row whose citations are not a list', () => {
+			// GIVEN a malformed row whose `citations` is a string
+			const findings = {
+				prospects: [
+					{
+						name: 'KBE Energy',
+						website: TECSOL_LISTING,
+						citations: 'annuaire.tecsol.fr',
+					},
+				],
+			}
+
+			// WHEN checked — THEN there is no citation to read, so the row is judged
+			// with nothing and its address stands
+			const result = guardCompanyWebsites(findings)
+			expect(prospectWebsites(result.findings)).toEqual([TECSOL_LISTING])
+			expect(result.blankedReadPage).toBe(0)
+		})
+
+		it('should report a host several rows claim as the shared host it is', () => {
+			// GIVEN two companies each given their page on a trade body's host, each
+			// citing the page it was read on
+			const findings = cited([
+				{
+					name: 'Electricidad Mora',
+					website: 'https://aemiat.com/e-mora/',
+					sources: ['https://aemiat.com/e-mora/'],
+				},
+				{
+					name: 'Instalaciones Rubio',
+					website: 'https://aemiat.com/rubio/',
+					sources: ['https://aemiat.com/rubio/'],
+				},
+			])
+
+			// WHEN checked — THEN both go, counted under the rule that knows more about
+			// why: several rows claiming one host says it belongs to none of them
+			const result = guardCompanyWebsites(findings)
+			expect(prospectWebsites(result.findings)).toEqual([undefined, undefined])
+			expect(result.blankedSharedHost).toBe(2)
+			expect(result.blankedReadPage).toBe(0)
+		})
+
+		it('should report a listing shape as the profile page it is', () => {
+			// GIVEN a directory filing the company one level down, cited as the page
+			// the claim was read from
+			const listing = 'https://directorio.es/empresa/acme-instal'
+			const findings = cited([
+				{ name: 'Acme Instal', website: listing, sources: [listing] },
+			])
+
+			// WHEN checked — THEN the address shape is the more exact diagnosis and
+			// keeps the count
+			const result = guardCompanyWebsites(findings)
+			expect(prospectWebsites(result.findings)).toEqual([undefined])
+			expect(result.blankedProfilePage).toBe(1)
+			expect(result.blankedReadPage).toBe(0)
 		})
 	})
 
