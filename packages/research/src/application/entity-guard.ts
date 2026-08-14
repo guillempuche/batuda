@@ -116,8 +116,13 @@ export const collapse = (value: string): string =>
 		.toLowerCase()
 		.replace(/[^a-z0-9]/g, '')
 
-// Accent-folded word tokens of a name, punctuation split out.
-const foldTokens = (value: string): string[] =>
+/**
+ * Accent-folded word tokens of a name, punctuation split out. Exported because
+ * the same folding has to read a web address the same way it reads a name — a
+ * second copy of it is how two checks start disagreeing about whether a piece of
+ * text spells a company.
+ */
+export const foldTokens = (value: string): string[] =>
 	value
 		.normalize('NFKD')
 		.replace(/\p{Diacritic}/gu, '')
