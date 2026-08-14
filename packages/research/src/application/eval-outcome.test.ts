@@ -162,6 +162,23 @@ describe('outcomeFromRun', () => {
 		})
 	})
 
+	describe('when a run never came back at all', () => {
+		it('should adapt it rather than throwing', () => {
+			// GIVEN a run the poll gave up on, which reaches here with no findings —
+			// the path a long market search ends on when it outlives its time limit
+			const outcome = outcomeFromRun({
+				status: 'failed',
+				findings: null,
+				fetchedUrls: [],
+			})
+
+			// WHEN adapted — THEN it scores as a failed run instead of ending the pass
+			expect(outcome.status).toBe('failed')
+			expect(outcome.contacts).toEqual([])
+			expect(outcome.companies).toEqual([])
+		})
+	})
+
 	describe('when the run answered with a list of companies', () => {
 		it('should read the companies a scan found, and whether each has a site', () => {
 			// GIVEN a prospect scan that came back with three companies, two of them
@@ -185,9 +202,19 @@ describe('outcomeFromRun', () => {
 			// profile block made every scan look like a run that found nothing, which
 			// is why no scan could ever be measured
 			expect(outcome.companies).toEqual([
-				{ name: 'Acme', hasWebsite: true },
-				{ name: 'Beta', hasWebsite: false },
-				{ name: 'Gamma', hasWebsite: true },
+				{
+					name: 'Acme',
+					website: 'https://acme.test',
+					location: null,
+					describedAs: '',
+				},
+				{ name: 'Beta', website: null, location: null, describedAs: '' },
+				{
+					name: 'Gamma',
+					website: 'https://gamma.test',
+					location: null,
+					describedAs: '',
+				},
 			])
 		})
 
@@ -202,6 +229,156 @@ describe('outcomeFromRun', () => {
 
 			// WHEN adapted — THEN there is no list to read, and the shape decides that
 			expect(outcome.companies).toEqual([])
+		})
+
+		it('should measure profile fullness only on a shape that was given a profile', () => {
+			// GIVEN the same findings read as a search and as a profile run
+			const asScan = outcomeFromRun({
+				status: 'succeeded',
+				schemaName: 'prospect_scan_v1',
+				findings: { prospects: [{ name: 'Alfa SL' }] },
+				fetchedUrls: [],
+			})
+			const asProfile = outcomeFromRun({
+				status: 'succeeded',
+				schemaName: 'company_enrichment_v1',
+				findings: { enrichment: {} },
+				fetchedUrls: [],
+			})
+
+			// WHEN adapted
+			// THEN only the profile run carries one. A search is never given a profile,
+			// so counting it reports every search as having filled none of a shape
+			// nobody asked it for; a profile run that came back empty is a real nought
+			// and still counts
+			expect(asScan.profile).toBeUndefined()
+			expect(asProfile.profile).toBeDefined()
+			expect(asProfile.profile?.fieldsFilled).toBe(0)
+		})
+
+		it('should keep a row whose name arrives wrapped with its source', () => {
+			// GIVEN a row whose name carries its citation, the shape a field takes once
+			// citations travel per field
+			const outcome = outcomeFromRun({
+				status: 'succeeded',
+				schemaName: 'prospect_scan_v1',
+				findings: { prospects: [{ name: { value: 'Alfa SL' } }] },
+				fetchedUrls: [],
+			})
+
+			// WHEN adapted — THEN the row is read rather than skipped for its shape
+			expect(outcome.companies[0]?.name).toBe('Alfa SL')
+		})
+	})
+})
+
+describe('outcomeFromRun — what a scan row carries for the market figures', () => {
+	describe('when a prospect row describes itself', () => {
+		it('should carry every field the row says what it does in', () => {
+			// GIVEN a prospect row filled the way the scan shape asks for it
+			const outcome = outcomeFromRun({
+				status: 'succeeded',
+				schemaName: 'prospect_scan_v1',
+				findings: {
+					prospects: [
+						{
+							name: 'Instalaciones Alfa SL',
+							website: 'https://alfa.example',
+							industry: 'Instalaciones eléctricas',
+							why_relevant: 'Instalador eléctrico industrial en Córdoba',
+							location: 'Córdoba',
+						},
+					],
+				},
+				fetchedUrls: [],
+			})
+
+			// WHEN adapted
+			// THEN the trade and the relevance note are run together. The note is read
+			// even though it is where a row can repeat the request back, because it is
+			// the only one of the three a prospect must fill — leaving it out silenced
+			// every row that stated its trade nowhere else
+			expect(outcome.companies).toEqual([
+				{
+					name: 'Instalaciones Alfa SL',
+					website: 'https://alfa.example',
+					location: 'Córdoba',
+					describedAs:
+						'Instalaciones eléctricas Instalador eléctrico industrial en Córdoba',
+				},
+			])
+		})
+	})
+
+	describe('when a competitor row describes itself', () => {
+		it('should read the description that shape uses instead', () => {
+			// GIVEN a competitor row, whose own words live under a different field name
+			const outcome = outcomeFromRun({
+				status: 'succeeded',
+				schemaName: 'competitor_scan_v1',
+				findings: {
+					competitors: [
+						{ name: 'Beta SL', description: 'Ascensores y elevadores' },
+					],
+				},
+				fetchedUrls: [],
+			})
+
+			// WHEN adapted — THEN it is read too, so neither shape goes unattributed to
+			// the part of a request it answers for the want of a field name
+			expect(outcome.companies[0]?.describedAs).toBe('Ascensores y elevadores')
+		})
+	})
+
+	describe('when a row states a field but leaves it blank', () => {
+		it('should read it as absent rather than as a value', () => {
+			// GIVEN a row whose location and website are whitespace
+			const outcome = outcomeFromRun({
+				status: 'succeeded',
+				schemaName: 'prospect_scan_v1',
+				findings: {
+					prospects: [{ name: 'Alfa SL', website: '  ', location: '\t' }],
+				},
+				fetchedUrls: [],
+			})
+
+			// WHEN adapted — THEN neither counts as stated, so a blank never inflates
+			// the share of rows that say where the company is
+			expect(outcome.companies[0]?.website).toBeNull()
+			expect(outcome.companies[0]?.location).toBeNull()
+		})
+	})
+
+	describe('when a field arrives wrapped with its source', () => {
+		it('should read the value inside', () => {
+			// GIVEN a location carried as a { value } wrapper, the shape a field takes
+			// once its citation travels with it
+			const outcome = outcomeFromRun({
+				status: 'succeeded',
+				schemaName: 'prospect_scan_v1',
+				findings: {
+					prospects: [{ name: 'Alfa SL', location: { value: 'Málaga' } }],
+				},
+				fetchedUrls: [],
+			})
+
+			// WHEN adapted — THEN the adapter is indifferent to which shape produced it
+			expect(outcome.companies[0]?.location).toBe('Málaga')
+		})
+	})
+
+	describe('when a row describes itself in none of the three fields', () => {
+		it('should leave its words empty rather than absent', () => {
+			// GIVEN a row with a name and nothing else
+			const outcome = outcomeFromRun({
+				status: 'succeeded',
+				schemaName: 'prospect_scan_v1',
+				findings: { prospects: [{ name: 'Alfa SL' }] },
+				fetchedUrls: [],
+			})
+
+			// WHEN adapted — THEN there is a string to search, holding nothing
+			expect(outcome.companies[0]?.describedAs).toBe('')
 		})
 	})
 })

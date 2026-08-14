@@ -12,9 +12,13 @@ pnpm cli research probe --api-key <nebius-key>
 
 # Score the golden set. Needs the research env configured (LLM + provider keys, DATABASE_URL) and an org/user to run as.
 pnpm cli research eval --org <org-id> --user <user-id> --golden eval/golden.json --out report.json
+
+# Score a set of whole-market requests instead. Same command, a scan schema, and a golden file of market rows.
+# RESEARCH_RUN_DEADLINE_SEC must be raised: it defaults to 20 minutes, and a market search runs longer.
+RESEARCH_RUN_DEADLINE_SEC=2400 pnpm cli research eval --org <org-id> --user <user-id> --schema prospect_scan_v1 --golden eval/golden-markets.json --out markets.json
 ```
 
-`eval` prints the metrics — grounding accuracy, field precision, field recall, titled-contact recall, profile fullness, wrong-company rate, needs-review rate, empty rate — and writes a full per-run report with `--out`.
+`eval` prints the metrics — grounding accuracy, field precision, field recall, titled-contact recall, profile fullness, wrong-company rate, needs-review rate, empty rate — and writes a full per-run report with `--out`. A pass of whole-market requests is graded on a different set of numbers; see [Market rows](#market-rows-grading-a-search-for-a-whole-market).
 
 Add `--by-bucket` to also print those metrics broken out by the golden rows' size/reach `bucket` (big / small / niche) and by `country`, so a regression that only hits, say, niche companies or one country is visible instead of averaged into the whole-set numbers. The same per-bucket and per-country summaries are always written to the `--out` report as `byBucket` / `byCountry`, and each run's span carries `eval.bucket` / `eval.country` for grouping on the monitoring board.
 
@@ -118,6 +122,66 @@ Two of these are fixed sets, and the value has to be one of them or it can never
 - `email` — the company's own published mailbox, exactly as printed (`info@…`, `hola@…`). Not a named person's address; those belong in `contacts`.
 - `phone` — the company's own published number, in any format (matched on digits)
 - `tax_id` — the registration number, in any format (matched on letters and digits)
+
+## Market rows: grading a search for a whole market
+
+A row can ask for a whole market instead of one company — "installation companies in Spain: electrical, plumbing, solar, fire protection, lifts". That is what a discovery scan answers, and none of the figures above apply to it: there is no one company for the run to have reached, and no profile of its own to have filled.
+
+Counting how many companies came back is not the grade either. A run on 13 August returned 62 rows, of which 23 were trade bodies and 10 were the same company written twice, and four of the five trades asked for were missing entirely — a healthy-looking count over a list nobody could use. A market row is graded on those faults instead.
+
+Copy `golden-markets.example.json` and give the row a `market` block in place of the domains:
+
+```json
+{
+  "id": "es-installations",
+  "query": "Empresas instaladoras en España: instalaciones eléctricas, fontanería…",
+  "expectedOutput": {
+    "market": {
+      "name": "ES",
+      "parts": [
+        { "id": "electrical", "terms": ["instalacion electrica", "electricidad"] },
+        { "id": "lifts", "terms": ["ascensor", "elevador"] }
+      ],
+      "notCompanies": ["FENIE", "Federación Nacional de Empresarios de Instalaciones de España"]
+    }
+  }
+}
+```
+
+- `name` — what the market is called, and the key the `By market` breakdown groups on. Use whatever tells two markets apart for you; a country code is the obvious choice.
+- `parts` — the things the request asks for, each with the wordings that place a returned row in it. **Request coverage** is how many parts came back with at least one row of the right kind of organisation, so a trade body cannot answer for the trade it represents.
+
+Write the terms accent-free and lower-case. A term of five letters or more also matches words that *begin* with it, so `instalacion electrica` finds "instalaciones eléctricas"; a shorter one must match a whole word, so `gas` never matches "gasto".
+
+That reach only runs downward, which is the thing to remember: `fontaneria` does not find "fontanero", because the term is not the start of the row's word. List the shortest stem, then the other forms a trade is named by — the agent noun ("instalador", "instaladora", "electricista"), the other language a market answers in, and the everyday phrasing ("placas solares" beside "fotovoltaic"). Words must also be adjacent: `contra incendios` does not find "protección activa y pasiva contra el fuego".
+
+Terms match loosely and coverage is a "≥ 1 row" figure, so a single unrelated row can carry a whole part — "alquiler de elevadores para obra" answers lifts, "correduría de seguros contra incendios" answers fire protection. Prefer terms that name the trade rather than its subject matter, and avoid one that is an ordinary word in another field (`pci` is a fire-protection term in Spain and a payments standard everywhere else).
+
+- `notCompanies` — the organisations known **not** to be the kind asked for: the trade bodies, federations, guilds and system operators a search for a trade runs straight through on its way to the members. **Organisation-kind precision** is the share of returned rows that are none of them. Required, and an empty array is a legitimate answer that has to be typed out — a market whose bodies nobody has listed scores a perfect 100%, and that reading must be a stated "none known" rather than something a forgotten key produced.
+
+A row counts as one of them when the listed name appears in the row's name as those words, in that order, next to each other. Whole words, not a run of letters — a body is usually known by its initials, and three letters land inside an unrelated name by accident (`RTE` sits inside "No**rte** Instalaciones").
+
+Three rules follow, and each of them bites:
+
+- **List the name the body is actually known by, in full.** Matching runs one way only: the listed name has to fit inside the row's, never the reverse. A golden entry reading "Federación Nacional de Empresarios de Instalaciones **de España**" misses a row that stops at "…Instalaciones", and one extra word inside the row's name ("Asociación **Provincial** de Instaladores…") defeats an entry written without it.
+- **List the initials as an entry of their own**, where the body is known by them. An acronym shares no words with what it stands for, so the spelled-out entry will never catch a row that gives only the initials.
+- **A one-word entry matches only a row whose whole name is that word.** `FENIE` catches a row called `FENIE`, and deliberately not the retailer `FENIE Energía` — likewise `UNEF` against `Grupo Unef Solar`, or `RTE` against `RTE Ascenseurs`. Counting a real company as a trade body overstates the very problem the figure exists to measure.
+
+What no rule about names can settle: a company genuinely trading under a body's initials reads as the body. Asking the model what an organisation is would settle it; a name cannot.
+
+Two figures ride along beside those. **Duplicate rate** is how many rows are another row's company again, folded on the same identity the pipeline itself uses — the name with its legal form off the end, or a shared website host. It reads zero while that fold holds, which makes it a guard on the fold rather than a second opinion about it.
+
+Read it as "no repeats of the kind those keys can tell", not as "no repeats". A live French market search returned one company under its own name and four more times as that name plus the town of a branch office, none of the four carrying a website — no shared name key, no shared host — and the figure read 0% over a list that plainly repeated one company five times. Widening it needs a hand-marked answer to score against, which is a different measurement.
+
+**Location fill** is how many rows say where the company is. The field is asked for a town or a province, but any stated place counts, so a row answering with the country alone still counts as filled.
+
+The **rows per market** count is still reported, as the scale those figures read against rather than as a grade. It is also what checking that every row is a real company would cost, so it needs a reading of its own before such a check exists.
+
+### What this measures, and what it does not
+
+Organisation-kind precision only counts the bodies your golden set names. A trade body nobody has listed passes through unmeasured, exactly as an unlisted expected field value is not scored — a golden set measures what it knows.
+
+That limit is the point of the **`By market`** breakdown, which prints whenever the pass held a market row and is written to the `--out` report as `byMarket`. The shipped check that reads what kind of organisation a row is works off word lists in Spanish, Catalan and English: measured against fifteen European trade bodies it recognised four. So a Spanish market scores near 100% while a French or German one scores far lower, and the two averaged together hide the fact worth watching. Keep at least one market in a language that check does not read.
 
 ## Four kinds of row to include
 

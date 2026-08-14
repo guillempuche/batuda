@@ -36,24 +36,13 @@ const boolPayload = (
 })
 
 /**
- * The scores for one run: the three yes/no checks as 0/1, plus precision and recall
- * only where there was something to judge (a run that filled nothing has no
- * precision, a company with no known fields has no recall).
+ * The scores for one run: the yes/no checks as 0/1, plus a rate only where there was
+ * something to judge (a run that filled nothing has no precision, a company with no
+ * known fields has no recall, a market that came back with no rows has nothing to
+ * judge row by row).
  */
 export const scorePayloadsForRun = (score: RunScore): ScorePayload[] => {
 	const payloads: ScorePayload[] = [
-		boolPayload(
-			'grounding',
-			score.grounded,
-			'reached the target company',
-			'did not reach the target company',
-		),
-		boolPayload(
-			'not_wrong_company',
-			!score.wrongCompany,
-			'data came from the target',
-			'returned another company as a success',
-		),
 		boolPayload(
 			'not_empty',
 			!score.empty,
@@ -61,6 +50,25 @@ export const scorePayloadsForRun = (score: RunScore): ScorePayload[] => {
 			'returned no usable data',
 		),
 	]
+	// Both of these ask about the one company the run was sent after, so a market
+	// request has no answer to give. Sending them anyway would file every market run
+	// as having failed to reach a company nobody named.
+	if (score.groundable) {
+		payloads.push(
+			boolPayload(
+				'grounding',
+				score.grounded,
+				'reached the target company',
+				'did not reach the target company',
+			),
+			boolPayload(
+				'not_wrong_company',
+				!score.wrongCompany,
+				'data came from the target',
+				'returned another company as a success',
+			),
+		)
+	}
 	if (score.fieldsScored > 0) {
 		payloads.push({
 			name: 'field_precision',
@@ -88,17 +96,63 @@ export const scorePayloadsForRun = (score: RunScore): ScorePayload[] => {
 			feedback: `${score.contactsFound}/${score.contactsExpected} known contacts found with a title`,
 		})
 	}
+	// What a market request is graded on. Coverage rides on the parts asked for, so
+	// it reports even when the list came back empty — nothing found is the answer
+	// there, not the absence of one. The other three divide by the rows, so they only
+	// ride when there were rows to judge.
+	const market = score.market
+	if (market !== undefined) {
+		if (market.partsExpected > 0) {
+			payloads.push({
+				name: 'request_coverage',
+				value: market.partsAnswered / market.partsExpected,
+				passed: market.partsAnswered === market.partsExpected,
+				feedback: `${market.partsAnswered}/${market.partsExpected} requested parts answered`,
+			})
+		}
+		if (market.rowsReturned > 0) {
+			payloads.push(
+				{
+					name: 'organisation_kind_precision',
+					value: market.rowsRightKind / market.rowsReturned,
+					passed: market.rowsRightKind === market.rowsReturned,
+					feedback: `${market.rowsRightKind}/${market.rowsReturned} rows are the kind of organisation asked for`,
+				},
+				{
+					name: 'not_duplicated',
+					value: 1 - market.rowsDuplicated / market.rowsReturned,
+					passed: market.rowsDuplicated === 0,
+					feedback: `${market.rowsDuplicated}/${market.rowsReturned} rows are another row's company again`,
+				},
+				{
+					name: 'location_fill',
+					value: market.rowsLocated / market.rowsReturned,
+					passed: market.rowsLocated === market.rowsReturned,
+					feedback: `${market.rowsLocated}/${market.rowsReturned} rows say what town or province the company is in`,
+				},
+			)
+		}
+	}
 	return payloads
 }
 
 /** The offline baseline report: the aggregate rates plus every run's raw score,
- * and the same rates broken out by size/reach bucket and by country so a
+ * and the same rates broken out by size/reach bucket, by country and by market so a
  * regression confined to one segment is visible rather than averaged away. */
 export interface EvalReport {
 	readonly summary: EvalSummary
 	readonly runs: ReadonlyArray<RunScore>
 	readonly byBucket: Record<string, EvalSummary>
 	readonly byCountry: Record<string, EvalSummary>
+	/**
+	 * The market figures per market, which is the breakdown they exist for: the
+	 * organisation-kind guard reads Spanish, Catalan and English, so a market
+	 * answering in one of those scores near 100% while one answering in French or
+	 * German scores far lower. Averaged across markets that difference disappears,
+	 * which is exactly the fact worth watching. Empty for a pass that held no market
+	 * request.
+	 */
+	readonly byMarket: Record<string, EvalSummary>
 }
 
 export const buildEvalReport = (
@@ -108,6 +162,10 @@ export const buildEvalReport = (
 	runs: scores,
 	byBucket: groupSummaries(scores, score => score.bucket ?? 'untagged'),
 	byCountry: groupSummaries(scores, score => score.country ?? 'unknown'),
+	byMarket: groupSummaries(
+		scores.filter(score => score.market !== undefined),
+		score => score.market?.name ?? 'unknown',
+	),
 })
 
 /**
@@ -122,14 +180,20 @@ export const evalSpanAttributes = (
 ): Record<string, string | number | boolean> => {
 	const attributes: Record<string, string | number | boolean> = {
 		'eval.company_id': score.id,
-		'eval.grounded': score.grounded,
-		'eval.wrong_company': score.wrongCompany,
 		'eval.empty': score.empty,
 		'eval.fields_expected': score.fieldsExpected,
 		'eval.fields_scored': score.fieldsScored,
 		'eval.fields_correct': score.fieldsCorrect,
 		'eval.contacts_expected': score.contactsExpected,
 		'eval.contacts_found': score.contactsFound,
+	}
+	// These two ask about the one company the run was sent after, and a chart
+	// averages them. A market request has no such company, so charting it as a false
+	// on both drags the board's grounding line down for runs that were never asked
+	// the question — the same rule the rates below already follow.
+	if (score.groundable) {
+		attributes['eval.grounded'] = score.grounded
+		attributes['eval.wrong_company'] = score.wrongCompany
 	}
 	if (score.bucket !== undefined) attributes['eval.bucket'] = score.bucket
 	if (score.country !== undefined) attributes['eval.country'] = score.country
@@ -143,6 +207,33 @@ export const evalSpanAttributes = (
 	if (score.contactsExpected > 0) {
 		attributes['eval.contact_recall'] =
 			score.contactsFound / score.contactsExpected
+	}
+	// A market request's own counts, so a chart can group by market and watch the
+	// figure that says whether a change reached a language the checks cannot read.
+	// The rates ride only where there was something to divide by, the same rule as
+	// above, so a market that came back with nothing charts no precision rather than
+	// a zero that reads as a quality collapse.
+	const market = score.market
+	if (market !== undefined) {
+		attributes['eval.market'] = market.name
+		attributes['eval.rows_returned'] = market.rowsReturned
+		attributes['eval.rows_right_kind'] = market.rowsRightKind
+		attributes['eval.rows_located'] = market.rowsLocated
+		attributes['eval.rows_duplicated'] = market.rowsDuplicated
+		attributes['eval.parts_expected'] = market.partsExpected
+		attributes['eval.parts_answered'] = market.partsAnswered
+		if (market.partsExpected > 0) {
+			attributes['eval.request_coverage'] =
+				market.partsAnswered / market.partsExpected
+		}
+		if (market.rowsReturned > 0) {
+			attributes['eval.organisation_kind_precision'] =
+				market.rowsRightKind / market.rowsReturned
+			attributes['eval.duplicate_rate'] =
+				market.rowsDuplicated / market.rowsReturned
+			attributes['eval.location_fill'] =
+				market.rowsLocated / market.rowsReturned
+		}
 	}
 	return attributes
 }
@@ -158,12 +249,21 @@ export const evalSummaryAttributes = (
 ): Record<string, string | number | boolean> => {
 	const attributes: Record<string, string | number | boolean> = {
 		'eval.runs': summary.runs,
-		'eval.grounding_accuracy': summary.groundingAccuracy,
-		'eval.wrong_company_rate': summary.wrongCompanyRate,
-		'eval.wrong_company_auto_applicable_rate':
-			summary.wrongCompanyAutoApplicableRate,
 		'eval.low_confidence_rate': summary.lowConfidenceRate,
 		'eval.empty_rate': summary.emptyRate,
+	}
+	// Grounding and the two look-alike rates are all about the one company a run was
+	// sent after, so a pass of market requests has no reading for any of them and
+	// charts none rather than a nought that reads as a collapse.
+	if (summary.groundingAccuracy !== null) {
+		attributes['eval.grounding_accuracy'] = summary.groundingAccuracy
+	}
+	if (summary.wrongCompanyRate !== null) {
+		attributes['eval.wrong_company_rate'] = summary.wrongCompanyRate
+	}
+	if (summary.wrongCompanyAutoApplicableRate !== null) {
+		attributes['eval.wrong_company_auto_applicable_rate'] =
+			summary.wrongCompanyAutoApplicableRate
 	}
 	if (summary.fieldsFilledPerRun !== null) {
 		attributes['eval.fields_filled_per_run'] = summary.fieldsFilledPerRun
@@ -185,6 +285,22 @@ export const evalSummaryAttributes = (
 	}
 	if (summary.contactRecall !== null) {
 		attributes['eval.contact_recall'] = summary.contactRecall
+	}
+	if (summary.organisationKindPrecision !== null) {
+		attributes['eval.organisation_kind_precision'] =
+			summary.organisationKindPrecision
+	}
+	if (summary.requestCoverage !== null) {
+		attributes['eval.request_coverage'] = summary.requestCoverage
+	}
+	if (summary.duplicateRate !== null) {
+		attributes['eval.duplicate_rate'] = summary.duplicateRate
+	}
+	if (summary.locationFill !== null) {
+		attributes['eval.location_fill'] = summary.locationFill
+	}
+	if (summary.rowsPerScan !== null) {
+		attributes['eval.rows_per_scan'] = summary.rowsPerScan
 	}
 	if (summary.costPerRun !== null) {
 		attributes['eval.cost_cents_per_run'] = summary.costPerRun
