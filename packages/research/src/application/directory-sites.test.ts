@@ -535,6 +535,55 @@ describe('linkedAddresses', () => {
 			expect(linkedAddresses(page)).toEqual(['https://listado.example/acme'])
 		})
 
+		it('should read two links written with nothing between them', () => {
+			// GIVEN the shape a listing's pager really has — one link straight after
+			// another, no space, no newline
+			const page =
+				'1[2](https://listado.example/empresa/uno)[3](https://listado.example/empresa/dos)'
+
+			// WHEN read — THEN they are two addresses. Letting a square bracket carry
+			// on the match would run them together into one that is neither, and both
+			// pages would be lost
+			expect(linkedAddresses(page)).toEqual([
+				'https://listado.example/empresa/uno',
+				'https://listado.example/empresa/dos',
+			])
+		})
+
+		it('should read a scheme the page wrote in capitals', () => {
+			// GIVEN an older page spelling the scheme the way it once was written
+			const page = '[Acme](HTTP://acme.es/empresa/acme-sl)'
+
+			// WHEN read — THEN the address is still an address
+			expect(linkedAddresses(page)).toEqual(['HTTP://acme.es/empresa/acme-sl'])
+		})
+
+		it('should read a listing own counter as the one address it is', () => {
+			// GIVEN a listing that sends its outbound links through a counter, with
+			// the company it points at inside the question mark
+			const page = '[Acme](https://listado.example/out.php?u=http://acme.es)'
+
+			// WHEN read — THEN it is one address on the listing's host, not two, so
+			// nothing invents a visit to a site the run never met
+			expect(linkedAddresses(page)).toEqual([
+				'https://listado.example/out.php?u=http://acme.es',
+			])
+		})
+
+		it('should keep a bracket the address itself opened', () => {
+			// GIVEN one address that ends in a bracket of its own — how an
+			// encyclopaedia tells two things of the same name apart — and one that
+			// only ends in the bracket markdown wrapped it in
+			const page =
+				'[Acme](https://es.wikipedia.org/wiki/Acme_(empresa)) and [Ferré](https://listado.example/ferre)'
+
+			// WHEN read — THEN each keeps what was its own
+			expect(linkedAddresses(page)).toEqual([
+				'https://es.wikipedia.org/wiki/Acme_(empresa)',
+				'https://listado.example/ferre',
+			])
+		})
+
 		it('should leave an address the page writes relative to itself', () => {
 			// GIVEN a page whose links are relative, which cannot be resolved without
 			// deciding what they are relative to
@@ -553,7 +602,7 @@ describe('linkedAddresses', () => {
 	})
 
 	describe('when a page links more addresses than are worth reading', () => {
-		it('should stop at the first few hundred', () => {
+		it('should stop at the first few hundred different ones', () => {
 			// GIVEN a sitemap-shaped page listing a thousand addresses
 			const page = Array.from(
 				{ length: 1000 },
@@ -564,6 +613,28 @@ describe('linkedAddresses', () => {
 			// they say nothing the earlier ones did not and each is weighed against
 			// every company on the list
 			expect(linkedAddresses(page)).toHaveLength(300)
+		})
+
+		it('should not let a repeated menu link crowd out the companies', () => {
+			// GIVEN a listing page shaped the way real ones are: its filters and
+			// navigation repeated far more times than the cap allows, and the
+			// companies it files listed underneath them
+			const page = [
+				...Array.from(
+					{ length: 400 },
+					() => '[Inici](https://listado.example/home)',
+				),
+				'[Electricistas Puig SL](https://listado.example/electricistas-puig)',
+				'[Instalaciones Ferré SA](https://listado.example/instalaciones-ferre)',
+			].join('\n')
+
+			// WHEN read — THEN the repeats count once between them, so the companies
+			// are still reached: counting raw matches instead would spend the whole
+			// budget on one menu link and read none of what the page is for
+			const found = linkedAddresses(page)
+			expect(found).toContain('https://listado.example/electricistas-puig')
+			expect(found).toContain('https://listado.example/instalaciones-ferre')
+			expect(found).toHaveLength(3)
 		})
 	})
 })

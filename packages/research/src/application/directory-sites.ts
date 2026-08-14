@@ -39,11 +39,12 @@
  *
  * A host is judged on every address met on it together, so a local paper that ran
  * two pieces, each naming a different one of the run's companies in its address,
- * reads like a listing. That is the sharpest edge left. It costs the paper's
- * standing as a source that is not a directory rather than any company's own site,
- * since no company's website is a newspaper — but it is a real cost to the check
- * that will lean on this, and it stays only until there is a measurement to set
- * something finer against.
+ * reads like a listing. That is the sharpest edge left, and reading a page's links
+ * makes it sharper rather than blunter: one fetched section page hands over every
+ * article on it at once, so two such pieces is ordinary rather than unlucky. What
+ * it costs is the paper's standing as a source that is not a directory, never a
+ * company's own site — no company's website is a newspaper — and it stays only
+ * until there is a measurement to set something finer against.
  *
  * Counting how many of a host's addresses sit under one path is NOT the way to
  * sharpen it, however much it looks like the same idea. That was measured correct
@@ -60,6 +61,7 @@ import {
 	DISTINCTIVE_NAME_LENGTH,
 	distinctiveWords,
 	type EntityTargets,
+	foldTokens,
 	isOwnSiteHost,
 	nameCore,
 	nameWithoutForms,
@@ -134,16 +136,41 @@ const listedCompanyNames = (
 	return names
 }
 
-// How many of one page's links are read. A sitemap or an A-to-Z index can carry
-// thousands, and past the first few hundred they say nothing the earlier ones did
-// not — while every one of them is weighed against every company on the list.
+// How many of one page's DIFFERENT links are read. A sitemap or an A-to-Z index
+// can carry thousands, and past the first few hundred they say nothing the earlier
+// ones did not — while every one of them is weighed against every company on the
+// list. Counted after repeats are folded away, because a listing page puts its
+// filters and its navigation above its companies: cap the raw matches instead and
+// a few hundred copies of one menu link eat the whole budget before the first
+// company is reached.
 const MAX_LINKS_PER_PAGE = 300
 
 // Addresses written as ordinary links, "https://…", picked out of a fetched page's
-// text. Trailing punctuation is shaved off because markdown wraps a link in
-// brackets and prose ends it with a full stop.
-const LINK_IN_PAGE = /https?:\/\/[^\s<>"'`]+/g
-const TRAILING_PUNCTUATION = /[).,;:\]}>'"]+$/
+// text. The characters a link cannot hold end the match; what a link CAN hold but
+// prose also puts after one is shaved off below. Square brackets end it too, even
+// though an address may technically hold them: markdown writes one link straight
+// after another with nothing between them, and without that the two run together
+// into a single address that is neither. The scheme is read whichever case the
+// page wrote it in.
+const LINK_IN_PAGE = /https?:\/\/[^\s<>"'`[\]]+/gi
+const TRAILING_PUNCTUATION = /[.,;:}]+$/
+
+// Markdown writes a link inside brackets, so a closing bracket at the end is the
+// markdown's and not the address's — unless the address opened one itself, which
+// is how an encyclopaedia tells two things of the same name apart
+// ("/wiki/Acme_(empresa)"). Shave only the unmatched ones, so the address that
+// keeps its bracket is the one that had it.
+const withoutWrappingBrackets = (link: string): string => {
+	let end = link.length
+	let depth = 0
+	for (let at = link.length - 1; at >= 0 && link[at] === ')'; at--) depth++
+	for (const character of link) if (character === '(') depth--
+	while (depth > 0 && end > 0 && link[end - 1] === ')') {
+		end--
+		depth--
+	}
+	return link.slice(0, end)
+}
 
 /**
  * The addresses a page the run fetched links to.
@@ -158,14 +185,20 @@ const TRAILING_PUNCTUATION = /[).,;:\]}>'"]+$/
  * Only whole addresses are read. A page that writes its links relative to itself
  * ("/EMPRESA.html") is missed rather than guessed at, since resolving them means
  * deciding what they are relative to and getting that wrong invents addresses.
+ *
+ * A listing that sends every outbound link through a counter of its own
+ * ("…/out.php?u=…") is read as the one address it is, on the listing's host. The
+ * company it points at is inside the question mark, which nothing here reads, so
+ * such a listing files nobody and goes unnoticed — a miss, in the safe direction.
  */
-export const linkedAddresses = (pageText: string): ReadonlyArray<string> => [
-	...new Set(
-		(pageText.match(LINK_IN_PAGE) ?? [])
-			.map(link => link.replace(TRAILING_PUNCTUATION, ''))
-			.slice(0, MAX_LINKS_PER_PAGE),
-	),
-]
+export const linkedAddresses = (pageText: string): ReadonlyArray<string> =>
+	[
+		...new Set(
+			(pageText.match(LINK_IN_PAGE) ?? []).map(link =>
+				withoutWrappingBrackets(link).replace(TRAILING_PUNCTUATION, ''),
+			),
+		),
+	].slice(0, MAX_LINKS_PER_PAGE)
 
 // The words of each part of an address after the host — [["empresa"], ["acme",
 // "s", "l"]] from "directorio.es/empresa/ACME-S.L.". A path arrives with its
@@ -185,14 +218,7 @@ const filingWords = (address: string): ReadonlyArray<ReadonlyArray<string>> => {
 	})()
 	return spelled
 		.split('/')
-		.map(segment =>
-			segment
-				.normalize('NFKD')
-				.replace(/\p{Diacritic}/gu, '')
-				.toLowerCase()
-				.split(/[^a-z0-9]+/)
-				.filter(Boolean),
-		)
+		.map(foldTokens)
 		.filter(words => words.length > 0)
 }
 
@@ -276,13 +302,22 @@ export const observeDirectorySites = (args: {
 	// held rather than counted, because one page naming two of them is a piece
 	// about both — it takes a separate address per company to be a listing.
 	const filedByHost = new Map<string, Map<string, Set<string>>>()
+	// A host that is a listed company's own site is that company's, whatever else
+	// sits on it: a firm's own page for each partner would otherwise read as a
+	// listing of them. Answered once per host, since hundreds of addresses read off
+	// one index page all share theirs.
+	const ownSiteHosts = new Map<string, boolean>()
+	const isOwnSite = (host: string): boolean => {
+		const known = ownSiteHosts.get(host)
+		if (known !== undefined) return known
+		const own = isOwnSiteHost(ownSiteKeys, host)
+		ownSiteHosts.set(host, own)
+		return own
+	}
 	for (const address of readable) {
-		const host = hostOf(address)
-		if (host === null) continue
-		// A host that is a listed company's own site is that company's, whatever
-		// else sits on it: a firm's own page for each partner would otherwise read
-		// as a listing of them.
-		if (isOwnSiteHost(ownSiteKeys, host)) continue
+		// Non-null: the screen above already parsed every address that got here.
+		const host = hostOf(address) ?? ''
+		if (isOwnSite(host)) continue
 		const segments = filingWords(address)
 		for (const core of companyCores) {
 			if (segments.some(segment => namesTheCompany(segment, core))) {
