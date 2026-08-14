@@ -933,6 +933,92 @@ describe('scoring a run that answered for a whole market', () => {
 			expect(score.market?.rowsDuplicated).toBe(2)
 		})
 
+		it('should count a branch office left on the list as its company again', () => {
+			// GIVEN a company and two rows named after it plus the town each sits in,
+			// neither carrying a site — the shape the fold is meant to have removed
+			const score = scoreRun(
+				marketGolden(),
+				outcome({
+					companies: [
+						company({
+							name: 'Terre Solaire',
+							website: 'https://terresolaire.example',
+						}),
+						company({ name: 'Terre Solaire – agence Lyon', location: 'Lyon' }),
+						company({
+							name: 'Terre Solaire – agence Douains',
+							location: 'Douains',
+						}),
+					],
+				}),
+			)
+
+			// WHEN scored
+			// THEN two rows are counted as repeats. Reading them by name or site alone
+			// would call this a clean list of three companies
+			expect(score.market?.rowsDuplicated).toBe(2)
+		})
+
+		it('should count a branch office whose company came after it', () => {
+			// GIVEN the branch listed above the company it belongs to
+			const score = scoreRun(
+				marketGolden(),
+				outcome({
+					companies: [
+						company({ name: 'Terre Solaire – agence Lyon', location: 'Lyon' }),
+						company({
+							name: 'Terre Solaire',
+							website: 'https://terresolaire.example',
+						}),
+					],
+				}),
+			)
+
+			// WHEN scored — THEN they still meet, whichever came first
+			expect(score.market?.rowsDuplicated).toBe(1)
+		})
+
+		it('should count a branch of a branch as the same company still', () => {
+			// GIVEN a company, a branch of it, and a sub-office of that branch
+			const score = scoreRun(
+				marketGolden(),
+				outcome({
+					companies: [
+						company({
+							name: 'Acme Solar',
+							website: 'https://acmesolar.example',
+						}),
+						company({ name: 'Acme Solar Lyon', location: 'Lyon' }),
+						company({ name: 'Acme Solar Lyon Sud', location: 'Lyon Sud' }),
+					],
+				}),
+			)
+
+			// WHEN scored
+			// THEN one company, not three — each row is filed under the one above it, so
+			// sameness carries the whole way up the chain
+			expect(score.market?.rowsDuplicated).toBe(2)
+		})
+
+		it('should count two companies sharing an opening word as two', () => {
+			// GIVEN a company and a genuinely different one whose name starts with it
+			const score = scoreRun(
+				marketGolden(),
+				outcome({
+					companies: [
+						company({
+							name: 'Terre Solaire',
+							website: 'https://terresolaire.example',
+						}),
+						company({ name: 'Terre Solaire Energie', location: 'Lyon' }),
+					],
+				}),
+			)
+
+			// WHEN scored — THEN no repeat is claimed over two separate companies
+			expect(score.market?.rowsDuplicated).toBe(0)
+		})
+
 		it('should count no duplicates in a list of distinct companies', () => {
 			// GIVEN three unrelated companies
 			const score = scoreRun(

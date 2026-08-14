@@ -24,7 +24,10 @@ import { mergeContacts } from './contacts-rescue'
 import { discoveryResultField, isDiscoveryScan } from './discovery-scan'
 import { enrichmentFill } from './extraction-fill'
 import { isPlainObject, isValueWrapper, unwrapValue } from './guard-shapes'
-import { discoveryRowIdentityKeys } from './prospect-dedupe-guard'
+import {
+	dedupeDiscoveryRows,
+	discoveryRowIdentityKeys,
+} from './prospect-dedupe-guard'
 
 // The company-profile facts worth spending an extra search on. `size_range` is
 // also nudged during the loop (headcount is rarely on the homepage); for the
@@ -215,18 +218,26 @@ export interface PerFieldMerge {
 	readonly filled: number
 	/** Whether the people list gained anyone, or gained a detail about anyone. */
 	readonly contactsChanged: boolean
-	/** How many companies the second look added that the first pass never named. */
+	/**
+	 * How many companies the list gained — not how many rows were appended. A row
+	 * naming a company already on the list joins it instead of lengthening the
+	 * list, and has found nobody.
+	 */
 	readonly added: number
 }
 
 /**
  * Fold a re-extraction over the enlarged evidence back into a scan's list.
  *
- * A company already found keeps everything it already had — a second look may
- * only fill a blank, never overwrite a grounded value, and never remove a company
- * from the list. A company the re-extraction names that the first pass did not is
- * appended: the enlarged evidence is a wider read of the same question, so what it
- * turns up is a find rather than a contradiction.
+ * A company already found keeps everything it already had — a second look may only
+ * fill a blank, and never overwrite a grounded value. A company the re-extraction
+ * names that the first pass did not is appended: the enlarged evidence is a wider
+ * read of the same question, so what it turns up is a find rather than a
+ * contradiction.
+ *
+ * The list can still come back shorter, and only ever for one reason: two rows of it
+ * turn out to be one company. That is a company written twice becoming a company
+ * written once, never a company dropped.
  */
 const mergeScanRows = (
 	schemaName: string,
@@ -296,14 +307,44 @@ const mergeScanRows = (
 	if (filled === 0 && additions.length === 0) {
 		return { findings, filled: 0, contactsChanged: false, added: 0 }
 	}
+	// This round has just moved the ground under the fold that ran before the rounds
+	// began: it appends companies that fold never saw, and fills in the website of a
+	// row that had none. Two rows that looked nothing alike then can be one company
+	// now — the same site under two spellings of the name, or a branch office found
+	// on a later page. Folding here, rather than once when the rounds are over, is
+	// what keeps that from depending on where a call sits: the step that disturbs
+	// the list is the step that settles it, so nothing later has to remember to.
+	const settle = (rows: ReadonlyArray<unknown>): number | undefined => {
+		const held = (
+			dedupeDiscoveryRows({ ...(findings as object), [field]: rows }, field)
+				.findings as Record<string, unknown>
+		)[field]
+		return Array.isArray(held) ? held.length : undefined
+	}
+	const settled = dedupeDiscoveryRows(
+		{ ...(findings as object), [field]: [...merged, ...additions] },
+		field,
+	)
+	const held = (settled.findings as Record<string, unknown>)[field]
+	// What the list gained, counted in companies rather than rows. A row that joined
+	// a company already on the list is not a find, and calling it one would buy
+	// another paid round of searches for somebody no reader ever sees.
+	//
+	// Measured against the rows already held, folded on their own, rather than
+	// against how many there were. This round can also have filled in the website
+	// that shows two companies already on the list were always one — that shortens
+	// it for a reason that is not a find, and letting it count against the gain
+	// would report a real find as nothing and stop the rounds a round early.
+	const before = settle(merged)
+	const after = Array.isArray(held) ? held.length : undefined
 	return {
-		findings: {
-			...(findings as object),
-			[field]: [...merged, ...additions],
-		},
+		findings: settled.findings,
 		filled,
 		contactsChanged: false,
-		added: additions.length,
+		added:
+			before === undefined || after === undefined
+				? additions.length
+				: Math.max(0, after - before),
 	}
 }
 

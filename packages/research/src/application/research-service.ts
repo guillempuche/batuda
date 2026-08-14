@@ -3448,9 +3448,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								{
 									// Same company twice: a broad search meets one company on a
 									// directory, in a ranking and in a news piece, and each meeting can
-									// spell it differently. Fold those rows into one — after the website
-									// check, so an address several rows shared is already gone before a
-									// host counts as evidence two rows are the same company.
+									// spell it differently. It also meets a company once under its own
+									// name and again for each branch office, named after the town the
+									// branch sits in. Fold all of those into one row — after the
+									// website check, so an address several rows shared is already gone
+									// before a host counts as evidence two rows are one company.
 									name: 'prospect-dedupe',
 									run: findings =>
 										Effect.gen(function* () {

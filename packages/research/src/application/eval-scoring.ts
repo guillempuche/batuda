@@ -44,7 +44,10 @@
 
 import { foldLabel } from '@batuda/domain'
 
-import { discoveryRowIdentityKeys } from './prospect-dedupe-guard'
+import {
+	branchOfficeParents,
+	discoveryRowIdentityKeys,
+} from './prospect-dedupe-guard'
 
 /**
  * The enrichment scalars we can check against an objective golden answer. Free-text
@@ -814,38 +817,44 @@ const isKnownNonCompany = (
  * How many rows are another row's company a second time: the rows, less the
  * companies they turn out to be.
  *
- * Two rows are one company when they share a name with the legal form off the end or
- * share a site host, and sameness carries — the same keys the scan itself folds rows
- * on.
+ * Two rows are one company when they share a name with the legal form off the end,
+ * share a site host, or one reads as the other's branch office — the same three ways
+ * the scan itself folds rows, and sameness carries across all of them.
  *
- * Reusing those keys is what this number is worth and what bounds it. The list it
- * reads has already been folded on them, so nothing it can see should be left: it
- * answers "is that fold still running and still doing its job", and it moves the
- * moment the answer is no. It cannot answer whether the keys are the right ones.
- *
- * That bound is wider than it sounds, and a live market search shows it: a company
- * came back once under its own name and four more times as that name plus the town
- * of a branch office, none of the four carrying a site. Neither key sees them — the
- * name is not the same name and there is no host to share — so the fold leaves all
- * five and this reads zero duplicates over a list that plainly repeats one company.
- * Reading it as "no repeats in this list" is wrong; it means "no repeats of the kind
- * these keys can tell". Counting those needs a hand-marked answer to score against,
- * which is a different measurement from this one.
+ * Reusing what the fold uses is what this number is worth and what bounds it. The
+ * list it reads has already been folded that way, so nothing it can see should be
+ * left: it answers "is that fold still running and still doing its job", and it moves
+ * the moment the answer is no. It cannot answer whether those three ways are the
+ * right ones — a repeat of a shape none of them describes reads here as two
+ * companies, and counting that needs a hand-marked answer to score against, which is
+ * a different measurement from this one.
  *
  * A row nothing can be read from — a name that is all punctuation, no address —
  * files under no key and so counts as its own company. That is the safe direction:
  * it never claims a duplicate it cannot show.
  */
 const duplicatedRows = (rows: RunOutcome['companies']): number => {
+	// The fields the fold reads a row by, in the shape it reads them: the name, the
+	// site, and the place — a branch is told by its name ending on the town it gives.
+	const asDiscoveryRows = rows.map(row => ({
+		name: row.name,
+		...(row.website === null ? {} : { website: row.website }),
+		...(row.location === null ? {} : { location: row.location }),
+	}))
+	const parentOfBranch = branchOfficeParents(asDiscoveryRows)
+
 	// Each company found so far, as the keys its rows filed under. A row meeting one
 	// of them is that company again; a row meeting two proves those two were one
-	// company all along, so they merge.
+	// company all along, so they merge. A branch is filed under the company it hangs
+	// off as well as itself, which is how it meets it whichever of the two came first.
 	const companies: Array<Set<string>> = []
-	for (const row of rows) {
-		const keys = discoveryRowIdentityKeys({
-			name: row.name,
-			...(row.website === null ? {} : { website: row.website }),
-		})
+	for (const [at, row] of asDiscoveryRows.entries()) {
+		const parent = parentOfBranch.get(at)
+		const parentRow = parent === undefined ? undefined : asDiscoveryRows[parent]
+		const keys = [
+			...discoveryRowIdentityKeys(row),
+			...(parentRow === undefined ? [] : discoveryRowIdentityKeys(parentRow)),
+		]
 		const matched = companies.filter(company =>
 			keys.some(key => company.has(key)),
 		)

@@ -160,15 +160,24 @@ const nameEnd = (tokens: ReadonlyArray<string>): number => {
 	return end
 }
 
+/**
+ * The words of a name minus its legal form — "Acme Logistics S.L." → ["acme",
+ * "logistics"]. Exported because a caller comparing two names has to compare
+ * them word by word rather than as one run of letters: telling whether one name
+ * is another name and then some needs to know where each word ends, and the
+ * collapsed "acmelogistics" no longer says.
+ */
+export const nameCoreTokens = (name: string): ReadonlyArray<string> => {
+	const tokens = foldTokens(name)
+	return tokens.slice(0, nameEnd(tokens))
+}
+
 // The whole name minus its legal form, collapsed — "Acme Logistics S.L." →
 // "acmelogistics". This is the strong-match key: it appears verbatim on the
 // company's own pages but is long enough not to hit by coincidence. A key that
 // is only an industry word would match any page in that industry, so the form is
 // read off the end rather than picked out wherever it appears.
-export const nameCore = (name: string): string => {
-	const tokens = foldTokens(name)
-	return tokens.slice(0, nameEnd(tokens)).join('')
-}
+export const nameCore = (name: string): string => nameCoreTokens(name).join('')
 
 /**
  * The name with every legal-form word taken out, wherever it sits — "SARL
