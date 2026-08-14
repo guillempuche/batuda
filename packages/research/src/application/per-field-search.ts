@@ -22,9 +22,9 @@
 
 import { mergeContacts } from './contacts-rescue'
 import { discoveryResultField, isDiscoveryScan } from './discovery-scan'
-import { collapse } from './entity-guard'
 import { enrichmentFill } from './extraction-fill'
 import { isPlainObject, isValueWrapper, unwrapValue } from './guard-shapes'
+import { discoveryRowIdentityKeys } from './prospect-dedupe-guard'
 
 // The company-profile facts worth spending an extra search on. `size_range` is
 // also nudged during the loop (headcount is rarely on the homepage); for the
@@ -44,9 +44,14 @@ export const HIGH_VALUE_FIELDS: ReadonlyArray<string> = [
 // Each field named here has to exist on that scan's own schema, or the search is
 // paid for and the answer has nowhere to land — a competitor is never asked for a
 // headcount, so asking the web for one would buy nothing. The test next door
-// checks each name against the real schema so the two cannot drift apart.
+// checks each name against the real schema so the two cannot drift apart. This
+// list also decides what a wider read is allowed to fill in, so a field left out
+// of it is one whose value is thrown away even when a round does turn it up.
+//
+// Listed in the order they are worth going after, since a round's cap can cut the
+// list short.
 const SCAN_ROW_FIELDS_BY_SCHEMA: Record<string, ReadonlyArray<string>> = {
-	prospect_scan_v1: ['website', 'employee_estimate'],
+	prospect_scan_v1: ['website', 'employee_estimate', 'location'],
 	competitor_scan_v1: ['website'],
 }
 
@@ -126,18 +131,6 @@ const rowName = (row: Record<string, unknown>): string | undefined => {
 		? name.trim()
 		: undefined
 }
-
-/**
- * The key two mentions of the same company share.
- *
- * A re-extraction reads the same company off a different page and writes the name
- * differently — `Transports Munné, S.L.` against `Transports Munne SL`. Folding
- * those together keeps one company from becoming two rows. The fold keeps the
- * legal suffix, which is what has to happen here: dropping it would fold `Acme`
- * and `Acme Holding` into one, and putting a recovered website on the wrong
- * company is far worse than listing it twice.
- */
-const nameKey = (name: string): string => collapse(name)
 
 /**
  * The still-empty high-value facts worth a focused search, in a stable order.
@@ -254,19 +247,25 @@ const mergeScanRows = (
 	) {
 		return { findings, filled: 0, contactsChanged: false, added: 0 }
 	}
-	const foundByName = new Map<string, Record<string, unknown>>()
+	// Rows are matched on what identifies the company — its name with the legal
+	// form off the end, or its site — not on the name as written. A second look
+	// meets a company through a register or a directory, which prints the fuller
+	// legal name, so matching the name as written files it as somebody new: the
+	// list grows a second copy instead of the first copy gaining what the round
+	// went looking for.
+	const foundByKey = new Map<string, Record<string, unknown>>()
 	for (const row of found) {
-		const name = rowName(row)
 		// First mention wins: a later duplicate of the same company in the same
 		// re-extraction has no better claim, and picking one keeps the fold stable.
-		if (name !== undefined && !foundByName.has(nameKey(name)))
-			foundByName.set(nameKey(name), row)
+		for (const key of discoveryRowIdentityKeys(row)) {
+			if (!foundByKey.has(key)) foundByKey.set(key, row)
+		}
 	}
 	let filled = 0
 	const merged = known.map(row => {
-		const name = rowName(row)
-		const match =
-			name === undefined ? undefined : foundByName.get(nameKey(name))
+		const match = discoveryRowIdentityKeys(row)
+			.map(key => foundByKey.get(key))
+			.find(found => found !== undefined)
 		if (match === undefined) return row
 		const next: Record<string, unknown> = { ...row }
 		let filledHere = 0
@@ -283,16 +282,15 @@ const mergeScanRows = (
 	// company twice appends it once. A duplicate would not only read badly — the
 	// list's length is what decides whether a scan came back too thin to trust,
 	// so counting one company twice can pass a scan off as healthier than it is.
-	const takenNames = new Set(
-		known.flatMap(row => {
-			const name = rowName(row)
-			return name === undefined ? [] : [nameKey(name)]
-		}),
-	)
+	const taken = new Set(known.flatMap(row => discoveryRowIdentityKeys(row)))
 	const additions = found.filter(row => {
-		const name = rowName(row)
-		if (name === undefined || takenNames.has(nameKey(name))) return false
-		takenNames.add(nameKey(name))
+		// Matching an existing company takes any of the keys; becoming a new row in
+		// the list takes a name. A company nobody can name is one nobody can work
+		// with, whatever else is known about it.
+		if (rowName(row) === undefined) return false
+		const keys = discoveryRowIdentityKeys(row)
+		if (keys.some(key => taken.has(key))) return false
+		for (const key of keys) taken.add(key)
 		return true
 	})
 	if (filled === 0 && additions.length === 0) {

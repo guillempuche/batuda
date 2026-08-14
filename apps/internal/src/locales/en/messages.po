@@ -399,6 +399,16 @@ msgstr "Add"
 msgid "Add {0}"
 msgstr "Add {0}"
 
+#. placeholder {0}: prospect.name
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Add {0} as an unverified lead"
+msgstr "Add {0} as an unverified lead"
+
+#. placeholder {0}: prospect.name
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Add {0} as lead"
+msgstr "Add {0} as lead"
+
 #: src/components/shared/editable-field.tsx
 msgid "Add {label}"
 msgstr "Add {label}"
@@ -478,6 +488,10 @@ msgstr "Added"
 #: src/components/research/findings/prospect-scan-view.tsx
 msgid "Added as a verified lead"
 msgstr "Added as a verified lead"
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Added as an unverified lead"
+msgstr "Added as an unverified lead"
 
 #: src/components/research/findings/prospect-scan-view.tsx
 #: src/routes/settings/organization/members.tsx
@@ -1114,6 +1128,7 @@ msgstr "Client"
 #: src/components/instructions/template-dialog.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/components/research/research-dialog.tsx
+#: src/routes/__root.tsx
 #: src/routes/calendar/index.tsx
 #: src/routes/emails/$threadId.tsx
 #: src/routes/emails/inboxes.tsx
@@ -1424,6 +1439,10 @@ msgstr "Could not allow it again"
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Could not apply the batch."
 msgstr "Could not apply the batch."
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Could not be confirmed:"
+msgstr "Could not be confirmed:"
 
 #: src/components/research/run-actions.tsx
 msgid "Could not cancel the run"
@@ -3092,6 +3111,7 @@ msgstr "Locating…"
 
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
+#: src/components/research/findings/prospect-scan-view.tsx
 #: src/components/research/research-dialog.tsx
 #: src/components/research/run-labels.ts
 #: src/routes/calendar/index.tsx
@@ -3945,6 +3965,10 @@ msgstr "Nothing to show in this range."
 #: src/routes/documents/index.tsx
 msgid "Nothing written down matches that."
 msgstr "Nothing written down matches that."
+
+#: src/routes/__root.tsx
+msgid "Notifications"
+msgstr "Notifications"
 
 #: src/components/primitives/pri-rich-text.tsx
 msgid "Numbered list"
@@ -6094,6 +6118,10 @@ msgstr "Unassign"
 #: src/routes/companies/index.tsx
 msgid "Unassigned"
 msgstr "Unassigned"
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Unconfirmed company"
+msgstr "Unconfirmed company"
 
 #: src/components/research/trust-badge.tsx
 msgid "Undeliverable"

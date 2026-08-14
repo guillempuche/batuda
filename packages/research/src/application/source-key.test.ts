@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import {
 	canonicalizeUrl,
 	hostOf,
+	isBareWebAddress,
 	isWebAddress,
 	pathOf,
 	sourceIdFor,
@@ -258,6 +259,60 @@ describe('isWebAddress', () => {
 			expect(isWebAddress('https://192.168.1.1/x')).toBe(false)
 			expect(isWebAddress('https://acme-.es')).toBe(false)
 			expect(isWebAddress('https://acme.e')).toBe(false)
+		})
+
+		it('should keep reading an address with an aside next to it as an address', () => {
+			// GIVEN a citation a model wrote with its own note glued on the end
+			// THEN it is still an address here. Saying no would mean the page skips the
+			// third-party confidence cap and the user-posted-content block, which is
+			// the unsafe direction for grading a citation — `isBareWebAddress` is what
+			// a website field asks instead
+			expect(
+				isWebAddress('https://acme.es/about (approximate, from the register)'),
+			).toBe(true)
+		})
+	})
+})
+
+describe('isBareWebAddress', () => {
+	describe('when the value is one address and nothing else', () => {
+		it('should accept it, padded with blank space or carrying an escape', () => {
+			// GIVEN one address typed with space either side — sloppy formatting, not
+			// something written next to it
+			expect(isBareWebAddress('  https://acme.es/contact  ')).toBe(true)
+			// AND an escaped space inside a real path is part of the address
+			expect(isBareWebAddress('https://acme.es/quienes%20somos')).toBe(true)
+			expect(isBareWebAddress('acme.es')).toBe(true)
+		})
+	})
+
+	describe('when something is written beside the address', () => {
+		it('should reject it, however clean the host reads', () => {
+			// GIVEN what a model hands back when it is unsure of a website: the address
+			// with its own aside attached
+			// THEN neither is one address. The parser folds the trailing words into the
+			// path as escapes and yields a clean hostname, so a check that weighs the
+			// host passes something nobody can open
+			expect(
+				isBareWebAddress(
+					'https://adime.org/ (not directly provided, inferred from name)',
+				),
+			).toBe(false)
+			expect(
+				isBareWebAddress(
+					'https://sea.es/ (derived from SEA Empresas Alavesas page)',
+				),
+			).toBe(false)
+			expect(isBareWebAddress('Website: https://acme.es')).toBe(false)
+			expect(isBareWebAddress('acme.es or acme.com')).toBe(false)
+		})
+
+		it('should still reject everything a web address is not', () => {
+			// GIVEN the values the looser question already turns down
+			expect(isBareWebAddress('info@acme.es')).toBe(false)
+			expect(isBareWebAddress('ftp://acme.es/pub')).toBe(false)
+			expect(isBareWebAddress('localhost')).toBe(false)
+			expect(isBareWebAddress('')).toBe(false)
 		})
 	})
 })

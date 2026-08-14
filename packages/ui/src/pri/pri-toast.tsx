@@ -5,8 +5,10 @@ import styled from 'styled-components'
  * Workshop toast — clipboard note: aged paper card with a masking tape
  * corner + a binder clip up top. Slides in from the bottom-right.
  *
- * Mount `<PriToast.Provider>` high in the tree and one `<PriToast.Viewport>`
- * somewhere at app chrome. Fire toasts via `useToastManager()` from Base UI.
+ * Mount `<PriToast.Provider>` high in the tree and one viewport holding the list
+ * at app chrome — `<PriToast.Viewport><PriToast.List closeLabel={…} /></…>`. The
+ * viewport alone draws an empty frame, so a toast raised into it is never seen.
+ * Fire toasts via `usePriToast()`.
  */
 const PriViewport = styled(Toast.Viewport).withConfig({
 	displayName: 'PriToastViewport',
@@ -125,11 +127,39 @@ const PriClose = styled(Toast.Close).withConfig({
 	}
 `
 
+/**
+ * The toasts currently raised, as cards. Put it inside the viewport:
+ * `<PriToast.Viewport><PriToast.List closeLabel={…} /></PriToast.Viewport>`.
+ *
+ * The viewport draws only the frame — without something turning the manager's
+ * queue into cards, `toast.add()` fills a queue nobody reads and every message
+ * the app raises is silently dropped. Nothing announces them either, so a
+ * screen-reader user is told nothing at all.
+ *
+ * The close button's label is passed in rather than written here, because this
+ * package holds no translations and the apps that use it do.
+ */
+export function PriToastList({ closeLabel }: { readonly closeLabel: string }) {
+	const { toasts } = Toast.useToastManager()
+	return (
+		<>
+			{toasts.map(toast => (
+				<PriRoot key={toast.id} toast={toast}>
+					<PriTitle />
+					<PriDescription />
+					<PriClose aria-label={closeLabel}>×</PriClose>
+				</PriRoot>
+			))}
+		</>
+	)
+}
+
 export const PriToast: {
 	Provider: typeof Toast.Provider
 	Portal: typeof Toast.Portal
 	Positioner: typeof Toast.Positioner
 	Viewport: typeof PriViewport
+	List: typeof PriToastList
 	Root: typeof PriRoot
 	Title: typeof PriTitle
 	Description: typeof PriDescription
@@ -139,6 +169,7 @@ export const PriToast: {
 	Portal: Toast.Portal,
 	Positioner: Toast.Positioner,
 	Viewport: PriViewport,
+	List: PriToastList,
 	Root: PriRoot,
 	Title: PriTitle,
 	Description: PriDescription,

@@ -107,8 +107,10 @@ describe('needsPerFieldSearch', () => {
 			// THEN each company is asked about by its own name, never the request's
 			expect(forScan(findings)).toEqual([
 				{ name: 'Acme', field: 'employee_estimate' },
+				{ name: 'Acme', field: 'location' },
 				{ name: 'Beta', field: 'website' },
 				{ name: 'Beta', field: 'employee_estimate' },
+				{ name: 'Beta', field: 'location' },
 			])
 		})
 
@@ -132,6 +134,7 @@ describe('needsPerFieldSearch', () => {
 						name: 'Acme',
 						website: 'https://acme.test',
 						employee_estimate: { value: 42, source_id: 'https://acme.test' },
+						location: 'Valencia',
 					},
 				],
 			}
@@ -145,8 +148,18 @@ describe('needsPerFieldSearch', () => {
 			// headcount whose value was nulled
 			const findings = {
 				prospects: [
-					{ name: 'A', website: '   ', employee_estimate: { value: null } },
-					{ name: 'B', website: null, employee_estimate: { value: 7 } },
+					{
+						name: 'A',
+						website: '   ',
+						employee_estimate: { value: null },
+						location: 'Valencia',
+					},
+					{
+						name: 'B',
+						website: null,
+						employee_estimate: { value: 7 },
+						location: '  ',
+					},
 				],
 			}
 			// WHEN computed
@@ -155,6 +168,7 @@ describe('needsPerFieldSearch', () => {
 				{ name: 'A', field: 'website' },
 				{ name: 'A', field: 'employee_estimate' },
 				{ name: 'B', field: 'website' },
+				{ name: 'B', field: 'location' },
 			])
 		})
 
@@ -174,6 +188,7 @@ describe('needsPerFieldSearch', () => {
 			expect(forScan(findings)).toEqual([
 				{ name: 'Real', field: 'website' },
 				{ name: 'Real', field: 'employee_estimate' },
+				{ name: 'Real', field: 'location' },
 			])
 		})
 
@@ -474,6 +489,66 @@ describe('mergePerFieldSearch', () => {
 			expect(merged.added).toBe(0)
 		})
 
+		it('should fold a company the second look met under its fuller legal name', () => {
+			// GIVEN a company first met under the name it trades as
+			const findings = {
+				prospects: [
+					{ name: 'Civera Electrificaciones', why_relevant: 'Installer.' },
+				],
+			}
+			// AND a second look that met it through a register, which prints the legal
+			// form on the end
+			const refreshed = {
+				prospects: [
+					{
+						name: 'Civera Electrificaciones, S.L.',
+						website: 'https://civeraelectrificaciones.com/',
+						location: 'Valencia',
+					},
+				],
+			}
+
+			// WHEN merged
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const rows = prospectsOf(merged.findings)
+
+			// THEN it is one company that gained a site and a place, not two rows. A
+			// register or a directory is exactly where a second look goes, and the
+			// fuller name it prints there is the ordinary case, not an unusual one
+			expect(rows).toHaveLength(1)
+			expect(rows[0]?.['name']).toBe('Civera Electrificaciones')
+			expect(rows[0]?.['website']).toBe('https://civeraelectrificaciones.com/')
+			expect(rows[0]?.['location']).toBe('Valencia')
+			expect(merged.added).toBe(0)
+		})
+
+		it('should fold a company the second look met under a different name entirely', () => {
+			// GIVEN a company first met under its trading name, with its site
+			const findings = {
+				prospects: [{ name: 'Asenel', website: 'https://www.asenel.net/' }],
+			}
+			// AND a second look that names it in full, on the same site
+			const refreshed = {
+				prospects: [
+					{
+						name: 'ASENEL (Asistencia Energética Eléctrica S.L.U.)',
+						website: 'https://www.asenel.net',
+						location: 'Valencia',
+					},
+				],
+			}
+
+			// WHEN merged
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const rows = prospectsOf(merged.findings)
+
+			// THEN the shared site settles it, as it does for the fold that runs over
+			// the list itself — the two names have nothing in common to match on
+			expect(rows).toHaveLength(1)
+			expect(rows[0]?.['location']).toBe('Valencia')
+			expect(merged.added).toBe(0)
+		})
+
 		it('should fold two spellings that differ only by an accent', () => {
 			// GIVEN a Catalan company name carrying its accent and legal suffix
 			const findings = { prospects: [{ name: 'Transports Munné, S.L.' }] }
@@ -664,7 +739,11 @@ describe('the fields each shape rescues', () => {
 				'location',
 				'size_range',
 			])
-			expect(scanRowFields(SCAN)).toEqual(['website', 'employee_estimate'])
+			expect(scanRowFields(SCAN)).toEqual([
+				'website',
+				'employee_estimate',
+				'location',
+			])
 			expect(scanRowFields(COMPETITORS)).toEqual(['website'])
 			expect(scanRowFields('freeform')).toEqual([])
 		})
@@ -680,6 +759,7 @@ describe('the fields each shape rescues', () => {
 					source_id: 'https://acme.test',
 					confidence: null,
 				},
+				location: 'Valencia',
 				why_relevant: 'matches',
 				description: 'a rival',
 				citations: [],

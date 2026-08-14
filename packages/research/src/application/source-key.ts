@@ -101,3 +101,26 @@ export const isWebAddress = (value: string): boolean => {
 	// unreadable.
 	return DOMAIN_NAME.test(parsed.hostname.toLowerCase().replace(/\.$/, ''))
 }
+
+/**
+ * Whether a string is ONE web address and nothing written beside it.
+ *
+ * Ask this — not `isWebAddress` — where a value is offered as a company's own
+ * website. A model unsure of a site hands back its aside along with it,
+ * "https://adime.org/ (not directly provided, inferred from name)", and the
+ * parser hides that completely: it folds the trailing words into the path as
+ * escapes and yields a clean hostname, so a check that weighs the host passes
+ * something nobody can open. An address carries no spaces, which makes a space
+ * inside the value the whole tell.
+ *
+ * The two questions want opposite answers when they are unsure. Grading a
+ * citation, "not an address" means a page skips the third-party confidence cap,
+ * so being generous is the safe direction and `isWebAddress` stays that way.
+ * Filling a website field, "not an address" only empties a field, while being
+ * generous puts prose where a reader expects a link.
+ */
+export const isBareWebAddress = (value: string): boolean => {
+	const trimmed = value.trim()
+	if (/\s/.test(trimmed)) return false
+	return isWebAddress(trimmed)
+}

@@ -59,6 +59,36 @@ Reading a key is never necessary: `infisical run` injects them into the child pr
 
 **`infisical` lives in the nix shell**, not on the plain PATH. Prefix everything with `nix develop --command sh -c '…'`.
 
+## Running ONE live query, not the eval
+
+To watch a single research request go end to end — the usual way to check a change against a real run — the same routing-vs-keys rule applies, but the run happens inside the **server**, so the environment has to reach that process. Three things stop it, and each fails in a way that looks like something else:
+
+1. **Turbo strips the injected secrets.** `infisical run --env=dev -- pnpm dev` hands them to Turbo, whose strict env mode drops anything not declared in `turbo.json`, so the server boots with no provider keys. Nothing errors — the run just finishes in under a second with `no_reliable_data` and "No pages were fetched", which reads exactly like a search that found nothing. Start the server directly instead of through Turbo.
+2. **Infisical's shared values displace this worktree's.** Bypass Turbo and the dev environment's own `BETTER_AUTH_SECRET` (and `DATABASE_URL`) win over the worktree's, and the server refuses to boot on a `ConfigError`. Re-source the worktree's `.env` *inside* the Infisical child so local values land on top, then apply the committed routing last.
+3. **The dev environment has no key for every tier.** `RESEARCH_API_KEY_ENRICH`, `_MAP` and `_VERIFY` are absent, and config validation refuses to boot without them. Set those providers to `none` — the search, scrape and LLM tiers are what a scan actually uses.
+
+```bash
+export ROOT=/path/to/worktree
+cd "$ROOT"
+export ROUTING=$(node -e 'const c=require("./apps/server/config.production.json");
+  for (const [k, v] of Object.entries(c))
+    if (k.startsWith("RESEARCH_") && !k.includes("API_KEY")) process.stdout.write(k + "=" + v + "\n")')
+nix develop --command infisical run --env=dev -- sh -c '
+  cd "$ROOT"; set -a; . ./.env; set +a
+  cd "$ROOT/apps/server"
+  exec env $ROUTING \
+    RESEARCH_PROVIDER_REGISTRY_ES=none RESEARCH_PROVIDER_REGISTRY_GB=none \
+    RESEARCH_PROVIDER_ENRICH=none RESEARCH_PROVIDER_MAP=none RESEARCH_PROVIDER_VERIFY=none \
+    "$ROOT/node_modules/.bin/portless" run --name api.batuda node --watch --import tsx src/main.ts
+'
+```
+
+Then start the run over MCP with an org-scoped API key (`pnpm cli auth create-key` does **not** set the org metadata the MCP endpoint requires — add `organizationId` + `createdByUserId` to the key's `metadata` in the dev database, or the handshake fails with "API key is not org-scoped"). Clear `research_cache` between runs of the same query, or the second one replays the first.
+
+**Do not edit a source file while a run is in flight** — `node --watch` restarts the server and the run dies mid-flight, leaving its row stuck at `running`.
+
+**A single run is billable**: the Spanish installations scan costs ~18¢ and takes ~20 minutes over ~300 sources.
+
 ## Infra stays local, never cloud
 
 `DATABASE_URL` and `STORAGE_*` must resolve to the worktree's own DB + bucket, never prod.
