@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-14 (ui-v2026.8.14)
+
+### Bug Fixes
+
+* make a research scan's list one usable row per company ([35f2865](https://github.com/guillempuche/batuda/commit/35f2865661976157c648dcac2395cbf197f423db)), closes [#459](https://github.com/guillempuche/batuda/issues/459)
+
 ## 2026-08-07 (ui-v2026.8.7)
 
 ### Features
