@@ -16,6 +16,17 @@
  * Either alone is enough, and sameness carries: A meeting B by name and B meeting C
  * by host makes all three one company, which is what they are.
  *
+ * A branch office is the third route, and neither of those two can see it. A company
+ * publishes a page per branch, and the scan brings back the company once and each
+ * branch again — "Terre Solaire" beside "Terre Solaire – agence Lyon". The names are
+ * not the same name, and a branch page rarely carries a site of its own, so there is
+ * no host either. What the run can see is the shape: a row whose name is another
+ * row's name and then some, ending in the very town this row says it sits in. That
+ * reads as one company's own branch, and it reads that way in any language, without
+ * knowing what "agence" means. See `branchOfficeParents` for why the shape has to be
+ * that tight — "one name starts the other" alone would fold two real companies that
+ * merely open with the same word.
+ *
  * The first row stays and the later ones fill its gaps — a tax id one meeting found
  * and the other did not, the site only the ranking printed — with their citations
  * added to its own. Nothing is overwritten: where both rows state a field, the first
@@ -23,13 +34,36 @@
  * rows outright would throw away everything the run paid to find on them, which is
  * the reason this merges instead of filtering.
  *
+ * Branches are the one exception to both of those, because they are the one case
+ * where the later rows are about somewhere else. The company's own name survives
+ * even when the list met a branch first, and every branch's town is kept beside the
+ * others rather than the first arrival standing for all of them — a company working
+ * from four towns is worth knowing about, and four towns is what the run found.
+ *
  * It runs after the website check, so a member-directory address several rows shared
  * is already gone by the time a host counts as evidence two rows are one company.
  */
 
-import { collapse, nameCore, withoutFormDots } from './entity-guard'
+import {
+	collapse,
+	DISTINCTIVE_NAME_LENGTH,
+	foldTokens,
+	nameCore,
+	nameCoreTokens,
+	withoutFormDots,
+} from './entity-guard'
 import { isPlainObject } from './guard-shapes'
 import { hostOf, isBareWebAddress } from './source-key'
+
+// The host of a row's own site, or null when the field holds nothing an address can
+// be read from. Null is also what a branch page looks like: it is the head office
+// that registers the domain, and the branch is a page on it at most.
+const siteHostOf = (row: Record<string, unknown>): string | null => {
+	const website = row['website']
+	return typeof website === 'string' && isBareWebAddress(website)
+		? hostOf(website)
+		: null
+}
 
 /**
  * What a row is filed under: its name with the legal form off the end, and the host
@@ -54,12 +88,95 @@ export const discoveryRowIdentityKeys = (
 		const filedAs = core === '' ? collapse(name) : core
 		if (filedAs !== '') keys.push(`name:${filedAs}`)
 	}
-	const website = row['website']
-	if (typeof website === 'string' && isBareWebAddress(website)) {
-		const host = hostOf(website)
-		if (host !== null) keys.push(`host:${host}`)
-	}
+	const host = siteHostOf(row)
+	if (host !== null) keys.push(`host:${host}`)
 	return keys
+}
+
+// Whether one name says another name and then more, word for word — "Terre Solaire"
+// starts "Terre Solaire – agence Lyon". Whole words, because the letters alone would
+// also have "Terre Solaire" start "Terres Solaires", which is a different company.
+const saysThenMore = (
+	name: ReadonlyArray<string>,
+	opening: ReadonlyArray<string>,
+): boolean =>
+	opening.length < name.length && opening.every((word, at) => name[at] === word)
+
+/**
+ * For each row that reads as another row's branch office, which row it belongs to,
+ * both named by their place in the list.
+ *
+ * A row is one of another's branches when all four hold:
+ *  - its name says that row's name and then more;
+ *  - it carries no site of its own, so it is not claiming a separate presence — and
+ *    a branch that gives the head office's address has already met it on the host;
+ *  - it says where it is;
+ *  - and its name **ends** on a word of that place. This is the whole of the rule's
+ *    safety. "One name starts the other" would fold "Terre Solaire" into a real and
+ *    different "Terre Solaire Energie"; asking that the name end on the town the row
+ *    itself claims does not, because "Energie" is not where anyone is. It is also
+ *    the reason there is no list of the words a branch is announced with — "agence",
+ *    "sucursal", "Niederlassung" — which would only be the languages somebody
+ *    thought of: the row tells us its own town, so nothing has to be known in
+ *    advance. It is the last word rather than any word, so that a joiner the place
+ *    happens to share — "Acme del Norte" sitting in "Puerto del Rosario" — cannot
+ *    pass for the town.
+ *
+ * A branch hangs off the longest name it could hang off, never every one of them.
+ * With "Acme", "Acme Solar" and "Acme Solar Lyon" on one list, the last belongs to
+ * "Acme Solar"; letting it belong to both would drag "Acme" and "Acme Solar" into
+ * one company through it, and those two are exactly the pair this must keep apart.
+ *
+ * A name too short to stand for a company on its own is no anchor for anybody's
+ * branches, so it is passed over rather than collecting every longer name on the
+ * list.
+ *
+ * What this still cannot tell apart: a company whose whole name is the trade it
+ * works in, sitting on a list beside unrelated firms called that trade and a town.
+ * "Electricidad" would take "Electricidad Madrid" and "Electricidad Barcelona" for
+ * its branches. Requiring the row above to be present at all is what bounds it —
+ * the pattern alone folds nothing — and going further means judging a name generic,
+ * which is a list of trade words in whichever languages somebody thought of.
+ *
+ * Exported because the measurement of how many duplicates a list still holds reads
+ * a returned list with the same eyes the fold does. A shape the fold acts on and
+ * the count cannot see would report a clean list every time.
+ */
+export const branchOfficeParents = (
+	rows: ReadonlyArray<unknown>,
+): ReadonlyMap<number, number> => {
+	const names = rows.map(row =>
+		isPlainObject(row) && typeof row['name'] === 'string'
+			? nameCoreTokens(withoutFormDots(row['name']))
+			: null,
+	)
+	// Long enough to stand for a company, worked out once per row rather than again
+	// for every longer name it is held up against.
+	const anchors = names.map(
+		name => name !== null && name.join('').length >= DISTINCTIVE_NAME_LENGTH,
+	)
+	const parents = new Map<number, number>()
+	rows.forEach((row, at) => {
+		const name = names[at]
+		if (!isPlainObject(row) || name == null) return
+		if (siteHostOf(row) !== null) return
+		const place = row['location']
+		if (typeof place !== 'string') return
+		const town = new Set(foldTokens(place))
+		const trailing = name[name.length - 1]
+		if (trailing === undefined || !town.has(trailing)) return
+
+		let hangsOff: number | undefined
+		let longest = 0
+		names.forEach((opening, openingAt) => {
+			if (opening === null || !anchors[openingAt]) return
+			if (!saysThenMore(name, opening) || opening.length <= longest) return
+			hangsOff = openingAt
+			longest = opening.length
+		})
+		if (hangsOff !== undefined) parents.set(at, hangsOff)
+	})
+	return parents
 }
 
 // What tells two citations apart: the page each names, as written. Only the case
@@ -87,17 +204,65 @@ const mergeCitations = (kept: unknown, added: unknown): unknown => {
 	return extra.length === 0 ? kept : [...kept, ...extra]
 }
 
+// Whether a place is one of those already named, allowing for one of the two being
+// written at more detail — "Lyon" beside "Lyon, Rhône" is one town said twice, and
+// listing both would invent a branch the company has not got. Every word of one has
+// to appear in the other, rather than one address merely reading inside the other:
+// "Roa" sits inside "Roanne" letter for letter, and those are two towns.
+const alreadyNamed = (places: string, place: string): boolean => {
+	const words = foldTokens(place)
+	return places.split(';').some(named => {
+		const already = foldTokens(named)
+		// One of the two comes apart into no words at all — a place written in a
+		// script this folding drops, like "東京". Fall back to the text as written, so
+		// a place the code cannot read is added rather than quietly lost: a town
+		// stated twice is a small harm beside a town the run found and threw away.
+		if (words.length === 0 || already.length === 0)
+			return named.trim().toLowerCase() === place.trim().toLowerCase()
+		return (
+			already.every(word => words.includes(word)) ||
+			words.every(word => already.includes(word))
+		)
+	})
+}
+
+// The places already named, plus one more when it is not among them. When a fold puts
+// a company's branches onto the row that stays, each branch states the only place it
+// has, and keeping whichever arrived first would drop the rest with nothing said.
+// Semicolons separate them because a single place is written with commas in it
+// already ("Alcobendas, Madrid"), and joining on those would read as one long address.
+const alsoAt = (places: unknown, added: string): string => {
+	const held = typeof places === 'string' ? places : ''
+	const place = added.trim()
+	if (place === '') return held
+	if (held.trim() === '') return place
+	return alreadyNamed(held, place) ? held : `${held}; ${place}`
+}
+
 // Fold a later meeting of the same company into the row that stays: fields it never
 // filled get filled, and the pages behind the later row are added to its own.
+//
+// `alsoElsewhere` says this fold is a branch joining its company rather than one
+// company met twice. It is the only case where the later row speaks about somewhere
+// else, so it is the only one whose place is added to what the row already names
+// instead of filling a gap and nothing more.
 const foldInto = (
 	kept: Record<string, unknown>,
 	later: Record<string, unknown>,
+	alsoElsewhere: boolean,
 ): Record<string, unknown> => {
 	const merged: Record<string, unknown> = { ...kept }
 	for (const [field, value] of Object.entries(later)) {
 		if (value === undefined || value === null) continue
 		if (field === 'citations') {
 			merged['citations'] = mergeCitations(kept['citations'], value)
+			continue
+		}
+		if (field === 'location' && alsoElsewhere && typeof value === 'string') {
+			// A row that names nowhere leaves the field as it found it, rather than
+			// putting an empty reading where there was no field at all.
+			const places = alsoAt(merged['location'], value)
+			if (places !== '') merged['location'] = places
 			continue
 		}
 		const held = merged[field]
@@ -159,8 +324,26 @@ export const dedupeDiscoveryRows = (
 				else sameCompany(seen, at)
 			}
 		})
+		const parentOfBranch = branchOfficeParents(rows)
+		for (const [branch, parent] of parentOfBranch) sameCompany(parent, branch)
 
-		// One row per company, in the order the list first met it.
+		// The company a branch belongs to, following the chain up when a branch hangs
+		// off a branch. Every step shortens the name, so this always comes to a stop.
+		const companyItself = (at: number): number => {
+			let row = at
+			let parent = parentOfBranch.get(row)
+			while (parent !== undefined) {
+				row = parent
+				parent = parentOfBranch.get(row)
+			}
+			return row
+		}
+
+		// One row per company, in the order the list first met it — under the company's
+		// own name, even where the list met one of its branches first. A reader given
+		// "Terre Solaire – agence Lyon" for a company working from five towns has been
+		// told the wrong thing about it, and which row a search happened to rank first
+		// is no reason to say it.
 		const keptAt = new Map<number, number>()
 		const kept: Array<unknown> = []
 		rows.forEach((row, at) => {
@@ -172,11 +355,24 @@ export const dedupeDiscoveryRows = (
 			const index = keptAt.get(company)
 			if (index === undefined) {
 				keptAt.set(company, kept.length)
-				kept.push(row)
+				const headOffice = rows[companyItself(at)]
+				const headOfficeName = isPlainObject(headOffice)
+					? headOffice['name']
+					: undefined
+				kept.push(
+					typeof headOfficeName === 'string' && headOfficeName !== row['name']
+						? { ...row, name: headOfficeName }
+						: row,
+				)
 				return
 			}
+			// This row speaks about somewhere else than the one it is joining when it is
+			// a branch, or when it is the company itself arriving after one of its
+			// branches took the place that stays. Another reading of the same branch is
+			// neither, and its place fills a gap like any other field.
 			const held = kept[index]
-			kept[index] = isPlainObject(held) ? foldInto(held, row) : row
+			const elsewhere = parentOfBranch.has(at) || companyItself(company) === at
+			kept[index] = isPlainObject(held) ? foldInto(held, row, elsewhere) : row
 			merged++
 		})
 		return kept

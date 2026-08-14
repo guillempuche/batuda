@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { dedupeDiscoveryRows } from './prospect-dedupe-guard'
+import {
+	branchOfficeParents,
+	dedupeDiscoveryRows,
+} from './prospect-dedupe-guard'
 
 const scan = (
 	prospects: ReadonlyArray<Record<string, unknown>>,
@@ -256,6 +259,262 @@ describe('dedupeDiscoveryRows', () => {
 		})
 	})
 
+	describe('when a company arrives again for each of its branch offices', () => {
+		it('should fold a market list down to the company the branches belong to', () => {
+			// GIVEN the rows a French market search came back with: the company once
+			// with its site, and four branch offices carrying only their town
+			const findings = scan([
+				{
+					name: 'Terre Solaire',
+					website: 'https://terresolaire.com/',
+					why_relevant: 'Solar installer.',
+				},
+				{ name: 'Terre Solaire – agence Douains', location: 'Douains' },
+				{ name: 'Terre Solaire – agence Longueau', location: 'Longueau' },
+				{ name: 'Terre Solaire – agence Lyon', location: 'Lyon' },
+				{ name: 'Terre Solaire – agence Montpellier', location: 'Montpellier' },
+			])
+
+			// WHEN de-duplicated
+			// THEN one company comes back, under its own name
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(rowsOf(result.findings)).toHaveLength(1)
+			expect(rowsOf(result.findings)[0]?.['name']).toBe('Terre Solaire')
+			expect(result.merged).toBe(4)
+		})
+
+		it('should keep every town the branches work from', () => {
+			// GIVEN a company stating no place of its own and three branches that each
+			// state the only one they have
+			const findings = scan([
+				{ name: 'Terre Solaire', website: 'https://terresolaire.com/' },
+				{ name: 'Terre Solaire – agence Douains', location: 'Douains' },
+				{ name: 'Terre Solaire – agence Lyon', location: 'Lyon' },
+				{ name: 'Terre Solaire – agence Montpellier', location: 'Montpellier' },
+			])
+
+			// WHEN de-duplicated
+			// THEN all three towns survive on the row that stays — taking whichever
+			// arrived first would drop the other two with nothing said
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(rowsOf(result.findings)[0]?.['location']).toBe(
+				'Douains; Lyon; Montpellier',
+			)
+		})
+
+		it('should name a town once when two branches share it', () => {
+			// GIVEN two branches of one company sitting in the same town
+			const findings = scan([
+				{ name: 'Terre Solaire', website: 'https://terresolaire.com/' },
+				{ name: 'Terre Solaire – agence Lyon', location: 'Lyon' },
+				{ name: 'Terre Solaire – bureau Lyon', location: 'Lyon' },
+			])
+
+			// WHEN de-duplicated — THEN the town is stated once, not twice
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(rowsOf(result.findings)[0]?.['location']).toBe('Lyon')
+		})
+
+		it('should report the company under its own name when a branch arrived first', () => {
+			// GIVEN a list that ranked a branch page above the company's own
+			const findings = scan([
+				{ name: 'Terre Solaire – agence Lyon', location: 'Lyon' },
+				{
+					name: 'Terre Solaire',
+					website: 'https://terresolaire.com/',
+					why_relevant: 'Solar installer.',
+				},
+			])
+
+			// WHEN de-duplicated
+			// THEN the reader is told the company's name, not one branch's. Which row a
+			// search happened to rank first is no reason to call it something else
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(rowsOf(result.findings)).toHaveLength(1)
+			expect(rowsOf(result.findings)[0]).toMatchObject({
+				name: 'Terre Solaire',
+				website: 'https://terresolaire.com/',
+				location: 'Lyon',
+			})
+		})
+
+		it('should reach the same answer whatever order the branches arrive in', () => {
+			// GIVEN the same five rows with the company's own row buried in the middle
+			const findings = scan([
+				{ name: 'Terre Solaire – agence Montpellier', location: 'Montpellier' },
+				{ name: 'Terre Solaire – agence Lyon', location: 'Lyon' },
+				{ name: 'Terre Solaire', website: 'https://terresolaire.com/' },
+				{ name: 'Terre Solaire – agence Douains', location: 'Douains' },
+				{ name: 'Terre Solaire – agence Longueau', location: 'Longueau' },
+			])
+
+			// WHEN de-duplicated
+			// THEN one company under its own name, with every town still on it
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(rowsOf(result.findings)).toHaveLength(1)
+			expect(rowsOf(result.findings)[0]).toMatchObject({
+				name: 'Terre Solaire',
+				website: 'https://terresolaire.com/',
+				location: 'Montpellier; Lyon; Douains; Longueau',
+			})
+		})
+
+		it('should still fold a branch whose website field holds prose', () => {
+			// GIVEN a branch row that answered the website question in words
+			const findings = scan([
+				{ name: 'Terre Solaire', website: 'https://terresolaire.com/' },
+				{
+					name: 'Terre Solaire – agence Lyon',
+					website: 'not provided',
+					location: 'Lyon',
+				},
+			])
+
+			// WHEN de-duplicated — THEN no address can be read from it, so it is still a
+			// row with no site of its own
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(rowsOf(result.findings)).toHaveLength(1)
+		})
+
+		it('should keep a branch that claims a site of its own', () => {
+			// GIVEN a row that names a second host
+			const findings = scan([
+				{ name: 'Terre Solaire', website: 'https://terresolaire.com/' },
+				{
+					name: 'Terre Solaire – agence Lyon',
+					website: 'https://terresolaire-lyon.fr',
+					location: 'Lyon',
+				},
+			])
+
+			// WHEN de-duplicated
+			// THEN both stay: a row claiming its own web presence is claiming to be
+			// somebody, and two hosts are the strongest evidence of two of them
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(rowsOf(result.findings)).toHaveLength(2)
+		})
+
+		it("should keep the head office's own town beside its branches", () => {
+			// GIVEN a branch met first and the company itself, each stating its own town
+			const findings = scan([
+				{ name: 'Terre Solaire – agence Lyon', location: 'Lyon' },
+				{
+					name: 'Terre Solaire',
+					website: 'https://terresolaire.com/',
+					location: 'Paris',
+				},
+			])
+
+			// WHEN de-duplicated — THEN both towns are named, whichever arrived first
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(rowsOf(result.findings)[0]?.['location']).toBe('Lyon; Paris')
+		})
+
+		it("should not add a second reading of the same branch's town", () => {
+			// GIVEN a branch, its company, and the branch met again on the company's own
+			// site — which joins on the host rather than as a branch of its own
+			const findings = scan([
+				{ name: 'Terre Solaire – agence Lyon', location: 'Lyon' },
+				{ name: 'Terre Solaire', website: 'https://terresolaire.com/' },
+				{
+					name: 'Agence Terre Solaire Lyon',
+					website: 'https://terresolaire.com/agences/lyon',
+					location: 'Lyon, Rhône',
+				},
+			])
+
+			// WHEN de-duplicated
+			// THEN the first reading of that town stands. Only a row speaking about
+			// somewhere else adds a place; another reading of one branch is not that
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(rowsOf(result.findings)).toHaveLength(1)
+			expect(rowsOf(result.findings)[0]?.['location']).toBe('Lyon')
+		})
+
+		it('should name one town once when two branches write it at different detail', () => {
+			// GIVEN two branch rows in the same town, one naming the province too
+			const findings = scan([
+				{ name: 'Terre Solaire', website: 'https://terresolaire.com/' },
+				{ name: 'Terre Solaire – agence Lyon', location: 'Lyon' },
+				{ name: 'Terre Solaire – bureau Lyon', location: 'Lyon, Rhône' },
+			])
+
+			// WHEN de-duplicated
+			// THEN one town, not two. A place that holds one already named is the same
+			// place written at more detail, and listing both would invent a branch
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(rowsOf(result.findings)[0]?.['location']).toBe('Lyon')
+		})
+
+		it('should keep two towns whose names merely read inside one another', () => {
+			// GIVEN branches in Roa and in Roanne — two real towns, one spelled inside
+			// the other letter for letter
+			const findings = scan([
+				{ name: 'Acme Solar', website: 'https://acmesolar.fr' },
+				{ name: 'Acme Solar Roa', location: 'Roa' },
+				{ name: 'Acme Solar Roanne', location: 'Roanne' },
+			])
+
+			// WHEN de-duplicated
+			// THEN both towns are named. Places are compared word by word, so one town
+			// reading inside another is not the same town written at more detail
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(rowsOf(result.findings)[0]?.['location']).toBe('Roa; Roanne')
+		})
+
+		it('should keep a town written in a script the folding cannot read', () => {
+			// GIVEN a branch in a town spelled in Latin letters, and the company itself
+			// stating a town this code's folding comes apart into no words at all
+			const findings = scan([
+				{ name: 'Acme Solar Osaka', location: 'Osaka' },
+				{
+					name: 'Acme Solar',
+					website: 'https://acmesolar.example',
+					location: '東京',
+				},
+			])
+
+			// WHEN de-duplicated
+			// THEN the unreadable town is kept beside the readable one. A place the
+			// code cannot read is a place it must not throw away for that reason
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(rowsOf(result.findings)[0]?.['location']).toBe('Osaka; 東京')
+		})
+
+		it('should ignore a company that names nowhere when it joins its branch', () => {
+			// GIVEN a branch met first, and the company itself whose place is only spaces
+			const findings = scan([
+				{ name: 'Terre Solaire – agence Lyon', location: 'Lyon' },
+				{
+					name: 'Terre Solaire',
+					website: 'https://terresolaire.com/',
+					location: '   ',
+				},
+			])
+
+			// WHEN de-duplicated
+			// THEN the branch's town stands alone. A row naming nowhere adds nowhere,
+			// rather than a blank reading trailing the one place the run did find
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(rowsOf(result.findings)[0]?.['location']).toBe('Lyon')
+		})
+
+		it('should not join the places of two rows that are one company met twice', () => {
+			// GIVEN one company met twice, each meeting reading its place differently
+			const findings = scan([
+				{ name: 'Instalaciones Rubio SL', location: 'Vigo' },
+				{ name: 'Instalaciones Rubio', location: 'Vigo, Pontevedra' },
+			])
+
+			// WHEN de-duplicated
+			// THEN the first reading stands. Two readings of one place are not two
+			// places, and only a branch speaks about somewhere else
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(rowsOf(result.findings)).toHaveLength(1)
+			expect(rowsOf(result.findings)[0]?.['location']).toBe('Vigo')
+		})
+	})
+
 	describe('when the answer is not a list of companies', () => {
 		it('should pass a run through untouched when it has no list', () => {
 			// GIVEN a run about one named company
@@ -281,6 +540,214 @@ describe('dedupeDiscoveryRows', () => {
 			// WHEN de-duplicated — THEN they pass straight through
 			expect(dedupeDiscoveryRows(null, 'prospects').findings).toBeNull()
 			expect(dedupeDiscoveryRows('text', 'prospects').findings).toBe('text')
+		})
+	})
+})
+
+describe('branchOfficeParents', () => {
+	describe("when a row reads as another row's branch office", () => {
+		it("should read a row ending on the town it gives as that company's branch", () => {
+			// GIVEN a company and a row named after it plus the town that row sits in
+			const rows = [
+				{ name: 'Terre Solaire', website: 'https://terresolaire.com/' },
+				{ name: 'Terre Solaire – agence Lyon', location: 'Lyon' },
+			]
+
+			// WHEN the branches are worked out
+			// THEN the second belongs to the first — read off the shape alone, with no
+			// need to know that "agence" is French for a branch office
+			expect(branchOfficeParents(rows)).toEqual(new Map([[1, 0]]))
+		})
+
+		it('should read the legal form off both names before comparing them', () => {
+			// GIVEN a company carrying its legal form and a branch that does not
+			const rows = [
+				{ name: 'Terre Solaire SARL', website: 'https://terresolaire.com/' },
+				{ name: 'Terre Solaire – agence Lyon', location: 'Lyon' },
+			]
+
+			// WHEN the branches are worked out — THEN the form is no obstacle
+			expect(branchOfficeParents(rows)).toEqual(new Map([[1, 0]]))
+		})
+
+		it('should follow a branch that hangs off another branch', () => {
+			// GIVEN a company, a branch of it, and a sub-office of that branch
+			const rows = [
+				{ name: 'Acme Solar', website: 'https://acmesolar.fr' },
+				{ name: 'Acme Solar Lyon', location: 'Lyon' },
+				{ name: 'Acme Solar Lyon Sud', location: 'Lyon Sud' },
+			]
+
+			// WHEN the branches are worked out — THEN each hangs off the one above it
+			expect(branchOfficeParents(rows)).toEqual(
+				new Map([
+					[1, 0],
+					[2, 1],
+				]),
+			)
+		})
+
+		it('should hang a branch off the longest name it could hang off', () => {
+			// GIVEN two companies whose names open the same way, and a branch of the
+			// longer one
+			const rows = [
+				{ name: 'Acme', website: 'https://acme.fr' },
+				{ name: 'Acme Solar', website: 'https://acmesolar.fr' },
+				{ name: 'Acme Solar Lyon', location: 'Lyon' },
+			]
+
+			// WHEN the branches are worked out
+			// THEN the branch belongs to "Acme Solar" alone. Letting it belong to both
+			// would drag those two companies into one through it
+			expect(branchOfficeParents(rows)).toEqual(new Map([[2, 1]]))
+		})
+	})
+
+	describe('when two rows merely open with the same word', () => {
+		it('should keep two different companies whose names share an opening word', () => {
+			// GIVEN one company and a genuinely different one whose name starts with it
+			const rows = [
+				{ name: 'Terre Solaire', website: 'https://terresolaire.com/' },
+				{ name: 'Terre Solaire Energie', location: 'Lyon' },
+			]
+
+			// WHEN the branches are worked out
+			// THEN neither belongs to the other. "One name starts the other" is not
+			// enough on its own — "Energie" is not where anybody is
+			expect(branchOfficeParents(rows)).toEqual(new Map())
+		})
+
+		it('should keep them separate through the fold as well', () => {
+			// GIVEN those same two companies going through the whole de-duplication
+			const findings = scan([
+				{ name: 'Terre Solaire', website: 'https://terresolaire.com/' },
+				{ name: 'Terre Solaire Energie', location: 'Lyon' },
+			])
+
+			// WHEN de-duplicated — THEN two companies come back, as they should
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(rowsOf(result.findings)).toHaveLength(2)
+			expect(result.merged).toBe(0)
+		})
+
+		it('should compare whole words rather than letters', () => {
+			// GIVEN a name that starts with the other's letters but not its words
+			const rows = [
+				{ name: 'Terre Solaire', website: 'https://terresolaire.com/' },
+				{ name: 'Terres Solaires Lyon', location: 'Lyon' },
+			]
+
+			// WHEN the branches are worked out
+			// THEN no branch: "terresolaire" opening "terressolaireslyon" is a trick of
+			// the spelling, and these are two companies
+			expect(branchOfficeParents(rows)).toEqual(new Map())
+		})
+
+		it('should not take a joiner the place happens to share for the town', () => {
+			// GIVEN a row whose trailing words hold "del", which its place holds too
+			const rows = [
+				{ name: 'Acme Servicios', website: 'https://acme.es' },
+				{ name: 'Acme Servicios del Norte', location: 'Puerto del Rosario' },
+			]
+
+			// WHEN the branches are worked out
+			// THEN no branch. The name has to END on the town, so a joiner sitting in
+			// the middle of both cannot pass for one
+			expect(branchOfficeParents(rows)).toEqual(new Map())
+		})
+
+		it('should pass over an anchor too short to stand for a company', () => {
+			// GIVEN a two-letter name that every longer name would open with
+			const rows = [
+				{ name: 'AB', website: 'https://ab.fr' },
+				{ name: 'AB Lyon', location: 'Lyon' },
+			]
+
+			// WHEN the branches are worked out
+			// THEN nothing hangs off it: a name that short turns up inside unrelated
+			// ones by coincidence, so it anchors nobody
+			expect(branchOfficeParents(rows)).toEqual(new Map())
+		})
+	})
+
+	describe('when a row cannot be read as a branch at all', () => {
+		it('should leave a row that states no place', () => {
+			// GIVEN a longer name with nothing saying where it is
+			const rows = [
+				{ name: 'Terre Solaire', website: 'https://terresolaire.com/' },
+				{ name: 'Terre Solaire agence Lyon' },
+			]
+
+			// WHEN the branches are worked out
+			// THEN no branch: the town is what the row has to tell us before its own
+			// name can be checked against it
+			expect(branchOfficeParents(rows)).toEqual(new Map())
+		})
+
+		it('should leave a row whose place is not written as text', () => {
+			// GIVEN a place that arrived as something other than a string
+			const rows = [
+				{ name: 'Terre Solaire', website: 'https://terresolaire.com/' },
+				{ name: 'Terre Solaire agence Lyon', location: { city: 'Lyon' } },
+			]
+
+			// WHEN the branches are worked out — THEN there is no town to read
+			expect(branchOfficeParents(rows)).toEqual(new Map())
+		})
+
+		it('should leave a row whose name is nothing a word can be read from', () => {
+			// GIVEN a name of pure punctuation
+			const rows = [
+				{ name: 'Terre Solaire', website: 'https://terresolaire.com/' },
+				{ name: '– —', location: 'Lyon' },
+			]
+
+			// WHEN the branches are worked out — THEN it hangs off nobody
+			expect(branchOfficeParents(rows)).toEqual(new Map())
+		})
+
+		it("should leave a row that is no company's name and then some", () => {
+			// GIVEN a row named after its town alone, with no company above it
+			const rows = [
+				{ name: 'Terre Solaire', website: 'https://terresolaire.com/' },
+				{ name: 'Solaire Lyon', location: 'Lyon' },
+			]
+
+			// WHEN the branches are worked out — THEN there is nothing to hang it off
+			expect(branchOfficeParents(rows)).toEqual(new Map())
+		})
+
+		it('should leave two rows carrying exactly the same name', () => {
+			// GIVEN one name twice, the second stating the town it ends on
+			const rows = [
+				{ name: 'Acme Lyon', website: 'https://acme.fr' },
+				{ name: 'Acme Lyon', location: 'Lyon' },
+			]
+
+			// WHEN the branches are worked out
+			// THEN neither is the other's branch — they are the same name, which the
+			// name key already folds
+			expect(branchOfficeParents(rows)).toEqual(new Map())
+		})
+
+		it('should leave list entries that are not rows alone', () => {
+			// GIVEN a list holding a null and a row with no name
+			const rows = [
+				null,
+				{ website: 'https://terresolaire.com/' },
+				{ name: 'Terre Solaire', website: 'https://terresolaire.com/' },
+				{ name: 'Terre Solaire agence Lyon', location: 'Lyon' },
+			]
+
+			// WHEN the branches are worked out
+			// THEN only the real rows are read, and the branch still finds its company
+			expect(branchOfficeParents(rows)).toEqual(new Map([[3, 2]]))
+		})
+
+		it('should find no branches in an empty list', () => {
+			// GIVEN nothing to read
+			// WHEN the branches are worked out — THEN there are none
+			expect(branchOfficeParents([])).toEqual(new Map())
 		})
 	})
 })

@@ -587,6 +587,102 @@ describe('mergePerFieldSearch', () => {
 			expect(merged.added).toBe(1)
 		})
 
+		it('should fold a branch office the round found onto the company listed', () => {
+			// GIVEN a company on the list, and a second look that names one of its
+			// branch offices — its name and then the town the branch sits in, with no
+			// site of its own
+			const findings = {
+				prospects: [
+					{ name: 'Terre Solaire', website: 'https://terresolaire.test' },
+				],
+			}
+			const refreshed = {
+				prospects: [
+					{ name: 'Terre Solaire – agence Nantes', location: 'Nantes' },
+				],
+			}
+			// WHEN merged
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const rows = prospectsOf(merged.findings)
+			// THEN one company, keeping the town the branch brought. The fold that runs
+			// before these rounds cannot see a company found after it, so a round that
+			// leaves a branch standing puts the duplicate straight into the answer
+			expect(rows.map(row => row['name'])).toEqual(['Terre Solaire'])
+			expect(rows[0]?.['location']).toBe('Nantes')
+			expect(merged.added).toBe(0)
+		})
+
+		it('should fold a company the round gave the site of one already listed', () => {
+			// GIVEN a company with its site, and a round that names it again under a
+			// different name and hands it the same site — the shape a live run returned
+			// as two rows both on aeroxsense.com
+			const findings = {
+				prospects: [{ name: 'AeroXsense', website: 'https://www.aero.test/' }],
+			}
+			const refreshed = {
+				prospects: [
+					{ name: 'AeroXsense (Fire Safety)', website: 'https://aero.test/' },
+				],
+			}
+			// WHEN merged
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const rows = prospectsOf(merged.findings)
+			// THEN the shared host settles it here too. A row appended by a round is
+			// never put in front of the fold again unless this step folds it
+			expect(rows).toHaveLength(1)
+			expect(merged.added).toBe(0)
+		})
+
+		it('should still count a genuinely new company as one the list gained', () => {
+			// GIVEN a round that names a company sharing an opening word with a listed
+			// one, in a town its name does not end on
+			const findings = {
+				prospects: [
+					{ name: 'Terre Solaire', website: 'https://terresolaire.test' },
+				],
+			}
+			const refreshed = {
+				prospects: [{ name: 'Terre Solaire Energie', location: 'Nantes' }],
+			}
+			// WHEN merged
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const rows = prospectsOf(merged.findings)
+			// THEN both are listed and the round is credited with the find — sharing an
+			// opening word is not being somebody's branch
+			expect(rows.map(row => row['name'])).toEqual([
+				'Terre Solaire',
+				'Terre Solaire Energie',
+			])
+			expect(merged.added).toBe(1)
+		})
+
+		it('should still credit a find when the round also joins two already listed', () => {
+			// GIVEN two rows that are one company nobody could yet tell apart — one
+			// carrying the site, the other only the name
+			const findings = {
+				prospects: [
+					{ name: 'Acme' },
+					{ name: 'Acme Group', website: 'https://acme.test' },
+				],
+			}
+			// AND a round that hands the first row that same site, which shows the two
+			// were always one, and names a company nobody had
+			const refreshed = {
+				prospects: [
+					{ name: 'Acme', website: 'https://acme.test' },
+					{ name: 'Delta Systems', website: 'https://delta.test' },
+				],
+			}
+			// WHEN merged
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const rows = prospectsOf(merged.findings)
+			// THEN the list holds the one company and the new one, and the round is
+			// credited with the find. Counting the length instead would read nothing
+			// gained — two rows in, two rows out — and stop the rounds a round early
+			expect(rows).toHaveLength(2)
+			expect(merged.added).toBe(1)
+		})
+
 		it('should append a company the second look names twice only once', () => {
 			// GIVEN a re-extraction that names the same NEW company in two rows
 			const findings = { prospects: [{ name: 'Zeta' }] }
