@@ -27,16 +27,9 @@
  * is already gone by the time a host counts as evidence two rows are one company.
  */
 
-import { collapse, nameCore } from './entity-guard'
+import { collapse, nameCore, withoutFormDots } from './entity-guard'
 import { isPlainObject } from './guard-shapes'
 import { hostOf, isBareWebAddress } from './source-key'
-
-// A legal form written with dots — "Muñoz S.L." — comes apart into single letters
-// that read as two more words of the name, so "Muñoz SL" and "Muñoz S.L." end up
-// under different keys. Taking the dots out first puts the form back together. Two
-// Spanish rows spelling the form differently is the ordinary case here, not an
-// exotic one.
-const withoutFormDots = (name: string): string => name.replace(/\./g, '')
 
 /**
  * What a row is filed under: its name with the legal form off the end, and the host

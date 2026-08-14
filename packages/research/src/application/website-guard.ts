@@ -12,7 +12,7 @@
  *
  * The rule blanks a website only when it is clearly not the company's own:
  *  - the value is not a web address at all, or
- *  - its host is a directory we already know (a short, evidence-driven list), or
+ *  - its host is one this run watched file several of its own companies, or
  *  - its host does not carry the company's name AND the name sits in a deeper part
  *    of the address — the shape of "someone-else.com/company/<the-company>", which
  *    is a listing, never a company's own home page, or
@@ -22,43 +22,26 @@
  * describes itself in the first path segment ("xpo.com/about-xpo-logistics"), and a
  * blank costs a real website, so the bar to blank is deliberately high.
  *
- * All but the last rule read only a name and a website, so they need no evidence
- * corpus and no database. They fire on any object carrying both — a scanned
- * competitor or prospect — and on the run's own answer for the target's website,
- * which arrives on its own with no name beside it and so is judged against the
- * target's name passed in. The last rule is the only one that asks about the whole
- * answer rather than one row, which is why the walk below is preceded by a reading
- * pass that gathers who claims which host.
+ * The address rule and the deeper-path rule read only a name and a website, so they
+ * need no evidence corpus and no database. They fire on any object carrying both —
+ * a scanned competitor or prospect — and on the run's own answer for the target's
+ * website, which arrives on its own with no name beside it and so is judged against
+ * the target's name passed in. The shared-host rule asks about the whole answer
+ * rather than one row, which is why the walk below is preceded by a reading pass
+ * that gathers who claims which host; the directory rule asks about the whole RUN,
+ * and is handed its answer from outside (see `directory-sites.ts`).
  */
 
-import { collapse, nameWithoutForms } from './entity-guard'
+import { type DirectorySites, siteVerdict } from './directory-sites'
+import {
+	collapse,
+	DISTINCTIVE_NAME_LENGTH,
+	nameWithoutForms,
+} from './entity-guard'
 import { isPlainObject } from './guard-shapes'
 import { hostOf, isBareWebAddress } from './source-key'
 
-// Directories whose company-profile pages a model most often mistakes for a
-// company's own site. This is a shortcut, not the defence: an unlisted directory
-// is still caught by the name-in-a-deeper-path rule below, so adding a host here
-// only makes the common cases cheaper — it is never the thing standing between a
-// listing and the CRM.
-const AGGREGATOR_HOSTS = new Set([
-	'cbinsights.com',
-	'crunchbase.com',
-	'zoominfo.com',
-	'owler.com',
-	'dnb.com',
-	'dun-bradstreet.com',
-	'pitchbook.com',
-	'datanyze.com',
-])
-
 const SKIP_KEYS = new Set(['citations', 'proposed_updates'])
-
-// The site sits on a known directory's host, or a subdomain of one
-// ("research.owler.com").
-const isAggregatorHost = (host: string): boolean =>
-	[...AGGREGATOR_HOSTS].some(
-		aggregator => host === aggregator || host.endsWith(`.${aggregator}`),
-	)
 
 // The parts of the address after the host — ["company", "redwood-logistics"] from
 // "cbinsights.com/company/redwood-logistics". A scheme is added when missing, since
@@ -108,16 +91,11 @@ const collectHostClaims = (findings: unknown): HostClaims => {
 	return claims
 }
 
-// The shortest name that can vouch for a host on its own. Two or three letters
-// turn up inside an unrelated address by coincidence — "it" sits inside
-// "digital.es" — and one company vouching for a host is what stands the
-// shared-host rule down for every row on it, so a coincidence there would quietly
-// switch the rule off. Four matches the bar the entity checks already set for a
-// word distinctive enough to go on.
-const VOUCHING_NAME_LENGTH = 4
-
+// One company vouching for a host stands the shared-host rule down for every row
+// on it, so a name too short to mean anything would quietly switch the rule off.
 const hostBelongsTo = (host: string, claimant: string): boolean =>
-	claimant.length >= VOUCHING_NAME_LENGTH && collapse(host).includes(claimant)
+	claimant.length >= DISTINCTIVE_NAME_LENGTH &&
+	collapse(host).includes(claimant)
 
 type WebsiteVerdict =
 	| 'keep'
@@ -131,6 +109,7 @@ const classifyWebsite = (
 	name: string,
 	website: string,
 	hostClaims: HostClaims,
+	directorySites: DirectorySites,
 ): WebsiteVerdict => {
 	const host = hostOf(website)
 	// Not an address at all: a value with words written next to it ("https://acme.es
@@ -138,7 +117,10 @@ const classifyWebsite = (
 	// holding prose is worse than an empty one — nobody can open it, and it reads as
 	// a real site to everything downstream.
 	if (host === null || !isBareWebAddress(website)) return 'not_an_address'
-	if (isAggregatorHost(host)) return 'directory'
+	// A host this run watched file several of its own companies. Any other host is
+	// `unknown`, which is no reason to blank a website and no clearance either — the
+	// rules below still have their say.
+	if (siteVerdict(host, directorySites) === 'directory') return 'directory'
 	// The name as an address would write it: a directory files a company under its
 	// trading name and leaves the legal form out, so the form is taken out here
 	// too, wherever in the name it sits. This asks whether the address names the
@@ -186,7 +168,7 @@ export interface WebsiteGuardResult {
 	readonly findings: unknown
 	/** Websites blanked because the value was not a web address. */
 	readonly blankedNotAnAddress: number
-	/** Websites blanked because their host is a known directory. */
+	/** Websites blanked because their host was watched filing several companies. */
 	readonly blankedDirectory: number
 	/** Websites blanked because the name sat in a deeper path of another host. */
 	readonly blankedProfilePage: number
@@ -199,12 +181,18 @@ export interface WebsiteGuardResult {
  * run's own answer for it rather than a scanned stranger's. That field sits alone —
  * a value with the page it came from and no company name beside it — so without the
  * name told from outside, the two name-based rules have nothing to compare and only
- * the known-directory rule can fire. Leave it out and that is exactly what happens,
- * which is still the check this guard exists for.
+ * the address rule and the directory rule are left. Pass it: a run about one named
+ * company observes no directories either, since telling one takes a list of
+ * companies to watch a host file, and such a run has one company.
+ *
+ * `directorySites` are the hosts the run itself watched behave like a listing. It
+ * defaults to none, which costs only that rule: a run that gathered nothing to
+ * watch still gets every rule that reads a name and an address.
  */
 export const guardCompanyWebsites = (
 	findings: unknown,
 	targetName?: string,
+	directorySites: DirectorySites = new Set(),
 ): WebsiteGuardResult => {
 	let blankedNotAnAddress = 0
 	let blankedDirectory = 0
@@ -240,6 +228,7 @@ export const guardCompanyWebsites = (
 				targetName ?? '',
 				value['value'],
 				hostClaims,
+				directorySites,
 			)
 			if (verdict !== 'keep') {
 				count(verdict)
@@ -253,7 +242,7 @@ export const guardCompanyWebsites = (
 		const name = value['name']
 		const website = value['website']
 		if (typeof name === 'string' && typeof website === 'string') {
-			const verdict = classifyWebsite(name, website, hostClaims)
+			const verdict = classifyWebsite(name, website, hostClaims, directorySites)
 			if (verdict !== 'keep') {
 				count(verdict)
 				// Drop the key entirely, so the value reads as one the model never
