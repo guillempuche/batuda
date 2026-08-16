@@ -437,7 +437,7 @@ Research owns a small set of tables, created together in the `research` migratio
 
 ### Quality — the eval harness
 
-A CLI eval measures the pipeline against a fixed golden set of companies whose correct answers are known, so a change to grounding or extraction shows up as a number rather than a guess. It reports grounding accuracy (did the run reach the target company's own site, or confirm it in a registry?), field precision and recall, titled-contact recall (did it find the company's decision-makers?), and the wrong-company and empty rates — the look-alike failure the harness exists to catch. It runs on demand from the CLI, never in production, and can export each run's scores to the observability board.
+A CLI eval measures the pipeline against a fixed golden set of companies whose correct answers are known, so a change to grounding or extraction shows up as a number rather than a guess. It reports grounding accuracy (did the run reach the target company's own site, or confirm it in a registry?), field precision and recall, titled-contact recall (did it find the company's decision-makers?), and the wrong-company and empty rates — the look-alike failure the harness exists to catch. It runs on demand from the CLI, never in production, and can export each run's scores to the observability board. What it holds still and what it lets change, how to run a pass, what each number means, and what a pass cannot tell you are all in [eval/README.md](../eval/README.md).
 
 ### Observability
 
