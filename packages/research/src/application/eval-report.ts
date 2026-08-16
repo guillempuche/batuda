@@ -239,6 +239,11 @@ export const evalSpanAttributes = (
 		if (market.rowsReturned > 0) {
 			attributes['eval.organisation_kind_precision'] =
 				market.rowsRightKind / market.rowsReturned
+			// Which method settled each row, so a chart can tell a pass the model
+			// answered for from one where it faltered and the figure fell back.
+			attributes['eval.rows_judged'] = market.rowsJudged
+			attributes['eval.rows_golden_listed'] = market.rowsGoldenListed
+			attributes['eval.rows_unjudged'] = market.rowsUnjudged
 			attributes['eval.duplicate_rate'] =
 				market.rowsDuplicated / market.rowsReturned
 			attributes['eval.location_fill'] =

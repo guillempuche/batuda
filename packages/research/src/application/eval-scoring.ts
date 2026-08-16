@@ -46,6 +46,7 @@
  * are written against are in eval-scoring-types.ts.
  */
 
+import type { OrganisationKind } from './eval-organisation-kind'
 import {
 	contactNameMatches,
 	fieldMatches,
@@ -96,6 +97,10 @@ export { foldDiacritics, termTokens } from './term-match'
 export const scoreRun = (
 	expected: GoldenExpectation,
 	outcome: RunOutcome,
+	// What a model made of each returned row, in the order they came back. Decided
+	// outside because asking a model is not something a scoring function can do, and
+	// left out entirely by a pass that did not ask.
+	organisationKinds?: ReadonlyArray<OrganisationKind>,
 ): RunScore => {
 	const anchors = [
 		...(expected.officialDomain === null ? [] : [expected.officialDomain]),
@@ -221,16 +226,32 @@ export const scoreRun = (
 	// empties a market — and with one run per market, throw away the whole market
 	// with it.
 	const expectedMarket = expected.market
+	// What each row is, and what settled it. Without a judge this is the reading the
+	// figure has always had: the golden file's list decides, and everything else is
+	// taken to be a company.
+	const kinds: ReadonlyArray<OrganisationKind> =
+		organisationKinds ??
+		outcome.companies.map(row => {
+			const listed =
+				expectedMarket !== undefined &&
+				isKnownNonCompany(row.name, expectedMarket.notCompanies)
+			return {
+				isCompany: !listed,
+				method: listed ? ('golden-listed' as const) : ('unjudged' as const),
+			}
+		})
 	const rightKindRows = outcome.companies.filter(
-		row =>
-			expectedMarket === undefined ||
-			!isKnownNonCompany(row.name, expectedMarket.notCompanies),
+		(_, index) => kinds[index]?.isCompany ?? true,
 	)
 	const market: MarketScore | undefined =
 		expectedMarket === undefined || !endedWithAnAnswer(outcome.status)
 			? undefined
 			: {
 					name: expectedMarket.name,
+					rowsGoldenListed: kinds.filter(k => k.method === 'golden-listed')
+						.length,
+					rowsJudged: kinds.filter(k => k.method === 'judged').length,
+					rowsUnjudged: kinds.filter(k => k.method === 'unjudged').length,
 					rowsReturned: outcome.companies.length,
 					rowsConfirmed: outcome.companies.filter(row => row.confirmed).length,
 					rowsRightKind: rightKindRows.length,
@@ -286,6 +307,8 @@ export const summarizeScores = (
 			contactRecall: null,
 			organisationKindPrecision: null,
 			confirmationRate: null,
+			rowsJudgedShare: null,
+			rowsGoldenListedShare: null,
 			requestCoverage: null,
 			duplicateRate: null,
 			locationFill: null,
@@ -338,6 +361,8 @@ export const summarizeScores = (
 	let totalRowsReturned = 0
 	let totalRowsRightKind = 0
 	let totalRowsConfirmed = 0
+	let totalRowsJudged = 0
+	let totalRowsGoldenListed = 0
 	let totalRowsLocated = 0
 	let totalRowsDuplicated = 0
 	let totalPartsExpected = 0
@@ -379,6 +404,8 @@ export const summarizeScores = (
 			totalRowsReturned += score.market.rowsReturned
 			totalRowsRightKind += score.market.rowsRightKind
 			totalRowsConfirmed += score.market.rowsConfirmed
+			totalRowsJudged += score.market.rowsJudged
+			totalRowsGoldenListed += score.market.rowsGoldenListed
 			totalRowsLocated += score.market.rowsLocated
 			totalRowsDuplicated += score.market.rowsDuplicated
 			totalPartsExpected += score.market.partsExpected
@@ -438,6 +465,8 @@ export const summarizeScores = (
 				: totalContactsFound / totalContactsExpected,
 		organisationKindPrecision: perRow(totalRowsRightKind),
 		confirmationRate: perRow(totalRowsConfirmed),
+		rowsJudgedShare: perRow(totalRowsJudged),
+		rowsGoldenListedShare: perRow(totalRowsGoldenListed),
 		requestCoverage:
 			totalPartsExpected === 0 ? null : totalPartsAnswered / totalPartsExpected,
 		duplicateRate: perRow(totalRowsDuplicated),

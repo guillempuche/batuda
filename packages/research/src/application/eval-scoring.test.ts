@@ -1149,6 +1149,9 @@ describe('scoring a run that answered for a whole market', () => {
 			// answered — the answer, rather than the absence of one
 			expect(score.market).toEqual({
 				name: 'ES',
+				rowsGoldenListed: 0,
+				rowsJudged: 0,
+				rowsUnjudged: 0,
 				rowsReturned: 0,
 				rowsRightKind: 0,
 				rowsConfirmed: 0,
@@ -1198,6 +1201,8 @@ describe('summarizeScores', () => {
 				fieldRecall: null,
 				contactRecall: null,
 				organisationKindPrecision: null,
+				rowsJudgedShare: null,
+				rowsGoldenListedShare: null,
 				requestCoverage: null,
 				duplicateRate: null,
 				locationFill: null,
@@ -1477,6 +1482,9 @@ describe('summarizing a pass that held market requests', () => {
 			...alsoOnScore,
 			market: {
 				name: 'ES',
+				rowsGoldenListed: 0,
+				rowsJudged: 0,
+				rowsUnjudged: 0,
 				rowsReturned: 10,
 				rowsRightKind: 10,
 				rowsConfirmed: 0,
@@ -1552,6 +1560,9 @@ describe('summarizing a pass that held market requests', () => {
 			const summary = summarizeScores([
 				marketScore({
 					name: 'ES',
+					rowsGoldenListed: 0,
+					rowsJudged: 0,
+					rowsUnjudged: 0,
 					rowsReturned: 60,
 					rowsRightKind: 30,
 					rowsLocated: 15,
@@ -1559,6 +1570,9 @@ describe('summarizing a pass that held market requests', () => {
 				}),
 				marketScore({
 					name: 'FR',
+					rowsGoldenListed: 0,
+					rowsJudged: 0,
+					rowsUnjudged: 0,
 					rowsReturned: 6,
 					rowsRightKind: 6,
 					rowsLocated: 6,

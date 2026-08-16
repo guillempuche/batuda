@@ -29,15 +29,20 @@ import {
 	contactEvalSpanAttributes,
 	contactEvalSummaryAttributes,
 	type EvalSummary,
+	ExtractLanguageModel,
 	evalSpanAttributes,
 	evalSummaryAttributes,
 	type FramingOutcome,
 	type GoldenExpectation,
+	judgeOrganisationKinds,
+	type KindCandidate,
 	type MarketExpectation,
 	type MarketScore,
 	type ModelProbeResult,
 	makeResearchLlmLive,
 	makeResearchProvidersLive,
+	OrganisationKindVerdictsSchema,
+	organisationKindPrompt,
 	outcomeFromContactRun,
 	outcomeFromRun,
 	ProviderError,
@@ -233,7 +238,10 @@ const noopContactDiscovery = Layer.succeed(ContactDiscovery)({
 // integration test does, but with the LIVE llm + provider layers (from research
 // env) rather than stubs — because measuring quality is the whole point.
 const researchLive = ResearchService.layer.pipe(
-	Layer.provide(makeResearchLlmLive),
+	// Merged rather than only provided, so the eval itself can reach the extract
+	// tier — it asks the model what kind of organisation each row of a market list
+	// is, which is a question the scoring cannot answer on its own.
+	Layer.provideMerge(makeResearchLlmLive),
 	Layer.provide(makeResearchProvidersLive),
 	Layer.provide(noopContactDiscovery),
 	Layer.provide(noopEventSink),
@@ -401,7 +409,38 @@ const driveOne = (
 			fetchedUrls: sourceRows.map(row => row.url),
 			...(run ? { usage: usageOf(run) } : {}),
 		})
-		return scoreRun(golden, outcome)
+		// Only a market request comes back with a list to judge; a company profile has
+		// no rows, so nothing is asked and nothing is spent.
+		const kinds =
+			golden.market === undefined || outcome.companies.length === 0
+				? undefined
+				: yield* judgeOrganisationKinds(
+						outcome.companies.map(row => ({
+							name: row.name,
+							describedAs: row.describedAs,
+						})),
+						golden.market.notCompanies,
+						askExtractTierForKinds,
+					)
+		return scoreRun(golden, outcome, kinds)
+	})
+
+/**
+ * Puts a market list's rows to the extract tier, which is the cheap one and enough
+ * for a question a row answers about itself.
+ *
+ * The wording is this file's own, deliberately not the one the pipeline's own check
+ * uses: an instrument that asked the question the same way as the thing it measures
+ * could never catch it being wrong.
+ */
+const askExtractTierForKinds = (rows: ReadonlyArray<KindCandidate>) =>
+	Effect.gen(function* () {
+		const extract = yield* ExtractLanguageModel
+		const response = yield* extract.generateObject({
+			schema: OrganisationKindVerdictsSchema,
+			prompt: organisationKindPrompt(rows),
+		})
+		return response.value
 	})
 
 // A market request's repeated runs, as what its list got right. Nothing a company
@@ -519,6 +558,8 @@ const formatMarketFigures = (summary: EvalSummary): ReadonlyArray<string> =>
 				`Rows per market:        ${decimal(summary.rowsPerScan)}`,
 				`  right kind:           ${pct(summary.organisationKindPrecision)}`,
 				`  confirmed:            ${pct(summary.confirmationRate)}`,
+				`    model ruled on:     ${pct(summary.rowsJudgedShare)}`,
+				`    already listed:     ${pct(summary.rowsGoldenListedShare)}`,
 				`  duplicates:           ${pct(summary.duplicateRate)}`,
 				`  with a location:      ${pct(summary.locationFill)}`,
 				`Request coverage:       ${pct(summary.requestCoverage)}`,

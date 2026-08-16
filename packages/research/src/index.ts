@@ -54,6 +54,15 @@ export {
 	type FramingComparison,
 	type FramingOutcome,
 } from './application/eval-invariance'
+export {
+	judgeOrganisationKinds,
+	type KindCandidate,
+	type KindMethod,
+	type OrganisationKind,
+	type OrganisationKindJudge,
+	OrganisationKindVerdictsSchema,
+	organisationKindPrompt,
+} from './application/eval-organisation-kind'
 export { outcomeFromRun } from './application/eval-outcome'
 export {
 	buildEvalReport,

@@ -195,6 +195,20 @@ Organisation-kind precision only counts the bodies your golden set names. A trad
 
 That limit is the point of the **`By market`** breakdown, which prints whenever the pass held a market row and is written to the `--out` report as `byMarket`. The shipped check that reads what kind of organisation a row is works off word lists in Spanish, Catalan and English: measured against fifteen European trade bodies it recognised four. So a Spanish market scores near 100% while a French or German one scores far lower, and the two averaged together hide the fact worth watching. Keep at least one market in a language that check does not read.
 
+### The model settles what a name cannot
+
+Every returned row the golden file says nothing about is put to a model, which is asked whether the row is an organisation that does the work of the trade or one that represents, regulates, supplies or lists the ones that do. That is what closes the gap above: a model reads every language a market answers in, and a body describes itself as one on its own page.
+
+Three rules keep it honest, and the printed table shows which of them settled what:
+
+- **A row the golden file names is a body whatever the model says.** A person checked that one; a model has no standing to overrule them.
+- **A model that errors, or cannot tell, leaves the row a company** — the reading the figure had before any model was involved. An outage must never read as a list full of trade bodies.
+- **Every row records which of the three decided it**, printed as `model ruled on` and `already listed` beneath the percentage. A pass where the model answered for every row and one where it fell over halfway both come out as a single percentage, and without the mix beside it the second reads as the first.
+
+**It moves two figures, not one.** Organisation-kind precision is the obvious one. Request coverage is the other: a part of the request counts as answered only when a row of the right kind answers it, so a row the model reclassifies as a trade body stops answering for its trade. Read them together after a change to the judge.
+
+The wording put to the model is the eval's own, deliberately not the one the pipeline's check uses. An instrument that asked the question exactly as the thing it measures does could never catch that thing being wrong — which is the whole reason this sits in the eval rather than reading the pipeline's verdict.
+
 ## Four kinds of row to include
 
 - **Clean companies** — a company with its fields filled in (`country`, `location`, `industry`, and `size_range` where known). These score field precision and recall.

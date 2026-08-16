@@ -249,6 +249,18 @@ export interface MarketScore {
 	/** Which market this run answered for — the key a per-market breakdown groups on. */
 	readonly name: string
 	/**
+	 * How the kind of each row was settled: named in the golden file, ruled on by a
+	 * model, or left alone because nothing decided it.
+	 *
+	 * Reported because a pass where the model faltered part way through produces one
+	 * percentage out of two different methods, and reading that as a single figure
+	 * would hide the change. A pass that asked no model is all `unjudged` bar the
+	 * rows the golden file named, which is what this figure always was.
+	 */
+	readonly rowsGoldenListed: number
+	readonly rowsJudged: number
+	readonly rowsUnjudged: number
+	/**
 	 * Rows the scan came back with. The scale the figures below read against, and
 	 * what checking that every row is a real company would cost, so it is reported
 	 * in its own right rather than only as a denominator.
@@ -403,6 +415,17 @@ export interface EvalSummary {
 	 * returning fewer rows, and only the two together say what happened.
 	 */
 	readonly confirmationRate: number | null
+	/**
+	 * How organisation-kind precision was arrived at: the share of rows a model
+	 * ruled on, and the share the golden file had already named.
+	 *
+	 * Printed beside it because the two are not the same measurement. A pass where
+	 * the model answered for every row and one where it fell over halfway both
+	 * produce a single percentage, and without these the second reads as the first.
+	 * What is neither judged nor listed was left alone, and counted as a company.
+	 */
+	readonly rowsJudgedShare: number | null
+	readonly rowsGoldenListedShare: number | null
 	readonly requestCoverage: number | null
 	readonly duplicateRate: number | null
 	readonly locationFill: number | null
