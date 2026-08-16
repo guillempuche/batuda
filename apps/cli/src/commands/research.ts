@@ -328,8 +328,12 @@ const pollToTerminal = (runId: string, maxAttempts: number) =>
 const MARKET_RUN_POLL_ATTEMPTS = 2_700
 
 // What a run answering about one company gets. A profile run finishes in minutes, so
-// a market-sized wait here only lengthens how long a wedged one holds its slot.
-const COMPANY_RUN_POLL_ATTEMPTS = 900
+// a market-sized wait here only lengthens how long a wedged one holds its slot — but
+// it still has to clear `RESEARCH_RUN_DEADLINE_SEC` for the same reason the market
+// wait does. At the old 900 it sat below that setting's twenty-minute default, so a
+// profile run that took longer than fifteen minutes was read as having found nothing
+// while it was still working, and scored as an empty result rather than a slow one.
+const COMPANY_RUN_POLL_ATTEMPTS = 1_500
 
 // Create a fresh eval run and poll it to a terminal status. A single golden
 // company never fans out, so a confirm-required result is a bug — die on it.
@@ -645,7 +649,25 @@ export const researchEval = (opts: {
 			return yield* Effect.fail(new Error('golden set has no valid rows'))
 		}
 		yield* requireMarketSchema(golden, opts.schemaName)
+
+		// One pass is cheap because it reads whatever an earlier pass left behind. A
+		// repeat cannot afford to: an answer served from the first round's cache is
+		// the first round's answer, and averaging it with itself steadies nothing. So
+		// a pass asking for repeats goes past the caches, and pays for every round.
+		const repeating = opts.runs > 1
+		const cacheSettings = ConfigProvider.layerAdd(
+			ConfigProvider.fromEnv({
+				env: repeating ? { RESEARCH_CACHE_BYPASS: 'true' } : {},
+			}),
+			{ asPrimary: true },
+		)
+
 		yield* Console.log(`Evaluating ${golden.length} companies…\n`)
+		if (repeating) {
+			yield* Console.log(
+				`Each company runs ${opts.runs} times, in ${opts.runs} rounds over the whole set, and every round asks the providers again rather than reading the last round's answer. Expect roughly ${opts.runs} times the cost and the time of a single pass.\n`,
+			)
+		}
 
 		// Tag the run's spans so a drift chart can group quality by which models
 		// produced it; the endpoint/commit ride the OTLP resource, not here.
@@ -663,39 +685,41 @@ export const researchEval = (opts: {
 
 		const scores = yield* Effect.gen(function* () {
 			const defaults = yield* systemDefaults
-			// Each company runs `runs` times: per-run grounding is noisy, so averaging
-			// several runs is what makes the reported rates trustworthy. The service
-			// caps how many execute at once, so this just stops runs waiting in line.
-			const tasks = golden.flatMap(company =>
-				Array.from({ length: opts.runs }, () => company),
-			)
-			return yield* Effect.forEach(
-				tasks,
-				company =>
-					driveOne(
-						opts.org,
-						opts.user,
-						defaults,
-						company,
-						opts.schemaName,
-						Option.getOrUndefined(opts.language),
-					).pipe(
-						Effect.tap(score =>
-							Effect.annotateCurrentSpan(evalSpanAttributes(score)),
+			// A round is one pass over every company. Repeats are rounds rather than a
+			// flat list of runs so that a company's second answer is taken after its
+			// first has finished, which is what the caches were told to step aside for.
+			const rounds = Array.from({ length: opts.runs }, (_, index) => index + 1)
+			const perRound = yield* Effect.forEach(rounds, round =>
+				Effect.forEach(
+					golden,
+					company =>
+						driveOne(
+							opts.org,
+							opts.user,
+							defaults,
+							company,
+							opts.schemaName,
+							Option.getOrUndefined(opts.language),
+						).pipe(
+							Effect.tap(score =>
+								Effect.annotateCurrentSpan(evalSpanAttributes(score)),
+							),
+							Effect.withSpan('research_eval.run', {
+								attributes: {
+									'eval.company_id': company.id,
+									'eval.query': company.query,
+									'eval.schema': opts.schemaName,
+									'eval.round': round,
+									'eval.agent_model': agentModel,
+									'eval.extract_model': extractModel,
+								},
+							}),
 						),
-						Effect.withSpan('research_eval.run', {
-							attributes: {
-								'eval.company_id': company.id,
-								'eval.query': company.query,
-								'eval.schema': opts.schemaName,
-								'eval.agent_model': agentModel,
-								'eval.extract_model': extractModel,
-							},
-						}),
-					),
-				{ concurrency: opts.concurrency },
+					{ concurrency: opts.concurrency },
+				),
 			)
-		}).pipe(Effect.provide(researchLive))
+			return perRound.flat()
+		}).pipe(Effect.provide(researchLive), Effect.provide(cacheSettings))
 
 		for (const company of golden) {
 			yield* Console.log(

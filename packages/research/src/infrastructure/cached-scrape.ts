@@ -42,6 +42,7 @@ import { canonicalizeUrl } from '../application/source-key'
 import { recordFetchedSource } from '../application/source-record'
 import { ProviderError } from '../domain/errors'
 import { ScrapedPage } from '../domain/types'
+import { cacheBypassConfig } from './_config'
 
 // The SQL client camelCases result keys (snake_case DB ↔ camelCase TS), so the
 // `content_ref`/`content_hash` columns arrive as `contentRef`/`contentHash` —
@@ -92,6 +93,9 @@ export const makeCachedScrape = () =>
 			const inner = yield* ScrapeProvider
 			const sql = yield* SqlClient.SqlClient
 			const blob = yield* BlobStorage
+			// Read once, when the layer is built, so a pass cannot change its mind
+			// halfway and read some pages off the record and fetch others afresh.
+			const bypassCache = yield* cacheBypassConfig
 
 			// Reads a cached row's stored markdown, or fails with a classified
 			// `provider:'cache'` ProviderError when the row points at nothing
@@ -160,7 +164,13 @@ export const makeCachedScrape = () =>
 							),
 						)
 
-					const hits = yield* sql<SourcesCacheHit>`
+					// The stored page, if one was fetched recently enough to still stand
+					// for the live one. Asked twice — once here and once holding the lock
+					// — so a page fetched while this call queued is not fetched again.
+					const findStoredPage = () =>
+						bypassCache
+							? Effect.succeed([])
+							: sql<SourcesCacheHit>`
 						SELECT id, url, content_ref, content_hash
 						FROM sources
 						WHERE url_hash = ${urlHash}
@@ -169,6 +179,8 @@ export const makeCachedScrape = () =>
 							AND content_ref <> ''
 						LIMIT 1
 					`
+
+					const hits = yield* findStoredPage()
 					const hit = hits[0]
 					if (hit) {
 						const cached = yield* readCached(hit)
@@ -188,15 +200,7 @@ export const makeCachedScrape = () =>
 					return yield* Effect.gen(function* () {
 						yield* sql`SELECT pg_advisory_xact_lock(hashtext(${`scrape:${urlHash}`}))`
 
-						const rehits = yield* sql<SourcesCacheHit>`
-							SELECT id, url, content_ref, content_hash
-							FROM sources
-							WHERE url_hash = ${urlHash}
-								AND last_fetched_at > now() - (${`${ttl} hours`})::interval
-								AND content_ref IS NOT NULL
-								AND content_ref <> ''
-							LIMIT 1
-						`
+						const rehits = yield* findStoredPage()
 						const rehit = rehits[0]
 						if (rehit) {
 							const cached = yield* readCached(rehit)

@@ -1069,7 +1069,7 @@ const researchEvalCommand = Command.make(
 		),
 		runs: Flag.integer('runs').pipe(
 			Flag.withDescription(
-				"How many times to run each company. Repeats inside one invocation are answered from the caches, so they return the first run's answer and average away no noise — to take a real reading, run separate passes with the caches cleared between them",
+				"How many times to run each company, averaging the rates over them. More than one runs the whole set that many times over, and every round asks the providers again instead of reading the last round's answer — so it costs about as many times a single pass as the number you give",
 			),
 			Flag.withDefault(1),
 		),

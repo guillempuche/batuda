@@ -19,12 +19,13 @@
 
 import { createHash } from 'node:crypto'
 
-import { Cache, Duration, Effect, Option } from 'effect'
+import { Cache, type Config, Duration, Effect, Option } from 'effect'
 import { LanguageModel } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { type LlmRate, priceLlmMicrocents } from '../application/cost-rates'
 import { UsageMeter } from '../application/usage-meter'
+import { cacheBypassConfig } from './_config'
 
 export type LlmTier = 'agent' | 'extract' | 'writer'
 
@@ -137,7 +138,11 @@ export const makeCachedLanguageModel = (
 	// What this slot charges. Only a call that reaches the provider is priced, so
 	// an answer served from the cache costs nothing without any special case.
 	rate: LlmRate = { inCentsPer1k: 0, outCentsPer1k: 0 },
-): Effect.Effect<LanguageModel.Service, never, SqlClient.SqlClient> =>
+): Effect.Effect<
+	LanguageModel.Service,
+	Config.ConfigError,
+	SqlClient.SqlClient
+> =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
 		const memCache = yield* Cache.make<string, unknown, never, never>({
@@ -147,8 +152,14 @@ export const makeCachedLanguageModel = (
 				Effect.die('llm memCache lookup invoked — expected set-only'),
 		})
 
+		// Read once, when the tier is built, so a pass cannot change its mind halfway
+		// and leave half its runs answered from a cache and half from the provider.
+		const bypassCache = yield* cacheBypassConfig
+
 		const lookup = (keyHash: string) =>
-			sql<{ response: unknown }>`
+			bypassCache
+				? Effect.succeed([])
+				: sql<{ response: unknown }>`
 				SELECT response
 				FROM llm_cache
 				WHERE key_hash = ${keyHash}
@@ -227,7 +238,12 @@ export const makeCachedLanguageModel = (
 				event: 'cache.hit',
 			}
 			return Effect.gen(function* () {
-				const cached = yield* Cache.getOption(memCache, keyHash)
+				// This one sits in front of the database copy and outlives a single run,
+				// so leaving it in place would answer a repeat from the last round's
+				// memory however thoroughly the stored copy were passed over.
+				const cached = bypassCache
+					? Option.none<unknown>()
+					: yield* Cache.getOption(memCache, keyHash)
 				if (Option.isSome(cached)) {
 					yield* Effect.logDebug('cache.hit').pipe(
 						Effect.annotateLogs({ ...baseAttrs, layer: 'mem' }),
