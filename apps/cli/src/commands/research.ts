@@ -59,6 +59,7 @@ import {
 
 import { SqlLive } from '../db'
 import { requireLocalDatabase } from '../lib/confirm-cloud'
+import { requireLiveProviders } from '../lib/require-live-providers'
 
 // `pnpm cli` runs from apps/cli, so resolve a relative --golden/--out against the
 // repo root — where a reader of the docs expects the path to be.
@@ -623,6 +624,14 @@ export const researchEval = (opts: {
 }) =>
 	Effect.gen(function* () {
 		yield* requireLocalDatabase('research eval')
+		// A profile pass reads pages the agent finds and the extract tier reads. The
+		// writer tier only phrases the human brief, which nothing here scores, and the
+		// company registers are asked to be off for a comparison — so neither is
+		// required, and demanding them would refuse a correct setup.
+		yield* requireLiveProviders('research eval', {
+			tiers: ['agent', 'extract'],
+			capabilities: ['search', 'scrape'],
+		})
 		const raw = yield* Effect.tryPromise({
 			try: () => readFile(fromRepoRoot(opts.goldenPath), 'utf8'),
 			catch: error => new Error(`cannot read golden set: ${String(error)}`),
@@ -886,6 +895,12 @@ export const researchEvalInvariance = (opts: {
 }) =>
 	Effect.gen(function* () {
 		yield* requireLocalDatabase('research eval-invariance')
+		// Drives the same live runs a profile pass does, so it needs the same parts
+		// reachable — two wordings agreeing on canned data says nothing about either.
+		yield* requireLiveProviders('research eval-invariance', {
+			tiers: ['agent', 'extract'],
+			capabilities: ['search', 'scrape'],
+		})
 		const raw = yield* Effect.tryPromise({
 			try: () => readFile(fromRepoRoot(opts.goldenPath), 'utf8'),
 			catch: error => new Error(`cannot read golden set: ${String(error)}`),
@@ -1004,6 +1019,18 @@ export const researchEvalContacts = (opts: {
 		if (Option.isSome(opts.enrichMode)) {
 			enrichOverrides['RESEARCH_ENRICH_MODE'] = opts.enrichMode.value
 		}
+		const enrichSettings = ConfigProvider.layerAdd(
+			ConfigProvider.fromEnv({ env: enrichOverrides }),
+			{ asPrimary: true },
+		)
+		// Read through the same overridden settings the runs will use, or the check
+		// would pass on an environment value the flag is about to replace. Contact
+		// discovery never searches or scrapes — it works from a domain it is handed —
+		// so only the enrichment it exists to measure is required here.
+		yield* requireLiveProviders('research eval-contacts', {
+			tiers: [],
+			capabilities: ['enrich'],
+		}).pipe(Effect.provide(enrichSettings))
 
 		const raw = yield* Effect.tryPromise({
 			try: () => readFile(fromRepoRoot(opts.goldenPath), 'utf8'),
@@ -1051,15 +1078,7 @@ export const researchEvalContacts = (opts: {
 					),
 				{ concurrency: opts.concurrency },
 			)
-		}).pipe(
-			Effect.provide(contactsLive),
-			Effect.provide(
-				ConfigProvider.layerAdd(
-					ConfigProvider.fromEnv({ env: enrichOverrides }),
-					{ asPrimary: true },
-				),
-			),
-		)
+		}).pipe(Effect.provide(contactsLive), Effect.provide(enrichSettings))
 
 		for (const company of golden) {
 			yield* Console.log(

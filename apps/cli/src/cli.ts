@@ -1062,12 +1062,14 @@ const researchEvalCommand = Command.make(
 			Flag.optional,
 		),
 		concurrency: Flag.integer('concurrency').pipe(
-			Flag.withDescription('How many runs to execute at once'),
-			Flag.withDefault(3),
+			Flag.withDescription(
+				'How many runs to execute at once. One by default: runs competing for the same providers slow each other into timeouts, and a run that times out scores as empty — which reads as a quality drop that no change caused',
+			),
+			Flag.withDefault(1),
 		),
 		runs: Flag.integer('runs').pipe(
 			Flag.withDescription(
-				'How many times to run each company; rates are averaged over them, since grounding is noisy per run',
+				"How many times to run each company. Repeats inside one invocation are answered from the caches, so they return the first run's answer and average away no noise — to take a real reading, run separate passes with the caches cleared between them",
 			),
 			Flag.withDefault(1),
 		),
@@ -1115,8 +1117,10 @@ const researchEvalContactsCommand = Command.make(
 			Flag.withDescription('Path to the contact golden-set JSON file'),
 		),
 		concurrency: Flag.integer('concurrency').pipe(
-			Flag.withDescription('How many companies to discover at once'),
-			Flag.withDefault(3),
+			Flag.withDescription(
+				'How many companies to discover at once. One by default, so a vendor answering slower under load cannot be read as worse enrichment',
+			),
+			Flag.withDefault(1),
 		),
 		runs: Flag.integer('runs').pipe(
 			Flag.withDescription(
@@ -1176,8 +1180,10 @@ const researchEvalInvarianceCommand = Command.make(
 			Flag.withDefault('company_enrichment_v1'),
 		),
 		concurrency: Flag.integer('concurrency').pipe(
-			Flag.withDescription('How many companies to evaluate at once'),
-			Flag.withDefault(2),
+			Flag.withDescription(
+				'How many companies to evaluate at once. One by default, so two wordings are compared under the same conditions rather than one of them under load',
+			),
+			Flag.withDefault(1),
 		),
 	},
 	({ org, user, golden, schema, concurrency }) =>
