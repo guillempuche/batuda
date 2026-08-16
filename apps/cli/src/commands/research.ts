@@ -859,9 +859,14 @@ export const researchEval = (opts: {
 		// themselves were billed. Asking a model what kind of organisation each row of
 		// a market list is happens after a run has finished, so folding it into that
 		// figure would charge the research for a question the measurement asked.
-		if (judgeSpend.costCents > 0) {
+		// Shown whenever the judge was asked anything, not only when it reached a whole
+		// cent. One question about a dozen rows costs a fraction of one, and cost is
+		// carried in whole cents — so testing the money would hide the figure in every
+		// ordinary pass, which is the case it was added for. The tokens never round away.
+		const judgeTokens = judgeSpend.tokensIn + judgeSpend.tokensOut
+		if (judgeTokens > 0) {
 			yield* Console.log(
-				`Judging the list cost:  ${cents(judgeSpend.costCents)} over the whole pass (not in the per-run figures above)`,
+				`Judging the list cost:  ${cents(judgeSpend.costCents)} over ${count(judgeTokens)} tokens for the whole pass (not in the per-run figures above)`,
 			)
 		}
 		if (opts.byBucket) {
