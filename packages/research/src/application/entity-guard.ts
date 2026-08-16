@@ -180,6 +180,15 @@ export const nameCoreTokens = (name: string): ReadonlyArray<string> => {
 export const nameCore = (name: string): string => nameCoreTokens(name).join('')
 
 /**
+ * The words of a name, every legal-form word taken out wherever it sits — "SARL
+ * Transports Dupont" → ["transports", "dupont"]. Exported because a caller
+ * asking which FRONT PART of a name a domain could spell has to know where each
+ * word ends, and the joined "transportsdupont" no longer says.
+ */
+export const nameWordsWithoutForms = (name: string): ReadonlyArray<string> =>
+	foldTokens(name).filter(t => !LEGAL_SUFFIXES.has(t))
+
+/**
  * The name with every legal-form word taken out, wherever it sits — "SARL
  * Transports Dupont" → "transportsdupont".
  *
@@ -190,9 +199,36 @@ export const nameCore = (name: string): string => nameCoreTokens(name).join('')
  * it does is spot the company's name in one more place.
  */
 export const nameWithoutForms = (name: string): string =>
-	foldTokens(name)
-		.filter(t => !LEGAL_SUFFIXES.has(t))
-		.join('')
+	nameWordsWithoutForms(name).join('')
+
+/**
+ * Whether a domain's label spells any of these names, allowing the legal form
+ * after it — "fusteriamiquel" and "fusteriamiquelsl" both spell "fusteriamiquel",
+ * and "fusteriamiquelreviews" spells somebody writing about it.
+ *
+ * The one place two callers have to agree: picking the site a run goes and reads
+ * asks this, and so does deciding whether a website is the company's own. Two
+ * copies of it would let a host be one company's site to one caller and not to
+ * the other.
+ */
+export const labelSpellsOneOf = (
+	label: string,
+	names: ReadonlyArray<string>,
+): boolean =>
+	names.some(name => {
+		// A name with nothing in it is spelled by every label, so a caller whose
+		// name list came back empty would have every domain answer yes.
+		if (name === '' || !label.startsWith(name)) return false
+		const rest = label.slice(name.length)
+		return rest === '' || LEGAL_SUFFIXES.has(rest)
+	})
+
+/**
+ * Whether a word names a trade rather than a company — "logistics", "grupo",
+ * "solutions". Exported alongside `distinctiveWords` for a caller that needs the
+ * judgement on a word it did not get from there.
+ */
+export const isGenericWord = (word: string): boolean => GENERIC_WORDS.has(word)
 
 /**
  * The shortest run of letters that may stand for a company on its own. Two or
@@ -239,16 +275,29 @@ export const domainHost = (website: string): string | undefined => {
 	return host.includes('.') && host.length >= 4 ? host : undefined
 }
 
-// The distinctive label inside a host — "acme" from "acme.co.uk" — used only as a
-// weak signal alongside the name's own words.
-const domainLabelOf = (host: string): string | undefined => {
+/**
+ * The label a domain is registered under — "acme" from "acme.co.uk", "tecsol"
+ * from "annuaire.tecsol.fr". Empty when the host has no label to read.
+ *
+ * Exported without the four-letter floor `domainLabelOf` puts on it, because the
+ * floor belongs to the question rather than to the reading: a fragment found
+ * INSIDE a longer host needs the length to mean anything, while a label that IS
+ * the whole name is just as telling at three letters ("dsv.com", "xpo.com").
+ */
+export const hostLabel = (host: string): string => {
 	const labels = host.split('.').filter(Boolean)
 	labels.pop() // drop the TLD
 	if (labels.length >= 2 && SECOND_LEVEL.has(labels[labels.length - 1] ?? '')) {
 		labels.pop() // drop a second-level public suffix (co.uk, com.au…)
 	}
-	const label = labels[labels.length - 1]
-	return label && label.length >= 4 ? label : undefined
+	return labels[labels.length - 1] ?? ''
+}
+
+// The distinctive label inside a host — "acme" from "acme.co.uk" — used only as a
+// weak signal alongside the name's own words.
+const domainLabelOf = (host: string): string | undefined => {
+	const label = hostLabel(host)
+	return label.length >= 4 ? label : undefined
 }
 
 // A caller often wraps the company name in quotes inside a longer instruction
@@ -540,11 +589,10 @@ export const isOwnSiteHost = (
 	// — "Fusteria Miquel" at fusteriamiquel.cat or fusteriamiquelsl.cat. Anything
 	// else appended is somebody writing about the company rather than the company
 	// itself: acmelogisticsreviews.com is a review site.
-	const spellsOutTheName = targets.cores.some(core => {
-		if (core.length < 4 || !folded.startsWith(core)) return false
-		const rest = folded.slice(core.length)
-		return rest === '' || LEGAL_SUFFIXES.has(rest)
-	})
+	const spellsOutTheName = labelSpellsOneOf(
+		folded,
+		targets.cores.filter(core => core.length >= DISTINCTIVE_NAME_LENGTH),
+	)
 	// Or the domain is one distinctive word of the name, which is how most firms
 	// register: "Transportes García" lives at garcia.es. Only a distinctive word
 	// counts, so the trade a company is in — which identifies nobody — cannot

@@ -3127,6 +3127,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									// nothing but a company's own site lands in the CRM's website
 									// field. Deterministic and evidence-free, so it runs here among the
 									// plain checks, ahead of the model critics.
+									//
+									// Blanking is only half the answer: an address nobody could
+									// condemn is not thereby the company's. So each survivor is also
+									// asked whether anything establishes that it is, and the two
+									// numbers are reported apart.
 									name: 'websites',
 									run: findings =>
 										Effect.gen(function* () {
@@ -3165,6 +3170,22 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													}),
 												)
 											}
+											// And of the addresses that survived, how many of them
+											// anything establishes as the company's own site. Logged
+											// whether or not anything was blanked: a run whose websites
+											// all read `unknown` is not a quiet run, it is one whose
+											// companies have nothing vouching for them.
+											if (check.ownSiteEstablished + check.ownSiteUnknown > 0) {
+												yield* Effect.logInfo(
+													'research.websites.own_site',
+												).pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														established: check.ownSiteEstablished,
+														unknown: check.ownSiteUnknown,
+													}),
+												)
+											}
 											return {
 												findings: check.findings,
 												spanCounts: {
@@ -3176,6 +3197,21 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														directories.sites.size,
 													'research.directories.addresses_read':
 														directories.addressesRead,
+													// Kept apart from the blanked count on purpose: an
+													// address that went and one nothing vouches for are
+													// different answers, and reading them as one total is
+													// how "not blanked" gets read as "owned".
+													//
+													// About this extraction, not about the run. Every gap
+													// round extracts again and the results are folded
+													// together afterwards, so a website only one round
+													// produced is counted on that round's line and missing
+													// from the last one. Read the run's own answer for a
+													// figure about the run.
+													'research.websites.own_site_established':
+														check.ownSiteEstablished,
+													'research.websites.own_site_unknown':
+														check.ownSiteUnknown,
 												},
 											}
 										}),
