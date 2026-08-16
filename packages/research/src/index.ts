@@ -65,6 +65,7 @@ export {
 } from './application/eval-report'
 export {
 	type EvalSummary,
+	type FieldOutcome,
 	type GoldenExpectation,
 	type MarketExpectation,
 	type MarketPart,

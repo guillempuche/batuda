@@ -61,6 +61,7 @@ import {
 import {
 	type EvalSummary,
 	endedWithAnAnswer,
+	type FieldOutcome,
 	type GoldenExpectation,
 	isSucceeded,
 	type MarketScore,
@@ -72,6 +73,7 @@ import {
 export { contactNameMatches } from './eval-scoring-company'
 export {
 	type EvalSummary,
+	type FieldOutcome,
 	GOLDEN_BUCKETS,
 	type GoldenBucket,
 	type GoldenExpectation,
@@ -117,6 +119,10 @@ export const scoreRun = (
 	let fieldsExpected = 0
 	let fieldsScored = 0
 	let fieldsCorrect = 0
+	// Kept alongside the counts, off the same comparisons, so a report can say which
+	// field missed and what came back — which the counts alone cannot, and which
+	// otherwise costs a whole second pass to find out.
+	const fieldOutcomes: FieldOutcome[] = []
 	for (const field of SCORABLE_FIELDS) {
 		const expectedValue = expected.fields[field]
 		if (expectedValue === undefined) continue
@@ -124,9 +130,26 @@ export const scoreRun = (
 		fieldsExpected++
 		const actual = outcome.fields[field]
 		// Precision's denominator: only the ones the run actually filled.
-		if (!isFilled(actual)) continue
+		if (!isFilled(actual)) {
+			fieldOutcomes.push({
+				field,
+				expected: expectedValue,
+				got: null,
+				scored: false,
+				correct: false,
+			})
+			continue
+		}
 		fieldsScored++
-		if (fieldMatches(field, expectedValue, actual)) fieldsCorrect++
+		const correct = fieldMatches(field, expectedValue, actual)
+		if (correct) fieldsCorrect++
+		fieldOutcomes.push({
+			field,
+			expected: expectedValue,
+			got: actual,
+			scored: true,
+			correct,
+		})
 	}
 
 	const anyFilled = SCORABLE_FIELDS.some(field =>
@@ -232,6 +255,7 @@ export const scoreRun = (
 		fieldsExpected,
 		fieldsScored,
 		fieldsCorrect,
+		fields: fieldOutcomes,
 		contactsExpected: expectedContacts.length,
 		contactsFound,
 		...(outcome.profile !== undefined ? { profile: outcome.profile } : {}),

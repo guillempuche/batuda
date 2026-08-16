@@ -1165,6 +1165,7 @@ describe('scoring a run that answered for a whole market', () => {
 describe('summarizeScores', () => {
 	const score = (over: Partial<RunScore>): RunScore => ({
 		id: 'r',
+		fields: [],
 		grounded: true,
 		groundable: true,
 		wrongCompany: false,
@@ -1451,6 +1452,7 @@ describe('summarizeScores', () => {
 describe('summarizing a pass that held market requests', () => {
 	const score = (over: Partial<RunScore>): RunScore => ({
 		id: 'r',
+		fields: [],
 		grounded: true,
 		groundable: true,
 		wrongCompany: false,
@@ -1833,6 +1835,81 @@ describe('scoring a run that answered with a list of companies', () => {
 
 			// WHEN scored — THEN nothing found is still nothing found
 			expect(score.empty).toBe(true)
+		})
+	})
+})
+
+describe('scoreRun — what happened to each field', () => {
+	describe('when a run fills some of the fields the golden row knows', () => {
+		it('should record every known field with what came back', () => {
+			// GIVEN a golden row stating three fields, and a run that got the trade
+			// right, the country wrong, and never said how many people work there
+			const score = scoreRun(
+				acme,
+				outcome({
+					fields: { industry: 'transport', country: 'FR' },
+				}),
+			)
+
+			// WHEN the per-field record is read — THEN it names all three, says what
+			// came back for each, and marks the one nobody filled as unscored so it
+			// weighs on recall without weighing on precision
+			expect(score.fields).toEqual([
+				{
+					field: 'industry',
+					expected: 'transport',
+					got: 'transport',
+					scored: true,
+					correct: true,
+				},
+				{
+					field: 'size_range',
+					expected: '11-50',
+					got: null,
+					scored: false,
+					correct: false,
+				},
+				{
+					field: 'country',
+					expected: 'ES',
+					got: 'FR',
+					scored: true,
+					correct: false,
+				},
+			])
+		})
+
+		it('should agree with the counts it sits beside', () => {
+			// GIVEN the same run
+			const score = scoreRun(
+				acme,
+				outcome({ fields: { industry: 'transport', country: 'FR' } }),
+			)
+
+			// WHEN the record is counted up — THEN it reproduces the three tallies
+			// exactly, because both are read off the same comparisons; if they ever
+			// disagreed, one of them would be lying about the same run
+			expect(score.fields).toHaveLength(score.fieldsExpected)
+			expect(score.fields.filter(f => f.scored)).toHaveLength(
+				score.fieldsScored,
+			)
+			expect(score.fields.filter(f => f.correct)).toHaveLength(
+				score.fieldsCorrect,
+			)
+		})
+	})
+
+	describe('when the golden row states no fields at all', () => {
+		it('should record nothing rather than a row of blanks', () => {
+			// GIVEN a row with nothing to check against
+			const score = scoreRun(
+				{ ...acme, fields: {} },
+				outcome({ fields: { industry: 'transport' } }),
+			)
+
+			// WHEN read — THEN the record is empty: a field nobody wrote an answer
+			// for is not a miss, and listing it would read as one
+			expect(score.fields).toEqual([])
 		})
 	})
 })

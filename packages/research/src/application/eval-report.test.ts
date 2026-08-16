@@ -10,6 +10,7 @@ import type { EvalSummary, RunScore } from './eval-scoring'
 
 const score = (over: Partial<RunScore>): RunScore => ({
 	id: 'r',
+	fields: [],
 	grounded: true,
 	groundable: true,
 	wrongCompany: false,

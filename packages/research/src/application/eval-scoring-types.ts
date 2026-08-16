@@ -281,10 +281,36 @@ export interface MarketScore {
 	readonly partsAnswered: number
 }
 
+/**
+ * How one field went, kept beside the counts so a report can say which field missed
+ * and what came back instead.
+ *
+ * The counts alone say a run got three of five right, and answering "which three"
+ * then costs another pass over the whole set — hours, and real money. Every one of
+ * these is read off what the run already returned, so keeping them costs nothing.
+ */
+export interface FieldOutcome {
+	readonly field: ScorableField
+	/** The known-correct value from the golden row. */
+	readonly expected: string
+	/** What the run filled in, or null where it filled nothing. */
+	readonly got: string | null
+	/** Whether this field counted toward precision — only a filled field does. */
+	readonly scored: boolean
+	/** Whether what came back matched, by that field's own matching rule. */
+	readonly correct: boolean
+}
+
 export interface RunScore {
 	readonly id: string
 	/** What this run cost, carried through so a pass can be totalled and compared. */
 	readonly usage?: RunUsage
+	/**
+	 * Field by field, for the fields the golden row states an answer for. The rates
+	 * are computed from the same comparisons, so this adds no judgement of its own —
+	 * it only keeps the reasons the counts threw away.
+	 */
+	readonly fields: ReadonlyArray<FieldOutcome>
 	readonly grounded: boolean
 	/**
 	 * Whether reaching a particular company was a question for this row at all. A
