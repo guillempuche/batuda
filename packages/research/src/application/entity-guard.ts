@@ -130,6 +130,50 @@ export const foldTokens = (value: string): string[] =>
 		.split(/[^a-z0-9]+/)
 		.filter(Boolean)
 
+// A geminate l as Catalan writes it, with every mark that may sit between the
+// two l's spelled by number because several of them draw the same dot and nobody
+// could tell them apart written out: the middle dot is the standard one, the
+// Greek ano teleia is the look-alike a paste leaves behind, the period is what a
+// database that could not write any of them fell back on, and the rest are what
+// a keyboard or a word processor reaches for instead.
+//
+// Both l's have to touch the mark, which is what keeps a legal form out of it:
+// "S.L." holds no l-dot-l, and in "S.L. Lopez" a space sits at the join.
+//
+// Only ever handed to `replace`, which starts from the beginning every time. Ask
+// it `test` instead and it answers from wherever the last call left off, so every
+// other name carrying a mark would come back as carrying none.
+const GEMINATED_L = /l[.\u00B7\u0387\u2022\u2027\u2219\u22C5]l/giu
+
+/**
+ * A name in each way an address may spell it, the name as written first.
+ *
+ * Catalan marks a geminate l with an interpunct — "Instal·lacions", "Col·legi",
+ * "Il·lustració" — and no address carries the mark. Both ways of writing it out
+ * are ordinary: the slug keeps the two l's ("installacions-vives") or keeps one
+ * ("instalacions-vives"). Read a name only one of those ways and it is filed
+ * under a spelling half the addresses never use — and the trade this product
+ * sells into is called "instal·lacions" across half the country.
+ *
+ * ONLY a name carrying the mark is read twice. Reading every "ll" as a possible
+ * geminate would put "Villa Nova" and "Vila Nova" — two different companies,
+ * both ordinary here — under one name, and the rules leaning on this take a
+ * company's website away.
+ *
+ * This runs on the name as it arrived, BEFORE a legal form's dots come out —
+ * which is the only order that lets the period be one of the marks. Take the
+ * dots out first and "Instal.lacions" has already become "Installacions", with
+ * nothing left to say the two l's were ever one sound.
+ *
+ * Several marks in one name are read all the same way rather than in every
+ * combination: an address is slugged by one convention, not one per word.
+ */
+export const nameSpellings = (name: string): ReadonlyArray<string> => {
+	const doubled = name.replace(GEMINATED_L, 'll')
+	const single = name.replace(GEMINATED_L, 'l')
+	return doubled === single ? [doubled] : [doubled, single]
+}
+
 // Words that join two halves of a legal form — "S.A. de C.V.", "Serveis i
 // Manteniments S.L." — skipped over while reading a form off the end, never
 // dropped on their own.
@@ -180,6 +224,23 @@ export const nameCoreTokens = (name: string): ReadonlyArray<string> => {
 export const nameCore = (name: string): string => nameCoreTokens(name).join('')
 
 /**
+ * The strong-match key in each spelling an address may use, the name as written
+ * first. A caller holding a LIST of keys asks with all of them; one holding a
+ * single identity for a company takes the first, so two spellings of one name
+ * can never be counted as two companies.
+ *
+ * A form written in dots is put back together here rather than by the caller, so
+ * no caller can forget to — see `spellingsWithoutForms`, which is where forgetting
+ * used to cost something.
+ */
+export const coreSpellings = (name: string): ReadonlyArray<string> =>
+	[
+		...new Set(
+			nameSpellings(name).map(spelling => nameCore(withoutFormDots(spelling))),
+		),
+	].filter(spelling => spelling !== '')
+
+/**
  * The words of a name, every legal-form word taken out wherever it sits — "SARL
  * Transports Dupont" → ["transports", "dupont"]. Exported because a caller
  * asking which FRONT PART of a name a domain could spell has to know where each
@@ -200,6 +261,29 @@ export const nameWordsWithoutForms = (name: string): ReadonlyArray<string> =>
  */
 export const nameWithoutForms = (name: string): string =>
 	nameWordsWithoutForms(name).join('')
+
+/**
+ * The same key in each spelling an address may use, empty ones left out. This is
+ * the reading BOTH the website guard and the directory watch put an address
+ * through, so neither can come to a different answer about whether a piece of
+ * text spells a company. As with `coreSpellings`, the name as written comes
+ * first, and that one is the company's identity.
+ *
+ * A form written in dots — "Muñoz S.L." — is put back together here, inside the
+ * reading, rather than left to each caller. That is the whole point: while one
+ * caller did it and the other did not, the two read that name as "munoz" and
+ * "munozsl", and the guard looking for the longer one could not find the company
+ * on its own munoz.es. Dots the geminate mark claimed are already gone by now,
+ * so a Catalan name written "Instal.lacions" keeps both of its readings.
+ */
+export const spellingsWithoutForms = (name: string): ReadonlyArray<string> =>
+	[
+		...new Set(
+			nameSpellings(name).map(spelling =>
+				nameWithoutForms(withoutFormDots(spelling)),
+			),
+		),
+	].filter(spelling => spelling !== '')
 
 /**
  * Whether a domain's label spells any of these names, allowing the legal form
@@ -253,14 +337,40 @@ export const withoutFormDots = (name: string): string => name.replace(/\./g, '')
  * and they are also how most firms register a domain — "Transportes García" at
  * garcia.es — which is why a caller asking whether a host is a company's own
  * needs them beside its cores.
+ *
+ * A word written with a geminate l comes back once per spelling, since a caller
+ * looking for it has no way of knowing which one it will meet.
  */
-export const distinctiveWords = (name: string): string[] =>
-	foldTokens(name).filter(
-		t =>
-			t.length >= DISTINCTIVE_NAME_LENGTH &&
-			!LEGAL_SUFFIXES.has(t) &&
-			!GENERIC_WORDS.has(t),
-	)
+export const distinctiveWords = (name: string): string[] => [
+	...new Set(
+		nameSpellings(name)
+			.flatMap(foldTokens)
+			.filter(
+				t =>
+					t.length >= DISTINCTIVE_NAME_LENGTH &&
+					!LEGAL_SUFFIXES.has(t) &&
+					!GENERIC_WORDS.has(t),
+			),
+	),
+]
+
+/**
+ * Whether a name holds no word that could stand for THIS company rather than for
+ * anybody in its trade — "Grupo Express SL" is a kind of company and a trade and
+ * nothing else.
+ *
+ * This is the intended trade, not a gap to close: a generic word identifies
+ * nobody, and matching on one is the expensive mistake. But the consequence is
+ * real and worth counting, because such a company is judged on less than
+ * everybody else is. Its own site can never be established — `ownSiteVerdict`
+ * has no word of its own to find in a domain, so even grupoexpress.cat reads
+ * `unknown` — and the rules that hold a website against a name have only the
+ * whole name left, so an address writing any part of it goes unrecognised.
+ * Blanking is the direction that costs, and it is the company's real site that
+ * goes.
+ */
+export const namesNobodyInParticular = (name: string): boolean =>
+	distinctiveWords(name).length === 0
 
 // The bare host of a website — "acme.co.uk" from "https://www.acme.co.uk/about".
 // A page that references this exact host really points at the target's site,
@@ -441,7 +551,9 @@ export const deriveEntityTargets = (args: {
 			),
 		),
 	]
-	const cores = names.map(nameCore).filter(c => c.length >= 4)
+	const cores = [
+		...new Set(names.flatMap(coreSpellings).filter(c => c.length >= 4)),
+	]
 	const words = [
 		...new Set([
 			...names.flatMap(distinctiveWords),

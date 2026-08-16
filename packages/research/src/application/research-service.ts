@@ -3220,7 +3220,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											// whether or not anything was blanked: a run whose websites
 											// all read `unknown` is not a quiet run, it is one whose
 											// companies have nothing vouching for them.
-											if (check.ownSiteEstablished + check.ownSiteUnknown > 0) {
+											if (
+												check.ownSiteEstablished +
+													check.ownSiteUnknown +
+													check.namedNobodyInParticular >
+												0
+											) {
 												yield* Effect.logInfo(
 													'research.websites.own_site',
 												).pipe(
@@ -3228,6 +3233,13 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														research_id: researchId,
 														established: check.ownSiteEstablished,
 														unknown: check.ownSiteUnknown,
+														// Beside them, because it says how many of these
+														// answers were never reachable: a company named
+														// only after its trade has no word of its own for
+														// a domain to spell, so its `unknown` is what the
+														// rules can say rather than what they found.
+														named_nobody_in_particular:
+															check.namedNobodyInParticular,
 													}),
 												)
 											}
@@ -3257,6 +3269,13 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														check.ownSiteEstablished,
 													'research.websites.own_site_unknown':
 														check.ownSiteUnknown,
+													// How many of those websites were weighed against a
+													// name holding no word of the company's own. The
+													// unknown count above is read against this one: a run
+													// whose companies are all called after their trade
+													// cannot establish a single site however well it went.
+													'research.websites.named_nobody_in_particular':
+														check.namedNobodyInParticular,
 												},
 											}
 										}),

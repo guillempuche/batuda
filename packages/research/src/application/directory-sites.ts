@@ -58,14 +58,13 @@
  */
 
 import {
+	coreSpellings,
 	DISTINCTIVE_NAME_LENGTH,
 	distinctiveWords,
 	type EntityTargets,
 	foldTokens,
 	isOwnSiteHost,
-	nameCore,
-	nameWithoutForms,
-	withoutFormDots,
+	spellingsWithoutForms,
 } from './entity-guard'
 import { isPlainObject } from './guard-shapes'
 import { hostOf, isBareWebAddress, pathOf } from './source-key'
@@ -86,12 +85,36 @@ export type SiteVerdict = 'directory' | 'unknown'
 // each of them somewhere of its own.
 const COMPANIES_THAT_MAKE_A_LISTING = 2
 
-// How an address would write this company's name, folded so case, accents and
-// punctuation stop mattering. Empty when nothing distinctive is left to look for.
-const filedAs = (name: string): string => {
-	const core = nameWithoutForms(withoutFormDots(name))
-	return core.length >= DISTINCTIVE_NAME_LENGTH ? core : ''
+// One of the run's companies: the name an address would write it under, and the
+// name it is counted as. They are two things because a Catalan name can be
+// written out two ways — an address may spell either, while the company is still
+// one company and must be counted once.
+interface ListedCompany {
+	readonly countedAs: string
+	readonly writtenAs: ReadonlyArray<string>
 }
+
+// Every way an address would write this company's name, folded so case, accents
+// and punctuation stop mattering. Empty when nothing distinctive is left to look
+// for.
+const filedAs = (name: string): ReadonlyArray<string> =>
+	spellingsWithoutForms(name).filter(
+		spelling => spelling.length >= DISTINCTIVE_NAME_LENGTH,
+	)
+
+// Whether a shorter name already seen is this same company: any way of writing
+// this one starts with any way of writing that one. Compared across spellings and
+// not between the two names as written, because the pair this exists to catch is
+// exactly a firm whose two rows spell one word differently.
+const isTheSameCompanyAgain = (
+	company: ListedCompany,
+	earlier: ReadonlyArray<ListedCompany>,
+): boolean =>
+	earlier.some(seen =>
+		company.writtenAs.some(written =>
+			seen.writtenAs.some(before => written.startsWith(before)),
+		),
+	)
 
 // One company per name, rather than one per spelling. A name that another name
 // starts with is the same company written at more length — "Grupo Ferré" and
@@ -100,13 +123,30 @@ const filedAs = (name: string): string => {
 // that settles spellings for good runs after this check, so it cannot be leant on
 // here.
 const distinctCompanies = (
-	cores: ReadonlyArray<string>,
-): ReadonlyArray<string> =>
-	[...new Set(cores)]
-		.sort((a, b) => a.length - b.length)
-		.filter(
-			(core, at, kept) => !kept.slice(0, at).some(s => core.startsWith(s)),
+	companies: ReadonlyArray<ListedCompany>,
+): ReadonlyArray<ListedCompany> => {
+	const byName = new Map<string, ListedCompany>()
+	for (const company of companies) {
+		const seen = byName.get(company.countedAs)
+		// Every spelling either row was written with, rather than whichever row came
+		// first: two rows of one company can spell it differently, and a listing
+		// filing it under the spelling the other row used still files this company.
+		byName.set(
+			company.countedAs,
+			seen === undefined
+				? company
+				: {
+						countedAs: company.countedAs,
+						writtenAs: [...new Set([...seen.writtenAs, ...company.writtenAs])],
+					},
 		)
+	}
+	return [...byName.values()]
+		.sort((a, b) => a.countedAs.length - b.countedAs.length)
+		.filter(
+			(company, at, kept) => !isTheSameCompanyAgain(company, kept.slice(0, at)),
+		)
+}
 
 // The names of this scan's own companies.
 const listedCompanyNames = (
@@ -279,10 +319,16 @@ export const observeDirectorySites = (args: {
 	if (listField === undefined) return { sites: new Set(), addressesRead }
 
 	const names = listedCompanyNames(findings, listField)
-	const companyCores = distinctCompanies(
-		names.map(filedAs).filter(core => core !== ''),
+	// The name as written leads its spellings, so a company is counted under that
+	// one however an address happens to spell it.
+	const companies = distinctCompanies(
+		names.flatMap(name => {
+			const writtenAs = filedAs(name)
+			const countedAs = writtenAs[0]
+			return countedAs === undefined ? [] : [{ countedAs, writtenAs }]
+		}),
 	)
-	if (companyCores.length < COMPANIES_THAT_MAKE_A_LISTING) {
+	if (companies.length < COMPANIES_THAT_MAKE_A_LISTING) {
 		return { sites: new Set(), addressesRead }
 	}
 	// What it takes for a host to be one of these companies' own site, asked the
@@ -291,7 +337,7 @@ export const observeDirectorySites = (args: {
 	// "acme-directory.com" is not.
 	const ownSiteKeys: EntityTargets = {
 		cores: names
-			.map(name => nameCore(withoutFormDots(name)))
+			.flatMap(coreSpellings)
 			.filter(core => core.length >= DISTINCTIVE_NAME_LENGTH),
 		words: [...new Set(names.flatMap(distinctiveWords))],
 		domains: [],
@@ -319,12 +365,18 @@ export const observeDirectorySites = (args: {
 		const host = hostOf(address) ?? ''
 		if (isOwnSite(host)) continue
 		const segments = filingWords(address)
-		for (const core of companyCores) {
-			if (segments.some(segment => namesTheCompany(segment, core))) {
+		for (const company of companies) {
+			if (
+				segments.some(segment =>
+					company.writtenAs.some(spelling =>
+						namesTheCompany(segment, spelling),
+					),
+				)
+			) {
 				const filed = filedByHost.get(host) ?? new Map<string, Set<string>>()
-				const at = filed.get(core) ?? new Set<string>()
+				const at = filed.get(company.countedAs) ?? new Set<string>()
 				at.add(address)
-				filed.set(core, at)
+				filed.set(company.countedAs, at)
 				filedByHost.set(host, filed)
 			}
 		}

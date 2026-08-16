@@ -51,7 +51,8 @@ import {
 	collapse,
 	DISTINCTIVE_NAME_LENGTH,
 	distinctiveWords,
-	nameWithoutForms,
+	namesNobodyInParticular,
+	spellingsWithoutForms,
 } from './entity-guard'
 import { isPlainObject } from './guard-shapes'
 import { ownSiteVerdict } from './own-site'
@@ -104,11 +105,11 @@ const addressNamesCompany = (
 	segments: ReadonlyArray<string>,
 ): boolean => {
 	const parts = [collapse(host), ...segments.map(collapse)]
-	const core = nameWithoutForms(name)
+	const spellings = spellingsWithoutForms(name)
 	const words = distinctiveWords(name)
 	return parts.some(
 		part =>
-			(core !== '' && part.includes(core)) ||
+			spellings.some(spelling => part.includes(spelling)) ||
 			words.some(word => part.includes(word)),
 	)
 }
@@ -159,15 +160,24 @@ const citedSourcesOf = (
 	)
 }
 
-// Who claims which host, across a whole answer: a host mapped to the name cores of
-// every company that gave it as its website. Gathered before anything is rewritten,
-// because "is this host any one company's own?" cannot be answered from one row.
-// A value that is not an address, or a name with nothing distinctive in it, tells
-// us nothing about who a host belongs to and is left out.
-type HostClaims = ReadonlyMap<string, ReadonlySet<string>>
+// Who claims which host, across a whole answer: a host mapped to every company
+// that gave it as its website. Gathered before anything is rewritten, because
+// "is this host any one company's own?" cannot be answered from one row. A value
+// that is not an address, or a name with nothing distinctive in it, tells us
+// nothing about who a host belongs to and is left out.
+//
+// Each company is held under the one name it is written by, with every spelling
+// an address may use for it alongside. Held that way rather than as a flat set
+// of spellings, because the rule below counts these to ask how many companies
+// claim a host: a Catalan name an address can write two ways would otherwise be
+// two of them on its own, and one company would look like a crowd.
+type HostClaims = ReadonlyMap<
+	string,
+	ReadonlyMap<string, ReadonlyArray<string>>
+>
 
 const collectHostClaims = (findings: unknown): HostClaims => {
-	const claims = new Map<string, Set<string>>()
+	const claims = new Map<string, Map<string, ReadonlyArray<string>>>()
 	const visit = (value: unknown): void => {
 		if (Array.isArray(value)) {
 			for (const item of value) visit(item)
@@ -178,10 +188,19 @@ const collectHostClaims = (findings: unknown): HostClaims => {
 		const website = value['website']
 		if (typeof name === 'string' && typeof website === 'string') {
 			const host = isBareWebAddress(website) ? hostOf(website) : null
-			const core = nameWithoutForms(name)
-			if (host !== null && core !== '') {
-				const claimants = claims.get(host) ?? new Set<string>()
-				claimants.add(core)
+			const spellings = spellingsWithoutForms(name)
+			const identity = spellings[0]
+			if (host !== null && identity !== undefined) {
+				const claimants =
+					claims.get(host) ?? new Map<string, ReadonlyArray<string>>()
+				// Every spelling this company has been written with on this host, not
+				// just the last row's. Two rows of one company can spell it differently
+				// — one with the geminate mark and one without — and taking only the
+				// later row would drop the spelling that recognises the company's own
+				// host, which is what stands the rule below down.
+				claimants.set(identity, [
+					...new Set([...(claimants.get(identity) ?? []), ...spellings]),
+				])
 				claims.set(host, claimants)
 			}
 		}
@@ -195,9 +214,15 @@ const collectHostClaims = (findings: unknown): HostClaims => {
 
 // One company vouching for a host stands the shared-host rule down for every row
 // on it, so a name too short to mean anything would quietly switch the rule off.
-const hostBelongsTo = (host: string, claimant: string): boolean =>
-	claimant.length >= DISTINCTIVE_NAME_LENGTH &&
-	collapse(host).includes(claimant)
+const hostBelongsTo = (
+	host: string,
+	claimantSpellings: ReadonlyArray<string>,
+): boolean =>
+	claimantSpellings.some(
+		spelling =>
+			spelling.length >= DISTINCTIVE_NAME_LENGTH &&
+			collapse(host).includes(spelling),
+	)
 
 type WebsiteVerdict =
 	| 'keep'
@@ -230,19 +255,26 @@ const classifyWebsite = (args: {
 	// trading name and leaves the legal form out, so the form is taken out here
 	// too, wherever in the name it sits. This asks whether the address names the
 	// company, which is a looser question than who the company is.
-	const core = nameWithoutForms(name)
+	const spellings = spellingsWithoutForms(name)
 	// With no distinctive name to look for, there is no way to tell a listing from
 	// the company's own site, so keep it.
-	if (core === '') return 'keep'
+	if (spellings.length === 0) return 'keep'
 	// The host itself carries the company's name — its own site, whatever the path.
-	if (collapse(host).includes(core)) return 'keep'
+	if (spellings.some(spelling => collapse(host).includes(spelling)))
+		return 'keep'
 	// The name appears only in a deeper path segment of a host that is not the
 	// company's: the signature of a directory's page about it. The first segment is
 	// excluded, because a company's own site describes itself right there
 	// ("xpo.com/about-xpo-logistics") while a directory files it one level down
 	// ("company/<name>").
 	const segments = pathSegmentsOf(website)
-	if (segments.slice(1).some(segment => collapse(segment).includes(core))) {
+	if (
+		segments
+			.slice(1)
+			.some(segment =>
+				spellings.some(spelling => collapse(segment).includes(spelling)),
+			)
+	) {
 		return 'profile_page'
 	}
 	// A host several companies in this answer call their own, and that none of them
@@ -261,7 +293,7 @@ const classifyWebsite = (args: {
 	if (
 		claimants !== undefined &&
 		claimants.size > 1 &&
-		![...claimants].some(claimant => hostBelongsTo(host, claimant))
+		![...claimants.values()].some(claimant => hostBelongsTo(host, claimant))
 	) {
 		return 'shared_host'
 	}
@@ -313,6 +345,19 @@ export interface WebsiteGuardResult {
 	 * company's sources may not count one of these as its own site.
 	 */
 	readonly ownSiteUnknown: number
+	/**
+	 * Websites judged against a name holding no word of the company's own —
+	 * "Grupo Express SL", which says a kind of company and a trade and no more.
+	 *
+	 * Counted so the numbers above can be read honestly, because these rows were
+	 * judged on less than the rest: nothing can establish their site (there is no
+	 * word for a domain to spell, so even grupoexpress.cat lands in
+	 * `ownSiteUnknown`), and the rules that weigh an address against a name have
+	 * only the whole name to go on. Their `unknown` therefore means "could never
+	 * have been anything else", not "nothing vouched for it", and the two must
+	 * not be added up as if they were one answer.
+	 */
+	readonly namedNobodyInParticular: number
 }
 
 /**
@@ -340,7 +385,18 @@ export const guardCompanyWebsites = (
 	let blankedReadPage = 0
 	let ownSiteEstablished = 0
 	let ownSiteUnknown = 0
+	let namedNobodyInParticular = 0
 	const hostClaims = collectHostClaims(findings)
+
+	// A name the guard could read, holding no word of the company's own. Counted
+	// as the website is judged rather than by its verdict, because what it records
+	// is how much the rules had to go on — which is the same whichever way they
+	// then went. A name with nothing readable in it at all is a different miss and
+	// is not counted here.
+	const countNamedNobodyInParticular = (name: string): void => {
+		if (spellingsWithoutForms(name).length > 0 && namesNobodyInParticular(name))
+			namedNobodyInParticular++
+	}
 
 	// Ask the survivor the question none of the rules above can answer, and keep
 	// the answer beside their counts. Asked only of a website that is staying,
@@ -386,6 +442,7 @@ export const guardCompanyWebsites = (
 			typeof value['value'] === 'string' &&
 			typeof value['name'] !== 'string'
 		) {
+			countNamedNobodyInParticular(targetName ?? '')
 			const verdict = classifyWebsite({
 				name: targetName ?? '',
 				website: value['value'],
@@ -407,6 +464,7 @@ export const guardCompanyWebsites = (
 		const name = value['name']
 		const website = value['website']
 		if (typeof name === 'string' && typeof website === 'string') {
+			countNamedNobodyInParticular(name)
 			const verdict = classifyWebsite({
 				name,
 				website,
@@ -440,5 +498,6 @@ export const guardCompanyWebsites = (
 		blankedReadPage,
 		ownSiteEstablished,
 		ownSiteUnknown,
+		namedNobodyInParticular,
 	}
 }

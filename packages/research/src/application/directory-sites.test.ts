@@ -664,4 +664,62 @@ describe('siteVerdict', () => {
 			expect(siteVerdict('anything', new Set())).toBe('unknown')
 		})
 	})
+
+	describe("when one of the run's companies is written with a geminated l", () => {
+		it('should watch the host file it whichever way the slug spells it', () => {
+			// GIVEN two of the run's companies filed on one host, one of them Catalan
+			// WHEN the listing writes the geminate with one l, and when it doubles it
+			// THEN the host is watched filing both companies either way. Read only
+			// the way the name is written, half the listings file the company under a
+			// spelling the run cannot recognise and the listing keeps its standing as
+			// that company's own website
+			for (const filed of ['instalacions-vives', 'installacions-vives']) {
+				const observation = observe(
+					['Instal·lacions Vives SL', 'Fusteria Miquel SL'],
+					[
+						`https://empreses.cat/fitxa/${filed}`,
+						'https://empreses.cat/fitxa/fusteria-miquel',
+					],
+				)
+				expect([...observation.sites]).toEqual(['empreses.cat'])
+			}
+		})
+
+		it('should read its two rows as one company however each spells the name', () => {
+			// GIVEN one firm listed twice, the way a Catalan list writes it — once
+			// under its trade name with the mark, once at more length without it
+			const observation = observe(
+				['Instal·lacions Vives SL', 'Instalacions Vives Serveis SL'],
+				[
+					'https://empreses.cat/fitxa/instalacions-vives',
+					'https://empreses.cat/fitxa/instalacions-vives-serveis',
+				],
+			)
+
+			// WHEN the host is judged
+			// THEN it is no listing: the longer name is the shorter one written at
+			// more length, and one company met twice cannot reach the two it takes.
+			// Compared only as each name is written, the two spellings would hide
+			// that from the rule and a firm's own site would be called a directory
+			expect([...observation.sites]).toEqual([])
+		})
+
+		it('should count its two spellings as the one company they are', () => {
+			// GIVEN a single Catalan company, filed twice on one host — once under
+			// each spelling of its name
+			const observation = observe(
+				['Instal·lacions Vives SL'],
+				[
+					'https://empreses.cat/fitxa/instalacions-vives',
+					'https://empreses.cat/altres/installacions-vives',
+				],
+			)
+
+			// WHEN the host is judged
+			// THEN it is no listing. It takes two of the run's companies to be one,
+			// and one company written two ways is still one — counted apart, a firm's
+			// own site would reach two on its own and lose the company its website
+			expect([...observation.sites]).toEqual([])
+		})
+	})
 })
