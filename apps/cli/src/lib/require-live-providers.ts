@@ -43,8 +43,12 @@ export class StubbedProvidersRefused extends Data.TaggedError(
 }> {
 	// The TUI prints `error.message` directly, so the reason has to live here.
 	override get message(): string {
+		const named =
+			this.stubbed.length === 1
+				? this.stubbed[0]
+				: `${this.stubbed.slice(0, -1).join(', ')} and ${this.stubbed[this.stubbed.length - 1]}`
 		return [
-			`Refused to run \`${this.command}\`: ${this.stubbed.join(' and ')} would answer with canned data.`,
+			`Refused to run \`${this.command}\`: ${named} would answer with canned data.`,
 			'A pass would finish clean and report numbers about companies that do not exist.',
 			'Point them at a real vendor, or use a command that does not need them.',
 		].join(' ')

@@ -159,6 +159,11 @@ export {
 	researchToolkitLayer,
 	researchToolkitWireFormat,
 } from './application/tools'
+export {
+	makeUsageMeter,
+	UsageMeter,
+	type UsageSnapshot,
+} from './application/usage-meter'
 // ── Domain ─────────────────────────────────────────────────────────────────
 export { AcceptedCountry } from './domain/country'
 export {

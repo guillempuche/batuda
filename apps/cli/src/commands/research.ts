@@ -41,6 +41,7 @@ import {
 	type ModelProbeResult,
 	makeResearchLlmLive,
 	makeResearchProvidersLive,
+	makeUsageMeter,
 	OrganisationKindVerdictsSchema,
 	organisationKindPrompt,
 	outcomeFromContactRun,
@@ -60,6 +61,7 @@ import {
 	type SystemDefaults,
 	scoreContactRun,
 	scoreRun,
+	UsageMeter,
 } from '@batuda/research'
 
 import { SqlLive } from '../db'
@@ -711,10 +713,20 @@ export const researchEval = (opts: {
 		// writer tier only phrases the human brief, which nothing here scores, and the
 		// company registers are asked to be off for a comparison — so neither is
 		// required, and demanding them would refuse a correct setup.
-		yield* requireLiveProviders('research eval', {
+		//
+		// A dry run spends nothing, so a part left on canned answers is something for
+		// it to report rather than a reason to stop: checking the golden file is often
+		// the whole point of asking, and on a machine with no keys at all it would
+		// otherwise be the one thing that could not be checked.
+		const routingRefusal = yield* requireLiveProviders('research eval', {
 			tiers: ['agent', 'extract'],
 			capabilities: ['search', 'scrape'],
-		})
+		}).pipe(
+			Effect.as<string | null>(null),
+			Effect.catchTag('StubbedProvidersRefused', error =>
+				opts.dryRun ? Effect.succeed(error.message) : Effect.fail(error),
+			),
+		)
 		const raw = yield* Effect.tryPromise({
 			try: () => readFile(fromRepoRoot(opts.goldenPath), 'utf8'),
 			catch: error => new Error(`cannot read golden set: ${String(error)}`),
@@ -731,12 +743,15 @@ export const researchEval = (opts: {
 
 		if (opts.dryRun) {
 			// Everything a real pass checks before it spends anything: the database is
-			// this machine's, no part of the pipeline would answer with canned data,
-			// and every row of the golden file parses. Both guards above have already
-			// run, so reaching here means only the file and the price are left to say.
+			// this machine's, every row of the golden file parses, and no part of the
+			// pipeline would answer with canned data — that last one reported rather
+			// than thrown, so the rest is still said on a machine set up with stubs.
 			yield* Console.log(
 				`${golden.length} row(s) ready, ${errors.length} rejected.`,
 			)
+			if (routingRefusal !== null) {
+				yield* Console.log(`Would not run: ${routingRefusal}`)
+			}
 			const runsTotal = golden.length * opts.runs
 			const price = yield* estimatedPassCents(opts.priceFrom, runsTotal)
 			yield* Console.log(
@@ -780,6 +795,12 @@ export const researchEval = (opts: {
 			'eval.companies': golden.length,
 		})
 
+		// The judge's calls sit outside any research run, and a run makes its own
+		// meter inside itself — so without one here they are billed to nobody and
+		// leave the cost per run looking like the whole price of a pass. This one
+		// catches exactly those calls: a run's own model calls use the run's meter.
+		const judgeMeter = yield* makeUsageMeter
+
 		const scores = yield* Effect.gen(function* () {
 			const defaults = yield* systemDefaults
 			// A round is one pass over every company. Repeats are rounds rather than a
@@ -816,7 +837,12 @@ export const researchEval = (opts: {
 				),
 			)
 			return perRound.flat()
-		}).pipe(Effect.provide(researchLive), Effect.provide(cacheSettings))
+		}).pipe(
+			Effect.provide(researchLive),
+			Effect.provide(cacheSettings),
+			Effect.provideService(UsageMeter, judgeMeter),
+		)
+		const judgeSpend = yield* judgeMeter.snapshot()
 
 		for (const company of golden) {
 			yield* Console.log(
@@ -829,6 +855,15 @@ export const researchEval = (opts: {
 
 		const report = buildEvalReport(scores)
 		yield* Console.log(formatSummary(report.summary))
+		// Printed apart from the cost per run above, which counts only what the runs
+		// themselves were billed. Asking a model what kind of organisation each row of
+		// a market list is happens after a run has finished, so folding it into that
+		// figure would charge the research for a question the measurement asked.
+		if (judgeSpend.costCents > 0) {
+			yield* Console.log(
+				`Judging the list cost:  ${cents(judgeSpend.costCents)} over the whole pass (not in the per-run figures above)`,
+			)
+		}
 		if (opts.byBucket) {
 			yield* Console.log(formatGroups('By bucket', report.byBucket))
 			yield* Console.log(formatGroups('By country', report.byCountry))
