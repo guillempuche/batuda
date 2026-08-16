@@ -96,7 +96,17 @@ infisical run --env=dev -- env DATABASE_URL="postgresql://batuda:batuda@localhos
 
 The eval refuses to start against a database that is not on this machine, so a forgotten pin stops the run rather than filling a shared database with a pass's runs, sources and cached answers — several of which point at page text held only in that process's memory, which the server would later fail to read and pay to fetch again.
 
-**Validate one company before the billable pass.** The full set is ~$10–15 and a few hours of live scraping and LLM calls, so first run a one-row golden with `--runs 1` (a few cents). A wrong vendor/model, an expired key, or a network-blocked provider fails in seconds and shows up as a 100% empty rate — the cheap early signal that the routing is wrong before you spend on all 20 companies.
+**Check before the billable pass — it costs nothing.**
+
+```bash
+pnpm cli research eval --org <org-id> --user <user-id> --golden eval/golden.json --dry-run --price-from report.json
+```
+
+`--dry-run` spends nothing and runs every pre-flight a real pass runs: the database is this machine's, no part of the pipeline would answer with canned data, and every golden row parses — each rejected row printed with its reason. It then says how many runs would execute, and with `--price-from <report.json>` prices them from what an earlier pass actually cost per run rather than from a guess. Without that flag it prints the count alone; no earlier pass, no price.
+
+The pass refuses outright if a part it measures through would answer with canned data (a stub), so a mistyped vendor stops in seconds instead of running for hours and reporting a 100% empty rate. A part set to `none` is not refused — that is switched off, which is a deliberate setting and reads honestly in the result.
+
+Even so, run a one-row golden with `--runs 1` (a few cents) before the full set: the guards prove the routing resolves, not that a key is live or that a provider will answer from this network.
 
 ## The golden file
 

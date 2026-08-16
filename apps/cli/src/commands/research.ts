@@ -426,6 +426,42 @@ const driveOne = (
 	})
 
 /**
+ * What a pass would cost, from what the last one actually cost.
+ *
+ * The eval already measures cost per run, so the price of the next pass is that
+ * figure times the runs about to happen rather than a number anybody guessed. With
+ * no earlier report to read there is no price, and saying so beats inventing one.
+ */
+const estimatedPassCents = (
+	priceFrom: Option.Option<string>,
+	runsTotal: number,
+): Effect.Effect<number | null> =>
+	Option.isNone(priceFrom)
+		? Effect.succeed(null)
+		: Effect.tryPromise({
+				try: () => readFile(fromRepoRoot(priceFrom.value), 'utf8'),
+				catch: error => new Error(String(error)),
+			}).pipe(
+				Effect.map(raw => {
+					const parsed: unknown = JSON.parse(raw)
+					const costPerRun =
+						typeof parsed === 'object' &&
+						parsed !== null &&
+						'summary' in parsed &&
+						typeof parsed.summary === 'object' &&
+						parsed.summary !== null &&
+						'costPerRun' in parsed.summary &&
+						typeof parsed.summary.costPerRun === 'number'
+							? parsed.summary.costPerRun
+							: null
+					return costPerRun === null ? null : costPerRun * runsTotal
+				}),
+				// An unreadable or unrecognisable report is not a reason to refuse a run
+				// that spends nothing — it only means there is no price to quote.
+				Effect.catchCause(() => Effect.succeed(null)),
+			)
+
+/**
  * Puts a market list's rows to the extract tier, which is the cheap one and enough
  * for a question a row answers about itself.
  *
@@ -666,6 +702,8 @@ export const researchEval = (opts: {
 	readonly runs: number
 	readonly out: Option.Option<string>
 	readonly byBucket: boolean
+	readonly dryRun: boolean
+	readonly priceFrom: Option.Option<string>
 }) =>
 	Effect.gen(function* () {
 		yield* requireLocalDatabase('research eval')
@@ -690,6 +728,24 @@ export const researchEval = (opts: {
 			return yield* Effect.fail(new Error('golden set has no valid rows'))
 		}
 		yield* requireMarketSchema(golden, opts.schemaName)
+
+		if (opts.dryRun) {
+			// Everything a real pass checks before it spends anything: the database is
+			// this machine's, no part of the pipeline would answer with canned data,
+			// and every row of the golden file parses. Both guards above have already
+			// run, so reaching here means only the file and the price are left to say.
+			yield* Console.log(
+				`${golden.length} row(s) ready, ${errors.length} rejected.`,
+			)
+			const runsTotal = golden.length * opts.runs
+			const price = yield* estimatedPassCents(opts.priceFrom, runsTotal)
+			yield* Console.log(
+				price === null
+					? `${runsTotal} run(s) would execute. No price: pass --price-from <report.json> from an earlier pass to cost this one.`
+					: `${runsTotal} run(s) would execute, about ${cents(price)} at the last pass's measured cost per run.`,
+			)
+			return
+		}
 
 		// One pass is cheap because it reads whatever an earlier pass left behind. A
 		// repeat cannot afford to: an answer served from the first round's cache is

@@ -1082,8 +1082,31 @@ const researchEvalCommand = Command.make(
 				'Also print the metrics broken out by size/reach bucket and by country, so a regression in one segment is not averaged away',
 			),
 		),
+		dryRun: Flag.boolean('dry-run').pipe(
+			Flag.withDescription(
+				'Check everything a pass needs and spend nothing: that the database is local, that no part of the pipeline would answer with canned data, and that every golden row parses. Prints how many runs would execute',
+			),
+		),
+		priceFrom: Flag.string('price-from').pipe(
+			Flag.withDescription(
+				"Report JSON from an earlier pass, used to price a --dry-run from that pass's measured cost per run rather than a guess",
+			),
+			Flag.optional,
+		),
 	},
-	({ org, user, golden, schema, language, concurrency, runs, out, byBucket }) =>
+	({
+		org,
+		user,
+		golden,
+		schema,
+		language,
+		concurrency,
+		runs,
+		out,
+		byBucket,
+		dryRun,
+		priceFrom,
+	}) =>
 		researchEval({
 			org,
 			user,
@@ -1094,6 +1117,8 @@ const researchEvalCommand = Command.make(
 			runs,
 			out,
 			byBucket,
+			dryRun,
+			priceFrom,
 		}),
 ).pipe(
 	Command.withShortDescription(
