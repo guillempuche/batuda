@@ -356,7 +356,9 @@ describe('guardCompanyWebsites', () => {
 			// GIVEN a competitor the model gave no website
 			const findings = scan([{ name: 'Acme Logistics' }])
 
-			// WHEN checked — THEN nothing to blank, and it is unchanged
+			// WHEN checked — THEN nothing to blank, and it is unchanged. There is no
+			// address to establish anything about either, so neither ownership count
+			// moves: a row with no website is not a row whose website is unvouched for
 			const result = guardCompanyWebsites(findings)
 			expect(result).toEqual({
 				findings,
@@ -365,6 +367,8 @@ describe('guardCompanyWebsites', () => {
 				blankedProfilePage: 0,
 				blankedSharedHost: 0,
 				blankedReadPage: 0,
+				ownSiteEstablished: 0,
+				ownSiteUnknown: 0,
 			})
 		})
 
@@ -1118,6 +1122,211 @@ describe('guardCompanyWebsites', () => {
 			expect(prospectWebsites(result.findings)).toEqual([undefined])
 			expect(result.blankedProfilePage).toBe(1)
 			expect(result.blankedReadPage).toBe(0)
+		})
+	})
+
+	describe('when a website survives every rule', () => {
+		it("should say whether anything establishes it as the company's own site", () => {
+			// GIVEN two companies that both keep their address: one at the domain its
+			// name spells, one at a host that spells nothing
+			const findings = scan([
+				{ name: 'Redwood Logistics', website: 'https://redwoodlogistics.com' },
+				{ name: 'KBE Energy', website: 'https://annuaire.tecsol.fr' },
+			])
+
+			// WHEN checked
+			// THEN both are kept and the two are told apart anyway, which is the whole
+			// point: surviving the rules is not the same statement as owning the site
+			const result = guardCompanyWebsites(findings)
+			expect(websitesOf(result.findings)).toEqual([
+				'https://redwoodlogistics.com',
+				'https://annuaire.tecsol.fr',
+			])
+			expect(result.ownSiteEstablished).toBe(1)
+			expect(result.ownSiteUnknown).toBe(1)
+		})
+
+		it('should count nothing for a website it blanked', () => {
+			// GIVEN an address the deeper-path rule takes away
+			const findings = scan([
+				{
+					name: 'Redwood Logistics',
+					website: 'https://cbinsights.com/company/redwood-logistics',
+				},
+			])
+
+			// WHEN checked — THEN an address that is gone has no ownership left to
+			// establish, so it lands in neither column rather than swelling the
+			// unvouched-for one
+			const result = guardCompanyWebsites(findings)
+			expect(result.blankedProfilePage).toBe(1)
+			expect(result.ownSiteEstablished + result.ownSiteUnknown).toBe(0)
+		})
+	})
+
+	describe('when a kept address gives the rules nothing to work with', () => {
+		it('should read a bare host on an unrelated domain as unestablished', () => {
+			// GIVEN a listing's home page, cited as the page read. With no path there
+			// is no page to tell apart from the site, so the read-page rule stands
+			// down by design
+			const findings = cited([
+				{
+					name: 'KBE Energy',
+					website: 'https://annuaire.tecsol.fr',
+					sources: ['https://annuaire.tecsol.fr'],
+				},
+			])
+
+			// WHEN checked — THEN it is kept, and unvouched for
+			const result = guardCompanyWebsites(findings)
+			expect(prospectWebsites(result.findings)).toEqual([
+				'https://annuaire.tecsol.fr',
+			])
+			expect(result.ownSiteUnknown).toBe(1)
+		})
+
+		it('should read a row citing nothing as unestablished', () => {
+			// GIVEN a row whose citations a guard ahead of this one already dropped,
+			// which leaves the read-page rule with no provenance to weigh
+			const findings = cited([
+				{ name: 'KBE Energy', website: TECSOL_LISTING, sources: [] },
+			])
+
+			// WHEN checked — THEN silence about where a claim came from is not a
+			// reason to call the address the company's
+			const result = guardCompanyWebsites(findings)
+			expect(prospectWebsites(result.findings)).toEqual([TECSOL_LISTING])
+			expect(result.ownSiteUnknown).toBe(1)
+		})
+
+		it('should read a row with a second source elsewhere as unestablished', () => {
+			// GIVEN a listing address on a row something else also mentioned, which
+			// stands the read-page rule down
+			const findings = cited([
+				{
+					name: 'KBE Energy',
+					website: TECSOL_LISTING,
+					sources: [TECSOL_LISTING, 'https://www.lemoniteur.fr/kbe-energy'],
+				},
+			])
+
+			// WHEN checked — THEN a second source about the COMPANY says nothing about
+			// who owns the ADDRESS, so it buys the address no standing
+			const result = guardCompanyWebsites(findings)
+			expect(prospectWebsites(result.findings)).toEqual([TECSOL_LISTING])
+			expect(result.ownSiteUnknown).toBe(1)
+		})
+
+		it('should read a slug carrying a word of the name as unestablished', () => {
+			// GIVEN a listing whose trade slug happens to spell a word of the name,
+			// which reads to the read-page rule as the address naming the company
+			const listing = 'https://annuaire.fr/energy-installateurs-12345'
+			const findings = cited([
+				{ name: 'KBE Energy', website: listing, sources: [listing] },
+			])
+
+			// WHEN checked — THEN the coincidence buys nothing here, because a path
+			// names a page about the company rather than the company's site
+			const result = guardCompanyWebsites(findings)
+			expect(prospectWebsites(result.findings)).toEqual([listing])
+			expect(result.ownSiteUnknown).toBe(1)
+		})
+
+		it('should read a row citing an opaque source id as unestablished', () => {
+			// GIVEN a row citing its page by the id the run stored it under, which
+			// carries no host for the read-page rule to compare
+			const findings = cited([
+				{
+					name: 'KBE Energy',
+					website: TECSOL_LISTING,
+					sources: ['src_9f2a1b3c4d5e6f70'],
+				},
+			])
+
+			// WHEN checked — THEN a citation nothing can be read off is not a
+			// clearance
+			const result = guardCompanyWebsites(findings)
+			expect(prospectWebsites(result.findings)).toEqual([TECSOL_LISTING])
+			expect(result.ownSiteUnknown).toBe(1)
+		})
+	})
+
+	describe("when ownership is asked of the run's own answer for the target", () => {
+		it('should hold that field to the same bar as a scanned row', () => {
+			// GIVEN one address on a host that spells no part of the name, put twice:
+			// as the run's own answer for the target, whose single source is a page
+			// elsewhere, and as an ordinary scanned row
+			const website = 'https://kbe-groupe.example/nos-activites'
+			const target = guardCompanyWebsites(
+				{
+					enrichment: {
+						website: {
+							value: website,
+							source_id: 'https://www.lemoniteur.fr/kbe-energy',
+							confidence: null,
+						},
+					},
+				},
+				'KBE Energy',
+			)
+			const row = guardCompanyWebsites(
+				cited([
+					{
+						name: 'KBE Energy',
+						website,
+						sources: [website, 'https://www.lemoniteur.fr/kbe-energy'],
+					},
+				]),
+			)
+
+			// WHEN both are checked
+			// THEN both keep the address and both read it as unestablished. That field
+			// carries exactly one source and can never carry a second, so a rule that
+			// stands down once a row has two is weaker there than anywhere else — and
+			// this question reads no sources at all, so the bar is the same
+			expect(target.ownSiteEstablished).toBe(0)
+			expect(target.ownSiteUnknown).toBe(1)
+			expect(row.ownSiteEstablished).toBe(0)
+			expect(row.ownSiteUnknown).toBe(1)
+		})
+
+		it("should establish the target's own site against the name it was told", () => {
+			// GIVEN the company's real domain as the run's answer for the target
+			const findings = {
+				enrichment: {
+					website: {
+						value: 'https://redwoodlogistics.com/about',
+						source_id: 'src_a',
+						confidence: null,
+					},
+				},
+			}
+
+			// WHEN checked against the company the run is about
+			// THEN the name told from outside is what the domain is read against, so
+			// the field that arrives with no name beside it can still be established
+			const result = guardCompanyWebsites(findings, 'Redwood Logistics')
+			expect(result.ownSiteEstablished).toBe(1)
+			expect(result.ownSiteUnknown).toBe(0)
+		})
+
+		it('should establish nothing for that field when no name was told', () => {
+			// GIVEN the same real domain on a run that was given no target name
+			const findings = {
+				enrichment: {
+					website: {
+						value: 'https://redwoodlogistics.com/about',
+						source_id: 'src_a',
+						confidence: null,
+					},
+				},
+			}
+
+			// WHEN checked with nothing to compare — THEN unknown, because there is no
+			// company for the domain to be the company's own site OF
+			const result = guardCompanyWebsites(findings)
+			expect(result.ownSiteEstablished).toBe(0)
+			expect(result.ownSiteUnknown).toBe(1)
 		})
 	})
 

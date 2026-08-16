@@ -9,8 +9,10 @@ import {
 	domainHost,
 	type EntityTargets,
 	groundedSourceIds,
+	hostLabel,
 	isConfirmedRegistryMatch,
 	isOwnSiteHost,
+	labelSpellsOneOf,
 	parseQueryDomain,
 	placesCorroborate,
 	queryPlaces,
@@ -597,6 +599,89 @@ describe('domainHost', () => {
 			// GIVEN text with no dot, or too short to be a host
 			expect(domainHost('localhost')).toBeUndefined()
 			expect(domainHost('a.b')).toBeUndefined()
+		})
+	})
+})
+
+describe('labelSpellsOneOf', () => {
+	describe('when the label is one of the names', () => {
+		it('should accept it whole and with the legal form after it', () => {
+			// GIVEN a workshop's domain written both ways
+			// WHEN read against the name — THEN a form on the end is the company
+			// still writing itself, so both spell it
+			expect(labelSpellsOneOf('fusteriamiquel', ['fusteriamiquel'])).toBe(true)
+			expect(labelSpellsOneOf('fusteriamiquelsl', ['fusteriamiquel'])).toBe(
+				true,
+			)
+		})
+
+		it('should read any one of the names offered', () => {
+			// GIVEN several ways the company could have registered
+			// WHEN read — THEN one of them spelling the label is enough
+			expect(labelSpellsOneOf('acme', ['acmelogistics', 'acme'])).toBe(true)
+		})
+	})
+
+	describe('when the label carries more than the name', () => {
+		it('should refuse anything appended that is not a legal form', () => {
+			// GIVEN a review site named after the company
+			// WHEN read — THEN whoever registered it writes ABOUT the company
+			expect(labelSpellsOneOf('acmelogisticsreviews', ['acmelogistics'])).toBe(
+				false,
+			)
+		})
+
+		it('should refuse a name the label merely contains', () => {
+			// GIVEN a domain with a word in front of the name
+			// WHEN read — THEN the name has to BE the label, not sit inside it
+			expect(labelSpellsOneOf('grupoacme', ['acme'])).toBe(false)
+		})
+	})
+
+	describe('when there is no name to read', () => {
+		it('should refuse an empty list', () => {
+			// GIVEN a caller whose names came back empty
+			// WHEN read — THEN no, rather than yes out of having nothing to compare
+			expect(labelSpellsOneOf('acme', [])).toBe(false)
+		})
+
+		it('should refuse an empty name among real ones', () => {
+			// GIVEN a name with nothing in it, which every label starts with
+			// WHEN read
+			// THEN it spells nothing. Left in, it would hand every domain a yes — and
+			// a label that happens to be a legal form ("sl") would get one twice over
+			expect(labelSpellsOneOf('acme', [''])).toBe(false)
+			expect(labelSpellsOneOf('sl', ['', 'acme'])).toBe(false)
+		})
+	})
+})
+
+describe('hostLabel', () => {
+	describe('when given a host with a label to read', () => {
+		it('should return the label the domain is registered under', () => {
+			// GIVEN hosts with a subdomain, a plain domain, and a country second level
+			// WHEN read — THEN what is left is the label somebody registered
+			expect(hostLabel('annuaire.tecsol.fr')).toBe('tecsol')
+			expect(hostLabel('acme.com')).toBe('acme')
+			expect(hostLabel('shop.acme.co.uk')).toBe('acme')
+		})
+
+		it('should keep a label too short to stand on its own', () => {
+			// GIVEN the large carriers' three-letter domains
+			// WHEN read
+			// THEN they come back whole. Whether three letters mean anything depends
+			// on the question asked of them, so the floor belongs to the caller
+			expect(hostLabel('xpo.com')).toBe('xpo')
+			expect(hostLabel('dsv.com')).toBe('dsv')
+		})
+	})
+
+	describe('when given something with no label', () => {
+		it('should return an empty string', () => {
+			// GIVEN a bare word, which is all the top level with nothing under it
+			// WHEN read — THEN nothing, rather than the top level read as a name
+			expect(hostLabel('localhost')).toBe('')
+			expect(hostLabel('')).toBe('')
 		})
 	})
 })

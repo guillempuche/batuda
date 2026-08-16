@@ -25,6 +25,16 @@
  * describes itself in the first path segment ("xpo.com/about-xpo-logistics"), and a
  * blank costs a real website, so the bar to blank is deliberately high.
  *
+ * Every one of those rules only ever BLANKS. None of them can say a website is
+ * the company's own, so "kept" means "not condemned" and a caller reading it as
+ * ownership answers yes out of silence. That question has its own answer next
+ * door — `ownSiteVerdict` in `own-site.ts` — and every website this leaves
+ * standing is put to it, so the counts below say not only how many addresses
+ * went but how many of the survivors anything actually establishes. Like the
+ * blank counts beside them, they describe the answer handed to THIS call. A run
+ * that extracts several times and folds the results together has to put the
+ * folded answer to the verdict itself.
+ *
  * The address rule and the deeper-path rule read only a name and a website, so they
  * need no evidence corpus and no database. They fire on any object carrying both —
  * a scanned competitor or prospect — and on the run's own answer for the target's
@@ -44,6 +54,7 @@ import {
 	nameWithoutForms,
 } from './entity-guard'
 import { isPlainObject } from './guard-shapes'
+import { ownSiteVerdict } from './own-site'
 import { hostOf, isBareWebAddress, pathOf } from './source-key'
 
 const SKIP_KEYS = new Set(['citations', 'proposed_updates'])
@@ -294,6 +305,14 @@ export interface WebsiteGuardResult {
 	readonly blankedSharedHost: number
 	/** Websites blanked because they were the page the row's claim was read from. */
 	readonly blankedReadPage: number
+	/** Websites left standing that are established as the company's own site. */
+	readonly ownSiteEstablished: number
+	/**
+	 * Websites left standing that nothing establishes as the company's own. Kept,
+	 * because keeping is not that verdict's decision — but a caller weighing a
+	 * company's sources may not count one of these as its own site.
+	 */
+	readonly ownSiteUnknown: number
 }
 
 /**
@@ -319,7 +338,18 @@ export const guardCompanyWebsites = (
 	let blankedProfilePage = 0
 	let blankedSharedHost = 0
 	let blankedReadPage = 0
+	let ownSiteEstablished = 0
+	let ownSiteUnknown = 0
 	const hostClaims = collectHostClaims(findings)
+
+	// Ask the survivor the question none of the rules above can answer, and keep
+	// the answer beside their counts. Asked only of a website that is staying,
+	// since one already gone has no ownership left to establish.
+	const countOwnSite = (name: string, website: string): void => {
+		if (ownSiteVerdict({ name, website }) === 'established')
+			ownSiteEstablished++
+		else ownSiteUnknown++
+	}
 
 	const count = (verdict: Exclude<WebsiteVerdict, 'keep'>): void => {
 		if (verdict === 'not_an_address') blankedNotAnAddress++
@@ -370,6 +400,7 @@ export const guardCompanyWebsites = (
 				// a reader of the profile still needs to see the key was asked for.
 				return null
 			}
+			countOwnSite(targetName ?? '', value['value'])
 			return value
 		}
 
@@ -392,6 +423,7 @@ export const guardCompanyWebsites = (
 					Object.entries(rest).map(([k, v]) => [k, walkChild(k, v)] as const),
 				)
 			}
+			countOwnSite(name, website)
 		}
 
 		return Object.fromEntries(
@@ -406,5 +438,7 @@ export const guardCompanyWebsites = (
 		blankedProfilePage,
 		blankedSharedHost,
 		blankedReadPage,
+		ownSiteEstablished,
+		ownSiteUnknown,
 	}
 }
