@@ -12,11 +12,11 @@
  */
 
 import type { MarketPart, RunOutcome } from './eval-scoring-types'
-import { anyTermAppearsIn, termTokens } from './term-match'
 import {
 	branchOfficeParents,
 	discoveryRowIdentityKeys,
 } from './prospect-dedupe-guard'
+import { anyTermAppearsIn, termTokens } from './term-match'
 
 export const partsAnsweredBy = (
 	rows: RunOutcome['companies'],
