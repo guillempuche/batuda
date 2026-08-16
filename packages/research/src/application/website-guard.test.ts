@@ -369,6 +369,7 @@ describe('guardCompanyWebsites', () => {
 				blankedReadPage: 0,
 				ownSiteEstablished: 0,
 				ownSiteUnknown: 0,
+				namedNobodyInParticular: 0,
 			})
 		})
 
@@ -1350,6 +1351,206 @@ describe('guardCompanyWebsites', () => {
 			const result = guardCompanyWebsites(findings)
 			expect(result.findings).toEqual(findings)
 			expect(result.blankedDirectory + result.blankedProfilePage).toBe(0)
+		})
+	})
+
+	describe('when the company name is written with a geminated l', () => {
+		it('should keep the site whichever way the host spells it', () => {
+			// GIVEN a Catalan company whose only source is the page on its own site,
+			// so the address naming the company is the only thing holding the value,
+			// and whose domain writes the geminate with a single l as a slug does
+			const findings = cited([
+				{
+					name: 'Il·lusions SL',
+					website: 'https://ilusions.cat/contacte',
+					sources: ['https://ilusions.cat/contacte'],
+				},
+			])
+
+			// WHEN checked
+			// THEN the site stays and is established as the company's own. Read only
+			// the way the name is written, the host spelled nothing the run knew and
+			// the company lost the very page it published
+			const result = guardCompanyWebsites(findings)
+			expect(prospectWebsites(result.findings)).toEqual([
+				'https://ilusions.cat/contacte',
+			])
+			expect(result.blankedReadPage).toBe(0)
+			expect(result.ownSiteEstablished).toBe(1)
+		})
+
+		it('should keep the site when the host doubles the l instead', () => {
+			// GIVEN the same company at the domain that keeps both l's
+			const findings = cited([
+				{
+					name: 'Il·lusions SL',
+					website: 'https://illusions.cat/contacte',
+					sources: ['https://illusions.cat/contacte'],
+				},
+			])
+
+			// WHEN checked — THEN it is kept too, so reading the name both ways costs
+			// the spelling that already worked nothing
+			const result = guardCompanyWebsites(findings)
+			expect(prospectWebsites(result.findings)).toEqual([
+				'https://illusions.cat/contacte',
+			])
+			expect(result.blankedReadPage).toBe(0)
+		})
+
+		it('should still blank a listing page that files it under either spelling', () => {
+			// GIVEN the same company on somebody else's host, filed one level down
+			// under each spelling in turn
+			// WHEN checked
+			// THEN both are blanked as the profile pages they are. Reading a name
+			// more ways sharpens this rule as much as it softens the one above —
+			// the loosening is not one-directional
+			for (const website of [
+				'https://directori.cat/empresa/ilusions',
+				'https://directori.cat/empresa/illusions',
+			]) {
+				const result = guardCompanyWebsites(
+					cited([{ name: 'Il·lusions SL', website, sources: [website] }]),
+				)
+				expect(prospectWebsites(result.findings)).toEqual([undefined])
+				expect(result.blankedProfilePage).toBe(1)
+			}
+		})
+
+		it('should keep every spelling a repeated company was written with', () => {
+			// GIVEN one Catalan company listed twice on its own host — once with the
+			// mark and once without, which is how one list writes one firm twice —
+			// beside two other companies that also gave that host
+			const findings = cited([
+				{ name: 'Il·lusions SL', website: 'https://ilusions.cat' },
+				{ name: 'Illusions SL', website: 'https://ilusions.cat' },
+				{ name: 'Fusteria Miquel SL', website: 'https://ilusions.cat' },
+				{ name: 'Serralleria Roca SL', website: 'https://ilusions.cat' },
+			])
+
+			// WHEN checked
+			// THEN nothing is blanked: the host is plainly the Catalan company's, and
+			// the reading that says so came from the row with the mark. Keeping only
+			// the later row's spellings would lose it and blank all four
+			const result = guardCompanyWebsites(findings)
+			expect(result.blankedSharedHost).toBe(0)
+			expect(prospectWebsites(result.findings)).toEqual([
+				'https://ilusions.cat',
+				'https://ilusions.cat',
+				'https://ilusions.cat',
+				'https://ilusions.cat',
+			])
+		})
+
+		it('should count one company claiming a host as one claimant, not two', () => {
+			// GIVEN one Catalan company and one other company on the same host, which
+			// the Catalan company's name is carried by
+			const findings = cited([
+				{ name: 'Il·lusions SL', website: 'https://ilusions.cat' },
+				{ name: 'Fusteria Miquel SL', website: 'https://ilusions.cat' },
+			])
+
+			// WHEN checked
+			// THEN the host is plainly the Catalan company's and nothing is blanked
+			// as a shared host. Its two spellings must count as the one company they
+			// are — counted apart, a single company would look like a crowd and the
+			// rule would fire on a host it owns
+			const result = guardCompanyWebsites(findings)
+			expect(result.blankedSharedHost).toBe(0)
+			expect(prospectWebsites(result.findings)).toEqual([
+				'https://ilusions.cat',
+				'https://ilusions.cat',
+			])
+		})
+	})
+
+	describe('when the run own target is written with a geminated l', () => {
+		it('should keep the target site whichever way its host spells the name', () => {
+			// GIVEN the run's own answer for its target's website — a value with the
+			// page it came from and no company name beside it, so the name is told
+			// from outside — at each spelling of the company's domain in turn
+			// WHEN checked against the company the run is about
+			// THEN the host carries the name either way and the site stands. This
+			// field is the strict path: it can never have a second source to stand
+			// the read-page rule down, so a host the run cannot read the name in is
+			// the whole of what holds the value
+			for (const value of [
+				'https://instalacionsvives.cat/contacte',
+				'https://installacionsvives.cat/contacte',
+			]) {
+				const findings = {
+					enrichment: {
+						website: { value, source_id: value, confidence: null },
+					},
+				}
+				const result = guardCompanyWebsites(findings, 'Instal·lacions Vives SL')
+				expect(
+					(result.findings as { enrichment: Record<string, unknown> })
+						.enrichment['website'],
+				).toEqual({ value, source_id: value, confidence: null })
+				expect(result.blankedReadPage + result.blankedProfilePage).toBe(0)
+			}
+		})
+
+		it('should still blank a listing filing the target under either spelling', () => {
+			// GIVEN a directory filing the target one level down, spelled each way
+			// WHEN checked against the company the run is about
+			// THEN both are caught as the profile pages they are
+			for (const value of [
+				'https://empreses.example.org/empresa/instalacions-vives',
+				'https://empreses.example.org/empresa/installacions-vives',
+			]) {
+				const findings = {
+					enrichment: {
+						website: { value, source_id: 'src_a', confidence: null },
+					},
+				}
+				const result = guardCompanyWebsites(findings, 'Instal·lacions Vives SL')
+				expect(
+					(result.findings as { enrichment: Record<string, unknown> })
+						.enrichment['website'],
+				).toBeNull()
+				expect(result.blankedProfilePage).toBe(1)
+			}
+		})
+	})
+
+	describe('when the company name holds no word of its own', () => {
+		it('should count the row as judged on the whole name alone', () => {
+			// GIVEN a company named only after a kind of company and a trade, beside
+			// one whose name carries a word of its own
+			const findings = cited([
+				{ name: 'Grupo Express SL', website: 'https://grupoexpress.cat' },
+				{ name: 'Fusteria Miquel SL', website: 'https://fusteriamiquel.cat' },
+			])
+
+			// WHEN checked
+			// THEN one row is recorded as named after nobody in particular, and its
+			// own exact domain still reads as unestablished — there is no word of the
+			// company's for a domain to spell, so `unknown` here means the rules could
+			// never have said anything else, not that nothing vouched for it
+			const result = guardCompanyWebsites(findings)
+			expect(result.namedNobodyInParticular).toBe(1)
+			expect(result.ownSiteEstablished).toBe(1)
+			expect(result.ownSiteUnknown).toBe(1)
+		})
+
+		it('should not count a row whose name reads as nothing at all', () => {
+			// GIVEN a row whose name is only a legal form, so there is no name to
+			// judge the address against in the first place
+			const findings = cited([
+				{ name: 'SL', website: 'https://directori.cat/empresa/algu' },
+			])
+
+			// WHEN checked
+			// THEN the website is kept, and the count stays at zero: a name that
+			// reads as nothing is a different miss from a name that reads as a trade,
+			// and adding the two together would hide both
+			const result = guardCompanyWebsites(findings)
+			expect(result.namedNobodyInParticular).toBe(0)
+			expect(prospectWebsites(result.findings)).toEqual([
+				'https://directori.cat/empresa/algu',
+			])
 		})
 	})
 })

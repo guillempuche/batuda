@@ -85,6 +85,7 @@ import {
 	hostLabel,
 	isGenericWord,
 	labelSpellsOneOf,
+	nameSpellings,
 	nameWordsWithoutForms,
 	withoutFormDots,
 } from './entity-guard'
@@ -149,12 +150,23 @@ const namesTheDomainCouldCarry = (
  * somebody writing about it.
  */
 const hostSpellsTheCompany = (name: string, host: string): boolean => {
-	const words = nameWordsWithoutForms(withoutFormDots(name))
-	if (words.length > MOST_WORDS_A_NAME_RUNS_TO) return false
-	return labelSpellsOneOf(collapse(hostLabel(host)), [
-		...namesTheDomainCouldCarry(words),
-		...distinctiveWords(name),
-	])
+	const label = collapse(hostLabel(host))
+	// The distinctive words are read off the name itself, which already offers
+	// each of them in every spelling.
+	const words = distinctiveWords(name)
+	// Every spelling of the name, since a domain writes a Catalan geminate l
+	// whichever way its owner chose and both are the same company's. The dots of a
+	// legal form come out after the spellings are read, never before, or a name
+	// written "Instal.lacions" would lose its second reading to them.
+	return nameSpellings(name).some(spelling => {
+		const spelled = nameWordsWithoutForms(withoutFormDots(spelling))
+		// A brief rather than a name, which no spelling of it can rescue.
+		if (spelled.length > MOST_WORDS_A_NAME_RUNS_TO) return false
+		return labelSpellsOneOf(label, [
+			...namesTheDomainCouldCarry(spelled),
+			...words,
+		])
+	})
 }
 
 /**

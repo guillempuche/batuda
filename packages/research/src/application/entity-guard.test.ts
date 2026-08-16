@@ -4,8 +4,10 @@ import {
 	cityGate,
 	classifyEntityMatch,
 	classifyEntityMatchPerSource,
+	coreSpellings,
 	deriveAnchorHost,
 	deriveEntityTargets,
+	distinctiveWords,
 	domainHost,
 	type EntityTargets,
 	groundedSourceIds,
@@ -13,10 +15,13 @@ import {
 	isConfirmedRegistryMatch,
 	isOwnSiteHost,
 	labelSpellsOneOf,
+	nameSpellings,
+	namesNobodyInParticular,
 	parseQueryDomain,
 	placesCorroborate,
 	queryPlaces,
 	reachedOwnSite,
+	spellingsWithoutForms,
 	withRedirectDomain,
 } from './entity-guard'
 
@@ -1004,6 +1009,329 @@ describe('cityGate', () => {
 					registryConfirmed: false,
 				}),
 			).toBe('keep')
+		})
+	})
+})
+
+describe('nameSpellings', () => {
+	describe('when the name carries no geminate mark', () => {
+		it('should read the name one way only', () => {
+			// GIVEN two different companies whose names differ by a doubled l, and
+			// neither of which marks a geminate
+			// WHEN each is read
+			// THEN each keeps its own single spelling, so nothing brings the two
+			// together. Reading every "ll" as a possible geminate would make one
+			// company of them, and both names are ordinary here
+			expect(nameSpellings('Villa Nova SL')).toEqual(['Villa Nova SL'])
+			expect(nameSpellings('Vila Nova SL')).toEqual(['Vila Nova SL'])
+			expect(spellingsWithoutForms('Villa Nova SL')).toEqual(['villanova'])
+			expect(spellingsWithoutForms('Vila Nova SL')).toEqual(['vilanova'])
+		})
+	})
+
+	describe('when the name carries a geminate mark', () => {
+		it('should read it both ways, the name as written first', () => {
+			// GIVEN a Catalan name written with an interpunct
+			// WHEN it is read
+			// THEN both ways an address may write it come back, and the name as
+			// written leads — that one is the company's identity
+			expect(spellingsWithoutForms('Instal·lacions Vives SL')).toEqual([
+				'installacionsvives',
+				'instalacionsvives',
+			])
+			expect(spellingsWithoutForms('Col·legi Oficial')).toEqual([
+				'collegioficial',
+				'colegioficial',
+			])
+		})
+
+		it('should collapse only the marked l, leaving every other doubled l alone', () => {
+			// GIVEN a name holding both a marked geminate and an ordinary doubled l
+			// WHEN it is read
+			// THEN only the marked pair is written out two ways: "Vallès" keeps its
+			// two l's in both readings, so the second reading can never reach a name
+			// that merely happens to be spelled with one
+			expect(spellingsWithoutForms('Col·legi Vallès SL')).toEqual([
+				'collegivalles',
+				'colegivalles',
+			])
+		})
+
+		it('should read the mark however it was typed, in either case', () => {
+			// GIVEN the mark written as each character a keyboard, a word processor
+			// or a paste leaves behind, and a name in capitals as a register writes it
+			// WHEN each is read
+			// THEN all of them come to the same two spellings
+			for (const mark of ['·', '·', '•', '‧', '∙', '⋅']) {
+				expect(spellingsWithoutForms(`Instal${mark}lacions`)).toEqual([
+					'installacions',
+					'instalacions',
+				])
+			}
+			expect(spellingsWithoutForms('INSTAL·LACIONS SL')).toEqual([
+				'installacions',
+				'instalacions',
+			])
+		})
+
+		it('should read several marks all the same way rather than in every mix', () => {
+			// GIVEN a name carrying two marks
+			// WHEN it is read
+			// THEN two spellings come back and not four: an address is slugged by one
+			// convention, not a different one per word
+			expect(spellingsWithoutForms('Col·legi Instal·ladors')).toEqual([
+				'collegiinstalladors',
+				'colegiinstaladors',
+			])
+		})
+
+		it('should leave a mark that is not between two l s alone', () => {
+			// GIVEN a name using the same character as a separator rather than as a
+			// geminate mark
+			// WHEN it is read
+			// THEN nothing is written out twice, because there is no geminate there
+			expect(nameSpellings('Serveis · Manteniment')).toEqual([
+				'Serveis · Manteniment',
+			])
+		})
+
+		it('should read the mark typed as an ASCII period', () => {
+			// GIVEN the geminate typed with a period, which is how a database that
+			// could not write the interpunct spells it
+			// WHEN it is read
+			// THEN both spellings come back, as for the interpunct. The reading takes
+			// the name before a legal form's dots come out, which is the only order
+			// that leaves a period there to be recognised
+			expect(spellingsWithoutForms('Instal.lacions Vives')).toEqual([
+				'installacionsvives',
+				'instalacionsvives',
+			])
+		})
+
+		it('should not mistake a legal form written in dots for the mark', () => {
+			// GIVEN names whose dots belong to a legal form rather than to a geminate
+			// WHEN each is read
+			// THEN none of them is read twice: the two l's have to touch the mark, so
+			// "S.L." holds no l-dot-l and a space sits at the join in "S.L. Lopez"
+			expect(spellingsWithoutForms('Muñoz S.L.')).toEqual(['munoz'])
+			expect(spellingsWithoutForms('Comercial S.L. Lopez')).toEqual([
+				'comerciallopez',
+			])
+			// Both halves of the Mexican form go, wherever they sit, leaving the word
+			// that joined them — this reading takes forms out rather than reading one
+			// off the end, which is `coreSpellings`' job
+			expect(spellingsWithoutForms('Grupo Ejemplo S.A. de C.V.')).toEqual([
+				'grupoejemplode',
+			])
+			expect(coreSpellings('Grupo Ejemplo S.A. de C.V.')).toEqual([
+				'grupoejemplo',
+			])
+		})
+	})
+
+	describe('when a legal form is written in dots', () => {
+		it('should read the name the same way for every caller', () => {
+			// GIVEN a name whose legal form is written in dots, which is the ordinary
+			// Spanish spelling
+			// WHEN the reading is asked for it
+			// THEN the form is gone. Putting the dots back together belongs to the
+			// reading rather than to each caller: while one caller did it and the
+			// other did not, the same name was "munoz" to the directory watch and
+			// "munozsl" to the website guard, and the guard looking for the longer one
+			// could not find the company on its own munoz.es
+			expect(spellingsWithoutForms('Muñoz S.L.')).toEqual(['munoz'])
+			expect(coreSpellings('Muñoz S.L.')).toEqual(['munoz'])
+		})
+
+		it('should give a run the same keys as the name written without dots', () => {
+			// GIVEN one company written both ways a Spanish list writes it
+			const dotted = deriveEntityTargets({
+				schemaName: 'company_enrichment_v1',
+				query: 'Muñoz S.L.',
+				subjects: [{ table: 'companies', name: 'Muñoz S.L.' }],
+			})
+			const plain = deriveEntityTargets({
+				schemaName: 'company_enrichment_v1',
+				query: 'Muñoz SL',
+				subjects: [{ table: 'companies', name: 'Muñoz SL' }],
+			})
+
+			// WHEN each is turned into match keys
+			// THEN they are the same keys. Two rows of one list spelling the form
+			// differently is the ordinary case, and the dotted one used to carry the
+			// form into its key and land the company under a name of its own
+			expect(dotted?.cores).toEqual(plain?.cores)
+			expect(dotted?.cores).toEqual(['munoz'])
+		})
+
+		it('should keep a Catalan name readable both ways through the dots', () => {
+			// GIVEN a Catalan name carrying both a dotted geminate and a dotted form
+			// WHEN it is read
+			// THEN the geminate is read first and the form's dots come out after, so
+			// neither spelling is lost to the other rule
+			expect(spellingsWithoutForms('Instal.lacions Vives S.L.')).toEqual([
+				'installacionsvives',
+				'instalacionsvives',
+			])
+		})
+	})
+
+	describe('when the name has nothing left after its legal form', () => {
+		it('should offer no key at all', () => {
+			// GIVEN a name that is only a legal form, and an empty one
+			// WHEN read
+			// THEN there is no key to look for, so a caller cannot be handed one that
+			// every address would match
+			expect(spellingsWithoutForms('SL')).toEqual([])
+			expect(spellingsWithoutForms('')).toEqual([])
+			expect(nameSpellings('')).toEqual([''])
+		})
+	})
+})
+
+describe('coreSpellings', () => {
+	describe('when a geminate name closes with a legal form', () => {
+		it('should read both spellings with the form off the end', () => {
+			// GIVEN a Catalan name with a trailing legal form
+			// WHEN its strong-match keys are read
+			// THEN both spellings come back without the form
+			expect(coreSpellings('Instal·lacions Vives SL')).toEqual([
+				'installacionsvives',
+				'instalacionsvives',
+			])
+		})
+	})
+
+	describe('when the name carries no mark', () => {
+		it('should read the one key it always did', () => {
+			// GIVEN an ordinary name
+			// WHEN its keys are read
+			// THEN there is exactly one, unchanged
+			expect(coreSpellings('Acme Logistics Ltd')).toEqual(['acmelogistics'])
+		})
+	})
+})
+
+describe('distinctiveWords', () => {
+	describe('when a word of the name carries a geminate mark', () => {
+		it('should offer that word in both spellings', () => {
+			// GIVEN a name whose distinctive word is geminated
+			// WHEN its distinctive words are read
+			// THEN both spellings are there, so an address writing either is
+			// recognised, and a word carrying no mark still appears once
+			expect(distinctiveWords('Instal·lacions Vives SL')).toEqual([
+				'installacions',
+				'vives',
+				'instalacions',
+			])
+		})
+	})
+
+	describe('when the name is built only from trade and legal words', () => {
+		it('should offer nothing to match on', () => {
+			// GIVEN a name that says a kind of company and a trade and no more
+			// WHEN its distinctive words are read
+			// THEN there are none: a generic word identifies nobody, and matching on
+			// one is the expensive mistake
+			expect(distinctiveWords('Grupo Express SL')).toEqual([])
+		})
+	})
+})
+
+describe('namesNobodyInParticular', () => {
+	describe('when every word of the name names a trade or a legal form', () => {
+		it('should say so', () => {
+			// GIVEN names built only from those words
+			// WHEN each is asked
+			// THEN each says it names nobody in particular
+			expect(namesNobodyInParticular('Grupo Express SL')).toBe(true)
+			expect(namesNobodyInParticular('Transportes Logistica SL')).toBe(true)
+			expect(namesNobodyInParticular('')).toBe(true)
+		})
+	})
+
+	describe('when one word of the name is the company own', () => {
+		it('should say the name identifies somebody', () => {
+			// GIVEN names carrying a word that stands for this company rather than
+			// for its trade — including one whose only such word is geminated, and
+			// one whose word merely resembles a trade word without being one
+			// WHEN each is asked
+			// THEN each identifies somebody
+			expect(namesNobodyInParticular('Fusteria Miquel SL')).toBe(false)
+			expect(namesNobodyInParticular('Instal·lacions Vives SL')).toBe(false)
+			expect(namesNobodyInParticular('Servicios Globales SL')).toBe(false)
+		})
+	})
+})
+
+describe('deriveEntityTargets', () => {
+	describe('when the subject name carries a geminate mark', () => {
+		it('should match evidence that spells the name either way', () => {
+			// GIVEN a run anchored on a Catalan company
+			const targets = deriveEntityTargets({
+				schemaName: 'company_enrichment_v1',
+				query: 'Instal·lacions Vives',
+				subjects: [{ table: 'companies', name: 'Instal·lacions Vives SL' }],
+			}) as EntityTargets
+
+			// WHEN evidence spells the name with one l, and when it spells it with two
+			// THEN both land the run on its target, rather than only the spelling the
+			// name happened to be written in
+			expect(classifyEntityMatch(targets, 'Instalacions Vives, Girona.')).toBe(
+				'strong',
+			)
+			expect(classifyEntityMatch(targets, 'Installacions Vives, Girona.')).toBe(
+				'strong',
+			)
+		})
+
+		it('should still take the whole name to land on the company', () => {
+			// GIVEN the same run
+			const targets = deriveEntityTargets({
+				schemaName: 'company_enrichment_v1',
+				query: 'Instal·lacions Vives',
+				subjects: [{ table: 'companies', name: 'Instal·lacions Vives SL' }],
+			}) as EntityTargets
+
+			// WHEN the evidence is about a different company in the same trade
+			// THEN it never reads as the target. The second spelling writes out one
+			// marked pair of l's and turns no other part of a name into a wildcard,
+			// so the strong bar — which is what lets a run act on its findings —
+			// still takes the whole name
+			expect(
+				classifyEntityMatch(targets, 'Instalacions Puig, Lleida.'),
+			).not.toBe('strong')
+			expect(classifyEntityMatch(targets, 'Vila Nova SL, Girona.')).toBe(
+				'absent',
+			)
+		})
+
+		it('should reach the same verdict whichever way the trade word is spelled', () => {
+			// GIVEN the same run, and a page about a different company whose trade is
+			// written the three ways Catalan writes it
+			const targets = deriveEntityTargets({
+				schemaName: 'company_enrichment_v1',
+				query: 'Instal·lacions Vives',
+				subjects: [{ table: 'companies', name: 'Instal·lacions Vives SL' }],
+			}) as EntityTargets
+
+			// WHEN each is classified
+			// THEN all three are weak — the run is told it never clearly landed, and
+			// its findings wait for somebody to read them.
+			//
+			// This is the cost of reading a name both ways, and it is worth stating
+			// plainly: a page about a stranger in the same trade is weak whichever
+			// way that trade is spelled, because "instal·lacions" counts as a
+			// distinctive word — it is not among the generic ones. Whether it belongs
+			// there is a separate decision about which words name a trade, not about
+			// how a name is folded
+			for (const corpus of [
+				'Instalacions Puig, Lleida.',
+				'Installacions Puig, Lleida.',
+				'Instal·lacions Puig, Lleida.',
+			]) {
+				expect(classifyEntityMatch(targets, corpus)).toBe('weak')
+			}
 		})
 	})
 })

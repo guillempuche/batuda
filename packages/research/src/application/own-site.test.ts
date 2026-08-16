@@ -373,4 +373,41 @@ describe('ownSiteVerdict', () => {
 			)
 		})
 	})
+
+	describe('when the name is written with a geminated l', () => {
+		it('should establish the domain whichever way it spells the name', () => {
+			// GIVEN a Catalan company and the two domains it might have registered
+			// WHEN each is asked
+			// THEN both are its own. A firm registers the spelling it prefers, and
+			// the run must not decide the other one belongs to somebody else
+			for (const website of [
+				'https://installacionsvives.cat',
+				'https://instalacionsvives.cat/contacte',
+			]) {
+				expect(
+					ownSiteVerdict({ name: 'Instal·lacions Vives SL', website }),
+				).toBe('established')
+			}
+		})
+
+		it('should not hand one company a look-alike name s domain', () => {
+			// GIVEN two different companies whose names differ only by a doubled l,
+			// neither of which marks a geminate
+			// WHEN each is offered the other's domain
+			// THEN neither is established. Only a name that carries the mark is read
+			// two ways, so an ordinary doubled l keeps the two apart
+			expect(
+				ownSiteVerdict({
+					name: 'Vila Nova SL',
+					website: 'https://villanova.cat',
+				}),
+			).toBe('unknown')
+			expect(
+				ownSiteVerdict({
+					name: 'Villa Nova SL',
+					website: 'https://vilanova.cat',
+				}),
+			).toBe('unknown')
+		})
+	})
 })
