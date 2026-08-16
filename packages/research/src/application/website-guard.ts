@@ -54,7 +54,7 @@ import {
 	namesNobodyInParticular,
 	spellingsWithoutForms,
 } from './entity-guard'
-import { isPlainObject } from './guard-shapes'
+import { citedSourceIds, isPlainObject } from './guard-shapes'
 import { ownSiteVerdict } from './own-site'
 import { hostOf, isBareWebAddress, pathOf } from './source-key'
 
@@ -145,20 +145,6 @@ const citesNothingButThisPage = (
 ): boolean =>
 	citedSources.length > 0 &&
 	citedSources.every(source => samePage(website, source))
-
-// The sources a row cites, as the model wrote them. Read off the row here because
-// the walk below copies the citation subtree through untouched.
-const citedSourcesOf = (
-	value: Record<string, unknown>,
-): ReadonlyArray<string> => {
-	const citations = value['citations']
-	if (!Array.isArray(citations)) return []
-	return citations.flatMap(entry =>
-		isPlainObject(entry) && typeof entry['source_id'] === 'string'
-			? [entry['source_id']]
-			: [],
-	)
-}
 
 // Who claims which host, across a whole answer: a host mapped to every company
 // that gave it as its website. Gathered before anything is rewritten, because
@@ -468,7 +454,7 @@ export const guardCompanyWebsites = (
 			const verdict = classifyWebsite({
 				name,
 				website,
-				citedSources: citedSourcesOf(value),
+				citedSources: citedSourceIds(value),
 				hostClaims,
 				directorySites,
 			})

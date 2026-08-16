@@ -246,7 +246,9 @@ export const linkedAddresses = (pageText: string): ReadonlyArray<string> =>
 // most of its names, so it is put back into letters before anything is read off
 // it; a path that was never valid escaping is read as it stands rather than
 // dropped.
-const filingWords = (address: string): ReadonlyArray<ReadonlyArray<string>> => {
+export const filingWords = (
+	address: string,
+): ReadonlyArray<ReadonlyArray<string>> => {
 	const path = pathOf(address)
 	if (path === null) return []
 	const spelled = (() => {
@@ -262,12 +264,18 @@ const filingWords = (address: string): ReadonlyArray<ReadonlyArray<string>> => {
 		.filter(words => words.length > 0)
 }
 
-// Whether one part of an address is this company filed under its name: some run of
-// whole words spells the name exactly. Asking only whether the name appears
-// somewhere inside would file "Roca" under "/barroca-inversiones" and "Mont" under
-// "/montcada-i-reixac", and two such names in one list are enough to call a
-// newspaper a listing.
-const namesTheCompany = (
+/**
+ * Whether one run of whole words spells the name exactly.
+ *
+ * Asking only whether the name appears somewhere inside would file "Roca" under
+ * "/barroca-inversiones" and "Mont" under "/montcada-i-reixac", and two such
+ * names in one list are enough to call a newspaper a listing.
+ *
+ * Shared with whoever else has to decide that a piece of text names a company.
+ * Both callers are adding something on the strength of it — a filing here, a
+ * source next door — so both need the reading that errs towards saying no.
+ */
+export const namesTheCompany = (
 	segment: ReadonlyArray<string>,
 	core: string,
 ): boolean => {

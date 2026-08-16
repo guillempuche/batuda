@@ -28,10 +28,11 @@
  *   duplicate rate       whether the fold that joins two rows of one company still
  *                        holds — see its own note for what it cannot see
  *   location fill        how many rows say what town or province the company is in
+ *   confirmation rate    how many rows two independent websites establish as real
  *
- * The row count is still reported, as the scale those four read against rather than
- * as the grade — it is also what checking that every row is a real company would
- * cost, so it needs a reading of its own before that check exists.
+ * The row count is still reported, as the scale those five read against rather than
+ * as the grade — a pass can hold its confirmation rate up by returning fewer rows,
+ * so only the two together say what happened.
  *
  * Grounding is judged by which pages the run *fetched*, not which its findings cite:
  * once per-field citations point at whichever page stated each fact, a run that
@@ -243,6 +244,12 @@ export interface RunOutcome {
 		readonly location: string | null
 		/** The row's own words about what it is and why it matched, run together. */
 		readonly describedAs: string
+		/**
+		 * Whether two independent websites established the company, one of them its
+		 * own site. False on a row carrying no verdict, which is the right reading
+		 * rather than a missing one: nothing established that company.
+		 */
+		readonly confirmed: boolean
 	}>
 	/**
 	 * Whether an official-registry lookup this run resolved the target company by
@@ -292,6 +299,15 @@ export interface MarketScore {
 	readonly rowsReturned: number
 	/** Of those, how many are not an organisation the golden names as not a company. */
 	readonly rowsRightKind: number
+	/**
+	 * Of the rows returned, how many the run established as real companies.
+	 *
+	 * Counted over every row rather than the right-kind ones, so it answers "how
+	 * much of what came back does the run stand behind" — the figure the recall
+	 * cost of requiring two independent sources is read off. A pass whose rows
+	 * carry no verdict reads nought, which is what it confirmed.
+	 */
+	readonly rowsConfirmed: number
 	/**
 	 * Of the rows returned — every one of them, including any the golden names as not
 	 * a company — how many say where the company is. The field is asked for a town or
@@ -399,6 +415,14 @@ export interface EvalSummary {
 	readonly requestCoverage: number | null
 	readonly duplicateRate: number | null
 	readonly locationFill: number | null
+	/**
+	 * Of every row that came back, the share the run established as a real
+	 * company. This is where requiring two independent sources shows up: it is
+	 * meant to fall below the row count, and how far is the cost of the check.
+	 * Read it beside `rowsPerScan` — a pass can hold its confirmation rate up by
+	 * returning fewer rows, and only the two together say what happened.
+	 */
+	readonly confirmationRate: number | null
 	/**
 	 * Rows one market request came back with on average. Not a quality figure —
 	 * it is the scale the four above read against, and the reading that says what
@@ -943,6 +967,7 @@ export const scoreRun = (
 					name: expectedMarket.name,
 					rowsReturned: outcome.companies.length,
 					rowsRightKind: rightKindRows.length,
+					rowsConfirmed: outcome.companies.filter(row => row.confirmed).length,
 					rowsLocated: outcome.companies.filter(row => isFilled(row.location))
 						.length,
 					rowsDuplicated: duplicatedRows(outcome.companies),
@@ -996,6 +1021,7 @@ export const summarizeScores = (
 			requestCoverage: null,
 			duplicateRate: null,
 			locationFill: null,
+			confirmationRate: null,
 			rowsPerScan: null,
 			fieldsFilledPerRun: null,
 			profileFieldsTotal: null,
@@ -1044,6 +1070,7 @@ export const summarizeScores = (
 	let scansScored = 0
 	let totalRowsReturned = 0
 	let totalRowsRightKind = 0
+	let totalRowsConfirmed = 0
 	let totalRowsLocated = 0
 	let totalRowsDuplicated = 0
 	let totalPartsExpected = 0
@@ -1084,6 +1111,7 @@ export const summarizeScores = (
 			scansScored++
 			totalRowsReturned += score.market.rowsReturned
 			totalRowsRightKind += score.market.rowsRightKind
+			totalRowsConfirmed += score.market.rowsConfirmed
 			totalRowsLocated += score.market.rowsLocated
 			totalRowsDuplicated += score.market.rowsDuplicated
 			totalPartsExpected += score.market.partsExpected
@@ -1142,6 +1170,7 @@ export const summarizeScores = (
 				? null
 				: totalContactsFound / totalContactsExpected,
 		organisationKindPrecision: perRow(totalRowsRightKind),
+		confirmationRate: perRow(totalRowsConfirmed),
 		requestCoverage:
 			totalPartsExpected === 0 ? null : totalPartsAnswered / totalPartsExpected,
 		duplicateRate: perRow(totalRowsDuplicated),

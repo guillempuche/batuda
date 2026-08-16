@@ -207,13 +207,21 @@ describe('outcomeFromRun', () => {
 					website: 'https://acme.test',
 					location: null,
 					describedAs: '',
+					confirmed: false,
 				},
-				{ name: 'Beta', website: null, location: null, describedAs: '' },
+				{
+					name: 'Beta',
+					website: null,
+					location: null,
+					describedAs: '',
+					confirmed: false,
+				},
 				{
 					name: 'Gamma',
 					website: 'https://gamma.test',
 					location: null,
 					describedAs: '',
+					confirmed: false,
 				},
 			])
 		})
@@ -305,6 +313,7 @@ describe('outcomeFromRun — what a scan row carries for the market figures', ()
 					location: 'Córdoba',
 					describedAs:
 						'Instalaciones eléctricas Instalador eléctrico industrial en Córdoba',
+					confirmed: false,
 				},
 			])
 		})
@@ -379,6 +388,57 @@ describe('outcomeFromRun — what a scan row carries for the market figures', ()
 
 			// WHEN adapted — THEN there is a string to search, holding nothing
 			expect(outcome.companies[0]?.describedAs).toBe('')
+		})
+	})
+})
+
+describe('outcomeFromRun — whether a scan row was established', () => {
+	describe('when a row carries a verdict', () => {
+		it('should read a confirmed row as confirmed', () => {
+			// GIVEN a scan whose rows were verified, one each way
+			const outcome = outcomeFromRun({
+				status: 'succeeded',
+				schemaName: 'prospect_scan_v1',
+				findings: {
+					prospects: [
+						{
+							name: 'Acme',
+							existence: { verdict: 'confirmed', websites: 2 },
+						},
+						{
+							name: 'Beta',
+							existence: {
+								verdict: 'candidate',
+								reason: 'one_website',
+								websites: 1,
+							},
+						},
+					],
+				},
+				fetchedUrls: [],
+			})
+
+			// WHEN adapted — THEN the verdict rides, so the recall cost of requiring
+			// two independent sources can be counted
+			expect(outcome.companies.map(row => row.confirmed)).toEqual([true, false])
+		})
+	})
+
+	describe('when a row carries no verdict', () => {
+		it('should read it as unconfirmed rather than as missing', () => {
+			// GIVEN a run from before verification existed — every run in the
+			// before-numbers
+			const outcome = outcomeFromRun({
+				status: 'succeeded',
+				schemaName: 'prospect_scan_v1',
+				findings: { prospects: [{ name: 'Acme' }] },
+				fetchedUrls: [],
+			})
+
+			// WHEN adapted
+			// THEN it reads a real nought rather than a blank, which is what makes
+			// the before and after passes comparable
+			expect(outcome.companies[0]?.confirmed).toBe(false)
 		})
 	})
 })

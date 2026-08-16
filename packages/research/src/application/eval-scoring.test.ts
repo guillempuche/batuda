@@ -38,6 +38,7 @@ const company = (
 	website: null,
 	location: null,
 	describedAs: '',
+	confirmed: false,
 	...over,
 })
 
@@ -1083,6 +1084,52 @@ describe('scoring a run that answered for a whole market', () => {
 		})
 	})
 
+	describe('when part of the list was established and part was not', () => {
+		it('should count only the rows two independent websites establish', () => {
+			// GIVEN a market whose rows split: two the run stands behind, two it
+			// could not confirm
+			const score = scoreRun(
+				marketGolden({ parts: [{ id: 'electrical', terms: ['electrica'] }] }),
+				outcome({
+					companies: [
+						company({ name: 'Alfa', confirmed: true }),
+						company({ name: 'Beta', confirmed: true }),
+						company({ name: 'Gamma' }),
+						company({ name: 'Delta' }),
+					],
+				}),
+			)
+
+			// WHEN scored
+			// THEN the confirmed count sits below the row count, which is the whole
+			// reading: how far it falls IS the cost of requiring two sources
+			expect(score.market?.rowsReturned).toBe(4)
+			expect(score.market?.rowsConfirmed).toBe(2)
+		})
+
+		it('should count a confirmed row the golden calls the wrong kind', () => {
+			// GIVEN a trade body the run confirmed — bodies have their own sites and
+			// press coverage, so they pass an existence check easily
+			const score = scoreRun(
+				marketGolden({
+					parts: [{ id: 'electrical', terms: ['electrica'] }],
+					notCompanies: ['Asociacion'],
+				}),
+				outcome({
+					companies: [company({ name: 'Asociacion', confirmed: true })],
+				}),
+			)
+
+			// WHEN scored
+			// THEN it counts as confirmed while failing the kind check. The two ask
+			// different questions, and folding them together would hide exactly the
+			// failure the epic warned of: a confirmation rate that looks healthy
+			// because the wrong organisations are the easiest ones to confirm
+			expect(score.market?.rowsConfirmed).toBe(1)
+			expect(score.market?.rowsRightKind).toBe(0)
+		})
+	})
+
 	describe('when the scan came back with nothing', () => {
 		it('should report an answered-nothing market rather than dropping out', () => {
 			// GIVEN a market request that looked and found no rows at all, which the
@@ -1104,6 +1151,7 @@ describe('scoring a run that answered for a whole market', () => {
 				name: 'ES',
 				rowsReturned: 0,
 				rowsRightKind: 0,
+				rowsConfirmed: 0,
 				rowsLocated: 0,
 				rowsDuplicated: 0,
 				partsExpected: 2,
@@ -1152,6 +1200,7 @@ describe('summarizeScores', () => {
 				requestCoverage: null,
 				duplicateRate: null,
 				locationFill: null,
+				confirmationRate: null,
 				rowsPerScan: null,
 				fieldsFilledPerRun: null,
 				profileFieldsTotal: null,
@@ -1428,6 +1477,7 @@ describe('summarizing a pass that held market requests', () => {
 				name: 'ES',
 				rowsReturned: 10,
 				rowsRightKind: 10,
+				rowsConfirmed: 0,
 				rowsLocated: 10,
 				rowsDuplicated: 0,
 				partsExpected: 5,

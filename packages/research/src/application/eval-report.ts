@@ -130,6 +130,16 @@ export const scorePayloadsForRun = (score: RunScore): ScorePayload[] => {
 					passed: market.rowsLocated === market.rowsReturned,
 					feedback: `${market.rowsLocated}/${market.rowsReturned} rows say what town or province the company is in`,
 				},
+				{
+					// Not marked failed short of every row: this one is MEANT to sit
+					// below the rest. A market where half the companies have one thin
+					// website is a market that half-confirms, and grading that red would
+					// report the check working as the check failing.
+					name: 'confirmation_rate',
+					value: market.rowsConfirmed / market.rowsReturned,
+					passed: market.rowsConfirmed > 0,
+					feedback: `${market.rowsConfirmed}/${market.rowsReturned} rows are established by two independent websites`,
+				},
 			)
 		}
 	}
@@ -298,6 +308,9 @@ export const evalSummaryAttributes = (
 	}
 	if (summary.locationFill !== null) {
 		attributes['eval.location_fill'] = summary.locationFill
+	}
+	if (summary.confirmationRate !== null) {
+		attributes['eval.confirmation_rate'] = summary.confirmationRate
 	}
 	if (summary.rowsPerScan !== null) {
 		attributes['eval.rows_per_scan'] = summary.rowsPerScan
