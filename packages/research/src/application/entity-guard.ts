@@ -403,6 +403,38 @@ export const hostLabel = (host: string): string => {
 	return labels[labels.length - 1] ?? ''
 }
 
+/**
+ * The domain a host is registered under — "acme.co.uk" from "blog.acme.co.uk",
+ * "eleconomista.es" from "empresite.eleconomista.es". Empty when the host has no
+ * label to read.
+ *
+ * Told apart from `hostLabel` above by what it keeps: the label alone answers
+ * "does this domain spell the company", while this answers "are these two
+ * addresses the same website", which needs the ending as well — "acme.es" and
+ * "acme.de" spell the same label and belong to different firms.
+ *
+ * It lives here rather than beside the other address readers because the set of
+ * second-level endings it drops is the one `hostLabel` already holds, and two
+ * copies of that set would be two answers to one question.
+ *
+ * The set is short, so a country whose second level it does not name folds one
+ * label too few — "acme.plc.uk" reads as "plc.uk", one website shared with every
+ * other firm under it. That direction only ever merges two sources into one,
+ * which withholds a confirmation and can never manufacture one. A public suffix
+ * list is what sharpens it, and belongs in code when it arrives.
+ */
+export const registrableDomain = (host: string): string => {
+	const labels = host.split('.').filter(Boolean)
+	const tld = labels.pop()
+	if (tld === undefined) return ''
+	const ending =
+		labels.length >= 2 && SECOND_LEVEL.has(labels[labels.length - 1] ?? '')
+			? `${labels.pop()}.${tld}`
+			: tld
+	const label = labels[labels.length - 1]
+	return label === undefined ? ending : `${label}.${ending}`
+}
+
 // The distinctive label inside a host — "acme" from "acme.co.uk" — used only as a
 // weak signal alongside the name's own words.
 const domainLabelOf = (host: string): string | undefined => {

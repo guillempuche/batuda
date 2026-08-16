@@ -67,3 +67,27 @@ export const isCitedField = (
 ): value is { value: unknown; source_id: string; quote?: string } =>
 	isValueWrapper(value) &&
 	typeof (value as { source_id?: unknown }).source_id === 'string'
+
+/**
+ * The pages a row cites, by the id the model wrote.
+ *
+ * One reading, shared: the website guard asks it to tell a row's own site from
+ * the page its claim was read on, and the existence verdict asks it to count
+ * how many websites name the company. Two copies would let one of them accept
+ * a citation the other drops, so the two would disagree about what a row cites.
+ *
+ * The ids come back as written. What is and is not a web address is a separate
+ * question, and each caller screens for it with the reading its own direction
+ * of error calls for.
+ */
+export const citedSourceIds = (
+	value: Record<string, unknown>,
+): ReadonlyArray<string> => {
+	const citations = value['citations']
+	if (!Array.isArray(citations)) return []
+	return citations.flatMap(entry =>
+		isPlainObject(entry) && typeof entry['source_id'] === 'string'
+			? [entry['source_id']]
+			: [],
+	)
+}

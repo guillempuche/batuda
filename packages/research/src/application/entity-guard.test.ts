@@ -21,6 +21,7 @@ import {
 	placesCorroborate,
 	queryPlaces,
 	reachedOwnSite,
+	registrableDomain,
 	spellingsWithoutForms,
 	withRedirectDomain,
 } from './entity-guard'
@@ -687,6 +688,64 @@ describe('hostLabel', () => {
 			// WHEN read — THEN nothing, rather than the top level read as a name
 			expect(hostLabel('localhost')).toBe('')
 			expect(hostLabel('')).toBe('')
+		})
+	})
+})
+
+describe('registrableDomain', () => {
+	describe('when given a host under an ordinary top level', () => {
+		it('should keep the registered label and its ending', () => {
+			// GIVEN a plain domain
+			// WHEN read
+			// THEN the ending stays, unlike `hostLabel` — "acme.es" and "acme.de"
+			// spell one label and belong to two different firms
+			expect(registrableDomain('acme.es')).toBe('acme.es')
+			expect(registrableDomain('xpo.com')).toBe('xpo.com')
+		})
+
+		it('should fold a subdomain onto the domain it sits under', () => {
+			// GIVEN two addresses on one site
+			// WHEN read — THEN both name the same website
+			expect(registrableDomain('blog.acme.es')).toBe('acme.es')
+			expect(registrableDomain('a.b.c.acme.es')).toBe('acme.es')
+		})
+
+		it('should fold a sub-brand onto its parent site', () => {
+			// GIVEN a listing that lives on a newspaper's domain
+			// WHEN read
+			// THEN they are one website for counting sources — the fold that the
+			// directory verdict must never make, because it would label the paper
+			expect(registrableDomain('empresite.eleconomista.es')).toBe(
+				'eleconomista.es',
+			)
+		})
+	})
+
+	describe('when given a host under a second-level ending', () => {
+		it('should keep both parts of the ending', () => {
+			// GIVEN a country that registers under a second level
+			// WHEN read — THEN "co.uk" is the ending, not the registered domain
+			expect(registrableDomain('acme.co.uk')).toBe('acme.co.uk')
+			expect(registrableDomain('shop.acme.co.uk')).toBe('acme.co.uk')
+		})
+
+		it('should fold one label too few under an ending it does not name', () => {
+			// GIVEN a second level outside the short set this knows
+			// WHEN read
+			// THEN it folds too far, merging separate firms into one website. That
+			// direction only ever turns two sources into one, which withholds a
+			// confirmation and can never manufacture one
+			expect(registrableDomain('acme.plc.uk')).toBe('plc.uk')
+		})
+	})
+
+	describe('when given something with no registered label', () => {
+		it('should hand back what there is', () => {
+			// GIVEN a bare word or nothing at all — neither reaches this from a real
+			// address, since an address needs a dot to be one
+			// WHEN read — THEN nothing is invented
+			expect(registrableDomain('localhost')).toBe('localhost')
+			expect(registrableDomain('')).toBe('')
 		})
 	})
 })

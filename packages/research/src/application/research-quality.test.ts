@@ -23,6 +23,7 @@ describe('computeRunQuality', () => {
 			scanResults: null,
 			refined: false,
 			coverage: null,
+			existence: null,
 		} as const
 
 		it('should not flag a strong, well-grounded run', () => {
@@ -108,6 +109,7 @@ describe('computeRunQuality', () => {
 			scanResults: FULL_LIST,
 			refined: false,
 			coverage: null,
+			existence: null,
 		} as const
 
 		it('should flag a scan vetted against a single source', () => {
@@ -212,6 +214,7 @@ describe('computeRunQuality', () => {
 			citationsKept: 10,
 			refined: true,
 			coverage: null,
+			existence: null,
 		} as const
 
 		it('should flag a well-sourced scan that still found only a handful', () => {
@@ -261,6 +264,7 @@ describe('computeRunQuality', () => {
 				scanResults: null,
 				refined: false,
 				coverage: null,
+				existence: null,
 			})
 			// THEN the thin-list signal stays quiet — a missing list is "does not
 			// apply", not "found nothing"
@@ -286,6 +290,7 @@ describe('computeRunQuality', () => {
 			scanResults: 62,
 			refined: false,
 			coverage: null,
+			existence: null,
 		} as const
 
 		it('should flag a long list that answered one of the trades asked about', () => {
@@ -362,6 +367,7 @@ describe('computeRunQuality', () => {
 			scanResults: FULL_LIST,
 			refined: false,
 			coverage: null,
+			existence: null,
 		} as const
 
 		it('should flag a run whose citations were all rejected', () => {
@@ -420,6 +426,7 @@ describe('computeRunQuality', () => {
 				scanResults: FULL_LIST,
 				refined: false,
 				coverage: null,
+				existence: null,
 			}).low_confidence
 
 		it('should flag one that never clearly reached that company', () => {
@@ -454,6 +461,7 @@ describe('computeRunQuality', () => {
 				scanResults: FULL_LIST,
 				refined: false,
 				coverage: null,
+				existence: null,
 			})
 			// THEN the count still stands: 'absent' is a verdict on what the evidence
 			// showed, not the run having no company to be about
@@ -477,6 +485,7 @@ describe('computeRunQuality', () => {
 			scanResults: null,
 			refined: false,
 			coverage: null,
+			existence: null,
 		} as const
 
 		it('should leave out the profile numbers a brief never fills', () => {
@@ -545,6 +554,7 @@ describe('computeRunQuality', () => {
 			scanResults: FULL_LIST,
 			refined: true,
 			coverage: null,
+			existence: null,
 		} as const
 
 		it('should report each phase of rounds as its own number', () => {
@@ -578,6 +588,7 @@ describe('computeRunQuality', () => {
 				scanResults: null,
 				refined: false,
 				coverage: null,
+				existence: null,
 			})
 			// THEN zero is reported rather than left out: a run that went back for
 			// nothing is a run that needed nothing, which is worth knowing
@@ -615,6 +626,63 @@ describe('computeRunQuality', () => {
 			// rounds a run took says nothing about whether its answer is thin
 			expect(many.low_confidence).toBe(none.low_confidence)
 			expect(many.low_confidence).toBe(false)
+		})
+	})
+})
+
+describe('computeRunQuality — how the list split', () => {
+	const scan = {
+		schemaName: 'prospect_scan_v1',
+		entityMatch: null,
+		rounds: 3,
+		gapRounds: 1,
+		sourcesTotal: 8,
+		sourcesFirstParty: 0,
+		ownDomainKnown: false,
+		fieldsGrounded: 0,
+		fieldsTotal: 0,
+		citationsSeen: 20,
+		citationsKept: 20,
+		scanResults: FULL_LIST,
+		refined: false,
+		coverage: null,
+	} as const
+
+	describe('when a scan verified its list', () => {
+		it('should report both counts', () => {
+			// GIVEN a list that split into four confirmed and eight candidates
+			const quality = computeRunQuality({
+				...scan,
+				existence: { confirmed: 4, candidates: 8 },
+			})
+
+			// THEN a reader can see what the run stands behind without opening it
+			expect(quality.existence).toEqual({ confirmed: 4, candidates: 8 })
+		})
+
+		it('should not flag a run for coming back mostly candidates', () => {
+			// GIVEN a list where nothing at all could be confirmed
+			const quality = computeRunQuality({
+				...scan,
+				existence: { confirmed: 0, candidates: 12 },
+			})
+
+			// THEN the run is reported, not flagged. What to do about a list of
+			// candidates is a decision about that list; making it the run-level flag
+			// would put every honest scan behind a review step before there is any
+			// measurement of how often that happens
+			expect(quality.low_confidence).toBe(false)
+		})
+	})
+
+	describe('when the run had no list to split', () => {
+		it('should leave the block out rather than reporting nought', () => {
+			// GIVEN a run that was never asked for companies
+			const quality = computeRunQuality({ ...scan, existence: null })
+
+			// THEN the question does not arise, which is not the same answer as
+			// "it confirmed none"
+			expect('existence' in quality).toBe(false)
 		})
 	})
 })

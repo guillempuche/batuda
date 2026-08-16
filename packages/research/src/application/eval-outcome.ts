@@ -23,6 +23,7 @@ import {
 	type ScorableField,
 	type TerminalStatus,
 } from './eval-scoring'
+import { isConfirmedRow } from './existence-verdict'
 import { contactFill, enrichmentFill } from './extraction-fill'
 import { unwrapValue } from './guard-shapes'
 import { hostOf } from './source-key'
@@ -133,6 +134,7 @@ export const outcomeFromRun = (input: {
 		website: string | null
 		location: string | null
 		describedAs: string
+		confirmed: boolean
 	}> = []
 	for (const row of discoveryRows(input.schemaName, findings)) {
 		const name = readFieldValue(row['name'])
@@ -142,6 +144,11 @@ export const outcomeFromRun = (input: {
 			website: readFilled(row['website']),
 			location: readFilled(row['location']),
 			describedAs: discoveryRowDescription(row),
+			// Read through the same reader the run writes with, so a row carrying no
+			// verdict reads as a candidate rather than as missing. That is what makes
+			// two passes comparable: an unverified one scores a real nought, not a
+			// blank.
+			confirmed: isConfirmedRow(row),
 		})
 	}
 

@@ -1625,3 +1625,64 @@ describe('isValidUuid', () => {
 		})
 	})
 })
+
+describe('buildBriefPrompt — telling confirmed companies from candidates', () => {
+	const brief = (existence?: {
+		readonly confirmed: number
+		readonly candidates: number
+	}) =>
+		buildBriefPrompt({
+			schemaName: 'prospect_scan_v1',
+			language: 'en',
+			date: '2026-08-16',
+			subjectName: undefined,
+			findings: { prospects: [] },
+			transcript: '',
+			uncoveredParts: [],
+			existence,
+		})
+
+	describe('when part of the list could not be confirmed', () => {
+		it('should tell the writer which companies the run stands behind', () => {
+			// GIVEN a list that split into some confirmed and some not
+			const prompt = brief({ confirmed: 4, candidates: 18 })
+
+			// THEN the writer is given both counts and told to keep them apart —
+			// without this it reads a list of twenty-two and writes about
+			// twenty-two companies, presenting what the run could not confirm as
+			// though it had
+			expect(prompt).toContain('4 of them are confirmed')
+			expect(prompt).toContain('18 are candidates')
+			expect(prompt).toContain(
+				'Never present a candidate as an established company',
+			)
+		})
+
+		it('should say a candidate is unproven, not disproven', () => {
+			// GIVEN the same split
+			const prompt = brief({ confirmed: 1, candidates: 2 })
+
+			// THEN the writer is told what a candidate is NOT, because "could not
+			// confirm" read as "found not to exist" is the opposite error and just
+			// as wrong
+			expect(prompt).toContain('could not confirm either way')
+			expect(prompt).toContain('budget_exhausted')
+		})
+	})
+
+	describe('when there is nothing to tell apart', () => {
+		it('should stay silent for a list that is confirmed throughout', () => {
+			// GIVEN every company established
+			// WHEN the brief is built
+			// THEN no directive rides: there is no distinction for the writer to
+			// draw, and one would invite doubt the run does not hold
+			expect(brief({ confirmed: 6, candidates: 0 })).not.toContain('existence')
+		})
+
+		it('should stay silent for a run that never had a list', () => {
+			// GIVEN a run with no companies to verify at all
+			// WHEN the brief is built — THEN nothing about existence reaches it
+			expect(brief(undefined)).not.toContain('existence')
+		})
+	})
+})

@@ -428,6 +428,7 @@ const formatMarketRuns = (
 		`${id.padEnd(20)} market ${market.name.padEnd(6)}`,
 		`rows ${rowsPerRun.toFixed(0).padStart(3)}`,
 		`right kind ${share(total(market => market.rowsRightKind))}`,
+		`confirmed ${share(total(market => market.rowsConfirmed))}`,
 		`duplicates ${share(total(market => market.rowsDuplicated))}`,
 		`located ${share(total(market => market.rowsLocated))}`,
 		`parts ${parts === 0 ? 'n/a' : `${total(market => market.partsAnswered)}/${parts}`}`,
@@ -512,6 +513,7 @@ const formatMarketFigures = (summary: EvalSummary): ReadonlyArray<string> =>
 		: [
 				`Rows per market:        ${decimal(summary.rowsPerScan)}`,
 				`  right kind:           ${pct(summary.organisationKindPrecision)}`,
+				`  confirmed:            ${pct(summary.confirmationRate)}`,
 				`  duplicates:           ${pct(summary.duplicateRate)}`,
 				`  with a location:      ${pct(summary.locationFill)}`,
 				`Request coverage:       ${pct(summary.requestCoverage)}`,
@@ -572,8 +574,8 @@ const formatMarketGroups = (groups: Record<string, EvalSummary>): string =>
 				([key, s]) =>
 					`${key.padEnd(10)} runs ${String(s.runs).padStart(3)}  rows ${decimal(
 						s.rowsPerScan,
-					)}  right kind ${pct(
-						s.organisationKindPrecision,
+					)}  right kind ${pct(s.organisationKindPrecision)}  confirmed ${pct(
+						s.confirmationRate,
 					)}  dupes ${pct(s.duplicateRate)}  located ${pct(
 						s.locationFill,
 					)}  coverage ${pct(s.requestCoverage)}  cost ${cents(s.costPerRun)}`,

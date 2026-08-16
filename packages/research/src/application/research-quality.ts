@@ -67,6 +67,14 @@ export interface RunQualityInput {
 	 * one kind of company, which is answered by companies of that kind.
 	 */
 	readonly coverage: RequestCoverage | null
+	/**
+	 * How the list split between companies two independent websites establish and
+	 * ones the run could not confirm. Null for a run with no list to split.
+	 */
+	readonly existence: {
+		readonly confirmed: number
+		readonly candidates: number
+	} | null
 }
 
 export interface RunQuality {
@@ -114,6 +122,19 @@ export interface RunQuality {
 	 * name — rather than reported as nothing covered.
 	 */
 	readonly coverage?: RequestCoverage
+	/**
+	 * How many of the companies the run stands behind, and how many it could not
+	 * confirm. Absent where the question does not arise — a run with no list.
+	 *
+	 * Reported, not gated on. What a reader does about a list that came back
+	 * mostly candidates is a decision about that list, and turning it into the
+	 * run-level flag would put every honest scan behind a review step before
+	 * there is any measurement of how often that happens.
+	 */
+	readonly existence?: {
+		readonly confirmed: number
+		readonly candidates: number
+	}
 	/** True when the result is thin enough that an automation should not act on it unreviewed. */
 	readonly low_confidence: boolean
 }
@@ -173,6 +194,7 @@ export const computeRunQuality = (input: RunQualityInput): RunQuality => {
 		citations_seen: input.citationsSeen,
 		citations_kept: input.citationsKept,
 		...(input.coverage !== null ? { coverage: input.coverage } : {}),
+		...(input.existence !== null ? { existence: input.existence } : {}),
 		low_confidence: lowConfidence,
 	}
 }
