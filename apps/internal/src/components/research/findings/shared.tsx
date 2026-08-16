@@ -70,7 +70,17 @@ export type CommonFindings = {
 	readonly proposed_updates?: ReadonlyArray<ProposedUpdate>
 	readonly pending_paid_actions?: ReadonlyArray<PendingPaidAction>
 	readonly discovered_existing?: ReadonlyArray<DiscoveredExisting>
-	readonly quality?: { readonly low_confidence?: boolean }
+	readonly quality?: {
+		readonly low_confidence?: boolean
+		/**
+		 * Which kinds of company the request asked for came back with rows and which
+		 * did not. Only a search that was asked about several carries it.
+		 */
+		readonly coverage?: {
+			readonly covered?: ReadonlyArray<string>
+			readonly uncovered?: ReadonlyArray<string>
+		}
+	}
 }
 
 export function stableKey(parts: ReadonlyArray<string>): string {
@@ -275,7 +285,12 @@ export function CommonSections({
 	// prospects built from the wrong one misleads just as much as a profile of
 	// it, so the warning lives in the block every view shares.
 	const needsReading = findings?.quality?.low_confidence === true
-	if (paid.length === 0 && !needsReading) {
+	// A search asked about several kinds of company can come back with a long list
+	// answering one of them. Naming the ones it came back with nobody for is what
+	// lets a reader tell "this market has none" from "the search stopped early" —
+	// from the list alone the two look identical.
+	const uncovered = findings?.quality?.coverage?.uncovered ?? []
+	if (paid.length === 0 && !needsReading && uncovered.length === 0) {
 		return null
 	}
 	return (
@@ -285,6 +300,18 @@ export function CommonSections({
 					<NeedsReadingFlag>
 						<Trans>Read this before it goes into a record</Trans>
 					</NeedsReadingFlag>
+				</Section>
+			) : null}
+			{uncovered.length > 0 ? (
+				<Section data-testid='research-uncovered-parts'>
+					<NeedsReadingFlag>
+						<Trans>The search came back with no company for:</Trans>
+					</NeedsReadingFlag>
+					<QualityList>
+						{uncovered.map(part => (
+							<li key={part}>{part}</li>
+						))}
+					</QualityList>
 				</Section>
 			) : null}
 			{paid.length > 0 ? <PendingPaidActionsSection actions={paid} /> : null}

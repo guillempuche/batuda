@@ -8,7 +8,7 @@
  * run already produced. The flag is deliberately conservative: it should catch the
  * clearly-thin runs, not second-guess a solid one.
  *
- * Four signals raise it. Whenever a run was pinned to one company, anything short
+ * Five signals raise it. Whenever a run was pinned to one company, anything short
  * of clearly reaching that company counts — which covers an enrichment filling
  * that company's profile and equally a scan launched from it, since a scan can be
  * pinned to a subject too and a wrong one there is just as misleading. On top of
@@ -17,9 +17,15 @@
  * back with a handful of results where a list was asked for is thin whatever it
  * was vetted against. And a run whose every citation was rejected reached none of
  * the pages it claimed to read, whatever else it did.
+ *
+ * The fifth is about what was asked rather than how much came back. A request
+ * naming five trades that comes back with sixty companies for one of them passes
+ * every count above — sixty is not thin — while answering a fifth of the question,
+ * so a part of the request nothing came back for raises the flag on its own.
  */
 
 import { DISCOVERY_THIN_RESULT_COUNT, isDiscoveryScan } from './discovery-scan'
+import type { RequestCoverage } from './request-parts'
 
 export interface RunQualityInput {
 	readonly schemaName: string
@@ -55,6 +61,12 @@ export interface RunQualityInput {
 	readonly scanResults: number | null
 	/** Whether the one refined retry fired after a thin first pass. */
 	readonly refined: boolean
+	/**
+	 * Which of the parts the request named came back with companies. Null when the
+	 * question does not arise — every run that is not a scan, and a request naming
+	 * one kind of company, which is answered by companies of that kind.
+	 */
+	readonly coverage: RequestCoverage | null
 }
 
 export interface RunQuality {
@@ -95,6 +107,13 @@ export interface RunQuality {
 	readonly citations_seen: number
 	/** Of those, how many pointed at a page the run actually reached. */
 	readonly citations_kept: number
+	/**
+	 * Which parts of the request came back with companies and which did not, so the
+	 * shortfall can be read off the finished run instead of by searching again.
+	 * Absent where the question does not arise — see the input field of the same
+	 * name — rather than reported as nothing covered.
+	 */
+	readonly coverage?: RequestCoverage
 	/** True when the result is thin enough that an automation should not act on it unreviewed. */
 	readonly low_confidence: boolean
 }
@@ -124,11 +143,18 @@ export const computeRunQuality = (input: RunQualityInput): RunQuality => {
 	// shortfall, left to the signals above.
 	const nothingStandsBehindIt =
 		input.citationsSeen > 0 && input.citationsKept === 0
+	// And a run that found companies for some of the trades it was asked about
+	// answered only some of the request, however long that list is. Whether the
+	// market has such companies at all is exactly what a reader has to decide, so
+	// it goes to them rather than passing as a full answer.
+	const partsWentUnanswered =
+		input.coverage !== null && input.coverage.uncovered.length > 0
 	const lowConfidence =
 		unsureOfTheCompany ||
 		thinlyVetted ||
 		thinResultList ||
-		nothingStandsBehindIt
+		nothingStandsBehindIt ||
+		partsWentUnanswered
 
 	return {
 		rounds: input.rounds,
@@ -146,6 +172,7 @@ export const computeRunQuality = (input: RunQualityInput): RunQuality => {
 		...(isScan ? { refined: input.refined } : {}),
 		citations_seen: input.citationsSeen,
 		citations_kept: input.citationsKept,
+		...(input.coverage !== null ? { coverage: input.coverage } : {}),
 		low_confidence: lowConfidence,
 	}
 }

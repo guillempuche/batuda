@@ -1,0 +1,290 @@
+/**
+ * The parts of a request, held for the whole of a search.
+ *
+ * A request naming five trades is answered by companies for five trades, not by
+ * sixty companies for one of them. Telling the search so is not enough on its own: a
+ * run that covers one trade and stops looks, from its own count, exactly like one
+ * that covered them all, and the person reading the list cannot tell "this market
+ * only has electricians" from "the search stopped after electricians".
+ *
+ * So the request is split into its parts before any searching starts, the list is
+ * carried into every pass, and what came back is held against it at the end: a part
+ * nothing answers sends the search back out for that part specifically, and one
+ * still unanswered when the run finishes is named in what the run reports rather
+ * than passed over in silence. Nothing here promises to find companies that are not
+ * findable — a market with no lift installers online should say it could not cover
+ * lifts, which is a good answer.
+ *
+ * What counts as a part: a kind of company the request asks for — a trade, a
+ * sector, a speciality. Not a place. A row says what it does in the words of its
+ * trade and says where it is in a field of its own, so a province read against the
+ * same words would come back uncovered on every row that answers it.
+ *
+ * Read the caveat on the fields `discoveryRowText` reads before treating a coverage
+ * reading as a score: a row can repeat the request back, so a part reads as covered
+ * generously. That is why a part that goes unanswered is what drives anything here,
+ * and why the follow-up asks for companies rather than for better descriptions of
+ * the ones already listed.
+ */
+
+import { Schema } from 'effect'
+
+import { foldLabel } from '@batuda/domain'
+
+import { discoveryRowText } from './discovery-scan'
+import { anyTermAppearsIn, termTokens } from './term-match'
+
+/** One kind of company a request asks for, and the wordings that place a row in it. */
+export interface RequestPart {
+	/** The kind of company, in the words the request itself used. */
+	readonly label: string
+	/** Other wordings that place a row in this part, in whichever languages the market answers in. */
+	readonly terms: ReadonlyArray<string>
+}
+
+/** Which of a request's parts came back with companies, and which did not. */
+export interface RequestCoverage {
+	readonly covered: ReadonlyArray<string>
+	readonly uncovered: ReadonlyArray<string>
+}
+
+/**
+ * Below this many parts there is nothing to work through: a request naming one kind
+ * of company is answered by companies of that kind, which every other signal already
+ * judges. Asking about coverage there would turn "no row happened to name the trade"
+ * into a shortfall of its own on runs that are perfectly fine.
+ */
+const MIN_COVERAGE_PARTS = 2
+
+/**
+ * A request that names more kinds of company than this was not split, it was
+ * shredded — the likeliest cause is one kind broken into the words it is made of.
+ * The first few are kept rather than the whole thing thrown away, so a genuinely
+ * long request still gets worked through as far as this.
+ */
+export const MAX_REQUEST_PARTS = 12
+
+/** Wordings kept per part. More than this is a model listing every phrasing it can think of. */
+export const MAX_PART_TERMS = 12
+
+/**
+ * Longest a wording may be. A trade is named in a few words; anything past this is
+ * a paragraph where a name was asked for. It matters because these words go into
+ * every searching pass's prompt — an unbounded one would fill the prompt on its own
+ * and stop the search after a single round.
+ */
+export const MAX_WORDING_CHARS = 80
+
+/**
+ * How many extra searching passes a request's unanswered parts are worth. The first
+ * is the one that does the work and the second is for what it could not reach; a
+ * part still empty past that is far more likely a trade this market has nobody for
+ * online than one more pass would turn up, and saying so beats spending the rest of
+ * the run on it.
+ */
+export const MAX_COVERAGE_PASSES = 2
+
+/**
+ * And no pass starts once this much of the run's clock is gone. A whole-market
+ * search already runs a good share of its deadline, and a pass that overruns it
+ * takes the run down with it — the deadline marks the run failed, which loses the
+ * companies it did find. Half the clock left is the room another pass plus the
+ * extraction, the gap rounds and the brief after it need.
+ */
+const COVERAGE_PASS_DEADLINE_FRACTION = 0.5
+
+/** Why the search is, or is not, going back out for the parts nothing answered. */
+export type CoveragePassVerdict =
+	| 'go'
+	| 'answered'
+	| 'passes_spent'
+	| 'deadline_margin'
+	| 'budget_margin'
+
+/**
+ * Whether to spend another searching pass on the parts nothing came back for.
+ *
+ * A part left unanswered because the clock or the money ran out is still reported as
+ * unanswered, so stopping here costs the reader nothing they would not otherwise be
+ * told — where overrunning the deadline costs them the whole run.
+ */
+export const coveragePassVerdict = (args: {
+	readonly uncovered: number
+	readonly passesSpent: number
+	readonly elapsedMs: number
+	readonly deadlineMs: number
+	readonly canAfford: boolean
+}): CoveragePassVerdict => {
+	if (args.uncovered === 0) return 'answered'
+	if (args.passesSpent >= MAX_COVERAGE_PASSES) return 'passes_spent'
+	if (args.elapsedMs > args.deadlineMs * COVERAGE_PASS_DEADLINE_FRACTION)
+		return 'deadline_margin'
+	if (!args.canAfford) return 'budget_margin'
+	return 'go'
+}
+
+// The shape the splitter is asked to fill — passed to generateObject and named in
+// the prompt too, per the extract tier's schema-in-both-places rule.
+export const RequestPartsSchema = Schema.Struct({
+	parts: Schema.Array(
+		Schema.Struct({
+			label: Schema.String,
+			terms: Schema.Array(Schema.String),
+		}),
+	),
+})
+
+/**
+ * What the splitter is asked. It runs before any searching, so all it has to read
+ * is the request itself.
+ */
+export const requestPartsPrompt = (query: string): string =>
+	[
+		'You are reading one research request and listing the kinds of company it asks for.',
+		'',
+		'A part is one kind of company the request names — a trade, a sector, a speciality, a line of work. Where the request names one kind of company, return exactly one part. Never split a single kind into the words it is made of ("industrial refrigeration" is one part, not "industrial" and "refrigeration"), and never add a kind the request does not name.',
+		'A place is not a part. A request for companies across a country, a region, or a list of provinces still asks for one kind of company per trade it names; leave the places out.',
+		'A request that names no kind of company at all — one that names a single company and asks who competes with it, or who resembles it — has no parts. Return an empty list for it rather than guessing at the trades that company might be in.',
+		'',
+		'For each part:',
+		'- label: the kind of company in the words the request itself uses, a few words at most.',
+		'- terms: other wordings that would place a company in this part — the ordinary word for the trade, and for someone who does it — in the language of the request, in the language of the country it is about, and in English. Between 3 and 10 of them. A wording that would fit a company in another part just as well belongs to neither: leave it out.',
+		'',
+		'Return the parts in the order the request names them.',
+		'Return {"parts": [{"label": "...", "terms": ["...", "..."]}]} and nothing else.',
+		'',
+		`Request:\n${query}`,
+	].join('\n')
+
+/**
+ * A wording trimmed and cut to a name's length, or null when it says nothing that
+ * could ever place a row. Cutting rather than refusing keeps a part whose label came
+ * back overlong: its first words are still the trade's name.
+ */
+const readWording = (raw: unknown): string | null => {
+	if (typeof raw !== 'string') return null
+	const wording = raw.trim().slice(0, MAX_WORDING_CHARS).trim()
+	return termTokens(wording).length === 0 ? null : wording
+}
+
+/**
+ * Drop any wording that two parts both claim.
+ *
+ * A word both the electrical part and the plumbing part list — "instalación" — places
+ * a row in neither, and left in it would mark every part covered off the first row
+ * that came back. A part's own label is never dropped, because a part with no wording
+ * at all could only read as uncovered for the rest of the run.
+ */
+const dropSharedWordings = (
+	parts: ReadonlyArray<{ label: string; terms: ReadonlyArray<string> }>,
+): ReadonlyArray<RequestPart> => {
+	const claims = new Map<string, number>()
+	for (const part of parts) {
+		for (const wording of [part.label, ...part.terms]) {
+			const key = foldLabel(wording)
+			claims.set(key, (claims.get(key) ?? 0) + 1)
+		}
+	}
+	return parts.map(part => ({
+		label: part.label,
+		terms: part.terms.filter(term => (claims.get(foldLabel(term)) ?? 0) < 2),
+	}))
+}
+
+/**
+ * The splitter's answer, read into the list the run will hold.
+ *
+ * Takes whatever came back rather than a decoded value: a model can answer with the
+ * wrong shape, and a search that then refuses to start would be a worse run than one
+ * that goes ahead with no list at all. Anything unreadable comes back empty, which
+ * turns coverage off for that run and leaves every other signal as it was.
+ */
+export const readRequestParts = (raw: unknown): ReadonlyArray<RequestPart> => {
+	if (raw === null || typeof raw !== 'object') return []
+	const entries = (raw as { parts?: unknown }).parts
+	if (!Array.isArray(entries)) return []
+
+	const parts: Array<{ label: string; terms: string[] }> = []
+	const seenLabels = new Set<string>()
+	for (const entry of entries) {
+		if (parts.length >= MAX_REQUEST_PARTS) break
+		if (entry === null || typeof entry !== 'object') continue
+		// A label that folds to no words can never place a row, so a part carrying
+		// one could only ever read as uncovered.
+		const label = readWording((entry as { label?: unknown }).label)
+		if (label === null) continue
+		const key = foldLabel(label)
+		if (seenLabels.has(key)) continue
+		seenLabels.add(key)
+
+		const rawTerms = (entry as { terms?: unknown }).terms
+		const terms: string[] = []
+		const seenTerms = new Set<string>([key])
+		if (Array.isArray(rawTerms)) {
+			for (const rawTerm of rawTerms) {
+				if (terms.length >= MAX_PART_TERMS) break
+				const term = readWording(rawTerm)
+				if (term === null) continue
+				const termKey = foldLabel(term)
+				if (seenTerms.has(termKey)) continue
+				seenTerms.add(termKey)
+				terms.push(term)
+			}
+		}
+		parts.push({ label, terms })
+	}
+
+	return dropSharedWordings(parts)
+}
+
+/**
+ * Which of the request's parts the rows that came back answer, or null when the
+ * request named too few parts for the question to mean anything.
+ */
+export const coverRequestParts = (
+	parts: ReadonlyArray<RequestPart>,
+	rows: ReadonlyArray<Record<string, unknown>>,
+): RequestCoverage | null => {
+	if (parts.length < MIN_COVERAGE_PARTS) return null
+	const rowWords = rows.map(row => termTokens(discoveryRowText(row)))
+	const covered: string[] = []
+	const uncovered: string[] = []
+	for (const part of parts) {
+		if (anyTermAppearsIn([part.label, ...part.terms], rowWords)) {
+			covered.push(part.label)
+		} else {
+			uncovered.push(part.label)
+		}
+	}
+	return { covered, uncovered }
+}
+
+/** Labels quoted for a prompt, so each part is named exactly as the request wrote it. */
+const listLabels = (labels: ReadonlyArray<string>): string =>
+	labels.map(label => `"${label}"`).join(', ')
+
+/**
+ * The list handed to the search itself, so what it is working through is on the page
+ * in front of it rather than something it was asked to keep in mind.
+ *
+ * Empty for a request naming one kind of company: there is no list to work through,
+ * and the same threshold decides that here and where coverage is read, so the search
+ * is never told to work through a list nothing will hold it to.
+ */
+export const requestPartsDirective = (
+	parts: ReadonlyArray<RequestPart>,
+): string =>
+	parts.length < MIN_COVERAGE_PARTS
+		? ''
+		: `The request asks for ${parts.length} kinds of company: ${listLabels(parts.map(part => part.label))}. Work through them one at a time and come back with companies for every one of them — a list answering one or two of them does not answer the request, however many companies those turn up.`
+
+/**
+ * What the search is sent back out with when parts of the request have no companies
+ * yet. It asks for companies rather than for better wording on purpose: a part is
+ * read as answered off what the rows say, so telling the model which parts look
+ * unanswered is also telling it how to look answered without finding anyone.
+ */
+export const uncoveredPartsDirective = (
+	uncovered: ReadonlyArray<string>,
+): string =>
+	`Nothing you have found so far answers ${listLabels(uncovered)}. Search for each of those now, on its own: the ordinary words for that work together with the place the request named, and the business directories, association member lists and sector registries where such companies are listed. Come back with companies that actually do that work — adding the words to a company you have already listed answers nothing. Keep every qualifier the request made: size, place, and niche.`

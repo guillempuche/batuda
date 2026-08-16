@@ -26,8 +26,8 @@ import {
 	type MarketPart,
 	SCORABLE_FIELDS,
 	type ScorableField,
-	termTokens,
 } from './eval-scoring'
+import { termTokens } from './term-match'
 
 /**
  * A raw golden row before validation: an id, the research query (the dataset

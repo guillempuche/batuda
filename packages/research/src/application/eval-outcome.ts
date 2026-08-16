@@ -11,7 +11,11 @@
  * so a per-field-citation schema change lands here and the scorer's metrics stay put.
  */
 
-import { discoveryRows, isDiscoveryScan } from './discovery-scan'
+import {
+	discoveryRowDescription,
+	discoveryRows,
+	isDiscoveryScan,
+} from './discovery-scan'
 import {
 	type RunOutcome,
 	type RunUsage,
@@ -53,31 +57,6 @@ const readFilled = (raw: unknown): string | null => {
 	const value = readFieldValue(raw)
 	return value === null || value.trim() === '' ? null : value.trim()
 }
-
-/**
- * Where a scan's row says what it does, run together so a row counts towards its
- * trade whichever field the run wrote that trade into. A prospect gives the trade it
- * was filed under and why it matched; a competitor gives a description instead.
- *
- * The relevance note is read even though it is the field most likely to repeat the
- * request back, because leaving it out measured something worse. It is the only one
- * of the three a prospect must fill: on a live pass 24 of 53 rows stated a trade and
- * every other row said what it did only there, so without it more than half the list
- * counted for nothing and the coverage figure turned into a reading of how often an
- * optional field got filled.
- *
- * What that costs is stated plainly: a row naming several trades counts towards each
- * one. That is right for an installer who genuinely does them all — the live pass has
- * rows authorised for four — and generous towards a row that merely lists back what
- * was asked for. The failure this figure has to catch survives either way, because a
- * trade no row mentions at all still reads unanswered.
- */
-const TRADE_FIELDS = ['industry', 'why_relevant', 'description'] as const
-
-const describedAs = (row: Record<string, unknown>): string =>
-	TRADE_FIELDS.map(field => readFilled(row[field]))
-		.filter(value => value !== null)
-		.join(' ')
 
 const enrichmentOf = (
 	findings: unknown,
@@ -162,7 +141,7 @@ export const outcomeFromRun = (input: {
 			name: name.trim(),
 			website: readFilled(row['website']),
 			location: readFilled(row['location']),
-			describedAs: describedAs(row),
+			describedAs: discoveryRowDescription(row),
 		})
 	}
 

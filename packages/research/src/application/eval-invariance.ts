@@ -10,7 +10,8 @@
  */
 
 import type { ScorableField } from './eval-scoring'
-import { foldDiacritics, normalizeText, SCORABLE_FIELDS } from './eval-scoring'
+import { normalizeText, SCORABLE_FIELDS } from './eval-scoring'
+import { foldDiacritics } from './term-match'
 
 export interface FramingOutcome {
 	/** Scorable field values the run reported (null/undefined = not filled). */

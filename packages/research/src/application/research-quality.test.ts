@@ -22,6 +22,7 @@ describe('computeRunQuality', () => {
 			citationsKept: 4,
 			scanResults: null,
 			refined: false,
+			coverage: null,
 		} as const
 
 		it('should not flag a strong, well-grounded run', () => {
@@ -106,6 +107,7 @@ describe('computeRunQuality', () => {
 			citationsKept: 10,
 			scanResults: FULL_LIST,
 			refined: false,
+			coverage: null,
 		} as const
 
 		it('should flag a scan vetted against a single source', () => {
@@ -209,6 +211,7 @@ describe('computeRunQuality', () => {
 			citationsSeen: 10,
 			citationsKept: 10,
 			refined: true,
+			coverage: null,
 		} as const
 
 		it('should flag a well-sourced scan that still found only a handful', () => {
@@ -257,9 +260,90 @@ describe('computeRunQuality', () => {
 				citationsKept: 4,
 				scanResults: null,
 				refined: false,
+				coverage: null,
 			})
 			// THEN the thin-list signal stays quiet — a missing list is "does not
 			// apply", not "found nothing"
+			expect(quality.low_confidence).toBe(false)
+		})
+	})
+
+	describe('when a scan answered only some of what it was asked', () => {
+		// A scan nothing else finds fault with: plenty of sources, every citation
+		// kept, a long list. The only thing that can move the flag here is coverage.
+		const healthyScan = {
+			schemaName: 'prospect_scan_v1',
+			entityMatch: null,
+			rounds: 5,
+			gapRounds: 2,
+			sourcesTotal: 131,
+			sourcesFirstParty: 0,
+			ownDomainKnown: false,
+			fieldsGrounded: 0,
+			fieldsTotal: 0,
+			citationsSeen: 60,
+			citationsKept: 60,
+			scanResults: 62,
+			refined: false,
+			coverage: null,
+		} as const
+
+		it('should flag a long list that answered one of the trades asked about', () => {
+			// GIVEN the reported run: 62 companies, four of the five trades the
+			// request named with nobody in them
+			const quality = computeRunQuality({
+				...healthyScan,
+				coverage: {
+					covered: ['instalaciones eléctricas'],
+					uncovered: ['fontanería', 'solar', 'incendios', 'ascensores'],
+				},
+			})
+			// THEN it is marked for a read: 62 is not thin and nothing else here is
+			// wrong, so without this the run reports plain success over a fifth of
+			// the question
+			expect(quality.low_confidence).toBe(true)
+		})
+
+		it('should report which parts came back and which did not', () => {
+			// GIVEN the same run
+			const quality = computeRunQuality({
+				...healthyScan,
+				coverage: {
+					covered: ['instalaciones eléctricas'],
+					uncovered: ['ascensores'],
+				},
+			})
+			// THEN the shortfall can be read off the finished run rather than by
+			// searching again to find out what is missing
+			expect(quality.coverage).toEqual({
+				covered: ['instalaciones eléctricas'],
+				uncovered: ['ascensores'],
+			})
+		})
+
+		it('should stay trusted when every part came back with companies', () => {
+			// GIVEN a scan that answered all three trades
+			const quality = computeRunQuality({
+				...healthyScan,
+				coverage: {
+					covered: ['instalaciones eléctricas', 'fontanería', 'ascensores'],
+					uncovered: [],
+				},
+			})
+			// THEN nothing is raised, and the covered list is still reported so a
+			// reader can see what "answered" meant
+			expect(quality.low_confidence).toBe(false)
+			expect(quality.coverage?.uncovered).toEqual([])
+		})
+
+		it('should leave coverage out where the question does not arise', () => {
+			// GIVEN a run that never had a list of parts to work through — every run
+			// that is not a scan, and a request naming one kind of company
+			const quality = computeRunQuality(healthyScan)
+			// THEN nothing is reported about coverage: an empty block would read as
+			// having covered none of it, which is a failing grade for a question
+			// nobody asked
+			expect(quality.coverage).toBeUndefined()
 			expect(quality.low_confidence).toBe(false)
 		})
 	})
@@ -277,6 +361,7 @@ describe('computeRunQuality', () => {
 			fieldsTotal: 0,
 			scanResults: FULL_LIST,
 			refined: false,
+			coverage: null,
 		} as const
 
 		it('should flag a run whose citations were all rejected', () => {
@@ -334,6 +419,7 @@ describe('computeRunQuality', () => {
 				citationsKept: 8,
 				scanResults: FULL_LIST,
 				refined: false,
+				coverage: null,
 			}).low_confidence
 
 		it('should flag one that never clearly reached that company', () => {
@@ -367,6 +453,7 @@ describe('computeRunQuality', () => {
 				citationsKept: 8,
 				scanResults: FULL_LIST,
 				refined: false,
+				coverage: null,
 			})
 			// THEN the count still stands: 'absent' is a verdict on what the evidence
 			// showed, not the run having no company to be about
@@ -389,6 +476,7 @@ describe('computeRunQuality', () => {
 			citationsKept: 3,
 			scanResults: null,
 			refined: false,
+			coverage: null,
 		} as const
 
 		it('should leave out the profile numbers a brief never fills', () => {
@@ -456,6 +544,7 @@ describe('computeRunQuality', () => {
 			citationsKept: 60,
 			scanResults: FULL_LIST,
 			refined: true,
+			coverage: null,
 		} as const
 
 		it('should report each phase of rounds as its own number', () => {
@@ -488,6 +577,7 @@ describe('computeRunQuality', () => {
 				citationsKept: 4,
 				scanResults: null,
 				refined: false,
+				coverage: null,
 			})
 			// THEN zero is reported rather than left out: a run that went back for
 			// nothing is a run that needed nothing, which is worth knowing
