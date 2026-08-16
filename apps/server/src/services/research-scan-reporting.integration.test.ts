@@ -31,9 +31,11 @@ import { enterOrgScope } from '../middleware/org.js'
 
 // What a discovery scan reports about itself, end to end. A scan that comes back
 // with a handful of companies must not read as green as one that came back with
-// a list; and a scan pinned to a company — "find this company's competitors" —
-// must earn the same refined retry and the same honest "found nothing" as an
-// open-ended one, rather than reporting success over an empty list.
+// a list; a scan asked about several trades that answers one of them must go back
+// out for the rest and say which it never covered; and a scan pinned to a company
+// — "find this company's competitors" — must earn the same refined retry and the
+// same honest "found nothing" as an open-ended one, rather than reporting success
+// over an empty list.
 //
 // One shared ResearchService layer drives every case (a fresh layer per case
 // would start a fresh dispatcher + connection pool each time and exhaust the CI
@@ -51,6 +53,14 @@ interface Scenario {
 	readonly evidence: string
 	/** Structured findings the extractor returns on every call. */
 	readonly findings: Record<string, unknown>
+	/**
+	 * What the splitter says the request asks for. Absent means the request named
+	 * one kind of company, which is what every scan here but the coverage one is.
+	 */
+	readonly parts?: ReadonlyArray<{
+		readonly label: string
+		readonly terms: ReadonlyArray<string>
+	}>
 }
 
 let scenario: Scenario
@@ -59,6 +69,11 @@ let scenario: Scenario
 // source-linking computes for the web_search result below.
 const SEED_URL = 'https://directory.test/scan-reporting'
 const SEED_URL_HASH = createHash('sha256').update(SEED_URL).digest('hex')
+// A second page, so a run here is never vetted against a single source. Without
+// it every scan below would be marked for a read on that count alone, and no test
+// could tell the signal it is about from that one.
+const SECOND_URL = 'https://association.test/members'
+const SECOND_URL_HASH = createHash('sha256').update(SECOND_URL).digest('hex')
 
 // The company an anchored scan is launched from. Its name is distinctive enough
 // that evidence naming it clears the entity gate — otherwise the run would fail
@@ -75,8 +90,8 @@ const usage = {
 	outputTokens: { total: 0, text: undefined, reasoning: undefined },
 }
 
-// Agent pass: hand back one web_search result carrying real page text, and no
-// further tool calls, so each pass gathers the seeded source then stops.
+// Agent pass: hand back two web_search results carrying real page text, and no
+// further tool calls, so each pass gathers the seeded sources then stops.
 const agentLlm: LanguageModel.Service = {
 	generateText: () =>
 		Effect.succeed({
@@ -90,7 +105,12 @@ const agentLlm: LanguageModel.Service = {
 					name: 'web_search',
 					isFailure: false,
 					encodedResult: undefined,
-					result: { items: [{ url: SEED_URL, content: scenario.evidence }] },
+					result: {
+						items: [
+							{ url: SEED_URL, content: scenario.evidence },
+							{ url: SECOND_URL, content: scenario.evidence },
+						],
+					},
 				},
 			],
 			finishReason: 'stop' as const,
@@ -101,10 +121,29 @@ const agentLlm: LanguageModel.Service = {
 		Stream.succeed({ type: 'text-delta' as const, delta: '' }) as never,
 }
 
+// The extract tier answers two different questions on a scan: first what kinds of
+// company the request asks for, then the structured findings. They are told apart
+// by a phrase only the splitting prompt carries.
+const SPLITTER_MARKER = 'kinds of company it asks for'
+
+// How many splitting prompts the stub recognised. A case that expects parts asserts
+// on this, so rewording the splitting prompt fails as "the stub never saw the
+// splitter" rather than as a puzzling status somewhere downstream.
+let splitterCalls = 0
+
 const extractLlm: LanguageModel.Service = {
 	generateText: () => Effect.succeed({ text: '', content: [], usage }) as never,
-	generateObject: () =>
-		Effect.succeed({ usage, value: scenario.findings }) as never,
+	generateObject: ((options: { readonly prompt?: unknown }) =>
+		Effect.sync(() => {
+			const isSplitter =
+				typeof options.prompt === 'string' &&
+				options.prompt.includes(SPLITTER_MARKER)
+			if (isSplitter) splitterCalls++
+			return {
+				usage,
+				value: isSplitter ? { parts: scenario.parts ?? [] } : scenario.findings,
+			}
+		})) as never,
 	streamText: () =>
 		Stream.succeed({ type: 'text-delta' as const, delta: '' }) as never,
 }
@@ -186,15 +225,28 @@ let userId: string
 let anchorCompanyId: string
 const createdRunIds: string[] = []
 
+// What a finished run says about the parts of its request, read off its findings.
+interface StoredCoverage {
+	readonly covered?: ReadonlyArray<string>
+	readonly uncovered?: ReadonlyArray<string>
+}
+
 // Run one scan to its terminal state and report how it finished.
 const runScan = async (args: {
 	readonly schemaName: string
 	readonly query: string
 	readonly scenario: Scenario
 	readonly subjectId?: string
-}): Promise<{ status: string; refined: boolean }> => {
+}): Promise<{
+	status: string
+	refined: boolean
+	covering: boolean
+	coverage: StoredCoverage | undefined
+	splitterAsked: boolean
+}> => {
 	scenario = args.scenario
 	firedEvents = []
+	splitterCalls = 0
 	return runtime.runPromise(
 		Effect.gen(function* () {
 			const svc = yield* ResearchService
@@ -239,7 +291,21 @@ const runScan = async (args: {
 					return yield* poll(attemptsLeft - 1)
 				})
 			const status = yield* poll(120)
-			return { status, refined: firedEvents.includes('research.refining') }
+			const [row] = yield* sql<{ findings: unknown }>`
+				SELECT findings FROM research_runs WHERE id = ${created.id}::uuid
+			`
+			const findings = row?.findings
+			const quality =
+				findings !== null && typeof findings === 'object'
+					? (findings as { quality?: { coverage?: StoredCoverage } }).quality
+					: undefined
+			return {
+				status,
+				refined: firedEvents.includes('research.refining'),
+				covering: firedEvents.includes('research.covering'),
+				coverage: quality?.coverage,
+				splitterAsked: splitterCalls > 0,
+			}
 		}),
 	)
 }
@@ -271,6 +337,11 @@ beforeAll(async () => {
 				VALUES (${`src-${randomUUID()}`}, 'web', 'it-stub', ${SEED_URL}, ${SEED_URL_HASH}, 'directory.test', 'seed')
 				ON CONFLICT (url_hash) DO NOTHING
 			`
+			yield* sql`
+				INSERT INTO sources (id, kind, provider, url, url_hash, domain, content_hash)
+				VALUES (${`src-${randomUUID()}`}, 'web', 'it-stub', ${SECOND_URL}, ${SECOND_URL_HASH}, 'association.test', 'seed')
+				ON CONFLICT (url_hash) DO NOTHING
+			`
 			return { org, userId: user.id, anchorId: anchor?.id ?? '' }
 		}),
 	)
@@ -289,6 +360,7 @@ afterAll(async () => {
 			}
 			yield* sql`DELETE FROM companies WHERE id = ${anchorCompanyId}::uuid`
 			yield* sql`DELETE FROM sources WHERE url_hash = ${SEED_URL_HASH}`
+			yield* sql`DELETE FROM sources WHERE url_hash = ${SECOND_URL_HASH}`
 		}),
 	)
 	await runtime.dispose()
@@ -326,6 +398,88 @@ describe('what a discovery scan reports about itself', () => {
 			//   that came back with forty
 			expect(result.refined).toBe(true)
 			expect(result.status).toBe('succeeded_low_confidence')
+		}, 60_000)
+	})
+
+	describe('when a scan answers one of the trades its request named', () => {
+		it('should search again for the rest and finish marked for a read', async () => {
+			// GIVEN a request naming three trades, answered by six electricians and
+			//   nobody else — a list long enough that nothing about its size is thin,
+			//   which is the run this exists to catch
+			const result = await runScan({
+				schemaName: 'prospect_scan_v1',
+				query:
+					'Empresas instaladoras en España: instalaciones eléctricas, fontanería y ascensores',
+				scenario: {
+					evidence: 'Directorio de empresas instaladoras eléctricas en España.',
+					parts: [
+						{
+							label: 'instalaciones eléctricas',
+							terms: ['electricista', 'electrical installation'],
+						},
+						{ label: 'fontanería', terms: ['fontanero', 'plumbing'] },
+						{ label: 'ascensores', terms: ['elevador', 'lift'] },
+					],
+					findings: {
+						prospects: Array.from({ length: 6 }, (_, index) => ({
+							name: `Electro Instal ${index}`,
+							why_relevant: 'Instalaciones eléctricas industriales',
+							citations: [],
+						})),
+					},
+				},
+			})
+
+			// THEN the run went back out for the two trades nothing answered, and
+			//   finished asking for a read rather than reporting plain success over a
+			//   third of the question — the list was never thin, so only coverage
+			//   could have raised either
+			expect(result.splitterAsked).toBe(true)
+			expect(result.covering).toBe(true)
+			expect(result.refined).toBe(false)
+			expect(result.status).toBe('succeeded_low_confidence')
+			// AND the shortfall is readable off the finished run, so nobody has to
+			//   search again to learn what is missing
+			expect(result.coverage?.covered).toEqual(['instalaciones eléctricas'])
+			expect(result.coverage?.uncovered).toEqual(['fontanería', 'ascensores'])
+		}, 60_000)
+	})
+
+	describe('when a scan answers every trade its request named', () => {
+		it('should finish plain succeeded without searching again', async () => {
+			// GIVEN a request naming two trades, with a company for each
+			const result = await runScan({
+				schemaName: 'prospect_scan_v1',
+				query: 'Empresas instaladoras: instalaciones eléctricas y fontanería',
+				scenario: {
+					evidence: 'Directorio de empresas instaladoras en España.',
+					parts: [
+						{ label: 'instalaciones eléctricas', terms: ['electricista'] },
+						{ label: 'fontanería', terms: ['fontanero'] },
+					],
+					findings: {
+						prospects: [
+							...Array.from({ length: 3 }, (_, index) => ({
+								name: `Electro Instal ${index}`,
+								why_relevant: 'Instalaciones eléctricas industriales',
+								citations: [],
+							})),
+							...Array.from({ length: 3 }, (_, index) => ({
+								name: `Fontaneria Vall ${index}`,
+								why_relevant: 'Fontanería y reformas de baños',
+								citations: [],
+							})),
+						],
+					},
+				},
+			})
+
+			// THEN nothing is missing, so no extra pass is spent and the run reports
+			//   the plain success it earned
+			expect(result.splitterAsked).toBe(true)
+			expect(result.covering).toBe(false)
+			expect(result.status).toBe('succeeded')
+			expect(result.coverage?.uncovered).toEqual([])
 		}, 60_000)
 	})
 

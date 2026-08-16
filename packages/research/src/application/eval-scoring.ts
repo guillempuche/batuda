@@ -48,6 +48,7 @@ import {
 	branchOfficeParents,
 	discoveryRowIdentityKeys,
 } from './prospect-dedupe-guard'
+import { anyTermAppearsIn, foldDiacritics, termTokens } from './term-match'
 
 /**
  * The enrichment scalars we can check against an objective golden answer. Free-text
@@ -462,10 +463,6 @@ export const normalizeText = (value: string): string =>
 const isFilled = (value: string | null | undefined): value is string =>
 	typeof value === 'string' && value.trim().length > 0
 
-/** Strip accents so "García" and "Garcia" compare equal. */
-export const foldDiacritics = (value: string): string =>
-	value.normalize('NFD').replace(/\p{Diacritic}/gu, '')
-
 // Titles a page prints before a name ("Sir James Dyson", "Dr Jane Roe"): not part of
 // the name, so a leading one is dropped before matching. "Don"/"Doña" are deliberately
 // absent — "Don" is also a real given name (Don Draper), and dropping it would lose a
@@ -698,47 +695,6 @@ const specificLocationAgrees = (
 }
 
 /**
- * A value's words with the accents taken off, so "Instalación" and "instalacion" are
- * one word and punctuation between two words never runs them into one.
- *
- * Exported so the golden data can be held to the same reading: a wording that folds
- * to no words can never place a row or name an organisation, and refusing it where it
- * is written beats accepting it and silently measuring nothing.
- */
-export const termTokens = (value: string): ReadonlyArray<string> =>
-	foldDiacritics(value)
-		.toLowerCase()
-		.split(/[^a-z0-9]+/)
-		.filter(token => token.length > 0)
-
-// Below this length a term's word has to match a whole word. A three-letter word is
-// the opening of far too many unrelated ones — "gas" starts "gasto" — while a longer
-// one is long enough that only its own endings follow it, so "instalacion electrica"
-// reaches "instalaciones eléctricas" without the golden listing every ending of
-// every trade in every language.
-const TERM_PREFIX_MIN_CHARS = 5
-
-// Whether a term's words appear among a row's words, in order and next to each
-// other. A long enough word matches as an opening, because Spanish, Catalan and
-// French put an ending on every word of a phrase, not only on the last one.
-const termAppearsIn = (
-	term: ReadonlyArray<string>,
-	words: ReadonlyArray<string>,
-): boolean => {
-	if (term.length === 0) return false
-	for (let at = 0; at + term.length <= words.length; at++) {
-		const matches = term.every((token, offset) => {
-			const word = words[at + offset] ?? ''
-			return token.length >= TERM_PREFIX_MIN_CHARS
-				? word.startsWith(token)
-				: word === token
-		})
-		if (matches) return true
-	}
-	return false
-}
-
-/**
  * How many of a request's parts came back with at least one row that answers them.
  *
  * Only rows that are the kind of organisation asked for are read. A trade's own
@@ -751,12 +707,7 @@ const partsAnsweredBy = (
 	parts: ReadonlyArray<MarketPart>,
 ): number => {
 	const rowWords = rows.map(row => termTokens(`${row.name} ${row.describedAs}`))
-	return parts.filter(part =>
-		part.terms.some(term => {
-			const tokens = termTokens(term)
-			return rowWords.some(words => termAppearsIn(tokens, words))
-		}),
-	).length
+	return parts.filter(part => anyTermAppearsIn(part.terms, rowWords)).length
 }
 
 /**

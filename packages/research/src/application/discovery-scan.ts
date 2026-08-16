@@ -9,6 +9,8 @@
  * one scan schema and quietly grade the other as having found nothing.
  */
 
+import { unwrapValue } from './guard-shapes'
+
 // The primary result array for each discovery-scan schema. A schema absent here
 // is not a discovery scan: it keeps whatever it found and is never retried.
 const DISCOVERY_RESULT_FIELD: Record<string, string> = {
@@ -58,6 +60,48 @@ export const discoveryRows = (
 			row !== null && typeof row === 'object' && !Array.isArray(row),
 	)
 }
+
+// Where a scan's row says what it does. A prospect gives the industry it was
+// filed under and why it matched; a competitor gives a description instead.
+//
+// The relevance note is read even though it is the field most likely to repeat the
+// request back, because leaving it out reads worse. It is the only one of the three a
+// prospect row must fill: on a live pass 24 of 53 rows stated a trade and every other
+// row said what it did only there, so without it more than half a list says nothing
+// at all and any reading built on this turns into a reading of how often an optional
+// field got filled.
+//
+// What that costs is stated plainly: a row naming several trades counts towards each
+// one. That is right for an installer who genuinely does them all — the live pass has
+// rows authorised for four — and generous towards a row that merely lists back what
+// was asked for. Anything counted off these fields is therefore an upper bound. The
+// failure worth catching survives it, because a trade no row mentions at all still
+// reads as unanswered.
+const TRADE_FIELDS = ['industry', 'why_relevant', 'description'] as const
+
+/** A field's value, or null when it is missing or says nothing. */
+const readFilled = (raw: unknown): string | null => {
+	const inner = unwrapValue(raw)
+	if (typeof inner !== 'string') return null
+	const trimmed = inner.trim()
+	return trimmed === '' ? null : trimmed
+}
+
+/** What one of a scan's rows says it does, run together as one piece of text. */
+export const discoveryRowDescription = (row: Record<string, unknown>): string =>
+	TRADE_FIELDS.map(field => readFilled(row[field]))
+		.filter(value => value !== null)
+		.join(' ')
+
+/**
+ * Everything one of a scan's rows says about itself in words: its name, and where
+ * it says what it does. A company named for its trade — "Ascensores Girona" —
+ * says which trade it is in nowhere else, so the name belongs in the reading.
+ */
+export const discoveryRowText = (row: Record<string, unknown>): string =>
+	[readFilled(row['name']), discoveryRowDescription(row)]
+		.filter(value => value !== null && value !== '')
+		.join(' ')
 
 /**
  * How many results a discovery scan's primary list carries. Null for a schema
