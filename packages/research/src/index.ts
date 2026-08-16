@@ -179,6 +179,7 @@ export {
 	SearchResult,
 	SearchResultItem,
 } from './domain/types'
+export type { LlmTier } from './infrastructure/cached-llm'
 export { makeCachedScrape } from './infrastructure/cached-scrape'
 export { makeCachedSearch } from './infrastructure/cached-search'
 export {
@@ -189,7 +190,16 @@ export {
 export {
 	type ConfiguredSlot,
 	configuredSlots,
+	type LlmVendor,
 	makeResearchLlmLive,
+	type ResolvedTier,
+	resolvedTierVendors,
 } from './infrastructure/llm-live'
 // ── Infrastructure (provider layers) ──────────────────────────────────────
-export { makeResearchProvidersLive } from './infrastructure/providers-live'
+export {
+	type CapabilityVendor,
+	makeResearchProvidersLive,
+	type ResearchCapability,
+	type ResolvedCapability,
+	resolvedCapabilityVendors,
+} from './infrastructure/providers-live'

@@ -4,7 +4,13 @@ import { describe, expect, it } from 'vitest'
 
 import { EnrichmentChain, RegistryRouter } from '../application/ports'
 import { NoRegistry, ProviderError } from '../domain/errors'
-import { enrichmentLayer, registryLayer } from './providers-live'
+import {
+	enrichmentLayer,
+	type ResearchCapability,
+	type ResolvedCapability,
+	registryLayer,
+	resolvedCapabilityVendors,
+} from './providers-live'
 
 // registryLayer's type carries an HttpClient requirement (the libreBORME /
 // Companies House builders need one). A stub-vendor boot never calls it, so a
@@ -153,6 +159,104 @@ describe('enrichmentLayer chain assembly', () => {
 			})
 			// THEN the chain carries union so the caller runs every vendor and merges
 			expect(chain.mode).toBe('union')
+		})
+	})
+})
+
+describe('which vendor a capability would really answer with', () => {
+	const readCapabilities = (
+		env: Record<string, string>,
+		only?: ReadonlyArray<ResearchCapability>,
+	) =>
+		Effect.runPromiseExit(
+			resolvedCapabilityVendors(only).pipe(
+				Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env }))),
+			),
+		)
+
+	const vendorOf = (
+		exit: Exit.Exit<ReadonlyArray<ResolvedCapability>, unknown>,
+		capability: ResearchCapability,
+	): string | undefined =>
+		Exit.isSuccess(exit)
+			? exit.value.find(entry => entry.capability === capability)?.vendor
+			: undefined
+
+	const LIVE = {
+		RESEARCH_PROVIDER_SEARCH: 'brave',
+		RESEARCH_PROVIDER_SCRAPE: 'firecrawl',
+	}
+
+	describe('when a capability names a real vendor', () => {
+		it('should name that vendor', async () => {
+			// GIVEN search and scrape pointed at real vendors
+			const exit = await readCapabilities(LIVE)
+
+			// WHEN read — THEN each reports what would answer for it
+			expect(vendorOf(exit, 'search')).toBe('brave')
+			expect(vendorOf(exit, 'scrape')).toBe('firecrawl')
+		})
+	})
+
+	describe('when a capability nobody set has a default', () => {
+		it('should read as off rather than failing', async () => {
+			// GIVEN nothing said about site discovery, enrichment or verification
+			const exit = await readCapabilities(LIVE)
+
+			// WHEN read — THEN they come back off, which is what their own layers do
+			// with the same silence; only a canned vendor would be a problem, and off
+			// returns nothing rather than something invented
+			expect(vendorOf(exit, 'map')).toBe('none')
+			expect(vendorOf(exit, 'enrich')).toBe('none')
+			expect(vendorOf(exit, 'verify')).toBe('none')
+		})
+	})
+
+	describe('when a capability is answered by canned data', () => {
+		it('should report the stub, including behind a real vendor', async () => {
+			// GIVEN search stubbed outright and scrape stubbed ahead of a real vendor
+			const exit = await readCapabilities({
+				RESEARCH_PROVIDER_SEARCH: 'stub',
+				RESEARCH_PROVIDER_SCRAPE: 'stub,firecrawl',
+			})
+
+			// WHEN read — THEN both report the stub, because the first choice is what
+			// a call reaches
+			expect(vendorOf(exit, 'search')).toBe('stub')
+			expect(vendorOf(exit, 'scrape')).toBe('stub')
+		})
+	})
+
+	describe('when a required capability was never set', () => {
+		it('should fail naming the setting', async () => {
+			// GIVEN nothing said about search, which carries no default
+			const exit = await readCapabilities({
+				RESEARCH_PROVIDER_SCRAPE: 'firecrawl',
+			})
+
+			// WHEN read — THEN it says which setting is missing rather than guessing
+			expect(Exit.isFailure(exit)).toBe(true)
+			if (Exit.isFailure(exit)) {
+				expect(Cause.pretty(exit.cause)).toContain('RESEARCH_PROVIDER_SEARCH')
+			}
+		})
+	})
+
+	describe('when only some capabilities are asked about', () => {
+		it('should read those alone, not the ones nobody asked for', async () => {
+			// GIVEN enrichment configured and nothing said about search or scrape,
+			// which is what an environment for contact discovery looks like — it is
+			// handed a domain and never searches
+			const exit = await readCapabilities(
+				{ RESEARCH_PROVIDER_ENRICH: 'hunter' },
+				['enrich'],
+			)
+
+			// WHEN only enrichment is asked about — THEN it answers, rather than
+			// failing for want of a setting behind a capability it was not asked
+			// about and the caller never reaches
+			expect(Exit.isSuccess(exit)).toBe(true)
+			expect(vendorOf(exit, 'enrich')).toBe('hunter')
 		})
 	})
 })
