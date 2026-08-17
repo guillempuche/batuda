@@ -446,6 +446,25 @@ describe('requestPartsPrompt', () => {
 			// of its own, so a place held as a part would read uncovered on every row
 			expect(prompt).toContain('A place is not a part')
 		})
+
+		it('should tell the splitter how to read an "and" between two trades', () => {
+			// GIVEN any request
+			const prompt = requestPartsPrompt('Empresas instaladoras en España')
+
+			// THEN the first question is whether the two wordings name the same work,
+			// which settles a trade named twice and a trade whose own name carries the
+			// word — asked second instead, it loses to the rule below about half the
+			// time
+			expect(prompt).toContain('settle this before anything else')
+			expect(prompt).toContain('health and safety is one line of work')
+
+			// AND only then does where the word sits come into it: the one closing a
+			// list separates the final trade, so a request naming five trades cannot
+			// come back split into four with the folded-away trade never searched for
+			// and never reported missing
+			expect(prompt).toContain('Only where the two really are different work')
+			expect(prompt).toContain("the list's own punctuation")
+		})
 	})
 })
 
