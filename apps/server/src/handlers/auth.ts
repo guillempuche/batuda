@@ -7,6 +7,7 @@ import { HttpServerRequest, HttpServerResponse } from 'effect/unstable/http'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 
 import { BatudaApi } from '@batuda/controllers'
+import { recordFacts } from '@batuda/observability'
 
 import { Auth } from '../lib/auth'
 import { EnvVars } from '../lib/env'
@@ -33,12 +34,12 @@ const proxyToAuth = Effect.gen(function* () {
 	const response = yield* Effect.promise(() => instance.handler(fetchRequest))
 
 	// The MCP OAuth-drop bug shows up as failures on the token endpoint, which
-	// Better Auth serves opaquely. Tag the request span with the grant outcome
-	// (response status) so a refresh failure is visible in Honeycomb without a
-	// console grep. The request body is already streamed to Better Auth, so
-	// grant_type isn't read here (would need teeing the stream).
+	// Better Auth serves opaquely. Record the grant outcome (response status) so
+	// a refresh failure is visible in Honeycomb without a console grep. The
+	// request body is already streamed to Better Auth, so grant_type isn't read
+	// here (would need teeing the stream).
 	if (url.pathname.endsWith('/oauth2/token')) {
-		yield* Effect.annotateCurrentSpan({
+		yield* recordFacts({
 			'auth.endpoint': 'oauth2/token',
 			'auth.token_response_status': response.status,
 		})

@@ -1,310 +1,104 @@
 # Observability & Analytics Guide
 
-<https://loggingsucks.com/>
+Further reading: <https://loggingsucks.com/> and [All you need is wide events](https://isburmistrov.substack.com/p/all-you-need-is-wide-events-not-metrics).
 
 Practical observability for a small team building a CRM. Focus on what helps you ship faster and debug production issues.
 
-## The Three Pillars
+This guide holds the **rules and the reasons**. It deliberately does not mirror the code: file names and function signatures drift, so where something is implemented is a pointer, not a copy.
 
-| Pillar      | What It Captures             | When to Use                                        | Example                                           |
-| ----------- | ---------------------------- | -------------------------------------------------- | ------------------------------------------------- |
-| **Logs**    | Discrete events with context | Always - primary debugging tool                    | `company:abc status changed prospect → contacted` |
-| **Metrics** | Aggregated numbers over time | When you need dashboards or alerts                 | `interactions_total{channel="email"}: 47`         |
-| **Traces**  | Request flow across services | When debugging slow/failing multi-service requests | `API → email service → webhook fan-out (234ms)`   |
+## One record per unit of work
 
-## Pillar 1: Structured Logging
-
-**This is your foundation.** Good logs make metrics and traces optional for MVP.
+The unit of observability is **one wide record per piece of work** — carrying every fact known about it on a single line.
 
-### Log Levels
-
-| Level   | When to Use                     | Example                            |
-| ------- | ------------------------------- | ---------------------------------- |
-| `error` | Something failed that shouldn't | Webhook delivery failed            |
-| `warn`  | Degraded but working            | Resend API key not set             |
-| `info`  | Business events worth tracking  | Interaction logged, page published |
-| `debug` | Development details             | SQL query executed, cache hit/miss |
-
-### Required Context Fields
-
-Every log entry should include:
+Two kinds of work open a record today: an **HTTP request**, closed by `http.request` / `http.server_error` / `http.defect`, and a **research run**, closed by `research.run` with what it spent split by model, provider and kind of work. A run is not part of any request — it keeps working on a forked fiber long after the request that asked for it returned — so it opens a record of its own rather than borrowing one.
 
-```typescript
-{
-  // WHO
-  companyId: "uuid",            // Which company (if known)
+Everything else is a view over those records:
 
-  // WHAT
-  event: "interaction.logged",  // Dot-notation event name
+| View        | What it really is                                       |
+| ----------- | ------------------------------------------------------- |
+| **Logs**    | The records themselves                                  |
+| **Traces**  | Records that carry a trace id, parent id and a duration |
+| **Metrics** | Records counted up at query time                        |
 
-  // WHERE
-  service: "server",            // server | internal
+The reason to keep them together is that **a question can only be answered from facts that share a line**. "How long did it take, split by how the caller signed in" needs the duration and the sign-in method on the same record. If the duration is on one line and the sign-in method on another, both facts were written down and the question is still unanswerable.
 
-  // WHEN
-  timestamp: "ISO-8601",        // Automatic in most loggers
-
-  // HOW
-  traceId: "uuid",              // Request correlation ID
-}
-```
-
-### Event Naming Convention
-
-Use dot-notation for consistent filtering:
+So the rule is: when work learns something, it puts that fact on the work's record rather than on a line of its own.
 
-```
-{domain}.{action}[.{result}]
-```
+### What every record carries
 
-**Examples:**
+| Field               | Why                                               |
+| ------------------- | ------------------------------------------------- |
+| `request.id`        | Ties everything from one request together         |
+| `event`             | Dot-notation name, so records filter by kind      |
+| `http.path_pattern` | The route, with ids collapsed — never the raw URL |
+| `org.id`            | Which tenant, once resolved                       |
+| `service`           | Which process emitted it                          |
 
-| Event                    | Description                      |
-| ------------------------ | -------------------------------- |
-| `company.created`        | New company added to CRM         |
-| `company.status_changed` | Pipeline status transition       |
-| `interaction.logged`     | Interaction recorded             |
-| `document.created`       | Research/notes document added    |
-| `email.sent`             | Outbound email via Resend        |
-| `email.received`         | Inbound reply via Resend webhook |
-| `email.failed`           | Email delivery failed            |
-| `webhook.fired`          | Webhook fan-out triggered        |
-| `webhook.failed`         | Webhook delivery failed          |
-| `page.published`         | Sales page made public           |
-| `page.viewed`            | Prospect viewed a sales page     |
-| `task.completed`         | CRM task marked done             |
-| `proposal.sent`          | Proposal delivered to prospect   |
-| `mcp.tool_called`        | MCP tool invoked by agent        |
+Timestamps and trace ids are added by the framework.
 
-### Structured Log Examples
+### Event names
 
-**Good - Structured with context:**
+`{domain}.{action}[.{result}]` — so a filter on one prefix gets a whole area.
 
-```typescript
-logger.info({
-  event: "interaction.logged",
-  companyId: "abc-123",
-  channel: "visit",
-  direction: "outbound",
-  outcome: "interested",
-  latencyMs: 45,
-})
-```
+| Event                    | Description                                 |
+| ------------------------ | ------------------------------------------- |
+| `http.request`           | A request completed                         |
+| `http.server_error`      | A request ended 5xx                         |
+| `http.defect`            | A request died without producing a response |
+| `company.created`        | New company added to CRM                    |
+| `company.status_changed` | Pipeline status transition                  |
+| `interaction.logged`     | Interaction recorded                        |
+| `document.created`       | Research/notes document added               |
+| `email.sent`             | Outbound email                              |
+| `email.received`         | Inbound reply                               |
+| `email.failed`           | Email delivery failed                       |
+| `webhook.fired`          | Webhook fan-out triggered                   |
+| `webhook.failed`         | Webhook delivery failed                     |
+| `page.published`         | Sales page made public                      |
+| `page.viewed`            | Prospect viewed a sales page                |
+| `task.created`           | CRM task raised                             |
+| `research.run`           | A research run finished, with what it spent |
+| `mcp.tool_called`        | MCP tool invoked by agent                   |
+| `mcp.auth.rejected`      | An MCP call was refused, and why            |
 
-**Bad - Unstructured string:**
+A request leaves exactly one of `http.request`, `http.server_error` or `http.defect`, so "every request that ended badly" is those last two.
 
-```typescript
-logger.info("Logged visit interaction for company abc-123, outcome interested in 45ms")
-```
+### Levels
 
-### Effect Logging
+| Level   | When to Use                     |
+| ------- | ------------------------------- |
+| `error` | Something failed that shouldn't |
+| `warn`  | Degraded but working            |
+| `info`  | Business events worth tracking  |
+| `debug` | Development details             |
 
-The project uses Effect's built-in logging. Key patterns:
+`MIN_LOG_LEVEL` sets the floor per process. In production it comes from `config.production.json`, which is copied into the image — so changing it means a rebuild and a redeploy, not a live switch. Worth knowing before an incident, when the instinct is to turn the detail up and read more.
 
-```typescript
-import { Effect } from "effect"
+## Counters: the narrow exception
 
-// Simple info log
-Effect.log("Company created")
+A counter is a running total. Bumping one throws away everything about the thing being counted, which is why almost nothing here is a counter.
 
-// With annotations (adds context to all logs in scope)
-Effect.logInfo("Interaction logged").pipe(
-  Effect.annotateLogs({
-    companyId: company.id,
-    channel: "email",
-    direction: "outbound",
-  })
-)
+**The rule:** a counter may carry only tags with a handful of possible values. The store keeps a separate total for every combination of tags, so tagging by organization, run or query grows without limit. Anything per-tenant or per-request belongs on a record or in the database instead.
 
-// Error with cause
-Effect.logError("Webhook delivery failed").pipe(
-  Effect.annotateLogs({ endpointUrl: endpoint.url, error: error.message })
-)
+In practice that leaves counters for money — tokens and spend, where a running total is exactly the question — and nothing else. Business questions ("how many companies did we add?") are answered by counting records at query time, and by the database, which is the real source of truth for business facts anyway.
 
-// Duration tracking with log spans
-Effect.logInfo("Webhook fan-out complete").pipe(
-  Effect.withLogSpan("webhook-fanout")
-)
-```
+Do not add a counter speculatively. A counter added "so we have the number later" is a dimension deleted in advance.
 
-### Logger Configuration
+## How much to keep
 
-Effect v4 provides structured logger formatters:
+Records are cheap and detail is expensive, so the two are thinned differently.
 
-```typescript
-import { Logger } from "effect"
+- **Every unit of work keeps its record.** One line per request is small and it is the thing you search. Never sample these away.
+- **Except a poll that went fine.** A successful `/health` check and a successful permission check (the `OPTIONS` a browser sends before a cross-origin call) drop to `debug`, so they are gone at the production level. Between them they can outnumber the requests a person actually made, and they say only that the poller is still polling. A failing one stays at its usual level — that is the moment they exist for.
+- **Traces can be thinned.** `OTEL_TRACES_KEEP_RATE` (0..1, default 1) keeps a share of traces. The decision is made once, when the trace starts, and every span below inherits it — so a trace is kept or dropped whole, never half-exported.
 
-// Structured JSON output (recommended for production)
-Logger.formatStructured
+Because the decision happens at the start, it cannot preferentially keep the traces that went on to fail. Keeping every failure means holding spans until the work ends and deciding then, which is a job for a collector in front of the vendor, not for the app. Until traffic justifies that, keep everything.
 
-// Batched logging (reduces I/O)
-Logger.batched(Logger.formatStructured, {
-  window: "1 second",
-  flush: Effect.fn(function*(batch) {
-    // Send batch to log aggregator
-  })
-})
+Routes whose URL itself carries a secret are exempt from tracing entirely rather than sampled — see Privacy.
 
-// Pretty output for development
-Logger.consolePretty()
-```
+## What to track
 
-## Pillar 2: Metrics
-
-**Add metrics when you need to answer aggregate questions.** Don't add metrics speculatively.
-
-### When to Add a Metric
-
-| Question Type           | Metric Type | Example                        |
-| ----------------------- | ----------- | ------------------------------ |
-| "How many X happened?"  | Counter     | `interactions_total`           |
-| "What's the current X?" | Gauge       | `pipeline_companies_by_status` |
-| "How long does X take?" | Histogram   | `api_request_duration_seconds` |
-
-### MVP Metrics (Start Here)
-
-Only track what directly impacts product success:
-
-**Business Metrics (most important):**
-
-| Metric               | Type    | Labels                 | Why                          |
-| -------------------- | ------- | ---------------------- | ---------------------------- |
-| `companies_total`    | Counter | `source`, `status`     | Are we adding prospects?     |
-| `interactions_total` | Counter | `channel`, `direction` | Are we engaging?             |
-| `pages_published`    | Counter | `lang`                 | Are we creating sales pages? |
-| `emails_total`       | Counter | `direction`, `status`  | Email activity               |
-
-**System Health:**
-
-| Metric                         | Type      | Labels               | Why                |
-| ------------------------------ | --------- | -------------------- | ------------------ |
-| `api_request_duration_seconds` | Histogram | `endpoint`, `status` | API performance    |
-| `webhook_delivery_total`       | Counter   | `event`, `status`    | Webhook health     |
-| `mcp_tool_duration_seconds`    | Histogram | `tool`               | MCP responsiveness |
-
-### Metric Naming Convention
-
-Follow Prometheus conventions:
-
-```
-{namespace}_{name}_{unit}
-```
-
-**Examples:**
-
-- `batuda_interactions_total`
-- `batuda_api_request_duration_seconds`
-- `batuda_webhook_delivery_total`
-
-### Implementation Options
-
-**Option 1: Log-based metrics (MVP recommended)**
-
-Extract metrics from structured logs using your log aggregator (Loki, CloudWatch, etc.):
-
-```
-count_over_time({event="interaction.logged"}[1h])
-```
-
-Pros: No additional code, single source of truth
-Cons: Less efficient for high-cardinality queries
-
-**Option 2: Native metrics (when needed)**
-
-Use Effect's Metrics module:
-
-```typescript
-import { Metric } from "effect"
-
-const interactionsLogged = Metric.counter("interactions_total", {
-  description: "Total interactions logged"
-})
-
-// Record a value
-Effect.succeed(interaction).pipe(
-  Effect.tap(() => Metric.update(interactionsLogged, 1))
-)
-
-// With attributes (labels)
-const emailsSent = Metric.counter("emails_total")
-yield* Metric.update(
-  Metric.withAttributes(emailsSent, {
-    direction: "outbound",
-    status: "sent",
-  }),
-  1
-)
-
-// Histogram for latency
-const apiLatency = Metric.histogram("api_request_duration_seconds", {
-  description: "API request duration",
-  boundaries: [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5]
-})
-
-// Prometheus export
-import { PrometheusMetrics } from "effect/unstable/observability"
-const formatted = yield* PrometheusMetrics.format({ prefix: "batuda" })
-```
-
-## Pillar 3: Distributed Tracing
-
-**For MVP, correlation IDs in logs are usually sufficient.** Add full tracing when:
-
-- Requests regularly span 3+ services
-- You can't debug performance issues with logs alone
-- You need flame graphs for optimization
-
-### Correlation IDs (MVP Approach)
-
-Pass a `traceId` through the entire request:
-
-```typescript
-// API receives request
-const traceId = crypto.randomUUID()
-
-// Pass through Effect context
-Effect.provideService(TraceId, traceId)
-
-// All logs include traceId
-logger.info({ traceId, event: "company.created" })
-```
-
-This lets you grep all logs for a single request:
-
-```bash
-grep "traceId=abc-123" logs.json
-```
-
-### Effect Spans (Built-in Tracing)
-
-Effect has built-in span support. Use `Effect.withSpan` to create named spans:
-
-```typescript
-const processWebhook = Effect.fn("Webhooks.process")(function*(event, payload) {
-  yield* Effect.logInfo("Processing webhook")
-
-  yield* deliverToEndpoints(payload).pipe(
-    Effect.withSpan("webhook.deliver"),
-    Effect.annotateSpans({
-      "webhook.event": event,
-      "webhook.endpoint_count": endpoints.length,
-    })
-  )
-})
-```
-
-Spans nest automatically — child spans inherit parent context. Use `Effect.currentSpan` to access the active span for adding attributes mid-flight.
-
-### Full Tracing (Later)
-
-When you need it, Effect v4 has built-in OTLP export (see Implementation Details):
-
-- **Honeycomb** — excellent for wide events and exploration
-- **Jaeger/Zipkin** — open source trace visualization
-- **Grafana Tempo** — integrates with Loki and Prometheus
-
-## What to Track: Batuda-Specific
-
-### Critical Paths to Instrument
+### Critical paths
 
 | Flow                     | Key Events                             | Why Critical               |
 | ------------------------ | -------------------------------------- | -------------------------- |
@@ -314,28 +108,13 @@ When you need it, Effect v4 has built-in OTLP export (see Implementation Details
 | **Email Inbound**        | `email.received`, `interaction.logged` | Reply tracking             |
 | **Webhook Fan-out**      | `webhook.fired`, `webhook.failed`      | Integration reliability    |
 | **Page Publishing**      | `page.published`, `page.viewed`        | Sales page effectiveness   |
-| **MCP Tool Calls**       | `mcp.tool_called`                      | Agent workflow reliability |
+| **MCP Tool Calls**       | `mcp.tool_called`, `mcp.auth.rejected` | Agent workflow reliability |
 
-### Error Tracking
+### Errors
 
-Track every error with enough context to debug:
+Every error carries enough context to debug without reproducing it: what was being looked up, on which route, for which tenant, and the full cause with its stack. An error whose record says only that something failed costs a reproduction.
 
-```typescript
-Effect.logError("Webhook delivery failed").pipe(
-  Effect.annotateLogs({
-    event: "webhook.failed",
-    endpointId: endpoint.id,
-    endpointUrl: endpoint.url,
-    webhookEvent: "company.status_changed",
-    httpStatus: response.status,
-    retryCount: 2,
-  })
-)
-```
-
-### Performance Tracking
-
-Track latency for user-facing operations:
+### Performance targets
 
 | Operation          | Target      | Alert Threshold |
 | ------------------ | ----------- | --------------- |
@@ -345,29 +124,9 @@ Track latency for user-facing operations:
 | Webhook delivery   | < 1s p95    | > 5s            |
 | Page render (SSR)  | < 300ms p95 | > 1s            |
 
-## Alerting Strategy
+## Monitoring philosophy: the four golden signals
 
-**Start with few, high-signal alerts.** Alert fatigue is worse than no alerts.
-
-### MVP Alerts (5 maximum)
-
-| Alert                | Condition                             | Severity |
-| -------------------- | ------------------------------------- | -------- |
-| **API Down**         | Health check fails for > 2 min        | Critical |
-| **High Error Rate**  | > 10% API 5xx responses in 15 min     | High     |
-| **Email Failures**   | > 5 consecutive email send failures   | High     |
-| **Webhook Failures** | > 20% webhook 5xx responses in 15 min | High     |
-
-### Alert Design Principles
-
-1. **Alert on symptoms, not causes** — "API returning errors" > "Database connection failed"
-2. **Include runbook link** — What to do when this fires
-3. **Test your alerts** — Trigger them intentionally
-4. **Review monthly** — Delete alerts that never fire or always fire
-
-## Monitoring Philosophy: The Four Golden Signals
-
-Follow Google's **Four Golden Signals** from the [Site Reliability Engineering](https://sre.google/sre-book/monitoring-distributed-systems/) book. These are the minimum signals you need to know if a system is healthy:
+Follow Google's **Four Golden Signals** from the [Site Reliability Engineering](https://sre.google/sre-book/monitoring-distributed-systems/) book — the minimum set that says whether a system is healthy:
 
 | Signal         | Question                 | Batuda Example                                    |
 | -------------- | ------------------------ | ------------------------------------------------- |
@@ -376,14 +135,7 @@ Follow Google's **Four Golden Signals** from the [Site Reliability Engineering](
 | **Latency**    | Is it fast enough?       | API P95, MCP tool duration, SSR render time       |
 | **Saturation** | Is anything at capacity? | Effect fiber health (proxy for resource pressure) |
 
-### Why Four Signals, Not Dozens of Graphs
-
-As a small team, you don't have an on-call rotation or a war room. You need boards that answer two questions:
-
-1. **"Is everything working?"** → Key Metrics board (daily glance)
-2. **"What exactly is broken?"** → Deep Dive board (investigation)
-
-The Key Metrics board maps directly to the Four Golden Signals. If a signal looks wrong, drill into the Deep Dive board which breaks down by product layer (pipeline, interactions, email), infrastructure layer (webhooks, MCP, DB), and runtime (Effect fibers, logs).
+As a solo operation there is no on-call rotation or war room. Two questions matter: *"is everything working?"* (a daily glance) and *"what exactly is broken?"* (an investigation). The golden signals answer the first. The second is answered by filtering and grouping records, not by a board built in advance — a board can only show the question someone already thought to ask.
 
 ### Targets
 
@@ -393,87 +145,27 @@ The Key Metrics board maps directly to the Four Golden Signals. If a signal look
 | Error rate      | < 1%    | Expect occasional webhook endpoint failures    |
 | Email success   | > 95%   | Invalid addresses are expected, not failures   |
 
-## Analytics vs Observability
+## Alerting
 
-| Aspect        | Observability           | Analytics                       |
-| ------------- | ----------------------- | ------------------------------- |
-| **Purpose**   | Debug production issues | Understand user behavior        |
-| **Audience**  | Engineers               | Product/Business                |
-| **Latency**   | Real-time               | Can be delayed                  |
-| **Retention** | Days to weeks           | Months to years                 |
-| **Examples**  | Error rates, latency    | Pipeline conversion, page views |
+**Start with few, high-signal alerts.** Alert fatigue is worse than no alerts.
 
-### Product Analytics (Separate Concern)
+| Alert                | Condition                             | Severity |
+| -------------------- | ------------------------------------- | -------- |
+| **API Down**         | Health check fails for > 2 min        | Critical |
+| **High Error Rate**  | > 10% API 5xx responses in 15 min     | High     |
+| **Email Failures**   | > 5 consecutive email send failures   | High     |
+| **Webhook Failures** | > 20% webhook 5xx responses in 15 min | High     |
 
-For business behavior tracking, consider dedicated tools:
+1. **Alert on symptoms, not causes** — "API returning errors" > "Database connection failed"
+2. **Include runbook link** — What to do when this fires
+3. **Test your alerts** — Trigger them intentionally
+4. **Review monthly** — Delete alerts that never fire or always fire
 
-| Tool          | Use Case                     | Cost               |
-| ------------- | ---------------------------- | ------------------ |
-| **PostHog**   | Full-featured, self-hostable | Free tier, then $$ |
-| **Plausible** | Privacy-focused, simple      | $9/mo              |
-| **Custom**    | Log events, query later      | Free (your time)   |
+## Privacy in observability
 
-**MVP recommendation:** Start with structured logs. Extract analytics later.
+This is a CRM holding other people's customer data, so what never gets written down is a hard rule rather than a preference. The trade is real: a problem can only be found in facts that were kept. The answer is to record **more harmless** facts — plan tier, feature flag, provider, model, retry count, cache hit — not more personal ones.
 
-## Tool Recommendations
-
-### Small Team, Low Budget
-
-| Need                | Recommendation       | Why                              |
-| ------------------- | -------------------- | -------------------------------- |
-| **Log aggregation** | Loki + Grafana       | Free, powerful, good with Effect |
-| **Metrics**         | Log-based initially  | No additional infra              |
-| **Alerting**        | Grafana alerts       | Integrated with logs             |
-| **Error tracking**  | Sentry (free tier)   | Great DX, source maps            |
-| **Uptime**          | Better Uptime (free) | Simple, reliable                 |
-
-### Hosting Options
-
-| Provider          | Logs     | Metrics    | Alerts  | Cost               |
-| ----------------- | -------- | ---------- | ------- | ------------------ |
-| **Grafana Cloud** | Loki     | Prometheus | Yes     | Free tier generous |
-| **Honeycomb**     | Built-in | Built-in   | Yes     | Free tier generous |
-| **Self-hosted**   | Loki     | Prometheus | Grafana | Your infra         |
-
-## Quick Reference
-
-### Log This
-
-```typescript
-// Business events
-Effect.logInfo("Company created").pipe(
-  Effect.annotateLogs({ companyId, source: "firecrawl", slug })
-)
-
-// Interactions
-Effect.logInfo("Interaction logged").pipe(
-  Effect.annotateLogs({ companyId, channel: "visit", direction: "outbound", outcome: "interested" })
-)
-
-// Errors (always with context)
-Effect.logError("Email send failed").pipe(
-  Effect.annotateLogs({
-    companyId,
-    contactEmail: email.slice(0, 3) + "***", // Partial only
-    error: error.message,
-    resendErrorCode: code,
-  })
-)
-```
-
-### Don't Log This
-
-- API keys, tokens, or secrets
-- Full email addresses (partial or use contactId)
-- Document content (only type and length)
-- Database credentials
-- Full webhook secrets (use endpointId)
-- High-frequency debug logs in production
-- Success logs for every DB query
-
-## Privacy in Observability
-
-### What We Collect
+### What we collect
 
 | Data Type             | Collected | Purpose                          |
 | --------------------- | --------- | -------------------------------- |
@@ -486,40 +178,52 @@ Effect.logError("Email send failed").pipe(
 | Document content      | **No**    | Business data                    |
 | Page content          | **No**    | Business data                    |
 
-### Safe Logging Patterns
+### Never record
 
-**Good - Privacy preserved:**
+- API keys, tokens, or secrets
+- Full email addresses (use contactId, or the domain alone)
+- Document, page or message content (only type and length)
+- Database credentials
+- Full webhook secrets (use endpointId)
+
+### Three rules that are easy to get wrong
+
+**Raw URLs never get recorded.** A URL can carry a single-use secret — a magic-link token in the query, a reset-password token in the path. Records carry a sanitized route with ids collapsed instead. Routes whose URL is itself a credential are exempt from tracing altogether, because the tracer records the full URL unredacted (headers like `authorization` and `cookie` are redacted by default; the URL is not).
+
+**Whole argument bags are scrubbed, not the fields that look sensitive.** Tool-call arguments are recorded verbatim by the AI toolkit and include mailbox passwords and whole attached files. Any list of sensitive-looking field names holds only until someone adds a field nobody thought to name — and that field would be secret exactly when it mattered. So the whole value goes, and anything worth tracing gets its own deliberate attribute.
+
+**Scrubbing happens centrally, on the way out — on both routes out.** The recording happens inside third-party libraries, so it is caught centrally rather than at each call site. There are two ways out of the process, and both are filtered: span attributes, via the wrapped tracer, and facts gathered onto a record, which leave on a log line instead. Filtering only the first would leave the second as a way around it.
+
+**Error text is the one accepted exception.** A crash's cause is the most useful thing it leaves behind, so it is logged in full rather than summarised — and a database error can name business data incidentally, in a failing statement or a constraint violation. The cause is bounded in size so a failure cannot ship a whole payload, but not in content. This is why observability retention is days-to-weeks rather than months.
+
+### Safe patterns
 
 ```typescript
 // Metadata instead of content
-span.attribute('document.type', 'research')
-span.attribute('document.content_length', content.length)
+{ 'document.type': 'research', 'document.content_length': content.length }
 
-// Partial email for debugging
-span.attribute('contact.email_domain', email.split('@')[1])
+// Domain instead of address
+{ 'contact.email_domain': domain }
 
-// Company by ID, not name
-Effect.annotateLogs({ companyId: company.id })
+// Tenant by id, never by name
+{ 'org.id': org.id }
 ```
 
-**Bad - Business data exposed:**
+## Analytics vs observability
 
-```typescript
-// NO: Company details in logs
-span.attribute('company.name', company.name)
+| Aspect        | Observability           | Analytics                       |
+| ------------- | ----------------------- | ------------------------------- |
+| **Purpose**   | Debug production issues | Understand user behavior        |
+| **Audience**  | Engineers               | Product/Business                |
+| **Latency**   | Real-time               | Can be delayed                  |
+| **Retention** | Days to weeks           | Months to years                 |
+| **Examples**  | Error rates, latency    | Pipeline conversion, page views |
 
-// NO: Full email
-span.attribute('contact.email', contact.email)
-
-// NO: Document content
-span.attribute('document.content', content)
-```
+For business behaviour, the database is the source of truth, not the telemetry. Records are for debugging what the system did; the CRM tables are for what the business did. If a product question needs a dedicated tool later, PostHog (self-hostable) or Plausible (privacy-focused) are the candidates.
 
 ## Local development with otel-tui
 
 The Nix flake provides [`otel-tui`](https://github.com/ymtdzzz/otel-tui) — a terminal OpenTelemetry receiver + viewer. It listens on the standard OTLP ports (`:4317` gRPC, `:4318` HTTP/JSON) and renders traces, logs, and metrics inline, so you can inspect them without running Jaeger/Grafana/Honeycomb locally.
-
-**Daily workflow:**
 
 ```bash
 # Terminal 1 — start the viewer (empty until traffic arrives)
@@ -529,7 +233,7 @@ pnpm dev:otel
 pnpm dev:server
 ```
 
-Effect's `Otlp.layerJson` appends `/v1/traces`, `/v1/logs`, and `/v1/metrics` to the base URL — the same convention otel-tui and every vendor (Honeycomb, Grafana, Tempo) expect. Swapping environments is a pure env-var change:
+Swapping environments is a pure env-var change:
 
 | Environment      | `OTEL_EXPORTER_OTLP_ENDPOINT`               | `OTEL_EXPORTER_OTLP_HEADERS` |
 | ---------------- | ------------------------------------------- | ---------------------------- |
@@ -537,137 +241,54 @@ Effect's `Otlp.layerJson` appends `/v1/traces`, `/v1/logs`, and `/v1/metrics` to
 | Honeycomb        | `https://api.honeycomb.io`                  | `x-honeycomb-team=KEY`       |
 | Grafana Cloud    | `https://otlp-gateway-....grafana.net/otlp` | `Authorization=Basic ...`    |
 
-## Implementation Details
+## Configuration
 
-### Shared OTLP layer: `@batuda/observability`
+| Variable                      | Meaning                                                                                                       |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Base URL. **Also the on/off switch** — unset means no export at all.                                          |
+| `OTEL_EXPORTER_OTLP_HEADERS`  | Comma-separated `key=value`. Carries the vendor key, so it's a secret.                                        |
+| `OTEL_TRACES_KEEP_RATE`       | Share of traces to keep, 0..1. Default 1. An unusable value falls back to 1 rather than stopping the process. |
+| `MIN_LOG_LEVEL`               | Level floor per process.                                                                                      |
+| `SERVICE_VERSION`             | CalVer version, injected by CI.                                                                               |
+| `GIT_SHA`                     | Full commit SHA; short SHA derived at runtime.                                                                |
+| `REGION`                      | Deployment region.                                                                                            |
 
-Both processes (server, mail-worker) export through one tiny workspace package, `packages/observability`. It owns the build metadata (version/commit/region read from `process.env`) and a per-process exporter factory, `makeOtlpObservability({ serviceName })`. Effect v4 ships OTLP in `effect/unstable/observability` — no separate `@effect/opentelemetry` package, and the HTTP client comes from `effect/unstable/http`, not `@effect/platform`.
+The endpoint is non-secret, so it lives in each app's `config.production.json` alongside the other endpoints — not a CI secret. It is deliberately left out until a vendor is set up, so export stays dark by default.
 
-```typescript
-// packages/observability/src/otlp.ts (shape — see the file for the full version)
-import { Config, Duration, Effect, Layer } from "effect"
-import { FetchHttpClient } from "effect/unstable/http"
-import { Otlp } from "effect/unstable/observability"
-import { buildMeta } from "./build-meta"
+**Per-service datasets.** Traces route to a Honeycomb dataset named after `service.name`, so each process separates on its own. Logs and metrics route by the `x-honeycomb-dataset` header instead, so each deploy workflow appends its own dataset name to the shared team-key secret. One environment-scoped API key covers every process.
 
-export const makeOtlpObservability = (options: { readonly serviceName: string }) =>
-  Layer.unwrap(
-    Effect.gen(function* () {
-      const baseUrl = yield* Config.string("OTEL_EXPORTER_OTLP_ENDPOINT").pipe(Config.withDefault(""))
-      const headersRaw = yield* Config.string("OTEL_EXPORTER_OTLP_HEADERS").pipe(Config.withDefault(""))
-      const environment = yield* Config.string("NODE_ENV")
-      // The endpoint is the on/off switch: no endpoint → no export (local dev).
-      if (!baseUrl) return Layer.empty
-      return Otlp.layerJson({
-        baseUrl,
-        resource: {
-          serviceName: options.serviceName, // batuda-server | batuda-mail-worker
-          serviceVersion: buildMeta.version,
-          attributes: {
-            "deployment.environment": environment,
-            "deployment.id": `${buildMeta.version}-${buildMeta.commitShort}`,
-            "vcs.revision": buildMeta.commit,
-            "cloud.region": buildMeta.region,
-          },
-        },
-        headers: parseOtlpHeaders(headersRaw),
-        tracerExportInterval: Duration.seconds(5),
-        loggerExportInterval: Duration.seconds(1),
-        metricsExportInterval: Duration.seconds(60),
-        metricsTemporality: "cumulative",
-      }).pipe(Layer.provide(FetchHttpClient.layer))
-    }),
-  )
-```
+Note the consequence: logs and traces from the same request land in different datasets. That is the vendor's routing, not a choice — it is why the per-request record has to be self-sufficient rather than something you assemble by joining a log to a trace.
 
-`Otlp.layerJson` registers a tracer, a metrics reader, AND an OTLP logger; the logger's `mergeWithExisting` defaults to `true`, so it adds to whatever console logger the process already has rather than replacing it. The server provides it in `apps/server/src/lib/observability.ts` (`serviceName: 'batuda-server'`); the mail-worker provides it around its `Live` layer in `apps/mail-worker/src/main.ts` (`serviceName: 'batuda-mail-worker'`).
+## Health endpoint
 
-**Configuration:**
+`/health` returns build metadata for uptime checks and deploy verification: CalVer version, short commit SHA, region.
 
-- `OTEL_EXPORTER_OTLP_ENDPOINT` — OTLP endpoint base URL (`https://api.honeycomb.io`). Non-secret, so it lives in each app's `config.production.json` alongside the other endpoints (`STORAGE_ENDPOINT`, the LLM base URLs) — NOT a CI secret. **It is also the on/off switch**: unset → export disabled. It is deliberately left OUT of `config.production.json` until Honeycomb is set up, so OTLP stays dark by default; adding the one line (plus the secret below) is what turns it on. Locally it comes from `.env` (`http://localhost:4318` for otel-tui).
-- `OTEL_EXPORTER_OTLP_HEADERS` — comma-separated `key=value` pairs. This DOES carry a secret (the Honeycomb team key), so it stays a CI secret holding the team key only (`x-honeycomb-team=KEY`); each deploy workflow appends its own non-secret `,x-honeycomb-dataset=…` (see below).
-- `SERVICE_VERSION` — CalVer version (injected by CI)
-- `GIT_SHA` — full commit SHA (short SHA derived at runtime)
-- `REGION` — Unikraft metro / deployment region
+**Security note:** only those. No framework or dependency versions, no internal paths, no stack traces. It is also exempt from tracing — an uptime checker polls it constantly and would drown the real traces.
 
-**Per-service datasets + the metrics-routing gotcha.** Traces auto-route to a Honeycomb dataset named after the resource `service.name`, so `batuda-server` and `batuda-mail-worker` separate on their own. Logs and metrics, however, route by the `x-honeycomb-dataset` header — so each deploy workflow appends `x-honeycomb-dataset=batuda-server` / `batuda-mail-worker` to the shared team-key secret. One Honeycomb API key (environment-scoped) is enough for both.
+## Where this lives in the code
 
-### Catch-all error logging + request tracing
+Pointers, not copies — read the files for detail.
 
-`apps/server/src/lib/observability-middleware.ts` (`ObservabilityLive`) is a global router middleware — attached in `AppLive` exactly like `CorsLive`. Per request it annotates the span and logs with `request.id` (reusing an upstream `x-request-id` when present), `http.method`, and `http.path_pattern` (UUIDs → `:id`, query/fragment dropped so a token in `?code=…` never lands in a span or log). It then logs the **full cause** of any defect (`Effect.tapCause`) or 5xx response at error level — the last line of defence so no API error escapes unlogged. `OrgMiddleware` adds `org.id` to the same span once the org resolves.
+| Concern                                                       | Where                                              |
+| ------------------------------------------------------------- | -------------------------------------------------- |
+| Shared exporter, sampling, span scrubbing                     | `packages/observability`                           |
+| Per-request record, route sanitizing, catch-all error logging | `apps/server/src/lib/observability-middleware.ts`  |
+| Logger set and level                                          | `apps/server/src/lib/logger.ts`                    |
+| Tracing exemptions for secret-carrying routes                 | `apps/server/src/main.ts`                          |
+| Spend counters                                                | `packages/research/src/application/usage-meter.ts` |
 
-`HttpMiddleware.tracer` is added to the `serve` chain in `apps/server/src/main.ts` so every request gets a span (Effect's `serve` adds only the request logger by default). A `TracerDisabledWhen` predicate exempts a few routes: `/health` (the uptime checker polls it constantly and would drown the real traces) and the routes whose URL itself carries a secret — magic-link verify (token in the query) and reset-password (token in the path). This matters because the tracer records `url.full`/`url.query` **unredacted** (header values like `authorization`/`cookie`/`x-api-key` are redacted by default, but the URL is not), so tracing those routes would export a single-use token to Honeycomb.
+Three structural notes worth knowing before changing any of it:
 
-### Better Auth error bridge
+**Effect's annotations flow downward, not upward.** An annotation set at the edge reaches every log written inside the request, which is why request id and route ride along for free. But a fact learned deep inside does *not* flow back out to the closing line — that is what the work record exists for.
 
-Better Auth runs its callbacks outside the Effect fiber, so its internal errors (adapter failures, OAuth/OIDC) would be console-only. `apps/server/src/lib/auth.ts` captures the layer's services and forwards Better Auth's `logger.log` (warn+error) and `onAPIError.onError` onto that runtime via `Effect.runForkWith`, so they export through OTLP like every other log.
+**The built-in request logger is deliberately disabled.** It annotates the raw request URL, which would export magic-link and reset tokens verbatim. The middleware emits a sanitized completion line in its place. Re-enabling it would reintroduce that leak.
 
-### Auth-sensitive spans (added per-surface, not blanket)
+**Better Auth's errors need a bridge to be seen at all.** Better Auth runs its callbacks outside the Effect fiber, so its internal failures — adapter errors, OAuth/OIDC problems — reach the console and nothing else. They are forwarded onto the Effect runtime deliberately; without that they never export, and an auth outage looks like silence rather than errors.
 
-Per the scoping below, spans are added only where the MCP-drop class of bug needs them, not across every endpoint:
+**Two auth surfaces are instrumented on purpose, not by blanket rule.** The MCP sign-in path and the OAuth token endpoint each carry extra facts because of one bug class: an MCP client shows a refused or expired credential as a silent retry loop, never a visible error. So how the caller signed in, which org they resolved to, and the grant outcome are recorded — enough to tell a dropped connection from a rejected one without reproducing it. Facts elsewhere are added where a question actually needs them, not across every endpoint.
 
-- MCP auth chokepoint (`apps/server/src/mcp/http.ts`) — the request span gets `mcp.auth_method` (`api_key`/`oauth`/`cookie`), `mcp.org_id`, and `mcp.principal_is_agent`. Every 401/403 path also logs a `mcp.auth.rejected` reason.
-- `/auth/oauth2/token` (`apps/server/src/handlers/auth.ts`) — the span gets `auth.token_response_status` (the grant outcome) when the proxied path is the token endpoint.
+**Global middleware order has to be stated, not assumed.** Router-wide middleware wraps a request in reverse registration order, and registration order is layer build order — which `Layer.mergeAll` performs concurrently. Left in a merge list, the observability middleware lands wherever the build happens to put it, and that position can change without anyone editing it.
 
-### Wide Events Pattern
+It has to be outermost, because a middleware that answers a caller itself — the MCP sign-in check refusing a connection — hides everything registered after it. Registered later, the observability middleware would never run for a refusal, and a refused MCP connection would leave no record of the request at all. That is the case an MCP client shows as a silent retry loop rather than a visible error, so it is the one that most needs a record.
 
-Effect spans accumulate context throughout the request lifecycle:
-
-```typescript
-const span = yield* Effect.currentSpan
-span.attribute('company.id', companyId)
-span.attribute('interaction.channel', channel)
-span.attribute('interaction.direction', direction)
-span.event('interaction.logged', DateTime.nowUnsafe(), { outcome: "interested" })
-```
-
-This produces a single rich event with all business context — ideal for exploration in Honeycomb or similar tools.
-
-### Health Endpoint
-
-Add a `/health` endpoint for Unikraft health checks:
-
-| Endpoint  | Purpose                       | Response                                                                |
-| --------- | ----------------------------- | ----------------------------------------------------------------------- |
-| `/health` | Health check + build metadata | `{ message: "OK", version: "1.0.0", commit: "a3b2b23", region: "fra" }` |
-
-**Security note:** Only expose CalVer version (no framework/dependency versions), short commit SHA, and region. No secrets, no internal paths, no stack traces.
-
-### Self-Documenting Errors
-
-The project uses Effect's `TaggedErrorClass` for typed errors:
-
-```typescript
-// apps/server/src/errors.ts
-export class NotFound extends Schema.TaggedErrorClass<NotFound>()('NotFound', {
-  entity: Schema.String,
-  id: Schema.String,
-}) {}
-```
-
-Enrich error logs with enough context to debug without reproduction:
-
-```typescript
-Effect.logError("Company not found").pipe(
-  Effect.annotateLogs({
-    entity: "company",
-    lookupKey: slug,
-    route: "/companies/:slug",
-  })
-)
-```
-
-## Summary
-
-| Priority | Action                       | Effort |
-| -------- | ---------------------------- | ------ |
-| **1**    | Structured logs with context | Low    |
-| **2**    | Health endpoint              | Low    |
-| **3**    | Correlation IDs              | Low    |
-| **4**    | Basic alerts (4 max)         | Medium |
-| **5**    | Log aggregation              | Medium |
-| **6**    | Dashboard                    | Medium |
-| **7**    | Native metrics               | High   |
-| **8**    | Distributed tracing          | High   |
-
-**Remember:** The best observability system is the one you actually use. Start simple, add complexity when you feel pain.
+So it is *provided* to the rest of the app rather than merged alongside it, which states the order as a dependency the build has to respect. The regression guard is the middleware-order test, which drives a real server through a refusing middleware and fails if the two are registered the other way round.

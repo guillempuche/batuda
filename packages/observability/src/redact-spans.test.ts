@@ -6,7 +6,7 @@
 import { Option, type Tracer } from 'effect'
 import { describe, expect, it } from 'vitest'
 
-import { redactingTracer } from './redact-spans'
+import { redactFacts, redactingTracer } from './redact-spans'
 
 // A tracer that keeps what it was told, so a test can read it back.
 const recordingTracer = () => {
@@ -98,6 +98,52 @@ describe('redactingTracer', () => {
 			expect(recorded.get('tool')).toBe('manage_email_inbox')
 			expect(recorded.get('mcp.org_id')).toBe('org_123')
 			expect(recorded.get('mcp.auth_method')).toBe('api_key')
+		})
+	})
+})
+
+// Wrapping the tracer protects span attributes only. Facts gathered onto a log
+// line leave by a different door, so the same rule has to apply there or the
+// wrapper is a door with a hole beside it.
+describe('redactFacts', () => {
+	describe('when a fact holds whatever a caller sent', () => {
+		it('should replace the whole value', () => {
+			// GIVEN facts carrying the catch-all argument bag
+			const facts = {
+				tool: 'manage_email_inbox',
+				parameters: { email: 'someone@example.com', password: 'hunter2' },
+			}
+
+			// WHEN filtered
+			const safe = redactFacts(facts)
+
+			// THEN nothing of the bag survives, and the deliberate attribute does
+			expect(JSON.stringify(safe)).not.toContain('hunter2')
+			expect(JSON.stringify(safe)).not.toContain('someone@example.com')
+			expect(safe['tool']).toBe('manage_email_inbox')
+		})
+
+		it('should leave the caller their original object', () => {
+			// GIVEN facts the caller may still be using
+			const facts = { parameters: { password: 'hunter2' } }
+
+			// WHEN filtered
+			redactFacts(facts)
+
+			// THEN the input is untouched — filtering returns a copy rather than
+			// reaching back into the caller's object
+			expect(JSON.stringify(facts)).toContain('hunter2')
+		})
+	})
+
+	describe('when no fact needs filtering', () => {
+		it('should hand back the same object rather than a copy', () => {
+			// GIVEN ordinary facts, which is nearly every call
+			const facts = { 'org.id': 'org_1', 'auth.method': 'api_key' }
+
+			// WHEN filtered
+			// THEN the common case costs no copy at all
+			expect(redactFacts(facts)).toBe(facts)
 		})
 	})
 })
