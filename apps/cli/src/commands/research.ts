@@ -29,15 +29,21 @@ import {
 	contactEvalSpanAttributes,
 	contactEvalSummaryAttributes,
 	type EvalSummary,
+	ExtractLanguageModel,
 	evalSpanAttributes,
 	evalSummaryAttributes,
 	type FramingOutcome,
 	type GoldenExpectation,
+	judgeOrganisationKinds,
+	type KindCandidate,
 	type MarketExpectation,
 	type MarketScore,
 	type ModelProbeResult,
 	makeResearchLlmLive,
 	makeResearchProvidersLive,
+	makeUsageMeter,
+	OrganisationKindVerdictsSchema,
+	organisationKindPrompt,
 	outcomeFromContactRun,
 	outcomeFromRun,
 	ProviderError,
@@ -55,10 +61,12 @@ import {
 	type SystemDefaults,
 	scoreContactRun,
 	scoreRun,
+	UsageMeter,
 } from '@batuda/research'
 
 import { SqlLive } from '../db'
 import { requireLocalDatabase } from '../lib/confirm-cloud'
+import { requireLiveProviders } from '../lib/require-live-providers'
 
 // `pnpm cli` runs from apps/cli, so resolve a relative --golden/--out against the
 // repo root — where a reader of the docs expects the path to be.
@@ -232,7 +240,10 @@ const noopContactDiscovery = Layer.succeed(ContactDiscovery)({
 // integration test does, but with the LIVE llm + provider layers (from research
 // env) rather than stubs — because measuring quality is the whole point.
 const researchLive = ResearchService.layer.pipe(
-	Layer.provide(makeResearchLlmLive),
+	// Merged rather than only provided, so the eval itself can reach the extract
+	// tier — it asks the model what kind of organisation each row of a market list
+	// is, which is a question the scoring cannot answer on its own.
+	Layer.provideMerge(makeResearchLlmLive),
 	Layer.provide(makeResearchProvidersLive),
 	Layer.provide(noopContactDiscovery),
 	Layer.provide(noopEventSink),
@@ -327,8 +338,12 @@ const pollToTerminal = (runId: string, maxAttempts: number) =>
 const MARKET_RUN_POLL_ATTEMPTS = 2_700
 
 // What a run answering about one company gets. A profile run finishes in minutes, so
-// a market-sized wait here only lengthens how long a wedged one holds its slot.
-const COMPANY_RUN_POLL_ATTEMPTS = 900
+// a market-sized wait here only lengthens how long a wedged one holds its slot — but
+// it still has to clear `RESEARCH_RUN_DEADLINE_SEC` for the same reason the market
+// wait does. At the old 900 it sat below that setting's twenty-minute default, so a
+// profile run that took longer than fifteen minutes was read as having found nothing
+// while it was still working, and scored as an empty result rather than a slow one.
+const COMPANY_RUN_POLL_ATTEMPTS = 1_500
 
 // Create a fresh eval run and poll it to a terminal status. A single golden
 // company never fans out, so a confirm-required result is a bug — die on it.
@@ -396,7 +411,74 @@ const driveOne = (
 			fetchedUrls: sourceRows.map(row => row.url),
 			...(run ? { usage: usageOf(run) } : {}),
 		})
-		return scoreRun(golden, outcome)
+		// Only a market request comes back with a list to judge; a company profile has
+		// no rows, so nothing is asked and nothing is spent.
+		const kinds =
+			golden.market === undefined || outcome.companies.length === 0
+				? undefined
+				: yield* judgeOrganisationKinds(
+						outcome.companies.map(row => ({
+							name: row.name,
+							describedAs: row.describedAs,
+						})),
+						golden.market.notCompanies,
+						askExtractTierForKinds,
+					)
+		return scoreRun(golden, outcome, kinds)
+	})
+
+/**
+ * What a pass would cost, from what the last one actually cost.
+ *
+ * The eval already measures cost per run, so the price of the next pass is that
+ * figure times the runs about to happen rather than a number anybody guessed. With
+ * no earlier report to read there is no price, and saying so beats inventing one.
+ */
+const estimatedPassCents = (
+	priceFrom: Option.Option<string>,
+	runsTotal: number,
+): Effect.Effect<number | null> =>
+	Option.isNone(priceFrom)
+		? Effect.succeed(null)
+		: Effect.tryPromise({
+				try: () => readFile(fromRepoRoot(priceFrom.value), 'utf8'),
+				catch: error => new Error(String(error)),
+			}).pipe(
+				Effect.map(raw => {
+					const parsed: unknown = JSON.parse(raw)
+					const costPerRun =
+						typeof parsed === 'object' &&
+						parsed !== null &&
+						'summary' in parsed &&
+						typeof parsed.summary === 'object' &&
+						parsed.summary !== null &&
+						'costPerRun' in parsed.summary &&
+						typeof parsed.summary.costPerRun === 'number'
+							? parsed.summary.costPerRun
+							: null
+					return costPerRun === null ? null : costPerRun * runsTotal
+				}),
+				// An unreadable or unrecognisable report is not a reason to refuse a run
+				// that spends nothing — it only means there is no price to quote.
+				Effect.catchCause(() => Effect.succeed(null)),
+			)
+
+/**
+ * Puts a market list's rows to the extract tier, which is the cheap one and enough
+ * for a question a row answers about itself.
+ *
+ * The wording is this file's own, deliberately not the one the pipeline's own check
+ * uses: an instrument that asked the question the same way as the thing it measures
+ * could never catch it being wrong.
+ */
+const askExtractTierForKinds = (rows: ReadonlyArray<KindCandidate>) =>
+	Effect.gen(function* () {
+		const extract = yield* ExtractLanguageModel
+		const response = yield* extract.generateObject({
+			schema: OrganisationKindVerdictsSchema,
+			prompt: organisationKindPrompt(rows),
+		})
+		return response.value
 	})
 
 // A market request's repeated runs, as what its list got right. Nothing a company
@@ -514,6 +596,8 @@ const formatMarketFigures = (summary: EvalSummary): ReadonlyArray<string> =>
 				`Rows per market:        ${decimal(summary.rowsPerScan)}`,
 				`  right kind:           ${pct(summary.organisationKindPrecision)}`,
 				`  confirmed:            ${pct(summary.confirmationRate)}`,
+				`    model ruled on:     ${pct(summary.rowsJudgedShare)}`,
+				`    already listed:     ${pct(summary.rowsGoldenListedShare)}`,
 				`  duplicates:           ${pct(summary.duplicateRate)}`,
 				`  with a location:      ${pct(summary.locationFill)}`,
 				`Request coverage:       ${pct(summary.requestCoverage)}`,
@@ -620,9 +704,29 @@ export const researchEval = (opts: {
 	readonly runs: number
 	readonly out: Option.Option<string>
 	readonly byBucket: boolean
+	readonly dryRun: boolean
+	readonly priceFrom: Option.Option<string>
 }) =>
 	Effect.gen(function* () {
 		yield* requireLocalDatabase('research eval')
+		// A profile pass reads pages the agent finds and the extract tier reads. The
+		// writer tier only phrases the human brief, which nothing here scores, and the
+		// company registers are asked to be off for a comparison — so neither is
+		// required, and demanding them would refuse a correct setup.
+		//
+		// A dry run spends nothing, so a part left on canned answers is something for
+		// it to report rather than a reason to stop: checking the golden file is often
+		// the whole point of asking, and on a machine with no keys at all it would
+		// otherwise be the one thing that could not be checked.
+		const routingRefusal = yield* requireLiveProviders('research eval', {
+			tiers: ['agent', 'extract'],
+			capabilities: ['search', 'scrape'],
+		}).pipe(
+			Effect.as<string | null>(null),
+			Effect.catchTag('StubbedProvidersRefused', error =>
+				opts.dryRun ? Effect.succeed(error.message) : Effect.fail(error),
+			),
+		)
 		const raw = yield* Effect.tryPromise({
 			try: () => readFile(fromRepoRoot(opts.goldenPath), 'utf8'),
 			catch: error => new Error(`cannot read golden set: ${String(error)}`),
@@ -636,7 +740,46 @@ export const researchEval = (opts: {
 			return yield* Effect.fail(new Error('golden set has no valid rows'))
 		}
 		yield* requireMarketSchema(golden, opts.schemaName)
+
+		if (opts.dryRun) {
+			// Everything a real pass checks before it spends anything: the database is
+			// this machine's, every row of the golden file parses, and no part of the
+			// pipeline would answer with canned data — that last one reported rather
+			// than thrown, so the rest is still said on a machine set up with stubs.
+			yield* Console.log(
+				`${golden.length} row(s) ready, ${errors.length} rejected.`,
+			)
+			if (routingRefusal !== null) {
+				yield* Console.log(`Would not run: ${routingRefusal}`)
+			}
+			const runsTotal = golden.length * opts.runs
+			const price = yield* estimatedPassCents(opts.priceFrom, runsTotal)
+			yield* Console.log(
+				price === null
+					? `${runsTotal} run(s) would execute. No price: pass --price-from <report.json> from an earlier pass to cost this one.`
+					: `${runsTotal} run(s) would execute, about ${cents(price)} at the last pass's measured cost per run.`,
+			)
+			return
+		}
+
+		// One pass is cheap because it reads whatever an earlier pass left behind. A
+		// repeat cannot afford to: an answer served from the first round's cache is
+		// the first round's answer, and averaging it with itself steadies nothing. So
+		// a pass asking for repeats goes past the caches, and pays for every round.
+		const repeating = opts.runs > 1
+		const cacheSettings = ConfigProvider.layerAdd(
+			ConfigProvider.fromEnv({
+				env: repeating ? { RESEARCH_CACHE_BYPASS: 'true' } : {},
+			}),
+			{ asPrimary: true },
+		)
+
 		yield* Console.log(`Evaluating ${golden.length} companies…\n`)
+		if (repeating) {
+			yield* Console.log(
+				`Each company runs ${opts.runs} times, in ${opts.runs} rounds over the whole set, and every round asks the providers again rather than reading the last round's answer. Expect roughly ${opts.runs} times the cost and the time of a single pass.\n`,
+			)
+		}
 
 		// Tag the run's spans so a drift chart can group quality by which models
 		// produced it; the endpoint/commit ride the OTLP resource, not here.
@@ -652,41 +795,54 @@ export const researchEval = (opts: {
 			'eval.companies': golden.length,
 		})
 
+		// The judge's calls sit outside any research run, and a run makes its own
+		// meter inside itself — so without one here they are billed to nobody and
+		// leave the cost per run looking like the whole price of a pass. This one
+		// catches exactly those calls: a run's own model calls use the run's meter.
+		const judgeMeter = yield* makeUsageMeter
+
 		const scores = yield* Effect.gen(function* () {
 			const defaults = yield* systemDefaults
-			// Each company runs `runs` times: per-run grounding is noisy, so averaging
-			// several runs is what makes the reported rates trustworthy. The service
-			// caps how many execute at once, so this just stops runs waiting in line.
-			const tasks = golden.flatMap(company =>
-				Array.from({ length: opts.runs }, () => company),
-			)
-			return yield* Effect.forEach(
-				tasks,
-				company =>
-					driveOne(
-						opts.org,
-						opts.user,
-						defaults,
-						company,
-						opts.schemaName,
-						Option.getOrUndefined(opts.language),
-					).pipe(
-						Effect.tap(score =>
-							Effect.annotateCurrentSpan(evalSpanAttributes(score)),
+			// A round is one pass over every company. Repeats are rounds rather than a
+			// flat list of runs so that a company's second answer is taken after its
+			// first has finished, which is what the caches were told to step aside for.
+			const rounds = Array.from({ length: opts.runs }, (_, index) => index + 1)
+			const perRound = yield* Effect.forEach(rounds, round =>
+				Effect.forEach(
+					golden,
+					company =>
+						driveOne(
+							opts.org,
+							opts.user,
+							defaults,
+							company,
+							opts.schemaName,
+							Option.getOrUndefined(opts.language),
+						).pipe(
+							Effect.tap(score =>
+								Effect.annotateCurrentSpan(evalSpanAttributes(score)),
+							),
+							Effect.withSpan('research_eval.run', {
+								attributes: {
+									'eval.company_id': company.id,
+									'eval.query': company.query,
+									'eval.schema': opts.schemaName,
+									'eval.round': round,
+									'eval.agent_model': agentModel,
+									'eval.extract_model': extractModel,
+								},
+							}),
 						),
-						Effect.withSpan('research_eval.run', {
-							attributes: {
-								'eval.company_id': company.id,
-								'eval.query': company.query,
-								'eval.schema': opts.schemaName,
-								'eval.agent_model': agentModel,
-								'eval.extract_model': extractModel,
-							},
-						}),
-					),
-				{ concurrency: opts.concurrency },
+					{ concurrency: opts.concurrency },
+				),
 			)
-		}).pipe(Effect.provide(researchLive))
+			return perRound.flat()
+		}).pipe(
+			Effect.provide(researchLive),
+			Effect.provide(cacheSettings),
+			Effect.provideService(UsageMeter, judgeMeter),
+		)
+		const judgeSpend = yield* judgeMeter.snapshot()
 
 		for (const company of golden) {
 			yield* Console.log(
@@ -699,6 +855,20 @@ export const researchEval = (opts: {
 
 		const report = buildEvalReport(scores)
 		yield* Console.log(formatSummary(report.summary))
+		// Printed apart from the cost per run above, which counts only what the runs
+		// themselves were billed. Asking a model what kind of organisation each row of
+		// a market list is happens after a run has finished, so folding it into that
+		// figure would charge the research for a question the measurement asked.
+		// Shown whenever the judge was asked anything, not only when it reached a whole
+		// cent. One question about a dozen rows costs a fraction of one, and cost is
+		// carried in whole cents — so testing the money would hide the figure in every
+		// ordinary pass, which is the case it was added for. The tokens never round away.
+		const judgeTokens = judgeSpend.tokensIn + judgeSpend.tokensOut
+		if (judgeTokens > 0) {
+			yield* Console.log(
+				`Judging the list cost:  ${cents(judgeSpend.costCents)} over ${count(judgeTokens)} tokens for the whole pass (not in the per-run figures above)`,
+			)
+		}
 		if (opts.byBucket) {
 			yield* Console.log(formatGroups('By bucket', report.byBucket))
 			yield* Console.log(formatGroups('By country', report.byCountry))
@@ -886,6 +1056,12 @@ export const researchEvalInvariance = (opts: {
 }) =>
 	Effect.gen(function* () {
 		yield* requireLocalDatabase('research eval-invariance')
+		// Drives the same live runs a profile pass does, so it needs the same parts
+		// reachable — two wordings agreeing on canned data says nothing about either.
+		yield* requireLiveProviders('research eval-invariance', {
+			tiers: ['agent', 'extract'],
+			capabilities: ['search', 'scrape'],
+		})
 		const raw = yield* Effect.tryPromise({
 			try: () => readFile(fromRepoRoot(opts.goldenPath), 'utf8'),
 			catch: error => new Error(`cannot read golden set: ${String(error)}`),
@@ -1004,6 +1180,18 @@ export const researchEvalContacts = (opts: {
 		if (Option.isSome(opts.enrichMode)) {
 			enrichOverrides['RESEARCH_ENRICH_MODE'] = opts.enrichMode.value
 		}
+		const enrichSettings = ConfigProvider.layerAdd(
+			ConfigProvider.fromEnv({ env: enrichOverrides }),
+			{ asPrimary: true },
+		)
+		// Read through the same overridden settings the runs will use, or the check
+		// would pass on an environment value the flag is about to replace. Contact
+		// discovery never searches or scrapes — it works from a domain it is handed —
+		// so only the enrichment it exists to measure is required here.
+		yield* requireLiveProviders('research eval-contacts', {
+			tiers: [],
+			capabilities: ['enrich'],
+		}).pipe(Effect.provide(enrichSettings))
 
 		const raw = yield* Effect.tryPromise({
 			try: () => readFile(fromRepoRoot(opts.goldenPath), 'utf8'),
@@ -1051,15 +1239,7 @@ export const researchEvalContacts = (opts: {
 					),
 				{ concurrency: opts.concurrency },
 			)
-		}).pipe(
-			Effect.provide(contactsLive),
-			Effect.provide(
-				ConfigProvider.layerAdd(
-					ConfigProvider.fromEnv({ env: enrichOverrides }),
-					{ asPrimary: true },
-				),
-			),
-		)
+		}).pipe(Effect.provide(contactsLive), Effect.provide(enrichSettings))
 
 		for (const company of golden) {
 			yield* Console.log(

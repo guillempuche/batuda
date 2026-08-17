@@ -27,6 +27,7 @@ import { type SearchInput, SearchProvider } from '../application/ports'
 import { recordSeenSources } from '../application/source-record'
 import { ProviderError } from '../domain/errors'
 import { SearchResult } from '../domain/types'
+import { cacheBypassConfig } from './_config'
 
 const sha256Hex = (input: string): string =>
 	createHash('sha256').update(input).digest('hex')
@@ -61,9 +62,14 @@ export const makeCachedSearch = () =>
 		Effect.gen(function* () {
 			const inner = yield* SearchProvider
 			const sql = yield* SqlClient.SqlClient
+			// Read once, when the layer is built, so a pass cannot change its mind
+			// halfway and answer some searches from a cache and some from the vendor.
+			const bypassCache = yield* cacheBypassConfig
 
 			const lookup = (keyHash: string) =>
-				sql<{ items: unknown; units_cost: number }>`
+				bypassCache
+					? Effect.succeed([])
+					: sql<{ items: unknown; units_cost: number }>`
 					SELECT items, units_cost
 					FROM search_cache
 					WHERE key_hash = ${keyHash}

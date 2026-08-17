@@ -1,7 +1,12 @@
 import { Cause, ConfigProvider, Effect, Exit } from 'effect'
 import { describe, expect, it } from 'vitest'
 
-import { type ConfiguredSlot, configuredSlots } from './llm-live'
+import type { LlmTier } from './cached-llm'
+import {
+	type ConfiguredSlot,
+	configuredSlots,
+	resolvedTierVendors,
+} from './llm-live'
 
 /**
  * Which models the settings point each tier at.
@@ -25,12 +30,11 @@ const reasonOf = (exit: Exit.Exit<unknown, unknown>): string =>
 	Exit.isFailure(exit) ? Cause.pretty(exit.cause) : ''
 
 // The other two tiers stubbed out, so a case can say one thing about one tier
-// without spelling out settings for all three.
+// without spelling out settings for all three. Neither stubbed tier is given a
+// model, because a stubbed tier never needs one.
 const AGENT_ON_GROQ = {
 	RESEARCH_LLM_EXTRACT_PROVIDERS: 'stub',
-	RESEARCH_LLM_EXTRACT_MODEL: 'unused',
 	RESEARCH_LLM_WRITER_PROVIDERS: 'stub',
-	RESEARCH_LLM_WRITER_MODEL: 'unused',
 	RESEARCH_LLM_AGENT_PROVIDERS: 'groq',
 	RESEARCH_LLM_AGENT_MODEL: 'openai/gpt-oss-120b',
 }
@@ -107,21 +111,87 @@ describe('the models a tier is pointed at', () => {
 
 	describe('when a tier reaches no vendor at all', () => {
 		it('should list nothing for it', async () => {
-			// GIVEN every tier stubbed
+			// GIVEN every tier stubbed, and none of them given a model
+			const exit = await read({
+				RESEARCH_LLM_AGENT_PROVIDERS: 'stub',
+				RESEARCH_LLM_EXTRACT_PROVIDERS: 'stub',
+				RESEARCH_LLM_WRITER_PROVIDERS: 'stub',
+			})
+
+			// WHEN read — THEN there is nothing to ask, because a stubbed tier
+			// answers from canned data and reaches no vendor. It must not ask for a
+			// model on the way to working that out: nobody gives a stubbed tier one,
+			// so asking turns "this is stubbed" into a missing-setting failure.
+			expect(reasonOf(exit)).toBe('')
+			expect(slotsOf(exit)).toEqual([])
+		})
+
+		it('should say so even when a live vendor sits behind the stub', async () => {
+			// GIVEN a tier whose first choice is the stub and second is a real vendor
 			const slots = slotsOf(
 				await read({
-					RESEARCH_LLM_AGENT_PROVIDERS: 'stub',
-					RESEARCH_LLM_AGENT_MODEL: 'unused',
-					RESEARCH_LLM_EXTRACT_PROVIDERS: 'stub',
-					RESEARCH_LLM_EXTRACT_MODEL: 'unused',
-					RESEARCH_LLM_WRITER_PROVIDERS: 'stub',
-					RESEARCH_LLM_WRITER_MODEL: 'unused',
+					...AGENT_ON_GROQ,
+					RESEARCH_LLM_AGENT_PROVIDERS: 'stub,groq',
 				}),
 			)
 
-			// WHEN read — THEN there is nothing to ask, because a stubbed tier
-			// answers from canned data and reaches no vendor
+			// WHEN read — THEN the tier lists nothing, because the layer that builds
+			// it swaps the whole tier for canned answers on the first choice alone and
+			// never reaches the second
 			expect(slots).toEqual([])
+		})
+	})
+})
+
+describe('which vendor a tier would really answer with', () => {
+	const readTiers = (
+		env: Record<string, string>,
+		only?: ReadonlyArray<LlmTier>,
+	) =>
+		Effect.runPromise(
+			resolvedTierVendors(only).pipe(
+				Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env }))),
+			),
+		)
+
+	describe('when a tier names a real vendor', () => {
+		it('should name that vendor', async () => {
+			// GIVEN one live tier and two stubbed
+			const tiers = await readTiers(AGENT_ON_GROQ)
+
+			// WHEN read — THEN each tier reports what would answer for it
+			expect(tiers).toEqual([
+				{ tier: 'agent', vendor: 'groq' },
+				{ tier: 'extract', vendor: 'stub' },
+				{ tier: 'writer', vendor: 'stub' },
+			])
+		})
+	})
+
+	describe('when the caller asks about no tier at all', () => {
+		it('should read no settings rather than demanding all of them', async () => {
+			// GIVEN an environment that says nothing about any model tier, which is
+			// what a run that only discovers contacts needs — it reaches no model
+			const tiers = await readTiers({}, [])
+
+			// WHEN nothing is asked about — THEN nothing is read, so a caller that
+			// touches no tier is not stopped for want of settings behind all three
+			expect(tiers).toEqual([])
+		})
+	})
+
+	describe('when a tier puts a real vendor behind the stub', () => {
+		it('should still report the stub', async () => {
+			// GIVEN a tier reading `stub,groq`
+			const tiers = await readTiers({
+				...AGENT_ON_GROQ,
+				RESEARCH_LLM_AGENT_PROVIDERS: 'stub,groq',
+			})
+
+			// WHEN read — THEN it reports the stub, because the first choice is what a
+			// call reaches; a list that merely mentions a real vendor runs on canned
+			// answers all the same
+			expect(tiers[0]).toEqual({ tier: 'agent', vendor: 'stub' })
 		})
 	})
 })

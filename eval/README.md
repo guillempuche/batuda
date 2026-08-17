@@ -4,6 +4,16 @@ Measure the research pipeline's quality against a fixed set of companies whose c
 
 This is a developer/CI tool. It never runs in production — it drives the same research pipeline the server runs, but from the CLI, on demand.
 
+## What this harness is
+
+The pipeline is what changes; the companies are what stay still. A benchmark for a model does the reverse — it holds the code still and swaps the model — and that one flip decides the rest of the shape: a row is data rather than code, an answer is a rate rather than a verdict, and a pass over the set costs real money because nothing about it is staged.
+
+**A row is data, so adding one is typing rather than programming.** One scorer reads every row, so a new company is a few lines of JSON and no code. What you pay for that: the harness has no way of knowing whether a "correct answer" is correct. A mistyped registration number is not a failing test — it is a wrong number in every report from then on, quietly, and only somebody re-checking the company will ever find it.
+
+**The answers are rates, not pass or fail.** A pass does not come back "passed"; it comes back as shares — how much of what was known came back, and how much of what came back was right. A share moves in small steps, which is what lets it show a drift that a yes/no would round away, and equally what makes any single pass unreadable on its own; see [Reading a change that targets under-filling](#reading-a-change-that-targets-under-filling).
+
+**Nothing is staged, so a pass is billable, slow, and noisy.** A real company either publishes that mailbox or it does not, which is what makes these numbers mean something outside this folder — and also what makes a pass cost ~$10–15 and a few hours, fail for reasons that have nothing to do with the change (a rate-limited provider, a site that blocked the scraper that morning), and differ from itself when run twice. Cost and noise are behind most of the rules in this file: why you validate one row before the billable pass, why a reading is three passes rather than one, why the registries go off for a comparison.
+
 ## Run it
 
 ```bash
@@ -52,7 +62,9 @@ A change meant to fix a near-empty profile or titleless contacts is judged by th
 
 **Grounding accuracy is the control**: extraction reads pages the fetch log already recorded, so grounding cannot legitimately move; if it does, the before and after reached different evidence and the comparison is void — rerun before trusting any other number. One limit worth knowing: grounding counts the source rows a run recorded, not whether a page's text was stored, so it cannot tell a page that was opened from one a search merely quoted. It controls for a prompt or trigger change; it cannot control for a change to the shape of the evidence itself.
 
-A single run is noise, so always take three — but take them as three separate `--runs 1` passes with the caches cleared between (`DELETE FROM search_cache; DELETE FROM llm_cache;`). Repeats inside one invocation are answered from those caches: they cost nothing, return the first run's answer, and so average away no noise at all.
+A single run is noise, so always take three — `--runs 3`. That runs the whole set three times over, one round after another, and every round asks the providers again instead of reading the round before it, so the three answers are three readings rather than one answer counted three times. It costs about three times a single pass, which is the price of the noise going away; a pass that asks for one run is unchanged and still reads whatever an earlier pass left behind.
+
+Clearing the caches by hand (`DELETE FROM search_cache; DELETE FROM llm_cache;`) is no longer part of the recipe, and would not have been enough on its own: a copy of each answer also sits in the running process's own memory, and the pages a run opened are kept in `sources` rather than in either of those tables.
 
 Whether a recovery pass earned its cost — as opposed to the up-front extraction prompt carrying the whole lift — is read from the monitoring board, not the printed table. Each run's `research.phase2` span carries the profile's fill at three stages: `research.enrichment.filled_broad` (fields the model returned on its own), `research.enrichment.filled_rescued` (after the focused recovery passes), and `research.enrichment.filled_kept` (what survived the guards), against `research.enrichment.fields_total`. A `filled_broad` near zero means the model answered almost nothing, which only the extraction prompt can move — a recovery pass cannot recover what was never there. A rise from `filled_broad` to `filled_rescued` is the recovery passes earning their spend; a drop from `filled_rescued` to `filled_kept` is the guards removing what a pass recovered. Charting the three across a prompt or trigger change shows which stage a number actually moved at, so a flat overall result is not mistaken for "nothing worked" when a pass recovered fields a guard then dropped.
 
@@ -72,7 +84,7 @@ If an environment already carries a `DATABASE_URL`, pin it back to local with a 
 
 **Routing, not just keys.** The keys alone don't run anything — the pipeline also needs the *routing*: `RESEARCH_LLM_<TIER>_PROVIDERS` + `_MODEL` for each of the three tiers, and the `RESEARCH_PROVIDER_SEARCH` / `_SCRAPE` / `_REGISTRY_GB` selectors. If those are missing from the run environment every provider silently falls back to `stub` and the eval reports a 100% empty rate over canned data — the keys being present is not enough. Unlike `DATABASE_URL`/`STORAGE_*`, this routing is **not secret** and is the *same* across worktrees, so it belongs in the Infisical env right next to the keys (never pass a key inline on the command; a provider name or model id is fine to pass inline, a key is not). Named vendors (`groq`, `fireworks`, `nebius`) carry their own endpoint, so a tier needs only its `PROVIDERS` name + `MODEL`; only a `custom` vendor also needs `_BASE_URL`.
 
-**Match prod's cascade when you measure.** Run each tier as the two-slot `custom,<fallback>` cascade production uses (`apps/server/config.production.json`: `custom,groq` for agent + writer, `custom,fireworks` for extract), not a single slot. A single-slot eval never exercises the fallback, so a transient primary 4xx under load fails the run outright — that is what depressed a prior concurrency-3 pass by ~20 points on titled-contact recall, a load artifact rather than a quality change. Keep eval concurrency at 1 regardless, so a measured delta is quality, not contention.
+**Match prod's cascade when you measure.** Run each tier as the two-slot `custom,<fallback>` cascade production uses (`apps/server/config.production.json`: `custom,groq` for agent + writer, `custom,fireworks` for extract), not a single slot. A single-slot eval never exercises the fallback, so a transient primary 4xx under load fails the run outright — that is what depressed a prior concurrency-3 pass by ~20 points on titled-contact recall, a load artifact rather than a quality change. `--concurrency` is 1 by default on `eval`, `eval-contacts` and `eval-invariance` for that reason, so a measured delta is quality rather than contention. Raising it makes a pass finish sooner and its numbers worth less; if you do raise it, say so beside the result, because the drop it causes looks exactly like a change that made the research worse.
 
 **Storage is local too.** Like the database, `STORAGE_*` must resolve to the worktree's own bucket (provisioned by `pnpm cli worktree up`), never the cloud one — a run has no business writing its scrape cache to prod. The dev Infisical env carries no `STORAGE_*`, so those come from the worktree automatically.
 
@@ -84,7 +96,17 @@ infisical run --env=dev -- env DATABASE_URL="postgresql://batuda:batuda@localhos
 
 The eval refuses to start against a database that is not on this machine, so a forgotten pin stops the run rather than filling a shared database with a pass's runs, sources and cached answers — several of which point at page text held only in that process's memory, which the server would later fail to read and pay to fetch again.
 
-**Validate one company before the billable pass.** The full set is ~$10–15 and a few hours of live scraping and LLM calls, so first run a one-row golden with `--runs 1` (a few cents). A wrong vendor/model, an expired key, or a network-blocked provider fails in seconds and shows up as a 100% empty rate — the cheap early signal that the routing is wrong before you spend on all 20 companies.
+**Check before the billable pass — it costs nothing.**
+
+```bash
+pnpm cli research eval --org <org-id> --user <user-id> --golden eval/golden.json --dry-run --price-from report.json
+```
+
+`--dry-run` spends nothing and runs every pre-flight a real pass runs: the database is this machine's, no part of the pipeline would answer with canned data, and every golden row parses — each rejected row printed with its reason. It then says how many runs would execute, and with `--price-from <report.json>` prices them from what an earlier pass actually cost per run rather than from a guess. Without that flag it prints the count alone; no earlier pass, no price.
+
+The pass refuses outright if a part it measures through would answer with canned data (a stub), so a mistyped vendor stops in seconds instead of running for hours and reporting a 100% empty rate. A part set to `none` is not refused — that is switched off, which is a deliberate setting and reads honestly in the result.
+
+Even so, run a one-row golden with `--runs 1` (a few cents) before the full set: the guards prove the routing resolves, not that a key is live or that a provider will answer from this network.
 
 ## The golden file
 
@@ -169,9 +191,9 @@ Three rules follow, and each of them bites:
 
 What no rule about names can settle: a company genuinely trading under a body's initials reads as the body. Asking the model what an organisation is would settle it; a name cannot.
 
-Two figures ride along beside those. **Duplicate rate** is how many rows are another row's company again, folded on the same identity the pipeline itself uses — the name with its legal form off the end, or a shared website host. It reads zero while that fold holds, which makes it a guard on the fold rather than a second opinion about it.
+Two figures ride along beside those. **Duplicate rate** is how many rows are another row's company again, folded on the same identity the pipeline itself uses — the name with its legal form off the end, a shared website host, or a branch office: a row whose name is another row's name and then the very town this row says it sits in, carrying no site of its own. It reads zero while that fold holds, which makes it a guard on the fold rather than a second opinion about it.
 
-Read it as "no repeats of the kind those keys can tell", not as "no repeats". A live French market search returned one company under its own name and four more times as that name plus the town of a branch office, none of the four carrying a website — no shared name key, no shared host — and the figure read 0% over a list that plainly repeated one company five times. Widening it needs a hand-marked answer to score against, which is a different measurement.
+Read it as "no repeats of the kind those keys can tell", not as "no repeats". The branch route exists because a live French market search returned one company under its own name and four more times as that name plus the town of a branch office, none of the four carrying a website — no shared name key, no shared host — and the figure read 0% over a list that plainly repeated one company five times. That case folds now, and the way to read the figure did not change with it: a repeat of a kind the fold has not been taught is still invisible to it, and it was a person reading the list who found this one, not the figure moving. Counting how many such repeats remain needs a hand-marked answer to score against, which is a different measurement.
 
 **Location fill** is how many rows say where the company is. The field is asked for a town or a province, but any stated place counts, so a row answering with the country alone still counts as filled.
 
@@ -182,6 +204,20 @@ The **rows per market** count is still reported, as the scale those figures read
 Organisation-kind precision only counts the bodies your golden set names. A trade body nobody has listed passes through unmeasured, exactly as an unlisted expected field value is not scored — a golden set measures what it knows.
 
 That limit is the point of the **`By market`** breakdown, which prints whenever the pass held a market row and is written to the `--out` report as `byMarket`. The shipped check that reads what kind of organisation a row is works off word lists in Spanish, Catalan and English: measured against fifteen European trade bodies it recognised four. So a Spanish market scores near 100% while a French or German one scores far lower, and the two averaged together hide the fact worth watching. Keep at least one market in a language that check does not read.
+
+### The model settles what a name cannot
+
+Every returned row the golden file says nothing about is put to a model, which is asked whether the row is an organisation that does the work of the trade or one that represents, regulates, supplies or lists the ones that do. That is what closes the gap above: a model reads every language a market answers in, and a body describes itself as one on its own page.
+
+Three rules keep it honest, and the printed table shows which of them settled what:
+
+- **A row the golden file names is a body whatever the model says.** A person checked that one; a model has no standing to overrule them.
+- **A model that errors, or cannot tell, leaves the row a company** — the reading the figure had before any model was involved. An outage must never read as a list full of trade bodies.
+- **Every row records which of the three decided it**, printed as `model ruled on` and `already listed` beneath the percentage. A pass where the model answered for every row and one where it fell over halfway both come out as a single percentage, and without the mix beside it the second reads as the first.
+
+**It moves two figures, not one.** Organisation-kind precision is the obvious one. Request coverage is the other: a part of the request counts as answered only when a row of the right kind answers it, so a row the model reclassifies as a trade body stops answering for its trade. Read them together after a change to the judge.
+
+The wording put to the model is the eval's own, deliberately not the one the pipeline's check uses. An instrument that asked the question exactly as the thing it measures does could never catch that thing being wrong — which is the whole reason this sits in the eval rather than reading the pipeline's verdict.
 
 ## Four kinds of row to include
 
@@ -217,6 +253,16 @@ That limit is the point of the **`By market`** breakdown, which prints whenever 
 
 Both blocks above are **templates, not data** — the ids say so. Replace every value with a company you have actually checked. A made-up address or registration number poisons the numbers exactly as a made-up industry does, and these two fields are easier to get wrong because they look precise.
 
+## What keeps a row in the set
+
+Every row is paid for on every pass, so a row has to be worth paying for. A company that has scored every field on the last few passes is confirming something already known and charging full price to do it. That is the one to move out — not because it is wrong, but because a set of them is an expensive way to be told nothing changed.
+
+Move it rather than delete it. `--golden` takes any file, so a second set costs only the run: keep the retired rows in one of their own and put it through when a change could plausibly have broken them.
+
+**A fix deserves a row, and that row belongs in a file of its own.** When a fault is found and fixed — a listing page whose links were read the wrong way, a branch office folded onto its parent — the company that showed it is the only thing that will catch it coming back. The main set is the wrong place for it: the top-line figures are shares over whatever rows the file holds, so editing the file changes what they are measured over, and a before/after taken across that edit is comparing two different sets. Keep those rows in something like `golden-regressions.json`, run it as its own pass, and the main set's history stays comparable.
+
+A row cannot say why it is there. There is no field for it and JSON has nowhere to put a note, so the `id` is the only place the reason survives — name a regression row after the fault it holds (`branch-office-fold`, `listing-page-links`) rather than after the company, and it still reads six months later.
+
 ## Registries: UK is free, ES is paid
 
 The `RegistryRouter` picks a registry by the company's country. **Companies House (UK)** is free — register a key at `developer.company-information.service.gov.uk` and set `RESEARCH_PROVIDER_REGISTRY_GB=companies-house`. **libreBORME (ES)** is ~€0.29/lookup — set `RESEARCH_PROVIDER_REGISTRY_ES=librebor` with `RESEARCH_API_KEY_REGISTRY_ES` (an `AccessId:AccessKey` pair).
@@ -228,6 +274,18 @@ Know what turning them off costs: a registry lookup that resolves the target by 
 ## Note
 
 `golden.example.json` ships a mix of real, verified companies: UK ones (whose register, Companies House, is free) that exercise grounding and the wrong-company rate, and Spanish small businesses (whose register, libreBORME, is paid) that exercise `country` (`ES`) and `size_range` against a thin web presence. Replace them with your own targets in any country. `industry` is scored against the wording you write in the golden, so keep it to the trade rather than a judgement about the sector — a run that read the site and wrote the same trade in its own words is a hit, and one that guessed from the company name is not.
+
+## What a pass cannot tell you
+
+Each of these is explained where it comes up above. Collected, they are what a number has to be read against.
+
+- **A golden set measures what it knows.** A field with no expected value is not scored, and a trade body nobody listed passes as a company. Every figure is a statement about the rows and values somebody wrote down, never about the whole set of things that could be wrong.
+- **Grounding counts the source rows a run recorded, not the page text it stored** — so it cannot tell a page the run opened from one a search merely quoted.
+- **"Wrong and unwatched" is an upper bound, not a forecast.** Read its direction; the value itself is far above what would really reach a record.
+- **Profile fullness divides by the extraction schema's own field count**, so it drops on identical output whenever the shape gains a field. It is only comparable across such a change if the before-pass was taken on the old shape.
+- **The shipped check for what kind of organisation a row is reads three languages.** It recognised four of fifteen European trade bodies, so a Spanish market scores near 100% on organisation-kind precision and a French one far lower, for a reason that is not quality.
+- **Duplicate rate is a guard on the fold, not a second opinion about it.** It reads zero exactly when the fold holds, so it can never surface a kind of repeat the fold has not been taught — the branch-office case it once missed was found by a person reading the list, not by the figure moving.
+- **Nothing checks that a returned row is a real company.** Rows per market is the scale the other market figures read against, not a grade of its own.
 
 ## Charting runs on the monitoring board
 

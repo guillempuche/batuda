@@ -10,6 +10,7 @@ import type { EvalSummary, RunScore } from './eval-scoring'
 
 const score = (over: Partial<RunScore>): RunScore => ({
 	id: 'r',
+	fields: [],
 	grounded: true,
 	groundable: true,
 	wrongCompany: false,
@@ -173,6 +174,8 @@ describe('evalSummaryAttributes', () => {
 				lowConfidenceRate: 0,
 				wrongCompanyAutoApplicableRate: 0,
 				organisationKindPrecision: null,
+				rowsJudgedShare: null,
+				rowsGoldenListedShare: null,
 				requestCoverage: null,
 				duplicateRate: null,
 				locationFill: null,
@@ -216,6 +219,8 @@ describe('evalSummaryAttributes', () => {
 				lowConfidenceRate: 0,
 				wrongCompanyAutoApplicableRate: 0,
 				organisationKindPrecision: null,
+				rowsJudgedShare: null,
+				rowsGoldenListedShare: null,
 				requestCoverage: null,
 				duplicateRate: null,
 				locationFill: null,
@@ -287,6 +292,9 @@ describe('reporting a pass that held market requests', () => {
 			grounded: false,
 			market: {
 				name: 'ES',
+				rowsGoldenListed: 0,
+				rowsJudged: 0,
+				rowsUnjudged: 0,
 				rowsReturned: 62,
 				rowsRightKind: 39,
 				rowsConfirmed: 0,
@@ -415,6 +423,8 @@ describe('reporting a pass that held market requests', () => {
 			fieldRecall: null,
 			contactRecall: null,
 			organisationKindPrecision: null,
+			rowsJudgedShare: null,
+			rowsGoldenListedShare: null,
 			requestCoverage: null,
 			duplicateRate: null,
 			locationFill: null,
@@ -447,6 +457,8 @@ describe('reporting a pass that held market requests', () => {
 			const attrs = evalSummaryAttributes(
 				summary({
 					organisationKindPrecision: 0.63,
+					rowsJudgedShare: 0,
+					rowsGoldenListedShare: 0,
 					requestCoverage: 0.2,
 					duplicateRate: 0.16,
 					locationFill: 0.4,

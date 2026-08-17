@@ -35,6 +35,22 @@ export const providerListConfig = <const V extends ReadonlyArray<string>>(
 }
 
 /**
+ * Whether to go past the caches and ask the provider every time.
+ *
+ * Off everywhere but a measuring run. A pass that repeats a company to average away
+ * the noise between runs gets the first run's answer back for free otherwise, and
+ * averaging one answer with itself steadies nothing — the repeat has to reach the
+ * providers again to be a repeat at all.
+ *
+ * It skips the reads only. What a run finds is still written down, because the pages
+ * it opened are the evidence its findings cite, not merely something kept to save a
+ * fetch later.
+ */
+export const cacheBypassConfig = Config.boolean('RESEARCH_CACHE_BYPASS').pipe(
+	Config.withDefault(false),
+)
+
+/**
  * Index-suffixed env var name. Slot 0 is the unsuffixed base; slot N (≥ 1)
  * is `${base}_${N + 1}` — e.g. `RESEARCH_API_KEY_SEARCH_2` for slot 1.
  */

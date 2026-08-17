@@ -1062,12 +1062,14 @@ const researchEvalCommand = Command.make(
 			Flag.optional,
 		),
 		concurrency: Flag.integer('concurrency').pipe(
-			Flag.withDescription('How many runs to execute at once'),
-			Flag.withDefault(3),
+			Flag.withDescription(
+				'How many runs to execute at once. One by default: runs competing for the same providers slow each other into timeouts, and a run that times out scores as empty — which reads as a quality drop that no change caused',
+			),
+			Flag.withDefault(1),
 		),
 		runs: Flag.integer('runs').pipe(
 			Flag.withDescription(
-				'How many times to run each company; rates are averaged over them, since grounding is noisy per run',
+				"How many times to run each company, averaging the rates over them. More than one runs the whole set that many times over, and every round asks the providers again instead of reading the last round's answer — so it costs about as many times a single pass as the number you give",
 			),
 			Flag.withDefault(1),
 		),
@@ -1080,8 +1082,31 @@ const researchEvalCommand = Command.make(
 				'Also print the metrics broken out by size/reach bucket and by country, so a regression in one segment is not averaged away',
 			),
 		),
+		dryRun: Flag.boolean('dry-run').pipe(
+			Flag.withDescription(
+				'Check everything a pass needs and spend nothing: that the database is local, that no part of the pipeline would answer with canned data, and that every golden row parses. Prints how many runs would execute',
+			),
+		),
+		priceFrom: Flag.string('price-from').pipe(
+			Flag.withDescription(
+				"Report JSON from an earlier pass, used to price a --dry-run from that pass's measured cost per run rather than a guess",
+			),
+			Flag.optional,
+		),
 	},
-	({ org, user, golden, schema, language, concurrency, runs, out, byBucket }) =>
+	({
+		org,
+		user,
+		golden,
+		schema,
+		language,
+		concurrency,
+		runs,
+		out,
+		byBucket,
+		dryRun,
+		priceFrom,
+	}) =>
 		researchEval({
 			org,
 			user,
@@ -1092,6 +1117,8 @@ const researchEvalCommand = Command.make(
 			runs,
 			out,
 			byBucket,
+			dryRun,
+			priceFrom,
 		}),
 ).pipe(
 	Command.withShortDescription(
@@ -1115,8 +1142,10 @@ const researchEvalContactsCommand = Command.make(
 			Flag.withDescription('Path to the contact golden-set JSON file'),
 		),
 		concurrency: Flag.integer('concurrency').pipe(
-			Flag.withDescription('How many companies to discover at once'),
-			Flag.withDefault(3),
+			Flag.withDescription(
+				'How many companies to discover at once. One by default, so a vendor answering slower under load cannot be read as worse enrichment',
+			),
+			Flag.withDefault(1),
 		),
 		runs: Flag.integer('runs').pipe(
 			Flag.withDescription(
@@ -1176,8 +1205,10 @@ const researchEvalInvarianceCommand = Command.make(
 			Flag.withDefault('company_enrichment_v1'),
 		),
 		concurrency: Flag.integer('concurrency').pipe(
-			Flag.withDescription('How many companies to evaluate at once'),
-			Flag.withDefault(2),
+			Flag.withDescription(
+				'How many companies to evaluate at once. One by default, so two wordings are compared under the same conditions rather than one of them under load',
+			),
+			Flag.withDefault(1),
 		),
 	},
 	({ org, user, golden, schema, concurrency }) =>

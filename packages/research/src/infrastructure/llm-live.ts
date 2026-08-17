@@ -55,7 +55,7 @@ const LLM_VENDORS = [
 	'custom',
 ] as const
 
-type LlmVendor = (typeof LLM_VENDORS)[number]
+export type LlmVendor = (typeof LLM_VENDORS)[number]
 
 const LLM_BASE_URLS = {
 	together: 'https://api.together.xyz/v1',
@@ -88,15 +88,46 @@ export interface ConfiguredSlot {
  *
  * Stubbed tiers are left out: they reach no vendor, so there is nothing to ask.
  */
+const LLM_TIERS: ReadonlyArray<{
+	readonly envPrefix: string
+	readonly tier: LlmTier
+}> = [
+	{ envPrefix: 'RESEARCH_LLM_AGENT', tier: 'agent' },
+	{ envPrefix: 'RESEARCH_LLM_EXTRACT', tier: 'extract' },
+	{ envPrefix: 'RESEARCH_LLM_WRITER', tier: 'writer' },
+]
+
+/** A tier, and the vendor that would really answer for it. */
+export interface ResolvedTier {
+	readonly tier: LlmTier
+	/** `stub` means canned answers: nothing live is behind this tier. */
+	readonly vendor: LlmVendor
+}
+
+/**
+ * The vendor each tier would really answer with, read the same way the layer that
+ * builds it reads them — the first choice decides, because that is what the layer
+ * itself keys on when it swaps a whole tier for canned answers.
+ *
+ * This exists so a caller can find out that a tier is stubbed without owning a copy
+ * of the vendor names, which live in one tuple here on purpose.
+ */
+export const resolvedTierVendors = (
+	tiers: ReadonlyArray<LlmTier> = LLM_TIERS.map(entry => entry.tier),
+): Effect.Effect<ReadonlyArray<ResolvedTier>, Config.ConfigError> =>
+	Effect.forEach(
+		LLM_TIERS.filter(entry => tiers.includes(entry.tier)),
+		({ envPrefix, tier }) =>
+			providerListConfig(LLM_VENDORS, `${envPrefix}_PROVIDERS`).pipe(
+				Effect.map(vendors => ({ tier, vendor: vendors[0] })),
+			),
+	)
+
 export const configuredSlots = (
 	tiers: ReadonlyArray<{
 		readonly envPrefix: string
 		readonly tier: LlmTier
-	}> = [
-		{ envPrefix: 'RESEARCH_LLM_AGENT', tier: 'agent' },
-		{ envPrefix: 'RESEARCH_LLM_EXTRACT', tier: 'extract' },
-		{ envPrefix: 'RESEARCH_LLM_WRITER', tier: 'writer' },
-	],
+	}> = LLM_TIERS,
 ): Effect.Effect<ReadonlyArray<ConfiguredSlot>, Config.ConfigError> =>
 	Effect.forEach(tiers, ({ envPrefix, tier }) =>
 		Effect.gen(function* () {
@@ -104,6 +135,11 @@ export const configuredSlots = (
 				LLM_VENDORS,
 				`${envPrefix}_PROVIDERS`,
 			)
+			// A tier whose first choice is the stub runs wholly on the stub, and the
+			// layer that builds it decides that on the first choice alone and never
+			// asks for a model. Asking here would fail a tier nobody gave a model to
+			// precisely because it was never going to need one.
+			if (vendors[0] === 'stub') return []
 			const model = yield* Config.string(`${envPrefix}_MODEL`)
 			return yield* Effect.forEach(vendors, (vendor, i) =>
 				Effect.gen(function* () {

@@ -96,6 +96,81 @@ type MapVendor = (typeof MAP_VENDORS)[number]
 type EnrichVendor = (typeof ENRICH_VENDORS)[number]
 type VerifyVendor = (typeof VERIFY_VENDORS)[number]
 
+/** The capabilities whose vendor a caller can ask about by name. */
+export type ResearchCapability =
+	| 'search'
+	| 'scrape'
+	| 'map'
+	| 'enrich'
+	| 'verify'
+
+/** Every vendor name any capability can resolve to. */
+export type CapabilityVendor =
+	| SearchVendor
+	| ScrapeVendor
+	| MapVendor
+	| EnrichVendor
+	| VerifyVendor
+
+/** A capability, and the vendor that would really answer for it. */
+export interface ResolvedCapability {
+	readonly capability: ResearchCapability
+	/**
+	 * `stub` means canned answers — the dangerous one, because canned answers look
+	 * like findings. `none` means the capability is switched off and returns
+	 * nothing, which is a deliberate setting and shows up honestly in a result.
+	 */
+	readonly vendor: CapabilityVendor
+}
+
+// Search and scrape carry no default, so an unset one stops the boot naming
+// itself. The rest default to off, exactly as their own layers do.
+const CAPABILITY_READERS: Record<
+	ResearchCapability,
+	Effect.Effect<CapabilityVendor, Config.ConfigError>
+> = {
+	search: providerListConfig(SEARCH_VENDORS, 'RESEARCH_PROVIDER_SEARCH').pipe(
+		Effect.map(vendors => vendors[0]),
+	),
+	scrape: providerListConfig(SCRAPE_VENDORS, 'RESEARCH_PROVIDER_SCRAPE').pipe(
+		Effect.map(vendors => vendors[0]),
+	),
+	map: providerListConfig(MAP_VENDORS, 'RESEARCH_PROVIDER_MAP', ['none']).pipe(
+		Effect.map(vendors => vendors[0]),
+	),
+	enrich: providerListConfig(ENRICH_VENDORS, 'RESEARCH_PROVIDER_ENRICH', [
+		'none',
+	]).pipe(Effect.map(vendors => vendors[0])),
+	verify: providerListConfig(VERIFY_VENDORS, 'RESEARCH_PROVIDER_VERIFY', [
+		'none',
+	]).pipe(Effect.map(vendors => vendors[0])),
+}
+
+const EVERY_CAPABILITY = Object.keys(
+	CAPABILITY_READERS,
+) as ReadonlyArray<ResearchCapability>
+
+/**
+ * The vendor each capability would really answer with, read from the same settings
+ * the layers read, first choice first — because that is the one a call reaches
+ * before any fallback.
+ *
+ * Only the capabilities asked for are read. Reading the rest would make a caller
+ * that cares about one of them fail for want of settings behind another it never
+ * touches — and two of these have no default, so that failure is easy to reach.
+ *
+ * Here rather than at the caller so the vendor names stay in the one tuple each,
+ * which is where a new provider is added.
+ */
+export const resolvedCapabilityVendors = (
+	capabilities: ReadonlyArray<ResearchCapability> = EVERY_CAPABILITY,
+): Effect.Effect<ReadonlyArray<ResolvedCapability>, Config.ConfigError> =>
+	Effect.forEach(capabilities, capability =>
+		CAPABILITY_READERS[capability].pipe(
+			Effect.map(vendor => ({ capability, vendor })),
+		),
+	)
+
 // ── What a provider slot charges ──
 
 // Cents per credit for one slot. Required with no fallback, and per slot,
