@@ -5,6 +5,7 @@ import { Plus } from 'lucide-react'
 import { useId, useState } from 'react'
 import styled from 'styled-components'
 
+import { NAME_ONLY_EVIDENCE } from '@batuda/research/application/name-only-guard'
 import { PriButton, usePriToast } from '@batuda/ui/pri'
 
 import { SafeLink } from '#/components/research/safe-link'
@@ -49,6 +50,9 @@ type ProspectEntry = {
 	readonly location?: string
 	readonly why_relevant: string
 	readonly unconfirmed_reason?: string
+	// Doubt the run did not put into words but the engine established on its own, so
+	// the wording belongs here rather than in the finding.
+	readonly unconfirmed_evidence?: string
 	readonly citations?: ReadonlyArray<Citation>
 }
 
@@ -93,12 +97,18 @@ export function ProspectScanView({
 // write a company nobody has vouched for.
 function ProspectRow({ prospect }: { readonly prospect: ProspectEntry }) {
 	const doubtId = useId()
+	const { t } = useLingui()
 	// A reason with nothing written in it is not a doubt anybody can weigh, and runs
 	// stored before the engine started taking those back still carry them. Read as a
 	// mark it would badge the row and hold back the vouching step while naming no
 	// cause at all.
 	const doubt = prospect.unconfirmed_reason?.trim()
-	const unconfirmed = doubt !== undefined && doubt !== ''
+	// The engine's own finding: every page this row cites was a page listing many
+	// companies, and it carries neither a site nor a place. Told here rather than
+	// stored as a sentence, so it reads in the language the reader is using.
+	const nameOnly = prospect.unconfirmed_evidence === NAME_ONLY_EVIDENCE
+	const spoken = doubt !== undefined && doubt !== ''
+	const unconfirmed = spoken || nameOnly
 
 	return (
 		<ListItem>
@@ -119,7 +129,9 @@ function ProspectRow({ prospect }: { readonly prospect: ProspectEntry }) {
 					<ReasonLabel>
 						<Trans>Could not be confirmed:</Trans>
 					</ReasonLabel>{' '}
-					{doubt}
+					{spoken
+						? doubt
+						: t`Only found named in a list of companies, with no website and no location of its own.`}
 				</Reason>
 			) : null}
 			<FieldsTable>
