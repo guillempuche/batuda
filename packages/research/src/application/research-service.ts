@@ -21,6 +21,7 @@ import { Prompt } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { ResearchRun } from '@batuda/domain'
+import { makeWorkRecord, WorkRecord } from '@batuda/observability'
 
 import {
 	AcceptedCountry,
@@ -1669,6 +1670,7 @@ export const cloneCacheHitRun = (params: {
 		}
 		yield* Effect.logInfo('research.cache_hit').pipe(
 			Effect.annotateLogs({
+				event: 'research.cache_hit',
 				user_id: userId,
 				research_id: clonedId,
 				source_research_id: cachedId,
@@ -1830,7 +1832,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 				if (pending.length > 0) {
 					yield* Effect.logInfo(
 						'research.dispatch: re-offered queued runs',
-					).pipe(Effect.annotateLogs({ count: pending.length }))
+					).pipe(
+						Effect.annotateLogs({
+							event: 'research.dispatch.requeued',
+							count: pending.length,
+						}),
+					)
 				}
 			})
 
@@ -2294,6 +2301,66 @@ export class ResearchService extends Context.Service<ResearchService>()(
 			// itself — `AND organization_id = …`, taken off the run row. The rest of
 			// what this reads is keyed on the run's own id, which belongs to one
 			// organization already and never comes from a caller.
+			// Spreads a tally into one field per entry, e.g. `model_calls.agent@x: 3`.
+			// Spreads a tally into one field per entry, e.g. `model_calls.agent@x: 3`.
+			//
+			// Bounded, because these go straight onto the line rather than through the
+			// work record, so the record's own size cap does not reach them: a run
+			// touching many models and vendors would otherwise widen the line by a
+			// field per combination. The biggest go on and the rest are counted, so
+			// what survives is what the spending was actually on.
+			const MAX_TALLY_FIELDS = 24
+			const prefixed = (prefix: string, totals: Record<string, number>) => {
+				const ranked = Object.entries(totals).sort(([, a], [, b]) => b - a)
+				const kept = ranked.slice(0, MAX_TALLY_FIELDS)
+				const line: Record<string, number> = Object.fromEntries(
+					kept.map(([key, value]) => [`${prefix}.${key}`, value]),
+				)
+				if (ranked.length > kept.length)
+					line[`${prefix}.other_count`] = ranked.length - kept.length
+				return line
+			}
+
+			// One line per run, carrying everything the run learned on the way plus
+			// what it spent. A run is long and expensive, and its story is otherwise
+			// spread over dozens of lines that cannot be grouped as one — so
+			// "what did a run cost, split by which model answered it" has no answer
+			// unless the facts and the totals share a row. Identity fields go last so
+			// a fact recorded during the run cannot shadow which run the line is for.
+			const closeRunRecord = (
+				researchId: string,
+				userId: string,
+				outcome: 'succeeded' | 'failed',
+			) =>
+				Effect.gen(function* () {
+					const { run_claimed: ranHere, ...facts } = yield* (yield* WorkRecord)
+						.read
+					// A run already claimed by another worker leaves this fiber straight
+					// away. Writing a line for it would invent a run that never happened
+					// here, and its zero cost would drag every average down.
+					if (!ranHere) return
+					const usage = yield* (yield* UsageMeter).snapshot()
+					yield* Effect.logInfo('research.run').pipe(
+						Effect.annotateLogs({
+							...facts,
+							event: 'research.run',
+							outcome,
+							tokens_in: usage.tokensIn,
+							tokens_out: usage.tokensOut,
+							cost_cents: usage.costCents,
+							// Flattened one key per model / provider / kind of work, rather
+							// than nested: grouping works on a field, so a nested object
+							// would have to be picked apart before it could answer "cost,
+							// split by the model that actually produced the run".
+							...prefixed('cost_cents', usage.costByBucket),
+							...prefixed('units', usage.unitsByProvider),
+							...prefixed('model_calls', usage.callsByModel),
+							research_id: researchId,
+							user_id: userId,
+						}),
+					)
+				})
+
 			const runFiber = (researchId: string, userId: string) =>
 				Effect.gen(function* () {
 					// Claim the run: proceed only if it is still queued. The consumer
@@ -2308,6 +2375,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						RETURNING id
 					`
 					if (!claimed) return
+					// Mark the record so the closing line knows this worker really ran
+					// the run, rather than finding it already taken and stepping aside.
+					yield* (yield* WorkRecord).add({ run_claimed: true })
 
 					// Refresh the heartbeat while this run works, so the sweep can
 					// tell a live long-running job from one whose worker died. Forked
@@ -2673,6 +2743,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								? Effect.failCause(cause)
 								: Effect.logWarning('research.progress.write_failed').pipe(
 										Effect.annotateLogs({
+											event: 'research.progress.write_failed',
 											research_id: researchId,
 											cause: Cause.pretty(cause),
 										}),
@@ -2902,6 +2973,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														'research.contacts.rescue_failed',
 													).pipe(
 														Effect.annotateLogs({
+															event: 'research.contacts.rescue_failed',
 															research_id: researchId,
 															cause: Cause.pretty(cause),
 														}),
@@ -2927,6 +2999,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									result = { ...(result as object), contacts: merged }
 									yield* Effect.logInfo('research.contacts.rescued').pipe(
 										Effect.annotateLogs({
+											event: 'research.contacts.rescued',
 											research_id: researchId,
 											before: broadContacts.length,
 											after: merged.length,
@@ -2961,6 +3034,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									result = fMerged.findings
 									yield* Effect.logInfo('research.firmographics.rescued').pipe(
 										Effect.annotateLogs({
+											event: 'research.firmographics.rescued',
 											research_id: researchId,
 											filled: fMerged.filled,
 										}),
@@ -2994,6 +3068,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									result = sMerged.findings
 									yield* Effect.logInfo('research.size.rescued').pipe(
 										Effect.annotateLogs({
+											event: 'research.size.rescued',
 											research_id: researchId,
 											filled: sMerged.filled,
 										}),
@@ -3054,6 +3129,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													'research.prospects.not_a_company',
 												).pipe(
 													Effect.annotateLogs({
+														event: 'research.prospects.not_a_company',
 														research_id: researchId,
 														name: row.name,
 														kind: row.kind,
@@ -3089,6 +3165,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													'research.citations.dropped',
 												).pipe(
 													Effect.annotateLogs({
+														event: 'research.citations.dropped',
 														research_id: researchId,
 														total: check.total,
 														kept: check.kept,
@@ -3104,6 +3181,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											)) {
 												yield* Effect.logInfo('research.field.dropped').pipe(
 													Effect.annotateLogs({
+														event: 'research.field.dropped',
 														research_id: researchId,
 														guard: 'citation',
 														field: fieldDrop.field,
@@ -3139,6 +3217,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													'research.contacts.wrong_entity',
 												).pipe(
 													Effect.annotateLogs({
+														event: 'research.contacts.wrong_entity',
 														research_id: researchId,
 														dropped: check.dropped,
 													}),
@@ -3167,6 +3246,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													'research.fields.ungrounded',
 												).pipe(
 													Effect.annotateLogs({
+														event: 'research.fields.ungrounded',
 														research_id: researchId,
 														dropped_placeholder: check.droppedPlaceholder,
 														dropped_wrong_kind: check.droppedWrongKind,
@@ -3184,6 +3264,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											)) {
 												yield* Effect.logInfo('research.field.dropped').pipe(
 													Effect.annotateLogs({
+														event: 'research.field.dropped',
 														research_id: researchId,
 														guard: 'scalar',
 														field: fieldDrop.field,
@@ -3251,6 +3332,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													'research.websites.blanked',
 												).pipe(
 													Effect.annotateLogs({
+														event: 'research.websites.blanked',
 														research_id: researchId,
 														blanked_not_an_address: check.blankedNotAnAddress,
 														blanked_directory: check.blankedDirectory,
@@ -3275,6 +3357,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													'research.websites.own_site',
 												).pipe(
 													Effect.annotateLogs({
+														event: 'research.websites.own_site',
 														research_id: researchId,
 														established: check.ownSiteEstablished,
 														unknown: check.ownSiteUnknown,
@@ -3346,6 +3429,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													'research.values.unsupported',
 												).pipe(
 													Effect.annotateLogs({
+														event: 'research.values.unsupported',
 														research_id: researchId,
 														dropped_proposals: check.droppedProposals,
 														stripped_values: check.strippedValues,
@@ -3373,6 +3457,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													'research.fit.unsupported',
 												).pipe(
 													Effect.annotateLogs({
+														event: 'research.fit.unsupported',
 														research_id: researchId,
 														dropped_disqualifiers: check.droppedDisqualifiers,
 														unverified_checks: check.unverifiedChecks,
@@ -3397,6 +3482,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													'research.vocabulary.normalized',
 												).pipe(
 													Effect.annotateLogs({
+														event: 'research.vocabulary.normalized',
 														research_id: researchId,
 														mapped: check.mapped,
 														blanked: check.blanked,
@@ -3464,6 +3550,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													'research.proposals.unappliable',
 												).pipe(
 													Effect.annotateLogs({
+														event: 'research.proposals.unappliable',
 														research_id: researchId,
 														dropped: check.dropped,
 														// Fields an earlier check had emptied, taken out
@@ -3546,6 +3633,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													'research.discovered_existing.unresolved',
 												).pipe(
 													Effect.annotateLogs({
+														event: 'research.discovered_existing.unresolved',
 														research_id: researchId,
 														dropped: check.dropped,
 													}),
@@ -3582,6 +3670,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													'research.prospects.off_criteria',
 												).pipe(
 													Effect.annotateLogs({
+														event: 'research.prospects.off_criteria',
 														research_id: researchId,
 														dropped: check.dropped,
 													}),
@@ -3610,6 +3699,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													'research.prospects.deduplicated',
 												).pipe(
 													Effect.annotateLogs({
+														event: 'research.prospects.deduplicated',
 														research_id: researchId,
 														merged: check.merged,
 													}),
@@ -3643,6 +3733,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													'research.prospects.doubt_cleared',
 												).pipe(
 													Effect.annotateLogs({
+														event: 'research.prospects.doubt_cleared',
 														research_id: researchId,
 														cleared: check.cleared,
 													}),
@@ -3674,6 +3765,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													'research.prospects.name_only',
 												).pipe(
 													Effect.annotateLogs({
+														event: 'research.prospects.name_only',
 														research_id: researchId,
 														marked: check.marked,
 													}),
@@ -3754,6 +3846,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													'research.critic.dropped',
 												).pipe(
 													Effect.annotateLogs({
+														event: 'research.critic.dropped',
 														research_id: researchId,
 														criticised: check.criticised,
 														dropped: check.dropped,
@@ -3807,6 +3900,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													'research.entity_source.blocked',
 												).pipe(
 													Effect.annotateLogs({
+														event: 'research.entity_source.blocked',
 														research_id: researchId,
 														dropped_fields: check.droppedCompanyFields,
 														dropped_off_entity: check.droppedOffEntity,
@@ -3835,6 +3929,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													'research.source_tier.capped',
 												).pipe(
 													Effect.annotateLogs({
+														event: 'research.source_tier.capped',
 														research_id: researchId,
 														capped: check.capped,
 													}),
@@ -3895,6 +3990,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						researchText = cachedResearchText
 						yield* Effect.logInfo('research.phase1.resume').pipe(
 							Effect.annotateLogs({
+								event: 'research.phase1.resume',
 								research_id: researchId,
 								text_length: researchText.length,
 							}),
@@ -4009,6 +4105,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														'research.request_parts.skipped',
 													).pipe(
 														Effect.annotateLogs({
+															event: 'research.request_parts.skipped',
 															research_id: researchId,
 															cause: Cause.pretty(cause),
 														}),
@@ -4019,6 +4116,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								if (requestParts.length > 0) {
 									yield* Effect.logInfo('research.request_parts').pipe(
 										Effect.annotateLogs({
+											event: 'research.request_parts',
 											research_id: researchId,
 											parts: requestParts.map(part => part.label),
 										}),
@@ -4086,6 +4184,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 															'research.anchor.search_failed',
 														).pipe(
 															Effect.annotateLogs({
+																event: 'research.anchor.search_failed',
 																research_id: researchId,
 																cause: Cause.pretty(cause),
 															}),
@@ -4115,6 +4214,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								}
 								yield* Effect.logInfo('research.anchor.host_found').pipe(
 									Effect.annotateLogs({
+										event: 'research.anchor.host_found',
 										research_id: researchId,
 										host: searchedOwnHost,
 									}),
@@ -4180,6 +4280,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													: 'research.anchor.seeded',
 											).pipe(
 												Effect.annotateLogs({
+													event: followedRedirect
+														? 'research.anchor.redirect_followed'
+														: 'research.anchor.seeded',
 													research_id: researchId,
 													host: ownHost,
 													...(followedRedirect
@@ -4195,6 +4298,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												? Effect.failCause(cause)
 												: Effect.logWarning('research.anchor.seed_failed').pipe(
 														Effect.annotateLogs({
+															event: 'research.anchor.seed_failed',
 															research_id: researchId,
 															host: ownHost,
 															cause: Cause.pretty(cause),
@@ -4243,6 +4347,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													'research.anchor.about_seeded',
 												).pipe(
 													Effect.annotateLogs({
+														event: 'research.anchor.about_seeded',
 														research_id: researchId,
 														url: aboutUrl,
 													}),
@@ -4256,6 +4361,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 															'research.anchor.about_skipped',
 														).pipe(
 															Effect.annotateLogs({
+																event: 'research.anchor.about_skipped',
 																research_id: researchId,
 																url: aboutUrl,
 																cause: Cause.pretty(cause),
@@ -4291,6 +4397,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										if (discovered.length > 0) {
 											yield* Effect.logInfo('research.discovery.mapped').pipe(
 												Effect.annotateLogs({
+													event: 'research.discovery.mapped',
 													research_id: researchId,
 													mapped: mapped.links.length,
 													fetching: discovered.length,
@@ -4324,6 +4431,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														'research.discovery.page_seeded',
 													).pipe(
 														Effect.annotateLogs({
+															event: 'research.discovery.page_seeded',
 															research_id: researchId,
 															url,
 														}),
@@ -4337,6 +4445,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 																'research.discovery.page_skipped',
 															).pipe(
 																Effect.annotateLogs({
+																	event: 'research.discovery.page_skipped',
 																	research_id: researchId,
 																	url,
 																	cause: Cause.pretty(cause),
@@ -4351,6 +4460,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												? Effect.failCause(cause)
 												: Effect.logInfo('research.discovery.skipped').pipe(
 														Effect.annotateLogs({
+															event: 'research.discovery.skipped',
 															research_id: researchId,
 															host: reachedHost,
 															cause: Cause.pretty(cause),
@@ -4364,6 +4474,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											? Effect.failCause(cause)
 											: Effect.logWarning('research.anchor.seed_failed').pipe(
 													Effect.annotateLogs({
+														event: 'research.anchor.seed_failed',
 														research_id: researchId,
 														host: ownHost,
 														cause: Cause.pretty(cause),
@@ -4452,6 +4563,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									}
 									yield* Effect.logInfo('research.registry.seeded').pipe(
 										Effect.annotateLogs({
+											event: 'research.registry.seeded',
 											research_id: researchId,
 											country: registryCountry,
 										}),
@@ -4467,6 +4579,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													'research.registry.seed_skipped',
 												).pipe(
 													Effect.annotateLogs({
+														event: 'research.registry.seed_skipped',
 														research_id: researchId,
 														country: registryCountry,
 														cause: Cause.pretty(cause),
@@ -4755,6 +4868,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									refined = true
 									yield* Effect.logInfo('research.refining').pipe(
 										Effect.annotateLogs({
+											event: 'research.refining',
 											research_id: researchId,
 											schema: schemaName,
 										}),
@@ -4791,6 +4905,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										if (coverage.uncovered.length > 0) {
 											yield* Effect.logInfo('research.covering.stopped').pipe(
 												Effect.annotateLogs({
+													event: 'research.covering.stopped',
 													research_id: researchId,
 													reason: verdict,
 													uncovered: coverage.uncovered,
@@ -4802,6 +4917,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 
 									yield* Effect.logInfo('research.covering').pipe(
 										Effect.annotateLogs({
+											event: 'research.covering',
 											research_id: researchId,
 											uncovered: coverage.uncovered,
 										}),
@@ -4903,7 +5019,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								'research.entity.city_downgraded': true,
 							})
 							yield* Effect.logInfo('research.entity.city_downgraded').pipe(
-								Effect.annotateLogs({ research_id: researchId }),
+								Effect.annotateLogs({
+									event: 'research.entity.city_downgraded',
+									research_id: researchId,
+								}),
 							)
 							entityMatch = 'absent'
 						}
@@ -4955,7 +5074,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					if (checkpointPhase >= 2 && existingFindingsHasValue) {
 						findings = existingFindings
 						yield* Effect.logInfo('research.phase2.resume').pipe(
-							Effect.annotateLogs({ research_id: researchId }),
+							Effect.annotateLogs({
+								event: 'research.phase2.resume',
+								research_id: researchId,
+							}),
 						)
 						// Same as the gathering checkpoint above: reusing the earlier
 						// attempt's findings skips the work that would otherwise report,
@@ -5000,7 +5122,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								entityMatch = 'weak'
 								yield* Effect.logWarning(
 									'research.entity.downgraded_source',
-								).pipe(Effect.annotateLogs({ research_id: researchId }))
+								).pipe(
+									Effect.annotateLogs({
+										event: 'research.entity.downgraded_source',
+										research_id: researchId,
+									}),
+								)
 							}
 						}
 						// Gap rounds: for each high-value fact the broad pass and the
@@ -5085,6 +5212,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							if (thinDeadline || thinBudget) {
 								yield* Effect.logInfo('research.gap_rounds.stopped').pipe(
 									Effect.annotateLogs({
+										event: 'research.gap_rounds.stopped',
 										research_id: researchId,
 										round: gapRound,
 										reason: thinDeadline ? 'deadline_margin' : 'budget_margin',
@@ -5142,6 +5270,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														'research.gap_rounds.cited_scrape_skipped',
 													).pipe(
 														Effect.annotateLogs({
+															event: 'research.gap_rounds.cited_scrape_skipped',
 															research_id: researchId,
 															url: citedUrl,
 															cause: Cause.pretty(cause),
@@ -5176,6 +5305,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										'research.gap_rounds.cited_voided',
 									).pipe(
 										Effect.annotateLogs({
+											event: 'research.gap_rounds.cited_voided',
 											research_id: researchId,
 											dropped: recheck.droppedOffEntity,
 										}),
@@ -5277,6 +5407,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										: Effect.logWarning('research.gap_rounds.refresh_failed')
 												.pipe(
 													Effect.annotateLogs({
+														event: 'research.gap_rounds.refresh_failed',
 														research_id: researchId,
 														round: gapRound,
 														cause: Cause.pretty(cause),
@@ -5303,6 +5434,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							})
 							yield* Effect.logInfo('research.gap_rounds.closed').pipe(
 								Effect.annotateLogs({
+									event: 'research.gap_rounds.closed',
 									research_id: researchId,
 									round: gapRound,
 									cited_fetched: citedUnscraped.length,
@@ -5437,6 +5569,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							if (worthSearching.length > searchable.length) {
 								yield* Effect.logInfo('research.existence.allowance').pipe(
 									Effect.annotateLogs({
+										event: 'research.existence.allowance',
 										research_id: researchId,
 										short: stillShort.length,
 										searchable: worthSearching.length,
@@ -5496,6 +5629,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														: Effect.logInfo('research.existence.search_failed')
 																.pipe(
 																	Effect.annotateLogs({
+																		event: 'research.existence.search_failed',
 																		research_id: researchId,
 																		cause: Cause.pretty(cause),
 																	}),
@@ -5532,6 +5666,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							if (stoppedAtDeadline) {
 								yield* Effect.logInfo('research.existence.stopped').pipe(
 									Effect.annotateLogs({
+										event: 'research.existence.stopped',
 										research_id: researchId,
 										reason: 'deadline_margin',
 									}),
@@ -5594,6 +5729,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									'research.existence.settled_then_lost',
 								).pipe(
 									Effect.annotateLogs({
+										event: 'research.existence.settled_then_lost',
 										research_id: researchId,
 										rows: settledThenLost,
 									}),
@@ -5612,6 +5748,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							})
 							yield* Effect.logInfo('research.existence.verified').pipe(
 								Effect.annotateLogs({
+									event: 'research.existence.verified',
 									research_id: researchId,
 									confirmed: verifiedGroups.confirmed.length,
 									candidates: verifiedGroups.candidates.length,
@@ -5639,6 +5776,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						if (requestCoverage.uncovered.length > 0) {
 							yield* Effect.logWarning('research.request_parts.uncovered').pipe(
 								Effect.annotateLogs({
+									event: 'research.request_parts.uncovered',
 									research_id: researchId,
 									uncovered: requestCoverage.uncovered,
 								}),
@@ -5907,6 +6045,16 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// Scope the run so the heartbeat fiber (forked above) is
 					// interrupted the moment the run finishes, fails, or is cancelled.
 					Effect.scoped,
+					// Close the run's record here, ABOVE the catch below: that catch
+					// turns a failed run into a normal return, so after it a success
+					// and a failure look the same and the outcome could not be told
+					// apart. A cancel is not a failure, so it writes no line.
+					Effect.tap(() => closeRunRecord(researchId, userId, 'succeeded')),
+					Effect.tapCause(cause =>
+						Cause.hasInterruptsOnly(cause)
+							? Effect.void
+							: closeRunRecord(researchId, userId, 'failed'),
+					),
 					Effect.catchCause(cause => {
 						if (shouldMarkRunFailed(cause)) {
 							return Effect.gen(function* () {
@@ -5962,7 +6110,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						event: 'research.fiber',
 					}),
 					// One record of spend per run, wrapping everything the run does, so
-					// every phase adds into the same tally.
+					// every phase adds into the same tally. The work record wraps the
+					// same way and for the same reason: one run, one tally, one row.
+					Effect.provideServiceEffect(WorkRecord, makeWorkRecord),
 					Effect.provideServiceEffect(UsageMeter, makeUsageMeter),
 				)
 
@@ -5977,7 +6127,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 			yield* reofferQueued.pipe(
 				Effect.catchCause(cause =>
 					Effect.logError('research.dispatch: reconcile failed').pipe(
-						Effect.annotateLogs({ cause: Cause.pretty(cause) }),
+						Effect.annotateLogs({
+							event: 'research.dispatch.reconcile_failed',
+							cause: Cause.pretty(cause),
+						}),
 					),
 				),
 				Effect.repeat(Schedule.spaced('2 seconds')),
@@ -5990,6 +6143,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						'research.sweepOrphans: failed runs orphaned mid-run',
 					).pipe(
 						Effect.annotateLogs({
+							event: 'research.orphans.swept',
 							running_count: swept.running.length,
 							running_ids: swept.running.map(r => r.id),
 						}),
@@ -5998,7 +6152,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 			}).pipe(
 				Effect.catchCause(cause =>
 					Effect.logError('research.dispatch: sweep failed').pipe(
-						Effect.annotateLogs({ cause: Cause.pretty(cause) }),
+						Effect.annotateLogs({
+							event: 'research.dispatch.sweep_failed',
+							cause: Cause.pretty(cause),
+						}),
 					),
 				),
 				Effect.repeat(Schedule.spaced(`${orphanSweepIntervalSeconds} seconds`)),
@@ -6025,7 +6182,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 				),
 				Effect.catchCause(cause =>
 					Effect.logError('research.dispatch: failed to start run').pipe(
-						Effect.annotateLogs({ cause: Cause.pretty(cause) }),
+						Effect.annotateLogs({
+							event: 'research.dispatch.start_failed',
+							cause: Cause.pretty(cause),
+						}),
 					),
 				),
 				Effect.forever,
@@ -6049,6 +6209,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						const schemaName = schemaNameFor(input)
 						yield* Effect.logInfo('research.create').pipe(
 							Effect.annotateLogs({
+								event: 'research.create',
 								user_id: userId,
 								organization_id: organizationId,
 								query_length: input.query.length,
@@ -6073,6 +6234,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									'research.create.subject_unavailable',
 								).pipe(
 									Effect.annotateLogs({
+										event: 'research.create.subject_unavailable',
 										user_id: userId,
 										organization_id: organizationId,
 										missing_count: missing.length,
@@ -6190,6 +6352,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							if (capped) {
 								yield* Effect.logWarning('research.selector.capped').pipe(
 									Effect.annotateLogs({
+										event: 'research.selector.capped',
 										user_id: userId,
 										matched: matched.length,
 										cap: selectorMax,
@@ -6219,6 +6382,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									'research.selector.confirm_required',
 								).pipe(
 									Effect.annotateLogs({
+										event: 'research.selector.confirm_required',
 										user_id: userId,
 										subject_count: targets.length,
 									}),
@@ -6299,6 +6463,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 
 							yield* Effect.logInfo('research.selector.fanout').pipe(
 								Effect.annotateLogs({
+									event: 'research.selector.fanout',
 									user_id: userId,
 									group_id: groupId,
 									leaves: targets.length,
@@ -6621,7 +6786,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 				cancel: (researchId: string) =>
 					Effect.gen(function* () {
 						yield* Effect.logInfo('research.cancel').pipe(
-							Effect.annotateLogs({ research_id: researchId }),
+							Effect.annotateLogs({
+								event: 'research.cancel',
+								research_id: researchId,
+							}),
 						)
 						const map = yield* Ref.get(activeFibers)
 						const maybeFiber = HashMap.get(map, researchId)

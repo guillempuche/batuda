@@ -320,6 +320,7 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 			(toolName: string) => (e: { readonly remaining: number }) =>
 				Effect.logWarning('research.tool.budget_exhausted').pipe(
 					Effect.annotateLogs({
+						event: 'research.tool.budget_exhausted',
 						tool: toolName,
 						'research.run_id': researchId,
 						remaining_cents: e.remaining,
@@ -342,6 +343,7 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 			<E>(cause: Cause.Cause<E>) =>
 				Effect.logError('research.tool.failed').pipe(
 					Effect.annotateLogs({
+						event: 'research.tool.failed',
 						tool: toolName,
 						'research.run_id': researchId,
 						cause: Cause.pretty(cause),
@@ -361,6 +363,7 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 		const skipUnsupportedScrape = (url: string) =>
 			Effect.logInfo('research.scrape.skipped_unsupported').pipe(
 				Effect.annotateLogs({
+					event: 'research.scrape.skipped_unsupported',
 					tool: 'scrape_page',
 					'research.run_id': researchId,
 					url,
@@ -379,7 +382,12 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 					if (stripped !== params.query) {
 						yield* Effect.logWarning(
 							'research.search.placeholder_site_stripped',
-						).pipe(Effect.annotateLogs({ tool: 'web_search' }))
+						).pipe(
+							Effect.annotateLogs({
+								event: 'research.search.placeholder_site_stripped',
+								tool: 'web_search',
+							}),
+						)
 					}
 					// Re-anchor a query that dropped the company name to the run's target,
 					// so the provider stays on it instead of returning off-company pages
@@ -393,6 +401,7 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 					if (query !== stripped) {
 						yield* Effect.logInfo('research.search.scoped_to_entity').pipe(
 							Effect.annotateLogs({
+								event: 'research.search.scoped_to_entity',
 								tool: 'web_search',
 								'research.run_id': researchId,
 							}),

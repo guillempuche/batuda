@@ -288,7 +288,12 @@ export const makeBudgetLayer = (config: BudgetConfig) =>
 				}).pipe(
 					Effect.tap(() =>
 						Effect.logDebug('budget.chargePaid').pipe(
-							Effect.annotateLogs({ provider, tool, cents }),
+							Effect.annotateLogs({
+								event: 'budget.chargePaid',
+								provider,
+								tool,
+								cents,
+							}),
 						),
 					),
 				)
@@ -321,7 +326,11 @@ export const makeBudgetLayer = (config: BudgetConfig) =>
 						),
 						Effect.tap(() =>
 							Effect.logDebug('budget.chargeCheap').pipe(
-								Effect.annotateLogs({ provider, cents }),
+								Effect.annotateLogs({
+									event: 'budget.chargeCheap',
+									provider,
+									cents,
+								}),
 							),
 						),
 					),

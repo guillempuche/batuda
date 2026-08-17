@@ -354,7 +354,13 @@ const searchLayer = Layer.effect(
 			SEARCH_VENDORS,
 			'RESEARCH_PROVIDER_SEARCH',
 		)
-		yield* Effect.logInfo(`research.search: ${vendors.join(',')}`)
+		yield* Effect.logInfo('research.providers.configured').pipe(
+			Effect.annotateLogs({
+				event: 'research.providers.configured',
+				port: 'search',
+				vendors,
+			}),
+		)
 		const instances = yield* Effect.all(
 			vendors.map((vendor, slot) =>
 				Effect.gen(function* () {
@@ -400,7 +406,13 @@ const scrapeLayer = Layer.effect(
 			SCRAPE_VENDORS,
 			'RESEARCH_PROVIDER_SCRAPE',
 		)
-		yield* Effect.logInfo(`research.scrape: ${vendors.join(',')}`)
+		yield* Effect.logInfo('research.providers.configured').pipe(
+			Effect.annotateLogs({
+				event: 'research.providers.configured',
+				port: 'scrape',
+				vendors,
+			}),
+		)
 		const instances = yield* Effect.all(
 			vendors.map((vendor, slot) =>
 				Effect.gen(function* () {
@@ -444,7 +456,13 @@ const mapLayer = Layer.effect(
 			'RESEARCH_PROVIDER_MAP',
 			['none'] as const,
 		)
-		yield* Effect.logInfo(`research.map: ${vendors.join(',')}`)
+		yield* Effect.logInfo('research.providers.configured').pipe(
+			Effect.annotateLogs({
+				event: 'research.providers.configured',
+				port: 'map',
+				vendors,
+			}),
+		)
 		const instances = yield* Effect.all(
 			vendors.map((vendor, slot) =>
 				Effect.gen(function* () {
@@ -482,7 +500,14 @@ export const enrichmentLayer = Layer.effect(
 			Schema.Literals(['fallback', 'union']),
 			'RESEARCH_ENRICH_MODE',
 		).pipe(Config.withDefault('fallback' as const))
-		yield* Effect.logInfo(`research.enrich: ${vendors.join(',')} (${mode})`)
+		yield* Effect.logInfo('research.providers.configured').pipe(
+			Effect.annotateLogs({
+				event: 'research.providers.configured',
+				port: 'enrich',
+				vendors,
+				mode,
+			}),
+		)
 		// A 'none'/empty slot contributes no attempt — no charge, no call. The
 		// original list index stays the slot so RESEARCH_API_KEY_ENRICH_2 keeps
 		// naming the second vendor even when a 'none' precedes it.
@@ -514,7 +539,13 @@ const verifierLayer = Layer.effect(
 			'RESEARCH_PROVIDER_VERIFY',
 			['none'] as const,
 		)
-		yield* Effect.logInfo(`research.verify: ${vendors.join(',')}`)
+		yield* Effect.logInfo('research.providers.configured').pipe(
+			Effect.annotateLogs({
+				event: 'research.providers.configured',
+				port: 'verify',
+				vendors,
+			}),
+		)
 		const instances = yield* Effect.all(
 			vendors.map((vendor, slot) => verifierInstance(vendor, slot)),
 		)
@@ -539,7 +570,14 @@ const buildRegistryDispatcher = (cc: RegistryCountry) =>
 			`RESEARCH_PROVIDER_REGISTRY_${cc}`,
 			['none'] as const,
 		)
-		yield* Effect.logInfo(`research.registry.${cc}: ${vendors.join(',')}`)
+		yield* Effect.logInfo('research.providers.configured').pipe(
+			Effect.annotateLogs({
+				event: 'research.providers.configured',
+				port: 'registry',
+				country: cc,
+				vendors,
+			}),
+		)
 		const instances = yield* Effect.all(
 			vendors.map((vendor, slot) => REGISTRY_BUILDERS[cc](vendor, slot)),
 		)
@@ -564,7 +602,14 @@ const buildReportDispatcher = (cc: RegistryCountry) =>
 			`RESEARCH_PROVIDER_REPORT_${cc}`,
 			['none'] as const,
 		)
-		yield* Effect.logInfo(`research.report.${cc}: ${vendors.join(',')}`)
+		yield* Effect.logInfo('research.providers.configured').pipe(
+			Effect.annotateLogs({
+				event: 'research.providers.configured',
+				port: 'report',
+				country: cc,
+				vendors,
+			}),
+		)
 		const instances = yield* Effect.all(
 			vendors.map((vendor, slot) => REPORT_BUILDERS[cc](vendor, slot)),
 		)
