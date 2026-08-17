@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-17 (mail-worker-v2026.8.17)
+
+### Features
+
+* record each request on one line and let traces be thinned ([8403e75](https://github.com/guillempuche/batuda/commit/8403e7529afdfd2fae34843e59fc1a9407a91640))
+
+### Bug Fixes
+
+* **research:** keep every letter of a name, whatever language wrote it ([d14668d](https://github.com/guillempuche/batuda/commit/d14668d13c557c7a5a679a8e19ad687652ebb6f9)), closes [#488](https://github.com/guillempuche/batuda/issues/488)
+
 ## 2026-08-10 (mail-worker-v2026.8.10)
 
 ### Bug Fixes
