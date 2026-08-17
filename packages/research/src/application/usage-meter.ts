@@ -87,6 +87,13 @@ export class UsageMeter extends Context.Service<
 // keeps a separate running total for every combination of tags, so tagging by
 // organization, run or query would create an endless number of them. Those
 // belong on a span or in the database instead.
+//
+// This meter and `WorkRecord` in @batuda/observability are the same shape on
+// purpose-adjacent problems: both gather facts about one piece of work through
+// `serviceOption`, so work running outside one carries on quietly. They are kept
+// apart because this one prices and buckets as it goes, which a plain bag of
+// facts does not do. If a research run ever opens a record of its own, these
+// totals are what it should carry.
 const llmTokens = Metric.counter('batuda_research_llm_tokens_total', {
 	description: 'Model tokens billed by the research pipeline',
 	incremental: true,

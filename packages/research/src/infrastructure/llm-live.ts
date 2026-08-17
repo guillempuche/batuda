@@ -239,7 +239,13 @@ const buildTierLayer = <Self>(
 				LLM_VENDORS,
 				`${envPrefix}_PROVIDERS`,
 			)
-			yield* Effect.logInfo(`${envPrefix.toLowerCase()}: ${vendors.join(',')}`)
+			yield* Effect.logInfo('research.providers.configured').pipe(
+				Effect.annotateLogs({
+					event: 'research.providers.configured',
+					port: envPrefix.toLowerCase(),
+					vendors,
+				}),
+			)
 
 			if (vendors[0] === 'stub') {
 				return Layer.succeed(Tag)(stubLanguageModelService)

@@ -246,7 +246,10 @@ export const makeCachedLanguageModel = (
 					: yield* Cache.getOption(memCache, keyHash)
 				if (Option.isSome(cached)) {
 					yield* Effect.logDebug('cache.hit').pipe(
-						Effect.annotateLogs({ ...baseAttrs, layer: 'mem' }),
+						Effect.annotateLogs({
+							...baseAttrs,
+							layer: 'mem',
+						}),
 					)
 					return cached.value as A
 				}
@@ -261,7 +264,10 @@ export const makeCachedLanguageModel = (
 					const response = rehydrateCachedResponse(method, hit.response)
 					yield* Cache.set(memCache, keyHash, response)
 					yield* Effect.logDebug('cache.hit').pipe(
-						Effect.annotateLogs({ ...baseAttrs, layer: 'pg' }),
+						Effect.annotateLogs({
+							...baseAttrs,
+							layer: 'pg',
+						}),
 					)
 					return response as A
 				}
