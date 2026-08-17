@@ -3990,6 +3990,10 @@ msgstr "Només un administrador de l'organització pot canviar aquesta pila."
 msgid "Only an owner or an admin can add members."
 msgstr "Només un propietari o un administrador pot afegir membres."
 
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Only found named in a list of companies, with no website and no location of its own."
+msgstr "Només s'ha trobat anomenada en una llista d'empreses, sense web ni ubicació pròpies."
+
 #: src/routes/settings/organization/policy.tsx
 msgid "Only machine-verified values apply on their own; free-text always waits for review."
 msgstr "Només els valors verificats per màquina s'apliquen sols; el text lliure sempre espera revisió."

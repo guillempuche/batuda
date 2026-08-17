@@ -18,6 +18,10 @@
 			"types": "./src/application/guard-shapes.ts",
 			"import": "./src/application/guard-shapes.ts"
 		},
+		"./application/name-only-guard": {
+			"types": "./src/application/name-only-guard.ts",
+			"import": "./src/application/name-only-guard.ts"
+		},
 		"./application/paid-action-tool": {
 			"types": "./src/application/paid-action-tool.ts",
 			"import": "./src/application/paid-action-tool.ts"

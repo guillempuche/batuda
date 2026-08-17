@@ -3990,6 +3990,10 @@ msgstr "Only an organization admin can change this stack."
 msgid "Only an owner or an admin can add members."
 msgstr "Only an owner or an admin can add members."
 
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Only found named in a list of companies, with no website and no location of its own."
+msgstr "Only found named in a list of companies, with no website and no location of its own."
+
 #: src/routes/settings/organization/policy.tsx
 msgid "Only machine-verified values apply on their own; free-text always waits for review."
 msgstr "Only machine-verified values apply on their own; free-text always waits for review."

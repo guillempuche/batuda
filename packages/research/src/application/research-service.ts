@@ -105,6 +105,7 @@ import {
 	withRoleMailbox,
 } from './generic-emails'
 import { type GuardLink, runGuardChain } from './guard-chain'
+import { markNameOnlyRows } from './name-only-guard'
 import { dropNonCompanies } from './organisation-kind-guard'
 import { normalizePaidActionTool } from './paid-action-tool'
 import {
@@ -3607,6 +3608,37 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												findings: check.findings,
 												spanCounts: {
 													'research.prospects.doubt_cleared': check.cleared,
+												},
+											}
+										}),
+								},
+								{
+									// A row can survive every check above and still be nothing but a
+									// name somebody's directory printed in a list. Say so, rather
+									// than leave it looking like a company the run looked into.
+									// After the link above, which takes marks away — running before
+									// it would hand this one straight to it.
+									name: 'name-only-evidence',
+									run: findings =>
+										Effect.gen(function* () {
+											const check = markNameOnlyRows(
+												findings,
+												discoveryResultField(schemaName),
+											)
+											if (check.marked > 0) {
+												yield* Effect.logInfo(
+													'research.prospects.name_only',
+												).pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														marked: check.marked,
+													}),
+												)
+											}
+											return {
+												findings: check.findings,
+												spanCounts: {
+													'research.prospects.name_only': check.marked,
 												},
 											}
 										}),
