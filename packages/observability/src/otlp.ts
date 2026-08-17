@@ -4,6 +4,7 @@ import { Otlp } from 'effect/unstable/observability'
 
 import { buildMeta } from './build-meta'
 import { redactingTracer } from './redact-spans'
+import { parseKeepRate, samplingTracer } from './sampling'
 
 /**
  * Parse OTLP headers from the standard comma-separated format.
@@ -32,6 +33,7 @@ const parseOtlpHeaders = (raw: string): Record<string, string> => {
  * Config:
  * - OTEL_EXPORTER_OTLP_ENDPOINT — base URL (e.g. https://api.honeycomb.io)
  * - OTEL_EXPORTER_OTLP_HEADERS — comma-separated key=value pairs
+ * - OTEL_TRACES_KEEP_RATE — share of traces to keep, 0..1 (default 1, keep all)
  * - NODE_ENV — deployment environment attribute
  */
 export const makeOtlpObservability = (options: {
@@ -58,6 +60,12 @@ export const makeOtlpObservability = (options: {
 			const environment = yield* Config.string('NODE_ENV').pipe(
 				Config.withDefault('development'),
 			)
+			// Read as text and parsed by `parseKeepRate`, which explains why: see
+			// there for what an unusable or out-of-range value does.
+			const keepRate = yield* Config.string('OTEL_TRACES_KEEP_RATE').pipe(
+				Config.withDefault('1'),
+				Config.map(parseKeepRate),
+			)
 
 			yield* Effect.logInfo('OTLP export enabled').pipe(
 				Effect.annotateLogs({
@@ -67,13 +75,18 @@ export const makeOtlpObservability = (options: {
 					commit: buildMeta.commitShort,
 					region: buildMeta.region,
 					environment,
+					tracesKeepRate: keepRate,
 				}),
 			)
 
-			// The exporter's own tracer, wrapped, so caller-supplied attributes are
-			// scrubbed on the way out whichever library recorded them.
-			const RedactedTracer = Layer.effect(Tracer.Tracer)(
-				Effect.map(Effect.service(Tracer.Tracer), redactingTracer),
+			// The exporter's own tracer, wrapped twice: sampling decides which traces
+			// are worth sending, redaction scrubs caller-supplied attributes on the
+			// way out whichever library recorded them. Sampling sits outside so it
+			// settles `sampled` before a span is built.
+			const ExportTracer = Layer.effect(Tracer.Tracer)(
+				Effect.map(Effect.service(Tracer.Tracer), inner =>
+					samplingTracer(redactingTracer(inner), keepRate),
+				),
 			)
 
 			return Otlp.layerJson({
@@ -99,7 +112,7 @@ export const makeOtlpObservability = (options: {
 				Layer.provide(FetchHttpClient.layer),
 				// Merged, not provided: the exporter's flusher, logger and metrics
 				// still have to reach the process; only the tracer is swapped.
-				layer => RedactedTracer.pipe(Layer.provideMerge(layer)),
+				layer => ExportTracer.pipe(Layer.provideMerge(layer)),
 			)
 		}),
 	)

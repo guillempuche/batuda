@@ -14,6 +14,27 @@ const OPAQUE_ATTRIBUTES = new Set(['parameters'])
 const REDACTED = '<redacted>'
 
 /**
+ * Applies the same rule to a plain bag of facts, for the paths that do not go
+ * through a span. Wrapping the tracer only protects span attributes, so any
+ * other route out of the process — a fact gathered onto a log line — has to be
+ * filtered here or the wrapper is a door with a hole beside it.
+ *
+ * Returns the original object untouched when nothing matches, so the common case
+ * costs one lookup per key and no copy.
+ */
+export const redactFacts = (
+	facts: Record<string, unknown>,
+): Record<string, unknown> => {
+	let redacted: Record<string, unknown> | undefined
+	for (const key of Object.keys(facts)) {
+		if (!OPAQUE_ATTRIBUTES.has(key)) continue
+		redacted ??= { ...facts }
+		redacted[key] = REDACTED
+	}
+	return redacted ?? facts
+}
+
+/**
  * Wraps a tracer so those attributes are replaced on the way out — the recording
  * happens inside a library, so it is caught here rather than there. Every other
  * attribute passes through untouched.

@@ -12,6 +12,7 @@ import {
 import { SqlClient } from 'effect/unstable/sql'
 
 import { SessionContext } from '@batuda/controllers'
+import { recordFacts } from '@batuda/observability'
 
 import { Auth } from '../lib/auth'
 import { EnvVars } from '../lib/env'
@@ -66,8 +67,19 @@ const rejectAuth = <A, E, R>(
 	reason: string,
 	response: Effect.Effect<A, E, R>,
 ) =>
-	Effect.logWarning('MCP auth rejected').pipe(
-		Effect.annotateLogs({ event: 'mcp.auth.rejected', reason }),
+	// The reason goes on the request's own line as well as on its own, so a
+	// refused connection can be read off the request record without first
+	// knowing to look for the refusal line beside it. One name on both lines, so
+	// filtering for why connections are being refused needs one field, not two.
+	recordFacts({ 'mcp.auth_rejected_reason': reason }).pipe(
+		Effect.andThen(
+			Effect.logWarning('MCP auth rejected').pipe(
+				Effect.annotateLogs({
+					event: 'mcp.auth.rejected',
+					'mcp.auth_rejected_reason': reason,
+				}),
+			),
+		),
 		Effect.andThen(response),
 	)
 
@@ -157,11 +169,13 @@ const McpAuthMiddleware = HttpRouter.middleware(
 						readonly role: string | null
 					},
 				) =>
-					// Tag the request span with how the caller authenticated and the
-					// org it resolved to BEFORE running the tool — the tool-call context
-					// needed to debug an MCP "disconnection" (silent 401 loop) from
-					// Honeycomb alone, present even if the tool then fails.
-					Effect.annotateCurrentSpan({
+					// Record how the caller signed in and the org it resolved to BEFORE
+					// running the tool — the tool-call context needed to debug an MCP
+					// "disconnection" (silent 401 loop) from Honeycomb alone, present
+					// even if the tool then fails. This lands on the request's line as
+					// well as its span, which works because the observability middleware
+					// is registered ahead of this one and has already opened the record.
+					recordFacts({
 						'mcp.auth_method': authMethod,
 						'mcp.org_id': org.id,
 						'mcp.principal_is_agent': principal.isAgent,

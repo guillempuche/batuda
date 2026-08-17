@@ -4,3 +4,9 @@
 
 export { buildMeta } from './build-meta'
 export { makeOtlpObservability } from './otlp'
+export {
+	makeWorkRecord,
+	recordFacts,
+	WorkRecord,
+	type WorkRecordService,
+} from './work-record'

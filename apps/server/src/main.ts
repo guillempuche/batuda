@@ -48,12 +48,11 @@ import { WebhooksLive } from './handlers/webhooks'
 import { CalcomWebhookLive } from './handlers/webhooks-calcom'
 import { Auth } from './lib/auth'
 import { ConfigFileLive } from './lib/config-provider'
-import { CorsLive } from './lib/cors'
 import { installCrashGuards } from './lib/crash-guards'
 import { EnvVars } from './lib/env'
+import { withGlobalMiddlewareOrder } from './lib/global-middleware-order'
 import { LoggerLive } from './lib/logger'
 import { OtlpObservability } from './lib/observability'
-import { ObservabilityLive } from './lib/observability-middleware'
 import { WellKnownLive } from './lib/well-known'
 import { McpHttpLive } from './mcp/http'
 import { OrgMiddlewareLive, resolveSystemOrg } from './middleware/org'
@@ -429,15 +428,19 @@ const TracerDisabledLive = Layer.succeed(HttpMiddleware.TracerDisabledWhen)(
 	},
 )
 
-const AppLive = Layer.mergeAll(
-	ApiLive,
-	McpHttpLive,
-	CorsLive,
-	ObservabilityLive,
-	TracerDisabledLive,
-	DocsLive,
-	OpenApiJsonLive,
-	WellKnownLive,
+// Observability and CORS are NOT in this list on purpose: a merge decides no
+// order between router-wide middleware, and these two have to run outside the
+// MCP sign-in check. `withGlobalMiddlewareOrder` explains why and is where that
+// order is pinned and tested.
+const AppLive = withGlobalMiddlewareOrder(
+	Layer.mergeAll(
+		ApiLive,
+		McpHttpLive,
+		TracerDisabledLive,
+		DocsLive,
+		OpenApiJsonLive,
+		WellKnownLive,
+	),
 )
 
 // `CurrentOrg` is request-scoped — provided per request by OrgMiddleware
