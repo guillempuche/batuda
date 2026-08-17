@@ -3,6 +3,32 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-17 (internal-v2026.8.17)
+
+### Features
+
+* grade a whole-market search on what its list gets wrong ([79fdda4](https://github.com/guillempuche/batuda/commit/79fdda4333118acfd7a129af701f14c601ba479b)), closes [#466](https://github.com/guillempuche/batuda/issues/466)
+* make the eval refuse to report numbers it did not earn ([aef6eb1](https://github.com/guillempuche/batuda/commit/aef6eb146951e0d78522bd956a28efc0c92de1b1))
+* record each request on one line and let traces be thinned ([8403e75](https://github.com/guillempuche/batuda/commit/8403e7529afdfd2fae34843e59fc1a9407a91640))
+* **research:** answer every trade asked for, or say which was missed ([a4ebff4](https://github.com/guillempuche/batuda/commit/a4ebff474a8bd0bbc74919159a72f96ef59f6b44))
+* **research:** confirm a company only when two websites name it ([a9be7f8](https://github.com/guillempuche/batuda/commit/a9be7f8586cd0c3cfd0e03fd31f0141ee898cda7)), closes [#486](https://github.com/guillempuche/batuda/issues/486)
+* **research:** give every log line a name and every run a row ([ba8ae27](https://github.com/guillempuche/batuda/commit/ba8ae27fc2b8d2b0a85e41d3b6cc311240e4fe4c))
+* say when a company was only ever a name in a list ([1b12c17](https://github.com/guillempuche/batuda/commit/1b12c17292b054b137d1fc01e3dbbeef9a68c857)), closes [#493](https://github.com/guillempuche/batuda/issues/493)
+
+### Bug Fixes
+
+* **research:** fold a company's branch offices onto the company itself ([eba0211](https://github.com/guillempuche/batuda/commit/eba021175dad7b119ea855151b592c077f38c7d4)), closes [#470](https://github.com/guillempuche/batuda/issues/470)
+* **research:** keep every letter of a name, whatever language wrote it ([d14668d](https://github.com/guillempuche/batuda/commit/d14668d13c557c7a5a679a8e19ad687652ebb6f9)), closes [#488](https://github.com/guillempuche/batuda/issues/488)
+* **research:** read a listing page's links as the page writes them ([0e9f412](https://github.com/guillempuche/batuda/commit/0e9f4120ea327242579ea72e6fd16d1d3191fb77))
+* **research:** recognise a name however an address spells it out ([36d31dd](https://github.com/guillempuche/batuda/commit/36d31dddd8f228589dd5ac2cb51b642619f7b304)), closes [#478](https://github.com/guillempuche/batuda/issues/478)
+* **research:** say when a website is established as the company's own ([4fec3a4](https://github.com/guillempuche/batuda/commit/4fec3a41984c7b655aa85b2974f1758e8e63f538)), closes [#476](https://github.com/guillempuche/batuda/issues/476)
+* **research:** stop a website being the page its claim was read from ([91b85b4](https://github.com/guillempuche/batuda/commit/91b85b4d49496b6d95014090e1b3f232058eafce))
+* **research:** tell a business directory by what a run watches it do ([c894ca2](https://github.com/guillempuche/batuda/commit/c894ca2cbe7b4520f2c27f6a9f9ec945f40c2222)), closes [#467](https://github.com/guillempuche/batuda/issues/467)
+
+### CI/CD
+
+* **release:** ui v2026.8.14 ([c15d979](https://github.com/guillempuche/batuda/commit/c15d9791d9cb02b44f6a55d300e3e7b05f14f9c3))
+
 ## 2026-08-14 (internal-v2026.8.14)
 
 ### Bug Fixes
