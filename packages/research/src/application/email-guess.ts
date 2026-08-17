@@ -1,20 +1,20 @@
 /**
  * Email-pattern guessing for contact discovery — turns a person's name plus a
  * company domain into ordered candidate addresses (most common pattern first).
- * Pure and dependency-free so the guess+verify pipeline and its tests drive it
- * without any I/O. Candidates are only ever sent after verification.
+ * Pure and free of I/O so the guess+verify pipeline and its tests drive it
+ * directly. Candidates are only ever sent after verification.
+ *
+ * A name is read into a local part by `collapse`, the same reading the guards
+ * put a company name through — `José Núñez` gives `jose` and `nunez`. Not a
+ * reading of its own, however self-contained that would leave this file: one
+ * kept here once before, and while it quietly disagreed `Straßer` was guessed
+ * at `straer@` and `Þór` at `or@`. An address a guess is wrong about is one
+ * somebody sends to.
  */
 
-type TokenKey = 'first' | 'last' | 'f' | 'l'
+import { collapse } from './entity-guard'
 
-// Strip diacritics, lowercase, and drop anything that isn't a letter or digit,
-// so `José Núñez` collapses to local-part-safe tokens (`jose`, `nunez`).
-const normalize = (value: string): string =>
-	value
-		.normalize('NFKD')
-		.replace(/\p{Diacritic}/gu, '')
-		.toLowerCase()
-		.replace(/[^a-z0-9]/g, '')
+type TokenKey = 'first' | 'last' | 'f' | 'l'
 
 export interface GuessNameInput {
 	readonly firstName: string
@@ -96,8 +96,8 @@ export const splitPersonName = (name: string): PersonName => {
 
 /** Ordered, de-duplicated candidate emails for a name at a domain. */
 export const guessEmails = (input: GuessNameInput): string[] => {
-	const first = normalize(input.firstName)
-	const last = normalize(input.lastName)
+	const first = collapse(input.firstName)
+	const last = collapse(input.lastName)
 	const domain = input.domain.trim().toLowerCase().replace(/^@+/, '')
 	if (!domain || (!first && !last)) return []
 
