@@ -37,6 +37,7 @@
 		"check-bundle-size": "node scripts/check-bundle-size.mjs",
 		"check-effect-pins": "node scripts/check-effect-pins.mjs",
 		"check-migrations": "node scripts/check-migration-safety.mjs",
+		"derive-letter-equivalences": "tsx scripts/derive-letter-equivalences.ts",
 		"______ Release ______": "",
 		"release:server": "release-it --config .release-it.server.cjs",
 		"release:internal": "release-it --config .release-it.internal.cjs",

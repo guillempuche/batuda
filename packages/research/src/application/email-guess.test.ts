@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { guessEmails, splitPersonName } from './email-guess'
+import { collapse } from './entity-guard'
 
 describe('guessEmails', () => {
 	describe('when given a full first and last name', () => {
@@ -73,6 +74,55 @@ describe('guessEmails', () => {
 			})
 			expect(result[0]).toBe('jose.oneil@corp.es')
 		})
+
+		it('should build the local part the way the guards read a name', () => {
+			// GIVEN a spread of names across the alphabets this product is asked about
+			// WHEN each is guessed at
+			// THEN the local part is exactly what the shared reading makes of the
+			// name. Asserted against that reading rather than against addresses I
+			// wrote out, because the way this broke before was somebody keeping a
+			// second copy of the reading here that agreed on the names in the tests
+			// and differed everywhere else
+			for (const name of [
+				'Straßer',
+				'Þór',
+				'Nørgaard',
+				'Łukasz',
+				'Işık',
+				'Núñez',
+				'Müller',
+				'Smith',
+			]) {
+				expect(
+					guessEmails({
+						firstName: name,
+						lastName: '',
+						domain: 'corp.example',
+					})[0],
+				).toBe(`${collapse(name)}@corp.example`)
+			}
+		})
+
+		it('should write out a letter that is not an accented a–z one', () => {
+			// GIVEN people whose names carry a letter that taking an accent off
+			// cannot turn into a plain one — the German ß, the Icelandic þ, the
+			// Nordic ø, the Polish ł, the dotless Turkish ı
+			// WHEN their work addresses are guessed
+			// THEN each letter is written as the letters it stands for. Dropped
+			// instead, these read "straer", "or", "nrgaard", "ukasz" and "isk" — and
+			// an address a guess is wrong about is one somebody then sends to
+			for (const [firstName, lastName, expected] of [
+				['Anna', 'Straßer', 'anna.strasser@corp.de'],
+				['Þór', 'Jónsson', 'thor.jonsson@corp.de'],
+				['Lars', 'Nørgaard', 'lars.norgaard@corp.de'],
+				['Łukasz', 'Nowak', 'lukasz.nowak@corp.de'],
+				['Işık', 'Demir', 'isik.demir@corp.de'],
+			] as const) {
+				expect(guessEmails({ firstName, lastName, domain: 'corp.de' })[0]).toBe(
+					expected,
+				)
+			}
+		})
 	})
 
 	describe('when only one name token is known', () => {
@@ -111,7 +161,7 @@ describe('guessEmails', () => {
 			// THEN normalization strips every token to empty and nothing is
 			// guessable from a pattern — the universal pipeline yields no address
 			// for this name and must lean on a vendor-supplied email instead
-			// [email-guess.ts — normalize drops [^a-z0-9]; guard !first && !last]
+			// [collapse drops anything outside a-z0-9; guard !first && !last]
 			expect(
 				guessEmails({ firstName: '李', lastName: '王', domain: 'acme.cn' }),
 			).toEqual([])

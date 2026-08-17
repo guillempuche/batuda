@@ -4,12 +4,14 @@ import {
 	cityGate,
 	classifyEntityMatch,
 	classifyEntityMatchPerSource,
+	collapse,
 	coreSpellings,
 	deriveAnchorHost,
 	deriveEntityTargets,
 	distinctiveWords,
 	domainHost,
 	type EntityTargets,
+	foldTokens,
 	groundedSourceIds,
 	hostLabel,
 	isConfirmedRegistryMatch,
@@ -25,6 +27,8 @@ import {
 	spellingsWithoutForms,
 	withRedirectDomain,
 } from './entity-guard'
+import { EQUIVALENT_LETTERS } from './letter-equivalences.generated'
+import { ownSiteVerdict } from './own-site'
 
 describe('deriveEntityTargets', () => {
 	describe('when the schema reports third-party companies', () => {
@@ -1391,6 +1395,206 @@ describe('deriveEntityTargets', () => {
 			]) {
 				expect(classifyEntityMatch(targets, corpus)).toBe('weak')
 			}
+		})
+	})
+})
+
+describe('collapse', () => {
+	describe('when a letter is not an accented a–z one but a letter of its own', () => {
+		it('should write it as the plain letters it stands for', () => {
+			// GIVEN names whose letters accent-stripping cannot turn into a–z
+			// WHEN each is folded
+			// THEN each letter is written as what it stands for, rather than dropped.
+			// Dropped, "Straßenbau" reads as "straenbau" — a key that is not empty, so
+			// every check believes it and none reports a problem
+			expect(collapse('Straßenbau')).toBe('strassenbau')
+			expect(collapse('Nørgaard')).toBe('norgaard')
+			expect(collapse('Łukasz')).toBe('lukasz')
+			expect(collapse('Cœur')).toBe('coeur')
+			expect(collapse('Þór')).toBe('thor')
+			expect(collapse('Işık')).toBe('isik')
+			expect(collapse('Đuro')).toBe('duro')
+			expect(collapse('Æther')).toBe('aether')
+		})
+
+		it('should read a name and its own web address to the same thing', () => {
+			// GIVEN each company beside the address it registered
+			// WHEN both are folded
+			// THEN they meet. This is the whole point: a name is only ever compared
+			// against an address, so the two have to fold to the same letters
+			for (const [name, host] of [
+				['Straßenbau Weber', 'strassenbau-weber.de'],
+				['Nørgaard VVS', 'norgaard-vvs.dk'],
+				['Łukasz Instalacje', 'lukasz-instalacje.pl'],
+				['Þór Raflagnir', 'thor-raflagnir.is'],
+			] as const) {
+				expect(collapse(host).startsWith(collapse(name))).toBe(true)
+			}
+		})
+
+		it('should fold a plain-letter name exactly as accent-stripping alone would', () => {
+			// GIVEN names holding nothing but plain letters, digits and punctuation —
+			// which is nearly every name this product has ever seen
+			// WHEN folded
+			// THEN each reads as taking the accents off would read it on its own. This
+			// is why writing the other letters out cannot make two unrelated companies
+			// match: the rewriting only ever touches a letter that is not a plain one
+			for (const name of [
+				'Acme Logistics S.L.',
+				'Transportes García',
+				'XPO Logistics',
+				'Grupo Ferré 2000',
+				'ASM',
+			]) {
+				expect(collapse(name)).toBe(
+					name
+						.normalize('NFKD')
+						.replace(/\p{Diacritic}/gu, '')
+						.toLowerCase()
+						.replace(/[^a-z0-9]/g, ''),
+				)
+			}
+		})
+
+		it('should answer for each letter with plain letters and nothing else', () => {
+			// GIVEN the generated table, every key of which is dropped straight into a
+			// character class to find the letters worth rewriting
+			// WHEN each row is read
+			// THEN every key is one letter and every answer is plain letters. A key
+			// carrying a "]" or a backslash would either break that character class
+			// on the way in or quietly change which letters it matches, and the
+			// generator's promise to emit letters only is the only thing stopping it
+			for (const [letter, plain] of EQUIVALENT_LETTERS) {
+				expect(letter).toMatch(/^\p{Letter}$/u)
+				expect(plain).toMatch(/^[a-z]+$/)
+			}
+		})
+
+		it('should keep no row the fold has already dealt with before it looks', () => {
+			// GIVEN the same table
+			// WHEN each key is put through the steps that run before the table is
+			// consulted — taken apart, accent marks off, lower-cased
+			// THEN the key comes back unchanged and is not already plain. A row for
+			// "ǽ" would never be reached, because by then the letter is "æ", and a
+			// row nothing reads is a row that reads as needed and is not
+			for (const [letter] of EQUIVALENT_LETTERS) {
+				const asTheFoldSeesIt = letter
+					.normalize('NFKD')
+					.replace(/\p{Diacritic}/gu, '')
+					.toLowerCase()
+				expect(asTheFoldSeesIt).toBe(letter)
+				expect(asTheFoldSeesIt).not.toMatch(/^[a-z]+$/)
+			}
+		})
+
+		it('should leave the letters no language places against a–z alone', () => {
+			// GIVEN a letter the generated table has no answer for
+			// WHEN folded
+			// THEN it is still dropped, and the name still finds nothing. Written down
+			// rather than hidden: placing these letters needs a fold that knows the
+			// languages that write them, which this is not
+			expect(collapse('Sáme ŋiella')).toBe('sameiella')
+		})
+	})
+
+	describe('when the same reading is asked for word by word', () => {
+		it('should agree with the whole-run reading', () => {
+			// GIVEN a name the plain-letter table rewrites
+			// WHEN read as one run and as words
+			// THEN the words joined are the run. The two readings must not drift —
+			// one guard reads an address as words and another as a run
+			for (const name of ['Straßenbau Weber', 'Þór Nørgaard', 'Işık Cœur']) {
+				expect(foldTokens(name).join('')).toBe(collapse(name))
+			}
+		})
+	})
+})
+
+describe('nameSpellings — vowels a company writes two ways', () => {
+	describe('when the name carries one of them', () => {
+		it('should offer the spelling its own domain may use', () => {
+			// GIVEN German and Nordic names whose vowels have a second written form
+			// WHEN read
+			// THEN both forms come back, the name as written first. A German firm
+			// registers "mueller.de" as readily as "muller.de", and the plain-letter
+			// table alone only ever produces the second
+			expect(spellingsWithoutForms('Müller Elektro')).toEqual([
+				'mullerelektro',
+				'muellerelektro',
+			])
+			expect(spellingsWithoutForms('Nørgaard VVS')).toEqual([
+				'norgaardvvs',
+				'noergaardvvs',
+			])
+			expect(spellingsWithoutForms('Håkon El')).toEqual(['hakonel', 'haakonel'])
+		})
+	})
+
+	describe('when the name does not carry one', () => {
+		it('should not invent a second reading for it', () => {
+			// GIVEN two different companies, one written with the vowel and one with
+			// the plain letters it may also be written as
+			// WHEN each is asked whether the other's domain is its own
+			// THEN neither is: only a name that actually carries the vowel is read
+			// twice, so a name already spelled "Mueller" gains nothing and a name
+			// spelled "Muller" gains nothing
+			expect(nameSpellings('Mueller GmbH')).toEqual(['Mueller GmbH'])
+			expect(nameSpellings('Muller SL')).toEqual(['Muller SL'])
+			expect(
+				ownSiteVerdict({ name: 'Muller SL', website: 'https://mueller.de' }),
+			).toBe('unknown')
+			expect(
+				ownSiteVerdict({ name: 'Mueller GmbH', website: 'https://muller.de' }),
+			).toBe('unknown')
+		})
+
+		it('should read it the same whether the accent is one character or two', () => {
+			// GIVEN one company name written both ways a page may carry it: the vowel
+			// as a single character, and the plain letter followed by a mark of its
+			// own. The two are indistinguishable on screen
+			const asOneCharacter = 'Müller Elektro'
+			const asLetterAndMark = 'Müller Elektro'
+			expect(asOneCharacter).not.toBe(asLetterAndMark)
+
+			// WHEN each is read
+			// THEN both offer the spelling the company's own domain uses. Searched as
+			// written, the second spells its vowel as two characters, finds nothing to
+			// write out, and the company is looked for only under "muller"
+			for (const name of [asOneCharacter, asLetterAndMark]) {
+				expect(spellingsWithoutForms(name)).toEqual([
+					'mullerelektro',
+					'muellerelektro',
+				])
+				expect(
+					ownSiteVerdict({ name, website: 'https://mueller-elektro.de' }),
+				).toBe('established')
+			}
+		})
+
+		it('should leave a name with no such vowel read once', () => {
+			// GIVEN ordinary names
+			// WHEN read
+			// THEN one reading each: a name carrying none of these vowels is never
+			// read a second way
+			expect(nameSpellings('Acme Logistics')).toEqual(['Acme Logistics'])
+			expect(nameSpellings('Straßenbau')).toEqual(['Straßenbau'])
+		})
+	})
+
+	describe('when a name carries several of them', () => {
+		it('should stop short of reading it every possible way', () => {
+			// GIVEN a name with three such vowels, and one with more
+			// WHEN read
+			// THEN the readings are capped, and the name as written is always the
+			// first — a caller takes that one as the company's identity, so it can
+			// never be the reading that gets cut
+			const three = nameSpellings('Müller Öl Ähre')
+			expect(three.length).toBeLessThanOrEqual(8)
+			expect(three[0]).toBe('Müller Öl Ähre')
+
+			const many = nameSpellings('Müller Öl Ähre Åse Nør')
+			expect(many.length).toBeLessThanOrEqual(8)
+			expect(many[0]).toBe('Müller Öl Ähre Åse Nør')
 		})
 	})
 })

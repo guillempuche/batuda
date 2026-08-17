@@ -410,4 +410,57 @@ describe('ownSiteVerdict', () => {
 			).toBe('unknown')
 		})
 	})
+
+	describe('when the name uses letters a web address cannot carry', () => {
+		it('should establish the domain the company actually registered', () => {
+			// GIVEN companies from six languages, each at its own site, whose names
+			// hold a letter that is not an accented a–z one
+			// WHEN each is asked
+			// THEN each is its own. Drop the letter instead of writing it out and
+			// "Straßenbau" reads as "straenbau" — a name nobody spells, so the company
+			// is looked for under it and its own site comes back as a stranger's
+			for (const [name, website] of [
+				['Straßenbau Weber GmbH', 'https://strassenbau-weber.de'],
+				['Nørgaard VVS', 'https://norgaard-vvs.dk'],
+				['Łukasz Instalacje', 'https://lukasz-instalacje.pl'],
+				['Cœur Énergie', 'https://coeur-energie.fr'],
+				['Þór Raflagnir', 'https://thor-raflagnir.is'],
+				['Işık Elektrik', 'https://isik-elektrik.com.tr'],
+			] as const) {
+				expect(ownSiteVerdict({ name, website })).toBe('established')
+			}
+		})
+
+		it('should establish it whichever way the domain writes the vowel', () => {
+			// GIVEN one German company, at each of the two domains it might have
+			// registered
+			// WHEN each is asked
+			// THEN both are its own: the plain letter and the two-letter form are the
+			// same name, and a firm picks one when it registers
+			for (const website of [
+				'https://muller-elektro.de',
+				'https://mueller-elektro.de',
+			]) {
+				expect(ownSiteVerdict({ name: 'Müller Elektro GmbH', website })).toBe(
+					'established',
+				)
+			}
+		})
+
+		it("should not hand a company a look-alike name's domain", () => {
+			// GIVEN companies whose names are near neighbours of one another once the
+			// letters are written out
+			// WHEN each is offered the other's domain
+			// THEN none is established. Writing a letter out is not the same as
+			// letting any two names that end up near each other match
+			for (const [name, website] of [
+				['Muller SL', 'https://mueller.de'],
+				['Mueller GmbH', 'https://muller.de'],
+				['Rose GmbH', 'https://rosse.de'],
+				['Sander AS', 'https://sonder.no'],
+			] as const) {
+				expect(ownSiteVerdict({ name, website })).toBe('unknown')
+			}
+		})
+	})
 })

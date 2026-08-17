@@ -17,6 +17,8 @@
  *              and fails closed as no_reliable_data.
  */
 
+import { EQUIVALENT_LETTERS } from './letter-equivalences.generated'
+
 // Legal-form suffixes dropped before matching, so "Acme Logistics S.L." and a
 // page that writes "Acme Logistica SL" still match on the same name core.
 const LEGAL_SUFFIXES = new Set([
@@ -105,28 +107,55 @@ const SECOND_LEVEL = new Set([
 	'gob',
 ])
 
-// Lower-case, strip accents, drop everything but letters and digits — the same
-// folding the email-guess step uses, so text matches regardless of punctuation,
-// case, or diacritics. Word boundaries are removed too, so a spelled-out name
-// like "Acme Logistics" is found as the contiguous run "acmelogistics".
-export const collapse = (value: string): string =>
-	value
-		.normalize('NFKD')
-		.replace(/\p{Diacritic}/gu, '')
-		.toLowerCase()
-		.replace(/[^a-z0-9]/g, '')
+// Just the letters the table has an answer for. Built from the table so the two
+// cannot drift apart, and kept narrow because this runs over whole scraped pages:
+// asked to look at every letter instead, the same work takes three times as long
+// for the same result, since almost every letter of almost every page is already
+// a plain one. Safe to drop into a character class unescaped — the table is
+// generated from letters only, so nothing in it can mean something to a regex.
+const LETTERS_TO_REWRITE = new RegExp(
+	`[${[...EQUIVALENT_LETTERS.keys()].join('')}]`,
+	'gu',
+)
 
 /**
- * Accent-folded word tokens of a name, punctuation split out. Exported because
- * the same folding has to read a web address the same way it reads a name — a
- * second copy of it is how two checks start disagreeing about whether a piece of
- * text spells a company.
+ * Lower-case, accents off, every letter written in a–z. Everything that reads a
+ * name goes through this, so a name and a web address are compared in one
+ * spelling.
+ *
+ * The last step is easy to leave out, and costly. Taking an accent off is not
+ * enough for a letter that is not an accented a–z one but a letter of its own:
+ * ß, ø, ł, þ, œ, the dotless Turkish ı. Drop whatever is left over and those
+ * letters go with it — "Straßenbau" reads as "straenbau" — and a key with
+ * letters missing is worse than no key at all, because it is not empty, so every
+ * check believes it and quietly concludes the company's own website belongs to
+ * somebody else. Each of them stands for plain letters that the company itself
+ * uses when it registers a domain, and `EQUIVALENT_LETTERS` is where those
+ * stand-ins are written down.
  */
-export const foldTokens = (value: string): string[] =>
+const inPlainLetters = (value: string): string =>
 	value
 		.normalize('NFKD')
 		.replace(/\p{Diacritic}/gu, '')
 		.toLowerCase()
+		.replace(
+			LETTERS_TO_REWRITE,
+			letter => EQUIVALENT_LETTERS.get(letter) ?? letter,
+		)
+
+// The whole name as one run of letters and digits, punctuation and spaces gone —
+// so a spelled-out name like "Acme Logistics" is found as "acmelogistics".
+export const collapse = (value: string): string =>
+	inPlainLetters(value).replace(/[^a-z0-9]/g, '')
+
+/**
+ * The same reading, kept as separate words. Exported because the same folding
+ * has to read a web address the same way it reads a name — a second copy of it
+ * is how two checks start disagreeing about whether a piece of text spells a
+ * company.
+ */
+export const foldTokens = (value: string): string[] =>
+	inPlainLetters(value)
 		.split(/[^a-z0-9]+/)
 		.filter(Boolean)
 
@@ -167,11 +196,72 @@ const GEMINATED_L = /l[.\u00B7\u0387\u2022\u2027\u2219\u22C5]l/giu
  *
  * Several marks in one name are read all the same way rather than in every
  * combination: an address is slugged by one convention, not one per word.
+ *
+ * The vowels below are the other half of this. `EQUIVALENT_LETTERS` already
+ * turns each of them into the plain letter it sorts as, so "Müller" is read as
+ * "muller" — but a German firm writes the same name "mueller" in its own domain,
+ * and both are ordinary. That second way is a spelling and not a sorting order,
+ * which is why no amount of Unicode data produces it and it is written here.
+ * These are rules about how a letter is written, like the word-joiners "i" and
+ * "de" further down: nothing here says which countries or trades a company is
+ * expected to come from.
  */
+// Written as plain letters rather than as patterns, so that asking whether a
+// name carries one is a plain search and there is no half-finished search left
+// behind on the pattern to trip up whoever asks next.
+const OTHER_VOWEL_SPELLINGS: ReadonlyArray<readonly [string, string]> = [
+	['ü', 'ue'],
+	['ö', 'oe'],
+	['ä', 'ae'],
+	['å', 'aa'],
+	['ø', 'oe'],
+]
+
+// How many readings of one name are worth carrying. Each vowel a name holds
+// doubles them, and past a handful the extra readings are combinations no
+// address ever writes while every one of them is matched against every company.
+const MOST_SPELLINGS = 8
+
+/**
+ * Every reading so far, plus each of them with this vowel written the other way.
+ *
+ * Hands back what it was given when the vowel is nowhere in the name, which is
+ * nearly every name, and again when writing it out would push the readings past
+ * what is worth carrying. Refusing the whole rule rather than trimming the
+ * result afterwards is what keeps the readings that ARE kept complete: a name is
+ * read every way one rule allows, or that rule is not applied to it at all.
+ */
+const alsoSpelled = (
+	readings: ReadonlyArray<string>,
+	[vowel, otherWay]: readonly [string, string],
+): ReadonlyArray<string> => {
+	const carriesIt = readings.some(reading =>
+		reading.toLowerCase().includes(vowel),
+	)
+	if (!carriesIt || readings.length * 2 > MOST_SPELLINGS) return readings
+	const shouted = vowel.toUpperCase()
+	return [
+		...new Set(
+			readings.flatMap(reading => [
+				reading,
+				reading.replaceAll(vowel, otherWay).replaceAll(shouted, otherWay),
+			]),
+		),
+	]
+}
+
 export const nameSpellings = (name: string): ReadonlyArray<string> => {
-	const doubled = name.replace(GEMINATED_L, 'll')
-	const single = name.replace(GEMINATED_L, 'l')
-	return doubled === single ? [doubled] : [doubled, single]
+	// An accent reaches this either as one character or as the plain letter with
+	// a mark of its own after it, and the two look identical on a page. Put back
+	// together first, or the vowels below are looked for as one character in a
+	// name that spells them as two, and a company written the second way quietly
+	// never gets its other reading.
+	const written = name.normalize('NFC')
+	const doubled = written.replace(GEMINATED_L, 'll')
+	const single = written.replace(GEMINATED_L, 'l')
+	const geminateReadings = doubled === single ? [doubled] : [doubled, single]
+
+	return OTHER_VOWEL_SPELLINGS.reduce(alsoSpelled, geminateReadings)
 }
 
 // Words that join two halves of a legal form — "S.A. de C.V.", "Serveis i

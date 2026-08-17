@@ -20,6 +20,13 @@
  * run of anything else turned into one space. Returns an empty string for a name
  * with no letters or digits in it at all, which callers must refuse rather than
  * store — an empty fold matches every other empty fold.
+ *
+ * A letter that is not an accented a–z one keeps itself here: "Straße" folds to
+ * "straße", not "strasse". The research package's fold writes such a letter out
+ * instead, and the two differ ON PURPOSE — what this one produces is STORED, as
+ * `company_industries.folded_key`, with a uniqueness rule standing on it. Change
+ * it and every key already written means something else, so making the two agree
+ * is a migration that rewrites those rows, never an edit to this line.
  */
 export const foldLabel = (raw: string): string =>
 	raw
