@@ -9,6 +9,36 @@
  * own companies at an address carrying that company's name. A host doing that for
  * two of them is a listing.
  *
+ * A company's OWN site is stepped over, one company at a time. A group's own
+ * domain carries a page for the group and a page for each part of it, so a list
+ * holding two parts of one group would otherwise watch that domain file two
+ * companies and brand it a listing — which costs the group its website, and then
+ * its standing to vouch for itself. Whose site a host is comes from
+ * `own-site.ts`, the single answer the rest of the run uses, so the watch cannot
+ * reach a different one.
+ *
+ * Asking one company at a time is what keeps a franchise caught. A franchise's
+ * domain is established as the franchise's own, so its pages about itself are
+ * stepped over — while its pages filing affiliates it does NOT name are weighed
+ * as usual, and two of those still make it a listing. Asking once for the whole
+ * list instead would step over every address on the host the moment any one
+ * company owned the domain, and a franchise on its own list would clear itself.
+ *
+ * The other side of that is a firm's own site with a page for each of its
+ * partners, which reads as a listing. Those pages really are about companies
+ * whose site it is not, so the reading is right — and it is paid for by the firm
+ * itself, which loses that host as its website and as the thing that vouches for
+ * it. That is the known price of the rule below, and the reason
+ * `COMPANIES_THAT_MAKE_A_LISTING` is not lowered.
+ *
+ * The price is NOT bought off by telling `website-guard.ts` to keep a website
+ * whenever `own-site.ts` says the company owns the host. That was tried and it
+ * fails wide open: ownership there is granted by any distinctive word of a name,
+ * so "Instalaciones Eléctricas Girona" owns girona.cat and every company named
+ * after its town or its trade would keep a directory's page as its website — in
+ * exactly the markets this is for. Ownership is a positive claim safe to COUNT
+ * and to clear a company with; it is not safe to overrule a blank with.
+ *
  * What it watches is every address the run met — each result its searches returned,
  * each page it fetched, and the addresses those pages link to. That last one is not
  * an extra: a search hands back a listing's category page, which names a trade and
@@ -58,15 +88,12 @@
  */
 
 import {
-	coreSpellings,
 	DISTINCTIVE_NAME_LENGTH,
-	distinctiveWords,
-	type EntityTargets,
 	foldTokens,
-	isOwnSiteHost,
 	spellingsWithoutForms,
 } from './entity-guard'
 import { isPlainObject } from './guard-shapes'
+import { ownSiteHostVerdict } from './own-site'
 import { hostOf, isBareWebAddress, pathOf } from './source-key'
 
 /** Hosts this run watched file several of its own companies. */
@@ -86,17 +113,43 @@ export type SiteVerdict = 'directory' | 'unknown'
 const COMPANIES_THAT_MAKE_A_LISTING = 2
 
 // One of the run's companies: the name an address would write it under, and the
-// name it is counted as. They are two things because a Catalan name can be
+// name it is counted as. Those two are separate because a Catalan name can be
 // written out two ways — an address may spell either, while the company is still
 // one company and must be counted once.
 interface ListedCompany {
 	readonly countedAs: string
 	readonly writtenAs: ReadonlyArray<string>
+	// Kept unfolded beside the spellings because the own-site reading below takes a
+	// name and folds it its own way. Handing it a spelling folded here would be a
+	// second answer to a question that already has one.
+	readonly rowNames: ReadonlyArray<string>
 }
 
 // Every way an address would write this company's name, folded so case, accents
 // and punctuation stop mattering. Empty when nothing distinctive is left to look
 // for.
+//
+// Four letters, where `own-site.ts` reads a domain from three. The two floors
+// answer different questions and the gap is deliberate: a three-letter run found
+// in a path turns up by coincidence — a language code, a section name — and would
+// file the wrong company, while a domain that IS three letters is the whole of
+// what a large carrier registered (dsv.com, xpo.com).
+//
+// What it costs is a listing that files companies named in three letters: they
+// have no filable spelling, so a site filing "DSV" and "XPO" is never watched
+// filing anybody and goes unnoticed. That is a miss and not a deleted website,
+// which is the direction to be wrong in — and a three-letter company is no worse
+// off on its own domain than a longer-named one, since its own pages cannot be
+// filed against it either.
+//
+// Lowering it to three was measured rather than argued, and is not worth it. It
+// does catch that missed listing. It also files any row whose name folds to an
+// ordinary three-letter part of an address — a language code, a region, a
+// section — so a firm's own site with pages at "/sud" and "/est", beside two
+// rows named for those regions, is branded a listing and loses real websites.
+// Over three live market runs the lower floor changed nothing at all: the same
+// hosts branded, no website kept or lost. A broad new way to be wrong, bought
+// for a benefit that did not appear.
 const filedAs = (name: string): ReadonlyArray<string> =>
 	spellingsWithoutForms(name).filter(
 		spelling => spelling.length >= DISTINCTIVE_NAME_LENGTH,
@@ -107,13 +160,11 @@ const filedAs = (name: string): ReadonlyArray<string> =>
 // not between the two names as written, because the pair this exists to catch is
 // exactly a firm whose two rows spell one word differently.
 const isTheSameCompanyAgain = (
-	company: ListedCompany,
-	earlier: ReadonlyArray<ListedCompany>,
+	company: { readonly writtenAs: ReadonlyArray<string> },
+	earlier: { readonly writtenAs: ReadonlyArray<string> },
 ): boolean =>
-	earlier.some(seen =>
-		company.writtenAs.some(written =>
-			seen.writtenAs.some(before => written.startsWith(before)),
-		),
+	company.writtenAs.some(written =>
+		earlier.writtenAs.some(before => written.startsWith(before)),
 	)
 
 // One company per name, rather than one per spelling. A name that another name
@@ -138,14 +189,59 @@ const distinctCompanies = (
 				: {
 						countedAs: company.countedAs,
 						writtenAs: [...new Set([...seen.writtenAs, ...company.writtenAs])],
+						rowNames: [...new Set([...seen.rowNames, ...company.rowNames])],
 					},
 		)
 	}
-	return [...byName.values()]
-		.sort((a, b) => a.countedAs.length - b.countedAs.length)
-		.filter(
-			(company, at, kept) => !isTheSameCompanyAgain(company, kept.slice(0, at)),
+	// Spelled out with the row names writable, rather than leaning on an
+	// intersection to strip the `readonly` off `ListedCompany`, because they really
+	// are rewritten below: a company only learns the rest of its names as the
+	// longer rows that fold into it arrive.
+	interface Absorbing {
+		readonly countedAs: string
+		readonly writtenAs: ReadonlyArray<string>
+		rowNames: ReadonlyArray<string>
+	}
+	const ordered = [...byName.values()].sort(
+		(a, b) => a.countedAs.length - b.countedAs.length,
+	)
+	const kept: Array<Absorbing> = []
+	// Which surviving company each row ends up under, the dropped rows included.
+	// A row repeats an EARLIER row whether or not that earlier one survived, and
+	// the difference matters: a name can be written several ways, so the chain
+	// from one row to the next may run through a row that was itself dropped.
+	// "Moll", "Møller Transport" — which reads both "moller…" and "moeller…" —
+	// and "Moeller Transport Nord" are one company, though the last spells
+	// nothing the first does. Comparing only against survivors breaks that chain
+	// and counts one company as two, which is the whole thing this prevents.
+	const survivorOf: Array<Absorbing> = []
+	for (const [at, company] of ordered.entries()) {
+		const repeatsAt = ordered.findIndex(
+			(seen, before) => before < at && isTheSameCompanyAgain(company, seen),
 		)
+		const survivor = repeatsAt === -1 ? undefined : survivorOf[repeatsAt]
+		if (survivor === undefined) {
+			const entry = { ...company }
+			kept.push(entry)
+			survivorOf[at] = entry
+			continue
+		}
+		// The longer row is this company written at more length. Its row is dropped
+		// and its NAME is not: a firm whose two rows read "Grup Blau" and "Grup Blau
+		// Instal·lacions" may have registered the longer one, and only that spelling
+		// recognises its own domain.
+		//
+		// The spellings a host files it under are deliberately not merged the same
+		// way. A longer name reaches more addresses, and every extra address a host
+		// is read as filing takes some company's website away, while an extra name a
+		// company may own only ever withholds a branding — so each list is generous
+		// in the direction that costs nothing.
+		survivorOf[at] = survivor
+		survivor.rowNames = [
+			...new Set([...survivor.rowNames, ...company.rowNames]),
+		]
+	}
+	return kept
 }
 
 // The names of this scan's own companies.
@@ -333,47 +429,47 @@ export const observeDirectorySites = (args: {
 		names.flatMap(name => {
 			const writtenAs = filedAs(name)
 			const countedAs = writtenAs[0]
-			return countedAs === undefined ? [] : [{ countedAs, writtenAs }]
+			return countedAs === undefined
+				? []
+				: [{ countedAs, writtenAs, rowNames: [name] }]
 		}),
 	)
 	if (companies.length < COMPANIES_THAT_MAKE_A_LISTING) {
 		return { sites: new Set(), addressesRead }
-	}
-	// What it takes for a host to be one of these companies' own site, asked the
-	// way the rest of the run asks it: the domain has to BE a name, not merely
-	// carry one, so "acme.example" is Acme Instalacions' own and
-	// "acme-directory.com" is not.
-	const ownSiteKeys: EntityTargets = {
-		cores: names
-			.flatMap(coreSpellings)
-			.filter(core => core.length >= DISTINCTIVE_NAME_LENGTH),
-		words: [...new Set(names.flatMap(distinctiveWords))],
-		domains: [],
-		places: [],
 	}
 
 	// Which of the run's companies each host files, and where. The addresses are
 	// held rather than counted, because one page naming two of them is a piece
 	// about both — it takes a separate address per company to be a listing.
 	const filedByHost = new Map<string, Map<string, Set<string>>>()
-	// A host that is a listed company's own site is that company's, whatever else
-	// sits on it: a firm's own page for each partner would otherwise read as a
-	// listing of them. Answered once per host, since hundreds of addresses read off
-	// one index page all share theirs.
-	const ownSiteHosts = new Map<string, boolean>()
-	const isOwnSite = (host: string): boolean => {
-		const known = ownSiteHosts.get(host)
+	// A host that is established as a company's own site files nothing for THAT
+	// company: a firm's own site names itself, and a group's own site carries a
+	// page for each part of the group. Answered once per company and host, since
+	// hundreds of addresses read off one index page all share theirs.
+	const ownSiteAnswers = new Map<string, boolean>()
+	const isOwnSiteOf = (company: ListedCompany, host: string): boolean => {
+		// Joined with a line break, which neither a folded name nor a host can hold,
+		// so no two pairs can fall on one key.
+		const key = `${company.countedAs}\n${host}`
+		const known = ownSiteAnswers.get(key)
 		if (known !== undefined) return known
-		const own = isOwnSiteHost(ownSiteKeys, host)
-		ownSiteHosts.set(host, own)
+		const own = company.rowNames.some(
+			name => ownSiteHostVerdict({ name, host }) === 'established',
+		)
+		ownSiteAnswers.set(key, own)
 		return own
 	}
 	for (const address of readable) {
 		// Non-null: the screen above already parsed every address that got here.
 		const host = hostOf(address) ?? ''
-		if (isOwnSite(host)) continue
+		// Read once for the address and only when some company still needs it: a
+		// group's own index page hands over hundreds of addresses that every company
+		// on the list steps over, and putting each of them back into letters before
+		// asking would be the whole page's work for nothing.
+		if (companies.every(company => isOwnSiteOf(company, host))) continue
 		const segments = filingWords(address)
 		for (const company of companies) {
+			if (isOwnSiteOf(company, host)) continue
 			if (
 				segments.some(segment =>
 					company.writtenAs.some(spelling =>

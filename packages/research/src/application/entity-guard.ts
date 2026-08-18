@@ -810,6 +810,16 @@ export const reachedOwnSite = (
  * The name has to BE the domain, not merely appear inside it: "Acme Logistics" is
  * at home on acmelogistics.com and on the shorter acme.com, since a company often
  * registers less than its full name, but not on acme-directory.com.
+ *
+ * Not the same reading as `ownSiteVerdict` in `own-site.ts`, and deliberately so.
+ * That one is asked about an address a run already holds, where a wrong yes costs
+ * one field, so it accepts the FRONT of a name — "D-Sécurité (groupe)" at
+ * d-securite.com. This one picks a site to go and read and then grounds a whole
+ * row on it, where a wrong yes writes a stranger's revenue, chief executive and
+ * telephone number onto the company, so it wants a whole name and would hand
+ * "Grupo Cobra Instalaciones" nothing at grupocobra.com. Every caller weighing an
+ * address already in hand asks `own-site.ts`; this is only for choosing what to
+ * fetch. Loosening it to match would fail open across the whole grounding path.
  */
 export const isOwnSiteHost = (
 	targets: EntityTargets,
