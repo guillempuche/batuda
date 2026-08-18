@@ -724,6 +724,19 @@ const stopWorktreeDevServers = (worktreePath: string) =>
 		`bash "${resolve(ROOT, 'scripts/worktree-stop-procs.sh')}" "${worktreePath}" ${process.pid}`,
 	).pipe(Effect.catch(() => Effect.void))
 
+/**
+ * Drop this worktree's database and bucket, and say what was found here.
+ *
+ * Finding nothing to drop is an answer rather than a failure, because the two
+ * callers want opposite things from it — `down` reports it, since asking to
+ * drop data that is not there leaves the command with nothing it was asked for;
+ * `done` notes it and keeps tidying, since a worktree that never needed a
+ * database is still a worktree to finish.
+ *
+ * Two things still fail outright: a checkout that is not a worktree at all, and
+ * one whose `.env` points at the shared data. Neither is an answer for a caller
+ * to weigh up.
+ */
 export const worktreeDown = Effect.gen(function* () {
 	if (!(yield* isLinkedWorktree)) {
 		return yield* Effect.fail(
@@ -744,23 +757,25 @@ export const worktreeDown = Effect.gen(function* () {
 		// database behind. Drop that rather than refusing and leaking it. Checked
 		// for existence first so the line below reports what actually happened
 		// instead of naming a database that was never there.
+		//
+		// Docker being off is not a reason to refuse either — a worktree that
+		// provisioned nothing needs no shared stack to be finished. The cost is not
+		// knowing whether a stray test database is sitting there, and `worktree
+		// prune` comes back for one anyway.
+		const databases = yield* listDatabases.pipe(
+			Effect.orElseSucceed((): ReadonlyArray<string> => []),
+		)
 		const leftover =
-			beforeUpDb && (yield* listDatabases).includes(beforeUpDb)
-				? beforeUpDb
-				: null
+			beforeUpDb && databases.includes(beforeUpDb) ? beforeUpDb : null
 		if (leftover) {
 			yield* stopWorktreeDevServers(ROOT)
 			yield* dropDatabase(leftover)
 			yield* Console.log(
 				`✓ Removed ${leftover} (never provisioned — no dev database or bucket to drop).`,
 			)
-			return
+			return 'removed' as const
 		}
-		return yield* Effect.fail(
-			new Error(
-				'No provisioned .env here — nothing to drop. Run `pnpm cli worktree up` first, or it was already torn down.',
-			),
-		)
+		return 'nothing-provisioned' as const
 	}
 	const { db, bucket } = identity
 	if (!isWorktreeOwned(db, bucket)) {
@@ -788,19 +803,59 @@ export const worktreeDown = Effect.gen(function* () {
 		Effect.catch(() => Effect.void),
 	)
 	yield* Console.log(`✓ Removed ${db} and ${bucket} (shared stack untouched).`)
+	return 'removed' as const
 })
 
-// Whether everything this branch changed is already on main.
-//
-// Asked by rolling the branch up into a single commit sitting on the point it
-// forked from, then letting git say whether that patch is already in main. That
-// is the shape a squash merge leaves behind, and comparing commit by commit
-// cannot see it. Any git failure here reads as "not already there", so a doubt
-// keeps the branch rather than deleting it.
+/** The wording `worktree down` fails with when it finds nothing to drop. */
+export const NOTHING_TO_DROP =
+	'No provisioned .env here — nothing to drop. Run `pnpm cli worktree up` first, or it was already torn down.'
+
+/**
+ * Whether everything this branch changed is already on main.
+ *
+ * Asked in three ways, because a merge leaves three different traces and each
+ * one hides the others:
+ *  - main can simply reach the branch, which is an ordinary merge or a
+ *    fast-forward, and the only shape where the commits themselves survive;
+ *  - every commit is on main under a new name, which is what replaying them one
+ *    by one leaves — a rebase merge;
+ *  - the whole branch is on main as a single commit, which is what squashing
+ *    leaves.
+ *
+ * `git branch -d` answers only the first, so it refuses both of the others even
+ * though the work is safe, and this repo merges by all three. It is also asked
+ * a question nobody wants here: it accepts a branch merged into its own remote
+ * copy, which says the work was pushed, not that it reached main.
+ *
+ * Any git failure while answering reads as "not already there", so a doubt
+ * keeps the branch rather than deleting it.
+ */
 const branchWorkIsOnMain = (root: string, branch: string) =>
 	Effect.gen(function* () {
 		const git = (...args: ReadonlyArray<string>) =>
 			execSilentArgs('git', ['-C', root, ...args])
+		const mainReachesIt = yield* git(
+			'merge-base',
+			'--is-ancestor',
+			branch,
+			'main',
+		).pipe(
+			Effect.map(() => true),
+			Effect.orElseSucceed(() => false),
+		)
+		if (mainReachesIt) return true
+		// `git cherry` marks a patch main already carries with "-", and one it is
+		// missing with "+". Empty output means no commits to judge, which the
+		// reachability question above has already settled.
+		const oneByOne = yield* git('cherry', 'main', branch)
+		if (
+			oneByOne !== '' &&
+			oneByOne.split('\n').every(line => line.startsWith('-'))
+		) {
+			return true
+		}
+		// The whole branch rolled up into one commit sitting where it forked, which
+		// is the shape a squash merge leaves.
 		const forkedAt = yield* git('merge-base', 'main', branch)
 		const content = yield* git('rev-parse', `${branch}^{tree}`)
 		// A loose commit that is never referenced, so it costs one object git
@@ -813,69 +868,123 @@ const branchWorkIsOnMain = (root: string, branch: string) =>
 			'-m',
 			'rolled up to compare against main',
 		)
-		// `git cherry` marks a patch main already carries with "-", and one it is
-		// missing with "+".
 		return (yield* git('cherry', 'main', rolledUp)).startsWith('-')
 	}).pipe(Effect.orElseSucceed(() => false))
 
-// Delete the branch the finished PR was on, leaving git's own refusal as the
-// first word.
-//
-// `git branch -d` asks whether the branch's commits are reachable from main. A
-// squash merge replays the whole branch as one new commit, so none of the
-// commits the branch actually holds is reachable and a branch whose work is
-// safely on main still reads as unmerged — which is most of this repo's PRs.
-// When that is why the delete was refused, ask the question git did not: is the
-// content already there? Only then insist. A branch holding work main has never
-// seen is left alone and named, because deleting it is the one step here nobody
-// can undo.
+/**
+ * Delete the branch the finished pull request was on.
+ *
+ * Whether the work is safe is decided by `branchWorkIsOnMain`, which asks more
+ * than `git branch -d` does — see there for why. A branch holding work main has
+ * never seen is left standing and named, because deleting it is the one step
+ * here nobody can undo.
+ */
 const deleteFinishedBranch = (root: string, branch: string, force: boolean) =>
 	Effect.gen(function* () {
-		const insist = execArgs('git', ['-C', root, 'branch', '-D', branch])
-		if (force) {
-			yield* insist
-			yield* Console.log(`✓ Deleted local branch ${branch}`)
+		if (!force && !(yield* branchWorkIsOnMain(root, branch))) {
+			return yield* Effect.fail(
+				new Error(
+					`Branch ${branch} was kept: main carries no copy of its work, in any of the shapes a merge leaves. Look at it with \`git log main..${branch}\`, then delete it yourself with \`git branch -D ${branch}\` if you are happy to lose it.`,
+				),
+			)
+		}
+		yield* execArgs('git', ['-C', root, 'branch', '-D', branch])
+		yield* Console.log(`✓ Deleted local branch ${branch}`)
+	})
+
+/**
+ * Put back what `--stash` set aside, whether the rest of the run succeeded or
+ * not. Anything that stops the run part-way otherwise leaves the changes in the
+ * stash with nothing said, and a clean working tree reads as work that vanished.
+ *
+ * `entry` is the commit this run's stash was saved as, and it is applied by that
+ * name rather than by taking whatever sits on top. The stash is shared by every
+ * worktree of the repository, so with several sessions running at once the top
+ * entry is often somebody else's — taking it would drop one branch's unfinished
+ * work into another's tree and leave the owner's own entry behind.
+ *
+ * `stashedIn` is the directory the changes came from, which the linked-worktree
+ * path deletes on its way through. Putting them back then would land one
+ * branch's edits in the main checkout, so where the directory is gone they are
+ * named and left where they are.
+ */
+const restoreStashed = (args: {
+	readonly stashedIn: string
+	readonly entry: string
+}) =>
+	Effect.gen(function* () {
+		const { stashedIn, entry } = args
+		if (!existsSync(stashedIn)) {
+			yield* Console.log(
+				`Uncommitted changes are still stashed — the worktree they came from is gone. Put them where you want them with \`git stash apply ${entry}\`.`,
+			)
 			return
 		}
-		// Asked quietly, because a refusal here is the ordinary case rather than a
-		// fault: git printing "not fully merged" and the run then reporting success
-		// reads as something having gone wrong. A refusal that survives the content
-		// check below is reported in this command's own words instead.
-		const wentQuietly = yield* execSilentArgs('git', [
+		const applied = yield* execArgs('git', [
 			'-C',
-			root,
-			'branch',
-			'-d',
-			branch,
+			stashedIn,
+			'stash',
+			'apply',
+			entry,
 		]).pipe(
 			Effect.map(() => true),
 			Effect.orElseSucceed(() => false),
 		)
-		if (wentQuietly) {
-			yield* Console.log(`✓ Deleted local branch ${branch}`)
-			return
-		}
-		if (!(yield* branchWorkIsOnMain(root, branch))) {
+		if (!applied) {
+			// Half-applied: git writes what it can and leaves the rest as conflicts,
+			// so saying the changes are merely "still saved" would describe a working
+			// tree the caller does not have. The entry is deliberately left in place.
 			return yield* Effect.fail(
 				new Error(
-					`Branch ${branch} was kept: git would not delete it, and its work is not on main either. Look at it, then delete it yourself with \`git branch -D ${branch}\` — that will also name any other reason git had.`,
+					`The stashed changes would not go back on cleanly — this working tree now holds the conflicts. They are still saved as ${entry}: sort the conflicts out, or reset and re-apply with \`git stash apply ${entry}\`.`,
 				),
 			)
 		}
-		yield* insist
-		yield* Console.log(`✓ Deleted local branch ${branch} (squashed into main)`)
+		// Dropping takes a place in the list (`stash@{n}`), never a commit, so this
+		// run's entry is looked up by the commit it was saved as: another session's
+		// entry may have arrived on top since, and dropping the top one would throw
+		// away their work.
+		const stashList = yield* execSilentArgs('git', [
+			'-C',
+			stashedIn,
+			'stash',
+			'list',
+			'--format=%H %gd',
+		])
+		const position = stashList
+			.split('\n')
+			.find(line => line.startsWith(entry))
+			?.split(' ')[1]
+		if (position !== undefined) {
+			yield* execArgs('git', ['-C', stashedIn, 'stash', 'drop', position])
+		}
+		yield* Console.log('✓ Popped stash')
 	})
 
 export const worktreeDone = (options: { force: boolean; stash: boolean }) =>
 	Effect.gen(function* () {
 		const { force, stash } = options
-		let didStash = false
+		// Where the stash came from and what it was saved as, both read while this
+		// run is still standing in the worktree — the linked-worktree path moves to
+		// the main checkout and deletes that directory, so by the end there is
+		// nobody left to ask, and the shared stash may have gained another session's
+		// entry on top.
+		let stashed: { readonly stashedIn: string; readonly entry: string } | null =
+			null
 		const clean = yield* workingTreeClean
 
 		if (!clean) {
 			if (stash) {
+				const takenFrom = resolve(
+					yield* execSilent('git', 'rev-parse', '--show-toplevel'),
+				)
 				yield* exec('git', 'stash', 'push', '-u', '-m', 'batuda-worktree-done')
-				didStash = true
+				// Read only once the push went through, so a stash that was never made
+				// leaves nothing to put back.
+				stashed = {
+					stashedIn: takenFrom,
+					entry: yield* execSilent('git', 'rev-parse', 'refs/stash'),
+				}
 				yield* Console.log('✓ Stashed uncommitted changes')
 			} else if (!force) {
 				return yield* Effect.fail(
@@ -886,58 +995,66 @@ export const worktreeDone = (options: { force: boolean; stash: boolean }) =>
 			}
 		}
 
-		const { isLinked: linked, main: mainRoot } = yield* worktreeContext
+		const finish = Effect.gen(function* () {
+			const { isLinked: linked, main: mainRoot } = yield* worktreeContext
 
-		if (linked) {
-			const branch = yield* branchName
-			const worktreePath = resolve(
-				yield* execSilent('git', 'rev-parse', '--show-toplevel'),
-			)
-			yield* Console.log(
-				`Finishing linked worktree ${worktreePath} (branch ${branch})...`,
-			)
-
-			yield* worktreeDown
-
-			// Move to the main checkout before deleting the worktree directory,
-			// otherwise subsequent git commands would run from a deleted cwd.
-			process.chdir(mainRoot)
-			const removeArgs = force
-				? ['worktree', 'remove', '--force', worktreePath]
-				: ['worktree', 'remove', worktreePath]
-			yield* execIn(mainRoot, 'git', ...removeArgs)
-			yield* Console.log('✓ Removed linked worktree directory')
-
-			yield* execIn(mainRoot, 'git', 'checkout', 'main')
-			yield* execIn(mainRoot, 'git', 'pull', '--prune')
-
-			if (yield* branchExists(branch)) {
-				yield* deleteFinishedBranch(mainRoot, branch, force)
-			}
-		} else {
-			const branch = yield* branchName
-			if (branch === 'main') {
-				return yield* Effect.fail(
-					new Error(
-						'Already on the main branch. Run this from a feature branch or linked worktree.',
-					),
+			if (linked) {
+				const branch = yield* branchName
+				const worktreePath = resolve(
+					yield* execSilent('git', 'rev-parse', '--show-toplevel'),
 				)
+				yield* Console.log(
+					`Finishing linked worktree ${worktreePath} (branch ${branch})...`,
+				)
+
+				// A worktree that never had a database is still a worktree to finish —
+				// a change to the command-line tool alone needs no stack — so nothing to
+				// drop is a note, not the end of the run.
+				if ((yield* worktreeDown) === 'nothing-provisioned') {
+					yield* Console.log(
+						'No database or bucket provisioned here — nothing to drop.',
+					)
+				}
+
+				// Move to the main checkout before deleting the worktree directory,
+				// otherwise subsequent git commands would run from a deleted cwd.
+				process.chdir(mainRoot)
+				const removeArgs = force
+					? ['worktree', 'remove', '--force', worktreePath]
+					: ['worktree', 'remove', worktreePath]
+				yield* execIn(mainRoot, 'git', ...removeArgs)
+				yield* Console.log('✓ Removed linked worktree directory')
+
+				yield* execIn(mainRoot, 'git', 'checkout', 'main')
+				yield* execIn(mainRoot, 'git', 'pull', '--prune')
+
+				if (yield* branchExists(branch)) {
+					yield* deleteFinishedBranch(mainRoot, branch, force)
+				}
+			} else {
+				const branch = yield* branchName
+				if (branch === 'main') {
+					return yield* Effect.fail(
+						new Error(
+							'Already on the main branch. Run this from a feature branch or linked worktree.',
+						),
+					)
+				}
+				yield* Console.log(`Finishing feature branch ${branch}...`)
+				yield* exec('git', 'checkout', 'main')
+				yield* exec('git', 'pull', '--prune')
+
+				if (yield* branchExists(branch)) {
+					yield* deleteFinishedBranch(mainRoot, branch, force)
+				}
 			}
-			yield* Console.log(`Finishing feature branch ${branch}...`)
-			yield* exec('git', 'checkout', 'main')
-			yield* exec('git', 'pull', '--prune')
 
-			if (yield* branchExists(branch)) {
-				yield* deleteFinishedBranch(mainRoot, branch, force)
-			}
-		}
+			yield* Console.log('✓ Done')
+		})
 
-		yield* Console.log('✓ Done')
-
-		if (didStash) {
-			yield* exec('git', 'stash', 'pop')
-			yield* Console.log('✓ Popped stash')
-		}
+		yield* stashed === null
+			? finish
+			: finish.pipe(Effect.onExit(() => restoreStashed(stashed)))
 	})
 
 // Reap dev servers left behind by crashed sessions — those whose owning CLI is

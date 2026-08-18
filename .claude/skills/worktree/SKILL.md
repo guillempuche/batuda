@@ -64,12 +64,12 @@ This one command detects whether it is running inside a linked worktree or the m
 - linked worktree: drops DB + bucket, removes the worktree directory, checks out `main`, pulls, and deletes the local branch if it still exists.
 - main checkout: checks out `main`, pulls, and deletes the local feature branch.
 
-It refuses if the working tree is dirty; pass `--stash` to safely stash uncommitted changes and pop them on `main`, or `--force` to discard them.
+It refuses if the working tree is dirty; pass `--stash` to set uncommitted changes aside and put them back in the directory they came from, or `--force` to discard them.
 
 ### What if the local branch still has changes?
 
-- **Uncommitted changes**: `worktree done` stops by default. Use `pnpm cli worktree done --stash` to stash them before cleanup and pop the stash on `main`. Alternatively, stash manually (`git stash`) and run `worktree done`, then `git stash pop` on `main`.
-- **Committed changes after a rebase-merge**: the local branch may no longer be an ancestor of `main` because the merge rewrote commits. `git branch -d` then reports "not fully merged". This is expected — the PR code is already on `main` with new hashes. Use `pnpm cli worktree done --force` (or `git branch -D <branch>`) after confirming you do not need the old local commits.
+- **Uncommitted changes**: `worktree done` stops by default. Use `pnpm cli worktree done --stash` to set them aside before cleanup; they are put back where they came from afterwards, whether or not the rest of the run succeeded. In a linked worktree that directory is deleted, so there the changes stay stashed and the command prints the `git stash apply` line that puts them back.
+- **Committed changes after a rebase- or squash-merge**: the local branch is no longer an ancestor of `main`, because the merge rewrote the commits. `worktree done` handles this on its own — it checks whether `main` carries the branch's work in any of the shapes a merge leaves, and deletes the branch when it does. It refuses only when `main` has no copy of the work at all, and then it says so and leaves the branch alone; `--force` deletes it regardless.
 - **Linked worktree with changes**: the worktree directory is removed, so any uncommitted changes inside it are lost unless stashed or committed first. Prefer `pnpm cli worktree done --stash`.
 
 ### Manual fallback (tools without the CLI)

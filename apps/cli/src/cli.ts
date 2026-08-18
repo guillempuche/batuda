@@ -41,6 +41,7 @@ import type { EnvFileResult } from './commands/setup'
 import { setup } from './commands/setup'
 import {
 	accessUrls,
+	NOTHING_TO_DROP,
 	worktreeDoctor,
 	worktreeDone,
 	worktreeDown,
@@ -690,7 +691,18 @@ const worktreeUpCommand = Command.make('up', {}, () => worktreeUp).pipe(
 	),
 )
 
-const worktreeDownCommand = Command.make('down', {}, () => worktreeDown).pipe(
+// Whoever asks to drop this worktree's data expects data to be there, so
+// finding none is worth reporting. `worktree done` reads the same answer as a
+// note and carries on.
+const worktreeDownCommand = Command.make('down', {}, () =>
+	worktreeDown.pipe(
+		Effect.flatMap(outcome =>
+			outcome === 'nothing-provisioned'
+				? Effect.fail(new Error(NOTHING_TO_DROP))
+				: Effect.void,
+		),
+	),
+).pipe(
 	Command.withShortDescription('Drop this worktree’s database + bucket'),
 	Command.withDescription(
 		'Drop this worktree’s Postgres database and MinIO bucket from the shared ' +
@@ -709,7 +721,7 @@ const worktreeDoneCommand = Command.make(
 		),
 		stash: Flag.boolean('stash').pipe(
 			Flag.withDescription(
-				'Stash uncommitted changes before cleanup, then pop them on main',
+				'Stash uncommitted changes before cleanup. They go back where they came from — but a linked worktree is deleted by this command, so there they stay stashed and are named for you to apply',
 			),
 			Flag.withDefault(false),
 		),
