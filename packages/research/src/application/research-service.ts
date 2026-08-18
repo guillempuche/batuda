@@ -5428,6 +5428,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								'research.per_field_search.fired': perFieldFired,
 								'research.per_field_search.filled': merged.filled,
 								'research.per_field_search.added': merged.added,
+								'research.per_field_search.folded': merged.folded,
 								'research.gap_rounds.contacts_kept':
 									contactFill(findings).named,
 								'research.gap_rounds.titled_kept': contactFill(findings).titled,
@@ -5441,6 +5442,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									fired: perFieldFired,
 									filled: merged.filled,
 									added: merged.added,
+									// Ordinarily none, and not every one is a mistake — but a
+									// company this round found and never shipped is counted here
+									// and nowhere else.
+									folded: merged.folded,
 								}),
 							)
 							// This round put new evidence in front of the model and it still

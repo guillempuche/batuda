@@ -12,7 +12,8 @@
  * Two rows are the same company when either their names or their sites say so:
  *  - the same name once its legal form is off the end, so "…y Servicios" and
  *    "…Y SERVICIOS SA" meet, and accents fold on the way;
- *  - the same site host, which catches the pair a rename or a trade name hides.
+ *  - the same site host, once the domain spells one of them, which catches the pair
+ *    a rename or a trade name hides.
  * Either alone is enough, and sameness carries: A meeting B by name and B meeting C
  * by host makes all three one company, which is what they are.
  *
@@ -40,8 +41,23 @@
  * others rather than the first arrival standing for all of them — a company working
  * from four towns is worth knowing about, and four towns is what the run found.
  *
- * It runs after the website check, so a member-directory address several rows shared
- * is already gone by the time a host counts as evidence two rows are one company.
+ * A shared host only counts once something establishes it as one of the rows' own
+ * site. The website check ahead of this does blank an address several rows claim and
+ * none of them is named by — but it weighs one reading at a time, and a search that
+ * looks again round after round hands it a single claimant each time. A trade body's
+ * member page given to one company this round and to another the next is never two
+ * claims at once, so it survives every pass and arrives here looking like a site two
+ * rows share. What tells that apart from a real shared site is whether the domain
+ * spells either company: a host that is nobody's own is no evidence that two
+ * companies are one. Where it is somebody's own, the rows beside them on it are that
+ * company again under another name, which is the pair this fold exists for.
+ *
+ * What that costs, on purpose: one company written twice at a domain that spells
+ * neither writing of it — an acronym, a name with a word in front — stays two rows,
+ * and the reader sorts it out. That is the direction to be wrong in. A duplicate is
+ * a nuisance on a list somebody reads; a wrong fold takes a real company off it with
+ * nothing said, and — since a row is confirmed by the websites naming it — hands the
+ * survivor evidence gathered about somebody else.
  */
 
 import {
@@ -53,7 +69,12 @@ import {
 	withoutFormDots,
 } from './entity-guard'
 import { isPlainObject } from './guard-shapes'
+import { ownSiteVerdict } from './own-site'
 import { hostOf, isBareWebAddress } from './source-key'
+
+// What marks a key as filing a row under its site. Written once, because a caller
+// asking which key joined two rows reads the same mark this writes.
+const SITE_KEY_PREFIX = 'host:'
 
 // The host of a row's own site, or null when the field holds nothing an address can
 // be read from. Null is also what a branch page looks like: it is the head office
@@ -66,9 +87,51 @@ const siteHostOf = (row: Record<string, unknown>): string | null => {
 }
 
 /**
+ * The hosts among these rows that a row is established as owning — the domain
+ * spells that company, so the site is plainly its own.
+ *
+ * Read across the whole list at once rather than row by row, because the pair this
+ * answers for is a company met under two names: "SICE" on sice.com beside
+ * "Sociedad Ibérica de Construcciones Eléctricas" on the same host, where only the
+ * first name spells the domain. One row establishing the host settles who it
+ * belongs to for every row standing on it — the same reasoning the website check
+ * makes when it stands its shared-host rule down.
+ *
+ * Nothing here clears a host, and nothing needs to: a host no row establishes is
+ * `unknown`, which is not a verdict that two rows are different companies. It is
+ * only the absence of a reason to say they are the same one, and the names still
+ * have their say.
+ */
+export const hostsEstablishedAsOwn = (
+	rows: ReadonlyArray<unknown>,
+): ReadonlySet<string> => {
+	const hosts = new Set<string>()
+	for (const row of rows) {
+		if (!isPlainObject(row)) continue
+		const website = row['website']
+		const name = row['name']
+		// Nothing to read: no address, or no company for a domain to spell. Either
+		// way nothing is established, which is the answer rather than a missing one.
+		if (typeof website !== 'string' || typeof name !== 'string') continue
+		// Filed under the host the identity key would file it under, so the row that
+		// establishes a site and the row that needs it meet on the same spelling.
+		const host = siteHostOf(row)
+		if (host === null) continue
+		if (ownSiteVerdict({ name, website }) === 'established') hosts.add(host)
+	}
+	return hosts
+}
+
+/**
  * What a row is filed under: its name with the legal form off the end, and the host
- * of its site. Either identifies the company on its own. A key nothing can be read
- * from is left out rather than becoming a key every thin row shares.
+ * of its site when that host is one of `ownSiteHosts`. Either identifies the company
+ * on its own. A key nothing can be read from is left out rather than becoming a key
+ * every thin row shares.
+ *
+ * `ownSiteHosts` comes from `hostsEstablishedAsOwn`, over every row this key is
+ * about to be compared against — both sides of a fold, not one. It is asked for
+ * rather than worked out here so a caller cannot compare keys read from two
+ * different readings of who owns what.
  *
  * Exported because the fold here is not the only place one company can arrive
  * twice: a later round that looks again for a company's missing fields matches what
@@ -77,6 +140,7 @@ const siteHostOf = (row: Record<string, unknown>): string | null => {
  */
 export const discoveryRowIdentityKeys = (
 	row: Record<string, unknown>,
+	ownSiteHosts: ReadonlySet<string>,
 ): ReadonlyArray<string> => {
 	const keys: Array<string> = []
 	const name = row['name']
@@ -89,9 +153,21 @@ export const discoveryRowIdentityKeys = (
 		if (filedAs !== '') keys.push(`name:${filedAs}`)
 	}
 	const host = siteHostOf(row)
-	if (host !== null) keys.push(`host:${host}`)
+	if (host !== null && ownSiteHosts.has(host))
+		keys.push(`${SITE_KEY_PREFIX}${host}`)
 	return keys
 }
+
+/**
+ * Whether a key files a row under its site rather than its name.
+ *
+ * Exported so a caller can tell which of the two joined two rows without taking
+ * the key apart itself. A join two names made is the ordinary one; a join a site
+ * made on its own is the one worth counting, and it is what the fold is asked to
+ * be careful about.
+ */
+export const isSiteKey = (key: string): boolean =>
+	key.startsWith(SITE_KEY_PREFIX)
 
 // Whether one name says another name and then more, word for word — "Terre Solaire"
 // starts "Terre Solaire – agence Lyon". Whole words, because the letters alone would
@@ -315,10 +391,12 @@ export const dedupeDiscoveryRows = (
 			// them in however the two rows turn out to be joined up.
 			companyOfRow[Math.max(one, other)] = Math.min(one, other)
 		}
+
+		const ownSiteHosts = hostsEstablishedAsOwn(rows)
 		const rowOfKey = new Map<string, number>()
 		rows.forEach((row, at) => {
 			if (!isPlainObject(row)) return
-			for (const key of discoveryRowIdentityKeys(row)) {
+			for (const key of discoveryRowIdentityKeys(row, ownSiteHosts)) {
 				const seen = rowOfKey.get(key)
 				if (seen === undefined) rowOfKey.set(key, at)
 				else sameCompany(seen, at)

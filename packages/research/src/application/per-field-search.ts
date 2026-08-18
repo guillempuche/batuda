@@ -27,6 +27,8 @@ import { isPlainObject, isValueWrapper, unwrapValue } from './guard-shapes'
 import {
 	dedupeDiscoveryRows,
 	discoveryRowIdentityKeys,
+	hostsEstablishedAsOwn,
+	isSiteKey,
 } from './prospect-dedupe-guard'
 
 // The company-profile facts worth spending an extra search on. `size_range` is
@@ -224,6 +226,22 @@ export interface PerFieldMerge {
 	 * list, and has found nobody.
 	 */
 	readonly added: number
+	/**
+	 * How many companies went into this fold and did not come out as a row of
+	 * their own, other than by carrying a name the list already held. Usually none.
+	 *
+	 * Not a count of mistakes — a round that fills in the site showing two listed
+	 * companies were always one folds a row away for a good reason. It is reported
+	 * because nothing else shows the opposite case: a company a round found, taken
+	 * for one already listed on a website belonging to neither, and gone from the
+	 * answer with nothing said. The duplicate figure cannot show that, since a row
+	 * that was dropped is not a duplicate.
+	 *
+	 * A round that re-reads companies already listed is not counted, however many
+	 * it re-reads: they meet by name, which is the ordinary case and the reason
+	 * the rounds run at all.
+	 */
+	readonly folded: number
 }
 
 /**
@@ -256,7 +274,7 @@ const mergeScanRows = (
 		findings === null ||
 		typeof findings !== 'object'
 	) {
-		return { findings, filled: 0, contactsChanged: false, added: 0 }
+		return { findings, filled: 0, contactsChanged: false, added: 0, folded: 0 }
 	}
 	// Rows are matched on what identifies the company — its name with the legal
 	// form off the end, or its site — not on the name as written. A second look
@@ -264,17 +282,23 @@ const mergeScanRows = (
 	// legal name, so matching the name as written files it as somebody new: the
 	// list grows a second copy instead of the first copy gaining what the round
 	// went looking for.
+	//
+	// Who owns which site is read off both sides at once. A round meets a company
+	// under a name that does not spell its domain while the list already holds it
+	// under one that does — and asking each side on its own would leave the site
+	// speaking for the row that has it and silent for the row that needs it.
+	const ownSiteHosts = hostsEstablishedAsOwn([...known, ...found])
 	const foundByKey = new Map<string, Record<string, unknown>>()
 	for (const row of found) {
 		// First mention wins: a later duplicate of the same company in the same
 		// re-extraction has no better claim, and picking one keeps the fold stable.
-		for (const key of discoveryRowIdentityKeys(row)) {
+		for (const key of discoveryRowIdentityKeys(row, ownSiteHosts)) {
 			if (!foundByKey.has(key)) foundByKey.set(key, row)
 		}
 	}
 	let filled = 0
 	const merged = known.map(row => {
-		const match = discoveryRowIdentityKeys(row)
+		const match = discoveryRowIdentityKeys(row, ownSiteHosts)
 			.map(key => foundByKey.get(key))
 			.find(found => found !== undefined)
 		if (match === undefined) return row
@@ -293,19 +317,38 @@ const mergeScanRows = (
 	// company twice appends it once. A duplicate would not only read badly — the
 	// list's length is what decides whether a scan came back too thin to trust,
 	// so counting one company twice can pass a scan off as healthier than it is.
-	const taken = new Set(known.flatMap(row => discoveryRowIdentityKeys(row)))
+	const taken = new Set(
+		known.flatMap(row => discoveryRowIdentityKeys(row, ownSiteHosts)),
+	)
+	// Companies this round named that a site alone joined to one already listed.
+	// Counted here because this is where such a row stops being a row: it is not
+	// appended, and no later step sees it to fold or to report.
+	let joinedOnSite = 0
 	const additions = found.filter(row => {
 		// Matching an existing company takes any of the keys; becoming a new row in
 		// the list takes a name. A company nobody can name is one nobody can work
 		// with, whatever else is known about it.
 		if (rowName(row) === undefined) return false
-		const keys = discoveryRowIdentityKeys(row)
-		if (keys.some(key => taken.has(key))) return false
+		const keys = discoveryRowIdentityKeys(row, ownSiteHosts)
+		const metOn = keys.filter(key => taken.has(key))
+		if (metOn.length > 0) {
+			// A round re-reading a company it already found meets it by name, which
+			// is the ordinary case and says nothing. A round whose company only ever
+			// met a listed one through a website is the case worth watching.
+			if (metOn.every(isSiteKey)) joinedOnSite++
+			return false
+		}
 		for (const key of keys) taken.add(key)
 		return true
 	})
 	if (filled === 0 && additions.length === 0) {
-		return { findings, filled: 0, contactsChanged: false, added: 0 }
+		return {
+			findings,
+			filled: 0,
+			contactsChanged: false,
+			added: 0,
+			folded: joinedOnSite,
+		}
 	}
 	// This round has just moved the ground under the fold that ran before the rounds
 	// began: it appends companies that fold never saw, and fills in the website of a
@@ -345,6 +388,14 @@ const mergeScanRows = (
 			before === undefined || after === undefined
 				? additions.length
 				: Math.max(0, after - before),
+		// The companies a site joined to one already listed, plus the rows this fold
+		// then joined to another — rows in, less rows out. A company the round
+		// simply did not name again is not in either: it stays on the list.
+		folded:
+			joinedOnSite +
+			(after === undefined
+				? 0
+				: Math.max(0, merged.length + additions.length - after)),
 	}
 }
 
@@ -370,7 +421,7 @@ export const mergePerFieldSearch = (
 	const enrichment = enrichmentOf(findings)
 	const refreshedEnrichment = enrichmentOf(refreshed)
 	if (enrichment === undefined || refreshedEnrichment === undefined) {
-		return { findings, filled: 0, contactsChanged: false, added: 0 }
+		return { findings, filled: 0, contactsChanged: false, added: 0, folded: 0 }
 	}
 	let filled = 0
 	const nextEnrichment: Record<string, unknown> = { ...enrichment }
@@ -391,7 +442,7 @@ export const mergePerFieldSearch = (
 		contacts.length !== known.length ||
 		contacts.some((contact, index) => contact !== known[index])
 	if (filled === 0 && !contactsChanged) {
-		return { findings, filled: 0, contactsChanged: false, added: 0 }
+		return { findings, filled: 0, contactsChanged: false, added: 0, folded: 0 }
 	}
 	return {
 		findings: {
@@ -402,5 +453,6 @@ export const mergePerFieldSearch = (
 		filled,
 		contactsChanged,
 		added: 0,
+		folded: 0,
 	}
 }

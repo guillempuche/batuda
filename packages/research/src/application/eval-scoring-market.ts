@@ -15,6 +15,7 @@ import type { MarketPart, RunOutcome } from './eval-scoring-types'
 import {
 	branchOfficeParents,
 	discoveryRowIdentityKeys,
+	hostsEstablishedAsOwn,
 } from './prospect-dedupe-guard'
 import { anyTermAppearsIn, termTokens } from './term-match'
 
@@ -85,8 +86,9 @@ export const isKnownNonCompany = (
  * companies they turn out to be.
  *
  * Two rows are one company when they share a name with the legal form off the end,
- * share a site host, or one reads as the other's branch office — the same three ways
- * the scan itself folds rows, and sameness carries across all of them.
+ * share a site host once the domain spells one of them, or one reads as the other's
+ * branch office — the same three ways the scan itself folds rows, and sameness
+ * carries across all of them.
  *
  * Reusing what the fold uses is what this number is worth and what bounds it. The
  * list it reads has already been folded that way, so nothing it can see should be
@@ -109,6 +111,10 @@ export const duplicatedRows = (rows: RunOutcome['companies']): number => {
 		...(row.location === null ? {} : { location: row.location }),
 	}))
 	const parentOfBranch = branchOfficeParents(asDiscoveryRows)
+	// Read over the whole returned list, which is the list the fold read too. Asking
+	// row by row would make this stricter than the fold it measures, and call a list
+	// clean while it still holds the pairs the fold joins on a site.
+	const ownSiteHosts = hostsEstablishedAsOwn(asDiscoveryRows)
 
 	// Each company found so far, as the keys its rows filed under. A row meeting one
 	// of them is that company again; a row meeting two proves those two were one
@@ -119,8 +125,10 @@ export const duplicatedRows = (rows: RunOutcome['companies']): number => {
 		const parent = parentOfBranch.get(at)
 		const parentRow = parent === undefined ? undefined : asDiscoveryRows[parent]
 		const keys = [
-			...discoveryRowIdentityKeys(row),
-			...(parentRow === undefined ? [] : discoveryRowIdentityKeys(parentRow)),
+			...discoveryRowIdentityKeys(row, ownSiteHosts),
+			...(parentRow === undefined
+				? []
+				: discoveryRowIdentityKeys(parentRow, ownSiteHosts)),
 		]
 		const matched = companies.filter(company =>
 			keys.some(key => company.has(key)),
