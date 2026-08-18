@@ -1,6 +1,8 @@
 import { Effect } from 'effect'
 import type { ImapFlow } from 'imapflow'
 
+import { boundedCause } from '@batuda/observability'
+
 import { ingestRawMessage } from './ingest.js'
 
 // Initial backfill — runs once per (folder, inbox) when folder_state is
@@ -60,7 +62,7 @@ export const backfillSinceDate = (args: {
 				Effect.catchCause(cause =>
 					Effect.logWarning(
 						`mail-worker: backfill ingest failed inbox=${args.inboxId} uid=${m.uid}`,
-					).pipe(Effect.andThen(Effect.logError(cause))),
+					).pipe(Effect.andThen(Effect.logError(boundedCause(cause)))),
 				),
 			)
 			if (m.uid > highest) highest = m.uid

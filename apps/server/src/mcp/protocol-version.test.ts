@@ -3,21 +3,69 @@
 // cannot recover from.
 //
 // These drive a real in-process MCP server through a middleware shaped like the
-// live one — normalise the request, read its body, hand the same one onward —
-// because the worst failure here is invisible to the header logic alone: a
-// request remembers the body it read and a copy does not, so handing the route
-// the other one leaves it waiting on a drained stream, with no error, no
-// timeout, and no response ever. Only the round trip catches that.
+// live one — open the record, normalise the request, name the call, read its
+// body, hand the same one onward — because the worst failure here is invisible to
+// the header logic alone: a request remembers the body it read and a copy does
+// not, so handing the route the other one leaves it waiting on a drained stream,
+// with no error, no timeout, and no response ever. Only the round trip catches
+// that.
+//
+// The refusal a settled connection still gets is covered here too: it is the
+// library's own answer, so only a real server produces it, and what a client and
+// a reader can learn from it is the whole point of the cases below.
 
 import { createServer } from 'node:http'
 
 import { NodeHttpServer } from '@effect/platform-node'
-import { Effect, Layer, ManagedRuntime, Schema } from 'effect'
+import {
+	Effect,
+	Layer,
+	Logger,
+	ManagedRuntime,
+	References,
+	Schema,
+} from 'effect'
 import { McpServer, Tool, Toolkit } from 'effect/unstable/ai'
 import { HttpRouter, HttpServer, HttpServerRequest } from 'effect/unstable/http'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { withNegotiableProtocolVersion } from './http'
+import { withRequestRecord } from '../lib/observability-middleware'
+import {
+	explainRefusedVersion,
+	recordCall,
+	withNegotiableProtocolVersion,
+} from './http'
+
+// Every line the server wrote, read the way the built-in formatters read them:
+// annotations live on the fiber, not on the log options.
+const lines: Array<{
+	readonly level: string
+	readonly annotations: Record<string, unknown>
+}> = []
+
+const CaptureLogsLive = Layer.provideMerge(
+	Layer.succeed(References.MinimumLogLevel, 'Debug'),
+)(
+	Logger.layer([
+		Logger.make(options => {
+			lines.push({
+				level: String(options.logLevel),
+				annotations: {
+					...options.fiber.getRef(References.CurrentLogAnnotations),
+				},
+			})
+		}),
+	]),
+)
+
+const lineFor = (event: string) =>
+	lines.find(line => line.annotations['event'] === event)
+
+// What a client should be able to read off a refusal.
+const JsonRpcError = Schema.Struct({
+	jsonrpc: Schema.String,
+	error: Schema.Struct({ code: Schema.Number, message: Schema.String }),
+})
 
 const Ping = Tool.make('ping', { success: Schema.String })
 const PingTools = Toolkit.make(Ping)
@@ -30,17 +78,22 @@ const PingHandlersLive = PingTools.toLayer(
 const NegotiationMiddleware = HttpRouter.middleware(
 	Effect.gen(function* () {
 		return httpEffect =>
-			Effect.gen(function* () {
-				const incoming = yield* HttpServerRequest.HttpServerRequest
-				if (!incoming.url.startsWith('/mcp')) return yield* httpEffect
-				const req = yield* withNegotiableProtocolVersion(incoming)
-				// The live middleware reads the body here, to record which client
-				// called; doing the same is the point of this harness.
-				yield* req.json.pipe(Effect.orElseSucceed(() => null))
-				return yield* httpEffect.pipe(
-					Effect.provideService(HttpServerRequest.HttpServerRequest, req),
-				)
-			})
+			// The request record is opened outermost in the live server, which is
+			// what lets the steps below write facts onto the request's own line.
+			withRequestRecord(
+				Effect.gen(function* () {
+					const incoming = yield* HttpServerRequest.HttpServerRequest
+					if (!incoming.url.startsWith('/mcp')) return yield* httpEffect
+					const req = yield* withNegotiableProtocolVersion(incoming)
+					yield* recordCall(incoming)
+					// The live middleware reads the body here, to record which client
+					// called; doing the same is the point of this harness.
+					yield* req.json.pipe(Effect.orElseSucceed(() => null))
+					return yield* explainRefusedVersion(httpEffect, req).pipe(
+						Effect.provideService(HttpServerRequest.HttpServerRequest, req),
+					)
+				}),
+			)
 	}),
 	{ global: true },
 )
@@ -56,7 +109,11 @@ const McpHttpLive = Layer.mergeAll(
 
 const ServerLive = HttpRouter.serve(McpHttpLive, {
 	disableListenLog: true,
-}).pipe(Layer.provideMerge(NodeHttpServer.layer(createServer, { port: 0 })))
+	disableLogger: true,
+}).pipe(
+	Layer.provide(CaptureLogsLive),
+	Layer.provideMerge(NodeHttpServer.layer(createServer, { port: 0 })),
+)
 
 const runtime = ManagedRuntime.make(ServerLive)
 let baseUrl: string
@@ -147,10 +204,11 @@ describe('the /mcp route meeting a protocol revision it does not know', () => {
 	})
 
 	describe('when a client names a bad revision after one was agreed', () => {
-		it('should still refuse it, since it was told what to send', async () => {
+		it('should refuse it with something the client can read', async () => {
 			// GIVEN a connection that already settled a revision
 			const opening = await initialize()
 			const sessionId = opening.headers.get('mcp-session-id') as string
+			lines.length = 0
 
 			// WHEN a later request names one the library does not know
 			const response = await post(
@@ -160,12 +218,82 @@ describe('the /mcp route meeting a protocol revision it does not know', () => {
 					method: 'tools/call',
 					params: { name: 'ping', arguments: {} },
 				},
-				{ 'mcp-session-id': sessionId, 'mcp-protocol-version': '2026-07-28' },
+				{
+					'mcp-session-id': sessionId,
+					'mcp-protocol-version': '2026-07-28',
+					'mcp-method': 'server/discover',
+				},
 			)
 
 			// THEN the refusal stands — the client was told which revision this is,
 			// so naming another one is its own mistake to fix
 			expect(response.status).toBe(400)
+
+			// AND it carries a JSON-RPC error naming the revision, rather than the
+			// empty body a client can do nothing with. Decoding is half the
+			// assertion: a body of another shape fails here.
+			const body = Schema.decodeUnknownSync(JsonRpcError)(await response.json())
+			expect(body.error.code).toBe(-32000)
+			expect(body.error.message).toContain('2026-07-28')
+		})
+
+		it('should leave a warning naming the refusal', async () => {
+			// GIVEN the same refused request
+			const opening = await initialize()
+			const sessionId = opening.headers.get('mcp-session-id') as string
+			lines.length = 0
+			await post(
+				{ jsonrpc: '2.0', id: 4, method: 'tools/call', params: {} },
+				{
+					'mcp-session-id': sessionId,
+					'mcp-protocol-version': '2026-07-28',
+					'mcp-method': 'server/discover',
+				},
+			)
+
+			// THEN the refusal is a warning, not another routine info line, and it
+			// names the revision that was turned down
+			const refusal = lineFor('mcp.protocol_version.refused')
+			expect(refusal?.level).toBe('Warn')
+			expect(refusal?.annotations['mcp.protocol_version.named']).toBe(
+				'2026-07-28',
+			)
+
+			// AND the request's own line says which call it was, so the 400 explains
+			// itself without hunting for the line beside it
+			const request = lineFor('http.request')
+			expect(request?.annotations['mcp.method']).toBe('server/discover')
+			expect(request?.annotations['mcp.protocol_version.named']).toBe(
+				'2026-07-28',
+			)
+			expect(request?.annotations['http.status']).toBe(400)
+		})
+	})
+
+	describe('when the body is broken rather than the revision', () => {
+		it('should not blame the revision for it', async () => {
+			// GIVEN a settled connection naming a revision this server DOES know
+			const opening = await initialize()
+			const sessionId = opening.headers.get('mcp-session-id') as string
+			lines.length = 0
+
+			// WHEN the body it sends is not valid JSON
+			const response = await fetch(`${baseUrl}/mcp`, {
+				method: 'POST',
+				headers: {
+					'content-type': 'application/json',
+					accept: 'application/json, text/event-stream',
+					'mcp-session-id': sessionId,
+					'mcp-protocol-version': '2025-06-18',
+				},
+				body: '{"jsonrpc":"2.0","id":5,"method":',
+			})
+
+			// THEN nothing claims the revision was the problem — a bad body and a
+			// refused revision both end in 400, and telling a client to re-open its
+			// connection would send it chasing the wrong thing
+			expect(await response.text()).not.toContain('Unsupported MCP protocol')
+			expect(lineFor('mcp.protocol_version.refused')).toBeUndefined()
 		})
 	})
 

@@ -2,6 +2,8 @@ import { Effect, Result, Schedule } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 import { ImapFlow } from 'imapflow'
 
+import { boundedCause } from '@batuda/observability'
+
 import { backfillSinceDate } from './backfill.js'
 import type { ClaimedInbox } from './claim.js'
 import { CredentialDecryptor } from './decrypt.js'
@@ -140,7 +142,7 @@ const syncOneFolderTick = (args: {
 				inboxId: args.inbox.id,
 				imapUidvalidity: e.uidValidity,
 				imapUid: e.uid,
-			}).pipe(Effect.catchCause(cause => Effect.logError(cause)))
+			}).pipe(Effect.catchCause(cause => Effect.logError(boundedCause(cause))))
 		}
 
 		const known = args.progress.get(args.folder.path) ?? null
@@ -332,7 +334,7 @@ export const runInboxSession = (claimed: ClaimedInbox) =>
 						Effect.catchCause(cause =>
 							Effect.logWarning(
 								`mail-worker: folder tick failed inbox=${claimed.id} folder=${folder.path}`,
-							).pipe(Effect.andThen(Effect.logError(cause))),
+							).pipe(Effect.andThen(Effect.logError(boundedCause(cause)))),
 						),
 					)
 				}
@@ -351,7 +353,9 @@ export const runInboxSession = (claimed: ClaimedInbox) =>
 						new Error(
 							`mailboxOpen(${folderToWaitOn.path}) failed: ${String(err)}`,
 						),
-				}).pipe(Effect.catchCause(cause => Effect.logError(cause)))
+				}).pipe(
+					Effect.catchCause(cause => Effect.logError(boundedCause(cause))),
+				)
 				yield* Effect.sync(() => {
 					void client.idle().catch(() => {})
 				})

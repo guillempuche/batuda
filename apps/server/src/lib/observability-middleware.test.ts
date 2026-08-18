@@ -2,10 +2,9 @@ import { Cause, Effect, Layer, Logger, References } from 'effect'
 import { HttpServerRequest } from 'effect/unstable/http'
 import { describe, expect, it } from 'vitest'
 
-import { recordFacts } from '@batuda/observability'
+import { boundedCause, recordFacts } from '@batuda/observability'
 
 import {
-	boundedCause,
 	httpPathPattern,
 	withRequestRecord,
 } from './observability-middleware.js'

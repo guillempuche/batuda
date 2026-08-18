@@ -5,26 +5,12 @@ import {
 	HttpServerRequest,
 } from 'effect/unstable/http'
 
-import { makeWorkRecord, WorkRecord } from '@batuda/observability'
+import { boundedCause, makeWorkRecord, WorkRecord } from '@batuda/observability'
 
 // Collapse record-identifying URL segments so errors group by route, not by
 // individual record. UUIDs → :id; the query string and fragment are dropped so
 // a token in `?code=…`/`?token=…` never lands in a span attribute or log line.
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi
-
-// A crash's cause is the most useful thing it leaves behind, so it is kept in
-// full rather than summarised — but bounded. A cause wrapping a driver error can
-// carry the failing statement and the values in it, and an unbounded one would
-// ship a whole request payload to the log exporter, which flushes every second.
-// Note this bounds the size, not the content: error text can still name business
-// data incidentally, which is why observability retention is short.
-const MAX_CAUSE_CHARS = 4000
-
-export const boundedCause = (cause: Cause.Cause<unknown>): string => {
-	const text = Cause.pretty(cause)
-	if (text.length <= MAX_CAUSE_CHARS) return text
-	return `${text.slice(0, MAX_CAUSE_CHARS)}… (${text.length - MAX_CAUSE_CHARS} more characters)`
-}
 
 /**
  * A request that says nothing beyond "the poller is still polling".
