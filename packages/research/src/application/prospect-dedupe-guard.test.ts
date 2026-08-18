@@ -3,6 +3,9 @@ import { describe, expect, it } from 'vitest'
 import {
 	branchOfficeParents,
 	dedupeDiscoveryRows,
+	discoveryRowIdentityKeys,
+	hostsEstablishedAsOwn,
+	isSiteKey,
 } from './prospect-dedupe-guard'
 
 const scan = (
@@ -256,6 +259,88 @@ describe('dedupeDiscoveryRows', () => {
 			// WHEN de-duplicated — THEN no host can be read, so neither row lends one
 			const result = dedupeDiscoveryRows(findings, 'prospects')
 			expect(rowsOf(result.findings)).toHaveLength(2)
+		})
+
+		it('should keep two companies handed a page each on a host neither is named by', () => {
+			// GIVEN two installers each given their page in a trade body's member list
+			const findings = scan([
+				{ name: 'Electricidad Mora', website: 'https://aemiat.com/e-mora/' },
+				{ name: 'Instalaciones Rubio', website: 'https://aemiat.com/rubio/' },
+			])
+
+			// WHEN de-duplicated
+			// THEN both stay. The domain spells neither of them, so it is nobody's own
+			// site and says nothing about whether these are one company
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(rowsOf(result.findings).map(row => row['name'])).toEqual([
+				'Electricidad Mora',
+				'Instalaciones Rubio',
+			])
+			expect(result.merged).toBe(0)
+		})
+
+		it("should not carry sameness through a host that is nobody's own", () => {
+			// GIVEN A and B meeting by name, and C sharing only the trade body's host
+			const findings = scan([
+				{ name: 'Electricidad Mora SL', why_relevant: 'A.' },
+				{ name: 'Electricidad Mora', website: 'https://aemiat.com/e-mora/' },
+				{ name: 'Instalaciones Rubio', website: 'https://aemiat.com/rubio/' },
+			])
+
+			// WHEN de-duplicated
+			// THEN the two spellings of one name still meet, and the third company is
+			// not dragged in behind them by an address none of the three owns
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(rowsOf(result.findings).map(row => row['name'])).toEqual([
+				'Electricidad Mora SL',
+				'Instalaciones Rubio',
+			])
+			expect(result.merged).toBe(1)
+		})
+	})
+
+	describe('when a host belongs to one of the rows standing on it', () => {
+		it('should fold a row given a page on a company site that spells that company', () => {
+			// GIVEN a company at the domain that spells its name, and a second row the
+			// run put on a page of that same site under a name of its own
+			const findings = scan([
+				{ name: 'Terre Solaire', website: 'https://terresolaire.com/' },
+				{
+					name: 'SAS Soleil du Sud',
+					website: 'https://terresolaire.com/qui-sommes-nous',
+				},
+			])
+
+			// WHEN de-duplicated
+			// THEN one company. The domain says whose site it is, so the row beside it
+			// is that company again under another name — the trade name beside the
+			// legal one, which is the pair this fold exists for
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(rowsOf(result.findings)).toHaveLength(1)
+			expect(rowsOf(result.findings)[0]?.['name']).toBe('Terre Solaire')
+		})
+
+		it('should let a third row establish the host the other two stand on', () => {
+			// GIVEN two rows on a host neither of their names spells, and a third row
+			// whose name does
+			const findings = scan([
+				{
+					name: 'Sociedad Ibérica de Construcciones Eléctricas',
+					website: 'https://sice.com/es',
+				},
+				{
+					name: 'Ibérica de Señalización Vial',
+					website: 'https://sice.com/senalizacion',
+				},
+				{ name: 'SICE', website: 'https://www.sice.com' },
+			])
+
+			// WHEN de-duplicated
+			// THEN all three are one company. Who owns a domain is read across the whole
+			// list, so the row that spells it settles the host for every row on it
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(rowsOf(result.findings)).toHaveLength(1)
+			expect(result.merged).toBe(2)
 		})
 	})
 
@@ -748,6 +833,131 @@ describe('branchOfficeParents', () => {
 			// GIVEN nothing to read
 			// WHEN the branches are worked out — THEN there are none
 			expect(branchOfficeParents([])).toEqual(new Map())
+		})
+	})
+})
+
+describe('hostsEstablishedAsOwn', () => {
+	describe('when a row stands at the domain that spells it', () => {
+		it("should read the host as that company's own", () => {
+			// GIVEN a workshop at the domain carrying its name
+			const rows = [
+				{
+					name: 'Fusteria Miquel',
+					website: 'https://fusteriamiquel.cat/qui-som',
+				},
+			]
+
+			// WHEN the owned hosts are worked out — THEN the host is one of them
+			expect(hostsEstablishedAsOwn(rows)).toEqual(
+				new Set(['fusteriamiquel.cat']),
+			)
+		})
+
+		it('should file the host the way a row files it, with the www off', () => {
+			// GIVEN one row writing the address with www and another without
+			const rows = [
+				{ name: 'SICE', website: 'https://www.sice.com' },
+				{
+					name: 'Sociedad Ibérica de Construcciones',
+					website: 'https://sice.com/es',
+				},
+			]
+
+			// WHEN the owned hosts are worked out
+			// THEN one host, spelled the way the identity keys spell it — otherwise the
+			// row that establishes a site and the row that needs it never meet
+			expect(hostsEstablishedAsOwn(rows)).toEqual(new Set(['sice.com']))
+		})
+	})
+
+	describe('when nothing establishes who a host belongs to', () => {
+		it('should leave out a host that spells neither company on it', () => {
+			// GIVEN two installers on a trade body's member pages
+			const rows = [
+				{ name: 'Electricidad Mora', website: 'https://aemiat.com/e-mora/' },
+				{ name: 'Instalaciones Rubio', website: 'https://aemiat.com/rubio/' },
+			]
+
+			// WHEN the owned hosts are worked out — THEN there are none
+			expect(hostsEstablishedAsOwn(rows)).toEqual(new Set())
+		})
+
+		it('should leave out a host merely carrying a word of the name', () => {
+			// GIVEN a listing site whose own domain happens to open with the name
+			const rows = [
+				{ name: 'Acme', website: 'https://acme-directory.com/acme' },
+			]
+
+			// WHEN the owned hosts are worked out
+			// THEN none. A domain has to BE the name, or every listing filed under a
+			// company would clear itself as that company's site
+			expect(hostsEstablishedAsOwn(rows)).toEqual(new Set())
+		})
+
+		it('should pass over a row with no name to judge the domain against', () => {
+			// GIVEN a row that gives a site and never says whose it is
+			const rows = [{ website: 'https://terresolaire.com/' }]
+
+			// WHEN the owned hosts are worked out — THEN nothing is established, which
+			// is the answer rather than a missing one
+			expect(hostsEstablishedAsOwn(rows)).toEqual(new Set())
+		})
+
+		it('should pass over a row whose name is empty', () => {
+			// GIVEN a row whose name field came back blank
+			const rows = [{ name: '   ', website: 'https://terresolaire.com/' }]
+
+			// WHEN the owned hosts are worked out — THEN a blank spells no domain, so
+			// the site is left standing for nobody
+			expect(hostsEstablishedAsOwn(rows)).toEqual(new Set())
+		})
+
+		it('should pass over a row whose website is not an address', () => {
+			// GIVEN a row answering the website question in words
+			const rows = [
+				{
+					name: 'Terre Solaire',
+					website: 'https://terresolaire.com (inferred)',
+				},
+			]
+
+			// WHEN the owned hosts are worked out — THEN there is no domain to read
+			expect(hostsEstablishedAsOwn(rows)).toEqual(new Set())
+		})
+
+		it('should pass over list entries that are not rows', () => {
+			// GIVEN a list holding a null beside a real row
+			const rows = [
+				null,
+				'not a row',
+				{ name: 'SICE', website: 'https://sice.com' },
+			]
+
+			// WHEN the owned hosts are worked out — THEN only the real row is read
+			expect(hostsEstablishedAsOwn(rows)).toEqual(new Set(['sice.com']))
+		})
+
+		it('should find nothing in an empty list', () => {
+			// GIVEN nothing to read
+			// WHEN the owned hosts are worked out — THEN there are none
+			expect(hostsEstablishedAsOwn([])).toEqual(new Set())
+		})
+	})
+})
+
+describe('isSiteKey', () => {
+	describe('when asked which of the two keys joined a pair of rows', () => {
+		it('should tell a key filed under a site from one filed under a name', () => {
+			// GIVEN the keys a row with both a name and its own site files under
+			const keys = discoveryRowIdentityKeys(
+				{ name: 'SICE', website: 'https://sice.com' },
+				new Set(['sice.com']),
+			)
+
+			// WHEN each is asked — THEN only the site key says yes, so a caller can
+			// count the joins a website made without taking a key apart itself
+			expect(keys.map(isSiteKey)).toEqual([false, true])
 		})
 	})
 })

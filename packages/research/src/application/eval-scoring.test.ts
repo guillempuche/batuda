@@ -857,8 +857,33 @@ describe('scoring a run that answered for a whole market', () => {
 				}),
 			)
 
-			// WHEN scored — THEN the shared site is enough
+			// WHEN scored — THEN the shared site is enough, because the domain spells
+			// one of the two names and so says whose site it is
 			expect(score.market?.rowsDuplicated).toBe(1)
+		})
+
+		it('should count two rows on a website neither of them is named by as two companies', () => {
+			// GIVEN two installers each given a page on a trade body's member list
+			const score = scoreRun(
+				marketGolden(),
+				outcome({
+					companies: [
+						company({
+							name: 'Electricidad Mora',
+							website: 'https://aemiat.example/e-mora/',
+						}),
+						company({
+							name: 'Instalaciones Rubio',
+							website: 'https://aemiat.example/rubio/',
+						}),
+					],
+				}),
+			)
+
+			// WHEN scored — THEN neither is a duplicate of the other, which is what the
+			// fold decided too. A count reading the list more loosely than the fold
+			// would report duplicates the fold is right to have left standing
+			expect(score.market?.rowsDuplicated).toBe(0)
 		})
 
 		it('should carry sameness across a chain of rows', () => {

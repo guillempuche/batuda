@@ -613,22 +613,28 @@ describe('mergePerFieldSearch', () => {
 		})
 
 		it('should fold a company the round gave the site of one already listed', () => {
-			// GIVEN a company with its site, and a round that names it again under a
-			// different name and hands it the same site — the shape a live run returned
-			// as two rows both on aeroxsense.com
+			// GIVEN a company at the domain that spells its name, and a round that names
+			// it again under a longer name and hands it the same site — the shape a live
+			// run returned as two rows both on aeroxsense.com
 			const findings = {
-				prospects: [{ name: 'AeroXsense', website: 'https://www.aero.test/' }],
+				prospects: [
+					{ name: 'AeroXsense', website: 'https://www.aeroxsense.test/' },
+				],
 			}
 			const refreshed = {
 				prospects: [
-					{ name: 'AeroXsense (Fire Safety)', website: 'https://aero.test/' },
+					{
+						name: 'AeroXsense (Fire Safety)',
+						website: 'https://aeroxsense.test/',
+					},
 				],
 			}
 			// WHEN merged
 			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
 			const rows = prospectsOf(merged.findings)
-			// THEN the shared host settles it here too. A row appended by a round is
-			// never put in front of the fold again unless this step folds it
+			// THEN the shared host settles it here too, because the domain says whose it
+			// is. A row appended by a round is never put in front of the fold again
+			// unless this step folds it
 			expect(rows).toHaveLength(1)
 			expect(merged.added).toBe(0)
 		})
@@ -749,6 +755,194 @@ describe('mergePerFieldSearch', () => {
 			// with or told apart from another
 			expect(merged.added).toBe(0)
 			expect(merged.findings).toBe(findings)
+		})
+
+		it('should keep a company a round met on the trade body page a listed one was given', () => {
+			// GIVEN a company already on the list, standing on the page a trade body's
+			// member list gave it
+			const findings = {
+				prospects: [
+					{ name: 'Electricidad Mora', website: 'https://aemiat.com/e-mora/' },
+				],
+			}
+			// AND a round that names a different installer and hands it a page on that
+			// same member list — one claimant each time, so nothing before this fold
+			// ever sees the two of them together
+			const refreshed = {
+				prospects: [
+					{ name: 'Instalaciones Rubio', website: 'https://aemiat.com/rubio/' },
+				],
+			}
+
+			// WHEN merged
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const rows = prospectsOf(merged.findings)
+
+			// THEN both companies ship. The domain spells neither of them, so it is
+			// nobody's own site and is no reason to call them one company
+			expect(rows.map(row => row['name'])).toEqual([
+				'Electricidad Mora',
+				'Instalaciones Rubio',
+			])
+			// AND the round is credited with the find, or the rounds stop a round early
+			// on the reading that it turned up nobody
+			expect(merged.added).toBe(1)
+			// AND the fold reports that it joined no row to another, which is the
+			// number that would show this company going missing
+			expect(merged.folded).toBe(0)
+		})
+
+		it('should report the row it folds when a round shows two listed companies are one', () => {
+			// GIVEN two rows the list holds under different names, one of them on the
+			// domain that spells the other
+			const findings = {
+				prospects: [
+					{ name: 'Terre Solaire', why_relevant: 'Installer.' },
+					{
+						name: 'Soleil du Sud',
+						website: 'https://terresolaire.test/mentions-legales',
+					},
+				],
+			}
+			// AND a round that brings the first row the site it had been missing
+			const refreshed = {
+				prospects: [
+					{ name: 'Terre Solaire', website: 'https://terresolaire.test' },
+				],
+			}
+
+			// WHEN merged
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+
+			// THEN one company, and the fold says it joined a row — a real fold, for
+			// the good reason that the site now says the two rows are one company
+			expect(prospectsOf(merged.findings).map(row => row['name'])).toEqual([
+				'Terre Solaire',
+			])
+			expect(merged.folded).toBe(1)
+			// AND nothing is credited as found, because nobody new was
+			expect(merged.added).toBe(0)
+		})
+
+		it('should keep every company a run of rounds meets on one trade body host', () => {
+			// GIVEN a first list of one company on a member page
+			let findings: unknown = {
+				prospects: [
+					{ name: 'Electricidad Mora', website: 'https://aemiat.com/e-mora/' },
+				],
+			}
+			// AND three more rounds, each naming one more installer on that same host
+			const rounds = [
+				{ name: 'Instalaciones Rubio', website: 'https://aemiat.com/rubio/' },
+				{ name: 'Montajes Tejero', website: 'https://aemiat.com/tejero/' },
+				{ name: 'Climatización Sanz', website: 'https://aemiat.com/sanz/' },
+			]
+
+			// WHEN each round is folded in as the run folds it
+			for (const found of rounds) {
+				findings = mergePerFieldSearch(
+					findings,
+					{ prospects: [found] },
+					SCAN,
+				).findings
+			}
+
+			// THEN four rows went in and four come out. Each round is innocent on its
+			// own, and it is only what they add up to that could shorten the list
+			expect(prospectsOf(findings).map(row => row['name'])).toEqual([
+				'Electricidad Mora',
+				'Instalaciones Rubio',
+				'Montajes Tejero',
+				'Climatización Sanz',
+			])
+		})
+
+		it('should fold a round onto the listed company whose name the domain spells', () => {
+			// GIVEN a company on the list at the domain that spells its name
+			const findings = {
+				prospects: [
+					{ name: 'Terre Solaire', website: 'https://terresolaire.test' },
+				],
+			}
+			// AND a round meeting it again under a legal name the domain says nothing of
+			const refreshed = {
+				prospects: [
+					{
+						name: 'SAS Soleil du Sud',
+						website: 'https://terresolaire.test/mentions-legales',
+						location: 'Lyon',
+					},
+				],
+			}
+
+			// WHEN merged
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const rows = prospectsOf(merged.findings)
+
+			// THEN one company, which gained the town the round found. Who owns the
+			// domain is read over both sides at once, so the listed row's name settles
+			// the site for the round's row as well — the trade name beside the legal
+			// one, which is what this fold is for
+			expect(rows.map(row => row['name'])).toEqual(['Terre Solaire'])
+			expect(rows[0]?.['location']).toBe('Lyon')
+			expect(merged.added).toBe(0)
+			// AND the join is reported, because a website joined two names on its own
+			// — rightly this time, but that is the shape that can go wrong
+			expect(merged.folded).toBe(1)
+		})
+
+		it('should not report a round that meets listed companies by their names', () => {
+			// GIVEN a list of two companies and a round that re-reads both of them,
+			// which is what every round ordinarily does
+			const findings = {
+				prospects: [
+					{ name: 'Acme Instal' },
+					{ name: 'Beta Muntatges', website: 'https://beta.test' },
+				],
+			}
+			const refreshed = {
+				prospects: [
+					{ name: 'Acme Instal SL', location: 'Girona' },
+					{ name: 'Beta Muntatges', location: 'Reus' },
+				],
+			}
+
+			// WHEN merged
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+
+			// THEN nothing is reported as joined. The rows met by name, which is the
+			// reason the rounds run at all — counting those would bury the one join
+			// this number exists to show
+			expect(prospectsOf(merged.findings)).toHaveLength(2)
+			expect(merged.folded).toBe(0)
+		})
+
+		it('should keep a round company that meets a listed one on neither a name nor a site', () => {
+			// GIVEN a company first met under a legal name, with no site
+			const findings = {
+				prospects: [{ name: 'Soleil du Sud SAS', why_relevant: 'Installer.' }],
+			}
+			// AND a round that names what is really the same firm under its trading
+			// name, bringing the domain that spells that one
+			const refreshed = {
+				prospects: [
+					{ name: 'Terre Solaire', website: 'https://terresolaire.test' },
+				],
+			}
+
+			// WHEN merged
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const rows = prospectsOf(merged.findings)
+
+			// THEN two rows, because nothing yet ties the two names together: the listed
+			// row carries no site to be met on. The cost of this fold's care is a
+			// duplicate the reader sorts out, never a company taken off the list
+			expect(rows.map(row => row['name'])).toEqual([
+				'Soleil du Sud SAS',
+				'Terre Solaire',
+			])
+			expect(merged.added).toBe(1)
+			expect(merged.folded).toBe(0)
 		})
 
 		it('should keep a company the second look no longer names', () => {
