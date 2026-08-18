@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-18 (internal-v2026.8.18)
+
+### Bug Fixes
+
+* **research:** read an "and" between two trades by where it sits ([3ad852a](https://github.com/guillempuche/batuda/commit/3ad852a357116bd56b3bbb16effb60caff0e6f81)), closes [#490](https://github.com/guillempuche/batuda/issues/490)
+* **research:** stop a search dropping a company for sharing an address ([79b10fc](https://github.com/guillempuche/batuda/commit/79b10fc5eb136763035ccf4da513df05b24af41c)), closes [#483](https://github.com/guillempuche/batuda/issues/483)
+* stop telemetry double-counting, hiding refusals, and going missing ([b91eabb](https://github.com/guillempuche/batuda/commit/b91eabbbb86edf645c54c5f2fdc60fa42ad6c59c))
+
 ## 2026-08-17 (internal-v2026.8.17)
 
 ### Features
