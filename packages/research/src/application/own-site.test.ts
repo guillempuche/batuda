@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { ownSiteVerdict } from './own-site'
+import { ownSiteHostVerdict, ownSiteVerdict } from './own-site'
 
 // The address the French solar directory files a company at: a slug naming a
 // trade and a role, ending in the listing's own record number, and naming no
@@ -461,6 +461,93 @@ describe('ownSiteVerdict', () => {
 			] as const) {
 				expect(ownSiteVerdict({ name, website })).toBe('unknown')
 			}
+		})
+	})
+})
+
+describe('ownSiteHostVerdict', () => {
+	describe('when a host is asked about directly', () => {
+		it('should establish a domain that spells the front of the name', () => {
+			// GIVEN a group's domain, and the group and its subsidiary as two rows
+			// WHEN each name is asked about the host
+			// THEN the front of a name is enough, so the domain is established as
+			// each of their own — which is what the directory watch steps over
+			expect(
+				ownSiteHostVerdict({
+					name: 'D-Sécurité (groupe)',
+					host: 'd-securite.com',
+				}),
+			).toBe('established')
+			expect(
+				ownSiteHostVerdict({
+					name: 'D-Sécurité Incendie',
+					host: 'd-securite.com',
+				}),
+			).toBe('established')
+		})
+
+		it('should leave a host that merely carries the name unknown', () => {
+			// GIVEN a listing whose domain has a company's name inside it
+			// WHEN asked
+			// THEN the label has to BE the name, never merely contain it
+			expect(
+				ownSiteHostVerdict({ name: 'Acme', host: 'acme-directorio.example' }),
+			).toBe('unknown')
+		})
+
+		it('should leave a host unknown for a name of nothing but trade words', () => {
+			// GIVEN a name holding no word of the company's own
+			// WHEN asked
+			// THEN there is no word of its own for a domain to spell
+			expect(
+				ownSiteHostVerdict({ name: 'Grupo Express SL', host: 'grupo.example' }),
+			).toBe('unknown')
+		})
+
+		it('should establish nothing without a name to compare', () => {
+			// GIVEN a run with no company name
+			// WHEN asked
+			// THEN an empty name must not be spelled by every host there is
+			expect(ownSiteHostVerdict({ name: '', host: 'acme.com' })).toBe('unknown')
+		})
+	})
+
+	describe('when the same site is asked about both ways', () => {
+		it('should answer a host exactly as it answers an address on it', () => {
+			// GIVEN one company's own site, and several addresses on it
+			// WHEN the host is asked directly and each address is asked
+			// THEN the two agree, which is what lets a caller weighing many
+			// addresses on one host ask once for the host
+			const name = 'Fusteria Miquel'
+			const host = 'fusteriamiquel.cat'
+			for (const website of [
+				'https://fusteriamiquel.cat',
+				'https://www.fusteriamiquel.cat/qui-som',
+				'https://fusteriamiquel.cat/obra/2024/cuina',
+			]) {
+				expect(ownSiteVerdict({ name, website })).toBe(
+					ownSiteHostVerdict({ name, host }),
+				)
+			}
+		})
+
+		it('should not screen a host the way an address is screened', () => {
+			// GIVEN a website value with words written beside the address
+			// WHEN put to each
+			// THEN the address reading refuses it, while the host reading trusts its
+			// caller to have read a host off an address already
+			expect(
+				ownSiteVerdict({
+					name: 'Fusteria Miquel',
+					website: 'https://fusteriamiquel.cat/ (inferred from the name)',
+				}),
+			).toBe('unknown')
+			expect(
+				ownSiteHostVerdict({
+					name: 'Fusteria Miquel',
+					host: 'fusteriamiquel.cat',
+				}),
+			).toBe('established')
 		})
 	})
 })

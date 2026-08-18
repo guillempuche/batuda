@@ -77,6 +77,24 @@
  * Whether the host is a business directory is a separate question with a
  * separate answer (`directory-sites.ts`), and a caller weighing a company's
  * sources asks both.
+ *
+ * ## The one reading that stays apart
+ *
+ * `isOwnSiteHost` in `entity-guard.ts` asks something that sounds the same and
+ * is not: which single site a run should GO AND READ as the company's. A wrong
+ * yes there sends the run off to read a stranger's pages and then writes that
+ * stranger's revenue, chief executive and telephone number onto the row, so it
+ * wants the domain to spell a WHOLE name and will not read the front of one —
+ * "Grupo Cobra Instalaciones" must not be handed grupocobra.com, a large
+ * unrelated group. This file is asked about an address a run already holds,
+ * where a wrong yes costs one field, so the front of a name is enough.
+ *
+ * The difference is in what each answer is then spent on, never in how a name is
+ * read, and it is written down at both definitions so neither drifts. Every
+ * caller weighing an address the run already has asks THIS file — the directory
+ * watch included, where asking the stricter one brands a group's own domain a
+ * listing for carrying a page for the group and a page for its subsidiary, and
+ * costs the group its website.
  */
 
 import {
@@ -170,6 +188,20 @@ const hostSpellsTheCompany = (name: string, host: string): boolean => {
 }
 
 /**
+ * Whether this host is established as the company's own site.
+ *
+ * The same question as `ownSiteVerdict`, asked of a host already read off an
+ * address. A caller weighing many addresses that share a host asks it once for
+ * the host rather than once per address, and gets the same answer either way,
+ * since the path is deliberately never read.
+ */
+export const ownSiteHostVerdict = (args: {
+	readonly name: string
+	readonly host: string
+}): OwnSiteVerdict =>
+	hostSpellsTheCompany(args.name, args.host) ? 'established' : 'unknown'
+
+/**
  * Whether this website is established as the company's own site.
  *
  * `name` is the company the address is claimed for — the row's own name on a
@@ -188,5 +220,5 @@ export const ownSiteVerdict = (args: {
 	const host = hostOf(website)
 	if (host === null) return 'unknown'
 
-	return hostSpellsTheCompany(name, host) ? 'established' : 'unknown'
+	return ownSiteHostVerdict({ name, host })
 }

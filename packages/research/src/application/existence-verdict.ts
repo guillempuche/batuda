@@ -16,12 +16,13 @@
  *
  * ## Why the second condition is stricter than it reads
  *
- * "At least one source is not a directory" sounds like it should admit a trade
- * paper. It cannot, and the reason is the shape of the verdicts this package
- * owns rather than a preference. `siteVerdict` answers `directory` or `unknown`
- * and has no third value meaning cleared — deliberately, so that a caller
- * cannot answer "is one of these not a listing?" out of silence. A newspaper is
- * therefore `unknown`, which is not a clearance.
+ * "At least one source is not a directory" sounds like it should be enough, and
+ * would admit a trade paper. It is not the rule, and the reason is the shape of
+ * the verdicts this package owns rather than a preference. `siteVerdict`
+ * (`directory-sites.ts`) answers `directory` or `unknown` and has no third value
+ * meaning cleared — deliberately, so that a caller cannot answer "is one of
+ * these not a listing?" out of silence. A newspaper is therefore `unknown`,
+ * which is not a clearance.
  *
  * So the only positive verdict available is `ownSiteVerdict` (`own-site.ts`),
  * and the rule comes out as: the company's own site, established as its own,
@@ -29,11 +30,36 @@
  * Never "the website guard did not blank it" — that means nothing condemned the
  * address, which is a different statement from the company owning it.
  *
- * What an `unknown` site still does is COUNT. A newspaper naming the company is
- * one of the two websites; it just cannot be the one that clears. A host watched
- * filing several of the run's companies is a `directory`: it counts toward the
- * two as well, and is barred from clearing. Reading either as "so the company is
+ * What a site that clears nothing still does is COUNT. A newspaper naming the
+ * company is one of the two websites; it just cannot be the one that clears. A
+ * host watched filing several of the run's companies counts toward the two as
+ * well, and is barred from clearing. Reading either as "so the company is
  * unproven, drop the source" would be a second, quieter way of failing closed.
+ *
+ * ## Why a watched listing clears nobody, even its apparent owner
+ *
+ * Ownership is read off the domain alone, so a company named after the very word
+ * a business directory registered — "Paginas" at paginas.es — reads as owning
+ * that directory. Nothing in the name or the address can tell that apart from a
+ * firm genuinely at its own domain, which is a cost `own-site.ts` names and
+ * accepts, having nothing better to go on.
+ *
+ * Here there IS something better: whether the run watched that host file company
+ * after company. A site listing the market is a listings site whatever its domain
+ * spells, so it clears nobody — including the row whose name it seems to carry.
+ * That is the one check able to catch the coincidence, and it fails closed, which
+ * is the direction this file is allowed to be wrong in.
+ *
+ * What it costs is a firm whose own site gives a page to each of its partners.
+ * The watch steps over the pages it finds a company owns, so such a host is
+ * usually branded on the PARTNERS' pages — and the firm, which plainly exists,
+ * is held back for keeping a partner list. Only usually: the watch weighs the
+ * names it was handed, and a row it never saw under that name, or a run where it
+ * watched nothing, can reach here branded for some other reason. So this rule
+ * cannot be relaxed on the strength of "branded means it lists partners".
+ *
+ * Paid knowingly: a wrongly-confirmed company is the more expensive mistake, and
+ * a second website that is not the branded host still clears this firm.
  *
  * ## Two states, never three
  *
@@ -46,11 +72,12 @@
  *
  * ## What must not be folded
  *
- * The independence count folds subdomains. The directory verdict must NOT — it
- * keys on the raw host, because `empresite.eleconomista.es` is a listing while
- * `eleconomista.es` is a newspaper, and folding the first into the second labels
- * a newspaper a directory. The two keys are computed side by side below and are
- * never swapped.
+ * The independence count folds subdomains, so two pages of one site cannot be
+ * two witnesses. The listing verdict must NOT be read off that folded key: it
+ * keys on the host as met, because `empresite.eleconomista.es` is a listing
+ * while `eleconomista.es` is a newspaper, and folding the first into the second
+ * labels a newspaper a directory. The two keys are computed side by side below
+ * and are never swapped.
  */
 
 import {
@@ -111,9 +138,11 @@ export interface RowExistence {
 /** The field a verdict is written to, so one spelling is read and written. */
 const EXISTENCE_KEY = 'existence'
 
-// One source address, read once. `own` and `directory` are asked of the RAW
-// host and `site` folds it, so the two keys travel together and neither can be
-// mistaken for the other further down.
+// One source address, read once. `host` is the address as met and `site` the
+// domain it is registered under, so the two travel together and neither can be
+// mistaken for the other further down. The listing verdict keys on the host as
+// met, since `empresite.eleconomista.es` is a listing and `eleconomista.es` is a
+// newspaper.
 interface SourceSite {
 	readonly host: string
 	readonly site: string
@@ -137,7 +166,7 @@ const webAddressesAmong = (
 
 // Every distinct host among these addresses, each read for the two questions
 // that decide what it can do: is it this company's own site, and is it a
-// listing. Held by raw host, since that is what the directory verdict keys on.
+// listing. Held by the host as met, so two pages of one site are read once.
 const sitesOf = (
 	name: string,
 	addresses: ReadonlyArray<string>,
@@ -234,20 +263,11 @@ export const existenceOf = (args: {
 			: [website, ...args.sources]
 	const sites = sitesOf(name, webAddressesAmong(offered), directorySites)
 	const websites = websitesOf(sites)
-	// A company's own site that is also a watched listing clears nothing, because a
-	// rule reading only one of the two verdicts would answer a narrower question
-	// than it claims to.
-	//
-	// They do disagree, and in a way that costs a real company its confirmation.
-	// The directory watch means to step over a listed company's own site, but it
-	// asks whose site it is with a stricter reading than this one: it wants the
-	// domain to spell a whole name, while this accepts the front of one. So a
-	// group's own domain that carries a page for the group and a page for its
-	// subsidiary — both on the same list — is counted as filing two companies and
-	// branded a listing, and the group then cannot be cleared by its own site.
-	// Withholding is the safe direction to be wrong in, so it stays this way until
-	// the two readings are reconciled, which is a change to the watch rather than
-	// to this rule.
+	// A site has to be this company's own AND not a host the run watched listing
+	// the market. Ownership is read off the domain alone, so a company named after
+	// a directory reads as owning it; watching that host file company after company
+	// is the one thing that catches the coincidence, and a listings site clears
+	// nobody however its domain reads.
 	const cleared = websites.some(group =>
 		group.some(site => site.own && !site.directory),
 	)

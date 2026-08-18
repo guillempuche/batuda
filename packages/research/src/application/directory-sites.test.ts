@@ -218,6 +218,24 @@ describe('observeDirectorySites', () => {
 			expect([...observation.sites]).toEqual([])
 		})
 
+		it('should follow a chain of spellings through a row it drops', () => {
+			// GIVEN one company under three names, where the middle one reads two
+			// ways — "Møller" gives both "moller" and "moeller" — so the last name
+			// repeats the middle one and spells nothing the first one does
+			const observation = observe(
+				['Moll', 'Møller Transport', 'Moeller Transport Nord'],
+				[
+					'https://directorio.example/empresa/moll',
+					'https://directorio.example/empresa/moeller-transport-nord',
+				],
+			)
+
+			// WHEN read — THEN the chain has to run through the row that was dropped,
+			// or the last name is counted as a second company and a host filing one
+			// firm twice reaches the two it takes to be a listing
+			expect([...observation.sites]).toEqual([])
+		})
+
 		it('should not count one company spelled two ways as two', () => {
 			// GIVEN a list holding the same company under a dotted and an undotted
 			// legal form, which the fold that settles it only reaches later
@@ -235,10 +253,44 @@ describe('observeDirectorySites', () => {
 		})
 	})
 
-	describe('when the host itself carries one of the company names', () => {
-		it("should never call a company's own site a directory", () => {
-			// GIVEN a company's own site naming two other companies of the run in its
-			// addresses — a page per partner, a page per client
+	describe("when the host is a listed company's own site", () => {
+		it("should not brand a group's own domain for carrying a page per part", () => {
+			// GIVEN a search that returned a parent and its subsidiary as two rows,
+			// and the group's own site with a page for each of them — the two names
+			// share a front part and diverge right after it
+			const observation = observe(
+				['D-Sécurité (groupe)', 'D-Sécurité Incendie'],
+				[
+					'https://www.d-securite.com/d-securite-groupe/',
+					'https://www.d-securite.com/d-securite-incendie/',
+				],
+			)
+
+			// WHEN read — THEN the domain spells the front of both names, so it is
+			// established as each one's own site and files neither of them
+			expect([...observation.sites]).toEqual([])
+		})
+
+		it('should recognise the short domain a company usually has', () => {
+			// GIVEN a group at a domain that is one word of the name rather than all
+			// of it — "acme.example", which is how most firms register — with a page
+			// for each part of the group
+			const observation = observe(
+				['Acme Instalacions SL', 'Acme Serveis SL'],
+				[
+					'https://acme.example/acme-instalacions',
+					'https://acme.example/acme-serveis',
+				],
+			)
+
+			// WHEN read — THEN the front of a name is enough to own the domain, so
+			// both pages are the group writing about itself
+			expect([...observation.sites]).toEqual([])
+		})
+
+		it('should still judge it for filing companies it does not name', () => {
+			// GIVEN a firm's own site with a page for each of two OTHER companies on
+			// the run's list — a page per partner, a page per client
 			const observation = observe(
 				['Instalaciones Ferré SA', 'Electricistas Puig SL', 'Muñoz SL'],
 				[
@@ -247,25 +299,81 @@ describe('observeDirectorySites', () => {
 				],
 			)
 
-			// WHEN read — THEN the host being named by one of them settles it: one
-			// host cannot be a stranger's listing and that company's own site at once
-			expect([...observation.sites]).toEqual([])
+			// WHEN read — THEN owning the domain excuses only the owner's own pages.
+			// These name two other companies whose site it is not, which is what a
+			// listing is. The firm keeps its own website, since the website guard
+			// settles whose a host is before it asks about listings; what it pays is
+			// standing to vouch for itself, which a second site of its own restores.
+			expect([...observation.sites]).toEqual(['instalacionesferre.es'])
 		})
 
-		it('should recognise the short domain a company usually has', () => {
-			// GIVEN the same shape on a domain that is one word of the name rather
-			// than all of it — "acme.example" for "Acme Instalacions SL", which is how
-			// most firms register
+		it("should judge a franchise's domain that files its affiliates", () => {
+			// GIVEN a franchise on its own list, filing affiliates it does not name
 			const observation = observe(
-				['Acme Instalacions SL', 'Electricistas Puig SL', 'Muñoz SL'],
+				['Grupelec Instal·lacions SL', 'Electricistas Puig SL', 'Muñoz SL'],
 				[
-					'https://acme.example/partners/electricistas-puig',
-					'https://acme.example/obras/munoz',
+					'https://grupelec.example/qui-som',
+					'https://grupelec.example/associats/electricistas-puig',
+					'https://grupelec.example/associats/munoz',
 				],
 			)
 
-			// WHEN read — THEN it is still that company's own site
+			// WHEN read — THEN the page about itself is stepped over and the two
+			// affiliate pages are not, so a franchise on its own list cannot clear
+			// itself the way asking once for the whole list would have let it
+			expect([...observation.sites]).toEqual(['grupelec.example'])
+		})
+
+		it('should let a company own the domain that spells its longer name', () => {
+			// GIVEN one company returned under two names, the shorter of which is the
+			// one it is counted under, on the domain that spells the LONGER — and one
+			// other company filed on that same host
+			const observation = observe(
+				['Grup Blau', 'Grup Blau Instal·lacions', 'Electricistas Puig SL'],
+				[
+					'https://grupblauinstallacions.cat/grup-blau',
+					'https://grupblauinstallacions.cat/electricistas-puig',
+				],
+			)
+
+			// WHEN read — THEN folding the two rows into one company must not throw
+			// away the name that recognises its own domain, or a firm's own site is
+			// branded a listing for having a page about somebody else
 			expect([...observation.sites]).toEqual([])
+		})
+
+		it('should stand the watch down only for the company that owns the host', () => {
+			// GIVEN a real listing whose domain a company on the list happens to
+			// spell, and two other companies filed on it
+			const observation = observe(
+				['Paginas Instalaciones SL', 'Electricistas Puig SL', 'Muñoz SL'],
+				[
+					'https://paginas.example/empresa/paginas-instalaciones',
+					'https://paginas.example/empresa/electricistas-puig',
+					'https://paginas.example/empresa/munoz',
+				],
+			)
+
+			// WHEN read — THEN only that company's own page is stepped over, and the
+			// two the host does not name still make it a listing. Asked once for the
+			// whole list, one coinciding name would have cleared the whole host.
+			expect([...observation.sites]).toEqual(['paginas.example'])
+		})
+
+		it('should let no host be owned by a name of nothing but trade words', () => {
+			// GIVEN a company named after its trade and nothing else, filed on the
+			// host its trade word spells
+			const observation = observe(
+				['Grupo Express SL', 'Electricistas Puig SL'],
+				[
+					'https://grupo.example/empresa/grupo-express',
+					'https://grupo.example/empresa/electricistas-puig',
+				],
+			)
+
+			// WHEN read — THEN a name identifying nobody cannot own a domain, so it
+			// cannot quietly excuse a listing either
+			expect([...observation.sites]).toEqual(['grupo.example'])
 		})
 
 		it('should not let a name merely appearing in the host stand the rule down', () => {

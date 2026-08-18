@@ -16,8 +16,10 @@ const OWN = 'https://fusteriamiquel.cat'
 const NAME = 'Fusteria Miquel'
 // A regional paper: never watched filing anybody, so it reads `unknown`.
 const PAPER = 'https://elpuntavui.cat/noticia/12345'
-// A listing the run watched file several of its own companies.
+// A business directory's page about the company, on a host that spells no part
+// of its name.
 const LISTING = 'https://paginas.es/empresa/fusteria-miquel'
+// A run that watched nothing behave like a listing.
 const NONE: ReadonlySet<string> = new Set()
 
 describe('existenceOf', () => {
@@ -40,8 +42,8 @@ describe('existenceOf', () => {
 		it('should let a directory be the second website', () => {
 			// GIVEN the company's own site, and a listing that files it
 			// WHEN asked
-			// THEN the listing counts toward the two — it is barred from CLEARING
-			// the company, not from being one of the websites that name it
+			// THEN the listing counts toward the two — what it cannot do is CLEAR
+			// the company, and nothing here asks it to
 			expect(
 				existenceOf({
 					name: NAME,
@@ -77,6 +79,57 @@ describe('existenceOf', () => {
 					name: NAME,
 					sources: [OWN, PAPER],
 					directorySites: NONE,
+				}),
+			).toEqual({ verdict: 'confirmed', websites: 2 })
+		})
+	})
+
+	describe('when the site is one the run watched filing other companies', () => {
+		it('should refuse to let a watched listing clear a company it is named for', () => {
+			// GIVEN a listing whose own domain happens to spell the company's name,
+			// which the domain reading alone takes for that company's own site
+			// WHEN asked
+			// THEN watching the host file company after company is the one thing that
+			// catches the coincidence, so it clears nobody — including the row whose
+			// name it seems to carry
+			expect(
+				existenceOf({
+					name: 'Paginas',
+					website: 'https://paginas.es',
+					sources: [PAPER],
+					directorySites: new Set(['paginas.es']),
+				}),
+			).toEqual({ verdict: 'candidate', reason: 'no_own_site', websites: 2 })
+		})
+
+		it('should hold back a firm whose own site files its partners — the cost', () => {
+			// GIVEN a firm at the domain its name spells, which gives each of its
+			// partners a page, so the watch reads that host as a listing
+			// WHEN asked
+			// THEN it is held back although it plainly exists: the price of the rule
+			// above, paid because a wrongly-confirmed company is the dearer mistake.
+			// A second website that is not this host still clears it.
+			expect(
+				existenceOf({
+					name: 'Instalaciones Ferré',
+					website: 'https://instalacionesferre.es',
+					sources: [PAPER],
+					directorySites: new Set(['instalacionesferre.es']),
+				}),
+			).toEqual({ verdict: 'candidate', reason: 'no_own_site', websites: 2 })
+		})
+
+		it('should still clear that firm from a second site of its own', () => {
+			// GIVEN the same firm, cited also on the other ending it registered
+			// WHEN asked
+			// THEN the branding costs it that one host, never the company: a site of
+			// its own that nothing watched still establishes it
+			expect(
+				existenceOf({
+					name: 'Instalaciones Ferré',
+					website: 'https://instalacionesferre.es',
+					sources: [PAPER, 'https://instalacionesferre.com'],
+					directorySites: new Set(['instalacionesferre.es']),
 				}),
 			).toEqual({ verdict: 'confirmed', websites: 2 })
 		})
@@ -172,7 +225,7 @@ describe('existenceOf', () => {
 		})
 
 		it('should hold back a company known only to newspapers', () => {
-			// GIVEN two papers, neither watched filing anybody, so both `unknown`
+			// GIVEN two papers, neither of them a domain the company's name spells
 			// WHEN asked
 			// THEN `unknown` is not a clearance — that is the whole fail-closed
 			// property, and two of them do not add up to one
@@ -181,22 +234,6 @@ describe('existenceOf', () => {
 					name: NAME,
 					sources: [PAPER, 'https://lavanguardia.com/economia/55'],
 					directorySites: NONE,
-				}),
-			).toEqual({ verdict: 'candidate', reason: 'no_own_site', websites: 2 })
-		})
-
-		it('should refuse to let a watched listing clear a company it is named for', () => {
-			// GIVEN a listing whose own domain happens to spell the company's name,
-			// which would otherwise read as the company's own site
-			// WHEN asked
-			// THEN being a watched listing bars it from clearing, so the row falls
-			// back to having no established site
-			expect(
-				existenceOf({
-					name: 'Paginas',
-					website: 'https://paginas.es',
-					sources: [PAPER],
-					directorySites: new Set(['paginas.es']),
 				}),
 			).toEqual({ verdict: 'candidate', reason: 'no_own_site', websites: 2 })
 		})
@@ -252,7 +289,11 @@ describe('existenceOf', () => {
 			// WHEN asked — THEN there is nothing to count
 			expect(
 				existenceOf({ name: NAME, sources: [], directorySites: NONE }),
-			).toEqual({ verdict: 'candidate', reason: 'no_sources', websites: 0 })
+			).toEqual({
+				verdict: 'candidate',
+				reason: 'no_sources',
+				websites: 0,
+			})
 		})
 
 		it('should never read an internal source id as a website', () => {
