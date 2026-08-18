@@ -10,7 +10,7 @@ This guide holds the **rules and the reasons**. It deliberately does not mirror 
 
 The unit of observability is **one wide record per piece of work** — carrying every fact known about it on a single line.
 
-Two kinds of work open a record today: an **HTTP request**, closed by `http.request` / `http.server_error` / `http.defect`, and a **research run**, closed by `research.run` with what it spent split by model, provider and kind of work. A run is not part of any request — it keeps working on a forked fiber long after the request that asked for it returned — so it opens a record of its own rather than borrowing one.
+Two kinds of work open a record today: an **HTTP request**, closed by `http.request` / `http.server_error` / `http.defect` / `http.not_found`, and a **research run**, closed by `research.run` with what it spent split by model, provider and kind of work. A run is not part of any request — it keeps working on a forked fiber long after the request that asked for it returned — so it opens a record of its own rather than borrowing one.
 
 Everything else is a view over those records:
 
@@ -45,6 +45,7 @@ Timestamps and trace ids are added by the framework.
 | `http.request`                 | A request completed                                        |
 | `http.server_error`            | A request ended 5xx                                        |
 | `http.defect`                  | A request died without producing a response                |
+| `http.not_found`               | A request asked for a route that does not exist            |
 | `company.created`              | New company added to CRM                                   |
 | `company.status_changed`       | Pipeline status transition                                 |
 | `interaction.logged`           | Interaction recorded                                       |
@@ -62,7 +63,7 @@ Timestamps and trace ids are added by the framework.
 | `mcp.auth.rejected`            | An MCP call was refused, and why                           |
 | `mcp.protocol_version.refused` | A call named a protocol revision this server does not know |
 
-A request leaves exactly one of `http.request`, `http.server_error` or `http.defect`, so "every request that ended badly" is those last two.
+A request leaves exactly one of `http.request`, `http.server_error`, `http.defect` or `http.not_found`. "Every request that ended badly" is the middle two: a route that does not exist is the caller's mistake rather than a fault of ours, and it is kept out of the error channel on purpose — recorded as a crash, every bot probing for `/robots.txt` leaves a stack trace at error level and buries the failures that matter.
 
 A request also leaves exactly **one span**, not two. The platform opens that span itself, so the server passes no tracer of its own when it starts serving; passing one as well used to open a second span per request, and every count taken from the traces read double until 2026-08-18. A trace older than that carries the twins.
 
@@ -291,6 +292,10 @@ Three structural notes worth knowing before changing any of it:
 **Better Auth's errors need a bridge to be seen at all.** Better Auth runs its callbacks outside the Effect fiber, so its internal failures — adapter errors, OAuth/OIDC problems — reach the console and nothing else. They are forwarded onto the Effect runtime deliberately; without that they never export, and an auth outage looks like silence rather than errors.
 
 **Two auth surfaces are instrumented on purpose, not by blanket rule.** The MCP sign-in path and the OAuth token endpoint each carry extra facts because of one bug class: an MCP client shows a refused or expired credential as a silent retry loop, never a visible error. So how the caller signed in, which org they resolved to, and the grant outcome are recorded — enough to tell a dropped connection from a rejected one without reproducing it. Facts elsewhere are added where a question actually needs them, not across every endpoint.
+
+**Telemetry has to be handed out of a layer, not just used inside it.** A layer can pass a service down to the layers it builds, or hand it back to whoever builds on top; those are two different things and they look the same to the compiler. The mail worker's loop is handed its layer from outside, so telemetry passed only downward reached the layers named in the stack and never the loop that writes every line. The worker started up, said exporting was enabled, and sent nothing — for months. Its dataset was never created, so the only sign was a gap nobody was watching.
+
+Nothing catches this on its own. The exporter's own type is erased by the branch that turns exporting off, so both spellings typecheck identically, and the process looks healthy either way. The guard is the mail worker's layer test, which builds the real layer and checks a logger and a tracer are among what comes out. It needs a database, because building the real layer means building all of it — so it lives in the integration suite and does not run under `pnpm test`.
 
 **Global middleware order has to be stated, not assumed.** Router-wide middleware wraps a request in reverse registration order, and registration order is layer build order — which `Layer.mergeAll` performs concurrently. Left in a merge list, the observability middleware lands wherever the build happens to put it, and that position can change without anyone editing it.
 
