@@ -1,7 +1,8 @@
-import { Cause, Effect } from 'effect'
+import { Cause, Effect, Option } from 'effect'
 import {
 	HttpMiddleware,
 	HttpRouter,
+	HttpServerError,
 	HttpServerRequest,
 } from 'effect/unstable/http'
 
@@ -31,6 +32,25 @@ const isRoutinePoll = (
 	status: number,
 ): boolean =>
 	status < 400 && (pathPattern === '/health' || method === 'OPTIONS')
+
+/**
+ * A request for an address the server does not have — the caller's mistake, not
+ * the server going wrong. Recorded as a crash, every bot probing for
+ * `/robots.txt` leaves an error-level stack trace and buries the failures that
+ * matter.
+ */
+const isMissingRoute = (cause: Cause.Cause<unknown>): boolean => {
+	// A request can miss its route AND crash at the same time — a cleanup step or
+	// a forked child dying alongside it. Only the missing route is looked at
+	// below, so calling that pair an ordinary 404 would throw the crash away.
+	if (Cause.hasDies(cause)) return false
+	const error = Cause.findErrorOption(cause)
+	return (
+		Option.isSome(error) &&
+		HttpServerError.isHttpServerError(error.value) &&
+		error.value.reason._tag === 'RouteNotFound'
+	)
+}
 
 export const httpPathPattern = (url: string): string => {
 	const path = url.split('?')[0]?.split('#')[0] ?? url
@@ -120,19 +140,29 @@ export const withRequestRecord = <A extends { readonly status: number }, E, R>(
 			Effect.tapCause(cause =>
 				Cause.hasInterruptsOnly(cause)
 					? Effect.void
-					: Effect.flatMap(record.read, facts =>
-							Effect.logError(boundedCause(cause)).pipe(
+					: Effect.flatMap(record.read, facts => {
+							// A missing route is the caller's mistake and stays at info,
+							// where a rise in them still shows a scan; anything else crashed
+							// and keeps the full cause at error level. Either way this is the
+							// only line the request leaves, since neither ever becomes a
+							// response and the completion log above never runs.
+							const missing = isMissingRoute(cause)
+							return (
+								missing
+									? Effect.logInfo('HTTP route not found')
+									: Effect.logError(boundedCause(cause))
+							).pipe(
 								Effect.annotateLogs({
 									...facts,
-									// A defect never becomes a response, so the completion log
-									// above never runs and THIS is the only line the request
-									// leaves. Name it so a request that failed this hard is
-									// still findable by event, like every other one.
-									event: 'http.defect',
+									event: missing ? 'http.not_found' : 'http.defect',
+									// Written by hand: the 404 is answered further out and never
+									// passes back through here. Only the missing route carries
+									// one, so it cannot land on a crash.
+									...(missing ? { 'http.status': 404 } : {}),
 									...context,
 								}),
-							),
-						),
+							)
+						}),
 			),
 			// Inside the request, so `recordFacts` anywhere below finds this
 			// request's record. Work forked off the request outlives this scope

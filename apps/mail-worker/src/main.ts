@@ -1,18 +1,13 @@
 import { NodeRuntime } from '@effect/platform-node'
-import { DateTime, Effect, type Fiber, Layer, Ref, Schedule } from 'effect'
+import { DateTime, Effect, type Fiber, Ref, Schedule } from 'effect'
 
-import { ParticipantMatcher } from '@batuda/email/participant-matcher'
 import { boundedCause } from '@batuda/observability'
 
 import { type ClaimedInbox, claimAvailableInboxes } from './claim.js'
 import { installCrashGuards } from './crash-guards.js'
-import { PgLive } from './db.js'
-import { CredentialDecryptor } from './decrypt.js'
 import { WorkerEnvVars } from './env.js'
 import { runInboxSession } from './inbox-session.js'
-import { ConfigFileLive } from './lib/config-provider.js'
-import { OtlpObservability } from './observability.js'
-import { RawMessageStorage } from './storage.js'
+import { Live } from './lib/live-layer.js'
 
 // Top-level program: scan for unclaimed inboxes on a tick, fork a
 // session fiber per newly-claimed inbox, and let session fibers retry
@@ -106,36 +101,6 @@ const program = Effect.gen(function* () {
 	// shutdown sequence, which interrupts everything cleanly.
 	yield* Effect.never
 })
-
-const Live = Layer.mergeAll(
-	CredentialDecryptor.layer,
-	RawMessageStorage.layer,
-	ParticipantMatcher.layer,
-).pipe(
-	// ParticipantMatcher reads contacts/companies via SqlClient, so PgLive must
-	// be PROVIDED to the merged layers — `mergeAll` alongside it leaves that
-	// requirement unsatisfied. provideMerge also re-exposes SqlClient for the
-	// inbox claim/session queries run by `program`.
-	Layer.provideMerge(PgLive),
-	Layer.provideMerge(WorkerEnvVars.layer),
-	// Export traces, logs, and metrics to the batuda-mail-worker Honeycomb
-	// dataset when OTEL_EXPORTER_OTLP_ENDPOINT is set. Without this the worker's
-	// IMAP disconnects, credential failures, and session-fiber deaths die in the
-	// console ring-buffer. Sits above ConfigFileLive so it can read NODE_ENV +
-	// the OTEL_* settings; merges with the default console logger, not replacing it.
-	//
-	// Merged rather than only provided: the exporter installs itself by putting a
-	// logger and a tracer into the context it is built into, and `program` below
-	// runs on what this layer HANDS BACK. Provided alone it reaches the layers
-	// built here and nothing else, which leaves a worker that boots, says export
-	// is enabled, and sends nothing — every line it writes goes to the console
-	// logger it still has.
-	Layer.provideMerge(OtlpObservability),
-	// Install the baked-file config values before the readers above resolve, so
-	// the env-var layer and the database client can read non-secret settings
-	// that no longer travel on the boot command line.
-	Layer.provide(ConfigFileLive),
-)
 
 // Turn on the crash safety net before the worker starts: a rare low-level error
 // (e.g. a dropped email connection) must be logged and the worker auto-restarted,

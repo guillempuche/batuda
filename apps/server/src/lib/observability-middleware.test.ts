@@ -1,5 +1,5 @@
 import { Cause, Effect, Layer, Logger, References } from 'effect'
-import { HttpServerRequest } from 'effect/unstable/http'
+import { HttpServerError, HttpServerRequest } from 'effect/unstable/http'
 import { describe, expect, it } from 'vitest'
 
 import { boundedCause, recordFacts } from '@batuda/observability'
@@ -215,7 +215,7 @@ describe('withRequestRecord', () => {
 			const { lines } = await runRequest(
 				recordFacts({ 'org.id': 'org_1' }).pipe(
 					Effect.andThen(Effect.die(new Error('boom'))),
-				) as Effect.Effect<{ readonly status: number }, never, never>,
+				),
 			)
 
 			// WHEN the defect escapes
@@ -236,17 +236,91 @@ describe('withRequestRecord', () => {
 	describe('when the client disconnects', () => {
 		it('should not log an error, because that is not a failure', async () => {
 			// GIVEN a request interrupted part-way, as a closed tab does
-			const { lines } = await runRequest(
-				Effect.interrupt as Effect.Effect<
-					{ readonly status: number },
-					never,
-					never
-				>,
-			)
+			const { lines } = await runRequest(Effect.interrupt)
 
 			// THEN nothing is logged at error level — an interrupt tripping error
 			// alerts would make every closed tab look like an outage
 			expect(lines.filter(line => line.level === 'Error')).toHaveLength(0)
+		})
+	})
+
+	// A route that does not exist is the caller's mistake, not ours. Recorded as a
+	// crash, every bot probing for /robots.txt leaves an error-level stack trace,
+	// and anything real is buried underneath the crawlers.
+	describe('when the router finds no match', () => {
+		it('should record it as a completed request, not a crash', async () => {
+			// GIVEN a request the router cannot match
+			const { lines } = await runRequest(
+				Effect.fail(
+					new HttpServerError.HttpServerError({
+						reason: new HttpServerError.RouteNotFound({
+							request: {} as never,
+						}),
+					}),
+				),
+			)
+
+			// THEN it leaves an ordinary record carrying a 404, at info
+			const line = lines.find(
+				entry => entry.annotations['event'] === 'http.not_found',
+			)
+			expect(line).toBeDefined()
+			expect(line?.annotations['http.status']).toBe(404)
+			expect(line?.annotations['http.path_pattern']).toBe('/v1/companies')
+			expect(line?.level).toBe('Info')
+
+			// AND nothing is logged as an error or named a crash
+			expect(lines.filter(entry => entry.level === 'Error')).toHaveLength(0)
+			expect(
+				lines.filter(entry => entry.annotations['event'] === 'http.defect'),
+			).toHaveLength(0)
+		})
+	})
+
+	describe('when something crashed alongside the missing route', () => {
+		it('should record the crash rather than write it off as a 404', async () => {
+			// GIVEN a request that failed for a missing route AND crashed — a
+			// finalizer or a forked child dying while the request was failing
+			const { lines } = await runRequest(
+				Effect.failCause(
+					Cause.combine(
+						Cause.fail(
+							new HttpServerError.HttpServerError({
+								reason: new HttpServerError.RouteNotFound({
+									request: {} as never,
+								}),
+							}),
+						),
+						Cause.die(new Error('boom')),
+					),
+				),
+			)
+
+			// THEN it is recorded as the crash it also was — called a 404, the crash
+			// would leave no line at all
+			const defect = lines.find(
+				entry => entry.annotations['event'] === 'http.defect',
+			)
+			expect(defect).toBeDefined()
+			expect(defect?.level).toBe('Error')
+			expect(
+				lines.filter(entry => entry.annotations['event'] === 'http.not_found'),
+			).toHaveLength(0)
+		})
+	})
+
+	describe('when the request dies for any other reason', () => {
+		it('should still record it as a crash', async () => {
+			// GIVEN a genuine defect rather than a missing route
+			const { lines } = await runRequest(Effect.die(new Error('boom')))
+
+			// THEN it keeps the crash treatment — only a missing route is quieted,
+			// never a real failure
+			const defect = lines.find(
+				entry => entry.annotations['event'] === 'http.defect',
+			)
+			expect(defect).toBeDefined()
+			expect(defect?.level).toBe('Error')
 		})
 	})
 })
