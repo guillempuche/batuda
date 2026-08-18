@@ -790,6 +790,82 @@ export const worktreeDown = Effect.gen(function* () {
 	yield* Console.log(`✓ Removed ${db} and ${bucket} (shared stack untouched).`)
 })
 
+// Whether everything this branch changed is already on main.
+//
+// Asked by rolling the branch up into a single commit sitting on the point it
+// forked from, then letting git say whether that patch is already in main. That
+// is the shape a squash merge leaves behind, and comparing commit by commit
+// cannot see it. Any git failure here reads as "not already there", so a doubt
+// keeps the branch rather than deleting it.
+const branchWorkIsOnMain = (root: string, branch: string) =>
+	Effect.gen(function* () {
+		const git = (...args: ReadonlyArray<string>) =>
+			execSilentArgs('git', ['-C', root, ...args])
+		const forkedAt = yield* git('merge-base', 'main', branch)
+		const content = yield* git('rev-parse', `${branch}^{tree}`)
+		// A loose commit that is never referenced, so it costs one object git
+		// collects on its own; nothing points at it once this answer is read.
+		const rolledUp = yield* git(
+			'commit-tree',
+			content,
+			'-p',
+			forkedAt,
+			'-m',
+			'rolled up to compare against main',
+		)
+		// `git cherry` marks a patch main already carries with "-", and one it is
+		// missing with "+".
+		return (yield* git('cherry', 'main', rolledUp)).startsWith('-')
+	}).pipe(Effect.orElseSucceed(() => false))
+
+// Delete the branch the finished PR was on, leaving git's own refusal as the
+// first word.
+//
+// `git branch -d` asks whether the branch's commits are reachable from main. A
+// squash merge replays the whole branch as one new commit, so none of the
+// commits the branch actually holds is reachable and a branch whose work is
+// safely on main still reads as unmerged — which is most of this repo's PRs.
+// When that is why the delete was refused, ask the question git did not: is the
+// content already there? Only then insist. A branch holding work main has never
+// seen is left alone and named, because deleting it is the one step here nobody
+// can undo.
+const deleteFinishedBranch = (root: string, branch: string, force: boolean) =>
+	Effect.gen(function* () {
+		const insist = execArgs('git', ['-C', root, 'branch', '-D', branch])
+		if (force) {
+			yield* insist
+			yield* Console.log(`✓ Deleted local branch ${branch}`)
+			return
+		}
+		// Asked quietly, because a refusal here is the ordinary case rather than a
+		// fault: git printing "not fully merged" and the run then reporting success
+		// reads as something having gone wrong. A refusal that survives the content
+		// check below is reported in this command's own words instead.
+		const wentQuietly = yield* execSilentArgs('git', [
+			'-C',
+			root,
+			'branch',
+			'-d',
+			branch,
+		]).pipe(
+			Effect.map(() => true),
+			Effect.orElseSucceed(() => false),
+		)
+		if (wentQuietly) {
+			yield* Console.log(`✓ Deleted local branch ${branch}`)
+			return
+		}
+		if (!(yield* branchWorkIsOnMain(root, branch))) {
+			return yield* Effect.fail(
+				new Error(
+					`Branch ${branch} was kept: git would not delete it, and its work is not on main either. Look at it, then delete it yourself with \`git branch -D ${branch}\` — that will also name any other reason git had.`,
+				),
+			)
+		}
+		yield* insist
+		yield* Console.log(`✓ Deleted local branch ${branch} (squashed into main)`)
+	})
+
 export const worktreeDone = (options: { force: boolean; stash: boolean }) =>
 	Effect.gen(function* () {
 		const { force, stash } = options
@@ -836,11 +912,7 @@ export const worktreeDone = (options: { force: boolean; stash: boolean }) =>
 			yield* execIn(mainRoot, 'git', 'pull', '--prune')
 
 			if (yield* branchExists(branch)) {
-				const deleteArgs = force
-					? ['branch', '-D', branch]
-					: ['branch', '-d', branch]
-				yield* execIn(mainRoot, 'git', ...deleteArgs)
-				yield* Console.log(`✓ Deleted local branch ${branch}`)
+				yield* deleteFinishedBranch(mainRoot, branch, force)
 			}
 		} else {
 			const branch = yield* branchName
@@ -856,11 +928,7 @@ export const worktreeDone = (options: { force: boolean; stash: boolean }) =>
 			yield* exec('git', 'pull', '--prune')
 
 			if (yield* branchExists(branch)) {
-				const deleteArgs = force
-					? ['branch', '-D', branch]
-					: ['branch', '-d', branch]
-				yield* exec('git', ...deleteArgs)
-				yield* Console.log(`✓ Deleted local branch ${branch}`)
+				yield* deleteFinishedBranch(mainRoot, branch, force)
 			}
 		}
 
