@@ -2,7 +2,7 @@ import { NodeRuntime } from '@effect/platform-node'
 import { DateTime, Effect, type Fiber, Layer, Ref, Schedule } from 'effect'
 
 import { ParticipantMatcher } from '@batuda/email/participant-matcher'
-import { makeOtlpObservability } from '@batuda/observability'
+import { boundedCause } from '@batuda/observability'
 
 import { type ClaimedInbox, claimAvailableInboxes } from './claim.js'
 import { installCrashGuards } from './crash-guards.js'
@@ -11,6 +11,7 @@ import { CredentialDecryptor } from './decrypt.js'
 import { WorkerEnvVars } from './env.js'
 import { runInboxSession } from './inbox-session.js'
 import { ConfigFileLive } from './lib/config-provider.js'
+import { OtlpObservability } from './observability.js'
 import { RawMessageStorage } from './storage.js'
 
 // Top-level program: scan for unclaimed inboxes on a tick, fork a
@@ -73,7 +74,7 @@ const program = Effect.gen(function* () {
 		yield* reapFinished
 		const claimed: readonly ClaimedInbox[] = yield* claimAvailableInboxes.pipe(
 			Effect.catchCause(cause =>
-				Effect.logError(cause).pipe(
+				Effect.logError(boundedCause(cause)).pipe(
 					Effect.andThen(Effect.succeed([] as readonly ClaimedInbox[])),
 				),
 			),
@@ -122,7 +123,14 @@ const Live = Layer.mergeAll(
 	// IMAP disconnects, credential failures, and session-fiber deaths die in the
 	// console ring-buffer. Sits above ConfigFileLive so it can read NODE_ENV +
 	// the OTEL_* settings; merges with the default console logger, not replacing it.
-	Layer.provide(makeOtlpObservability({ serviceName: 'batuda-mail-worker' })),
+	//
+	// Merged rather than only provided: the exporter installs itself by putting a
+	// logger and a tracer into the context it is built into, and `program` below
+	// runs on what this layer HANDS BACK. Provided alone it reaches the layers
+	// built here and nothing else, which leaves a worker that boots, says export
+	// is enabled, and sends nothing — every line it writes goes to the console
+	// logger it still has.
+	Layer.provideMerge(OtlpObservability),
 	// Install the baked-file config values before the readers above resolve, so
 	// the env-var layer and the database client can read non-secret settings
 	// that no longer travel on the boot command line.

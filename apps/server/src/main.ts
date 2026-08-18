@@ -465,12 +465,14 @@ const AppLive = withGlobalMiddlewareOrder(
 // out-of-request-scope Defect" case in main.boot.test.ts, which runs under
 // `pnpm --filter @batuda/server test:boot` rather than `pnpm test`.
 
-// `HttpMiddleware.tracer` wraps the whole server chain in a per-request span so
-// traces export to OTLP and per-route span annotations (request id, org id, tool
-// name) have a span to attach to. `serve` already adds the request logger; this
-// adds the missing tracer. `/health` is exempted from tracing inside AppLive.
+// No tracer is passed here. The platform opens a per-request span itself,
+// whether middleware is given or not, and that span is what per-route
+// annotations (request id, org id, tool name) attach to. Passing one as well
+// wraps every request twice and leaves a bare duplicate span beside each real
+// one — two rows per request, so every count reads double. The routes exempt
+// from tracing are the ones `TracerDisabledLive` names above; the platform's own
+// wrapping reads that same list.
 const program = HttpRouter.serve(AppLive, {
-	middleware: HttpMiddleware.tracer,
 	// Disable Effect's built-in request logger: in this version it annotates
 	// `http.url` with the RAW request URL, so a magic-link/reset token in the URL
 	// would export verbatim to OTLP. ObservabilityLive emits a sanitized

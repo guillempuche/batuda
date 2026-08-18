@@ -23,6 +23,15 @@ import { McpToolsLive } from './server'
 
 const PROTOCOL_VERSION_HEADER = 'mcp-protocol-version'
 const SESSION_ID_HEADER = 'mcp-session-id'
+// Which JSON-RPC call this request carries. A header rather than the body, so it
+// can be read without touching a stream the route still needs — Claude's client
+// sets it, and a client that doesn't simply leaves the field off its line.
+const METHOD_HEADER = 'mcp-method'
+
+// The revision and the method a request names are the caller's own words, so they
+// are cut short before landing on a log line: one client sending something long
+// should not stretch every record it touches.
+const bounded = (value: string) => value.slice(0, 64)
 
 // A client opening a connection names the newest protocol revision it speaks,
 // and the route refuses anything past the newest the library knows with an empty
@@ -58,6 +67,72 @@ const jsonRpcError = (
 		{ jsonrpc: '2.0', id: null, error: { code, message } },
 		{ status, ...(headers ? { headers } : {}) },
 	)
+
+/**
+ * Names the call on the request's own line, before anything can refuse it.
+ *
+ * A refused MCP request is the one hardest to read after the fact: the client
+ * shows a silent retry, and the line left behind says only which route and which
+ * status. Naming the call and the revision it asked for turns that line into an
+ * explanation, and it has to be recorded up front — a request refused later
+ * never reaches the code that would have known.
+ *
+ * Read from the request as it arrived, not the one handed onward, so the line
+ * says what the client actually asked for even where negotiation drops the
+ * revision it named.
+ */
+export const recordCall = (request: HttpServerRequest.HttpServerRequest) => {
+	const method = request.headers[METHOD_HEADER]
+	const named = request.headers[PROTOCOL_VERSION_HEADER]
+	return recordFacts({
+		...(method !== undefined && { 'mcp.method': bounded(method) }),
+		...(named !== undefined && {
+			'mcp.protocol_version.named': bounded(named),
+		}),
+	})
+}
+
+/**
+ * Gives a refused revision a reason to read.
+ *
+ * A request naming a revision the library does not know is answered with an
+ * empty 400: no body for the client to act on, and a line that says 400 without
+ * saying why. This says why in both directions — a warning line naming the
+ * revision, and a JSON-RPC error body telling the client what to do instead.
+ *
+ * Only a response the route RETURNED is looked at, and the one empty 400 the
+ * route returns is that refusal — the RPC layer under it returns none. A request
+ * the route FAILED on (a broken body, say) also ends in an empty 400, but that
+ * one is built further out, past this, so a bad body is never blamed on the
+ * revision. The revision is read from the request the route itself saw, since
+ * that is what it decided on.
+ */
+export const explainRefusedVersion = <E, R>(
+	app: Effect.Effect<HttpServerResponse.HttpServerResponse, E, R>,
+	request: HttpServerRequest.HttpServerRequest,
+) =>
+	Effect.flatMap(app, response => {
+		const named = request.headers[PROTOCOL_VERSION_HEADER]
+		if (
+			named === undefined ||
+			response.status !== 400 ||
+			response.body._tag !== 'Empty'
+		)
+			return Effect.succeed(response)
+		return Effect.logWarning('MCP protocol version refused').pipe(
+			Effect.annotateLogs({
+				event: 'mcp.protocol_version.refused',
+				'mcp.protocol_version.named': bounded(named),
+			}),
+			Effect.andThen(
+				jsonRpcError(
+					400,
+					-32000,
+					`Unsupported MCP protocol version: ${bounded(named)}. Open a new connection to settle a supported revision, or send the one this connection settled.`,
+				),
+			),
+		)
+	})
 
 // MCP clients (ChatGPT, Claude.ai) surface an auth rejection as a silent retry
 // loop, not a visible error — so every 401/403 path logs why it fired. `reason`
@@ -145,6 +220,7 @@ const McpAuthMiddleware = HttpRouter.middleware(
 					return yield* httpEffect
 				}
 				const req = yield* withNegotiableProtocolVersion(incoming)
+				yield* recordCall(incoming)
 
 				const incomingMessage = NodeHttpServerRequest.toIncomingMessage(req)
 				const headers = fromNodeHeaders(incomingMessage.headers)
@@ -205,7 +281,7 @@ const McpAuthMiddleware = HttpRouter.middleware(
 										userAgent: headers.get('user-agent'),
 									})
 								}
-								return yield* httpEffect
+								return yield* explainRefusedVersion(httpEffect, req)
 							}).pipe(
 								// The very request the body was read from: a request remembers
 								// its body and a copy does not, so handing the route the other

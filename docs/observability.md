@@ -40,28 +40,31 @@ Timestamps and trace ids are added by the framework.
 
 `{domain}.{action}[.{result}]` — so a filter on one prefix gets a whole area.
 
-| Event                    | Description                                 |
-| ------------------------ | ------------------------------------------- |
-| `http.request`           | A request completed                         |
-| `http.server_error`      | A request ended 5xx                         |
-| `http.defect`            | A request died without producing a response |
-| `company.created`        | New company added to CRM                    |
-| `company.status_changed` | Pipeline status transition                  |
-| `interaction.logged`     | Interaction recorded                        |
-| `document.created`       | Research/notes document added               |
-| `email.sent`             | Outbound email                              |
-| `email.received`         | Inbound reply                               |
-| `email.failed`           | Email delivery failed                       |
-| `webhook.fired`          | Webhook fan-out triggered                   |
-| `webhook.failed`         | Webhook delivery failed                     |
-| `page.published`         | Sales page made public                      |
-| `page.viewed`            | Prospect viewed a sales page                |
-| `task.created`           | CRM task raised                             |
-| `research.run`           | A research run finished, with what it spent |
-| `mcp.tool_called`        | MCP tool invoked by agent                   |
-| `mcp.auth.rejected`      | An MCP call was refused, and why            |
+| Event                          | Description                                                |
+| ------------------------------ | ---------------------------------------------------------- |
+| `http.request`                 | A request completed                                        |
+| `http.server_error`            | A request ended 5xx                                        |
+| `http.defect`                  | A request died without producing a response                |
+| `company.created`              | New company added to CRM                                   |
+| `company.status_changed`       | Pipeline status transition                                 |
+| `interaction.logged`           | Interaction recorded                                       |
+| `document.created`             | Research/notes document added                              |
+| `email.sent`                   | Outbound email                                             |
+| `email.received`               | Inbound reply                                              |
+| `email.failed`                 | Email delivery failed                                      |
+| `webhook.fired`                | Webhook fan-out triggered                                  |
+| `webhook.failed`               | Webhook delivery failed                                    |
+| `page.published`               | Sales page made public                                     |
+| `page.viewed`                  | Prospect viewed a sales page                               |
+| `task.created`                 | CRM task raised                                            |
+| `research.run`                 | A research run finished, with what it spent                |
+| `mcp.tool_called`              | MCP tool invoked by agent                                  |
+| `mcp.auth.rejected`            | An MCP call was refused, and why                           |
+| `mcp.protocol_version.refused` | A call named a protocol revision this server does not know |
 
 A request leaves exactly one of `http.request`, `http.server_error` or `http.defect`, so "every request that ended badly" is those last two.
+
+A request also leaves exactly **one span**, not two. The platform opens that span itself, so the server passes no tracer of its own when it starts serving; passing one as well used to open a second span per request, and every count taken from the traces read double until 2026-08-18. A trace older than that carries the twins.
 
 ### Levels
 
@@ -257,6 +260,8 @@ The endpoint is non-secret, so it lives in each app's `config.production.json` a
 
 **Per-service datasets.** Traces route to a Honeycomb dataset named after `service.name`, so each process separates on its own. Logs and metrics route by the `x-honeycomb-dataset` header instead, so each deploy workflow appends its own dataset name to the shared team-key secret. One environment-scoped API key covers every process.
 
+A process only reports if it **merges** the observability layer into the layer it runs on. Provided without merging, it boots, says export is enabled, runs the exporter's own flushers — and sends none of its own lines, because the logger and tracer the exporter installs never reach the code that writes them. The mail-worker ran that way until 2026-08-18: alive, logging, and absent from the vendor. `packages/observability/src/otlp.test.ts` holds that line.
+
 Note the consequence: logs and traces from the same request land in different datasets. That is the vendor's routing, not a choice — it is why the per-request record has to be self-sufficient rather than something you assemble by joining a log to a trace.
 
 ## Health endpoint
@@ -271,7 +276,7 @@ Pointers, not copies — read the files for detail.
 
 | Concern                                                       | Where                                              |
 | ------------------------------------------------------------- | -------------------------------------------------- |
-| Shared exporter, sampling, span scrubbing                     | `packages/observability`                           |
+| Shared exporter, sampling, span scrubbing, cause bounding     | `packages/observability`                           |
 | Per-request record, route sanitizing, catch-all error logging | `apps/server/src/lib/observability-middleware.ts`  |
 | Logger set and level                                          | `apps/server/src/lib/logger.ts`                    |
 | Tracing exemptions for secret-carrying routes                 | `apps/server/src/main.ts`                          |

@@ -2,6 +2,7 @@
 // (version/commit/region) surfaced on the health endpoint and the OTLP resource,
 // plus the per-process exporter layer factory.
 
+export { boundedCause } from './bounded-cause'
 export { buildMeta } from './build-meta'
 export { makeOtlpObservability } from './otlp'
 export {
