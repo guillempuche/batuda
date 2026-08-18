@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-18 (mail-worker-v2026.8.18)
+
+### Bug Fixes
+
+* stop telemetry double-counting, hiding refusals, and going missing ([b91eabb](https://github.com/guillempuche/batuda/commit/b91eabbbb86edf645c54c5f2fdc60fa42ad6c59c))
+
 ## 2026-08-17 (mail-worker-v2026.8.17)
 
 ### Features
