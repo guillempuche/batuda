@@ -691,14 +691,14 @@ const worktreeUpCommand = Command.make('up', {}, () => worktreeUp).pipe(
 	),
 )
 
-// Whoever asks to drop this worktree's data expects data to be there, so
-// finding none is worth reporting. `worktree done` reads the same answer as a
-// note and carries on.
+// Finding nothing to drop is the state this command exists to produce, so it is
+// reported and not failed over — running it twice, or on a worktree that never
+// had a database, leaves the same nothing behind either way.
 const worktreeDownCommand = Command.make('down', {}, () =>
 	worktreeDown.pipe(
 		Effect.flatMap(outcome =>
 			outcome === 'nothing-provisioned'
-				? Effect.fail(new Error(NOTHING_TO_DROP))
+				? Console.log(NOTHING_TO_DROP)
 				: Effect.void,
 		),
 	),
@@ -715,7 +715,7 @@ const worktreeDoneCommand = Command.make(
 	{
 		force: Flag.boolean('force').pipe(
 			Flag.withDescription(
-				'Ignore a dirty working tree and force branch/worktree removal',
+				'Push past every refusal: discard uncommitted changes (in a linked worktree they are deleted with the directory), and delete the branch even when main carries no copy of its work',
 			),
 			Flag.withDefault(false),
 		),
