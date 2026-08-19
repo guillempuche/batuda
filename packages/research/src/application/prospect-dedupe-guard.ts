@@ -102,8 +102,8 @@ import {
 	withoutFormDots,
 } from './entity-guard'
 import { isPlainObject } from './guard-shapes'
-import { rowGroups } from './row-groups'
 import { ownSiteVerdict } from './own-site'
+import { rowGroups } from './row-groups'
 import { hostOf, isBareWebAddress } from './source-key'
 
 // What marks a key as filing a row under its site. Written once, because a caller
