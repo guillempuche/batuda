@@ -1045,6 +1045,24 @@ describe('scoring a run that answered for a whole market', () => {
 			expect(score.market?.rowsDuplicated).toBe(0)
 		})
 
+		it('should count a row whose name carries a note after it', () => {
+			// GIVEN a scan that wrote where it met the company after the name
+			const score = scoreRun(
+				marketGolden(),
+				outcome({
+					companies: [
+						company({ name: 'KBE Energy' }),
+						company({ name: 'KBE Energy (Annuaire Tecsol entry)' }),
+					],
+				}),
+			)
+
+			// WHEN scored — THEN the strict figure sees it, because it reads a list
+			// with the same four routes the fold joins on. A shape the fold acts on
+			// and this cannot see would report every list clean
+			expect(score.market?.rowsDuplicated).toBe(1)
+		})
+
 		it('should count no duplicates in a list of distinct companies', () => {
 			// GIVEN three unrelated companies
 			const score = scoreRun(
@@ -1060,6 +1078,241 @@ describe('scoring a run that answered for a whole market', () => {
 
 			// WHEN scored — THEN the list is what it says it is
 			expect(score.market?.rowsDuplicated).toBe(0)
+		})
+	})
+
+	describe('when a list repeats a company the fold cannot join', () => {
+		it('should count a name beside the same name with a word in front of it', () => {
+			// GIVEN the pair a French run returned, which the fold has to leave alone
+			const score = scoreRun(
+				marketGolden(),
+				outcome({
+					companies: [
+						company({ name: 'SNEF' }),
+						company({
+							name: 'Groupe SNEF',
+							website: 'https://snef.fr',
+							location: 'Marseille',
+						}),
+					],
+				}),
+			)
+
+			// WHEN scored — THEN the strict figure reads clean, because it reuses the
+			// keys the fold joins on; the loose one moves, which is the only way a
+			// reader ever learns those keys are too narrow
+			expect(score.market?.rowsDuplicated).toBe(0)
+			expect(score.market?.rowsPossiblyDuplicated).toBe(1)
+		})
+
+		it('should count a name beside the same name with words after it', () => {
+			// GIVEN the other pair from that run
+			const score = scoreRun(
+				marketGolden(),
+				outcome({
+					companies: [
+						company({ name: 'VOLTEC' }),
+						company({ name: 'Voltec Power Technology Solutions' }),
+					],
+				}),
+			)
+
+			// WHEN scored — THEN the same reading
+			expect(score.market?.rowsDuplicated).toBe(0)
+			expect(score.market?.rowsPossiblyDuplicated).toBe(1)
+		})
+
+		it('should count a pair whose one different word is the same word pluralised', () => {
+			// GIVEN a pair differing by a plural and one trailing word
+			const score = scoreRun(
+				marketGolden(),
+				outcome({
+					companies: [
+						company({ name: 'PPVS – Facility Management France' }),
+						company({
+							name: 'PPVS – Facilities Management',
+							website: 'https://ppvs-fm.com',
+							location: 'Paris',
+						}),
+					],
+				}),
+			)
+
+			// WHEN scored — THEN counted: a word ending differently from the same stem
+			// is spelling rather than a different word
+			expect(score.market?.rowsDuplicated).toBe(0)
+			expect(score.market?.rowsPossiblyDuplicated).toBe(1)
+		})
+
+		it('should count two real companies in that same shape as well', () => {
+			// GIVEN a name and a genuinely different company whose name is that name
+			// and then a word
+			const score = scoreRun(
+				marketGolden(),
+				outcome({
+					companies: [
+						company({ name: 'Terre Solaire' }),
+						company({ name: 'Terre Solaire Energie' }),
+					],
+				}),
+			)
+
+			// WHEN scored — THEN counted, and that is right for what this figure is: a
+			// prompt to go and look at a pair, not a claim they are one company. It is
+			// exactly why the fold may not act on the same reading
+			expect(score.market?.rowsPossiblyDuplicated).toBe(1)
+		})
+
+		it("should never read below the figure that reuses the fold's keys", () => {
+			// GIVEN two rows one company only because they share a site, which their
+			// names say nothing about
+			const score = scoreRun(
+				marketGolden(),
+				outcome({
+					companies: [
+						company({ name: 'Alfa SL', website: 'https://alfa.example' }),
+						company({
+							name: 'Instalaciones Beta',
+							website: 'https://alfa.example/es',
+						}),
+					],
+				}),
+			)
+
+			// WHEN scored — THEN the loose figure counts the fold's own pairs too, so
+			// a report can subtract one from the other and read what is left
+			expect(score.market?.rowsDuplicated).toBe(1)
+			expect(score.market?.rowsPossiblyDuplicated).toBe(1)
+		})
+	})
+
+	describe('when two companies merely have names that look alike', () => {
+		it('should not count two names sharing an opening shorter than what they trail', () => {
+			// GIVEN two real French installers opening on the same four letters
+			const score = scoreRun(
+				marketGolden(),
+				outcome({
+					companies: [
+						company({ name: 'Voltalia' }),
+						company({ name: 'Voltec' }),
+					],
+				}),
+			)
+
+			// WHEN scored — THEN neither figure moves: most of "voltalia" is not in
+			// "voltec" at all, so they are not one word written two ways
+			expect(score.market?.rowsPossiblyDuplicated).toBe(0)
+		})
+
+		it('should not count a one-word name against a longer name it opens like', () => {
+			// GIVEN a company whose whole name opens like a word of another's
+			const score = scoreRun(
+				marketGolden(),
+				outcome({
+					companies: [
+						company({ name: 'Systovi' }),
+						company({ name: 'Eiffage Energie Systemes' }),
+					],
+				}),
+			)
+
+			// WHEN scored — THEN nothing counted
+			expect(score.market?.rowsPossiblyDuplicated).toBe(0)
+		})
+
+		it('should not count a name too short to stand for a company', () => {
+			// GIVEN a row named by two letters beside a longer name starting with them
+			const score = scoreRun(
+				marketGolden(),
+				outcome({
+					companies: [
+						company({ name: 'AB' }),
+						company({ name: 'AB Instalaciones Electricas' }),
+					],
+				}),
+			)
+
+			// WHEN scored — THEN passed over rather than joining every longer name
+			expect(score.market?.rowsPossiblyDuplicated).toBe(0)
+		})
+
+		it('should read a pair the same way whichever row came back first', () => {
+			// GIVEN a pair where one name says a word twice, so the two names carry the
+			// same number of words but not the same words
+			const rows = [
+				company({ name: 'Energie Energie Solar' }),
+				company({ name: 'Energie Solar Photo' }),
+			]
+
+			// WHEN scored in one order and then the other
+			const asFound = scoreRun(marketGolden(), outcome({ companies: rows }))
+			const reversed = scoreRun(
+				marketGolden(),
+				outcome({ companies: [...rows].reverse() }),
+			)
+
+			// THEN both read alike. A list arrives in whatever order the model wrote
+			// it, so a figure that answered differently for the same two rows would be
+			// reporting that order rather than the list
+			expect(reversed.market?.rowsPossiblyDuplicated).toBe(
+				asFound.market?.rowsPossiblyDuplicated,
+			)
+		})
+
+		it('should not count three one-word names that merely share a stem', () => {
+			// GIVEN three companies a live French search returned, whose names all open
+			// on the same five letters
+			const score = scoreRun(
+				marketGolden(),
+				outcome({
+					companies: [
+						company({ name: 'Innova' }),
+						company({ name: 'Innovasun' }),
+						company({ name: 'Innovtech' }),
+					],
+				}),
+			)
+
+			// WHEN scored — THEN none of them counts against the others. A name of one
+			// word has nothing standing beside it to bear out what a shared ending
+			// suggests, so it has to appear in the other name as that word exactly
+			expect(score.market?.rowsPossiblyDuplicated).toBe(0)
+		})
+
+		it('should still count a one-word name that appears whole in a longer one', () => {
+			// GIVEN the repeat from that same list, where the shorter name appears in
+			// the longer one word for word
+			const score = scoreRun(
+				marketGolden(),
+				outcome({
+					companies: [
+						company({ name: 'Instaleo' }),
+						company({ name: 'Notre Solar – Instaleo' }),
+					],
+				}),
+			)
+
+			// WHEN scored — THEN counted: asking a one-word name to match exactly is
+			// what keeps the stems apart, and it costs nothing here
+			expect(score.market?.rowsDuplicated).toBe(0)
+			expect(score.market?.rowsPossiblyDuplicated).toBe(1)
+		})
+
+		it('should count no possible duplicates in a list of distinct companies', () => {
+			// GIVEN three unrelated companies
+			const score = scoreRun(
+				marketGolden(),
+				outcome({
+					companies: [
+						company({ name: 'Alfa Instalaciones' }),
+						company({ name: 'Beta Electricidad' }),
+						company({ name: 'Gamma Climatizacion' }),
+					],
+				}),
+			)
+
+			// WHEN scored — THEN the list is what it says it is
+			expect(score.market?.rowsPossiblyDuplicated).toBe(0)
 		})
 	})
 
@@ -1182,6 +1435,7 @@ describe('scoring a run that answered for a whole market', () => {
 				rowsConfirmed: 0,
 				rowsLocated: 0,
 				rowsDuplicated: 0,
+				rowsPossiblyDuplicated: 0,
 				partsExpected: 2,
 				partsAnswered: 0,
 			})
@@ -1230,6 +1484,7 @@ describe('summarizeScores', () => {
 				rowsGoldenListedShare: null,
 				requestCoverage: null,
 				duplicateRate: null,
+				possibleDuplicateRate: null,
 				locationFill: null,
 				confirmationRate: null,
 				rowsPerScan: null,
@@ -1515,6 +1770,7 @@ describe('summarizing a pass that held market requests', () => {
 				rowsConfirmed: 0,
 				rowsLocated: 10,
 				rowsDuplicated: 0,
+				rowsPossiblyDuplicated: 0,
 				partsExpected: 5,
 				partsAnswered: 5,
 				...over,
@@ -1573,6 +1829,7 @@ describe('summarizing a pass that held market requests', () => {
 			expect(summary.organisationKindPrecision).toBeNull()
 			expect(summary.requestCoverage).toBeNull()
 			expect(summary.duplicateRate).toBeNull()
+			expect(summary.possibleDuplicateRate).toBeNull()
 			expect(summary.locationFill).toBeNull()
 			expect(summary.rowsPerScan).toBeNull()
 		})
@@ -1592,6 +1849,9 @@ describe('summarizing a pass that held market requests', () => {
 					rowsRightKind: 30,
 					rowsLocated: 15,
 					rowsDuplicated: 6,
+					// Never below the strict count: three more rows repeat a company
+					// that no fold could safely join.
+					rowsPossiblyDuplicated: 9,
 				}),
 				marketScore({
 					name: 'FR',
@@ -1610,6 +1870,7 @@ describe('summarizing a pass that held market requests', () => {
 			// the two markets' own rates, which would read a far kinder 75%
 			expect(summary.organisationKindPrecision).toBeCloseTo(36 / 66)
 			expect(summary.duplicateRate).toBeCloseTo(6 / 66)
+			expect(summary.possibleDuplicateRate).toBeCloseTo(9 / 66)
 			expect(summary.locationFill).toBeCloseTo(21 / 66)
 			expect(summary.rowsPerScan).toBe(33)
 		})

@@ -125,6 +125,18 @@ export const scorePayloadsForRun = (score: RunScore): ScorePayload[] => {
 					feedback: `${market.rowsDuplicated}/${market.rowsReturned} rows are another row's company again`,
 				},
 				{
+					// Not marked failed on its own: this one counts pairs no fold may
+					// safely join, so a list as good as the rules allow still counts some
+					// here. What it is for is the gap to the strict count — rows repeating
+					// a company that nothing structural can tell from two companies with
+					// near-identical names — which is a reader's cue to look rather than a
+					// fault the run could have avoided.
+					name: 'not_possibly_duplicated',
+					value: 1 - market.rowsPossiblyDuplicated / market.rowsReturned,
+					passed: market.rowsPossiblyDuplicated === market.rowsDuplicated,
+					feedback: `${market.rowsPossiblyDuplicated}/${market.rowsReturned} rows may be another row's company again, ${market.rowsPossiblyDuplicated - market.rowsDuplicated} of them beyond what the fold can join`,
+				},
+				{
 					name: 'location_fill',
 					value: market.rowsLocated / market.rowsReturned,
 					passed: market.rowsLocated === market.rowsReturned,
@@ -230,6 +242,7 @@ export const evalSpanAttributes = (
 		attributes['eval.rows_right_kind'] = market.rowsRightKind
 		attributes['eval.rows_located'] = market.rowsLocated
 		attributes['eval.rows_duplicated'] = market.rowsDuplicated
+		attributes['eval.rows_possibly_duplicated'] = market.rowsPossiblyDuplicated
 		attributes['eval.parts_expected'] = market.partsExpected
 		attributes['eval.parts_answered'] = market.partsAnswered
 		if (market.partsExpected > 0) {
@@ -246,6 +259,8 @@ export const evalSpanAttributes = (
 			attributes['eval.rows_unjudged'] = market.rowsUnjudged
 			attributes['eval.duplicate_rate'] =
 				market.rowsDuplicated / market.rowsReturned
+			attributes['eval.possible_duplicate_rate'] =
+				market.rowsPossiblyDuplicated / market.rowsReturned
 			attributes['eval.location_fill'] =
 				market.rowsLocated / market.rowsReturned
 		}
@@ -310,6 +325,9 @@ export const evalSummaryAttributes = (
 	}
 	if (summary.duplicateRate !== null) {
 		attributes['eval.duplicate_rate'] = summary.duplicateRate
+	}
+	if (summary.possibleDuplicateRate !== null) {
+		attributes['eval.possible_duplicate_rate'] = summary.possibleDuplicateRate
 	}
 	if (summary.locationFill !== null) {
 		attributes['eval.location_fill'] = summary.locationFill
