@@ -512,6 +512,7 @@ const formatMarketRuns = (
 		`right kind ${share(total(market => market.rowsRightKind))}`,
 		`confirmed ${share(total(market => market.rowsConfirmed))}`,
 		`duplicates ${share(total(market => market.rowsDuplicated))}`,
+		`maybe ${share(total(market => market.rowsPossiblyDuplicated))}`,
 		`located ${share(total(market => market.rowsLocated))}`,
 		`parts ${parts === 0 ? 'n/a' : `${total(market => market.partsAnswered)}/${parts}`}`,
 	].join('  ')
@@ -599,6 +600,7 @@ const formatMarketFigures = (summary: EvalSummary): ReadonlyArray<string> =>
 				`    model ruled on:     ${pct(summary.rowsJudgedShare)}`,
 				`    already listed:     ${pct(summary.rowsGoldenListedShare)}`,
 				`  duplicates:           ${pct(summary.duplicateRate)}`,
+				`    may be a repeat:    ${pct(summary.possibleDuplicateRate)}`,
 				`  with a location:      ${pct(summary.locationFill)}`,
 				`Request coverage:       ${pct(summary.requestCoverage)}`,
 			]
@@ -660,7 +662,9 @@ const formatMarketGroups = (groups: Record<string, EvalSummary>): string =>
 						s.rowsPerScan,
 					)}  right kind ${pct(s.organisationKindPrecision)}  confirmed ${pct(
 						s.confirmationRate,
-					)}  dupes ${pct(s.duplicateRate)}  located ${pct(
+					)}  dupes ${pct(s.duplicateRate)}  maybe ${pct(
+						s.possibleDuplicateRate,
+					)}  located ${pct(
 						s.locationFill,
 					)}  coverage ${pct(s.requestCoverage)}  cost ${cents(s.costPerRun)}`,
 			),

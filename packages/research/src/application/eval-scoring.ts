@@ -26,7 +26,8 @@
  *   organisation kind    how many rows are the kind of organisation that was asked for
  *   request coverage     how many of the parts the request named came back with a row
  *   duplicate rate       whether the fold that joins two rows of one company still
- *                        holds — see its own note for what it cannot see
+ *                        holds, beside a looser reading of the same list that shows
+ *                        the repeats that fold's keys cannot see at all
  *   location fill        how many rows say what town or province the company is in
  *
  * The row count is still reported, as the scale those four read against rather than
@@ -55,9 +56,9 @@ import {
 	specificLocationAgrees,
 } from './eval-scoring-company'
 import {
-	duplicatedRows,
 	isKnownNonCompany,
 	partsAnsweredBy,
+	repeatedRows,
 } from './eval-scoring-market'
 import {
 	type EvalSummary,
@@ -243,6 +244,7 @@ export const scoreRun = (
 	const rightKindRows = outcome.companies.filter(
 		(_, index) => kinds[index]?.isCompany ?? true,
 	)
+	const repeats = repeatedRows(outcome.companies)
 	const market: MarketScore | undefined =
 		expectedMarket === undefined || !endedWithAnAnswer(outcome.status)
 			? undefined
@@ -257,7 +259,8 @@ export const scoreRun = (
 					rowsRightKind: rightKindRows.length,
 					rowsLocated: outcome.companies.filter(row => isFilled(row.location))
 						.length,
-					rowsDuplicated: duplicatedRows(outcome.companies),
+					rowsDuplicated: repeats.duplicated,
+					rowsPossiblyDuplicated: repeats.possiblyDuplicated,
 					partsExpected: expectedMarket.parts.length,
 					// Coverage counts the parts the request named rather than the rows, so
 					// a market that came back with nothing still reports it — none of them
@@ -311,6 +314,7 @@ export const summarizeScores = (
 			rowsGoldenListedShare: null,
 			requestCoverage: null,
 			duplicateRate: null,
+			possibleDuplicateRate: null,
 			locationFill: null,
 			rowsPerScan: null,
 			fieldsFilledPerRun: null,
@@ -365,6 +369,7 @@ export const summarizeScores = (
 	let totalRowsGoldenListed = 0
 	let totalRowsLocated = 0
 	let totalRowsDuplicated = 0
+	let totalRowsPossiblyDuplicated = 0
 	let totalPartsExpected = 0
 	let totalPartsAnswered = 0
 	for (const score of scores) {
@@ -408,6 +413,7 @@ export const summarizeScores = (
 			totalRowsGoldenListed += score.market.rowsGoldenListed
 			totalRowsLocated += score.market.rowsLocated
 			totalRowsDuplicated += score.market.rowsDuplicated
+			totalRowsPossiblyDuplicated += score.market.rowsPossiblyDuplicated
 			totalPartsExpected += score.market.partsExpected
 			totalPartsAnswered += score.market.partsAnswered
 		}
@@ -470,6 +476,7 @@ export const summarizeScores = (
 		requestCoverage:
 			totalPartsExpected === 0 ? null : totalPartsAnswered / totalPartsExpected,
 		duplicateRate: perRow(totalRowsDuplicated),
+		possibleDuplicateRate: perRow(totalRowsPossiblyDuplicated),
 		locationFill: perRow(totalRowsLocated),
 		rowsPerScan: scansScored === 0 ? null : totalRowsReturned / scansScored,
 		fieldsFilledPerRun:

@@ -285,8 +285,21 @@ export interface MarketScore {
 	 * country is not something a count of rows can know.
 	 */
 	readonly rowsLocated: number
-	/** How many rows are another row's company written a second time. */
+	/**
+	 * How many rows are another row's company written a second time, read with the
+	 * keys the pipeline's own fold uses.
+	 */
 	readonly rowsDuplicated: number
+	/**
+	 * How many rows MAY be another row's company written a second time, read more
+	 * loosely than any fold may act on — every row the strict count catches, plus
+	 * the ones its keys are too narrow to see.
+	 *
+	 * Never below `rowsDuplicated`. The two are reported side by side because the
+	 * gap is the reading: rows that repeat a company and that nothing structural
+	 * could tell apart from two companies with near-identical names.
+	 */
+	readonly rowsPossiblyDuplicated: number
 	/** Parts the request named — the trades, services or segments it asked for. */
 	readonly partsExpected: number
 	/** Of those, how many came back with at least one row. */
@@ -428,6 +441,12 @@ export interface EvalSummary {
 	readonly rowsGoldenListedShare: number | null
 	readonly requestCoverage: number | null
 	readonly duplicateRate: number | null
+	/**
+	 * The share of rows that may repeat a company, read loosely enough to see the
+	 * repeats the fold's keys cannot. Never below `duplicateRate`; what sits between
+	 * the two is what the fold left standing because no rule could safely join it.
+	 */
+	readonly possibleDuplicateRate: number | null
 	readonly locationFill: number | null
 	/**
 	 * Rows one market request came back with on average. Not a quality figure —
