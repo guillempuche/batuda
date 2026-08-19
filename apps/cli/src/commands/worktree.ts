@@ -806,9 +806,18 @@ export const worktreeDown = Effect.gen(function* () {
 	return 'removed' as const
 })
 
-/** The wording `worktree down` fails with when it finds nothing to drop. */
+/**
+ * What `worktree down` says when it finds nothing to drop.
+ *
+ * Said rather than failed over, because the state it was asked for — no
+ * database and no bucket for this worktree — is the state it found. Teardown
+ * here is idempotent the same way the rest of it is: databases go with `DROP
+ * DATABASE IF EXISTS`, and the hook that tears a worktree down on removal
+ * always exits happy. A second `down`, or one on a worktree that never had
+ * anything, is worth a word and not an error.
+ */
 export const NOTHING_TO_DROP =
-	'No provisioned .env here — nothing to drop. Run `pnpm cli worktree up` first, or it was already torn down.'
+	'Nothing to drop — this worktree has no database or bucket of its own. Either `pnpm cli worktree up` never ran here, or it has already been torn down.'
 
 /**
  * Whether everything this branch changed is already on main.
@@ -871,26 +880,99 @@ const branchWorkIsOnMain = (root: string, branch: string) =>
 		return (yield* git('cherry', 'main', rolledUp)).startsWith('-')
 	}).pipe(Effect.orElseSucceed(() => false))
 
-/**
- * Delete the branch the finished pull request was on.
- *
- * Whether the work is safe is decided by `branchWorkIsOnMain`, which asks more
- * than `git branch -d` does — see there for why. A branch holding work main has
- * never seen is left standing and named, because deleting it is the one step
- * here nobody can undo.
- */
-const deleteFinishedBranch = (root: string, branch: string, force: boolean) =>
-	Effect.gen(function* () {
-		if (!force && !(yield* branchWorkIsOnMain(root, branch))) {
-			return yield* Effect.fail(
+// Bring main up to date, and only ever by fast-forward.
+//
+// A plain `git pull` writes a merge commit when local main has wandered off
+// from the remote, which is exactly what this repository does not want in its
+// history — and it would do it silently, in the middle of a cleanup nobody
+// asked to change main. Stopping instead leaves the two copies of main for
+// somebody to look at, which is the only way it gets noticed at all.
+const pullMain = (root: string) =>
+	execArgs('git', ['-C', root, 'pull', '--ff-only', '--prune']).pipe(
+		// git has already printed why it could not; what it cannot say is that this
+		// stopped before anything was removed, and where to look.
+		Effect.catch(() =>
+			Effect.fail(
 				new Error(
-					`Branch ${branch} was kept: main carries no copy of its work, in any of the shapes a merge leaves. Look at it with \`git log main..${branch}\`, then delete it yourself with \`git branch -D ${branch}\` if you are happy to lose it.`,
+					'main could not be brought up to date by fast-forward, so nothing has been removed. Local main has most likely wandered off from the remote — compare them with `git log --oneline origin/main..main` and sort that out first.',
 				),
-			)
-		}
+			),
+		),
+	)
+
+/**
+ * Refuse unless main carries a copy of this branch's work.
+ *
+ * Asked before anything is dropped or deleted, so a branch that has to be kept
+ * costs the caller nothing: the worktree, its database and its directory are
+ * all still there to go back to. Deleting a branch is the one step here nobody
+ * can undo, and `branchWorkIsOnMain` is what decides whether main already has
+ * what would be lost.
+ */
+const refuseUnlessWorkIsOnMain = (
+	root: string,
+	branch: string,
+	force: boolean,
+) =>
+	Effect.gen(function* () {
+		if (force || (yield* branchWorkIsOnMain(root, branch))) return
+		return yield* Effect.fail(
+			new Error(
+				`Branch ${branch} holds work main carries no copy of, in any of the shapes a merge leaves. Nothing has been removed. Look at it with \`git log main..${branch}\`, then run again with --force if you are happy to lose it.`,
+			),
+		)
+	})
+
+/**
+ * Delete the branch. Nothing is weighed up here — `refuseUnlessWorkIsOnMain`
+ * has already decided, early enough that a refusal costs nothing.
+ */
+const deleteBranch = (root: string, branch: string) =>
+	Effect.gen(function* () {
 		yield* execArgs('git', ['-C', root, 'branch', '-D', branch])
 		yield* Console.log(`✓ Deleted local branch ${branch}`)
 	})
+
+// The ignored things that come back on their own: build output, and the `.env`
+// `worktree up` writes again. Losing those with the directory costs nobody
+// anything, so they are the ones not worth naming. Matched anywhere in a path,
+// since build output sits at every level of the tree.
+const GENERATED_DIRS: ReadonlyArray<string> = [
+	'node_modules/',
+	'dist/',
+	'.turbo/',
+	'.wrangler/',
+	'.vite/',
+	'coverage/',
+]
+
+// The env file provisioning writes, which `worktree up` makes again. Matched
+// whole: a `.env.cloud` or `.env.local` sitting beside it was written by hand
+// and nothing brings it back, so it still gets named.
+const isProvisionedEnv = (path: string): boolean =>
+	path === '.env' || path.endsWith('/.env')
+
+const handPlacedFiles = (worktreePath: string) =>
+	execSilentArgs('git', [
+		'-C',
+		worktreePath,
+		'status',
+		'--porcelain',
+		'--ignored',
+	]).pipe(
+		Effect.map(out =>
+			out
+				.split('\n')
+				.filter(line => line.startsWith('!! '))
+				.map(line => line.slice(3))
+				.filter(
+					path =>
+						!isProvisionedEnv(path) &&
+						!GENERATED_DIRS.some(known => path.includes(known)),
+				),
+		),
+		Effect.orElseSucceed((): ReadonlyArray<string> => []),
+	)
 
 /**
  * Put back what `--stash` set aside, whether the rest of the run succeeded or
@@ -1000,12 +1082,46 @@ export const worktreeDone = (options: { force: boolean; stash: boolean }) =>
 
 			if (linked) {
 				const branch = yield* branchName
+				// Take main back and bring it up to date. Git keeps a branch in one
+				// working tree at a time, so when this worktree is the one holding
+				// main, this can only happen once the directory is gone.
+				const catchMainUp = Effect.gen(function* () {
+					yield* execIn(mainRoot, 'git', 'checkout', 'main')
+					yield* pullMain(mainRoot)
+				})
 				const worktreePath = resolve(
 					yield* execSilent('git', 'rev-parse', '--show-toplevel'),
 				)
 				yield* Console.log(
 					`Finishing linked worktree ${worktreePath} (branch ${branch})...`,
 				)
+
+				// A worktree left sitting on main names no branch of its own to finish,
+				// which is what a merge that deletes the branch leaves behind. Its data
+				// and directory still go, and main itself is brought up to date further
+				// down, once this worktree has let go of it.
+				const ownBranch = branch === 'main' ? null : branch
+				if (ownBranch === null) {
+					yield* Console.log(
+						'This worktree is on main, so there is no branch of its own to delete.',
+					)
+				} else {
+					// Done before anything is judged or removed: what counts as
+					// "already on main" depends on it, and a pull that cannot happen —
+					// no network, a main that has wandered off — is a reason to stop
+					// while there is still a worktree to come back to.
+					yield* catchMainUp
+					if (yield* branchExists(ownBranch)) {
+						yield* refuseUnlessWorkIsOnMain(mainRoot, ownBranch, force)
+					}
+				}
+
+				const handPlaced = yield* handPlacedFiles(worktreePath)
+				if (handPlaced.length > 0) {
+					yield* Console.log(
+						`These go when the directory does: ${handPlaced.slice(0, 5).join(', ')}${handPlaced.length > 5 ? `, and ${handPlaced.length - 5} more` : ''}.`,
+					)
+				}
 
 				// A worktree that never had a database is still a worktree to finish —
 				// a change to the command-line tool alone needs no stack — so nothing to
@@ -1019,17 +1135,24 @@ export const worktreeDone = (options: { force: boolean; stash: boolean }) =>
 				// Move to the main checkout before deleting the worktree directory,
 				// otherwise subsequent git commands would run from a deleted cwd.
 				process.chdir(mainRoot)
-				const removeArgs = force
-					? ['worktree', 'remove', '--force', worktreePath]
-					: ['worktree', 'remove', worktreePath]
-				yield* execIn(mainRoot, 'git', ...removeArgs)
+				yield* execArgs('git', [
+					'-C',
+					mainRoot,
+					'worktree',
+					'remove',
+					...(force ? ['--force'] : []),
+					worktreePath,
+				])
 				yield* Console.log('✓ Removed linked worktree directory')
 
-				yield* execIn(mainRoot, 'git', 'checkout', 'main')
-				yield* execIn(mainRoot, 'git', 'pull', '--prune')
-
-				if (yield* branchExists(branch)) {
-					yield* deleteFinishedBranch(mainRoot, branch, force)
+				if (ownBranch === null) {
+					// Bring main up to date, which had to wait: git keeps a branch in one
+					// working tree at a time, so the main checkout could not take main
+					// back while this worktree still held it.
+					yield* execIn(mainRoot, 'git', 'checkout', 'main')
+					yield* pullMain(mainRoot)
+				} else if (yield* branchExists(ownBranch)) {
+					yield* deleteBranch(mainRoot, ownBranch)
 				}
 			} else {
 				const branch = yield* branchName
@@ -1042,10 +1165,11 @@ export const worktreeDone = (options: { force: boolean; stash: boolean }) =>
 				}
 				yield* Console.log(`Finishing feature branch ${branch}...`)
 				yield* exec('git', 'checkout', 'main')
-				yield* exec('git', 'pull', '--prune')
+				yield* pullMain(mainRoot)
 
 				if (yield* branchExists(branch)) {
-					yield* deleteFinishedBranch(mainRoot, branch, force)
+					yield* refuseUnlessWorkIsOnMain(mainRoot, branch, force)
+					yield* deleteBranch(mainRoot, branch)
 				}
 			}
 
