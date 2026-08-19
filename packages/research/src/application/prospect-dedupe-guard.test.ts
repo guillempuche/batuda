@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+	bracketedNoteParents,
 	branchOfficeParents,
 	dedupeDiscoveryRows,
 	discoveryRowIdentityKeys,
@@ -600,6 +601,169 @@ describe('dedupeDiscoveryRows', () => {
 		})
 	})
 
+	describe('when a scan wrote a note after a name it had already written down', () => {
+		it('should fold a row whose name carries the directory it was met on', () => {
+			// GIVEN the pair a French market run actually returned, the second row's
+			// own words calling itself a duplicate
+			const findings = scan([
+				{ name: 'KBE Energy', why_relevant: 'Solar installer.' },
+				{
+					name: 'KBE Energy (Annuaire Tecsol entry)',
+					why_relevant: 'Duplicate entry of KBE Energy in the Tecsol list.',
+				},
+			])
+
+			// WHEN the list is de-duplicated
+			// THEN one row survives, under the name without the note
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(rowsOf(result.findings)).toHaveLength(1)
+			expect(rowsOf(result.findings)[0]?.['name']).toBe('KBE Energy')
+			expect(result.merged).toBe(1)
+		})
+
+		it('should fold a row whose name carries the trade it was found under', () => {
+			// GIVEN the other pair the same market returned
+			const findings = scan([
+				{ name: '2C ENERGIES', location: "Val-d'Oise (95)" },
+				{
+					name: '2C ENERGIES (CHAUFFAGE CLIMATISATION ENERGIES)',
+					location: 'Presles',
+				},
+			])
+
+			// WHEN de-duplicated — THEN one row, and the note row's town fills nothing
+			// it already answered: this is one company written twice, not a second
+			// place the company works from
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(rowsOf(result.findings)).toHaveLength(1)
+			expect(rowsOf(result.findings)[0]?.['location']).toBe("Val-d'Oise (95)")
+		})
+
+		it('should keep the plain name when the noted row came back first', () => {
+			// GIVEN the noted row ranked ahead of the plain one
+			const findings = scan([
+				{ name: 'KBE Energy (Annuaire Tecsol entry)', location: 'Paris' },
+				{ name: 'KBE Energy' },
+			])
+
+			// WHEN de-duplicated — THEN the company keeps its own name, and what the
+			// noted row knew is not thrown away with the brackets
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(rowsOf(result.findings)).toHaveLength(1)
+			expect(rowsOf(result.findings)[0]?.['name']).toBe('KBE Energy')
+			expect(rowsOf(result.findings)[0]?.['location']).toBe('Paris')
+		})
+
+		it('should keep two rows whose brackets are what tells them apart', () => {
+			// GIVEN a company's two arms, each named by where it trades
+			const findings = scan([{ name: 'Acme (UK)' }, { name: 'Acme (US)' }])
+
+			// WHEN de-duplicated — THEN both survive. Taking brackets off every name
+			// before filing it would have folded these two, which is why the plain
+			// name has to be on the list for a note to read as a note
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(rowsOf(result.findings)).toHaveLength(2)
+			expect(result.merged).toBe(0)
+		})
+
+		it('should keep all three when the plain name is on the list beside them', () => {
+			// GIVEN the bare name as well
+			const findings = scan([
+				{ name: 'Acme' },
+				{ name: 'Acme (UK)' },
+				{ name: 'Acme (US)' },
+			])
+
+			// WHEN de-duplicated — THEN three rows: folding either arm onto the bare
+			// row would drag the other in through it
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(rowsOf(result.findings)).toHaveLength(3)
+		})
+
+		it("should add the noted row's pages to the row that stays", () => {
+			// GIVEN each row citing a page the other did not
+			const findings = scan([
+				{ name: 'KBE Energy', citations: [{ source_id: 'src_own' }] },
+				{
+					name: 'KBE Energy (Annuaire Tecsol entry)',
+					citations: [{ source_id: 'src_tecsol' }],
+				},
+			])
+
+			// WHEN de-duplicated — THEN the surviving row is backed by both
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(citedPagesOf(result.findings)).toEqual(['src_own', 'src_tecsol'])
+		})
+	})
+
+	describe('when one name is another name and then more words', () => {
+		it('should keep a name beside the same name with a word in front of it', () => {
+			// GIVEN the pair a French market run returned, which is one company
+			const findings = scan([
+				{ name: 'SNEF' },
+				{
+					name: 'Groupe SNEF',
+					website: 'https://snef.fr',
+					location: 'Marseille',
+				},
+			])
+
+			// WHEN de-duplicated — THEN both survive, and that is not an oversight.
+			// Joining them needs to know that "Groupe" adds nothing to a name, which
+			// is a list of words per language
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(rowsOf(result.findings)).toHaveLength(2)
+		})
+
+		it('should keep a name beside the same name with words after it', () => {
+			// GIVEN the other pair from that run, also one company
+			const findings = scan([
+				{ name: 'VOLTEC' },
+				{ name: 'Voltec Power Technology Solutions' },
+			])
+
+			// WHEN de-duplicated — THEN both survive
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(rowsOf(result.findings)).toHaveLength(2)
+		})
+
+		it('should keep a pair that is that same shape once a plural is folded', () => {
+			// GIVEN a pair a French run returned, one company, differing by a plural
+			// and by one trailing word
+			const findings = scan([
+				{ name: 'PPVS – Facility Management France' },
+				{
+					name: 'PPVS – Facilities Management',
+					website: 'https://ppvs-fm.com',
+					location: 'Paris',
+				},
+			])
+
+			// WHEN de-duplicated — THEN both survive. Folding the plural away is the
+			// smaller half: grant it and what is left is one name being the other plus
+			// a trailing word, with no town stated to check that word against, which is
+			// the case above and closed for the same reason
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(rowsOf(result.findings)).toHaveLength(2)
+		})
+
+		it('should keep two real companies whose names sit in the same shape', () => {
+			// GIVEN a name and a genuinely different company whose name is that name
+			// and then a word — row for row the same shape as the pair above, with the
+			// same fields to read, which is why neither can be folded
+			const findings = scan([
+				{ name: 'Terre Solaire' },
+				{ name: 'Terre Solaire Energie' },
+			])
+
+			// WHEN de-duplicated — THEN both survive, which is the right answer here
+			// and the wrong one above, and nothing on the rows says which is which
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(rowsOf(result.findings)).toHaveLength(2)
+			expect(result.merged).toBe(0)
+		})
+	})
+
 	describe('when the answer is not a list of companies', () => {
 		it('should pass a run through untouched when it has no list', () => {
 			// GIVEN a run about one named company
@@ -837,6 +1001,234 @@ describe('branchOfficeParents', () => {
 	})
 })
 
+describe('bracketedNoteParents', () => {
+	describe('when a name carries a note somebody wrote after it', () => {
+		it('should read it as the same company as the plain name beside it', () => {
+			// GIVEN a scan that wrote down where it met a company, after the name
+			const rows = [
+				{ name: 'KBE Energy' },
+				{ name: 'KBE Energy (Annuaire Tecsol entry)' },
+			]
+
+			// WHEN the notes are read
+			// THEN the noted row belongs to the plain one
+			expect([
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+			]).toEqual([[1, 0]])
+		})
+
+		it('should read the note whichever way round the two rows arrived', () => {
+			// GIVEN the noted row first and the plain one after it
+			const rows = [
+				{ name: 'KBE Energy (Annuaire Tecsol entry)' },
+				{ name: 'KBE Energy' },
+			]
+
+			// WHEN the notes are read — THEN the plain row is still the one it belongs
+			// to, because which row a search ranked first says nothing about the name
+			expect([
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+			]).toEqual([[0, 1]])
+		})
+
+		it('should read the legal form off both names before comparing them', () => {
+			// GIVEN the plain row carrying a legal form the noted one does not
+			const rows = [
+				{ name: 'Acme Energie SARL' },
+				{ name: 'Acme Energie (Annuaire entry)' },
+			]
+
+			// WHEN the notes are read — THEN the form comes off before the names meet
+			expect([
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+			]).toEqual([[1, 0]])
+		})
+
+		it('should read a note written after space at the end of the name', () => {
+			// GIVEN a name whose brackets are padded and trailed with spaces
+			const rows = [
+				{ name: 'Acme Energie' },
+				{ name: 'Acme Energie  (note)  ' },
+			]
+
+			// WHEN the notes are read — THEN the padding is not what tells them apart
+			expect([
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+			]).toEqual([[1, 0]])
+		})
+
+		it('should treat one note written two ways as one note', () => {
+			// GIVEN the same note after the same name twice, spelled differently
+			const rows = [
+				{ name: 'Acme Energie' },
+				{ name: 'Acme Energie (Annuaire)' },
+				{ name: 'Acme Energie (annuaire)' },
+			]
+
+			// WHEN the notes are read — THEN both belong to the plain row: the
+			// brackets are not telling the two rows apart, they say the same thing
+			expect([
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+			]).toEqual([
+				[1, 0],
+				[2, 0],
+			])
+		})
+	})
+
+	describe('when the brackets are telling two rows apart', () => {
+		it('should leave two rows whose notes differ and no plain name beside them', () => {
+			// GIVEN a company's two arms, each named by where it trades
+			const rows = [{ name: 'Acme (UK)' }, { name: 'Acme (US)' }]
+
+			// WHEN the notes are read — THEN nothing folds: neither row is the plain
+			// name the other is a second reading of
+			expect([
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+			]).toEqual([])
+		})
+
+		it('should leave them even when the plain name is on the list as well', () => {
+			// GIVEN the bare name beside both of them
+			const rows = [
+				{ name: 'Acme' },
+				{ name: 'Acme (UK)' },
+				{ name: 'Acme (US)' },
+			]
+
+			// WHEN the notes are read — THEN still nothing: two different notes on one
+			// name are distinguishing the rows, and folding either onto the bare row
+			// would drag all three together through it
+			expect([
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+			]).toEqual([])
+		})
+
+		it('should read a noted row past two hosts neither company is named by', () => {
+			// GIVEN the pair a live French search returned: one row citing another
+			// company's site altogether, the other a social page
+			const rows = [
+				{
+					name: 'Société Nouvelle Garraud',
+					website: 'https://www.entreprise-gourdon.fr/',
+				},
+				{
+					name: 'SOCIÉTÉ NOUVELLE GARRAUD (SN GARRAUD)',
+					website: 'https://www.facebook.com/sng.garraud/',
+				},
+			]
+
+			// WHEN the notes are read — THEN they still meet. Two different hosts hold
+			// a note apart from its name only when each is established as that row's
+			// own; a host nobody is named by says nothing about who anybody is
+			expect([
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+			]).toEqual([[1, 0]])
+		})
+
+		it('should leave a noted row standing at a different site of its own', () => {
+			// GIVEN two rows each at a domain that spells them
+			const rows = [
+				{ name: 'Acme', website: 'https://acme.com' },
+				{ name: 'Acme (UK)', website: 'https://acme.co.uk' },
+			]
+
+			// WHEN the notes are read — THEN two addresses each a company's own is the
+			// strongest thing on a row for saying these are two companies, and it
+			// outranks a bracket
+			expect([
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+			]).toEqual([])
+		})
+
+		it("should read a noted row sharing the plain row's host as the same company", () => {
+			// GIVEN a noted row on a page of the plain row's own site
+			const rows = [
+				{ name: 'Acme', website: 'https://acme.com' },
+				{ name: 'Acme (UK)', website: 'https://acme.com/uk' },
+			]
+
+			// WHEN the notes are read — THEN one host is no reason to hold them apart
+			expect([
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+			]).toEqual([[1, 0]])
+		})
+	})
+
+	describe('when there is no plain name for a note to belong to', () => {
+		it('should leave a noted row whose plain name is not on the list', () => {
+			// GIVEN a note on a name nothing else carries
+			const rows = [{ name: 'Acme (Annuaire entry)' }, { name: 'Beta Energie' }]
+
+			// WHEN the notes are read — THEN the brackets alone fold nothing
+			expect([
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+			]).toEqual([])
+		})
+
+		it('should leave a value that is nothing but a bracketed phrase', () => {
+			// GIVEN a "name" that is only a note
+			const rows = [{ name: '(Annuaire entry)' }, { name: 'Acme' }]
+
+			// WHEN the notes are read — THEN it names no company for another row to be
+			// a second reading of
+			expect([
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+			]).toEqual([])
+		})
+
+		it('should leave a name whose brackets do not close it', () => {
+			// GIVEN words written after the brackets rather than the other way round
+			const rows = [{ name: 'Acme' }, { name: 'Acme (Paris) Nord' }]
+
+			// WHEN the notes are read — THEN this is a longer name, not a noted one
+			expect([
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+			]).toEqual([])
+		})
+
+		it('should leave a name carrying nothing but a legal form before its note', () => {
+			// GIVEN brackets after a name with no company left in it
+			const rows = [{ name: 'SARL' }, { name: 'SARL (Annuaire entry)' }]
+
+			// WHEN the notes are read — THEN there is no company to be the same one as
+			expect([
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+			]).toEqual([])
+		})
+	})
+
+	describe('when a row is not something a note can be read from', () => {
+		it('should leave list entries that are not rows alone', () => {
+			// GIVEN a list holding something that is not a row
+			const rows = ['KBE Energy (Annuaire entry)', null, { name: 'KBE Energy' }]
+
+			// WHEN the notes are read — THEN only rows are read
+			expect([
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+			]).toEqual([])
+		})
+
+		it('should leave a row whose name is not written as text', () => {
+			// GIVEN a name that came back as something other than words
+			const rows = [{ name: 42 }, { name: 'Acme' }]
+
+			// WHEN the notes are read — THEN nothing is read off it
+			expect([
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+			]).toEqual([])
+		})
+
+		it('should find no notes in an empty list', () => {
+			// GIVEN nothing to read
+			// WHEN the notes are read — THEN there is nothing to belong to anything
+			expect([...bracketedNoteParents([], hostsEstablishedAsOwn([]))]).toEqual(
+				[],
+			)
+		})
+	})
+})
+
 describe('hostsEstablishedAsOwn', () => {
 	describe('when a row stands at the domain that spells it', () => {
 		it("should read the host as that company's own", () => {
@@ -872,6 +1264,41 @@ describe('hostsEstablishedAsOwn', () => {
 	})
 
 	describe('when nothing establishes who a host belongs to', () => {
+		it('should not let a note naming a directory pass that directory off as own', () => {
+			// GIVEN a row whose name carries a note saying which directory it was met
+			// on, standing on that very directory, beside another company listed there
+			const rows = [
+				{
+					name: 'KBE Energy (Annuaire Tecsol entry)',
+					website: 'https://annuaire.tecsol.fr/kbe',
+				},
+				{ name: 'Beta Energie', website: 'https://annuaire.tecsol.fr/beta' },
+			]
+
+			// WHEN the hosts are read
+			// THEN the directory is nobody's own site. Reading the note as part of the
+			// name would have the directory's own words spell the company, and every
+			// other firm listed there would then file under it as the same company
+			expect([...hostsEstablishedAsOwn(rows)]).toEqual([])
+		})
+
+		it('should keep two companies on one directory apart through the fold', () => {
+			// GIVEN those same two rows
+			const findings = scan([
+				{
+					name: 'KBE Energy (Annuaire Tecsol entry)',
+					website: 'https://annuaire.tecsol.fr/kbe',
+				},
+				{ name: 'Beta Energie', website: 'https://annuaire.tecsol.fr/beta' },
+			])
+
+			// WHEN de-duplicated — THEN both survive, because a shared directory is no
+			// evidence that two companies are one
+			const result = dedupeDiscoveryRows(findings, 'prospects')
+			expect(rowsOf(result.findings)).toHaveLength(2)
+			expect(result.merged).toBe(0)
+		})
+
 		it('should leave out a host that spells neither company on it', () => {
 			// GIVEN two installers on a trade body's member pages
 			const rows = [
