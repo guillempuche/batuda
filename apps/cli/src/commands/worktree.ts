@@ -880,25 +880,120 @@ const branchWorkIsOnMain = (root: string, branch: string) =>
 		return (yield* git('cherry', 'main', rolledUp)).startsWith('-')
 	}).pipe(Effect.orElseSucceed(() => false))
 
-// Bring main up to date, and only ever by fast-forward.
-//
-// A plain `git pull` writes a merge commit when local main has wandered off
-// from the remote, which is exactly what this repository does not want in its
-// history — and it would do it silently, in the middle of a cleanup nobody
-// asked to change main. Stopping instead leaves the two copies of main for
-// somebody to look at, which is the only way it gets noticed at all.
-const pullMain = (root: string) =>
-	execArgs('git', ['-C', root, 'pull', '--ff-only', '--prune']).pipe(
-		// git has already printed why it could not; what it cannot say is that this
-		// stopped before anything was removed, and where to look.
-		Effect.catch(() =>
-			Effect.fail(
-				new Error(
-					'main could not be brought up to date by fast-forward, so nothing has been removed. Local main has most likely wandered off from the remote — compare them with `git log --oneline origin/main..main` and sort that out first.',
+// Which working tree has main checked out, or null when none has. Git keeps a
+// branch in one of them at a time, and that is what decides whether main's ref
+// can be moved from here at all.
+const worktreeHoldingMain = (root: string) =>
+	execSilentArgs('git', ['-C', root, 'worktree', 'list', '--porcelain']).pipe(
+		Effect.map(out => {
+			let at: string | null = null
+			for (const line of out.split('\n')) {
+				if (line.startsWith('worktree ')) at = line.slice('worktree '.length)
+				else if (line.trim() === 'branch refs/heads/main') return at
+			}
+			return null
+		}),
+		Effect.orElseSucceed((): string | null => null),
+	)
+
+// The remote main follows, so a clone that calls it something other than
+// `origin` is still read from the place its own configuration names.
+const remoteForMain = (root: string) =>
+	execSilentArgs('git', [
+		'-C',
+		root,
+		'config',
+		'--get',
+		'branch.main.remote',
+	]).pipe(
+		Effect.map(name => (name.trim() === '' ? 'origin' : name.trim())),
+		Effect.orElseSucceed(() => 'origin'),
+	)
+
+/**
+ * Bring main up to date without moving anybody's checkout.
+ *
+ * The main checkout is somewhere a person may be standing with work of their
+ * own, and finishing a worktree is no reason to disturb it. Checking main out
+ * there does one of two unhelpful things: git carries uncommitted edits across
+ * when the two branches agree on the file, so the work quietly follows onto
+ * main; or the branches differ, git refuses, and this run stops over something
+ * that has nothing to do with the worktree being finished.
+ *
+ * So the remote is read the same way whatever the checkout is doing, and only
+ * the last step differs: where main is the branch in hand it is moved forward
+ * in place, and where it is not, its ref is moved on its own and no working
+ * tree is touched at all.
+ *
+ * Every way of stopping says which one it was. Refusing to merge a main that
+ * has wandered off from the remote is the whole point — a plain pull would
+ * write a merge commit, silently, in the middle of a cleanup nobody asked to
+ * change main — but being told that when the real trouble is a remote that
+ * cannot be reached, or a main another worktree is holding, sends somebody
+ * looking for a divergence that is not there.
+ */
+const catchMainUp = (root: string) =>
+	Effect.gen(function* () {
+		const wanderedOff = Effect.fail(
+			new Error(
+				'main could not be brought up to date by fast-forward, so nothing has been removed. Local main has most likely wandered off from the remote — compare them with `git log --oneline origin/main..main` and sort that out first.',
+			),
+		)
+		const branchInHand = yield* execSilentArgs('git', [
+			'-C',
+			root,
+			'rev-parse',
+			'--abbrev-ref',
+			'HEAD',
+		]).pipe(Effect.orElseSucceed(() => ''))
+
+		// Asked before anything is fetched, because a branch another working tree
+		// holds cannot be moved however the fetch goes.
+		if (branchInHand !== 'main') {
+			const heldAt = yield* worktreeHoldingMain(root)
+			if (heldAt !== null) {
+				return yield* Effect.fail(
+					new Error(
+						`main is checked out at ${heldAt}, and git keeps a branch in one working tree at a time, so it cannot be moved from here. Nothing has been removed. Finish that worktree, or move it off main, and run this again.`,
+					),
+				)
+			}
+		}
+
+		const remote = yield* remoteForMain(root)
+		// The ordinary fetch, which brings every remote-tracking branch up to date
+		// and drops the ones whose branches are gone. Naming a single branch here
+		// instead would narrow what pruning covers to that branch, and the stale
+		// ones would quietly pile up.
+		yield* execArgs('git', ['-C', root, 'fetch', remote, '--prune']).pipe(
+			Effect.catch(() =>
+				Effect.fail(
+					new Error(
+						`${remote} could not be reached to bring main up to date, so nothing has been removed.`,
+					),
 				),
 			),
-		),
-	)
+		)
+		yield* (
+			branchInHand === 'main'
+				? execArgs('git', [
+						'-C',
+						root,
+						'merge',
+						'--ff-only',
+						`refs/remotes/${remote}/main`,
+					])
+				: // Moved from the copy just fetched, so there is no second trip to the
+					// remote, and it stops rather than forcing when it cannot.
+					execArgs('git', [
+						'-C',
+						root,
+						'fetch',
+						'.',
+						`refs/remotes/${remote}/main:main`,
+					])
+		).pipe(Effect.catch(() => wanderedOff))
+	})
 
 /**
  * Refuse unless main carries a copy of this branch's work.
@@ -1082,13 +1177,6 @@ export const worktreeDone = (options: { force: boolean; stash: boolean }) =>
 
 			if (linked) {
 				const branch = yield* branchName
-				// Take main back and bring it up to date. Git keeps a branch in one
-				// working tree at a time, so when this worktree is the one holding
-				// main, this can only happen once the directory is gone.
-				const catchMainUp = Effect.gen(function* () {
-					yield* execIn(mainRoot, 'git', 'checkout', 'main')
-					yield* pullMain(mainRoot)
-				})
 				const worktreePath = resolve(
 					yield* execSilent('git', 'rev-parse', '--show-toplevel'),
 				)
@@ -1110,7 +1198,7 @@ export const worktreeDone = (options: { force: boolean; stash: boolean }) =>
 					// "already on main" depends on it, and a pull that cannot happen —
 					// no network, a main that has wandered off — is a reason to stop
 					// while there is still a worktree to come back to.
-					yield* catchMainUp
+					yield* catchMainUp(mainRoot)
 					if (yield* branchExists(ownBranch)) {
 						yield* refuseUnlessWorkIsOnMain(mainRoot, ownBranch, force)
 					}
@@ -1146,11 +1234,10 @@ export const worktreeDone = (options: { force: boolean; stash: boolean }) =>
 				yield* Console.log('✓ Removed linked worktree directory')
 
 				if (ownBranch === null) {
-					// Bring main up to date, which had to wait: git keeps a branch in one
-					// working tree at a time, so the main checkout could not take main
-					// back while this worktree still held it.
-					yield* execIn(mainRoot, 'git', 'checkout', 'main')
-					yield* pullMain(mainRoot)
+					// Bringing main up to date had to wait: git keeps a branch in one
+					// working tree at a time, so nothing could move it while this
+					// worktree still held it.
+					yield* catchMainUp(mainRoot)
 				} else if (yield* branchExists(ownBranch)) {
 					yield* deleteBranch(mainRoot, ownBranch)
 				}
@@ -1165,7 +1252,7 @@ export const worktreeDone = (options: { force: boolean; stash: boolean }) =>
 				}
 				yield* Console.log(`Finishing feature branch ${branch}...`)
 				yield* exec('git', 'checkout', 'main')
-				yield* pullMain(mainRoot)
+				yield* catchMainUp(mainRoot)
 
 				if (yield* branchExists(branch)) {
 					yield* refuseUnlessWorkIsOnMain(mainRoot, branch, force)
