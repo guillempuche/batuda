@@ -9,6 +9,13 @@ import { SchemaNameSchema } from '@batuda/research'
 // would otherwise surface a raw Postgres error to the caller.
 export const Uuid = Schema.String.check(Schema.isUUID())
 
+// The same check, carrying a note about where the id comes from. Kept apart
+// from `Uuid` rather than built on it: the note has to go on before the check,
+// because `.annotate()` on a schema that already has one hangs the note off
+// the check instead, where the parameter a client reads never picks it up.
+export const describedUuid = (description: string) =>
+	Schema.String.annotate({ description }).check(Schema.isUUID())
+
 // What each kind of run is for, in the words the web app already offers a
 // person picking between them. Written once so the two tools that start a run
 // cannot drift into describing the same choice differently.

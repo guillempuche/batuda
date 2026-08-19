@@ -18,19 +18,20 @@ import {
 
 import { EnvVars } from '../../lib/env'
 import { detachFromTransaction, enterOrgScope } from '../../middleware/org'
+import { RESEARCH_ID_SOURCE } from './_ids'
 import {
 	InstructionClarification,
 	InstructionsOverride,
 	resolveInstructionOverride,
 } from './_instructions-shared'
 import {
+	describedUuid,
 	MaxWaitSeconds,
 	pollAfterMs,
 	ResearchQuery,
 	redactDbErrors,
 	SCHEMA_GUIDANCE,
 	SchemaNameParam,
-	Uuid,
 } from './_research-shared'
 
 const REQUEST_DEPENDENCIES = [SessionContext, CurrentOrg]
@@ -182,7 +183,7 @@ const GetResearch = Tool.make('get_research', {
 	description:
 		"Get the current state of a research run. Returns status, progressSteps, poll_after_ms, findings (if complete), cost, sources, and applied_instructions — the instruction templates that shaped the run. progressSteps counts the rounds of work the run has got through: null until the first round finishes, then climbing as the run works. It sits unchanged for minutes at a time by design — a late round scrapes and searches every gap it is still closing, and writing up the brief does not move it at all — so a count that is not moving is a slow run, not a stuck one. Keep polling: a run that really is stuck is failed by the server on its own deadline, so a stalled count is never a reason to call cancel_research. poll_after_ms is how many milliseconds to wait before calling this again; it is absent once the run has ended, which means stop calling. The full instruction-template text is omitted by default to keep the response small; pass include:['instruction_segments'] to get it back.",
 	parameters: Schema.Struct({
-		id: Uuid,
+		id: describedUuid(RESEARCH_ID_SOURCE),
 		// Opt back into heavy fields dropped by default. Only the full instruction
 		// text qualifies today; kept as a list so more can join without a shape change.
 		include: Schema.optional(

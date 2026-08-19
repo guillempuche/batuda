@@ -49,6 +49,7 @@ import {
 } from '../../services/timeline-activity'
 import { CurrentUser } from '../current-user'
 import { ToolMessage } from '../tool-message'
+import { CompanyIdOrSlugParam, CompanyIdParam } from './_ids'
 import { McpPageLimit, McpPageOffset, PageResult, toPage } from './_result'
 
 const REQUEST_DEPENDENCIES = [CurrentOrg, CurrentUser]
@@ -88,7 +89,7 @@ const GetCompany = Tool.make('get_company', {
 	description:
 		'Get full company profile including contacts and last 5 interactions. Use the slug or ID.',
 	parameters: Schema.Struct({
-		id_or_slug: Schema.String,
+		id_or_slug: CompanyIdOrSlugParam,
 	}),
 	success: Schema.Union([CompanyDetail, Company.json]),
 	dependencies: REQUEST_DEPENDENCIES,
@@ -179,7 +180,7 @@ const UpdateCompany = Tool.make('update_company', {
 	description:
 		"Update one or more fields on an existing company by UUID. Only include fields to change; omitted fields stay unchanged. Set clear_email_suppression=true to let mail go to the company's own mailboxes again after a bounce or a spam report turns out to have been wrong — a role address like info@ or orders@ has nobody listed under it, so nothing on a contact can lift its block. It frees all of the company's own held-back mailboxes in one go, and any that bounces again is held straight back. An address somebody has vouched for is left as it is — that is not a block, and this does not throw the vouch away. A block is recorded against every record in the organisation holding that address, and this speaks only for the company's own — so if a contact or a branch holds the same address, their copy goes on refusing the send until it is cleared too. A branch's copy cannot be cleared at all yet.",
 	parameters: Schema.Struct({
-		id: Schema.String,
+		id: CompanyIdParam,
 		clear_email_suppression: Schema.optional(Schema.Boolean),
 		name: Schema.optional(Schema.String),
 		taxId: Schema.optional(Schema.String).annotate({
@@ -232,7 +233,7 @@ const GeocodeCompany = Tool.make('geocode_company', {
 	description:
 		'Resolve a company to latitude/longitude via the configured geocoder (Nominatim). On a match, persists lat/lng/geocoded_at/geocode_source. Returns { outcome, company }: outcome is "geocoded" (company is the updated row), "no_match" (nothing resolved for the location), "nothing_to_search" (company has no name or location), or "lookup_failed" (the geocoder could not be reached). Rate-limited to 1 req/sec.',
 	parameters: Schema.Struct({
-		id: Schema.String,
+		id: CompanyIdParam,
 	}),
 	success: Schema.Struct({
 		outcome: Schema.Literals([
@@ -258,7 +259,7 @@ const ManageCompanySites = Tool.make('manage_company_sites', {
 		"The places a company trades from — its shops, offices, depots. Most companies need none of these: a company with one place is described by its own address and coordinates, and a site is what you add when there is a second. Adding one is what makes that place findable on the map on its own, so a rep drawing a box around their territory sees the branch there rather than only the city the company is registered in. action: 'list' (all of them), 'add' (name plus, where known, address/location/country/latitude/longitude), 'update' (by site_id, only the fields to change), 'remove' (by site_id). Give coordinates when you have them — a site without them is recorded but cannot be found on a map.",
 	parameters: Schema.Struct({
 		action: Schema.Literals(['list', 'add', 'update', 'remove']),
-		company_id: Schema.String,
+		company_id: CompanyIdParam,
 		site_id: Schema.optional(Schema.String),
 		name: Schema.optional(Schema.String),
 		address: Schema.optional(Schema.String),
@@ -292,7 +293,7 @@ const ManageCompanyChannels = Tool.make('manage_company_channels', {
 			'vouch',
 			'unvouch',
 		]),
-		company_id: Schema.String,
+		company_id: CompanyIdParam,
 		site_id: Schema.optional(Schema.String),
 		channel_id: Schema.optional(Schema.String),
 		kind: Schema.optional(Schema.String),
@@ -325,7 +326,7 @@ const ManageCompanyRelations = Tool.make('manage_company_relations', {
 		"How two companies belong together — a holding and the firm it owns, a franchisor and its franchisee, a company and whoever bought it. Recording one stops the pair reading as two near-duplicates that somebody eventually merges by mistake. action: 'list' (everything this company is part of, from both directions), 'add' (related_company_id plus kind), 'remove' (by relation_id). kind: 'parent' (company_id is owned BY related_company_id), 'franchise_of' (company_id trades under related_company_id's brand but is independently owned — not a subsidiary, and it decides for itself), 'acquired_by' (company_id was bought by related_company_id). Store the pair once, from the owned/franchised/acquired side; the other company shows it too without a second entry.",
 	parameters: Schema.Struct({
 		action: Schema.Literals(['list', 'add', 'remove']),
-		company_id: Schema.String,
+		company_id: CompanyIdParam,
 		related_company_id: Schema.optional(Schema.String),
 		kind: Schema.optional(
 			Schema.Literals(['parent', 'franchise_of', 'acquired_by']),
@@ -372,7 +373,7 @@ const DeleteCompany = Tool.make('delete_company', {
 	description:
 		'Take a company out of view — off the lists, out of the pipeline figures, and away from the people working it. Its contacts go with it, and its history is kept rather than thrown away, so restore_company puts the lot back. The name is released, so the same firm can be added again afterwards; if somebody does that, restoring the old one needs it renamed first. Nothing is lost, but nobody sees it until it comes back, so say what you are about to remove and let the person confirm before calling this.',
 	parameters: Schema.Struct({
-		id: Schema.String,
+		id: CompanyIdParam,
 	}),
 	success: Schema.Struct({
 		contacts_affected: Schema.Number,
@@ -390,7 +391,10 @@ const RestoreCompany = Tool.make('restore_company', {
 	description:
 		'Put a deleted company back, along with the people that deletion hid. Use the company id; a deleted company cannot be found by name, because its name was released when it went. Refused when another company is using that name now — rename that one first, then try again.',
 	parameters: Schema.Struct({
-		id: Schema.String,
+		id: Schema.String.annotate({
+			description:
+				'A deleted company’s id, from search_companies with deleted:"only" — an ordinary search will not show it.',
+		}),
 	}),
 	success: Schema.Struct({
 		contacts_affected: Schema.Number,

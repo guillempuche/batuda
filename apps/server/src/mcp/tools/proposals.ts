@@ -10,6 +10,7 @@ import {
 	ProposalEvent,
 	TimelineActivityService,
 } from '../../services/timeline-activity'
+import { CompanyIdParam, ProposalIdParam } from './_ids'
 import { McpPageLimit, TruncatableResult, toTruncatable } from './_result'
 
 const REQUEST_DEPENDENCIES = [CurrentOrg]
@@ -52,7 +53,7 @@ const CreateProposal = Tool.make('create_proposal', {
 	description:
 		'Create a proposal for a company. line_items is free-form JSON (rows with quantity/unit_price/description); status defaults to "draft" until later promoted via update_proposal.',
 	parameters: Schema.Struct({
-		company_id: Schema.String,
+		company_id: CompanyIdParam,
 		contact_id: Schema.optional(Schema.String),
 		title: Schema.String,
 		line_items: Schema.Unknown,
@@ -72,7 +73,7 @@ const UpdateProposal = Tool.make('update_proposal', {
 	description:
 		'Update fields on an existing proposal by id. Transitioning status to sent|viewed|responded records a ProposalEvent on the timeline. Other status values update the row silently.',
 	parameters: Schema.Struct({
-		id: Schema.String,
+		id: ProposalIdParam,
 		status: Schema.optional(Schema.String),
 		title: Schema.optional(Schema.String),
 		line_items: Schema.optional(Schema.Unknown),

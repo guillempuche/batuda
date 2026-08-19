@@ -21,7 +21,8 @@ import { Geocoder } from '../../services/geocoder'
 import { resolveResearchProposedUpdate } from '../../services/research-apply'
 import { TimelineActivityService } from '../../services/timeline-activity'
 import { requireApproval } from './_elicit'
-import { redactDbErrors, Uuid } from './_research-shared'
+import { RESEARCH_ID_SOURCE, SUBJECT_ID_SOURCE } from './_ids'
+import { describedUuid, redactDbErrors, Uuid } from './_research-shared'
 import {
 	ListResult,
 	McpPageLimit,
@@ -174,7 +175,7 @@ const CancelResearch = Tool.make('cancel_research', {
 	description:
 		'Interrupt a queued or running research run. Already-cancelled runs are left as-is.',
 	parameters: Schema.Struct({
-		id: Uuid,
+		id: describedUuid(RESEARCH_ID_SOURCE),
 	}),
 	success: Schema.Union([
 		Schema.Struct({ status: Schema.Literal('cancelled') }),
@@ -192,9 +193,9 @@ const AttachResearch = Tool.make('attach_research', {
 	// from, so the sentence an agent reads cannot drift from what it accepts.
 	description: `Post-hoc link a research run to a CRM subject (${RESEARCH_SUBJECT_TABLES.join('|')}). Inserts a finding row in research_links; re-attaching the same pair is a no-op.`,
 	parameters: Schema.Struct({
-		id: Schema.String,
+		id: Schema.String.annotate({ description: RESEARCH_ID_SOURCE }),
 		subject_table: ResearchSubjectTable,
-		subject_id: Uuid,
+		subject_id: describedUuid(SUBJECT_ID_SOURCE),
 	}),
 	success: Schema.Union([
 		Schema.Struct({ status: Schema.Literal('attached') }),
@@ -213,7 +214,7 @@ const DeleteResearch = Tool.make('delete_research', {
 	description:
 		'Soft-delete a research run (sets status=deleted; the row stays for audit but stops appearing in list_research). Returns {error:"not_found"} for a run this organization does not have. Otherwise asks the person first and does nothing until they agree: {status:"cancelled"} means they said no, {status:"confirmation_required"} means this client has no way to ask them — relay nextStep rather than retrying, since retrying gives the same answer.',
 	parameters: Schema.Struct({
-		id: Uuid,
+		id: describedUuid(RESEARCH_ID_SOURCE),
 	}),
 	success: Schema.Union([
 		Schema.Struct({ status: Schema.Literal('deleted') }),
@@ -231,8 +232,11 @@ const ResolveResearchPaidAction = Tool.make('resolve_research_paid_action', {
 	description:
 		'Resolve a paid-action approval gate on a research run. decision=approve spawns a follow-up run that performs the paid call — money moves, so the person is asked first and nothing is spent until they agree ({status:"cancelled"} if they said no, {status:"confirmation_required"} if this client cannot ask them; relay nextStep rather than retrying). decision=skip dismisses the gate without spending and needs no approval. paid_action_id is the gate id surfaced by the run.',
 	parameters: Schema.Struct({
-		id: Schema.String,
-		paid_action_id: Schema.String,
+		id: Schema.String.annotate({ description: RESEARCH_ID_SOURCE }),
+		paid_action_id: Schema.String.annotate({
+			description:
+				'The gate id the run surfaced — read it off the paid-action gate in get_research.',
+		}),
 		decision: Decision,
 	}),
 	success: Schema.Unknown,
@@ -248,7 +252,7 @@ const ListResearchProposedUpdates = Tool.make(
 		description:
 			'List proposed CRM updates surfaced by a research run. Each row is a proposal awaiting human review (apply or reject) before mutating the target table. Returns at most `limit` rows (default 100, max 500); `hasMore` says whether the run proposed more than were returned.',
 		parameters: Schema.Struct({
-			id: Schema.String,
+			id: Schema.String.annotate({ description: RESEARCH_ID_SOURCE }),
 			limit: Schema.optional(McpPageLimit),
 		}),
 		success: TruncatableResult(Schema.Unknown),
@@ -266,8 +270,11 @@ const ResolveResearchProposedUpdate = Tool.make(
 		description:
 			'Resolve a proposed CRM update from a research run. decision=apply writes the proposed change to the target row — it changes the customer\'s own records, so the person is asked first and nothing is written until they agree ({status:"cancelled"} if they said no, {status:"confirmation_required"} if this client cannot ask them; relay nextStep rather than retrying). decision=reject discards the proposal without changing the row and needs no approval.',
 		parameters: Schema.Struct({
-			id: Schema.String,
-			proposed_update_id: Schema.String,
+			id: Schema.String.annotate({ description: RESEARCH_ID_SOURCE }),
+			proposed_update_id: Schema.String.annotate({
+				description:
+					'A proposal id from list_research_proposed_updates on the same run.',
+			}),
 			decision: ProposedUpdateDecision,
 		}),
 		success: Schema.Unknown,

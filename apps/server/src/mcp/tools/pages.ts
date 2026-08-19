@@ -7,6 +7,7 @@ import { BlockNode, TiptapDocument } from '@batuda/ui/blocks'
 
 import { PageService } from '../../services/pages'
 import { requireApproval } from './_elicit'
+import { PageIdOrSlugParam, PageIdParam } from './_ids'
 import { McpPageLimit, McpPageOffset, PageResult, toPage } from './_result'
 
 // `publish_page` returns the published page, or a cancelled marker saying why
@@ -41,7 +42,7 @@ const CreatePage = Tool.make('create_page', {
 const UpdatePage = Tool.make('update_page', {
 	description: 'Update page content, title, or meta.',
 	parameters: Schema.Struct({
-		id: Schema.String,
+		id: PageIdParam,
 		title: Schema.optional(Schema.String),
 		content: Schema.optional(TiptapDocument),
 		meta: Schema.optional(Schema.Unknown),
@@ -57,7 +58,7 @@ const PublishPage = Tool.make('publish_page', {
 	description:
 		'Publish a draft page — sets status to published. This makes the page publicly visible.',
 	parameters: Schema.Struct({
-		id: Schema.String,
+		id: PageIdParam,
 	}),
 	success: PublishResult,
 	dependencies: [McpSchema.McpServerClient],
@@ -87,7 +88,7 @@ const ListPages = Tool.make('list_pages', {
 const GetPage = Tool.make('get_page', {
 	description: 'Get full page content by ID or slug+lang.',
 	parameters: Schema.Struct({
-		id_or_slug: Schema.String,
+		id_or_slug: PageIdOrSlugParam,
 		lang: Schema.optional(Schema.String),
 	}),
 	success: Page.json,
@@ -101,7 +102,7 @@ const EditPageBlock = Tool.make('edit_page_block', {
 	description:
 		'Edit a page block tree by position. action=insert puts block at position (appends if omitted); update merges attrs into the block at position; move relocates a block from->to; remove deletes the block at position.',
 	parameters: Schema.Struct({
-		page_id: Schema.String,
+		page_id: PageIdParam,
 		action: Schema.Literals(['insert', 'update', 'move', 'remove']),
 		position: Schema.optional(Schema.Number),
 		block: Schema.optional(BlockNode),
