@@ -28,6 +28,39 @@
  * that tight — "one name starts the other" alone would fold two real companies that
  * merely open with the same word.
  *
+ * A note written after the name is the fourth, and it is a different kind of thing
+ * from the other three: not another company to find, but a phrase the scan added to
+ * a name it had already written down — "KBE Energy (Annuaire Tecsol entry)" beside
+ * "KBE Energy". Taking brackets off every name before filing it would fold "Acme
+ * (UK)" into "Acme (US)" as well, so what makes this safe is the list rather than
+ * the brackets: the plain name has to be on it, and it has to carry one note or
+ * none. See `bracketedNoteParents`.
+ *
+ * What none of the four can reach, and it is not for want of trying: one name that
+ * is another and then more words, with no town to anchor it — "SNEF" beside "Groupe
+ * SNEF", "VOLTEC" beside "Voltec Power Technology Solutions". Each is one company
+ * written twice. They are also the same shape, row for row, as "Terre Solaire"
+ * beside a real and different "Terre Solaire Energie": a name, that name plus words,
+ * and nothing else on either row to read. Put those two lists side by side and they
+ * are identical field for field, so no rule reading the rows can answer differently
+ * for them — the difference is only that "Groupe" adds nothing to a name where
+ * "Energie" adds something, which is a list of words per language. This is not a
+ * rule nobody has found yet; it is a rule that cannot be written from what a row
+ * carries.
+ *
+ * A pair spelled slightly differently lands on that same wall rather than on one of
+ * its own. "PPVS – Facilities Management" beside "PPVS – Facility Management France"
+ * is one company, and folding the plural away is the smaller half of the problem:
+ * grant it for free and what is left is "…facilit* management" beside "…facilit*
+ * management france" — one name being the other plus a trailing word, with the row
+ * stating no town for that word to be checked against. So closing it needs the case
+ * above closed first, and that one is closed to any rule of this kind.
+ *
+ * Both stay two rows, and what the fold leaves standing is counted rather than
+ * joined: the measurement of how many duplicates a list still holds reads the same
+ * pairs far more loosely, precisely because a count that overstates costs a reader
+ * a look, where a fold that overstates costs a real company its place on the list.
+ *
  * The first row stays and the later ones fill its gaps — a tax id one meeting found
  * and the other did not, the site only the ranking printed — with their citations
  * added to its own. Nothing is overwritten: where both rows state a field, the first
@@ -69,6 +102,7 @@ import {
 	withoutFormDots,
 } from './entity-guard'
 import { isPlainObject } from './guard-shapes'
+import { rowGroups } from './row-groups'
 import { ownSiteVerdict } from './own-site'
 import { hostOf, isBareWebAddress } from './source-key'
 
@@ -85,6 +119,22 @@ const siteHostOf = (row: Record<string, unknown>): string | null => {
 		? hostOf(website)
 		: null
 }
+
+// A name and the note somebody wrote after it in brackets — "KBE Energy (Annuaire
+// Tecsol entry)" is the name "KBE Energy" with a note saying where it was found.
+// Read off the name as written, because folding a name into words drops the
+// brackets before anything can see them.
+//
+// The note has to close at the very end of the name, and there has to be a name in
+// front of it to keep: a value that is nothing but a bracketed phrase names no
+// company for another row to be a second reading of.
+const TRAILING_NOTE = /^(.*\S)\s*\(([^()]*)\)\s*$/
+
+// The company a name names, with any note off the end — "KBE Energy (Annuaire
+// Tecsol entry)" is the company "KBE Energy". The name as written when it carries
+// no note.
+const withoutTrailingNote = (name: string): string =>
+	TRAILING_NOTE.exec(name)?.[1] ?? name
 
 /**
  * The hosts among these rows that a row is established as owning — the domain
@@ -117,7 +167,17 @@ export const hostsEstablishedAsOwn = (
 		// establishes a site and the row that needs it meet on the same spelling.
 		const host = siteHostOf(row)
 		if (host === null) continue
-		if (ownSiteVerdict({ name, website }) === 'established') hosts.add(host)
+		// Judged on the company's name, not on a note written after it. A scan that
+		// writes down where it met a company — "KBE Energy (Annuaire Tecsol entry)" —
+		// puts the directory's own words into the name field, and reading those would
+		// have the directory spell the company and so pass for its own site. Every
+		// other row on that directory would then be filed under it as the same
+		// company, which merges firms that have nothing to do with each other.
+		if (
+			ownSiteVerdict({ name: withoutTrailingNote(name), website }) ===
+			'established'
+		)
+			hosts.add(host)
 	}
 	return hosts
 }
@@ -255,6 +315,105 @@ export const branchOfficeParents = (
 	return parents
 }
 
+/**
+ * For each row whose name ends in a note written in brackets, the row carrying
+ * that same name without one.
+ *
+ * A scan meets a company on a directory and writes down where it met it —
+ * "KBE Energy (Annuaire Tecsol entry)" — or writes the trade it found the company
+ * under after the name — "2C ENERGIES (CHAUFFAGE CLIMATISATION ENERGIES)". Neither
+ * bracketed phrase is part of what the company is called, so the two rows are the
+ * same company written twice, and the plain one is the writing to keep.
+ *
+ * Taking the brackets off before filing every row would be the obvious move and is
+ * the wrong one: it also files "Acme (UK)" and "Acme (US)" as one company, and
+ * those are two. Two things keep this apart from that, and both are about the shape
+ * of the list rather than what any word means:
+ *
+ *  - **The plain name has to be on the list.** A note only reads as a note when the
+ *    same name is there without it, which is the row it is a second reading of.
+ *    "Acme (UK)" beside "Acme (US)" and no bare "Acme" folds nothing.
+ *  - **One note, or none.** Where a name carries two different notes, the brackets
+ *    are telling the rows apart rather than annotating one of them, so all of them
+ *    are left alone — including where the bare name is on the list too. "Acme",
+ *    "Acme (UK)" and "Acme (US)" stays three rows.
+ *
+ * A row is also left alone when it stands at a site established as its own and the
+ * plain row stands at a different one. Two rows each at a domain that spells them is
+ * the most a row can say about being somebody separate, and it outranks a bracket.
+ *
+ * Established is the whole of that, and asking for less costs a real fold: a live
+ * French search returned "Société Nouvelle Garraud" citing another company's site
+ * and "SOCIÉTÉ NOUVELLE GARRAUD (SN GARRAUD)" citing a Facebook page. Two different
+ * hosts, and neither is either company's own — a host nobody is named by says
+ * nothing about who anybody is, so it is no reason to hold a note apart from the
+ * name it annotates. `ownSiteHosts` is asked for rather than worked out here for the
+ * same reason `discoveryRowIdentityKeys` asks: who owns a host is read across the
+ * whole list, and a caller must not compare one reading of that against another.
+ *
+ * What this still cannot tell apart, and nothing on the row can: one company
+ * genuinely registered with brackets in its name, on a list beside another row that
+ * is the same name without them. Requiring the plain row to be present is what
+ * bounds it — the brackets alone fold nothing.
+ *
+ * Exported for the same reason `branchOfficeParents` is: the measurement of how
+ * many duplicates a list still holds reads a returned list with the same eyes the
+ * fold does, and a shape the fold acts on and the count cannot see would report a
+ * clean list every time.
+ */
+export const bracketedNoteParents = (
+	rows: ReadonlyArray<unknown>,
+	ownSiteHosts: ReadonlySet<string>,
+): ReadonlyMap<number, number> => {
+	const readings = rows.map(row => {
+		if (!isPlainObject(row) || typeof row['name'] !== 'string') return null
+		const written = row['name']
+		const noted = TRAILING_NOTE.exec(written)
+		const [, beforeTheNote, theNote] = noted ?? []
+		const core = nameCore(withoutFormDots(beforeTheNote ?? written))
+		// A name with nothing but a legal form in front of the brackets leaves no
+		// company for the plain row to be the same one as.
+		if (core === '') return null
+		const host = siteHostOf(row)
+		return {
+			core,
+			note: noted === null ? null : collapse(theNote ?? ''),
+			ownSite: host !== null && ownSiteHosts.has(host) ? host : null,
+		}
+	})
+
+	// The first row written plainly under each name, and the distinct notes the rest
+	// of them wrote after it.
+	const plainRowOf = new Map<string, number>()
+	const notesOn = new Map<string, Set<string>>()
+	readings.forEach((reading, at) => {
+		if (reading === null) return
+		if (reading.note === null) {
+			if (!plainRowOf.has(reading.core)) plainRowOf.set(reading.core, at)
+			return
+		}
+		const notes = notesOn.get(reading.core)
+		if (notes === undefined) notesOn.set(reading.core, new Set([reading.note]))
+		else notes.add(reading.note)
+	})
+
+	const parents = new Map<number, number>()
+	readings.forEach((reading, at) => {
+		if (reading === null || reading.note === null) return
+		const plain = plainRowOf.get(reading.core)
+		if (plain === undefined) return
+		if ((notesOn.get(reading.core)?.size ?? 0) > 1) return
+		const plainOwnSite = readings[plain]?.ownSite ?? null
+		const atDifferentSitesOfTheirOwn =
+			reading.ownSite !== null &&
+			plainOwnSite !== null &&
+			reading.ownSite !== plainOwnSite
+		if (atDifferentSitesOfTheirOwn) return
+		parents.set(at, plain)
+	})
+	return parents
+}
+
 // What tells two citations apart: the page each names, as written. Only the case
 // and the space around it are ignored — every other character of an address does
 // real work, and folding them away would file "/about-us" and "/aboutus" as one
@@ -373,24 +532,7 @@ export const dedupeDiscoveryRows = (
 		// happened to meet first, leaving the other behind as a duplicate. The list
 		// arrives in whatever order the model wrote it, so that would make the answer
 		// depend on the order.
-		const companyOfRow = rows.map((_, at) => at)
-		const companyOf = (at: number): number => {
-			let row = at
-			let of = companyOfRow[row]
-			while (of !== undefined && of !== row) {
-				row = of
-				of = companyOfRow[row]
-			}
-			return row
-		}
-		const sameCompany = (a: number, b: number): void => {
-			const one = companyOf(a)
-			const other = companyOf(b)
-			if (one === other) return
-			// The earlier row names the company, so the list keeps the order it met
-			// them in however the two rows turn out to be joined up.
-			companyOfRow[Math.max(one, other)] = Math.min(one, other)
-		}
+		const { groupOf: companyOf, join: sameCompany } = rowGroups(rows.length)
 
 		const ownSiteHosts = hostsEstablishedAsOwn(rows)
 		const rowOfKey = new Map<string, number>()
@@ -404,18 +546,34 @@ export const dedupeDiscoveryRows = (
 		})
 		const parentOfBranch = branchOfficeParents(rows)
 		for (const [branch, parent] of parentOfBranch) sameCompany(parent, branch)
+		const parentOfNote = bracketedNoteParents(rows, ownSiteHosts)
+		for (const [noted, plain] of parentOfNote) sameCompany(plain, noted)
 
-		// The company a branch belongs to, following the chain up when a branch hangs
-		// off a branch. Every step shortens the name, so this always comes to a stop.
-		const companyItself = (at: number): number => {
+		// Follow a row up to the row whose name is the one to keep: a branch up to the
+		// company it hangs off, a name with a note after it back to the plain writing
+		// of it.
+		//
+		// Stops after as many steps as there are rows to visit. A branch always leaves
+		// words behind and a note never comes off twice running, so a chain of either
+		// alone runs out on its own — but the two can alternate, and what a list of
+		// model-written names can do to that is not worth working out when the cost of
+		// being wrong is a run that hangs. A chain longer than the rows it could visit
+		// has been round in a circle, and stopping there answers with a real row.
+		const climbFrom = (
+			at: number,
+			parents: ReadonlyMap<number, number>,
+		): number => {
 			let row = at
-			let parent = parentOfBranch.get(row)
-			while (parent !== undefined) {
+			for (let step = 0; step < parents.size; step++) {
+				const parent = parents.get(row)
+				if (parent === undefined) return row
 				row = parent
-				parent = parentOfBranch.get(row)
 			}
 			return row
 		}
+		// A branch and a note both settle which name a company keeps. Only a branch
+		// settles where it is, so the two are asked separately below.
+		const nameComesFrom = new Map([...parentOfNote, ...parentOfBranch])
 
 		// One row per company, in the order the list first met it — under the company's
 		// own name, even where the list met one of its branches first. A reader given
@@ -433,13 +591,11 @@ export const dedupeDiscoveryRows = (
 			const index = keptAt.get(company)
 			if (index === undefined) {
 				keptAt.set(company, kept.length)
-				const headOffice = rows[companyItself(at)]
-				const headOfficeName = isPlainObject(headOffice)
-					? headOffice['name']
-					: undefined
+				const namedBy = rows[climbFrom(at, nameComesFrom)]
+				const ownName = isPlainObject(namedBy) ? namedBy['name'] : undefined
 				kept.push(
-					typeof headOfficeName === 'string' && headOfficeName !== row['name']
-						? { ...row, name: headOfficeName }
+					typeof ownName === 'string' && ownName !== row['name']
+						? { ...row, name: ownName }
 						: row,
 				)
 				return
@@ -447,9 +603,11 @@ export const dedupeDiscoveryRows = (
 			// This row speaks about somewhere else than the one it is joining when it is
 			// a branch, or when it is the company itself arriving after one of its
 			// branches took the place that stays. Another reading of the same branch is
-			// neither, and its place fills a gap like any other field.
+			// neither, and neither is the same name with a note written after it, so
+			// their place fills a gap like any other field.
 			const held = kept[index]
-			const elsewhere = parentOfBranch.has(at) || companyItself(company) === at
+			const elsewhere =
+				parentOfBranch.has(at) || climbFrom(company, parentOfBranch) === at
 			kept[index] = isPlainObject(held) ? foldInto(held, row, elsewhere) : row
 			merged++
 		})
