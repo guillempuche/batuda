@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-19 (server-v2026.8.19)
+
+### Bug Fixes
+
+* **server:** stop recording a missing route as a crash ([d2ab946](https://github.com/guillempuche/batuda/commit/d2ab946d0d0de0abffb4b813db16d800dc45d35c))
+
 ## 2026-08-18 (server-v2026.8.18)
 
 ### Bug Fixes
