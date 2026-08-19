@@ -65,6 +65,12 @@ const isActionParameterized = (toolName: string): boolean =>
 // above should, since everything below only walks what is listed there.
 const EXPECTED_TOOL_COUNT = 97
 
+// A parameter that names another record: `id`, `id_or_slug`, or anything
+// ending in `_id`. An assistant holds what a person said, never a database, so
+// a value of this shape can only have come from an earlier call — and one that
+// does not say which call is the whole of the failure this rule exists for.
+const NAMES_ANOTHER_RECORD = /^(id|id_or_slug|.*_id)$/
+
 const READ_ONLY_NAME = /^(list_|get_|search_|find_|lookup_)/
 const DESTRUCTIVE_NAME = /^(delete_|discard_|cancel_)/
 const IDEMPOTENT_NAME =
@@ -188,6 +194,37 @@ describe('MCP tool annotation coverage', () => {
 			}
 		})
 
+		it('should let the tools that write a message take a mailbox the same way', () => {
+			// GIVEN send_email and manage_email_draft, which both compose a
+			//       message for the same person out of the same mailboxes
+			// WHEN reading the parameters each one publishes
+			// THEN neither insists on a mailbox. An assistant is told to write an
+			//      email, never which mailbox to write it from, so a rule learned
+			//      on one of these is applied to the other — and where the two
+			//      disagreed, the failure named a key the caller had never heard
+			//      of, which is no new information, so it sent the same call again
+			const writers = ['send_email', 'manage_email_draft']
+			const insisting = writers.filter(name => {
+				const tool = Object.entries(EmailTools.tools).find(
+					([toolName]) => toolName === name,
+				)?.[1]
+				expect(tool, `${name} is no longer published`).toBeDefined()
+				const input = Tool.getJsonSchema(tool as Tool.Any) as {
+					required?: ReadonlyArray<string>
+					properties?: Record<string, unknown>
+				}
+				expect(
+					input.properties?.['inbox_id'],
+					`${name} no longer takes inbox_id at all`,
+				).toBeDefined()
+				return (input.required ?? []).includes('inbox_id')
+			})
+			expect(
+				insisting,
+				`${insisting.join(', ')} will not write a message without being told which mailbox, while its sibling will`,
+			).toEqual([])
+		})
+
 		it('should exempt only tools that still exist', () => {
 			// GIVEN the named exemptions from the flat-result rule
 			// WHEN checking each against the live tools
@@ -253,6 +290,30 @@ describe('MCP tool annotation coverage', () => {
 							outputSchema.type,
 							`${toolName} success schema must not encode to a JSON array; wrap the list in an object (ListResult / { items })`,
 						).not.toBe('array')
+					})
+
+					it('should say where every id it insists on comes from', () => {
+						// GIVEN a tool that will not run without an id
+						// WHEN reading the parameters it publishes
+						// THEN each such id says which call produces one. Without
+						//      that the caller guesses, is told only that a key it
+						//      never heard of is missing, and — having learned
+						//      nothing — sends the very same request again
+						// [tools/${toolkitName} — id-source invariant]
+						const input = Tool.getJsonSchema(tool) as {
+							required?: ReadonlyArray<string>
+							properties?: Record<string, { description?: unknown }>
+						}
+						const unsourced = (input.required ?? [])
+							.filter(name => NAMES_ANOTHER_RECORD.test(name))
+							.filter(name => {
+								const said = input.properties?.[name]?.description
+								return typeof said !== 'string' || said.trim() === ''
+							})
+						expect(
+							unsourced,
+							`${toolName} requires ${unsourced.join(', ')} without saying where to get one; annotate the parameter with the call that returns it (see ./_ids.ts)`,
+						).toEqual([])
 					})
 
 					it('should say whether it returned everything it found', () => {

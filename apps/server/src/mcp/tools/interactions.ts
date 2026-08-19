@@ -14,6 +14,7 @@ import {
 	TimelineActivityService,
 } from '../../services/timeline-activity'
 import { ToolMessage } from '../tool-message'
+import { CompanyIdParam } from './_ids'
 import { McpPageLimit, TruncatableResult, toTruncatable } from './_result'
 
 const REQUEST_DEPENDENCIES = [CurrentOrg]
@@ -25,7 +26,7 @@ const LogInteraction = Tool.make('log_interaction', {
 	description:
 		'Log a sales interaction. Channel: email|phone|whatsapp|linkedin|instagram|in_person|other. Direction: inbound|outbound. Type: call|email|meeting|demo|follow_up|other. Auto-updates company last_contacted_at and next_action.',
 	parameters: Schema.Struct({
-		company_id: Schema.String,
+		company_id: CompanyIdParam,
 		contact_id: Schema.optional(Schema.String),
 		channel: Schema.String,
 		direction: Schema.String,
@@ -48,7 +49,7 @@ const ListInteractions = Tool.make('list_interactions', {
 	description:
 		'List interactions for a company, newest first. Optionally filter by channel or type. `hasMore` says whether more matched than were returned — read it before saying how many there are.',
 	parameters: Schema.Struct({
-		company_id: Schema.String,
+		company_id: CompanyIdParam,
 		channel: Schema.optional(Schema.String),
 		type: Schema.optional(Schema.String),
 		limit: Schema.optional(McpPageLimit),

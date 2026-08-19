@@ -59,16 +59,18 @@ const actingInAnOrg = Layer.succeed(
 // A mail service where nothing the caller names is ever there — which is the
 // only situation these requests are about.
 const nothingIsThere = Layer.succeed(EmailService, {
-	getDraft: (_inboxId: string, draftId: string) =>
+	// The mailbox is optional the way the real service takes it: naming none
+	// means the draft's own, or the one the caller sends from.
+	getDraft: (_inboxId: string | undefined, draftId: string) =>
 		Effect.fail(new NotFound({ entity: 'EmailDraft', id: draftId })),
-	updateDraft: (_inboxId: string, draftId: string) =>
+	updateDraft: (_inboxId: string | undefined, draftId: string) =>
 		Effect.fail(new NotFound({ entity: 'EmailDraft', id: draftId })),
-	deleteDraft: (_inboxId: string, draftId: string) =>
+	deleteDraft: (_inboxId: string | undefined, draftId: string) =>
 		Effect.fail(new NotFound({ entity: 'EmailDraft', id: draftId })),
-	sendDraft: (_inboxId: string, draftId: string) =>
+	sendDraft: (_inboxId: string | undefined, draftId: string) =>
 		Effect.fail(new NotFound({ entity: 'EmailDraft', id: draftId })),
-	createDraft: (inboxId: string) =>
-		Effect.fail(new NotFound({ entity: 'Inbox', id: inboxId })),
+	createDraft: (inboxId: string | undefined) =>
+		Effect.fail(new NotFound({ entity: 'Inbox', id: inboxId ?? '' })),
 	deleteInbox: (inboxId: string) =>
 		Effect.fail(new NotFound({ entity: 'Inbox', id: inboxId })),
 } as never)

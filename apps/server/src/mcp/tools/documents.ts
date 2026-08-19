@@ -24,6 +24,7 @@ import {
 	TimelineActivityService,
 } from '../../services/timeline-activity'
 import { ToolMessage } from '../tool-message'
+import { DocumentIdParam, SUBJECT_ID_SOURCE, SubjectIdParam } from './_ids'
 import { McpPageLimit, TruncatableResult, toTruncatable } from './_result'
 
 const REQUEST_DEPENDENCIES = [CurrentOrg]
@@ -62,7 +63,9 @@ const GetDocuments = Tool.make('get_documents', {
 	description: `List documents filed against a CRM record. subject_table (${SUBJECT_TABLE_CHOICES}) + subject_id narrows to one record; type and q (substring of title or body) filter further; all are optional and combinable. Returns id, type, title, timestamps, a short snippet and where each document is filed — NOT the full body. Call get_document for that.`,
 	parameters: Schema.Struct({
 		subject_table: Schema.optional(DocumentSubjectTable),
-		subject_id: Schema.optional(Schema.String),
+		subject_id: Schema.optional(Schema.String).annotate({
+			description: SUBJECT_ID_SOURCE,
+		}),
 		type: Schema.optional(Document.json.fields.type),
 		q: Schema.optional(Schema.String),
 		limit: Schema.optional(McpPageLimit),
@@ -78,7 +81,7 @@ const GetDocuments = Tool.make('get_documents', {
 const GetDocument = Tool.make('get_document', {
 	description: `Get a single document and the records it is filed against. A markdown document carries its body in \`content\`, cut off past ${MAX_BODY_CHARS} characters with a trailing "…[truncated]". A web page (format=html) has an empty \`content\` and a short-lived \`bodyUrl\` to fetch it from instead — that link is the only way to read one, and it expires.`,
 	parameters: Schema.Struct({
-		id: Schema.String,
+		id: DocumentIdParam,
 	}),
 	success: Schema.Struct({
 		...Document.json.fields,
@@ -102,7 +105,7 @@ const CreateDocument = Tool.make('create_document', {
 	description: `Create a document filed against a CRM record: subject_table (${SUBJECT_TABLE_CHOICES}) + subject_id say where it belongs, and attach_document files the same document in more places afterwards. Content is markdown. A prep note for a meeting is filed against that calendar_event, not against the company.`,
 	parameters: Schema.Struct({
 		subject_table: DocumentSubjectTable,
-		subject_id: Schema.String,
+		subject_id: SubjectIdParam,
 		type: Document.json.fields.type,
 		title: Schema.optional(Schema.String),
 		content: Schema.String,
@@ -118,7 +121,7 @@ const UpdateDocument = Tool.make('update_document', {
 	description:
 		'Update a document title, body or type. Only the fields you pass change.',
 	parameters: Schema.Struct({
-		id: Schema.String,
+		id: DocumentIdParam,
 		type: Schema.optional(Document.json.fields.type),
 		title: Schema.optional(Schema.String),
 		content: Schema.optional(Schema.String),
@@ -134,7 +137,7 @@ const UpdateDocument = Tool.make('update_document', {
 const DeleteDocument = Tool.make('delete_document', {
 	description:
 		'Permanently delete a document and every filing of it. There is no version history, so the body is gone. An id that is already gone still reports deleted. To keep the document but stop showing it against one record, use detach_document instead.',
-	parameters: Schema.Struct({ id: Schema.String }),
+	parameters: Schema.Struct({ id: DocumentIdParam }),
 	success: Schema.Struct({ status: Schema.Literal('deleted') }),
 	dependencies: REQUEST_DEPENDENCIES,
 })
@@ -146,9 +149,9 @@ const DeleteDocument = Tool.make('delete_document', {
 const AttachDocument = Tool.make('attach_document', {
 	description: `File an existing document against one more CRM record: subject_table (${SUBJECT_TABLE_CHOICES}) + subject_id. A document can be filed in any number of places, and filing it where it already sits is a no-op. Returns not_found when the record does not exist or belongs to another organisation.`,
 	parameters: Schema.Struct({
-		id: Schema.String,
+		id: DocumentIdParam,
 		subject_table: DocumentSubjectTable,
-		subject_id: Schema.String,
+		subject_id: SubjectIdParam,
 	}),
 	success: Schema.Union([
 		Schema.Struct({ status: Schema.Literal('attached') }),
@@ -165,9 +168,9 @@ const DetachDocument = Tool.make('detach_document', {
 	description:
 		'Stop filing a document against one record. The document itself survives, along with its other filings; unfiling something already unfiled is a no-op.',
 	parameters: Schema.Struct({
-		id: Schema.String,
+		id: DocumentIdParam,
 		subject_table: DocumentSubjectTable,
-		subject_id: Schema.String,
+		subject_id: SubjectIdParam,
 	}),
 	success: Schema.Struct({ status: Schema.Literal('detached') }),
 	dependencies: REQUEST_DEPENDENCIES,

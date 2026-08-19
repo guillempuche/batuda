@@ -8,6 +8,7 @@ import { Task, TaskEvent } from '@batuda/domain'
 import { requireOrgMembers } from '../../services/org-members'
 import { TaskService } from '../../services/tasks'
 import { ToolMessage } from '../tool-message'
+import { TaskIdParam } from './_ids'
 import {
 	McpPageLimit,
 	McpPageOffset,
@@ -140,7 +141,7 @@ const UpdateTask = Tool.make('update_task', {
 	description:
 		'Partially update a task. Pass only the fields you want to change; omitted fields are untouched. Preserves the `status=done <-> completed_at IS NOT NULL` invariant by rejecting writes that would break it — use complete_task / reopen_task for status transitions.',
 	parameters: Schema.Struct({
-		id: Schema.String,
+		id: TaskIdParam,
 		title: Schema.optional(Schema.String),
 		type: Schema.optional(Schema.String),
 		priority: Schema.optional(TaskPriority),
@@ -169,7 +170,10 @@ const CompleteTask = Tool.make('complete_task', {
 	description:
 		'Mark a task as done (status=done, completed_at=now()). Idempotent — a second call on an already-done task is a no-op. Pass a single id or an array of ids to complete in one call; the array form goes through the bulk-complete service path.',
 	parameters: Schema.Struct({
-		id: Schema.Union([Schema.String, Schema.Array(Schema.String)]),
+		id: Schema.Union([Schema.String, Schema.Array(Schema.String)]).annotate({
+			description:
+				'One task id from list_tasks or search_tasks, or an array of them to finish several at once.',
+		}),
 	}),
 	success: Schema.Union([Task.json, BulkCompleteResult, Schema.Null]),
 	dependencies: [CurrentOrg],
@@ -182,7 +186,7 @@ const CompleteTask = Tool.make('complete_task', {
 const ReopenTask = Tool.make('reopen_task', {
 	description:
 		'Re-open a done or cancelled task (status=open, completed_at=NULL). Idempotent — re-opening an already-open task leaves the row alone.',
-	parameters: Schema.Struct({ id: Schema.String }),
+	parameters: Schema.Struct({ id: TaskIdParam }),
 	success: Schema.NullOr(Task.json),
 	dependencies: [CurrentOrg],
 })
@@ -194,7 +198,7 @@ const ReopenTask = Tool.make('reopen_task', {
 const CancelTask = Tool.make('cancel_task', {
 	description:
 		'Cancel an open or in-progress task (status=cancelled). Rejects tasks whose status is already done. Use reopen_task first if you need to cancel a completed task.',
-	parameters: Schema.Struct({ id: Schema.String }),
+	parameters: Schema.Struct({ id: TaskIdParam }),
 	success: Schema.NullOr(Task.json),
 	dependencies: [CurrentOrg],
 })
@@ -207,7 +211,7 @@ const SnoozeTask = Tool.make('snooze_task', {
 	description:
 		'Hide a task from the active queue until `until` (ISO 8601 datetime). The row stays at status=open; list_tasks with include_snoozed=false filters it out while the timer is still in the future. `until` must be a future timestamp.',
 	parameters: Schema.Struct({
-		id: Schema.String,
+		id: TaskIdParam,
 		until: Schema.String,
 	}),
 	success: Schema.NullOr(Task.json),
@@ -222,7 +226,7 @@ const RescheduleTask = Tool.make('reschedule_task', {
 	description:
 		'Shortcut for update_task that just moves due_at. Pass null to clear a due date.',
 	parameters: Schema.Struct({
-		id: Schema.String,
+		id: TaskIdParam,
 		due_at: Schema.NullOr(Schema.String),
 	}),
 	success: Schema.NullOr(Task.json),
@@ -236,7 +240,7 @@ const RescheduleTask = Tool.make('reschedule_task', {
 const GetTask = Tool.make('get_task', {
 	description:
 		'Get a single task by id. Returns the full row including audit timestamps and link slots; for the activity audit trail use get_task_events.',
-	parameters: Schema.Struct({ id: Schema.String }),
+	parameters: Schema.Struct({ id: TaskIdParam }),
 	success: Schema.NullOr(Task.json),
 	dependencies: [CurrentOrg],
 })
@@ -249,7 +253,7 @@ const GetTaskEvents = Tool.make('get_task_events', {
 	description:
 		'List audit events recorded for a task (created/updated/completed/cancelled/snoozed/rescheduled), most recent first. Returns at most `limit` events (default 100, max 500); `hasMore` says whether the task has more history than was returned.',
 	parameters: Schema.Struct({
-		id: Schema.String,
+		id: TaskIdParam,
 		limit: Schema.optional(McpPageLimit),
 	}),
 	success: TruncatableResult(TaskEvent.json),

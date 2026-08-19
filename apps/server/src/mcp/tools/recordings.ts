@@ -4,6 +4,7 @@ import { Tool, Toolkit } from 'effect/unstable/ai'
 import { RecordingDetail, RecordingSummary } from '@batuda/controllers'
 
 import { RecordingService } from '../../services/recordings'
+import { CompanyIdParam, RecordingIdParam } from './_ids'
 import { McpPageLimit, McpPageOffset, PageResult, toPage } from './_result'
 
 const PlaybackInfo = Schema.Struct({
@@ -21,7 +22,7 @@ const ListCallRecordings = Tool.make('list_call_recordings', {
 	description:
 		'List call recordings for a company, newest first by interaction date. Returns metadata only (no audio bytes, no transcript yet — transcription ships in a later phase). `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true.',
 	parameters: Schema.Struct({
-		company_id: Schema.String,
+		company_id: CompanyIdParam,
 		limit: Schema.optional(McpPageLimit),
 		offset: Schema.optional(McpPageOffset),
 	}),
@@ -36,7 +37,7 @@ const GetCallRecording = Tool.make('get_call_recording', {
 	description:
 		'Get a single call recording by id, joined with its parent interaction. Set include_playback_url=true to also return a short-lived signed playback URL (expires in ~10 min) alongside metadata.',
 	parameters: Schema.Struct({
-		recording_id: Schema.String,
+		recording_id: RecordingIdParam,
 		include_playback_url: Schema.optional(Schema.Boolean),
 	}),
 	success: Schema.Union([RecordingDetail, RecordingWithPlayback]),
@@ -50,7 +51,7 @@ const DeleteCallRecording = Tool.make('delete_call_recording', {
 	description:
 		'Soft-delete a call recording. Marks the row deleted_at=now() and best-effort deletes the stored audio object; an orphaned object is fine to leave for a future cleanup cron if the storage delete fails.',
 	parameters: Schema.Struct({
-		recording_id: Schema.String,
+		recording_id: RecordingIdParam,
 	}),
 	success: Schema.Struct({
 		status: Schema.Literal('deleted'),

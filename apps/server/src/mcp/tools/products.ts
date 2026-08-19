@@ -5,6 +5,7 @@ import { SqlClient } from 'effect/unstable/sql'
 import { CurrentOrg } from '@batuda/controllers'
 import { Product } from '@batuda/domain'
 
+import { ProductIdParam } from './_ids'
 import { McpPageLimit, TruncatableResult, toTruncatable } from './_result'
 
 const REQUEST_DEPENDENCIES = [CurrentOrg]
@@ -50,7 +51,7 @@ const UpdateProduct = Tool.make('update_product', {
 	description:
 		'Update fields on an existing product by id. Only the fields you pass are changed; org-scope is enforced by RLS.',
 	parameters: Schema.Struct({
-		id: Schema.String,
+		id: ProductIdParam,
 		name: Schema.optional(Schema.String),
 		type: Schema.optional(Schema.String),
 		status: Schema.optional(Schema.String),

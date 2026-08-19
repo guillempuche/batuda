@@ -29,6 +29,7 @@ import { requireLiveCompany } from '../../services/company-liveness'
 import { unlinkSubject } from '../../services/documents'
 import { ownedSiteId } from '../../services/sites'
 import { ToolMessage } from '../tool-message'
+import { CompanyIdParam, ContactIdParam } from './_ids'
 import { McpPageLimit, TruncatableResult, toTruncatable } from './_result'
 
 const decodeContact = Schema.decodeUnknownEffect(Contact)
@@ -57,7 +58,7 @@ const ListContacts = Tool.make('list_contacts', {
 	description:
 		'List contacts for a company, each with its channels. Returns at most `limit` rows (default 100, max 500); `hasMore` says whether more matched than were returned — read it before saying how many there are.',
 	parameters: Schema.Struct({
-		company_id: Schema.String,
+		company_id: CompanyIdParam,
 		limit: Schema.optional(McpPageLimit),
 	}),
 	success: TruncatableResult(ContactSummary),
@@ -71,7 +72,7 @@ const CreateContact = Tool.make('create_contact', {
 	description:
 		'Create a contact linked to a company. Role examples: CEO, CTO, Marketing Director, Sales Manager. Pass channels[] for every reachable address (kind: email | phone | linkedin | x | website | bluesky | …); the primary email channel is the address used for sending.',
 	parameters: Schema.Struct({
-		company_id: Schema.String,
+		company_id: CompanyIdParam,
 		site_id: Schema.optional(Schema.String).annotate({
 			description:
 				'The branch this person works at, when the company has more than one and it is known which. Leave it out for someone who works for the company at large or moves between its branches — most people, and guessing here is worse than saying nothing.',
@@ -91,7 +92,7 @@ const UpdateContact = Tool.make('update_contact', {
 	description:
 		'Update one or more fields on an existing contact by UUID. Only include fields to change. channels[] only adds an address or refreshes one already on file — it never removes or replaces one, so correcting an address here leaves the old one behind and the person ends up holding both. Use manage_contact_channels to correct, remove, label or re-elect a single channel. Set clear_email_suppression=true to let mail go again to every held-back address on this contact, after a bounce or a spam report turns out to have been wrong — it lifts blocks and nothing else, so an address somebody has vouched for is left as it is. A block is recorded against every record in the organisation holding that address, and this speaks only for the rows on this contact — so if a company or a branch holds the same address, the block stays in place until those are cleared too.',
 	parameters: Schema.Struct({
-		id: Schema.String,
+		id: ContactIdParam,
 		site_id: Schema.optional(Schema.NullOr(Schema.String)).annotate({
 			description:
 				'The branch this person works at, when the company has more than one and it is known which. Leave it out for someone who works for the company at large or moves between its branches — most people, and guessing here is worse than saying nothing. Pass null to clear a branch somebody no longer works at; leaving it out changes nothing.',
@@ -113,7 +114,7 @@ const DeleteContact = Tool.make('delete_contact', {
 	description:
 		'Permanently delete a contact by UUID. Cascade-detaches the contact from interactions / proposals / threads via ON DELETE SET NULL — those rows survive with contact_id=NULL, so the history stays but stops naming anybody. Their channels go with them, including any record of an address having bounced, so re-creating the person starts that address clean. To fix a wrong address, use manage_contact_channels rather than deleting the person — this loses everything they are attached to.',
 	parameters: Schema.Struct({
-		id: Schema.String,
+		id: ContactIdParam,
 	}),
 	success: Schema.Struct({
 		status: Schema.Literal('deleted'),
@@ -140,7 +141,7 @@ const ManageContactChannels = Tool.make('manage_contact_channels', {
 			'vouch',
 			'unvouch',
 		]),
-		contact_id: Schema.String,
+		contact_id: ContactIdParam,
 		channel_id: Schema.optional(Schema.String),
 		kind: Schema.optional(Schema.String),
 		value: Schema.optional(Schema.String),

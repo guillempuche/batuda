@@ -13,6 +13,7 @@ import { dispatchRsvpReply } from '../../services/calendar-rsvp-dispatch'
 import { companyVisible } from '../../services/company-liveness'
 import { EmailService } from '../../services/email'
 import { ToolMessage } from '../tool-message'
+import { CalendarEventIdParam, EventTypeIdParam, OwnEmailParam } from './_ids'
 import {
 	ListResult,
 	McpPageLimit,
@@ -64,7 +65,7 @@ const FindAvailability = Tool.make('find_availability', {
 	description:
 		'List bookable slots for an event type between two ISO-8601 datetimes. Slots are cached per (eventTypeId, from, to) for 60 seconds, so calling this tool repeatedly for the same window is cheap. Returns [] if the event type is fully booked in the window (NoAvailability is flattened to empty array).',
 	parameters: Schema.Struct({
-		event_type_id: Schema.String,
+		event_type_id: EventTypeIdParam,
 		from: Schema.String,
 		to: Schema.String,
 	}),
@@ -82,10 +83,10 @@ const ScheduleMeeting = Tool.make('schedule_meeting', {
 	description:
 		'Book a meeting via the configured calendar provider (cal.com by default). Returns the persisted calendar_events row. Automatically computes end_at from the event type duration, writes the booking, adds attendees, and fires MeetingScheduled on the timeline so last_meeting_at/next_calendar_event_at denorm columns update in the same transaction.',
 	parameters: Schema.Struct({
-		event_type_id: Schema.String,
+		event_type_id: EventTypeIdParam,
 		start_at: Schema.String,
 		attendees: Schema.Array(AttendeeInput),
-		organizer_email: Schema.String,
+		organizer_email: OwnEmailParam,
 		company_id: Schema.optional(Schema.NullOr(Schema.String)),
 		contact_id: Schema.optional(Schema.NullOr(Schema.String)),
 		metadata: Schema.optional(Schema.NullOr(Schema.Unknown)),
@@ -101,7 +102,7 @@ const RescheduleMeeting = Tool.make('reschedule_meeting', {
 	description:
 		'Move an existing booking to a new start time. Only valid for source="booking" events with a provider booking id; email-sourced or internal events return InvalidRsvpTarget with reason="reschedule_only_for_booking_source". Preserves duration (end_at = new_start + original duration).',
 	parameters: Schema.Struct({
-		calendar_event_id: Schema.String,
+		calendar_event_id: CalendarEventIdParam,
 		new_start_at: Schema.String,
 	}),
 	success: CalendarEvent.json,
@@ -116,7 +117,7 @@ const CancelMeeting = Tool.make('cancel_meeting', {
 	description:
 		'Cancel a calendar event. Source decides the outbound path: booking -> provider cancel; email -> status flip only (we cannot cancel an invitation we did not own); internal -> row update with no network. Fires MeetingCancelled on the timeline so next_calendar_event_at is recomputed from the remaining confirmed rows.',
 	parameters: Schema.Struct({
-		calendar_event_id: Schema.String,
+		calendar_event_id: CalendarEventIdParam,
 		reason: Schema.optional(Schema.NullOr(Schema.String)),
 	}),
 	success: CalendarEvent.json,
@@ -132,8 +133,11 @@ const RespondToInvitation = Tool.make('respond_to_invitation', {
 	description:
 		'RSVP to a calendar invitation. attendee_email must be on the stored attendee list for the event (protects against agents forging replies for someone else — returns CannotRsvpForSomeoneElse with 403 otherwise). Source dispatches: booking -> provider accept/decline; email -> METHOD=REPLY ICS built and returned as replyIcs bytes for the caller to send via email.reply; internal -> InvalidRsvpTarget. rsvp=tentative on a provider that does not support it is absorbed locally (UnsupportedRsvp caught) so the local attendee row still records the intent.',
 	parameters: Schema.Struct({
-		calendar_event_id: Schema.String,
-		attendee_email: Schema.String,
+		calendar_event_id: CalendarEventIdParam,
+		attendee_email: Schema.String.annotate({
+			description:
+				'Which attendee is replying — one of the addresses on the event, as get_calendar_event lists them. Replying for the person you are working for means their own address, `primary.email` from list_email_inboxes.',
+		}),
 		rsvp: RsvpChoice,
 		comment: Schema.optional(Schema.NullOr(Schema.String)),
 		actor_user_id: Schema.optional(Schema.NullOr(Schema.String)),
@@ -149,7 +153,10 @@ const RsvpPendingInvitations = Tool.make('rsvp_pending_invitations', {
 	description:
 		'List every upcoming calendar event where the given attendee email still has rsvp="needs-action" and start_at > now(). Useful for the agent to proactively surface invitations the user has not replied to. Sorted by start_at ascending; excludes cancelled events. `hasMore` says whether more matched than were returned — read it before saying how many there are.',
 	parameters: Schema.Struct({
-		attendee_email: Schema.String,
+		attendee_email: Schema.String.annotate({
+			description:
+				'Whose invitations to look at. For the person you are working for, that is `primary.email` from list_email_inboxes — the mailbox they send from by default. A colleague’s address works too when the request names one.',
+		}),
 		limit: Schema.optional(McpPageLimit),
 	}),
 	success: TruncatableResult(PendingInvitation),
@@ -164,7 +171,7 @@ const ForwardInvitation = Tool.make('forward_invitation', {
 	description:
 		'Rebuild a METHOD=REQUEST ICS for an existing calendar event with the same UID and sequence so downstream systems dedup it, adding the given recipient as an ATTENDEE. Refuses cancelled events (no point forwarding dead invites). Returns the bytes — the caller pairs this with email.send to deliver.',
 	parameters: Schema.Struct({
-		calendar_event_id: Schema.String,
+		calendar_event_id: CalendarEventIdParam,
 		to_email: Schema.String,
 		note: Schema.optional(Schema.NullOr(Schema.String)),
 	}),
@@ -220,7 +227,7 @@ const GetCalendarEvent = Tool.make('get_calendar_event', {
 	description:
 		'Get a single calendar event by id. Returns the full calendar_events row (start_at, end_at, attendees, status, source, ical_uid, etc.).',
 	parameters: Schema.Struct({
-		id: Schema.String,
+		id: CalendarEventIdParam,
 	}),
 	success: CalendarEvent.json,
 	dependencies: REQUEST_DEPENDENCIES,
@@ -239,7 +246,7 @@ const CreateInternalBlock = Tool.make('create_internal_block', {
 		title: Schema.String,
 		start_at: Schema.String,
 		end_at: Schema.String,
-		organizer_email: Schema.String,
+		organizer_email: OwnEmailParam,
 		company_id: Schema.optional(Schema.NullOr(Schema.String)),
 		contact_id: Schema.optional(Schema.NullOr(Schema.String)),
 		location_type: Schema.optional(

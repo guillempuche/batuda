@@ -566,14 +566,20 @@ export class EmailService extends Context.Service<EmailService>()(
 			// nothing turned up made "no such draft" the quicker of the two, and
 			// how long an answer takes would then say which it was.
 			const reachableDraft = (
-				namedInboxId: string,
+				namedInboxId: string | undefined,
 				draftId: string,
 			): Effect.Effect<DraftRow, NotFound, CurrentOrg | SessionContext> =>
 				Effect.gen(function* () {
 					const draft = yield* drafts
 						.get(draftId)
 						.pipe(Effect.catchTag('NotFound', () => Effect.succeed(null)))
-					const reachable = yield* resolveInbox(draft?.inboxId ?? namedInboxId)
+					// Naming no mailbox is allowed: the draft says which one it is in,
+					// and with no draft there is nothing to reach either way.
+					const owningInboxId = draft?.inboxId ?? namedInboxId
+					const reachable =
+						owningInboxId === undefined
+							? null
+							: yield* resolveInbox(owningInboxId)
 					if (draft === null || reachable === null) {
 						// The draft's own mailbox id must never appear here. It is the
 						// id of somebody else's private mailbox, and naming it would
@@ -581,6 +587,25 @@ export class EmailService extends Context.Service<EmailService>()(
 						return yield* new NotFound({ entity: 'EmailDraft', id: draftId })
 					}
 					return draft
+				})
+
+			// The mailbox a caller actually named. A blank one is nobody's mailbox
+			// and reads as none: `send` has always taken it that way, and an
+			// assistant filling in an optional field with an empty string means the
+			// same thing — looking for a mailbox called "" only fails at it.
+			const namedInbox = (inboxId: string | undefined): string | undefined =>
+				inboxId === undefined || inboxId.trim() === '' ? undefined : inboxId
+
+			// A mailbox the caller named alongside a draft id. The draft's own
+			// mailbox is what decides whether the draft can be reached, so this
+			// only holds a caller to a mailbox it actually named — naming none is
+			// how a caller says "wherever this draft already is".
+			const assertNamedInboxReachable = (inboxId: string | undefined) =>
+				Effect.gen(function* () {
+					if (inboxId === undefined) return
+					if (!(yield* resolveInbox(inboxId))) {
+						return yield* new NotFound({ entity: 'Inbox', id: inboxId })
+					}
 				})
 
 			// Mailboxes out of the caller's reach read as absent rather than
@@ -2541,7 +2566,7 @@ export class EmailService extends Context.Service<EmailService>()(
 				// columns now — no clientId-string stuffing.
 
 				createDraft: (
-					inboxId: string,
+					inboxId: string | undefined,
 					params: {
 						to?: string | string[] | undefined
 						cc?: string | string[] | undefined
@@ -2558,10 +2583,22 @@ export class EmailService extends Context.Service<EmailService>()(
 					},
 				) =>
 					Effect.gen(function* () {
-						const inbox = yield* resolveInbox(inboxId)
-						if (!inbox) {
-							return yield* new NotFound({ entity: 'Inbox', id: inboxId })
-						}
+						// Naming no mailbox writes the draft in the one the caller
+						// sends from, the same rule `send` follows — there is no draft
+						// yet to take a mailbox from.
+						const named = namedInbox(inboxId)
+						const inbox =
+							named === undefined
+								? yield* resolveDefaultInboxForCurrentUser()
+								: yield* resolveInbox(named).pipe(
+										Effect.flatMap(row =>
+											row
+												? Effect.succeed(row)
+												: Effect.fail(
+														new NotFound({ entity: 'Inbox', id: named }),
+													),
+										),
+									)
 						const draft = yield* drafts.create({
 							inboxId: inbox.id,
 							mode: context?.mode === 'reply' ? 'reply' : 'new',
@@ -2580,7 +2617,7 @@ export class EmailService extends Context.Service<EmailService>()(
 					}),
 
 				updateDraft: (
-					inboxId: string,
+					inboxId: string | undefined,
 					draftId: string,
 					params: {
 						to?: string | string[] | undefined
@@ -2591,11 +2628,9 @@ export class EmailService extends Context.Service<EmailService>()(
 					},
 				) =>
 					Effect.gen(function* () {
-						const inbox = yield* resolveInbox(inboxId)
-						if (!inbox) {
-							return yield* new NotFound({ entity: 'Inbox', id: inboxId })
-						}
-						yield* reachableDraft(inboxId, draftId)
+						const named = namedInbox(inboxId)
+						yield* assertNamedInboxReachable(named)
+						yield* reachableDraft(named, draftId)
 						const updated = yield* drafts.update(draftId, {
 							...(params.to !== undefined && {
 								to: toRecipientArray(params.to) ?? [],
@@ -2616,24 +2651,20 @@ export class EmailService extends Context.Service<EmailService>()(
 						)
 					}),
 
-				deleteDraft: (inboxId: string, draftId: string) =>
+				deleteDraft: (inboxId: string | undefined, draftId: string) =>
 					Effect.gen(function* () {
-						const inbox = yield* resolveInbox(inboxId)
-						if (!inbox) {
-							return yield* new NotFound({ entity: 'Inbox', id: inboxId })
-						}
-						yield* reachableDraft(inboxId, draftId)
+						const named = namedInbox(inboxId)
+						yield* assertNamedInboxReachable(named)
+						yield* reachableDraft(named, draftId)
 						yield* staging.sweepForDraft(draftId).pipe(Effect.ignore)
 						yield* drafts.remove(draftId)
 					}),
 
-				getDraft: (inboxId: string, draftId: string) =>
+				getDraft: (inboxId: string | undefined, draftId: string) =>
 					Effect.gen(function* () {
-						const inbox = yield* resolveInbox(inboxId)
-						if (!inbox) {
-							return yield* new NotFound({ entity: 'Inbox', id: inboxId })
-						}
-						const draft = yield* reachableDraft(inboxId, draftId)
+						const named = namedInbox(inboxId)
+						yield* assertNamedInboxReachable(named)
+						const draft = yield* reachableDraft(named, draftId)
 						return yield* decodeDraft(draftRowToProviderShape(draft)).pipe(
 							Effect.orDie,
 						)
@@ -2691,16 +2722,26 @@ export class EmailService extends Context.Service<EmailService>()(
 						}
 					}),
 
-				sendDraft: (inboxId: string, draftId: string) =>
+				sendDraft: (inboxId: string | undefined, draftId: string) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
-						const inbox = yield* resolveInbox(inboxId)
+						const named = namedInbox(inboxId)
+						const draft = yield* reachableDraft(named, draftId)
+						// A named mailbox is the one the message goes out from, which
+						// is how the composer lets somebody change the From address
+						// after starting a draft. Naming none sends from the mailbox
+						// the draft was written in, so a shared mailbox's message
+						// never goes out under one person's own address by accident.
+						const sendingInboxId = named ?? draft.inboxId
+						const inbox = yield* resolveInbox(sendingInboxId)
 						if (!inbox) {
-							return yield* new NotFound({ entity: 'Inbox', id: inboxId })
+							return yield* new NotFound({
+								entity: 'Inbox',
+								id: sendingInboxId,
+							})
 						}
 						yield* assertInboxUsable(inbox)
 
-						const draft = yield* reachableDraft(inboxId, draftId)
 						const ctx = parseClientId(draft.clientId ?? undefined)
 
 						yield* assertRecipientsNotSuppressed(
