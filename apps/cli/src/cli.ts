@@ -715,7 +715,7 @@ const worktreeDoneCommand = Command.make(
 	{
 		force: Flag.boolean('force').pipe(
 			Flag.withDescription(
-				'Push past every refusal: discard uncommitted changes (in a linked worktree they are deleted with the directory), and delete the branch even when main carries no copy of its work',
+				'Push past every refusal: in a linked worktree uncommitted changes are deleted with the directory, in the main checkout they come across to main with you where git can carry them, and the branch is deleted even when main carries no copy of its work',
 			),
 			Flag.withDefault(false),
 		),

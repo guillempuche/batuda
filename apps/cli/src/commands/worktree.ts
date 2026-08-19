@@ -910,6 +910,12 @@ const remoteForMain = (root: string) =>
 		Effect.orElseSucceed(() => 'origin'),
 	)
 
+// The failure in its own words, so git's account of what it could not do
+// survives into the message wrapped around it. Checked rather than assumed,
+// since what arrives here need not be an Error.
+const reasonOf = (failure: unknown): string =>
+	failure instanceof Error ? failure.message : String(failure)
+
 /**
  * Bring main up to date without moving anybody's checkout.
  *
@@ -1214,33 +1220,51 @@ export const worktreeDone = (options: { force: boolean; stash: boolean }) =>
 				// A worktree that never had a database is still a worktree to finish —
 				// a change to the command-line tool alone needs no stack — so nothing to
 				// drop is a note, not the end of the run.
-				if ((yield* worktreeDown) === 'nothing-provisioned') {
+				const dropped = (yield* worktreeDown) === 'removed'
+				if (!dropped) {
 					yield* Console.log(
 						'No database or bucket provisioned here — nothing to drop.',
 					)
 				}
 
-				// Move to the main checkout before deleting the worktree directory,
-				// otherwise subsequent git commands would run from a deleted cwd.
-				process.chdir(mainRoot)
-				yield* execArgs('git', [
-					'-C',
-					mainRoot,
-					'worktree',
-					'remove',
-					...(force ? ['--force'] : []),
-					worktreePath,
-				])
-				yield* Console.log('✓ Removed linked worktree directory')
+				const finishRemoving = Effect.gen(function* () {
+					// Move to the main checkout before deleting the worktree directory,
+					// otherwise subsequent git commands would run from a deleted cwd.
+					process.chdir(mainRoot)
+					yield* execArgs('git', [
+						'-C',
+						mainRoot,
+						'worktree',
+						'remove',
+						...(force ? ['--force'] : []),
+						worktreePath,
+					])
+					yield* Console.log('✓ Removed linked worktree directory')
 
-				if (ownBranch === null) {
-					// Bringing main up to date had to wait: git keeps a branch in one
-					// working tree at a time, so nothing could move it while this
-					// worktree still held it.
-					yield* catchMainUp(mainRoot)
-				} else if (yield* branchExists(ownBranch)) {
-					yield* deleteBranch(mainRoot, ownBranch)
-				}
+					if (ownBranch === null) {
+						// Bringing main up to date had to wait: git keeps a branch in one
+						// working tree at a time, so nothing could move it while this
+						// worktree still held it.
+						yield* catchMainUp(mainRoot)
+					} else if (yield* branchExists(ownBranch)) {
+						yield* deleteBranch(mainRoot, ownBranch)
+					}
+				})
+
+				// The data is gone by now and nothing brings it back, so a step that
+				// fails from here has to say so: git names what it could not do, and
+				// cannot know that a database went first.
+				yield* dropped
+					? finishRemoving.pipe(
+							Effect.catch(failure =>
+								Effect.fail(
+									new Error(
+										`${reasonOf(failure)}\n\nThis worktree's data was dropped before that, and is not coming back: \`pnpm cli worktree up\` makes a fresh database and bucket if you carry on here.${ownBranch === null ? '' : ` The branch ${ownBranch} is untouched.`}`,
+									),
+								),
+							),
+						)
+					: finishRemoving
 			} else {
 				const branch = yield* branchName
 				if (branch === 'main') {
@@ -1252,6 +1276,15 @@ export const worktreeDone = (options: { force: boolean; stash: boolean }) =>
 				}
 				yield* Console.log(`Finishing feature branch ${branch}...`)
 				yield* exec('git', 'checkout', 'main')
+				// The main checkout is the working tree being kept, so there is no
+				// directory to take uncommitted changes away with: git carries them onto
+				// main when both branches agree on the file. The work is safe, but it
+				// now sits on a branch it was not written for, which nothing else says.
+				if (!(yield* workingTreeClean)) {
+					yield* Console.log(
+						`Uncommitted changes came across to main with you — they were written on ${branch}. Set them aside with \`git stash\` if main is not where they belong.`,
+					)
+				}
 				yield* catchMainUp(mainRoot)
 
 				if (yield* branchExists(branch)) {
