@@ -6231,6 +6231,17 @@ export class ResearchService extends Context.Service<ResearchService>()(
 			// it creates is left queued for whichever process does dispatch.
 			const layerScope = yield* Effect.scope
 			const dispatches = yield* ResearchDispatch
+			// Said out loud at boot, both ways, alongside the providers this run
+			// would use. Whether a process carries runs out is otherwise invisible:
+			// the daemons below announce nothing until they find work, so a server
+			// that had quietly stopped dispatching would look exactly like one with
+			// an empty queue, and runs would sit there with nobody wondering why.
+			yield* Effect.logInfo('research.dispatch.configured').pipe(
+				Effect.annotateLogs({
+					event: 'research.dispatch.configured',
+					dispatches,
+				}),
+			)
 			if (dispatches) {
 				yield* reofferQueued.pipe(
 					Effect.catchCause(cause =>

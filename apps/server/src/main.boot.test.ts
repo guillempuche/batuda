@@ -204,6 +204,24 @@ describe('apps/server program boot', () => {
 		expect(res.status).toBe(200)
 	})
 
+	it('should say it carries queued research runs out', () => {
+		// GIVEN the deployed server is the process that drains the research
+		//       queue — the local command-line MCP server deliberately does not
+		// WHEN reading what it announced at boot
+		const combined = `${output.stdout}\n${output.stderr}`
+		// THEN it said so. Nothing else would notice if it stopped: the daemons
+		//      that do the work announce nothing until they find some, so a
+		//      server that had quietly stopped dispatching looks exactly like
+		//      one with an empty queue, and the runs pile up waiting for a
+		//      worker that never comes.
+		//
+		//      Read off the record's own fields rather than its wording, the way
+		//      anything else querying these lines would — see observability.md.
+		expect(combined).toMatch(/"event":"research\.dispatch\.configured"/)
+		expect(combined).toMatch(/"dispatches":true/)
+		expect(combined).not.toMatch(/"dispatches":false/)
+	})
+
 	it('should not surface a missing-service Defect during boot', () => {
 		// GIVEN the program reached the listening state
 		// WHEN we inspect the merged stderr+stdout
