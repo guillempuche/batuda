@@ -468,6 +468,55 @@ describe('makeFirecrawlScrape', () => {
 		expect(log.count).toBe(3)
 	})
 
+	it('should carry the reason the provider gave for the refusal', async () => {
+		// GIVEN a 2xx refusal that says why, the way Firecrawl does
+		const { exit } = runScrape(200, {
+			success: false,
+			code: 'SCRAPE_TIMEOUT',
+			error: 'The page took too long to load',
+		})
+
+		// WHEN it settles — THEN the message names both, because "success=false" on
+		// its own reads the same whether the page blocked the fetch, the account ran
+		// out, or their side timed out, and those want different responses
+		const resolved = await exit
+		expect(errorOf(resolved)?.message).toBe(
+			'scrape failed: SCRAPE_TIMEOUT: The page took too long to load',
+		)
+	})
+
+	it('should cut a reason that runs to a paragraph', async () => {
+		// GIVEN the shape a real refusal arrives in: a short name, then several
+		// hundred characters of advice
+		const { exit } = runScrape(200, {
+			success: false,
+			code: 'SCRAPE_DNS_RESOLUTION_ERROR',
+			error: `DNS resolution failed for that hostname. ${'Possible causes to check. '.repeat(20)}`,
+		})
+
+		// WHEN it settles — THEN the name and the opening sentence survive, and the
+		// rest does not, so a run losing a dozen fetches cannot bury the log
+		const resolved = await exit
+		const message = errorOf(resolved)?.message ?? ''
+		expect(message).toContain('SCRAPE_DNS_RESOLUTION_ERROR')
+		expect(message).toContain('DNS resolution failed for that hostname.')
+		expect(message.endsWith('…')).toBe(true)
+		// The cap plus the wrapper, nowhere near the 500-odd that arrived.
+		expect(message.length).toBeLessThan(230)
+	})
+
+	it('should say plainly when the provider refused without a reason', async () => {
+		// GIVEN a refusal carrying no words at all
+		const { exit } = runScrape(200, { success: false })
+
+		// WHEN it settles — THEN the message says the reason is missing rather than
+		// implying none was asked for
+		const resolved = await exit
+		expect(errorOf(resolved)?.message).toBe(
+			'scrape failed: provider reported success=false, with no reason given',
+		)
+	})
+
 	it('should fail non-recoverably on a body it cannot read at all', async () => {
 		// GIVEN a 2xx whose `data` is not a page block
 		const { exit, log } = runScrape(200, { data: 'nonsense' })
