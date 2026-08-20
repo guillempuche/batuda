@@ -2,6 +2,41 @@
 
 Operational procedures for production. Add a new section per procedure.
 
+## Adding or rotating a cloud secret
+
+Every cloud secret is an edit in **Infisical**, in the `prod` folder that matches the GitHub environment reading it — never in the GitHub dashboard and never in a committed file. The sync carries it down; a value pasted into GitHub by hand is overwritten by the next sync or, worse, quietly diverges from Infisical. See [architecture.md → Environment variables & secrets](architecture.md#environment-variables--secrets) for the folder → environment mapping.
+
+Non-secret settings do not come this way at all: they live in `apps/server/config.production.json`, shipped with the image.
+
+What each secret is, and how to mint one when there is nothing to copy:
+
+| Secret                                                | Where it comes from                                                                                                                                                                                                                                                                                              |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                        | Neon pooled connection string for `app_service`. The schema-owner one is separate — see [Applying database migrations](#applying-database-migrations).                                                                                                                                                           |
+| `BETTER_AUTH_SECRET`                                  | 32 random bytes, hex: `node -e "console.log(crypto.randomBytes(32).toString('hex'))"`. Rotating it has a second step — see [Rotating `BETTER_AUTH_SECRET`](#rotating-better_auth_secret).                                                                                                                        |
+| `EMAIL_CREDENTIAL_KEY`                                | 32 random bytes, **base64** (not hex): `node -e "console.log(crypto.randomBytes(32).toString('base64'))"`. Every stored mailbox password is encrypted under a subkey derived from it, so **rotating it makes every connected mailbox undecryptable** — keep the old value until each inbox has been reconnected. |
+| `STORAGE_ACCESS_KEY_ID` / `STORAGE_SECRET_ACCESS_KEY` | Cloudflare R2 API token (S3-compatible). The endpoint and bucket are non-secret and live in `config.production.json`.                                                                                                                                                                                            |
+| `EMAIL_API_KEY_TRANSACTIONAL`                         | Resend API key, for magic links and invitations. Needed because `EMAIL_PROVIDER_TRANSACTIONAL=resend`; the CRM's own mail uses per-inbox IMAP/SMTP instead.                                                                                                                                                      |
+| `CALENDAR_API_KEY` / `CALENDAR_WEBHOOK_SECRET`        | cal.com → Settings → Developer. See the webhook note below.                                                                                                                                                                                                                                                      |
+| `KRAFTCLOUD_TOKEN`                                    | Unikraft Cloud API token. Used by the deploy itself, not by the running server.                                                                                                                                                                                                                                  |
+| `CLOUDFLARE_API_TOKEN`                                | For the web deploy only. Minimal scope is Account → Workers Scripts → Edit: the account id is pinned in `apps/internal/wrangler.jsonc`, the route is bound out of band, and there are no KV/D1/Durable Object bindings.                                                                                          |
+| `RESEARCH_API_KEY_*` / `RESEARCH_LLM_*_API_KEY`       | One per capability slot — see the provider-key grammar below.                                                                                                                                                                                                                                                    |
+
+### The cal.com webhook
+
+Point the subscriber at `https://api.batuda.co/webhooks/calcom` and subscribe to **all** triggers, which is cal.com's default. The server acts on six of them (`BOOKING_CREATED`, `BOOKING_REQUESTED`, `BOOKING_RESCHEDULED`, `BOOKING_CANCELLED`, `BOOKING_REJECTED`, `MEETING_ENDED`, dispatched in `apps/server/src/services/calendar.ts`) and answers every other trigger with a 200 so a new one cal.com adds later cannot fail the endpoint. Creating the webhook needs team owner or admin in the dashboard.
+
+### Provider-key grammar
+
+One variable per capability slot, so a key is named for the job it does rather than the vendor doing it. Slot 1 is unsuffixed, slot 2 onwards takes `_2`, `_3` — and a slot only needs a key when the matching `RESEARCH_PROVIDER_*` list actually names that many vendors. When one vendor serves several capabilities the same value goes in each variable: Firecrawl covers both scrape and extract, so `RESEARCH_API_KEY_SCRAPE` and `RESEARCH_API_KEY_EXTRACT` hold the same `fc-…` key.
+
+A few vendors want an unusual shape:
+
+- **Brave** (search) — the free tier still needs a card on file.
+- **libreBORME** (Spanish registry) — HTTP Basic, so the value is the pair `AccessId:AccessKey`.
+- **Companies House** (UK registry) — HTTP Basic with the API key as the username.
+- **eInforma** (Spanish reports) — OAuth2 client credentials, so it needs both `RESEARCH_API_KEY_REPORT_ES` (client id) and `RESEARCH_API_SECRET_REPORT_ES`.
+
 ## Rotating `BETTER_AUTH_SECRET`
 
 `BETTER_AUTH_SECRET` does double duty: it signs sessions/cookies **and** it encrypts the JWKS private key Better Auth uses to sign OAuth / MCP / web-chat access tokens. Because of that second role you **cannot rotate the secret on its own** — the stored signing key was encrypted with the *old* secret, and Better Auth keeps trying to decrypt it with the new one and fails (`BetterAuthError: Failed to decrypt private key`), so every token sign breaks until the key is cleared. It does **not** self-heal: unless a key has expired, the existing one is reused and never regenerated, so the broken state persists indefinitely on its own (mechanism in `docs/repos/better-auth/packages/better-auth/src/plugins/jwt/sign.ts:117-132` — the key is only re-minted when it is missing or past its `expiresAt`, and with no rotation configured it has no `expiresAt`; tracked in issue #59).

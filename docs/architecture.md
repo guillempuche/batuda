@@ -562,7 +562,7 @@ Infisical (project pinned in `.infisical.json`) holds the cloud secrets, organiz
 
 So adding or rotating a cloud secret is an edit in Infisical (the matching `prod` folder) — never in GitHub and never in a file — and the sync carries it to the right environment. The prod migration credential, for instance, is `MIGRATION_DATABASE_URL` in `prod` → `/ci`; see [runbooks.md → Applying database migrations](runbooks.md#applying-database-migrations) for why it is quarantined and reviewer-gated.
 
-Non-secret deployed config does **not** ride this path: boot-required non-secret values (`ALLOWED_ORIGINS`, the research provider/model selections, `RESEARCH_MAX_*`) live in `apps/server/config.production.json`, shipped with the image and loaded at boot — `apps/server/src/lib/config-provider.ts` throws if the file is missing. The GitHub Actions **Variables** mentioned above are a separate non-secret store, used only by the CLI's cloud mode, not by the deploy.
+Non-secret deployed config does **not** ride this path: boot-required non-secret values (`ALLOWED_ORIGINS`, the research provider/model selections, `RESEARCH_MAX_*`) live in `apps/server/config.production.json`, shipped with the image and loaded at boot — `apps/server/src/lib/config-provider.ts` throws if the file is missing. GitHub Actions **Variables** are not used at all: no workflow reads `vars.*`, and the CLI's cloud mode reads the same committed file. Non-secret deployed config has exactly one home.
 
 ---
 

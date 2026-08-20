@@ -39,8 +39,8 @@ const fail = (detail: string) => ({ status: 'fail' as const, detail })
 // required — `setup` syncs them. Variants like `.env.example.pr-media` are
 // opt-in, per-workflow configs `setup` deliberately skips, so the only place to
 // learn they exist is here. A variant counts only if its header declares a
-// `Copy to \`.env.x\`` target; reference-only files (e.g. `.env.example.github`,
-// which documents GitHub-dashboard secrets and is never loaded) are skipped.
+// `Copy to \`.env.x\`` target; a file without one is reference-only and is
+// skipped, since there is nothing for `setup` to copy it to.
 const findEnvExamples = (): string[] => {
 	const results: string[] = []
 	for (const entry of readdirSync(ROOT)) {
@@ -64,7 +64,7 @@ const findEnvExamples = (): string[] => {
 }
 
 const envFileCheck = (example: string, inWorktree: boolean): Check => {
-	// `.env.example` → `.env`; `.env.example.github` → `.env.github`.
+	// `.env.example` → `.env`; `.env.example.pr-media` → `.env.pr-media`.
 	const target = example.replace('.example', '')
 	const optional = !example.endsWith('.env.example')
 	return {
