@@ -45,3 +45,41 @@ jobs:
         uses: ./.github/actions/e2e-stack
         with:
           with-mail: "true"
+
+  # The pull-request gate runs the integration suite against the merge GitHub
+  # builds from the branch and main. That answers "does this change work", not
+  # "does main work": two pull requests can each be green on their own merge and
+  # red once both have landed, and nothing looked at main afterwards. This does.
+  #
+  # A backstop rather than a gate — it cannot block a merge that already
+  # happened, and its job is to name the commit that broke main while the change
+  # is still fresh in somebody's head.
+  integration-main:
+    name: Integration suite (post-merge)
+    runs-on: ubuntu-latest
+    # The suite takes ~2 minutes; the rest is pulling images, migrating and
+    # seeding. Matches the pull-request gate's own budget for the same work.
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "24"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The integration suite imports several workspace packages from their
+      # built `dist/`, the same way the dev server does.
+      - name: Build
+        run: pnpm build
+
+      - name: Integration suite against a local Postgres
+        uses: ./.github/actions/integration-db
