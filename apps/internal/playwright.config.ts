@@ -137,6 +137,12 @@ export default defineConfig({
 	// from `pnpm cli db reset && pnpm cli seed` between manual runs, not from parallelism.
 	fullyParallel: false,
 	workers: 1,
+	// A stray `test.only` narrows the run to that one test and still exits green,
+	// which is the worst thing that can happen to a gate: it keeps reporting
+	// success while covering almost nothing. In CI that is a failure instead, so
+	// the mistake shows up on the pull request that made it rather than months
+	// later. Left off locally, where narrowing the run to one test is the point.
+	forbidOnly: !!process.env['CI'],
 	// One retry in CI so a single transient blip (a slow mount, a network
 	// hiccup) doesn't fail a PR on the smoke gate; a test that only passes on
 	// retry still surfaces in the report and gets triaged (docs/runbooks.md).
