@@ -9,13 +9,9 @@ import {
 	SessionContext,
 } from '@batuda/controllers'
 import { RESEARCH_SUBJECT_TABLES, ResearchSubjectTable } from '@batuda/domain'
-import {
-	ResearchService,
-	resolvePolicy,
-	type SystemDefaults,
-} from '@batuda/research'
+import { ResearchService, resolvePolicy } from '@batuda/research'
 
-import { EnvVars } from '../../lib/env'
+import { ResearchDefaults } from '../../lib/research-defaults'
 import { CompanyService } from '../../services/companies'
 import { Geocoder } from '../../services/geocoder'
 import { resolveResearchProposedUpdate } from '../../services/research-apply'
@@ -349,18 +345,10 @@ export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 		const geocoder = yield* Geocoder
 		const sql = yield* SqlClient.SqlClient
 		const timeline = yield* TimelineActivityService
-		const env = yield* EnvVars
-
 		// What the limits are when nobody has set any, so "is this a raise?"
 		// compares against the figures actually in force rather than treating a
 		// first-time change as one.
-		const systemDefaults: SystemDefaults = {
-			budgetCents: env.RESEARCH_DEFAULT_BUDGET_CENTS,
-			paidBudgetCents: env.RESEARCH_DEFAULT_PAID_BUDGET_CENTS,
-			autoApprovePaidCents: env.RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS,
-			paidMonthlyCapCents: env.RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS,
-			hardCeiling: env.RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS,
-		}
+		const systemDefaults = yield* ResearchDefaults
 		return {
 			list_research: filters =>
 				svc

@@ -86,7 +86,8 @@ apps/server/src/
 │   └── health.ts
 ├── lib/
 │   ├── auth.ts               # Better Auth instance as Context.Service
-│   └── env.ts                # EnvVars service (DATABASE_URL, RESEARCH_*, etc.)
+│   ├── env.ts                # EnvVars — what the web server itself needs (port, origins, auth)
+│   └── research-defaults.ts  # ResearchDefaults — what a run may spend by default
 ├── mcp/
 │   ├── server.ts             # McpToolsLive — toolkits + resources + prompts
 │   ├── http.ts               # McpHttpLive — HTTP transport at /mcp
@@ -662,7 +663,21 @@ export const McpToolsLive = Layer.mergeAll(
 
 ### Testing MCP locally
 
+The stdio server carries no session, so it has to be told which organization to
+act in and as whom — all four are required and it refuses to start without them.
+Take the ids from `pnpm cli data users`; acting as a real member matters because
+the tools that answer per-person (your mailbox, your tasks) read that id, and the
+ones that write record it as who did it.
+
+It deliberately does **not** carry research runs out — `pnpm dev` does that. A
+run you start here is left queued for the dev server to pick up, so an editor
+left connected never competes with it for the queue.
+
 ```bash
+# Set these once in your shell (or in .env, which dev:mcp loads)
+export BATUDA_ACTIVE_ORG_ID=... BATUDA_ACTIVE_ORG_NAME=... BATUDA_ACTIVE_ORG_SLUG=...
+export BATUDA_ACTIVE_USER_ID=...
+
 # MCP Inspector (interactive web UI)
 npx @modelcontextprotocol/inspector -- pnpm --filter @batuda/server dev:mcp
 
@@ -672,7 +687,8 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 # HTTP endpoint
 curl -X POST -k https://api.batuda.localhost:$(cat ~/.portless/proxy.port 2>/dev/null || echo 443)/mcp -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{...}}'
 
-# Claude Code — .mcp.json already configures the batuda stdio server
+# Claude Code — .mcp.json points at the deployed HTTP server (api.batuda.co),
+# not this one, so a local change shows up there only after a release.
 ```
 
 ---

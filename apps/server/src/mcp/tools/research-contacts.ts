@@ -7,10 +7,9 @@ import {
 	ContactDiscovery,
 	estimateDiscoverCostCents,
 	resolvePolicy,
-	type SystemDefaults,
 } from '@batuda/research'
 
-import { EnvVars } from '../../lib/env'
+import { ResearchDefaults } from '../../lib/research-defaults'
 import { detachFromTransaction } from '../../middleware/org'
 import { requireApproval } from './_elicit'
 import { redactDbErrors } from './_research-shared'
@@ -46,15 +45,7 @@ export const ResearchContactsHandlersLive = ResearchContactsTools.toLayer(
 	Effect.gen(function* () {
 		const contactDiscovery = yield* ContactDiscovery
 		const sql = yield* SqlClient.SqlClient
-		const env = yield* EnvVars
-
-		const systemDefaults: SystemDefaults = {
-			budgetCents: env.RESEARCH_DEFAULT_BUDGET_CENTS,
-			paidBudgetCents: env.RESEARCH_DEFAULT_PAID_BUDGET_CENTS,
-			autoApprovePaidCents: env.RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS,
-			paidMonthlyCapCents: env.RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS,
-			hardCeiling: env.RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS,
-		}
+		const systemDefaults = yield* ResearchDefaults
 
 		return {
 			discover_contacts: params =>

@@ -116,6 +116,7 @@ export {
 	MxResolver,
 	RegistryRouter,
 	ReportRouter,
+	ResearchDispatch,
 	ResearchEventSink,
 	ResearchRunContext,
 	ScrapeProvider,

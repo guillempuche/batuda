@@ -332,3 +332,25 @@ export interface BudgetService {
 export class Budget extends Context.Service<Budget, BudgetService>()(
 	'research/Budget',
 ) {}
+
+// ── Dispatch ──
+
+/**
+ * Whether this process carries queued research runs out, or only answers
+ * questions about them.
+ *
+ * Every process that builds `ResearchService` otherwise becomes a worker: it
+ * takes queued rows off the database, runs them, and fails ones whose worker
+ * has gone quiet. That is right for the web server and wrong for the local
+ * command-line MCP server a developer points an editor at, which would
+ * otherwise compete with `pnpm dev` for the same queue — and spend, with real
+ * provider keys.
+ *
+ * A reference rather than a service, so it carries its own answer and nothing
+ * has to provide it: leave it alone and the process dispatches, as every
+ * caller did before this existed.
+ */
+export const ResearchDispatch = Context.Reference<boolean>(
+	'research/ResearchDispatch',
+	{ defaultValue: () => true },
+)
