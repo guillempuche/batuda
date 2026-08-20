@@ -1,0 +1,89 @@
+name: Integration database
+description: >-
+  Stand up the Postgres + MinIO the integration suite needs — the same compose
+  services dev uses — then migrate and seed them. Running the database on the
+  runner keeps every query on localhost instead of paying an internet round-trip
+  to a remote host, which is what used to make this phase run near 15 minutes.
+
+  Extracted so the pull-request gate and the post-merge backstop stand the
+  database up the same way. Two copies drift, and a backstop that drifts from
+  the gate reports breaks the gate never had.
+
+runs:
+  using: composite
+  steps:
+    # Bring up Postgres + MinIO from the same docker-compose file dev uses.
+    # `--wait` blocks until `db` reports healthy (its pg_isready healthcheck)
+    # and `storage` is up.
+    #
+    # The bucket is created by a container that stops as soon as it's done, and
+    # `--wait` treats a stopped container as a failure — listing it alongside the
+    # others passed or failed on timing alone. `run` waits and reports whether it
+    # worked.
+    - name: Start Postgres + MinIO via docker compose
+      shell: bash
+      run: |
+        # Fetching the images is the one step here that reaches outside the
+        # runner, so it gets a few tries: a slow minute at the registry
+        # should cost a wait, not a red build on an unrelated change.
+        pull_attempt=1
+        until docker compose -f docker/docker-compose.yml pull --quiet db storage storage-init; do
+          if [ "$pull_attempt" -ge 3 ]; then
+            echo "Could not fetch the container images after 3 tries." >&2
+            exit 1
+          fi
+          echo "Image pull failed (attempt $pull_attempt) — retrying shortly."
+          sleep $((pull_attempt * 10))
+          pull_attempt=$((pull_attempt + 1))
+        done
+        docker compose -f docker/docker-compose.yml up -d --wait db storage
+        docker compose -f docker/docker-compose.yml run --rm --no-deps storage-init
+
+    # The local container above. Its `batuda` superuser owns the schema, and
+    # integration tests SET ROLE into the app_user / app_service roles that the
+    # 0001 migration creates — exactly as every developer's local stack does.
+    - name: Apply migrations
+      shell: bash
+      env:
+        DATABASE_URL: postgresql://batuda:batuda@localhost:5433/batuda
+      run: pnpm db:migrate
+
+    # Seed fixtures (notably the `taller` / `restaurant` orgs) that
+    # several integration tests rely on. EMAIL_CREDENTIAL_KEY is base64
+    # of 32 zero bytes — fine for a throwaway CI database. STORAGE_*
+    # points at the MinIO container started above; the seedDemoEmails
+    # stage PUTs raw RFC822 bytes there.
+    - name: Seed
+      shell: bash
+      env:
+        DATABASE_URL: postgresql://batuda:batuda@localhost:5433/batuda
+        BETTER_AUTH_SECRET: ci-only-not-prod-ci-only-not-prod-ci
+        EMAIL_CREDENTIAL_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+        STORAGE_ENDPOINT: http://localhost:9000
+        STORAGE_REGION: us-east-1
+        STORAGE_ACCESS_KEY_ID: batuda
+        STORAGE_SECRET_ACCESS_KEY: batuda-secret
+        STORAGE_BUCKET: batuda-assets
+        EMAIL_PROVIDER: local-inbox
+        GEOCODER_PROVIDER: nominatim
+      run: pnpm cli seed
+
+    # --concurrency=1 forces the workspaces' test:integration tasks to
+    # run one at a time. multi-org-isolation (server) TRUNCATEs the
+    # email tables in beforeAll; if mail-worker's threading runs in
+    # parallel, its INSERT loses the race to that TRUNCATE. Within each
+    # workspace, vitest's fileParallelism: false already serializes
+    # files. The proper fix (per-test transactions in multi-org) is
+    # tracked as a follow-up CI-perf slice.
+    - name: Test (integration)
+      shell: bash
+      env:
+        DATABASE_URL: postgresql://batuda:batuda@localhost:5433/batuda
+        BETTER_AUTH_SECRET: ci-only-not-prod-ci-only-not-prod-ci
+        EMAIL_CREDENTIAL_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+        STORAGE_ENDPOINT: http://localhost:9000
+        STORAGE_REGION: us-east-1
+        STORAGE_ACCESS_KEY_ID: batuda
+        STORAGE_SECRET_ACCESS_KEY: batuda-secret
+        STORAGE_BUCKET: batuda-assets
+      run: pnpm exec turbo test:integration --concurrency=1
