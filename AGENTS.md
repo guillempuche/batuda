@@ -273,7 +273,7 @@ RESEARCH_API_KEY_SEARCH=bsa_...            # slot 0 key
 RESEARCH_API_KEY_SEARCH_2=fc_...           # slot 1 key
 ```
 
-**No backwards-compat shims.** When an env var is renamed, update `.env.example`, `.env.example.github`, all consumers, and every deployment in one atomic commit. Do not add a fallback that reads the old name.
+**No backwards-compat shims.** When an env var is renamed, update `.env.example`, all consumers, and every deployment in one atomic commit — a secret is renamed in Infisical, a non-secret in `apps/server/config.production.json`. Do not add a fallback that reads the old name.
 
 ### Backend (apps/server)
 
