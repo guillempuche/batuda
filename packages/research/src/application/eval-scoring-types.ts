@@ -193,6 +193,25 @@ export interface RunOutcome {
 	 * figures read: who it is, where it is, what it says it does, and its web
 	 * address, which is one of the two things that tell two rows apart.
 	 */
+	/**
+	 * What the run said about the trades its request named: how many it reported
+	 * nothing for, how many of those it never went looking for, and why it stopped
+	 * looking. Read off the run's own reckoning rather than recomputed, because
+	 * whether it looked is not something its rows can say.
+	 *
+	 * Null where the run stored no such reckoning — a run that answers with a
+	 * profile rather than a list, one whose request named a single trade, and every
+	 * run finished before this was recorded.
+	 */
+	readonly reportedCoverage: {
+		readonly missing: number
+		readonly neverSearched: number
+		/**
+		 * Of those, the ones the search finished believing it had already found —
+		 * the shape this figure exists to catch. Nought is the healthy reading.
+		 */
+		readonly thoughtAnswered: number
+	} | null
 	readonly companies: ReadonlyArray<{
 		readonly name: string
 		/** The address the row carries, as written, or null when it carries none. */
@@ -304,6 +323,24 @@ export interface MarketScore {
 	readonly partsExpected: number
 	/** Of those, how many came back with at least one row. */
 	readonly partsAnswered: number
+	/**
+	 * What the run itself reported about its shortfall, kept apart from the two
+	 * counts above because they are not the same quantity: those read the golden
+	 * file's list of trades against the rows judged to be the right kind of
+	 * company, while these read the run's own split of its query against every row.
+	 * The two disagree by design, so they must not be subtracted from one another.
+	 *
+	 * Null where the run stored no reckoning of its own — see `reportedCoverage` on
+	 * the outcome. That is not the same as a run with nothing missing, which
+	 * reports nought. Held as one value rather than three, so a reckoning cannot
+	 * be half-read: it arrives whole or not at all, and no consumer has to
+	 * re-assert that for itself.
+	 */
+	readonly reportedCoverage: {
+		readonly missing: number
+		readonly neverSearched: number
+		readonly thoughtAnswered: number
+	} | null
 }
 
 /**
@@ -440,6 +477,37 @@ export interface EvalSummary {
 	readonly rowsJudgedShare: number | null
 	readonly rowsGoldenListedShare: number | null
 	readonly requestCoverage: number | null
+	/**
+	 * Of the trades runs reported nothing for, the share they never went looking
+	 * for. Both halves come from the runs' own reckoning, so they divide honestly;
+	 * holding them against the golden file's list of trades would not, since that is
+	 * a different list matched a different way.
+	 *
+	 * Read it beside `scansReportingCoverage`, which tells a null apart: no scan
+	 * reported a shortfall at all, or no scan reported a reckoning to read.
+	 *
+	 * Two quite different runs land in this figure and it cannot separate them — one
+	 * that lost a trade between its two readings, and one the clock or the spending
+	 * limit stopped before it could look. The stored reckoning says which; this
+	 * number does not.
+	 */
+	readonly neverSearchedShare: number | null
+	/**
+	 * How many trades across the pass a run finished believing it had found and
+	 * then reported nothing for. Counted rather than shared, because the healthy
+	 * reading is nought and a share of nought over nought says nothing.
+	 *
+	 * This is the one figure here that answers a single question: did a run's two
+	 * readings of what it gathered disagree? Anything above nought means one did.
+	 */
+	readonly partsThoughtAnswered: number | null
+	/**
+	 * How many scans carried a reckoning of their own to read. Reported because a
+	 * scan that comes back with nothing at all never stores one, yet still counts
+	 * as a market elsewhere in this summary — so a pass can look clean here while
+	 * its worst runs are simply absent.
+	 */
+	readonly scansReportingCoverage: number | null
 	readonly duplicateRate: number | null
 	/**
 	 * The share of rows that may repeat a company, read loosely enough to see the

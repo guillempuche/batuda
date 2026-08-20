@@ -92,6 +92,32 @@ export const outcomeFromRun = (input: {
 		}
 	}
 
+	// What the run said about the trades its request named. Taken whole or not at
+	// all: a run finished before these counts existed carries the rest of the
+	// block, and reading a missing count as nought would make it the one thing
+	// these figures must never report — a clean pass.
+	const quality =
+		findings !== null && typeof findings === 'object'
+			? (findings as { quality?: unknown }).quality
+			: undefined
+	const storedCoverage =
+		quality !== null && typeof quality === 'object'
+			? (quality as { coverage?: unknown }).coverage
+			: undefined
+	const countedList = (key: string): number | null => {
+		if (storedCoverage === null || typeof storedCoverage !== 'object')
+			return null
+		const value = (storedCoverage as Record<string, unknown>)[key]
+		return Array.isArray(value) ? value.length : null
+	}
+	const missing = countedList('uncovered')
+	const neverSearched = countedList('unsearched')
+	const thoughtAnswered = countedList('thought_answered')
+	const reportedCoverage =
+		missing !== null && neverSearched !== null && thoughtAnswered !== null
+			? { missing, neverSearched, thoughtAnswered }
+			: null
+
 	// The people the run kept (after the entity + grounding guards), each with the
 	// title it found or null — so the scorer can measure how many known contacts
 	// came back with a title.
@@ -164,6 +190,7 @@ export const outcomeFromRun = (input: {
 		contacts,
 		companies,
 		registryConfirmed,
+		reportedCoverage,
 		// Only a run that was asked for a profile is measured on how full it came back.
 		// A search answers with a list and is never given one, so counting it reports
 		// every search as having filled none of a shape nobody asked it for — a failing

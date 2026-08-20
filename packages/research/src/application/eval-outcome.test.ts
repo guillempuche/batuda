@@ -162,6 +162,83 @@ describe('outcomeFromRun', () => {
 		})
 	})
 
+	describe('when a scan reported what it never went looking for', () => {
+		it('should take the run’s own reckoning whole', () => {
+			// GIVEN a finished scan whose stored block names two missing trades, one
+			// of which nothing ever searched for, and says why the looking stopped
+			const outcome = outcomeFromRun({
+				status: 'succeeded_low_confidence',
+				findings: {
+					prospects: [],
+					quality: {
+						coverage: {
+							covered: ['marbristas'],
+							uncovered: ['ascensores', 'fontanería'],
+							unsearched: ['ascensores'],
+							thought_answered: ['ascensores'],
+							stopped_because: 'answered',
+						},
+					},
+				},
+				fetchedUrls: [],
+			})
+
+			// THEN all three counts are read, including the one that says the trade
+			// was lost after the search's last look rather than declined for room
+			expect(outcome.reportedCoverage).toEqual({
+				missing: 2,
+				neverSearched: 1,
+				thoughtAnswered: 1,
+			})
+		})
+	})
+
+	describe('when a scan finished before these counts existed', () => {
+		it('should report no reckoning rather than a clean one', () => {
+			// GIVEN a block stored by an older run: it names what came back missing
+			// but says nothing about what was looked for
+			const outcome = outcomeFromRun({
+				status: 'succeeded_low_confidence',
+				findings: {
+					prospects: [],
+					quality: {
+						coverage: {
+							covered: ['marbristas'],
+							uncovered: ['ascensores'],
+						},
+					},
+				},
+				fetchedUrls: [],
+			})
+
+			// THEN nothing is claimed. Reading the absent count as nought would make
+			// every run finished before this change report a perfect record, which is
+			// the one answer this figure must never invent
+			expect(outcome.reportedCoverage).toBeNull()
+		})
+	})
+
+	describe('when a run stored no coverage block at all', () => {
+		it('should report no reckoning', () => {
+			// GIVEN a run that answered with a profile, and one whose scan came back
+			// empty and never reached the point where a block is written
+			expect(
+				outcomeFromRun({
+					status: 'succeeded',
+					findings: { enrichment: { industry: 'transport' } },
+					fetchedUrls: [],
+				}).reportedCoverage,
+			).toBeNull()
+			expect(
+				outcomeFromRun({
+					status: 'no_reliable_data',
+					findings: { error: 'no results', reason: 'no_results' },
+					fetchedUrls: [],
+				}).reportedCoverage,
+			).toBeNull()
+		})
+	})
+
 	describe('when a run never came back at all', () => {
 		it('should adapt it rather than throwing', () => {
 			// GIVEN a run the poll gave up on, which reaches here with no findings —
