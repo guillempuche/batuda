@@ -83,9 +83,31 @@ runs:
         pnpm db:migrate
         pnpm cli seed
 
+    # Only the browser binary comes from here. `--with-deps` hands the job to
+    # apt-get, and the runner's Ubuntu mirror stalls badly enough on the package
+    # indexes to swallow the whole time budget before a single test starts. It
+    # earns nothing in exchange: every shared library Chromium needs is already
+    # on the image, which ships Chrome, Chromium and Edge of its own. The only
+    # thing apt adds on top is CJK, Thai and Cyrillic fonts, and no spec here
+    # renders text in any of them.
+    #
+    # Fetching the browser still reaches outside the runner, so it gets the same
+    # treatment as the image pull above. The time bound is the part that counts:
+    # a stalled download never returns an error for a retry to act on, it just
+    # sits there until the runner kills the job.
     - name: Install Playwright browser
       shell: bash
-      run: pnpm --filter @batuda/internal exec playwright install --with-deps chromium
+      run: |
+        install_attempt=1
+        until timeout 120 pnpm --filter @batuda/internal exec playwright install chromium; do
+          if [ "$install_attempt" -ge 3 ]; then
+            echo "Could not fetch the Playwright browser after 3 tries." >&2
+            exit 1
+          fi
+          echo "Browser download failed (attempt $install_attempt) — retrying shortly."
+          sleep $((install_attempt * 10))
+          install_attempt=$((install_attempt + 1))
+        done
 
     # Serve the stack under portless. A plain `actions/checkout` is not a linked
     # worktree, so portless serves the bare `batuda.localhost` /
