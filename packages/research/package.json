@@ -26,6 +26,10 @@
 			"types": "./src/application/paid-action-tool.ts",
 			"import": "./src/application/paid-action-tool.ts"
 		},
+		"./application/request-parts": {
+			"types": "./src/application/request-parts.ts",
+			"import": "./src/application/request-parts.ts"
+		},
 		"./application/schemas": {
 			"types": "./src/application/schemas/index.ts",
 			"import": "./src/application/schemas/index.ts"

@@ -15,6 +15,13 @@
  * findable — a market with no lift installers online should say it could not cover
  * lifts, which is a good answer.
  *
+ * The two do not read the same list. Going back out is decided over what has been
+ * gathered so far; the report is held against the list the run finally hands
+ * back — a second reading of the same pages wherever the search is pinned to a
+ * company. So a part can be answered when the decision is taken and empty by the
+ * time it is reported, which is why the report names the parts nothing ever went
+ * looking for instead of letting them read as searches that came back empty.
+ *
  * What counts as a part: a kind of company the request asks for — a trade, a
  * sector, a speciality. Not a place. A row says what it does in the words of its
  * trade and says where it is in a field of its own, so a province read against the
@@ -46,6 +53,12 @@ export interface RequestPart {
 export interface RequestCoverage {
 	readonly covered: ReadonlyArray<string>
 	readonly uncovered: ReadonlyArray<string>
+	/**
+	 * Of the ones nothing answered, those no pass ever went looking for. Reported
+	 * apart because "the search found nobody" and "the search never looked" are
+	 * different answers, and only the first says anything about the market.
+	 */
+	readonly unsearched: ReadonlyArray<string>
 }
 
 /**
@@ -242,24 +255,65 @@ export const readRequestParts = (raw: unknown): ReadonlyArray<RequestPart> => {
 /**
  * Which of the request's parts the rows that came back answer, or null when the
  * request named too few parts for the question to mean anything.
+ *
+ * `searched` is the parts a pass went back out for, which the rows cannot say on
+ * their own: a part can end up empty with no pass ever spent on it, either from the
+ * two readings this file opens with disagreeing, or from the clock or the money
+ * stopping a pass before it ran.
  */
 export const coverRequestParts = (
 	parts: ReadonlyArray<RequestPart>,
 	rows: ReadonlyArray<Record<string, unknown>>,
+	searched: ReadonlySet<string>,
 ): RequestCoverage | null => {
 	if (parts.length < MIN_COVERAGE_PARTS) return null
 	const rowWords = rows.map(row => termTokens(discoveryRowText(row)))
 	const covered: string[] = []
 	const uncovered: string[] = []
+	const unsearched: string[] = []
 	for (const part of parts) {
 		if (anyTermAppearsIn([part.label, ...part.terms], rowWords)) {
 			covered.push(part.label)
 		} else {
 			uncovered.push(part.label)
+			if (!searched.has(part.label)) unsearched.push(part.label)
 		}
 	}
-	return { covered, uncovered }
+	return { covered, uncovered, unsearched }
 }
+
+/**
+ * The parts a search went out for and still came back empty on.
+ *
+ * These are the only ones anything may say it found nobody for. A part nothing
+ * looked for is left out rather than named, because every wording that reports a
+ * shortfall asserts a search that happened.
+ */
+export const searchedAndEmptyParts = (
+	uncovered: ReadonlyArray<string>,
+	unsearched: ReadonlyArray<string>,
+): ReadonlyArray<string> =>
+	uncovered.filter(label => !unsearched.includes(label))
+
+/**
+ * Of the parts nothing went looking for, those the search finished believing it
+ * had already found companies for.
+ *
+ * This is the one reading that separates the two ways a part goes unlooked-for.
+ * A part the search still knew was missing when it stopped was a decision — there
+ * was no clock, no money or no pass left. A part it no longer saw as missing was
+ * lost after its last look, which is the drift a run pinned to a company can have
+ * between the list it decided on and the list it reports.
+ *
+ * Why the reason the loop stopped cannot answer this: that reason describes the
+ * run, and one run can hold both cases at once — a part lost after the last look
+ * beside another the clock stopped it reaching.
+ */
+export const partsThoughtAnswered = (
+	unsearched: ReadonlyArray<string>,
+	stillMissingAtTheLastLook: ReadonlyArray<string>,
+): ReadonlyArray<string> =>
+	unsearched.filter(label => !stillMissingAtTheLastLook.includes(label))
 
 /** Labels quoted for a prompt, so each part is named exactly as the request wrote it. */
 const listLabels = (labels: ReadonlyArray<string>): string =>

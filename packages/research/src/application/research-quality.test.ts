@@ -23,6 +23,8 @@ describe('computeRunQuality', () => {
 			scanResults: null,
 			refined: false,
 			coverage: null,
+			coverageStopped: null,
+			coverageLastMissing: [],
 			existence: null,
 		} as const
 
@@ -109,6 +111,8 @@ describe('computeRunQuality', () => {
 			scanResults: FULL_LIST,
 			refined: false,
 			coverage: null,
+			coverageStopped: null,
+			coverageLastMissing: [],
 			existence: null,
 		} as const
 
@@ -214,6 +218,8 @@ describe('computeRunQuality', () => {
 			citationsKept: 10,
 			refined: true,
 			coverage: null,
+			coverageStopped: null,
+			coverageLastMissing: [],
 			existence: null,
 		} as const
 
@@ -264,6 +270,8 @@ describe('computeRunQuality', () => {
 				scanResults: null,
 				refined: false,
 				coverage: null,
+				coverageStopped: null,
+				coverageLastMissing: [],
 				existence: null,
 			})
 			// THEN the thin-list signal stays quiet — a missing list is "does not
@@ -290,6 +298,8 @@ describe('computeRunQuality', () => {
 			scanResults: 62,
 			refined: false,
 			coverage: null,
+			coverageStopped: null,
+			coverageLastMissing: [],
 			existence: null,
 		} as const
 
@@ -301,6 +311,7 @@ describe('computeRunQuality', () => {
 				coverage: {
 					covered: ['instalaciones eléctricas'],
 					uncovered: ['fontanería', 'solar', 'incendios', 'ascensores'],
+					unsearched: [],
 				},
 			})
 			// THEN it is marked for a read: 62 is not thin and nothing else here is
@@ -316,6 +327,7 @@ describe('computeRunQuality', () => {
 				coverage: {
 					covered: ['instalaciones eléctricas'],
 					uncovered: ['ascensores'],
+					unsearched: [],
 				},
 			})
 			// THEN the shortfall can be read off the finished run rather than by
@@ -323,7 +335,56 @@ describe('computeRunQuality', () => {
 			expect(quality.coverage).toEqual({
 				covered: ['instalaciones eléctricas'],
 				uncovered: ['ascensores'],
+				unsearched: [],
+				thought_answered: [],
+				stopped_because: null,
 			})
+		})
+
+		it('should say why the looking stopped, so the two causes read apart', () => {
+			// GIVEN two runs missing the same trade and naming it unsearched — one
+			// that had nothing left to chase, one the clock stopped
+			const drifted = computeRunQuality({
+				...healthyScan,
+				coverage: {
+					covered: ['instalaciones eléctricas'],
+					uncovered: ['ascensores'],
+					unsearched: ['ascensores'],
+				},
+				coverageStopped: 'answered',
+			})
+			const ranOut = computeRunQuality({
+				...healthyScan,
+				coverage: {
+					covered: ['instalaciones eléctricas'],
+					uncovered: ['ascensores'],
+					unsearched: ['ascensores'],
+				},
+				coverageStopped: 'deadline_margin',
+			})
+			// THEN the blocks are identical but for the reason, which is the only
+			// thing saying whether the trade was lost between two readings or the
+			// run simply ran out of room to look
+			expect(drifted.coverage?.stopped_because).toBe('answered')
+			expect(ranOut.coverage?.stopped_because).toBe('deadline_margin')
+			expect(drifted.coverage?.unsearched).toEqual(ranOut.coverage?.unsearched)
+		})
+
+		it('should carry the parts nothing ever looked for through to the block', () => {
+			// GIVEN a run whose only shortfall is a trade no pass was ever spent on
+			const quality = computeRunQuality({
+				...healthyScan,
+				coverage: {
+					covered: ['instalaciones eléctricas'],
+					uncovered: ['ascensores'],
+					unsearched: ['ascensores'],
+				},
+			})
+			// THEN it is still marked for a read — the list does not answer the
+			// request either way — and the block says the trade was never searched
+			// for, so the gap is not read as a market with nobody in it
+			expect(quality.low_confidence).toBe(true)
+			expect(quality.coverage?.unsearched).toEqual(['ascensores'])
 		})
 
 		it('should stay trusted when every part came back with companies', () => {
@@ -333,6 +394,7 @@ describe('computeRunQuality', () => {
 				coverage: {
 					covered: ['instalaciones eléctricas', 'fontanería', 'ascensores'],
 					uncovered: [],
+					unsearched: [],
 				},
 			})
 			// THEN nothing is raised, and the covered list is still reported so a
@@ -367,6 +429,8 @@ describe('computeRunQuality', () => {
 			scanResults: FULL_LIST,
 			refined: false,
 			coverage: null,
+			coverageStopped: null,
+			coverageLastMissing: [],
 			existence: null,
 		} as const
 
@@ -426,6 +490,8 @@ describe('computeRunQuality', () => {
 				scanResults: FULL_LIST,
 				refined: false,
 				coverage: null,
+				coverageStopped: null,
+				coverageLastMissing: [],
 				existence: null,
 			}).low_confidence
 
@@ -461,6 +527,8 @@ describe('computeRunQuality', () => {
 				scanResults: FULL_LIST,
 				refined: false,
 				coverage: null,
+				coverageStopped: null,
+				coverageLastMissing: [],
 				existence: null,
 			})
 			// THEN the count still stands: 'absent' is a verdict on what the evidence
@@ -485,6 +553,8 @@ describe('computeRunQuality', () => {
 			scanResults: null,
 			refined: false,
 			coverage: null,
+			coverageStopped: null,
+			coverageLastMissing: [],
 			existence: null,
 		} as const
 
@@ -554,6 +624,8 @@ describe('computeRunQuality', () => {
 			scanResults: FULL_LIST,
 			refined: true,
 			coverage: null,
+			coverageStopped: null,
+			coverageLastMissing: [],
 			existence: null,
 		} as const
 
@@ -588,6 +660,8 @@ describe('computeRunQuality', () => {
 				scanResults: null,
 				refined: false,
 				coverage: null,
+				coverageStopped: null,
+				coverageLastMissing: [],
 				existence: null,
 			})
 			// THEN zero is reported rather than left out: a run that went back for
@@ -646,6 +720,8 @@ describe('computeRunQuality — how the list split', () => {
 		scanResults: FULL_LIST,
 		refined: false,
 		coverage: null,
+		coverageStopped: null,
+		coverageLastMissing: [],
 	} as const
 
 	describe('when a scan verified its list', () => {

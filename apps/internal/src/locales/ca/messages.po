@@ -5832,6 +5832,10 @@ msgstr "L'execució ha acabat sense actualitzacions proposades ni accions de pag
 msgid "The search came back with no company for:"
 msgstr "La cerca no ha trobat cap empresa per a:"
 
+#: src/components/research/findings/shared.tsx
+msgid "The search did not look for:"
+msgstr "La cerca no ha buscat:"
+
 #: src/routes/companies/$slug.tsx
 msgid "The tasks for this company could not be fetched. Check that the session is valid, then try again."
 msgstr "No s'han pogut recuperar les tasques d'aquesta empresa. Comprova que la sessió sigui vàlida i torna-ho a provar."

@@ -5832,6 +5832,10 @@ msgstr "The run finished without proposed updates or paid actions."
 msgid "The search came back with no company for:"
 msgstr "The search came back with no company for:"
 
+#: src/components/research/findings/shared.tsx
+msgid "The search did not look for:"
+msgstr "The search did not look for:"
+
 #: src/routes/companies/$slug.tsx
 msgid "The tasks for this company could not be fetched. Check that the session is valid, then try again."
 msgstr "The tasks for this company could not be fetched. Check that the session is valid, then try again."

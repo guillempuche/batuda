@@ -370,7 +370,10 @@ export function CompanyEnrichmentView({
 				</Section>
 			) : null}
 
-			{quality !== undefined ? (
+			{/* A run that fetched nothing now carries this block too, so its presence
+			    no longer means the run produced something. Counting passes over
+			    evidence there reads as work that stood behind an answer. */}
+			{quality !== undefined && findings?.reason !== 'no_reliable_data' ? (
 				<Section data-testid='research-quality'>
 					<SectionTitle>
 						<Trans>Quality</Trans>
