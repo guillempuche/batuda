@@ -177,6 +177,9 @@ describe('evalSummaryAttributes', () => {
 				rowsJudgedShare: null,
 				rowsGoldenListedShare: null,
 				requestCoverage: null,
+				neverSearchedShare: null,
+				scansReportingCoverage: null,
+				partsThoughtAnswered: null,
 				duplicateRate: null,
 				possibleDuplicateRate: null,
 				locationFill: null,
@@ -223,6 +226,9 @@ describe('evalSummaryAttributes', () => {
 				rowsJudgedShare: null,
 				rowsGoldenListedShare: null,
 				requestCoverage: null,
+				neverSearchedShare: null,
+				scansReportingCoverage: null,
+				partsThoughtAnswered: null,
 				duplicateRate: null,
 				possibleDuplicateRate: null,
 				locationFill: null,
@@ -305,9 +311,40 @@ describe('reporting a pass that held market requests', () => {
 				rowsPossiblyDuplicated: 10,
 				partsExpected: 5,
 				partsAnswered: 1,
+				reportedCoverage: null,
 				...over,
 			},
 		})
+
+	describe('when a market run carried a reckoning of its own', () => {
+		it('should chart its counts per run, so a moved rate names the run', () => {
+			// GIVEN a market run that reported four missing trades, two of them never
+			// looked for and one of those only because it thought it had it
+			const attrs = evalSpanAttributes(
+				marketScore({
+					reportedCoverage: {
+						missing: 4,
+						neverSearched: 2,
+						thoughtAnswered: 1,
+					},
+				}),
+			)
+			// THEN each rides on the run's own span — a pass-level rate says a change
+			// happened, and only these say which run it happened in
+			expect(attrs['eval.reported_missing']).toBe(4)
+			expect(attrs['eval.reported_never_searched']).toBe(2)
+			expect(attrs['eval.reported_thought_answered']).toBe(1)
+		})
+
+		it('should chart nothing for a run that stored no reckoning', () => {
+			// GIVEN a run that ended before a reckoning was written
+			const attrs = evalSpanAttributes(marketScore())
+			// THEN the keys are absent rather than nought, which would chart a run
+			// that said nothing as a run that found nothing wrong
+			expect(attrs).not.toHaveProperty('eval.reported_missing')
+			expect(attrs).not.toHaveProperty('eval.reported_thought_answered')
+		})
+	})
 
 	describe('when a market run is turned into per-run scores', () => {
 		it('should score the list and leave out the questions it was never asked', () => {
@@ -345,6 +382,7 @@ describe('reporting a pass that held market requests', () => {
 						rowsLocated: 10,
 						rowsDuplicated: 0,
 						partsAnswered: 5,
+						reportedCoverage: null,
 					}),
 				),
 			)
@@ -373,6 +411,7 @@ describe('reporting a pass that held market requests', () => {
 						rowsLocated: 0,
 						rowsDuplicated: 0,
 						partsAnswered: 0,
+						reportedCoverage: null,
 					}),
 				),
 			)
@@ -429,6 +468,9 @@ describe('reporting a pass that held market requests', () => {
 			rowsJudgedShare: null,
 			rowsGoldenListedShare: null,
 			requestCoverage: null,
+			neverSearchedShare: null,
+			scansReportingCoverage: null,
+			partsThoughtAnswered: null,
 			duplicateRate: null,
 			possibleDuplicateRate: null,
 			locationFill: null,
@@ -464,6 +506,9 @@ describe('reporting a pass that held market requests', () => {
 					rowsJudgedShare: 0,
 					rowsGoldenListedShare: 0,
 					requestCoverage: 0.2,
+					neverSearchedShare: null,
+					scansReportingCoverage: null,
+					partsThoughtAnswered: null,
 					duplicateRate: 0.16,
 					locationFill: 0.4,
 					confirmationRate: 0.3,

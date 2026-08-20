@@ -266,6 +266,7 @@ export const scoreRun = (
 					// a market that came back with nothing still reports it — none of them
 					// answered — instead of dropping out of the figure.
 					partsAnswered: partsAnsweredBy(rightKindRows, expectedMarket.parts),
+					reportedCoverage: outcome.reportedCoverage,
 				}
 
 	return {
@@ -313,6 +314,9 @@ export const summarizeScores = (
 			rowsJudgedShare: null,
 			rowsGoldenListedShare: null,
 			requestCoverage: null,
+			neverSearchedShare: null,
+			scansReportingCoverage: null,
+			partsThoughtAnswered: null,
 			duplicateRate: null,
 			possibleDuplicateRate: null,
 			locationFill: null,
@@ -372,6 +376,12 @@ export const summarizeScores = (
 	let totalRowsPossiblyDuplicated = 0
 	let totalPartsExpected = 0
 	let totalPartsAnswered = 0
+	// Counted only over the scans that stored a reckoning of their own, so the
+	// share below divides one run's words by the same run's words.
+	let scansReportingCoverage = 0
+	let totalReportedMissing = 0
+	let totalReportedNeverSearched = 0
+	let totalReportedThoughtAnswered = 0
 	for (const score of scores) {
 		// Only a run that was asked to reach a particular company can be counted for
 		// having reached it.
@@ -416,6 +426,13 @@ export const summarizeScores = (
 			totalRowsPossiblyDuplicated += score.market.rowsPossiblyDuplicated
 			totalPartsExpected += score.market.partsExpected
 			totalPartsAnswered += score.market.partsAnswered
+			const reckoning = score.market.reportedCoverage
+			if (reckoning !== null) {
+				scansReportingCoverage++
+				totalReportedMissing += reckoning.missing
+				totalReportedNeverSearched += reckoning.neverSearched
+				totalReportedThoughtAnswered += reckoning.thoughtAnswered
+			}
 		}
 		totalExpected += score.fieldsExpected
 		totalScored += score.fieldsScored
@@ -475,6 +492,13 @@ export const summarizeScores = (
 		rowsGoldenListedShare: perRow(totalRowsGoldenListed),
 		requestCoverage:
 			totalPartsExpected === 0 ? null : totalPartsAnswered / totalPartsExpected,
+		neverSearchedShare:
+			totalReportedMissing === 0
+				? null
+				: totalReportedNeverSearched / totalReportedMissing,
+		scansReportingCoverage: scansScored === 0 ? null : scansReportingCoverage,
+		partsThoughtAnswered:
+			scansReportingCoverage === 0 ? null : totalReportedThoughtAnswered,
 		duplicateRate: perRow(totalRowsDuplicated),
 		possibleDuplicateRate: perRow(totalRowsPossiblyDuplicated),
 		locationFill: perRow(totalRowsLocated),

@@ -603,6 +603,9 @@ const formatMarketFigures = (summary: EvalSummary): ReadonlyArray<string> =>
 				`    may be a repeat:    ${pct(summary.possibleDuplicateRate)}`,
 				`  with a location:      ${pct(summary.locationFill)}`,
 				`Request coverage:       ${pct(summary.requestCoverage)}`,
+				`  never looked for:     ${pct(summary.neverSearchedShare)} of what came back missing`,
+				`  scans that reckoned:  ${count(summary.scansReportingCoverage)}`,
+				`  thought it had them:  ${count(summary.partsThoughtAnswered)} (want nought)`,
 			]
 
 // Which models actually did the work. A tier is configured with a first choice
@@ -666,7 +669,11 @@ const formatMarketGroups = (groups: Record<string, EvalSummary>): string =>
 						s.possibleDuplicateRate,
 					)}  located ${pct(
 						s.locationFill,
-					)}  coverage ${pct(s.requestCoverage)}  cost ${cents(s.costPerRun)}`,
+					)}  coverage ${pct(s.requestCoverage)}  never looked ${pct(
+						s.neverSearchedShare,
+					)} over ${count(s.scansReportingCoverage)}  thought had ${count(
+						s.partsThoughtAnswered,
+					)}  cost ${cents(s.costPerRun)}`,
 			),
 	].join('\n')
 

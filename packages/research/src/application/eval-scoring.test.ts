@@ -27,6 +27,7 @@ const outcome = (over: Partial<RunOutcome>): RunOutcome => ({
 	fields: {},
 	contacts: [],
 	companies: [],
+	reportedCoverage: null,
 	...over,
 })
 
@@ -1438,6 +1439,7 @@ describe('scoring a run that answered for a whole market', () => {
 				rowsPossiblyDuplicated: 0,
 				partsExpected: 2,
 				partsAnswered: 0,
+				reportedCoverage: null,
 			})
 			expect(score.empty).toBe(true)
 		})
@@ -1483,6 +1485,9 @@ describe('summarizeScores', () => {
 				rowsJudgedShare: null,
 				rowsGoldenListedShare: null,
 				requestCoverage: null,
+				neverSearchedShare: null,
+				scansReportingCoverage: null,
+				partsThoughtAnswered: null,
 				duplicateRate: null,
 				possibleDuplicateRate: null,
 				locationFill: null,
@@ -1773,6 +1778,7 @@ describe('summarizing a pass that held market requests', () => {
 				rowsPossiblyDuplicated: 0,
 				partsExpected: 5,
 				partsAnswered: 5,
+				reportedCoverage: null,
 				...over,
 			},
 		})
@@ -1885,6 +1891,120 @@ describe('summarizing a pass that held market requests', () => {
 			// WHEN summarized — THEN five of the ten parts asked for were answered
 			expect(summary.requestCoverage).toBe(0.5)
 		})
+
+		it('should divide what nothing looked for by what came back missing', () => {
+			// GIVEN two markets, between them reporting eight missing trades of
+			// which two were never gone out for
+			const summary = summarizeScores([
+				marketScore({
+					reportedCoverage: {
+						missing: 5,
+						neverSearched: 2,
+						thoughtAnswered: 0,
+					},
+				}),
+				marketScore({
+					name: 'FR',
+					reportedCoverage: {
+						missing: 3,
+						neverSearched: 0,
+						thoughtAnswered: 0,
+					},
+				}),
+			])
+
+			// THEN both halves are the runs' own words, divided once across the pass
+			expect(summary.neverSearchedShare).toBeCloseTo(2 / 8)
+			expect(summary.scansReportingCoverage).toBe(2)
+		})
+
+		it('should count the trades a run finished believing it had found', () => {
+			// GIVEN two markets that between them never looked for three trades —
+			// one declined for want of room, two the search thought it had already
+			const summary = summarizeScores([
+				marketScore({
+					reportedCoverage: {
+						missing: 4,
+						neverSearched: 1,
+						thoughtAnswered: 0,
+					},
+				}),
+				marketScore({
+					name: 'FR',
+					reportedCoverage: {
+						missing: 4,
+						neverSearched: 2,
+						thoughtAnswered: 2,
+					},
+				}),
+			])
+
+			// THEN only the two thought answered are counted. That is the reading
+			// this figure exists for — nought means no run's two readings of what it
+			// gathered disagreed — and the never-searched share cannot say it,
+			// because a trade the clock stopped a run reaching lands there too
+			expect(summary.partsThoughtAnswered).toBe(2)
+			expect(summary.neverSearchedShare).toBeCloseTo(3 / 8)
+		})
+
+		it('should say nothing where every scan answered in full', () => {
+			// GIVEN two scans that each reported no shortfall at all
+			const summary = summarizeScores([
+				marketScore({
+					reportedCoverage: {
+						missing: 0,
+						neverSearched: 0,
+						thoughtAnswered: 0,
+					},
+				}),
+				marketScore({
+					name: 'FR',
+					reportedCoverage: {
+						missing: 0,
+						neverSearched: 0,
+						thoughtAnswered: 0,
+					},
+				}),
+			])
+
+			// THEN there is nothing to divide, and the scan count says so — without
+			// it a clean pass and a blind one would read the same
+			expect(summary.neverSearchedShare).toBeNull()
+			expect(summary.scansReportingCoverage).toBe(2)
+			// AND the count reads nought, which is the healthy answer rather than an
+			// absent one
+			expect(summary.partsThoughtAnswered).toBe(0)
+		})
+
+		it('should count the scans that reckoned, apart from the scans that ran', () => {
+			// GIVEN one scan that reported a reckoning and one that came back with
+			// nothing — the empty one never stores a block, yet still counts as a
+			// market everywhere else in this summary
+			const summary = summarizeScores([
+				marketScore({
+					reportedCoverage: {
+						missing: 4,
+						neverSearched: 4,
+						thoughtAnswered: 0,
+					},
+				}),
+				marketScore({
+					name: 'FR',
+					rowsReturned: 0,
+					rowsRightKind: 0,
+					rowsLocated: 0,
+					rowsDuplicated: 0,
+					partsAnswered: 0,
+					reportedCoverage: null,
+				}),
+			])
+
+			// THEN the share reads only the scan that spoke, and the count is what
+			// keeps that visible: a share of 1 over 1 of 2 scans is not a pass where
+			// every shortfall went unlooked-for
+			expect(summary.neverSearchedShare).toBe(1)
+			expect(summary.scansReportingCoverage).toBe(1)
+		})
 	})
 
 	describe('when every market in the pass came back empty', () => {
@@ -1897,6 +2017,7 @@ describe('summarizing a pass that held market requests', () => {
 					rowsLocated: 0,
 					rowsDuplicated: 0,
 					partsAnswered: 0,
+					reportedCoverage: null,
 				}),
 			])
 

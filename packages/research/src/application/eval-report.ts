@@ -245,6 +245,15 @@ export const evalSpanAttributes = (
 		attributes['eval.rows_possibly_duplicated'] = market.rowsPossiblyDuplicated
 		attributes['eval.parts_expected'] = market.partsExpected
 		attributes['eval.parts_answered'] = market.partsAnswered
+		// The run's own reckoning, charted per run so a rate that moves across a
+		// pass can be traced to the run that moved it. Absent where the run stored
+		// none — reporting nought there would chart a clean run.
+		const reckoning = market.reportedCoverage
+		if (reckoning !== null) {
+			attributes['eval.reported_missing'] = reckoning.missing
+			attributes['eval.reported_never_searched'] = reckoning.neverSearched
+			attributes['eval.reported_thought_answered'] = reckoning.thoughtAnswered
+		}
 		if (market.partsExpected > 0) {
 			attributes['eval.request_coverage'] =
 				market.partsAnswered / market.partsExpected
@@ -322,6 +331,19 @@ export const evalSummaryAttributes = (
 	}
 	if (summary.requestCoverage !== null) {
 		attributes['eval.request_coverage'] = summary.requestCoverage
+	}
+	if (summary.neverSearchedShare !== null) {
+		attributes['eval.never_searched_share'] = summary.neverSearchedShare
+	}
+	// Reported whenever any scan ran, including nought — that is the reading that
+	// says the figure above is blind rather than clean.
+	if (summary.scansReportingCoverage !== null) {
+		attributes['eval.scans_reporting_coverage'] = summary.scansReportingCoverage
+	}
+	// Charted because nought is the reading that matters: any run above it had its
+	// two readings of what it gathered disagree.
+	if (summary.partsThoughtAnswered !== null) {
+		attributes['eval.parts_thought_answered'] = summary.partsThoughtAnswered
 	}
 	if (summary.duplicateRate !== null) {
 		attributes['eval.duplicate_rate'] = summary.duplicateRate
