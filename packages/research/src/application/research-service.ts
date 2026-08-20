@@ -194,7 +194,7 @@ import { clearFieldOnlyDoubt } from './unconfirmed-mark-guard'
 import { makeUsageMeter, UsageMeter } from './usage-meter'
 import { verifyValueProvenance } from './value-guard'
 import { constrainVocabulary } from './vocabulary-guard'
-import { guardCompanyWebsites } from './website-guard'
+import { guardCompanyWebsites, type HostClaims } from './website-guard'
 
 // Raw Postgres rows carry `Date` timestamp columns; these decoders read each
 // date from a Date (rather than an ISO string) so the decoded value lands as a
@@ -2841,6 +2841,107 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					let citationsSeen = 0
 					let citationsKept = 0
 
+					// The company the run is about, however it is known: the subject's name when
+					// the run was started from a company on file, and the question itself when it
+					// was started from free text. Read once, so every check that weighs an address
+					// against the run's own company weighs it against the same name.
+					const runSubjectSnapshot = subjects[0]?.snapshot as
+						| Record<string, unknown>
+						| undefined
+					const targetName =
+						typeof runSubjectSnapshot?.['name'] === 'string'
+							? runSubjectSnapshot['name']
+							: (run as { query: string }).query
+
+					// Website sanity, and what it remembers between calls.
+					//
+					// Run on every extraction, and again on the list a fold produced. The list a
+					// run ships is several extractions folded together and no extraction ever
+					// sees it, so a check that only ever ran on an extraction has never read the
+					// answer a reader gets.
+					//
+					// `websiteClaims` is what carries across: which company gave which host as
+					// its website, taken as claimed and before any rule blanked anything. The
+					// rule that condemns a host two differently-named companies claim needs both
+					// of them at once — and a trade body's two members can each arrive alone, in
+					// answers a round apart. Re-reading the folded list cannot recover that: the
+					// round that held both already blanked one of them, so the claim the rule
+					// needs is gone before the rule is asked. Remembering it is the only reading
+					// in which the two are ever together.
+					let websiteClaims: HostClaims = new Map()
+					const checkWebsites = (
+						answer: unknown,
+						pass: 'extraction' | 'folded',
+					) =>
+						Effect.gen(function* () {
+							// Which sites this run watched file several of its own companies. Worked
+							// out per call rather than once, because the organisation-kind link drops
+							// the rows that are not companies at all, a trade body's own name must not
+							// be one of the names a host is judged by, and a fold puts companies in
+							// front of the watch that no single extraction held.
+							const directories = observeDirectorySites({
+								findings: answer,
+								listField: discoveryResultField(schemaName),
+								addresses: [...gatheredAddresses],
+							})
+							const check = guardCompanyWebsites(
+								answer,
+								targetName,
+								directories.sites,
+								websiteClaims,
+							)
+							websiteClaims = check.hostClaims
+							const blanked =
+								check.blankedNotAnAddress +
+								check.blankedDirectory +
+								check.blankedProfilePage +
+								check.blankedSharedHost +
+								check.blankedReadPage
+							if (blanked > 0) {
+								yield* Effect.logWarning('research.websites.blanked').pipe(
+									Effect.annotateLogs({
+										event: 'research.websites.blanked',
+										research_id: researchId,
+										// Which answer was judged: one extraction, or the list a fold
+										// produced. A blank on the folded line is one no extraction could
+										// have reached on its own.
+										pass,
+										blanked_not_an_address: check.blankedNotAnAddress,
+										blanked_directory: check.blankedDirectory,
+										blanked_profile_page: check.blankedProfilePage,
+										blanked_shared_host: check.blankedSharedHost,
+										blanked_read_page: check.blankedReadPage,
+									}),
+								)
+							}
+							// And of the addresses that survived, how many of them anything establishes
+							// as the company's own site. Logged whether or not anything was blanked: a
+							// run whose websites all read `unknown` is not a quiet run, it is one whose
+							// companies have nothing vouching for them.
+							if (
+								check.ownSiteEstablished +
+									check.ownSiteUnknown +
+									check.namedNobodyInParticular >
+								0
+							) {
+								yield* Effect.logInfo('research.websites.own_site').pipe(
+									Effect.annotateLogs({
+										event: 'research.websites.own_site',
+										research_id: researchId,
+										pass,
+										established: check.ownSiteEstablished,
+										unknown: check.ownSiteUnknown,
+										// Beside them, because it says how many of these answers were never
+										// reachable: a company named only after its trade has no word of its
+										// own for a domain to spell, so its `unknown` is what the rules can
+										// say rather than what they found.
+										named_nobody_in_particular: check.namedNobodyInParticular,
+									}),
+								)
+							}
+							return { check, blanked, directories }
+						})
+
 					// Phase-2 extraction + every grounding guard, shared so both the
 					// normal path and the discovery-scan retry run the same logic. Returns
 					// the cleaned findings; the caller writes the single phase-2 checkpoint.
@@ -2965,17 +3066,13 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// The focused rescue passes below aim at one company — the subject's
 							// name + its own domain — so a recovered person or fact is tied to
 							// the right company.
-							const rescueSnapshot = subjects[0]?.snapshot as
-								| Record<string, unknown>
-								| undefined
 							const rescueTarget = {
-								name:
-									typeof rescueSnapshot?.['name'] === 'string'
-										? rescueSnapshot['name']
-										: (run as { query: string }).query,
+								name: targetName,
+								// Worked out here rather than beside `targetName`: a redirect met
+								// while gathering can still settle which domain the run is about.
 								domain:
-									(typeof rescueSnapshot?.['website'] === 'string'
-										? rescueSnapshot['website']
+									(typeof runSubjectSnapshot?.['website'] === 'string'
+										? runSubjectSnapshot['website']
 										: undefined) ?? entityTargets?.domains?.[0],
 							}
 							// Contacts rescue: the broad pass reliably under-delivers the people
@@ -3338,71 +3435,8 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									name: 'websites',
 									run: findings =>
 										Effect.gen(function* () {
-											// Which sites this run watched file several of its own
-											// companies. Worked out here rather than once for the chain,
-											// because the organisation-kind link drops the rows that are
-											// not companies at all, and a trade body's own name must not
-											// be one of the names a host is judged by.
-											const directories = observeDirectorySites({
-												findings,
-												listField: discoveryResultField(schemaName),
-												addresses: [...gatheredAddresses],
-											})
-											const check = guardCompanyWebsites(
-												findings,
-												rescueTarget.name,
-												directories.sites,
-											)
-											const blanked =
-												check.blankedNotAnAddress +
-												check.blankedDirectory +
-												check.blankedProfilePage +
-												check.blankedSharedHost +
-												check.blankedReadPage
-											if (blanked > 0) {
-												yield* Effect.logWarning(
-													'research.websites.blanked',
-												).pipe(
-													Effect.annotateLogs({
-														event: 'research.websites.blanked',
-														research_id: researchId,
-														blanked_not_an_address: check.blankedNotAnAddress,
-														blanked_directory: check.blankedDirectory,
-														blanked_profile_page: check.blankedProfilePage,
-														blanked_shared_host: check.blankedSharedHost,
-														blanked_read_page: check.blankedReadPage,
-													}),
-												)
-											}
-											// And of the addresses that survived, how many of them
-											// anything establishes as the company's own site. Logged
-											// whether or not anything was blanked: a run whose websites
-											// all read `unknown` is not a quiet run, it is one whose
-											// companies have nothing vouching for them.
-											if (
-												check.ownSiteEstablished +
-													check.ownSiteUnknown +
-													check.namedNobodyInParticular >
-												0
-											) {
-												yield* Effect.logInfo(
-													'research.websites.own_site',
-												).pipe(
-													Effect.annotateLogs({
-														event: 'research.websites.own_site',
-														research_id: researchId,
-														established: check.ownSiteEstablished,
-														unknown: check.ownSiteUnknown,
-														// Beside them, because it says how many of these
-														// answers were never reachable: a company named
-														// only after its trade has no word of its own for
-														// a domain to spell, so its `unknown` is what the
-														// rules can say rather than what they found.
-														named_nobody_in_particular:
-															check.namedNobodyInParticular,
-													}),
-												)
-											}
+											const { check, blanked, directories } =
+												yield* checkWebsites(findings, 'extraction')
 											return {
 												findings: check.findings,
 												spanCounts: {
@@ -3421,10 +3455,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													//
 													// About this extraction, not about the run. Every gap
 													// round extracts again and the results are folded
-													// together afterwards, so a website only one round
-													// produced is counted on that round's line and missing
-													// from the last one. Read the run's own answer for a
-													// figure about the run.
+													// together afterwards; the folded list is checked too,
+													// and that check's own-site figures are on its
+													// `research.websites.own_site` line, not here.
 													'research.websites.own_site_established':
 														check.ownSiteEstablished,
 													'research.websites.own_site_unknown':
@@ -5204,6 +5237,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						// it is asked — without this, those first few would take every round's
 						// searches and the rest of a long list would never be reached at all.
 						const gapsSearched = new Set<string>()
+						// Every address the check took off the list a fold produced, added up
+						// over the whole loop. Counted here rather than reported round by round,
+						// because what it answers is whether the run ever condemned an address
+						// no single extraction had the evidence to condemn — and a round that
+						// took none would otherwise overwrite the round that took one.
+						let blankedAfterFolds = 0
 						for (let gapRound = 1; gapRound <= MAX_GAP_ROUNDS; gapRound++) {
 							// Who the focused searches are about. A company profile searches
 							// under the anchored subject's name, which is the same name the
@@ -5464,12 +5503,24 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								schemaName,
 							)
 							findings = merged.findings
+							// Nothing has judged this list yet: every extraction was judged on
+							// its own and then folded in, so an address one round condemned for
+							// one company can still be standing on a row another round carried
+							// in. Judged here against every claim the run has read, and after
+							// each fold rather than once at the end, so what the next round
+							// searches for is what the list is actually missing.
+							const foldedWebsites = yield* checkWebsites(findings, 'folded')
+							findings = foldedWebsites.check.findings
+							blankedAfterFolds += foldedWebsites.blanked
 							yield* Effect.annotateCurrentSpan({
 								'research.gap_rounds.round': gapRound,
 								'research.per_field_search.fired': perFieldFired,
 								'research.per_field_search.filled': merged.filled,
 								'research.per_field_search.added': merged.added,
 								'research.per_field_search.folded': merged.folded,
+								// What only a folded list could show: an address no single
+								// extraction had the evidence to condemn, over every round so far.
+								'research.websites.blanked_folded': blankedAfterFolds,
 								'research.gap_rounds.contacts_kept':
 									contactFill(findings).named,
 								'research.gap_rounds.titled_kept': contactFill(findings).titled,

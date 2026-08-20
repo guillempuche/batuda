@@ -16,8 +16,8 @@
  *  - its host does not carry the company's name AND the name sits in a deeper part
  *    of the address — the shape of "someone-else.com/company/<the-company>", which
  *    is a listing, never a company's own home page, or
- *  - its host does not carry the company's name AND other companies in the same
- *    answer claim that host as theirs too, or
+ *  - its host does not carry the company's name AND other companies the run has
+ *    read claim that host as theirs too, or
  *  - nothing in the address names the company anywhere AND the address is the one
  *    page every source the row cites points at — the field holding the page the
  *    claim was read from rather than the site that page sits on.
@@ -41,9 +41,11 @@
  * website, which arrives on its own with no name beside it and so is judged against
  * the target's name passed in. The read-page rule reads one more thing off the same
  * row, the sources it cites, which travel with it. The shared-host rule asks about
- * the whole answer rather than one row, which is why the walk below is preceded by
- * a reading pass that gathers who claims which host; the directory rule asks about
- * the whole RUN, and is handed its answer from outside (see `directory-sites.ts`).
+ * every answer the run has read rather than one row, which is why the walk below is
+ * preceded by a reading pass that gathers who claims which host, and why what it
+ * gathered comes back out with the result so the next call can be handed it; the
+ * directory rule asks about the whole RUN, and is handed its answer from outside
+ * (see `directory-sites.ts`).
  */
 
 import { type DirectorySites, siteVerdict } from './directory-sites'
@@ -55,7 +57,7 @@ import {
 	spellingsWithoutForms,
 } from './entity-guard'
 import { citedSourceIds, isPlainObject } from './guard-shapes'
-import { ownSiteVerdict } from './own-site'
+import { ownSiteHostVerdict, ownSiteVerdict } from './own-site'
 import { hostOf, isBareWebAddress, pathOf } from './source-key'
 
 const SKIP_KEYS = new Set(['citations', 'proposed_updates'])
@@ -146,24 +148,50 @@ const citesNothingButThisPage = (
 	citedSources.length > 0 &&
 	citedSources.every(source => samePage(website, source))
 
-// Who claims which host, across a whole answer: a host mapped to every company
-// that gave it as its website. Gathered before anything is rewritten, because
-// "is this host any one company's own?" cannot be answered from one row. A value
-// that is not an address, or a name with nothing distinctive in it, tells us
-// nothing about who a host belongs to and is left out.
-//
-// Each company is held under the one name it is written by, with every spelling
-// an address may use for it alongside. Held that way rather than as a flat set
-// of spellings, because the rule below counts these to ask how many companies
-// claim a host: a Catalan name an address can write two ways would otherwise be
-// two of them on its own, and one company would look like a crowd.
-type HostClaims = ReadonlyMap<
-	string,
-	ReadonlyMap<string, ReadonlyArray<string>>
->
+/**
+ * Who claims which host: a host mapped to every company that gave it as its
+ * website. Gathered before anything is rewritten, because "is this host any one
+ * company's own?" cannot be answered from one row. A value that is not an
+ * address, or a name with nothing distinctive in it, tells us nothing about who
+ * a host belongs to and is left out.
+ *
+ * Each company is held under the one name it is written by, with every writing
+ * of it this host has been claimed under alongside. Held that way rather than as
+ * a flat set of names, because the shared-host rule counts these to ask how many
+ * companies claim a host: a Catalan name an address can write two ways would
+ * otherwise be two of them on its own, and one company would look like a crowd.
+ *
+ * The names are kept as written rather than folded down to what an address would
+ * spell, because the stand-down below puts each of them to `own-site.ts`, and
+ * that reader weighs a name's words and its shorter forms — none of which
+ * survives the folding.
+ *
+ * The pages are kept beside them because where on a host a company was filed is
+ * what tells a listing from a site: a trade body gives each member a page of its
+ * own, while a company met under two names is one page written down twice.
+ *
+ * Exported because a run reads several answers and folds them into one, and the
+ * claims have to outlive each reading — see `guardCompanyWebsites`.
+ */
+export interface HostClaim {
+	/** Every writing of the company this host has been claimed under. */
+	readonly names: ReadonlyArray<string>
+	/** Every page of this host it was given, the site itself being the empty one. */
+	readonly pages: ReadonlyArray<string>
+}
 
-const collectHostClaims = (findings: unknown): HostClaims => {
-	const claims = new Map<string, Map<string, ReadonlyArray<string>>>()
+export type HostClaims = ReadonlyMap<string, ReadonlyMap<string, HostClaim>>
+
+const collectHostClaims = (
+	findings: unknown,
+	prior: HostClaims,
+): HostClaims => {
+	const claims = new Map<string, Map<string, HostClaim>>()
+	// What earlier readings claimed, carried in as if it had been read here. A
+	// company that claimed a host in an earlier reading still claims it: nothing
+	// a later reading says takes that back, and the rule below is the one thing
+	// that needs both claimants at once.
+	for (const [host, claimants] of prior) claims.set(host, new Map(claimants))
 	const visit = (value: unknown): void => {
 		if (Array.isArray(value)) {
 			for (const item of value) visit(item)
@@ -177,16 +205,18 @@ const collectHostClaims = (findings: unknown): HostClaims => {
 			const spellings = spellingsWithoutForms(name)
 			const identity = spellings[0]
 			if (host !== null && identity !== undefined) {
-				const claimants =
-					claims.get(host) ?? new Map<string, ReadonlyArray<string>>()
-				// Every spelling this company has been written with on this host, not
-				// just the last row's. Two rows of one company can spell it differently
-				// — one with the geminate mark and one without — and taking only the
-				// later row would drop the spelling that recognises the company's own
-				// host, which is what stands the rule below down.
-				claimants.set(identity, [
-					...new Set([...(claimants.get(identity) ?? []), ...spellings]),
-				])
+				const claimants = claims.get(host) ?? new Map<string, HostClaim>()
+				// Every writing this company has been claimed under on this host, and
+				// every page of it the company was given — not just the last row's. Two
+				// rows of one company can spell it differently, one with the geminate
+				// mark and one without, and taking only the later row would drop the
+				// writing that recognises the company's own host, which is what stands
+				// the rule below down.
+				const held = claimants.get(identity)
+				claimants.set(identity, {
+					names: [...new Set([...(held?.names ?? []), name])],
+					pages: [...new Set([...(held?.pages ?? []), pageOf(website)])],
+				})
 				claims.set(host, claimants)
 			}
 		}
@@ -198,16 +228,83 @@ const collectHostClaims = (findings: unknown): HostClaims => {
 	return claims
 }
 
-// One company vouching for a host stands the shared-host rule down for every row
-// on it, so a name too short to mean anything would quietly switch the rule off.
+// Whether two claimants are plainly DIFFERENT companies. One host cannot be two
+// different companies' own site, and that is the whole premise of the rule below
+// — but two claimants that are one company written two ways are not two
+// companies, and reading them as such turns a firm's own site into a host nobody
+// owns and takes the address off both its rows.
+//
+// A firm writes its name with a word in front on one page and without it on
+// another — "SIMIE" beside "Groupe SIMIE" — and each writing arrives as its own
+// claimant. So a claimant whose distinctive words all appear in another's is
+// that other one met again rather than somebody new. Read on the words rather
+// than on the letters, because the added word can sit anywhere in the name.
+//
+// A name with no distinctive word in it says nothing about who it is, so it
+// nests into nobody and is counted on its own — the same withholding every
+// reading of a name here makes when it has nothing to read.
+const differentCompanies = (one: HostClaim, other: HostClaim): boolean => {
+	const wordsOf = (claim: HostClaim): ReadonlySet<string> =>
+		new Set(claim.names.flatMap(name => distinctiveWords(name)))
+	const nests = (
+		inner: ReadonlySet<string>,
+		outer: ReadonlySet<string>,
+	): boolean => inner.size > 0 && [...inner].every(word => outer.has(word))
+	const ours = wordsOf(one)
+	const theirs = wordsOf(other)
+	return !nests(ours, theirs) && !nests(theirs, ours)
+}
+
+// Whether the host filed these two apart, which is what a site listing companies
+// does: a trade body gives each member a page of its own ("aemiat.com/e-mora/"
+// beside "aemiat.com/rubio/"). Two claimants on the SAME page are one page
+// written down twice — the ordinary shape of a company met under two names, each
+// row recording the site it publishes — and that is no evidence the host files
+// anybody.
+const filedApart = (one: HostClaim, other: HostClaim): boolean =>
+	one.pages.some(page => !other.pages.includes(page)) ||
+	other.pages.some(page => !one.pages.includes(page))
+
+// Whether a host is filing companies rather than being one company's site: some
+// two of its claimants are different companies AND it gave them different pages.
+const filesSeveralCompanies = (
+	claimants: ReadonlyMap<string, HostClaim>,
+): boolean => {
+	const claims = [...claimants.values()]
+	return claims.some((one, at) =>
+		claims
+			.slice(at + 1)
+			.some(other => differentCompanies(one, other) && filedApart(one, other)),
+	)
+}
+
+// Whether a host plainly belongs to one of the companies claiming it, asked two
+// ways because neither reading contains the other.
+//
+// The host carrying the name is the loose reading: "acme-directory.com" carries
+// "Acme" and belongs to somebody else. It is kept because a wrong yes here only
+// withholds a blank, and a blank costs a real website. A name too short to mean
+// anything is left out of it, or it would quietly switch the rule off for every
+// row on the host.
+//
+// The domain being established as that company's own is the reading the rest of
+// the run uses, and it reaches what the first one cannot: a firm registers the
+// front of its name or the one word people use it by, so "XPO Logistics" is at
+// xpo.com and "Transportes García" at garcia.es — neither of which carries the
+// whole name. Without it, one company met under two names on a domain like that
+// reads as two companies sharing a stranger's host, and both lose a site that
+// really is theirs.
 const hostBelongsTo = (
 	host: string,
-	claimantSpellings: ReadonlyArray<string>,
+	claimantNames: ReadonlyArray<string>,
 ): boolean =>
-	claimantSpellings.some(
-		spelling =>
-			spelling.length >= DISTINCTIVE_NAME_LENGTH &&
-			collapse(host).includes(spelling),
+	claimantNames.some(
+		name =>
+			spellingsWithoutForms(name).some(
+				spelling =>
+					spelling.length >= DISTINCTIVE_NAME_LENGTH &&
+					collapse(host).includes(spelling),
+			) || ownSiteHostVerdict({ name, host }) === 'established',
 	)
 
 type WebsiteVerdict =
@@ -263,23 +360,35 @@ const classifyWebsite = (args: {
 	) {
 		return 'profile_page'
 	}
-	// A host several companies in this answer call their own, and that none of them
-	// is named by. A trade body's member directory gives each member a page at the
-	// top level ("aemiat.com/<member>/"), which the first-segment exemption above
-	// reads as a company describing itself on its own site — right for
-	// "xpo.com/about-xpo", wrong here. What separates the two is not the address but
-	// the companies beside it: one host cannot be four different companies' own
-	// site, and the four names saying so are in the same list.
+	// A host several DIFFERENT companies call their own, and that none of them is
+	// named by. A trade body's member directory gives each member a page at the top
+	// level ("aemiat.com/<member>/"), which the first-segment exemption above reads as a
+	// company describing itself on its own site — right for "xpo.com/about-xpo",
+	// wrong here. What separates the two is not the address but the companies beside
+	// it: one host cannot be four different companies' own site, and a host that is
+	// filing them gives each one a page of its own.
 	//
 	// One of them being named by the host changes the answer completely: the host is
 	// then plainly that company's, and the other rows on it are the same company met
 	// again under its other name — a trade name beside a legal one. Blanking those
 	// would take away the very site that says the two rows are one company.
+	//
+	// The claimants need not have arrived together. A run reads its list several
+	// times and folds the readings into one, so the trade body's two members can
+	// each be alone in the answer they arrive in; what makes them a crowd is the
+	// run having read both, which is what `priorClaims` carries.
+	//
+	// Whose host it is comes from `own-site.ts`, the one answer the rest of the run
+	// uses, with the looser reading beside it — see `hostBelongsTo`. Both only ever
+	// hold this rule back, which is the direction a website check is allowed to be
+	// wrong in.
 	const claimants = hostClaims.get(host)
 	if (
 		claimants !== undefined &&
-		claimants.size > 1 &&
-		![...claimants.values()].some(claimant => hostBelongsTo(host, claimant))
+		filesSeveralCompanies(claimants) &&
+		![...claimants.values()].some(claimant =>
+			hostBelongsTo(host, claimant.names),
+		)
 	) {
 		return 'shared_host'
 	}
@@ -344,6 +453,15 @@ export interface WebsiteGuardResult {
 	 * not be added up as if they were one answer.
 	 */
 	readonly namedNobodyInParticular: number
+	/**
+	 * Who claimed which host — this answer's claims and every earlier call's,
+	 * recorded as claimed and before any rule blanked anything.
+	 *
+	 * Handed back so the next call can be given it, which is what lets the
+	 * shared-host rule weigh two claimants that never appeared in the same
+	 * answer.
+	 */
+	readonly hostClaims: HostClaims
 }
 
 /**
@@ -358,11 +476,21 @@ export interface WebsiteGuardResult {
  * `directorySites` are the hosts the run itself watched behave like a listing. It
  * defaults to none, which costs only that rule: a run that gathered nothing to
  * watch still gets every rule that reads a name and an address.
+ *
+ * `priorClaims` is what earlier calls read — `hostClaims` off their result. It
+ * defaults to none, which is one answer judged on its own. A run that extracts
+ * several times and folds the results together has to pass it, and has to judge
+ * the folded list too: each answer is judged alone and then merged, so a member
+ * page condemned for one company while its neighbour was in another answer is
+ * standing on the list that ships, and no reading of that list can recover the
+ * claim that condemned it. Recorded claims can, because they are taken before
+ * the blanking.
  */
 export const guardCompanyWebsites = (
 	findings: unknown,
 	targetName?: string,
 	directorySites: DirectorySites = new Set(),
+	priorClaims: HostClaims = new Map(),
 ): WebsiteGuardResult => {
 	let blankedNotAnAddress = 0
 	let blankedDirectory = 0
@@ -372,7 +500,7 @@ export const guardCompanyWebsites = (
 	let ownSiteEstablished = 0
 	let ownSiteUnknown = 0
 	let namedNobodyInParticular = 0
-	const hostClaims = collectHostClaims(findings)
+	const hostClaims = collectHostClaims(findings, priorClaims)
 
 	// A name the guard could read, holding no word of the company's own. Counted
 	// as the website is judged rather than by its verdict, because what it records
@@ -485,5 +613,6 @@ export const guardCompanyWebsites = (
 		ownSiteEstablished,
 		ownSiteUnknown,
 		namedNobodyInParticular,
+		hostClaims,
 	}
 }

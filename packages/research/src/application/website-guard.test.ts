@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { mergePerFieldSearch } from './per-field-search'
 import { guardCompanyWebsites } from './website-guard'
 
 // A competitor/prospect entry: a name plus the website the model returned for it.
@@ -359,6 +360,7 @@ describe('guardCompanyWebsites', () => {
 			// WHEN checked — THEN nothing to blank, and it is unchanged. There is no
 			// address to establish anything about either, so neither ownership count
 			// moves: a row with no website is not a row whose website is unvouched for
+			// AND nothing is claimed, since a row with no address claims no host
 			const result = guardCompanyWebsites(findings)
 			expect(result).toEqual({
 				findings,
@@ -370,6 +372,7 @@ describe('guardCompanyWebsites', () => {
 				ownSiteEstablished: 0,
 				ownSiteUnknown: 0,
 				namedNobodyInParticular: 0,
+				hostClaims: new Map(),
 			})
 		})
 
@@ -725,6 +728,78 @@ describe('guardCompanyWebsites', () => {
 			expect(result.blankedSharedHost).toBe(0)
 		})
 
+		it('should stand down for a domain spelling the front of a claimant name', () => {
+			// GIVEN one company met under two names on the domain it registered, which
+			// is the front of one of those names and carries neither of them whole
+			const findings = scan([
+				{ name: 'XPO Logistics', website: 'https://xpo.com' },
+				{ name: 'XPO Iberia', website: 'https://xpo.com/es' },
+			])
+
+			// WHEN checked
+			// THEN both keep it. A firm registers the front of its name or the one word
+			// people use it by, so asking only whether the host carries a name whole
+			// would read a company's own domain as a stranger's and take it from both
+			// rows
+			const result = guardCompanyWebsites(findings)
+			expect(websitesOf(result.findings)).toEqual([
+				'https://xpo.com',
+				'https://xpo.com/es',
+			])
+			expect(result.blankedSharedHost).toBe(0)
+		})
+
+		it('should keep a site claimed by one company written two ways', () => {
+			// GIVEN one firm on its own site, written with a word in front of its name
+			// on one row and without it on the other, on a domain naming a trade
+			// rather than the firm
+			const findings = scan([
+				{ name: 'SIMIE', website: 'https://www.securiteincendie.fr/' },
+				{ name: 'Groupe SIMIE', website: 'https://www.securiteincendie.fr/' },
+			])
+
+			// WHEN checked
+			// THEN both keep it. The rule counts different companies, and these are one
+			// company met twice — nothing about the address says otherwise, and reading
+			// the two writings as two firms would take a company's own site off both of
+			// its rows
+			const result = guardCompanyWebsites(findings)
+			expect(websitesOf(result.findings)).toEqual([
+				'https://www.securiteincendie.fr/',
+				'https://www.securiteincendie.fr/',
+			])
+			expect(result.blankedSharedHost).toBe(0)
+		})
+
+		it('should keep one page two differently-named rows both point at', () => {
+			// GIVEN a firm on the site it publishes, whose domain names the trade it
+			// works in rather than the firm, with a second row naming that trade and
+			// pointing at the very same page
+			const findings = scan([
+				{
+					name: 'France SAV Solaire',
+					website: 'https://www.sav-onduleur-photovoltaique.com',
+				},
+				{
+					name: 'SAV Photovoltaïque',
+					website: 'https://www.sav-onduleur-photovoltaique.com/',
+				},
+			])
+
+			// WHEN checked
+			// THEN both stand. A host that files companies gives each of them a page of
+			// its own; one page written down twice says nothing about who owns the
+			// host, and the two names share no word for the rule to read them as one
+			// company either — so the only thing left is that the site is somebody's
+			// and a blank would take it from them
+			const result = guardCompanyWebsites(findings)
+			expect(websitesOf(result.findings)).toEqual([
+				'https://www.sav-onduleur-photovoltaique.com',
+				'https://www.sav-onduleur-photovoltaique.com/',
+			])
+			expect(result.blankedSharedHost).toBe(0)
+		})
+
 		it('should keep a host only one company in the answer claims', () => {
 			// GIVEN a single company on a host nobody else gives
 			const findings = scan([
@@ -781,6 +856,327 @@ describe('guardCompanyWebsites', () => {
 					.prospects[0]?.website,
 			).toBe('https://acme.es')
 			expect(result.blankedSharedHost).toBe(0)
+		})
+	})
+
+	describe('when the run has read more than one answer', () => {
+		it('should blank a member page another company claimed in an earlier answer', () => {
+			// GIVEN the sequence a run really runs: a first answer holding one member
+			// of a trade body, then a later round holding two, each answer checked on
+			// its own and the two folded together afterwards
+			const held = guardCompanyWebsites(
+				cited([
+					{ name: 'Electricidad Mora', website: 'https://aemiat.com/e-mora/' },
+				]),
+			)
+			const round = guardCompanyWebsites(
+				cited([
+					{ name: 'Electricidad Mora', website: 'https://aemiat.com/e-mora/' },
+					{ name: 'Instalaciones Rubio', website: 'https://aemiat.com/rubio/' },
+				]),
+				undefined,
+				new Set(),
+				held.hostClaims,
+			)
+			const folded = mergePerFieldSearch(
+				held.findings,
+				round.findings,
+				'prospect_scan_v1',
+			)
+
+			// WHEN the folded list is checked against everything the run has read
+			const judged = guardCompanyWebsites(
+				folded.findings,
+				undefined,
+				new Set(),
+				round.hostClaims,
+			)
+
+			// THEN nobody keeps the trade body's host. The first answer had one
+			// claimant and kept the address; the round had two and blanked both, which
+			// is what leaves one row standing on it in the folded list. Only the claims
+			// the run carried put the two companies together again
+			expect(prospectWebsites(judged.findings)).toEqual([undefined, undefined])
+			expect(judged.blankedSharedHost).toBe(1)
+		})
+
+		it('should hand back what it read, so a later answer can be judged against it', () => {
+			// GIVEN one answer holding a single company
+			const findings = scan([
+				{ name: 'Electricidad Mora', website: 'https://aemiat.com/e-mora/' },
+			])
+
+			// WHEN checked
+			const result = guardCompanyWebsites(findings)
+
+			// THEN the claim it read comes back with it, filed under the host, so the
+			// next answer is weighed against a company that is not in it
+			expect([...(result.hostClaims.get('aemiat.com')?.keys() ?? [])]).toEqual([
+				'electricidadmora',
+			])
+		})
+
+		it('should record a claim before the rule blanks it', () => {
+			// GIVEN one answer holding both members, which the rule condemns outright
+			const findings = scan([
+				{ name: 'Electricidad Mora', website: 'https://aemiat.com/e-mora/' },
+				{ name: 'Instalaciones Rubio', website: 'https://aemiat.com/rubio/' },
+			])
+
+			// WHEN checked
+			const result = guardCompanyWebsites(findings)
+
+			// THEN both addresses go — AND both claims survive in what is handed back.
+			// Reading the answer it produced would find one claimant or none, so the
+			// evidence has to be taken before the blanking or a later answer inherits
+			// nothing
+			expect(websitesOf(result.findings)).toEqual([undefined, undefined])
+			expect([...(result.hostClaims.get('aemiat.com')?.keys() ?? [])]).toEqual([
+				'electricidadmora',
+				'instalacionesrubio',
+			])
+		})
+
+		it('should keep a site whose host an earlier answer named its claimant by', () => {
+			// GIVEN one company met under its trade name first, on the site that name
+			// is in, and under its legal name in a later answer
+			const first = guardCompanyWebsites(
+				scan([{ name: 'SICE', website: 'https://www.sice.com' }]),
+			)
+
+			// WHEN the later answer is checked against what the first one read
+			const later = guardCompanyWebsites(
+				scan([
+					{
+						name: 'Sociedad Ibérica de Construcciones Eléctricas',
+						website: 'https://sice.com/es',
+					},
+				]),
+				undefined,
+				new Set(),
+				first.hostClaims,
+			)
+
+			// THEN the address stands. Carrying the claims makes the two rows two
+			// claimants on one host for the first time — and the host plainly belongs
+			// to one of them, which is the whole reason this rule stands down. Blanking
+			// here would take away the only thing saying the two rows are one company
+			expect(websitesOf(later.findings)).toEqual(['https://sice.com/es'])
+			expect(later.blankedSharedHost).toBe(0)
+		})
+
+		it('should keep a site whose host only a later answer names its claimant by', () => {
+			// GIVEN the same company, met the other way round: the legal name that
+			// spells nothing arrives first, the trade name the domain carries second
+			const first = guardCompanyWebsites(
+				scan([
+					{
+						name: 'Sociedad Ibérica de Construcciones Eléctricas',
+						website: 'https://sice.com/es',
+					},
+				]),
+			)
+
+			// WHEN the answer holding the trade name is checked against it
+			const later = guardCompanyWebsites(
+				scan([{ name: 'SICE', website: 'https://www.sice.com' }]),
+				undefined,
+				new Set(),
+				first.hostClaims,
+			)
+
+			// THEN it stands too: which answer named the host is not what settles it,
+			// so the rule cannot come out differently for the order the rounds ran in
+			expect(websitesOf(later.findings)).toEqual(['https://www.sice.com'])
+			expect(later.blankedSharedHost).toBe(0)
+		})
+
+		it('should keep a domain spelling a claimant name front across answers', () => {
+			// GIVEN one company met under one name first and under another in a later
+			// answer, both on the domain that is the front of the first name
+			const first = guardCompanyWebsites(
+				scan([{ name: 'XPO Logistics', website: 'https://xpo.com' }]),
+			)
+
+			// WHEN the later answer is checked against what the first read
+			const later = guardCompanyWebsites(
+				scan([{ name: 'XPO Iberia', website: 'https://xpo.com/es' }]),
+				undefined,
+				new Set(),
+				first.hostClaims,
+			)
+
+			// THEN it stands. Carrying the claims is what puts two names on this host
+			// for the first time, so the reading that recognises an abbreviated domain
+			// as its owner's has to hold across answers too, or the fix for a trade
+			// body's page is paid for with real company sites
+			expect(websitesOf(later.findings)).toEqual(['https://xpo.com/es'])
+			expect(later.blankedSharedHost).toBe(0)
+		})
+
+		it('should keep a site one company claims two ways across answers', () => {
+			// GIVEN a firm met under its short name first and with a word in front of
+			// it in a later answer, on the same site both times
+			const first = guardCompanyWebsites(
+				scan([{ name: 'SIMIE', website: 'https://www.securiteincendie.fr/' }]),
+			)
+
+			// WHEN the later answer is checked against what the first read
+			const later = guardCompanyWebsites(
+				scan([
+					{ name: 'Groupe SIMIE', website: 'https://www.securiteincendie.fr/' },
+				]),
+				undefined,
+				new Set(),
+				first.hostClaims,
+			)
+
+			// THEN it stands. Carrying the claims is what brings the two writings
+			// together for the first time, so counting companies rather than writings
+			// has to hold across answers too
+			expect(websitesOf(later.findings)).toEqual([
+				'https://www.securiteincendie.fr/',
+			])
+			expect(later.blankedSharedHost).toBe(0)
+		})
+
+		it('should not make a crowd of one company met under two spellings', () => {
+			// GIVEN one company on a host that does not name it, written with the
+			// Catalan geminate mark in the first answer and without it in the second
+			const first = guardCompanyWebsites(
+				scan([
+					{ name: 'Instal·lacions Puig', website: 'https://gremi.cat/puig/' },
+				]),
+			)
+
+			// WHEN the second answer is checked against what the first read
+			const later = guardCompanyWebsites(
+				scan([
+					{ name: 'Instal.lacions Puig', website: 'https://gremi.cat/puig/' },
+				]),
+				undefined,
+				new Set(),
+				first.hostClaims,
+			)
+
+			// THEN the address stands. A company is held under the one name it is
+			// written by however an answer spells it, so re-reading the same company
+			// every round can never make it two companies claiming one host
+			expect(websitesOf(later.findings)).toEqual(['https://gremi.cat/puig/'])
+			expect(later.blankedSharedHost).toBe(0)
+		})
+
+		it('should not count a name with nothing distinctive as a claimant', () => {
+			// GIVEN a row whose name is nothing but a legal form, on a host a real
+			// company claims in a later answer
+			const first = guardCompanyWebsites(
+				scan([{ name: 'SL', website: 'https://gremi.cat/anon/' }]),
+			)
+
+			// WHEN the later answer is checked against it
+			const later = guardCompanyWebsites(
+				scan([
+					{ name: 'Electricidad Mora', website: 'https://gremi.cat/mora/' },
+				]),
+				undefined,
+				new Set(),
+				first.hostClaims,
+			)
+
+			// THEN the address stands: a name nothing can be read from says nothing
+			// about who a host belongs to, so it must not be carried as a claimant and
+			// turn one company into two
+			expect(websitesOf(later.findings)).toEqual(['https://gremi.cat/mora/'])
+			expect(later.blankedSharedHost).toBe(0)
+		})
+
+		it('should leave a host alone when only one company ever claimed it', () => {
+			// GIVEN the same single company read again in a later answer
+			const first = guardCompanyWebsites(
+				scan([
+					{ name: 'Electricidad Mora', website: 'https://aemiat.com/e-mora/' },
+				]),
+			)
+
+			// WHEN the later answer is checked against what the first read
+			const later = guardCompanyWebsites(
+				scan([
+					{ name: 'Electricidad Mora', website: 'https://aemiat.com/e-mora/' },
+				]),
+				undefined,
+				new Set(),
+				first.hostClaims,
+			)
+
+			// THEN it stands. Carrying the claims counts companies, never readings, so
+			// a run that reads the same company every round does not talk itself into
+			// blanking its address
+			expect(websitesOf(later.findings)).toEqual(['https://aemiat.com/e-mora/'])
+			expect(later.blankedSharedHost).toBe(0)
+		})
+
+		it('should not carry a person website in a proposal into what it read', () => {
+			// GIVEN a contact proposal naming a host, read before an answer that puts a
+			// second company on it
+			const first = guardCompanyWebsites({
+				prospects: [
+					{ name: 'Acme Instal', website: 'https://gremi.cat/acme/' },
+				],
+				proposed_updates: [
+					{
+						operation: 'create',
+						fields: { name: 'Ada Lovelace', website: 'https://gremi.cat/ada/' },
+					},
+				],
+			})
+
+			// WHEN the later answer is checked against it
+			const later = guardCompanyWebsites(
+				scan([{ name: 'Acme Instal', website: 'https://gremi.cat/acme/' }]),
+				undefined,
+				new Set(),
+				first.hostClaims,
+			)
+
+			// THEN the company keeps its address: the proposal subtree is skipped when
+			// the claims are gathered, so a person cannot follow the run into a later
+			// round and cost a company its site there
+			expect(websitesOf(later.findings)).toEqual(['https://gremi.cat/acme/'])
+			expect(later.blankedSharedHost).toBe(0)
+		})
+
+		it('should judge an answer the same way when nothing was read before it', () => {
+			// GIVEN one answer with a shared host, a listing shape and an own site in it
+			const findings = scan([
+				{ name: 'Electricidad Mora', website: 'https://aemiat.com/e-mora/' },
+				{ name: 'Instalaciones Rubio', website: 'https://aemiat.com/rubio/' },
+				{ name: 'Acme', website: 'https://directorio.es/empresa/acme' },
+				{
+					name: 'XPO Logistics',
+					website: 'https://xpo.com/about-xpo-logistics',
+				},
+			])
+
+			// WHEN checked with no earlier claims, either left out or handed in empty
+			const withoutPrior = guardCompanyWebsites(findings)
+			const withEmptyPrior = guardCompanyWebsites(
+				findings,
+				undefined,
+				new Set(),
+				new Map(),
+			)
+
+			// THEN both read the answer identically: with nothing carried in, an
+			// answer is judged on itself alone
+			expect(websitesOf(withEmptyPrior.findings)).toEqual(
+				websitesOf(withoutPrior.findings),
+			)
+			expect(withEmptyPrior.blankedSharedHost).toBe(
+				withoutPrior.blankedSharedHost,
+			)
+			expect(withEmptyPrior.blankedProfilePage).toBe(
+				withoutPrior.blankedProfilePage,
+			)
 		})
 	})
 
