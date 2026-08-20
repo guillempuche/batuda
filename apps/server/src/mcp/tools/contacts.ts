@@ -428,6 +428,15 @@ export const ContactHandlersLive = ContactTools.toLayer(
 								),
 							)
 					}
+					// Vouching is the documented way past a held-back send, so a call
+					// that names no channel must say so rather than hand back a normal
+					// list the caller reads as success before being stopped again.
+					if (params.action === 'vouch' && params.channel_id === undefined)
+						return yield* Effect.die(
+							new ToolMessage(
+								'channel_id is required to vouch for an address — one from manage_contact_channels(action:"list"), or the channel_id named in the message that stopped the send.',
+							),
+						)
 					if (params.action === 'vouch' && params.channel_id !== undefined) {
 						const outcome = yield* vouchForChannel(
 							sql,
@@ -458,7 +467,9 @@ export const ContactHandlersLive = ContactTools.toLayer(
 					if (params.action === 'unvouch') {
 						if (params.channel_id === undefined)
 							return yield* Effect.die(
-								new ToolMessage('channel_id is required to take back a vouch.'),
+								new ToolMessage(
+									'channel_id is required to take back a vouch — one from manage_contact_channels(action:"list").',
+								),
 							)
 						const outcome = yield* withdrawVouch(
 							sql,
