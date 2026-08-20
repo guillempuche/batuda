@@ -515,3 +515,46 @@ describe('a verdict that was written down rather than found out', () => {
 		})
 	})
 })
+
+describe('vouching for an address without saying which one', () => {
+	describe('when the call names no channel', () => {
+		it('should refuse and name where to find one', async () => {
+			// GIVEN vouching is the documented way past a send held back by a
+			// verdict, and a caller that has not said which address it means
+			// WHEN it vouches with no channel_id
+			const refusal = await refusalFrom(
+				manageRaw({ action: 'vouch', contact_id: pep }),
+			)
+
+			// THEN it is turned away, and told where a channel_id comes from.
+			// Handing back the ordinary list instead reads as success: the caller
+			// sends again, is stopped by the same verdict, and vouches again —
+			// the loop this whole surface exists to avoid
+			expect(refusal).toContain('channel_id is required')
+			expect(refusal).toContain('manage_contact_channels')
+		})
+
+		it('should leave every address exactly as vouched-for as it was', async () => {
+			// GIVEN what stands behind the person's addresses now. A vouch is
+			// recorded as status='valid', which the tool's own shape does not
+			// carry, so this reads the column the vouch would have written.
+			const vouchedFor = async (): Promise<ReadonlyArray<string>> => {
+				const r = await pool.query<{ address: string }>(
+					`SELECT address FROM channels
+					 WHERE subject_table = 'contacts' AND subject_id = $1
+					   AND status = 'valid' ORDER BY address`,
+					[pep],
+				)
+				return r.rows.map(row => row.address)
+			}
+			const before = await vouchedFor()
+
+			// WHEN a vouch arrives naming no channel
+			await refusalFrom(manageRaw({ action: 'vouch', contact_id: pep }))
+
+			// THEN nothing was vouched for on the way past — a refusal that had
+			// already written something would be worse than the loop
+			expect(await vouchedFor()).toEqual(before)
+		})
+	})
+})

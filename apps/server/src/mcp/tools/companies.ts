@@ -676,7 +676,9 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 					if (params.action === 'unvouch') {
 						if (params.channel_id === undefined)
 							return yield* Effect.die(
-								new ToolMessage('channel_id is required to take back a vouch.'),
+								new ToolMessage(
+									'channel_id is required to take back a vouch — one from manage_company_channels(action:"list").',
+								),
 							)
 						const outcome = yield* withdrawVouch(
 							sql,
@@ -703,7 +705,7 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 					if (params.action === 'vouch' && params.channel_id === undefined)
 						return yield* Effect.die(
 							new ToolMessage(
-								'channel_id is required to vouch for an address.',
+								'channel_id is required to vouch for an address — one from manage_company_channels(action:"list"), or the channel_id named in the message that stopped the send.',
 							),
 						)
 					if (params.action === 'vouch' && params.channel_id !== undefined) {
