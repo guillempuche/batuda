@@ -174,17 +174,13 @@ export class EnvVars extends Context.Service<EnvVars>()('EnvVars', {
 			)
 		}
 
-		// S3-compatible object storage. Same code path serves MinIO (local
-		// dev) and Cloudflare R2 (prod) — only the endpoint/credentials
-		// change. All required, no defaults: storage credentials must be
-		// configured explicitly per environment.
-		const STORAGE_ENDPOINT = yield* Config.string('STORAGE_ENDPOINT')
-		const STORAGE_REGION = yield* Config.string('STORAGE_REGION')
-		const STORAGE_ACCESS_KEY_ID = yield* Config.string('STORAGE_ACCESS_KEY_ID')
-		const STORAGE_SECRET_ACCESS_KEY = yield* Config.redacted(
-			'STORAGE_SECRET_ACCESS_KEY',
-		)
-		const STORAGE_BUCKET = yield* Config.string('STORAGE_BUCKET')
+		// Settings that belong to one layer are read by that layer instead of
+		// being gathered here: where the object store is (s3-storage-provider.ts),
+		// the key that unlocks a stored mailbox password (credential-crypto.ts),
+		// and what a research run may spend (research-defaults.ts). What is left
+		// here is what the web server itself needs. The split is why the local
+		// command-line MCP server, which has no port and no address, can start:
+		// it would otherwise have had to supply both to open a mailbox.
 
 		// Local-inbox is the only provider during the BYO-mailbox migration;
 		// real outbound SMTP / inbound IMAP transport ships in the mail-worker
@@ -194,13 +190,6 @@ export class EnvVars extends Context.Service<EnvVars>()('EnvVars', {
 			Schema.Literals(['local-inbox']),
 			'EMAIL_PROVIDER',
 		)
-		// AES-256-GCM master key for encrypting per-inbox IMAP/SMTP
-		// credentials at rest. Base64-encoded 32 bytes. Per-inbox subkeys
-		// are derived via HKDF-SHA256 with the inbox id as `info`, so a
-		// row-level leak doesn't compromise other rows without this key.
-		// Required, no default — boot fails rather than ship plaintext.
-		// Generate with: node -e "console.log(crypto.randomBytes(32).toString('base64'))"
-		const EMAIL_CREDENTIAL_KEY = yield* Config.redacted('EMAIL_CREDENTIAL_KEY')
 
 		// No default — the developer must explicitly opt into a geocoding
 		// provider. Nominatim is the only option today; the variable is
@@ -209,23 +198,6 @@ export class EnvVars extends Context.Service<EnvVars>()('EnvVars', {
 			Schema.Literals(['nominatim']),
 			'GEOCODER_PROVIDER',
 		)
-
-		// Budget defaults (system-level)
-		const RESEARCH_DEFAULT_BUDGET_CENTS = yield* Config.int(
-			'RESEARCH_DEFAULT_BUDGET_CENTS',
-		).pipe(Config.withDefault(100))
-		const RESEARCH_DEFAULT_PAID_BUDGET_CENTS = yield* Config.int(
-			'RESEARCH_DEFAULT_PAID_BUDGET_CENTS',
-		).pipe(Config.withDefault(500))
-		const RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS = yield* Config.int(
-			'RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS',
-		).pipe(Config.withDefault(200))
-		const RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS = yield* Config.int(
-			'RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS',
-		).pipe(Config.withDefault(2000))
-		const RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS = yield* Config.int(
-			'RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS',
-		).pipe(Config.withDefault(10000))
 
 		// Concurrency and safety
 		const RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL = yield* Config.int(
@@ -251,19 +223,8 @@ export class EnvVars extends Context.Service<EnvVars>()('EnvVars', {
 			API_KEY_RATE_LIMIT_WINDOW_SECONDS,
 			ALLOWED_ORIGINS,
 			APP_PUBLIC_URL,
-			STORAGE_ENDPOINT,
-			STORAGE_REGION,
-			STORAGE_ACCESS_KEY_ID,
-			STORAGE_SECRET_ACCESS_KEY,
-			STORAGE_BUCKET,
 			EMAIL_PROVIDER,
-			EMAIL_CREDENTIAL_KEY,
 			GEOCODER_PROVIDER,
-			RESEARCH_DEFAULT_BUDGET_CENTS,
-			RESEARCH_DEFAULT_PAID_BUDGET_CENTS,
-			RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS,
-			RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS,
-			RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS,
 			RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL,
 			RESEARCH_MAX_CONCURRENCY_FANOUT,
 		} as const

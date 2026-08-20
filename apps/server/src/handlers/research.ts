@@ -17,13 +17,9 @@ import {
 	isTerminalResearchStatus,
 } from '@batuda/domain'
 import { resolveInstructions, resolveStackRef } from '@batuda/instructions'
-import {
-	type CreateResearchInput,
-	ResearchService,
-	type SystemDefaults,
-} from '@batuda/research'
+import { type CreateResearchInput, ResearchService } from '@batuda/research'
 
-import { EnvVars } from '../lib/env'
+import { ResearchDefaults } from '../lib/research-defaults'
 import { CompanyService } from '../services/companies'
 import { Geocoder } from '../services/geocoder'
 import {
@@ -58,7 +54,7 @@ export const ResearchLive = HttpApiBuilder.group(
 	handlers =>
 		Effect.gen(function* () {
 			const svc = yield* ResearchService
-			const env = yield* EnvVars
+			const systemDefaults = yield* ResearchDefaults
 			// Applying a proposed update writes a CRM row and may fork an
 			// org-scoped re-geocode; resolve those services here so both the apply
 			// and reject handlers can provide them to the shared resolver.
@@ -91,14 +87,6 @@ export const ResearchLive = HttpApiBuilder.group(
 						e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
 					),
 				)
-
-			const systemDefaults: SystemDefaults = {
-				budgetCents: env.RESEARCH_DEFAULT_BUDGET_CENTS,
-				paidBudgetCents: env.RESEARCH_DEFAULT_PAID_BUDGET_CENTS,
-				autoApprovePaidCents: env.RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS,
-				paidMonthlyCapCents: env.RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS,
-				hardCeiling: env.RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS,
-			}
 
 			return handlers
 				.handle('create', _ =>

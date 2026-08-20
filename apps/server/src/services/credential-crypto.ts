@@ -6,9 +6,7 @@ import {
 	randomBytes,
 } from 'node:crypto'
 
-import { Context, Effect, Layer, Redacted } from 'effect'
-
-import { EnvVars } from '../lib/env'
+import { Config, Context, Effect, Layer, Redacted } from 'effect'
 
 export interface EncryptedCredential {
 	readonly ciphertext: Uint8Array
@@ -68,11 +66,11 @@ export class CredentialCrypto extends Context.Service<CredentialCrypto>()(
 	'CredentialCrypto',
 	{
 		make: Effect.gen(function* () {
-			const env = yield* EnvVars
-			const masterKey = Buffer.from(
-				Redacted.value(env.EMAIL_CREDENTIAL_KEY),
-				'base64',
-			)
+			// Read here rather than from the server-wide settings, the way the
+			// database connection reads its own url — nothing else uses it.
+			// Required, no default: boot fails rather than ship plaintext.
+			const key = yield* Config.redacted('EMAIL_CREDENTIAL_KEY')
+			const masterKey = Buffer.from(Redacted.value(key), 'base64')
 			if (masterKey.length !== 32) {
 				return yield* Effect.die(
 					new Error(

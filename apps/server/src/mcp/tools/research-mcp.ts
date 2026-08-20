@@ -13,10 +13,9 @@ import {
 	type CreateResearchInput,
 	ResearchService,
 	type SubjectUnavailable,
-	type SystemDefaults,
 } from '@batuda/research'
 
-import { EnvVars } from '../../lib/env'
+import { ResearchDefaults } from '../../lib/research-defaults'
 import { detachFromTransaction, enterOrgScope } from '../../middleware/org'
 import { RESEARCH_ID_SOURCE } from './_ids'
 import {
@@ -262,15 +261,7 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 	Effect.gen(function* () {
 		const svc = yield* ResearchService
 		const sql = yield* SqlClient.SqlClient
-		const env = yield* EnvVars
-
-		const systemDefaults: SystemDefaults = {
-			budgetCents: env.RESEARCH_DEFAULT_BUDGET_CENTS,
-			paidBudgetCents: env.RESEARCH_DEFAULT_PAID_BUDGET_CENTS,
-			autoApprovePaidCents: env.RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS,
-			paidMonthlyCapCents: env.RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS,
-			hardCeiling: env.RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS,
-		}
+		const systemDefaults = yield* ResearchDefaults
 
 		// Resolve a per-run override (an optional named stack, plus template names
 		// or ids) to the effective instruction stack, or a clarification to hand

@@ -136,6 +136,7 @@ import {
 	ExtractLanguageModel,
 	MapProvider,
 	RegistryRouter,
+	ResearchDispatch,
 	ResearchEventSink,
 	ResearchRunContext,
 	ScrapeProvider,
@@ -6128,74 +6129,83 @@ export class ResearchService extends Context.Service<ResearchService>()(
 			// clean services — never a request's committed connection. Runs fork into
 			// the layer scope so a shutdown interrupts them; the periodic sweep then
 			// reclaims their rows. A failure in any is logged, not fatal.
+			//
+			// Skipped by a process that only answers questions about runs — see
+			// ResearchDispatch. Everything below this block still works there: a run
+			// it creates is left queued for whichever process does dispatch.
 			const layerScope = yield* Effect.scope
-			yield* reofferQueued.pipe(
-				Effect.catchCause(cause =>
-					Effect.logError('research.dispatch: reconcile failed').pipe(
-						Effect.annotateLogs({
-							event: 'research.dispatch.reconcile_failed',
-							cause: Cause.pretty(cause),
-						}),
+			const dispatches = yield* ResearchDispatch
+			if (dispatches) {
+				yield* reofferQueued.pipe(
+					Effect.catchCause(cause =>
+						Effect.logError('research.dispatch: reconcile failed').pipe(
+							Effect.annotateLogs({
+								event: 'research.dispatch.reconcile_failed',
+								cause: Cause.pretty(cause),
+							}),
+						),
 					),
-				),
-				Effect.repeat(Schedule.spaced('2 seconds')),
-				Effect.forkScoped,
-			)
-			yield* Effect.gen(function* () {
-				const swept = yield* sweepOrphanRuns(ORPHAN_AGE_SECONDS)
-				if (swept.running.length > 0) {
-					yield* Effect.logWarning(
-						'research.sweepOrphans: failed runs orphaned mid-run',
-					).pipe(
-						Effect.annotateLogs({
-							event: 'research.orphans.swept',
-							running_count: swept.running.length,
-							running_ids: swept.running.map(r => r.id),
-						}),
-					)
-				}
-			}).pipe(
-				Effect.catchCause(cause =>
-					Effect.logError('research.dispatch: sweep failed').pipe(
-						Effect.annotateLogs({
-							event: 'research.dispatch.sweep_failed',
-							cause: Cause.pretty(cause),
-						}),
-					),
-				),
-				Effect.repeat(Schedule.spaced(`${orphanSweepIntervalSeconds} seconds`)),
-				Effect.forkScoped,
-			)
-			yield* Queue.take(dispatch).pipe(
-				Effect.flatMap(({ researchId, userId }) =>
-					Effect.gen(function* () {
-						// Skip a run already in flight: the reconcile re-offers queued
-						// rows, so the same run can arrive twice. (The guarded claim is
-						// the final backstop; this just avoids a redundant fiber.)
-						const inFlight = yield* Ref.get(activeFibers)
-						if (HashMap.has(inFlight, researchId)) return
-						const fiber = yield* fiberSem
-							.withPermit(userId)(runFiber(researchId, userId))
-							.pipe(
-								Effect.ensuring(cleanupRun(researchId)),
-								Effect.forkIn(layerScope),
-							)
-						yield* Ref.update(activeFibers, m =>
-							HashMap.set(m, researchId, fiber),
+					Effect.repeat(Schedule.spaced('2 seconds')),
+					Effect.forkScoped,
+				)
+				yield* Effect.gen(function* () {
+					const swept = yield* sweepOrphanRuns(ORPHAN_AGE_SECONDS)
+					if (swept.running.length > 0) {
+						yield* Effect.logWarning(
+							'research.sweepOrphans: failed runs orphaned mid-run',
+						).pipe(
+							Effect.annotateLogs({
+								event: 'research.orphans.swept',
+								running_count: swept.running.length,
+								running_ids: swept.running.map(r => r.id),
+							}),
 						)
-					}),
-				),
-				Effect.catchCause(cause =>
-					Effect.logError('research.dispatch: failed to start run').pipe(
-						Effect.annotateLogs({
-							event: 'research.dispatch.start_failed',
-							cause: Cause.pretty(cause),
+					}
+				}).pipe(
+					Effect.catchCause(cause =>
+						Effect.logError('research.dispatch: sweep failed').pipe(
+							Effect.annotateLogs({
+								event: 'research.dispatch.sweep_failed',
+								cause: Cause.pretty(cause),
+							}),
+						),
+					),
+					Effect.repeat(
+						Schedule.spaced(`${orphanSweepIntervalSeconds} seconds`),
+					),
+					Effect.forkScoped,
+				)
+				yield* Queue.take(dispatch).pipe(
+					Effect.flatMap(({ researchId, userId }) =>
+						Effect.gen(function* () {
+							// Skip a run already in flight: the reconcile re-offers queued
+							// rows, so the same run can arrive twice. (The guarded claim is
+							// the final backstop; this just avoids a redundant fiber.)
+							const inFlight = yield* Ref.get(activeFibers)
+							if (HashMap.has(inFlight, researchId)) return
+							const fiber = yield* fiberSem
+								.withPermit(userId)(runFiber(researchId, userId))
+								.pipe(
+									Effect.ensuring(cleanupRun(researchId)),
+									Effect.forkIn(layerScope),
+								)
+							yield* Ref.update(activeFibers, m =>
+								HashMap.set(m, researchId, fiber),
+							)
 						}),
 					),
-				),
-				Effect.forever,
-				Effect.forkScoped,
-			)
+					Effect.catchCause(cause =>
+						Effect.logError('research.dispatch: failed to start run').pipe(
+							Effect.annotateLogs({
+								event: 'research.dispatch.start_failed',
+								cause: Cause.pretty(cause),
+							}),
+						),
+					),
+					Effect.forever,
+					Effect.forkScoped,
+				)
+			}
 
 			return {
 				/** Create a research run, enqueue it, and return the run id. */
