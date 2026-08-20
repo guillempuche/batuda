@@ -51,8 +51,13 @@ interface Org {
 interface Scenario {
 	/** Page text the one "fetched" search result carries. */
 	readonly evidence: string
-	/** Structured findings the extractor returns on every call. */
-	readonly findings: Record<string, unknown>
+	/**
+	 * Structured findings the extractor returns, one entry per extraction in the
+	 * order they are asked for; the last entry answers every extraction after it.
+	 * A list rather than one answer because a scan pinned to a company extracts
+	 * twice, and a case about the two disagreeing has to be able to say so.
+	 */
+	readonly findings: ReadonlyArray<Record<string, unknown>>
 	/**
 	 * What the splitter says the request asks for. Absent means the request named
 	 * one kind of company, which is what every scan here but the coverage one is.
@@ -131,6 +136,14 @@ const SPLITTER_MARKER = 'kinds of company it asks for'
 // splitter" rather than as a puzzling status somewhere downstream.
 let splitterCalls = 0
 
+// Answers the extract tier gave that were not the splitter. On the scans below
+// that is one per extraction, which is what tells an anchored scan (it extracts
+// again in phase 2) from an open-ended one (it reuses phase 1's) — but the same
+// tier also answers the rescues and the critic, so every case pins this count.
+// An extra caller then fails here, loudly, instead of quietly handing the next
+// scripted answer to the wrong extraction.
+let extractionCalls = 0
+
 const extractLlm: LanguageModel.Service = {
 	generateText: () => Effect.succeed({ text: '', content: [], usage }) as never,
 	generateObject: ((options: { readonly prompt?: unknown }) =>
@@ -138,19 +151,37 @@ const extractLlm: LanguageModel.Service = {
 			const isSplitter =
 				typeof options.prompt === 'string' &&
 				options.prompt.includes(SPLITTER_MARKER)
-			if (isSplitter) splitterCalls++
+			if (isSplitter) {
+				splitterCalls++
+				return { usage, value: { parts: scenario.parts ?? [] } }
+			}
+			extractionCalls++
+			// Past the end of the list, the last answer stands — a case that does not
+			// care how many extractions ran gives one answer and gets it every time.
+			// Extractions are issued one at a time, so the count picks the answer the
+			// case scripted for this point in the run.
 			return {
 				usage,
-				value: isSplitter ? { parts: scenario.parts ?? [] } : scenario.findings,
+				value:
+					scenario.findings[
+						Math.min(extractionCalls - 1, scenario.findings.length - 1)
+					] ?? {},
 			}
 		})) as never,
 	streamText: () =>
 		Stream.succeed({ type: 'text-delta' as const, delta: '' }) as never,
 }
 
+// What the writer was told to close the brief with. A case asserts on it,
+// because the shortfall paragraph is the half of this a person actually reads.
+let briefPrompt = ''
+
 const writerLlm: LanguageModel.Service = {
-	generateText: () =>
-		Effect.succeed({ text: '## Scan brief', content: [], usage }) as never,
+	generateText: ((options: { readonly prompt?: unknown }) =>
+		Effect.sync(() => {
+			if (typeof options.prompt === 'string') briefPrompt = options.prompt
+			return { text: '## Scan brief', content: [], usage }
+		})) as never,
 	generateObject: () => Effect.succeed({ usage, value: {} }) as never,
 	streamText: () =>
 		Stream.succeed({ type: 'text-delta' as const, delta: '' }) as never,
@@ -229,6 +260,9 @@ const createdRunIds: string[] = []
 interface StoredCoverage {
 	readonly covered?: ReadonlyArray<string>
 	readonly uncovered?: ReadonlyArray<string>
+	readonly unsearched?: ReadonlyArray<string>
+	readonly thought_answered?: ReadonlyArray<string>
+	readonly stopped_because?: string | null
 }
 
 // Run one scan to its terminal state and report how it finished.
@@ -243,10 +277,14 @@ const runScan = async (args: {
 	covering: boolean
 	coverage: StoredCoverage | undefined
 	splitterAsked: boolean
+	extractions: number
+	briefPrompt: string
 }> => {
 	scenario = args.scenario
 	firedEvents = []
 	splitterCalls = 0
+	extractionCalls = 0
+	briefPrompt = ''
 	return runtime.runPromise(
 		Effect.gen(function* () {
 			const svc = yield* ResearchService
@@ -305,6 +343,8 @@ const runScan = async (args: {
 				covering: firedEvents.includes('research.covering'),
 				coverage: quality?.coverage,
 				splitterAsked: splitterCalls > 0,
+				extractions: extractionCalls,
+				briefPrompt,
 			}
 		}),
 	)
@@ -376,20 +416,22 @@ describe('what a discovery scan reports about itself', () => {
 				query: 'Find midsize US freight brokerage prospects',
 				scenario: {
 					evidence: 'A directory listing of US freight brokerage firms.',
-					findings: {
-						prospects: [
-							{
-								name: 'Ridgeline Freight',
-								why_relevant: 'Midsize US broker',
-								citations: [],
-							},
-							{
-								name: 'Copperline Logistics',
-								why_relevant: 'Midsize US broker',
-								citations: [],
-							},
-						],
-					},
+					findings: [
+						{
+							prospects: [
+								{
+									name: 'Ridgeline Freight',
+									why_relevant: 'Midsize US broker',
+									citations: [],
+								},
+								{
+									name: 'Copperline Logistics',
+									why_relevant: 'Midsize US broker',
+									citations: [],
+								},
+							],
+						},
+					],
 				},
 			})
 
@@ -420,13 +462,15 @@ describe('what a discovery scan reports about itself', () => {
 						{ label: 'fontanería', terms: ['fontanero', 'plumbing'] },
 						{ label: 'ascensores', terms: ['elevador', 'lift'] },
 					],
-					findings: {
-						prospects: Array.from({ length: 6 }, (_, index) => ({
-							name: `Electro Instal ${index}`,
-							why_relevant: 'Instalaciones eléctricas industriales',
-							citations: [],
-						})),
-					},
+					findings: [
+						{
+							prospects: Array.from({ length: 6 }, (_, index) => ({
+								name: `Electro Instal ${index}`,
+								why_relevant: 'Instalaciones eléctricas industriales',
+								citations: [],
+							})),
+						},
+					],
 				},
 			})
 
@@ -442,6 +486,10 @@ describe('what a discovery scan reports about itself', () => {
 			//   search again to learn what is missing
 			expect(result.coverage?.covered).toEqual(['instalaciones eléctricas'])
 			expect(result.coverage?.uncovered).toEqual(['fontanería', 'ascensores'])
+			// AND neither is named as unsearched: the run went out for both of them
+			//   and came back with nobody, which is a different answer from never
+			//   having looked
+			expect(result.coverage?.unsearched).toEqual([])
 		}, 60_000)
 	})
 
@@ -457,20 +505,22 @@ describe('what a discovery scan reports about itself', () => {
 						{ label: 'instalaciones eléctricas', terms: ['electricista'] },
 						{ label: 'fontanería', terms: ['fontanero'] },
 					],
-					findings: {
-						prospects: [
-							...Array.from({ length: 3 }, (_, index) => ({
-								name: `Electro Instal ${index}`,
-								why_relevant: 'Instalaciones eléctricas industriales',
-								citations: [],
-							})),
-							...Array.from({ length: 3 }, (_, index) => ({
-								name: `Fontaneria Vall ${index}`,
-								why_relevant: 'Fontanería y reformas de baños',
-								citations: [],
-							})),
-						],
-					},
+					findings: [
+						{
+							prospects: [
+								...Array.from({ length: 3 }, (_, index) => ({
+									name: `Electro Instal ${index}`,
+									why_relevant: 'Instalaciones eléctricas industriales',
+									citations: [],
+								})),
+								...Array.from({ length: 3 }, (_, index) => ({
+									name: `Fontaneria Vall ${index}`,
+									why_relevant: 'Fontanería y reformas de baños',
+									citations: [],
+								})),
+							],
+						},
+					],
 				},
 			})
 
@@ -494,7 +544,7 @@ describe('what a discovery scan reports about itself', () => {
 				subjectId: anchorCompanyId,
 				scenario: {
 					evidence: `${ANCHOR_NAME} is a natural stone workshop in Puigcerdà, Girona.`,
-					findings: { competitors: [] },
+					findings: [{ competitors: [] }],
 				},
 			})
 
@@ -503,6 +553,244 @@ describe('what a discovery scan reports about itself', () => {
 			//   over an empty list
 			expect(result.refined).toBe(true)
 			expect(result.status).toBe('no_reliable_data')
+		}, 60_000)
+	})
+
+	describe('when a scan holds rows but reaches no page to stand them on', () => {
+		it('should not report a trade covered by a list it throws away', async () => {
+			// GIVEN a scan whose extraction hands back marble workers, but whose
+			//   search results carry no page text — so nothing is fetched, the run
+			//   cannot ground anything, and the list it was holding is discarded
+			const result = await runScan({
+				schemaName: 'prospect_scan_v1',
+				query: 'Empresas en Girona: marbristas y ascensores',
+				scenario: {
+					evidence: '',
+					parts: [
+						{ label: 'marbristas', terms: ['marmolista', 'stone workshop'] },
+						{ label: 'ascensores', terms: ['elevador', 'lift'] },
+					],
+					findings: [
+						{
+							prospects: Array.from({ length: 6 }, (_, index) => ({
+								name: `Marbres Cerdanya ${index}`,
+								why_relevant: 'Marbristas y piedra natural',
+								citations: [],
+							})),
+						},
+					],
+				},
+			})
+
+			// THEN it says it found nothing reliable
+			expect(result.status).toBe('no_reliable_data')
+			// AND it claims no trade covered. The marble workers were real in memory
+			//   and are not in what the run hands back, so reporting them covered
+			//   would describe a list nobody receives — the same disagreement between
+			//   two readings that the rest of this file exists to stop
+			expect(result.coverage?.covered).toEqual([])
+			expect(result.coverage?.uncovered).toEqual(['marbristas', 'ascensores'])
+		}, 60_000)
+	})
+
+	describe('when a scan naming several trades comes back with nobody at all', () => {
+		it('should still say which trades it was asked about and never looked for', async () => {
+			// GIVEN a request naming two trades that finds no companies whatsoever —
+			//   the run that ends before the reporting every other scan goes through
+			const result = await runScan({
+				schemaName: 'prospect_scan_v1',
+				query: 'Empresas en Girona: marbristas y ascensores',
+				scenario: {
+					evidence: 'Directorio comarcal sin empresas listadas.',
+					parts: [
+						{ label: 'marbristas', terms: ['marmolista', 'stone workshop'] },
+						{ label: 'ascensores', terms: ['elevador', 'lift'] },
+					],
+					findings: [{ prospects: [] }],
+				},
+			})
+
+			// THEN it finishes saying it found nothing, as before
+			expect(result.status).toBe('no_reliable_data')
+			// AND it still reports what it was asked for: neither trade answered, and
+			//   both named as ones nothing went looking for once the passes ran out.
+			//   Without this the run that covered least is the one that says least,
+			//   and nothing measuring coverage can see it at all
+			expect(result.coverage?.covered).toEqual([])
+			expect(result.coverage?.uncovered).toEqual(['marbristas', 'ascensores'])
+			expect(result.coverage?.unsearched).toEqual([])
+		}, 60_000)
+	})
+
+	describe('when a scan pinned to a company loses a trade between its two extractions', () => {
+		it('should report the trade as one it never searched for', async () => {
+			// GIVEN a prospect scan pinned to a company on file, naming two trades,
+			//   whose first extraction answers both — so the search stops, having
+			//   nothing left to look for — and whose second, the one the run
+			//   reports on, comes back with the lift installers gone
+			const result = await runScan({
+				schemaName: 'prospect_scan_v1',
+				query: `Find prospects like ${ANCHOR_NAME}: marbristas y ascensores`,
+				subjectId: anchorCompanyId,
+				scenario: {
+					evidence: `${ANCHOR_NAME} is a natural stone workshop in Puigcerdà, Girona. Directorio de marbristas y de empresas de ascensores.`,
+					parts: [
+						{ label: 'marbristas', terms: ['marmolista', 'stone workshop'] },
+						{ label: 'ascensores', terms: ['elevador', 'lift'] },
+					],
+					findings: [
+						{
+							prospects: [
+								...Array.from({ length: 4 }, (_, index) => ({
+									name: `Marbres Cerdanya ${index}`,
+									why_relevant: 'Marbristas y piedra natural',
+									citations: [],
+								})),
+								...Array.from({ length: 2 }, (_, index) => ({
+									name: `Ascensors Pirineu ${index}`,
+									why_relevant: 'Instalación de ascensores',
+									citations: [],
+								})),
+							],
+						},
+						{
+							prospects: Array.from({ length: 6 }, (_, index) => ({
+								name: `Marbres Cerdanya ${index}`,
+								why_relevant: 'Marbristas y piedra natural',
+								citations: [],
+							})),
+						},
+					],
+				},
+			})
+
+			// THEN being pinned made it extract twice, and the second extraction is
+			//   what it reports on — so the lifts genuinely have nobody in the list
+			expect(result.extractions).toBe(2)
+			expect(result.coverage?.covered).toEqual(['marbristas'])
+			expect(result.coverage?.uncovered).toEqual(['ascensores'])
+			// AND because the first extraction had answered them, no pass was ever
+			//   spent looking for lifts — which is what the run says, instead of
+			//   letting the shortfall read as a search that came back empty
+			expect(result.covering).toBe(false)
+			expect(result.coverage?.unsearched).toEqual(['ascensores'])
+			// AND the trade is named as one the search finished believing it had
+			//   found — the reading that tells this apart from a run the clock
+			//   stopped before it could look
+			expect(result.coverage?.thought_answered).toEqual(['ascensores'])
+			expect(result.coverage?.stopped_because).toBe('answered')
+			expect(result.status).toBe('succeeded_low_confidence')
+			// AND the written brief is never told the search came back empty on it —
+			//   that paragraph asserts a search that happened, so a trade nothing
+			//   looked for is left out of it rather than named. The prompt is checked
+			//   for content first: without that, a run whose writer never fired would
+			//   pass this on an empty string
+			expect(result.briefPrompt).toContain(
+				'Begin with a single markdown heading',
+			)
+			expect(result.briefPrompt).not.toContain('came back empty')
+			// AND it is told to say so plainly instead of passing over the trade in
+			//   silence, which is what leaving it out of both lists would do
+			expect(result.briefPrompt).toContain('never searched for')
+			expect(result.briefPrompt).toContain('ascensores')
+		}, 60_000)
+	})
+
+	describe('when a scan pinned to a company did go out for the trade it is missing', () => {
+		it('should report it missing without naming it as one nothing looked for', async () => {
+			// GIVEN the same pinned scan, but with every extraction answering only
+			//   the marble workers — so the lifts read as missing while there was
+			//   still a pass to spend, and the search went out for them
+			const result = await runScan({
+				schemaName: 'prospect_scan_v1',
+				query: `Find prospects like ${ANCHOR_NAME}: marbristas y ascensores`,
+				subjectId: anchorCompanyId,
+				scenario: {
+					evidence: `${ANCHOR_NAME} is a natural stone workshop in Puigcerdà, Girona. Directorio de marbristas y de empresas de ascensores.`,
+					parts: [
+						{ label: 'marbristas', terms: ['marmolista', 'stone workshop'] },
+						{ label: 'ascensores', terms: ['elevador', 'lift'] },
+					],
+					findings: [
+						{
+							prospects: Array.from({ length: 6 }, (_, index) => ({
+								name: `Marbres Cerdanya ${index}`,
+								why_relevant: 'Marbristas y piedra natural',
+								citations: [],
+							})),
+						},
+					],
+				},
+			})
+
+			// THEN the lifts are still missing from the list it reports — but the
+			//   record of having gone out for them survives into phase 2's reading,
+			//   so this reads as a search that came back empty, which is the one
+			//   answer that says something about the market
+			expect(result.covering).toBe(true)
+			expect(result.coverage?.uncovered).toEqual(['ascensores'])
+			expect(result.coverage?.unsearched).toEqual([])
+			// AND it stopped having spent every pass it is allowed, not for want of
+			//   anything to chase
+			expect(result.coverage?.thought_answered).toEqual([])
+			expect(result.coverage?.stopped_because).toBe('passes_spent')
+			expect(result.status).toBe('succeeded_low_confidence')
+			// AND the written brief does name it, because here the search really did
+			//   go out for it and come back with nobody
+			expect(result.briefPrompt).toContain('came back empty')
+			expect(result.briefPrompt).toContain('ascensores')
+			expect(result.briefPrompt).not.toContain('never searched for')
+		}, 60_000)
+	})
+
+	describe('when the same request runs open-ended', () => {
+		it('should extract once and report every trade covered', async () => {
+			// GIVEN the identical scenario with no company pinned — the control: one
+			//   extraction, so the reading the search stopped on and the reading the
+			//   run reports are the same one and cannot disagree
+			const result = await runScan({
+				schemaName: 'prospect_scan_v1',
+				query: 'Empresas en Girona: marbristas y ascensores',
+				scenario: {
+					evidence:
+						'Directorio de marbristas y de empresas de ascensores en Girona.',
+					parts: [
+						{ label: 'marbristas', terms: ['marmolista', 'stone workshop'] },
+						{ label: 'ascensores', terms: ['elevador', 'lift'] },
+					],
+					findings: [
+						{
+							prospects: [
+								...Array.from({ length: 4 }, (_, index) => ({
+									name: `Marbres Cerdanya ${index}`,
+									why_relevant: 'Marbristas y piedra natural',
+									citations: [],
+								})),
+								...Array.from({ length: 2 }, (_, index) => ({
+									name: `Ascensors Pirineu ${index}`,
+									why_relevant: 'Instalación de ascensores',
+									citations: [],
+								})),
+							],
+						},
+						{
+							prospects: Array.from({ length: 6 }, (_, index) => ({
+								name: `Marbres Cerdanya ${index}`,
+								why_relevant: 'Marbristas y piedra natural',
+								citations: [],
+							})),
+						},
+					],
+				},
+			})
+
+			// THEN the second answer above is never asked for, both trades are
+			//   answered, and nothing is reported as missing or as unsearched
+			expect(result.extractions).toBe(1)
+			expect(result.covering).toBe(false)
+			expect(result.coverage?.uncovered).toEqual([])
+			expect(result.coverage?.unsearched).toEqual([])
+			expect(result.status).toBe('succeeded')
 		}, 60_000)
 	})
 })

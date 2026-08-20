@@ -11,6 +11,7 @@ import {
 	readRequestParts,
 	requestPartsDirective,
 	requestPartsPrompt,
+	searchedAndEmptyParts,
 	uncoveredPartsDirective,
 } from './request-parts'
 
@@ -273,14 +274,20 @@ describe('readRequestParts', () => {
 	})
 })
 
+// What a run that never went back out for anything hands in. The cases below
+// turn on which rows place which part, not on what was searched for.
+const NOTHING_SEARCHED: ReadonlySet<string> = new Set()
+
 describe('coverRequestParts', () => {
 	describe('when the request named too few parts to work through', () => {
 		it('should ask nothing about coverage at all', () => {
 			// GIVEN a request for one kind of company, and one for none
 			// THEN there is no question to answer: a request naming one kind is
 			// answered by companies of that kind, which the other signals judge
-			expect(coverRequestParts([ELECTRICAL], [])).toBeNull()
-			expect(coverRequestParts([], [{ name: 'Alfa SL' }])).toBeNull()
+			expect(coverRequestParts([ELECTRICAL], [], NOTHING_SEARCHED)).toBeNull()
+			expect(
+				coverRequestParts([], [{ name: 'Alfa SL' }], NOTHING_SEARCHED),
+			).toBeNull()
 		})
 	})
 
@@ -293,11 +300,13 @@ describe('coverRequestParts', () => {
 					{ name: 'Alfa SL', why_relevant: 'Instalaciones eléctricas' },
 					{ name: 'Beta SL', why_relevant: 'Fontanería industrial' },
 				],
+				NOTHING_SEARCHED,
 			)
 			// THEN the request is answered
 			expect(coverage).toEqual({
 				covered: ['instalaciones eléctricas', 'fontanería'],
 				uncovered: [],
+				unsearched: [],
 			})
 		})
 	})
@@ -312,6 +321,7 @@ describe('coverRequestParts', () => {
 					name: `Electro ${index}`,
 					why_relevant: 'Instalaciones eléctricas industriales',
 				})),
+				NOTHING_SEARCHED,
 			)
 			// THEN the two trades nobody answered are named, in the order the request
 			// named them, however long the list is
@@ -323,11 +333,16 @@ describe('coverRequestParts', () => {
 	describe('when the search came back with no rows', () => {
 		it('should read every part as uncovered', () => {
 			// GIVEN nothing found
-			const coverage = coverRequestParts([ELECTRICAL, PLUMBING], [])
+			const coverage = coverRequestParts(
+				[ELECTRICAL, PLUMBING],
+				[],
+				NOTHING_SEARCHED,
+			)
 			// THEN nothing is covered — the honest reading of an empty list
 			expect(coverage).toEqual({
 				covered: [],
 				uncovered: ['instalaciones eléctricas', 'fontanería'],
+				unsearched: ['instalaciones eléctricas', 'fontanería'],
 			})
 		})
 	})
@@ -343,6 +358,7 @@ describe('coverRequestParts', () => {
 					{ name: 'Alfa', industry: 'Instalaciones eléctricas' },
 					{ name: 'Beta', why_relevant: 'Fontanero para obra nueva' },
 				],
+				NOTHING_SEARCHED,
 			)
 			// THEN all three are answered
 			expect(coverage?.uncovered).toEqual([])
@@ -359,6 +375,7 @@ describe('coverRequestParts', () => {
 					},
 					{ name: 'Beta', industry: { value: 'Ascensores', source_id: 'src' } },
 				],
+				NOTHING_SEARCHED,
 			)
 			// THEN both read the same as a bare string would
 			expect(coverage?.uncovered).toEqual([])
@@ -369,6 +386,7 @@ describe('coverRequestParts', () => {
 			const coverage = coverRequestParts(
 				[ELECTRICAL, PLUMBING],
 				[{}, { name: '' }, { industry: '   ' }],
+				NOTHING_SEARCHED,
 			)
 			// THEN nothing is answered — an empty row places no trade
 			expect(coverage?.covered).toEqual([])
@@ -381,6 +399,7 @@ describe('coverRequestParts', () => {
 			const coverage = coverRequestParts(
 				[{ label: 'instalacion electrica', terms: [] }, LIFTS],
 				[{ name: 'Alfa', industry: 'Instalaciones Eléctricas Industriales' }],
+				NOTHING_SEARCHED,
 			)
 			// THEN it answers the part: Spanish and Catalan put an ending on every
 			// word of a phrase, so a long wording matches as an opening
@@ -392,6 +411,7 @@ describe('coverRequestParts', () => {
 			const coverage = coverRequestParts(
 				[{ label: 'gas', terms: [] }, LIFTS],
 				[{ name: 'Alfa', why_relevant: 'Control del gasto energético' }],
+				NOTHING_SEARCHED,
 			)
 			// THEN it does not answer: a short word opens far too many unrelated ones
 			expect(coverage?.uncovered).toContain('gas')
@@ -407,6 +427,7 @@ describe('coverRequestParts', () => {
 						why_relevant: 'Electricidad para instalaciones de riego',
 					},
 				],
+				NOTHING_SEARCHED,
 			)
 			// THEN it does not answer: the words of a trade's name are the ordinary
 			// words of half the sector, and any-order matching reads them everywhere
@@ -418,10 +439,166 @@ describe('coverRequestParts', () => {
 			const coverage = coverRequestParts(
 				[PLUMBING, LIFTS],
 				[{ name: 'Alfa', description: 'Plumbing contractor' }],
+				NOTHING_SEARCHED,
 			)
 			// THEN the part is answered — the market answers in its own languages,
 			// which is what the wordings are for
 			expect(coverage?.covered).toEqual(['fontanería'])
+		})
+	})
+})
+
+describe('coverRequestParts — which missing parts were ever searched for', () => {
+	describe('when a pass went back out for a part and still found nobody', () => {
+		it('should report it missing without saying nothing looked for it', () => {
+			// GIVEN lifts nothing answers, after a pass went out for lifts alone
+			const coverage = coverRequestParts(
+				[ELECTRICAL, LIFTS],
+				[{ name: 'Alfa', industry: 'Instalaciones eléctricas' }],
+				new Set(['ascensores']),
+			)
+			// THEN the shortfall stands — but it is a search that came back empty,
+			// which is the one reading that says something about the market
+			expect(coverage?.uncovered).toEqual(['ascensores'])
+			expect(coverage?.unsearched).toEqual([])
+		})
+	})
+
+	describe('when no pass ever went out for a part', () => {
+		it('should name it as one nothing looked for', () => {
+			// GIVEN the same missing trade, with no pass ever spent on it — the
+			// anchored run this exists to catch, which read the trade as answered
+			// over its first extraction and reports over its second
+			const coverage = coverRequestParts(
+				[ELECTRICAL, LIFTS],
+				[{ name: 'Alfa', industry: 'Instalaciones eléctricas' }],
+				NOTHING_SEARCHED,
+			)
+			// THEN it is still missing from the list, and named as never looked for,
+			// so the shortfall cannot be read as a market with no lift installers
+			expect(coverage?.uncovered).toEqual(['ascensores'])
+			expect(coverage?.unsearched).toEqual(['ascensores'])
+		})
+	})
+
+	describe('when one missing part was searched for and another was not', () => {
+		it('should tell the two apart, in the order the request named them', () => {
+			// GIVEN three trades with only electricians in the list, a pass having
+			// gone out for plumbing alone
+			const coverage = coverRequestParts(
+				[ELECTRICAL, PLUMBING, LIFTS],
+				[{ name: 'Alfa', industry: 'Instalaciones eléctricas' }],
+				new Set(['fontanería']),
+			)
+			// THEN both are reported missing, and only the one nothing looked for is
+			// named as such
+			expect(coverage?.uncovered).toEqual(['fontanería', 'ascensores'])
+			expect(coverage?.unsearched).toEqual(['ascensores'])
+		})
+	})
+
+	describe('when every part came back with companies', () => {
+		it('should name none of them, however little was searched for', () => {
+			// GIVEN a list answering both trades and no pass ever spent
+			const coverage = coverRequestParts(
+				[ELECTRICAL, PLUMBING],
+				[
+					{ name: 'Alfa SL', why_relevant: 'Instalaciones eléctricas' },
+					{ name: 'Beta SL', why_relevant: 'Fontanería industrial' },
+				],
+				NOTHING_SEARCHED,
+			)
+			// THEN nothing is named: a part that came back with companies is
+			// answered, and how it was reached says nothing more about it
+			expect(coverage?.uncovered).toEqual([])
+			expect(coverage?.unsearched).toEqual([])
+		})
+	})
+
+	describe('when the search came back with nothing at all', () => {
+		it('should name every part it never went out for', () => {
+			// GIVEN an empty list, with a pass spent on electrical work alone
+			const coverage = coverRequestParts(
+				[ELECTRICAL, PLUMBING, LIFTS],
+				[],
+				new Set(['instalaciones eléctricas']),
+			)
+			// THEN all three are missing, and the two nothing looked for are named
+			expect(coverage?.uncovered).toEqual([
+				'instalaciones eléctricas',
+				'fontanería',
+				'ascensores',
+			])
+			expect(coverage?.unsearched).toEqual(['fontanería', 'ascensores'])
+		})
+	})
+
+	describe('when what was searched for names something the request did not', () => {
+		it('should leave the reading untouched', () => {
+			// GIVEN a searched label matching no part of this request, and one that
+			// matches a part the list already answers
+			const coverage = coverRequestParts(
+				[ELECTRICAL, LIFTS],
+				[{ name: 'Alfa', industry: 'Instalaciones eléctricas' }],
+				new Set(['instalaciones eléctricas', 'carpintería']),
+			)
+			// THEN neither says anything: only a part nothing answered can be named
+			// as one nothing looked for
+			expect(coverage?.uncovered).toEqual(['ascensores'])
+			expect(coverage?.unsearched).toEqual(['ascensores'])
+		})
+	})
+
+	describe('when the request named too few parts to work through', () => {
+		it('should still ask nothing about coverage', () => {
+			// GIVEN one kind of company, and a pass recorded against it
+			// THEN there is no question to answer, whatever was searched for
+			expect(coverRequestParts([LIFTS], [], new Set(['ascensores']))).toBeNull()
+		})
+	})
+})
+
+describe('searchedAndEmptyParts', () => {
+	describe('when nothing was ever looked for', () => {
+		it('should offer no part as one a search came back empty on', () => {
+			// GIVEN two missing trades, neither of them searched for
+			const parts = searchedAndEmptyParts(
+				['fontanería', 'ascensores'],
+				['fontanería', 'ascensores'],
+			)
+			// THEN none can be reported as found-nobody: saying so asserts a search
+			// that never happened
+			expect(parts).toEqual([])
+		})
+	})
+
+	describe('when every missing part was searched for', () => {
+		it('should offer all of them', () => {
+			// GIVEN two missing trades, both gone out for
+			const parts = searchedAndEmptyParts(['fontanería', 'ascensores'], [])
+			// THEN both are honest shortfalls, in the request's order
+			expect(parts).toEqual(['fontanería', 'ascensores'])
+		})
+	})
+
+	describe('when only some of the missing parts were searched for', () => {
+		it('should offer those alone, keeping the request’s order', () => {
+			// GIVEN three missing trades, the middle one never looked for
+			const parts = searchedAndEmptyParts(
+				['fontanería', 'ascensores', 'solar'],
+				['ascensores'],
+			)
+			// THEN only the two a search actually went out for are offered
+			expect(parts).toEqual(['fontanería', 'solar'])
+		})
+	})
+
+	describe('when the run reported no shortfall at all', () => {
+		it('should offer nothing', () => {
+			// GIVEN a run with nothing missing — a scan that answered every trade,
+			// and one that never asked the question
+			// THEN there is no shortfall to report
+			expect(searchedAndEmptyParts([], [])).toEqual([])
 		})
 	})
 })

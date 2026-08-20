@@ -5,6 +5,7 @@ import { useId, useState } from 'react'
 import styled from 'styled-components'
 
 import { normalizePaidActionTool } from '@batuda/research/application/paid-action-tool'
+import { searchedAndEmptyParts } from '@batuda/research/application/request-parts'
 import { PriButton, usePriToast } from '@batuda/ui/pri'
 
 import {
@@ -67,6 +68,11 @@ export type DiscoveredExisting = {
 }
 
 export type CommonFindings = {
+	/**
+	 * Set by a run that hands back nothing it stands behind. What it did and did
+	 * not cover is still worth showing; what it would be safe to act on is not.
+	 */
+	readonly reason?: string
 	readonly proposed_updates?: ReadonlyArray<ProposedUpdate>
 	readonly pending_paid_actions?: ReadonlyArray<PendingPaidAction>
 	readonly discovered_existing?: ReadonlyArray<DiscoveredExisting>
@@ -79,6 +85,8 @@ export type CommonFindings = {
 		readonly coverage?: {
 			readonly covered?: ReadonlyArray<string>
 			readonly uncovered?: ReadonlyArray<string>
+			/** Of the missing ones, those the search never went looking for. */
+			readonly unsearched?: ReadonlyArray<string>
 		}
 	}
 }
@@ -284,13 +292,31 @@ export function CommonSections({
 	// Any kind of run can come back unsure which company it found, and a list of
 	// prospects built from the wrong one misleads just as much as a profile of
 	// it, so the warning lives in the block every view shares.
-	const needsReading = findings?.quality?.low_confidence === true
+	// A run that hands back nothing has nothing to be careful with. Saying "read
+	// this before it goes into a record" beside its own "no reliable data" reads
+	// as two verdicts on one page, and only one of them is the run's.
+	const foundNothing = findings?.reason === 'no_reliable_data'
+	const needsReading =
+		!foundNothing && findings?.quality?.low_confidence === true
 	// A search asked about several kinds of company can come back with a long list
 	// answering one of them. Naming the ones it came back with nobody for is what
 	// lets a reader tell "this market has none" from "the search stopped early" —
 	// from the list alone the two look identical.
 	const uncovered = findings?.quality?.coverage?.uncovered ?? []
-	if (paid.length === 0 && !needsReading && uncovered.length === 0) {
+	// And of those, the ones nothing ever went looking for are named apart: a
+	// search that never looked says nothing about whether those companies are out
+	// there, so it must not read as an empty market.
+	const unsearched = findings?.quality?.coverage?.unsearched ?? []
+	const searchedAndEmpty = searchedAndEmptyParts(uncovered, unsearched)
+	// Both lists guard the early return: findings that name parts nothing looked
+	// for but none that came back empty still have something to show, and nothing
+	// on this side keeps the two in step.
+	if (
+		paid.length === 0 &&
+		!needsReading &&
+		uncovered.length === 0 &&
+		unsearched.length === 0
+	) {
 		return null
 	}
 	return (
@@ -302,13 +328,25 @@ export function CommonSections({
 					</NeedsReadingFlag>
 				</Section>
 			) : null}
-			{uncovered.length > 0 ? (
+			{searchedAndEmpty.length > 0 ? (
 				<Section data-testid='research-uncovered-parts'>
 					<NeedsReadingFlag>
 						<Trans>The search came back with no company for:</Trans>
 					</NeedsReadingFlag>
 					<QualityList>
-						{uncovered.map(part => (
+						{searchedAndEmpty.map(part => (
+							<li key={part}>{part}</li>
+						))}
+					</QualityList>
+				</Section>
+			) : null}
+			{unsearched.length > 0 ? (
+				<Section data-testid='research-unsearched-parts'>
+					<NeedsReadingFlag>
+						<Trans>The search did not look for:</Trans>
+					</NeedsReadingFlag>
+					<QualityList>
+						{unsearched.map(part => (
 							<li key={part}>{part}</li>
 						))}
 					</QualityList>

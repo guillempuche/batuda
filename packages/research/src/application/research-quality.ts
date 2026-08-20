@@ -25,7 +25,11 @@
  */
 
 import { DISCOVERY_THIN_RESULT_COUNT, isDiscoveryScan } from './discovery-scan'
-import type { RequestCoverage } from './request-parts'
+import {
+	type CoveragePassVerdict,
+	partsThoughtAnswered,
+	type RequestCoverage,
+} from './request-parts'
 
 export interface RunQualityInput {
 	readonly schemaName: string
@@ -68,6 +72,20 @@ export interface RunQualityInput {
 	 */
 	readonly coverage: RequestCoverage | null
 	/**
+	 * Why the search stopped going back out for the parts nothing answered. Told
+	 * apart from the shortfall itself because the two have different causes: a
+	 * search that stopped with nothing left to look for lost its rows between two
+	 * readings, while one that stopped on the clock or the money simply ran out of
+	 * room. Null on every run that never asked the question.
+	 */
+	readonly coverageStopped: CoveragePassVerdict | null
+	/**
+	 * What the search still saw as missing when it stopped going back out. Held
+	 * against the shortfall the run finally reports to say which parts were lost
+	 * after that last look, rather than declined for want of room.
+	 */
+	readonly coverageLastMissing: ReadonlyArray<string>
+	/**
 	 * How the list split between companies two independent websites establish and
 	 * ones the run could not confirm. Null for a run with no list to split.
 	 */
@@ -75,6 +93,27 @@ export interface RunQualityInput {
 		readonly confirmed: number
 		readonly candidates: number
 	} | null
+}
+
+/**
+ * The coverage reading a finished run stores, with the reason the looking stopped
+ * beside it. Two parts can read as never looked for with quite different causes,
+ * and only the reason tells them apart.
+ */
+export interface ReportedCoverage extends RequestCoverage {
+	/**
+	 * Of the parts nothing looked for, those the search finished believing it had
+	 * already found. Empty is the healthy reading; anything here is a part lost
+	 * between the list the search decided on and the list it reports.
+	 */
+	readonly thought_answered: ReadonlyArray<string>
+	/**
+	 * Why the search stopped going back out. Describes the run, not any one part —
+	 * a run can stop for want of clock while a part beside it was lost after the
+	 * last look, so this never says why a particular part went unlooked-for.
+	 * `thought_answered` is what says that.
+	 */
+	readonly stopped_because: CoveragePassVerdict | null
 }
 
 export interface RunQuality {
@@ -116,12 +155,13 @@ export interface RunQuality {
 	/** Of those, how many pointed at a page the run actually reached. */
 	readonly citations_kept: number
 	/**
-	 * Which parts of the request came back with companies and which did not, so the
-	 * shortfall can be read off the finished run instead of by searching again.
-	 * Absent where the question does not arise — see the input field of the same
-	 * name — rather than reported as nothing covered.
+	 * Which parts of the request came back with companies, which did not, which of
+	 * the missing ones nothing ever went looking for, and why the looking stopped —
+	 * so the shortfall can be read off the finished run instead of by searching
+	 * again. Absent where the question does not arise — see the input field of the
+	 * same name — rather than reported as nothing covered.
 	 */
-	readonly coverage?: RequestCoverage
+	readonly coverage?: ReportedCoverage
 	/**
 	 * How many of the companies the run stands behind, and how many it could not
 	 * confirm. Absent where the question does not arise — a run with no list.
@@ -193,7 +233,18 @@ export const computeRunQuality = (input: RunQualityInput): RunQuality => {
 		...(isScan ? { refined: input.refined } : {}),
 		citations_seen: input.citationsSeen,
 		citations_kept: input.citationsKept,
-		...(input.coverage !== null ? { coverage: input.coverage } : {}),
+		...(input.coverage !== null
+			? {
+					coverage: {
+						...input.coverage,
+						thought_answered: partsThoughtAnswered(
+							input.coverage.unsearched,
+							input.coverageLastMissing,
+						),
+						stopped_because: input.coverageStopped,
+					},
+				}
+			: {}),
 		...(input.existence !== null ? { existence: input.existence } : {}),
 		low_confidence: lowConfidence,
 	}
