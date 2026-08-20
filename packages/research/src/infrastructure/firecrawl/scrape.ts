@@ -33,10 +33,27 @@ import { cleanScrapedMarkdown } from './clean-scraped-markdown'
 
 const SCRAPE_URL = 'https://api.firecrawl.dev/v2/scrape'
 
+// A real DNS refusal runs to 450-odd characters, nearly all of it a numbered
+// list of advice, and a run that loses a dozen fetches would bury the rest of
+// the log in it. The opening sentence carries the answer.
+const LONGEST_REASON_WORTH_LOGGING = 160
+
+const shortened = (reason: string): string =>
+	reason.length > LONGEST_REASON_WORTH_LOGGING
+		? `${reason.slice(0, LONGEST_REASON_WORTH_LOGGING)}…`
+		: reason
+
 // Subset of the Firecrawl scrape response we read. Unknown fields are ignored.
 const ScrapeResponse = Schema.Struct({
 	// Firecrawl's own verdict on the fetch, which a 2xx does not guarantee.
 	success: NullableOptional(Schema.Boolean),
+	// Why Firecrawl says the fetch did not work, in its own words, and the short
+	// name it files that reason under (SCRAPE_TIMEOUT, SCRAPE_DNS_RESOLUTION_ERROR
+	// and the like). Read only to put them in the message below: without them a
+	// refusal reads as "it did not work" and nothing separates a page that blocks
+	// robots from an account that has run out, which is hours of the wrong guess.
+	error: NullableOptional(Schema.String),
+	code: NullableOptional(Schema.String),
 	// The credits Firecrawl says this fetch consumed. Optional because the field
 	// is not on every response shape; a fetch that stays quiet counts as one.
 	creditsUsed: NullableOptional(Schema.Number),
@@ -170,10 +187,21 @@ export const makeFirecrawlScrape = (slot: number) =>
 						// work. That is their side failing and worth another try, so it
 						// surfaces as an error rather than as a page that came back empty.
 						if (body.success === false) {
+							// Carry Firecrawl's own words through. A refusal with nothing but
+							// "success=false" reads the same whether the page blocked the
+							// fetch, the account ran dry, or their side timed out, and the
+							// three want completely different responses from whoever reads
+							// the log.
+							const said = [body.code, body.error && shortened(body.error)]
+								.filter((part): part is string => part != null && part !== '')
+								.join(': ')
 							return yield* Effect.fail(
 								new ProviderError({
 									provider: 'firecrawl',
-									message: 'scrape failed: provider reported success=false',
+									message:
+										said === ''
+											? 'scrape failed: provider reported success=false, with no reason given'
+											: `scrape failed: ${said}`,
 									recoverable: true,
 								}),
 							)
