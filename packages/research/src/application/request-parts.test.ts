@@ -4,10 +4,12 @@ import {
 	coveragePassVerdict,
 	coverRequestParts,
 	MAX_COVERAGE_PASSES,
+	MAX_KINDS_OF_COMPANY,
 	MAX_PART_TERMS,
 	MAX_REQUEST_PARTS,
 	MAX_WORDING_CHARS,
 	type RequestPart,
+	readKindsOfCompany,
 	readRequestParts,
 	requestPartsDirective,
 	requestPartsPrompt,
@@ -277,6 +279,80 @@ describe('readRequestParts', () => {
 // What a run that never went back out for anything hands in. The cases below
 // turn on which rows place which part, not on what was searched for.
 const NOTHING_SEARCHED: ReadonlySet<string> = new Set()
+
+describe('readKindsOfCompany', () => {
+	describe('when the splitter answers with words for a kind of company', () => {
+		it('should keep them as written', () => {
+			// GIVEN a Catalan market's words for what a company calls itself
+			// WHEN read — THEN kept, and it is these that tell "Grup Puig" is a firm
+			// called Puig rather than a firm called Grup
+			expect(
+				readKindsOfCompany({ kindsOfCompany: ['grup', 'serveis', 'societat'] }),
+			).toEqual(['grup', 'serveis', 'societat'])
+		})
+
+		it('should keep one of a word the splitter listed twice', () => {
+			// GIVEN the same word back in two spellings of the same letters
+			// WHEN read — THEN once, since a word repeated says nothing twice
+			expect(
+				readKindsOfCompany({ kindsOfCompany: ['Grupo', 'grupo', 'servicios'] }),
+			).toEqual(['Grupo', 'servicios'])
+		})
+
+		it('should drop a word too short to spend on a name', () => {
+			// GIVEN a two- and a three-letter word among the real ones
+			// WHEN read
+			// THEN only the words long enough to be words. These are spent saying a
+			// name's word identifies nobody, and a short one reaches far more names
+			// than it was meant to — "sa" would take the front off half a French list
+			expect(
+				readKindsOfCompany({ kindsOfCompany: ['sa', 'cie', 'groupe'] }),
+			).toEqual(['groupe'])
+		})
+
+		it('should keep no more than a language actually uses', () => {
+			// GIVEN a splitter listing every word it can think of
+			// WHEN read — THEN cut, because past this it is reaching beyond what the
+			// language uses and each word takes a real name away from somebody
+			expect(
+				readKindsOfCompany({
+					kindsOfCompany: Array.from(
+						{ length: MAX_KINDS_OF_COMPANY + 6 },
+						(_, at) => `kindword${at}`,
+					),
+				}).length,
+			).toBe(MAX_KINDS_OF_COMPANY)
+		})
+	})
+
+	describe('when the answer carries no words for a kind of company', () => {
+		it('should come back empty rather than refusing the answer', () => {
+			// GIVEN answers with the list missing, wrongly shaped, or not an answer
+			// WHEN each is read
+			// THEN empty every time. A run that cannot read them still has its trades
+			// and the shared list, which is a worse reading rather than no run at all
+			for (const raw of [
+				{ parts: [] },
+				{ kindsOfCompany: 'grupo' },
+				{ kindsOfCompany: null },
+				null,
+				'grupo',
+			]) {
+				expect(readKindsOfCompany(raw)).toEqual([])
+			}
+		})
+
+		it('should drop an entry that is not a word', () => {
+			// GIVEN a list carrying blanks and things that are not words at all
+			// WHEN read — THEN only what a name could actually be written with
+			expect(
+				readKindsOfCompany({
+					kindsOfCompany: ['grupo', '', '   ', 42, null, '...', 'servicios'],
+				}),
+			).toEqual(['grupo', 'servicios'])
+		})
+	})
+})
 
 describe('coverRequestParts', () => {
 	describe('when the request named too few parts to work through', () => {

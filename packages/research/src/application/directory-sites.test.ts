@@ -5,10 +5,10 @@ import {
 	observeDirectorySites,
 	siteVerdict,
 } from './directory-sites'
-import { tradeWordsOf } from './trade-words'
+import { runWordsOf } from './run-words'
 
 // A run that named no trades, which is a request about one company on file.
-const noTrades = tradeWordsOf([])
+const noRunWords = runWordsOf([])
 
 // A prospect scan's list, as the guard chain hands it over.
 const scan = (names: ReadonlyArray<string>) => ({
@@ -23,7 +23,7 @@ const observe = (
 		findings: scan(names),
 		listField: 'prospects',
 		addresses,
-		tradeWords: noTrades,
+		runWords: noRunWords,
 	})
 
 describe('observeDirectorySites', () => {
@@ -42,7 +42,7 @@ describe('observeDirectorySites', () => {
 					'https://fontaneria.es/fontaneria-garcia',
 					'https://fontaneria.es/fontaneria-lopez',
 				],
-				tradeWords: tradeWordsOf(['fontanería']),
+				runWords: runWordsOf(['fontanería']),
 			})
 
 			expect([...observation.sites]).toEqual(['fontaneria.es'])
@@ -61,7 +61,7 @@ describe('observeDirectorySites', () => {
 					'https://garcia.es/fontaneria-garcia',
 					'https://garcia.es/fontaneria-lopez',
 				],
-				tradeWords: tradeWordsOf(['fontanería']),
+				runWords: runWordsOf(['fontanería']),
 			})
 
 			expect([...observation.sites]).toEqual([])
@@ -601,7 +601,7 @@ describe('observeDirectorySites', () => {
 					'https://listado.example/electricistas-puig',
 					'https://listado.example/instalaciones-ferre',
 				],
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 
 			// WHEN read — THEN one company can never reach two, so nothing is judged —
@@ -629,7 +629,7 @@ describe('observeDirectorySites', () => {
 				findings: { prospects: [{ website: 'https://a.example' }, {}] },
 				listField: 'prospects',
 				addresses: ['https://listado.example/x'],
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 
 			// WHEN read — THEN neither yields a name to look for

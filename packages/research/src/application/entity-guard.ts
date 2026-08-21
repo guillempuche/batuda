@@ -69,11 +69,16 @@ const LEGAL_SUFFIXES = new Set([
 // finish: it takes every trade in every language a market answers in, and each
 // word written down takes a real distinctive word away from the firms genuinely
 // called it. A run brings the trades it went looking for instead
-// (`trade-words.ts`), which is that market's own vocabulary and needs no
-// upkeep. What is left below is the words for a KIND of company, which work for
-// anybody in any market, and one industry's words that stand only for a run
-// with no market behind it to read — see `own-site.ts` for what they still do
-// and what would let them go.
+// (`run-words.ts`), which is that market's own vocabulary and needs no
+// upkeep. What is left below is the words for a KIND of company and one
+// industry's words that stand only for a run with no market behind it to read.
+//
+// DO NOT ADD ANOTHER LANGUAGE HERE EITHER. The kind-of-company half reads as
+// English and Spanish and is neither: "Sociedad García" is at home on
+// sociedad.es today, and so are Empresa, Corporación and Asociación something,
+// in the market this is measured on. Filling those in finishes nothing, for the
+// reason above — see `own-site.ts` for what these words still do, what was
+// priced to replace them, and which half of the question word order answers.
 const GENERIC_WORDS = new Set([
 	'logistics',
 	'logistica',

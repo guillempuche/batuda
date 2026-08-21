@@ -156,6 +156,7 @@ import {
 	type RequestCoverage,
 	type RequestPart,
 	RequestPartsSchema,
+	readKindsOfCompany,
 	readRequestParts,
 	requestPartsDirective,
 	requestPartsPrompt,
@@ -163,6 +164,7 @@ import {
 	uncoveredPartsDirective,
 } from './request-parts'
 import { computeRunQuality } from './research-quality'
+import { type RunWords, runWordsOf } from './run-words'
 import { guardScalarFields } from './scalar-field-guard'
 import {
 	type FreeformSchema,
@@ -190,7 +192,6 @@ import {
 	researchToolkit,
 	researchToolkitLayer,
 } from './tools'
-import { type TradeWords, tradeWordsOf } from './trade-words'
 import { clearFieldOnlyDoubt } from './unconfirmed-mark-guard'
 import { makeUsageMeter, UsageMeter } from './usage-meter'
 import { verifyValueProvenance } from './value-guard'
@@ -2731,12 +2732,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					let requestParts: ReadonlyArray<RequestPart> = []
 					// The words those parts use for the trades, which is how every check
 					// that weighs an address against a name tells the trade in the name
-					// from the company (`trade-words.ts`). Held beside the parts so the two
+					// from the company (`run-words.ts`). Held beside the parts so the two
 					// cannot say different things, and empty wherever they are — a run
 					// about one company on file names no trades, and so does a resume that
 					// skipped the phase they are split in. Both then read a name with only
 					// the shared list behind them.
-					let runTradeWords: TradeWords = new Set()
+					let wordsTheRunBrings: RunWords = runWordsOf([])
 					// Which of those parts a pass actually went back out for. Carried
 					// alongside the list because the rows cannot say whether the run
 					// looked: a part answered by phase 1's reading can be empty in
@@ -2892,14 +2893,14 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								findings: answer,
 								listField: discoveryResultField(schemaName),
 								addresses: [...gatheredAddresses],
-								tradeWords: runTradeWords,
+								runWords: wordsTheRunBrings,
 							})
 							const check = guardCompanyWebsites({
 								findings: answer,
 								targetName,
 								directorySites: directories.sites,
 								priorClaims: websiteClaims,
-								tradeWords: runTradeWords,
+								runWords: wordsTheRunBrings,
 							})
 							websiteClaims = check.hostClaims
 							const blanked =
@@ -3771,7 +3772,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											const check = dedupeDiscoveryRows(
 												findings,
 												discoveryResultField(schemaName),
-												runTradeWords,
+												wordsTheRunBrings,
 											)
 											if (check.merged > 0) {
 												yield* Effect.logInfo(
@@ -4170,13 +4171,21 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// search that refused to start because the split came back badly
 							// would be a worse run than one that searches without it.
 							if (isDiscoveryScan(schemaName)) {
-								requestParts = yield* extractLlm
+								// One answer, two things read off it: the parts the run works
+								// through, and the words that say what KIND of company a name is
+								// naming. The second is asked here because this is the one place a
+								// run reads its own request, and a request written in a market's
+								// language is what says which language those words are in.
+								const split = yield* extractLlm
 									.generateObject({
 										schema: RequestPartsSchema,
 										prompt: requestPartsPrompt(query),
 									})
 									.pipe(
-										Effect.map(response => readRequestParts(response.value)),
+										Effect.map(response => ({
+											parts: readRequestParts(response.value),
+											kinds: readKindsOfCompany(response.value),
+										})),
 										Effect.catchCause(cause =>
 											Cause.hasInterruptsOnly(cause)
 												? Effect.failCause(cause)
@@ -4188,12 +4197,21 @@ export class ResearchService extends Context.Service<ResearchService>()(
 															research_id: researchId,
 															cause: Cause.pretty(cause),
 														}),
-														Effect.as([] as ReadonlyArray<RequestPart>),
+														Effect.as({
+															parts: [] as ReadonlyArray<RequestPart>,
+															kinds: [] as ReadonlyArray<string>,
+														}),
 													),
 										),
 									)
-								runTradeWords = tradeWordsOf(
-									requestParts.flatMap(part => [part.label, ...part.terms]),
+								requestParts = split.parts
+								// Both answer the one question every reading asks of a word — does
+								// it identify anybody — so both go into one vocabulary. They are
+								// handed over apart because only the request's own wordings are
+								// trusted to come off the front of a domain: see `RunWords`.
+								wordsTheRunBrings = runWordsOf(
+									split.parts.flatMap(part => [part.label, ...part.terms]),
+									split.kinds,
 								)
 								if (requestParts.length > 0) {
 									yield* Effect.logInfo('research.request_parts').pipe(
@@ -5518,7 +5536,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								findings,
 								refreshed.findings,
 								schemaName,
-								runTradeWords,
+								wordsTheRunBrings,
 							)
 							findings = merged.findings
 							// Nothing has judged this list yet: every extraction was judged on
@@ -5629,7 +5647,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									findings,
 									listField: verificationListField,
 									addresses: [...gatheredAddresses],
-									tradeWords: runTradeWords,
+									runWords: wordsTheRunBrings,
 								}).sites
 							// What each row has to stand on, beyond its own citations.
 							const foundSources: Array<Array<string>> = verificationRows.map(
@@ -5650,7 +5668,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									website: rowWebsite(row),
 									sources: rowCitedSourceIds(row),
 									directorySites: watchedBefore,
-									tradeWords: runTradeWords,
+									runWords: wordsTheRunBrings,
 								}).verdict === 'confirmed'
 									? []
 									: [at],
@@ -5811,7 +5829,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											...(foundSources[at] ?? []),
 										],
 										directorySites: watchedAfter,
-										tradeWords: runTradeWords,
+										runWords: wordsTheRunBrings,
 									})
 									const unchecked = notChecked[at]
 									// The count stays even when the run never got to the row: how

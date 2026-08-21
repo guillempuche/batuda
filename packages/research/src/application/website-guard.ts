@@ -61,9 +61,9 @@ import {
 } from './entity-guard'
 import { citedSourceIds, isPlainObject } from './guard-shapes'
 import { ownSiteHostVerdict, ownSiteVerdict } from './own-site'
+import type { RunWords } from './run-words'
 import { isSocialPlatformHost } from './social-sites'
 import { hostOf, isBareWebAddress, pathOf } from './source-key'
-import type { TradeWords } from './trade-words'
 
 const SKIP_KEYS = new Set(['citations', 'proposed_updates'])
 
@@ -302,7 +302,7 @@ const filesSeveralCompanies = (
 const hostBelongsTo = (
 	host: string,
 	claimantNames: ReadonlyArray<string>,
-	tradeWords: TradeWords,
+	runWords: RunWords,
 ): boolean =>
 	claimantNames.some(
 		name =>
@@ -310,7 +310,7 @@ const hostBelongsTo = (
 				spelling =>
 					spelling.length >= DISTINCTIVE_NAME_LENGTH &&
 					collapse(host).includes(spelling),
-			) || ownSiteHostVerdict({ name, host, tradeWords }) === 'established',
+			) || ownSiteHostVerdict({ name, host, runWords }) === 'established',
 	)
 
 type WebsiteVerdict =
@@ -329,16 +329,10 @@ const classifyWebsite = (args: {
 	readonly citedSources: ReadonlyArray<string>
 	readonly hostClaims: HostClaims
 	readonly directorySites: DirectorySites
-	readonly tradeWords: TradeWords
+	readonly runWords: RunWords
 }): WebsiteVerdict => {
-	const {
-		name,
-		website,
-		citedSources,
-		hostClaims,
-		directorySites,
-		tradeWords,
-	} = args
+	const { name, website, citedSources, hostClaims, directorySites, runWords } =
+		args
 	const host = hostOf(website)
 	// Not an address at all: a value with words written next to it ("https://acme.es
 	// (inferred from the name)"), or something that was never a URL. A website field
@@ -407,7 +401,7 @@ const classifyWebsite = (args: {
 		claimants !== undefined &&
 		filesSeveralCompanies(claimants) &&
 		![...claimants.values()].some(claimant =>
-			hostBelongsTo(host, claimant.names, tradeWords),
+			hostBelongsTo(host, claimant.names, runWords),
 		)
 	) {
 		return 'shared_host'
@@ -508,7 +502,7 @@ export interface WebsiteGuardResult {
  * claim that condemned it. Recorded claims can, because they are taken before
  * the blanking.
  *
- * `tradeWords` are the trades the run went looking for (`trade-words.ts`), which
+ * `runWords` are the trades the run went looking for (`run-words.ts`), which
  * is how the ownership reading tells the trade in a company's name from the
  * company. Asked for on every call rather than defaulted to none, unlike the
  * three above: leaving it out does not merely stand a rule down, it makes this
@@ -519,14 +513,14 @@ export const guardCompanyWebsites = (args: {
 	readonly targetName?: string | undefined
 	readonly directorySites?: DirectorySites | undefined
 	readonly priorClaims?: HostClaims | undefined
-	readonly tradeWords: TradeWords
+	readonly runWords: RunWords
 }): WebsiteGuardResult => {
 	const {
 		findings,
 		targetName,
 		directorySites = new Set<string>(),
 		priorClaims = new Map(),
-		tradeWords,
+		runWords,
 	} = args
 	let blankedNotAnAddress = 0
 	let blankedSocialPage = 0
@@ -553,7 +547,7 @@ export const guardCompanyWebsites = (args: {
 	// the answer beside their counts. Asked only of a website that is staying,
 	// since one already gone has no ownership left to establish.
 	const countOwnSite = (name: string, website: string): void => {
-		if (ownSiteVerdict({ name, website, tradeWords }) === 'established')
+		if (ownSiteVerdict({ name, website, runWords }) === 'established')
 			ownSiteEstablished++
 		else ownSiteUnknown++
 	}
@@ -602,7 +596,7 @@ export const guardCompanyWebsites = (args: {
 					typeof value['source_id'] === 'string' ? [value['source_id']] : [],
 				hostClaims,
 				directorySites,
-				tradeWords,
+				runWords,
 			})
 			if (verdict !== 'keep') {
 				count(verdict)
@@ -624,7 +618,7 @@ export const guardCompanyWebsites = (args: {
 				citedSources: citedSourceIds(value),
 				hostClaims,
 				directorySites,
-				tradeWords,
+				runWords,
 			})
 			if (verdict !== 'keep') {
 				count(verdict)

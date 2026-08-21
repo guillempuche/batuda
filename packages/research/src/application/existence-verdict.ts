@@ -95,8 +95,8 @@ import {
 } from './entity-guard'
 import { isPlainObject } from './guard-shapes'
 import { ownSiteVerdict } from './own-site'
+import type { RunWords } from './run-words'
 import { hostOf, isBareWebAddress } from './source-key'
-import type { TradeWords } from './trade-words'
 
 /** Where the row's existence stands. There is no third value. */
 export type ExistenceVerdict = 'confirmed' | 'candidate'
@@ -177,9 +177,9 @@ const sitesOf = (args: {
 	readonly name: string
 	readonly addresses: ReadonlyArray<string>
 	readonly directorySites: DirectorySites
-	readonly tradeWords: TradeWords
+	readonly runWords: RunWords
 }): ReadonlyArray<SourceSite> => {
-	const { name, addresses, directorySites, tradeWords } = args
+	const { name, addresses, directorySites, runWords } = args
 	const byHost = new Map<string, SourceSite>()
 	for (const address of addresses) {
 		const host = hostOf(address)
@@ -188,8 +188,7 @@ const sitesOf = (args: {
 			host,
 			site: registrableDomain(host),
 			own:
-				ownSiteVerdict({ name, website: address, tradeWords }) ===
-				'established',
+				ownSiteVerdict({ name, website: address, runWords }) === 'established',
 			directory: siteVerdict(host, directorySites) === 'directory',
 		})
 	}
@@ -265,9 +264,9 @@ export const existenceOf = (args: {
 	readonly website?: string | undefined
 	readonly sources: ReadonlyArray<string>
 	readonly directorySites: DirectorySites
-	readonly tradeWords: TradeWords
+	readonly runWords: RunWords
 }): RowExistence => {
-	const { name, website, directorySites, tradeWords } = args
+	const { name, website, directorySites, runWords } = args
 	const offered =
 		website === undefined || website.trim() === ''
 			? args.sources
@@ -276,7 +275,7 @@ export const existenceOf = (args: {
 		name,
 		addresses: webAddressesAmong(offered),
 		directorySites,
-		tradeWords,
+		runWords,
 	})
 	const websites = websitesOf(sites)
 	// A site has to be this company's own AND not a host the run watched listing
