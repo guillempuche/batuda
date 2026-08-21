@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { badRequestMessage, taggedFailure } from './tagged-failure'
+import {
+	badRequestMessage,
+	notSendableReason,
+	taggedFailure,
+} from './tagged-failure'
 
 const causeWith = (error: unknown) => ({ reasons: [{ error }] })
 
@@ -81,6 +85,43 @@ describe('the sentence the server sent when it turned a write away', () => {
 				badRequestMessage(causeWith({ _tag: 'BadRequest', message: 7 })),
 			).toBe(null)
 			expect(badRequestMessage(causeWith({ _tag: 'NotFound' }))).toBe(null)
+		})
+	})
+})
+
+describe('notSendableReason', () => {
+	describe('when the server turned a send away over the message itself', () => {
+		it('should read back the reason it named', () => {
+			// GIVEN the cause shape the API client hands back
+			// WHEN the reason is read out
+			// THEN it is the one the server sent, so the screen can word it
+			// in the reader's language rather than showing backend prose
+			expect(
+				notSendableReason({
+					reasons: [
+						{ error: { _tag: 'EmailNotSendable', reason: 'no_subject' } },
+					],
+				}),
+			).toBe('no_subject')
+		})
+	})
+
+	describe('when the failure was something else', () => {
+		it('should answer with nothing', () => {
+			// GIVEN a different tagged failure, a malformed one, and a reason
+			// this build does not know
+			// THEN none of them is mistaken for a refusal
+			expect(
+				notSendableReason({ reasons: [{ error: { _tag: 'BadRequest' } }] }),
+			).toBeNull()
+			expect(notSendableReason(null)).toBeNull()
+			expect(
+				notSendableReason({
+					reasons: [
+						{ error: { _tag: 'EmailNotSendable', reason: 'invented' } },
+					],
+				}),
+			).toBeNull()
 		})
 	})
 })

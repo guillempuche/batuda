@@ -24,7 +24,11 @@ import { SrOnly } from '#/components/shared/sr-only'
 import { type Draft, useComposeEmail } from '#/context/compose-email-context'
 import { authClient } from '#/lib/auth-client'
 import type { StagedAttachment } from '#/lib/email-attachments'
-import { badRequestMessage, suppressedRecipient } from '#/lib/tagged-failure'
+import {
+	badRequestMessage,
+	notSendableReason,
+	suppressedRecipient,
+} from '#/lib/tagged-failure'
 
 type InboxOption = {
 	readonly id: string
@@ -363,6 +367,17 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 						blocked.reason === null
 							? why
 							: `${why} ${t`The receiving server said: ${blocked.reason}`}`,
+					)
+				}
+				// Turned away over the shape of the message rather than who it is
+				// going to. The server sends the reason; the sentence is written here
+				// so it is in the reader's language.
+				const unsendable = notSendableReason(exit.cause)
+				if (unsendable !== null) {
+					throw new Error(
+						unsendable === 'no_subject'
+							? t`Without a subject this arrives as "(no subject)" and is likely to be treated as spam.`
+							: t`A "Re:" on a message that answers nothing reads as a forged reply. Reply from the conversation, or drop the "Re:".`,
 					)
 				}
 				throw new Error(badRequestMessage(exit.cause) ?? t`Send failed`)

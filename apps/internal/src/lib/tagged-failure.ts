@@ -70,3 +70,17 @@ export function suppressedRecipient(
 		reason: typeof reason === 'string' && reason !== '' ? reason : null,
 	}
 }
+
+/** Why a send was turned away over the shape of the message itself. */
+export type NotSendableReason = 'no_subject' | 'forged_reply'
+
+/**
+ * The reason a send was refused, or null when the failure was something else.
+ *
+ * The server answers with the reason alone rather than a sentence, so the
+ * wording is written here, in the reader's language.
+ */
+export function notSendableReason(cause: unknown): NotSendableReason | null {
+	const reason = taggedFailure(cause, 'EmailNotSendable')?.['reason']
+	return reason === 'no_subject' || reason === 'forged_reply' ? reason : null
+}

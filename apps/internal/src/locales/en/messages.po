@@ -313,6 +313,10 @@ msgstr "70%+"
 msgid "90%+"
 msgstr "90%+"
 
+#: src/components/emails/compose-form.tsx
+msgid "A \"Re:\" on a message that answers nothing reads as a forged reply. Reply from the conversation, or drop the \"Re:\"."
+msgstr "A \"Re:\" on a message that answers nothing reads as a forged reply. Reply from the conversation, or drop the \"Re:\"."
+
 #: src/routes/index.tsx
 msgid "A high-priority company that has gone quiet is listed once, under Needs attention."
 msgstr "A high-priority company that has gone quiet is listed once, under Needs attention."
@@ -6424,6 +6428,10 @@ msgstr "Who"
 #: src/routes/emails/inboxes.tsx
 msgid "Who's your email provider?"
 msgstr "Who's your email provider?"
+
+#: src/components/emails/compose-form.tsx
+msgid "Without a subject this arrives as \"(no subject)\" and is likely to be treated as spam."
+msgstr "Without a subject this arrives as \"(no subject)\" and is likely to be treated as spam."
 
 #: src/components/research/inbox/paid-action-queue.tsx
 msgid "Working…"
