@@ -940,6 +940,43 @@ describe('reachedOwnSite', () => {
 			expect(reachedOwnSite(targets, [{ host: undefined }])).toBe(false)
 		})
 	})
+
+	describe('when the fetched page is on a social platform', () => {
+		it('should not read a platform page as the company own site', () => {
+			// GIVEN an agency named after the platform it works on, and a page
+			// fetched from that platform
+			const agency: EntityTargets = {
+				cores: ['facebookadsagency'],
+				words: ['facebook'],
+				domains: [],
+				places: [],
+			}
+
+			// WHEN asked whether the run reached the company's own site
+			// THEN no. A page there belongs to whoever opened the account, and
+			// counting it would let a mailbox printed on Facebook be harvested as
+			// this company's own
+			expect(reachedOwnSite(agency, [{ host: 'facebook.com' }])).toBe(false)
+			expect(reachedOwnSite(agency, [{ host: 'es-la.facebook.com' }])).toBe(
+				false,
+			)
+		})
+
+		it('should still read the company own domain as its site', () => {
+			// GIVEN the same agency at the domain it registered itself
+			const agency: EntityTargets = {
+				cores: ['facebookadsagency'],
+				words: ['facebook'],
+				domains: [],
+				places: [],
+			}
+
+			// WHEN asked — THEN yes: the refusal is about the platform, not the word
+			expect(reachedOwnSite(agency, [{ host: 'facebookadsagency.com' }])).toBe(
+				true,
+			)
+		})
+	})
 })
 
 describe('isOwnSiteHost', () => {
@@ -1049,6 +1086,48 @@ describe('isOwnSiteHost', () => {
 			expect(isOwnSiteHost(tiny, 'a-b-c.com')).toBe(false)
 			expect(isOwnSiteHost(tiny, 'abcdirectory.com')).toBe(false)
 			expect(isOwnSiteHost(generic, 'transportes.com')).toBe(false)
+		})
+	})
+
+	describe('when the host is a social platform', () => {
+		it('should reject a platform, however plainly the name spells it', () => {
+			// GIVEN an agency whose name spells a platform's own label
+			const agency: EntityTargets = {
+				cores: ['facebookadsagency'],
+				words: ['facebook'],
+				domains: [],
+				places: [],
+			}
+
+			// WHEN that platform is weighed as the site to go and read
+			// THEN no. A wrong yes here anchors the whole run on Facebook and writes
+			// back whatever it serves as this company's facts
+			expect(isOwnSiteHost(agency, 'facebook.com')).toBe(false)
+			expect(isOwnSiteHost(agency, 'fr.linkedin.com')).toBe(false)
+		})
+
+		it('should reject a platform already stored as the company website', () => {
+			// GIVEN a company whose website on file is a Facebook page, which is how
+			// a row left behind by the old behaviour arrives
+			const stored: EntityTargets = {
+				cores: ['lipotech'],
+				words: ['lipotech'],
+				domains: ['facebook.com'],
+				places: [],
+			}
+
+			// WHEN the run looks for the site to go and read
+			// THEN still no. Honouring it would send every one of that company's runs
+			// off to read Facebook and write back whatever it served
+			expect(isOwnSiteHost(stored, 'facebook.com')).toBe(false)
+		})
+
+		it('should still accept an ordinary host the caller supplied', () => {
+			// GIVEN the host the caller handed over for a company
+			// WHEN asked — THEN yes, as before: the refusal above is about platforms,
+			// not about supplied domains
+			const anchored: EntityTargets = { ...garcia, domains: ['tg.example'] }
+			expect(isOwnSiteHost(anchored, 'tg.example')).toBe(true)
 		})
 	})
 })

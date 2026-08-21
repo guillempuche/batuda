@@ -2904,6 +2904,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							websiteClaims = check.hostClaims
 							const blanked =
 								check.blankedNotAnAddress +
+								check.blankedSocialPage +
 								check.blankedDirectory +
 								check.blankedProfilePage +
 								check.blankedSharedHost +
@@ -2918,6 +2919,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										// have reached on its own.
 										pass,
 										blanked_not_an_address: check.blankedNotAnAddress,
+										blanked_social_page: check.blankedSocialPage,
 										blanked_directory: check.blankedDirectory,
 										blanked_profile_page: check.blankedProfilePage,
 										blanked_shared_host: check.blankedSharedHost,

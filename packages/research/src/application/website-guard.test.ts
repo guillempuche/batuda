@@ -414,6 +414,7 @@ describe('guardCompanyWebsites', () => {
 			expect(result).toEqual({
 				findings,
 				blankedNotAnAddress: 0,
+				blankedSocialPage: 0,
 				blankedDirectory: 0,
 				blankedProfilePage: 0,
 				blankedSharedHost: 0,
@@ -2062,6 +2063,303 @@ describe('guardCompanyWebsites', () => {
 			expect(prospectWebsites(result.findings)).toEqual([
 				'https://directori.cat/empresa/algu',
 			])
+		})
+	})
+
+	describe('when the website is a page on a social platform', () => {
+		it('should blank the company own page on the platform', () => {
+			// GIVEN the row two live French market searches both returned: a small
+			// firm with no site of its own, given the only web presence anybody could
+			// find for it
+			const findings = cited([
+				{
+					name: 'LIPOTECH SARL',
+					website: 'https://www.facebook.com/LIPOTECH.SARL',
+					sources: ['https://www.facebook.com/LIPOTECH.SARL'],
+				},
+			])
+
+			// WHEN checked
+			// THEN the address goes. The page really is the company's, and it is
+			// still not the company's website — whoever opens it lands on Facebook
+			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			expect(prospectWebsites(result.findings)).toEqual([undefined])
+			expect(result.blankedSocialPage).toBe(1)
+		})
+
+		it('should blank a competitor page as readily as a prospect one', () => {
+			// GIVEN the platform page on the other shape a scan answers with
+			const findings = scan([
+				{
+					name: 'LIPOTECH SARL',
+					website: 'https://www.facebook.com/LIPOTECH.SARL',
+				},
+			])
+
+			// WHEN checked — THEN blanked too. Which list a company arrived in says
+			// nothing about whose site the address is
+			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			expect(websitesOf(result.findings)).toEqual([undefined])
+			expect(result.blankedSocialPage).toBe(1)
+		})
+
+		it('should blank a host written with the dot a domain may end in', () => {
+			// GIVEN the same page at the fully-spelled form of the host, which opens
+			// in a browser exactly as the ordinary one does
+			const findings = cited([
+				{
+					name: 'LIPOTECH SARL',
+					website: 'https://facebook.com./LIPOTECH.SARL',
+				},
+			])
+
+			// WHEN checked
+			// THEN blanked. An address a reader can open is an address that ships, so
+			// a spelling this check did not recognise would put the page back
+			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			expect(prospectWebsites(result.findings)).toEqual([undefined])
+			expect(result.blankedSocialPage).toBe(1)
+		})
+
+		it('should blank a post inside a group on the platform', () => {
+			// GIVEN the other address the same searches returned — a post inside a
+			// group, which is not the company's page and not any company's site
+			const findings = cited([
+				{
+					name: 'LIPOTECH SARL',
+					website:
+						'https://www.facebook.com/groups/electricienfrance/posts/1408466207156608',
+					sources: ['https://annuaire.fr/lipotech', 'https://societe.com/x'],
+				},
+			])
+
+			// WHEN checked
+			// THEN blanked, whatever else the row cited. A row that cites a second
+			// page stands down the rule that reads citations, and the platform is the
+			// one reading that does not need them
+			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			expect(prospectWebsites(result.findings)).toEqual([undefined])
+			expect(result.blankedSocialPage).toBe(1)
+		})
+
+		it('should blank a row that cites nothing at all', () => {
+			// GIVEN the platform page with no citations behind it
+			// WHEN checked
+			// THEN still blanked. What the host IS holds whether or not the row says
+			// where anything was read
+			const findings = cited([
+				{
+					name: 'LIPOTECH SARL',
+					website: 'https://www.facebook.com/LIPOTECH.SARL',
+				},
+			])
+
+			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			expect(prospectWebsites(result.findings)).toEqual([undefined])
+			expect(result.blankedSocialPage).toBe(1)
+		})
+
+		it('should blank the platform home page given as a website', () => {
+			// GIVEN a row handed the platform itself, with no page under it
+			// WHEN checked
+			// THEN blanked. Elsewhere a bare host is left alone because there is no
+			// page to tell from the site; here the host is the whole answer
+			const findings = cited([
+				{ name: 'LIPOTECH SARL', website: 'https://facebook.com' },
+			])
+
+			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			expect(prospectWebsites(result.findings)).toEqual([undefined])
+			expect(result.blankedSocialPage).toBe(1)
+		})
+
+		it('should blank a company page on any of the platforms', () => {
+			// GIVEN the same company filed on each platform in turn
+			// WHEN checked
+			// THEN every one of them goes. A LinkedIn page is as much the company's
+			// and as little its website as a Facebook one
+			const findings = cited([
+				{
+					name: 'Acme Logistics',
+					website: 'https://www.linkedin.com/company/acme-logistics',
+				},
+				{ name: 'Acme Logistics', website: 'https://x.com/acmelogistics' },
+				{
+					name: 'Acme Logistics',
+					website: 'https://www.instagram.com/acmelogistics/',
+				},
+				{
+					name: 'Acme Logistics',
+					website: 'https://www.youtube.com/@acmelogistics',
+				},
+			])
+
+			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			expect(prospectWebsites(result.findings)).toEqual([
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+			])
+			expect(result.blankedSocialPage).toBe(4)
+		})
+
+		it('should blank the platform even when the company name spells its host', () => {
+			// GIVEN an agency named after the platform it works on, which is an
+			// ordinary kind of company
+			// WHEN checked
+			// THEN the page still goes. The host carrying a company's name is normally
+			// the strongest reason to keep an address, and it is read AFTER this one
+			// so a name cannot talk a platform into being somebody's site
+			const findings = cited([
+				{
+					name: 'Insta Logistics',
+					website: 'https://instagram.com/instalogistics',
+				},
+				{
+					name: 'Facebook Ads Agency',
+					website: 'https://www.facebook.com/fbadsagency',
+				},
+			])
+
+			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			expect(prospectWebsites(result.findings)).toEqual([undefined, undefined])
+			expect(result.blankedSocialPage).toBe(2)
+		})
+
+		it('should blank a row with no readable name beside it', () => {
+			// GIVEN a row named only by a legal form, which leaves every rule that
+			// weighs a name with nothing to weigh
+			// WHEN checked
+			// THEN blanked anyway, because this rule never asked for a name
+			const findings = cited([
+				{ name: 'SL', website: 'https://www.facebook.com/quelquun' },
+			])
+
+			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			expect(prospectWebsites(result.findings)).toEqual([undefined])
+			expect(result.blankedSocialPage).toBe(1)
+		})
+
+		it('should empty the run own answer for the target company', () => {
+			// GIVEN the run's own answer for the company it was asked about, which
+			// arrives alone with the page it was read from and no name beside it
+			const findings = {
+				website: {
+					value: 'https://www.facebook.com/LIPOTECH.SARL',
+					source_id: 'src_1',
+				},
+			}
+
+			// WHEN checked against the target's name
+			// THEN emptied, so a reader of the profile sees the field was asked for
+			// and not answered rather than seeing Facebook
+			const result = guardCompanyWebsites({
+				findings,
+				targetName: 'LIPOTECH SARL',
+				tradeWords: noTrades,
+			})
+			expect(result.findings).toEqual({ website: null })
+			expect(result.blankedSocialPage).toBe(1)
+		})
+
+		it('should put only the surviving address to the ownership question', () => {
+			// GIVEN a platform page beside a company at its own domain
+			// WHEN checked
+			// THEN an address that is gone has no ownership left to establish, so it
+			// lands in neither column — counting it as unvouched-for would read as a
+			// company whose site nothing backed
+			const findings = cited([
+				{
+					name: 'LIPOTECH SARL',
+					website: 'https://www.facebook.com/LIPOTECH.SARL',
+				},
+				{ name: 'Fusteria Miquel SL', website: 'https://fusteriamiquel.cat' },
+			])
+
+			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			expect(result.ownSiteEstablished).toBe(1)
+			expect(result.ownSiteUnknown).toBe(0)
+		})
+
+		it('should count the blank under its own reason', () => {
+			// GIVEN one row per reason: a platform page, a listing page filing the
+			// company one level down, and a value that is not an address at all
+			const findings = cited([
+				{
+					name: 'LIPOTECH SARL',
+					website: 'https://www.facebook.com/LIPOTECH.SARL',
+				},
+				{
+					name: 'Redwood Logistics',
+					website: 'https://cbinsights.com/company/redwood-logistics',
+				},
+				{
+					name: 'Acme Freight',
+					website: 'https://acme.es (inferred from the name)',
+				},
+			])
+
+			// WHEN checked
+			// THEN each is counted under its own reason, so a reader of the run's
+			// numbers can tell how often a platform page was offered from how often a
+			// directory was
+			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			expect(result.blankedSocialPage).toBe(1)
+			expect(result.blankedProfilePage).toBe(1)
+			expect(result.blankedNotAnAddress).toBe(1)
+			expect(result.blankedDirectory).toBe(0)
+			expect(result.blankedSharedHost).toBe(0)
+			expect(result.blankedReadPage).toBe(0)
+		})
+	})
+
+	describe('when a host only resembles a social platform', () => {
+		it('should keep a company own site whose domain starts with a platform name', () => {
+			// GIVEN the agencies named after the platforms they work on, this time at
+			// domains they registered themselves
+			const findings = cited([
+				{
+					name: 'Facebook Ads Agency',
+					website: 'https://facebook-ads-agency.com',
+				},
+				{
+					name: 'Instagram Marketing',
+					website: 'https://instagram-marketing.es',
+				},
+			])
+
+			// WHEN checked
+			// THEN both are kept. A platform's name inside somebody else's domain is
+			// not the platform, and blanking these would cost two real companies the
+			// site they publish
+			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			expect(prospectWebsites(result.findings)).toEqual([
+				'https://facebook-ads-agency.com',
+				'https://instagram-marketing.es',
+			])
+			expect(result.blankedSocialPage).toBe(0)
+		})
+
+		it('should keep a first-segment page on the company own domain', () => {
+			// GIVEN a company describing itself on its own site at the first path
+			// level — the same shape as a platform page and the reason no reading of
+			// an address alone can separate the two
+			const findings = cited([
+				{
+					name: 'XPO Logistics',
+					website: 'https://xpo.com/about-xpo-logistics',
+				},
+			])
+
+			// WHEN checked
+			// THEN kept. What saves it is the host: a company's own domain is no
+			// platform
+			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			expect(prospectWebsites(result.findings)).toEqual([
+				'https://xpo.com/about-xpo-logistics',
+			])
+			expect(result.blankedSocialPage).toBe(0)
 		})
 	})
 })

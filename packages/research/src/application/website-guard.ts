@@ -12,6 +12,9 @@
  *
  * The rule blanks a website only when it is clearly not the company's own:
  *  - the value is not a web address at all, or
+ *  - its host is a social platform, which publishes pages FOR companies rather
+ *    than BY them, so a page there is somebody else's site however plainly it
+ *    names the company (see `social-sites.ts`), or
  *  - its host is one this run watched file several of its own companies, or
  *  - its host does not carry the company's name AND the name sits in a deeper part
  *    of the address — the shape of "someone-else.com/company/<the-company>", which
@@ -58,6 +61,7 @@ import {
 } from './entity-guard'
 import { citedSourceIds, isPlainObject } from './guard-shapes'
 import { ownSiteHostVerdict, ownSiteVerdict } from './own-site'
+import { isSocialPlatformHost } from './social-sites'
 import { hostOf, isBareWebAddress, pathOf } from './source-key'
 import type { TradeWords } from './trade-words'
 
@@ -312,6 +316,7 @@ const hostBelongsTo = (
 type WebsiteVerdict =
 	| 'keep'
 	| 'not_an_address'
+	| 'social_page'
 	| 'directory'
 	| 'profile_page'
 	| 'shared_host'
@@ -340,6 +345,11 @@ const classifyWebsite = (args: {
 	// holding prose is worse than an empty one — nobody can open it, and it reads as
 	// a real site to everything downstream.
 	if (host === null || !isBareWebAddress(website)) return 'not_an_address'
+	// A page on a social platform. Asked before any rule that reads the company's
+	// name, or "Insta Logistics" keeps instagram.com as its own — and before the
+	// rules that turn on what else the run happened to meet, so the same page is
+	// blanked for the same stated reason every time.
+	if (isSocialPlatformHost(host)) return 'social_page'
 	// A host this run watched file several of its own companies. Any other host is
 	// `unknown`, which is no reason to blank a website and no clearance either — the
 	// rules below still have their say.
@@ -434,6 +444,8 @@ export interface WebsiteGuardResult {
 	readonly findings: unknown
 	/** Websites blanked because the value was not a web address. */
 	readonly blankedNotAnAddress: number
+	/** Websites blanked because their host was a social platform. */
+	readonly blankedSocialPage: number
 	/** Websites blanked because their host was watched filing several companies. */
 	readonly blankedDirectory: number
 	/** Websites blanked because the name sat in a deeper path of another host. */
@@ -517,6 +529,7 @@ export const guardCompanyWebsites = (args: {
 		tradeWords,
 	} = args
 	let blankedNotAnAddress = 0
+	let blankedSocialPage = 0
 	let blankedDirectory = 0
 	let blankedProfilePage = 0
 	let blankedSharedHost = 0
@@ -547,6 +560,7 @@ export const guardCompanyWebsites = (args: {
 
 	const count = (verdict: Exclude<WebsiteVerdict, 'keep'>): void => {
 		if (verdict === 'not_an_address') blankedNotAnAddress++
+		else if (verdict === 'social_page') blankedSocialPage++
 		else if (verdict === 'directory') blankedDirectory++
 		else if (verdict === 'profile_page') blankedProfilePage++
 		else if (verdict === 'shared_host') blankedSharedHost++
@@ -632,6 +646,7 @@ export const guardCompanyWebsites = (args: {
 	return {
 		findings: walk(findings),
 		blankedNotAnAddress,
+		blankedSocialPage,
 		blankedDirectory,
 		blankedProfilePage,
 		blankedSharedHost,

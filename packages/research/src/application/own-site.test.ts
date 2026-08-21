@@ -1314,6 +1314,74 @@ describe('ownSiteVerdict', () => {
 			}
 		})
 	})
+
+	describe('when the host is a social platform', () => {
+		it('should refuse a platform page to a company named after it', () => {
+			// GIVEN an agency whose name really does spell the domain of the platform
+			// it works on — the one way a page on Facebook could otherwise be
+			// established as somebody's own site
+			// WHEN each is asked
+			// THEN unknown. A page on a platform belongs to whoever opened the
+			// account, and the letters of a name are no reason to say the company
+			// owns the domain it sits on
+			expect(
+				ownSiteVerdict({
+					name: 'Facebook Ads Agency',
+					website: 'https://www.facebook.com/fbadsagency',
+					tradeWords: noTrades,
+				}),
+			).toBe('unknown')
+			expect(
+				ownSiteVerdict({
+					name: 'Instagram Marketing SL',
+					website: 'https://instagram.com/instamarketing',
+					tradeWords: noTrades,
+				}),
+			).toBe('unknown')
+		})
+
+		it('should refuse the platform even to the platform itself', () => {
+			// GIVEN the one company for whom the address really is the site
+			// WHEN asked
+			// THEN unknown, and this is the price rather than a gap. Exempting it
+			// means reading who owns the host, and that reading hands the platform to
+			// every agency named after it — a hole that costs more than the handful
+			// of firms this withholds from
+			expect(
+				ownSiteVerdict({
+					name: 'Facebook',
+					website: 'https://facebook.com',
+					tradeWords: noTrades,
+				}),
+			).toBe('unknown')
+		})
+
+		it('should refuse a platform subdomain', () => {
+			// GIVEN the door a platform serves one country through
+			// WHEN asked — THEN the same platform, and the same answer
+			expect(
+				ownSiteVerdict({
+					name: 'Linkedin Formacio',
+					website: 'https://fr.linkedin.com/company/linkedin-formacio',
+					tradeWords: noTrades,
+				}),
+			).toBe('unknown')
+		})
+
+		it('should still establish a domain that merely starts with a platform name', () => {
+			// GIVEN the same agency at a domain it registered itself
+			// WHEN asked
+			// THEN established, because the refusal above is about the platform and
+			// not about the word: whoever registered "facebook-ads-agency.com" owns it
+			expect(
+				ownSiteVerdict({
+					name: 'Facebook Ads Agency',
+					website: 'https://facebookadsagency.com',
+					tradeWords: noTrades,
+				}),
+			).toBe('established')
+		})
+	})
 })
 
 describe('ownSiteHostVerdict', () => {
@@ -1439,6 +1507,37 @@ describe('ownSiteHostVerdict', () => {
 					tradeWords: noTrades,
 				}),
 			).toBe('established')
+		})
+	})
+
+	describe('when a social platform host is asked about', () => {
+		it('should refuse the platform however plainly the name spells it', () => {
+			// GIVEN a host asked on its own, for a company whose name spells it
+			// WHEN asked
+			// THEN unknown, the same answer the whole address gets — so a caller that
+			// weighs many addresses sharing one host cannot reach a different verdict
+			// from one that weighs them one at a time
+			expect(
+				ownSiteHostVerdict({
+					name: 'Facebook Ads Agency',
+					host: 'facebook.com',
+					tradeWords: noTrades,
+				}),
+			).toBe('unknown')
+			expect(
+				ownSiteHostVerdict({
+					name: 'Instagram Marketing SL',
+					host: 'instagram.com',
+					tradeWords: noTrades,
+				}),
+			).toBe('unknown')
+			expect(
+				ownSiteHostVerdict({
+					name: 'Tiktok Media Group',
+					host: 'tiktok.com',
+					tradeWords: noTrades,
+				}),
+			).toBe('unknown')
 		})
 	})
 })
