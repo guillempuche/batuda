@@ -50,6 +50,7 @@ import {
 	parseContactGoldenSet,
 	parseGoldenSet,
 	probeModelCapabilities,
+	probeReachability,
 	type RawContactGoldenRow,
 	type RawGoldenRow,
 	ResearchEventSink,
@@ -57,6 +58,7 @@ import {
 	type ResolvedInstructions,
 	type RunScore,
 	type RunUsage,
+	researchProviderEndpoints,
 	researchToolkitWireFormat,
 	type SystemDefaults,
 	scoreContactRun,
@@ -66,6 +68,10 @@ import {
 
 import { SqlLive } from '../db'
 import { requireLocalDatabase } from '../lib/confirm-cloud'
+import {
+	NOTHING_TO_REACH,
+	settingWillNotRead,
+} from '../lib/provider-reachability'
 import { requireLiveProviders } from '../lib/require-live-providers'
 
 // `pnpm cli` runs from apps/cli, so resolve a relative --golden/--out against the
@@ -700,6 +706,37 @@ const requireMarketSchema = (
 }
 
 /**
+ * Whether this machine can reach each vendor a pass would go to, found out here
+ * where nothing has been spent rather than hours into a paid pass.
+ *
+ * It answers about the connection only: a vendor that turns a key-less request
+ * away still counts as reached, and `research probe-config` is what says whether
+ * a key works.
+ */
+const reportReachability = Effect.gen(function* () {
+	const { endpoints, unreadable } = yield* researchProviderEndpoints()
+	for (const { part, detail } of unreadable) {
+		// Neither ✓ nor ✗: nothing was checked behind this setting. `doctor` shows
+		// the same fact as an amber row, so the two screens agree on what it is.
+		yield* Console.log(`! ${part}: ${settingWillNotRead(detail)}`)
+	}
+	// Said rather than skipped, so a dry run that checked and found nothing to
+	// reach cannot be read as one that never checked. Only when nothing is broken
+	// either: a part that would not read may well have been pointed at a vendor,
+	// and there is no way from here to say it was not.
+	if (endpoints.length === 0) {
+		if (unreadable.length === 0) yield* Console.log(NOTHING_TO_REACH)
+		return
+	}
+	const results = yield* probeReachability(endpoints)
+	for (const result of results) {
+		yield* Console.log(
+			`${mark(result.verdict === 'reachable')} ${result.detail} Used by: ${result.labels.join(', ')}.`,
+		)
+	}
+}).pipe(Effect.provide(FetchHttpClient.layer))
+
+/**
  * Run the golden set through the live research pipeline and report the four quality
  * metrics. This drives real runs (LLM + providers + DB), so it needs the research
  * env configured and an org/user to run as; it connects under a BYPASS-RLS role and
@@ -737,6 +774,12 @@ export const researchEval = (opts: {
 			Effect.catchTag('StubbedProvidersRefused', error =>
 				opts.dryRun ? Effect.succeed(error.message) : Effect.fail(error),
 			),
+			// A setting that will not read stops a real pass, where it should. A dry
+			// run carries on instead, because the reachability report it prints names
+			// the variable and the values it accepts, which stopping here would not.
+			Effect.catch(error =>
+				opts.dryRun ? Effect.succeed<string | null>(null) : Effect.fail(error),
+			),
 		)
 		const raw = yield* Effect.tryPromise({
 			try: () => readFile(fromRepoRoot(opts.goldenPath), 'utf8'),
@@ -763,6 +806,7 @@ export const researchEval = (opts: {
 			if (routingRefusal !== null) {
 				yield* Console.log(`Would not run: ${routingRefusal}`)
 			}
+			yield* reportReachability
 			const runsTotal = golden.length * opts.runs
 			const price = yield* estimatedPassCents(opts.priceFrom, runsTotal)
 			yield* Console.log(

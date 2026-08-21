@@ -219,3 +219,9 @@ export {
 	type ResolvedCapability,
 	resolvedCapabilityVendors,
 } from './infrastructure/providers-live'
+// ── Infrastructure (vendor reachability) ──────────────────────────────────
+export {
+	hostOf,
+	probeReachability,
+	researchProviderEndpoints,
+} from './infrastructure/reachability'
