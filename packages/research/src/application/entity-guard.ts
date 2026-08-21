@@ -17,6 +17,8 @@
  *              and fails closed as no_reliable_data.
  */
 
+import { domainToUnicode } from 'node:url'
+
 import { EQUIVALENT_LETTERS } from './letter-equivalences.generated'
 
 // Legal-form suffixes dropped before matching, so "Acme Logistics S.L." and a
@@ -78,6 +80,17 @@ const GENERIC_WORDS = new Set([
 	'express',
 	'group',
 	'grupo',
+	// The French spelling belongs beside the other two: without it "groupe" counts
+	// as a word of a company's own, so groupe.fr reads as the site of every firm
+	// called Groupe something — the very thing grupo.es is refused for, left open
+	// in one of the two markets this is measured on.
+	//
+	// A word added here that EXTENDS one already on the list also moves where
+	// `own-site.ts` cuts a domain, since it reads past the longest of these a label
+	// opens with: "groupe" hides "group", so groupexpress.fr is cut to "xpress"
+	// rather than to the "express" the shorter word leaves standing. Worth checking
+	// a new word against the ones it spells the front of.
+	'groupe',
 	'holding',
 	'holdings',
 	'services',
@@ -475,6 +488,57 @@ export const domainHost = (website: string): string | undefined => {
 	return host.includes('.') && host.length >= 4 ? host : undefined
 }
 
+// What the owner of a domain actually registered. A web address carries only the
+// letters a–z, so a name holding anything else — an accent, or a whole alphabet
+// of its own — is written into the address in a code that begins "xn--", and the
+// reader hands that code back rather than the name: "xn--construccionsgarca-xyb"
+// for construccionsgarcía. Folded as it stands, the code spells nothing any
+// company is called, so the firm's own site reads as a stranger's — in exactly
+// the markets this work is for.
+//
+// Putting the name back is not the same as clearing it. A domain written in
+// another alphabet comes back in that alphabet, and the fold has plain letters
+// only for the ones it holds a spelling for, so a name merely made to LOOK like
+// the company's still spells nothing.
+//
+// Only a label wearing that opening is put back, so an ordinary one is never
+// touched: asked about a plain label the reader also tries to read it as a
+// machine address, and hands back "0.0.0.192" for "192". A code the reader
+// cannot make sense of comes back empty, and handing back an empty label would
+// throw away the only text there was, so the code itself is kept.
+const CODED_LABEL_OPENING = 'xn--'
+
+// The marks that join two parts of a name rather than spell any of it, which the
+// fold drops on purpose: the hyphen a domain writes between words, and the dots
+// Catalan writes between a geminate l.
+const JOINS_TWO_PARTS = /[-.\u00B7\u0387\u2022\u2027\u2219\u22C5]/u
+
+// Whether the fold has a plain spelling for every letter of a name. The fold
+// DROPS what it cannot spell, so a name that is the company's own followed by a
+// word in an alphabet the table has no answer for comes out as the company's own
+// alone: "fusteriamiquelотзывы" reads as "fusteriamiquel", and a site writing
+// reviews of the workshop is established as the workshop's. Reading only the
+// names the fold can spell whole keeps that door shut, and costs nothing a
+// company registered — an accent has a plain spelling, which is the whole reason
+// this reads the name at all.
+const spelledWhole = (registered: string): boolean =>
+	[...registered].every(
+		letter =>
+			JOINS_TWO_PARTS.test(letter) ||
+			/^[a-z0-9]+$/.test(inPlainLetters(letter)),
+	)
+
+// What it still cannot tell apart: a name spelled in plain letters and a domain
+// that spells it with an accent are one name here, so a firm called Acme is at
+// home on ácme.com as well as on acme.com. That is the same equivalence that
+// puts Muñoz at munoz.es, read from the other side, and refusing it here would
+// have the fold answer two ways about one pair of spellings.
+const asRegistered = (label: string): string => {
+	if (!label.toLowerCase().startsWith(CODED_LABEL_OPENING)) return label
+	const registered = domainToUnicode(label)
+	return registered === '' || !spelledWhole(registered) ? label : registered
+}
+
 /**
  * The label a domain is registered under — "acme" from "acme.co.uk", "tecsol"
  * from "annuaire.tecsol.fr". Empty when the host has no label to read.
@@ -490,7 +554,7 @@ export const hostLabel = (host: string): string => {
 	if (labels.length >= 2 && SECOND_LEVEL.has(labels[labels.length - 1] ?? '')) {
 		labels.pop() // drop a second-level public suffix (co.uk, com.au…)
 	}
-	return labels[labels.length - 1] ?? ''
+	return asRegistered(labels[labels.length - 1] ?? '')
 }
 
 /**
@@ -812,14 +876,23 @@ export const reachedOwnSite = (
  * registers less than its full name, but not on acme-directory.com.
  *
  * Not the same reading as `ownSiteVerdict` in `own-site.ts`, and deliberately so.
- * That one is asked about an address a run already holds, where a wrong yes costs
- * one field, so it accepts the FRONT of a name — "D-Sécurité (groupe)" at
- * d-securite.com. This one picks a site to go and read and then grounds a whole
+ * That one is asked about an address a run already holds, where a wrong yes
+ * cannot send a run off to read anything: what it costs is a false voucher for
+ * the company's existence, an exemption from the directory watch, and a key
+ * that folds two rows into one company. So it accepts the FRONT of a name —
+ * "D-Sécurité (groupe)" at d-securite.com — and one word for a trade written in
+ * front of it, so that "Cobra Instalaciones y Servicios" is at home on
+ * grupocobra.com. This one picks a site to go and read and then grounds a whole
  * row on it, where a wrong yes writes a stranger's revenue, chief executive and
- * telephone number onto the company, so it wants a whole name and would hand
- * "Grupo Cobra Instalaciones" nothing at grupocobra.com. Every caller weighing an
- * address already in hand asks `own-site.ts`; this is only for choosing what to
- * fetch. Loosening it to match would fail open across the whole grounding path.
+ * telephone number onto the company, so it wants the name to BE the domain with
+ * nothing in front of it, and would hand "Grupo Cobra Instalaciones" nothing at
+ * grupocobra.com. Every caller weighing an address already in hand asks
+ * `own-site.ts`; this is only for choosing what to fetch. Loosening it to match
+ * would fail open across the whole grounding path.
+ *
+ * The accented spelling is the one reading they do share, since it says what the
+ * domain is rather than what may be made of it: `hostLabel`, which both go
+ * through, puts a domain registered with an accent back into its own letters.
  */
 export const isOwnSiteHost = (
 	targets: EntityTargets,
