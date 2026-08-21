@@ -95,6 +95,7 @@ import {
 import { isPlainObject } from './guard-shapes'
 import { ownSiteHostVerdict } from './own-site'
 import { hostOf, isBareWebAddress, pathOf } from './source-key'
+import type { TradeWords } from './trade-words'
 
 /** Hosts this run watched file several of its own companies. */
 export type DirectorySites = ReadonlySet<string>
@@ -416,8 +417,9 @@ export const observeDirectorySites = (args: {
 	readonly findings: unknown
 	readonly listField: string | undefined
 	readonly addresses: ReadonlyArray<string>
+	readonly tradeWords: TradeWords
 }): DirectoryObservation => {
-	const { findings, listField, addresses } = args
+	const { findings, listField, addresses, tradeWords } = args
 	const readable = addresses.filter(isBareWebAddress)
 	const addressesRead = readable.length
 	if (listField === undefined) return { sites: new Set(), addressesRead }
@@ -454,7 +456,7 @@ export const observeDirectorySites = (args: {
 		const known = ownSiteAnswers.get(key)
 		if (known !== undefined) return known
 		const own = company.rowNames.some(
-			name => ownSiteHostVerdict({ name, host }) === 'established',
+			name => ownSiteHostVerdict({ name, host, tradeWords }) === 'established',
 		)
 		ownSiteAnswers.set(key, own)
 		return own

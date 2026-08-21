@@ -190,6 +190,7 @@ import {
 	researchToolkit,
 	researchToolkitLayer,
 } from './tools'
+import { type TradeWords, tradeWordsOf } from './trade-words'
 import { clearFieldOnlyDoubt } from './unconfirmed-mark-guard'
 import { makeUsageMeter, UsageMeter } from './usage-meter'
 import { verifyValueProvenance } from './value-guard'
@@ -2728,6 +2729,14 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// there is no list then, so the run says nothing about coverage rather
 					// than reporting that it covered none of it.
 					let requestParts: ReadonlyArray<RequestPart> = []
+					// The words those parts use for the trades, which is how every check
+					// that weighs an address against a name tells the trade in the name
+					// from the company (`trade-words.ts`). Held beside the parts so the two
+					// cannot say different things, and empty wherever they are — a run
+					// about one company on file names no trades, and so does a resume that
+					// skipped the phase they are split in. Both then read a name with only
+					// the shared list behind them.
+					let runTradeWords: TradeWords = new Set()
 					// Which of those parts a pass actually went back out for. Carried
 					// alongside the list because the rows cannot say whether the run
 					// looked: a part answered by phase 1's reading can be empty in
@@ -2883,13 +2892,15 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								findings: answer,
 								listField: discoveryResultField(schemaName),
 								addresses: [...gatheredAddresses],
+								tradeWords: runTradeWords,
 							})
-							const check = guardCompanyWebsites(
-								answer,
+							const check = guardCompanyWebsites({
+								findings: answer,
 								targetName,
-								directories.sites,
-								websiteClaims,
-							)
+								directorySites: directories.sites,
+								priorClaims: websiteClaims,
+								tradeWords: runTradeWords,
+							})
 							websiteClaims = check.hostClaims
 							const blanked =
 								check.blankedNotAnAddress +
@@ -3758,6 +3769,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											const check = dedupeDiscoveryRows(
 												findings,
 												discoveryResultField(schemaName),
+												runTradeWords,
 											)
 											if (check.merged > 0) {
 												yield* Effect.logInfo(
@@ -4178,6 +4190,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													),
 										),
 									)
+								runTradeWords = tradeWordsOf(
+									requestParts.flatMap(part => [part.label, ...part.terms]),
+								)
 								if (requestParts.length > 0) {
 									yield* Effect.logInfo('research.request_parts').pipe(
 										Effect.annotateLogs({
@@ -5501,6 +5516,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								findings,
 								refreshed.findings,
 								schemaName,
+								runTradeWords,
 							)
 							findings = merged.findings
 							// Nothing has judged this list yet: every extraction was judged on
@@ -5611,6 +5627,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									findings,
 									listField: verificationListField,
 									addresses: [...gatheredAddresses],
+									tradeWords: runTradeWords,
 								}).sites
 							// What each row has to stand on, beyond its own citations.
 							const foundSources: Array<Array<string>> = verificationRows.map(
@@ -5631,6 +5648,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									website: rowWebsite(row),
 									sources: rowCitedSourceIds(row),
 									directorySites: watchedBefore,
+									tradeWords: runTradeWords,
 								}).verdict === 'confirmed'
 									? []
 									: [at],
@@ -5791,6 +5809,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											...(foundSources[at] ?? []),
 										],
 										directorySites: watchedAfter,
+										tradeWords: runTradeWords,
 									})
 									const unchecked = notChecked[at]
 									// The count stays even when the run never got to the row: how

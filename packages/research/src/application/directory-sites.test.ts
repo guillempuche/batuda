@@ -5,6 +5,10 @@ import {
 	observeDirectorySites,
 	siteVerdict,
 } from './directory-sites'
+import { tradeWordsOf } from './trade-words'
+
+// A run that named no trades, which is a request about one company on file.
+const noTrades = tradeWordsOf([])
 
 // A prospect scan's list, as the guard chain hands it over.
 const scan = (names: ReadonlyArray<string>) => ({
@@ -19,9 +23,51 @@ const observe = (
 		findings: scan(names),
 		listField: 'prospects',
 		addresses,
+		tradeWords: noTrades,
 	})
 
 describe('observeDirectorySites', () => {
+	describe('when the run names the trade its companies are called after', () => {
+		it('should watch a host no company is established as owning', () => {
+			// GIVEN two firms named after one trade, each filed at its own address on
+			// the bare domain of that trade, in a run that asked for that trade
+			// WHEN the run's addresses are watched
+			// THEN the host is a listing. Neither firm is established as owning
+			// fontaneria.es, so neither steps over it, and the watch sees it file two
+			// of the run's own companies
+			const observation = observeDirectorySites({
+				findings: scan(['Fontanería García', 'Fontanería López']),
+				listField: 'prospects',
+				addresses: [
+					'https://fontaneria.es/fontaneria-garcia',
+					'https://fontaneria.es/fontaneria-lopez',
+				],
+				tradeWords: tradeWordsOf(['fontanería']),
+			})
+
+			expect([...observation.sites]).toEqual(['fontaneria.es'])
+		})
+
+		it('should still step over a host the company own name spells', () => {
+			// GIVEN the same two firms, one of them filed on the domain that spells
+			// its own word
+			// WHEN watched
+			// THEN garcia.es is stepped over for García, so it is seen filing only one
+			// company and is no listing
+			const observation = observeDirectorySites({
+				findings: scan(['Fontanería García', 'Fontanería López']),
+				listField: 'prospects',
+				addresses: [
+					'https://garcia.es/fontaneria-garcia',
+					'https://garcia.es/fontaneria-lopez',
+				],
+				tradeWords: tradeWordsOf(['fontanería']),
+			})
+
+			expect([...observation.sites]).toEqual([])
+		})
+	})
+
 	describe("when one host files several of the run's own companies", () => {
 		it('should judge it a directory', () => {
 			// GIVEN two of the run's companies each filed at their own address on one
@@ -555,6 +601,7 @@ describe('observeDirectorySites', () => {
 					'https://listado.example/electricistas-puig',
 					'https://listado.example/instalaciones-ferre',
 				],
+				tradeWords: noTrades,
 			})
 
 			// WHEN read — THEN one company can never reach two, so nothing is judged —
@@ -582,6 +629,7 @@ describe('observeDirectorySites', () => {
 				findings: { prospects: [{ website: 'https://a.example' }, {}] },
 				listField: 'prospects',
 				addresses: ['https://listado.example/x'],
+				tradeWords: noTrades,
 			})
 
 			// WHEN read — THEN neither yields a name to look for
