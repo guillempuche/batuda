@@ -3,9 +3,14 @@ import { FetchHttpClient } from 'effect/unstable/http'
 import { describe, expect, it } from 'vitest'
 
 import { EnrichmentChain, RegistryRouter } from '../application/ports'
+import type { RegistryCountry } from '../domain/country'
 import { NoRegistry, ProviderError } from '../domain/errors'
 import {
+	type CapabilityEndpoint,
+	configuredCapabilityEndpoints,
+	configuredRegistryEndpoints,
 	enrichmentLayer,
+	type RegistryEndpoint,
 	type ResearchCapability,
 	type ResolvedCapability,
 	registryLayer,
@@ -257,6 +262,205 @@ describe('which vendor a capability would really answer with', () => {
 			// about and the caller never reaches
 			expect(Exit.isSuccess(exit)).toBe(true)
 			expect(vendorOf(exit, 'enrich')).toBe('hunter')
+		})
+	})
+})
+
+describe('where the vendors a capability is pointed at answer', () => {
+	const readEndpoints = (
+		env: Record<string, string>,
+		only?: ReadonlyArray<ResearchCapability>,
+	) =>
+		Effect.runPromiseExit(
+			configuredCapabilityEndpoints(only).pipe(
+				Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env }))),
+			),
+		)
+
+	const endpointsOf = (
+		exit: Exit.Exit<ReadonlyArray<CapabilityEndpoint>, unknown>,
+	): ReadonlyArray<CapabilityEndpoint> =>
+		Exit.isSuccess(exit) ? exit.value : []
+
+	const LIVE = {
+		RESEARCH_PROVIDER_SEARCH: 'brave',
+		RESEARCH_PROVIDER_SCRAPE: 'firecrawl',
+	}
+
+	describe('when a capability names a real vendor', () => {
+		it('should give the host it answers on, without the API path', async () => {
+			// GIVEN search and scrape pointed at real vendors
+			// WHEN read
+			expect(endpointsOf(await readEndpoints(LIVE))).toEqual([
+				{
+					capability: 'search',
+					slot: 1,
+					vendor: 'brave',
+					origin: 'https://api.search.brave.com',
+				},
+				{
+					capability: 'scrape',
+					slot: 1,
+					vendor: 'firecrawl',
+					origin: 'https://api.firecrawl.dev',
+				},
+			])
+		})
+	})
+
+	describe('when a capability falls back to a second vendor', () => {
+		it('should give both, numbered by the order a call reaches them', async () => {
+			// GIVEN a search cascade of two vendors
+			const found = endpointsOf(
+				await readEndpoints(
+					{ ...LIVE, RESEARCH_PROVIDER_SEARCH: 'firecrawl,brave-context' },
+					['search'],
+				),
+			)
+
+			// WHEN read — THEN the fallback is there too, since a blocked second
+			// vendor stays hidden until the first one is already struggling
+			expect(found.map(entry => [entry.slot, entry.origin])).toEqual([
+				[1, 'https://api.firecrawl.dev'],
+				[2, 'https://api.search.brave.com'],
+			])
+		})
+	})
+
+	describe('when a capability answers from canned data or is switched off', () => {
+		it('should give nothing for it, since it reaches no vendor', async () => {
+			// GIVEN search stubbed and everything with a default left unset
+			const found = endpointsOf(
+				await readEndpoints({
+					RESEARCH_PROVIDER_SEARCH: 'stub',
+					RESEARCH_PROVIDER_SCRAPE: 'firecrawl',
+				}),
+			)
+
+			// WHEN read — THEN only the vendor that would really be called is there;
+			// nothing is probed on behalf of canned data or an off switch
+			expect(found.map(entry => entry.capability)).toEqual(['scrape'])
+		})
+
+		it('should skip a canned first choice and still give the vendor behind it', async () => {
+			// GIVEN a stub ahead of a real vendor
+			const found = endpointsOf(
+				await readEndpoints(
+					{ ...LIVE, RESEARCH_PROVIDER_SCRAPE: 'stub,firecrawl' },
+					['scrape'],
+				),
+			)
+
+			// WHEN read — THEN the stub contributes nothing and the real vendor keeps
+			// the slot number it occupies in the setting
+			expect(found).toEqual([
+				{
+					capability: 'scrape',
+					slot: 2,
+					vendor: 'firecrawl',
+					origin: 'https://api.firecrawl.dev',
+				},
+			])
+		})
+	})
+
+	describe('when a capability was never set at all', () => {
+		it('should give nothing for it rather than failing', async () => {
+			// GIVEN nothing said about search, which carries no default. Unlike
+			// reading its vendor — which guards a run and must refuse — this only
+			// ever reports, and a setting nobody wrote reaches nothing
+			const found = endpointsOf(
+				await readEndpoints({ RESEARCH_PROVIDER_SCRAPE: 'firecrawl' }),
+			)
+
+			// WHEN read — THEN scrape still answers, instead of being lost with it
+			expect(found.map(entry => entry.capability)).toEqual(['scrape'])
+		})
+	})
+
+	describe('when a capability was set to something that will not read', () => {
+		it('should fail naming the setting, so a typo is not read as unset', async () => {
+			// GIVEN a mistyped vendor name — the setting exists and is wrong, which
+			// is a fault rather than a machine nobody configured
+			const exit = await readEndpoints({
+				RESEARCH_PROVIDER_SEARCH: 'firecrwal',
+				RESEARCH_PROVIDER_SCRAPE: 'firecrawl',
+			})
+
+			// WHEN read — THEN it says which setting is at fault
+			expect(Exit.isFailure(exit)).toBe(true)
+			if (Exit.isFailure(exit)) {
+				expect(Cause.pretty(exit.cause)).toContain('RESEARCH_PROVIDER_SEARCH')
+			}
+		})
+	})
+})
+
+describe('where the company register a country is pointed at answers', () => {
+	const readRegistries = (
+		env: Record<string, string>,
+		only?: ReadonlyArray<RegistryCountry>,
+	) =>
+		Effect.runPromiseExit(
+			configuredRegistryEndpoints(only).pipe(
+				Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env }))),
+			),
+		)
+
+	const registriesOf = (
+		exit: Exit.Exit<ReadonlyArray<RegistryEndpoint>, unknown>,
+	): ReadonlyArray<RegistryEndpoint> => (Exit.isSuccess(exit) ? exit.value : [])
+
+	describe('when countries name real registers', () => {
+		it('should give each one its host, since a country can be blocked alone', async () => {
+			// GIVEN both countries pointed at their national register
+			const found = registriesOf(
+				await readRegistries({
+					RESEARCH_PROVIDER_REGISTRY_ES: 'librebor',
+					RESEARCH_PROVIDER_REGISTRY_GB: 'companies-house',
+				}),
+			)
+
+			// WHEN read — THEN both are there, so reaching the Spanish one says
+			// nothing about the British one
+			expect(found.map(entry => [entry.country, entry.origin])).toEqual([
+				['ES', 'https://api.librebor.me'],
+				['GB', 'https://api.company-information.service.gov.uk'],
+			])
+		})
+	})
+
+	describe('when a country is switched off, stubbed or never set', () => {
+		it('should give nothing for it', async () => {
+			// GIVEN Spain switched off and Britain on canned data
+			const found = registriesOf(
+				await readRegistries({
+					RESEARCH_PROVIDER_REGISTRY_ES: 'none',
+					RESEARCH_PROVIDER_REGISTRY_GB: 'stub',
+				}),
+			)
+
+			// WHEN read — THEN neither reaches a register, so neither is asked about
+			expect(found).toEqual([])
+			// AND a country nobody set at all is the same, rather than a failure
+			expect(registriesOf(await readRegistries({}))).toEqual([])
+		})
+	})
+
+	describe('when a country was set to something that will not read', () => {
+		it('should fail naming the setting, so a typo is not read as switched off', async () => {
+			// GIVEN a mistyped register name for Spain
+			const exit = await readRegistries({
+				RESEARCH_PROVIDER_REGISTRY_ES: 'libreborme',
+			})
+
+			// WHEN read — THEN it says which setting is at fault
+			expect(Exit.isFailure(exit)).toBe(true)
+			if (Exit.isFailure(exit)) {
+				expect(Cause.pretty(exit.cause)).toContain(
+					'RESEARCH_PROVIDER_REGISTRY_ES',
+				)
+			}
 		})
 	})
 })

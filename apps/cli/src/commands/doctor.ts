@@ -10,6 +10,7 @@ import { SqlLive } from '../db'
 import { isLocalDatabaseHost, resolveDatabaseHost } from '../lib/database-host'
 import { parseEnvKeys } from '../lib/env-file'
 import { getTarget } from '../lib/load-env'
+import { researchReachabilityChecks } from '../lib/provider-reachability'
 import { execSilent, ROOT } from '../shell'
 import { isLinkedWorktree } from './worktree'
 
@@ -397,6 +398,12 @@ export const doctor = Effect.gen(function* () {
 	for (const check of checks) {
 		const result = yield* check.run
 		results.push({ name: check.name, ...result })
+	}
+	// Reaching a vendor is a question about this machine's connection, and the
+	// cloud tier reaches them from somewhere else entirely, so an answer from here
+	// would say nothing about it.
+	if (target !== 'cloud') {
+		results.push(...(yield* researchReachabilityChecks()))
 	}
 	return results
 })

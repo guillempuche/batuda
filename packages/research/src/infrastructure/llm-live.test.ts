@@ -5,6 +5,7 @@ import type { LlmTier } from './cached-llm'
 import {
 	type ConfiguredSlot,
 	configuredSlots,
+	configuredSlotsIfSet,
 	resolvedTierVendors,
 } from './llm-live'
 
@@ -192,6 +193,63 @@ describe('which vendor a tier would really answer with', () => {
 			// call reaches; a list that merely mentions a real vendor runs on canned
 			// answers all the same
 			expect(tiers[0]).toEqual({ tier: 'agent', vendor: 'stub' })
+		})
+	})
+})
+
+describe('what silence in a tier’s settings means to each reader', () => {
+	const readIfSet = (env: Record<string, string>, tier: LlmTier) =>
+		Effect.runPromiseExit(
+			configuredSlotsIfSet(tier).pipe(
+				Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env }))),
+			),
+		)
+
+	describe('when a check needs the models a run uses', () => {
+		it('should stop and name the setting, since a tier a run needs is a fault', async () => {
+			// GIVEN the writer tier left unset while the other two are configured
+			const exit = await read({
+				RESEARCH_LLM_AGENT_PROVIDERS: 'stub',
+				RESEARCH_LLM_EXTRACT_PROVIDERS: 'stub',
+			})
+
+			// WHEN read through the strict reader — THEN it says which setting is
+			// missing, so a check that calls the models cannot go quiet on a machine
+			// whose settings somebody half-wrote
+			expect(reasonOf(exit)).toContain('RESEARCH_LLM_WRITER_PROVIDERS')
+		})
+	})
+
+	describe('when a check only reports on what is configured', () => {
+		it('should come back empty rather than stopping', async () => {
+			// GIVEN nothing said about the writer tier
+			const exit = await readIfSet({}, 'writer')
+
+			// WHEN read through the reporting reader — THEN silence means the tier
+			// reaches no vendor, so a tier nobody set cannot hide the tiers beside it
+			expect(Exit.isSuccess(exit)).toBe(true)
+			if (Exit.isSuccess(exit)) expect(exit.value).toEqual([])
+		})
+
+		it('should still stop when the setting was written and will not read', async () => {
+			// GIVEN a mistyped vendor name — the setting exists and is wrong
+			const exit = await readIfSet(
+				{ RESEARCH_LLM_AGENT_PROVIDERS: 'grok' },
+				'agent',
+			)
+
+			// WHEN read — THEN a typo is a fault rather than silence, which is what
+			// keeps "you never set this" apart from "what you set is wrong"
+			expect(reasonOf(exit)).toContain('RESEARCH_LLM_AGENT_PROVIDERS')
+		})
+
+		it('should list the models when the tier is set', async () => {
+			// GIVEN a tier on a real vendor
+			const exit = await readIfSet(AGENT_ON_GROQ, 'agent')
+
+			// WHEN read — THEN it answers with the same slots the strict reader gives
+			expect(Exit.isSuccess(exit)).toBe(true)
+			if (Exit.isSuccess(exit)) expect(exit.value).toHaveLength(1)
 		})
 	})
 })

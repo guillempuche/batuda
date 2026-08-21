@@ -123,31 +123,31 @@ export interface ResolvedCapability {
 	readonly vendor: CapabilityVendor
 }
 
-// Search and scrape carry no default, so an unset one stops the boot naming
-// itself. The rest default to off, exactly as their own layers do.
-const CAPABILITY_READERS: Record<
-	ResearchCapability,
-	Effect.Effect<CapabilityVendor, Config.ConfigError>
-> = {
-	search: providerListConfig(SEARCH_VENDORS, 'RESEARCH_PROVIDER_SEARCH').pipe(
-		Effect.map(vendors => vendors[0]),
-	),
-	scrape: providerListConfig(SCRAPE_VENDORS, 'RESEARCH_PROVIDER_SCRAPE').pipe(
-		Effect.map(vendors => vendors[0]),
-	),
-	map: providerListConfig(MAP_VENDORS, 'RESEARCH_PROVIDER_MAP', ['none']).pipe(
-		Effect.map(vendors => vendors[0]),
-	),
-	enrich: providerListConfig(ENRICH_VENDORS, 'RESEARCH_PROVIDER_ENRICH', [
-		'none',
-	]).pipe(Effect.map(vendors => vendors[0])),
-	verify: providerListConfig(VERIFY_VENDORS, 'RESEARCH_PROVIDER_VERIFY', [
-		'none',
-	]).pipe(Effect.map(vendors => vendors[0])),
+/** Every vendor a capability is pointed at, first choice first — never empty. */
+type VendorList = ReadonlyArray<CapabilityVendor> & {
+	readonly 0: CapabilityVendor
 }
 
-const EVERY_CAPABILITY = Object.keys(
-	CAPABILITY_READERS,
+// Search and scrape carry no default, so an unset one stops the boot naming
+// itself. The rest default to off, exactly as their own layers do.
+const CAPABILITY_LISTS: Record<
+	ResearchCapability,
+	Config.Config<VendorList>
+> = {
+	search: providerListConfig(SEARCH_VENDORS, 'RESEARCH_PROVIDER_SEARCH'),
+	scrape: providerListConfig(SCRAPE_VENDORS, 'RESEARCH_PROVIDER_SCRAPE'),
+	map: providerListConfig(MAP_VENDORS, 'RESEARCH_PROVIDER_MAP', ['none']),
+	enrich: providerListConfig(ENRICH_VENDORS, 'RESEARCH_PROVIDER_ENRICH', [
+		'none',
+	]),
+	verify: providerListConfig(VERIFY_VENDORS, 'RESEARCH_PROVIDER_VERIFY', [
+		'none',
+	]),
+}
+
+/** Every capability, in the order a caller reading all of them gets them. */
+export const RESEARCH_CAPABILITIES = Object.keys(
+	CAPABILITY_LISTS,
 ) as ReadonlyArray<ResearchCapability>
 
 /**
@@ -163,13 +163,133 @@ const EVERY_CAPABILITY = Object.keys(
  * which is where a new provider is added.
  */
 export const resolvedCapabilityVendors = (
-	capabilities: ReadonlyArray<ResearchCapability> = EVERY_CAPABILITY,
+	capabilities: ReadonlyArray<ResearchCapability> = RESEARCH_CAPABILITIES,
 ): Effect.Effect<ReadonlyArray<ResolvedCapability>, Config.ConfigError> =>
 	Effect.forEach(capabilities, capability =>
-		CAPABILITY_READERS[capability].pipe(
-			Effect.map(vendor => ({ capability, vendor })),
+		CAPABILITY_LISTS[capability].pipe(
+			Effect.map(vendors => ({ capability, vendor: vendors[0] })),
 		),
 	)
+
+// ── Where each vendor answers ──
+
+/** A vendor that reaches the network, so there is a host to ask about. */
+type ReachableVendor = Exclude<CapabilityVendor, 'stub' | 'none' | 'local'>
+
+// Scheme and host only, because a connection check can honestly claim no more
+// than that the host was reached. Every vendor that goes to the network needs a
+// row here, and the `satisfies` is what makes a new one say where it answers.
+// The three left out reach nothing: two answer from canned data or not at all,
+// and the local page fetcher is not written yet.
+const VENDOR_ORIGINS: Partial<Record<CapabilityVendor, string>> = {
+	brave: 'https://api.search.brave.com',
+	'brave-context': 'https://api.search.brave.com',
+	firecrawl: 'https://api.firecrawl.dev',
+	hunter: 'https://api.hunter.io',
+	fullenrich: 'https://app.fullenrich.com',
+} satisfies Record<ReachableVendor, string>
+
+/** One vendor a capability is configured to reach, and where it answers. */
+export interface CapabilityEndpoint {
+	readonly capability: ResearchCapability
+	/** 1 for a capability's first choice, 2 for what it falls back to. */
+	readonly slot: number
+	readonly vendor: CapabilityVendor
+	/** Scheme and host of the vendor's API. */
+	readonly origin: string
+}
+
+/**
+ * Where every vendor the capability settings name would answer, first choice
+ * first — read from the same settings the layers read, so anything checking a
+ * connection is checking the vendors a run would really reach.
+ *
+ * Fallback slots count too, not just the first choice: a blocked second vendor
+ * only shows up once the first one is already having a bad day. A slot answered
+ * by canned data or switched off reaches nothing, so it is left out rather than
+ * reported with nowhere to go.
+ *
+ * A capability nobody set at all is treated the same way — it reaches nothing,
+ * so it contributes nothing. Only a setting that was written and will not read
+ * fails, which is what keeps "you never configured this" apart from "what you
+ * configured is wrong". Unlike `resolvedCapabilityVendors`, which guards a run
+ * and has to refuse a missing setting outright, this one only ever reports.
+ *
+ * Here rather than at the caller so the vendor names and their addresses stay
+ * together in this file, which is where a new provider is added.
+ */
+export const configuredCapabilityEndpoints = (
+	capabilities: ReadonlyArray<ResearchCapability> = RESEARCH_CAPABILITIES,
+): Effect.Effect<ReadonlyArray<CapabilityEndpoint>, Config.ConfigError> =>
+	Effect.forEach(capabilities, capability =>
+		Config.option(CAPABILITY_LISTS[capability]).pipe(
+			Effect.map(configured =>
+				Option.isNone(configured)
+					? []
+					: configured.value.flatMap((vendor, index) => {
+							const origin = VENDOR_ORIGINS[vendor]
+							return origin === undefined
+								? []
+								: [{ capability, slot: index + 1, vendor, origin }]
+						}),
+			),
+		),
+	).pipe(Effect.map(nested => nested.flat()))
+
+/** Every vendor name a country's register setting can resolve to. */
+type RegistryVendor =
+	(typeof REGISTRY_VENDORS_BY_COUNTRY)[RegistryCountry][number]
+
+// Same rule as the capability table above: a register that goes to the network
+// needs a row here, and the `satisfies` is what makes a new one say where it
+// answers. The paid company reports have no table at all, because the one
+// vendor there is not written yet and so reaches nothing.
+const REGISTRY_VENDOR_ORIGINS: Partial<Record<RegistryVendor, string>> = {
+	librebor: 'https://api.librebor.me',
+	'companies-house': 'https://api.company-information.service.gov.uk',
+} satisfies Record<Exclude<RegistryVendor, 'stub' | 'none'>, string>
+
+/** One company register a country is configured to reach, and where it answers. */
+export interface RegistryEndpoint {
+	readonly country: RegistryCountry
+	/** 1 for a country's first choice, 2 for what it falls back to. */
+	readonly slot: number
+	readonly vendor: RegistryVendor
+	/** Scheme and host of the register's API. */
+	readonly origin: string
+}
+
+/**
+ * Where the company register each country is pointed at would answer.
+ *
+ * Registers sit apart from the capabilities above because they are chosen per
+ * country rather than once for the pipeline, so a machine can reach the Spanish
+ * one and not the British one. Silence means the same as it does there: a
+ * country nobody set reaches nothing and contributes nothing, and only a setting
+ * that was written and will not read fails.
+ */
+export const configuredRegistryEndpoints = (
+	countries: ReadonlyArray<RegistryCountry> = REGISTRY_COUNTRIES,
+): Effect.Effect<ReadonlyArray<RegistryEndpoint>, Config.ConfigError> =>
+	Effect.forEach(countries, country =>
+		Config.option(
+			providerListConfig(
+				REGISTRY_VENDORS_BY_COUNTRY[country],
+				`RESEARCH_PROVIDER_REGISTRY_${country}`,
+			),
+		).pipe(
+			Effect.map(configured =>
+				Option.isNone(configured)
+					? []
+					: configured.value.flatMap((vendor, index) => {
+							const origin = REGISTRY_VENDOR_ORIGINS[vendor]
+							return origin === undefined
+								? []
+								: [{ country, slot: index + 1, vendor, origin }]
+						}),
+			),
+		),
+	).pipe(Effect.map(nested => nested.flat()))
 
 // ── What a provider slot charges ──
 

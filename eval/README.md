@@ -102,11 +102,13 @@ The eval refuses to start against a database that is not on this machine, so a f
 pnpm cli research eval --org <org-id> --user <user-id> --golden eval/golden.json --dry-run --price-from report.json
 ```
 
-`--dry-run` spends nothing and runs every pre-flight a real pass runs: the database is this machine's, no part of the pipeline would answer with canned data, and every golden row parses — each rejected row printed with its reason. It then says how many runs would execute, and with `--price-from <report.json>` prices them from what an earlier pass actually cost per run rather than from a guess. Without that flag it prints the count alone; no earlier pass, no price.
+`--dry-run` spends nothing and runs every pre-flight a real pass runs: the database is this machine's, no part of the pipeline would answer with canned data, every golden row parses — each rejected row printed with its reason — and this machine can reach each vendor a pass would go to. It then says how many runs would execute, and with `--price-from <report.json>` prices them from what an earlier pass actually cost per run rather than from a guess. Without that flag it prints the count alone; no earlier pass, no price.
 
 The pass refuses outright if a part it measures through would answer with canned data (a stub), so a mistyped vendor stops in seconds instead of running for hours and reporting a 100% empty rate. A part set to `none` is not refused — that is switched off, which is a deliberate setting and reads honestly in the result.
 
-Even so, run a one-row golden with `--runs 1` (a few cents) before the full set: the guards prove the routing resolves, not that a key is live or that a provider will answer from this network.
+The reachability line is about the connection and nothing else. It sends no key, so a vendor that turns the check away still counts as reached — being turned away proves the request arrived — and a vendor reported as unreachable is one this machine could not get to at all, which is a VPN, a proxy or a DNS filter rather than anything about a key. `pnpm cli doctor` reports the same thing outside a pass, and `pnpm cli research probe-config` is what says whether a key still works. Reaching a vendor's host does not prove the endpoint a run calls will answer, or that the account behind the key has allowance left.
+
+Even so, run a one-row golden with `--runs 1` (a few cents) before the full set: the guards prove the routing resolves and the vendors are reachable, not that a key is live.
 
 ## The golden file
 

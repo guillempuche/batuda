@@ -1096,7 +1096,7 @@ const researchEvalCommand = Command.make(
 		),
 		dryRun: Flag.boolean('dry-run').pipe(
 			Flag.withDescription(
-				'Check everything a pass needs and spend nothing: that the database is local, that no part of the pipeline would answer with canned data, and that every golden row parses. Prints how many runs would execute',
+				'Check everything a pass needs and spend nothing: that the database is local, that no part of the pipeline would answer with canned data, that every golden row parses, and that this machine can reach each vendor a pass would go to. The reachability check sends no key, so it costs nothing and a vendor that turns it away still counts as reached. Prints how many runs would execute',
 			),
 		),
 		priceFrom: Flag.string('price-from').pipe(

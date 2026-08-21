@@ -29,7 +29,14 @@
  */
 
 import { OpenAiClient, OpenAiLanguageModel } from '@effect/ai-openai-compat'
-import { Config, type Context, type Duration, Effect, Layer } from 'effect'
+import {
+	Config,
+	type Context,
+	type Duration,
+	Effect,
+	Layer,
+	Option,
+} from 'effect'
 import type { LanguageModel } from 'effect/unstable/ai'
 import { FetchHttpClient } from 'effect/unstable/http'
 
@@ -78,24 +85,16 @@ export interface ConfiguredSlot {
 	readonly apiKeyEnv: string
 }
 
-/**
- * Every model the settings point a tier at.
- *
- * Read the same way a run reads them, so anything checking the settings is
- * looking at what a run would really use. Working this out separately would be
- * a second reading of the same settings, free to drift from the first and
- * report on models nothing runs.
- *
- * Stubbed tiers are left out: they reach no vendor, so there is nothing to ask.
- */
-const LLM_TIERS: ReadonlyArray<{
-	readonly envPrefix: string
-	readonly tier: LlmTier
-}> = [
-	{ envPrefix: 'RESEARCH_LLM_AGENT', tier: 'agent' },
-	{ envPrefix: 'RESEARCH_LLM_EXTRACT', tier: 'extract' },
-	{ envPrefix: 'RESEARCH_LLM_WRITER', tier: 'writer' },
-]
+// Where each tier's settings live, written in the order a run goes through the
+// tiers, because `LLM_TIERS` below takes its order from this table.
+const TIER_ENV_PREFIX: Record<LlmTier, string> = {
+	agent: 'RESEARCH_LLM_AGENT',
+	extract: 'RESEARCH_LLM_EXTRACT',
+	writer: 'RESEARCH_LLM_WRITER',
+}
+
+/** Every model tier, in the order a run goes through them. */
+export const LLM_TIERS = Object.keys(TIER_ENV_PREFIX) as ReadonlyArray<LlmTier>
 
 /** A tier, and the vendor that would really answer for it. */
 export interface ResolvedTier {
@@ -103,6 +102,14 @@ export interface ResolvedTier {
 	/** `stub` means canned answers: nothing live is behind this tier. */
 	readonly vendor: LlmVendor
 }
+
+// The tiers a caller asked about, in the order a run goes through them and each
+// named once: taking the caller's array as it came would read a tier twice when
+// it was named twice, and would let the order somebody happened to type decide
+// the order a refusal names them in.
+const tiersInRunOrder = (
+	tiers: ReadonlyArray<LlmTier>,
+): ReadonlyArray<LlmTier> => LLM_TIERS.filter(tier => tiers.includes(tier))
 
 /**
  * The vendor each tier would really answer with, read the same way the layer that
@@ -113,61 +120,105 @@ export interface ResolvedTier {
  * of the vendor names, which live in one tuple here on purpose.
  */
 export const resolvedTierVendors = (
-	tiers: ReadonlyArray<LlmTier> = LLM_TIERS.map(entry => entry.tier),
+	tiers: ReadonlyArray<LlmTier> = LLM_TIERS,
 ): Effect.Effect<ReadonlyArray<ResolvedTier>, Config.ConfigError> =>
-	Effect.forEach(
-		LLM_TIERS.filter(entry => tiers.includes(entry.tier)),
-		({ envPrefix, tier }) =>
-			providerListConfig(LLM_VENDORS, `${envPrefix}_PROVIDERS`).pipe(
-				Effect.map(vendors => ({ tier, vendor: vendors[0] })),
-			),
+	Effect.forEach(tiersInRunOrder(tiers), tier =>
+		providerListConfig(LLM_VENDORS, `${TIER_ENV_PREFIX[tier]}_PROVIDERS`).pipe(
+			Effect.map(vendors => ({ tier, vendor: vendors[0] })),
+		),
 	)
 
-export const configuredSlots = (
-	tiers: ReadonlyArray<{
-		readonly envPrefix: string
-		readonly tier: LlmTier
-	}> = LLM_TIERS,
+/** Every vendor a tier is pointed at, first choice first — never empty. */
+type NonEmptyVendorList = ReadonlyArray<LlmVendor> & { readonly 0: LlmVendor }
+
+// The models behind a tier's vendor list, once that list is in hand. It sits
+// apart from reading the list so the two readers below differ on what silence
+// means and on nothing else.
+const slotsForVendors = (
+	tier: LlmTier,
+	vendors: NonEmptyVendorList,
 ): Effect.Effect<ReadonlyArray<ConfiguredSlot>, Config.ConfigError> =>
-	Effect.forEach(tiers, ({ envPrefix, tier }) =>
-		Effect.gen(function* () {
-			const vendors = yield* providerListConfig(
-				LLM_VENDORS,
-				`${envPrefix}_PROVIDERS`,
-			)
-			// A tier whose first choice is the stub runs wholly on the stub, and the
-			// layer that builds it decides that on the first choice alone and never
-			// asks for a model. Asking here would fail a tier nobody gave a model to
-			// precisely because it was never going to need one.
-			if (vendors[0] === 'stub') return []
-			const model = yield* Config.string(`${envPrefix}_MODEL`)
-			return yield* Effect.forEach(vendors, (vendor, i) =>
-				Effect.gen(function* () {
-					if (vendor === 'stub') return []
-					const slotModel =
-						i === 0
-							? model
-							: yield* Config.string(keyForSlot(`${envPrefix}_MODEL`, i)).pipe(
-									Config.withDefault(model),
-								)
-					const baseUrl =
-						vendor === 'custom'
-							? yield* Config.string(keyForSlot(`${envPrefix}_BASE_URL`, i))
-							: LLM_BASE_URLS[vendor]
-					return [
-						{
-							tier,
-							slot: i + 1,
-							vendor,
-							model: slotModel,
-							baseUrl,
-							apiKeyEnv: keyForSlot(`${envPrefix}_API_KEY`, i),
-						} satisfies ConfiguredSlot,
-					]
-				}),
-			).pipe(Effect.map(nested => nested.flat()))
-		}),
+	Effect.gen(function* () {
+		const envPrefix = TIER_ENV_PREFIX[tier]
+		// A tier whose first choice is the stub runs wholly on the stub, and the
+		// layer that builds it decides that on the first choice alone and never
+		// asks for a model. Asking here would fail a tier nobody gave a model to
+		// precisely because it was never going to need one.
+		if (vendors[0] === 'stub') return []
+		const model = yield* Config.string(`${envPrefix}_MODEL`)
+		return yield* Effect.forEach(vendors, (vendor, i) =>
+			Effect.gen(function* () {
+				if (vendor === 'stub') return []
+				const slotModel =
+					i === 0
+						? model
+						: yield* Config.string(keyForSlot(`${envPrefix}_MODEL`, i)).pipe(
+								Config.withDefault(model),
+							)
+				const baseUrl =
+					vendor === 'custom'
+						? yield* Config.string(keyForSlot(`${envPrefix}_BASE_URL`, i))
+						: LLM_BASE_URLS[vendor]
+				return [
+					{
+						tier,
+						slot: i + 1,
+						vendor,
+						model: slotModel,
+						baseUrl,
+						apiKeyEnv: keyForSlot(`${envPrefix}_API_KEY`, i),
+					} satisfies ConfiguredSlot,
+				]
+			}),
+		).pipe(Effect.map(nested => nested.flat()))
+	})
+
+/**
+ * Every model the settings point a tier at.
+ *
+ * Read the same way a run reads them, so anything checking the settings is
+ * looking at what a run would really use. Working this out separately would be
+ * a second reading of the same settings, free to drift from the first and
+ * report on models nothing runs.
+ *
+ * Stubbed tiers are left out: they reach no vendor, so there is nothing to ask.
+ * A tier nobody named a vendor for stops the read instead, since a tier a run
+ * needs and nobody set is a fault.
+ */
+export const configuredSlots = (
+	tiers: ReadonlyArray<LlmTier> = LLM_TIERS,
+): Effect.Effect<ReadonlyArray<ConfiguredSlot>, Config.ConfigError> =>
+	Effect.forEach(tiersInRunOrder(tiers), tier =>
+		providerListConfig(LLM_VENDORS, `${TIER_ENV_PREFIX[tier]}_PROVIDERS`).pipe(
+			Effect.flatMap(vendors => slotsForVendors(tier, vendors)),
+		),
 	).pipe(Effect.map(nested => nested.flat()))
+
+/**
+ * `configuredSlots` for one tier, except that a tier nobody named a vendor for
+ * comes back empty instead of stopping the read.
+ *
+ * The two callers want opposite things from silence. A check of the models a run
+ * uses has to say which setting is missing, because a tier a run needs and
+ * nobody set is a fault. A check that only reports on what is configured has to
+ * carry on, because a tier nobody set reaches no vendor — and reading them all
+ * through the strict one would let a single unset tier hide the tiers beside it.
+ *
+ * Empty covers both ways a tier reaches nothing, the unset one and the stubbed
+ * one, because a caller that only reports has no use for the difference.
+ */
+export const configuredSlotsIfSet = (
+	tier: LlmTier,
+): Effect.Effect<ReadonlyArray<ConfiguredSlot>, Config.ConfigError> =>
+	Config.option(
+		providerListConfig(LLM_VENDORS, `${TIER_ENV_PREFIX[tier]}_PROVIDERS`),
+	).pipe(
+		Effect.flatMap(configured =>
+			Option.isNone(configured)
+				? Effect.succeed<ReadonlyArray<ConfiguredSlot>>([])
+				: slotsForVendors(tier, configured.value),
+		),
+	)
 
 // How long one model call may take before it is given up on, per tier. The
 // models these tiers run routinely think for the better part of a minute, so a
