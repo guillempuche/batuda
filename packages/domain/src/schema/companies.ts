@@ -111,6 +111,16 @@ export const CompanyLinkedin = Schema.String.pipe(
 export const CompanyGoogleMapsUrl = Schema.String.pipe(
 	Schema.check(Schema.isPattern(MAPS_ADDRESS_PATTERN)),
 )
+// A page the company keeps on a platform. A list of kind-and-address pairs
+// rather than a field per platform, because which platforms exist is not this
+// schema's business to know: the kind is stored as it arrives, the way a channel
+// always has been, so a platform nobody has met yet needs no change here. The
+// address is only asked to say something, since a kind nothing describes has no
+// shape to hold it to.
+export const CompanySocialProfile = Schema.Struct({
+	kind: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
+	value: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
+})
 // Finite rather than a plain number: a plain number also allows the words "NaN"
 // and "Infinity", which no place on Earth has, and which reach the database as a
 // server error instead of a refused value.

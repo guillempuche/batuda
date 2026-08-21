@@ -19,7 +19,10 @@ describe('ENRICHMENT_FIELDS', () => {
 		// GIVEN the field list derived from the enrichment schema
 		// THEN it is exactly the fields the model is asked to fill, which is what
 		// the fullness measure divides by — so a field added to the schema has to be
-		// added here too, on purpose, rather than quietly shifting the denominator
+		// added here too, on purpose, rather than quietly shifting the denominator.
+		// The pages a company keeps on platforms count among them, beside its
+		// mailbox and its number. Some companies publish none, but a run that could
+		// have found one and did not is exactly what this measure is for
 		expect([...ENRICHMENT_FIELDS].sort()).toEqual([
 			'country',
 			'current_tools',
@@ -28,6 +31,7 @@ describe('ENRICHMENT_FIELDS', () => {
 			'location',
 			'phone',
 			'size_range',
+			'social_profiles',
 			'tags',
 			'tax_id',
 			'website',

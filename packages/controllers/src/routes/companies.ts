@@ -19,6 +19,7 @@ import {
 	CompanyPriority,
 	CompanySizeRange,
 	CompanySlug,
+	CompanySocialProfile,
 	CompanyStatus,
 	CompanyWebsite,
 	Contact,
@@ -92,6 +93,10 @@ export const CreateCompanyInput = Schema.Struct({
 	phone: Schema.optional(CompanyPhone),
 	instagram: Schema.optional(CompanyInstagram),
 	linkedin: Schema.optional(CompanyLinkedin),
+	// Every other platform the company keeps a page on. Instagram and LinkedIn
+	// keep their own fields because callers already send them that way; anything
+	// else arrives here, and all of them are stored the same.
+	socialProfiles: Schema.optional(Schema.Array(CompanySocialProfile)),
 	googleMapsUrl: Schema.optional(CompanyGoogleMapsUrl),
 	productsFit: Schema.optional(Schema.Array(Schema.String)),
 	tags: Schema.optional(Schema.Array(Schema.String)),
@@ -135,6 +140,7 @@ export const UpdateCompanyInput = Schema.Struct({
 	phone: Schema.optional(Schema.NullOr(CompanyPhone)),
 	instagram: Schema.optional(Schema.NullOr(CompanyInstagram)),
 	linkedin: Schema.optional(Schema.NullOr(CompanyLinkedin)),
+	socialProfiles: Schema.optional(Schema.Array(CompanySocialProfile)),
 	googleMapsUrl: Schema.optional(Schema.NullOr(CompanyGoogleMapsUrl)),
 	productsFit: Schema.optional(Schema.NullOr(Schema.Array(Schema.String))),
 	tags: Schema.optional(Schema.NullOr(Schema.Array(Schema.String))),

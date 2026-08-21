@@ -33,6 +33,7 @@ export const CHANNEL_KINDS = [
 	'linkedin',
 	'x',
 	'instagram',
+	'facebook',
 	'website',
 	'bluesky',
 ] as const
@@ -49,6 +50,12 @@ export const INSTAGRAM_ADDRESS_PATTERN =
 	/^(@?[A-Za-z0-9._]{1,30}|https?:\/\/(www\.)?instagram\.com\/.+)$/
 export const LINKEDIN_ADDRESS_PATTERN =
 	/^(https?:\/\/)?([a-z]{2,3}\.)?linkedin\.com\/.+$/i
+// Something has to follow the host, so the platform's own home page is not an
+// address for anybody. Any subdomain counts, since Facebook serves each country
+// and the phone from its own ("es-la.facebook.com", "m.facebook.com") and that
+// is the address a person copies.
+export const FACEBOOK_ADDRESS_PATTERN =
+	/^(https?:\/\/)?([a-z0-9-]+\.)*facebook\.com\/.+$/i
 export const MAPS_ADDRESS_PATTERN =
 	/^https?:\/\/([a-z0-9-]+\.)*(google\.[a-z.]+|goo\.gl)\/.+/i
 
@@ -59,6 +66,7 @@ const BY_KIND: Record<string, RegExp> = {
 	website: WEBSITE_ADDRESS_PATTERN,
 	instagram: INSTAGRAM_ADDRESS_PATTERN,
 	linkedin: LINKEDIN_ADDRESS_PATTERN,
+	facebook: FACEBOOK_ADDRESS_PATTERN,
 }
 
 /**

@@ -63,6 +63,19 @@ const COMPANY_CHANNEL_FIELDS = [
 	'linkedin',
 ] as const
 
+// The one field that carries several ways of reaching a company at once. Kept
+// apart from the named fields above because it holds a LIST, and because what a
+// caller may put in it is not a fixed set: the platform is stored as it arrives.
+//
+// Both spellings, because both callers are real: a typed client and an MCP tool
+// send the camelCase name, while a research proposal carries the model's own
+// snake_case one. The named fields above are single words and so never had this
+// problem.
+const SOCIAL_PROFILES_FIELDS = new Set(['socialProfiles', 'social_profiles'])
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+	typeof value === 'object' && value !== null && !Array.isArray(value)
+
 /**
  * Separate a company's write into the columns it really has and the ways of
  * reaching it, which live elsewhere now.
@@ -80,6 +93,22 @@ export const splitCompanyChannelFields = (
 	const columns: Record<string, unknown> = {}
 	const channels: Array<ChannelInput> = []
 	for (const [key, value] of Object.entries(data)) {
+		if (SOCIAL_PROFILES_FIELDS.has(key)) {
+			// None of these is marked as the one to use for its kind: a company's
+			// Facebook page is the only Facebook page it has, and the mark would go
+			// to whichever arrived last if it ever had two. An entry missing its
+			// platform or its address is stepped over rather than refusing the whole
+			// write, since these come out of a model's free-form answer.
+			for (const entry of Array.isArray(value) ? value : []) {
+				if (!isPlainObject(entry)) continue
+				const kind = entry['kind']
+				const address = entry['value']
+				if (typeof kind !== 'string' || typeof address !== 'string') continue
+				if (kind.trim() === '' || address.trim() === '') continue
+				channels.push({ kind: kind.trim(), value: address.trim() })
+			}
+			continue
+		}
 		if (!(COMPANY_CHANNEL_FIELDS as ReadonlyArray<string>).includes(key)) {
 			columns[key] = value
 			continue

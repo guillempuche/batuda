@@ -24,6 +24,7 @@ export const useChannelKindLabel = (): ((kind: string) => string) => {
 		website: t`Website`,
 		linkedin: t`LinkedIn`,
 		instagram: t`Instagram`,
+		facebook: t`Facebook`,
 		x: t`X`,
 		bluesky: t`Bluesky`,
 	} satisfies Record<ChannelKind, string>

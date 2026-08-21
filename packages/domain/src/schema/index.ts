@@ -54,6 +54,7 @@ export {
 	CompanyPriority,
 	CompanySizeRange,
 	CompanySlug,
+	CompanySocialProfile,
 	CompanyStatus,
 	CompanyWebsite,
 } from './companies'

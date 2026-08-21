@@ -60,6 +60,8 @@
  * ordinary; platforms among these markets' installers and carriers are not.
  */
 
+import { hostOf, isBareWebAddress } from './source-key'
+
 // Matched on the host alone, whatever path follows: a profile, a post and the
 // home page alike are somebody's account rather than a company's own site.
 const SOCIAL_PLATFORMS = [
@@ -93,4 +95,185 @@ export const isSocialPlatformHost = (host: string): boolean => {
 	return SOCIAL_PLATFORMS.some(
 		platform => tidied === platform || tidied.endsWith(`.${platform}`),
 	)
+}
+
+/**
+ * A way of reaching a company on a platform: which platform, and the address.
+ *
+ * The address is not the company's website — that is what the check above
+ * settles — but its page on a platform is still worth keeping, the way its
+ * telephone number is.
+ */
+export interface SocialProfile {
+	/** The platform, as a channel is stored under: "facebook", "linkedin", … */
+	readonly kind: string
+	/** The address as it was given. */
+	readonly value: string
+}
+
+// Which platform a host belongs to, under the name a channel is stored by. The
+// two names Twitter answers to are one platform and one channel.
+const KIND_BY_HOST: ReadonlyArray<readonly [string, string]> = [
+	['facebook.com', 'facebook'],
+	['instagram.com', 'instagram'],
+	['linkedin.com', 'linkedin'],
+	['x.com', 'x'],
+	['twitter.com', 'x'],
+	['tiktok.com', 'tiktok'],
+	['youtube.com', 'youtube'],
+	['threads.net', 'threads'],
+]
+
+// The words each platform has taken for itself, so an address starting with one
+// names no account. A refusal list rather than a list of the names allowed,
+// because what a company may call itself is unbounded while what the platform
+// has taken is not.
+const RESERVED: Record<string, ReadonlySet<string>> = {
+	facebook: new Set([
+		'groups',
+		'share',
+		'sharer.php',
+		'watch',
+		'reel',
+		'story.php',
+		'permalink.php',
+		'profile.php',
+		'photo',
+		'photo.php',
+		'media',
+		'events',
+		'marketplace',
+		'hashtag',
+		'search',
+		'pages',
+		'p',
+		'login',
+		'help',
+		'policies',
+	]),
+	instagram: new Set([
+		'p',
+		'reel',
+		'reels',
+		'explore',
+		'stories',
+		'tv',
+		'accounts',
+		'direct',
+	]),
+	x: new Set([
+		'i',
+		'home',
+		'search',
+		'explore',
+		'hashtag',
+		'intent',
+		'share',
+		'status',
+		'notifications',
+		'messages',
+		'settings',
+	]),
+}
+
+// The path with its capitals left on. `pathOf` folds a path to lowercase, which
+// is what comparing a segment against a word a platform reserved wants and the
+// opposite of what the address itself wants: a YouTube channel is filed under an
+// id where the capitals count, so a lowercased one links to nothing.
+const pathAsWritten = (url: string): string => {
+	const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(url)
+		? url
+		: `https://${url}`
+	try {
+		return new URL(withScheme).pathname
+	} catch {
+		return ''
+	}
+}
+
+/**
+ * The company's own page on a platform, or null when the address is not one.
+ *
+ * A page a company opened in its own name is a way of reaching it. A post inside
+ * somebody's group, a video, a share link that spells nothing, a person's own
+ * profile — none of those is, and recording one as "the company's Facebook"
+ * writes down something that was never true. So each platform is read for the
+ * shape its ACCOUNT pages take, and everything else is refused.
+ *
+ * The refusals are the point, and the two addresses a market search actually
+ * offered are both among them: "facebook.com/share/1CtPJpK3i7/" says only that
+ * somebody pressed share, and "instagram.com/p/DTxItU0lfKN/" is one post, which
+ * belongs to an account this address does not name. Neither becomes a channel.
+ *
+ * Refusing a real page costs a way of reaching the company that nobody had a
+ * minute ago, and anybody who looks can put it back. Accepting one that is not
+ * the company's puts a stranger's page on the row under the company's own name,
+ * where the next person to read it has no reason to doubt it. So an address that
+ * does not plainly take the shape of an account is refused.
+ */
+export const socialProfileOf = (url: string): SocialProfile | null => {
+	const host = hostOf(url)
+	if (host === null || !isBareWebAddress(url)) return null
+	const tidied = host.trim().toLowerCase().replace(/\.$/, '')
+	const matched = KIND_BY_HOST.find(
+		([site]) => tidied === site || tidied.endsWith(`.${site}`),
+	)
+	if (matched === undefined) return null
+	const [site, kind] = matched
+
+	const segments = pathAsWritten(url)
+		.split('/')
+		.filter(Boolean)
+		.map(segment => segment.trim())
+	const written = segments[0]
+	if (written === undefined) return null
+	// Compared in one case, kept in the other: which word a platform reserved is
+	// not a question about capitals, while the address itself is.
+	const first = written.toLowerCase()
+
+	// The answer if the address does turn out to take the shape of an account.
+	//
+	// Written back from what was read rather than kept as it arrived, because this
+	// becomes a stored way of reaching the company and two spellings of one page
+	// would be stored as two — a company listed as having two Facebooks. So the
+	// platform's own host stands in for whichever door the address came through
+	// (the mobile one, a country's), the trailing slash goes, and so do the
+	// tracking parameters a shared link picks up: a page is the same page whichever
+	// link reached it.
+	const profile = {
+		kind,
+		value: `https://${site}/${segments.join('/')}`,
+	}
+
+	// A company keeps its page under "company" or "showcase"; "in" is one person,
+	// and a person is not the company however senior they are.
+	if (kind === 'linkedin')
+		return segments.length === 2 &&
+			(first === 'company' || first === 'showcase')
+			? profile
+			: null
+
+	// The handle platforms write an account as "@name" and everything else under a
+	// word of their own, so the mark IS the tell and no refusal list is needed.
+	if (kind === 'tiktok' || kind === 'threads')
+		return segments.length === 1 && first.startsWith('@') ? profile : null
+
+	// A channel is written four ways here, one of them the same "@name" the others
+	// use, and the rest a word of YouTube's own followed by the name.
+	if (kind === 'youtube') {
+		if (segments.length === 1 && first.startsWith('@')) return profile
+		return segments.length === 2 &&
+			(first === 'c' || first === 'channel' || first === 'user')
+			? profile
+			: null
+	}
+
+	// The rest put an account at the top level, so one segment that the platform
+	// has not reserved is the account's own name. A platform read this way with no
+	// list of its own words yet would take every address as an account, so it is
+	// refused until somebody writes the list — the direction this file is allowed
+	// to be wrong in.
+	const reserved = RESERVED[kind]
+	if (reserved === undefined) return null
+	return segments.length === 1 && !reserved.has(first) ? profile : null
 }

@@ -2467,6 +2467,10 @@ msgstr "Extraient conclusions"
 msgid "Extracting findings."
 msgstr "Extraient conclusions."
 
+#: src/components/contacts/channel-kind-label.tsx
+msgid "Facebook"
+msgstr "Facebook"
+
 #: src/components/research/findings/company-enrichment-view.tsx
 msgid "Fail"
 msgstr "No compleix"

@@ -5,6 +5,7 @@ import {
 	DiscoveredExisting,
 	PendingPaidAction,
 	ProposedUpdate,
+	SocialProfile,
 	Sourced,
 } from './_shared'
 
@@ -71,10 +72,15 @@ export const CompanyEnrichmentV1Schema = Schema.Struct({
 			Sourced(
 				Schema.String.annotate({
 					description:
-						"The company's own official website. It must be the site the company runs — not a directory or aggregator profile page about the company, and not a social-media page.",
+						"The company's own official website. It must be the site the company runs — not a directory or aggregator profile page about the company, and not a social-media page. A page on a platform goes in `social_profiles` instead, even when it is the only web presence you can find.",
 				}),
 			),
 		),
+		// Where the social-media pages the website field refuses belong. A company
+		// with no site of its own often has one of these and nothing else, and it
+		// is worth keeping as a way of reaching the company rather than being lost
+		// for not being a website.
+		social_profiles: Schema.optionalKey(Schema.Array(SocialProfile)),
 	}),
 	// The fit judgement the run reaches. It was previously written only into the
 	// human brief and lost from the structured output, so a consumer reading
