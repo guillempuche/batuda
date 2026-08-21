@@ -21,6 +21,7 @@ export const CHANNEL_ICON: Record<string, typeof MailIcon> = {
 	linkedin: Briefcase,
 	x: AtSign,
 	instagram: AtSign,
+	facebook: AtSign,
 	website: Globe,
 	bluesky: AtSign,
 } satisfies Record<ChannelKind, typeof MailIcon>

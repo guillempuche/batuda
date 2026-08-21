@@ -140,3 +140,30 @@ export const PendingPaidAction = Schema.Struct({
 	estimated_cents: LenientNumber,
 	reason: Schema.String,
 })
+
+// A company's page on a social platform, as a run reports one.
+//
+// Deliberately NOT the open channel list a contact carries. A contact has no
+// named way of holding an email or a telephone number, so its list is the only
+// door and has to take everything. A company already names its mailbox, its
+// number and its website, and a second list that also accepted those would give
+// one company two answers to "what is its email", which is the very thing those
+// named fields exist to prevent. So this holds only what they cannot: the pages
+// a company keeps on platforms, which are not its website.
+//
+// `kind` stays free text rather than a fixed list, because a platform nobody has
+// met yet needs no change here and an unknown one is stored and shown as it
+// arrived. What bounds it in practice is the description the model is given.
+export const SocialProfile = Schema.Struct({
+	kind: Schema.String.annotate({
+		description:
+			'The platform, lowercase and on its own: facebook, instagram, linkedin, x, tiktok, youtube, threads.',
+	}),
+	value: Schema.String.annotate({
+		description: "The full address of the company's page on that platform.",
+	}),
+	// Required + nullable for the same reason a citation's confidence is: an
+	// optionalKey around a union serialises to a nested anyOf that a strict
+	// provider refuses, so a profile with no confidence sends null.
+	confidence: LenientNumber,
+})

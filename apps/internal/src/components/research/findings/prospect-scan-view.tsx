@@ -44,6 +44,13 @@ import {
 type ProspectEntry = {
 	readonly name: string
 	readonly website?: string
+	// A company with no site of its own often has one of these and nothing else,
+	// so they travel with the lead rather than staying in a finding nobody opens
+	// again.
+	readonly social_profiles?: ReadonlyArray<{
+		readonly kind: string
+		readonly value: string
+	}>
 	readonly tax_id?: string
 	readonly industry?: string
 	readonly country?: string
@@ -236,6 +243,14 @@ function AddAsLeadButton({
 	)
 	const [busy, setBusy] = useState(false)
 
+	// Only the pages that say both what platform they are and where. These come out
+	// of a model's answer, and one blank entry would otherwise make the whole
+	// request invalid — losing the lead over a footnote, with nothing on screen to
+	// say which row was at fault.
+	const usableProfiles = (prospect.social_profiles ?? [])
+		.filter(p => p.kind.trim() !== '' && p.value.trim() !== '')
+		.map(p => ({ kind: p.kind.trim(), value: p.value.trim() }))
+
 	const add = async () => {
 		setBusy(true)
 		const slug = toSlug(prospect.name)
@@ -248,6 +263,9 @@ function AddAsLeadButton({
 				...(prospect.country ? { country: prospect.country } : {}),
 				...(prospect.location ? { location: prospect.location } : {}),
 				...(prospect.website ? { website: prospect.website } : {}),
+				...(usableProfiles.length > 0
+					? { socialProfiles: usableProfiles }
+					: {}),
 			},
 		})
 		if (exit._tag !== 'Success') {

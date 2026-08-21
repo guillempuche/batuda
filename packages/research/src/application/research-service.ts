@@ -171,6 +171,7 @@ import {
 	schemaFieldNames,
 	schemaNameFor,
 } from './schemas/index'
+import { rescueSocialWebsites } from './social-website-rescue'
 import {
 	hostOf,
 	isWebAddress,
@@ -2883,19 +2884,25 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						pass: 'extraction' | 'folded',
 					) =>
 						Effect.gen(function* () {
+							// A company's page on a platform, moved onto the company before the
+							// check below can drop it for not being a website. Run first so that
+							// what the check condemns is what nothing could keep, and so the check
+							// itself goes on only ever taking values away.
+							const rescue = rescueSocialWebsites(answer)
+
 							// Which sites this run watched file several of its own companies. Worked
 							// out per call rather than once, because the organisation-kind link drops
 							// the rows that are not companies at all, a trade body's own name must not
 							// be one of the names a host is judged by, and a fold puts companies in
 							// front of the watch that no single extraction held.
 							const directories = observeDirectorySites({
-								findings: answer,
+								findings: rescue.findings,
 								listField: discoveryResultField(schemaName),
 								addresses: [...gatheredAddresses],
 								tradeWords: runTradeWords,
 							})
 							const check = guardCompanyWebsites({
-								findings: answer,
+								findings: rescue.findings,
 								targetName,
 								directorySites: directories.sites,
 								priorClaims: websiteClaims,
@@ -2909,7 +2916,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								check.blankedProfilePage +
 								check.blankedSharedHost +
 								check.blankedReadPage
-							if (blanked > 0) {
+							if (blanked > 0 || rescue.rescued > 0) {
 								yield* Effect.logWarning('research.websites.blanked').pipe(
 									Effect.annotateLogs({
 										event: 'research.websites.blanked',
@@ -2920,6 +2927,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										pass,
 										blanked_not_an_address: check.blankedNotAnAddress,
 										blanked_social_page: check.blankedSocialPage,
+										// Pages kept as a way of reaching the company rather than
+										// dropped — read beside the blanks, since a run that rescued
+										// several and blanked none is a different run from a quiet one.
+										rescued_social_profile: rescue.rescued,
 										blanked_directory: check.blankedDirectory,
 										blanked_profile_page: check.blankedProfilePage,
 										blanked_shared_host: check.blankedSharedHost,
@@ -2952,7 +2963,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									}),
 								)
 							}
-							return { check, blanked, directories }
+							return { check, blanked, directories, rescued: rescue.rescued }
 						})
 
 					// Phase-2 extraction + every grounding guard, shared so both the
@@ -3448,12 +3459,15 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									name: 'websites',
 									run: findings =>
 										Effect.gen(function* () {
-											const { check, blanked, directories } =
+											const { check, blanked, directories, rescued } =
 												yield* checkWebsites(findings, 'extraction')
 											return {
 												findings: check.findings,
 												spanCounts: {
 													'research.websites.blanked': blanked,
+													// A page kept as a way of reaching the company
+													// instead of being dropped for not being a website.
+													'research.websites.rescued_social': rescued,
 													// Both numbers, because they say different things: no
 													// directory found out of no addresses read is plumbing
 													// broken, out of two hundred it is a real quiet answer.

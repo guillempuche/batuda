@@ -18,6 +18,7 @@ import {
 	CompanyPriority,
 	CompanySizeRange,
 	CompanySlug,
+	CompanySocialProfile,
 	CompanyStatus,
 	CompanyWebsite,
 	HandSetVerificationVerdict,
@@ -122,6 +123,10 @@ const companyInputFields = {
 	phone: Schema.optional(CompanyPhone),
 	instagram: Schema.optional(CompanyInstagram),
 	linkedin: Schema.optional(CompanyLinkedin),
+	socialProfiles: Schema.optional(Schema.Array(CompanySocialProfile)).annotate({
+		description:
+			"The pages this company keeps on social platforms, each as { kind, value } — kind lowercase and on its own ('facebook', 'tiktok'), value the full address. A page on a platform is not a website: put it here, never in `website`. Use manage_company_channels to change one later.",
+	}),
 	googleMapsUrl: Schema.optional(CompanyGoogleMapsUrl),
 	productsFit: Schema.optional(Schema.Array(Schema.String)),
 	tags: Schema.optional(Schema.Array(Schema.String)),
@@ -201,6 +206,12 @@ const UpdateCompany = Tool.make('update_company', {
 		email: Schema.optional(CompanyEmail),
 		phone: Schema.optional(CompanyPhone),
 		instagram: Schema.optional(CompanyInstagram),
+		socialProfiles: Schema.optional(
+			Schema.Array(CompanySocialProfile),
+		).annotate({
+			description:
+				'The pages this company keeps on social platforms, each as { kind, value }. A page on a platform is not a website: put it here, never in `website`.',
+		}),
 		linkedin: Schema.optional(CompanyLinkedin),
 		googleMapsUrl: Schema.optional(CompanyGoogleMapsUrl),
 		productsFit: Schema.optional(Schema.Array(Schema.String)),
