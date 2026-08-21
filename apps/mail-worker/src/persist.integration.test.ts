@@ -197,8 +197,9 @@ const fetchThreadLink = async (externalThreadId: string) => {
 	const rows = await pool.query<{
 		company_id: string | null
 		contact_id: string | null
+		subject: string | null
 	}>(
-		`SELECT company_id, contact_id FROM email_thread_links WHERE external_thread_id = $1`,
+		`SELECT company_id, contact_id, subject FROM email_thread_links WHERE external_thread_id = $1`,
 		[externalThreadId],
 	)
 	return rows.rows[0]
@@ -334,7 +335,7 @@ describe('persistMessage — CRM auto-link', () => {
 			// THEN the thread link still points at Acme (ON CONFLICT DO UPDATE preserves company_id)
 			const link = await fetchThreadLink(rootMessageId)
 			expect(link?.company_id).toBe(acmeCompanyId)
-			// [apps/mail-worker/src/persist.ts — DO UPDATE clause only touches updated_at]
+			// [DO UPDATE clause leaves company_id alone]
 		})
 	})
 
@@ -355,6 +356,185 @@ describe('persistMessage — CRM auto-link', () => {
 			expect(row?.company_id).toBeNull()
 			expect(row?.contact_id).toBeNull()
 			// [apps/mail-worker/src/persist.ts — `args.parsed.fromAddress ? matcher.match(…) : new NoMatch(…)` null-guard]
+		})
+	})
+})
+
+// Replies are sent under the conversation's subject, so a conversation that
+// never got one sends a message with no subject line at all — which arrives as
+// "(no subject)" and scores as spam.
+describe('persistMessage — the conversation keeps a subject', () => {
+	describe('when the first message on a conversation arrives', () => {
+		it('should put its subject on the conversation', async () => {
+			// GIVEN an arriving message with a subject
+			const rootMessageId = `<subject-root-${randomUUID()}@example>`
+			await runIngest(
+				persist(
+					buildParsed({
+						messageId: rootMessageId,
+						subject: 'your pallet pools',
+					}),
+				),
+			)
+
+			// THEN the conversation carries it
+			const link = await fetchThreadLink(rootMessageId)
+			expect(link?.subject).toBe('your pallet pools')
+		})
+	})
+
+	describe('when a later message arrives on the same conversation', () => {
+		it('should not rename the conversation', async () => {
+			// GIVEN a conversation started under one subject
+			const rootMessageId = `<subject-keep-${randomUUID()}@example>`
+			await runIngest(
+				persist(
+					buildParsed({
+						messageId: rootMessageId,
+						subject: 'your pallet pools',
+					}),
+				),
+			)
+
+			// WHEN a reply arrives with the subject rewritten
+			await runIngest(
+				persist(
+					buildParsed({
+						messageId: `<subject-keep-reply-${randomUUID()}@example>`,
+						inReplyTo: rootMessageId,
+						subject: 'Re: your pallet pools — revised',
+					}),
+				),
+			)
+
+			// THEN the conversation keeps the subject it started with
+			// AND replies keep going out under a stable subject
+			const link = await fetchThreadLink(rootMessageId)
+			expect(link?.subject).toBe('your pallet pools')
+		})
+	})
+
+	describe('when the first message had no subject', () => {
+		it('should fill one in from the next message that has one', async () => {
+			// GIVEN a conversation started by a message with no subject
+			const rootMessageId = `<subject-backfill-${randomUUID()}@example>`
+			await runIngest(
+				persist(buildParsed({ messageId: rootMessageId, subject: null })),
+			)
+			const before = await fetchThreadLink(rootMessageId)
+			expect(before?.subject).toBeNull()
+
+			// WHEN a later message on it does have one
+			await runIngest(
+				persist(
+					buildParsed({
+						messageId: `<subject-backfill-reply-${randomUUID()}@example>`,
+						inReplyTo: rootMessageId,
+						subject: 'your pallet pools',
+					}),
+				),
+			)
+
+			// THEN the conversation picks it up rather than staying blank
+			// [COALESCE(NULLIF(subject, ''), EXCLUDED.subject)]
+			const after = await fetchThreadLink(rootMessageId)
+			expect(after?.subject).toBe('your pallet pools')
+		})
+
+		it('should fill one in when the first message had an empty one', async () => {
+			// GIVEN a first message whose subject is present but empty, which
+			// sends just as badly as none at all
+			const rootMessageId = `<subject-empty-${randomUUID()}@example>`
+			await runIngest(
+				persist(buildParsed({ messageId: rootMessageId, subject: '' })),
+			)
+
+			// WHEN a later message on it carries a real one
+			await runIngest(
+				persist(
+					buildParsed({
+						messageId: `<subject-empty-reply-${randomUUID()}@example>`,
+						inReplyTo: rootMessageId,
+						subject: 'your pallet pools',
+					}),
+				),
+			)
+
+			// THEN the empty one is replaced rather than kept
+			// [NULLIF(subject, '')]
+			const link = await fetchThreadLink(rootMessageId)
+			expect(link?.subject).toBe('your pallet pools')
+		})
+	})
+
+	describe('when the conversation starts with a message we sent', () => {
+		it('should put its subject on the conversation too', async () => {
+			// GIVEN our own message, read back from the sent folder
+			const rootMessageId = `<subject-outbound-${randomUUID()}@example>`
+			await runIngest(
+				persistIn(
+					buildParsed({
+						messageId: rootMessageId,
+						subject: 'your pallet pools',
+					}),
+					{ folder: 'Sent', direction: 'outbound' },
+				),
+			)
+
+			// THEN the conversation carries it, so a later reply has a subject
+			// to borrow whichever way the conversation began
+			const link = await fetchThreadLink(rootMessageId)
+			expect(link?.subject).toBe('your pallet pools')
+		})
+	})
+})
+
+describe('persistMessage — a message can be found in its conversation', () => {
+	describe('when a reply names only the message it answers', () => {
+		it('should still show up in the conversation it belongs to', async () => {
+			// GIVEN a conversation of three: a first message, a reply to it, and
+			// a reply to THAT one which names only its immediate parent — the
+			// shape a client sends when it writes In-Reply-To and no References,
+			// and the shape a client that trims a long chain sends too
+			const root = `<find-root-${randomUUID()}@example>`
+			const middle = `<find-middle-${randomUUID()}@example>`
+			const last = `<find-last-${randomUUID()}@example>`
+			await runIngest(persist(buildParsed({ messageId: root, subject: 'q' })))
+			await runIngest(
+				persist(
+					buildParsed({
+						messageId: middle,
+						inReplyTo: root,
+						references: [root],
+						subject: 'Re: q',
+					}),
+				),
+			)
+			await runIngest(
+				persist(
+					buildParsed({
+						messageId: last,
+						inReplyTo: middle,
+						references: [middle],
+						subject: 'Re: q',
+					}),
+				),
+			)
+
+			// THEN all three are in the conversation
+			// AND without the conversation's own id on the last one it would be
+			// filed correctly and then never shown, counted, or marked unread —
+			// which is how a customer's answer goes missing
+			const rows = await pool.query<{ message_id: string }>(
+				`SELECT message_id FROM email_messages
+				 WHERE organization_id = $1
+				   AND (message_id = $2 OR "references" @> ARRAY[$2]::text[])
+				 ORDER BY received_at`,
+				[ORG_ID, root],
+			)
+			expect(rows.rows.map(r => r.message_id).sort()).toEqual(
+				[root, middle, last].sort(),
+			)
 		})
 	})
 })

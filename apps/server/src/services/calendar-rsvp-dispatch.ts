@@ -39,13 +39,18 @@ export const dispatchRsvpReply = (args: {
 		// and move on rather than failing the RSVP.
 		const eventRows = yield* sql<{
 			metadata: Record<string, unknown> | null
+			title: string | null
 		}>`
-			SELECT metadata
+			SELECT metadata, title
 			FROM calendar_events
 			WHERE id = ${args.calendarEventId}
 			LIMIT 1
 		`
 		const meta = eventRows[0]?.metadata ?? null
+		// An invitation thread nearly always carries a subject to answer under,
+		// but this reply has to go out either way — an accept nobody receives
+		// reads to the organiser as no answer at all.
+		const eventTitle = eventRows[0]?.title ?? null
 		const sourceEmailMessageId =
 			meta && typeof meta === 'object' && 'sourceEmailMessageId' in meta
 				? (meta as { sourceEmailMessageId?: unknown }).sourceEmailMessageId
@@ -79,6 +84,15 @@ export const dispatchRsvpReply = (args: {
 			 )
 			WHERE em.id = ${sourceEmailMessageId}
 			  AND em.organization_id = ${currentOrg.id}
+			-- A conversation can hold more than one of these rows when its
+			-- first message was taken in after a reply that named it, so pick
+			-- deterministically rather than whichever comes back first. A
+			-- references chain runs oldest first, so the earliest entry that
+			-- has a conversation is the conversation — the message's own id
+			-- would name the later split instead, which holds only the tail.
+			ORDER BY array_position(em."references", etl.external_thread_id)
+			           ASC NULLS LAST,
+			         etl.created_at ASC, etl.id ASC
 			LIMIT 1
 		`
 		const threadLinkId = linkRows[0]?.id
@@ -112,6 +126,8 @@ export const dispatchRsvpReply = (args: {
 		yield* email
 			.reply(threadLinkId, body, {
 				skipFooter: true,
+				...(eventTitle !== null &&
+					eventTitle.trim() !== '' && { fallbackSubject: eventTitle }),
 				rawAttachments: [
 					{
 						filename: 'invite.ics',

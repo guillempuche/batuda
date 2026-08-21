@@ -2,7 +2,7 @@ import { Effect, Stream } from 'effect'
 import { HttpServerResponse, Multipart } from 'effect/unstable/http'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 
-import { BadRequest, BatudaApi } from '@batuda/controllers'
+import { BatudaApi } from '@batuda/controllers'
 
 import { EmailService } from '../services/email'
 import {
@@ -69,7 +69,9 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 						)
 						.pipe(
 							// Surface the inbox-state failures as the route's declared
-							// 409s; collapse internal errors to die().
+							// 409s; collapse internal errors to die(). A refused send is
+							// declared separately and travels on its own, so the reader
+							// is told what to fix while a real fault still reads as one.
 							Effect.catchTag('EmailError', e => Effect.die(e)),
 							Effect.catchTag('SqlError', e => Effect.die(e)),
 							Effect.catchTag('SmtpSendFailed', e => Effect.die(e)),
@@ -84,6 +86,9 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 							}),
 							...(_.payload.preview !== undefined && {
 								preview: _.payload.preview,
+							}),
+							...(_.payload.subject !== undefined && {
+								subject: _.payload.subject,
 							}),
 							...(_.payload.attachments !== undefined && {
 								attachmentRefs: toStagingRefs(_.payload.attachments),
@@ -380,8 +385,9 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 				.handle('sendDraft', _ =>
 					svc.sendDraft(_.payload.inboxId, _.params.draftId).pipe(
 						Effect.catchTags({
-							EmailError: e =>
-								Effect.fail(new BadRequest({ message: e.message })),
+							// A refused send is declared on the route and travels out on
+							// its own; only real faults are collapsed here.
+							EmailError: e => Effect.die(e),
 							NotFound: e => Effect.fail(e),
 							InboxInactive: e => Effect.die(e),
 							GrantUnavailable: e => Effect.die(e),

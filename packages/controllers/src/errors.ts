@@ -56,6 +56,20 @@ export class EmailError extends Schema.TaggedErrorClass<EmailError>()(
 	{ message: Schema.String },
 ) {}
 
+/**
+ * A message that was not put on the wire because of the shape it was in, not
+ * because anything failed. Both shapes it names are read as spam by receiving
+ * servers, and both are the sender's to fix.
+ *
+ * It carries the reason rather than a sentence, so the side facing the reader
+ * writes the wording in their language and telemetry can count the reasons
+ * apart. Returned as 400.
+ */
+export class EmailNotSendable extends Schema.TaggedErrorClass<EmailNotSendable>()(
+	'EmailNotSendable',
+	{ reason: Schema.Literals(['no_subject', 'forged_reply']) },
+) {}
+
 // ── Inbox lifecycle errors (route-level, status-mapped) ──
 
 /** No default inbox configured for the calling member. Returned as 409. */

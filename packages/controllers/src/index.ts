@@ -4,6 +4,7 @@ export {
 	ConfirmRequired,
 	Conflict,
 	EmailError,
+	EmailNotSendable,
 	EmailSendError,
 	EmailSendErrorKind,
 	EmailSuppressed,

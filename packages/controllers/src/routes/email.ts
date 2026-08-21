@@ -10,6 +10,7 @@ import { EmailBlocks } from '@batuda/email/schema'
 
 import {
 	BadRequest,
+	EmailNotSendable,
 	EmailSuppressed,
 	GrantAuthFailed,
 	GrantConnectFailed,
@@ -175,6 +176,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 			}),
 			error: [
 				EmailSuppressed.pipe(HttpApiSchema.status(409)),
+				EmailNotSendable.pipe(HttpApiSchema.status(400)),
 				BadRequest.pipe(HttpApiSchema.status(400)),
 				...InboxOpFailures,
 			],
@@ -186,6 +188,10 @@ export const EmailGroup = HttpApiGroup.make('email')
 				threadId: Schema.String,
 				bodyJson: EmailBlocks,
 				preview: Schema.optional(Schema.String),
+				// Omitted, the thread's own subject is used, prefixed "Re: ".
+				// Supplied, it wins — the only way to answer a thread whose
+				// messages never carried a subject to borrow.
+				subject: Schema.optional(Schema.String),
 				cc: Schema.optional(Schema.Array(Schema.String)),
 				bcc: Schema.optional(Schema.Array(Schema.String)),
 				attachments: Schema.optional(Schema.Array(SendAttachmentRef)),
@@ -197,6 +203,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 			}),
 			error: [
 				EmailSuppressed.pipe(HttpApiSchema.status(409)),
+				EmailNotSendable.pipe(HttpApiSchema.status(400)),
 				BadRequest.pipe(HttpApiSchema.status(400)),
 				NotFound.pipe(HttpApiSchema.status(404)),
 				...InboxOpFailures,
@@ -518,6 +525,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 			}),
 			error: [
 				EmailSuppressed.pipe(HttpApiSchema.status(409)),
+				EmailNotSendable.pipe(HttpApiSchema.status(400)),
 				BadRequest.pipe(HttpApiSchema.status(400)),
 				NotFound.pipe(HttpApiSchema.status(404)),
 			],

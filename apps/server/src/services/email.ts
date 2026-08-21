@@ -17,6 +17,7 @@ import {
 	CurrentOrg,
 	EmailError,
 	EmailMessageRecord,
+	EmailNotSendable,
 	EmailSuppressed,
 	EmailThreadDetail,
 	EmailThreadList,
@@ -135,6 +136,91 @@ export const retrySmtpSend = <A, E>(
 		Effect.retry(smtpRetrySchedule),
 		Effect.mapError(cause => new SmtpSendFailed({ cause, inboxId })),
 	)
+
+// A reply carries the conversation it answers in its `References` header: the
+// parent's own chain with the parent's Message-ID added on the end. That is
+// what a mail client reads to hang the message under the right one — sending
+// only the first and last links leaves it guessing, and strict readers lose
+// the middle of the conversation.
+//
+// The first message stays at the front, because a conversation is found here
+// by looking for it in this list. A very long conversation keeps that one plus
+// the most recent links rather than letting the header grow without end, which
+// is what mail clients do.
+const MAX_REFERENCES = 20
+
+// One rule for "does this subject already read as a reply", used everywhere a
+// subject is prefixed or judged. Three slightly different spellings of it used
+// to disagree: a subject written "Re : quote" was left alone on one send path
+// and stacked into "Re: Re : quote" on another.
+const REPLY_PREFIX = /^\s*re\s*:/i
+
+const withReplyPrefix = (subject: string): string =>
+	REPLY_PREFIX.test(subject) ? subject : `Re: ${subject}`
+
+export const buildReferences = (args: {
+	readonly root: string
+	readonly parentReferences: readonly string[]
+	readonly parentMessageId: string
+}): string[] => {
+	// A stored chain comes back from a text column that can hold blanks and
+	// nulls; anything that is not a usable id is dropped before it reaches the
+	// header, where a null would otherwise be written as the word "null".
+	const usable = (id: unknown): id is string =>
+		typeof id === 'string' && id.trim() !== ''
+	// The parent's own ancestors, oldest first, with the parent itself taken
+	// out so it can sit on the end — a reader takes the last entry to be the
+	// message this one answers.
+	const ancestors = args.parentReferences
+		.filter(usable)
+		.filter((id, idx, all) => all.indexOf(id) === idx)
+		.filter(id => id !== args.parentMessageId)
+	const chain = usable(args.parentMessageId)
+		? [...ancestors, args.parentMessageId]
+		: ancestors
+	// A conversation is found by looking for its first message in this list, so
+	// that id has to be present. It nearly always already is, because the
+	// parent was picked out by carrying it. Putting it in front unconditionally
+	// would be wrong on a conversation joined midway, where the first message we
+	// hold is the newest one and belongs last.
+	const full =
+		!usable(args.root) || chain.includes(args.root)
+			? chain
+			: [args.root, ...chain]
+	if (full.length <= MAX_REFERENCES) return full
+	// Too long to send whole: keep the most recent links, and keep the first
+	// message whatever happens, or the conversation stops being findable.
+	const newest = full.slice(1 - MAX_REFERENCES)
+	return newest.includes(args.root)
+		? full.slice(-MAX_REFERENCES)
+		: [args.root, ...newest]
+}
+
+// Two shapes that receiving mail servers score as spam, refused here rather
+// than put on the wire. Every way of sending a message funnels through
+// `dispatchOutbound`, which calls this first, so no route can skip it.
+//
+// A message we refuse costs one loud failure; a message we send in either of
+// these shapes costs the sender's reputation with that recipient's provider,
+// and we only find out much later.
+export const assertSendable = (message: {
+	readonly subject: string
+	readonly inReplyTo?: string | undefined
+	readonly references?: readonly string[] | undefined
+}): Effect.Effect<void, EmailNotSendable> =>
+	Effect.gen(function* () {
+		const subject = message.subject.trim()
+		if (subject === '') {
+			return yield* new EmailNotSendable({ reason: 'no_subject' })
+		}
+		// A "Re:" that answers nothing is the classic forged-reply signature,
+		// and filters test for exactly this pairing.
+		const answersNothing =
+			!message.inReplyTo && (message.references?.length ?? 0) === 0
+		if (REPLY_PREFIX.test(subject) && answersNothing) {
+			return yield* new EmailNotSendable({ reason: 'forged_reply' })
+		}
+	})
 
 // PgClient.transformResultNames in apps/server/src/db/client.ts converts
 // snake_case columns to camelCase on read, so every row type in this file
@@ -885,10 +971,24 @@ export class EmailService extends Context.Service<EmailService>()(
 				message: OutboundMessage,
 			): Effect.Effect<
 				{ messageId: string; rawRef: string },
-				SmtpSendFailed,
+				SmtpSendFailed | EmailNotSendable,
 				never
 			> =>
 				Effect.gen(function* () {
+					// A refused send is a message that did not go out, so it says so
+					// on a line of its own the way `email.sent` does. Only the reason
+					// is recorded — never the subject, which is the customer's text.
+					yield* assertSendable(message).pipe(
+						Effect.tapError(refusal =>
+							Effect.logWarning('Email refused before sending').pipe(
+								Effect.annotateLogs({
+									event: 'email.refused',
+									reason: refusal.reason,
+									inboxId: inbox.id,
+								}),
+							),
+						),
+					)
 					const creds = yield* loadDecryptedCreds(inbox)
 					const sent = yield* retrySmtpSend(
 						transport.send(creds, message),
@@ -936,6 +1036,12 @@ export class EmailService extends Context.Service<EmailService>()(
 					id: string
 					externalThreadId: string
 				} | null
+				// The threading headers this message actually carried. Stored as
+				// sent, so the next reply builds its chain on what the recipient
+				// saw rather than on a shorter one we invented afterwards.
+				wireThreading?:
+					| { inReplyTo: string; references: readonly string[] }
+					| undefined
 				rawRfc822Ref: string
 				// What the recipient was sent. Kept on the row because the only
 				// other copies are the wire bytes in object storage and whatever
@@ -957,10 +1063,18 @@ export class EmailService extends Context.Service<EmailService>()(
 							let threadLinkId: string | null
 
 							if (args.existingThreadLink) {
-								// Reply: reuse the link's root id, append it to References.
+								// Reply: the conversation keeps its root id, and the row
+								// records the headers the message went out with. The root
+								// stays first in that chain, which is what the lookups
+								// that pivot from any reply back to the conversation
+								// search for.
 								externalThreadId = args.existingThreadLink.externalThreadId
-								inReplyTo = args.existingThreadLink.externalThreadId
-								referencesArr = [args.existingThreadLink.externalThreadId]
+								inReplyTo =
+									args.wireThreading?.inReplyTo ??
+									args.existingThreadLink.externalThreadId
+								referencesArr = args.wireThreading
+									? [...args.wireThreading.references]
+									: [args.existingThreadLink.externalThreadId]
 								threadLinkId = args.existingThreadLink.id
 							} else {
 								// Brand-new thread: provider's threadId IS the root msg id.
@@ -1190,6 +1304,10 @@ export class EmailService extends Context.Service<EmailService>()(
 						cc?: string[] | undefined
 						bcc?: string[] | undefined
 						preview?: string | undefined
+						subject?: string | undefined
+						// Used only when the conversation has no subject to borrow,
+						// for a caller that always has to get its message out.
+						fallbackSubject?: string | undefined
 						attachmentRefs?: readonly StagingRef[] | undefined
 						rawAttachments?: readonly SendAttachmentInput[] | undefined
 						skipFooter?: boolean | undefined
@@ -1210,10 +1328,29 @@ export class EmailService extends Context.Service<EmailService>()(
 							contactId: string | null
 							subject: string | null
 						}>`
-							SELECT id, external_thread_id, inbox_id, company_id, contact_id, subject
-							FROM email_thread_links
-							WHERE id = ${threadId}
-							  AND organization_id = ${currentOrg.id}
+							SELECT tl.id, tl.external_thread_id, tl.inbox_id, tl.company_id,
+							       tl.contact_id,
+							       -- Threads that began with an arriving message have no
+							       -- subject of their own, so borrow the first message's
+							       -- one. Without this the reply goes out with an empty
+							       -- subject, which the mail library sends as no Subject
+							       -- line at all — it arrives as "(no subject)".
+							       COALESCE(
+							         NULLIF(btrim(tl.subject), ''),
+							         (
+							           SELECT sm.subject FROM email_messages sm
+							           WHERE sm.organization_id = tl.organization_id
+							             AND (sm.message_id = tl.external_thread_id
+							                  OR sm."references" @> ARRAY[tl.external_thread_id]::text[])
+							             AND sm.subject IS NOT NULL
+							             AND btrim(sm.subject) <> ''
+							           ORDER BY sm.received_at ASC, sm.message_id ASC
+							           LIMIT 1
+							         )
+							       ) AS subject
+							FROM email_thread_links tl
+							WHERE tl.id = ${threadId}
+							  AND tl.organization_id = ${currentOrg.id}
 							LIMIT 1
 						`.pipe(Effect.orDie)
 						if (links.length === 0) {
@@ -1238,21 +1375,29 @@ export class EmailService extends Context.Service<EmailService>()(
 						yield* assertInboxUsable(inbox)
 
 						// Most recent message in the thread anchors the reply. We
-						// match on `message_id = external_thread_id` (root) OR
-						// `external_thread_id = ANY(references)` (any reply).
+						// match the root by its own id, or any later message by the
+						// root sitting in its references — written as `@>` so the
+						// index over that column is the one that answers.
 						const lastMessages = yield* sql<{
 							messageId: string
+							references: string[] | null
 							direction: string
 							recipients: { from?: string | null; to?: string[] }
 						}>`
-							SELECT message_id, direction, recipients
+							SELECT message_id, "references", direction, recipients
 							FROM email_messages
 							WHERE organization_id = ${currentOrg.id}
 							  AND (
 							    message_id = ${link.externalThreadId}
-							    OR ${link.externalThreadId} = ANY("references")
+							    OR "references" @> ARRAY[${link.externalThreadId}]::text[]
 							  )
-							ORDER BY received_at DESC NULLS LAST, status_updated_at DESC
+							  AND deleted_at IS NULL
+							-- The arrival time comes from the Date header, which counts
+							-- in whole seconds, so two messages can share one. The id
+							-- settles it, or which message is answered changes between
+							-- two otherwise identical replies.
+							ORDER BY received_at DESC NULLS LAST,
+							         status_updated_at DESC, message_id DESC
 							LIMIT 1
 						`.pipe(Effect.orDie)
 						const lastMessage = lastMessages[0]
@@ -1291,14 +1436,27 @@ export class EmailService extends Context.Service<EmailService>()(
 						]
 
 						// Subject convention: "Re:" prefix on first reply, leave alone
-						// thereafter (matches MUA defaults). Empty subject is allowed
-						// — providers will accept it.
-						const replySubject = link.subject
-							? link.subject.startsWith('Re:') ||
-								link.subject.toLowerCase().startsWith('re:')
-								? link.subject
-								: `Re: ${link.subject}`
+						// thereafter (matches MUA defaults).
+						//
+						// A subject the caller chose wins, the way it does on a draft
+						// and the way a mail client lets you edit the line before
+						// sending. It is also the only way to answer a conversation
+						// whose messages never carried a subject to borrow: without it
+						// this would be empty, and the guard in `dispatchOutbound`
+						// would refuse the send with nothing the caller could do.
+						const chosenSubject = extras?.subject
+						const borrowedSubject = link.subject
+							? withReplyPrefix(link.subject)
 							: ''
+						const fallbackSubject = extras?.fallbackSubject
+						const replySubject =
+							chosenSubject && chosenSubject.trim() !== ''
+								? chosenSubject
+								: borrowedSubject !== ''
+									? borrowedSubject
+									: fallbackSubject && fallbackSubject.trim() !== ''
+										? withReplyPrefix(fallbackSubject)
+										: ''
 
 						const outbound: OutboundMessage = {
 							from: inbox.email,
@@ -1309,9 +1467,11 @@ export class EmailService extends Context.Service<EmailService>()(
 							...(cc.length > 0 && { cc }),
 							...(bcc.length > 0 && { bcc }),
 							inReplyTo: lastMessage.messageId,
-							references: [link.externalThreadId, lastMessage.messageId].filter(
-								(value, idx, arr) => arr.indexOf(value) === idx,
-							),
+							references: buildReferences({
+								root: link.externalThreadId,
+								parentReferences: lastMessage.references ?? [],
+								parentMessageId: lastMessage.messageId,
+							}),
 							...(sendAttachments.length > 0 && {
 								attachments: toOutboundAttachments(sendAttachments),
 							}),
@@ -1328,13 +1488,19 @@ export class EmailService extends Context.Service<EmailService>()(
 							inbox,
 							companyId: link.companyId,
 							contactId: link.contactId,
-							subject: link.subject,
+							// What the recipient actually saw, "Re:" and all — not the
+							// thread's own subject.
+							subject: replySubject,
 							to: replyRecipients,
 							cc,
 							bcc,
 							existingThreadLink: {
 								id: link.id,
 								externalThreadId: link.externalThreadId,
+							},
+							wireThreading: {
+								inReplyTo: lastMessage.messageId,
+								references: outbound.references ?? [],
 							},
 							rawRfc822Ref: dispatched.rawRef,
 							textBody: rendered.text,
@@ -1401,15 +1567,15 @@ export class EmailService extends Context.Service<EmailService>()(
 								-- empty, so fall back to the earliest message's subject to
 								-- avoid showing "(no subject)" when the messages have one.
 								COALESCE(
-									NULLIF(tl.subject, ''),
+									NULLIF(btrim(tl.subject), ''),
 									(
 										SELECT sm.subject FROM email_messages sm
 										WHERE sm.organization_id = tl.organization_id
 										  AND (sm.message_id = tl.external_thread_id
-										       OR tl.external_thread_id = ANY(sm."references"))
+										       OR sm."references" @> ARRAY[tl.external_thread_id]::text[])
 										  AND sm.subject IS NOT NULL
-										  AND sm.subject <> ''
-										ORDER BY sm.received_at ASC
+										  AND btrim(sm.subject) <> ''
+										ORDER BY sm.received_at ASC, sm.message_id ASC
 										LIMIT 1
 									)
 								) AS subject,
@@ -1502,7 +1668,7 @@ export class EmailService extends Context.Service<EmailService>()(
 							WHERE em.organization_id = ${currentOrg.id}
 							  AND (
 							    em.message_id = ${link.externalThreadId}
-							    OR ${link.externalThreadId} = ANY(em."references")
+							    OR em."references" @> ARRAY[${link.externalThreadId}]::text[]
 							  )
 							ORDER BY em.received_at ASC NULLS LAST, em.status_updated_at ASC
 						`.pipe(Effect.orDie)
@@ -1668,7 +1834,7 @@ export class EmailService extends Context.Service<EmailService>()(
 										SELECT 1 FROM email_messages em
 										WHERE em.organization_id = tl.organization_id
 										  AND (em.message_id = tl.external_thread_id
-										       OR tl.external_thread_id = ANY(em."references"))
+										       OR em."references" @> ARRAY[tl.external_thread_id]::text[])
 										  AND em.search_vector @@ plainto_tsquery('simple', ${trimmedQuery})
 									)
 									OR EXISTS (
@@ -1676,7 +1842,7 @@ export class EmailService extends Context.Service<EmailService>()(
 										JOIN message_participants mp ON mp.email_message_id = em2.id
 										WHERE em2.organization_id = tl.organization_id
 										  AND (em2.message_id = tl.external_thread_id
-										       OR tl.external_thread_id = ANY(em2."references"))
+										       OR em2."references" @> ARRAY[tl.external_thread_id]::text[])
 										  AND mp.email_address ILIKE ${`%${trimmedQuery}%`}
 									)
 								)`)
@@ -1721,15 +1887,15 @@ export class EmailService extends Context.Service<EmailService>()(
 								-- empty, so fall back to the earliest message's subject to
 								-- avoid showing "(no subject)" when the messages have one.
 								COALESCE(
-									NULLIF(tl.subject, ''),
+									NULLIF(btrim(tl.subject), ''),
 									(
 										SELECT sm.subject FROM email_messages sm
 										WHERE sm.organization_id = tl.organization_id
 										  AND (sm.message_id = tl.external_thread_id
-										       OR tl.external_thread_id = ANY(sm."references"))
+										       OR sm."references" @> ARRAY[tl.external_thread_id]::text[])
 										  AND sm.subject IS NOT NULL
-										  AND sm.subject <> ''
-										ORDER BY sm.received_at ASC
+										  AND btrim(sm.subject) <> ''
+										ORDER BY sm.received_at ASC, sm.message_id ASC
 										LIMIT 1
 									)
 								) AS subject,
@@ -1744,19 +1910,19 @@ export class EmailService extends Context.Service<EmailService>()(
 									SELECT COUNT(*) FROM email_messages m
 									WHERE m.organization_id = tl.organization_id
 									  AND (m.message_id = tl.external_thread_id
-									       OR tl.external_thread_id = ANY(m."references"))
+									       OR m."references" @> ARRAY[tl.external_thread_id]::text[])
 								) AS message_count,
 								(
 									SELECT MAX(m.status_updated_at) FROM email_messages m
 									WHERE m.organization_id = tl.organization_id
 									  AND (m.message_id = tl.external_thread_id
-									       OR tl.external_thread_id = ANY(m."references"))
+									       OR m."references" @> ARRAY[tl.external_thread_id]::text[])
 								) AS last_message_at,
 								(
 									SELECT m.direction FROM email_messages m
 									WHERE m.organization_id = tl.organization_id
 									  AND (m.message_id = tl.external_thread_id
-									       OR tl.external_thread_id = ANY(m."references"))
+									       OR m."references" @> ARRAY[tl.external_thread_id]::text[])
 									ORDER BY m.status_updated_at DESC
 									LIMIT 1
 								) AS last_message_direction,
@@ -1764,14 +1930,14 @@ export class EmailService extends Context.Service<EmailService>()(
 									SELECT MAX(m.status_updated_at) FROM email_messages m
 									WHERE m.organization_id = tl.organization_id
 									  AND (m.message_id = tl.external_thread_id
-									       OR tl.external_thread_id = ANY(m."references"))
+									       OR m."references" @> ARRAY[tl.external_thread_id]::text[])
 									  AND m.direction = 'inbound'
 								) AS last_inbound_at,
 								(
 									SELECT m.inbound_classification FROM email_messages m
 									WHERE m.organization_id = tl.organization_id
 									  AND (m.message_id = tl.external_thread_id
-									       OR tl.external_thread_id = ANY(m."references"))
+									       OR m."references" @> ARRAY[tl.external_thread_id]::text[])
 									  AND m.direction = 'inbound'
 									ORDER BY m.status_updated_at DESC
 									LIMIT 1
@@ -1781,7 +1947,7 @@ export class EmailService extends Context.Service<EmailService>()(
 										SELECT MAX(m.status_updated_at) FROM email_messages m
 										WHERE m.organization_id = tl.organization_id
 										  AND (m.message_id = tl.external_thread_id
-										       OR tl.external_thread_id = ANY(m."references"))
+										       OR m."references" @> ARRAY[tl.external_thread_id]::text[])
 										  AND m.direction = 'inbound'
 									) > COALESCE(tl.last_read_at, 'epoch'::timestamptz),
 									false
@@ -2752,28 +2918,108 @@ export class EmailService extends Context.Service<EmailService>()(
 							},
 						)
 
-						// Reply path needs the parent thread's external_thread_id +
-						// references chain so the new message lands inside that
-						// thread instead of opening a fresh one. Prefer the column
-						// on the draft row; fall back to the parsed clientId for
-						// rows created before the schema change.
-						const threadLinkId = draft.threadLinkId ?? ctx.threadLinkId
+						// Which conversation this draft answers, if any — the message
+						// needs its external_thread_id and references chain to land
+						// inside it instead of opening a fresh one. Three ways of
+						// naming it, in order: the column on the draft row, the parsed
+						// clientId for rows written before that column existed, and
+						// `in_reply_to`, which names the parent by its Message-ID.
+						// That last one was being written down and never read, so a
+						// caller who threaded a draft the obvious way was ignored; hop
+						// from the id to the conversation the way arriving mail does.
+						let threadLinkId = draft.threadLinkId ?? ctx.threadLinkId
+						if (!threadLinkId && draft.inReplyTo) {
+							const parentRows = yield* sql<{ id: string }>`
+								SELECT tl.id
+								FROM email_messages em
+								JOIN email_thread_links tl
+								  ON tl.organization_id = em.organization_id
+								 AND (
+								   tl.external_thread_id = em.message_id
+								   OR tl.external_thread_id = ANY(em."references")
+								 )
+								WHERE em.organization_id = ${currentOrg.id}
+								  AND em.message_id = ${draft.inReplyTo}
+								  -- Same mailbox the draft is going out from: this send
+								  -- goes out from the draft's mailbox, so filing it under
+								  -- another one's conversation would put a message in a
+								  -- thread it was never part of.
+								  AND tl.inbox_id = ${inbox.id}
+								-- Same tie-break as the mail worker uses: oldest known
+								-- ancestor wins, so a split conversation always answers
+								-- with the same half.
+								ORDER BY array_position(em."references", tl.external_thread_id)
+								           ASC NULLS LAST,
+								         tl.created_at ASC, tl.id ASC
+								LIMIT 1
+							`.pipe(Effect.orDie)
+							threadLinkId = parentRows[0]?.id ?? null
+						}
 						let existingThreadLink: {
 							id: string
 							externalThreadId: string
+							subject: string | null
 						} | null = null
-						if (draft.mode === 'reply' && threadLinkId) {
+						// The message this one answers. `In-Reply-To` names it so the
+						// recipient's mail client hangs the message under it rather
+						// than at the top of the conversation.
+						let parentMessageId: string | null = null
+						let parentReferences: readonly string[] = []
+						// A draft that names a thread is answering it, whatever else it
+						// says. This used to also insist on `mode` being the literal
+						// string "reply" — an undocumented parameter nobody set — so
+						// every draft opened a second conversation and, whenever the
+						// writer had prefixed the subject "Re:", went out looking like
+						// a forged reply.
+						if (threadLinkId) {
 							const linkRows = yield* sql<{
 								id: string
 								externalThreadId: string
+								subject: string | null
 							}>`
-								SELECT id, external_thread_id
-								FROM email_thread_links
-								WHERE id = ${threadLinkId}
-								  AND organization_id = ${currentOrg.id}
+								SELECT tl.id, tl.external_thread_id,
+								       COALESCE(
+								         NULLIF(btrim(tl.subject), ''),
+								         (
+								           SELECT sm.subject FROM email_messages sm
+								           WHERE sm.organization_id = tl.organization_id
+								             AND (sm.message_id = tl.external_thread_id
+								                  OR sm."references" @> ARRAY[tl.external_thread_id]::text[])
+								             AND sm.subject IS NOT NULL
+								             AND btrim(sm.subject) <> ''
+								           ORDER BY sm.received_at ASC, sm.message_id ASC
+								           LIMIT 1
+								         )
+								       ) AS subject
+								FROM email_thread_links tl
+								WHERE tl.id = ${threadLinkId}
+								  AND tl.organization_id = ${currentOrg.id}
+								  -- Same rule as the hop above: a draft only answers a
+								  -- conversation in the mailbox it is going out from.
+								  AND tl.inbox_id = ${inbox.id}
 								LIMIT 1
 							`.pipe(Effect.orDie)
 							existingThreadLink = linkRows[0] ?? null
+							if (existingThreadLink) {
+								const lastRows = yield* sql<{
+									messageId: string
+									references: string[] | null
+								}>`
+									SELECT message_id, "references"
+									FROM email_messages
+									WHERE organization_id = ${currentOrg.id}
+									  AND (
+									    message_id = ${existingThreadLink.externalThreadId}
+									    OR "references" @> ARRAY[${existingThreadLink.externalThreadId}]::text[]
+									  )
+									  AND deleted_at IS NULL
+									ORDER BY received_at DESC NULLS LAST,
+									         status_updated_at DESC, message_id DESC
+									LIMIT 1
+								`.pipe(Effect.orDie)
+								parentMessageId = lastRows[0]?.messageId ?? null
+								parentReferences = lastRows[0]?.references ?? []
+							}
 						}
 
 						// Resolve staged attachments for this draft + render the
@@ -2820,10 +3066,21 @@ export class EmailService extends Context.Service<EmailService>()(
 								}),
 						})
 
+						// A draft answering a thread borrows that thread's subject when
+						// the writer left it blank, so it goes out as "Re: …" rather
+						// than with no subject line at all.
+						const threadSubject = existingThreadLink?.subject ?? null
+						const draftSubject =
+							draft.subject && draft.subject.trim() !== ''
+								? draft.subject
+								: threadSubject
+									? withReplyPrefix(threadSubject)
+									: ''
+
 						const outbound: OutboundMessage = {
 							from: inbox.email,
 							to: draft.toAddresses as string[],
-							subject: draft.subject ?? '',
+							subject: draftSubject,
 							text: rendered.text,
 							html: rendered.html,
 							...(draft.ccAddresses.length > 0 && {
@@ -2833,8 +3090,14 @@ export class EmailService extends Context.Service<EmailService>()(
 								bcc: draft.bccAddresses as string[],
 							}),
 							...(existingThreadLink && {
-								inReplyTo: existingThreadLink.externalThreadId,
-								references: [existingThreadLink.externalThreadId],
+								inReplyTo:
+									parentMessageId ?? existingThreadLink.externalThreadId,
+								references: buildReferences({
+									root: existingThreadLink.externalThreadId,
+									parentReferences,
+									parentMessageId:
+										parentMessageId ?? existingThreadLink.externalThreadId,
+								}),
 							}),
 							...(staged.length > 0 && {
 								attachments: toOutboundAttachments(toSendAttachments(staged)),
@@ -2854,11 +3117,19 @@ export class EmailService extends Context.Service<EmailService>()(
 							inbox,
 							companyId: ctx.companyId,
 							contactId: ctx.contactId,
-							subject: draft.subject ?? null,
+							// What the recipient actually saw, not what the draft held.
+							subject: draftSubject,
 							to: draft.toAddresses as string[],
 							cc: draft.ccAddresses as string[],
 							bcc: draft.bccAddresses as string[],
 							existingThreadLink,
+							...(existingThreadLink && {
+								wireThreading: {
+									inReplyTo:
+										parentMessageId ?? existingThreadLink.externalThreadId,
+									references: outbound.references ?? [],
+								},
+							}),
 							rawRfc822Ref: dispatched.rawRef,
 							textBody: rendered.text,
 							htmlBody: rendered.html,

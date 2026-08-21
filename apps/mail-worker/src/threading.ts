@@ -35,6 +35,15 @@ export const resolveThreadId = (args: {
 				 )
 				WHERE em.organization_id = ${args.organizationId}
 				  AND em.message_id = ${args.inReplyTo}
+				-- A conversation can hold more than one of these rows when its
+				-- first message was taken in after a reply that named it, so pick
+				-- deterministically rather than whichever comes back first. A
+				-- references chain runs oldest first, so the earliest entry that
+				-- has a conversation is the conversation — the message's own id
+				-- would name the later split instead, which holds only the tail.
+				ORDER BY array_position(em."references", etl.external_thread_id)
+				           ASC NULLS LAST,
+				         etl.created_at ASC, etl.id ASC
 				LIMIT 1
 			`
 			const hit = rows[0]?.externalThreadId
@@ -56,11 +65,31 @@ export const resolveThreadId = (args: {
 				 )
 				WHERE em.organization_id = ${args.organizationId}
 				  AND em.message_id = ${ref}
+				-- A conversation can hold more than one of these rows when its
+				-- first message was taken in after a reply that named it, so pick
+				-- deterministically rather than whichever comes back first. A
+				-- references chain runs oldest first, so the earliest entry that
+				-- has a conversation is the conversation — the message's own id
+				-- would name the later split instead, which holds only the tail.
+				ORDER BY array_position(em."references", etl.external_thread_id)
+				           ASC NULLS LAST,
+				         etl.created_at ASC, etl.id ASC
 				LIMIT 1
 			`
 			const hit = rows[0]?.externalThreadId
 			if (hit) return hit
 		}
 
+		// Nothing on file to hang this on, so this message starts a conversation
+		// of its own.
+		//
+		// The oldest id it names looks like the better answer — it would let a
+		// reply taken in before the message it answers join that one later,
+		// instead of leaving the contact with two. It is not: several people
+		// replying to one message we do not hold all name the same id, so they
+		// would land in a single conversation, and a conversation belongs to
+		// whoever is on the first message to reach it. The second company's
+		// mail would then sit under the first company's. Measured both ways —
+		// a duplicate conversation costs less than mixing two customers.
 		return args.messageId
 	})

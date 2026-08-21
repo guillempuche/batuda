@@ -119,11 +119,19 @@ const AttachmentRef = Schema.Struct({
 	cid: Schema.optional(Schema.String),
 })
 
+// What a refused send is told, in the words the caller can act on. The service
+// answers with the reason alone so each surface can say it its own way; this is
+// the one an assistant reads.
+const refusalMessage = (reason: 'no_subject' | 'forged_reply'): string =>
+	reason === 'no_subject'
+		? 'Refused: the message has no subject, so it would arrive as "(no subject)" and be treated as spam. Pass a subject and send again.'
+		: 'Refused: the subject starts with "Re:" but the message answers nothing, which receiving servers read as a forged reply. Answer the thread with reply_email, or pass thread_link_id on the draft, or drop the "Re:".'
+
 // ── Compose tools ────────────────────────────────────────────────
 
 const SendEmail = Tool.make('send_email', {
 	description:
-		'Send a new email. The body is a structured block tree (paragraph / heading / list / quote / divider / image) — not raw html/text. Omit inbox_id to use the calling member’s primary inbox in the active org. Attachments reference staging_ids returned by stage_email_attachment; set inline=true for cid-referenced inline images. Before composing, read the member’s standing email instructions (writing style, sign-off, do/don’t rules) from the batuda://instructions/email resource and write the body to follow them. Returns {_tag:"sent"} on success; {_tag:"suppressed"} if a recipient once hard-bounced or reported spam, which is a hard block on every path; or {_tag:"cancelled"} if an address being written to carries a deliverability verdict of "undeliverable" or "risky" and nobody confirmed it — either the answer was no, or this client cannot put a question to anybody, and the reason says which. Verdicts of "catch_all" and "unknown", and addresses nobody has checked, are not gated. Read `verification` on a contact\'s channels (list_contacts) before composing to see this coming; when a send is stopped, the reason names the exact call that lifts it. Set skip_footer=true to omit the inbox default footer.',
+		'Send a new email, starting a new conversation. To answer or follow up on a conversation that already exists use reply_email instead, or a draft carrying thread_link_id — this tool sets no threading headers, so a "Re: " subject here would reach the recipient as a forged reply and is refused. The body is a structured block tree (paragraph / heading / list / quote / divider / image) — not raw html/text. Omit inbox_id to use the calling member’s primary inbox in the active org. Attachments reference staging_ids returned by stage_email_attachment; set inline=true for cid-referenced inline images. Before composing, read the member’s standing email instructions (writing style, sign-off, do/don’t rules) from the batuda://instructions/email resource and write the body to follow them. Returns {_tag:"sent"} on success; {_tag:"suppressed"} if a recipient once hard-bounced or reported spam, which is a hard block on every path; or {_tag:"cancelled"} if an address being written to carries a deliverability verdict of "undeliverable" or "risky" and nobody confirmed it — either the answer was no, or this client cannot put a question to anybody, and the reason says which. Verdicts of "catch_all" and "unknown", and addresses nobody has checked, are not gated. Read `verification` on a contact\'s channels (list_contacts) before composing to see this coming; when a send is stopped, the reason names the exact call that lifts it. Set skip_footer=true to omit the inbox default footer.',
 	parameters: Schema.Struct({
 		inbox_id: Schema.optional(Schema.String).annotate({
 			description:
@@ -150,11 +158,15 @@ const SendEmail = Tool.make('send_email', {
 
 const ReplyEmail = Tool.make('reply_email', {
 	description:
-		'Reply to the latest message in an existing email thread. Body is a structured block tree — if you want the parent quoted, emit a `quote` block wrapping sanitized parent blocks (you can read the parent via get_email_thread). Optional Cc/Bcc extend the thread. Attachments reference staging_ids from stage_email_attachment. Before composing, read the member’s standing email instructions from the batuda://instructions/email resource and write the reply to follow them. Returns {_tag:"sent"}; {_tag:"suppressed"} if a recipient once hard-bounced or reported spam; or {_tag:"cancelled"} when a confirmation was needed and not obtained — because the contact\'s address (or one added in cc/bcc) carries an "undeliverable" or "risky" verdict, or because the thread already has EMAIL_AGENT_SOFT_THREAD_LIMIT outbound messages (default 3) and this reply would be one more. The reason names which, and says when the client had no way to ask anybody — and for an address it names the call that lifts the stop. Pass acknowledge_thread_length: true to answer the message-count reason without a prompt; an address with something recorded against it is answered by vouching for it instead. Set skip_footer=true to omit the inbox default footer.',
+		'Reply to the latest message in an existing email thread. The thread\'s own subject is used, prefixed "Re: ", so leave subject out unless you mean to change it — or unless the thread\'s messages never carried one, where there is nothing to borrow and a subject is required. Body is a structured block tree — if you want the parent quoted, emit a `quote` block wrapping sanitized parent blocks (you can read the parent via get_email_thread). Optional Cc/Bcc extend the thread. Attachments reference staging_ids from stage_email_attachment. Before composing, read the member’s standing email instructions from the batuda://instructions/email resource and write the reply to follow them. Returns {_tag:"sent"}; {_tag:"suppressed"} if a recipient once hard-bounced or reported spam; or {_tag:"cancelled"} when a confirmation was needed and not obtained — because the contact\'s address (or one added in cc/bcc) carries an "undeliverable" or "risky" verdict, or because the thread already has EMAIL_AGENT_SOFT_THREAD_LIMIT outbound messages (default 3) and this reply would be one more. The reason names which, and says when the client had no way to ask anybody — and for an address it names the call that lifts the stop. Pass acknowledge_thread_length: true to answer the message-count reason without a prompt; an address with something recorded against it is answered by vouching for it instead. Set skip_footer=true to omit the inbox default footer.',
 	parameters: Schema.Struct({
 		thread_id: EmailThreadIdParam,
 		body_json: EmailBlocks,
 		preview: Schema.optional(Schema.String),
+		subject: Schema.optional(Schema.String).annotate({
+			description:
+				'Subject line. Leave it out and the thread\'s own subject is used, prefixed "Re: " — that is what you want almost always. Pass one to change the subject mid-thread, or to answer a thread whose messages never carried a subject: there is nothing to borrow there, and a send with no subject is refused because it would arrive as "(no subject)".',
+		}),
 		cc: Schema.optional(Schema.Array(Schema.String)),
 		bcc: Schema.optional(Schema.Array(Schema.String)),
 		attachments: Schema.optional(Schema.Array(AttachmentRef)),
@@ -445,7 +457,7 @@ const ManageEmailInbox = Tool.make('manage_email_inbox', {
 
 const ManageEmailDraft = Tool.make('manage_email_draft', {
 	description:
-		'Manage an email draft a human can review before sending. Omit inbox_id: a new draft is written in the calling member’s primary inbox in the active org, the same rule send_email follows, and update / send / delete act on the mailbox the draft already lives in. action=create makes a new draft (optionally linked to CRM via company_id/contact_id/mode); update changes fields on an existing draft_id; send dispatches draft_id through the same thread-link/interaction/message pipeline as a direct send, and runs the same deliverability guard on the addresses, so writing a message down first is not a way past that (it does not re-count how many outbound messages a thread already holds, which only reply_email does) (returns {_tag:"sent"}, {_tag:"suppressed"}, or {_tag:"cancelled"} — see send_email for what each means); delete permanently removes draft_id. body_json is the typed block tree preserved for lossless editor re-hydration.',
+		'Manage an email draft a human can review before sending. Omit inbox_id: a new draft is written in the calling member’s primary inbox in the active org, the same rule send_email follows, and update / send / delete act on the mailbox the draft already lives in. action=create makes a new draft (optionally linked to CRM via company_id/contact_id, and to an existing conversation via thread_link_id or in_reply_to — pass one of those whenever the draft answers a thread, or it goes out as a brand-new conversation); update changes fields on an existing draft_id; send dispatches draft_id through the same thread-link/interaction/message pipeline as a direct send, and runs the same deliverability guard on the addresses, so writing a message down first is not a way past that (it does not re-count how many outbound messages a thread already holds, which only reply_email does) (returns {_tag:"sent"}, {_tag:"suppressed"}, or {_tag:"cancelled"} — see send_email for what each means); delete permanently removes draft_id. body_json is the typed block tree preserved for lossless editor re-hydration.',
 	parameters: Schema.Struct({
 		action: Schema.Literals(['create', 'update', 'send', 'delete']),
 		inbox_id: Schema.optional(Schema.String).annotate({
@@ -459,13 +471,25 @@ const ManageEmailDraft = Tool.make('manage_email_draft', {
 		to: Schema.optional(Recipients),
 		cc: Schema.optional(Schema.Array(Schema.String)),
 		bcc: Schema.optional(Schema.Array(Schema.String)),
-		subject: Schema.optional(Schema.String),
+		subject: Schema.optional(Schema.String).annotate({
+			description:
+				'Subject line. Leave it out on a draft that answers an existing thread and the thread\'s own subject is used, prefixed "Re: ". On a draft that starts a new conversation a subject is required — a send with none is refused, because a message with no subject line arrives as "(no subject)".',
+		}),
 		body_json: Schema.optional(EmailBlocks),
-		in_reply_to: Schema.optional(Schema.String),
+		in_reply_to: Schema.optional(Schema.String).annotate({
+			description:
+				'Message-ID of the message this one answers, angle brackets and all. An alternative to thread_link_id when you have the parent message but not the thread: the thread it belongs to is looked up from it. Ignored when thread_link_id is given.',
+		}),
 		company_id: Schema.optional(Schema.String),
 		contact_id: Schema.optional(Schema.String),
-		mode: Schema.optional(Schema.String),
-		thread_link_id: Schema.optional(Schema.String),
+		mode: Schema.optional(Schema.Literals(['new', 'reply'])).annotate({
+			description:
+				'What kind of message this is, recorded for the composer that re-opens the draft. It does not decide threading: a draft is threaded when it carries thread_link_id or in_reply_to, whichever mode says.',
+		}),
+		thread_link_id: Schema.optional(Schema.String).annotate({
+			description:
+				'The thread this draft answers, as returned by list_email_threads or get_email_thread. This is what attaches the sent message to an existing conversation — with it the message carries In-Reply-To and References and lands in the same thread for the recipient; without it the message starts a new conversation, and a "Re: " subject on a message that starts a new conversation is refused, because that pairing reads as a forged reply.',
+		}),
 	}),
 	// create / update return the draft; send returns the send result; delete
 	// returns the deleted marker.
@@ -742,13 +766,17 @@ export const EmailHandlersLive = EmailTools.toLayer(
 					SELECT count(*)::int AS n FROM email_messages
 					WHERE direction = 'outbound' AND organization_id = ${orgId}
 					AND (message_id = ${link.externalThreadId}
-					     OR ${link.externalThreadId} = ANY("references"))
+					     OR "references" @> ARRAY[${link.externalThreadId}]::text[])
+					AND deleted_at IS NULL
 				`
 				// Where a reply will actually land. This has to pick the same
 				// addresses the send itself picks, or the guard judges one mailbox
 				// while the message goes to another — so it repeats the send path's
 				// choice: the sender of an inbound message, the addressees of an
-				// outbound one, ordered the same way.
+				// outbound one, ordered the same way, skipping messages the server
+				// has since dropped and settling ties on the same column. Change
+				// the one in `EmailService.reply` and this has to move with it;
+				// they have drifted apart before.
 				//
 				// Judging the linked person's default address instead answered about
 				// a different mailbox whenever the conversation was with any other
@@ -761,8 +789,10 @@ export const EmailHandlersLive = EmailTools.toLayer(
 					SELECT direction, recipients FROM email_messages
 					WHERE organization_id = ${orgId}
 						AND (message_id = ${link.externalThreadId}
-						     OR ${link.externalThreadId} = ANY("references"))
-					ORDER BY received_at DESC NULLS LAST, status_updated_at DESC
+						     OR "references" @> ARRAY[${link.externalThreadId}]::text[])
+						AND deleted_at IS NULL
+					ORDER BY received_at DESC NULLS LAST,
+					         status_updated_at DESC, message_id DESC
 					LIMIT 1
 				`
 				const newest = latest[0]
@@ -869,6 +899,12 @@ export const EmailHandlersLive = EmailTools.toLayer(
 								messageId: r.messageId,
 								threadId: r.threadId,
 							})),
+							// A refused send names why. The wording lives here, on the
+							// surface that speaks to the caller, so the service can
+							// answer with the reason alone.
+							Effect.catchTag('EmailNotSendable', e =>
+								Effect.die(new ToolMessage(refusalMessage(e.reason))),
+							),
 							Effect.catchTag('EmailSuppressed', e =>
 								Effect.succeed({
 									_tag: 'suppressed' as const,
@@ -924,6 +960,9 @@ export const EmailHandlersLive = EmailTools.toLayer(
 							...(params.preview !== undefined && {
 								preview: params.preview,
 							}),
+							...(params.subject !== undefined && {
+								subject: params.subject,
+							}),
 							...(params.attachments !== undefined && {
 								attachmentRefs: toStagingRefs(params.attachments),
 							}),
@@ -937,6 +976,12 @@ export const EmailHandlersLive = EmailTools.toLayer(
 								messageId: r.messageId,
 								threadId: r.threadId,
 							})),
+							// A refused send names why. The wording lives here, on the
+							// surface that speaks to the caller, so the service can
+							// answer with the reason alone.
+							Effect.catchTag('EmailNotSendable', e =>
+								Effect.die(new ToolMessage(refusalMessage(e.reason))),
+							),
 							Effect.catchTag('EmailSuppressed', e =>
 								Effect.succeed({
 									_tag: 'suppressed' as const,
@@ -1323,6 +1368,12 @@ export const EmailHandlersLive = EmailTools.toLayer(
 											messageId: r.messageId,
 											threadId: r.threadId,
 										},
+							),
+							// A refused send names why. The wording lives here, on the
+							// surface that speaks to the caller, so the service can
+							// answer with the reason alone.
+							Effect.catchTag('EmailNotSendable', e =>
+								Effect.die(new ToolMessage(refusalMessage(e.reason))),
 							),
 							Effect.catchTag('EmailSuppressed', e =>
 								Effect.succeed({
