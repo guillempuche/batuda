@@ -30,7 +30,7 @@ import {
 	hostsEstablishedAsOwn,
 	isSiteKey,
 } from './prospect-dedupe-guard'
-import type { TradeWords } from './trade-words'
+import type { RunWords } from './run-words'
 
 // The company-profile facts worth spending an extra search on. `size_range` is
 // also nudged during the loop (headcount is rarely on the homepage); for the
@@ -262,7 +262,7 @@ const mergeScanRows = (
 	schemaName: string,
 	findings: unknown,
 	refreshed: unknown,
-	tradeWords: TradeWords,
+	runWords: RunWords,
 ): PerFieldMerge => {
 	const field = discoveryResultField(schemaName)
 	const known = scanRowsOf(schemaName, findings)
@@ -289,7 +289,7 @@ const mergeScanRows = (
 	// under a name that does not spell its domain while the list already holds it
 	// under one that does — and asking each side on its own would leave the site
 	// speaking for the row that has it and silent for the row that needs it.
-	const ownSiteHosts = hostsEstablishedAsOwn([...known, ...found], tradeWords)
+	const ownSiteHosts = hostsEstablishedAsOwn([...known, ...found], runWords)
 	const foundByKey = new Map<string, Record<string, unknown>>()
 	for (const row of found) {
 		// First mention wins: a later duplicate of the same company in the same
@@ -364,7 +364,7 @@ const mergeScanRows = (
 			dedupeDiscoveryRows(
 				{ ...(findings as object), [field]: rows },
 				field,
-				tradeWords,
+				runWords,
 			).findings as Record<string, unknown>
 		)[field]
 		return Array.isArray(held) ? held.length : undefined
@@ -372,7 +372,7 @@ const mergeScanRows = (
 	const settled = dedupeDiscoveryRows(
 		{ ...(findings as object), [field]: [...merged, ...additions] },
 		field,
-		tradeWords,
+		runWords,
 	)
 	const held = (settled.findings as Record<string, unknown>)[field]
 	// What the list gained, counted in companies rather than rows. A row that joined
@@ -420,10 +420,10 @@ export const mergePerFieldSearch = (
 	findings: unknown,
 	refreshed: unknown,
 	schemaName: string,
-	tradeWords: TradeWords,
+	runWords: RunWords,
 ): PerFieldMerge => {
 	if (isDiscoveryScan(schemaName)) {
-		return mergeScanRows(schemaName, findings, refreshed, tradeWords)
+		return mergeScanRows(schemaName, findings, refreshed, runWords)
 	}
 	const enrichment = enrichmentOf(findings)
 	const refreshedEnrichment = enrichmentOf(refreshed)

@@ -30,8 +30,8 @@ import {
 	hostsEstablishedAsOwn,
 } from './prospect-dedupe-guard'
 import { rowGroups } from './row-groups'
+import type { RunWords } from './run-words'
 import { anyTermAppearsIn, termTokens } from './term-match'
-import type { TradeWords } from './trade-words'
 
 export const partsAnsweredBy = (
 	rows: RunOutcome['companies'],
@@ -124,13 +124,13 @@ const companiesAmong = (
 // name with a note written after it.
 const joinedAsTheFoldDoes = (
 	rows: ReadonlyArray<Record<string, unknown>>,
-	tradeWords: TradeWords,
+	runWords: RunWords,
 ): ReadonlyArray<readonly [number, number]> => {
 	const joined: Array<readonly [number, number]> = []
 	// Read over the whole returned list, which is the list the fold read too. Asking
 	// row by row would make this stricter than the fold it measures, and call a list
 	// clean while it still holds the pairs the fold joins on a site.
-	const ownSiteHosts = hostsEstablishedAsOwn(rows, tradeWords)
+	const ownSiteHosts = hostsEstablishedAsOwn(rows, runWords)
 	const rowOfKey = new Map<string, number>()
 	rows.forEach((row, at) => {
 		for (const key of discoveryRowIdentityKeys(row, ownSiteHosts)) {
@@ -295,14 +295,14 @@ export interface RepeatedRows {
 
 export const repeatedRows = (
 	rows: RunOutcome['companies'],
-	tradeWords: TradeWords,
+	runWords: RunWords,
 ): RepeatedRows => {
 	const discoveryRows = asDiscoveryRows(rows)
 	// Worked out once and read twice. The loose figure is the strict one's pairs
 	// plus more of them, which is what makes it a superset rather than a second
 	// opinion that could disagree — and it is also why the joins the fold makes are
 	// not worth finding twice over.
-	const asTheFoldDoes = joinedAsTheFoldDoes(discoveryRows, tradeWords)
+	const asTheFoldDoes = joinedAsTheFoldDoes(discoveryRows, runWords)
 	return {
 		duplicated:
 			discoveryRows.length -

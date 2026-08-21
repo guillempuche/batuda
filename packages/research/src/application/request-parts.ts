@@ -81,6 +81,28 @@ export const MAX_REQUEST_PARTS = 12
 export const MAX_PART_TERMS = 12
 
 /**
+ * How many words for a KIND of company are kept. A language has a handful — group,
+ * holding, services, and the local words beside them. A list longer than this is a
+ * model reaching past what its language actually uses, and every word on it takes a
+ * real word away from the firms genuinely called it.
+ */
+export const MAX_KINDS_OF_COMPANY = 16
+
+/**
+ * Shortest a word for a kind of company may be, counted in the letters a web address
+ * carries. These words are spent saying a name word identifies nobody, and a two- or
+ * three-letter one strips far more names than it was meant to — "sa" would take the
+ * front off half a French list. Set where a word is long enough to be a word rather
+ * than an initial.
+ *
+ * It is a floor on LETTERS, which is the only thing the fold these words are read
+ * against keeps ("集团" is a whole word in two characters). That costs nothing today,
+ * because a name written in those characters folds to nothing and no reading here
+ * reaches it either way — see `entity-guard.ts`.
+ */
+export const SHORTEST_KIND_OF_COMPANY = 4
+
+/**
  * Longest a wording may be. A trade is named in a few words; anything past this is
  * a paragraph where a name was asked for. It matters because these words go into
  * every searching pass's prompt — an unbounded one would fill the prompt on its own
@@ -145,6 +167,7 @@ export const RequestPartsSchema = Schema.Struct({
 			terms: Schema.Array(Schema.String),
 		}),
 	),
+	kindsOfCompany: Schema.Array(Schema.String),
 })
 
 /**
@@ -166,7 +189,11 @@ export const requestPartsPrompt = (query: string): string =>
 		'- terms: other wordings that would place a company in this part — the ordinary word for the trade, and for someone who does it — in the language of the request, in the language of the country it is about, and in English. Between 3 and 10 of them. A wording that would fit a company in another part just as well belongs to neither: leave it out.',
 		'',
 		'Return the parts in the order the request names them.',
-		'Return {"parts": [{"label": "...", "terms": ["...", "..."]}]} and nothing else.',
+		'',
+		'Separately, list the words a COMPANY NAME uses to say what kind of company it is rather than which company it is — group, holding, services, associates and the like. Give them in the language of the request, in the language of the country it is about, and in English, in the plural and singular forms a name actually writes. "Grup Puig" is a firm called Puig, so "grup" belongs on this list; "Puig" never does.',
+		'These are words for a KIND of company, never for a trade and never for a place: plumbing, lifts, Barcelona and France are all wrong here. A family name, a coined name or a brand is wrong here too, and putting one on this list takes its own name away from every firm called it — so leave out anything you are not sure of. Between 4 and 12 words. Return an empty list rather than guessing at a language you cannot place.',
+		'',
+		'Return {"parts": [{"label": "...", "terms": ["...", "..."]}], "kindsOfCompany": ["...", "..."]} and nothing else.',
 		'',
 		`Request:\n${query}`,
 	].join('\n')
@@ -250,6 +277,45 @@ export const readRequestParts = (raw: unknown): ReadonlyArray<RequestPart> => {
 	}
 
 	return dropSharedWordings(parts)
+}
+
+/**
+ * The words the run was told name a KIND of company, read off the same answer the
+ * parts come from.
+ *
+ * Read apart from the parts because a part is something the run goes looking for and
+ * these are not: nothing searches for "group". They are spent on one thing, telling
+ * a company's own word from the word saying what sort of thing it is, so a request
+ * that came back without them leaves that reading exactly as the shared list had it.
+ *
+ * Short words are dropped rather than trusted. These are spent saying a name's word
+ * identifies nobody, so a wrong one costs a real firm its own name — and the shorter
+ * the word, the more names it reaches. A wrong one can only ever withhold, never
+ * reach a name: `run-words.ts` keeps these out of the reading that cuts the front off
+ * a domain, because they come from a model reading a language rather than from
+ * anything the person who asked actually wrote.
+ *
+ * A word in a writing system the fold has no letters for is dropped with them, and
+ * silently, because nothing downstream could have used it: a name in that writing
+ * folds to nothing too, so there would be nothing for the word to be read against.
+ */
+export const readKindsOfCompany = (raw: unknown): ReadonlyArray<string> => {
+	if (raw === null || typeof raw !== 'object') return []
+	const listed = (raw as { kindsOfCompany?: unknown }).kindsOfCompany
+	if (!Array.isArray(listed)) return []
+
+	const kinds: Array<string> = []
+	const seen = new Set<string>()
+	for (const entry of listed) {
+		if (kinds.length >= MAX_KINDS_OF_COMPANY) break
+		const word = readWording(entry)
+		if (word === null || word.length < SHORTEST_KIND_OF_COMPANY) continue
+		const key = foldLabel(word)
+		if (seen.has(key)) continue
+		seen.add(key)
+		kinds.push(word)
+	}
+	return kinds
 }
 
 /**

@@ -1,27 +1,37 @@
 /**
- * The words a run's own request uses for the trades it asked about, so a check
- * reading a company's name can tell the trade in it from the company.
+ * The words a run brings for what a company's name SAYS about it rather than
+ * which company it is, so a check reading a name can tell those words from the
+ * company.
  *
- * "Fontanería García" is a plumber called García. A check that cannot see which
- * of those two words is the trade treats both as the company's own, and then
- * fontaneria.es — which belongs to whoever registered it, not to every plumber in
- * Spain — reads as this firm's own site.
+ * Two kinds, and a name usually carries one of each. "Fontanería García" is a
+ * plumber called García; "Grup Puig" is a firm called Puig. A check that cannot
+ * see which of the two words is the company treats both as its own, and then
+ * fontaneria.es and grup.cat — which belong to whoever registered them, not to
+ * every plumber in Spain or every Catalan firm called Grup something — read as
+ * these firms' own sites.
  *
  * ## Why the words are not written down anywhere
  *
- * A list of words that identify nobody can only hold the trades somebody thought
- * of, so it carries one industry's vocabulary and treats every other industry's
- * as a company's own name. Filling it in is not a matter of finishing the job: it
- * needs every trade in every language a market answers in, and each word added
+ * A list of words that identify nobody can only hold what somebody thought of, so
+ * it carries one industry's vocabulary and one or two languages, and treats every
+ * other industry's and every other language's as a company's own name. Filling it
+ * in is not a matter of finishing the job: it needs every trade and every word for
+ * a kind of company in every language a market answers in, and each word added
  * takes a real distinctive word away from the firms genuinely called that.
  *
- * A run does not need the list, because it already knows: it was launched for a
- * market and the request names the trades it wants. Those words are that market's
- * own vocabulary, in the languages that market answers in, written by the person
- * who asked — and nothing has to be kept up to date for a trade nobody has
- * searched for yet. `request-parts.ts` already splits a request into its trades
- * and `term-match.ts` already reads their wordings against a page; this reads the
- * same wordings against a name.
+ * A run does not need the list, because it already knows what market it was
+ * launched for. Its request names the trades it wants outright, and the language
+ * that request is written in says which language its companies name themselves in
+ * — so the same reading of the request that splits it into trades is asked for
+ * that language's words for a kind of company too (`request-parts.ts`). Both are
+ * that market's own vocabulary, and nothing has to be kept up to date for a trade
+ * or a language nobody has searched in yet.
+ *
+ * They are held as ONE set because every reading that asks who owns an address
+ * asks one question of a word — does it identify anybody — and a word for a kind
+ * of company answers it exactly as a trade does. Two sets would be two chances for
+ * two callers to answer from different words. `term-match.ts` already reads these
+ * wordings against a page; this reads them against a name.
  *
  * It is the reading `directory-sites.ts` takes for a different question — what a
  * site IS comes from watching what the run sees it do, never from a list of
@@ -66,8 +76,23 @@
 
 import { foldTokens, nameSpellings } from './entity-guard'
 
-/** The words a run's request used for the trades it asked about, folded to letters. */
-export type TradeWords = ReadonlySet<string>
+/**
+ * The words a run brings for what a name says rather than who it names, folded to
+ * letters.
+ *
+ * Two readings, because the two are not equally sure of themselves. `words` is
+ * everything the run brought. `asked` is only what the REQUEST itself wrote, which
+ * is the half a person typed rather than the half a model supplied from its own
+ * knowledge of a language — and that half alone is trusted to come off the front of
+ * a domain. A word wrongly called a kind of company can then only withhold, which
+ * this package is allowed to be wrong in; left in `asked` it would also cut
+ * garciaacme.es down to "acme" and hand a stranger's domain to every firm called
+ * Acme, which it is not.
+ */
+export interface RunWords {
+	readonly words: ReadonlySet<string>
+	readonly asked: ReadonlySet<string>
+}
 
 // Below this length a request's word has to spell a name's word exactly. Three or
 // four letters open far too many unrelated words — "gas" opens "gasol" — while a
@@ -81,8 +106,8 @@ const SHORTEST_WORD_READ_AS_AN_OPENING = 5
 const LONGEST_ENDING = 2
 
 /**
- * The trade words of a run, read off every wording its request used for the
- * trades it asked about.
+ * The words of a run, read off every wording its request used for the trades it
+ * asked about and every word it gave for a kind of company.
  *
  * Wordings rather than the parts they came in, because the two callers hold them
  * in different shapes: a run has the parts its request was split into, and the
@@ -99,34 +124,40 @@ const LONGEST_ENDING = 2
  * trade slips through under it. Folding it any other way here is also how two
  * checks start disagreeing about whether a piece of text spells a trade.
  */
-export const tradeWordsOf = (wordings: ReadonlyArray<string>): TradeWords =>
-	new Set(wordings.flatMap(nameSpellings).flatMap(foldTokens))
+export const runWordsOf = (
+	wordings: ReadonlyArray<string>,
+	kindsOfCompany: ReadonlyArray<string> = [],
+): RunWords => {
+	const fold = (given: ReadonlyArray<string>): Set<string> =>
+		new Set(given.flatMap(nameSpellings).flatMap(foldTokens))
+	const asked = fold(wordings)
+	return { words: new Set([...asked, ...fold(kindsOfCompany)]), asked }
+}
 
 /**
  * Whether the request wrote this word, exactly as it stands.
  *
  * What a caller asks when it is reading a run of letters that MIGHT be a word
  * rather than a word it already has — the front of a domain, where nothing says
- * where the first word ends. The ending `namesATrade` reads past must not be
+ * where the first word ends. The ending `namesNobody` reads past must not be
  * offered there: a request for "fontanería" would then also spell "fontaneriag",
  * the trade plus the first letter of the name after it, and a caller taking the
  * longest word a domain opens with would cut fontaneriagarcia.es one letter too
  * deep and never find García underneath.
  */
-export const wasAskedForExactly = (
-	word: string,
-	tradeWords: TradeWords,
-): boolean => tradeWords.has(word)
+export const runWroteExactly = (word: string, runWords: RunWords): boolean =>
+	runWords.asked.has(word)
 
 /**
- * Whether this word of a name says what the company does rather than who it is.
+ * Whether this word of a name says what the company does or what kind of thing it
+ * is, rather than who it is.
  *
  * The word arrives already folded and as a whole word, since every caller reads
  * it off a name that has been through the same fold.
  */
-export const namesATrade = (word: string, tradeWords: TradeWords): boolean => {
-	if (tradeWords.has(word)) return true
-	for (const asked of tradeWords) {
+export const namesNobody = (word: string, runWords: RunWords): boolean => {
+	if (runWords.words.has(word)) return true
+	for (const asked of runWords.words) {
 		if (
 			asked.length >= SHORTEST_WORD_READ_AS_AN_OPENING &&
 			word.startsWith(asked) &&

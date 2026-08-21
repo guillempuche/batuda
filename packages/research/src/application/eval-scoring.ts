@@ -71,7 +71,7 @@ import {
 	type RunScore,
 	SCORABLE_FIELDS,
 } from './eval-scoring-types'
-import { tradeWordsOf } from './trade-words'
+import { runWordsOf } from './run-words'
 
 export { contactNameMatches } from './eval-scoring-company'
 export {
@@ -258,7 +258,7 @@ export const scoreRun = (
 	// its run read too.
 	const repeats = repeatedRows(
 		outcome.companies,
-		tradeWordsOf(expectedMarket?.parts.flatMap(part => part.terms) ?? []),
+		runWordsOf(expectedMarket?.parts.flatMap(part => part.terms) ?? []),
 	)
 	const market: MarketScore | undefined =
 		expectedMarket === undefined || !endedWithAnAnswer(outcome.status)

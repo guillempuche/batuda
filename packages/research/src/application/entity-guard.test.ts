@@ -29,10 +29,10 @@ import {
 } from './entity-guard'
 import { EQUIVALENT_LETTERS } from './letter-equivalences.generated'
 import { ownSiteVerdict } from './own-site'
-import { tradeWordsOf } from './trade-words'
+import { runWordsOf } from './run-words'
 
 // A run that named no trades, which is a request about one company on file.
-const noTrades = tradeWordsOf([])
+const noRunWords = runWordsOf([])
 
 describe('deriveEntityTargets', () => {
 	describe('when the schema reports third-party companies', () => {
@@ -1682,14 +1682,14 @@ describe('nameSpellings — vowels a company writes two ways', () => {
 				ownSiteVerdict({
 					name: 'Muller SL',
 					website: 'https://mueller.de',
-					tradeWords: noTrades,
+					runWords: noRunWords,
 				}),
 			).toBe('unknown')
 			expect(
 				ownSiteVerdict({
 					name: 'Mueller GmbH',
 					website: 'https://muller.de',
-					tradeWords: noTrades,
+					runWords: noRunWords,
 				}),
 			).toBe('unknown')
 		})
@@ -1715,7 +1715,7 @@ describe('nameSpellings — vowels a company writes two ways', () => {
 					ownSiteVerdict({
 						name,
 						website: 'https://mueller-elektro.de',
-						tradeWords: noTrades,
+						runWords: noRunWords,
 					}),
 				).toBe('established')
 			}

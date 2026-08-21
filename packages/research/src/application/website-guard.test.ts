@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import { mergePerFieldSearch } from './per-field-search'
-import { tradeWordsOf } from './trade-words'
+import { runWordsOf } from './run-words'
 import { guardCompanyWebsites } from './website-guard'
 
 // A run that named no trades, which is a request about one company on file.
-const noTrades = tradeWordsOf([])
+const noRunWords = runWordsOf([])
 
 // A competitor/prospect entry: a name plus the website the model returned for it.
 const scan = (
@@ -64,7 +64,7 @@ describe('guardCompanyWebsites', () => {
 			// WHEN checked with the trades the run went looking for
 			const result = guardCompanyWebsites({
 				findings,
-				tradeWords: tradeWordsOf(['installations électriques']),
+				runWords: runWordsOf(['installations électriques']),
 			})
 
 			// THEN the website is kept — nothing here condemns it — but nothing
@@ -85,7 +85,7 @@ describe('guardCompanyWebsites', () => {
 			// WHEN checked — THEN its own site is established and counted
 			const result = guardCompanyWebsites({
 				findings,
-				tradeWords: tradeWordsOf(['fontanería']),
+				runWords: runWordsOf(['fontanería']),
 			})
 
 			expect(result.ownSiteEstablished).toBe(1)
@@ -105,7 +105,7 @@ describe('guardCompanyWebsites', () => {
 			const result = guardCompanyWebsites({
 				findings,
 				directorySites: new Set(['research.owler.com']),
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 
 			// THEN the listing is removed, which the rules reading only this one
@@ -125,7 +125,7 @@ describe('guardCompanyWebsites', () => {
 			const result = guardCompanyWebsites({
 				findings,
 				directorySites: new Set(['aemiat.com']),
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 
 			// THEN it is kept: an unwatched host is unknown, and unknown is no reason
@@ -147,7 +147,7 @@ describe('guardCompanyWebsites', () => {
 			])
 
 			// WHEN checked with no observation to go on
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 
 			// THEN the address naming the company one level down is enough on its
 			// own, so losing the list of known directories costs this case nothing
@@ -170,7 +170,7 @@ describe('guardCompanyWebsites', () => {
 			])
 
 			// WHEN checked — THEN it is still caught, by the address shape alone
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(websitesOf(result.findings)).toEqual([undefined])
 			expect(result.blankedProfilePage).toBe(1)
 			expect(result.blankedDirectory).toBe(0)
@@ -190,7 +190,7 @@ describe('guardCompanyWebsites', () => {
 			// THEN it is caught. The address is put back into letters before the name is
 			// looked for, so the escaping does not hide the listing — and a run over a
 			// Spanish or Catalan market meets this spelling constantly
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(websitesOf(result.findings)).toEqual([undefined])
 			expect(result.blankedProfilePage).toBe(1)
 		})
@@ -207,7 +207,7 @@ describe('guardCompanyWebsites', () => {
 
 			// WHEN checked — THEN the part is read as written rather than thrown away,
 			// so a path that was never valid escaping still gets judged
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(websitesOf(result.findings)).toEqual([undefined])
 			expect(result.blankedProfilePage).toBe(1)
 		})
@@ -226,7 +226,7 @@ describe('guardCompanyWebsites', () => {
 			// must not split it into two — read the other way round, the name would land
 			// in a "deeper" part that the address never had, and the company would lose
 			// its own page
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(websitesOf(result.findings)).toEqual([
 				'https://xpo.com/about%2Fxpo-logistics',
 			])
@@ -240,7 +240,7 @@ describe('guardCompanyWebsites', () => {
 			])
 
 			// WHEN checked — THEN a short name is no reason to let a listing through
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(websitesOf(result.findings)).toEqual([undefined])
 		})
 	})
@@ -263,7 +263,7 @@ describe('guardCompanyWebsites', () => {
 			// direction for a guard whose job is spotting listings
 			expect(
 				websitesOf(
-					guardCompanyWebsites({ findings, tradeWords: noTrades }).findings,
+					guardCompanyWebsites({ findings, runWords: noRunWords }).findings,
 				),
 			).toEqual([undefined])
 		})
@@ -280,7 +280,7 @@ describe('guardCompanyWebsites', () => {
 			])
 
 			// WHEN checked — THEN it is left untouched
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(websitesOf(result.findings)).toEqual([
 				'https://redwoodlogistics.com/about',
 			])
@@ -298,7 +298,7 @@ describe('guardCompanyWebsites', () => {
 
 			// WHEN checked — THEN a first-segment mention is a company describing
 			// itself, not a directory filing it away
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(websitesOf(result.findings)).toEqual([
 				'https://xpo.com/about-xpo-logistics',
 			])
@@ -311,7 +311,7 @@ describe('guardCompanyWebsites', () => {
 			])
 
 			// WHEN checked — THEN it is kept: the name is in no deeper path segment
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(websitesOf(result.findings)).toEqual([
 				'https://gopenske.com/logistics',
 			])
@@ -322,7 +322,7 @@ describe('guardCompanyWebsites', () => {
 			const findings = scan([{ name: 'DSV', website: 'https://dsv.com' }])
 
 			// WHEN checked — THEN nothing to file it away, so it stays
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(websitesOf(result.findings)).toEqual(['https://dsv.com'])
 		})
 
@@ -336,7 +336,7 @@ describe('guardCompanyWebsites', () => {
 			])
 
 			// WHEN checked — THEN the host naming the company is the deciding signal
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(websitesOf(result.findings)).toEqual([
 				'https://acmelogistics.com/company/acme-logistics',
 			])
@@ -354,7 +354,7 @@ describe('guardCompanyWebsites', () => {
 			])
 
 			// WHEN checked — THEN the missing scheme does not hide the listing
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(websitesOf(result.findings)).toEqual([undefined])
 			expect(result.blankedProfilePage).toBe(1)
 		})
@@ -370,7 +370,7 @@ describe('guardCompanyWebsites', () => {
 			const result = guardCompanyWebsites({
 				findings,
 				directorySites: new Set(['owler.com']),
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 			expect(websitesOf(result.findings)).toEqual([undefined])
 			expect(result.blankedDirectory).toBe(1)
@@ -384,7 +384,7 @@ describe('guardCompanyWebsites', () => {
 
 			// WHEN checked — THEN it goes: a website field nobody can open is worse
 			// than an empty one, because it reads as a real site downstream
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(websitesOf(result.findings)).toEqual([undefined])
 			expect(result.blankedNotAnAddress).toBe(1)
 		})
@@ -396,7 +396,7 @@ describe('guardCompanyWebsites', () => {
 			])
 
 			// WHEN checked — THEN it cannot be judged, so it stays
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(websitesOf(result.findings)).toEqual([
 				'https://some-directory.io/company/acme',
 			])
@@ -410,7 +410,7 @@ describe('guardCompanyWebsites', () => {
 			// address to establish anything about either, so neither ownership count
 			// moves: a row with no website is not a row whose website is unvouched for
 			// AND nothing is claimed, since a row with no address claims no host
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(result).toEqual({
 				findings,
 				blankedNotAnAddress: 0,
@@ -430,14 +430,14 @@ describe('guardCompanyWebsites', () => {
 			// GIVEN non-object findings
 			// WHEN checked — THEN they pass straight through
 			expect(
-				guardCompanyWebsites({ findings: null, tradeWords: noTrades }).findings,
+				guardCompanyWebsites({ findings: null, runWords: noRunWords }).findings,
 			).toBeNull()
 			expect(
-				guardCompanyWebsites({ findings: 'text', tradeWords: noTrades })
+				guardCompanyWebsites({ findings: 'text', runWords: noRunWords })
 					.findings,
 			).toBe('text')
 			expect(
-				guardCompanyWebsites({ findings: [1, 2], tradeWords: noTrades })
+				guardCompanyWebsites({ findings: [1, 2], runWords: noRunWords })
 					.findings,
 			).toEqual([1, 2])
 		})
@@ -456,7 +456,7 @@ describe('guardCompanyWebsites', () => {
 			}
 
 			// WHEN checked — THEN the walk fires on the shape, not the schema name
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(
 				(result.findings as { prospects: Array<{ website?: string }> })
 					.prospects[0]?.website,
@@ -481,7 +481,7 @@ describe('guardCompanyWebsites', () => {
 			const result = guardCompanyWebsites({
 				findings,
 				directorySites: new Set(['crunchbase.com']),
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 
 			// THEN the directory rule still fires, which is the whole point: it is the
@@ -510,7 +510,7 @@ describe('guardCompanyWebsites', () => {
 			const result = guardCompanyWebsites({
 				findings,
 				targetName: 'Redwood Logistics',
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 
 			// THEN the name-in-a-deeper-path rule catches it
@@ -535,7 +535,7 @@ describe('guardCompanyWebsites', () => {
 			const result = guardCompanyWebsites({
 				findings,
 				targetName: 'Redwood Logistics',
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 
 			// THEN the host carries the name, so it stands
@@ -564,7 +564,7 @@ describe('guardCompanyWebsites', () => {
 			const result = guardCompanyWebsites({
 				findings,
 				targetName: 'KBE Energy',
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 
 			// THEN the same reading reaches the field that arrives alone: nothing in
@@ -591,7 +591,7 @@ describe('guardCompanyWebsites', () => {
 			const result = guardCompanyWebsites({
 				findings,
 				targetName: 'Groupe Dupont SA',
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 
 			// THEN it goes, and this is the price of the rule rather than a bug: the
@@ -620,7 +620,7 @@ describe('guardCompanyWebsites', () => {
 			const result = guardCompanyWebsites({
 				findings,
 				targetName: 'KBE Energy',
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 			expect(
 				(result.findings as { enrichment: Record<string, unknown> }).enrichment[
@@ -643,7 +643,7 @@ describe('guardCompanyWebsites', () => {
 			const result = guardCompanyWebsites({
 				findings,
 				targetName: 'Redwood Logistics',
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 
 			// THEN the pair rule wins for a named company, so the site is kept
@@ -671,7 +671,7 @@ describe('guardCompanyWebsites', () => {
 			// WHEN checked
 			// THEN both go. The parser folds the trailing words into the path and hands
 			// back a clean host, so nothing that reads the host alone can catch this
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(websitesOf(result.findings)).toEqual([undefined, undefined])
 			expect(result.blankedNotAnAddress).toBe(2)
 		})
@@ -683,7 +683,7 @@ describe('guardCompanyWebsites', () => {
 			])
 
 			// WHEN checked — THEN it is one address and nothing else, so it stands
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(websitesOf(result.findings)).toEqual([
 				'https://acme.es/quienes%20somos',
 			])
@@ -705,7 +705,7 @@ describe('guardCompanyWebsites', () => {
 			const result = guardCompanyWebsites({
 				findings,
 				targetName: 'Acme',
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 			expect(
 				(result.findings as { enrichment: Record<string, unknown> }).enrichment[
@@ -731,7 +731,7 @@ describe('guardCompanyWebsites', () => {
 			// THEN all four go. The listing sits in the first path segment, which the
 			// deeper-path rule deliberately exempts — what settles it is that one host
 			// cannot be four different companies' own site
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(websitesOf(result.findings)).toEqual([
 				undefined,
 				undefined,
@@ -759,7 +759,7 @@ describe('guardCompanyWebsites', () => {
 
 			// WHEN checked — THEN every one stands: each host carries its own company's
 			// name, and no host is claimed by anybody else
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(websitesOf(result.findings)).toEqual([
 				'https://xpo.com/about-xpo-logistics',
 				'https://seur.com/sobre-seur',
@@ -782,7 +782,7 @@ describe('guardCompanyWebsites', () => {
 			// names, and blanking on the difference would blank that case too — so a
 			// host that belongs to somebody here takes this rule out of play, and what
 			// the two rows are to each other is settled by the de-duplication after it
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(websitesOf(result.findings)).toEqual([
 				'https://acme.es',
 				'https://acme.es/rubio',
@@ -806,7 +806,7 @@ describe('guardCompanyWebsites', () => {
 			// this is one company met twice rather than a directory — and the shared
 			// site is the only thing that says the two rows are the same company, so
 			// blanking it would leave them as two
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(websitesOf(result.findings)).toEqual([
 				'https://www.sice.com',
 				'https://sice.com/es',
@@ -827,7 +827,7 @@ describe('guardCompanyWebsites', () => {
 			// people use it by, so asking only whether the host carries a name whole
 			// would read a company's own domain as a stranger's and take it from both
 			// rows
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(websitesOf(result.findings)).toEqual([
 				'https://xpo.com',
 				'https://xpo.com/es',
@@ -849,7 +849,7 @@ describe('guardCompanyWebsites', () => {
 			// company met twice — nothing about the address says otherwise, and reading
 			// the two writings as two firms would take a company's own site off both of
 			// its rows
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(websitesOf(result.findings)).toEqual([
 				'https://www.securiteincendie.fr/',
 				'https://www.securiteincendie.fr/',
@@ -878,7 +878,7 @@ describe('guardCompanyWebsites', () => {
 			// host, and the two names share no word for the rule to read them as one
 			// company either — so the only thing left is that the site is somebody's
 			// and a blank would take it from them
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(websitesOf(result.findings)).toEqual([
 				'https://www.sav-onduleur-photovoltaique.com',
 				'https://www.sav-onduleur-photovoltaique.com/',
@@ -896,7 +896,7 @@ describe('guardCompanyWebsites', () => {
 			// WHEN checked
 			// THEN it stands: one row claiming a host is not evidence the host is
 			// somebody else's, and a blank costs a real website
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(websitesOf(result.findings)).toEqual([
 				'https://aemiat.com/e-mora/',
 				'https://tejero.es',
@@ -916,7 +916,7 @@ describe('guardCompanyWebsites', () => {
 
 			// WHEN checked — THEN the more exact diagnosis wins, so the counters keep
 			// telling apart a listing from a host several rows merely share
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(websitesOf(result.findings)).toEqual([undefined, undefined])
 			expect(result.blankedProfilePage).toBe(2)
 			expect(result.blankedSharedHost).toBe(0)
@@ -936,7 +936,7 @@ describe('guardCompanyWebsites', () => {
 
 			// WHEN checked — THEN the proposal subtree is skipped when the claims are
 			// gathered too, so a person never costs a company its site
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(
 				(result.findings as { prospects: Array<{ website?: string }> })
 					.prospects[0]?.website,
@@ -954,7 +954,7 @@ describe('guardCompanyWebsites', () => {
 				findings: cited([
 					{ name: 'Electricidad Mora', website: 'https://aemiat.com/e-mora/' },
 				]),
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 			const round = guardCompanyWebsites({
 				findings: cited([
@@ -962,20 +962,20 @@ describe('guardCompanyWebsites', () => {
 					{ name: 'Instalaciones Rubio', website: 'https://aemiat.com/rubio/' },
 				]),
 				priorClaims: held.hostClaims,
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 			const folded = mergePerFieldSearch(
 				held.findings,
 				round.findings,
 				'prospect_scan_v1',
-				noTrades,
+				noRunWords,
 			)
 
 			// WHEN the folded list is checked against everything the run has read
 			const judged = guardCompanyWebsites({
 				findings: folded.findings,
 				priorClaims: round.hostClaims,
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 
 			// THEN nobody keeps the trade body's host. The first answer had one
@@ -993,7 +993,7 @@ describe('guardCompanyWebsites', () => {
 			])
 
 			// WHEN checked
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 
 			// THEN the claim it read comes back with it, filed under the host, so the
 			// next answer is weighed against a company that is not in it
@@ -1010,7 +1010,7 @@ describe('guardCompanyWebsites', () => {
 			])
 
 			// WHEN checked
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 
 			// THEN both addresses go — AND both claims survive in what is handed back.
 			// Reading the answer it produced would find one claimant or none, so the
@@ -1028,7 +1028,7 @@ describe('guardCompanyWebsites', () => {
 			// is in, and under its legal name in a later answer
 			const first = guardCompanyWebsites({
 				findings: scan([{ name: 'SICE', website: 'https://www.sice.com' }]),
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 
 			// WHEN the later answer is checked against what the first one read
@@ -1040,7 +1040,7 @@ describe('guardCompanyWebsites', () => {
 					},
 				]),
 				priorClaims: first.hostClaims,
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 
 			// THEN the address stands. Carrying the claims makes the two rows two
@@ -1061,14 +1061,14 @@ describe('guardCompanyWebsites', () => {
 						website: 'https://sice.com/es',
 					},
 				]),
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 
 			// WHEN the answer holding the trade name is checked against it
 			const later = guardCompanyWebsites({
 				findings: scan([{ name: 'SICE', website: 'https://www.sice.com' }]),
 				priorClaims: first.hostClaims,
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 
 			// THEN it stands too: which answer named the host is not what settles it,
@@ -1082,14 +1082,14 @@ describe('guardCompanyWebsites', () => {
 			// answer, both on the domain that is the front of the first name
 			const first = guardCompanyWebsites({
 				findings: scan([{ name: 'XPO Logistics', website: 'https://xpo.com' }]),
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 
 			// WHEN the later answer is checked against what the first read
 			const later = guardCompanyWebsites({
 				findings: scan([{ name: 'XPO Iberia', website: 'https://xpo.com/es' }]),
 				priorClaims: first.hostClaims,
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 
 			// THEN it stands. Carrying the claims is what puts two names on this host
@@ -1107,7 +1107,7 @@ describe('guardCompanyWebsites', () => {
 				findings: scan([
 					{ name: 'SIMIE', website: 'https://www.securiteincendie.fr/' },
 				]),
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 
 			// WHEN the later answer is checked against what the first read
@@ -1116,7 +1116,7 @@ describe('guardCompanyWebsites', () => {
 					{ name: 'Groupe SIMIE', website: 'https://www.securiteincendie.fr/' },
 				]),
 				priorClaims: first.hostClaims,
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 
 			// THEN it stands. Carrying the claims is what brings the two writings
@@ -1135,7 +1135,7 @@ describe('guardCompanyWebsites', () => {
 				findings: scan([
 					{ name: 'Instal·lacions Puig', website: 'https://gremi.cat/puig/' },
 				]),
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 
 			// WHEN the second answer is checked against what the first read
@@ -1144,7 +1144,7 @@ describe('guardCompanyWebsites', () => {
 					{ name: 'Instal.lacions Puig', website: 'https://gremi.cat/puig/' },
 				]),
 				priorClaims: first.hostClaims,
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 
 			// THEN the address stands. A company is held under the one name it is
@@ -1159,7 +1159,7 @@ describe('guardCompanyWebsites', () => {
 			// company claims in a later answer
 			const first = guardCompanyWebsites({
 				findings: scan([{ name: 'SL', website: 'https://gremi.cat/anon/' }]),
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 
 			// WHEN the later answer is checked against it
@@ -1168,7 +1168,7 @@ describe('guardCompanyWebsites', () => {
 					{ name: 'Electricidad Mora', website: 'https://gremi.cat/mora/' },
 				]),
 				priorClaims: first.hostClaims,
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 
 			// THEN the address stands: a name nothing can be read from says nothing
@@ -1184,7 +1184,7 @@ describe('guardCompanyWebsites', () => {
 				findings: scan([
 					{ name: 'Electricidad Mora', website: 'https://aemiat.com/e-mora/' },
 				]),
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 
 			// WHEN the later answer is checked against what the first read
@@ -1193,7 +1193,7 @@ describe('guardCompanyWebsites', () => {
 					{ name: 'Electricidad Mora', website: 'https://aemiat.com/e-mora/' },
 				]),
 				priorClaims: first.hostClaims,
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 
 			// THEN it stands. Carrying the claims counts companies, never readings, so
@@ -1221,7 +1221,7 @@ describe('guardCompanyWebsites', () => {
 						},
 					],
 				},
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 
 			// WHEN the later answer is checked against it
@@ -1230,7 +1230,7 @@ describe('guardCompanyWebsites', () => {
 					{ name: 'Acme Instal', website: 'https://gremi.cat/acme/' },
 				]),
 				priorClaims: first.hostClaims,
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 
 			// THEN the company keeps its address: the proposal subtree is skipped when
@@ -1255,12 +1255,12 @@ describe('guardCompanyWebsites', () => {
 			// WHEN checked with no earlier claims, either left out or handed in empty
 			const withoutPrior = guardCompanyWebsites({
 				findings,
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 			const withEmptyPrior = guardCompanyWebsites({
 				findings,
 				priorClaims: new Map(),
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 
 			// THEN both read the answer identically: with nothing carried in, an
@@ -1292,7 +1292,7 @@ describe('guardCompanyWebsites', () => {
 			])
 
 			// WHEN checked
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 
 			// THEN the address goes: nothing in it names the company, and its own
 			// citation says only that the run read the page
@@ -1321,7 +1321,7 @@ describe('guardCompanyWebsites', () => {
 			// THEN only the website key is dropped — the company and its evidence stay,
 			// because what was wrong was the address, not the company
 			expect(
-				guardCompanyWebsites({ findings, tradeWords: noTrades }).findings,
+				guardCompanyWebsites({ findings, runWords: noRunWords }).findings,
 			).toEqual({
 				prospects: [
 					{
@@ -1342,7 +1342,7 @@ describe('guardCompanyWebsites', () => {
 
 			// WHEN checked — THEN the host carries the name, which settles it long
 			// before the page it was read from is asked about
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([own])
 			expect(result.blankedReadPage).toBe(0)
 		})
@@ -1360,7 +1360,7 @@ describe('guardCompanyWebsites', () => {
 			// THEN it stands. The host names nobody and the page is the one that was
 			// read, so what separates this from the listing above is the single thing
 			// this rule adds: the first segment spells the company out
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([own])
 			expect(result.blankedReadPage).toBe(0)
 		})
@@ -1375,7 +1375,7 @@ describe('guardCompanyWebsites', () => {
 
 			// WHEN checked — THEN one distinctive word inside the host is a mention,
 			// and a mention anywhere withholds the blank
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([own])
 			expect(result.blankedReadPage).toBe(0)
 		})
@@ -1395,7 +1395,7 @@ describe('guardCompanyWebsites', () => {
 			// THEN it stays. With no path there is no page to tell apart from the site,
 			// so the tell this rule reads is absent and what is left is the ordinary
 			// case — a run that read a home page and wrote the site down
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([
 				'https://annuaire.tecsol.fr',
 			])
@@ -1412,7 +1412,7 @@ describe('guardCompanyWebsites', () => {
 
 			// WHEN checked — THEN the name is found through the escaping, so the page
 			// is read as naming the company and kept
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([own])
 			expect(result.blankedReadPage).toBe(0)
 		})
@@ -1429,7 +1429,7 @@ describe('guardCompanyWebsites', () => {
 
 			// WHEN checked — THEN the same page cited repeatedly is still one page, and
 			// still the only thing that mentioned the company
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([undefined])
 			expect(result.blankedReadPage).toBe(1)
 		})
@@ -1448,7 +1448,7 @@ describe('guardCompanyWebsites', () => {
 			// THEN it stands. This rule speaks only for a row whose whole evidence is
 			// the address itself; once something else has mentioned the company, what
 			// the address is stops being a question this rule can answer
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([TECSOL_LISTING])
 			expect(result.blankedReadPage).toBe(0)
 		})
@@ -1461,7 +1461,7 @@ describe('guardCompanyWebsites', () => {
 
 			// WHEN checked — THEN a row citing nothing says nothing either way, so
 			// there is no provenance to read and the address is left alone
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([TECSOL_LISTING])
 			expect(result.blankedReadPage).toBe(0)
 		})
@@ -1481,7 +1481,7 @@ describe('guardCompanyWebsites', () => {
 
 			// WHEN checked — THEN the two spellings are one page, so tidying the
 			// citation does not hide where the claim came from
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([undefined])
 			expect(result.blankedReadPage).toBe(1)
 		})
@@ -1497,7 +1497,7 @@ describe('guardCompanyWebsites', () => {
 			])
 
 			// WHEN checked — THEN a page is the same page whichever link led to it
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([undefined])
 			expect(result.blankedReadPage).toBe(1)
 		})
@@ -1516,7 +1516,7 @@ describe('guardCompanyWebsites', () => {
 
 			// WHEN checked — THEN a matching path on a different site is a different
 			// page, so the website is not where the claim came from
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([TECSOL_LISTING])
 			expect(result.blankedReadPage).toBe(0)
 		})
@@ -1535,7 +1535,7 @@ describe('guardCompanyWebsites', () => {
 			// THEN nothing fires: an opaque id names no host, so it can neither match
 			// the address nor be mistaken for it. The rule reads a citation only when
 			// the model wrote it as the address it is
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([TECSOL_LISTING])
 			expect(result.blankedReadPage).toBe(0)
 		})
@@ -1556,7 +1556,7 @@ describe('guardCompanyWebsites', () => {
 
 			// WHEN checked — THEN an entry naming no source has mentioned the company
 			// nowhere, so it neither counts as another source nor blocks the rule
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([undefined])
 			expect(result.blankedReadPage).toBe(1)
 		})
@@ -1575,7 +1575,7 @@ describe('guardCompanyWebsites', () => {
 
 			// WHEN checked — THEN there is no citation to read, so the row is judged
 			// with nothing and its address stands
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([TECSOL_LISTING])
 			expect(result.blankedReadPage).toBe(0)
 		})
@@ -1598,7 +1598,7 @@ describe('guardCompanyWebsites', () => {
 
 			// WHEN checked — THEN both go, counted under the rule that knows more about
 			// why: several rows claiming one host says it belongs to none of them
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([undefined, undefined])
 			expect(result.blankedSharedHost).toBe(2)
 			expect(result.blankedReadPage).toBe(0)
@@ -1614,7 +1614,7 @@ describe('guardCompanyWebsites', () => {
 
 			// WHEN checked — THEN the address shape is the more exact diagnosis and
 			// keeps the count
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([undefined])
 			expect(result.blankedProfilePage).toBe(1)
 			expect(result.blankedReadPage).toBe(0)
@@ -1633,7 +1633,7 @@ describe('guardCompanyWebsites', () => {
 			// WHEN checked
 			// THEN both are kept and the two are told apart anyway, which is the whole
 			// point: surviving the rules is not the same statement as owning the site
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(websitesOf(result.findings)).toEqual([
 				'https://redwoodlogistics.com',
 				'https://annuaire.tecsol.fr',
@@ -1654,7 +1654,7 @@ describe('guardCompanyWebsites', () => {
 			// WHEN checked — THEN an address that is gone has no ownership left to
 			// establish, so it lands in neither column rather than swelling the
 			// unvouched-for one
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(result.blankedProfilePage).toBe(1)
 			expect(result.ownSiteEstablished + result.ownSiteUnknown).toBe(0)
 		})
@@ -1674,7 +1674,7 @@ describe('guardCompanyWebsites', () => {
 			])
 
 			// WHEN checked — THEN it is kept, and unvouched for
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([
 				'https://annuaire.tecsol.fr',
 			])
@@ -1690,7 +1690,7 @@ describe('guardCompanyWebsites', () => {
 
 			// WHEN checked — THEN silence about where a claim came from is not a
 			// reason to call the address the company's
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([TECSOL_LISTING])
 			expect(result.ownSiteUnknown).toBe(1)
 		})
@@ -1708,7 +1708,7 @@ describe('guardCompanyWebsites', () => {
 
 			// WHEN checked — THEN a second source about the COMPANY says nothing about
 			// who owns the ADDRESS, so it buys the address no standing
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([TECSOL_LISTING])
 			expect(result.ownSiteUnknown).toBe(1)
 		})
@@ -1723,7 +1723,7 @@ describe('guardCompanyWebsites', () => {
 
 			// WHEN checked — THEN the coincidence buys nothing here, because a path
 			// names a page about the company rather than the company's site
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([listing])
 			expect(result.ownSiteUnknown).toBe(1)
 		})
@@ -1741,7 +1741,7 @@ describe('guardCompanyWebsites', () => {
 
 			// WHEN checked — THEN a citation nothing can be read off is not a
 			// clearance
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([TECSOL_LISTING])
 			expect(result.ownSiteUnknown).toBe(1)
 		})
@@ -1764,7 +1764,7 @@ describe('guardCompanyWebsites', () => {
 					},
 				},
 				targetName: 'KBE Energy',
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 			const row = guardCompanyWebsites({
 				findings: cited([
@@ -1774,7 +1774,7 @@ describe('guardCompanyWebsites', () => {
 						sources: [website, 'https://www.lemoniteur.fr/kbe-energy'],
 					},
 				]),
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 
 			// WHEN both are checked
@@ -1806,7 +1806,7 @@ describe('guardCompanyWebsites', () => {
 			const result = guardCompanyWebsites({
 				findings,
 				targetName: 'Redwood Logistics',
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 			expect(result.ownSiteEstablished).toBe(1)
 			expect(result.ownSiteUnknown).toBe(0)
@@ -1826,7 +1826,7 @@ describe('guardCompanyWebsites', () => {
 
 			// WHEN checked with nothing to compare — THEN unknown, because there is no
 			// company for the domain to be the company's own site OF
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(result.ownSiteEstablished).toBe(0)
 			expect(result.ownSiteUnknown).toBe(1)
 		})
@@ -1849,7 +1849,7 @@ describe('guardCompanyWebsites', () => {
 
 			// WHEN checked — THEN the proposed-updates subtree is left untouched, so a
 			// person's website is never blanked as if it were a company's
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(result.findings).toEqual(findings)
 			expect(result.blankedDirectory + result.blankedProfilePage).toBe(0)
 		})
@@ -1872,7 +1872,7 @@ describe('guardCompanyWebsites', () => {
 			// THEN the site stays and is established as the company's own. Read only
 			// the way the name is written, the host spelled nothing the run knew and
 			// the company lost the very page it published
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([
 				'https://ilusions.cat/contacte',
 			])
@@ -1892,7 +1892,7 @@ describe('guardCompanyWebsites', () => {
 
 			// WHEN checked — THEN it is kept too, so reading the name both ways costs
 			// the spelling that already worked nothing
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([
 				'https://illusions.cat/contacte',
 			])
@@ -1914,7 +1914,7 @@ describe('guardCompanyWebsites', () => {
 					findings: cited([
 						{ name: 'Il·lusions SL', website, sources: [website] },
 					]),
-					tradeWords: noTrades,
+					runWords: noRunWords,
 				})
 				expect(prospectWebsites(result.findings)).toEqual([undefined])
 				expect(result.blankedProfilePage).toBe(1)
@@ -1936,7 +1936,7 @@ describe('guardCompanyWebsites', () => {
 			// THEN nothing is blanked: the host is plainly the Catalan company's, and
 			// the reading that says so came from the row with the mark. Keeping only
 			// the later row's spellings would lose it and blank all four
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(result.blankedSharedHost).toBe(0)
 			expect(prospectWebsites(result.findings)).toEqual([
 				'https://ilusions.cat',
@@ -1959,7 +1959,7 @@ describe('guardCompanyWebsites', () => {
 			// as a shared host. Its two spellings must count as the one company they
 			// are — counted apart, a single company would look like a crowd and the
 			// rule would fire on a host it owns
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(result.blankedSharedHost).toBe(0)
 			expect(prospectWebsites(result.findings)).toEqual([
 				'https://ilusions.cat',
@@ -1990,7 +1990,7 @@ describe('guardCompanyWebsites', () => {
 				const result = guardCompanyWebsites({
 					findings,
 					targetName: 'Instal·lacions Vives SL',
-					tradeWords: noTrades,
+					runWords: noRunWords,
 				})
 				expect(
 					(result.findings as { enrichment: Record<string, unknown> })
@@ -2016,7 +2016,7 @@ describe('guardCompanyWebsites', () => {
 				const result = guardCompanyWebsites({
 					findings,
 					targetName: 'Instal·lacions Vives SL',
-					tradeWords: noTrades,
+					runWords: noRunWords,
 				})
 				expect(
 					(result.findings as { enrichment: Record<string, unknown> })
@@ -2041,7 +2041,7 @@ describe('guardCompanyWebsites', () => {
 			// own exact domain still reads as unestablished — there is no word of the
 			// company's for a domain to spell, so `unknown` here means the rules could
 			// never have said anything else, not that nothing vouched for it
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(result.namedNobodyInParticular).toBe(1)
 			expect(result.ownSiteEstablished).toBe(1)
 			expect(result.ownSiteUnknown).toBe(1)
@@ -2058,7 +2058,7 @@ describe('guardCompanyWebsites', () => {
 			// THEN the website is kept, and the count stays at zero: a name that
 			// reads as nothing is a different miss from a name that reads as a trade,
 			// and adding the two together would hide both
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(result.namedNobodyInParticular).toBe(0)
 			expect(prospectWebsites(result.findings)).toEqual([
 				'https://directori.cat/empresa/algu',
@@ -2082,7 +2082,7 @@ describe('guardCompanyWebsites', () => {
 			// WHEN checked
 			// THEN the address goes. The page really is the company's, and it is
 			// still not the company's website — whoever opens it lands on Facebook
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([undefined])
 			expect(result.blankedSocialPage).toBe(1)
 		})
@@ -2098,7 +2098,7 @@ describe('guardCompanyWebsites', () => {
 
 			// WHEN checked — THEN blanked too. Which list a company arrived in says
 			// nothing about whose site the address is
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(websitesOf(result.findings)).toEqual([undefined])
 			expect(result.blankedSocialPage).toBe(1)
 		})
@@ -2116,7 +2116,7 @@ describe('guardCompanyWebsites', () => {
 			// WHEN checked
 			// THEN blanked. An address a reader can open is an address that ships, so
 			// a spelling this check did not recognise would put the page back
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([undefined])
 			expect(result.blankedSocialPage).toBe(1)
 		})
@@ -2137,7 +2137,7 @@ describe('guardCompanyWebsites', () => {
 			// THEN blanked, whatever else the row cited. A row that cites a second
 			// page stands down the rule that reads citations, and the platform is the
 			// one reading that does not need them
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([undefined])
 			expect(result.blankedSocialPage).toBe(1)
 		})
@@ -2154,7 +2154,7 @@ describe('guardCompanyWebsites', () => {
 				},
 			])
 
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([undefined])
 			expect(result.blankedSocialPage).toBe(1)
 		})
@@ -2168,7 +2168,7 @@ describe('guardCompanyWebsites', () => {
 				{ name: 'LIPOTECH SARL', website: 'https://facebook.com' },
 			])
 
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([undefined])
 			expect(result.blankedSocialPage).toBe(1)
 		})
@@ -2194,7 +2194,7 @@ describe('guardCompanyWebsites', () => {
 				},
 			])
 
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([
 				undefined,
 				undefined,
@@ -2222,7 +2222,7 @@ describe('guardCompanyWebsites', () => {
 				},
 			])
 
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([undefined, undefined])
 			expect(result.blankedSocialPage).toBe(2)
 		})
@@ -2236,7 +2236,7 @@ describe('guardCompanyWebsites', () => {
 				{ name: 'SL', website: 'https://www.facebook.com/quelquun' },
 			])
 
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([undefined])
 			expect(result.blankedSocialPage).toBe(1)
 		})
@@ -2257,7 +2257,7 @@ describe('guardCompanyWebsites', () => {
 			const result = guardCompanyWebsites({
 				findings,
 				targetName: 'LIPOTECH SARL',
-				tradeWords: noTrades,
+				runWords: noRunWords,
 			})
 			expect(result.findings).toEqual({ website: null })
 			expect(result.blankedSocialPage).toBe(1)
@@ -2277,7 +2277,7 @@ describe('guardCompanyWebsites', () => {
 				{ name: 'Fusteria Miquel SL', website: 'https://fusteriamiquel.cat' },
 			])
 
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(result.ownSiteEstablished).toBe(1)
 			expect(result.ownSiteUnknown).toBe(0)
 		})
@@ -2304,7 +2304,7 @@ describe('guardCompanyWebsites', () => {
 			// THEN each is counted under its own reason, so a reader of the run's
 			// numbers can tell how often a platform page was offered from how often a
 			// directory was
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(result.blankedSocialPage).toBe(1)
 			expect(result.blankedProfilePage).toBe(1)
 			expect(result.blankedNotAnAddress).toBe(1)
@@ -2333,7 +2333,7 @@ describe('guardCompanyWebsites', () => {
 			// THEN both are kept. A platform's name inside somebody else's domain is
 			// not the platform, and blanking these would cost two real companies the
 			// site they publish
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([
 				'https://facebook-ads-agency.com',
 				'https://instagram-marketing.es',
@@ -2355,7 +2355,7 @@ describe('guardCompanyWebsites', () => {
 			// WHEN checked
 			// THEN kept. What saves it is the host: a company's own domain is no
 			// platform
-			const result = guardCompanyWebsites({ findings, tradeWords: noTrades })
+			const result = guardCompanyWebsites({ findings, runWords: noRunWords })
 			expect(prospectWebsites(result.findings)).toEqual([
 				'https://xpo.com/about-xpo-logistics',
 			])
