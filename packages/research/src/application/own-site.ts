@@ -26,6 +26,14 @@
  * somebody else, and a listing whose own domain happens to carry a word of the
  * name would otherwise clear itself.
  *
+ * Two ways of writing a domain are read for what they are on the way there, and
+ * neither of them is a way of naming a company. A firm often puts what it does
+ * in front of what it is called — "Cobra Instalaciones y Servicios" at
+ * grupocobra.com — so one word for a trade comes off the front of the label, on
+ * the terms `withoutLeadingTradeWord` sets. And a domain registered with an accent
+ * travels in a code that spells nothing, which `hostLabel` puts back into the
+ * letters its owner registered before any of this reads it.
+ *
  * ## What deliberately does NOT establish it
  *
  * **The path.** "facebook.com/Some-Company" and "xpo.com/about-xpo-logistics"
@@ -57,22 +65,65 @@
  *
  * ## What it costs, on purpose
  *
- * A company at a domain that spells its name with something in front of it —
- * "Penske Logistics" at gopenske.com, "Grupo Cobra" at grupocobra.com — reads
- * `unknown`, as does one at an acronym its name never spells (SICE at sice.com).
- * So does any company at a domain registered with an accent, which arrives in
- * the punycode spelling and folds to letters that spell nothing: a blind spot
- * in exactly the markets this work is for, and the reason it is written down
- * here rather than met in a run.
+ * A company at a domain that puts something in front of its name which names no
+ * trade — "Penske Logistics" at gopenske.com — reads `unknown`, as does one at
+ * an initialism its own name never spells: "Sociedad Ibérica de Construcciones
+ * Eléctricas" at sice.com.
  *
- * In every one of those the website is still kept, since keeping is not this
- * verdict's decision; what it loses is standing as the source that vouches for
- * the company. That is a withholding, and withholding is the direction this
- * file is allowed to be wrong in.
+ * In both the website is still kept, since keeping is not this verdict's
+ * decision; what it loses is standing as the source that vouches for the
+ * company. That is a withholding, and withholding is the direction this file is
+ * allowed to be wrong in.
  *
- * Closing any of them means loosening — reading past a word in front, or
- * matching initials — and each loosening is a new way to clear a stranger's
- * address. Measure the cost before paying it.
+ * ## The shortening that was measured and refused
+ *
+ * Five market searches turned up four real companies whose domain shortens
+ * their name, and there is no single way they shorten it: sice.com and semi.es
+ * take the first letter of each word; ppvs-fm.com writes the first word whole
+ * and then the initials of the rest; esanit.fr takes one letter of the first
+ * word and part of the second. Four rows, three shapes, and the last of them
+ * cuts a word wherever it pleases.
+ *
+ * They stay `unknown`, and that is the answer rather than a gap left for later.
+ * What the reading above matches on is letters the company itself wrote, in the
+ * order it wrote them, which is why a longer name is HARDER to land on by
+ * accident. Initials turn that around: the name is spent down to one letter a
+ * word, so the more words a firm has the fewer letters it is judged on, and
+ * every other firm whose words open the same way spells the same domain.
+ * Take a firm called "Servicios Eléctricos y Montajes Industriales", invented
+ * here to make the point where the four above were met in a run: it spells
+ * semi.es exactly as well as the owner of that domain does, and would be handed
+ * a stranger's site to vouch for it — the failure this file exists to prevent,
+ * walking in through the door that letting those four rows in would open.
+ *
+ * The floor `SHORTEST_NAME_A_DOMAIN_SPELLS` sets below already says this about
+ * the same letters: one or two letters is an initial rather than a name. Reading
+ * initials would leave that floor standing and make it mean nothing.
+ *
+ * ## What reading past a trade word still gets wrong
+ *
+ * A domain that writes a trade word and then the front of a name answers for
+ * every company whose name starts the same way, and one of them registered it.
+ * "Cobra Formación" is at home on grupocobra.com by this reading, and the group
+ * that owns it is not that company. Reading only the FRONT of a name is what
+ * keeps this to companies that genuinely start alike rather than to every
+ * company sharing any word — a market pass over 138 companies with a website
+ * cleared no stranger under this reading, and one under the looser one.
+ *
+ * The other half of the price is a firm whose domain writes a trade word and
+ * then a word from the MIDDLE of its name, which is refused with them: an
+ * acronym a name carries in brackets, "Electronic Trafic (ETRA)" at
+ * grupoetra.com, reads `unknown` though the domain is the company's own.
+ *
+ * ## What is left to close, and the rule for closing it
+ *
+ * Every rule here that lets more addresses through is a new way to clear a
+ * stranger's address, so each is bought one at a time against rows a run
+ * actually met, and each keeps its own list of what it still cannot clear.
+ * A trade word may be read past because the words come from the list the checks
+ * already share and cannot be invented for a case; an initialism may not,
+ * because nothing bounds who else spells it. Measure the cost before paying it,
+ * and take the withholding when the measurement does not settle it.
  *
  * Whether the host is a business directory is a separate question with a
  * separate answer (`directory-sites.ts`), and a caller weighing a company's
@@ -84,21 +135,36 @@
  * is not: which single site a run should GO AND READ as the company's. A wrong
  * yes there sends the run off to read a stranger's pages and then writes that
  * stranger's revenue, chief executive and telephone number onto the row, so it
- * wants the domain to spell a WHOLE name and will not read the front of one —
- * "Grupo Cobra Instalaciones" must not be handed grupocobra.com, a large
- * unrelated group. This file is asked about an address a run already holds,
- * where a wrong yes costs one field, so the front of a name is enough.
+ * wants the name to BE the domain — the whole of it, or one word of it standing
+ * alone, with nothing in front of either — so "Grupo Cobra Instalaciones" must
+ * not be handed grupocobra.com, a large unrelated group. This file is asked
+ * about an address a run already holds, where a wrong yes cannot send a run off
+ * to read anything, so the front of a name is enough and so is a trade word
+ * ahead of it.
  *
- * The difference is in what each answer is then spent on, never in how a name is
- * read, and it is written down at both definitions so neither drifts. Every
- * caller weighing an address the run already has asks THIS file — the directory
- * watch included, where asking the stricter one brands a group's own domain a
- * listing for carrying a page for the group and a page for its subsidiary, and
- * costs the group its website.
+ * What a wrong yes DOES cost here is worth naming, because it is more than the
+ * field: an established site is the one thing that vouches for a company's
+ * existence, it exempts its host from the directory watch, and it becomes a key
+ * that folds two rows into one company. Cheaper than sending a run off to write
+ * a stranger's revenue onto a row, which is what buys the asymmetry — but not
+ * one field, and the loosenings above were weighed against the larger figure.
+ *
+ * Reading the accented spelling is the one thing they do share, because it is
+ * not a rule about names at all: it is what the domain says, and a check that
+ * read the code instead would be reading a different address from the one
+ * somebody registered. It sits in `hostLabel`, which both go through.
+ *
+ * The difference in what each answer is spent on is what sets how far each may
+ * read, and both halves are written down at both definitions so neither drifts.
+ * Every caller weighing an address the run already has asks THIS file — the
+ * directory watch included, where asking the stricter one brands a group's own
+ * domain a listing for carrying a page for the group and a page for its
+ * subsidiary, and costs the group its website.
  */
 
 import {
 	collapse,
+	DISTINCTIVE_NAME_LENGTH,
 	distinctiveWords,
 	hostLabel,
 	isGenericWord,
@@ -121,9 +187,9 @@ export type OwnSiteVerdict = 'established' | 'unknown'
 // whole question down as the name, and every long word of a question would then
 // be a word a domain could be cleared by — "Acme Corp Barcelona" clearing
 // barcelona.cat. A run that does not know the company's name cannot say whose
-// site anything is. Set well clear of the longest real names, which run to six
+// site anything is. Set well clear of the longest real names, which run to five
 // ("Sociedad Española de Montajes Industriales"), because what sits on the other
-// side of this is a paragraph rather than a seventh word.
+// side of this is a paragraph rather than a sixth word.
 const MOST_WORDS_A_NAME_RUNS_TO = 8
 
 // The shortest front part a domain may be read as spelling. The large carriers
@@ -158,6 +224,33 @@ const namesTheDomainCouldCarry = (
 	return runs
 }
 
+// What is left of a label once the trade word it opens with is taken off, or null
+// when it opens with none. A firm often writes what it does in front of what it
+// is called, and grupocobra.com is Cobra's.
+//
+// One word, and only a word the shared trade list already holds, so a run may not
+// invent one to reach a name with — "gopenske.com" keeps its "go", because "go"
+// names no trade. A label keeps no spaces to say where its first word ends, so
+// the LONGEST trade word it opens with is the one taken off: several of the
+// shared words are the stem of another — "transporte" of "transportes" — and
+// cutting at every one of them would read "transportesacme" from after the stem
+// as well, handing a firm called Sacme a domain that says Acme.
+//
+// What is left has to be long enough to stand for somebody. Three letters are a
+// whole label's worth of evidence when a firm registered exactly them
+// ("dsv.com"), but here they are a fragment inside a longer label, which is the
+// coincidence `DISTINCTIVE_NAME_LENGTH` exists to price: without the floor
+// "grupoacs.com" answers for every firm called ACS and groupama.fr for every one
+// called AMA.
+const withoutLeadingTradeWord = (label: string): string | null => {
+	for (let taken = label.length - 1; taken > 0; taken--) {
+		if (!isGenericWord(label.slice(0, taken))) continue
+		const rest = label.slice(taken)
+		return rest.length >= DISTINCTIVE_NAME_LENGTH ? rest : null
+	}
+	return null
+}
+
 /**
  * Whether a host is this company's own domain.
  *
@@ -165,10 +258,12 @@ const namesTheDomainCouldCarry = (
  * one distinctive word of the name on its own — which is how most small firms
  * register. Either may have the legal form after it, and nothing else:
  * "fusteriamiquelsl.cat" is the workshop, "fusteriamiquelreviews.com" is
- * somebody writing about it.
+ * somebody writing about it. A trade word in front of the name is read past, on
+ * the terms `withoutLeadingTradeWord` sets.
  */
 const hostSpellsTheCompany = (name: string, host: string): boolean => {
 	const label = collapse(hostLabel(host))
+	const pastTheTrade = withoutLeadingTradeWord(label)
 	// The distinctive words are read off the name itself, which already offers
 	// each of them in every spelling.
 	const words = distinctiveWords(name)
@@ -180,10 +275,14 @@ const hostSpellsTheCompany = (name: string, host: string): boolean => {
 		const spelled = nameWordsWithoutForms(withoutFormDots(spelling))
 		// A brief rather than a name, which no spelling of it can rescue.
 		if (spelled.length > MOST_WORDS_A_NAME_RUNS_TO) return false
-		return labelSpellsOneOf(label, [
-			...namesTheDomainCouldCarry(spelled),
-			...words,
-		])
+		const couldCarry = namesTheDomainCouldCarry(spelled)
+		if (labelSpellsOneOf(label, [...couldCarry, ...words])) return true
+		// Past a trade word, only the front of the name is read, never one word
+		// taken from the middle of it. The label has already spent its own front on
+		// the trade word, so a word matched here is a word the domain CONTAINS
+		// rather than one it spells — and "grupofire.com" is Grupo FIRE's, not the
+		// site of every firm with "fire" somewhere in its name.
+		return pastTheTrade !== null && labelSpellsOneOf(pastTheTrade, couldCarry)
 	})
 }
 
