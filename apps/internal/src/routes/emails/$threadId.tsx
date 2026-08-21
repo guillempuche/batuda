@@ -882,12 +882,20 @@ function findLastInbound(
 	return null
 }
 
+// Mail clients write the reply prefix several ways — "RE:", "re:", and (with
+// French typography) "Re :". Any of them already marks a reply, so none of them
+// should be stacked on top of. The server reads it the same way.
+const REPLY_PREFIX = /^re\s*:/i
+
 function prefixSubject(subject: string, prefix: string): string {
 	const trimmed = subject.trim()
-	if (trimmed === '') return prefix.trim()
-	if (trimmed.toLowerCase().startsWith(prefix.trim().toLowerCase())) {
-		return trimmed
-	}
+	// A conversation with nothing to borrow leaves this empty rather than
+	// answering with a bare "Re:". The server turns an empty one away and says
+	// why, which is what every other way of replying already does — answering
+	// "Re:" here would make the browser the one place a message with no real
+	// subject still went out.
+	if (trimmed === '') return ''
+	if (REPLY_PREFIX.test(trimmed)) return trimmed
 	return `${prefix}${trimmed}`
 }
 

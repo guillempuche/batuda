@@ -7,6 +7,25 @@ import { NoMatch, ParticipantMatcher } from '@batuda/email/participant-matcher'
 
 import { resolveThreadId } from './threading.js'
 
+// Whether an id is one a conversation can be keyed on.
+//
+// A conversation is identified by a single id, and there is one row per id per
+// organisation — so an id that many unrelated messages share is not an
+// identifier at all, it is a bucket they all fall into. Senders emit plenty of
+// those: an empty `<>`, a header mangled into prose ("Your message of Tue…"),
+// two ids run together by a stray comma. Adopting one of those would put every
+// message in the organisation carrying the same junk into a single
+// conversation, mixing unrelated people's mail together.
+//
+// So the shape is checked before it is trusted: something inside the brackets,
+// nothing that belongs to more than one id, and the `@` that RFC 5322 requires.
+// Anything failing that is passed over for the next candidate.
+const isUsableMessageId = (id: string | null | undefined): id is string => {
+	if (typeof id !== 'string') return false
+	const core = id.trim().replace(/^</, '').replace(/>$/, '').trim()
+	return core !== '' && !/[\s<>,]/.test(core) && core.includes('@')
+}
+
 // Parsed-mail subset the worker reads. Decouples persist from any
 // specific parser so a future swap (e.g. mailparser → letterparser) is
 // localized.
@@ -45,11 +64,23 @@ const collectAddresses = (
 export const fromParsedMail = (mail: ParsedMail): ParsedInbound => {
 	const messageId = mail.messageId ?? ''
 	const inReplyTo = mail.inReplyTo ?? null
-	const references = mail.references
+	const headerReferences = mail.references
 		? Array.isArray(mail.references)
 			? mail.references
 			: [mail.references]
 		: []
+	// A message that answers something but carries no References header stands
+	// its In-Reply-To in for the chain, which is what RFC 5322 says to do and
+	// what mail clients do. Without it the row belongs to no conversation at
+	// all: which conversation a message is in is read from this list, so a
+	// reply that arrives this way is filed correctly and then never shown,
+	// never counted, and never marks the thread unread.
+	const references =
+		headerReferences.length > 0
+			? headerReferences
+			: isUsableMessageId(inReplyTo)
+				? [inReplyTo]
+				: []
 	const text = typeof mail.text === 'string' ? mail.text : null
 	const preview = text ? text.slice(0, 200) : null
 	return {
@@ -142,6 +173,19 @@ export const persistMessage = (args: {
 			references: args.parsed.references,
 		})
 
+		// Which conversation a message is in is read back out of this list, so
+		// the conversation's own id has to be in it or the message belongs
+		// nowhere a reader looks — filed correctly and then never shown, never
+		// counted, never marking the conversation unread.
+		//
+		// A sender that names only the message it answers, and not the whole
+		// chain back to the start, leaves it out. So does a sender that trims a
+		// long chain. Both are ordinary. The id goes in front, where the oldest
+		// ancestor belongs.
+		const storedReferences = args.parsed.references.includes(externalThreadId)
+			? args.parsed.references
+			: [externalThreadId, ...args.parsed.references]
+
 		// Whose conversation this is comes from the other side of it: who wrote
 		// to us, or who we wrote to. Reading the sender of a message we sent
 		// would only ever find ourselves, and a conversation that starts
@@ -197,14 +241,17 @@ export const persistMessage = (args: {
 		// `(organization_id, external_thread_id)` index. The DO UPDATE
 		// clause deliberately leaves `company_id`/`contact_id` alone —
 		// the first message on a thread sets the link, later messages
-		// from a different sender don't re-home the whole thread. The id comes
-		// back so the history entry can point at the conversation this message
-		// belongs to.
+		// from a different sender don't re-home the whole thread. The subject
+		// is filled in only when the thread hasn't got one, so a later message
+		// can't rename the conversation — replies to it are sent with this
+		// subject, so it has to stay put. The id comes back so the history
+		// entry can point at the conversation this message belongs to.
 		const threadLinks = yield* sql<{ id: string }>`
-			INSERT INTO email_thread_links (organization_id, inbox_id, external_thread_id, company_id, contact_id, updated_at)
-			VALUES (${args.organizationId}, ${args.inboxId}, ${externalThreadId}, ${companyId}, ${contactId}, now())
+			INSERT INTO email_thread_links (organization_id, inbox_id, external_thread_id, company_id, contact_id, subject, updated_at)
+			VALUES (${args.organizationId}, ${args.inboxId}, ${externalThreadId}, ${companyId}, ${contactId}, ${args.parsed.subject}, now())
 			ON CONFLICT (organization_id, external_thread_id)
-			DO UPDATE SET updated_at = now()
+			DO UPDATE SET updated_at = now(),
+			              subject = COALESCE(NULLIF(btrim(email_thread_links.subject), ''), NULLIF(btrim(EXCLUDED.subject), ''))
 			RETURNING id
 		`
 		const threadLinkId = threadLinks[0]?.id ?? null
@@ -227,7 +274,7 @@ export const persistMessage = (args: {
 				${args.organizationId}, ${args.inboxId}, ${args.folder},
 				${args.imapUid}, ${args.imapUidvalidity},
 				${args.parsed.messageId}, ${args.parsed.inReplyTo},
-				${args.parsed.references as unknown as string[]},
+				${storedReferences as unknown as string[]},
 				${args.parsed.subject}, ${args.parsed.receivedAt},
 				${args.parsed.textBody}, ${args.parsed.htmlBody}, ${args.parsed.textPreview},
 				${args.rawRfc822Ref},

@@ -19,6 +19,13 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 //     (thread-reply, thread-reply-all)
 //   apps/internal/src/components/emails/compose-form.tsx
 //     (compose-{form,to,subject,send})
+//
+// A reply's subject is not covered here beyond asserting one arrives: the
+// composer works it out itself from the thread and renders no subject field on
+// a reply (compose-form.tsx, `!isReply`), so there is no way from the browser
+// to send a reply without one. What the server does when it has to choose the
+// subject is covered in
+// apps/server/src/services/email-threading.integration.test.ts.
 
 const psql = (sqlText: string): string =>
 	execSync(`psql "${DATABASE_URL}" -tA -c "${sqlText.replace(/"/g, '\\"')}"`, {
@@ -85,6 +92,9 @@ test.describe('reply on a seeded thread', () => {
 			const raw = getRawMessage(summary)
 			expect(raw).toMatch(/in-reply-to:\s*<[^>]+>/i)
 			expect(raw).toMatch(/references:\s*<[^>]+>/i)
+			// AND a Subject line, which the headers above do not imply: a reply
+			// once went out with these two correct and no Subject at all.
+			expect(raw).toMatch(/^subject:\s*Re: Quote for the booking module\s*$/im)
 		})
 	})
 

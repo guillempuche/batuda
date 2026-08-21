@@ -41,7 +41,7 @@ const searchThreads = async (q: string): Promise<string[]> => {
 		      SELECT 1 FROM email_messages em
 		      WHERE em.organization_id = tl.organization_id
 		        AND (em.message_id = tl.external_thread_id
-		             OR tl.external_thread_id = ANY(em."references"))
+		             OR em."references" @> ARRAY[tl.external_thread_id]::text[])
 		        AND em.search_vector @@ plainto_tsquery('simple', $2)
 		    )
 		    OR EXISTS (
@@ -49,7 +49,7 @@ const searchThreads = async (q: string): Promise<string[]> => {
 		      JOIN message_participants mp ON mp.email_message_id = em2.id
 		      WHERE em2.organization_id = tl.organization_id
 		        AND (em2.message_id = tl.external_thread_id
-		             OR tl.external_thread_id = ANY(em2."references"))
+		             OR em2."references" @> ARRAY[tl.external_thread_id]::text[])
 		        AND mp.email_address ILIKE $3
 		    )
 		  )

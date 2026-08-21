@@ -101,6 +101,84 @@ test.describe('compose and send via the mail catcher', () => {
 		})
 	})
 
+	test.describe('when a new message is written as if it were a reply', () => {
+		test('should refuse it and leave the compose window open', async ({
+			page,
+		}) => {
+			// GIVEN a brand-new message — this path threads nothing — written
+			// under a "Re: " subject, the way a follow-up gets written. That
+			// pairing is the classic forged-reply shape, and mail filters test
+			// for it; a batch of these reached real prospects.
+			const testId = `e2e-fake-reply-${Date.now()}`
+			const recipient = `${testId}@catcher.local`
+			const subject = `Re: pallet pools ${testId}`
+
+			await page.goto('/emails')
+			await openCompose(page, 'emails-compose')
+			await page.getByTestId('compose-to').fill(recipient)
+			await page.getByTestId('compose-subject').fill(subject)
+			await fillBody(page, `should not arrive ${testId}`)
+
+			// WHEN Alice clicks Send
+			await expect(page.getByTestId('compose-send')).toBeEnabled()
+			const sendResponse = page.waitForResponse(
+				resp =>
+					resp.url().includes('/email/drafts/') &&
+					resp.url().endsWith('/send') &&
+					resp.request().method() === 'POST',
+				{ timeout: 15_000 },
+			)
+			await page.getByTestId('compose-send').click()
+
+			// THEN the server turns it away with the reason named, not a bare
+			// failure. Asserted on the reason the wire carries rather than on
+			// the sentence shown: the sentence is written per language, so
+			// pinning it here would tie this test to one wording and to one
+			// locale, and would go green on the wrong refusal.
+			const refusal = await sendResponse
+			expect(refusal.status()).toBe(400)
+			const refusalBody = (await refusal.json()) as {
+				_tag?: string
+				reason?: string
+			}
+			expect(refusalBody._tag).toBe('EmailNotSendable')
+			expect(refusalBody.reason).toBe('forged_reply')
+
+			// AND nothing reaches the catcher
+			await expectNoMessage(recipient, subject)
+
+			// AND the sender is told something they can act on, whatever the
+			// wording, and the window stays open so the message can be fixed
+			await expect(page.getByRole('alert')).toBeVisible({ timeout: 10_000 })
+			await expect(page.getByTestId('compose-window')).toBeVisible()
+		})
+
+		test('should send the same message once the "Re: " is dropped', async ({
+			page,
+		}) => {
+			// GIVEN the same message under an ordinary subject
+			// AND this is the pair to the test above: it proves the refusal
+			// turns on the subject, not on anything else about the message
+			const testId = `e2e-plain-followup-${Date.now()}`
+			const recipient = `${testId}@catcher.local`
+			const subject = `pallet pools ${testId}`
+
+			await page.goto('/emails')
+			await openCompose(page, 'emails-compose')
+			await page.getByTestId('compose-to').fill(recipient)
+			await page.getByTestId('compose-subject').fill(subject)
+			await fillBody(page, `plain follow-up ${testId}`)
+
+			// WHEN Alice clicks Send
+			await expect(page.getByTestId('compose-send')).toBeEnabled()
+			await page.getByTestId('compose-send').click()
+
+			// THEN it goes out
+			const msg = await waitForMessage(recipient, { subject })
+			expect(msg.Subject).toBe(subject)
+		})
+	})
+
 	test.describe('when the recipient is suppressed', () => {
 		test.beforeEach(() => {
 			// AND Pep Casals' email channel is forced into bounced state so

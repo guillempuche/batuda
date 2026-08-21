@@ -76,6 +76,91 @@ describe('fromParsedMail', () => {
 		})
 	})
 
+	describe('when a reply names its parent only in In-Reply-To', () => {
+		it('should stand that in for the missing chain', async () => {
+			// GIVEN a reply with no References header, which some clients send
+			const mail = await parse(
+				rfc822({
+					from: 'a@x',
+					to: 'b@x',
+					subject: 'Re: r',
+					messageId: '<2@x>',
+					inReplyTo: '<1@x>',
+				}),
+			)
+
+			// WHEN it is read
+			const parsed = fromParsedMail(mail)
+
+			// THEN the parent it names becomes its chain
+			// AND without this the message belongs to no conversation: which
+			// conversation a message is in is read from this list, so it would
+			// be filed correctly and then never shown, counted, or marked unread
+			expect(parsed.references).toEqual(['<1@x>'])
+		})
+
+		it('should leave the header chain alone when there is one', async () => {
+			// GIVEN a reply carrying both headers
+			const mail = await parse(
+				rfc822({
+					from: 'a@x',
+					to: 'b@x',
+					subject: 'Re: r',
+					messageId: '<3@x>',
+					inReplyTo: '<2@x>',
+					references: '<1@x> <2@x>',
+				}),
+			)
+
+			// WHEN it is read
+			// THEN the header wins — the stand-in is only for when there is none
+			const parsed = fromParsedMail(mail)
+			expect(parsed.references).toEqual(['<1@x>', '<2@x>'])
+		})
+	})
+
+	describe('when the parent id a message names is not usable', () => {
+		it('should not stand a meaningless one in for the chain', async () => {
+			// GIVEN a reply whose In-Reply-To is an empty pair of brackets, which
+			// senders do emit
+			const mail = await parse(
+				rfc822({
+					from: 'a@x',
+					to: 'b@x',
+					subject: 'Re: r',
+					messageId: '<4@x>',
+					inReplyTo: '<>',
+				}),
+			)
+
+			// WHEN it is read
+			const parsed = fromParsedMail(mail)
+
+			// THEN nothing stands in — an id every mangled message shares is not
+			// an identifier, and keying conversations on it would gather
+			// unrelated people's mail into one
+			expect(parsed.references).toEqual([])
+		})
+
+		it('should not stand in a header the sender wrote as prose', async () => {
+			// GIVEN the shape older clients emit
+			const mail = await parse(
+				rfc822({
+					from: 'a@x',
+					to: 'b@x',
+					subject: 'Re: r',
+					messageId: '<5@x>',
+					inReplyTo: 'Your message of Tue <1@x>',
+				}),
+			)
+
+			// WHEN it is read
+			// THEN it is passed over rather than taken as an id
+			const parsed = fromParsedMail(mail)
+			expect(parsed.references).toEqual([])
+		})
+	})
+
 	describe('when text body is longer than 200 characters', () => {
 		it('should clamp the preview to 200 characters', async () => {
 			const long = 'x'.repeat(500)
