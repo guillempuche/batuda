@@ -107,6 +107,393 @@ describe('ownSiteVerdict', () => {
 		})
 	})
 
+	describe('when the domain writes a trade word in front of the name', () => {
+		it('should establish the real companies a market search turned up', () => {
+			// GIVEN the companies five market searches turned up whose domain says
+			// what they do before saying who they are, and then the front of the name
+			// WHEN each is asked
+			// THEN each is its own site: the word in front identifies nobody, so what
+			// follows it is still the domain spelling the company
+			for (const [name, website] of [
+				['Cobra Instalaciones y Servicios', 'https://grupocobra.com'],
+				['Lasser', 'https://grupolasser.com'],
+				['CAHORS', 'https://www.groupe-cahors.com/es-espana'],
+			] as const) {
+				expect(ownSiteVerdict({ name, website })).toBe('established')
+			}
+		})
+
+		it('should leave a domain naming a word from the middle of the name', () => {
+			// GIVEN a company a market search met, at the domain of a company that
+			// shares one word with it, and a second whose name carries an acronym in
+			// brackets rather than at its front
+			// WHEN each is asked
+			// THEN unknown, and the second is a real company losing its own site. The
+			// label spends its own front on the trade word, so a word matched after
+			// that is one the domain CONTAINS rather than one it spells — and reading
+			// those hands "grupofire.com", which is Grupo FIRE's, to every firm with
+			// "fire" somewhere in its name
+			expect(
+				ownSiteVerdict({
+					name: 'KGS Fire & Security España',
+					website: 'http://www.grupofire.com',
+				}),
+			).toBe('unknown')
+			expect(
+				ownSiteVerdict({
+					name: 'Electronic Trafic (ETRA)',
+					website: 'https://grupoetra.com',
+				}),
+			).toBe('unknown')
+		})
+
+		it('should answer the host exactly as it answers an address on it', () => {
+			// GIVEN the same domain asked both ways
+			// WHEN each is asked
+			// THEN they agree, so a caller weighing many addresses on one host still
+			// gets one answer for the host
+			expect(
+				ownSiteHostVerdict({ name: 'Lasser', host: 'grupolasser.com' }),
+			).toBe('established')
+			expect(
+				ownSiteVerdict({
+					name: 'Lasser',
+					website: 'https://grupolasser.com/quienes-somos',
+				}),
+			).toBe('established')
+		})
+
+		it('should not establish a domain that only shares the front of the name', () => {
+			// GIVEN a different company whose name opens with the same letters
+			// WHEN asked against the first one's name
+			// THEN unknown. Reading past the trade word does not lower the bar behind
+			// it: what is left still has to BE the name rather than begin with it
+			expect(
+				ownSiteVerdict({
+					name: 'Lasser',
+					website: 'https://grupolasserna.com',
+				}),
+			).toBe('unknown')
+		})
+
+		it('should not read past a word that names no trade', () => {
+			// GIVEN domains that put something else in front of the name
+			// WHEN each is asked
+			// THEN unknown, and this is the cost that stays paid: only a word from
+			// the trade list the checks already share may be read past, so no run can
+			// invent one to reach a name with
+			for (const [name, website] of [
+				['Penske Logistics', 'https://gopenske.com/logistics'],
+				['Ferré', 'https://miferre.es'],
+			] as const) {
+				expect(ownSiteVerdict({ name, website })).toBe('unknown')
+			}
+		})
+
+		it('should take off the longest trade word, not a stem of one', () => {
+			// GIVEN a domain writing the Spanish plural of a trade and then a name,
+			// where the singular is on the same shared list and is the stem of it
+			// WHEN the company the domain names is asked, and two whose names are the
+			// letters a cut at the stem would leave behind
+			// THEN only the first is established. A label keeps no spaces to say
+			// where its first word ends, so cutting at every trade word it opens with
+			// would read "transportesacme" from after "transporte" too and hand a
+			// firm called Sacme a domain that says Acme
+			expect(
+				ownSiteVerdict({
+					name: 'Acme',
+					website: 'https://transportesacme.com',
+				}),
+			).toBe('established')
+			for (const name of ['Sacme', 'Esacme']) {
+				expect(
+					ownSiteVerdict({ name, website: 'https://transportesacme.com' }),
+				).toBe('unknown')
+			}
+		})
+
+		it('should not read past two words to reach the name', () => {
+			// GIVEN a domain with two trade words stacked in front
+			// WHEN asked
+			// THEN unknown: every word read past is one more way a stranger's domain
+			// can be reached, so exactly one comes off
+			expect(
+				ownSiteVerdict({
+					name: 'Cobra Instalaciones',
+					website: 'https://grupotransportescobra.com',
+				}),
+			).toBe('unknown')
+		})
+
+		it('should not establish a listing that writes the name and then its own', () => {
+			// GIVEN a directory whose domain opens with a trade word and carries the
+			// company's name inside it
+			// WHEN asked
+			// THEN unknown. Taking the word off leaves "acmedirectorio", which
+			// carries the name rather than being it
+			expect(
+				ownSiteVerdict({
+					name: 'Acme Logistics',
+					website: 'https://grupoacme-directorio.com/acme-logistics',
+				}),
+			).toBe('unknown')
+		})
+
+		it('should not hand one company the group domain of another', () => {
+			// GIVEN two of the companies above, each offered the group domain of
+			// another
+			// WHEN each is asked
+			// THEN neither is established: the word comes off for both, and what is
+			// underneath still has to spell the company being asked about
+			expect(
+				ownSiteVerdict({
+					name: 'Cobra Instalaciones y Servicios',
+					website: 'https://grupoetra.com',
+				}),
+			).toBe('unknown')
+			expect(
+				ownSiteVerdict({ name: 'Lasser', website: 'https://grupocobra.com' }),
+			).toBe('unknown')
+		})
+
+		it('should not establish a domain holding only a fragment of the name', () => {
+			// GIVEN a domain whose remainder is the first letters of a word rather
+			// than a word
+			// WHEN asked
+			// THEN unknown. Three letters are a whole label's worth of evidence only
+			// when a firm registered exactly them ("dsv.com"); left over inside a
+			// longer label they are a fragment, so an abbreviation buys nothing
+			expect(
+				ownSiteVerdict({
+					name: 'Instalaciones Rubio',
+					website: 'https://grupoins.com',
+				}),
+			).toBe('unknown')
+		})
+
+		it('should not rescue a name that is only trade words', () => {
+			// GIVEN a company named after nothing but its trade, and a domain that
+			// writes a trade word twice
+			// WHEN each is asked
+			// THEN unknown either way: the first has no word of its own for a label
+			// to spell, and taking the front word off the second leaves another trade
+			// word rather than the family name
+			expect(
+				ownSiteVerdict({
+					name: 'Logistics Group',
+					website: 'https://grupologistics.com',
+				}),
+			).toBe('unknown')
+			expect(
+				ownSiteVerdict({
+					name: 'Grupo Ferré',
+					website: 'https://grupogrupo.es',
+				}),
+			).toBe('unknown')
+		})
+
+		it('should still read a legal form after the word it read past', () => {
+			// GIVEN a domain writing a trade word, the name, and then the legal form
+			// WHEN asked
+			// THEN established — the same rule that lets "cobrasa.com" stand for
+			// Cobra, reached once the trade word in front has come off. Pinned
+			// because it is where the two readings meet, and the furthest a label may
+			// sit from the name and still spell it
+			expect(
+				ownSiteVerdict({ name: 'Cobra', website: 'https://grupocobrasa.com' }),
+			).toBe('established')
+		})
+	})
+
+	describe('when the domain is registered with an accent', () => {
+		it('should establish the company at the domain it registered', () => {
+			// GIVEN companies whose domain holds an accent, which a web address
+			// cannot carry — so the reader hands back the code it is written in
+			// WHEN each is asked
+			// THEN each is its own. Read as it arrives the code spells nothing any
+			// company is called, which would lose a firm its own site in exactly the
+			// markets this work is for
+			for (const [name, website] of [
+				['Construccions García', 'https://xn--construccionsgarca-xyb.cat'],
+				['Énergie Solaire', 'https://xn--nergie-solaire-9jb.fr'],
+				['Instal·lacions Núñez', 'https://xn--installacionsnez-50a66h4e.es'],
+			] as const) {
+				expect(ownSiteVerdict({ name, website })).toBe('established')
+			}
+		})
+
+		it('should read the accented domain wherever the address points', () => {
+			// GIVEN the same domain reached at a page and behind a subdomain
+			// WHEN each is asked
+			// THEN the domain is put back into its own spelling before anything is
+			// read, so neither hides the company
+			for (const website of [
+				'https://xn--nergie-solaire-9jb.fr/nos-realisations',
+				'https://www.xn--nergie-solaire-9jb.fr',
+			]) {
+				expect(ownSiteVerdict({ name: 'Énergie Solaire', website })).toBe(
+					'established',
+				)
+			}
+		})
+
+		it('should establish the accented and the plain domain alike', () => {
+			// GIVEN the two domains a company with an accent in its name might have
+			// registered
+			// WHEN each is asked
+			// THEN both are its own, since a firm picks one when it registers and the
+			// run must not decide the other belongs to somebody else
+			for (const website of [
+				'https://xn--nergie-solaire-9jb.fr',
+				'https://energie-solaire.fr',
+			]) {
+				expect(ownSiteVerdict({ name: 'Énergie Solaire', website })).toBe(
+					'established',
+				)
+			}
+		})
+
+		it('should read a trade word in front of an accented name', () => {
+			// GIVEN a domain doing both at once — a word for the trade, then the name
+			// with its accent
+			// WHEN asked
+			// THEN established: the domain is put back into letters first, and the
+			// word in front comes off the letters
+			expect(
+				ownSiteVerdict({
+					name: 'Énergie Solaire',
+					website: 'https://xn--groupe-nergie-solaire-h5b.fr',
+				}),
+			).toBe('established')
+		})
+
+		it('should withhold when a word and its stem both fit the letters', () => {
+			// GIVEN a domain whose letters can be split two ways, because one trade
+			// word on the shared list is the stem of another — "groupénergie-solaire"
+			// reads as "group" then the name, and as "groupe" then a name nobody has
+			// WHEN asked
+			// THEN unknown. Only the longer word is taken off, so a label that spells
+			// the company solely under the shorter reading is let go. That is the
+			// price of not letting one domain answer for two companies, and it falls
+			// on a spelling that elides the trade word's own last letter, never on the
+			// ordinary "groupe-énergie-solaire"
+			expect(
+				ownSiteVerdict({
+					name: 'Énergie Solaire',
+					website: 'https://xn--groupnergie-solaire-fzb.fr',
+				}),
+			).toBe('unknown')
+		})
+
+		it('should not establish an accented domain for a different company', () => {
+			// GIVEN one company's accented domain offered as another company's
+			// WHEN asked
+			// THEN unknown: putting the domain back into its own letters says what it
+			// spells, never who else may claim it
+			expect(
+				ownSiteVerdict({
+					name: 'Instalaciones Rubio',
+					website: 'https://xn--construccionsgarca-xyb.cat',
+				}),
+			).toBe('unknown')
+		})
+
+		it('should not establish a domain in letters the fold has no answer for', () => {
+			// GIVEN a domain written in letters that merely look like the company's —
+			// the shape somebody registers to be mistaken for somebody else
+			// WHEN asked
+			// THEN unknown. Only letters the fold has a plain spelling for survive
+			// it, and these are not among them, so the label spells nothing rather
+			// than spelling the company
+			expect(
+				ownSiteVerdict({
+					name: 'Apple',
+					website: 'https://xn--80ak6aa92e.com',
+				}),
+			).toBe('unknown')
+		})
+
+		it('should keep a domain whose code cannot be read as it stands', () => {
+			// GIVEN a label wearing the opening of an accented domain over something
+			// that is not one
+			// WHEN asked
+			// THEN unknown, because the unreadable code is kept rather than swapped
+			// for the empty string a reader hands back — and an empty label would be
+			// no label at all
+			expect(
+				ownSiteVerdict({ name: 'Acme', website: 'https://xn--acme-9ta.com' }),
+			).toBe('unknown')
+		})
+
+		it('should leave an address given by numbers alone', () => {
+			// GIVEN a site named by its address on the network
+			// WHEN asked
+			// THEN unknown, and the numbers are not touched on the way: asked to read
+			// a plain label as an accented one, a reader also tries it as a machine
+			// address and hands back something longer than it was given
+			expect(
+				ownSiteVerdict({ name: 'Acme', website: 'http://192.168.1.10/acme' }),
+			).toBe('unknown')
+		})
+	})
+
+	describe('when the domain shortens the name to its initials', () => {
+		it('should leave every shortening a market search met unknown', () => {
+			// GIVEN the four companies whose domain shortens their name, in three
+			// different shapes between them
+			// WHEN each is asked
+			// THEN unknown, on purpose and after measuring it. The rule that would
+			// clear them reads initials, and a handful of initials is spelled by
+			// every firm whose words start the same way — so it would hand a company
+			// a stranger's site to vouch for it. Their website is still kept; what
+			// they lose is standing as the source that vouches for them
+			for (const [name, website] of [
+				['Sociedad Ibérica de Construcciones Eléctricas', 'https://sice.com'],
+				['Sociedad Española de Montajes Industriales', 'https://semi.es'],
+				['PPVS Facility Management', 'https://ppvs-fm.com'],
+				['Energetique Sanitaire', 'https://esanit.fr'],
+			] as const) {
+				expect(ownSiteVerdict({ name, website })).toBe('unknown')
+			}
+		})
+
+		it('should not clear one company at the initials of another', () => {
+			// GIVEN a second company whose words start with the same letters as the
+			// first — which is what makes reading initials expensive
+			// WHEN it is offered the first one's domain
+			// THEN unknown, and it stays unknown for as long as initials go unread
+			expect(
+				ownSiteVerdict({
+					name: 'Servicios Eléctricos y Montajes Industriales',
+					website: 'https://semi.es',
+				}),
+			).toBe('unknown')
+		})
+	})
+
+	describe('when the addresses a market search rightly caught are asked', () => {
+		it('should still refuse every one of them', () => {
+			// GIVEN the four addresses that read `unknown` because the check was
+			// working: a directory's listing page, a social post, a government
+			// agency's company record, and one company handed another's address
+			// WHEN each is asked
+			// THEN each is still unknown. These are what every loosening is measured
+			// against — a rule that recovers real companies and moves one of these
+			// with them has bought nothing
+			for (const [name, website] of [
+				['KBE Energy', TECSOL_LISTING],
+				['LIPOTECH SARL', 'https://www.facebook.com/LIPOTECH.SARL'],
+				[
+					'Lipotech',
+					'https://annuaire-entreprises.data.gouv.fr/entreprise/lipotech-812345678',
+				],
+				['Instalaciones Rubio', 'https://grupocobra.com'],
+			] as const) {
+				expect(ownSiteVerdict({ name, website })).toBe('unknown')
+			}
+		})
+	})
+
 	describe('when the domain merely contains the name', () => {
 		it('should not establish a domain with something else appended', () => {
 			// GIVEN a site whose domain carries the company's name and then some
@@ -158,6 +545,36 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'Grupo Ferré',
 					website: 'https://grupoferre.es',
+				}),
+			).toBe('established')
+		})
+
+		it('should refuse the trade word in every language the list spells it', () => {
+			// GIVEN two companies named after the same trade in two languages, each
+			// at the bare domain of that word
+			// WHEN each is asked
+			// THEN neither is established. The list spells the word in all three
+			// languages, so groupe.fr is no more the site of every firm called Groupe
+			// something than grupo.es is of every Grupo
+			expect(
+				ownSiteVerdict({ name: 'Grupo Ferré', website: 'https://grupo.es' }),
+			).toBe('unknown')
+			expect(
+				ownSiteVerdict({
+					name: 'Groupe Roy Énergie',
+					website: 'https://groupe.fr',
+				}),
+			).toBe('unknown')
+		})
+
+		it('should establish a French name once its own word is in the domain', () => {
+			// GIVEN a company a market search met, at the domain that writes the
+			// French trade word and then its name
+			// WHEN asked — THEN the word comes off and the company is underneath
+			expect(
+				ownSiteVerdict({
+					name: 'CAHORS',
+					website: 'https://www.groupe-cahors.com/es-espana',
 				}),
 			).toBe('established')
 		})
@@ -509,6 +926,26 @@ describe('ownSiteHostVerdict', () => {
 			// WHEN asked
 			// THEN an empty name must not be spelled by every host there is
 			expect(ownSiteHostVerdict({ name: '', host: 'acme.com' })).toBe('unknown')
+		})
+
+		it('should read an accented host the same way an address is read', () => {
+			// GIVEN a company's own accented domain, and the same domain offered as
+			// another company's
+			// WHEN each is asked of the host directly — which is the door the
+			// directory watch knocks on, where a wrong no costs a group its website
+			// THEN the domain answers for its own company and for nobody else
+			expect(
+				ownSiteHostVerdict({
+					name: 'Énergie Solaire',
+					host: 'xn--nergie-solaire-9jb.fr',
+				}),
+			).toBe('established')
+			expect(
+				ownSiteHostVerdict({
+					name: 'Instalaciones Rubio',
+					host: 'xn--nergie-solaire-9jb.fr',
+				}),
+			).toBe('unknown')
 		})
 	})
 
