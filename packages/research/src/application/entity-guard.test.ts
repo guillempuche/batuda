@@ -694,6 +694,41 @@ describe('hostLabel', () => {
 			expect(hostLabel('')).toBe('')
 		})
 	})
+
+	describe('when the label was registered with an accent', () => {
+		it('should hand back the name its owner registered', () => {
+			// GIVEN domains whose names hold an accent, which a web address cannot
+			// carry — so they travel in a code opening "xn--"
+			// WHEN each is read
+			// THEN the name comes back rather than the code, which folds to letters
+			// spelling nothing any company is called
+			expect(hostLabel('xn--construccionsgarca-xyb.cat')).toBe(
+				'construccionsgarcía',
+			)
+			expect(hostLabel('xn--nergie-solaire-9jb.fr')).toBe('énergie-solaire')
+			expect(hostLabel('www.xn--nergie-solaire-9jb.fr')).toBe('énergie-solaire')
+		})
+
+		it('should keep a code it cannot make sense of', () => {
+			// GIVEN a label wearing that opening over something that is not one
+			// WHEN read
+			// THEN the code itself comes back. A reader hands back nothing for a code
+			// it cannot read, and an empty label would throw away the only text there
+			// was
+			expect(hostLabel('xn--acme-9ta.com')).toBe('xn--acme-9ta')
+		})
+
+		it('should leave a label that was never in that code alone', () => {
+			// GIVEN ordinary labels, one of them all digits
+			// WHEN each is read
+			// THEN each comes back untouched. Only a label wearing the opening is put
+			// back, because a reader asked about a plain one also tries to read it as
+			// a machine address and answers "0.0.0.1" for the "1" read below
+			expect(hostLabel('192.168.1.10')).toBe('1')
+			expect(hostLabel('acme.com')).toBe('acme')
+			expect(hostLabel('my_host.example.com')).toBe('example')
+		})
+	})
 })
 
 describe('registrableDomain', () => {
@@ -929,6 +964,26 @@ describe('isOwnSiteHost', () => {
 
 		it('should accept the whole name spelled out', () => {
 			expect(isOwnSiteHost(garcia, 'transportesgarcia.com')).toBe(true)
+		})
+
+		it("should accept the company's own domain written with an accent", () => {
+			// GIVEN a French firm whose domain holds an accent, so it travels in the
+			// code a web address can carry, and a second firm's accented domain
+			// WHEN this reading — the stricter of the two, which picks the ONE site a
+			// run then goes and reads — is asked about each
+			// THEN the company's own is its own and the stranger's is not. Left in
+			// the code the label spells nothing, and the run would decline to open
+			// the company's own site at all
+			const energie: EntityTargets = {
+				cores: ['energiesolaire'],
+				words: ['energie', 'solaire'],
+				domains: [],
+				places: [],
+			}
+			expect(isOwnSiteHost(energie, 'xn--nergie-solaire-9jb.fr')).toBe(true)
+			expect(isOwnSiteHost(energie, 'xn--construccionsgarca-xyb.cat')).toBe(
+				false,
+			)
 		})
 
 		it('should accept the whole name with the legal form tacked on', () => {
