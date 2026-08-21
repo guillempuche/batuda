@@ -31,6 +31,7 @@ import {
 } from './prospect-dedupe-guard'
 import { rowGroups } from './row-groups'
 import { anyTermAppearsIn, termTokens } from './term-match'
+import type { TradeWords } from './trade-words'
 
 export const partsAnsweredBy = (
 	rows: RunOutcome['companies'],
@@ -123,12 +124,13 @@ const companiesAmong = (
 // name with a note written after it.
 const joinedAsTheFoldDoes = (
 	rows: ReadonlyArray<Record<string, unknown>>,
+	tradeWords: TradeWords,
 ): ReadonlyArray<readonly [number, number]> => {
 	const joined: Array<readonly [number, number]> = []
 	// Read over the whole returned list, which is the list the fold read too. Asking
 	// row by row would make this stricter than the fold it measures, and call a list
 	// clean while it still holds the pairs the fold joins on a site.
-	const ownSiteHosts = hostsEstablishedAsOwn(rows)
+	const ownSiteHosts = hostsEstablishedAsOwn(rows, tradeWords)
 	const rowOfKey = new Map<string, number>()
 	rows.forEach((row, at) => {
 		for (const key of discoveryRowIdentityKeys(row, ownSiteHosts)) {
@@ -280,19 +282,27 @@ const joinedByOneNameSayingAnother = (
  * direction: neither claims a duplicate it cannot show.
  */
 export interface RepeatedRows {
-	/** Read with the keys the pipeline's own fold uses. */
+	/**
+	 * Read with the keys the pipeline's own fold uses, and with the trades the
+	 * golden file names rather than the ones the run split out of its request —
+	 * so a row whose host only one of those two vocabularies establishes is
+	 * counted differently here from how the run folded it.
+	 */
 	readonly duplicated: number
 	/** Read loosely enough to see what those keys cannot. Never the smaller of the two. */
 	readonly possiblyDuplicated: number
 }
 
-export const repeatedRows = (rows: RunOutcome['companies']): RepeatedRows => {
+export const repeatedRows = (
+	rows: RunOutcome['companies'],
+	tradeWords: TradeWords,
+): RepeatedRows => {
 	const discoveryRows = asDiscoveryRows(rows)
 	// Worked out once and read twice. The loose figure is the strict one's pairs
 	// plus more of them, which is what makes it a superset rather than a second
 	// opinion that could disagree — and it is also why the joins the fold makes are
 	// not worth finding twice over.
-	const asTheFoldDoes = joinedAsTheFoldDoes(discoveryRows)
+	const asTheFoldDoes = joinedAsTheFoldDoes(discoveryRows, tradeWords)
 	return {
 		duplicated:
 			discoveryRows.length -

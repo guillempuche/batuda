@@ -96,6 +96,7 @@ import {
 import { isPlainObject } from './guard-shapes'
 import { ownSiteVerdict } from './own-site'
 import { hostOf, isBareWebAddress } from './source-key'
+import type { TradeWords } from './trade-words'
 
 /** Where the row's existence stands. There is no third value. */
 export type ExistenceVerdict = 'confirmed' | 'candidate'
@@ -167,11 +168,18 @@ const webAddressesAmong = (
 // Every distinct host among these addresses, each read for the two questions
 // that decide what it can do: is it this company's own site, and is it a
 // listing. Held by the host as met, so two pages of one site are read once.
-const sitesOf = (
-	name: string,
-	addresses: ReadonlyArray<string>,
-	directorySites: DirectorySites,
-): ReadonlyArray<SourceSite> => {
+//
+// Named rather than in a row, because the hosts a run watched listing and the
+// trades it went looking for are both a set of words and neither reader could
+// tell it had been handed the other: every host would read as a listing and no
+// trade would be recognised, with nothing to say so.
+const sitesOf = (args: {
+	readonly name: string
+	readonly addresses: ReadonlyArray<string>
+	readonly directorySites: DirectorySites
+	readonly tradeWords: TradeWords
+}): ReadonlyArray<SourceSite> => {
+	const { name, addresses, directorySites, tradeWords } = args
 	const byHost = new Map<string, SourceSite>()
 	for (const address of addresses) {
 		const host = hostOf(address)
@@ -179,7 +187,9 @@ const sitesOf = (
 		byHost.set(host, {
 			host,
 			site: registrableDomain(host),
-			own: ownSiteVerdict({ name, website: address }) === 'established',
+			own:
+				ownSiteVerdict({ name, website: address, tradeWords }) ===
+				'established',
 			directory: siteVerdict(host, directorySites) === 'directory',
 		})
 	}
@@ -255,13 +265,19 @@ export const existenceOf = (args: {
 	readonly website?: string | undefined
 	readonly sources: ReadonlyArray<string>
 	readonly directorySites: DirectorySites
+	readonly tradeWords: TradeWords
 }): RowExistence => {
-	const { name, website, directorySites } = args
+	const { name, website, directorySites, tradeWords } = args
 	const offered =
 		website === undefined || website.trim() === ''
 			? args.sources
 			: [website, ...args.sources]
-	const sites = sitesOf(name, webAddressesAmong(offered), directorySites)
+	const sites = sitesOf({
+		name,
+		addresses: webAddressesAmong(offered),
+		directorySites,
+		tradeWords,
+	})
 	const websites = websitesOf(sites)
 	// A site has to be this company's own AND not a host the run watched listing
 	// the market. Ownership is read off the domain alone, so a company named after

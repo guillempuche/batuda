@@ -9,6 +9,10 @@ import {
 	rowExistence,
 	withExistence,
 } from './existence-verdict'
+import { tradeWordsOf } from './trade-words'
+
+// A run that named no trades, which is a request about one company on file.
+const noTrades = tradeWordsOf([])
 
 // A workshop whose own domain spells its name, so `ownSiteVerdict` establishes
 // it — the only thing in the package that can clear a source.
@@ -23,6 +27,45 @@ const LISTING = 'https://paginas.es/empresa/fusteria-miquel'
 const NONE: ReadonlySet<string> = new Set()
 
 describe('existenceOf', () => {
+	describe('when the run names the trade the company is called after', () => {
+		it('should not confirm a company on the bare domain of its trade', () => {
+			// GIVEN a firm named after its trade, offering the bare domain of that
+			// trade as its website, in a run that asked for that trade
+			// AND a second, unrelated website that names it
+			// WHEN asked whether it exists
+			// THEN it is a candidate: fontaneria.es is not established as anybody's
+			// own, so nothing here vouches for the company and the two websites alone
+			// are not enough
+			expect(
+				existenceOf({
+					name: 'Fontanería García',
+					website: 'https://fontaneria.es',
+					sources: [PAPER],
+					directorySites: NONE,
+					tradeWords: tradeWordsOf(['fontanería']),
+				}).verdict,
+			).toBe('candidate')
+		})
+
+		it('should confirm the same company at the domain spelling its own word', () => {
+			// GIVEN the same firm and the same run, at the domain that carries the
+			// word only it has
+			// WHEN asked
+			// THEN confirmed. Reading the run's trades takes away the trade, not the
+			// company, so a firm named after what it does is not judged more harshly
+			// than anybody else
+			expect(
+				existenceOf({
+					name: 'Fontanería García',
+					website: 'https://garcia.es',
+					sources: [PAPER],
+					directorySites: NONE,
+					tradeWords: tradeWordsOf(['fontanería']),
+				}),
+			).toEqual({ verdict: 'confirmed', websites: 2 })
+		})
+	})
+
 	describe("when the company's own site and a second website name it", () => {
 		it('should confirm the company', () => {
 			// GIVEN a company at the domain its name spells
@@ -35,6 +78,7 @@ describe('existenceOf', () => {
 					website: OWN,
 					sources: [PAPER],
 					directorySites: NONE,
+					tradeWords: noTrades,
 				}),
 			).toEqual({ verdict: 'confirmed', websites: 2 })
 		})
@@ -50,6 +94,7 @@ describe('existenceOf', () => {
 					website: OWN,
 					sources: [LISTING],
 					directorySites: new Set(['paginas.es']),
+					tradeWords: noTrades,
 				}),
 			).toEqual({ verdict: 'confirmed', websites: 2 })
 		})
@@ -65,6 +110,7 @@ describe('existenceOf', () => {
 					website: OWN,
 					sources: ['elpuntavui.cat'],
 					directorySites: NONE,
+					tradeWords: noTrades,
 				}),
 			).toEqual({ verdict: 'confirmed', websites: 2 })
 		})
@@ -79,6 +125,7 @@ describe('existenceOf', () => {
 					name: NAME,
 					sources: [OWN, PAPER],
 					directorySites: NONE,
+					tradeWords: noTrades,
 				}),
 			).toEqual({ verdict: 'confirmed', websites: 2 })
 		})
@@ -98,6 +145,7 @@ describe('existenceOf', () => {
 					website: 'https://paginas.es',
 					sources: [PAPER],
 					directorySites: new Set(['paginas.es']),
+					tradeWords: noTrades,
 				}),
 			).toEqual({ verdict: 'candidate', reason: 'no_own_site', websites: 2 })
 		})
@@ -115,6 +163,7 @@ describe('existenceOf', () => {
 					website: 'https://instalacionesferre.es',
 					sources: [PAPER],
 					directorySites: new Set(['instalacionesferre.es']),
+					tradeWords: noTrades,
 				}),
 			).toEqual({ verdict: 'candidate', reason: 'no_own_site', websites: 2 })
 		})
@@ -130,6 +179,7 @@ describe('existenceOf', () => {
 					website: 'https://instalacionesferre.es',
 					sources: [PAPER, 'https://instalacionesferre.com'],
 					directorySites: new Set(['instalacionesferre.es']),
+					tradeWords: noTrades,
 				}),
 			).toEqual({ verdict: 'confirmed', websites: 2 })
 		})
@@ -146,6 +196,7 @@ describe('existenceOf', () => {
 					website: OWN,
 					sources: [`${OWN}/contacte`],
 					directorySites: NONE,
+					tradeWords: noTrades,
 				}),
 			).toEqual({ verdict: 'candidate', reason: 'one_website', websites: 1 })
 		})
@@ -160,6 +211,7 @@ describe('existenceOf', () => {
 					website: OWN,
 					sources: ['https://blog.fusteriamiquel.cat/obra-nova'],
 					directorySites: NONE,
+					tradeWords: noTrades,
 				}),
 			).toEqual({ verdict: 'candidate', reason: 'one_website', websites: 1 })
 		})
@@ -173,6 +225,7 @@ describe('existenceOf', () => {
 					website: OWN,
 					sources: ['https://www.fusteriamiquel.cat/contacte'],
 					directorySites: NONE,
+					tradeWords: noTrades,
 				}),
 			).toEqual({ verdict: 'candidate', reason: 'one_website', websites: 1 })
 		})
@@ -188,6 +241,7 @@ describe('existenceOf', () => {
 					website: OWN,
 					sources: ['https://fusteriamiquel.com'],
 					directorySites: NONE,
+					tradeWords: noTrades,
 				}),
 			).toEqual({ verdict: 'candidate', reason: 'one_website', websites: 1 })
 		})
@@ -205,6 +259,7 @@ describe('existenceOf', () => {
 						'https://eleconomista.es/noticia/999',
 					],
 					directorySites: NONE,
+					tradeWords: noTrades,
 				}),
 			).toEqual({ verdict: 'candidate', reason: 'one_website', websites: 1 })
 		})
@@ -220,6 +275,7 @@ describe('existenceOf', () => {
 					name: NAME,
 					sources: [LISTING, 'https://otrodirectorio.es/e/fusteria-miquel'],
 					directorySites: new Set(['paginas.es', 'otrodirectorio.es']),
+					tradeWords: noTrades,
 				}),
 			).toEqual({ verdict: 'candidate', reason: 'no_own_site', websites: 2 })
 		})
@@ -234,6 +290,7 @@ describe('existenceOf', () => {
 					name: NAME,
 					sources: [PAPER, 'https://lavanguardia.com/economia/55'],
 					directorySites: NONE,
+					tradeWords: noTrades,
 				}),
 			).toEqual({ verdict: 'candidate', reason: 'no_own_site', websites: 2 })
 		})
@@ -248,6 +305,7 @@ describe('existenceOf', () => {
 					website: 'https://sice.com',
 					sources: [PAPER],
 					directorySites: NONE,
+					tradeWords: noTrades,
 				}),
 			).toEqual({ verdict: 'candidate', reason: 'no_own_site', websites: 2 })
 		})
@@ -263,6 +321,7 @@ describe('existenceOf', () => {
 					website: OWN,
 					sources: [PAPER],
 					directorySites: NONE,
+					tradeWords: noTrades,
 				}),
 			).toEqual({ verdict: 'candidate', reason: 'no_own_site', websites: 2 })
 		})
@@ -278,6 +337,7 @@ describe('existenceOf', () => {
 					name: 'Zeta Instal·lacions',
 					sources: ['https://acme.es/x', 'https://acme.de/y'],
 					directorySites: NONE,
+					tradeWords: noTrades,
 				}),
 			).toEqual({ verdict: 'candidate', reason: 'no_own_site', websites: 2 })
 		})
@@ -288,7 +348,12 @@ describe('existenceOf', () => {
 			// GIVEN a row citing nothing and holding no website
 			// WHEN asked — THEN there is nothing to count
 			expect(
-				existenceOf({ name: NAME, sources: [], directorySites: NONE }),
+				existenceOf({
+					name: NAME,
+					sources: [],
+					directorySites: NONE,
+					tradeWords: noTrades,
+				}),
 			).toEqual({
 				verdict: 'candidate',
 				reason: 'no_sources',
@@ -306,6 +371,7 @@ describe('existenceOf', () => {
 					name: NAME,
 					sources: ['src_9f2a1b3c', 'src_aa11bb22'],
 					directorySites: NONE,
+					tradeWords: noTrades,
 				}),
 			).toEqual({ verdict: 'candidate', reason: 'no_sources', websites: 0 })
 		})
@@ -321,6 +387,7 @@ describe('existenceOf', () => {
 					website: 'https://fusteriamiquel.cat/ (inferred from the name)',
 					sources: ['https://elpuntavui.cat/ (probably)'],
 					directorySites: NONE,
+					tradeWords: noTrades,
 				}),
 			).toEqual({ verdict: 'candidate', reason: 'no_sources', websites: 0 })
 		})
@@ -334,6 +401,7 @@ describe('existenceOf', () => {
 					website: '   ',
 					sources: [PAPER],
 					directorySites: NONE,
+					tradeWords: noTrades,
 				}),
 			).toEqual({ verdict: 'candidate', reason: 'one_website', websites: 1 })
 		})
@@ -346,6 +414,7 @@ describe('existenceOf', () => {
 					name: NAME,
 					sources: ['info@fusteriamiquel.cat'],
 					directorySites: NONE,
+					tradeWords: noTrades,
 				}),
 			).toEqual({ verdict: 'candidate', reason: 'no_sources', websites: 0 })
 		})

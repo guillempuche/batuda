@@ -105,6 +105,7 @@ import { isPlainObject } from './guard-shapes'
 import { ownSiteVerdict } from './own-site'
 import { rowGroups } from './row-groups'
 import { hostOf, isBareWebAddress } from './source-key'
+import type { TradeWords } from './trade-words'
 
 // What marks a key as filing a row under its site. Written once, because a caller
 // asking which key joined two rows reads the same mark this writes.
@@ -151,9 +152,15 @@ const withoutTrailingNote = (name: string): string =>
  * `unknown`, which is not a verdict that two rows are different companies. It is
  * only the absence of a reason to say they are the same one, and the names still
  * have their say.
+ *
+ * `tradeWords` are the trades the run went looking for, handed down so this reads
+ * an address exactly as the rest of the run reads it. Without them two firms named
+ * after one trade would both own that trade's bare domain, and the key that folds
+ * rows by site would make them one company.
  */
 export const hostsEstablishedAsOwn = (
 	rows: ReadonlyArray<unknown>,
+	tradeWords: TradeWords,
 ): ReadonlySet<string> => {
 	const hosts = new Set<string>()
 	for (const row of rows) {
@@ -174,8 +181,11 @@ export const hostsEstablishedAsOwn = (
 		// other row on that directory would then be filed under it as the same
 		// company, which merges firms that have nothing to do with each other.
 		if (
-			ownSiteVerdict({ name: withoutTrailingNote(name), website }) ===
-			'established'
+			ownSiteVerdict({
+				name: withoutTrailingNote(name),
+				website,
+				tradeWords,
+			}) === 'established'
 		)
 			hosts.add(host)
 	}
@@ -520,6 +530,7 @@ export interface DedupeResult {
 export const dedupeDiscoveryRows = (
 	findings: unknown,
 	listField: string | undefined,
+	tradeWords: TradeWords,
 ): DedupeResult => {
 	if (listField === undefined) return { findings, merged: 0 }
 
@@ -534,7 +545,7 @@ export const dedupeDiscoveryRows = (
 		// depend on the order.
 		const { groupOf: companyOf, join: sameCompany } = rowGroups(rows.length)
 
-		const ownSiteHosts = hostsEstablishedAsOwn(rows)
+		const ownSiteHosts = hostsEstablishedAsOwn(rows, tradeWords)
 		const rowOfKey = new Map<string, number>()
 		rows.forEach((row, at) => {
 			if (!isPlainObject(row)) return

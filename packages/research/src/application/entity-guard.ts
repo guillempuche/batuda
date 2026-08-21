@@ -63,6 +63,16 @@ const LEGAL_SUFFIXES = new Set([
 // freight company contains "logistics"/"transport". A name reduced to only these
 // yields no distinctive word, so the run cannot reach a weak (let alone strong)
 // match on an industry term alone.
+//
+// DO NOT ADD ANOTHER INDUSTRY HERE. Writing down the words of a trade can never
+// finish: it takes every trade in every language a market answers in, and each
+// word written down takes a real distinctive word away from the firms genuinely
+// called it. A run brings the trades it went looking for instead
+// (`trade-words.ts`), which is that market's own vocabulary and needs no
+// upkeep. What is left below is the words for a KIND of company, which work for
+// anybody in any market, and one industry's words that stand only for a run
+// with no market behind it to read — see `own-site.ts` for what they still do
+// and what would let them go.
 const GENERIC_WORDS = new Set([
 	'logistics',
 	'logistica',

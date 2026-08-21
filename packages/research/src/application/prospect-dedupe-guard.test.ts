@@ -8,6 +8,10 @@ import {
 	hostsEstablishedAsOwn,
 	isSiteKey,
 } from './prospect-dedupe-guard'
+import { tradeWordsOf } from './trade-words'
+
+// A run that named no trades, which is a request about one company on file.
+const noTrades = tradeWordsOf([])
 
 const scan = (
 	prospects: ReadonlyArray<Record<string, unknown>>,
@@ -39,7 +43,7 @@ describe('dedupeDiscoveryRows', () => {
 			// WHEN the list is de-duplicated
 			// THEN one row survives — the form comes off the end of the name key, so
 			// the two spellings meet
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toHaveLength(1)
 			expect(rowsOf(result.findings)[0]?.['name']).toBe(
 				'Cobra Instalaciones y Servicios',
@@ -55,7 +59,7 @@ describe('dedupeDiscoveryRows', () => {
 			])
 
 			// WHEN de-duplicated — THEN accents fold before the names are compared
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toHaveLength(1)
 		})
 
@@ -69,7 +73,7 @@ describe('dedupeDiscoveryRows', () => {
 			// WHEN de-duplicated
 			// THEN the dots come out before the form is read off the end, so it is one
 			// company rather than one whose form reads as two more words of its name
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toHaveLength(1)
 		})
 
@@ -85,7 +89,7 @@ describe('dedupeDiscoveryRows', () => {
 			])
 
 			// WHEN de-duplicated — THEN the site settles it: the host is the same one
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toHaveLength(1)
 		})
 
@@ -99,7 +103,7 @@ describe('dedupeDiscoveryRows', () => {
 
 			// WHEN de-duplicated
 			// THEN all three become one company, which is what they are
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toHaveLength(1)
 			expect(result.merged).toBe(2)
 		})
@@ -117,7 +121,7 @@ describe('dedupeDiscoveryRows', () => {
 			// THEN still one company. The bridge row joins two rows that were until
 			// then separate, and a list arrives in whatever order the model wrote it —
 			// so an answer that changed with the order would be no answer at all
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toHaveLength(1)
 			expect(result.merged).toBe(2)
 		})
@@ -139,7 +143,7 @@ describe('dedupeDiscoveryRows', () => {
 			// WHEN de-duplicated
 			// THEN the later row's findings survive on the row that stays — dropping it
 			// outright would throw away what the run paid to find
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)[0]).toMatchObject({
 				name: 'Instalaciones Rubio SL',
 				tax_id: 'B36123456',
@@ -157,7 +161,7 @@ describe('dedupeDiscoveryRows', () => {
 
 			// WHEN de-duplicated
 			// THEN the first reading stays: it is the one the checks upstream weighed
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)[0]?.['industry']).toBe('electrical')
 		})
 
@@ -169,7 +173,7 @@ describe('dedupeDiscoveryRows', () => {
 			])
 
 			// WHEN de-duplicated — THEN the blank is a gap, so the later value lands
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)[0]?.['website']).toBe('https://acme.es')
 		})
 
@@ -196,7 +200,7 @@ describe('dedupeDiscoveryRows', () => {
 
 			// WHEN de-duplicated
 			// THEN the surviving row keeps everything the run read, each page once
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(citedPagesOf(result.findings)).toEqual([
 				'https://acme.es',
 				'https://ranking.es',
@@ -216,7 +220,7 @@ describe('dedupeDiscoveryRows', () => {
 			])
 
 			// WHEN de-duplicated — THEN the evidence still reaches the row that stays
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(citedPagesOf(result.findings)).toEqual(['https://acme.es'])
 		})
 	})
@@ -230,7 +234,7 @@ describe('dedupeDiscoveryRows', () => {
 			])
 
 			// WHEN de-duplicated — THEN both stay and nothing is counted as merged
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toHaveLength(2)
 			expect(result.merged).toBe(0)
 		})
@@ -246,7 +250,7 @@ describe('dedupeDiscoveryRows', () => {
 			// THEN they still meet, on the name as written. Neither is a company anyone
 			// can work with, but leaving them with no key at all would let the list
 			// keep every copy of the same useless row
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toHaveLength(1)
 		})
 
@@ -258,7 +262,7 @@ describe('dedupeDiscoveryRows', () => {
 			])
 
 			// WHEN de-duplicated — THEN no host can be read, so neither row lends one
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toHaveLength(2)
 		})
 
@@ -272,7 +276,7 @@ describe('dedupeDiscoveryRows', () => {
 			// WHEN de-duplicated
 			// THEN both stay. The domain spells neither of them, so it is nobody's own
 			// site and says nothing about whether these are one company
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings).map(row => row['name'])).toEqual([
 				'Electricidad Mora',
 				'Instalaciones Rubio',
@@ -291,7 +295,7 @@ describe('dedupeDiscoveryRows', () => {
 			// WHEN de-duplicated
 			// THEN the two spellings of one name still meet, and the third company is
 			// not dragged in behind them by an address none of the three owns
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings).map(row => row['name'])).toEqual([
 				'Electricidad Mora SL',
 				'Instalaciones Rubio',
@@ -316,7 +320,7 @@ describe('dedupeDiscoveryRows', () => {
 			// THEN one company. The domain says whose site it is, so the row beside it
 			// is that company again under another name — the trade name beside the
 			// legal one, which is the pair this fold exists for
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toHaveLength(1)
 			expect(rowsOf(result.findings)[0]?.['name']).toBe('Terre Solaire')
 		})
@@ -339,7 +343,7 @@ describe('dedupeDiscoveryRows', () => {
 			// WHEN de-duplicated
 			// THEN all three are one company. Who owns a domain is read across the whole
 			// list, so the row that spells it settles the host for every row on it
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toHaveLength(1)
 			expect(result.merged).toBe(2)
 		})
@@ -363,7 +367,7 @@ describe('dedupeDiscoveryRows', () => {
 
 			// WHEN de-duplicated
 			// THEN one company comes back, under its own name
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toHaveLength(1)
 			expect(rowsOf(result.findings)[0]?.['name']).toBe('Terre Solaire')
 			expect(result.merged).toBe(4)
@@ -382,7 +386,7 @@ describe('dedupeDiscoveryRows', () => {
 			// WHEN de-duplicated
 			// THEN all three towns survive on the row that stays — taking whichever
 			// arrived first would drop the other two with nothing said
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)[0]?.['location']).toBe(
 				'Douains; Lyon; Montpellier',
 			)
@@ -397,7 +401,7 @@ describe('dedupeDiscoveryRows', () => {
 			])
 
 			// WHEN de-duplicated — THEN the town is stated once, not twice
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)[0]?.['location']).toBe('Lyon')
 		})
 
@@ -415,7 +419,7 @@ describe('dedupeDiscoveryRows', () => {
 			// WHEN de-duplicated
 			// THEN the reader is told the company's name, not one branch's. Which row a
 			// search happened to rank first is no reason to call it something else
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toHaveLength(1)
 			expect(rowsOf(result.findings)[0]).toMatchObject({
 				name: 'Terre Solaire',
@@ -436,7 +440,7 @@ describe('dedupeDiscoveryRows', () => {
 
 			// WHEN de-duplicated
 			// THEN one company under its own name, with every town still on it
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toHaveLength(1)
 			expect(rowsOf(result.findings)[0]).toMatchObject({
 				name: 'Terre Solaire',
@@ -458,7 +462,7 @@ describe('dedupeDiscoveryRows', () => {
 
 			// WHEN de-duplicated — THEN no address can be read from it, so it is still a
 			// row with no site of its own
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toHaveLength(1)
 		})
 
@@ -476,7 +480,7 @@ describe('dedupeDiscoveryRows', () => {
 			// WHEN de-duplicated
 			// THEN both stay: a row claiming its own web presence is claiming to be
 			// somebody, and two hosts are the strongest evidence of two of them
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toHaveLength(2)
 		})
 
@@ -492,7 +496,7 @@ describe('dedupeDiscoveryRows', () => {
 			])
 
 			// WHEN de-duplicated — THEN both towns are named, whichever arrived first
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)[0]?.['location']).toBe('Lyon; Paris')
 		})
 
@@ -512,7 +516,7 @@ describe('dedupeDiscoveryRows', () => {
 			// WHEN de-duplicated
 			// THEN the first reading of that town stands. Only a row speaking about
 			// somewhere else adds a place; another reading of one branch is not that
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toHaveLength(1)
 			expect(rowsOf(result.findings)[0]?.['location']).toBe('Lyon')
 		})
@@ -528,7 +532,7 @@ describe('dedupeDiscoveryRows', () => {
 			// WHEN de-duplicated
 			// THEN one town, not two. A place that holds one already named is the same
 			// place written at more detail, and listing both would invent a branch
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)[0]?.['location']).toBe('Lyon')
 		})
 
@@ -544,7 +548,7 @@ describe('dedupeDiscoveryRows', () => {
 			// WHEN de-duplicated
 			// THEN both towns are named. Places are compared word by word, so one town
 			// reading inside another is not the same town written at more detail
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)[0]?.['location']).toBe('Roa; Roanne')
 		})
 
@@ -563,7 +567,7 @@ describe('dedupeDiscoveryRows', () => {
 			// WHEN de-duplicated
 			// THEN the unreadable town is kept beside the readable one. A place the
 			// code cannot read is a place it must not throw away for that reason
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)[0]?.['location']).toBe('Osaka; 東京')
 		})
 
@@ -581,7 +585,7 @@ describe('dedupeDiscoveryRows', () => {
 			// WHEN de-duplicated
 			// THEN the branch's town stands alone. A row naming nowhere adds nowhere,
 			// rather than a blank reading trailing the one place the run did find
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)[0]?.['location']).toBe('Lyon')
 		})
 
@@ -595,7 +599,7 @@ describe('dedupeDiscoveryRows', () => {
 			// WHEN de-duplicated
 			// THEN the first reading stands. Two readings of one place are not two
 			// places, and only a branch speaks about somewhere else
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toHaveLength(1)
 			expect(rowsOf(result.findings)[0]?.['location']).toBe('Vigo')
 		})
@@ -615,7 +619,7 @@ describe('dedupeDiscoveryRows', () => {
 
 			// WHEN the list is de-duplicated
 			// THEN one row survives, under the name without the note
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toHaveLength(1)
 			expect(rowsOf(result.findings)[0]?.['name']).toBe('KBE Energy')
 			expect(result.merged).toBe(1)
@@ -634,7 +638,7 @@ describe('dedupeDiscoveryRows', () => {
 			// WHEN de-duplicated — THEN one row, and the note row's town fills nothing
 			// it already answered: this is one company written twice, not a second
 			// place the company works from
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toHaveLength(1)
 			expect(rowsOf(result.findings)[0]?.['location']).toBe("Val-d'Oise (95)")
 		})
@@ -648,7 +652,7 @@ describe('dedupeDiscoveryRows', () => {
 
 			// WHEN de-duplicated — THEN the company keeps its own name, and what the
 			// noted row knew is not thrown away with the brackets
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toHaveLength(1)
 			expect(rowsOf(result.findings)[0]?.['name']).toBe('KBE Energy')
 			expect(rowsOf(result.findings)[0]?.['location']).toBe('Paris')
@@ -661,7 +665,7 @@ describe('dedupeDiscoveryRows', () => {
 			// WHEN de-duplicated — THEN both survive. Taking brackets off every name
 			// before filing it would have folded these two, which is why the plain
 			// name has to be on the list for a note to read as a note
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toHaveLength(2)
 			expect(result.merged).toBe(0)
 		})
@@ -676,7 +680,7 @@ describe('dedupeDiscoveryRows', () => {
 
 			// WHEN de-duplicated — THEN three rows: folding either arm onto the bare
 			// row would drag the other in through it
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toHaveLength(3)
 		})
 
@@ -691,7 +695,7 @@ describe('dedupeDiscoveryRows', () => {
 			])
 
 			// WHEN de-duplicated — THEN the surviving row is backed by both
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(citedPagesOf(result.findings)).toEqual(['src_own', 'src_tecsol'])
 		})
 	})
@@ -711,7 +715,7 @@ describe('dedupeDiscoveryRows', () => {
 			// WHEN de-duplicated — THEN both survive, and that is not an oversight.
 			// Joining them needs to know that "Groupe" adds nothing to a name, which
 			// is a list of words per language
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toHaveLength(2)
 		})
 
@@ -723,7 +727,7 @@ describe('dedupeDiscoveryRows', () => {
 			])
 
 			// WHEN de-duplicated — THEN both survive
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toHaveLength(2)
 		})
 
@@ -743,7 +747,7 @@ describe('dedupeDiscoveryRows', () => {
 			// smaller half: grant it and what is left is one name being the other plus
 			// a trailing word, with no town stated to check that word against, which is
 			// the case above and closed for the same reason
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toHaveLength(2)
 		})
 
@@ -758,7 +762,7 @@ describe('dedupeDiscoveryRows', () => {
 
 			// WHEN de-duplicated — THEN both survive, which is the right answer here
 			// and the wrong one above, and nothing on the rows says which is which
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toHaveLength(2)
 			expect(result.merged).toBe(0)
 		})
@@ -770,7 +774,7 @@ describe('dedupeDiscoveryRows', () => {
 			const findings = { enrichment: { industry: 'electrical' } }
 
 			// WHEN de-duplicated with no list field — THEN nothing is compared
-			const result = dedupeDiscoveryRows(findings, undefined)
+			const result = dedupeDiscoveryRows(findings, undefined, noTrades)
 			expect(result.findings).toBe(findings)
 			expect(result.merged).toBe(0)
 		})
@@ -780,15 +784,19 @@ describe('dedupeDiscoveryRows', () => {
 			const findings = { prospects: [null, { name: 'Elecnor' }] }
 
 			// WHEN de-duplicated — THEN only real rows are compared
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toEqual([null, { name: 'Elecnor' }])
 		})
 
 		it('should leave findings that are null or a bare value untouched', () => {
 			// GIVEN non-object findings
 			// WHEN de-duplicated — THEN they pass straight through
-			expect(dedupeDiscoveryRows(null, 'prospects').findings).toBeNull()
-			expect(dedupeDiscoveryRows('text', 'prospects').findings).toBe('text')
+			expect(
+				dedupeDiscoveryRows(null, 'prospects', noTrades).findings,
+			).toBeNull()
+			expect(dedupeDiscoveryRows('text', 'prospects', noTrades).findings).toBe(
+				'text',
+			)
 		})
 	})
 })
@@ -874,7 +882,7 @@ describe('branchOfficeParents', () => {
 			])
 
 			// WHEN de-duplicated — THEN two companies come back, as they should
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toHaveLength(2)
 			expect(result.merged).toBe(0)
 		})
@@ -1013,7 +1021,7 @@ describe('bracketedNoteParents', () => {
 			// WHEN the notes are read
 			// THEN the noted row belongs to the plain one
 			expect([
-				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows, noTrades)),
 			]).toEqual([[1, 0]])
 		})
 
@@ -1027,7 +1035,7 @@ describe('bracketedNoteParents', () => {
 			// WHEN the notes are read — THEN the plain row is still the one it belongs
 			// to, because which row a search ranked first says nothing about the name
 			expect([
-				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows, noTrades)),
 			]).toEqual([[0, 1]])
 		})
 
@@ -1040,7 +1048,7 @@ describe('bracketedNoteParents', () => {
 
 			// WHEN the notes are read — THEN the form comes off before the names meet
 			expect([
-				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows, noTrades)),
 			]).toEqual([[1, 0]])
 		})
 
@@ -1053,7 +1061,7 @@ describe('bracketedNoteParents', () => {
 
 			// WHEN the notes are read — THEN the padding is not what tells them apart
 			expect([
-				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows, noTrades)),
 			]).toEqual([[1, 0]])
 		})
 
@@ -1068,7 +1076,7 @@ describe('bracketedNoteParents', () => {
 			// WHEN the notes are read — THEN both belong to the plain row: the
 			// brackets are not telling the two rows apart, they say the same thing
 			expect([
-				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows, noTrades)),
 			]).toEqual([
 				[1, 0],
 				[2, 0],
@@ -1084,7 +1092,7 @@ describe('bracketedNoteParents', () => {
 			// WHEN the notes are read — THEN nothing folds: neither row is the plain
 			// name the other is a second reading of
 			expect([
-				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows, noTrades)),
 			]).toEqual([])
 		})
 
@@ -1100,7 +1108,7 @@ describe('bracketedNoteParents', () => {
 			// name are distinguishing the rows, and folding either onto the bare row
 			// would drag all three together through it
 			expect([
-				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows, noTrades)),
 			]).toEqual([])
 		})
 
@@ -1122,7 +1130,7 @@ describe('bracketedNoteParents', () => {
 			// a note apart from its name only when each is established as that row's
 			// own; a host nobody is named by says nothing about who anybody is
 			expect([
-				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows, noTrades)),
 			]).toEqual([[1, 0]])
 		})
 
@@ -1137,7 +1145,7 @@ describe('bracketedNoteParents', () => {
 			// strongest thing on a row for saying these are two companies, and it
 			// outranks a bracket
 			expect([
-				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows, noTrades)),
 			]).toEqual([])
 		})
 
@@ -1150,7 +1158,7 @@ describe('bracketedNoteParents', () => {
 
 			// WHEN the notes are read — THEN one host is no reason to hold them apart
 			expect([
-				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows, noTrades)),
 			]).toEqual([[1, 0]])
 		})
 	})
@@ -1162,7 +1170,7 @@ describe('bracketedNoteParents', () => {
 
 			// WHEN the notes are read — THEN the brackets alone fold nothing
 			expect([
-				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows, noTrades)),
 			]).toEqual([])
 		})
 
@@ -1173,7 +1181,7 @@ describe('bracketedNoteParents', () => {
 			// WHEN the notes are read — THEN it names no company for another row to be
 			// a second reading of
 			expect([
-				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows, noTrades)),
 			]).toEqual([])
 		})
 
@@ -1183,7 +1191,7 @@ describe('bracketedNoteParents', () => {
 
 			// WHEN the notes are read — THEN this is a longer name, not a noted one
 			expect([
-				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows, noTrades)),
 			]).toEqual([])
 		})
 
@@ -1193,7 +1201,7 @@ describe('bracketedNoteParents', () => {
 
 			// WHEN the notes are read — THEN there is no company to be the same one as
 			expect([
-				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows, noTrades)),
 			]).toEqual([])
 		})
 	})
@@ -1205,7 +1213,7 @@ describe('bracketedNoteParents', () => {
 
 			// WHEN the notes are read — THEN only rows are read
 			expect([
-				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows, noTrades)),
 			]).toEqual([])
 		})
 
@@ -1215,21 +1223,50 @@ describe('bracketedNoteParents', () => {
 
 			// WHEN the notes are read — THEN nothing is read off it
 			expect([
-				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows)),
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows, noTrades)),
 			]).toEqual([])
 		})
 
 		it('should find no notes in an empty list', () => {
 			// GIVEN nothing to read
 			// WHEN the notes are read — THEN there is nothing to belong to anything
-			expect([...bracketedNoteParents([], hostsEstablishedAsOwn([]))]).toEqual(
-				[],
-			)
+			expect([
+				...bracketedNoteParents([], hostsEstablishedAsOwn([], noTrades)),
+			]).toEqual([])
 		})
 	})
 })
 
 describe('hostsEstablishedAsOwn', () => {
+	describe('when the run names the trade the rows are called after', () => {
+		it('should not read the bare domain of that trade as anybody own', () => {
+			// GIVEN two different plumbers, each offering the bare domain of the trade
+			// they are named after, in a run that asked for that trade
+			const rows = [
+				{ name: 'Fontanería García', website: 'https://fontaneria.es' },
+				{ name: 'Fontanería López', website: 'https://fontaneria.es' },
+			]
+
+			// WHEN the owned hosts are worked out
+			// THEN none: fontaneria.es belongs to whoever registered it. Reading it as
+			// owned would make it a key both rows share, and two unrelated firms would
+			// be folded into one company
+			expect(hostsEstablishedAsOwn(rows, tradeWordsOf(['fontanería']))).toEqual(
+				new Set(),
+			)
+		})
+
+		it('should still read the host of a row that spells its own name', () => {
+			// GIVEN the same run and a row at the domain carrying the word only it has
+			const rows = [{ name: 'Fontanería García', website: 'https://garcia.es' }]
+
+			// WHEN the owned hosts are worked out — THEN that host is one of them
+			expect(hostsEstablishedAsOwn(rows, tradeWordsOf(['fontanería']))).toEqual(
+				new Set(['garcia.es']),
+			)
+		})
+	})
+
 	describe('when a row stands at the domain that spells it', () => {
 		it("should read the host as that company's own", () => {
 			// GIVEN a workshop at the domain carrying its name
@@ -1241,7 +1278,7 @@ describe('hostsEstablishedAsOwn', () => {
 			]
 
 			// WHEN the owned hosts are worked out — THEN the host is one of them
-			expect(hostsEstablishedAsOwn(rows)).toEqual(
+			expect(hostsEstablishedAsOwn(rows, noTrades)).toEqual(
 				new Set(['fusteriamiquel.cat']),
 			)
 		})
@@ -1259,7 +1296,9 @@ describe('hostsEstablishedAsOwn', () => {
 			// WHEN the owned hosts are worked out
 			// THEN one host, spelled the way the identity keys spell it — otherwise the
 			// row that establishes a site and the row that needs it never meet
-			expect(hostsEstablishedAsOwn(rows)).toEqual(new Set(['sice.com']))
+			expect(hostsEstablishedAsOwn(rows, noTrades)).toEqual(
+				new Set(['sice.com']),
+			)
 		})
 	})
 
@@ -1279,7 +1318,7 @@ describe('hostsEstablishedAsOwn', () => {
 			// THEN the directory is nobody's own site. Reading the note as part of the
 			// name would have the directory's own words spell the company, and every
 			// other firm listed there would then file under it as the same company
-			expect([...hostsEstablishedAsOwn(rows)]).toEqual([])
+			expect([...hostsEstablishedAsOwn(rows, noTrades)]).toEqual([])
 		})
 
 		it('should keep two companies on one directory apart through the fold', () => {
@@ -1294,7 +1333,7 @@ describe('hostsEstablishedAsOwn', () => {
 
 			// WHEN de-duplicated — THEN both survive, because a shared directory is no
 			// evidence that two companies are one
-			const result = dedupeDiscoveryRows(findings, 'prospects')
+			const result = dedupeDiscoveryRows(findings, 'prospects', noTrades)
 			expect(rowsOf(result.findings)).toHaveLength(2)
 			expect(result.merged).toBe(0)
 		})
@@ -1307,7 +1346,7 @@ describe('hostsEstablishedAsOwn', () => {
 			]
 
 			// WHEN the owned hosts are worked out — THEN there are none
-			expect(hostsEstablishedAsOwn(rows)).toEqual(new Set())
+			expect(hostsEstablishedAsOwn(rows, noTrades)).toEqual(new Set())
 		})
 
 		it('should leave out a host merely carrying a word of the name', () => {
@@ -1319,7 +1358,7 @@ describe('hostsEstablishedAsOwn', () => {
 			// WHEN the owned hosts are worked out
 			// THEN none. A domain has to BE the name, or every listing filed under a
 			// company would clear itself as that company's site
-			expect(hostsEstablishedAsOwn(rows)).toEqual(new Set())
+			expect(hostsEstablishedAsOwn(rows, noTrades)).toEqual(new Set())
 		})
 
 		it('should pass over a row with no name to judge the domain against', () => {
@@ -1328,7 +1367,7 @@ describe('hostsEstablishedAsOwn', () => {
 
 			// WHEN the owned hosts are worked out — THEN nothing is established, which
 			// is the answer rather than a missing one
-			expect(hostsEstablishedAsOwn(rows)).toEqual(new Set())
+			expect(hostsEstablishedAsOwn(rows, noTrades)).toEqual(new Set())
 		})
 
 		it('should pass over a row whose name is empty', () => {
@@ -1337,7 +1376,7 @@ describe('hostsEstablishedAsOwn', () => {
 
 			// WHEN the owned hosts are worked out — THEN a blank spells no domain, so
 			// the site is left standing for nobody
-			expect(hostsEstablishedAsOwn(rows)).toEqual(new Set())
+			expect(hostsEstablishedAsOwn(rows, noTrades)).toEqual(new Set())
 		})
 
 		it('should pass over a row whose website is not an address', () => {
@@ -1350,7 +1389,7 @@ describe('hostsEstablishedAsOwn', () => {
 			]
 
 			// WHEN the owned hosts are worked out — THEN there is no domain to read
-			expect(hostsEstablishedAsOwn(rows)).toEqual(new Set())
+			expect(hostsEstablishedAsOwn(rows, noTrades)).toEqual(new Set())
 		})
 
 		it('should pass over list entries that are not rows', () => {
@@ -1362,13 +1401,15 @@ describe('hostsEstablishedAsOwn', () => {
 			]
 
 			// WHEN the owned hosts are worked out — THEN only the real row is read
-			expect(hostsEstablishedAsOwn(rows)).toEqual(new Set(['sice.com']))
+			expect(hostsEstablishedAsOwn(rows, noTrades)).toEqual(
+				new Set(['sice.com']),
+			)
 		})
 
 		it('should find nothing in an empty list', () => {
 			// GIVEN nothing to read
 			// WHEN the owned hosts are worked out — THEN there are none
-			expect(hostsEstablishedAsOwn([])).toEqual(new Set())
+			expect(hostsEstablishedAsOwn([], noTrades)).toEqual(new Set())
 		})
 	})
 })

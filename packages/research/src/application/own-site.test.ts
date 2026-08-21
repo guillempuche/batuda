@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
 import { ownSiteHostVerdict, ownSiteVerdict } from './own-site'
+import { tradeWordsOf } from './trade-words'
+
+// A run that named no trades, which is a request about one company on file:
+// nothing to read, so only the shared list of words for a kind of company
+// stands. Every reading here that does not turn on a market's own vocabulary is
+// held to that, so the list's own work stays visible.
+const noTrades = tradeWordsOf([])
 
 // The address the French solar directory files a company at: a slug naming a
 // trade and a role, ending in the listing's own record number, and naming no
@@ -18,6 +25,7 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'Redwood Logistics',
 					website: 'https://redwoodlogistics.com/about',
+					tradeWords: noTrades,
 				}),
 			).toBe('established')
 		})
@@ -30,6 +38,7 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'Acme Logistics',
 					website: 'https://acme.com',
+					tradeWords: noTrades,
 				}),
 			).toBe('established')
 		})
@@ -49,7 +58,9 @@ describe('ownSiteVerdict', () => {
 				['TIBA Group', 'https://tiba-group.com/about-tiba'],
 				['GLS Spain', 'https://gls-spain.es/gls-spain-quienes'],
 			] as const) {
-				expect(ownSiteVerdict({ name, website })).toBe('established')
+				expect(ownSiteVerdict({ name, website, tradeWords: noTrades })).toBe(
+					'established',
+				)
 			}
 		})
 
@@ -61,6 +72,7 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'Transportes García',
 					website: 'https://garcia.es/contacto',
+					tradeWords: noTrades,
 				}),
 			).toBe('established')
 		})
@@ -72,6 +84,7 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'Fusteria Miquel',
 					website: 'https://fusteriamiquelsl.cat',
+					tradeWords: noTrades,
 				}),
 			).toBe('established')
 		})
@@ -81,7 +94,11 @@ describe('ownSiteVerdict', () => {
 			// WHEN asked — THEN the dots are taken out before the name is read, so one
 			// company spelled two ways is not two answers
 			expect(
-				ownSiteVerdict({ name: 'Acme S.L.', website: 'https://acme.com' }),
+				ownSiteVerdict({
+					name: 'Acme S.L.',
+					website: 'https://acme.com',
+					tradeWords: noTrades,
+				}),
 			).toBe('established')
 		})
 
@@ -89,7 +106,11 @@ describe('ownSiteVerdict', () => {
 			// GIVEN an accented name and the unaccented domain a registrar hands out
 			// WHEN asked — THEN accents are folded away on both sides
 			expect(
-				ownSiteVerdict({ name: 'Grupo Muñoz', website: 'https://munoz.es' }),
+				ownSiteVerdict({
+					name: 'Grupo Muñoz',
+					website: 'https://munoz.es',
+					tradeWords: noTrades,
+				}),
 			).toBe('established')
 		})
 
@@ -102,6 +123,7 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'Acme Logistics',
 					website: 'https://botiga.acme.co.uk/contacte',
+					tradeWords: noTrades,
 				}),
 			).toBe('established')
 		})
@@ -119,7 +141,9 @@ describe('ownSiteVerdict', () => {
 				['Lasser', 'https://grupolasser.com'],
 				['CAHORS', 'https://www.groupe-cahors.com/es-espana'],
 			] as const) {
-				expect(ownSiteVerdict({ name, website })).toBe('established')
+				expect(ownSiteVerdict({ name, website, tradeWords: noTrades })).toBe(
+					'established',
+				)
 			}
 		})
 
@@ -137,12 +161,14 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'KGS Fire & Security España',
 					website: 'http://www.grupofire.com',
+					tradeWords: noTrades,
 				}),
 			).toBe('unknown')
 			expect(
 				ownSiteVerdict({
 					name: 'Electronic Trafic (ETRA)',
 					website: 'https://grupoetra.com',
+					tradeWords: noTrades,
 				}),
 			).toBe('unknown')
 		})
@@ -153,12 +179,17 @@ describe('ownSiteVerdict', () => {
 			// THEN they agree, so a caller weighing many addresses on one host still
 			// gets one answer for the host
 			expect(
-				ownSiteHostVerdict({ name: 'Lasser', host: 'grupolasser.com' }),
+				ownSiteHostVerdict({
+					name: 'Lasser',
+					host: 'grupolasser.com',
+					tradeWords: noTrades,
+				}),
 			).toBe('established')
 			expect(
 				ownSiteVerdict({
 					name: 'Lasser',
 					website: 'https://grupolasser.com/quienes-somos',
+					tradeWords: noTrades,
 				}),
 			).toBe('established')
 		})
@@ -172,6 +203,7 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'Lasser',
 					website: 'https://grupolasserna.com',
+					tradeWords: noTrades,
 				}),
 			).toBe('unknown')
 		})
@@ -186,7 +218,9 @@ describe('ownSiteVerdict', () => {
 				['Penske Logistics', 'https://gopenske.com/logistics'],
 				['Ferré', 'https://miferre.es'],
 			] as const) {
-				expect(ownSiteVerdict({ name, website })).toBe('unknown')
+				expect(ownSiteVerdict({ name, website, tradeWords: noTrades })).toBe(
+					'unknown',
+				)
 			}
 		})
 
@@ -203,11 +237,16 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'Acme',
 					website: 'https://transportesacme.com',
+					tradeWords: noTrades,
 				}),
 			).toBe('established')
 			for (const name of ['Sacme', 'Esacme']) {
 				expect(
-					ownSiteVerdict({ name, website: 'https://transportesacme.com' }),
+					ownSiteVerdict({
+						name,
+						website: 'https://transportesacme.com',
+						tradeWords: noTrades,
+					}),
 				).toBe('unknown')
 			}
 		})
@@ -221,6 +260,7 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'Cobra Instalaciones',
 					website: 'https://grupotransportescobra.com',
+					tradeWords: noTrades,
 				}),
 			).toBe('unknown')
 		})
@@ -235,6 +275,7 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'Acme Logistics',
 					website: 'https://grupoacme-directorio.com/acme-logistics',
+					tradeWords: noTrades,
 				}),
 			).toBe('unknown')
 		})
@@ -249,10 +290,15 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'Cobra Instalaciones y Servicios',
 					website: 'https://grupoetra.com',
+					tradeWords: noTrades,
 				}),
 			).toBe('unknown')
 			expect(
-				ownSiteVerdict({ name: 'Lasser', website: 'https://grupocobra.com' }),
+				ownSiteVerdict({
+					name: 'Lasser',
+					website: 'https://grupocobra.com',
+					tradeWords: noTrades,
+				}),
 			).toBe('unknown')
 		})
 
@@ -267,6 +313,7 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'Instalaciones Rubio',
 					website: 'https://grupoins.com',
+					tradeWords: noTrades,
 				}),
 			).toBe('unknown')
 		})
@@ -282,12 +329,14 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'Logistics Group',
 					website: 'https://grupologistics.com',
+					tradeWords: noTrades,
 				}),
 			).toBe('unknown')
 			expect(
 				ownSiteVerdict({
 					name: 'Grupo Ferré',
 					website: 'https://grupogrupo.es',
+					tradeWords: noTrades,
 				}),
 			).toBe('unknown')
 		})
@@ -300,7 +349,11 @@ describe('ownSiteVerdict', () => {
 			// because it is where the two readings meet, and the furthest a label may
 			// sit from the name and still spell it
 			expect(
-				ownSiteVerdict({ name: 'Cobra', website: 'https://grupocobrasa.com' }),
+				ownSiteVerdict({
+					name: 'Cobra',
+					website: 'https://grupocobrasa.com',
+					tradeWords: noTrades,
+				}),
 			).toBe('established')
 		})
 	})
@@ -318,7 +371,9 @@ describe('ownSiteVerdict', () => {
 				['Énergie Solaire', 'https://xn--nergie-solaire-9jb.fr'],
 				['Instal·lacions Núñez', 'https://xn--installacionsnez-50a66h4e.es'],
 			] as const) {
-				expect(ownSiteVerdict({ name, website })).toBe('established')
+				expect(ownSiteVerdict({ name, website, tradeWords: noTrades })).toBe(
+					'established',
+				)
 			}
 		})
 
@@ -331,9 +386,13 @@ describe('ownSiteVerdict', () => {
 				'https://xn--nergie-solaire-9jb.fr/nos-realisations',
 				'https://www.xn--nergie-solaire-9jb.fr',
 			]) {
-				expect(ownSiteVerdict({ name: 'Énergie Solaire', website })).toBe(
-					'established',
-				)
+				expect(
+					ownSiteVerdict({
+						name: 'Énergie Solaire',
+						website,
+						tradeWords: noTrades,
+					}),
+				).toBe('established')
 			}
 		})
 
@@ -347,9 +406,13 @@ describe('ownSiteVerdict', () => {
 				'https://xn--nergie-solaire-9jb.fr',
 				'https://energie-solaire.fr',
 			]) {
-				expect(ownSiteVerdict({ name: 'Énergie Solaire', website })).toBe(
-					'established',
-				)
+				expect(
+					ownSiteVerdict({
+						name: 'Énergie Solaire',
+						website,
+						tradeWords: noTrades,
+					}),
+				).toBe('established')
 			}
 		})
 
@@ -363,6 +426,7 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'Énergie Solaire',
 					website: 'https://xn--groupe-nergie-solaire-h5b.fr',
+					tradeWords: noTrades,
 				}),
 			).toBe('established')
 		})
@@ -381,6 +445,7 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'Énergie Solaire',
 					website: 'https://xn--groupnergie-solaire-fzb.fr',
+					tradeWords: noTrades,
 				}),
 			).toBe('unknown')
 		})
@@ -394,6 +459,7 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'Instalaciones Rubio',
 					website: 'https://xn--construccionsgarca-xyb.cat',
+					tradeWords: noTrades,
 				}),
 			).toBe('unknown')
 		})
@@ -409,6 +475,7 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'Apple',
 					website: 'https://xn--80ak6aa92e.com',
+					tradeWords: noTrades,
 				}),
 			).toBe('unknown')
 		})
@@ -421,7 +488,11 @@ describe('ownSiteVerdict', () => {
 			// for the empty string a reader hands back — and an empty label would be
 			// no label at all
 			expect(
-				ownSiteVerdict({ name: 'Acme', website: 'https://xn--acme-9ta.com' }),
+				ownSiteVerdict({
+					name: 'Acme',
+					website: 'https://xn--acme-9ta.com',
+					tradeWords: noTrades,
+				}),
 			).toBe('unknown')
 		})
 
@@ -432,7 +503,11 @@ describe('ownSiteVerdict', () => {
 			// a plain label as an accented one, a reader also tries it as a machine
 			// address and hands back something longer than it was given
 			expect(
-				ownSiteVerdict({ name: 'Acme', website: 'http://192.168.1.10/acme' }),
+				ownSiteVerdict({
+					name: 'Acme',
+					website: 'http://192.168.1.10/acme',
+					tradeWords: noTrades,
+				}),
 			).toBe('unknown')
 		})
 	})
@@ -453,7 +528,9 @@ describe('ownSiteVerdict', () => {
 				['PPVS Facility Management', 'https://ppvs-fm.com'],
 				['Energetique Sanitaire', 'https://esanit.fr'],
 			] as const) {
-				expect(ownSiteVerdict({ name, website })).toBe('unknown')
+				expect(ownSiteVerdict({ name, website, tradeWords: noTrades })).toBe(
+					'unknown',
+				)
 			}
 		})
 
@@ -466,6 +543,7 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'Servicios Eléctricos y Montajes Industriales',
 					website: 'https://semi.es',
+					tradeWords: noTrades,
 				}),
 			).toBe('unknown')
 		})
@@ -489,7 +567,9 @@ describe('ownSiteVerdict', () => {
 				],
 				['Instalaciones Rubio', 'https://grupocobra.com'],
 			] as const) {
-				expect(ownSiteVerdict({ name, website })).toBe('unknown')
+				expect(ownSiteVerdict({ name, website, tradeWords: noTrades })).toBe(
+					'unknown',
+				)
 			}
 		})
 	})
@@ -505,6 +585,7 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'Acme Logistics',
 					website: 'https://acme-directory.com/acme-logistics',
+					tradeWords: noTrades,
 				}),
 			).toBe('unknown')
 		})
@@ -520,6 +601,7 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'Penske Logistics',
 					website: 'https://gopenske.com/logistics',
+					tradeWords: noTrades,
 				}),
 			).toBe('unknown')
 		})
@@ -533,7 +615,11 @@ describe('ownSiteVerdict', () => {
 			// whoever registered it rather than to every company called Grupo
 			// something
 			expect(
-				ownSiteVerdict({ name: 'Grupo Ferré', website: 'https://grupo.es' }),
+				ownSiteVerdict({
+					name: 'Grupo Ferré',
+					website: 'https://grupo.es',
+					tradeWords: noTrades,
+				}),
 			).toBe('unknown')
 		})
 
@@ -545,6 +631,7 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'Grupo Ferré',
 					website: 'https://grupoferre.es',
+					tradeWords: noTrades,
 				}),
 			).toBe('established')
 		})
@@ -557,12 +644,17 @@ describe('ownSiteVerdict', () => {
 			// languages, so groupe.fr is no more the site of every firm called Groupe
 			// something than grupo.es is of every Grupo
 			expect(
-				ownSiteVerdict({ name: 'Grupo Ferré', website: 'https://grupo.es' }),
+				ownSiteVerdict({
+					name: 'Grupo Ferré',
+					website: 'https://grupo.es',
+					tradeWords: noTrades,
+				}),
 			).toBe('unknown')
 			expect(
 				ownSiteVerdict({
 					name: 'Groupe Roy Énergie',
 					website: 'https://groupe.fr',
+					tradeWords: noTrades,
 				}),
 			).toBe('unknown')
 		})
@@ -575,6 +667,7 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'CAHORS',
 					website: 'https://www.groupe-cahors.com/es-espana',
+					tradeWords: noTrades,
 				}),
 			).toBe('established')
 		})
@@ -587,8 +680,286 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'Logistics Group',
 					website: 'https://logistics.com',
+					tradeWords: noTrades,
 				}),
 			).toBe('unknown')
+		})
+	})
+
+	describe('when the run names the trade a company is called after', () => {
+		it('should refuse the bare domain of that trade in every sector', () => {
+			// GIVEN one company shape — a trade and a family name — across the sectors
+			// a search can be launched for, each offered the bare domain of its own
+			// trade, and each judged inside a run that asked for that trade
+			// WHEN each is asked
+			// THEN none of them: a trade identifies nobody, so fontaneria.es belongs
+			// to whoever registered it rather than to every firm called Fontanería
+			// something. Nothing here is a word anybody wrote down — each run brought
+			// its own trade with it
+			for (const [asked, name, website] of [
+				['fontanería', 'Fontanería García', 'https://fontaneria.es'],
+				['instalaciones', 'Instalaciones García', 'https://instalaciones.es'],
+				['ascensor', 'Ascensores García', 'https://ascensores.com'],
+				['plomberie', 'Plomberie García', 'https://plomberie.fr'],
+				[
+					'construcciones',
+					'Construcciones García',
+					'https://construcciones.es',
+				],
+				['reformas', 'Reformas García', 'https://reformas.es'],
+				['panadería', 'Panadería García', 'https://panaderia.es'],
+				['restaurante', 'Restaurante García', 'https://restaurante.es'],
+				['abogados', 'Abogados García', 'https://abogados.es'],
+				['asesoría', 'Asesoría García', 'https://asesoria.es'],
+				['clínica', 'Clínica García', 'https://clinica.es'],
+				['farmacia', 'Farmacia García', 'https://farmacia.es'],
+				['ferretería', 'Ferretería García', 'https://ferreteria.es'],
+				['talleres', 'Talleres García', 'https://talleres.es'],
+			] as const) {
+				expect(
+					ownSiteVerdict({ name, website, tradeWords: tradeWordsOf([asked]) }),
+				).toBe('unknown')
+			}
+		})
+
+		it('should refuse it whichever end of the name the trade sits at', () => {
+			// GIVEN the same company written the two ways a name is written — trade
+			// first, as Spanish does, and trade last, as English does
+			// WHEN each is asked for the bare trade domain
+			// THEN neither. What settles it is which word names the trade, never
+			// where in the name it was written
+			for (const name of ['Fontanería García', 'García Fontanería']) {
+				expect(
+					ownSiteVerdict({
+						name,
+						website: 'https://fontaneria.es',
+						tradeWords: tradeWordsOf(['fontanería']),
+					}),
+				).toBe('unknown')
+			}
+		})
+
+		it("should still establish the domain carrying the company's own word", () => {
+			// GIVEN the same company at the domain that spells the word only it has,
+			// and at the one spelling its whole name
+			// WHEN each is asked
+			// THEN both are its own site. Reading the run's trade takes the trade
+			// away, never the company — which is what keeps this from costing every
+			// firm named after what it does its own address
+			for (const website of [
+				'https://garcia.es',
+				'https://fontaneriagarcia.es',
+			]) {
+				expect(
+					ownSiteVerdict({
+						name: 'Fontanería García',
+						website,
+						tradeWords: tradeWordsOf(['fontanería']),
+					}),
+				).toBe('established')
+			}
+		})
+
+		it("should read past the run's trade word written in front of a domain", () => {
+			// GIVEN a firm that wrote what it does before what it is called, where
+			// what it does is a trade this run asked for rather than a word for a
+			// kind of company
+			// WHEN asked
+			// THEN the word comes off and the company is underneath, exactly as it
+			// does for "grupo"
+			expect(
+				ownSiteVerdict({
+					name: 'García',
+					website: 'https://fontaneriagarcia.es',
+					tradeWords: tradeWordsOf(['fontanería']),
+				}),
+			).toBe('established')
+		})
+
+		it('should cut a domain at the word the request wrote and no deeper', () => {
+			// GIVEN a domain whose trade word is followed by the company name, so the
+			// trade plus that name's first letter reads as the trade with an ending
+			// WHEN asked
+			// THEN the company is still found. The front of a domain is cut only at a
+			// word the request actually wrote, so the ending that reaches
+			// "fontanerías" in a NAME cannot eat into the name behind a domain
+			expect(
+				ownSiteVerdict({
+					name: 'García',
+					website: 'https://fontaneriagarcia.es',
+					tradeWords: tradeWordsOf(['fontanería', 'ascensor']),
+				}),
+			).toBe('established')
+		})
+
+		it('should not take a joining word off the front of a domain', () => {
+			// GIVEN a request naming its trades in phrases, which carry the little
+			// words that join them — "fontanería y climatización" — so those are words
+			// the run asked for like any other
+			// AND a stranger's domain that happens to open with one of them
+			// WHEN asked
+			// THEN unknown. A word that short in front of a domain says nothing about
+			// what a firm does, and taking it off would cut the label one letter in
+			// and hand Talia a domain somebody else registered
+			const asked = tradeWordsOf([
+				'fontanería y climatización',
+				'instalación de gas',
+			])
+			for (const [name, website] of [
+				['Talia', 'https://detalia.com'],
+				['Acme', 'https://yacme.com'],
+			] as const) {
+				expect(ownSiteVerdict({ name, website, tradeWords: asked })).toBe(
+					'unknown',
+				)
+			}
+		})
+
+		it("should establish nothing for a name that is only the run's trades", () => {
+			// GIVEN a name with nothing in it but what the company does, in a run
+			// that asked for exactly that
+			// WHEN asked — THEN there is no company left to look for, so no domain
+			// can spell one
+			expect(
+				ownSiteVerdict({
+					name: 'Instalaciones Eléctricas',
+					website: 'https://instalacioneselectricas.es',
+					tradeWords: tradeWordsOf(['instalación eléctrica']),
+				}),
+			).toBe('unknown')
+		})
+
+		it('should not let a joining word stand for a company', () => {
+			// GIVEN a firm a market search met whose name is nothing but its trade and
+			// the word joining two halves of it, at the bare domain of that trade
+			// WHEN asked with the trades that run went looking for
+			// THEN unknown. Without this the two letters of "et" are the one word of
+			// the name left standing as the company's own, and the firm is handed the
+			// domain of its whole trade
+			expect(
+				ownSiteVerdict({
+					name: 'Services et installations électriques',
+					website: 'https://services-et-installations-electriques.com',
+					tradeWords: tradeWordsOf(['installations électriques']),
+				}),
+			).toBe('unknown')
+		})
+
+		it('should still keep the two letters a firm calls itself by', () => {
+			// GIVEN firms a market search met whose own name is an initialism of two
+			// letters, beside a word the same run asked for
+			// WHEN each is asked
+			// THEN each is at home on its own domain. Two letters can be a company's
+			// name, which is why what settles a joining word is the word itself and
+			// never how short it is
+			for (const [name, website] of [
+				['VS ENERGY', 'https://vsenergy.fr'],
+				['TK Elevator', 'http://tkelevator.fr/'],
+				['Plomberie DS', 'https://www.plomberie-ds.fr/'],
+			] as const) {
+				expect(
+					ownSiteVerdict({
+						name,
+						website,
+						tradeWords: tradeWordsOf([
+							'solar energy',
+							'plomberie et chauffage',
+							'ascenseurs',
+						]),
+					}),
+				).toBe('established')
+			}
+		})
+
+		it('should keep a coined name that merely opens with a trade word', () => {
+			// GIVEN two firms a market search met whose names open with the trade the
+			// run asked for and then carry on
+			// WHEN each is asked
+			// THEN each is at home on its own domain. Reading those as the trade
+			// would leave them with no word of their own and take away a real site
+			for (const [name, website] of [
+				['Solarock', 'https://solarock.fr'],
+				['Solartec Group', 'https://solartecgroup.com'],
+			] as const) {
+				expect(
+					ownSiteVerdict({
+						name,
+						website,
+						tradeWords: tradeWordsOf(['energía solar', 'solar energy']),
+					}),
+				).toBe('established')
+			}
+		})
+
+		it('should refuse the trade in both spellings of a geminated l', () => {
+			// GIVEN a Catalan trade, which is written two ways, and the bare domain of
+			// each spelling
+			// WHEN each is asked
+			// THEN neither, whichever way the request wrote it. A request matched
+			// against one spelling only would leave the other looking like a word of
+			// the company's own
+			for (const website of [
+				'https://installacions.cat',
+				'https://instalacions.cat',
+			]) {
+				expect(
+					ownSiteVerdict({
+						name: 'Instal·lacions Vives',
+						website,
+						tradeWords: tradeWordsOf(['instal·lacions elèctriques']),
+					}),
+				).toBe('unknown')
+			}
+		})
+
+		it('should leave alone a company whose trade the run never named', () => {
+			// GIVEN a firm whose trade this run never asked about, met on the same
+			// list as the ones it did
+			// WHEN asked — THEN its own name still spells its domain: the run's
+			// trades take words away, and a word the run never named is not one
+			expect(
+				ownSiteVerdict({
+					name: 'Panadería García',
+					website: 'https://panaderia-garcia.es',
+					tradeWords: tradeWordsOf(['fontanería']),
+				}),
+			).toBe('established')
+		})
+	})
+
+	describe('when the run names no trades', () => {
+		it('should still refuse a word for a kind of company', () => {
+			// GIVEN a run about one company on file, which brings no trades with it
+			// WHEN the bare domain of a word for a kind of company is asked
+			// THEN unknown still: those words come from the short shared list, which
+			// works for anybody in any market and needs no run behind it
+			for (const [name, website] of [
+				['Grupo Ferré', 'https://grupo.es'],
+				['Groupe Roy Énergie', 'https://groupe.fr'],
+				['Servicios García', 'https://servicios.es'],
+				['Consulting García', 'https://consulting.es'],
+			] as const) {
+				expect(ownSiteVerdict({ name, website, tradeWords: noTrades })).toBe(
+					'unknown',
+				)
+			}
+		})
+
+		it('should leave a trade the shared list never held', () => {
+			// GIVEN the same shape in a trade the list does not carry, with no run to
+			// read one from
+			// WHEN asked
+			// THEN it clears, and that is the known cost rather than an oversight:
+			// with nothing naming the trade, no reading of the address tells
+			// "Fontanería" from "García". What closes it is a run with a market
+			// behind it, which is every run that can meet this shape on a list
+			expect(
+				ownSiteVerdict({
+					name: 'Fontanería García',
+					website: 'https://fontaneria.es',
+					tradeWords: noTrades,
+				}),
+			).toBe('established')
 		})
 	})
 
@@ -601,6 +972,7 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'Redwood Logistics',
 					website: 'https://cbinsights.com/company/redwood-logistics',
+					tradeWords: noTrades,
 				}),
 			).toBe('unknown')
 		})
@@ -617,6 +989,7 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'LIPOTECH SARL',
 					website: 'https://www.facebook.com/LIPOTECH.SARL',
+					tradeWords: noTrades,
 				}),
 			).toBe('unknown')
 		})
@@ -629,6 +1002,7 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'KBE Energy',
 					website: 'https://annuaire.tecsol.fr',
+					tradeWords: noTrades,
 				}),
 			).toBe('unknown')
 		})
@@ -642,6 +1016,7 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'KBE Energy',
 					website: 'https://annuaire.fr/energy-installateurs-12345',
+					tradeWords: noTrades,
 				}),
 			).toBe('unknown')
 		})
@@ -652,7 +1027,11 @@ describe('ownSiteVerdict', () => {
 			// WHEN asked — THEN unknown, and neither the page nor anything the row
 			// cites could change that, since neither is read
 			expect(
-				ownSiteVerdict({ name: 'KBE Energy', website: TECSOL_LISTING }),
+				ownSiteVerdict({
+					name: 'KBE Energy',
+					website: TECSOL_LISTING,
+					tradeWords: noTrades,
+				}),
 			).toBe('unknown')
 		})
 	})
@@ -670,10 +1049,18 @@ describe('ownSiteVerdict', () => {
 			// domain could be cleared by, and a run that does not know the company's
 			// name cannot say whose site anything is
 			expect(
-				ownSiteVerdict({ name: question, website: 'https://fontaneria.es' }),
+				ownSiteVerdict({
+					name: question,
+					website: 'https://fontaneria.es',
+					tradeWords: noTrades,
+				}),
 			).toBe('unknown')
 			expect(
-				ownSiteVerdict({ name: question, website: 'https://empresas.es' }),
+				ownSiteVerdict({
+					name: question,
+					website: 'https://empresas.es',
+					tradeWords: noTrades,
+				}),
 			).toBe('unknown')
 		})
 
@@ -685,6 +1072,7 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'Sociedad Española de Montajes Industriales SA',
 					website: 'https://sociedadespanola.es',
+					tradeWords: noTrades,
 				}),
 			).toBe('established')
 		})
@@ -696,7 +1084,11 @@ describe('ownSiteVerdict', () => {
 			// WHEN asked — THEN one letter is an initial rather than a name, and a
 			// domain that short belongs to whoever paid for it
 			expect(
-				ownSiteVerdict({ name: 'A. Martín', website: 'https://a.com' }),
+				ownSiteVerdict({
+					name: 'A. Martín',
+					website: 'https://a.com',
+					tradeWords: noTrades,
+				}),
 			).toBe('unknown')
 		})
 
@@ -704,7 +1096,11 @@ describe('ownSiteVerdict', () => {
 			// GIVEN the shortest domain a real company here is at
 			// WHEN asked — THEN three letters stand, so the floor cannot be raised
 			expect(
-				ownSiteVerdict({ name: 'Fer Corporation', website: 'https://fer.org' }),
+				ownSiteVerdict({
+					name: 'Fer Corporation',
+					website: 'https://fer.org',
+					tradeWords: noTrades,
+				}),
 			).toBe('established')
 		})
 	})
@@ -721,6 +1117,7 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'Sociedad Española de Montajes Industriales SA (SEMI)',
 					website: 'https://www.semi-sa.com',
+					tradeWords: noTrades,
 				}),
 			).toBe('established')
 		})
@@ -732,17 +1129,25 @@ describe('ownSiteVerdict', () => {
 			// a target the run was never told the name of
 			// WHEN asked — THEN unknown rather than missing: a run with no name
 			// establishes nothing, which is an answer
-			expect(ownSiteVerdict({ name: '', website: 'https://acme.com' })).toBe(
-				'unknown',
-			)
+			expect(
+				ownSiteVerdict({
+					name: '',
+					website: 'https://acme.com',
+					tradeWords: noTrades,
+				}),
+			).toBe('unknown')
 		})
 
 		it('should not establish anything for a name that is only a legal form', () => {
 			// GIVEN a row whose whole name is the form
 			// WHEN asked — THEN the form is taken out and nothing is left to look for
-			expect(ownSiteVerdict({ name: 'S.L.', website: 'https://sl.com' })).toBe(
-				'unknown',
-			)
+			expect(
+				ownSiteVerdict({
+					name: 'S.L.',
+					website: 'https://sl.com',
+					tradeWords: noTrades,
+				}),
+			).toBe('unknown')
 		})
 
 		it('should not establish a value with words written beside the address', () => {
@@ -754,6 +1159,7 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'ADIME',
 					website: 'https://adime.org/ (not directly provided, inferred)',
+					tradeWords: noTrades,
 				}),
 			).toBe('unknown')
 		})
@@ -762,7 +1168,9 @@ describe('ownSiteVerdict', () => {
 			// GIVEN values no reader could open
 			// WHEN asked — THEN each is unknown
 			for (const website of ['not a url', '', 'info@acme.es', 'src_9f2a1b3c']) {
-				expect(ownSiteVerdict({ name: 'Acme', website })).toBe('unknown')
+				expect(
+					ownSiteVerdict({ name: 'Acme', website, tradeWords: noTrades }),
+				).toBe('unknown')
 			}
 		})
 
@@ -770,7 +1178,11 @@ describe('ownSiteVerdict', () => {
 			// GIVEN a site given by its address on the network rather than by name
 			// WHEN asked — THEN nothing in the numbers spells a company
 			expect(
-				ownSiteVerdict({ name: 'Acme', website: 'http://192.168.1.10/acme' }),
+				ownSiteVerdict({
+					name: 'Acme',
+					website: 'http://192.168.1.10/acme',
+					tradeWords: noTrades,
+				}),
 			).toBe('unknown')
 		})
 	})
@@ -782,12 +1194,20 @@ describe('ownSiteVerdict', () => {
 			// THEN the domain answers for its own company and for nobody else, so a
 			// row handed somebody else's site gets no clearance from it
 			const website = 'https://acme.com/quienes-somos'
-			expect(ownSiteVerdict({ name: 'Acme Logistics', website })).toBe(
-				'established',
-			)
-			expect(ownSiteVerdict({ name: 'Instalaciones Rubio', website })).toBe(
-				'unknown',
-			)
+			expect(
+				ownSiteVerdict({
+					name: 'Acme Logistics',
+					website,
+					tradeWords: noTrades,
+				}),
+			).toBe('established')
+			expect(
+				ownSiteVerdict({
+					name: 'Instalaciones Rubio',
+					website,
+					tradeWords: noTrades,
+				}),
+			).toBe('unknown')
 		})
 	})
 
@@ -802,7 +1222,11 @@ describe('ownSiteVerdict', () => {
 				'https://instalacionsvives.cat/contacte',
 			]) {
 				expect(
-					ownSiteVerdict({ name: 'Instal·lacions Vives SL', website }),
+					ownSiteVerdict({
+						name: 'Instal·lacions Vives SL',
+						website,
+						tradeWords: noTrades,
+					}),
 				).toBe('established')
 			}
 		})
@@ -817,12 +1241,14 @@ describe('ownSiteVerdict', () => {
 				ownSiteVerdict({
 					name: 'Vila Nova SL',
 					website: 'https://villanova.cat',
+					tradeWords: noTrades,
 				}),
 			).toBe('unknown')
 			expect(
 				ownSiteVerdict({
 					name: 'Villa Nova SL',
 					website: 'https://vilanova.cat',
+					tradeWords: noTrades,
 				}),
 			).toBe('unknown')
 		})
@@ -844,7 +1270,9 @@ describe('ownSiteVerdict', () => {
 				['Þór Raflagnir', 'https://thor-raflagnir.is'],
 				['Işık Elektrik', 'https://isik-elektrik.com.tr'],
 			] as const) {
-				expect(ownSiteVerdict({ name, website })).toBe('established')
+				expect(ownSiteVerdict({ name, website, tradeWords: noTrades })).toBe(
+					'established',
+				)
 			}
 		})
 
@@ -858,9 +1286,13 @@ describe('ownSiteVerdict', () => {
 				'https://muller-elektro.de',
 				'https://mueller-elektro.de',
 			]) {
-				expect(ownSiteVerdict({ name: 'Müller Elektro GmbH', website })).toBe(
-					'established',
-				)
+				expect(
+					ownSiteVerdict({
+						name: 'Müller Elektro GmbH',
+						website,
+						tradeWords: noTrades,
+					}),
+				).toBe('established')
 			}
 		})
 
@@ -876,7 +1308,9 @@ describe('ownSiteVerdict', () => {
 				['Rose GmbH', 'https://rosse.de'],
 				['Sander AS', 'https://sonder.no'],
 			] as const) {
-				expect(ownSiteVerdict({ name, website })).toBe('unknown')
+				expect(ownSiteVerdict({ name, website, tradeWords: noTrades })).toBe(
+					'unknown',
+				)
 			}
 		})
 	})
@@ -893,12 +1327,14 @@ describe('ownSiteHostVerdict', () => {
 				ownSiteHostVerdict({
 					name: 'D-Sécurité (groupe)',
 					host: 'd-securite.com',
+					tradeWords: noTrades,
 				}),
 			).toBe('established')
 			expect(
 				ownSiteHostVerdict({
 					name: 'D-Sécurité Incendie',
 					host: 'd-securite.com',
+					tradeWords: noTrades,
 				}),
 			).toBe('established')
 		})
@@ -908,7 +1344,11 @@ describe('ownSiteHostVerdict', () => {
 			// WHEN asked
 			// THEN the label has to BE the name, never merely contain it
 			expect(
-				ownSiteHostVerdict({ name: 'Acme', host: 'acme-directorio.example' }),
+				ownSiteHostVerdict({
+					name: 'Acme',
+					host: 'acme-directorio.example',
+					tradeWords: noTrades,
+				}),
 			).toBe('unknown')
 		})
 
@@ -917,7 +1357,11 @@ describe('ownSiteHostVerdict', () => {
 			// WHEN asked
 			// THEN there is no word of its own for a domain to spell
 			expect(
-				ownSiteHostVerdict({ name: 'Grupo Express SL', host: 'grupo.example' }),
+				ownSiteHostVerdict({
+					name: 'Grupo Express SL',
+					host: 'grupo.example',
+					tradeWords: noTrades,
+				}),
 			).toBe('unknown')
 		})
 
@@ -925,7 +1369,13 @@ describe('ownSiteHostVerdict', () => {
 			// GIVEN a run with no company name
 			// WHEN asked
 			// THEN an empty name must not be spelled by every host there is
-			expect(ownSiteHostVerdict({ name: '', host: 'acme.com' })).toBe('unknown')
+			expect(
+				ownSiteHostVerdict({
+					name: '',
+					host: 'acme.com',
+					tradeWords: noTrades,
+				}),
+			).toBe('unknown')
 		})
 
 		it('should read an accented host the same way an address is read', () => {
@@ -938,12 +1388,14 @@ describe('ownSiteHostVerdict', () => {
 				ownSiteHostVerdict({
 					name: 'Énergie Solaire',
 					host: 'xn--nergie-solaire-9jb.fr',
+					tradeWords: noTrades,
 				}),
 			).toBe('established')
 			expect(
 				ownSiteHostVerdict({
 					name: 'Instalaciones Rubio',
 					host: 'xn--nergie-solaire-9jb.fr',
+					tradeWords: noTrades,
 				}),
 			).toBe('unknown')
 		})
@@ -962,8 +1414,8 @@ describe('ownSiteHostVerdict', () => {
 				'https://www.fusteriamiquel.cat/qui-som',
 				'https://fusteriamiquel.cat/obra/2024/cuina',
 			]) {
-				expect(ownSiteVerdict({ name, website })).toBe(
-					ownSiteHostVerdict({ name, host }),
+				expect(ownSiteVerdict({ name, website, tradeWords: noTrades })).toBe(
+					ownSiteHostVerdict({ name, host, tradeWords: noTrades }),
 				)
 			}
 		})
@@ -977,12 +1429,14 @@ describe('ownSiteHostVerdict', () => {
 				ownSiteVerdict({
 					name: 'Fusteria Miquel',
 					website: 'https://fusteriamiquel.cat/ (inferred from the name)',
+					tradeWords: noTrades,
 				}),
 			).toBe('unknown')
 			expect(
 				ownSiteHostVerdict({
 					name: 'Fusteria Miquel',
 					host: 'fusteriamiquel.cat',
+					tradeWords: noTrades,
 				}),
 			).toBe('established')
 		})

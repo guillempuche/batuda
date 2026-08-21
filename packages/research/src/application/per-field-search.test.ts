@@ -13,6 +13,10 @@ import {
 } from './per-field-search'
 import { CompetitorScanV1Schema } from './schemas/competitor-scan-v1'
 import { ProspectScanV1Schema } from './schemas/prospect-scan-v1'
+import { tradeWordsOf } from './trade-words'
+
+// A run that named no trades, which is a request about one company on file.
+const noTrades = tradeWordsOf([])
 
 // A per-field-citation value the way the enrichment schema stores one.
 const sourced = (value: string) => ({ value, source_id: 'https://x.test' })
@@ -313,6 +317,7 @@ describe('mergePerFieldSearch', () => {
 				findings,
 				refreshed,
 				PROFILE,
+				noTrades,
 			)
 			// THEN the empty country is filled but the grounded industry is untouched
 			expect(filled).toBe(1)
@@ -333,7 +338,7 @@ describe('mergePerFieldSearch', () => {
 				findings: next,
 				filled,
 				added,
-			} = mergePerFieldSearch(findings, {}, PROFILE)
+			} = mergePerFieldSearch(findings, {}, PROFILE, noTrades)
 			// THEN nothing is filled and the same findings come back
 			expect(filled).toBe(0)
 			expect(added).toBe(0)
@@ -362,6 +367,7 @@ describe('mergePerFieldSearch', () => {
 				findings,
 				refreshed,
 				PROFILE,
+				noTrades,
 			)
 
 			// THEN the second person is kept, the first not duplicated
@@ -387,6 +393,7 @@ describe('mergePerFieldSearch', () => {
 				findings,
 				refreshed,
 				PROFILE,
+				noTrades,
 			)
 			expect(contactsChanged).toBe(false)
 			expect(next).toBe(findings)
@@ -409,6 +416,7 @@ describe('mergePerFieldSearch', () => {
 				findings,
 				refreshed,
 				PROFILE,
+				noTrades,
 			)
 
 			// THEN the title is kept, even though the list is exactly as long as it
@@ -448,7 +456,7 @@ describe('mergePerFieldSearch', () => {
 			}
 
 			// WHEN merged
-			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN, noTrades)
 			const rows = prospectsOf(merged.findings)
 
 			// THEN each recovered value lands on the company it belongs to, the
@@ -480,7 +488,7 @@ describe('mergePerFieldSearch', () => {
 				prospects: [{ name: 'acme sl', website: 'https://acme.test' }],
 			}
 			// WHEN merged
-			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN, noTrades)
 			const rows = prospectsOf(merged.findings)
 			// THEN one company stays one company, keeping the name first written
 			expect(rows).toHaveLength(1)
@@ -509,7 +517,7 @@ describe('mergePerFieldSearch', () => {
 			}
 
 			// WHEN merged
-			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN, noTrades)
 			const rows = prospectsOf(merged.findings)
 
 			// THEN it is one company that gained a site and a place, not two rows. A
@@ -539,7 +547,7 @@ describe('mergePerFieldSearch', () => {
 			}
 
 			// WHEN merged
-			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN, noTrades)
 			const rows = prospectsOf(merged.findings)
 
 			// THEN the shared site settles it, as it does for the fold that runs over
@@ -559,7 +567,7 @@ describe('mergePerFieldSearch', () => {
 				],
 			}
 			// WHEN merged
-			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN, noTrades)
 			const rows = prospectsOf(merged.findings)
 			// THEN it is still one company — most of the market this searches writes
 			// names with accents, and matching on the letters alone would have listed
@@ -577,7 +585,7 @@ describe('mergePerFieldSearch', () => {
 				prospects: [{ name: 'Acme Holding', website: 'https://holding.test' }],
 			}
 			// WHEN merged
-			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN, noTrades)
 			const rows = prospectsOf(merged.findings)
 			// THEN Acme keeps its blank rather than inheriting another company's site,
 			// and the other company is listed in its own right — a duplicate is a far
@@ -602,7 +610,7 @@ describe('mergePerFieldSearch', () => {
 				],
 			}
 			// WHEN merged
-			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN, noTrades)
 			const rows = prospectsOf(merged.findings)
 			// THEN one company, keeping the town the branch brought. The fold that runs
 			// before these rounds cannot see a company found after it, so a round that
@@ -630,7 +638,7 @@ describe('mergePerFieldSearch', () => {
 				],
 			}
 			// WHEN merged
-			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN, noTrades)
 			const rows = prospectsOf(merged.findings)
 			// THEN the shared host settles it here too, because the domain says whose it
 			// is. A row appended by a round is never put in front of the fold again
@@ -651,7 +659,7 @@ describe('mergePerFieldSearch', () => {
 				prospects: [{ name: 'Terre Solaire Energie', location: 'Nantes' }],
 			}
 			// WHEN merged
-			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN, noTrades)
 			const rows = prospectsOf(merged.findings)
 			// THEN both are listed and the round is credited with the find — sharing an
 			// opening word is not being somebody's branch
@@ -680,7 +688,7 @@ describe('mergePerFieldSearch', () => {
 				],
 			}
 			// WHEN merged
-			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN, noTrades)
 			const rows = prospectsOf(merged.findings)
 			// THEN the list holds the one company and the new one, and the round is
 			// credited with the find. Counting the length instead would read nothing
@@ -699,7 +707,7 @@ describe('mergePerFieldSearch', () => {
 				],
 			}
 			// WHEN merged
-			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN, noTrades)
 			const rows = prospectsOf(merged.findings)
 			// THEN it joins the list once — the list's length decides whether a scan
 			// came back too thin to trust, so counting one company twice would pass a
@@ -718,7 +726,7 @@ describe('mergePerFieldSearch', () => {
 				],
 			}
 			// WHEN merged
-			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN, noTrades)
 			const rows = prospectsOf(merged.findings)
 			// THEN one of them is taken and the fold stays stable, with no duplicate
 			// appended for the company already known
@@ -734,7 +742,7 @@ describe('mergePerFieldSearch', () => {
 				prospects: [{ name: 'Acme', website: 'https://acme.test' }],
 			}
 			// WHEN merged
-			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN, noTrades)
 			// THEN the wider read's find is kept — an empty list is exactly the one
 			// with the most to gain from looking again
 			expect(prospectsOf(merged.findings).map(row => row['name'])).toEqual([
@@ -750,7 +758,7 @@ describe('mergePerFieldSearch', () => {
 				prospects: [{ website: 'https://nameless.test' }, { name: '  ' }],
 			}
 			// WHEN merged
-			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN, noTrades)
 			// THEN nothing is appended, since a company with no name cannot be worked
 			// with or told apart from another
 			expect(merged.added).toBe(0)
@@ -775,7 +783,7 @@ describe('mergePerFieldSearch', () => {
 			}
 
 			// WHEN merged
-			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN, noTrades)
 			const rows = prospectsOf(merged.findings)
 
 			// THEN both companies ship. The domain spells neither of them, so it is
@@ -812,7 +820,7 @@ describe('mergePerFieldSearch', () => {
 			}
 
 			// WHEN merged
-			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN, noTrades)
 
 			// THEN one company, and the fold says it joined a row — a real fold, for
 			// the good reason that the site now says the two rows are one company
@@ -844,6 +852,7 @@ describe('mergePerFieldSearch', () => {
 					findings,
 					{ prospects: [found] },
 					SCAN,
+					noTrades,
 				).findings
 			}
 
@@ -876,7 +885,7 @@ describe('mergePerFieldSearch', () => {
 			}
 
 			// WHEN merged
-			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN, noTrades)
 			const rows = prospectsOf(merged.findings)
 
 			// THEN one company, which gained the town the round found. Who owns the
@@ -908,7 +917,7 @@ describe('mergePerFieldSearch', () => {
 			}
 
 			// WHEN merged
-			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN, noTrades)
 
 			// THEN nothing is reported as joined. The rows met by name, which is the
 			// reason the rounds run at all — counting those would bury the one join
@@ -931,7 +940,7 @@ describe('mergePerFieldSearch', () => {
 			}
 
 			// WHEN merged
-			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN, noTrades)
 			const rows = prospectsOf(merged.findings)
 
 			// THEN two rows, because nothing yet ties the two names together: the listed
@@ -954,7 +963,7 @@ describe('mergePerFieldSearch', () => {
 				prospects: [{ name: 'Beta', website: 'https://beta.test' }],
 			}
 			// WHEN merged
-			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN, noTrades)
 			// THEN a second look only ever adds — it never shortens the list
 			expect(prospectsOf(merged.findings).map(row => row['name'])).toEqual([
 				'Acme',
@@ -971,7 +980,7 @@ describe('mergePerFieldSearch', () => {
 				prospects: [{ name: 'Acme', website: 'https://other.test' }],
 			}
 			// WHEN merged
-			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN, noTrades)
 			// THEN the very same findings come back, which is what stops the rounds
 			expect(merged.findings).toBe(findings)
 			expect(merged.filled).toBe(0)
@@ -983,8 +992,12 @@ describe('mergePerFieldSearch', () => {
 			const refreshed = { prospects: [{ name: 'Acme' }] }
 			// WHEN merged
 			// THEN nothing is invented around them
-			expect(mergePerFieldSearch(null, refreshed, SCAN).findings).toBe(null)
-			expect(mergePerFieldSearch('x', refreshed, SCAN).findings).toBe('x')
+			expect(
+				mergePerFieldSearch(null, refreshed, SCAN, noTrades).findings,
+			).toBe(null)
+			expect(mergePerFieldSearch('x', refreshed, SCAN, noTrades).findings).toBe(
+				'x',
+			)
 		})
 
 		it('should leave the findings alone when the second look holds no list', () => {
@@ -992,8 +1005,12 @@ describe('mergePerFieldSearch', () => {
 			const findings = { prospects: [{ name: 'Acme' }] }
 			// WHEN merged
 			// THEN the list is untouched
-			expect(mergePerFieldSearch(findings, {}, SCAN).findings).toBe(findings)
-			expect(mergePerFieldSearch(findings, null, SCAN).findings).toBe(findings)
+			expect(mergePerFieldSearch(findings, {}, SCAN, noTrades).findings).toBe(
+				findings,
+			)
+			expect(mergePerFieldSearch(findings, null, SCAN, noTrades).findings).toBe(
+				findings,
+			)
 		})
 
 		it('should carry the rest of the findings across untouched', () => {
@@ -1006,7 +1023,7 @@ describe('mergePerFieldSearch', () => {
 				prospects: [{ name: 'Acme', website: 'https://acme.test' }],
 			}
 			// WHEN merged
-			const merged = mergePerFieldSearch(findings, refreshed, SCAN)
+			const merged = mergePerFieldSearch(findings, refreshed, SCAN, noTrades)
 			// THEN everything beside the list survives the fold
 			expect(
 				(merged.findings as { pending_paid_actions: unknown })

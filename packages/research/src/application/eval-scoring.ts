@@ -71,6 +71,7 @@ import {
 	type RunScore,
 	SCORABLE_FIELDS,
 } from './eval-scoring-types'
+import { tradeWordsOf } from './trade-words'
 
 export { contactNameMatches } from './eval-scoring-company'
 export {
@@ -244,7 +245,21 @@ export const scoreRun = (
 	const rightKindRows = outcome.companies.filter(
 		(_, index) => kinds[index]?.isCompany ?? true,
 	)
-	const repeats = repeatedRows(outcome.companies)
+	// Read with the trades the golden file wrote down for this market, which is the
+	// nearest thing the eval holds to the words the run itself went looking for. A
+	// reading with no trades at all would establish more sites than the run's fold
+	// did and then report as duplicates the rows the fold was right to leave apart.
+	//
+	// The golden wordings rather than the ones the run split its own request into,
+	// though those are closer to what the fold read: the run's are written afresh
+	// every pass, so a duplicate count read off them would move between two passes
+	// of one market for reasons that have nothing to do with the change under
+	// measurement. A company row names no market and so no trades, which is what
+	// its run read too.
+	const repeats = repeatedRows(
+		outcome.companies,
+		tradeWordsOf(expectedMarket?.parts.flatMap(part => part.terms) ?? []),
+	)
 	const market: MarketScore | undefined =
 		expectedMarket === undefined || !endedWithAnAnswer(outcome.status)
 			? undefined
