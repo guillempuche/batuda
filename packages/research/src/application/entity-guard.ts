@@ -20,6 +20,7 @@
 import { domainToUnicode } from 'node:url'
 
 import { EQUIVALENT_LETTERS } from './letter-equivalences.generated'
+import { isSocialPlatformHost } from './social-sites'
 
 // Legal-form suffixes dropped before matching, so "Acme Logistics S.L." and a
 // page that writes "Acme Logistica SL" still match on the same name core.
@@ -861,6 +862,10 @@ export const reachedOwnSite = (
 ): boolean =>
 	pages.some(page => {
 		if (page.host === undefined) return false
+		// A page on a social platform belongs to whoever opened the account, never
+		// to the company — whether its name spells the platform or its stored
+		// website points there.
+		if (isSocialPlatformHost(page.host)) return false
 		if (targets.domains.includes(page.host)) return true
 		const label = domainLabelOf(page.host)
 		if (label === undefined) return false
@@ -903,11 +908,18 @@ export const reachedOwnSite = (
  * The accented spelling is the one reading they do share, since it says what the
  * domain is rather than what may be made of it: `hostLabel`, which both go
  * through, puts a domain registered with an accent back into its own letters.
+ *
+ * A social platform is refused outright — "Facebook Ads Agency" is no reason to
+ * go and read Facebook as that company's site — since a page there belongs to
+ * whoever opened the account. Refused ahead of the domain the caller supplied,
+ * too: a company whose stored website is a Facebook page would otherwise send
+ * every one of its runs off to read Facebook and write back what it found there.
  */
 export const isOwnSiteHost = (
 	targets: EntityTargets,
 	host: string,
 ): boolean => {
+	if (isSocialPlatformHost(host)) return false
 	if (targets.domains.includes(host)) return true
 	const label = domainLabelOf(host)
 	if (label === undefined) return false

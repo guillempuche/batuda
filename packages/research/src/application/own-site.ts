@@ -77,6 +77,14 @@
  * exempted there so an "about us" page is not mistaken for one. Those are
  * reasons to withhold a blank. None of them is a reason to claim ownership.
  *
+ * **A host that is a social platform.** The one way a page on Facebook could
+ * still be established: an agency named after the platform it works on —
+ * "Instagram Marketing SL", "Facebook Ads Agency" — spells that host's own label,
+ * and the reading above would hand it the platform as its site. A page on a
+ * platform belongs to whoever opened the account, which is no reason to say the
+ * company owns the domain, so such a host is refused before any of its letters
+ * are read (`social-sites.ts`).
+ *
  * **Where the claim was read from.** A row's citations say which pages the run
  * opened, never who owns a domain. Settling ownership on provenance opens a hole
  * for every way a row can cite: one citing nothing, one whose citations a guard
@@ -218,6 +226,7 @@ import {
 	nameWordsWithoutForms,
 	withoutFormDots,
 } from './entity-guard'
+import { isSocialPlatformHost } from './social-sites'
 import { hostOf, isBareWebAddress } from './source-key'
 import { namesATrade, type TradeWords, wasAskedForExactly } from './trade-words'
 
@@ -415,6 +424,7 @@ export const ownSiteHostVerdict = (args: {
 	readonly host: string
 	readonly tradeWords: TradeWords
 }): OwnSiteVerdict =>
+	!isSocialPlatformHost(args.host) &&
 	hostSpellsTheCompany(args.name, args.host, args.tradeWords)
 		? 'established'
 		: 'unknown'
