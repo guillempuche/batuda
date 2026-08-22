@@ -19,6 +19,8 @@
 
 import { Schema } from 'effect'
 
+import { foldLabel } from '@batuda/domain'
+
 import { Citation, Sourced } from './schemas/_shared'
 
 // The narrow schema the focused pass fills: people only, each with a title and the
@@ -73,18 +75,17 @@ export const contactsRescuePrompt = (
 	].join('\n')
 }
 
-// A person's name reduced to a comparison key: lowercased, accent-folded, stripped
-// of punctuation and collapsed whitespace. Deliberately exact (no initials/nickname
-// matching) so two genuinely different spellings stay separate rather than risk
-// merging two different people — recall over a lossy merge.
-export const normalizeContactName = (name: string): string =>
-	name
-		.normalize('NFD')
-		.replace(/\p{Diacritic}/gu, '')
-		.toLowerCase()
-		.replace(/[^a-z0-9\s]/g, ' ')
-		.replace(/\s+/g, ' ')
-		.trim()
+// A person's name reduced to a comparison key: decoration removed, lower case,
+// punctuation collapsed. Deliberately exact (no initials/nickname matching) so two
+// genuinely different spellings stay separate rather than risk merging two
+// different people — recall over a lossy merge.
+//
+// The shared fold, because it keeps the letters of every writing system. A rule
+// that kept only a-z folded 王小明, Иван Петров and محمد العلي all to nothing, and
+// the guard below — written to refuse an entry with no name at all — then threw
+// each of them away. It also took the letter out of Łukasz and Bjørn, which are
+// the markets this actually runs in.
+export const normalizeContactName = (name: string): string => foldLabel(name)
 
 interface RawContact {
 	readonly name?: unknown
@@ -97,22 +98,42 @@ interface RawContact {
 const citationsArray = (c: RawContact): ReadonlyArray<unknown> =>
 	Array.isArray(c.citations) ? c.citations : []
 
+export interface ContactsMergeResult {
+	readonly contacts: ReadonlyArray<RawContact>
+	/** People left out because they came with no name to key on. */
+	readonly dropped: number
+}
+
 /**
  * Union the broad and recovered contacts, keyed on the normalized name. A name seen
  * in both keeps the broad contact's fields, fills any it lacks (a title, a channel)
  * from the recovered one, and unions their citations. First-seen order is preserved.
+ *
+ * What could not be kept is counted rather than left to be noticed. Every other step
+ * that drops a contact says how many it dropped, and a shorter list handed back with
+ * nothing said is how a run that lost four of its five people still reads as a clean
+ * one.
  */
 export const mergeContacts = (
 	broad: ReadonlyArray<RawContact>,
 	rescued: ReadonlyArray<RawContact>,
-): ReadonlyArray<RawContact> => {
+): ContactsMergeResult => {
 	const byKey = new Map<string, RawContact>()
 	const order: string[] = []
+	let dropped = 0
 
 	const absorb = (c: RawContact): void => {
-		if (typeof c.name !== 'string') return
+		if (typeof c.name !== 'string') {
+			dropped++
+			return
+		}
 		const key = normalizeContactName(c.name)
-		if (key === '') return
+		// Nothing to key on. Such entries cannot be kept apart from each other
+		// either — they would all share one key — so they go, and are counted.
+		if (key === '') {
+			dropped++
+			return
+		}
 		const existing = byKey.get(key)
 		if (existing === undefined) {
 			byKey.set(key, c)
@@ -130,5 +151,5 @@ export const mergeContacts = (
 
 	for (const c of broad) absorb(c)
 	for (const c of rescued) absorb(c)
-	return order.map(key => byKey.get(key) as RawContact)
+	return { contacts: order.map(key => byKey.get(key) as RawContact), dropped }
 }

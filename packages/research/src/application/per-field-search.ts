@@ -440,7 +440,8 @@ export const mergePerFieldSearch = (
 	}
 	const known = contactsOf(findings)
 	const found = contactsOf(refreshed)
-	const contacts = found.length > 0 ? mergeContacts(known, found) : known
+	const contacts =
+		found.length > 0 ? mergeContacts(known, found).contacts : known
 	// A second look adds people, but it also puts a title on somebody already
 	// named — and that leaves the list exactly as long as it was. Asking what is
 	// in the list rather than how long it is keeps those titles, which are the

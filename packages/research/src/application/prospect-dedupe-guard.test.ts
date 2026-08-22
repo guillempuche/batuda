@@ -239,6 +239,24 @@ describe('dedupeDiscoveryRows', () => {
 			expect(result.merged).toBe(0)
 		})
 
+		it('should leave two companies whose only shared words are their form', () => {
+			// GIVEN two unrelated Chinese companies, each written with an English legal
+			// form after it — the ordinary shape of a name a scan brings back from an
+			// English-language page about a Chinese market
+			const findings = scan([
+				{ name: '上海高博 Co., Ltd', why_relevant: 'One.' },
+				{ name: '北京华信 Co., Ltd', why_relevant: 'Another.' },
+			])
+
+			// WHEN de-duplicated
+			// THEN both stay. The fold has no letters for the names themselves, so what
+			// it hands back is the English written beside them — and filing on that made
+			// every company ending "Co., Ltd" the same company
+			const result = dedupeDiscoveryRows(findings, 'prospects', noRunWords)
+			expect(rowsOf(result.findings)).toHaveLength(2)
+			expect(result.merged).toBe(0)
+		})
+
 		it('should still fold two rows whose names are only a legal form', () => {
 			// GIVEN two rows named nothing but a legal form, which leaves no core
 			const findings = scan([
@@ -1129,6 +1147,55 @@ describe('bracketedNoteParents', () => {
 			// WHEN the notes are read — THEN they still meet. Two different hosts hold
 			// a note apart from its name only when each is established as that row's
 			// own; a host nobody is named by says nothing about who anybody is
+			expect([
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows, noRunWords)),
+			]).toEqual([[1, 0]])
+		})
+
+		it('should leave a noted row where only the plain row stands somewhere', () => {
+			// GIVEN a plain row at a domain that spells it, and a noted row naming a
+			// different address that does not spell anybody
+			const rows = [
+				{ name: 'Acme', website: 'https://acme.com' },
+				{ name: 'Acme (UK)', website: 'https://acme-uk.example' },
+			]
+
+			// WHEN the notes are read
+			// THEN they stay two rows. One row at a domain of its own beside a row
+			// naming a different address is enough to say they are two companies —
+			// asking both to establish a site let whichever could not hand the other's
+			// claim away
+			expect([
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows, noRunWords)),
+			]).toEqual([])
+		})
+
+		it('should leave it whichever of the two stands at a site of its own', () => {
+			// GIVEN the same pair the other way round: the NOTED row is the one whose
+			// domain spells it, and the plain row sits on a listing
+			const rows = [
+				{ name: 'Acme', website: 'https://acme-directory.example/acme' },
+				{ name: 'Acme (UK)', website: 'https://acme.com' },
+			]
+
+			// WHEN the notes are read — THEN still two rows, since which of them can
+			// spell its own domain says nothing about whether they are one company
+			expect([
+				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows, noRunWords)),
+			]).toEqual([])
+		})
+
+		it('should read a noted row naming no address as the same company', () => {
+			// GIVEN a plain row at a domain that spells it and a noted row with no
+			// address at all — the ordinary shape of a scan writing down where it met
+			// a company it had already listed
+			const rows = [
+				{ name: 'DO Chauffage', website: 'https://do-chauffage.fr' },
+				{ name: 'DO CHAUFFAGE (UPSswitch entry)' },
+			]
+
+			// WHEN the notes are read — THEN they meet. A row naming no address is not
+			// standing somewhere else; only a stated, different address is
 			expect([
 				...bracketedNoteParents(rows, hostsEstablishedAsOwn(rows, noRunWords)),
 			]).toEqual([[1, 0]])

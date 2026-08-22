@@ -45,6 +45,38 @@ describe('normalizeContactName', () => {
 	})
 })
 
+describe('normalizeContactName, on a name outside plain a-z', () => {
+	describe('when the name is written in another writing system', () => {
+		it('should give it a key of its own rather than none', () => {
+			// GIVEN five people named in five writing systems
+			// WHEN each name is folded
+			// THEN each gets its own key. Folding them all to nothing made them one
+			// person to the merge below, and the guard that refuses a nameless entry
+			// then threw every one of them away
+			const keys = [
+				'王小明',
+				'Иван Петров',
+				'محمد العلي',
+				'김민준',
+				'Γιώργος Παπάς',
+			].map(normalizeContactName)
+			expect(keys.some(key => key === '')).toBe(false)
+			expect(new Set(keys).size).toBe(keys.length)
+		})
+	})
+
+	describe('when a Latin letter is a letter rather than an accented one', () => {
+		it('should keep the letter instead of leaving a hole where it was', () => {
+			// GIVEN Polish and Norwegian names, in the markets this actually runs in
+			// WHEN each is folded
+			// THEN the letter survives. Writing out only a-z deleted it outright, so
+			// Łukasz keyed as "ukasz" and the two passes never met
+			expect(normalizeContactName('Łukasz Nowak')).toBe('łukasz nowak')
+			expect(normalizeContactName('Bjørn Håland')).toBe('bjørn haland')
+		})
+	})
+})
+
 describe('mergeContacts', () => {
 	describe('when broad and rescued name different people', () => {
 		it('should union them in first-seen order', () => {
@@ -56,7 +88,7 @@ describe('mergeContacts', () => {
 			const merged = mergeContacts(broad, rescued)
 
 			// THEN both survive, broad first
-			expect(merged.map(c => c.name)).toEqual([
+			expect(merged.contacts.map(c => c.name)).toEqual([
 				'Eric Fortmeyer',
 				'Chad Buchanan',
 			])
@@ -86,12 +118,12 @@ describe('mergeContacts', () => {
 			const merged = mergeContacts(broad, rescued)
 
 			// THEN one contact, broad's richer role kept, citations unioned
-			expect(merged).toHaveLength(1)
-			expect(merged[0]?.role).toEqual({
+			expect(merged.contacts).toHaveLength(1)
+			expect(merged.contacts[0]?.role).toEqual({
 				value: 'President & CEO',
 				source_id: 'https://circle.com',
 			})
-			expect(merged[0]?.citations).toEqual([
+			expect(merged.contacts[0]?.citations).toEqual([
 				{ source_id: 'https://circle.com' },
 				{ source_id: 'https://circle.com/about' },
 			])
@@ -108,8 +140,10 @@ describe('mergeContacts', () => {
 			const merged = mergeContacts(broad, rescued)
 
 			// THEN the recovered title lands on the single contact
-			expect(merged).toHaveLength(1)
-			expect(merged[0]?.role).toEqual({ value: 'VP Sales & Operations' })
+			expect(merged.contacts).toHaveLength(1)
+			expect(merged.contacts[0]?.role).toEqual({
+				value: 'VP Sales & Operations',
+			})
 		})
 	})
 
@@ -123,7 +157,7 @@ describe('mergeContacts', () => {
 			const merged = mergeContacts(broad, rescued)
 
 			// THEN both are kept (conservative: no lossy merge)
-			expect(merged.map(c => c.name)).toEqual([
+			expect(merged.contacts.map(c => c.name)).toEqual([
 				'Andrew Smith',
 				'Andrew J. Smith',
 			])
@@ -136,7 +170,59 @@ describe('mergeContacts', () => {
 			const merged = mergeContacts([{ name: '  ' }], [{ name: 'Ada' }])
 
 			// THEN only the named one survives
-			expect(merged.map(c => c.name)).toEqual(['Ada'])
+			expect(merged.contacts.map(c => c.name)).toEqual(['Ada'])
+		})
+	})
+})
+
+describe('mergeContacts, on names outside plain a-z', () => {
+	describe('when the people are named in several writing systems', () => {
+		it('should hand every one of them back', () => {
+			// GIVEN four people named outside the Latin alphabet and one inside it
+			const broad = [
+				{ name: '王小明' },
+				{ name: 'Иван Петров' },
+				{ name: 'محمد العلي' },
+				{ name: '김민준' },
+				{ name: 'Núria Pla' },
+			]
+
+			// WHEN merged with a second pass that found nobody new
+			const merged = mergeContacts(broad, [])
+
+			// THEN nobody is lost. A fold with letters only for a-z handed back Núria
+			// alone, with no error and no count — four people gone from a run that
+			// reported success
+			expect(merged.contacts.map(c => c.name)).toEqual(broad.map(c => c.name))
+			expect(merged.dropped).toBe(0)
+		})
+	})
+
+	describe('when a second pass finds the title of somebody already named', () => {
+		it('should put the title on the person rather than list them twice', () => {
+			// GIVEN a Chinese name in both passes, the second carrying the title
+			// WHEN merged
+			// THEN one person with their title — the fold still does its own job
+			const merged = mergeContacts(
+				[{ name: '王小明' }],
+				[{ name: '王小明', role: { value: '创始人' } }],
+			)
+			expect(merged.contacts).toHaveLength(1)
+			expect(merged.contacts[0]?.role).toEqual({ value: '创始人' })
+		})
+	})
+
+	describe('when several entries carry no name to key on', () => {
+		it('should count them rather than let the list quietly shrink', () => {
+			// GIVEN two entries whose names hold no letter or digit at all
+			// WHEN merged
+			// THEN neither is kept, neither absorbs the other, and the count says so
+			const merged = mergeContacts(
+				[{ name: '  ' }, { name: '—' }],
+				[{ name: 'Ada' }],
+			)
+			expect(merged.contacts.map(c => c.name)).toEqual(['Ada'])
+			expect(merged.dropped).toBe(2)
 		})
 	})
 })

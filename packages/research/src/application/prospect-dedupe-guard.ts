@@ -96,6 +96,7 @@
 import {
 	collapse,
 	DISTINCTIVE_NAME_LENGTH,
+	foldReadsEveryLetter,
 	foldTokens,
 	nameCore,
 	nameCoreTokens,
@@ -219,7 +220,11 @@ export const discoveryRowIdentityKeys = (
 		// still has to file under something, or two rows carrying the same useless
 		// name have no key to meet on and the list keeps every copy of it.
 		const core = nameCore(withoutFormDots(name))
-		const filedAs = core === '' ? collapse(name) : core
+		// Only where the fold read the whole name, though. Where it dropped letters,
+		// what is left is the Latin somebody wrote beside them, and every company
+		// ending "Co., Ltd" would meet on that and become one row.
+		const filedAs =
+			core === '' && foldReadsEveryLetter(name) ? collapse(name) : core
 		if (filedAs !== '') keys.push(`name:${filedAs}`)
 	}
 	const host = siteHostOf(row)
@@ -348,9 +353,11 @@ export const branchOfficeParents = (
  *    are left alone — including where the bare name is on the list too. "Acme",
  *    "Acme (UK)" and "Acme (US)" stays three rows.
  *
- * A row is also left alone when it stands at a site established as its own and the
- * plain row stands at a different one. Two rows each at a domain that spells them is
- * the most a row can say about being somebody separate, and it outranks a bracket.
+ * A row is also left alone when ONE of the two stands at a domain that spells it
+ * while the other names a different address. That is the most a row can say about
+ * being somebody separate, and it outranks a bracket — and only the row whose
+ * domain spells it has to say it, since a row that cannot spell its own domain is
+ * not thereby standing in the same place as anybody.
  *
  * Established is the whole of that, and asking for less costs a real fold: a live
  * French search returned "Société Nouvelle Garraud" citing another company's site
@@ -387,6 +394,7 @@ export const bracketedNoteParents = (
 		const host = siteHostOf(row)
 		return {
 			core,
+			host,
 			note: noted === null ? null : collapse(theNote ?? ''),
 			ownSite: host !== null && ownSiteHosts.has(host) ? host : null,
 		}
@@ -413,12 +421,25 @@ export const bracketedNoteParents = (
 		const plain = plainRowOf.get(reading.core)
 		if (plain === undefined) return
 		if ((notesOn.get(reading.core)?.size ?? 0) > 1) return
+		const plainHost = readings[plain]?.host ?? null
 		const plainOwnSite = readings[plain]?.ownSite ?? null
-		const atDifferentSitesOfTheirOwn =
-			reading.ownSite !== null &&
-			plainOwnSite !== null &&
-			reading.ownSite !== plainOwnSite
-		if (atDifferentSitesOfTheirOwn) return
+		// One row standing at a domain that spells it, while the other names a
+		// different address, is two rows saying they are in two different places —
+		// and only the row whose domain spells it has to say so.
+		//
+		// Asking BOTH to say it put the hold on the weaker of the two readings:
+		// whichever row could not establish a site handed the other's claim away. A
+		// name made of nothing but the trade's own words can never spell its own
+		// domain, so such a row folded into any plain row of that name wherever it
+		// stood.
+		const oneStandsSomewhereTheOtherIsNot =
+			(reading.ownSite !== null &&
+				plainHost !== null &&
+				reading.ownSite !== plainHost) ||
+			(plainOwnSite !== null &&
+				reading.host !== null &&
+				plainOwnSite !== reading.host)
+		if (oneStandsSomewhereTheOtherIsNot) return
 		parents.set(at, plain)
 	})
 	return parents

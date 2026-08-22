@@ -593,7 +593,27 @@ describe('parseGoldenRow — a market entry that says nothing', () => {
 			// unanswered for good and the coverage figure would sit low for a reason
 			// nobody could see in the numbers
 			expect(result.ok).toBe(false)
-			if (!result.ok) expect(result.error).toContain('no words in it')
+			if (!result.ok) expect(result.error).toContain('cannot read')
+		})
+	})
+
+	describe('when a known non-company is written in another script', () => {
+		it('should name the entry rather than say it has no words in it', () => {
+			// GIVEN a trade body listed in a script this eval's word reading has no
+			// letters for
+			const result = parseGoldenRow(
+				marketWith({ notCompanies: ['中国光伏行业协会'] }),
+			)
+
+			// WHEN parsed
+			// THEN refused, and the refusal names the entry and says what is wrong. The
+			// words are all there — this reading is the thing that cannot see them, and
+			// saying otherwise sends somebody looking for a typo that is not there
+			expect(result.ok).toBe(false)
+			if (!result.ok) {
+				expect(result.error).toContain('中国光伏行业协会')
+				expect(result.error).toContain('cannot read')
+			}
 		})
 	})
 
@@ -610,7 +630,7 @@ describe('parseGoldenRow — a market entry that says nothing', () => {
 			// THEN it fails. A blank entry matches nothing, so it quietly raises the very
 			// figure it was typed in to lower
 			expect(result.ok).toBe(false)
-			if (!result.ok) expect(result.error).toContain('no words in it')
+			if (!result.ok) expect(result.error).toContain('cannot read')
 		})
 	})
 })
