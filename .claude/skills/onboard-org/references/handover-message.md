@@ -1,7 +1,8 @@
 # The getting-started message
 
 The message a new organization's first admin receives once their account exists. English
-only. Print it in the conversation, filled in and ready to paste — never send it anywhere.
+only. Print it in the conversation, filled in and ready to paste — never send it anywhere,
+and say when handing it over that it still needs sending, since production emails nothing.
 
 Placeholders to replace:
 
@@ -18,6 +19,25 @@ belongs to more than one organization (`pnpm cli data members`). Drop it otherwi
 Trim rather than pad. If they only bought research, cut the companies-and-people section;
 if they are not connecting a chat yet, cut everything after sign-in and say so when handing
 the message over.
+
+## Writing the examples
+
+The three example prompts below are the part that has to change every time. They are what
+tells a new customer whether this was built for their work or somebody else's, so write them
+from what the organization actually sells, to whom, and where — the reading done in §2 of the
+skill. The versions here are a worked example in one market, not text to paste.
+
+Three rules for the research example, which is the one that matters most:
+
+- **Ask for many companies, not one.** The product's job is finding a set worth talking to,
+  so the example has to look like a search, not a lookup of a company they already knew about.
+- **No invented filters.** Head count, revenue bands and the like read as restrictions the
+  customer never asked for. Say what kind of company they want; leave the rest open.
+- **A country only if theirs is a market.** Name one when the organization plainly works in
+  a single country. When they sell anywhere, say nothing about geography at all.
+
+The standing-instructions example follows from the same reading: it should be the thing they
+would want said about every company, every time — not a filter.
 
 ---
 
@@ -46,21 +66,24 @@ Either way it asks you to approve it once, in your own browser, with your own si
 you also code, {{APP_URL}}/settings/mcp has ready-made snippets for Claude Code, Cursor, VS
 Code and the rest.
 
-**Telling it how you work.** Say your standing rules once and ask it to remember them:
+**Telling it how you work.** Say once what you always want, and ask it to remember:
 
-> "From now on, when you research a company, I only care about firms under 50 people in
-> Catalonia, and I always want the owner's email if you can find it. Save that."
+> "Whenever you research a company, always tell me who owns engineering and whether their
+> app already works offline. Save that."
 
-It keeps those rules and applies them to later work without being reminded. To see what it
-is following, just ask — *"what rules are you using for research?"* You can read or edit the
-same list at {{APP_URL}}/settings/organization/templates, shared with your team. A rule that
-is only yours lives at {{APP_URL}}/settings/profile/templates.
+It keeps that and applies it to later work without being reminded. The same works for email
+— tell it how you want messages written once and it follows that from then on. To see what
+it is following, just ask — *"what are you following for research?"* You can read or edit the
+same list at {{APP_URL}}/settings/organization/templates, shared with your team, so anything
+you change there changes it for everyone. Something that is only yours lives at
+{{APP_URL}}/settings/profile/templates.
 
-**Asking it to research.** Name a company and say what you want to know:
+**Asking it to research.** Point it at a whole set of companies, not one at a time:
 
-> "Research Forn Sant Jordi in Girona. Do they fit what I sell, and who decides?"
+> "Find companies building mobile apps for technicians and drivers who work where the signal
+> drops. Tell me who owns engineering at each."
 
-It goes off and reads the company's own site, public records where a country keeps them, and
+It goes off and reads each company's own site, public records where a country keeps them, and
 the web. That takes a few minutes — you can keep working. It comes back with what it
 found and where each fact came from, and it never changes your records on its own: it
 proposes, you accept. The proposals are waiting for you under Research at {{APP_URL}}
@@ -68,10 +91,9 @@ whenever you want to look.
 
 **Adding companies and people.** Plain language works:
 
-> "Add these three as prospects: Cal Met, Forn Sant Jordi, Vins del Ter. All bakeries in
-> Girona."
+> "Add these three as prospects: Rentokil, Chubb Fire & Security, Verisure."
 
-> "Add Marta Puig as the owner at Cal Met, marta@calmet.cat."
+> "Add Dana Whitfield as VP of Engineering at Rentokil, dana@rentokil.com."
 
 **If you work in more than one place.** An assistant works in one organization at a time.
 When you approve the connector it ticks every organization you belong to, and then nothing
