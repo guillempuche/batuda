@@ -74,6 +74,7 @@ describe('resolveThreadId', () => {
 			readonly messageId: string
 			readonly externalThreadId: string
 			readonly references?: readonly string[]
+			readonly inReplyTo?: string
 		},
 	) => {
 		// Both rows live under the same org so the JOIN in resolveThreadId
@@ -86,11 +87,11 @@ describe('resolveThreadId', () => {
 		)
 		await pool.query(
 			`INSERT INTO email_messages
-			   (organization_id, message_id, "references",
+			   (organization_id, message_id, "references", in_reply_to,
 			    direction, folder, raw_rfc822_ref, status)
-			 VALUES ($1, $2, $3,
+			 VALUES ($1, $2, $3, $4,
 			         'inbound', 'INBOX', 'sentinel', 'normal')`,
-			[orgId, opts.messageId, opts.references ?? []],
+			[orgId, opts.messageId, opts.references ?? [], opts.inReplyTo ?? null],
 		)
 	}
 
@@ -184,6 +185,157 @@ describe('resolveThreadId', () => {
 				}).pipe(Effect.provide(PgLive)),
 			)
 			expect(result).toBe('<new@x>')
+		})
+	})
+
+	// Looking forward: a message we already hold names the arriving one as an
+	// ancestor. This is the ordinary order for a conversation the account also
+	// takes part in from its own mail client — the inbox is read before the
+	// sent folder, so the reply is taken in first.
+	describe('when a message we already hold answers the arriving one', () => {
+		it('should join that conversation instead of starting a second one', async () => {
+			// GIVEN a reply taken in first, which started a conversation of its
+			// own because what it answers had not arrived yet
+			// WHEN the message it answers arrives
+			// THEN it joins the reply's conversation
+			// AND without this the contact is left holding two halves of one
+			// exchange, neither of which shows the whole thing
+			const orgId = freshOrg()
+			await insertParent(orgId, {
+				messageId: '<reply@x>',
+				externalThreadId: '<reply@x>',
+				references: ['<root@x>'],
+			})
+
+			const result = await runWithSql(
+				resolveThreadId({
+					organizationId: orgId,
+					messageId: '<root@x>',
+					inReplyTo: null,
+					references: [],
+				}).pipe(Effect.provide(PgLive)),
+			)
+
+			// AND the conversation is keyed on this message, the one it starts
+			// with — the reply only held the key because it arrived first
+			expect(result).toBe('<root@x>')
+
+			// AND it is still one conversation, moved rather than duplicated
+			const links = await pool.query<{ external_thread_id: string }>(
+				`SELECT external_thread_id FROM email_thread_links WHERE organization_id = $1`,
+				[orgId],
+			)
+			expect(links.rows.map(r => r.external_thread_id)).toEqual(['<root@x>'])
+		})
+
+		it('should find it by In-Reply-To when the sender trimmed the chain', async () => {
+			// GIVEN a reply that names what it answers only in In-Reply-To —
+			// ordinary for a sender that does not carry the whole chain
+			// WHEN the message it answers arrives
+			// THEN it is still found, via the other half of the lookup
+			const orgId = freshOrg()
+			await insertParent(orgId, {
+				messageId: '<trimmed-reply@x>',
+				externalThreadId: '<trimmed-reply@x>',
+				references: [],
+				inReplyTo: '<trimmed-root@x>',
+			})
+
+			const result = await runWithSql(
+				resolveThreadId({
+					organizationId: orgId,
+					messageId: '<trimmed-root@x>',
+					inReplyTo: null,
+					references: [],
+				}).pipe(Effect.provide(PgLive)),
+			)
+
+			expect(result).toBe('<trimmed-root@x>')
+		})
+
+		it('should still start its own when several conversations answer it', async () => {
+			// GIVEN two people who each replied to a message we never held, so
+			// their replies are filed as two separate conversations
+			// WHEN the message they both answer finally arrives
+			// THEN it starts a conversation of its own rather than joining one
+			// AND this is the case that matters: joining either would file it,
+			// and every later reply to it, under whichever person answered
+			// first — one company's mail under another company's name
+			const orgId = freshOrg()
+			await insertParent(orgId, {
+				messageId: '<acme-reply@x>',
+				externalThreadId: '<acme-reply@x>',
+				references: ['<shared@x>'],
+			})
+			await insertParent(orgId, {
+				messageId: '<beta-reply@x>',
+				externalThreadId: '<beta-reply@x>',
+				references: ['<shared@x>'],
+			})
+
+			const result = await runWithSql(
+				resolveThreadId({
+					organizationId: orgId,
+					messageId: '<shared@x>',
+					inReplyTo: null,
+					references: [],
+				}).pipe(Effect.provide(PgLive)),
+			)
+
+			expect(result).toBe('<shared@x>')
+		})
+
+		it('should not reach into another organisation for the answer', async () => {
+			// GIVEN a reply held by one organisation
+			// WHEN a message it answers arrives for a different organisation
+			// THEN the lookup does not cross the boundary
+			const orgId = freshOrg()
+			const otherOrgId = freshOrg()
+			await insertParent(otherOrgId, {
+				messageId: '<other-org-reply@x>',
+				externalThreadId: '<other-org-reply@x>',
+				references: ['<crossing@x>'],
+			})
+
+			const result = await runWithSql(
+				resolveThreadId({
+					organizationId: orgId,
+					messageId: '<crossing@x>',
+					inReplyTo: null,
+					references: [],
+				}).pipe(Effect.provide(PgLive)),
+			)
+
+			expect(result).toBe('<crossing@x>')
+		})
+
+		it('should prefer what the arriving message itself names', async () => {
+			// GIVEN both directions available: the arriving message names a
+			// known ancestor, and a held reply names the arriving message
+			// WHEN it is filed
+			// THEN the ancestor it names wins — looking forward is the last
+			// resort, not a competing answer
+			const orgId = freshOrg()
+			await insertParent(orgId, {
+				messageId: '<known-ancestor@x>',
+				externalThreadId: '<known-ancestor@x>',
+			})
+			await insertParent(orgId, {
+				messageId: '<later-reply@x>',
+				externalThreadId: '<later-reply@x>',
+				references: ['<middle@x>'],
+			})
+
+			const result = await runWithSql(
+				resolveThreadId({
+					organizationId: orgId,
+					messageId: '<middle@x>',
+					inReplyTo: '<known-ancestor@x>',
+					references: ['<known-ancestor@x>'],
+				}).pipe(Effect.provide(PgLive)),
+			)
+
+			expect(result).toBe('<known-ancestor@x>')
 		})
 	})
 })

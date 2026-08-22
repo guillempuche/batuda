@@ -60,9 +60,15 @@ export const backfillSinceDate = (args: {
 				raw: new Uint8Array(m.source),
 			}).pipe(
 				Effect.catchCause(cause =>
-					Effect.logWarning(
-						`mail-worker: backfill ingest failed inbox=${args.inboxId} uid=${m.uid}`,
-					).pipe(Effect.andThen(Effect.logError(boundedCause(cause)))),
+					Effect.logWarning('Ingesting an older message failed').pipe(
+						Effect.andThen(Effect.logError(boundedCause(cause))),
+						Effect.annotateLogs({
+							event: 'email.ingest_failed',
+							inboxId: args.inboxId,
+							folder: args.folder,
+							imapUid: m.uid,
+						}),
+					),
 				),
 			)
 			if (m.uid > highest) highest = m.uid

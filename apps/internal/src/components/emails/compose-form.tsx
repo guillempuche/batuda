@@ -290,6 +290,7 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 
 	const [ccBccOpen, setCcBccOpen] = useState(false)
 	const [sendState, setSendState] = useState<SendState>('idle')
+	const [attachmentsUnfinished, setAttachmentsUnfinished] = useState(false)
 	const [errorMessage, setErrorMessage] = useState<string | null>(null)
 	const [suppressed, setSuppressed] = useState<
 		ReadonlyArray<SuppressedAddress>
@@ -298,6 +299,10 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 
 	const canSend = useMemo(() => {
 		if (sendState === 'sending') return false
+		// A file still on its way up, or stopped on an error nobody has cleared,
+		// is not on the message. Sending now would send it without the
+		// attachment and say nothing about it.
+		if (attachmentsUnfinished) return false
 		if (form.bodyText.trim() === '') return false
 		if (suppressed.length > 0) return false
 		if (serverId === null) return false
@@ -309,6 +314,7 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 		return true
 	}, [
 		sendState,
+		attachmentsUnfinished,
 		form.bodyText,
 		form.to,
 		suppressed,
@@ -624,6 +630,7 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 				onChange={next => {
 					patchForm({ attachments: next })
 				}}
+				onUploadingChange={setAttachmentsUnfinished}
 				inboxId={effectiveInboxId}
 				{...(serverIdRef.current !== null && { draftId: serverIdRef.current })}
 			/>

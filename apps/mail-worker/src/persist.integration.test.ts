@@ -467,23 +467,82 @@ describe('persistMessage — the conversation keeps a subject', () => {
 		})
 	})
 
-	describe('when the conversation starts with a message we sent', () => {
-		it('should put its subject on the conversation too', async () => {
-			// GIVEN our own message, read back from the sent folder
+	describe('when the conversation started with a message we sent ourselves', () => {
+		it('should leave the subject the send already recorded', async () => {
+			// GIVEN a message this app sent: the row and the conversation are
+			// written at send time, before the mail server has ever been read,
+			// and the row has no folder position yet
 			const rootMessageId = `<subject-outbound-${randomUUID()}@example>`
+			await pool.query(
+				`INSERT INTO email_thread_links (organization_id, inbox_id, external_thread_id, subject, status)
+				 VALUES ($1, $2, $3, 'your pallet pools', 'open')`,
+				[ORG_ID, inboxId, rootMessageId],
+			)
+			await pool.query(
+				`INSERT INTO email_messages (organization_id, inbox_id, folder, message_id,
+				   "references", subject, received_at, recipients, attachments,
+				   status, status_updated_at, direction, raw_rfc822_ref)
+				 VALUES ($1, $2, 'Sent', $3, ARRAY[]::text[], 'your pallet pools', now(),
+				   '{}'::jsonb, '[]'::jsonb, 'normal', now(), 'outbound', 'sentinel')`,
+				[ORG_ID, inboxId, rootMessageId],
+			)
+
+			// WHEN the same message comes back to us out of the sent folder
 			await runIngest(
 				persistIn(
 					buildParsed({
 						messageId: rootMessageId,
+						subject: 'a different subject entirely',
+					}),
+					{ folder: 'Sent', direction: 'outbound' },
+				),
+			)
+
+			// THEN the conversation keeps what the send recorded
+			// AND this is the path production takes: the row already exists, so
+			// the arriving copy fills in where it now lives rather than being
+			// stored a second time, and never reaches the conversation at all
+			const link = await fetchThreadLink(rootMessageId)
+			expect(link?.subject).toBe('your pallet pools')
+
+			// AND only one row exists for it, rather than a duplicate
+			// AND that row now says where on the server it lives, which is the
+			// whole reason the arriving copy is worth reading at all
+			const rows = await pool.query<{
+				n: string
+				imap_uid: number | null
+				folder: string
+			}>(
+				`SELECT count(*) OVER () AS n, imap_uid, folder FROM email_messages
+				 WHERE organization_id = $1 AND message_id = $2`,
+				[ORG_ID, rootMessageId],
+			)
+			expect(Number(rows.rows[0]?.n)).toBe(1)
+			expect(rows.rows[0]?.imap_uid).not.toBeNull()
+			expect(rows.rows[0]?.folder).toBe('Sent')
+		})
+	})
+
+	describe('when a message we sent arrives with no record of it here', () => {
+		it('should start the conversation and give it the subject', async () => {
+			// GIVEN a message sent from the account's own mail client, so this
+			// app never wrote a row for it — the path issue #520 describes
+			// WHEN it is read out of the sent folder
+			const strayMessageId = `<subject-stray-${randomUUID()}@example>`
+			await runIngest(
+				persistIn(
+					buildParsed({
+						messageId: strayMessageId,
 						subject: 'your pallet pools',
 					}),
 					{ folder: 'Sent', direction: 'outbound' },
 				),
 			)
 
-			// THEN the conversation carries it, so a later reply has a subject
-			// to borrow whichever way the conversation began
-			const link = await fetchThreadLink(rootMessageId)
+			// THEN the conversation it starts carries that subject
+			// AND without it a reply has none to borrow and goes out with no
+			// subject line at all, which is the bug this began as
+			const link = await fetchThreadLink(strayMessageId)
 			expect(link?.subject).toBe('your pallet pools')
 		})
 	})
@@ -535,6 +594,110 @@ describe('persistMessage — a message can be found in its conversation', () => 
 			expect(rows.rows.map(r => r.message_id).sort()).toEqual(
 				[root, middle, last].sort(),
 			)
+		})
+	})
+
+	describe('when the reply is taken in before the message it answers', () => {
+		it('should end up as one conversation, not two halves', async () => {
+			// GIVEN a message sent from the account's own mail client, and the
+			// answer to it — and the answer read first, because the inbox is
+			// read before the sent folder on every sweep
+			const sent = `<split-sent-${randomUUID()}@example>`
+			const answer = `<split-answer-${randomUUID()}@example>`
+			await runIngest(
+				persist(
+					buildParsed({
+						messageId: answer,
+						inReplyTo: sent,
+						references: [sent],
+						subject: 'Re: your pallet pools',
+					}),
+				),
+			)
+
+			// WHEN the message it answers is read out of the sent folder
+			await runIngest(
+				persistIn(
+					buildParsed({ messageId: sent, subject: 'your pallet pools' }),
+					{ folder: 'Sent', direction: 'outbound' },
+				),
+			)
+
+			// THEN there is one conversation holding both, rather than the
+			// contact being left with two halves of one exchange
+			const links = await pool.query<{
+				id: string
+				external_thread_id: string
+			}>(
+				`SELECT id, external_thread_id FROM email_thread_links
+				 WHERE organization_id = $1 AND external_thread_id IN ($2, $3)`,
+				[ORG_ID, sent, answer],
+			)
+			expect(links.rows).toHaveLength(1)
+
+			// AND the conversation is keyed on the message it starts with,
+			// not on the reply that happened to arrive first
+			expect(links.rows[0]?.external_thread_id).toBe(sent)
+
+			// AND neither row was made to name the other as its ancestor. The
+			// stored chain is what the sender wrote: the answer names what it
+			// answers, and the message it answers names nothing.
+			const chains = await pool.query<{
+				message_id: string
+				references: string[]
+			}>(
+				`SELECT message_id, "references" FROM email_messages
+				 WHERE organization_id = $1 AND message_id IN ($2, $3)`,
+				[ORG_ID, sent, answer],
+			)
+			const byId = new Map(chains.rows.map(r => [r.message_id, r.references]))
+			expect(byId.get(answer)).toEqual([sent])
+			expect(byId.get(sent)).toEqual([])
+
+			// AND both messages are in it
+			const members = await pool.query<{ message_id: string }>(
+				`SELECT em.message_id FROM email_messages em
+				 JOIN email_thread_links tl
+				   ON tl.organization_id = em.organization_id
+				  AND (em.message_id = tl.external_thread_id
+				       OR em."references" @> ARRAY[tl.external_thread_id]::text[])
+				 WHERE em.organization_id = $1 AND tl.id = $2`,
+				[ORG_ID, links.rows[0]?.id],
+			)
+			expect(members.rows.map(r => r.message_id).sort()).toEqual(
+				[sent, answer].sort(),
+			)
+		})
+	})
+
+	describe('when the message starts a conversation of its own', () => {
+		it('should store the chain it arrived with, untouched', async () => {
+			// GIVEN a message that answers something we do not hold, so it
+			// starts a conversation of its own
+			const absent = `<absent-${randomUUID()}@example>`
+			const starter = `<starter-${randomUUID()}@example>`
+			await runIngest(
+				persist(
+					buildParsed({
+						messageId: starter,
+						inReplyTo: absent,
+						references: [absent],
+						subject: 'Re: q',
+					}),
+				),
+			)
+
+			// THEN nothing is added to what the sender wrote
+			// AND in particular not the message's own id: it is found by that
+			// already, and putting it first would leave the newest id where the
+			// oldest belongs — which is the order the resolver reads to tell
+			// which of two conversations a message is in
+			const rows = await pool.query<{ references: string[] }>(
+				`SELECT "references" FROM email_messages
+				 WHERE organization_id = $1 AND message_id = $2`,
+				[ORG_ID, starter],
+			)
+			expect(rows.rows[0]?.references).toEqual([absent])
 		})
 	})
 })

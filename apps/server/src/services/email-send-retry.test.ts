@@ -2,7 +2,7 @@ import { Cause, Effect, Exit, Fiber, Ref } from 'effect'
 import { TestClock } from 'effect/testing'
 import { describe, expect, it } from 'vitest'
 
-import { retrySmtpSend, type SmtpSendFailed } from './email'
+import { retrySmtpSend, type SmtpSendFailed, smtpFailureReason } from './email'
 
 const extractFailure = <E>(cause: Cause.Cause<E>): E | null => {
 	let found: E | null = null
@@ -109,5 +109,50 @@ describe('retrySmtpSend', () => {
 				Effect.provide(TestClock.layer()),
 				Effect.runPromise,
 			))
+	})
+})
+
+describe('smtpFailureReason', () => {
+	describe('when the mail server gave a reason', () => {
+		it('should hand back that reason and nothing else', () => {
+			// GIVEN the shape the transport fails with: the reason lives in a
+			// field of its own and the error carries no message
+			// WHEN the reason is read off it
+			// THEN it comes back on its own — no error name, and above all no
+			// stack, which is what would otherwise reach a person or an
+			// assistant reading why their message did not go
+			const reason = smtpFailureReason({
+				_tag: 'GrantConnectFailed',
+				inboxId: 'i',
+				detail: 'code=ECONNREFUSED response=550 mailbox not found',
+			})
+			expect(reason).toBe('code=ECONNREFUSED response=550 mailbox not found')
+			expect(reason).not.toContain('\n')
+			expect(reason).not.toContain('    at ')
+		})
+	})
+
+	describe('when it gave none', () => {
+		it('should say so with an empty answer rather than invent one', () => {
+			// GIVEN a failure with nothing in that field, and something that is
+			// not a classified failure at all
+			// THEN both come back empty, so the caller picks its own stand-in —
+			// a log line wants the cause and its frames, a sentence written for
+			// somebody to read wants neither
+			expect(smtpFailureReason({ detail: null })).toBe('')
+			expect(smtpFailureReason({ detail: '   ' })).toBe('')
+			expect(smtpFailureReason(new Error('boom'))).toBe('')
+			expect(smtpFailureReason(undefined)).toBe('')
+		})
+	})
+
+	describe('when the reason runs long', () => {
+		it('should cut it so one refusal cannot fill the log', () => {
+			// GIVEN a mail server that answers with far more than it should
+			// THEN what comes back is bounded, and says it was cut
+			const reason = smtpFailureReason({ detail: 'x'.repeat(5_000) })
+			expect(reason.length).toBeLessThan(600)
+			expect(reason.endsWith('…')).toBe(true)
+		})
 	})
 })

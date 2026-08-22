@@ -112,7 +112,60 @@ test.describe('compose with attachment', () => {
 			expect(att?.ContentType).toBe('application/pdf')
 			expect(att?.Size).toBeGreaterThan(0)
 		})
+	})
 
+	test.describe('when the user attaches several files at once', () => {
+		test('should send every one of them, not just the last to finish', async ({
+			page,
+		}) => {
+			// GIVEN two files chosen in a single pick, the way a file dialog
+			// hands them over
+			const testId = `e2e-attach-many-${Date.now()}`
+			const recipient = `${testId}@catcher.local`
+			const first = `${testId}-first.pdf`
+			const second = `${testId}-second.pdf`
+
+			await page.goto('/emails', { waitUntil: 'networkidle' })
+			await openCompose(page, 'emails-compose')
+			await page.getByTestId('compose-to').fill(recipient)
+			await page.getByTestId('compose-subject').fill(`Subj ${testId}`)
+			await fillBody(page, `Body ${testId}`)
+
+			// WHEN both are picked together
+			await page
+				.getByTestId('compose-form')
+				.locator('input[type="file"]')
+				.setInputFiles([
+					{ name: first, mimeType: 'application/pdf', buffer: PDF_BYTES },
+					{ name: second, mimeType: 'application/pdf', buffer: PDF_BYTES },
+				])
+
+			await expect(
+				page.getByTestId('compose-form').getByText(first),
+			).toBeVisible()
+			await expect(
+				page.getByTestId('compose-form').getByText(second),
+			).toBeVisible()
+			await expect(page.getByTestId('compose-send')).toBeEnabled({
+				timeout: 15_000,
+			})
+			await page.getByTestId('compose-send').click()
+
+			// THEN both are on the message that goes out
+			// AND this is the case that used to lose one: each upload finished
+			// against the list as it was before either began, so whichever
+			// landed second replaced the first — silently, on a message that
+			// still sent
+			const summary = await waitForMessage(recipient, {
+				subject: `Subj ${testId}`,
+			})
+			const detail = await getMessage(summary)
+			const names = detail.Attachments.map(a => a.FileName).sort()
+			expect(names).toEqual([first, second].sort())
+		})
+	})
+
+	test.describe('after a send succeeds', () => {
 		test('should purge email_attachment_staging on success', async ({
 			page,
 		}) => {
@@ -136,10 +189,20 @@ test.describe('compose with attachment', () => {
 			await expect(page.getByTestId('compose-send')).toBeEnabled({
 				timeout: 10_000,
 			})
-			await page.getByTestId('compose-send').click()
 
-			// Wait for the send to land in the catcher before reading the
-			// staging row — the post-send purge runs after the SMTP ack.
+			// Wait for the send request itself to come back, not just for the
+			// message to reach the catcher. The catcher has it the moment SMTP
+			// delivers, and the purge runs after that — so reading the staging
+			// row on the catcher's timing reads it before the purge has run.
+			const sent = page.waitForResponse(
+				resp =>
+					resp.url().includes('/email/drafts/') &&
+					resp.url().endsWith('/send') &&
+					resp.request().method() === 'POST',
+				{ timeout: 20_000 },
+			)
+			await page.getByTestId('compose-send').click()
+			expect((await sent).status()).toBe(200)
 			await waitForMessage(recipient, { subject: `Subj ${testId}` })
 
 			// THEN the staging row is gone — markSentAndCleanup deletes it
@@ -150,5 +213,51 @@ test.describe('compose with attachment', () => {
 			)
 			expect(remaining).toBe('')
 		})
+	})
+})
+
+test.describe('removing an attachment before sending', () => {
+	test('should leave it off the message that goes out', async ({ page }) => {
+		// GIVEN a file attached and then taken off again, the way somebody
+		// corrects a mistake before sending
+		const testId = `e2e-attach-removed-${Date.now()}`
+		const recipient = `${testId}@catcher.local`
+		const filename = `${testId}.pdf`
+
+		psql(
+			`UPDATE inboxes SET grant_status='connected' WHERE email='admin@taller.cat'`,
+		)
+		await page.goto('/', { waitUntil: 'commit' })
+		await setActiveOrgBySlug(page, 'taller')
+		await page.goto('/emails', { waitUntil: 'networkidle' })
+		await openCompose(page, 'emails-compose')
+		await page.getByTestId('compose-to').fill(recipient)
+		await page.getByTestId('compose-subject').fill(`Subj ${testId}`)
+		await fillBody(page, `Body ${testId}`)
+		await page
+			.getByTestId('compose-form')
+			.locator('input[type="file"]')
+			.setInputFiles({
+				name: filename,
+				mimeType: 'application/pdf',
+				buffer: PDF_BYTES,
+			})
+		await expect(page.getByTestId('compose-send')).toBeEnabled({
+			timeout: 10_000,
+		})
+
+		// WHEN the chip is removed and the message sent
+		await page.getByRole('button', { name: `Remove ${filename}` }).click()
+		await expect(
+			page.getByTestId('compose-form').getByText(filename),
+		).toBeHidden()
+		await page.getByTestId('compose-send').click()
+
+		// THEN the message carries no attachment
+		const summary = await waitForMessage(recipient, {
+			subject: `Subj ${testId}`,
+		})
+		const detail = await getMessage(summary)
+		expect(detail.Attachments.map(a => a.FileName)).toEqual([])
 	})
 })

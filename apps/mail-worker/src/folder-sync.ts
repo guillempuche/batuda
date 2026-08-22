@@ -2,6 +2,8 @@ import { Effect } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 import type { ImapFlow } from 'imapflow'
 
+import { boundedCause } from '@batuda/observability'
+
 import { ingestRawMessage } from './ingest.js'
 
 // Per-folder sync state stored under inboxes.folder_state JSONB:
@@ -113,9 +115,15 @@ export const fetchAndIngestNewerThan = (args: {
 				// successes. The dedupe index makes a re-fetch on next sync
 				// idempotent if the cause was transient.
 				Effect.catchCause(cause =>
-					Effect.logWarning(
-						`mail-worker: ingest failed inbox=${args.inboxId} uid=${m.uid}`,
-					).pipe(Effect.andThen(Effect.logError(cause))),
+					Effect.logWarning('Ingesting a message failed').pipe(
+						Effect.andThen(Effect.logError(boundedCause(cause))),
+						Effect.annotateLogs({
+							event: 'email.ingest_failed',
+							inboxId: args.inboxId,
+							folder: args.folder,
+							imapUid: m.uid,
+						}),
+					),
 				),
 			)
 			if (m.uid > highest) highest = m.uid

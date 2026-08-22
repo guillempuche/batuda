@@ -14,19 +14,12 @@ import { Cause, Effect, Exit, Layer, Logger, References } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
-import { CurrentOrg, SessionContext } from '@batuda/controllers'
+import type { CurrentOrg, SessionContext } from '@batuda/controllers'
 
 import { PgLive } from '../db/client.js'
-import { enterOrgScope } from '../middleware/org.js'
-import { CalendarService } from './calendar.js'
-import { CredentialCrypto } from './credential-crypto.js'
 import { EmailService } from './email.js'
-import { EmailAttachmentStaging } from './email-attachment-staging.js'
-import { DraftStore } from './email-draft-store.js'
-import { EmailProvider } from './email-provider.js'
-import { MailTransport, type OutboundMessage } from './mail-transport.js'
-import { StorageProvider } from './storage-provider.js'
-import { TimelineActivityService } from './timeline-activity.js'
+import { makeOrgRuntime, scopedAsOrg } from './email-harness.js'
+import type { OutboundMessage } from './mail-transport.js'
 
 const ORG = 'threading-test-org'
 // A second tenant, so "the conversation belongs to somebody else" is a real
@@ -38,93 +31,26 @@ const USER = 'threading-user'
 let lastOutbound: OutboundMessage | null = null
 let sentCount = 0
 
-const stubCrypto = Layer.succeed(CredentialCrypto, {
-	encryptPassword: () => ({
-		ciphertext: new Uint8Array([0]),
-		nonce: new Uint8Array([0]),
-		tag: new Uint8Array([0]),
-	}),
-	decryptPassword: () => 'stubbed-password',
-} as never)
+// One harness, shared with the other EmailService suites — see
+// `email-harness.ts` for why the SqlClient has to be the same one the org
+// scope is entered on.
+const asOrg = {
+	orgId: ORG,
+	orgName: 'Threading Test',
+	orgSlug: 'threading-test',
+	userId: USER,
+	// Records the outgoing message and answers with a Message-ID the way SMTP
+	// does. Numbered, so two sends in one test cannot collide on the unique
+	// index over (organisation, message id).
+	onSend: (message: OutboundMessage) => {
+		lastOutbound = message
+		sentCount += 1
+		return `<threading-sent-${sentCount}@taller.test>`
+	},
+} as const
 
-// Records the outgoing message instead of sending it, and hands back a
-// Message-ID the way SMTP does.
-const stubTransport = Layer.succeed(MailTransport, {
-	probe: () => Effect.void,
-	send: (_creds: unknown, message: OutboundMessage) =>
-		Effect.sync(() => {
-			lastOutbound = message
-			sentCount += 1
-			return {
-				messageId: `<threading-sent-${sentCount}@taller.test>`,
-				raw: new Uint8Array([0]),
-			}
-		}),
-	appendToSent: () => Effect.void,
-} as never)
-
-const stubStorage = Layer.succeed(StorageProvider, {
-	put: () => Effect.void,
-} as never)
-
-const stubStaging = Layer.succeed(EmailAttachmentStaging, {
-	resolve: () => Effect.succeed([]),
-	markSentAndCleanup: () => Effect.void,
-} as never)
-
-const stubTimeline = Layer.succeed(TimelineActivityService, {
-	record: () => Effect.void,
-} as never)
-
-const serviceLayer = EmailService.layer.pipe(
-	Layer.provide([
-		stubCrypto,
-		stubTransport,
-		stubStorage,
-		stubStaging,
-		stubTimeline,
-		Layer.succeed(EmailProvider, {} as never),
-		DraftStore.layer.pipe(Layer.provide(PgLive)),
-		Layer.succeed(CalendarService, {} as never),
-	]),
-	Layer.provide(PgLive),
-)
-
-const actingAs = Layer.mergeAll(
-	Layer.succeed(CurrentOrg, {
-		id: ORG,
-		name: 'Threading Test',
-		slug: 'threading-test',
-		role: 'owner',
-	}),
-	Layer.succeed(SessionContext, {
-		userId: USER,
-		email: `${USER}@test.local`,
-		name: undefined,
-		isAgent: false,
-	}),
-)
-
-// Run the way a request does, inside the organization's own database scope.
-const scoped = <A, E>(
-	effect: Effect.Effect<
-		A,
-		E,
-		EmailService | SqlClient.SqlClient | CurrentOrg | SessionContext
-	>,
-) =>
-	Effect.gen(function* () {
-		const sql = yield* SqlClient.SqlClient
-		return yield* enterOrgScope(sql, {
-			org: {
-				id: ORG,
-				name: 'Threading Test',
-				slug: 'threading-test',
-			} as never,
-			userId: USER,
-			role: 'owner',
-		})(effect.pipe(Effect.provide(serviceLayer), Effect.provide(actingAs)))
-	}).pipe(Effect.provide(PgLive))
+// Built once for the file; disposed in afterAll.
+const runtime = makeOrgRuntime(asOrg)
 
 const run = <A, E>(
 	effect: Effect.Effect<
@@ -132,7 +58,7 @@ const run = <A, E>(
 		E,
 		EmailService | SqlClient.SqlClient | CurrentOrg | SessionContext
 	>,
-) => Effect.runPromise(scoped(effect))
+) => runtime.runPromise(scopedAsOrg(asOrg, effect))
 
 const runExit = <A, E>(
 	effect: Effect.Effect<
@@ -140,7 +66,7 @@ const runExit = <A, E>(
 		E,
 		EmailService | SqlClient.SqlClient | CurrentOrg | SessionContext
 	>,
-) => Effect.runPromiseExit(scoped(effect))
+) => runtime.runPromiseExit(scopedAsOrg(asOrg, effect))
 
 const sqlOnly = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
 	Effect.runPromise(effect.pipe(Effect.provide(PgLive)))
@@ -412,6 +338,7 @@ afterAll(async () => {
 			yield* sql`DELETE FROM organization WHERE id IN (${ORG}, ${OTHER_ORG})`
 		}),
 	)
+	await runtime.dispose()
 })
 
 describe('EmailService.reply', () => {
@@ -1063,11 +990,16 @@ describe('replying twice on the same conversation', () => {
 		// GIVEN a conversation that has already been answered once, so the
 		// message being answered now is our own
 		const threadId = await seedTwoMessageThread(null)
-		await reply(threadId)
+		// Both sends are checked before anything is read off the transport.
+		// `reply` hands back an Exit rather than throwing, and the assertions
+		// below read the last message the transport was given — so a send that
+		// failed would leave the previous one in place and be reported as a
+		// chain that did not grow, which says nothing about why.
+		expect(await reply(threadId)).toSatisfy(Exit.isSuccess)
 		const firstSent = lastOutbound?.references ?? []
 
 		// WHEN a second reply goes out
-		await reply(threadId)
+		expect(await reply(threadId)).toSatisfy(Exit.isSuccess)
 
 		// THEN it carries everything the first one did, plus the first reply
 		// itself — the chain grows rather than resetting to two entries
@@ -1081,10 +1013,11 @@ describe('replying twice on the same conversation', () => {
 	})
 
 	it('should store the headers each message actually carried', async () => {
-		// GIVEN two replies on one conversation
+		// GIVEN two replies on one conversation, both checked before the rows
+		// they wrote are read — see the test above for why
 		const threadId = await seedTwoMessageThread(null)
-		await reply(threadId)
-		await reply(threadId)
+		expect(await reply(threadId)).toSatisfy(Exit.isSuccess)
+		expect(await reply(threadId)).toSatisfy(Exit.isSuccess)
 
 		// THEN each stored row says what went on the wire, not a shorter chain
 		// invented afterwards — the next reply reads these back
@@ -1187,6 +1120,172 @@ describe('a conversation whose subject is only blank space', () => {
 	})
 })
 
+describe('the record a send that never got through leaves', () => {
+	// "Are messages reaching people" cannot be answered without this line. It
+	// is also the one the doc's email-failure alert counts, and until it
+	// existed a send that never got through left nothing on the outbound path
+	// at all — only whatever status the caller's request happened to end on.
+	const REFUSAL = '550 5.1.1 <pep@calpepfonda.cat> mailbox not found'
+	const FAILING_ORG = {
+		orgId: ORG,
+		orgName: 'Threading Test',
+		orgSlug: 'threading-test',
+		userId: USER,
+		sendFailure: REFUSAL,
+	} as const
+
+	const failingSend = makeOrgRuntime(FAILING_ORG)
+	afterAll(async () => {
+		await failingSend.dispose()
+	})
+
+	it('should name it, and keep the address off the fields it files it under', async () => {
+		// GIVEN a mail server that refuses the message, naming the recipient
+		// the way a mail server does
+		const threadId = await seedThread({
+			linkSubject: 'your pallet pools',
+			messages: [{ messageId: ROOT_ID, subject: 'your pallet pools' }],
+		})
+
+		const lines: Array<{
+			level: string
+			message: string
+			annotations: Record<string, unknown>
+		}> = []
+		const capture = Logger.layer([
+			Logger.make(options => {
+				lines.push({
+					level: String(options.logLevel),
+					message: String(options.message),
+					annotations: options.fiber.getRef(
+						References.CurrentLogAnnotations,
+					) as Record<string, unknown>,
+				})
+			}),
+		]).pipe(
+			Layer.provideMerge(Layer.succeed(References.MinimumLogLevel, 'Debug')),
+		)
+
+		// WHEN the send is attempted
+		const exit = await failingSend.runPromiseExit(
+			scopedAsOrg(
+				FAILING_ORG,
+				Effect.gen(function* () {
+					const svc = yield* EmailService
+					return yield* svc.reply(threadId, body)
+				}),
+			).pipe(Effect.provide(capture)) as Effect.Effect<unknown, unknown, never>,
+		)
+
+		// THEN the send failed
+		expect(Exit.isFailure(exit)).toBe(true)
+
+		// AND it is on a line of its own, named, at error level
+		const failed = lines.find(l => l.annotations['event'] === 'email.failed')
+		expect(failed).toBeDefined()
+		expect(failed?.level).toBe('Error')
+		expect(failed?.annotations['inboxId']).toBeDefined()
+
+		// AND the line says WHY. The classified error keeps its reason in a
+		// field of its own and carries no message, so rendering the cause alone
+		// gives the error's name and a stack — a line saying a send failed and
+		// not what the mail server said, which is the whole of what is needed
+		// to fix it.
+		expect(failed?.message).toContain('mailbox not found')
+
+		// AND no field it is filed under carries the recipient. A mail server
+		// names the address in its refusal, and that text is the one thing kept
+		// verbatim — but it must not become a field anything is grouped by,
+		// which is how an address ends up in a dashboard.
+		const fields = JSON.stringify(failed?.annotations ?? {})
+		expect(fields).not.toContain('pep@calpepfonda.cat')
+		expect(fields).not.toContain('@')
+	}, 30_000)
+})
+
+describe('the record a failed clean-up leaves', () => {
+	// The message is already on its way when the clean-up runs, so a clean-up
+	// that fails must not fail the send. Swallowing it whole left nothing to
+	// count by, and rows and bytes accumulate with no signal at all.
+	const PURGE_ORG = {
+		orgId: ORG,
+		orgName: 'Threading Test',
+		orgSlug: 'threading-test',
+		userId: USER,
+		onSend: (message: OutboundMessage) => {
+			lastOutbound = message
+			sentCount += 1
+			return `<threading-purge-${sentCount}@taller.test>`
+		},
+		stagedAttachments: [
+			{
+				stagingId: 'staged-1',
+				inline: false,
+				cid: null,
+				filename: 'quote.pdf',
+				contentType: 'application/pdf',
+				contentBase64: 'JVBERi0=',
+			},
+		],
+		purgeFailure: 'storage unreachable',
+	} as const
+
+	const failingPurge = makeOrgRuntime(PURGE_ORG)
+	afterAll(async () => {
+		await failingPurge.dispose()
+	})
+
+	it('should still send, and say so on a line telemetry can count', async () => {
+		// GIVEN a message with an attachment, whose clean-up will fail
+		const threadId = await seedThread({
+			linkSubject: 'your pallet pools',
+			messages: [{ messageId: ROOT_ID, subject: 'your pallet pools' }],
+		})
+
+		const lines: Array<{
+			level: string
+			annotations: Record<string, unknown>
+		}> = []
+		const capture = Logger.layer([
+			Logger.make(options => {
+				lines.push({
+					level: String(options.logLevel),
+					annotations: options.fiber.getRef(
+						References.CurrentLogAnnotations,
+					) as Record<string, unknown>,
+				})
+			}),
+		]).pipe(
+			Layer.provideMerge(Layer.succeed(References.MinimumLogLevel, 'Debug')),
+		)
+
+		// WHEN it is sent
+		const exit = await failingPurge.runPromiseExit(
+			scopedAsOrg(
+				PURGE_ORG,
+				Effect.gen(function* () {
+					const svc = yield* EmailService
+					return yield* svc.reply(threadId, body)
+				}),
+			).pipe(Effect.provide(capture)) as Effect.Effect<unknown, unknown, never>,
+		)
+
+		// THEN the send succeeded — the recipient already has it, so failing
+		// here would report a message undelivered that was in fact delivered
+		expect(Exit.isSuccess(exit)).toBe(true)
+
+		// AND the failure is on a line of its own, named, with enough on it to
+		// tell which mailbox and how much was left behind
+		const warned = lines.find(
+			l => l.annotations['event'] === 'email.staging_purge_failed',
+		)
+		expect(warned).toBeDefined()
+		expect(warned?.level).toBe('Warn')
+		expect(warned?.annotations['staged']).toBe(1)
+		expect(warned?.annotations['inboxId']).toBeDefined()
+	})
+})
+
 describe('the record a refused send leaves', () => {
 	// A message that never went out is still something that happened on the
 	// outbound path, so it says so on a line of its own — the way a send that
@@ -1209,8 +1308,8 @@ describe('the record a refused send leaves', () => {
 		]).pipe(
 			Layer.provideMerge(Layer.succeed(References.MinimumLogLevel, 'Debug')),
 		)
-		await Effect.runPromiseExit(
-			scoped(effect).pipe(Effect.provide(capture)) as Effect.Effect<
+		await runtime.runPromiseExit(
+			scopedAsOrg(asOrg, effect).pipe(Effect.provide(capture)) as Effect.Effect<
 				unknown,
 				unknown,
 				never
