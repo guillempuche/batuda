@@ -9,6 +9,7 @@ import {
 import { acquireAuthAdapter } from '../lib/auth-adapter'
 import { confirmCloud } from '../lib/confirm-cloud'
 import { isLocalDatabase } from '../lib/database-host'
+import { reachableSignInLink } from '../lib/dev-sign-in-link'
 
 export interface AuthInviteAdminInput {
 	readonly email: string
@@ -123,7 +124,7 @@ export const authInviteAdmin = (input: AuthInviteAdminInput) =>
 
 		yield* Console.log('Magic link (valid for 5 minutes):')
 		yield* Console.log('')
-		yield* Console.log(`  ${link.url}`)
+		yield* Console.log(`  ${reachableSignInLink(link.url)}`)
 		yield* Console.log('')
 		yield* Console.log(
 			'Start the server (`pnpm dev:server`) and open the link to complete sign-in.',
