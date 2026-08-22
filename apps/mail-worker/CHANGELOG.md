@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-22 (mail-worker-v2026.8.22)
+
+### Features
+
+* keep a company's social page as a way of reaching it ([68ace59](https://github.com/guillempuche/batuda/commit/68ace59d4ff46b1a2332ba1151491be6e583de47))
+
+### Bug Fixes
+
+* **domain:** tell a mark that makes a letter from one that decorates it ([c2d5e45](https://github.com/guillempuche/batuda/commit/c2d5e45cebd90cb8814ddfdf305dbafb26d21a67))
+* keep a conversation whole, and stop a removed attachment sending ([c939ee5](https://github.com/guillempuche/batuda/commit/c939ee5e5f9fd1f1fbb7fa623d500e7c6ca426d2)), closes [#509](https://github.com/guillempuche/batuda/issues/509)
+* **mail-worker:** give two folders sharing a segment their own name ([9397a6c](https://github.com/guillempuche/batuda/commit/9397a6c2974e0447a1d156cc053ddf3b92581d84))
+* send follow-ups with a subject and the right threading headers ([2dbcf59](https://github.com/guillempuche/batuda/commit/2dbcf595886ebb555055b7aad27f227bcbb58cf7))
+
 ## 2026-08-19 (mail-worker-v2026.8.19)
 
 ### Bug Fixes
