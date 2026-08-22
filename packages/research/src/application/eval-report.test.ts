@@ -303,6 +303,7 @@ describe('reporting a pass that held market requests', () => {
 				rowsGoldenListed: 0,
 				rowsJudged: 0,
 				rowsUnjudged: 0,
+				rowsNameUnreadable: 0,
 				rowsReturned: 62,
 				rowsRightKind: 39,
 				rowsConfirmed: 0,

@@ -19,6 +19,7 @@
 
 import {
 	DISTINCTIVE_NAME_LENGTH,
+	foldReadsEveryLetter,
 	nameCoreTokens,
 	withoutFormDots,
 } from './entity-guard'
@@ -41,8 +42,11 @@ export const partsAnsweredBy = (
 	return parts.filter(part => anyTermAppearsIn(part.terms, rowWords)).length
 }
 
+export type GoldenKindVerdict = 'listed' | 'not-listed' | 'unreadable'
+
 /**
- * Whether a row is one of the organisations the golden names as not a company.
+ * What the golden's list says about a row's name: it names this organisation, it
+ * does not, or this reading found nothing in the name to hold the list against.
  *
  * The listed name has to appear in the row's name as those words, in that order,
  * next to each other. A run writes a body's name longer than the golden does —
@@ -73,12 +77,22 @@ export const partsAnsweredBy = (
  * initials, like the retailer FENIE Energía beside the federation FENIE. It reads as
  * the body. Asking the model what an organisation is would settle it; a name cannot.
  */
-export const isKnownNonCompany = (
+export const goldenKindOf = (
 	name: string,
 	notCompanies: ReadonlyArray<string>,
-): boolean => {
+): GoldenKindVerdict => {
+	// Nothing written at all is not the same as something written this reading
+	// cannot take in: one is a gap in the row, the other a gap in the eval.
+	if (name.trim() === '') return 'not-listed'
+	// The reading has letters only for a-z, so a name written in another script
+	// comes back as nothing — or, worse, as whatever Latin happened to be written
+	// beside it. Holding the list against that fragment answered a question nobody
+	// asked, in both directions: a Chinese trade body counted as a company and the
+	// pass reported the precision of a list it could not read, while a real Chinese
+	// company whose brackets held a place name was marked a body off that one word.
+	if (!foldReadsEveryLetter(name)) return 'unreadable'
 	const words = termTokens(name)
-	return notCompanies.some(listed => {
+	const namedByTheList = notCompanies.some(listed => {
 		const listedWords = termTokens(listed)
 		if (listedWords.length === 0) return false
 		// A body known by its initials shares that word with the companies trading
@@ -93,6 +107,7 @@ export const isKnownNonCompany = (
 			listedWords.every((word, offset) => words[at + offset] === word),
 		)
 	})
+	return namedByTheList ? 'listed' : 'not-listed'
 }
 
 // The fields the fold reads a row by, in the shape it reads them: the name, the

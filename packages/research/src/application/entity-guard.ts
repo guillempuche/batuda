@@ -178,6 +178,19 @@ export const collapse = (value: string): string =>
 	inPlainLetters(value).replace(/[^a-z0-9]/g, '')
 
 /**
+ * Whether the fold read the whole of a name, or dropped part of it on the way.
+ *
+ * `collapse` writes out the letters it holds plain stand-ins for — ß, ø, ł — and
+ * drops the rest without a word, so a name written in a script it has no letters
+ * for comes back as whatever Latin happened to be written beside it. A caller
+ * filing a row under that has to tell a genuinely short name from the leftovers
+ * of one it could not read: every Chinese company ending "Co., Ltd" comes back as
+ * "coltd", and filing on it makes them one company.
+ */
+export const foldReadsEveryLetter = (value: string): boolean =>
+	!/[\p{L}\p{N}]/u.test(inPlainLetters(value).replace(/[a-z0-9]/g, ''))
+
+/**
  * The same reading, kept as separate words. Exported because the same folding
  * has to read a web address the same way it reads a name — a second copy of it
  * is how two checks start disagreeing about whether a piece of text spells a

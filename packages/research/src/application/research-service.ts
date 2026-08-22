@@ -3150,15 +3150,29 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										broadContacts,
 										rescue.contacts as Array<Record<string, unknown>>,
 									)
-									result = { ...(result as object), contacts: merged }
+									result = {
+										...(result as object),
+										contacts: merged.contacts,
+									}
 									yield* Effect.logInfo('research.contacts.rescued').pipe(
 										Effect.annotateLogs({
 											event: 'research.contacts.rescued',
 											research_id: researchId,
 											before: broadContacts.length,
-											after: merged.length,
+											after: merged.contacts.length,
 										}),
 									)
+									// Said out loud rather than left as a list that quietly got
+									// shorter, the way every other step that drops a contact does.
+									if (merged.dropped > 0) {
+										yield* Effect.logWarning('research.contacts.nameless').pipe(
+											Effect.annotateLogs({
+												event: 'research.contacts.nameless',
+												research_id: researchId,
+												dropped: merged.dropped,
+											}),
+										)
+									}
 								}
 							}
 							// Firmographics rescue: the broad pass also drops the size band and

@@ -56,7 +56,7 @@ import {
 	specificLocationAgrees,
 } from './eval-scoring-company'
 import {
-	isKnownNonCompany,
+	goldenKindOf,
 	partsAnsweredBy,
 	repeatedRows,
 } from './eval-scoring-market'
@@ -234,12 +234,21 @@ export const scoreRun = (
 	const kinds: ReadonlyArray<OrganisationKind> =
 		organisationKinds ??
 		outcome.companies.map(row => {
-			const listed =
-				expectedMarket !== undefined &&
-				isKnownNonCompany(row.name, expectedMarket.notCompanies)
+			const verdict =
+				expectedMarket === undefined
+					? ('not-listed' as const)
+					: goldenKindOf(row.name, expectedMarket.notCompanies)
 			return {
-				isCompany: !listed,
-				method: listed ? ('golden-listed' as const) : ('unjudged' as const),
+				// A row the list could not be read against stays a company, which is
+				// the safe direction — but it is counted apart, so a pass over a
+				// market this reading is blind to says so rather than reading clean.
+				isCompany: verdict !== 'listed',
+				method:
+					verdict === 'listed'
+						? ('golden-listed' as const)
+						: verdict === 'unreadable'
+							? ('name-unreadable' as const)
+							: ('unjudged' as const),
 			}
 		})
 	const rightKindRows = outcome.companies.filter(
@@ -269,6 +278,8 @@ export const scoreRun = (
 						.length,
 					rowsJudged: kinds.filter(k => k.method === 'judged').length,
 					rowsUnjudged: kinds.filter(k => k.method === 'unjudged').length,
+					rowsNameUnreadable: kinds.filter(k => k.method === 'name-unreadable')
+						.length,
 					rowsReturned: outcome.companies.length,
 					rowsConfirmed: outcome.companies.filter(row => row.confirmed).length,
 					rowsRightKind: rightKindRows.length,

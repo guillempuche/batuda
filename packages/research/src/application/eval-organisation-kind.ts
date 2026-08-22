@@ -29,10 +29,21 @@
 
 import { Effect, Schema } from 'effect'
 
-import { isKnownNonCompany } from './eval-scoring-market'
+import { goldenKindOf } from './eval-scoring-market'
 
-/** Which of the three ways settled what a row is. */
-export type KindMethod = 'golden-listed' | 'judged' | 'unjudged'
+/** Which way settled what a row is. */
+export type KindMethod =
+	| 'golden-listed'
+	| 'judged'
+	| 'unjudged'
+	/**
+	 * The golden's list could not be held against this name at all — nothing in it
+	 * is written in letters this reading has. Apart from `unjudged`, because "the
+	 * model was not asked" and "the list could not be read" are different answers,
+	 * and averaging the second into a clean figure is how a pass reports the
+	 * precision of a market it is blind to.
+	 */
+	| 'name-unreadable'
 
 /** What one row was decided to be, and by what. */
 export interface OrganisationKind {
@@ -109,7 +120,12 @@ export const judgeOrganisationKinds = <R = never>(
 	judge: OrganisationKindJudge<R>,
 ): Effect.Effect<ReadonlyArray<OrganisationKind>, never, R> =>
 	Effect.gen(function* () {
-		const listed = rows.map(row => isKnownNonCompany(row.name, notCompanies))
+		// Only a name the list actually named settles it here. A name this reading
+		// cannot read goes to the model with the rest — the model is the one reader
+		// in this chain that does read every writing system, which is what it is for.
+		const listed = rows.map(
+			row => goldenKindOf(row.name, notCompanies) === 'listed',
+		)
 		const toAsk = rows.filter((_, index) => !listed[index])
 		if (toAsk.length === 0) {
 			return listed.map(isListed => ({

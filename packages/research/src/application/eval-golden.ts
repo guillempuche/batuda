@@ -110,10 +110,14 @@ const parseMarket = (raw: unknown): MarketParseResult => {
 		// Held to the words the scorer reads, not to whether the string looks empty: a
 		// term of punctuation alone survives a blank check and still folds to nothing,
 		// so it could never place a row and the part would read unanswered for good.
-		if (terms.some(term => termTokens(term).length === 0)) {
+		const unreadableTerm = terms.find(term => termTokens(term).length === 0)
+		if (unreadableTerm !== undefined) {
 			return {
 				ok: false,
-				error: `market part "${id}" has a term with no words in it`,
+				// Named, and said as what it is. A term written in a script this
+				// reading has no letters for has plenty of words in it — telling
+				// somebody otherwise sends them looking for a typo that is not there.
+				error: `market part "${id}" has a term this eval cannot read: ${unreadableTerm}`,
 			}
 		}
 		parts.push({ id, terms })
@@ -133,8 +137,14 @@ const parseMarket = (raw: unknown): MarketParseResult => {
 	}
 	// Same reading as the terms above. An entry that folds to no words matches
 	// nothing, so it quietly raises the very figure it was typed in to lower.
-	if (notCompanies.some(entry => termTokens(entry).length === 0)) {
-		return { ok: false, error: 'a notCompanies entry has no words in it' }
+	const unreadableEntry = notCompanies.find(
+		entry => termTokens(entry).length === 0,
+	)
+	if (unreadableEntry !== undefined) {
+		return {
+			ok: false,
+			error: `a notCompanies entry this eval cannot read: ${unreadableEntry}`,
+		}
 	}
 
 	return { ok: true, value: { name, parts, notCompanies } }

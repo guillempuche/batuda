@@ -280,6 +280,12 @@ export interface MarketScore {
 	readonly rowsJudged: number
 	readonly rowsUnjudged: number
 	/**
+	 * Rows whose name the golden's list could not be held against, because nothing
+	 * in it is written in letters this reading has. Reported rather than folded
+	 * into the figures: a check that could not run must never pass for one that ran.
+	 */
+	readonly rowsNameUnreadable: number
+	/**
 	 * Rows the scan came back with. The scale the figures below read against, and
 	 * what checking that every row is a real company would cost, so it is reported
 	 * in its own right rather than only as a denominator.
