@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 
 import {
+	Cause,
 	Context,
 	Data,
 	DateTime,
@@ -31,6 +32,8 @@ import {
 import { EmailDraft, Inbox, InboxFooter, isOrgManager } from '@batuda/domain'
 import { renderBlocks, type StagedAttachmentRef } from '@batuda/email/render'
 import type { EmailBlocks } from '@batuda/email/schema'
+import { isReplySubject, withReplyPrefix } from '@batuda/email/subject'
+import { boundedCause } from '@batuda/observability'
 
 import {
 	type CountMode,
@@ -129,6 +132,35 @@ export const smtpRetrySchedule = Schedule.exponential('1 second', 2).pipe(
 	Schedule.upTo({ times: 3 }),
 )
 
+// Long enough for any reason a mail server gives, short enough that a hostile
+// one cannot fill the log exporter.
+const MAX_REASON_CHARS = 500
+
+/**
+ * What the mail server said, or an empty string when it said nothing.
+ *
+ * The classified failure keeps its reason in `detail` and carries no message of
+ * its own, so anything rendering the error alone gets its name and a stack —
+ * which says a send failed and not why, which is the whole of what somebody
+ * needs to fix it. Callers decide how to stand in for an absent reason: a log
+ * line wants the cause and its frames, a sentence for the caller wants neither.
+ */
+export const smtpFailureReason = (cause: unknown): string => {
+	const detail =
+		typeof cause === 'object' &&
+		cause !== null &&
+		'detail' in cause &&
+		typeof cause.detail === 'string'
+			? cause.detail.trim()
+			: ''
+	// Kept as plain text. Handing it to the cause renderer instead would wrap it
+	// in an error raised here, and print this function's own stack under every
+	// failed send — frames that point at the reporting, not at the failure.
+	return detail.length <= MAX_REASON_CHARS
+		? detail
+		: `${detail.slice(0, MAX_REASON_CHARS)}…`
+}
+
 export const retrySmtpSend = <A, E>(
 	send: Effect.Effect<A, E>,
 	inboxId: string,
@@ -149,15 +181,6 @@ export const retrySmtpSend = <A, E>(
 // the most recent links rather than letting the header grow without end, which
 // is what mail clients do.
 const MAX_REFERENCES = 20
-
-// One rule for "does this subject already read as a reply", used everywhere a
-// subject is prefixed or judged. Three slightly different spellings of it used
-// to disagree: a subject written "Re : quote" was left alone on one send path
-// and stacked into "Re: Re : quote" on another.
-const REPLY_PREFIX = /^\s*re\s*:/i
-
-const withReplyPrefix = (subject: string): string =>
-	REPLY_PREFIX.test(subject) ? subject : `Re: ${subject}`
 
 export const buildReferences = (args: {
 	readonly root: string
@@ -218,7 +241,7 @@ export const assertSendable = (message: {
 		// and filters test for exactly this pairing.
 		const answersNothing =
 			!message.inReplyTo && (message.references?.length ?? 0) === 0
-		if (REPLY_PREFIX.test(subject) && answersNothing) {
+		if (isReplySubject(subject) && answersNothing) {
 			return yield* new EmailNotSendable({ reason: 'forged_reply' })
 		}
 	})
@@ -993,9 +1016,27 @@ export class EmailService extends Context.Service<EmailService>()(
 						),
 					)
 					const creds = yield* loadDecryptedCreds(inbox)
+					// A send that never got through is the one thing the outbound
+					// path most needs counted — "are messages reaching people" is
+					// unanswerable without it, and the failure otherwise shows up
+					// only as whatever status the caller's request ended on.
 					const sent = yield* retrySmtpSend(
 						transport.send(creds, message),
 						inbox.id,
+					).pipe(
+						Effect.tapError(failure =>
+							Effect.logError(
+								`Sending a message failed: ${
+									smtpFailureReason(failure.cause) ||
+									boundedCause(Cause.fail(failure.cause))
+								}`,
+							).pipe(
+								Effect.annotateLogs({
+									event: 'email.failed',
+									inboxId: inbox.id,
+								}),
+							),
+						),
 					)
 					const messageId = sent.messageId
 					const key = sentRawKey(inbox.organizationId, inbox.id)
@@ -1004,8 +1045,14 @@ export class EmailService extends Context.Service<EmailService>()(
 						.pipe(
 							Effect.catchCause(cause =>
 								Effect.logWarning(
-									`outbound raw upload failed inbox=${inbox.id} key=${key}`,
-								).pipe(Effect.andThen(Effect.logError(cause))),
+									'Keeping a copy of a sent message failed',
+								).pipe(
+									Effect.andThen(Effect.logError(boundedCause(cause))),
+									Effect.annotateLogs({
+										event: 'email.sent_copy_failed',
+										inboxId: inbox.id,
+									}),
+								),
 							),
 						)
 					yield* transport
@@ -1280,9 +1327,23 @@ export class EmailService extends Context.Service<EmailService>()(
 						})
 
 						if (staged.length > 0) {
+							// The message is already gone, so a purge that fails must not
+							// fail the send — but it leaves rows and bytes behind, and
+							// swallowing it whole left nothing to count that by.
 							yield* staging
 								.markSentAndCleanup(staged.map(s => s.stagingId))
-								.pipe(Effect.ignore)
+								.pipe(
+									Effect.ignore({
+										log: 'Warn',
+										message:
+											'Staged attachments outlived the message they went with',
+									}),
+									Effect.annotateLogs({
+										event: 'email.staging_purge_failed',
+										inboxId: inbox.id,
+										staged: staged.length,
+									}),
+								)
 						}
 
 						yield* Effect.logInfo('Email sent').pipe(
@@ -1447,19 +1508,18 @@ export class EmailService extends Context.Service<EmailService>()(
 						// whose messages never carried a subject to borrow: without it
 						// this would be empty, and the guard in `dispatchOutbound`
 						// would refuse the send with nothing the caller could do.
-						const chosenSubject = extras?.subject
-						const borrowedSubject = link.subject
-							? withReplyPrefix(link.subject)
-							: ''
-						const fallbackSubject = extras?.fallbackSubject
-						const replySubject =
-							chosenSubject && chosenSubject.trim() !== ''
-								? chosenSubject
-								: borrowedSubject !== ''
-									? borrowedSubject
-									: fallbackSubject && fallbackSubject.trim() !== ''
-										? withReplyPrefix(fallbackSubject)
-										: ''
+						// Each one trimmed before it is judged, or a subject of nothing
+						// but spaces reads as a real one and goes out as a bare "Re:".
+						const chosenSubject = extras?.subject?.trim()
+						const borrowedSubject = link.subject?.trim()
+						const fallbackSubject = extras?.fallbackSubject?.trim()
+						const replySubject = chosenSubject
+							? chosenSubject
+							: borrowedSubject
+								? withReplyPrefix(borrowedSubject)
+								: fallbackSubject
+									? withReplyPrefix(fallbackSubject)
+									: ''
 
 						const outbound: OutboundMessage = {
 							from: inbox.email,
@@ -1511,9 +1571,23 @@ export class EmailService extends Context.Service<EmailService>()(
 						})
 
 						if (staged.length > 0) {
+							// The message is already gone, so a purge that fails must not
+							// fail the send — but it leaves rows and bytes behind, and
+							// swallowing it whole left nothing to count that by.
 							yield* staging
 								.markSentAndCleanup(staged.map(s => s.stagingId))
-								.pipe(Effect.ignore)
+								.pipe(
+									Effect.ignore({
+										log: 'Warn',
+										message:
+											'Staged attachments outlived the message they went with',
+									}),
+									Effect.annotateLogs({
+										event: 'email.staging_purge_failed',
+										inboxId: inbox.id,
+										staged: staged.length,
+									}),
+								)
 						}
 
 						yield* Effect.logInfo('Email reply sent').pipe(
@@ -3072,13 +3146,14 @@ export class EmailService extends Context.Service<EmailService>()(
 						// A draft answering a thread borrows that thread's subject when
 						// the writer left it blank, so it goes out as "Re: …" rather
 						// than with no subject line at all.
-						const threadSubject = existingThreadLink?.subject ?? null
-						const draftSubject =
-							draft.subject && draft.subject.trim() !== ''
-								? draft.subject
-								: threadSubject
-									? withReplyPrefix(threadSubject)
-									: ''
+						// Both trimmed before they are judged, or a subject of nothing
+						// but spaces reads as a real one and goes out as a bare "Re:".
+						const threadSubject = existingThreadLink?.subject?.trim()
+						const draftSubject = draft.subject?.trim()
+							? draft.subject.trim()
+							: threadSubject
+								? withReplyPrefix(threadSubject)
+								: ''
 
 						const outbound: OutboundMessage = {
 							from: inbox.email,
@@ -3139,9 +3214,23 @@ export class EmailService extends Context.Service<EmailService>()(
 						})
 
 						if (staged.length > 0) {
+							// The message is already gone, so a purge that fails must not
+							// fail the send — but it leaves rows and bytes behind, and
+							// swallowing it whole left nothing to count that by.
 							yield* staging
 								.markSentAndCleanup(staged.map(s => s.stagingId))
-								.pipe(Effect.ignore)
+								.pipe(
+									Effect.ignore({
+										log: 'Warn',
+										message:
+											'Staged attachments outlived the message they went with',
+									}),
+									Effect.annotateLogs({
+										event: 'email.staging_purge_failed',
+										inboxId: inbox.id,
+										staged: staged.length,
+									}),
+								)
 						}
 
 						yield* drafts.remove(draftId)

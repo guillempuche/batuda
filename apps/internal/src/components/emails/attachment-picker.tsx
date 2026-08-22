@@ -1,9 +1,10 @@
 import { useLingui } from '@lingui/react/macro'
 import { AlertTriangle, Loader2, Paperclip, X } from 'lucide-react'
-import { useCallback, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import styled from 'styled-components'
 
 import {
+	discardAttachment,
 	formatBytes,
 	type StagedAttachment,
 	uploadAttachment,
@@ -30,12 +31,19 @@ type PendingUpload = {
 export function AttachmentPicker({
 	value,
 	onChange,
+	onUploadingChange,
 	disabled,
 	inboxId,
 	draftId,
 }: {
 	readonly value: ReadonlyArray<StagedAttachment>
 	readonly onChange: (next: ReadonlyArray<StagedAttachment>) => void
+	/**
+	 * Called while a file is not yet on the message — still on its way up, or
+	 * stopped on an error the sender has not cleared. The sender has to know:
+	 * sending now sends the message without it, and nothing afterwards says so.
+	 */
+	readonly onUploadingChange?: (uploading: boolean) => void
 	readonly disabled?: boolean
 	readonly inboxId: string | null
 	readonly draftId?: string
@@ -44,6 +52,30 @@ export function AttachmentPicker({
 	const inputId = useId()
 	const inputRef = useRef<HTMLInputElement | null>(null)
 	const [pending, setPending] = useState<ReadonlyArray<PendingUpload>>([])
+
+	// The list as it stands after every change dispatched so far, which is not
+	// the same as the list last rendered: files chosen together finish in the
+	// same tick, and each would otherwise be added to the list as it was before
+	// any of them began, so all but one would vanish from the window.
+	//
+	// Seeded once and written only here, which is sound because nothing else
+	// writes it — the parent sets this list from this component and from
+	// nowhere else.
+	const settled = useRef(value)
+	const replaceValue = useCallback(
+		(next: ReadonlyArray<StagedAttachment>) => {
+			settled.current = next
+			onChange(next)
+		},
+		[onChange],
+	)
+
+	// An upload stopped on an error is not on the message either, and clearing
+	// it is the sender's to do — so it holds Send just as an in-flight one does.
+	const unfinished = pending.length > 0
+	useEffect(() => {
+		onUploadingChange?.(unfinished)
+	}, [unfinished, onUploadingChange])
 
 	const startUpload = useCallback(
 		(file: File) => {
@@ -65,7 +97,7 @@ export function AttachmentPicker({
 			})
 				.then(result => {
 					setPending(prev => prev.filter(p => p.id !== id))
-					onChange([...value, result])
+					replaceValue([...settled.current, result])
 				})
 				.catch((error: unknown) => {
 					if (controller.signal.aborted) {
@@ -81,7 +113,7 @@ export function AttachmentPicker({
 					)
 				})
 		},
-		[onChange, value, inboxId, draftId],
+		[replaceValue, inboxId, draftId],
 	)
 
 	const handleFiles = useCallback(
@@ -104,9 +136,17 @@ export function AttachmentPicker({
 
 	const handleRemove = useCallback(
 		(stagingId: string) => {
-			onChange(value.filter(v => v.stagingId !== stagingId))
+			replaceValue(settled.current.filter(v => v.stagingId !== stagingId))
+			// The send reads every file staged against the draft, not this list —
+			// so dropping the chip alone leaves the file on the message and it
+			// goes out after somebody took it off on purpose. Nothing to do if
+			// the call fails: the chip is already gone, and the sweep that
+			// expires staged files will catch the row.
+			if (inboxId !== null) {
+				void discardAttachment(stagingId, { inboxId }).catch(() => {})
+			}
 		},
-		[onChange, value],
+		[replaceValue, inboxId],
 	)
 
 	const hasAny = value.length > 0 || pending.length > 0

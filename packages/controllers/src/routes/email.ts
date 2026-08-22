@@ -463,7 +463,9 @@ export const EmailGroup = HttpApiGroup.make('email')
 				inReplyTo: Schema.optional(Schema.String),
 				companyId: Schema.optional(Schema.String),
 				contactId: Schema.optional(Schema.String),
-				mode: Schema.optional(Schema.String),
+				// The same two values the MCP tool accepts and the database
+				// constrains the column to; the two surfaces disagreed before.
+				mode: Schema.optional(Schema.Literals(['new', 'reply'])),
 				threadLinkId: Schema.optional(Schema.String),
 			}),
 			success: EmailDraft.json,

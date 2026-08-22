@@ -13,7 +13,7 @@ import {
 import { EmailDraft, Inbox, InboxFooter } from '@batuda/domain'
 import { EmailBlocks } from '@batuda/email/schema'
 
-import { EmailService } from '../../services/email'
+import { EmailService, smtpFailureReason } from '../../services/email'
 import {
 	EmailAttachmentStaging,
 	type StagingRef,
@@ -122,6 +122,21 @@ const AttachmentRef = Schema.Struct({
 // What a refused send is told, in the words the caller can act on. The service
 // answers with the reason alone so each surface can say it its own way; this is
 // the one an assistant reads.
+// What to tell the caller when the mail server would not take the message.
+//
+// Written here on purpose. A fault that is not deliberately worded is replaced
+// with a fixed, uninformative sentence on the way out, because a raw one can
+// carry database text and internal paths — so a reason worth reading has to be
+// marked as such where it is raised. The mail server names the recipient in a
+// refusal, and telling the caller which of their own addresses bounced is the
+// point of saying anything at all.
+const sendFailureMessage = (cause: unknown): string => {
+	const reason = smtpFailureReason(cause)
+	return reason === ''
+		? 'The mail server would not take the message, and gave no reason. Check the mailbox settings and try again.'
+		: `The mail server would not take the message: ${reason}`
+}
+
 const refusalMessage = (reason: 'no_subject' | 'forged_reply'): string =>
 	reason === 'no_subject'
 		? 'Refused: the message has no subject, so it would arrive as "(no subject)" and be treated as spam. Pass a subject and send again.'
@@ -902,6 +917,9 @@ export const EmailHandlersLive = EmailTools.toLayer(
 							// A refused send names why. The wording lives here, on the
 							// surface that speaks to the caller, so the service can
 							// answer with the reason alone.
+							Effect.catchTag('SmtpSendFailed', e =>
+								Effect.die(new ToolMessage(sendFailureMessage(e.cause))),
+							),
 							Effect.catchTag('EmailNotSendable', e =>
 								Effect.die(new ToolMessage(refusalMessage(e.reason))),
 							),
@@ -979,6 +997,9 @@ export const EmailHandlersLive = EmailTools.toLayer(
 							// A refused send names why. The wording lives here, on the
 							// surface that speaks to the caller, so the service can
 							// answer with the reason alone.
+							Effect.catchTag('SmtpSendFailed', e =>
+								Effect.die(new ToolMessage(sendFailureMessage(e.cause))),
+							),
 							Effect.catchTag('EmailNotSendable', e =>
 								Effect.die(new ToolMessage(refusalMessage(e.reason))),
 							),
@@ -1372,6 +1393,9 @@ export const EmailHandlersLive = EmailTools.toLayer(
 							// A refused send names why. The wording lives here, on the
 							// surface that speaks to the caller, so the service can
 							// answer with the reason alone.
+							Effect.catchTag('SmtpSendFailed', e =>
+								Effect.die(new ToolMessage(sendFailureMessage(e.cause))),
+							),
 							Effect.catchTag('EmailNotSendable', e =>
 								Effect.die(new ToolMessage(refusalMessage(e.reason))),
 							),

@@ -10,6 +10,10 @@
 			"types": "./src/index.ts",
 			"import": "./src/index.ts"
 		},
+		"./subject": {
+			"types": "./src/subject.ts",
+			"import": "./src/subject.ts"
+		},
 		"./schema": {
 			"types": "./src/schema.ts",
 			"import": "./src/schema.ts"

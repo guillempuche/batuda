@@ -11,15 +11,20 @@ process.env['DATABASE_URL'] ??=
 
 import { randomUUID } from 'node:crypto'
 
+import { Effect } from 'effect'
+import { SqlClient } from 'effect/unstable/sql'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+
+import { EmailService } from './email.js'
+import { makeOrgRuntime, scopedAsOrg } from './email-harness.js'
 
 const DATABASE_URL =
 	process.env['DATABASE_URL'] ??
 	'postgresql://batuda:batuda@localhost:5433/batuda'
 
-const ORG_ID = `test-org-${randomUUID()}`
-const ACME_DOMAIN = `acme-${randomUUID()}.example`
+const ORG_ID = 'email-search-test-org'
+const ACME_DOMAIN = 'acme-search.test'
 
 let pool: pg.Pool
 let inboxId: string
@@ -28,36 +33,31 @@ let subjectOnlyThreadId: string
 let recipientOnlyThreadId: string
 let accentedThreadId: string
 
-// Mirrors the FTS WHERE branch in apps/server/src/services/email.ts:listThreads.
-// Returns the matched thread_link ids for `q` scoped to ORG_ID.
-const searchThreads = async (q: string): Promise<string[]> => {
-	const rows = await pool.query<{ id: string }>(
-		`
-		SELECT tl.id
-		FROM email_thread_links tl
-		WHERE tl.organization_id = $1
-		  AND (
-		    EXISTS (
-		      SELECT 1 FROM email_messages em
-		      WHERE em.organization_id = tl.organization_id
-		        AND (em.message_id = tl.external_thread_id
-		             OR em."references" @> ARRAY[tl.external_thread_id]::text[])
-		        AND em.search_vector @@ plainto_tsquery('simple', $2)
-		    )
-		    OR EXISTS (
-		      SELECT 1 FROM email_messages em2
-		      JOIN message_participants mp ON mp.email_message_id = em2.id
-		      WHERE em2.organization_id = tl.organization_id
-		        AND (em2.message_id = tl.external_thread_id
-		             OR em2."references" @> ARRAY[tl.external_thread_id]::text[])
-		        AND mp.email_address ILIKE $3
-		    )
-		  )
-		`,
-		[ORG_ID, q, `%${q}%`],
+// The search the app actually runs, not a copy of it. This file used to hold
+// its own transcription of that query, which meant it kept passing while the
+// real one changed underneath — the test could not fail for the thing it was
+// written to protect. Everything below goes through the service instead, inside
+// the same organisation scope a request runs in.
+const asOrg = {
+	orgId: ORG_ID,
+	orgName: 'Search Test',
+	orgSlug: 'search-test',
+	userId: 'search-user',
+} as const
+
+const runtime = makeOrgRuntime(asOrg)
+
+const searchThreads = (q: string): Promise<string[]> =>
+	runtime.runPromise(
+		scopedAsOrg(
+			asOrg,
+			Effect.gen(function* () {
+				const emails = yield* EmailService
+				const page = yield* emails.listThreads({ query: q })
+				return page.items.map(t => t.id)
+			}),
+		),
 	)
-	return rows.rows.map(r => r.id)
-}
 
 const insertThreadWithMessage = async (args: {
 	externalThreadId: string
@@ -168,6 +168,37 @@ afterAll(async () => {
 	)
 	await pool.query(`DELETE FROM inboxes WHERE organization_id = $1`, [ORG_ID])
 	await pool.end()
+	await runtime.dispose()
+})
+
+describe('the scope these searches run in', () => {
+	describe('when the harness enters an organisation', () => {
+		it('should put the role and the organisation on the connection the query uses', async () => {
+			// GIVEN the harness, which runs an effect the way a request runs
+			// WHEN it asks the database who it is and which organisation it is in
+			const identity = await runtime.runPromise(
+				scopedAsOrg(
+					asOrg,
+					Effect.gen(function* () {
+						const sql = yield* SqlClient.SqlClient
+						const rows = yield* sql<{
+							who: string
+							org: string
+						}>`SELECT current_user AS who, current_setting('app.current_org_id', true) AS org`
+						return rows[0]
+					}).pipe(Effect.orDie),
+				),
+			)
+
+			// THEN both are set, on the same connection the searches below run on
+			// AND this is what makes row-level security real here rather than
+			// decorative: built over a second client, the scope would be set on a
+			// connection nothing queries, and a search that had lost its
+			// organisation filter would still look correct
+			expect(identity?.who).toBe('app_user')
+			expect(identity?.org).toBe(ORG_ID)
+		})
+	})
 })
 
 describe('email search — full-text', () => {

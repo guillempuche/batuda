@@ -182,9 +182,16 @@ export const persistMessage = (args: {
 		// chain back to the start, leaves it out. So does a sender that trims a
 		// long chain. Both are ordinary. The id goes in front, where the oldest
 		// ancestor belongs.
-		const storedReferences = args.parsed.references.includes(externalThreadId)
-			? args.parsed.references
-			: [externalThreadId, ...args.parsed.references]
+		//
+		// Except when the conversation is this message's own: it is found by its
+		// own id already, and putting that first would leave the newest id where
+		// the oldest belongs — the order the resolver reads to tell which of two
+		// conversations a message is in.
+		const startsItsOwn = externalThreadId === args.parsed.messageId
+		const storedReferences =
+			startsItsOwn || args.parsed.references.includes(externalThreadId)
+				? args.parsed.references
+				: [externalThreadId, ...args.parsed.references]
 
 		// Whose conversation this is comes from the other side of it: who wrote
 		// to us, or who we wrote to. Reading the sender of a message we sent
@@ -371,6 +378,22 @@ export const persistMessage = (args: {
 					updated_at = now()
 				WHERE id = ${companyId} AND deleted_at IS NULL
 			`
+		}
+
+		// One line per message taken in, so "is mail still arriving, and whose"
+		// can be answered at all. Counts and ids only: who wrote, what they
+		// wrote and what they called it are the contents of the message, and
+		// none of it belongs in a log.
+		if (args.direction === 'inbound') {
+			yield* Effect.logInfo('Email received').pipe(
+				Effect.annotateLogs({
+					event: 'email.received',
+					inboxId: args.inboxId,
+					folder: args.folder,
+					companyId,
+					attachments: args.attachments.length,
+				}),
+			)
 		}
 
 		return { messageId: messageDbId }

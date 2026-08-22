@@ -332,9 +332,14 @@ export const runInboxSession = (claimed: ClaimedInbox) =>
 						progress,
 					}).pipe(
 						Effect.catchCause(cause =>
-							Effect.logWarning(
-								`mail-worker: folder tick failed inbox=${claimed.id} folder=${folder.path}`,
-							).pipe(Effect.andThen(Effect.logError(boundedCause(cause)))),
+							Effect.logWarning('Reading a folder failed').pipe(
+								Effect.andThen(Effect.logError(boundedCause(cause))),
+								Effect.annotateLogs({
+									event: 'email.folder_read_failed',
+									inboxId: claimed.id,
+									folder: folder.path,
+								}),
+							),
 						),
 					)
 				}

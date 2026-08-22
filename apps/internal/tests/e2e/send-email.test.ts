@@ -102,9 +102,13 @@ test.describe('compose and send via the mail catcher', () => {
 	})
 
 	test.describe('when a new message is written as if it were a reply', () => {
-		test('should refuse it and leave the compose window open', async ({
-			page,
-		}) => {
+		// Tagged so it gates a pull request: CI's smoke subset is `--grep @smoke`,
+		// and an untagged spec only ever runs on main, after the merge it should
+		// have stopped. A batch of these forged replies reached real prospects,
+		// so this is one worth catching before the merge rather than after.
+		test('should refuse it and leave the compose window open', {
+			tag: '@smoke',
+		}, async ({ page }) => {
 			// GIVEN a brand-new message — this path threads nothing — written
 			// under a "Re: " subject, the way a follow-up gets written. That
 			// pairing is the classic forged-reply shape, and mail filters test

@@ -21,6 +21,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import styled, { css } from 'styled-components'
 
+import { withReplyPrefix } from '@batuda/email/subject'
 import { PriButton } from '@batuda/ui/pri'
 
 import {
@@ -256,7 +257,7 @@ function ThreadDetailPage() {
 							...seed.cc,
 						].filter(addr => addr.toLowerCase() !== selfEmail)
 					: []
-			const subject = prefixSubject(detail.subject ?? '', 'Re: ')
+			const subject = prefixSubject(detail.subject ?? '')
 			const quoteSeed = seed
 			const attribution = {
 				withDate: t`On {date}, {who} wrote:`,
@@ -882,12 +883,7 @@ function findLastInbound(
 	return null
 }
 
-// Mail clients write the reply prefix several ways — "RE:", "re:", and (with
-// French typography) "Re :". Any of them already marks a reply, so none of them
-// should be stacked on top of. The server reads it the same way.
-const REPLY_PREFIX = /^re\s*:/i
-
-function prefixSubject(subject: string, prefix: string): string {
+function prefixSubject(subject: string): string {
 	const trimmed = subject.trim()
 	// A conversation with nothing to borrow leaves this empty rather than
 	// answering with a bare "Re:". The server turns an empty one away and says
@@ -895,8 +891,7 @@ function prefixSubject(subject: string, prefix: string): string {
 	// "Re:" here would make the browser the one place a message with no real
 	// subject still went out.
 	if (trimmed === '') return ''
-	if (REPLY_PREFIX.test(trimmed)) return trimmed
-	return `${prefix}${trimmed}`
+	return withReplyPrefix(trimmed)
 }
 
 // ── Styled components ─────────────────────────────────────────────

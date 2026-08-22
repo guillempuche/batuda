@@ -50,6 +50,31 @@ export async function uploadAttachment(
 	}
 }
 
+/**
+ * Take a staged file back off the message.
+ *
+ * The send reads every file staged against the draft, not the list the compose
+ * window is showing — so dropping the chip on its own leaves the file on the
+ * message, and it goes out after somebody took it off on purpose.
+ */
+export async function discardAttachment(
+	stagingId: string,
+	options: { readonly inboxId: string },
+): Promise<void> {
+	const url = new URL(
+		`${apiBaseUrl()}/v1/email/attachments/staging/${encodeURIComponent(stagingId)}`,
+	)
+	url.searchParams.set('inboxId', options.inboxId)
+	const response = await fetch(url, {
+		method: 'DELETE',
+		credentials: 'include',
+	})
+	// Already gone is the outcome the caller wanted, not a failure.
+	if (!response.ok && response.status !== 404) {
+		throw new Error(await extractError(response))
+	}
+}
+
 export function downloadUrlFor(
 	messageId: string,
 	attachmentId: string,
