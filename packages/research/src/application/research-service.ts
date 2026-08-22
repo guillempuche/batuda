@@ -131,6 +131,7 @@ import {
 	perFieldSearchKey,
 	perFieldSearchQuery,
 	perFieldSearchRound,
+	roundChangedNothing,
 	rowsMissing,
 } from './per-field-search'
 import { resolvePolicy, type SystemDefaults } from './policy'
@@ -5495,6 +5496,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// Cited pages fetched: re-judge the kept fields against them
 							// right away — the point of fetching is that a wrong-company
 							// page can now void the field it sourced, no LLM call needed.
+							// Fields this round took away because a page it fetched turned out
+							// to be about somebody else. Held for the round's end: taking a
+							// field away is work the round did, and a round judged on what it
+							// gained alone would read as having done nothing.
+							let voidedThisRound = 0
 							if (roundHashes.length > 0 && entityTargets) {
 								const gapOpenedByHash = new Map(
 									openedPages(scrapeCorpus).map(
@@ -5511,6 +5517,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									sourceId => gapOpenedByHash.get(urlHashForScrape(sourceId)),
 								)
 								findings = recheck.findings
+								voidedThisRound = recheck.droppedOffEntity
 								if (recheck.droppedOffEntity > 0) {
 									if (entityMatch === 'strong') entityMatch = 'weak'
 									yield* Effect.logWarning(
@@ -5597,6 +5604,29 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// as absent and the quality signal reports the thinness.
 							if (roundHashes.length === 0) break
 							yield* linkRunSources(roundHashes)
+							// The read below is the long part of a round, and nothing inside
+							// it watches the clock. Started too late it does not come back
+							// with less — it takes the whole run down with it, because the
+							// run's answer is written after this loop and a run past its
+							// deadline is failed rather than finished. What this round bought
+							// keeps: the evidence is held for the rest of the run, so the
+							// reading of it is what is given up, not the buying.
+							const beforeReadMs =
+								DateTime.toEpochMillis(DateTime.nowUnsafe()) - runStartedAtMs
+							if (
+								beforeReadMs >
+								runDeadlineSeconds * 1000 * GAP_ROUND_DEADLINE_FRACTION
+							) {
+								yield* Effect.logInfo('research.gap_rounds.stopped').pipe(
+									Effect.annotateLogs({
+										event: 'research.gap_rounds.stopped',
+										research_id: researchId,
+										round: gapRound,
+										reason: 'deadline_margin',
+									}),
+								)
+								break
+							}
 							// What this round just bought goes to the front, then the
 							// company's own pages. The extraction prompt fills to a character
 							// budget and stops, and a broad scan's corpus reaches that budget
@@ -5692,12 +5722,32 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									folded: merged.folded,
 								}),
 							)
-							// This round put new evidence in front of the model and it still
-							// filled nothing and found nobody — so the gaps that are left are
-							// not going to close, and another round would buy the same
-							// nothing. A scan cites a page or three per company, so waiting
-							// for the cited pages to run out first would never stop it.
-							if (merged.filled === 0 && merged.added === 0) break
+							// This round put new evidence in front of the model and nothing
+							// about the answer moved at all — so the gaps that are left are not
+							// going to close, and another round would buy the same nothing. A
+							// scan cites a page or three per company, so waiting for the cited
+							// pages to run out first would never stop it.
+							//
+							// Every way a round can change the answer counts here, not only
+							// the two that read as gains. A company written twice becoming a
+							// company written once carries the blanks of both onto the row
+							// that stays; a run about a single company can only ever gain
+							// people, never companies; and a round that takes away an address
+							// belonging to somebody else has opened a gap the next round can
+							// go and fill. Judged on gains alone, each of those reads as a
+							// round that did nothing, and the run stops with the rest of the
+							// list never asked about.
+							if (
+								roundChangedNothing({
+									filled: merged.filled,
+									added: merged.added,
+									folded: merged.folded,
+									contactsChanged: merged.contactsChanged,
+									websitesBlanked: foldedWebsites.blanked,
+									fieldsVoided: voidedThisRound,
+								})
+							)
+								break
 						}
 						// How far the rounds reached, counted in companies: a cap on searches
 						// says nothing about how much of the list was served, and a company
