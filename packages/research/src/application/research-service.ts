@@ -93,12 +93,14 @@ import {
 } from './entity-guard'
 import { classifyNamespace, guardEntitySources } from './entity-source-guard'
 import {
+	awaitsConfirmation,
 	type CandidateReason,
 	existenceOf,
 	isConfirmedRow,
 	markRowsExistence,
 	partitionByExistence,
 	resultNamesCompany,
+	rowsAwaitingConfirmation,
 	verificationQuery,
 } from './existence-verdict'
 import { contactFill, enrichmentFill } from './extraction-fill'
@@ -126,8 +128,10 @@ import { normalizePaidActionTool } from './paid-action-tool'
 import {
 	mergePerFieldSearch,
 	needsPerFieldSearch,
-	perFieldSearchCap,
+	perFieldSearchKey,
 	perFieldSearchQuery,
+	perFieldSearchRound,
+	rowsMissing,
 } from './per-field-search'
 import { resolvePolicy, type SystemDefaults } from './policy'
 import {
@@ -326,7 +330,7 @@ const MAX_DISCOVERY_PAGES = 6
 // Hard cap on the gap-closing rounds after phase 2 — each re-searches only what
 // is still missing, so a thin run earns its grounding instead of shipping on
 // the first pass.
-const MAX_GAP_ROUNDS = 4
+export const MAX_GAP_ROUNDS = 4
 // Cited-but-never-fetched pages scraped per round, turning the per-source
 // entity check's fail-open into a real verdict on the cited page.
 const MAX_CITED_SCRAPES_PER_ROUND = 3
@@ -5306,7 +5310,62 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						// no single extraction had the evidence to condemn — and a round that
 						// took none would otherwise overwrite the round that took one.
 						let blankedAfterFolds = 0
+						// Companies the rounds set out to ask for a site. Held apart from
+						// how many end up without one: a company never asked about and one
+						// asked about whose search found nothing want opposite fixes, and a
+						// single figure covering both cannot tell an operator which they have.
+						let websiteSearchesAsked = 0
+						const gapPolicy = (run as { paidPolicy: ResolvedPolicy | null })
+							.paidPolicy
+						// How many searches the step that confirms the list still has to buy.
+						// It runs last and spends whatever these rounds leave, so its share is
+						// set aside before they spend: a round that took the lot would turn
+						// companies the run could have stood behind into ones reported as
+						// unchecked for want of money, which says nothing about the company.
+						// Counted by the rule that step uses, so the two cannot disagree.
+						const searchesHeldForConfirming = (): number => {
+							const listField = discoveryResultField(schemaName)
+							if (listField === undefined) return 0
+							return rowsAwaitingConfirmation(
+								discoveryRows(schemaName, findings),
+								observeDirectorySites({
+									findings,
+									listField,
+									addresses: [...gatheredAddresses],
+									runWords: wordsTheRunBrings,
+								}).sites,
+								wordsTheRunBrings,
+							)
+						}
+						// What this round may spend at all, on anything. Both a fetch and a
+						// search come out of this one figure, so neither can quietly eat what
+						// was set aside for the other or for the confirming step. The margin
+						// that step keeps back for the brief comes off here too: left in, the
+						// rounds would spend it and that step would come up exactly that far
+						// short of the companies it was counting on.
+						const spendableThisRound = (): number =>
+							Math.max(
+								0,
+								(gapPolicy?.budgetCents ?? 0) -
+									cheapSpentCents -
+									gapSpentCents -
+									searchesHeldForConfirming() * SEARCH_COST_CENTS -
+									VERIFICATION_BUDGET_MARGIN_CENTS,
+							)
 						for (let gapRound = 1; gapRound <= MAX_GAP_ROUNDS; gapRound++) {
+							const openedHashes = new Set(
+								openedPages(scrapeCorpus).map(page => page.urlHash),
+							)
+							// Worked out before anything is bought, so what the round spends
+							// on fetches is known rather than assumed: reserving a fixed three
+							// would starve the searches on every round that has no cited page
+							// left to fetch, which is most of the later ones.
+							const citedWaiting = citedUnscrapedSources(
+								schemaName,
+								findings,
+								hash => openedHashes.has(hash) || citedAttempted.has(hash),
+								MAX_CITED_SCRAPES_PER_ROUND,
+							)
 							// Who the focused searches are about. A company profile searches
 							// under the anchored subject's name, which is the same name the
 							// entity guard holds the run's evidence to. A scan is handed it
@@ -5316,63 +5375,73 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								schemaName,
 								subjectName: entityName,
 							})
-							const perFieldTargets = perFieldGaps
-								.filter(
-									target =>
-										!gapsSearched.has(`${target.name}\u001F${target.field}`),
-								)
-								.slice(0, perFieldSearchCap(schemaName))
-							for (const target of perFieldTargets) {
-								gapsSearched.add(`${target.name}\u001F${target.field}`)
-							}
-							const openedHashes = new Set(
-								openedPages(scrapeCorpus).map(page => page.urlHash),
+							const unbought = perFieldGaps.filter(
+								target => !gapsSearched.has(perFieldSearchKey(target)),
 							)
-							const citedUnscraped = citedUnscrapedSources(
+
+							const spendable = spendableThisRound()
+							// Fetches are bought before searches, so they are taken off first.
+							const citedToFetch = citedWaiting.slice(
+								0,
+								Math.floor(spendable / SCRAPE_COST_CENTS),
+							)
+							const perFieldTargets = perFieldSearchRound(
 								schemaName,
-								findings,
-								hash => openedHashes.has(hash) || citedAttempted.has(hash),
-								MAX_CITED_SCRAPES_PER_ROUND,
+								unbought,
+								gapsSearched,
+								Math.floor(
+									(spendable - citedToFetch.length * SCRAPE_COST_CENTS) /
+										SEARCH_COST_CENTS,
+								),
 							)
+
 							// Grounded and fully fetched — nothing left to close.
-							if (perFieldTargets.length === 0 && citedUnscraped.length === 0)
-								break
-							const elapsedMs =
-								DateTime.toEpochMillis(DateTime.nowUnsafe()) - runStartedAtMs
-							const thinDeadline =
-								elapsedMs >
-								runDeadlineSeconds * 1000 * GAP_ROUND_DEADLINE_FRACTION
-							// Phase 2 has no live budget scope; the margin reads the run's
-							// policy budget less everything spent so far — phase 1 plus the
-							// gap rounds already run — so it actually tightens each round.
-							const gapPolicy = (run as { paidPolicy: ResolvedPolicy | null })
-								.paidPolicy
-							const thinBudget =
-								(gapPolicy?.budgetCents ?? 0) -
-									cheapSpentCents -
-									gapSpentCents <
-								SCRAPE_COST_CENTS * 2
-							if (thinDeadline || thinBudget) {
+							if (unbought.length === 0 && citedWaiting.length === 0) break
+							// Something left to buy and nothing to buy it with. Said out loud:
+							// a run stopped for want of money leaves the same silence as one
+							// that closed every gap, and only the first is worth acting on.
+							if (perFieldTargets.length === 0 && citedToFetch.length === 0) {
 								yield* Effect.logInfo('research.gap_rounds.stopped').pipe(
 									Effect.annotateLogs({
 										event: 'research.gap_rounds.stopped',
 										research_id: researchId,
 										round: gapRound,
-										reason: thinDeadline ? 'deadline_margin' : 'budget_margin',
+										reason: 'budget_margin',
 									}),
 								)
 								break
 							}
-							// Counted here, past both stop checks: the body below can leave
-							// by several different exits, so a round counted at the end
-							// would go unreported whenever it takes one of them.
+							const elapsedMs =
+								DateTime.toEpochMillis(DateTime.nowUnsafe()) - runStartedAtMs
+							const thinDeadline =
+								elapsedMs >
+								runDeadlineSeconds * 1000 * GAP_ROUND_DEADLINE_FRACTION
+							if (thinDeadline) {
+								yield* Effect.logInfo('research.gap_rounds.stopped').pipe(
+									Effect.annotateLogs({
+										event: 'research.gap_rounds.stopped',
+										research_id: researchId,
+										round: gapRound,
+										reason: 'deadline_margin',
+									}),
+								)
+								break
+							}
+							// Counted here, past every stop check: the body below can leave by
+							// several different exits, so a round counted at the end would go
+							// unreported whenever it takes one of them. What the round set out
+							// to buy is remembered here for the same reason, so a later round
+							// moves on rather than asking the same question again.
+							for (const target of perFieldTargets) {
+								gapsSearched.add(perFieldSearchKey(target))
+							}
 							gapRounds++
 							yield* recordProgress
 							const roundHashes: string[] = []
 							// Fetch the cited pages first: cheap certainty about sources
 							// the run already leans on.
 							yield* Effect.forEach(
-								citedUnscraped,
+								citedToFetch,
 								citedUrl =>
 									Effect.gen(function* () {
 										// Mark the attempt (fetched, empty, or errored) so a page that
@@ -5461,11 +5530,30 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								if (roundHashes.length > 0) yield* linkRunSources(roundHashes)
 								continue
 							}
-							const perFieldFired = perFieldTargets.length
+							// Counted as they fire rather than from the batch's length: the
+							// clock check below turns searches away once the batch is drawn
+							// up, and reporting the length would say the run went looking for
+							// companies it never reached.
+							let perFieldFired = 0
 							yield* Effect.forEach(
 								perFieldTargets,
 								target =>
 									Effect.gen(function* () {
+										// Checked per search, not once for the batch: a round of
+										// these is long enough to cross the whole-run deadline
+										// part way through, and crossing it does not degrade the
+										// run, it destroys it — the timeout fails the run and its
+										// findings are replaced with an error.
+										const searchElapsedMs =
+											DateTime.toEpochMillis(DateTime.nowUnsafe()) -
+											runStartedAtMs
+										if (
+											searchElapsedMs >
+											runDeadlineSeconds * 1000 * GAP_ROUND_DEADLINE_FRACTION
+										)
+											return
+										perFieldFired++
+										if (target.field === 'website') websiteSearchesAsked++
 										gapSpentCents += SEARCH_COST_CENTS
 										const searched = yield* gapSearch
 											.search({
@@ -5594,7 +5682,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									event: 'research.gap_rounds.closed',
 									research_id: researchId,
 									round: gapRound,
-									cited_fetched: citedUnscraped.length,
+									cited_fetched: citedToFetch.length,
 									fired: perFieldFired,
 									filled: merged.filled,
 									added: merged.added,
@@ -5610,6 +5698,25 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// nothing. A scan cites a page or three per company, so waiting
 							// for the cited pages to run out first would never stop it.
 							if (merged.filled === 0 && merged.added === 0) break
+						}
+						// How far the rounds reached, counted in companies: a cap on searches
+						// says nothing about how much of the list was served, and a company
+						// left with no site of its own has to be reached some other way
+						// before anybody can use it. Silent when the rounds served the whole
+						// list, which has nothing to report.
+						const listedRows = discoveryRows(schemaName, findings)
+						const withoutWebsite = rowsMissing(listedRows, 'website')
+						if (withoutWebsite > 0) {
+							yield* Effect.logInfo('research.gap_rounds.unreached').pipe(
+								Effect.annotateLogs({
+									event: 'research.gap_rounds.unreached',
+									research_id: researchId,
+									listed: listedRows.length,
+									without_website: withoutWebsite,
+									asked: websiteSearchesAsked,
+									rounds: gapRounds,
+								}),
+							)
 						}
 						yield* Ref.update(toolLog, log => [
 							...log,
@@ -5691,15 +5798,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// spent on the companies that need it.
 							const watchedBefore = watchedSites()
 							const stillShort = verificationRows.flatMap((row, at) =>
-								existenceOf({
-									name: rowName(row),
-									website: rowWebsite(row),
-									sources: rowCitedSourceIds(row),
-									directorySites: watchedBefore,
-									runWords: wordsTheRunBrings,
-								}).verdict === 'confirmed'
-									? []
-									: [at],
+								awaitsConfirmation(row, watchedBefore, wordsTheRunBrings)
+									? [at]
+									: [],
 							)
 
 							const verifyPolicy = (

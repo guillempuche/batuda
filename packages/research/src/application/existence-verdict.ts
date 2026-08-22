@@ -93,7 +93,7 @@ import {
 	registrableDomain,
 	spellingsWithoutForms,
 } from './entity-guard'
-import { isPlainObject } from './guard-shapes'
+import { citedSourceIds, isPlainObject } from './guard-shapes'
 import { ownSiteVerdict } from './own-site'
 import type { RunWords } from './run-words'
 import { hostOf, isBareWebAddress } from './source-key'
@@ -456,3 +456,45 @@ export const partitionByExistence = (
 	confirmed: rows.filter(isConfirmedRow),
 	candidates: rows.filter(row => !isConfirmedRow(row)),
 })
+
+/**
+ * Whether the run cannot yet stand behind this company.
+ *
+ * The one rule, so that whoever sets money aside for the confirming step and the
+ * step itself cannot come to different answers about the same row.
+ */
+export const awaitsConfirmation = (
+	row: Record<string, unknown>,
+	directorySites: DirectorySites,
+	runWords: RunWords,
+): boolean =>
+	existenceOf({
+		name: typeof row['name'] === 'string' ? row['name'] : '',
+		website: typeof row['website'] === 'string' ? row['website'] : undefined,
+		sources: citedSourceIds(row),
+		directorySites,
+		runWords,
+	}).verdict !== 'confirmed'
+
+/**
+ * How many searches confirming this list still has to buy.
+ *
+ * A company already settled by what the run has gathered is settled for nothing.
+ * A company the list never names is left out, because a search cannot help one:
+ * the query would be a quoted blank, and the confirming step declines to buy it.
+ *
+ * Read as an estimate, not a promise. It is struck while the run is still
+ * gathering, and a site that later turns out to file company after company can
+ * take a company back out of settled after the counting is done — so the true
+ * figure can come out either side of this one.
+ */
+export const rowsAwaitingConfirmation = (
+	rows: ReadonlyArray<Record<string, unknown>>,
+	directorySites: DirectorySites,
+	runWords: RunWords,
+): number =>
+	rows.filter(row => {
+		const name = row['name']
+		if (typeof name !== 'string' || name.trim() === '') return false
+		return awaitsConfirmation(row, directorySites, runWords)
+	}).length
