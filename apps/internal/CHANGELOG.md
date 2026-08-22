@@ -3,6 +3,43 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-22 (internal-v2026.8.22)
+
+### Features
+
+* count the repeats a market list's keys cannot see ([a1a2116](https://github.com/guillempuche/batuda/commit/a1a211659b7d3a3be0f8141ccf01ea948d22fecf))
+* keep a company's social page as a way of reaching it ([68ace59](https://github.com/guillempuche/batuda/commit/68ace59d4ff46b1a2332ba1151491be6e583de47))
+* **research:** let a golden pass see a trade a run never looked for ([f88600d](https://github.com/guillempuche/batuda/commit/f88600d0f01aa24f128a5d0cfa2afa5b09571b78))
+* **research:** read a trade word written in front of a company's name ([602050a](https://github.com/guillempuche/batuda/commit/602050af823b1162a0ccd0ad67663af5cce95543))
+* **research:** tell a blocked connection from a rejected key ([896ee00](https://github.com/guillempuche/batuda/commit/896ee00866e422c4152f4ecc3164417f077715ac)), closes [#491](https://github.com/guillempuche/batuda/issues/491)
+
+### Bug Fixes
+
+* **domain:** tell a mark that makes a letter from one that decorates it ([c2d5e45](https://github.com/guillempuche/batuda/commit/c2d5e45cebd90cb8814ddfdf305dbafb26d21a67))
+* **internal:** show a refused send in the reader's language ([e6e8aa4](https://github.com/guillempuche/batuda/commit/e6e8aa4d7616a1f86c917e2a0d116c106c8fdc85))
+* keep a conversation whole, and stop a removed attachment sending ([c939ee5](https://github.com/guillempuche/batuda/commit/c939ee5e5f9fd1f1fbb7fa623d500e7c6ca426d2)), closes [#509](https://github.com/guillempuche/batuda/issues/509)
+* let the command-line MCP server start again ([60b72a4](https://github.com/guillempuche/batuda/commit/60b72a4d64da817a092312f4d0346338986b994f))
+* **research:** join a company to the same name with a note after it ([013c88e](https://github.com/guillempuche/batuda/commit/013c88e4747609058511e84263d9ea27e08940a9))
+* **research:** read a domain as the letters its owner registered ([cbf5da1](https://github.com/guillempuche/batuda/commit/cbf5da1f867d80b4fe04e1c14d0f472f1c4af354))
+* **research:** say why a page fetch was refused ([a00631d](https://github.com/guillempuche/batuda/commit/a00631dbd44703c091e90bae2a06f8d201ea1201))
+* **research:** sort an import and put a README caveat on its own bullet ([b0d7ab3](https://github.com/guillempuche/batuda/commit/b0d7ab3f1fefc4fa23d183a316def56e66d22f44))
+* **research:** stop a group's own website being taken for a directory ([2cbc373](https://github.com/guillempuche/batuda/commit/2cbc3737bbe9b3ac046a830b1b40fa32aab65212)), closes [#494](https://github.com/guillempuche/batuda/issues/494)
+* **research:** stop a search reporting a trade it never searched for ([31efdcf](https://github.com/guillempuche/batuda/commit/31efdcfa6130c44b64093e7ca5520cc2efaa5e87)), closes [#485](https://github.com/guillempuche/batuda/issues/485)
+* **research:** stop a social page shipping as a company's website ([236c0db](https://github.com/guillempuche/batuda/commit/236c0db1b9e4f920cadbe1efac99b3fbdcce8a87)), closes [#477](https://github.com/guillempuche/batuda/issues/477)
+* **research:** stop an association's member page shipping as a website ([217327c](https://github.com/guillempuche/batuda/commit/217327c8e59a2a378dfa0926627440e22c1698d4))
+* **research:** stop four guards losing what they were meant to protect ([a97242a](https://github.com/guillempuche/batuda/commit/a97242a33c1dc25f211a1f8f66a3d2f75b88a47a))
+* **research:** tell a company from the kind of company it says it is ([5b8d00e](https://github.com/guillempuche/batuda/commit/5b8d00ede9a971007dc954c87972f7ba9bebc4ee)), closes [#529](https://github.com/guillempuche/batuda/issues/529)
+* **research:** tell a company's trade from its name by asking the run ([3b6aa54](https://github.com/guillempuche/batuda/commit/3b6aa54b9398f9940b07ce59353179a66acee7ff)), closes [#527](https://github.com/guillempuche/batuda/issues/527)
+* send follow-ups with a subject and the right threading headers ([2dbcf59](https://github.com/guillempuche/batuda/commit/2dbcf595886ebb555055b7aad27f227bcbb58cf7))
+
+### Tests
+
+* **server:** catch a server that has stopped running research ([db1fd7e](https://github.com/guillempuche/batuda/commit/db1fd7ef4c78018279323b0a282709b176a7b39c))
+
+### CI/CD
+
+* **internal:** refuse a focused browser test in CI ([5d8ea2b](https://github.com/guillempuche/batuda/commit/5d8ea2b51fb441968b1d987f17a7bd047cf45d1b))
+
 ## 2026-08-18 (internal-v2026.8.18)
 
 ### Bug Fixes
