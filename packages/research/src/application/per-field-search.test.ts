@@ -1,6 +1,7 @@
 import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
 
+import { discoveryRows } from './discovery-scan'
 import {
 	HIGH_VALUE_FIELDS,
 	MAX_PER_FIELD_SEARCHES,
@@ -8,9 +9,15 @@ import {
 	mergePerFieldSearch,
 	needsPerFieldSearch,
 	perFieldSearchCap,
+	perFieldSearchKey,
 	perFieldSearchQuery,
+	perFieldSearchRound,
+	type RescueTarget,
+	rowsMissing,
 	scanRowFields,
+	scanRowFoldFields,
 } from './per-field-search'
+import { MAX_GAP_ROUNDS } from './research-service'
 import { runWordsOf } from './run-words'
 import { CompetitorScanV1Schema } from './schemas/competitor-scan-v1'
 import { ProspectScanV1Schema } from './schemas/prospect-scan-v1'
@@ -25,11 +32,23 @@ const SCAN = 'prospect_scan_v1'
 const COMPETITORS = 'competitor_scan_v1'
 const PROFILE = 'company_enrichment_v1'
 
+// The rounds a run really gets, read from the service rather than copied, so the
+// reach these tests claim cannot drift away from the reach production delivers.
+const ROUNDS_A_RUN_GETS = MAX_GAP_ROUNDS
+
+// A budget big enough that money never decides the outcome, for the cases about
+// something other than affordability.
+const PLENTY = 10_000
+
 const forProfile = (findings: unknown, subjectName = 'Acme Corp') =>
 	needsPerFieldSearch({ findings, schemaName: PROFILE, subjectName })
 
 const forScan = (findings: unknown, schemaName: string = SCAN) =>
 	needsPerFieldSearch({ findings, schemaName, subjectName: 'unused by a scan' })
+
+// The rows a caller hands in, read the way the service reads them.
+const rowsOf = (findings: unknown, schemaName: string = SCAN) =>
+	discoveryRows(schemaName, findings)
 
 const prospectsOf = (findings: unknown) =>
 	(findings as { prospects: ReadonlyArray<Record<string, unknown>> }).prospects
@@ -108,13 +127,95 @@ describe('needsPerFieldSearch', () => {
 				],
 			}
 			// WHEN computed
-			// THEN each company is asked about by its own name, never the request's
+			// THEN each company is asked about by its own name, never the request's,
+			// AND the whole list's most useful blank is asked about first: the company
+			// with no website is reached before either company's headcount
 			expect(forScan(findings)).toEqual([
-				{ name: 'Acme', field: 'employee_estimate' },
-				{ name: 'Acme', field: 'location' },
 				{ name: 'Beta', field: 'website' },
+				{ name: 'Acme', field: 'employee_estimate' },
 				{ name: 'Beta', field: 'employee_estimate' },
+				{ name: 'Acme', field: 'location' },
 				{ name: 'Beta', field: 'location' },
+			])
+		})
+
+		it('should buy no company a headcount while any company still lacks a website', () => {
+			// GIVEN a list the length a market search really comes back with, every
+			// company named and nothing else known about any of them
+			const listed = 29
+			const findings = {
+				prospects: Array.from({ length: listed }, (_, at) => ({
+					name: `Company ${at + 1}`,
+				})),
+			}
+			// WHEN computed
+			const targets = forScan(findings)
+			// THEN every company is asked for its website, and all of those come
+			// before the first headcount: a round takes the front of this list, so a
+			// headcount bought ahead of a website leaves a company nobody can reach
+			expect(targets.filter(target => target.field === 'website')).toHaveLength(
+				listed,
+			)
+			expect(targets.slice(0, listed).map(target => target.field)).toEqual(
+				Array(listed).fill('website'),
+			)
+			// AND a single round's whole allowance goes to websites
+			expect(
+				targets
+					.slice(0, perFieldSearchCap(SCAN))
+					.every(target => target.field === 'website'),
+			).toBe(true)
+		})
+
+		it('should reach the last company on the list before the first one is asked for a headcount', () => {
+			// GIVEN the first company already has a website and the last has nothing
+			const findings = {
+				prospects: [
+					{ name: 'First', website: 'https://first.test' },
+					{ name: 'Last' },
+				],
+			}
+			// WHEN computed
+			// THEN the company at the end is served first, because what it is missing
+			// is worth more than what the one at the front is missing — where a
+			// company sits on the list does not decide whether it is helped
+			expect(forScan(findings)[0]).toEqual({ name: 'Last', field: 'website' })
+		})
+
+		it('should keep the field groups whole when a row in the middle names nobody', () => {
+			// GIVEN a nameless row sitting between two named ones
+			const findings = {
+				prospects: [
+					{ name: 'A' },
+					{ website: 'https://ghost.test' },
+					{ name: 'B' },
+				],
+			}
+			// WHEN computed
+			// THEN the row that cannot be searched for drops out without splitting the
+			// groups: both websites still come before either headcount
+			expect(forScan(findings)).toEqual([
+				{ name: 'A', field: 'website' },
+				{ name: 'B', field: 'website' },
+				{ name: 'A', field: 'employee_estimate' },
+				{ name: 'B', field: 'employee_estimate' },
+				{ name: 'A', field: 'location' },
+				{ name: 'B', field: 'location' },
+			])
+		})
+
+		it('should ask about each of two rows that carry the same name', () => {
+			// GIVEN a list naming one company twice, which the fold that runs before
+			// these searches would normally have joined into one row
+			const findings = { prospects: [{ name: 'Acme' }, { name: 'Acme' }] }
+			// WHEN computed
+			// THEN each row is reported: deciding which rows are one company is the
+			// fold's job, not this step's
+			expect(
+				forScan(findings).filter(target => target.field === 'website'),
+			).toEqual([
+				{ name: 'Acme', field: 'website' },
+				{ name: 'Acme', field: 'website' },
 			])
 		})
 
@@ -167,11 +268,12 @@ describe('needsPerFieldSearch', () => {
 				],
 			}
 			// WHEN computed
-			// THEN each of those reads as a gap worth searching for
+			// THEN each of those reads as a gap worth searching for, both websites
+			// ahead of the headcount and the town
 			expect(forScan(findings)).toEqual([
 				{ name: 'A', field: 'website' },
-				{ name: 'A', field: 'employee_estimate' },
 				{ name: 'B', field: 'website' },
+				{ name: 'A', field: 'employee_estimate' },
 				{ name: 'B', field: 'location' },
 			])
 		})
@@ -217,6 +319,337 @@ describe('needsPerFieldSearch', () => {
 			// THEN the schema decides the shape, so no profile field is searched for —
 			// a scan has nowhere to put one
 			expect(forScan(findings)).toEqual([])
+		})
+	})
+})
+
+describe('rowsMissing', () => {
+	describe('when a scan came back with a list', () => {
+		it('should count the companies still short of the fact', () => {
+			// GIVEN three companies, one of which carries a website
+			const findings = {
+				prospects: [
+					{ name: 'A', website: 'https://a.test' },
+					{ name: 'B' },
+					{ name: 'C', website: '   ' },
+				],
+			}
+			// WHEN the list is counted
+			// THEN the blank and the whitespace-only one are both still short
+			expect(rowsMissing(rowsOf(findings), 'website')).toBe(2)
+		})
+
+		it('should count a company it cannot even search for', () => {
+			// GIVEN a row with no name and no website
+			const findings = { prospects: [{ website: 'https://a.test' }, {}] }
+			// WHEN counted
+			// THEN the nameless row still counts — it is a company the list is short
+			// on, and leaving it out would report the list as better served than it is
+			expect(rowsMissing(rowsOf(findings), 'website')).toBe(1)
+		})
+
+		it('should read a headcount stored as a number as filled', () => {
+			// GIVEN one headcount paired with its source and one nulled
+			const findings = {
+				prospects: [
+					{ name: 'A', employee_estimate: { value: 42, source_id: 'x' } },
+					{ name: 'B', employee_estimate: { value: null } },
+				],
+			}
+			// WHEN counted
+			// THEN only the nulled one is short
+			expect(rowsMissing(rowsOf(findings), 'employee_estimate')).toBe(1)
+		})
+	})
+
+	describe('when there is no list to count', () => {
+		it('should count nothing rather than guess', () => {
+			// GIVEN findings with an empty list, no list, an unusable list, and a
+			// schema that is not a scan at all
+			// WHEN counted
+			// THEN each answers zero
+			expect(rowsMissing(rowsOf({ prospects: [] }), 'website')).toBe(0)
+			expect(rowsMissing(rowsOf({}), 'website')).toBe(0)
+			expect(rowsMissing(rowsOf({ prospects: 'nope' }), 'website')).toBe(0)
+			expect(rowsMissing(rowsOf(null), 'website')).toBe(0)
+			expect(rowsMissing(rowsOf({ prospects: [{}] }, PROFILE), 'website')).toBe(
+				0,
+			)
+		})
+	})
+})
+
+describe('perFieldSearchRound', () => {
+	// What a whole run of rounds buys: each round takes what it may, and what it
+	// took is remembered so the next round moves on. Nothing here fills a blank, so
+	// the list of what is missing never shrinks and these figures are the most a
+	// run of rounds can ask after — the service also stops early when a round
+	// turns up nothing at all, which only ever asks after fewer.
+	const overRounds = (listed: number, rounds = ROUNDS_A_RUN_GETS) => {
+		const findings = {
+			prospects: Array.from({ length: listed }, (_, at) => ({
+				name: `Company ${at + 1}`,
+			})),
+		}
+		const bought = new Set<string>()
+		const fired: RescueTarget[] = []
+		for (let round = 1; round <= rounds; round++) {
+			const taken = perFieldSearchRound(
+				SCAN,
+				needsPerFieldSearch({
+					findings,
+					schemaName: SCAN,
+					subjectName: 'unused by a scan',
+				}),
+				bought,
+				PLENTY,
+			)
+			for (const target of taken) {
+				bought.add(perFieldSearchKey(target))
+				fired.push(target)
+			}
+		}
+		return {
+			fired: fired.length,
+			websites: fired.filter(target => target.field === 'website').length,
+			companiesAskedForASite: new Set(
+				fired
+					.filter(target => target.field === 'website')
+					.map(target => target.name),
+			).size,
+		}
+	}
+
+	describe('when a market search comes back with a full list', () => {
+		it('should ask every company for a site when the rounds can cover the list', () => {
+			// GIVEN a list of the length the shorter market really comes back with,
+			// which the rounds have room to reach the whole of
+			const listed = 34
+			// WHEN the rounds a run gets are played out
+			const spent = overRounds(listed)
+			// THEN not one company is left unasked, and only once every company has
+			// been asked does anything go to a headcount or a town
+			expect(spent.companiesAskedForASite).toBe(listed)
+			expect(spent.websites).toBe(listed)
+			expect(spent.fired).toBeGreaterThan(listed)
+			// AND the allowance really did have room to spare, so this is the
+			// covered case rather than a list that merely happened to fit
+			expect(MAX_SCAN_ROW_SEARCHES * ROUNDS_A_RUN_GETS).toBeGreaterThan(listed)
+		})
+
+		it('should spend every search on sites when the list outruns the rounds', () => {
+			// GIVEN a market list longer than the rounds can get through — the
+			// longest a market search has really come back with
+			const listed = 67
+			// WHEN the rounds are played out
+			const spent = overRounds(listed)
+			// THEN nothing at all goes to a headcount or a town: the rounds run out
+			// of searches before they run out of companies with no site
+			expect(spent.websites).toBe(spent.fired)
+			expect(spent.companiesAskedForASite).toBe(spent.fired)
+			// AND the list really did outrun the rounds, so this is that case
+			expect(spent.fired).toBeLessThan(listed)
+		})
+
+		it('should never spend a round on a fact it has already bought', () => {
+			// GIVEN a list short enough that the rounds finish it
+			// WHEN played out over twice as many rounds as a run gets
+			const spent = overRounds(4, ROUNDS_A_RUN_GETS * 2)
+			// THEN each company is asked for each of its three facts exactly once —
+			// a fact a search failed to fill is not re-bought round after round
+			expect(spent.fired).toBe(4 * 3)
+			expect(spent.websites).toBe(4)
+		})
+	})
+
+	describe('when the list names one company twice', () => {
+		it('should buy the answer once rather than pay twice for it', () => {
+			// GIVEN two rows carrying the same name, which ask the same question
+			const gaps: ReadonlyArray<RescueTarget> = [
+				{ name: 'Acme', field: 'website' },
+				{ name: 'Acme', field: 'website' },
+				{ name: 'Beta', field: 'website' },
+			]
+			// WHEN a round takes what it may
+			// THEN the repeat is passed over, so the slot it would have taken goes to
+			// a company that has not been asked about at all
+			expect(perFieldSearchRound(SCAN, gaps, new Set(), PLENTY)).toEqual([
+				{ name: 'Acme', field: 'website' },
+				{ name: 'Beta', field: 'website' },
+			])
+		})
+	})
+
+	describe('when the run has already bought some of what is missing', () => {
+		it('should skip those and fill the round from what is left', () => {
+			// GIVEN a website already bought in an earlier round
+			const gaps: ReadonlyArray<RescueTarget> = [
+				{ name: 'Acme', field: 'website' },
+				{ name: 'Beta', field: 'website' },
+			]
+			const bought = new Set([
+				perFieldSearchKey({ name: 'Acme', field: 'website' }),
+			])
+			// WHEN the next round takes what it may
+			// THEN only the company still short is bought for
+			expect(perFieldSearchRound(SCAN, gaps, bought, PLENTY)).toEqual([
+				{ name: 'Beta', field: 'website' },
+			])
+		})
+
+		it('should leave the set it was handed untouched', () => {
+			// GIVEN a set of what the run has bought so far
+			const bought = new Set<string>()
+			// WHEN a round takes from the gaps
+			perFieldSearchRound(
+				SCAN,
+				[{ name: 'Acme', field: 'website' }],
+				bought,
+				PLENTY,
+			)
+			// THEN the caller's own record is not written to behind its back — it
+			// decides for itself what counts as bought once the searches have fired
+			expect(bought.size).toBe(0)
+		})
+	})
+
+	describe('when there is nothing left to buy', () => {
+		it('should take nothing', () => {
+			// GIVEN no gaps at all, and gaps that were all bought already
+			// WHEN a round takes what it may
+			// THEN it takes nothing, so the caller can close the loop
+			expect(perFieldSearchRound(SCAN, [], new Set(), PLENTY)).toEqual([])
+			expect(
+				perFieldSearchRound(
+					SCAN,
+					[{ name: 'Acme', field: 'website' }],
+					new Set([perFieldSearchKey({ name: 'Acme', field: 'website' })]),
+					PLENTY,
+				),
+			).toEqual([])
+		})
+	})
+
+	describe('when the money runs down as the rounds go', () => {
+		it('should take less each round and then nothing', () => {
+			// GIVEN twenty companies with no site, and a purse that the rounds eat
+			// into as they spend — the way the service re-reads it every round
+			const gaps: ReadonlyArray<RescueTarget> = Array.from(
+				{ length: 20 },
+				(_, at) => ({ name: `Company ${at + 1}`, field: 'website' }),
+			)
+			const bought = new Set<string>()
+			let purse = 18
+			const perRound: number[] = []
+			for (let round = 1; round <= ROUNDS_A_RUN_GETS; round++) {
+				const taken = perFieldSearchRound(SCAN, gaps, bought, purse)
+				for (const target of taken) bought.add(perFieldSearchKey(target))
+				purse -= taken.length
+				perRound.push(taken.length)
+			}
+			// THEN the allowance binds while there is money, the purse binds once
+			// there is not, and a spent run buys nothing rather than going over
+			expect(perRound).toEqual([14, 4, 0, 0])
+			expect(purse).toBe(0)
+		})
+	})
+
+	describe('when the money left is not an ordinary figure', () => {
+		it('should buy nothing rather than the whole list', () => {
+			// GIVEN gaps and an affordability that arithmetic has turned into
+			// nonsense — a budget that was never a number, say
+			const gaps: ReadonlyArray<RescueTarget> = Array.from(
+				{ length: 30 },
+				(_, at) => ({ name: `Company ${at + 1}`, field: 'website' }),
+			)
+			// WHEN a round asks what it may take
+			// THEN it takes nothing: every comparison against such a figure is
+			// false, so an unguarded cap would let the round buy the entire list
+			expect(perFieldSearchRound(SCAN, gaps, new Set(), Number.NaN)).toEqual([])
+		})
+
+		it('should still hold to the allowance when the money is boundless', () => {
+			// GIVEN gaps and no ceiling on spending at all
+			const gaps: ReadonlyArray<RescueTarget> = Array.from(
+				{ length: 30 },
+				(_, at) => ({ name: `Company ${at + 1}`, field: 'website' }),
+			)
+			// WHEN a round asks what it may take
+			// THEN the allowance binds and the round still buys: a figure with no
+			// ceiling in it is not a broken one, and turning it away as if it were
+			// would leave a run that can pay for everything buying nothing
+			expect(
+				perFieldSearchRound(SCAN, gaps, new Set(), Number.POSITIVE_INFINITY),
+			).toHaveLength(MAX_SCAN_ROW_SEARCHES)
+		})
+	})
+
+	describe('when the run cannot pay for a whole round', () => {
+		it('should buy only what is left rather than the whole allowance', () => {
+			// GIVEN more companies short of a site than the run can still pay for
+			const gaps: ReadonlyArray<RescueTarget> = Array.from(
+				{ length: 20 },
+				(_, at) => ({ name: `Company ${at + 1}`, field: 'website' }),
+			)
+			// WHEN a round runs with only three searches' worth of money left
+			const taken = perFieldSearchRound(SCAN, gaps, new Set(), 3)
+			// THEN it takes three: the allowance says what a round may spend when
+			// there is money for it, never that there is
+			expect(taken).toHaveLength(3)
+		})
+
+		it('should buy nothing at all when there is nothing left', () => {
+			// GIVEN companies still short of a site and an exhausted budget
+			const gaps: ReadonlyArray<RescueTarget> = [
+				{ name: 'Acme', field: 'website' },
+			]
+			// WHEN a round runs with nothing left, or past exhausted
+			// THEN it buys nothing, and the caller closes the loop rather than
+			// spending money the run does not have
+			expect(perFieldSearchRound(SCAN, gaps, new Set(), 0)).toEqual([])
+			expect(perFieldSearchRound(SCAN, gaps, new Set(), -5)).toEqual([])
+		})
+
+		it('should still hold to the allowance when money is plentiful', () => {
+			// GIVEN far more money than a round is allowed to spend
+			const gaps: ReadonlyArray<RescueTarget> = Array.from(
+				{ length: 40 },
+				(_, at) => ({ name: `Company ${at + 1}`, field: 'website' }),
+			)
+			// WHEN a round runs
+			// THEN the allowance still binds: a full purse is not a licence to spend
+			// a whole list in one round and leave the later rounds nothing to read
+			expect(perFieldSearchRound(SCAN, gaps, new Set(), PLENTY)).toHaveLength(
+				MAX_SCAN_ROW_SEARCHES,
+			)
+		})
+	})
+
+	describe('when the run is a company profile', () => {
+		it('should hold to the smaller per-fact allowance', () => {
+			// GIVEN a profile missing all four of its high-value facts
+			const gaps: ReadonlyArray<RescueTarget> = HIGH_VALUE_FIELDS.map(
+				field => ({ name: 'Acme Corp', field }),
+			)
+			// WHEN a round takes what it may
+			// THEN it takes the profile's cap, not the scan's
+			expect(
+				perFieldSearchRound(PROFILE, gaps, new Set(), PLENTY),
+			).toHaveLength(MAX_PER_FIELD_SEARCHES)
+		})
+	})
+})
+
+describe('perFieldSearchKey', () => {
+	describe('when two pairs run together as the same letters', () => {
+		it('should tell them apart', () => {
+			// GIVEN a company whose name ends where a field name would begin
+			// WHEN each pair is keyed
+			// THEN the two keys differ, so one is never mistaken for the other and a
+			// fact bought for one company never reads as bought for another
+			expect(perFieldSearchKey({ name: 'Acme', field: 'website' })).not.toBe(
+				perFieldSearchKey({ name: 'Acmeweb', field: 'site' }),
+			)
 		})
 	})
 })
@@ -1055,6 +1488,31 @@ describe('the fields each shape rescues', () => {
 			expect(scanRowFields('freeform')).toEqual([])
 		})
 
+		it('should let a wider read keep more than it would go looking for', () => {
+			// GIVEN the two lists, one for what is bought and one for what may be
+			// folded back in
+			// WHEN a round meets a company's page on a platform without being sent
+			// after it
+			// THEN there is somewhere to put it, because a fact left off the fold
+			// list is thrown away even when a round does turn it up — and a company
+			// with no site of its own may have nothing else anybody can reach it by
+			expect(scanRowFoldFields(SCAN)).toContain('social_profiles')
+			expect(scanRowFields(SCAN)).not.toContain('social_profiles')
+			expect(scanRowFoldFields('freeform')).toEqual([])
+		})
+
+		it('should let a wider read keep everything it goes looking for', () => {
+			// GIVEN both lists for each kind of scan
+			// WHEN a round buys a fact
+			// THEN the fold can write it back: a fact searched for but missing from
+			// the fold list would be paid for and dropped on the way home
+			for (const schemaName of [SCAN, COMPETITORS]) {
+				for (const field of scanRowFields(schemaName)) {
+					expect(scanRowFoldFields(schemaName)).toContain(field)
+				}
+			}
+		})
+
 		it('should only name facts the scan schema can actually carry', () => {
 			// GIVEN a company row carrying every fact the rescue would search for,
 			// put through the very schema the model fills
@@ -1067,6 +1525,13 @@ describe('the fields each shape rescues', () => {
 					confidence: null,
 				},
 				location: 'Valencia',
+				social_profiles: [
+					{
+						kind: 'facebook',
+						value: 'https://facebook.com/acme',
+						confidence: null,
+					},
+				],
 				why_relevant: 'matches',
 				description: 'a rival',
 				citations: [],
@@ -1083,7 +1548,7 @@ describe('the fields each shape rescues', () => {
 				// THEN it survived — a fact the schema drops would be searched for
 				// every round and merged back nowhere, which is the same waste this
 				// rescue was rewritten to stop doing on a company profile
-				for (const field of scanRowFields(schemaName)) {
+				for (const field of scanRowFoldFields(schemaName)) {
 					expect(row).toHaveProperty(field)
 				}
 			}

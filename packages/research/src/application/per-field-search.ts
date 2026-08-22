@@ -54,8 +54,11 @@ export const HIGH_VALUE_FIELDS: ReadonlyArray<string> = [
 // list also decides what a wider read is allowed to fill in, so a field left out
 // of it is one whose value is thrown away even when a round does turn it up.
 //
-// Listed in the order they are worth going after, since a round's cap can cut the
-// list short.
+// Listed in the order they are worth going after, since a round's cap cuts the
+// list short and whatever falls past the cut is never bought. The gap between the
+// first and the rest is wide: a missing headcount is a nuisance, while a company
+// with no site of its own is one somebody has to go and find another way of
+// reaching before they can do anything with it at all.
 const SCAN_ROW_FIELDS_BY_SCHEMA: Record<string, ReadonlyArray<string>> = {
 	prospect_scan_v1: ['website', 'employee_estimate', 'location'],
 	competitor_scan_v1: ['website'],
@@ -64,6 +67,26 @@ const SCAN_ROW_FIELDS_BY_SCHEMA: Record<string, ReadonlyArray<string>> = {
 /** The facts worth searching for on one company this kind of scan found. */
 export const scanRowFields = (schemaName: string): ReadonlyArray<string> =>
 	SCAN_ROW_FIELDS_BY_SCHEMA[schemaName] ?? []
+
+// What a wider read is allowed to fill in on a company the list already holds.
+// Everything worth going out and searching for, plus what a run turns up without
+// being asked: a company's pages on the platforms are never searched for, but a
+// round that meets one has found the only way anybody has of reaching a company
+// with no site of its own, and a field left off this list is one whose value is
+// thrown away even when a round does turn it up.
+const SCAN_ROW_FOLD_FIELDS_BY_SCHEMA: Record<string, ReadonlyArray<string>> = {
+	prospect_scan_v1: [
+		'website',
+		'employee_estimate',
+		'location',
+		'social_profiles',
+	],
+	competitor_scan_v1: ['website'],
+}
+
+/** The facts a wider read may fill in on one company this kind of scan found. */
+export const scanRowFoldFields = (schemaName: string): ReadonlyArray<string> =>
+	SCAN_ROW_FOLD_FIELDS_BY_SCHEMA[schemaName] ?? []
 
 // At most this many extra searches per round for a company profile: an all-empty
 // profile would otherwise fire one per field. Any missing field beyond the cap is
@@ -75,7 +98,18 @@ export const MAX_PER_FIELD_SEARCHES = 3
 // so the profile's cap would recover almost nothing; this is larger and still
 // bounded, with the round loop's own budget and deadline margins as the real
 // governor.
-export const MAX_SCAN_ROW_SEARCHES = 8
+//
+// Sized to the list rather than picked: a market search comes back with anywhere
+// from twenty-five to seventy companies, and over the rounds a run gets, this
+// asks after most of them. A cap of eight would reach thirty-two over those same
+// rounds, which on a list of fifty-five leaves twenty-three companies never asked
+// about anything.
+//
+// This is what a round may spend, not a promise the money is there. A run's
+// allowance is a hundred or two hundred of these searches and scrapes together,
+// and the step that confirms the list draws on the same purse, so the round loop
+// keeps back what that step will need and takes what is left.
+export const MAX_SCAN_ROW_SEARCHES = 14
 
 /** One fact to go looking for, on one of the run's subjects. */
 export interface RescueTarget {
@@ -104,6 +138,9 @@ const hasValue = (fieldValue: unknown): boolean =>
 const hasRowValue = (fieldValue: unknown): boolean => {
 	const held = unwrapValue(fieldValue)
 	if (typeof held === 'string') return held.trim() !== ''
+	// A fact that holds a list of things — the pages a company opened in its own
+	// name — has something as soon as it holds one of them.
+	if (Array.isArray(held)) return held.length > 0
 	return typeof held === 'number' && Number.isFinite(held)
 }
 
@@ -142,8 +179,9 @@ const rowName = (row: Record<string, unknown>): string | undefined => {
  * The still-empty high-value facts worth a focused search, in a stable order.
  *
  * For a company profile that is the one subject's empty fields; for a discovery
- * scan it is one entry per company that is missing one. Empty when there is
- * nothing left to recover.
+ * scan it is one entry per company that is missing one, most useful fact first
+ * across the whole list — every company's website before anybody's headcount.
+ * Empty when there is nothing left to recover.
  */
 export const needsPerFieldSearch = (args: {
 	readonly findings: unknown
@@ -155,11 +193,19 @@ export const needsPerFieldSearch = (args: {
 	// anything: a scan that came back with nothing is still a scan, and reading it
 	// as a profile would search for facts it has nowhere to put.
 	if (isDiscoveryScan(args.schemaName)) {
-		const targets: RescueTarget[] = []
-		for (const row of scanRowsOf(args.schemaName, args.findings)) {
+		// Only companies a search can actually be run for: with no name the query is
+		// a quoted blank, and nothing an answer said could be tied back to the row.
+		const named = scanRowsOf(args.schemaName, args.findings).flatMap(row => {
 			const name = rowName(row)
-			if (name === undefined) continue
-			for (const field of scanRowFields(args.schemaName)) {
+			return name === undefined ? [] : [{ name, row }]
+		})
+		// A round buys the front of this list and leaves the rest for a later round,
+		// so the fields go on the outside: every company gets a site before anybody
+		// gets a headcount. Company by company would hand a whole round to whoever
+		// the list happens to name first.
+		const targets: RescueTarget[] = []
+		for (const field of scanRowFields(args.schemaName)) {
+			for (const { name, row } of named) {
 				if (!hasRowValue(row[field])) targets.push({ name, field })
 			}
 		}
@@ -175,9 +221,74 @@ export const needsPerFieldSearch = (args: {
 	}))
 }
 
+/**
+ * How many of these companies are still missing one fact.
+ *
+ * Takes the rows rather than the findings, so a caller reporting both a total and
+ * a shortfall reads one list for both and cannot end up with a shortfall larger
+ * than the list it is counted against.
+ *
+ * Every row counts, named or not — a row nobody can search for is still a row the
+ * list is short on, and leaving it out would report a list as better served than
+ * it is.
+ */
+export const rowsMissing = (
+	rows: ReadonlyArray<Record<string, unknown>>,
+	field: string,
+): number => rows.filter(row => !hasRowValue(row[field])).length
+
 /** How many searches one round may fire for this shape of run. */
 export const perFieldSearchCap = (schemaName: string): number =>
 	isDiscoveryScan(schemaName) ? MAX_SCAN_ROW_SEARCHES : MAX_PER_FIELD_SEARCHES
+
+/**
+ * What one fact about one company is remembered under once it has been bought.
+ *
+ * The two halves are held apart by a character no company name carries, so a name
+ * running into a field name cannot read as some other pair.
+ */
+export const perFieldSearchKey = (target: RescueTarget): string =>
+	`${target.name}\u001F${target.field}`
+
+/**
+ * What one round buys, taken from the front of what is still missing.
+ *
+ * The front is where the worth is, so a round spends on sites until every company
+ * has been asked for one and only then moves down to headcounts. What a run has
+ * already bought is passed over, and so is a repeat inside this same round: two
+ * rows carrying one name ask the same question, and asking it twice buys one
+ * answer for two of the round's few slots.
+ *
+ * Never more than the run can still pay for: a round that took its fill out of a
+ * thinner budget would overspend, and the step that confirms the list afterwards
+ * is what goes without.
+ */
+export const perFieldSearchRound = (
+	schemaName: string,
+	gaps: ReadonlyArray<RescueTarget>,
+	alreadyBought: ReadonlySet<string>,
+	affordableSearches: number,
+): ReadonlyArray<RescueTarget> => {
+	// A figure that is not a number buys nothing: every comparison against one is
+	// false, so a cap that trusted it would let a round take the whole list in one
+	// go.
+	const affordable = Math.max(0, affordableSearches)
+	const cap = Number.isNaN(affordable)
+		? 0
+		: Math.min(perFieldSearchCap(schemaName), affordable)
+	// Copied rather than added to: what the run has bought is the caller's to
+	// record, once the searches have actually fired.
+	const bought = new Set(alreadyBought)
+	const taken: RescueTarget[] = []
+	for (const target of gaps) {
+		if (taken.length >= cap) break
+		const key = perFieldSearchKey(target)
+		if (bought.has(key)) continue
+		bought.add(key)
+		taken.push(target)
+	}
+	return taken
+}
 
 // A short, human-readable label per fact, used to phrase the search.
 const FIELD_INTENT: Record<string, string> = {
@@ -306,7 +417,7 @@ const mergeScanRows = (
 		if (match === undefined) return row
 		const next: Record<string, unknown> = { ...row }
 		let filledHere = 0
-		for (const key of scanRowFields(schemaName)) {
+		for (const key of scanRowFoldFields(schemaName)) {
 			if (!hasRowValue(row[key]) && hasRowValue(match[key])) {
 				next[key] = match[key]
 				filledHere++

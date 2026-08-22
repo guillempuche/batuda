@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+	awaitsConfirmation,
 	existenceOf,
 	isConfirmedRow,
 	markRowsExistence,
 	partitionByExistence,
 	resultNamesCompany,
 	rowExistence,
+	rowsAwaitingConfirmation,
 	withExistence,
 } from './existence-verdict'
 import { runWordsOf } from './run-words'
@@ -783,5 +785,138 @@ describe('partitionByExistence', () => {
 		// GIVEN no rows at all
 		// WHEN split — THEN neither group invents one
 		expect(partitionByExistence([])).toEqual({ confirmed: [], candidates: [] })
+	})
+})
+
+describe('rowsAwaitingConfirmation', () => {
+	// A row the way a scan stores one: its own site, plus the pages it cited.
+	const row = (
+		name: string,
+		website: string | undefined,
+		sources: ReadonlyArray<string>,
+	): Record<string, unknown> => ({
+		name,
+		...(website === undefined ? {} : { website }),
+		citations: sources.map(source_id => ({ source_id })),
+	})
+
+	describe('when some of the list is already settled', () => {
+		it('should count only the companies still to be checked', () => {
+			// GIVEN one company its own site and a paper both name, and two the run
+			// cannot settle from what it has gathered
+			const rows = [
+				row(NAME, OWN, [PAPER]),
+				row('Segona SL', undefined, [PAPER]),
+				row('Tercera SL', 'https://tercera.cat', []),
+			]
+			// WHEN the list is counted
+			// THEN only the two still short are counted — the settled one costs the
+			// confirming step nothing, so holding money back for it would keep money
+			// back for a search that never happens
+			expect(rowsAwaitingConfirmation(rows, NONE, noRunWords)).toBe(2)
+		})
+	})
+
+	describe('when the whole list is already settled', () => {
+		it('should count nothing', () => {
+			// GIVEN every company confirmed on its own site and a second website
+			const rows = [row(NAME, OWN, [PAPER]), row(NAME, OWN, [PAPER])]
+			// WHEN counted
+			// THEN the confirming step has nothing to buy
+			expect(rowsAwaitingConfirmation(rows, NONE, noRunWords)).toBe(0)
+		})
+	})
+
+	describe('when nothing the company cites is its own site', () => {
+		it('should count it as one still to be checked', () => {
+			// GIVEN a company with no site of its own, named only by a listing and
+			// a paper — two websites, but not one of them established as its own
+			const rows = [row(NAME, undefined, [LISTING, PAPER])]
+			// WHEN counted
+			// THEN it is still to be checked: two websites are not enough on their
+			// own, and this is exactly the row a site lookup would go on to settle
+			expect(rowsAwaitingConfirmation(rows, NONE, noRunWords)).toBe(1)
+		})
+	})
+
+	describe('when there is no list', () => {
+		it('should count nothing rather than guess', () => {
+			// GIVEN no companies at all
+			// WHEN counted
+			// THEN nothing is held back
+			expect(rowsAwaitingConfirmation([], NONE, noRunWords)).toBe(0)
+		})
+	})
+
+	describe('when a row names no company', () => {
+		it('should leave it out, because no search can be bought for it', () => {
+			// GIVEN an unnamed row beside one that can be searched for
+			const rows = [row('', undefined, []), row('Segona SL', undefined, [])]
+			// WHEN counted
+			// THEN only the row a search could settle counts: the confirming step
+			// declines to buy for a company it cannot name, so money kept back for
+			// the other is money no step ever spends
+			expect(rowsAwaitingConfirmation(rows, NONE, noRunWords)).toBe(1)
+		})
+	})
+})
+
+describe('awaitsConfirmation', () => {
+	const row = (
+		name: string,
+		website: string | undefined,
+		sources: ReadonlyArray<string>,
+	): Record<string, unknown> => ({
+		name,
+		...(website === undefined ? {} : { website }),
+		citations: sources.map(source_id => ({ source_id })),
+	})
+
+	describe('when the watch turns the clearing site into a listing', () => {
+		it('should go from settled to still to be checked', () => {
+			// GIVEN a company cleared by its own site plus a second website
+			const settled = row(NAME, OWN, [PAPER])
+			// WHEN the same row is read against a run that has since watched that
+			// host file company after company
+			// THEN it is no longer settled: the watch is what the answer turns on,
+			// so a caller handing in the wrong one gets the wrong count
+			expect(awaitsConfirmation(settled, NONE, noRunWords)).toBe(false)
+			expect(
+				awaitsConfirmation(
+					settled,
+					new Set(['fusteriamiquel.cat']),
+					noRunWords,
+				),
+			).toBe(true)
+		})
+	})
+
+	describe('when a row arrives in a shape nothing tidied', () => {
+		it('should read it as still to be checked rather than throwing', () => {
+			// GIVEN rows straight off an extraction: no citations at all, citations
+			// that are not a list, entries with no source, and a website that is
+			// not text
+			// WHEN each is read
+			// THEN each answers, because these are the shapes a model really
+			// returns and a count that threw here would take the run down
+			expect(awaitsConfirmation({ name: NAME }, NONE, noRunWords)).toBe(true)
+			expect(
+				awaitsConfirmation({ name: NAME, citations: 'nope' }, NONE, noRunWords),
+			).toBe(true)
+			expect(
+				awaitsConfirmation(
+					{ name: NAME, citations: [{}, null] },
+					NONE,
+					noRunWords,
+				),
+			).toBe(true)
+			expect(
+				awaitsConfirmation(
+					{ name: NAME, website: { value: OWN }, citations: [] },
+					NONE,
+					noRunWords,
+				),
+			).toBe(true)
+		})
 	})
 })
