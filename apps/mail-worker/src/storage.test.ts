@@ -46,6 +46,51 @@ describe('rawMessageKey', () => {
 		})
 	})
 
+	describe('when two folder names differ only in what a key cannot carry', () => {
+		it('should still give each of them a name of its own', () => {
+			// GIVEN folder names a mail server really hands over, differing only in
+			// characters that have to come out of a key
+			const shared = {
+				organizationId: 'org-1',
+				inboxId: 'inbox-1',
+				uidValidity: 1,
+				uid: 7,
+			}
+
+			// WHEN each is named for storage
+			// THEN no two share a name. Taking the characters out is many-to-one, so
+			// without a fingerprint each pair's message 7 was stored over the other's
+			for (const [one, other] of [
+				['Archive/2024', 'Archive 2024'],
+				['[Gmail]/Sent Mail', '[Gmail] Sent Mail'],
+				['Entwürfe', 'Entwörfe'],
+				['受信箱', '送信済み'],
+			] as const) {
+				expect(rawMessageKey({ ...shared, folder: one })).not.toBe(
+					rawMessageKey({ ...shared, folder: other }),
+				)
+			}
+		})
+
+		it('should name the same folder the same way every time', () => {
+			// GIVEN one folder named twice — what happens when a message is fetched
+			// again
+			const named = () =>
+				rawMessageKey({
+					organizationId: 'org-1',
+					inboxId: 'inbox-1',
+					folder: 'Archive/2024',
+					uidValidity: 1,
+					uid: 7,
+				})
+
+			// WHEN named twice
+			// THEN the same name, so a second fetch writes the identical bytes back
+			// in place rather than leaving a second copy behind
+			expect(named()).toBe(named())
+		})
+	})
+
 	describe('when the folder name is not safe to put in a key', () => {
 		it('should reduce it to something that is', () => {
 			// GIVEN a provider whose folder name carries separators and spaces
@@ -58,8 +103,13 @@ describe('rawMessageKey', () => {
 				uid: 2,
 			})
 
-			// THEN the name cannot open a path of its own inside the key
-			expect(key).toBe('messages/org-1/inbox-1/_Gmail__Sent_Mail/1/2.eml')
+			// THEN the name cannot open a path of its own inside the key, and it
+			// carries a fingerprint of how it arrived — reducing a name is
+			// many-to-one, so without one two folders share a segment and store
+			// message 7 over message 7
+			expect(key).toMatch(
+				/^messages\/org-1\/inbox-1\/_Gmail__Sent_Mail-[0-9a-f]{8}\/1\/2\.eml$/,
+			)
 		})
 	})
 })

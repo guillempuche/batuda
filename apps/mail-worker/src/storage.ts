@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer'
+import { createHash } from 'node:crypto'
 
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { Context, Effect, Layer, Redacted } from 'effect'
@@ -11,8 +12,18 @@ import { WorkerEnvVars } from './env.js'
 // is stored over message 7 of the inbox, and one of them is gone for good.
 // Folder names travel over the wire and can hold anything, so they are reduced
 // to what is safe in a key before use.
-const folderSegment = (folder: string): string =>
-	folder.replace(/[^a-zA-Z0-9._-]/g, '_')
+//
+// Reducing them is many-to-one, though, which puts the same hazard back one step
+// along: "Archive/2024" and "Archive 2024" both come out "Archive_2024", and the
+// two folders' message 7 land on one name again. So a name that had anything taken
+// out of it carries a short fingerprint of how it arrived, which makes the segment
+// its own again. A name that needed nothing taken out keeps exactly the segment it
+// always had, which is every folder tracked today.
+const folderSegment = (folder: string): string => {
+	const safe = folder.replace(/[^a-zA-Z0-9._-]/g, '_')
+	if (safe === folder) return safe
+	return `${safe}-${createHash('sha256').update(folder).digest('hex').slice(0, 8)}`
+}
 
 // S3-compatible object store (R2 in prod, MinIO in dev). The worker
 // uploads raw RFC822 bytes under a stable key derived from inbox + folder +
