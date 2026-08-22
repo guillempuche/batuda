@@ -1,7 +1,7 @@
 ---
 name: onboard-org
 description: This skill should be used when the user asks to "set up a new org", "create an organization", "onboard a customer", "onboard <name>", "add a member", "add someone to an org", "give <person> access", "create a tenant", or asks what to send a new customer so they can start using Batuda from ChatGPT or Claude.ai. Covers the developer-only `pnpm cli auth` org + first-admin creation (production, rehearsed locally), how members are added afterwards, the one-organization-per-connection rule for people who belong to several orgs, read-only confirmation, and the English getting-started message to hand over.
-allowed-tools: Bash(pnpm:*) Bash(infisical:*) Read
+allowed-tools: Bash(pnpm:*) Bash(nix:*) WebFetch WebSearch Read
 ---
 
 # Onboarding a new organization
@@ -12,10 +12,30 @@ Only a Batuda developer can create an organization. Public signup is off
 database. Everything after the first admin is self-serve: that admin adds their own people
 from the web app.
 
-Four steps, in order: **rehearse → create → confirm → hand over** — §1, §2, §5 and §6. The
-two sections in between are reference for when they come up, not steps. Never skip the
-confirm — an org that reaches a customer half-made costs a support round-trip that a
-two-second read would have prevented.
+**Onboarding means production.** Somebody asking to onboard an org is asking for one a
+customer can sign into, so never stop at the local run and never ask which environment is
+meant. Local is step one of this job, not a destination: it is where the command is
+rehearsed before it touches the real database. Only build a local-only org if the person
+says so in as many words.
+
+Settle the details first (§0), then five steps in order: **rehearse → research → create →
+confirm → hand over** — §1 to §3, §6 and §7. The two sections in between are reference for
+when they come up, not steps. Never skip the confirm — an org that reaches a customer
+half-made costs a support round-trip that a two-second read would have prevented.
+
+## 0. Get the details right first
+
+Three of the values are permanent and customer-visible, and nothing downstream will catch a
+wrong one:
+
+- **The person's full name** — greets them in the app forever. Ask for it. Never build one
+  from the email address: `kobie@…` is not a name, and a guess is visible to them on day one.
+- **The organization name and slug** — take them from whoever asked, not from the email
+  domain. The name is what the customer reads; the slug is permanent.
+- **The email address** — read it back before the production run. A wrong slug aborts with
+  `OrgSlugTaken`, but a wrong email has no guard, no delete anywhere in the CLI, and prints
+  no link in production. A typo becomes an account nobody can sign into, and the first
+  symptom is a customer saying it does not work.
 
 ## 1. Rehearse locally
 
@@ -27,17 +47,59 @@ walks it.
 pnpm cli auth invite-admin --email owner@acme.com --name "Ada Lovelace" --org-name "Acme" --org-slug acme --locale en
 ```
 
-The CLI captures the magic link in-process and prints it. With `pnpm dev:server` running,
-open it and confirm the sign-in lands. (`pnpm cli auth bootstrap-org` is the other local
-path — first admin *and* org on an empty database; it refuses if any `"user"` row exists.)
+The CLI captures the magic link in-process and prints it, already pointing at the host and
+port this checkout is served on — a worktree included. With `pnpm dev:server` running, open
+it as printed and confirm the sign-in lands. (`pnpm cli auth bootstrap-org` is the other
+local path — first admin *and* org on an empty database; it refuses if any `"user"` row
+exists.)
 
-## 2. Create it in production
+Two things this leaves behind, both worth clearing when the rehearsal is done: the dev
+server is still running, and the rehearsal org and user stay in the local database — there
+is no delete for either, so `pnpm cli db reset` (drop and re-migrate) is the only way back,
+and it takes the rest of the local data with it.
+
+## 2. Research the organization and who it sells to
+
+The handover in §7 is not a form letter with a name dropped into it. Four of its lines — the
+standing instructions, the research request, the companies to add and the contact — have to be
+written for this customer, and they cannot be written without knowing who the customer sells
+to. So find that out before going near production.
+
+**Run this research automatically, as part of the job.** Do not ask whether to look them up,
+do not ask the person to describe their own market, and do not wait to be told to search — an
+onboarding request is the instruction. The only thing worth asking about is a company you
+genuinely cannot identify from its domain.
+
+Fetch their own site, then search for what a home page will not tell you — the kinds of
+company that actually buy this, any customers or case studies they publish, and the job title
+that signs off. Both halves are needed: a site states a pitch, and what the examples need is
+the shape of a real prospect list. Two or three searches is usually enough.
+
+Come out of it able to answer, in one sentence each:
+
+- **What they sell, in the words a buyer would use.**
+- **What kind of company buys it** — concrete enough to search for, not "businesses".
+- **Who inside that company decides**, by role.
+- **Where** — one country, a region, or anywhere. Only say a country when their market plainly
+  is one; otherwise say nothing about geography and let it stay worldwide.
+
+That is what the four examples get written from. If the research comes up thin, say so when
+handing the message over rather than padding the examples with guesses.
+
+This is reading and searching public pages to write a better message. Nothing is written to
+their records, nothing is bought, and no guess leaves the message.
+
+## 3. Create it in production
 
 Read the target host first, then pass it back as the confirm:
 
 ```bash
-infisical run --env=prod -- pnpm cli doctor --env cloud
+nix develop -c infisical run --env=prod -- pnpm cli doctor --env cloud
 ```
+
+`infisical` is a package in the flake's dev shell, not a global install, so every production
+command below is prefixed with `nix develop -c`. Without it they all die with
+`command not found`.
 
 That run adds a **Cloud DB host** row the local run does not have, carrying the host the
 connection will actually dial — which is not always the address the connection string
@@ -45,15 +107,15 @@ appears to name. That row's value is what `--confirm-host` wants. The check fail
 than guessing when `DATABASE_URL` is missing or still points at localhost.
 
 ```bash
-infisical run --env=prod -- pnpm cli auth invite-admin --env cloud --email owner@acme.com --name "Ada Lovelace" --org-name "Acme" --org-slug acme --locale en --confirm-host <host from doctor>
+nix develop -c infisical run --env=prod -- pnpm cli auth invite-admin --env cloud --email owner@acme.com --name "Ada Lovelace" --org-name "Acme" --org-slug acme --locale en --confirm-host <host from doctor>
 ```
 
 What each part is doing, and the traps:
 
-- **Two independent halves.** `infisical run --env=prod` injects the secrets into this one
-  process; `--env cloud` layers the non-secret settings from
-  `apps/server/config.production.json`. Neither stands in for the other, and anything
-  already in the environment outranks both.
+- **Three independent parts.** `nix develop -c` puts `infisical` on the path;
+  `infisical run --env=prod` injects the secrets into this one process; `--env cloud` layers
+  the non-secret settings from `apps/server/config.production.json`. None stands in for
+  another, and anything already in the environment outranks the lot.
 - **`--confirm-host` replaces the interactive `y/N`** and refuses if it disagrees with the
   resolved `DATABASE_URL`. That is what makes a forgotten `--env cloud` harmless instead of
   a write to the wrong database. Never guess the value — read it from the `Cloud DB host`
@@ -69,12 +131,15 @@ What each part is doing, and the traps:
 - **The role follows the org**: creating one makes them `owner`, joining an existing one
   makes them `admin`.
 - **`--locale en|ca`** decides the language of their welcome email and their first visit.
-  Omitted leaves it unset.
+  Pass `ca` only for a customer who works in Catalan and `en` for everyone else. Always pass
+  one: omitted leaves the column null, and a null hands the choice to whatever the browser
+  asks for — so a Catalan-configured laptop opens an English customer's account in Catalan.
+  English is only where it lands once the browser offers nothing either.
 
 Secrets never go in argv — pnpm echoes its arguments. Nothing here takes one; keep it that
 way.
 
-## 3. Adding more people
+## 4. Adding more people
 
 - **Another admin, from the CLI** — the same `invite-admin` command with the same
   `--org-slug` plus `--allow-existing-org`. An email that already has an account is reused:
@@ -89,7 +154,7 @@ way.
 Prefer handing that second path — the members form — to the admin over running it for them.
 It is theirs, it is one form, and it keeps a developer out of the customer's daily work.
 
-## 4. People who belong to more than one organization
+## 5. People who belong to more than one organization
 
 An assistant acts in **exactly one organization per call**. A connection authorized for
 several has every call refused, with:
@@ -118,7 +183,7 @@ Reading the state on that page:
 | One organization chip                                  | Working. This is the state to aim for.                                                                                                     |
 | All your organizations                                 | Nobody has chosen. It reaches every org this person belongs to — which is what breaks every call for anyone in more than one organization. |
 | No organization selected                               | Every organization has been cut off from this connection. It reaches nothing.                                                              |
-| An owner removed this one. Ask them to allow it again. | The organization stopped it, so the member cannot tick it back on. §4.1                                                                    |
+| An owner removed this one. Ask them to allow it again. | The organization stopped it, so the member cannot tick it back on. §5.1                                                                    |
 
 Consequences to state in the handover when they apply:
 
@@ -127,7 +192,7 @@ Consequences to state in the handover when they apply:
 - An API key is pinned to one organization for its whole life, so a coding tool needs one
   key per org.
 
-### 4.1 Who can undo a stop, and who cannot
+### 5.1 Who can undo a stop, and who cannot
 
 A stop records who made it, and that record alone decides who can lift it.
 
@@ -150,17 +215,20 @@ not a developer, and not a reconnect.
 Include the multi-org part of the handover **only** for people it actually applies to. For a
 single-org person it is noise that invites them to change a setting that is already right.
 
-## 5. Confirm — read-only
+## 6. Confirm — read-only
 
 Nothing below writes anything or spends anything.
 
 ```bash
-infisical run --env=prod -- pnpm cli data orgs --env cloud
+nix develop -c infisical run --env=prod -- pnpm cli data orgs --env cloud
 ```
 
 ```bash
-infisical run --env=prod -- pnpm cli data members --env cloud
+nix develop -c infisical run --env=prod -- pnpm cli data members --env cloud
 ```
+
+Every command here prints the flake's shell banner and a couple of deprecation warnings from
+the database driver before its table. That is normal output, not a failure — read the table.
 
 What a healthy result looks like:
 
@@ -168,23 +236,45 @@ What a healthy result looks like:
 - `data members` — the person's email against that org slug, with the role that was
   intended (`owner` for a new org, `admin` for a joined one). One row per membership, so
   this is also where a multi-org person shows up as two rows.
-- `infisical run --env=prod -- pnpm cli auth list-users --env cloud` — the account itself,
-  if the email needs checking. Both halves are needed here too; without them it reads the
-  local database and reports a healthy-looking absence.
+- `nix develop -c infisical run --env=prod -- pnpm cli auth list-users --env cloud` — the
+  account itself, if the email needs checking. Every part is needed here too; without them it
+  reads the local database and reports a healthy-looking absence.
 
 If the org row exists with a member count of 0, the membership did not land. Re-run the same
 `invite-admin` with `--allow-existing-org` — without it the slug that already exists aborts
 with `OrgSlugTaken` — rather than creating a second org under a new slug. The account is
 reused, and the role lands as `admin` rather than `owner`, because the org is no longer new.
 
-## 6. Hand over the getting-started message
+**Then read the same output for your own account.** Adding yourself for support is what tips
+a developer's own address past one organization, and §5 applies to you exactly as it does to
+a customer: from the next call, every request through your own connection is refused until
+you pick one organization at `https://batuda.co/settings/mcp/connections`. Count your own
+rows in `data members` before moving on — the cost of missing it is your own tooling
+breaking later, somewhere that looks unrelated.
+
+## 7. Hand over the getting-started message
 
 Read `references/handover-message.md`, fill the placeholders, and **print the finished
 message in the conversation** in English, ready to paste into an email or a chat. Do not
 write it to a file unless asked for one.
 
-Fill in: the organization name, the person's first name, `https://batuda.co`,
-`https://api.batuda.co/mcp`. Keep or drop the multi-organization block per §4.
+Fill in: the organization name, the person's first name, `https://batuda.co`, and
+`https://api.batuda.co/mcp`.
+
+**Then write the four example prompts from the §2 research** — the standing instructions, the
+research request, the companies to add and the contact. The template carries no wording for
+these on purpose: they are the part a new customer reads to decide whether this tool
+understands their work, and somebody else's prospects answer that badly. The reference file
+says what each one has to do; the worked illustration in it is there to show the shape and is
+never pasted.
+
+**Keep or drop the multi-organization block** on the evidence already in front of you rather
+than on a guess: count that person's rows in the §6 `data members` output. Two or more means
+keep it, one means drop it, for the reason §5 gives.
+
+**Say who sends it.** Production emails nothing, so until somebody writes to them the
+customer does not know the account exists. Print the message and say plainly that it still
+needs sending, and from whose address.
 
 The message is customer-facing copy, so it follows `docs/brand-voice.md`:
 
@@ -201,10 +291,11 @@ their email will be in Catalan even though this message is English.
 
 | Symptom                                    | Cause and fix                                                                                                       |
 | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| `infisical: command not found`             | The `nix develop -c` prefix is missing — it is a flake dev-shell package, not a global install. §3.                 |
 | `UsersAlreadyExist`                        | `bootstrap-org` ran against a database that already has users. Use `invite-admin`.                                  |
 | `OrgSlugTaken`                             | The slug exists. Check for a typo; add `--allow-existing-org` only if joining it is the intent.                     |
 | The command refuses the host               | `--confirm-host` disagrees with the resolved `DATABASE_URL` — the target is not what was assumed. Re-read `doctor`. |
-| Customer says every request is refused     | Multi-organization connection. §4.                                                                                  |
+| Customer says every request is refused     | Multi-organization connection. §5.                                                                                  |
 | Customer signed in but sees 403 everywhere | Signed in with no organization. Check `data members` for a membership row.                                          |
 
 ## Additional resources
