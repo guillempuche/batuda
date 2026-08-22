@@ -13,6 +13,7 @@ import {
 	perFieldSearchQuery,
 	perFieldSearchRound,
 	type RescueTarget,
+	roundChangedNothing,
 	rowsMissing,
 	scanRowFields,
 	scanRowFoldFields,
@@ -1552,6 +1553,56 @@ describe('the fields each shape rescues', () => {
 					expect(row).toHaveProperty(field)
 				}
 			}
+		})
+	})
+})
+
+describe('roundChangedNothing', () => {
+	// A round that bought searches and came back with the answer untouched.
+	const untouched = {
+		filled: 0,
+		added: 0,
+		folded: 0,
+		contactsChanged: false,
+		websitesBlanked: 0,
+		fieldsVoided: 0,
+	}
+
+	describe('when the round left the answer exactly as it found it', () => {
+		it('should say so, so the run stops rather than buying the same silence', () => {
+			// GIVEN a round that filled nothing, found nobody, joined nobody, named
+			// nobody new and took nothing away
+			// WHEN the round is judged
+			// THEN there is nothing left for another round to buy
+			expect(roundChangedNothing(untouched)).toBe(true)
+		})
+	})
+
+	describe.each([
+		['filled a blank', { filled: 1 }],
+		['found a company the list did not hold', { added: 1 }],
+		['joined two rows into one company', { folded: 1 }],
+		['named somebody new', { contactsChanged: true }],
+		['took an address off the list', { websitesBlanked: 1 }],
+		['took away a field belonging to another company', { fieldsVoided: 1 }],
+	])('when the round has %s and nothing else', (_what, change) => {
+		it('should not read as a round that did nothing', () => {
+			// GIVEN a round whose only mark on the answer is this one
+			// WHEN the round is judged
+			// THEN the run carries on: judged on what it gained alone this reads as
+			// a spent round, and the rest of the list would go unasked
+			expect(roundChangedNothing({ ...untouched, ...change })).toBe(false)
+		})
+	})
+
+	describe('when a round both gained and gave up ground', () => {
+		it('should still count as a round that changed something', () => {
+			// GIVEN a round that filled two blanks and took one wrong address away
+			// WHEN judged
+			// THEN it changed the answer, whichever direction each change went in
+			expect(
+				roundChangedNothing({ ...untouched, filled: 2, websitesBlanked: 1 }),
+			).toBe(false)
 		})
 	})
 })

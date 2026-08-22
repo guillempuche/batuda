@@ -356,6 +356,46 @@ export interface PerFieldMerge {
 	readonly folded: number
 }
 
+/** Everything one gap round can change about a run's answer. */
+export interface RoundChange {
+	/** Blanks the round filled in. */
+	readonly filled: number
+	/** Companies the round found that the list did not hold. */
+	readonly added: number
+	/** Companies that went in and came out joined to one already listed. */
+	readonly folded: number
+	/** Whether the people the run names gained anyone, or gained a detail. */
+	readonly contactsChanged: boolean
+	/** Addresses the round took off the list once it could see the whole of it. */
+	readonly websitesBlanked: number
+	/** Fields the round took away as belonging to some other company. */
+	readonly fieldsVoided: number
+}
+
+/**
+ * Whether a round left the answer exactly as it found it.
+ *
+ * A round that changed nothing has bought all it is going to: the next one would
+ * pay for the same silence. But a round changes the answer in more ways than it
+ * gains things by, and every one of them counts here.
+ *
+ * Two companies written once are not a company lost, and the row that stays keeps
+ * what both of them knew. A run about a single company can gain people and never
+ * a company. And a round that takes an address away because it belongs to somebody
+ * else has opened a blank the next round can go and fill — the round after a
+ * correction is the one most worth having.
+ *
+ * Read the wrong way round, each of those is a working round mistaken for a spent
+ * one, and the rest of the list goes unasked.
+ */
+export const roundChangedNothing = (change: RoundChange): boolean =>
+	change.filled === 0 &&
+	change.added === 0 &&
+	change.folded === 0 &&
+	!change.contactsChanged &&
+	change.websitesBlanked === 0 &&
+	change.fieldsVoided === 0
+
 /**
  * Fold a re-extraction over the enlarged evidence back into a scan's list.
  *
