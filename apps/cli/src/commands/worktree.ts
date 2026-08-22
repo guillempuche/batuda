@@ -839,10 +839,93 @@ export const NOTHING_TO_DROP =
  * Any git failure while answering reads as "not already there", so a doubt
  * keeps the branch rather than deleting it.
  */
+/**
+ * The number of a merged pull request in what `gh pr list --json number` printed,
+ * or null when it named none.
+ *
+ * Its own function so the shape can be read against real output without a network
+ * or a signed-in `gh`: everything that decides whether a branch may be deleted
+ * should be readable somewhere.
+ */
+export const mergedPullRequestIn = (printed: string): number | null => {
+	try {
+		const listed: unknown = JSON.parse(printed)
+		if (!Array.isArray(listed)) return null
+		const first: unknown = listed[0]
+		if (first === null || typeof first !== 'object') return null
+		const number = (first as { number?: unknown }).number
+		return typeof number === 'number' ? number : null
+	} catch {
+		// Not JSON at all, which is what a `gh` that failed prints.
+		return null
+	}
+}
+
+/**
+ * The `owner/name` GitHub knows a checkout as, read off the address its remote
+ * was cloned from. Null when the address names no GitHub repository.
+ *
+ * Both the addresses git clones from are read — the `https://` one and the `git@`
+ * one — and the `.git` some carry and some do not comes off either way.
+ */
+export const repositoryNameIn = (remoteAddress: string): string | null =>
+	/github\.com[:/]([^/]+\/[^/]+?)(?:\.git)?\/?$/.exec(
+		remoteAddress.trim(),
+	)?.[1] ?? null
+
+/**
+ * The pull request GitHub has already merged for this branch, or null.
+ *
+ * Asked before anything below, because it is the only exact answer to hand.
+ * Everything below compares diffs, and a diff stops matching the moment main
+ * gains a commit touching the same files: the rebase that merges the branch folds
+ * that other commit into those files, so main genuinely carries the work while no
+ * patch and no file on main is identical to the branch's. That is the ordinary
+ * case on a repository anybody else is pushing to, and it left the refusal firing
+ * on branches merged an hour earlier — which teaches the reader to reach for
+ * --force, the one flag that deletes without looking.
+ *
+ * Anything that goes wrong — no `gh`, not signed in, nothing to reach — comes
+ * back null, and the readings below answer instead. This is one more way to say
+ * yes, never a new way to refuse.
+ */
+const mergedPullRequestFor = (root: string, branch: string) =>
+	Effect.gen(function* () {
+		// Named outright rather than left to `gh` to work out from a directory: the
+		// teardown runs from wherever it was called, which is not always inside this
+		// checkout.
+		const remote = yield* execSilentArgs('git', [
+			'-C',
+			root,
+			'remote',
+			'get-url',
+			'origin',
+		])
+		const repo = repositoryNameIn(remote)
+		if (repo === null) return null
+		return mergedPullRequestIn(
+			yield* execSilentArgs('gh', [
+				'pr',
+				'list',
+				'--repo',
+				repo,
+				'--head',
+				branch,
+				'--state',
+				'merged',
+				'--limit',
+				'1',
+				'--json',
+				'number',
+			]),
+		)
+	}).pipe(Effect.orElseSucceed((): number | null => null))
+
 const branchWorkIsOnMain = (root: string, branch: string) =>
 	Effect.gen(function* () {
 		const git = (...args: ReadonlyArray<string>) =>
 			execSilentArgs('git', ['-C', root, ...args])
+		if ((yield* mergedPullRequestFor(root, branch)) !== null) return true
 		const mainReachesIt = yield* git(
 			'merge-base',
 			'--is-ancestor',
@@ -1019,7 +1102,7 @@ const refuseUnlessWorkIsOnMain = (
 		if (force || (yield* branchWorkIsOnMain(root, branch))) return
 		return yield* Effect.fail(
 			new Error(
-				`Branch ${branch} holds work main carries no copy of, in any of the shapes a merge leaves. Nothing has been removed. Look at it with \`git log main..${branch}\`, then run again with --force if you are happy to lose it.`,
+				`Branch ${branch} holds work main carries no copy of, and GitHub has no merged pull request for it. Nothing has been removed. Look at it with \`git log main..${branch}\`, or at its pull request; then run again with --force if you are happy to lose it.`,
 			),
 		)
 	})
