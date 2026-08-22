@@ -14,6 +14,7 @@ import {
 } from '@batuda/controllers'
 import { Document, type DocumentSubjectTable } from '@batuda/domain'
 
+import { textAnywhere } from '../lib/search-text'
 import {
 	pageOf,
 	probeLimit,
@@ -63,10 +64,7 @@ const makeSummaryDecoder = () =>
 // short enough that a page of them is not a page of whole documents.
 const SNIPPET_CHARS = 200
 
-// A search term is a plain substring, so the characters Postgres reads as
-// wildcards have to be escaped or a stray `%` matches everything.
-const likeNeedle = (search: string) =>
-	`%${search.replace(/[\\%_]/g, match => `\\${match}`)}%`
+const likeNeedle = (search: string) => textAnywhere(search)
 
 export const DocumentsLive = HttpApiBuilder.group(
 	BatudaApi,

@@ -5,6 +5,7 @@ import { SqlClient } from 'effect/unstable/sql'
 import { BadRequest, Conflict, CurrentOrg, NotFound } from '@batuda/controllers'
 import { Task } from '@batuda/domain'
 
+import { textAnywhere } from '../lib/search-text'
 import {
 	type CountMode,
 	probeLimit,
@@ -213,7 +214,7 @@ export class TaskService extends Context.Service<TaskService>()('TaskService', {
 			if (filters.completed === false)
 				conditions.push(sql`status NOT IN ('done', 'cancelled')`)
 			if (filters.search) {
-				const needle = `%${filters.search.replace(/[\\%_]/g, match => `\\${match}`)}%`
+				const needle = textAnywhere(filters.search)
 				// The words a task carries used to sit in a box on the row itself.
 				// They are documents now, so a search that only read the row would
 				// quietly stop finding half of what it used to.

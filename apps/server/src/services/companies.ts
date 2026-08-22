@@ -10,6 +10,7 @@ import {
 } from '@batuda/controllers'
 import { Company, Contact, Interaction } from '@batuda/domain'
 
+import { textAnywhere } from '../lib/search-text'
 import {
 	type CountMode,
 	pageOf,
@@ -132,7 +133,7 @@ export class CompanyService extends Context.Service<CompanyService>()(
 								sql`EXISTS (
 									SELECT 1 FROM jsonb_array_elements(COALESCE(fit_checks, '[]'::jsonb)) fc
 									WHERE fc->>'result' = 'pass'
-										AND fc->>'criterion' ILIKE ${`%${filters.fitCriterionPassed}%`}
+										AND fc->>'criterion' ILIKE ${textAnywhere(filters.fitCriterionPassed)}
 								)`,
 							)
 						if (filters.attention)
@@ -140,7 +141,7 @@ export class CompanyService extends Context.Service<CompanyService>()(
 								attentionCondition(sql, filters.attention, filters.staleDays),
 							)
 						if (filters.query)
-							conditions.push(sql`name ILIKE ${`%${filters.query}%`}`)
+							conditions.push(sql`name ILIKE ${textAnywhere(filters.query)}`)
 						// A rectangle on the map matches a company when the company's own
 						// pin is inside it, or when any of its branches is. Without the
 						// second half, a chain registered in one city is invisible to
