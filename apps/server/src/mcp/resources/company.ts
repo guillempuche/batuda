@@ -2,6 +2,7 @@ import { Effect, Schema } from 'effect'
 import { McpSchema, McpServer } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
+import { textAtTheStart } from '../../lib/search-text'
 import { CompanyService } from '../../services/companies'
 
 const slugParam = McpSchema.param('slug', Schema.String)
@@ -19,7 +20,7 @@ export const CompanyResource =
 					const sql = yield* SqlClient.SqlClient
 					const rows = yield* sql<{ slug: string }>`
 							SELECT slug FROM companies
-							WHERE slug ILIKE ${`${input}%`}
+							WHERE slug ILIKE ${textAtTheStart(input)}
 								AND deleted_at IS NULL
 							ORDER BY updated_at DESC LIMIT 10
 						`

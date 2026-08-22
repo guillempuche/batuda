@@ -48,6 +48,7 @@ import {
 const UUID_PATTERN =
 	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+import { textAnywhere } from '../lib/search-text'
 import { CalendarService } from './calendar.js'
 import { suppressedAmong } from './channels.js'
 import { CredentialCrypto } from './credential-crypto.js'
@@ -309,20 +310,22 @@ const toOutboundAttachments = (
 		...(a.disposition !== undefined && { disposition: a.disposition }),
 	}))
 
-// Outbound R2 key. The IMAP UID isn't known until the worker re-syncs the
-// Sent folder, so the key shape diverges from the inbound one
-// (`messages/<org>/<inbox>/<uidvalidity>/<uid>.eml`). Sanitize the
-// Message-ID — nodemailer returns `<random@host>`; angle-brackets and
-// any non-filename-safe glyph get folded to `_` so the path stays valid
-// across S3-compatible backends.
-const sentRawKey = (
-	organizationId: string,
-	inboxId: string,
-	messageId: string,
-): string => {
-	const safe = messageId.replace(/[<>]/g, '').replace(/[^a-zA-Z0-9@.\-_]/g, '_')
-	return `messages/${organizationId}/${inboxId}/sent/${safe}.eml`
-}
+// Outbound R2 key. The IMAP UID isn't known until the worker re-syncs the Sent
+// folder, so the key shape diverges from the inbound one
+// (`messages/<org>/<inbox>/<uidvalidity>/<uid>.eml`).
+//
+// The name is drawn fresh rather than taken from the Message-ID. Folding an id
+// down to what a path may carry turns many ids into one name — "+", "!" and "#"
+// are all legal in a Message-ID and all became "_" — and storing is a plain
+// overwrite, so the second message to take a name wrote over the first one's
+// bytes with nothing said. Those bytes are the only copy on our side, and every
+// read of the older message then served the newer one's mail.
+//
+// Which message an object belongs to is answered by `email_messages.raw_rfc822_ref`,
+// which holds this name and is the only thing that ever reads it back — so nothing
+// needs the name to be guessable from the message.
+export const sentRawKey = (organizationId: string, inboxId: string): string =>
+	`messages/${organizationId}/${inboxId}/sent/${randomUUID()}.eml`
 
 const toRecipientArray = (
 	value: string | readonly string[] | undefined,
@@ -995,7 +998,7 @@ export class EmailService extends Context.Service<EmailService>()(
 						inbox.id,
 					)
 					const messageId = sent.messageId
-					const key = sentRawKey(inbox.organizationId, inbox.id, messageId)
+					const key = sentRawKey(inbox.organizationId, inbox.id)
 					yield* storage
 						.put({ key, body: sent.raw, contentType: 'message/rfc822' })
 						.pipe(
@@ -1843,7 +1846,7 @@ export class EmailService extends Context.Service<EmailService>()(
 										WHERE em2.organization_id = tl.organization_id
 										  AND (em2.message_id = tl.external_thread_id
 										       OR em2."references" @> ARRAY[tl.external_thread_id]::text[])
-										  AND mp.email_address ILIKE ${`%${trimmedQuery}%`}
+										  AND mp.email_address ILIKE ${textAnywhere(trimmedQuery)}
 									)
 								)`)
 							}

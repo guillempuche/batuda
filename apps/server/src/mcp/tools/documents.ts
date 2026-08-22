@@ -9,6 +9,7 @@ import {
 	DocumentSubjectTable,
 } from '@batuda/domain'
 
+import { textAnywhere } from '../../lib/search-text'
 import {
 	deleteStoredFile,
 	HTML_URL_TTL_SECONDS,
@@ -211,10 +212,7 @@ export const DocumentHandlersLive = DocumentTools.toLayer(
 					}
 					if (params.type) conditions.push(sql`d.type = ${params.type}`)
 					if (params.q) {
-						// A search term is a plain substring, so the characters
-						// Postgres reads as wildcards have to be escaped or a stray
-						// `%` matches everything.
-						const needle = `%${params.q.replace(/[\\%_]/g, match => `\\${match}`)}%`
+						const needle = textAnywhere(params.q)
 						conditions.push(
 							sql`(d.title ILIKE ${needle} OR d.content ILIKE ${needle})`,
 						)

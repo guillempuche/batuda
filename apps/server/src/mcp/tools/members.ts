@@ -4,6 +4,7 @@ import { SqlClient, type Statement } from 'effect/unstable/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
 
+import { textAnywhere } from '../../lib/search-text'
 import { CurrentUser } from '../current-user'
 
 const REQUEST_DEPENDENCIES = [CurrentOrg, CurrentUser]
@@ -48,7 +49,7 @@ export const MemberHandlersLive = MemberTools.toLayer(
 					// reading it any other way would reach across organisations.
 					const conditions: Array<Statement.Fragment> = [sql`TRUE`]
 					if (query !== undefined) {
-						const like = `%${query}%`
+						const like = textAnywhere(query)
 						conditions.push(
 							sql`(u.name ILIKE ${like} OR u.email ILIKE ${like})`,
 						)
