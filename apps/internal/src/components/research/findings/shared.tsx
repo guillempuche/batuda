@@ -79,6 +79,11 @@ export type CommonFindings = {
 	readonly quality?: {
 		readonly low_confidence?: boolean
 		/**
+		 * Set by a run about a company whose name it could not read, so none of the
+		 * checks that ask whether the pages are that company's ever ran.
+		 */
+		readonly subject_unreadable?: boolean
+		/**
 		 * Which kinds of company the request asked for came back with rows and which
 		 * did not. Only a search that was asked about several carries it.
 		 */
@@ -298,6 +303,12 @@ export function CommonSections({
 	const foundNothing = findings?.reason === 'no_reliable_data'
 	const needsReading =
 		!foundNothing && findings?.quality?.low_confidence === true
+	// Named apart from the caution above: that one says the run wants reading,
+	// this says the single thing about it nobody could check. A reader told only
+	// "read this" has no way to tell it from a run that was checked and came back
+	// unsure, which is a much smaller worry.
+	const subjectUnreadable =
+		!foundNothing && findings?.quality?.subject_unreadable === true
 	// A search asked about several kinds of company can come back with a long list
 	// answering one of them. Naming the ones it came back with nobody for is what
 	// lets a reader tell "this market has none" from "the search stopped early" —
@@ -325,6 +336,16 @@ export function CommonSections({
 				<Section data-testid='research-needs-reading'>
 					<NeedsReadingFlag>
 						<Trans>Read this before it goes into a record</Trans>
+					</NeedsReadingFlag>
+				</Section>
+			) : null}
+			{subjectUnreadable ? (
+				<Section data-testid='research-subject-unreadable'>
+					<NeedsReadingFlag>
+						<Trans>
+							This company's name could not be read, so nothing checked the
+							pages are its own
+						</Trans>
 					</NeedsReadingFlag>
 				</Section>
 			) : null}

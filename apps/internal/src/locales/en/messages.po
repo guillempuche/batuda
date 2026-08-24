@@ -5950,6 +5950,10 @@ msgstr "This assistant works in the organizations you tick here."
 msgid "This company can't be displayed"
 msgstr "This company can't be displayed"
 
+#: src/components/research/findings/shared.tsx
+msgid "This company's name could not be read, so nothing checked the pages are its own"
+msgstr "This company's name could not be read, so nothing checked the pages are its own"
+
 #: src/components/companies/documents-panel.tsx
 msgid "This document is a web page. It opens in a new tab."
 msgstr "This document is a web page. It opens in a new tab."

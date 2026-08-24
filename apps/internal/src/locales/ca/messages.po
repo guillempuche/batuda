@@ -5950,6 +5950,10 @@ msgstr "Aquest assistent treballa a les organitzacions que marquis aquí."
 msgid "This company can't be displayed"
 msgstr "Aquesta empresa no es pot mostrar"
 
+#: src/components/research/findings/shared.tsx
+msgid "This company's name could not be read, so nothing checked the pages are its own"
+msgstr "No s'ha pogut llegir el nom d'aquesta empresa, així que res no ha comprovat que les pàgines siguin seves"
+
 #: src/components/companies/documents-panel.tsx
 msgid "This document is a web page. It opens in a new tab."
 msgstr "Aquest document és una pàgina web. S'obre en una pestanya nova."
