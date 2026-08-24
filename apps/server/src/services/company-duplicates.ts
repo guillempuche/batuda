@@ -107,13 +107,21 @@ export const nameOverlap = (
 	return matched / total
 }
 
-/** A company already on file that the one being added may be another spelling of. */
+/**
+ * A company that was created, and the one it may be another spelling of.
+ *
+ * Reported, never refused: only the person adding them knows whether two
+ * similar names are two branches or one company typed twice.
+ */
 export interface PossibleDuplicate {
+	/** The company that was created. */
 	readonly slug: string
-	readonly existing_slug: string
-	readonly existing_name: string
+	readonly matches_slug: string
+	readonly matches_name: string
+	/** Whether the lookalike was already on file or arrived in the same request. */
+	readonly matches: 'on_file' | 'in_request'
 	readonly matched_on: 'website' | 'name'
-	/** 0–100, how much of the new name the existing one accounts for. */
+	/** 0–100, how much of the new name the other one accounts for. */
 	readonly confidence: number
 }
 
@@ -167,7 +175,6 @@ export const findDuplicateCompanies = (
 			WHERE c.organization_id = ${orgId} AND c.deleted_at IS NULL
 			LIMIT ${SAMPLE_CAP}
 		`
-		if (existing.length === 0) return [] as ReadonlyArray<PossibleDuplicate>
 
 		if (existing.length === SAMPLE_CAP) {
 			yield* Effect.logInfo('companies.duplicates.sampled').pipe(
@@ -192,28 +199,54 @@ export const findDuplicateCompanies = (
 			row.website === null ? undefined : hostOf(row.website),
 		)
 
+		// Everything a company being added is weighed against: what is already on
+		// file, and — as the loop goes — the entries that arrived ahead of it in
+		// this same request. Two spellings of one company sent together used to be
+		// written as two rows with nothing said about it.
+		const seen: Array<{
+			readonly slug: string
+			readonly name: string
+			readonly tokens: ReadonlyArray<string>
+			readonly host: string | undefined
+			readonly matches: 'on_file' | 'in_request'
+		}> = existing.map((row, index) => ({
+			slug: row.slug,
+			name: row.name,
+			tokens: tokensByRow[index] ?? [],
+			host: hostsByRow[index],
+			matches: 'on_file' as const,
+		}))
+
 		const found: Array<PossibleDuplicate> = []
 		for (const candidate of incoming) {
 			const tokens = nameTokens(candidate.name)
 			const host =
 				candidate.website === undefined ? undefined : hostOf(candidate.website)
 			let best: PossibleDuplicate | undefined
-			for (const [index, row] of existing.entries()) {
+			for (const other of seen) {
 				// The same web address is the same company, whatever it calls itself.
-				const sameHost = host !== undefined && hostsByRow[index] === host
-				const overlap = nameOverlap(tokens, tokensByRow[index] ?? [], weightOf)
+				const sameHost = host !== undefined && other.host === host
+				const overlap = nameOverlap(tokens, other.tokens, weightOf)
 				if (!sameHost && overlap < REPORT_ABOVE) continue
 				const confidence = sameHost ? 100 : Math.round(overlap * 100)
 				if (best !== undefined && best.confidence >= confidence) continue
 				best = {
 					slug: candidate.slug,
-					existing_slug: row.slug,
-					existing_name: row.name,
+					matches_slug: other.slug,
+					matches_name: other.name,
+					matches: other.matches,
 					matched_on: sameHost ? 'website' : 'name',
 					confidence,
 				}
 			}
 			if (best !== undefined) found.push(best)
+			seen.push({
+				slug: candidate.slug,
+				name: candidate.name,
+				tokens,
+				host,
+				matches: 'in_request',
+			})
 		}
 		return found as ReadonlyArray<PossibleDuplicate>
 	})
