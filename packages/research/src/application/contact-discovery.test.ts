@@ -8,12 +8,14 @@ import { BudgetExceeded, ProviderError } from '../domain/errors'
 import { EnrichmentResult } from '../domain/types'
 import {
 	buyingRoleFromTitle,
+	compareByBuyingRole,
 	compareContacts,
 	type DiscoveredContact,
 	dedupePeople,
 	emailChannel,
 	estimateDiscoverCostCents,
 	MAX_VERIFICATIONS,
+	peopleToReach,
 	runEnrichmentChain,
 } from './contact-discovery'
 import {
@@ -199,6 +201,113 @@ describe('compareContacts', () => {
 				channels: [{ kind: 'linkedin', value: 'https://linkedin.com/in/x' }],
 			}
 			expect([socialOnly, withEmail].sort(compareContacts)[0]).toBe(withEmail)
+		})
+	})
+})
+
+describe('compareByBuyingRole', () => {
+	const director = {
+		firstName: 'Marta',
+		lastName: 'Ferrer',
+		position: 'Director General',
+	}
+	const clerk = {
+		firstName: 'Pau',
+		lastName: 'Roig',
+		position: 'Administratiu',
+	}
+
+	describe('when one person decides a purchase and the other does not', () => {
+		it('should put the decider first whichever order they arrive in', () => {
+			// GIVEN a director and a clerk, offered in each order. The paid checks stop
+			// at a ceiling, so whoever lands in front is who the money is spent on
+			// THEN the director is reached first either way
+			expect([clerk, director].sort(compareByBuyingRole)[0]).toBe(director)
+			expect([director, clerk].sort(compareByBuyingRole)[0]).toBe(director)
+		})
+	})
+
+	describe('when neither person decides a purchase', () => {
+		it('should leave the order the register gave them', () => {
+			// GIVEN two people whose titles suggest no part in a purchase
+			const other = {
+				firstName: 'Nuria',
+				lastName: 'Sala',
+				position: 'Administrativa',
+			}
+			// THEN nothing is reordered: there is no reason to prefer either
+			expect([clerk, other].sort(compareByBuyingRole)).toEqual([clerk, other])
+		})
+	})
+
+	describe('when both people decide a purchase', () => {
+		it('should leave the order the register gave them', () => {
+			// GIVEN a director and a founder, both of whom can carry a purchase
+			const founder = {
+				firstName: 'Jordi',
+				lastName: 'Vila',
+				seniority: 'founder',
+			}
+			// THEN neither outranks the other, so the order they arrived in stands
+			expect([director, founder].sort(compareByBuyingRole)).toEqual([
+				director,
+				founder,
+			])
+		})
+	})
+
+	describe('when a register named somebody without a position', () => {
+		it('should rank them behind a decider', () => {
+			// GIVEN a person carrying no title at all
+			const nameless = { firstName: 'Anna', lastName: 'Puig' }
+			// THEN the director is still the one worth spending on first
+			expect([nameless, director].sort(compareByBuyingRole)[0]).toBe(director)
+		})
+	})
+})
+
+describe('peopleToReach', () => {
+	// What a Spanish register gives back for one firm: it lists positions, so
+	// Marta is named twice because she holds two of them, and the junior of the
+	// two happens to come first.
+	const fromRegister = [
+		{ firstName: 'Marta', lastName: 'Ferrer', position: 'Consejera Delegada' },
+		{ firstName: 'Jordi', lastName: 'Vila', position: 'Secretario' },
+		{ firstName: 'Marta', lastName: 'Ferrer', position: 'Presidente' },
+	]
+
+	describe('when a register names one person under two roles', () => {
+		it('should keep her once, under the role that can carry a purchase', () => {
+			// GIVEN the register above, where merging on first-seen would keep
+			// 'Consejera Delegada' and throw away the listing that marks her a buyer
+			const reached = peopleToReach(fromRegister)
+			// THEN she appears once, as the president, at the front — so she is the
+			// one the limited address checks are spent on
+			expect(reached).toHaveLength(2)
+			expect(reached[0]).toEqual({
+				firstName: 'Marta',
+				lastName: 'Ferrer',
+				position: 'Presidente',
+			})
+		})
+	})
+
+	describe('when nobody is listed twice', () => {
+		it('should hand back everyone, deciders first', () => {
+			// GIVEN two distinct people, the decider named last
+			const reached = peopleToReach([
+				{ firstName: 'Pau', lastName: 'Roig', position: 'Apoderado' },
+				{ firstName: 'Jordi', lastName: 'Vila', position: 'Presidente' },
+			])
+			// THEN nobody is dropped and the president is asked about first
+			expect(reached.map(p => p.firstName)).toEqual(['Jordi', 'Pau'])
+		})
+	})
+
+	describe('when the register named nobody', () => {
+		it('should hand back an empty list', () => {
+			// GIVEN a company whose register entry lists no active positions
+			expect(peopleToReach([])).toEqual([])
 		})
 	})
 })
@@ -545,6 +654,22 @@ describe('dedupePeople', () => {
 			// THEN the first wins — there is nothing better to prefer
 			expect(merged).toHaveLength(1)
 			expect(merged[0]?.email).toBe('first@acme.example')
+		})
+	})
+
+	describe('when a register lists one person under two roles', () => {
+		it('should collapse them to one', () => {
+			// GIVEN a company register that lists positions rather than people, so a
+			// director holding two active roles arrives twice under the same name
+			const merged = dedupePeople([
+				somePerson('Marta', 'Ferrer'),
+				somePerson('Marta', 'Ferrer'),
+			])
+			// THEN she is one person. Left doubled, her two entries guess the same
+			// address and reach the verifier under one key, so one is turned away as
+			// already bought — coming back unreachable, stamping the run as resumed,
+			// and spending one of the ten checks on nothing
+			expect(merged).toHaveLength(1)
 		})
 	})
 

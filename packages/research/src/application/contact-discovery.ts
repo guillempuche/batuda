@@ -49,7 +49,7 @@ import {
 // A person from either name source (registry directors or the enrichment
 // vendor). Registry directors arrive with just a name + role; enrichment adds
 // emails, seniority, and other channels. Only the fields the pipeline reads.
-interface SourcePerson {
+export interface SourcePerson {
 	readonly firstName: string
 	readonly lastName: string
 	readonly position?: string | undefined
@@ -369,6 +369,31 @@ export const compareContacts = (
 	return (emailB?.confidence ?? 0) - (emailA?.confidence ?? 0)
 }
 
+// Whoever can carry a purchase forward is reached first. The paid checks in
+// discovery stop at a ceiling, so this decides who the money is spent on. It
+// asks the same question `compareContacts` sorts the finished list by, so the
+// two cannot drift apart.
+export const compareByBuyingRole = (
+	a: SourcePerson,
+	b: SourcePerson,
+): number => {
+	const aDecides = decidesPurchase(buyingRoleFromTitle(a.position, a.seniority))
+	const bDecides = decidesPurchase(buyingRoleFromTitle(b.position, b.seniority))
+	if (aDecides === bDecides) return 0
+	return aDecides ? -1 : 1
+}
+
+// The list the paid checks work through: one person once, and whoever can
+// carry a purchase forward at the front.
+//
+// Sorted before the merge, not after. The merge keeps the first copy of a
+// person, so a director the register happens to list under a junior title
+// first would otherwise survive as the junior one — losing both the title
+// that says they can buy and their place at the front of the queue.
+export const peopleToReach = (
+	people: ReadonlyArray<SourcePerson>,
+): SourcePerson[] => dedupePeople([...people].sort(compareByBuyingRole))
+
 export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 	'ContactDiscovery',
 	{
@@ -633,8 +658,16 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 								}),
 							)
 
+						// A register lists a position, not a person, so a director holding two
+						// roles arrives twice. Both copies guess the same address and go to the
+						// verifier under the same key, so one pays and the other is turned away
+						// as already bought: it comes back with no address, the run stamps itself
+						// as having resumed paid work, and one of the ten checks a call may make
+						// is spent buying nothing. Settled before any money moves.
+						const toReach = peopleToReach(people)
+
 						const built = yield* Effect.forEach(
-							people,
+							toReach,
 							person =>
 								Effect.gen(function* () {
 									const channels: ContactChannel[] = []
