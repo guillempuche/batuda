@@ -2,13 +2,13 @@
  * Turns a finished run's shape into a small quality signal, so an automation can
  * tell a well-grounded result from a thin one without inspecting every run by hand.
  *
- * Every run reported `succeeded` before, whether it did six grounded rounds on the
- * company's own site or one search on a nonsense query — nothing to gate on. This
- * derives a compact `quality` block and a `low_confidence` flag from signals the
- * run already produced. The flag is deliberately conservative: it should catch the
+ * Without it a run that did six grounded rounds on the company's own site and one
+ * that ran a single search on a nonsense query both report `succeeded`, and there
+ * is nothing to gate on. This derives a compact `quality` block and a
+ * `low_confidence` flag from signals the run already produced. The flag is deliberately conservative: it should catch the
  * clearly-thin runs, not second-guess a solid one.
  *
- * Five signals raise it. Whenever a run was pinned to one company, anything short
+ * Six signals raise it. Whenever a run was pinned to one company, anything short
  * of clearly reaching that company counts — which covers an enrichment filling
  * that company's profile and equally a scan launched from it, since a scan can be
  * pinned to a subject too and a wrong one there is just as misleading. On top of
@@ -22,6 +22,12 @@
  * naming five trades that comes back with sixty companies for one of them passes
  * every count above — sixty is not thin — while answering a fifth of the question,
  * so a part of the request nothing came back for raises the flag on its own.
+ *
+ * The sixth is about the checks themselves rather than about the result. A run
+ * pinned to a company whose name nothing here could read had none of the checks
+ * that ask whether its pages are that company's — not weaker checks, no checks —
+ * and every one of them was skipped in silence. That is exactly what this flag
+ * is for, so it says so and the run is read before it is acted on.
  */
 
 import { DISCOVERY_THIN_RESULT_COUNT, isDiscoveryScan } from './discovery-scan'
@@ -39,6 +45,13 @@ export interface RunQualityInput {
 	 * so there was never an entity to match.
 	 */
 	readonly entityMatch: 'strong' | 'weak' | 'absent' | null
+	/**
+	 * Whether the run is about one company whose name yielded no match key at all,
+	 * so every check that asks whether a page is that company's had nothing to ask
+	 * with. Told apart from `entityMatch: null`, which is a run about no one
+	 * company: there the checks have nothing to check, which costs nothing.
+	 */
+	readonly subjectUnreadable: boolean
 	/** Reflect-loop rounds phase 1 ran (0 on a resume). */
 	readonly rounds: number
 	/** Gap-closing rounds phase 2 ran after the first extraction (0 on a resume). */
@@ -175,6 +188,17 @@ export interface RunQuality {
 		readonly confirmed: number
 		readonly candidates: number
 	}
+	/**
+	 * Present, and only ever true, when the run's own subject could not be read,
+	 * so the checks that hold its pages against it never ran. Written down as the
+	 * run's own stated reason rather than left in the logs, because a reader
+	 * otherwise sees a result that looks exactly like a checked one.
+	 *
+	 * Left out entirely where the question does not arise — a run whose subject
+	 * was read, and a run that has no subject — so its presence is the whole
+	 * signal, and how often it happens can be counted off finished runs.
+	 */
+	readonly subject_unreadable?: true
 	/** True when the result is thin enough that an automation should not act on it unreviewed. */
 	readonly low_confidence: boolean
 }
@@ -210,12 +234,18 @@ export const computeRunQuality = (input: RunQualityInput): RunQuality => {
 	// it goes to them rather than passing as a full answer.
 	const partsWentUnanswered =
 		input.coverage !== null && input.coverage.uncovered.length > 0
+	// And a run whose subject's name yielded no key was never held against that
+	// company at all. `unsureOfTheCompany` cannot see this one: with no keys there
+	// is no verdict to be unsure of, so the run arrives here carrying the same
+	// empty verdict as a scan that was about nobody in particular.
+	const subjectWentUnchecked = input.subjectUnreadable
 	const lowConfidence =
 		unsureOfTheCompany ||
 		thinlyVetted ||
 		thinResultList ||
 		nothingStandsBehindIt ||
-		partsWentUnanswered
+		partsWentUnanswered ||
+		subjectWentUnchecked
 
 	return {
 		rounds: input.rounds,
@@ -246,6 +276,7 @@ export const computeRunQuality = (input: RunQualityInput): RunQuality => {
 				}
 			: {}),
 		...(input.existence !== null ? { existence: input.existence } : {}),
+		...(subjectWentUnchecked ? { subject_unreadable: true as const } : {}),
 		low_confidence: lowConfidence,
 	}
 }

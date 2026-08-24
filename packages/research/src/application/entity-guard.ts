@@ -723,9 +723,47 @@ export const isEntityGroundedSchema = (schemaName: string): boolean =>
 	ENTITY_GROUNDED_SCHEMAS.has(schemaName)
 
 /**
- * Builds the match keys for a run's target, or null when the run should not be
- * entity-gated (a scan/freeform run with no anchored subject, or a target with no
- * usable name or domain).
+ * What reading a run's own subject came back with.
+ *
+ * Two facts rather than one, because having no keys covers two situations a
+ * caller has to tell apart: "this run is about no one company" and "it is about
+ * a company whose name nothing here could read". A check may be skipped when
+ * there is nothing to check; skipping it because the reading failed is how a run
+ * nobody checked reports itself as clean.
+ */
+export interface EntitySubjectReading {
+	/** The keys the evidence is held against, or null when none came out. */
+	readonly targets: EntityTargets | null
+	/**
+	 * True when the run IS about one company and not one key came out of its name
+	 * or its website — so every check that asks "are these pages this company's?"
+	 * has nothing to ask with.
+	 *
+	 * The usual cause is a name written in an alphabet the fold has no plain
+	 * letters for: Japanese, Greek, Cyrillic, Arabic, Korean, Devanagari all come
+	 * back empty. A name of two or three letters and nothing else reaches the same
+	 * place, since a fragment that short turns up inside unrelated text by
+	 * coincidence and is refused for it. Both leave the same hole, so both are
+	 * reported the same way.
+	 *
+	 * False for a run that has no subject at all — an open scan, a freeform brief.
+	 * There the checks genuinely have nothing to check, which is the one case
+	 * skipping them costs nothing.
+	 *
+	 * Not the same question as `foldReadsEveryLetter`, which asks whether the fold
+	 * spelled every letter of a name. The two part company on a name half written
+	 * in another alphabet: "株式会社 Yamada Denki" loses letters, so that one
+	 * answers no, while a key still comes out of the half that reads, so this one
+	 * is false. Ask that one to file a name under a key, and this one to find out
+	 * whether any check could run at all.
+	 */
+	readonly subjectUnreadable: boolean
+}
+
+/**
+ * Builds the match keys for a run's target, and says which of the two reasons
+ * there are none: a scan/freeform run with no anchored subject to check, or a
+ * subject whose name and website yielded no usable key.
  */
 export const deriveEntityTargets = (args: {
 	schemaName: string
@@ -741,9 +779,13 @@ export const deriveEntityTargets = (args: {
 	/** The run's location hint, folded into the place keys alongside the query's
 	 * own "…, City" tail. */
 	location?: string | undefined
-}): EntityTargets | null => {
+}): EntitySubjectReading => {
 	const anchored = args.subjects.length > 0
-	if (!isEntityGroundedSchema(args.schemaName) && !anchored) return null
+	// Nothing to check: a scan reports third parties and a freeform brief is
+	// about no one company, so neither has a subject whose pages these keys
+	// would be proving.
+	if (!isEntityGroundedSchema(args.schemaName) && !anchored)
+		return { targets: null, subjectUnreadable: false }
 
 	const names = anchored
 		? args.subjects
@@ -776,10 +818,16 @@ export const deriveEntityTargets = (args: {
 		]),
 	]
 
+	// Something to check, and no way to check it. Said out loud rather than
+	// handed back as the "nothing to check" above, so the run can report that it
+	// went unchecked instead of finishing as clean as one that passed.
 	if (cores.length === 0 && words.length === 0 && domains.length === 0)
-		return null
+		return { targets: null, subjectUnreadable: true }
 	const places = queryPlaces(args.query, args.location)
-	return { cores, words, domains, places }
+	return {
+		targets: { cores, words, domains, places },
+		subjectUnreadable: false,
+	}
 }
 
 /**

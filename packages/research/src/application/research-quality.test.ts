@@ -16,6 +16,7 @@ describe('computeRunQuality', () => {
 			sourcesTotal: 5,
 			sourcesFirstParty: 3,
 			ownDomainKnown: true,
+			subjectUnreadable: false,
 			fieldsGrounded: 4,
 			fieldsTotal: 6,
 			citationsSeen: 4,
@@ -81,6 +82,7 @@ describe('computeRunQuality', () => {
 				entityMatch: 'strong',
 				sourcesFirstParty: 0,
 				ownDomainKnown: false,
+				subjectUnreadable: false,
 			})
 			// THEN it is left out: with no site anyone could have read, the count can
 			// only ever be 0, exactly as on a search about no one company
@@ -104,6 +106,7 @@ describe('computeRunQuality', () => {
 			sourcesTotal: 6,
 			sourcesFirstParty: 0,
 			ownDomainKnown: false,
+			subjectUnreadable: false,
 			fieldsGrounded: 0,
 			fieldsTotal: 0,
 			citationsSeen: 10,
@@ -212,6 +215,7 @@ describe('computeRunQuality', () => {
 			sourcesTotal: 6,
 			sourcesFirstParty: 0,
 			ownDomainKnown: false,
+			subjectUnreadable: false,
 			fieldsGrounded: 0,
 			fieldsTotal: 0,
 			citationsSeen: 10,
@@ -263,6 +267,7 @@ describe('computeRunQuality', () => {
 				sourcesTotal: 5,
 				sourcesFirstParty: 3,
 				ownDomainKnown: true,
+				subjectUnreadable: false,
 				fieldsGrounded: 4,
 				fieldsTotal: 6,
 				citationsSeen: 4,
@@ -291,6 +296,7 @@ describe('computeRunQuality', () => {
 			sourcesTotal: 131,
 			sourcesFirstParty: 0,
 			ownDomainKnown: false,
+			subjectUnreadable: false,
 			fieldsGrounded: 0,
 			fieldsTotal: 0,
 			citationsSeen: 60,
@@ -424,6 +430,7 @@ describe('computeRunQuality', () => {
 			sourcesTotal: 2,
 			sourcesFirstParty: 0,
 			ownDomainKnown: false,
+			subjectUnreadable: false,
 			fieldsGrounded: 0,
 			fieldsTotal: 0,
 			scanResults: FULL_LIST,
@@ -483,6 +490,7 @@ describe('computeRunQuality', () => {
 				sourcesTotal: 6,
 				sourcesFirstParty: 2,
 				ownDomainKnown: true,
+				subjectUnreadable: false,
 				fieldsGrounded: 0,
 				fieldsTotal: 0,
 				citationsSeen: 8,
@@ -520,6 +528,7 @@ describe('computeRunQuality', () => {
 				sourcesTotal: 6,
 				sourcesFirstParty: 2,
 				ownDomainKnown: true,
+				subjectUnreadable: false,
 				fieldsGrounded: 0,
 				fieldsTotal: 0,
 				citationsSeen: 8,
@@ -546,6 +555,7 @@ describe('computeRunQuality', () => {
 			sourcesTotal: 4,
 			sourcesFirstParty: 0,
 			ownDomainKnown: false,
+			subjectUnreadable: false,
 			fieldsGrounded: 0,
 			fieldsTotal: 0,
 			citationsSeen: 3,
@@ -617,6 +627,7 @@ describe('computeRunQuality', () => {
 			sourcesTotal: 131,
 			sourcesFirstParty: 0,
 			ownDomainKnown: false,
+			subjectUnreadable: false,
 			fieldsGrounded: 0,
 			fieldsTotal: 0,
 			citationsSeen: 60,
@@ -653,6 +664,7 @@ describe('computeRunQuality', () => {
 				sourcesTotal: 5,
 				sourcesFirstParty: 3,
 				ownDomainKnown: true,
+				subjectUnreadable: false,
 				fieldsGrounded: 6,
 				fieldsTotal: 6,
 				citationsSeen: 4,
@@ -713,6 +725,7 @@ describe('computeRunQuality — how the list split', () => {
 		sourcesTotal: 8,
 		sourcesFirstParty: 0,
 		ownDomainKnown: false,
+		subjectUnreadable: false,
 		fieldsGrounded: 0,
 		fieldsTotal: 0,
 		citationsSeen: 20,
@@ -759,6 +772,108 @@ describe('computeRunQuality — how the list split', () => {
 			// THEN the question does not arise, which is not the same answer as
 			// "it confirmed none"
 			expect('existence' in quality).toBe(false)
+		})
+	})
+})
+
+describe('computeRunQuality — when the run could not read its own subject', () => {
+	// An enrichment run that went well by every other measure: rounds, sources,
+	// citations, a full profile. The only thing wrong with it is that nobody ever
+	// checked the pages were this company's.
+	const healthy = {
+		schemaName: 'company_enrichment_v1',
+		entityMatch: null,
+		rounds: 6,
+		gapRounds: 1,
+		sourcesTotal: 5,
+		sourcesFirstParty: 0,
+		ownDomainKnown: false,
+		subjectUnreadable: false,
+		fieldsGrounded: 5,
+		fieldsTotal: 6,
+		citationsSeen: 4,
+		citationsKept: 4,
+		scanResults: null,
+		refined: false,
+		coverage: null,
+		coverageStopped: null,
+		coverageLastMissing: [],
+		existence: null,
+	} as const
+
+	describe('when the subject name yielded no key', () => {
+		it('should refuse the run a clean finish', () => {
+			// GIVEN a run that is thin in no other way
+			const quality = computeRunQuality({ ...healthy, subjectUnreadable: true })
+			// THEN it cannot come back as a clean success: every check that asks
+			// whether these pages are this company's was skipped
+			expect(quality.low_confidence).toBe(true)
+		})
+
+		it("should state the reason in the run's own answer", () => {
+			// GIVEN the same run
+			const quality = computeRunQuality({ ...healthy, subjectUnreadable: true })
+			// THEN a person reading the result is told why, rather than having to
+			// find it in the logs
+			expect(quality.subject_unreadable).toBe(true)
+		})
+
+		it('should say it of a scan pinned to such a company too', () => {
+			// GIVEN an anchored scan whose list is long and well vetted
+			const quality = computeRunQuality({
+				...healthy,
+				schemaName: 'prospect_scan_v1',
+				scanResults: FULL_LIST,
+				fieldsGrounded: 0,
+				fieldsTotal: 0,
+				subjectUnreadable: true,
+			})
+			// THEN it is flagged as well — a scan built from a company nobody
+			// checked is no safer to act on unread than a profile of one
+			expect(quality.low_confidence).toBe(true)
+			expect(quality.subject_unreadable).toBe(true)
+		})
+	})
+
+	describe('when the subject was read', () => {
+		it('should leave the reason out rather than report it false', () => {
+			// GIVEN a run whose subject name yielded keys
+			const quality = computeRunQuality({
+				...healthy,
+				entityMatch: 'strong',
+			})
+			// THEN the question does not arise, so nothing is said — its presence
+			// is the whole signal, and is what makes the count meaningful
+			expect('subject_unreadable' in quality).toBe(false)
+			expect(quality.low_confidence).toBe(false)
+		})
+
+		it('should stay quiet on a run that is flagged for some other reason', () => {
+			// GIVEN a readable subject the evidence only glancingly mentioned
+			const quality = computeRunQuality({
+				...healthy,
+				entityMatch: 'weak',
+			})
+			// THEN the run is flagged, but not for a reason that did not happen
+			expect(quality.low_confidence).toBe(true)
+			expect('subject_unreadable' in quality).toBe(false)
+		})
+	})
+
+	describe('when the run was about nobody in particular', () => {
+		it('should say nothing, since there was no subject to read', () => {
+			// GIVEN an open scan, pinned to no company
+			const quality = computeRunQuality({
+				...healthy,
+				schemaName: 'prospect_scan_v1',
+				scanResults: FULL_LIST,
+				fieldsGrounded: 0,
+				fieldsTotal: 0,
+			})
+			// THEN the checks had nothing to check, which costs nothing and is not
+			// this reason
+			expect('subject_unreadable' in quality).toBe(false)
+			expect(quality.low_confidence).toBe(false)
 		})
 	})
 })

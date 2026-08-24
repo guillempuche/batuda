@@ -15,7 +15,7 @@ const targets = deriveEntityTargets({
 			website: 'circledelivers.com',
 		},
 	],
-})
+}).targets
 
 const contactsOf = (findings: unknown): Array<{ name: string }> =>
 	(findings as { contacts: Array<{ name: string }> }).contacts

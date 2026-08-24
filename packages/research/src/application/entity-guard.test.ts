@@ -47,7 +47,8 @@ describe('deriveEntityTargets', () => {
 				'freeform',
 			]) {
 				expect(
-					deriveEntityTargets({ schemaName, query: 'anything', subjects: [] }),
+					deriveEntityTargets({ schemaName, query: 'anything', subjects: [] })
+						.targets,
 				).toBeNull()
 			}
 		})
@@ -61,7 +62,7 @@ describe('deriveEntityTargets', () => {
 				schemaName: 'company_enrichment_v1',
 				query: 'KG Motors Inc.',
 				subjects: [{ table: 'companies', name: 'KG Motors Inc.' }],
-			})
+			}).targets
 
 			// THEN only the trailing form comes off, so the key is the company's own
 			// name. A key of just "motors" would be carried by any page about any car
@@ -82,7 +83,7 @@ describe('deriveEntityTargets', () => {
 				schemaName: 'company_enrichment_v1',
 				query: 'Grupo Ejemplo SA de CV',
 				subjects: [{ table: 'companies', name: 'Grupo Ejemplo SA de CV' }],
-			})
+			}).targets
 
 			// THEN both halves come off, so a page writing the trading name matches.
 			// The connecting word is only stepped over between two halves of a form —
@@ -96,7 +97,7 @@ describe('deriveEntityTargets', () => {
 				schemaName: 'company_enrichment_v1',
 				query: 'Acme Logistics SL',
 				subjects: [{ table: 'companies', name: 'Acme Logistics SL' }],
-			})
+			}).targets
 
 			// THEN the form at the end is still dropped, so a page writing the bare
 			// name matches the company as filed
@@ -112,7 +113,7 @@ describe('deriveEntityTargets', () => {
 				schemaName: 'company_enrichment_v1',
 				query: 'Sunset Transportation, St. Louis MO',
 				subjects: [],
-			})
+			}).targets
 			// THEN the pre-comma company name becomes the strong-match core
 			expect(targets?.cores).toContain('sunsettransportation')
 		})
@@ -125,7 +126,7 @@ describe('deriveEntityTargets', () => {
 				query:
 					'Research "Ascent Global Logistics" (ascentgl.com, Belleville, MI) — a US 3PL. Find headcount.',
 				subjects: [],
-			})
+			}).targets
 			// THEN the quoted name — not the whole sentence — becomes the core, so it
 			// can actually match the company's own pages
 			expect(targets?.cores).toContain('ascentgloballogistics')
@@ -140,7 +141,7 @@ describe('deriveEntityTargets', () => {
 				schemaName: 'company_enrichment_v1',
 				query: 'Look up “Cohitech”, Balsareny',
 				subjects: [],
-			})
+			}).targets
 			// THEN the curly-quoted phrase is the core
 			expect(targets?.cores).toContain('cohitech')
 		})
@@ -157,7 +158,7 @@ describe('deriveEntityTargets', () => {
 						website: 'https://acme.com',
 					},
 				],
-			})
+			}).targets
 			// THEN the name core is a strong key and the full host is a domain key
 			expect(targets?.cores).toContain('acmewidgets')
 			expect(targets?.domains).toContain('acme.com')
@@ -174,8 +175,192 @@ describe('deriveEntityTargets', () => {
 					schemaName: 'company_enrichment_v1',
 					query: '',
 					subjects: [{ table: 'companies' }],
-				}),
+				}).targets,
 			).toBeNull()
+		})
+
+		it('should say the subject went unread rather than pass as ungated', () => {
+			// GIVEN the same unidentifiable subject
+			const reading = deriveEntityTargets({
+				schemaName: 'company_enrichment_v1',
+				query: '',
+				subjects: [{ table: 'companies' }],
+			})
+			// THEN it is told apart from a run that is about nobody in particular:
+			// there is a company here, and nothing came of trying to read it
+			expect(reading.subjectUnreadable).toBe(true)
+		})
+	})
+})
+
+describe('deriveEntityTargets on a name the fold cannot read', () => {
+	// Each of these folds to nothing, so no key comes out and every check that
+	// would hold a page against the company has nothing to hold it against.
+	const unreadable = [
+		['Greek', 'Ηλεκτρολογικά Παπαδόπουλος'],
+		['Cyrillic', 'Строймонтаж Иванов'],
+		['Arabic', 'شركة الخليج للمقاولات'],
+		['CJK', '株式会社山田電気'],
+		['Korean', '삼성전자'],
+		['Devanagari', 'शर्मा इलेक्ट्रिकल्स'],
+	] as const
+
+	describe('when an entity-grounded run names its subject in another alphabet', () => {
+		for (const [alphabet, name] of unreadable) {
+			it(`should report the ${alphabet} subject as unread, with no keys`, () => {
+				// GIVEN an enrichment run for a company written in this alphabet
+				const reading = deriveEntityTargets({
+					schemaName: 'company_enrichment_v1',
+					query: name,
+					subjects: [{ table: 'companies', name }],
+				})
+				// THEN no key came out — the fold holds plain letters for none of it
+				expect(reading.targets).toBeNull()
+				// AND the run says so, instead of reading as one with nothing to check
+				expect(reading.subjectUnreadable).toBe(true)
+			})
+		}
+
+		it('should say the same for a contact hunt, which is about one company too', () => {
+			// GIVEN a contact_discovery_v1 run — the other schema whose whole job is
+			// its own named subject
+			const reading = deriveEntityTargets({
+				schemaName: 'contact_discovery_v1',
+				query: '株式会社山田電気',
+				subjects: [],
+			})
+			// THEN the subject went unread there as well
+			expect(reading.targets).toBeNull()
+			expect(reading.subjectUnreadable).toBe(true)
+		})
+
+		it('should say the same for a scan anchored to such a company', () => {
+			// GIVEN a scan pinned to a subject whose name is written in Cyrillic —
+			// anchored, so it is held to that subject like an enrichment is
+			const reading = deriveEntityTargets({
+				schemaName: 'prospect_scan_v1',
+				query: 'competitors',
+				subjects: [{ table: 'companies', name: 'Строймонтаж Иванов' }],
+			})
+			// THEN the anchor went unread, and the run is not mistaken for an open
+			// scan that was pinned to nobody
+			expect(reading.targets).toBeNull()
+			expect(reading.subjectUnreadable).toBe(true)
+		})
+	})
+
+	describe('when a Latin name is too short to stand for a company', () => {
+		it('should report it unread, since no key came out of it either', () => {
+			// GIVEN a subject whose whole name is two letters — too short to be
+			// distinctive, so it is refused the same as an unreadable one
+			const reading = deriveEntityTargets({
+				schemaName: 'company_enrichment_v1',
+				query: 'AB',
+				subjects: [{ table: 'companies', name: 'AB' }],
+			})
+			// THEN the same hole is reported the same way: there is a company here
+			// and no check can be run on it
+			expect(reading.targets).toBeNull()
+			expect(reading.subjectUnreadable).toBe(true)
+		})
+	})
+
+	describe('when the run is about nobody in particular', () => {
+		it('should report no subject to read rather than an unread one', () => {
+			// GIVEN a scan or a freeform brief with no anchored subject — the one
+			// case where the checks genuinely have nothing to check
+			for (const schemaName of [
+				'prospect_scan_v1',
+				'competitor_scan_v1',
+				'freeform',
+			]) {
+				const reading = deriveEntityTargets({
+					schemaName,
+					query: 'anything',
+					subjects: [],
+				})
+				// THEN skipping costs nothing, and nothing is claimed to have gone
+				// unread
+				expect(reading.targets).toBeNull()
+				expect(reading.subjectUnreadable).toBe(false)
+			}
+		})
+	})
+
+	describe('when a name in another alphabet comes with something else to check', () => {
+		it('should read the subject through its own website', () => {
+			// GIVEN a Japanese company whose row carries its website
+			const reading = deriveEntityTargets({
+				schemaName: 'company_enrichment_v1',
+				query: '株式会社山田電気',
+				subjects: [
+					{
+						table: 'companies',
+						name: '株式会社山田電気',
+						website: 'https://yamada-denki.co.jp',
+					},
+				],
+			})
+			// THEN the host is a key of its own, so the checks have something to run
+			// on and nothing went unread
+			expect(reading.targets?.domains).toContain('yamada-denki.co.jp')
+			expect(reading.subjectUnreadable).toBe(false)
+		})
+
+		it('should read the subject through a corrected domain', () => {
+			// GIVEN a re-run that carries the human-supplied official domain
+			const reading = deriveEntityTargets({
+				schemaName: 'company_enrichment_v1',
+				query: 'Строймонтаж Иванов',
+				subjects: [],
+				anchorDomain: 'stroymontazh.ru',
+			})
+			// THEN that domain is the key, and the subject is not reported unread
+			expect(reading.targets?.domains).toContain('stroymontazh.ru')
+			expect(reading.subjectUnreadable).toBe(false)
+		})
+
+		it('should read a name that is only partly in another alphabet', () => {
+			// GIVEN a name whose Latin half spells the company
+			const reading = deriveEntityTargets({
+				schemaName: 'company_enrichment_v1',
+				query: '株式会社 Yamada Denki',
+				subjects: [{ table: 'companies', name: '株式会社 Yamada Denki' }],
+			})
+			// THEN a key comes out of the half that reads, so nothing is reported
+			// unread — a subject counts as unread only when no key at all comes out,
+			// not when part of the name is dropped
+			expect(reading.targets?.cores).toContain('yamadadenki')
+			expect(reading.subjectUnreadable).toBe(false)
+		})
+	})
+
+	describe('when the name reads but names nobody in particular', () => {
+		it('should not report it unread, since a key did come out', () => {
+			// GIVEN a company called nothing but its trade and its legal form
+			const reading = deriveEntityTargets({
+				schemaName: 'company_enrichment_v1',
+				query: 'Grupo Express SL',
+				subjects: [{ table: 'companies', name: 'Grupo Express SL' }],
+			})
+			// THEN it is a different shortfall from this one — the checks do run,
+			// on a key that identifies the trade rather than the firm
+			expect(reading.targets).not.toBeNull()
+			expect(reading.subjectUnreadable).toBe(false)
+		})
+	})
+
+	describe('when the name reads normally', () => {
+		it('should hand back its keys and report nothing unread', () => {
+			// GIVEN a subject named in plain letters, the control for the cases above
+			const reading = deriveEntityTargets({
+				schemaName: 'company_enrichment_v1',
+				query: 'Fusteria Miquel',
+				subjects: [{ table: 'companies', name: 'Fusteria Miquel' }],
+			})
+			// THEN the name reads and its key comes out, so there is nothing to say
+			expect(reading.targets?.cores).toContain('fusteriamiquel')
+			expect(reading.subjectUnreadable).toBe(false)
 		})
 	})
 })
@@ -256,7 +441,7 @@ describe('classifyEntityMatch', () => {
 				schemaName: 'company_enrichment_v1',
 				query: 'Cafés Ordóñez',
 				subjects: [],
-			})
+			}).targets
 			// WHEN a corpus writes the same name without the accents
 			// THEN folding makes the two equal and the match is strong
 			expect(classifyEntityMatch(targets!, 'the cafes ordonez brand')).toBe(
@@ -293,7 +478,7 @@ describe('classifyEntityMatch', () => {
 				schemaName: 'company_enrichment_v1',
 				query: 'Zxqvon Interstellar Freight Brokerage LLC',
 				subjects: [],
-			})
+			}).targets
 			// WHEN its keys are classified against a corpus about other freight firms
 			// THEN the run is absent (its distinctive words appear nowhere)
 			expect(
@@ -308,7 +493,7 @@ describe('isConfirmedRegistryMatch', () => {
 		schemaName: 'company_enrichment_v1',
 		query: 'Acme Logistics, Barcelona',
 		subjects: [],
-	})
+	}).targets
 
 	describe('when the lookup resolved the target company', () => {
 		it('should confirm on a legal name that strongly matches the target', () => {
@@ -378,7 +563,7 @@ describe('classifyEntityMatchPerSource', () => {
 				website: 'https://acme.es',
 			},
 		],
-	})
+	}).targets
 
 	describe('when the sources mix the target and a look-alike', () => {
 		it('should tag each source on its own', () => {
@@ -443,7 +628,7 @@ describe('deriveEntityTargets with an anchor domain', () => {
 				query: 'Acme',
 				subjects: [{ table: 'companies', name: 'Acme Widgets' }],
 				anchorDomain: 'https://www.acme.com/contact',
-			})
+			}).targets
 			// THEN the anchor host is a strong-match domain key, its label a weak word
 			expect(targets?.domains).toContain('acme.com')
 			expect(targets?.words).toContain('acme')
@@ -456,7 +641,7 @@ describe('deriveEntityTargets with an anchor domain', () => {
 				query: 'some company',
 				subjects: [],
 				anchorDomain: 'monzo.com',
-			})
+			}).targets
 			// THEN the host still becomes a domain key
 			expect(targets?.domains).toContain('monzo.com')
 		})
@@ -468,12 +653,12 @@ describe('deriveEntityTargets with an anchor domain', () => {
 				query: 'Acme',
 				subjects: [{ table: 'companies', name: 'Acme Widgets' }],
 				anchorDomain: 'not a domain',
-			})
+			}).targets
 			const without = deriveEntityTargets({
 				schemaName: 'company_enrichment_v1',
 				query: 'Acme',
 				subjects: [{ table: 'companies', name: 'Acme Widgets' }],
-			})
+			}).targets
 			// THEN it is dropped and the result matches the no-anchor derivation
 			expect(withJunk?.domains).toEqual(without?.domains)
 		})
@@ -488,7 +673,7 @@ describe('deriveEntityTargets with a domain in the query', () => {
 				schemaName: 'company_enrichment_v1',
 				query: 'Sunset Transportation (sunsettrans.com)',
 				subjects: [],
-			})
+			}).targets
 			// THEN a page referencing that host will strong-match the target
 			expect(targets?.domains).toContain('sunsettrans.com')
 		})
@@ -1350,12 +1535,12 @@ describe('nameSpellings', () => {
 				schemaName: 'company_enrichment_v1',
 				query: 'Muñoz S.L.',
 				subjects: [{ table: 'companies', name: 'Muñoz S.L.' }],
-			})
+			}).targets
 			const plain = deriveEntityTargets({
 				schemaName: 'company_enrichment_v1',
 				query: 'Muñoz SL',
 				subjects: [{ table: 'companies', name: 'Muñoz SL' }],
-			})
+			}).targets
 
 			// WHEN each is turned into match keys
 			// THEN they are the same keys. Two rows of one list spelling the form
@@ -1473,7 +1658,7 @@ describe('deriveEntityTargets', () => {
 				schemaName: 'company_enrichment_v1',
 				query: 'Instal·lacions Vives',
 				subjects: [{ table: 'companies', name: 'Instal·lacions Vives SL' }],
-			}) as EntityTargets
+			}).targets as EntityTargets
 
 			// WHEN evidence spells the name with one l, and when it spells it with two
 			// THEN both land the run on its target, rather than only the spelling the
@@ -1492,7 +1677,7 @@ describe('deriveEntityTargets', () => {
 				schemaName: 'company_enrichment_v1',
 				query: 'Instal·lacions Vives',
 				subjects: [{ table: 'companies', name: 'Instal·lacions Vives SL' }],
-			}) as EntityTargets
+			}).targets as EntityTargets
 
 			// WHEN the evidence is about a different company in the same trade
 			// THEN it never reads as the target. The second spelling writes out one
@@ -1514,7 +1699,7 @@ describe('deriveEntityTargets', () => {
 				schemaName: 'company_enrichment_v1',
 				query: 'Instal·lacions Vives',
 				subjects: [{ table: 'companies', name: 'Instal·lacions Vives SL' }],
-			}) as EntityTargets
+			}).targets as EntityTargets
 
 			// WHEN each is classified
 			// THEN all three are weak — the run is told it never clearly landed, and
