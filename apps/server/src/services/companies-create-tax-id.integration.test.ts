@@ -69,7 +69,7 @@ afterAll(async () => {
 })
 
 describe('CompanyService.createMany deduping on the registration number', () => {
-	describe('when the same company is offered twice under different names', () => {
+	describe('when the same company is offered twice in one call, under different names', () => {
 		it('should create it once and say which identity matched', async () => {
 			// GIVEN one firm submitted twice: two different trading names, so two
 			// different slugs, but the same number written two ways
@@ -94,15 +94,16 @@ describe('CompanyService.createMany deduping on the registration number', () => 
 			expect(batch.created[0]?.slug).toBe(`acme-${suffix}`)
 			expect(batch.created[0]?.taxId).toBe(`B-${digits}`)
 
-			// AND the second is reported as already held, by its number rather than
-			// its slug — which is the whole point: its slug was new
+			// AND the second is reported as a repeat inside this very call, by its
+			// number rather than its slug — which is the whole point: its slug was new,
+			// and it was never on file before this call either
 			expect(batch.skipped).toStrictEqual([
-				{ slug: `acme-logistics-${suffix}`, matchedOn: 'taxId' },
+				{ slug: `acme-logistics-${suffix}`, matchedOn: 'taxIdInRequest' },
 			])
 		})
 	})
 
-	describe('when a slug is reused', () => {
+	describe('when a slug is reused inside one call', () => {
 		it('should report the slug as what matched', async () => {
 			// GIVEN two entries sharing a slug and carrying no number at all
 			const suffix = randomUUID().slice(0, 8)
@@ -112,10 +113,11 @@ describe('CompanyService.createMany deduping on the registration number', () => 
 			])
 			createdIds.push(...batch.created.map(company => company.id))
 
-			// THEN one landed and the other is reported against the slug
+			// THEN one landed, and the other is reported as the caller having sent the
+			// same slug twice rather than as a company already in the CRM
 			expect(batch.created).toHaveLength(1)
 			expect(batch.skipped).toStrictEqual([
-				{ slug: `dup-${suffix}`, matchedOn: 'slug' },
+				{ slug: `dup-${suffix}`, matchedOn: 'slugInRequest' },
 			])
 		})
 	})
@@ -150,6 +152,60 @@ describe('CompanyService.createMany deduping on the registration number', () => 
 			// treated as a match between two unrelated firms
 			expect(batch.created).toHaveLength(2)
 			expect(batch.skipped).toStrictEqual([])
+		})
+	})
+})
+
+describe('CompanyService.createMany telling a company already on file from one sent twice', () => {
+	describe('when a later call repeats a number an earlier call created', () => {
+		it('should report it as already on file', async () => {
+			// GIVEN a company created and finished with, then offered again under a
+			// new name in a separate call — the case the in-call repeat is easy to
+			// confuse with, and the one where "already existed" is the truth
+			const suffix = randomUUID().slice(0, 8)
+			const digits = `${Date.now()}`.slice(-8)
+			const first = await createMany([
+				{ name: 'Prior SL', slug: `prior-${suffix}`, taxId: `B-${digits}` },
+			])
+			createdIds.push(...first.created.map(company => company.id))
+
+			const second = await createMany([
+				{
+					name: 'Prior Trading SL',
+					slug: `prior-trading-${suffix}`,
+					taxId: `b${digits}`,
+				},
+			])
+			createdIds.push(...second.created.map(company => company.id))
+
+			// THEN nothing new landed, and the report says the number was on file
+			// rather than sent twice — the caller's list was fine
+			expect(second.created).toHaveLength(0)
+			expect(second.skipped).toStrictEqual([
+				{ slug: `prior-trading-${suffix}`, matchedOn: 'taxId' },
+			])
+		})
+	})
+
+	describe('when a later call repeats a slug an earlier call created', () => {
+		it('should report it as already on file', async () => {
+			// GIVEN a slug created in one call and offered again in the next
+			const suffix = randomUUID().slice(0, 8)
+			const first = await createMany([
+				{ name: 'Held One', slug: `held-${suffix}` },
+			])
+			createdIds.push(...first.created.map(company => company.id))
+
+			const second = await createMany([
+				{ name: 'Held Two', slug: `held-${suffix}` },
+			])
+			createdIds.push(...second.created.map(company => company.id))
+
+			// THEN the slug is reported as one the CRM already held
+			expect(second.created).toHaveLength(0)
+			expect(second.skipped).toStrictEqual([
+				{ slug: `held-${suffix}`, matchedOn: 'slug' },
+			])
 		})
 	})
 })

@@ -461,13 +461,34 @@ export class CompanyService extends Context.Service<CompanyService>()(
 						const inserted: Array<unknown> = []
 						const skipped: Array<{
 							readonly slug: string
-							readonly matchedOn: 'slug' | 'taxId'
+							readonly matchedOn:
+								| 'slug'
+								| 'taxId'
+								| 'slugInRequest'
+								| 'taxIdInRequest'
 						}> = []
+						// What this very call has written so far. Without it a repeat inside
+						// one request reads exactly like a company that had been on file for
+						// a year: the slug conflict and the tax-id lookup below both find the
+						// row this same call inserted a moment earlier, and the caller is told
+						// it already existed.
+						const slugsWritten = new Set<string>()
+						const taxIdsWritten = new Set<string>()
 						for (const data of items) {
 							const slug = typeof data['slug'] === 'string' ? data['slug'] : ''
 							const taxId =
 								typeof data['taxId'] === 'string' ? data['taxId'] : null
-							if (taxId !== null && normalizeTaxId(taxId) !== '') {
+							const normalizedTaxId =
+								taxId === null ? '' : normalizeTaxId(taxId)
+							if (slugsWritten.has(slug)) {
+								skipped.push({ slug, matchedOn: 'slugInRequest' })
+								continue
+							}
+							if (normalizedTaxId !== '') {
+								if (taxIdsWritten.has(normalizedTaxId)) {
+									skipped.push({ slug, matchedOn: 'taxIdInRequest' })
+									continue
+								}
 								const existing = yield* sql`
 									SELECT id FROM companies
 									WHERE organization_id = ${currentOrg.id}
@@ -478,7 +499,7 @@ export class CompanyService extends Context.Service<CompanyService>()(
 										AND deleted_at IS NULL
 										AND tax_id IS NOT NULL
 										AND upper(regexp_replace(tax_id, '[^A-Za-z0-9]', '', 'g'))
-											= ${normalizeTaxId(taxId)}
+											= ${normalizedTaxId}
 									LIMIT 1
 								`
 								if (existing.length > 0) {
@@ -518,6 +539,8 @@ export class CompanyService extends Context.Service<CompanyService>()(
 										split.channels,
 									)
 								}
+								slugsWritten.add(slug)
+								if (normalizedTaxId !== '') taxIdsWritten.add(normalizedTaxId)
 								inserted.push(row)
 							}
 						}

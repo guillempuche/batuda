@@ -85,7 +85,8 @@ describe('finding a company that is already on file', () => {
 			)
 			// THEN the person adding it is told, rather than quietly getting a second row
 			expect(found).toHaveLength(1)
-			expect(found[0]?.existing_name).toBe('Fusteria Vidal')
+			expect(found[0]?.matches_name).toBe('Fusteria Vidal')
+			expect(found[0]?.matches).toBe('on_file')
 			expect(found[0]?.matched_on).toBe('name')
 		})
 	})
@@ -121,7 +122,7 @@ describe('finding a company that is already on file', () => {
 				}),
 			)
 			expect(found).toHaveLength(1)
-			expect(found[0]?.existing_name).toBe('Transports Ferré')
+			expect(found[0]?.matches_name).toBe('Transports Ferré')
 			expect(found[0]?.matched_on).toBe('website')
 		})
 	})
@@ -133,6 +134,56 @@ describe('finding a company that is already on file', () => {
 					const sql = yield* SqlClient.SqlClient
 					return yield* findDuplicateCompanies(sql, ORG, [
 						{ slug: 'forn-sant-jordi', name: 'Forn Sant Jordi' },
+					])
+				}),
+			)
+			expect(found).toEqual([])
+		})
+	})
+})
+
+describe('finding two spellings of one company inside a single request', () => {
+	describe('when two entries in the same call share a web address', () => {
+		it('should report the second against the first', async () => {
+			// GIVEN one call adding what the caller believes are two companies, under
+			// different names and slugs, but on one web address
+			const found = await run(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* findDuplicateCompanies(sql, ORG, [
+						{
+							slug: 'obrador-camps',
+							name: 'Obrador Camps',
+							website: 'https://obradorcamps.cat',
+						},
+						{
+							slug: 'camps-pastisseria',
+							name: 'Camps Pastisseria',
+							website: 'https://www.obradorcamps.cat/botiga',
+						},
+					])
+				}),
+			)
+			// THEN the later one is flagged against the earlier one, and says the
+			// lookalike came in this same call rather than off the CRM — both were
+			// still written, so the caller is the one who decides
+			expect(found).toHaveLength(1)
+			expect(found[0]?.slug).toBe('camps-pastisseria')
+			expect(found[0]?.matches_slug).toBe('obrador-camps')
+			expect(found[0]?.matches).toBe('in_request')
+			expect(found[0]?.matched_on).toBe('website')
+		})
+	})
+
+	describe('when the entries in one call resemble nothing', () => {
+		it('should report nothing', async () => {
+			// GIVEN two plainly different companies sent together
+			const found = await run(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* findDuplicateCompanies(sql, ORG, [
+						{ slug: 'forn-sant-jordi', name: 'Forn Sant Jordi' },
+						{ slug: 'clinica-bonavista', name: 'Clinica Bonavista' },
 					])
 				}),
 			)

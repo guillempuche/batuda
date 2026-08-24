@@ -148,7 +148,15 @@ const CompanyInput = Schema.Struct(companyInputFields)
 // version drifted: it offered three statuses the app has never had and a priority
 // range twice the real one, and assistants followed it into rows that show up in
 // no board column. Now the sentence cannot say anything the schema would refuse.
-export const CREATE_COMPANIES_DESCRIPTION = `Create one or more companies in a single call — pass \`companies\` as an array (a single element to create just one, the whole shortlist to load a batch). Slug: unique kebab-case from name. Status: ${COMPANY_STATUSES.join('|')} (default: prospect). ownerId assigns the colleague who will work the company — pass a user id from list_members, or leave it out to create it unowned. It only lands on companies actually created: a skipped duplicate keeps the owner it already had, so re-sending a list is never a way to hand companies over. Use update_company for that. Priority: ${COMPANY_PRIORITIES[0]} (highest) to ${COMPANY_PRIORITIES[COMPANY_PRIORITIES.length - 1]} (lowest, default: 2). Pass taxId whenever you know it: a company is skipped if its slug already exists OR its registration number already does, so the number catches the same firm arriving under a different trading name. Runs in one transaction; a skip is not an error, so re-running an overlapping list is safe. Returns { created, skipped, possible_duplicates }: the rows that landed, for each one left out its slug plus matched_on ("slug" or "tax_id") saying which identity already existed, and any company that looks like one already on file under a different name — reported, not blocked, so check those before treating them as new.`
+export const CREATE_COMPANIES_DESCRIPTION = `Create one or more companies in a single call — pass \`companies\` as an array (a single element to create just one, the whole shortlist to load a batch). Slug: unique kebab-case from name. Status: ${COMPANY_STATUSES.join('|')} (default: prospect). ownerId assigns the colleague who will work the company — pass a user id from list_members, or leave it out to create it unowned. It only lands on companies actually created: a skipped duplicate keeps the owner it already had, so re-sending a list is never a way to hand companies over. Use update_company for that. Priority: ${COMPANY_PRIORITIES[0]} (highest) to ${COMPANY_PRIORITIES[COMPANY_PRIORITIES.length - 1]} (lowest, default: 2). Pass taxId whenever you know it: a company is skipped if its slug already exists OR its registration number already does, so the number catches the same firm arriving under a different trading name. Runs in one transaction; a skip is not an error, so re-running an overlapping list is safe. Returns { created, skipped, created_needs_review }. Read the split this way: created and created_needs_review were both WRITTEN; only skipped was not. \`skipped\` gives each left-out slug plus matched_on — "slug" or "tax_id" when that identity was already on file before this call, "slug_in_request" or "tax_id_in_request" when the same company appeared twice in the list you just sent (a mistake in the list, not a company already in the CRM). \`created_needs_review\` gives companies that DID land but resemble another one: matches_slug and matches_name name the lookalike, matches says whether it is "on_file" (already in the CRM) or "in_request" (another entry in this same call), and matched_on says whether they share a web address or just a similar name — a website match reports confidence 100, which only means the host was identical, never that the row was rejected. Check those before treating them as separate companies.`
+
+// What the service calls a skip, in the words the tool answers with.
+const SKIPPED_BECAUSE = {
+	slug: 'slug',
+	taxId: 'tax_id',
+	slugInRequest: 'slug_in_request',
+	taxIdInRequest: 'tax_id_in_request',
+} as const
 
 const CreateCompanies = Tool.make('create_companies', {
 	description: CREATE_COMPANIES_DESCRIPTION,
@@ -157,19 +165,29 @@ const CreateCompanies = Tool.make('create_companies', {
 	}),
 	success: Schema.Struct({
 		created: Schema.Array(Company.json),
+		// Not written, because something with this identity was there already —
+		// either on file before this call, or earlier in this same request.
 		skipped: Schema.Array(
 			Schema.Struct({
 				slug: Schema.String,
-				matched_on: Schema.Literals(['slug', 'tax_id']),
+				matched_on: Schema.Literals([
+					'slug',
+					'tax_id',
+					'slug_in_request',
+					'tax_id_in_request',
+				]),
 			}),
 		),
-		// Reported rather than refused: only the person adding them knows whether
-		// two similar names are two branches or one company typed twice.
-		possible_duplicates: Schema.Array(
+		// Written, and worth a second look: every company named here landed, and
+		// resembles another one. Reported rather than refused, because only the
+		// person adding them knows whether two similar names are two branches or
+		// one company typed twice.
+		created_needs_review: Schema.Array(
 			Schema.Struct({
 				slug: Schema.String,
-				existing_slug: Schema.String,
-				existing_name: Schema.String,
+				matches_slug: Schema.String,
+				matches_name: Schema.String,
+				matches: Schema.Literals(['on_file', 'in_request']),
 				matched_on: Schema.Literals(['website', 'name']),
 				confidence: Schema.Number,
 			}),
@@ -470,9 +488,10 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 			create_companies: params =>
 				Effect.gen(function* () {
 					const currentOrg = yield* CurrentOrg
-					// Looked for before the write, so a company is compared against what
-					// was already on file rather than against the rest of this batch.
-					const possibleDuplicates = yield* findDuplicateCompanies(
+					// Looked for before the write: each company is compared against what is
+					// already on file, and — inside — against the entries ahead of it in this
+					// same request.
+					const needsReview = yield* findDuplicateCompanies(
 						sql,
 						currentOrg.id,
 						params.companies.map(c => ({
@@ -486,12 +505,9 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 						created: batch.created,
 						skipped: batch.skipped.map(skip => ({
 							slug: skip.slug,
-							matched_on:
-								skip.matchedOn === 'taxId'
-									? ('tax_id' as const)
-									: ('slug' as const),
+							matched_on: SKIPPED_BECAUSE[skip.matchedOn],
 						})),
-						possible_duplicates: possibleDuplicates,
+						created_needs_review: needsReview,
 					}
 				}).pipe(
 					Effect.catchTag('BadRequest', e =>
