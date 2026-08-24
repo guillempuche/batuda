@@ -35,8 +35,9 @@ import { enterOrgScope } from '../middleware/org.js'
 // is about a DIFFERENT company must fail closed to no_reliable_data; one that
 // clearly names the target must still succeed; a run that only glancingly
 // mentions it must keep what it found but finish marked for review rather than
-// presented as certain; and a run whose only scrape FAILS must resolve to
-// no_reliable_data, not failed.
+// presented as certain; a run whose subject's name yields no key at all must say
+// so and finish marked for review, since every one of those checks was skipped;
+// and a run whose only scrape FAILS must resolve to no_reliable_data, not failed.
 //
 // One shared ResearchService layer drives every case (a fresh layer per case
 // would start a fresh dispatcher + connection pool each time and exhaust the CI
@@ -254,7 +255,7 @@ interface RunResult {
 	readonly sourceCount: number
 	readonly findings: {
 		proposed_updates?: unknown[]
-		quality?: { low_confidence?: boolean }
+		quality?: { low_confidence?: boolean; subject_unreadable?: boolean }
 	} | null
 }
 
@@ -425,6 +426,59 @@ describe('ResearchService entity grounding gate', () => {
 			).toBe('succeeded_low_confidence')
 			// AND it says outright that somebody has to read it before acting
 			expect(result.findings?.quality?.low_confidence).toBe(true)
+		}, 30_000)
+	})
+
+	describe("when the subject's name yields no match key at all", () => {
+		it('should say so and finish marked for review, not as a clean success', async () => {
+			// GIVEN an enrichment run for a company written in an alphabet the name
+			//   reading has no plain letters for, whose only scrape returns a page
+			//   about an entirely different company
+			const result = await runScenario({
+				query: '株式会社山田電気',
+				schemaName: 'company_enrichment_v1',
+				url: `https://unread-${randomUUID()}.example/about`,
+				markdown: 'Topia Freight is a load broker based in Denver, Colorado.',
+				isFailure: false,
+			})
+
+			// THEN it does not come back as a clean success. Nothing held those
+			//   pages against the company, so nobody checked this run at all
+			expect(
+				result.status,
+				`unexpected status: ${result.errorMessage ?? '(none)'}`,
+			).toBe('succeeded_low_confidence')
+			// AND the run's own answer says why, so a person reading the result sees
+			//   it without going to the logs
+			expect(result.findings?.quality?.subject_unreadable).toBe(true)
+			expect(result.findings?.quality?.low_confidence).toBe(true)
+			// AND what it found is still handed back — this marks the run for
+			//   reading, it does not throw the work away
+			expect(result.findings?.proposed_updates).toHaveLength(1)
+		}, 30_000)
+	})
+
+	describe('when the subject went unread and the run also found nothing', () => {
+		it('should still say the subject went unread', async () => {
+			// GIVEN an enrichment run for a company written in another alphabet whose
+			//   single scrape_page call fails, so no page is fetched at all
+			const result = await runScenario({
+				query: 'Строймонтаж Иванов',
+				schemaName: 'company_enrichment_v1',
+				url: `https://unread-dead-${randomUUID()}.example/x`,
+				markdown: '',
+				isFailure: true,
+			})
+
+			// THEN it reports no reliable data, because it grounded nothing
+			expect(
+				result.status,
+				`unexpected status: ${result.errorMessage ?? '(none)'}`,
+			).toBe('no_reliable_data')
+			expect(result.sourceCount).toBe(0)
+			// AND the reason the run went unchecked survives on to a run that hands
+			//   back nothing, which is a separate answer from having found nothing
+			expect(result.findings?.quality?.subject_unreadable).toBe(true)
 		}, 30_000)
 	})
 

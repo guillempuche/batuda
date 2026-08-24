@@ -392,7 +392,9 @@ interface SourcedPage {
 // Feed extraction only the fetched pages that concern the target, so a look-alike
 // company's page pulled in alongside it cannot leak into the extracted fields.
 // Falls back to every page when the per-source check grounds none, so a run that
-// matched only through a search snippet still has something to extract from. The
+// matched only through a search snippet still has something to extract from. With
+// no targets at all every page goes through — for a run whose subject went unread
+// that is a filter that never ran, and the run says so in its own answer. The
 // company's own pages come first, so a fact stated on both the official site and an
 // aggregator is extracted from — and attributed to — the official one, instead of
 // the aggregator that happened to sit earlier in the fetch order.
@@ -2525,16 +2527,23 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					const hintLocation = (
 						context?.hints as { location?: string } | undefined
 					)?.location
-					// `let`, not `const`: when the seeded anchor domain redirects to a
-					// different host (a rebrand), the seed below folds that destination
-					// in as a strong-match key so the run grounds on the live site.
-					let entityTargets = deriveEntityTargets({
+					const subjectReading = deriveEntityTargets({
 						schemaName,
 						anchorDomain: context?.anchorDomain,
 						query: (run as { query: string }).query,
 						subjects: subjectTargets,
 						location: hintLocation,
 					})
+					// `let`, not `const`: when the seeded anchor domain redirects to a
+					// different host (a rebrand), the seed below folds that destination
+					// in as a strong-match key so the run grounds on the live site.
+					let entityTargets = subjectReading.targets
+					// True when the run is about one company and nothing could read its
+					// name, so every check below that holds a page against it has nothing
+					// to hold it against. Carried through the run so it can say so at the
+					// end, rather than finishing as clean as one that was checked and
+					// passed.
+					const subjectUnreadable = subjectReading.subjectUnreadable
 					let entityMatch: EntityMatch | null =
 						(run as { entityMatch?: EntityMatch | null }).entityMatch ?? null
 
@@ -2547,6 +2556,24 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							.map(s => s.name)
 							.find((n): n is string => n != null && n.trim() !== '') ??
 						queryName((run as { query: string }).query)
+
+					// Said once an attempt, so a starved market shows up in the telemetry
+					// rather than being guessed at. A resumed run comes back through here
+					// and says it again, so counting HOW MANY RUNS goes by the stored
+					// `quality.subject_unreadable`, which is written once per run; this
+					// pair is for watching the rate and for finding the run afterwards.
+					if (subjectUnreadable) {
+						yield* Effect.annotateCurrentSpan({
+							'research.entity.subject_unreadable': true,
+						})
+						yield* Effect.logWarning('research.entity.subject_unreadable').pipe(
+							Effect.annotateLogs({
+								event: 'research.entity.subject_unreadable',
+								research_id: researchId,
+								subject_name: entityName,
+							}),
+						)
+					}
 
 					// The company's own official site to fetch up front, when the caller
 					// gave its domain — a target-correction re-run's anchor, an anchored
@@ -2806,8 +2833,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					//
 					// Only pages the run opened count, and only ones that read as this
 					// company's: the single sentence a search quotes is too little to tell
-					// whose page it came from, and an address is worth having only when we
-					// know whose it is.
+					// whose page it came from, and an address is worth having only when its
+					// owner is known.
+					//
+					// With no key for the subject, nothing can say whose page it is, so no
+					// mailbox is harvested at all — that loses a real address rather than
+					// handing back a stranger's.
 					const harvestRoleMailboxes = (): ReadonlyArray<GenericEmail> => {
 						if (
 							schemaName !== 'company_enrichment_v1' ||
@@ -3381,6 +3412,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									name: 'contact-entity',
 									run: findings =>
 										Effect.gen(function* () {
+											// Passes every person through when there are no keys: with
+											// nothing to hold a quote against, one naming another
+											// company cannot be told from one naming this company.
 											const check = bindContactsToEntity(
 												findings,
 												entityTargets,
@@ -3980,7 +4014,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									// while a citation the run never fetched keeps its field. Runs
 									// before the source-tier cap so a blocked field is gone, not merely
 									// down-weighted. Only an enrichment run has a single subject to
-									// check against; any other run passes through.
+									// check against; any other run passes through — as does one whose
+									// subject's name yielded no key, since there is nothing to judge a
+									// cited page against. That run says so in its own answer rather
+									// than passing as one that was judged: see
+									// `quality.subject_unreadable`.
 									name: 'entity-sources',
 									run: findings =>
 										Effect.gen(function* () {
@@ -4628,6 +4666,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							const registrySnapshot = subjects[0]?.snapshot as
 								| Record<string, unknown>
 								| undefined
+							// A subject whose name went unread is left out here for a reason of
+							// its own, not as one more skipped check: the register is searched
+							// BY that name, and a hit cannot be confirmed against keys that do
+							// not exist, so the lookup would only spend money.
 							const registryCountry =
 								entityTargets !== null && isEntityGroundedSchema(schemaName)
 									? resolveRegistryCountry({
@@ -4886,6 +4928,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													: classifyEntityMatch(entityTargets, corpus)
 											// Grounding gate: reach the target's own site before answering; bounded
 											// so a run that still cannot ground fails closed rather than looping.
+											// With no keys there is no verdict to fall short of, so the
+											// nudge never fires and the run answers without ever having
+											// reached a page anyone held against the company.
 											if (
 												entityTargets !== null &&
 												verdict !== 'strong' &&
@@ -5081,7 +5126,18 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								// Only an unanchored scan hands its findings on; an anchored one
 								// extracted here to measure the list and lets phase 2 do the
 								// grounded extraction it needs.
-								findings: entityTargets === null ? findings : undefined,
+								//
+								// Asked of the anchor rather than of the keys: a scan anchored to
+								// a company whose name went unread has an anchor all the same, and
+								// going by the keys would send it down the unanchored path for the
+								// one reason that should never buy a run less care. It costs that
+								// scan a second extraction, and buys the two things phase 2 does
+								// without any keys at all: each page labelled with the host it sits
+								// on, and the anchor's own pages read first.
+								findings:
+									entityTargets === null && !subjectUnreadable
+										? findings
+										: undefined,
 								refined,
 								cheapCents,
 							}
@@ -5135,6 +5191,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							evidenceText,
 							...scrapeCorpus.map(page => page.text),
 						].join('\n')
+						// Null for a run with no keys — whether because it is about nobody
+						// in particular or because its subject's name went unread. The two
+						// are told apart in the quality block, which is where the second one
+						// costs the run its clean finish; here there is simply no verdict to
+						// reach.
 						entityMatch = entityTargets
 							? classifyEntityMatch(entityTargets, entityCorpus)
 							: null
@@ -5501,6 +5562,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// field away is work the round did, and a round judged on what it
 							// gained alone would read as having done nothing.
 							let voidedThisRound = 0
+							// Same as the per-source guard above: with no keys there is nothing
+							// to re-judge the fetched pages against, so the round voids no
+							// field and the run's own answer says the check was skipped.
 							if (roundHashes.length > 0 && entityTargets) {
 								const gapOpenedByHash = new Map(
 									openedPages(scrapeCorpus).map(
@@ -6129,8 +6193,14 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								date: briefDate,
 								// Only a run that scoped itself to one subject has a subject to
 								// name; a scan or a market question has none, and inventing one
-								// is what puts a stand-in in the heading.
-								subjectName: entityTargets === null ? undefined : entityName,
+								// is what puts a stand-in in the heading. A subject whose name
+								// went unread is still a subject, and it is still what the run
+								// was asked about — leaving it out because no key came of it
+								// would take the company off its own brief.
+								subjectName:
+									entityTargets === null && !subjectUnreadable
+										? undefined
+										: entityName,
 								findings,
 								transcript: researchText,
 								// Only the trades a pass actually went out for. The wording
@@ -6195,6 +6265,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					const nothingFoundQuality = computeRunQuality({
 						schemaName,
 						entityMatch,
+						subjectUnreadable,
 						rounds: runRounds,
 						gapRounds,
 						sourcesTotal: sources?.n ?? 0,
@@ -6304,6 +6375,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					const quality = computeRunQuality({
 						schemaName,
 						entityMatch,
+						subjectUnreadable,
 						rounds: runRounds,
 						gapRounds,
 						sourcesTotal: sources?.n ?? 0,
