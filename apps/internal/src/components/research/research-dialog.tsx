@@ -6,7 +6,7 @@ import { msg } from '@lingui/core/macro'
 import { Plural, Trans, useLingui } from '@lingui/react/macro'
 import { Link } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
-import { Check, ChevronsUpDown, X } from 'lucide-react'
+import { ChevronsUpDown, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import styled, { css } from 'styled-components'
 
@@ -577,7 +577,7 @@ export function ResearchDialog({
 										<ChevronsUpDown size={12} aria-hidden />
 									</PriSelect.Icon>
 								</PriSelect.Trigger>
-								<SelectOptions items={stackItems} />
+								<PriSelect.Options items={stackItems} />
 							</PriSelect.Root>
 						</Field>
 
@@ -718,33 +718,6 @@ type SelectItem<T extends string> = {
 	readonly label: string
 }
 
-// The list half of a dropdown, shared by every selector in this dialog so the
-// options look and behave the same wherever they are opened from.
-function SelectOptions<T extends string>({
-	items,
-}: {
-	readonly items: ReadonlyArray<SelectItem<T>>
-}) {
-	return (
-		<PriSelect.Portal>
-			<PriSelect.Positioner alignItemWithTrigger={false} sideOffset={6}>
-				<PriSelect.Popup>
-					<PriSelect.List>
-						{items.map(item => (
-							<PriSelect.Item key={item.value} value={item.value}>
-								<PriSelect.ItemIndicator>
-									<Check size={12} aria-hidden />
-								</PriSelect.ItemIndicator>
-								<PriSelect.ItemText>{item.label}</PriSelect.ItemText>
-							</PriSelect.Item>
-						))}
-					</PriSelect.List>
-				</PriSelect.Popup>
-			</PriSelect.Positioner>
-		</PriSelect.Portal>
-	)
-}
-
 // A dropdown in the scope grid. The trigger is a button, which a `<label for>`
 // may point at, so each field keeps the same label markup as the text fields
 // around it. What comes back is matched against the options rather than trusted,
@@ -777,7 +750,7 @@ function ScopeSelect<T extends string>({
 					<ChevronsUpDown size={12} aria-hidden />
 				</PriSelect.Icon>
 			</ScopeTrigger>
-			<SelectOptions items={items} />
+			<PriSelect.Options items={items} />
 		</PriSelect.Root>
 	)
 }

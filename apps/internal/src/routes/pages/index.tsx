@@ -2,11 +2,12 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { DateTime, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
-import { ExternalLink } from 'lucide-react'
+import { ChevronsUpDown, ExternalLink } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
 import type { PageSummary } from '@batuda/controllers'
+import { PriSelect } from '@batuda/ui/pri'
 
 import {
 	canonicalKey,
@@ -118,6 +119,14 @@ function PagesListPage() {
 	const isFailure = list.isError
 
 	const [statusFilter, setStatusFilter] = useState(search.status ?? '')
+	const statusItems = useMemo(
+		() => [
+			{ value: '', label: t`All statuses` },
+			{ value: 'draft', label: t`Draft` },
+			{ value: 'published', label: t`Published` },
+		],
+		[t],
+	)
 
 	// Keeps the dropdown in step with the address bar, since going back or
 	// forward in the browser changes the status in the URL but not the
@@ -133,11 +142,13 @@ function PagesListPage() {
 					<Trans>Pages</Trans>
 				</Title>
 				<HeaderActions>
-					<StatusFilter
-						data-testid='pages-status-filter'
+					<PriSelect.Root
+						items={statusItems}
 						value={statusFilter}
-						onChange={e => {
-							const nextStatus = e.target.value
+						onValueChange={next => {
+							const picked = statusItems.find(item => item.value === next)
+							if (!picked) return
+							const nextStatus = picked.value
 							setStatusFilter(nextStatus)
 							if (nextStatus) {
 								void navigate({ search: { ...search, status: nextStatus } })
@@ -150,10 +161,17 @@ function PagesListPage() {
 							}
 						}}
 					>
-						<option value=''>{t`All statuses`}</option>
-						<option value='draft'>{t`Draft`}</option>
-						<option value='published'>{t`Published`}</option>
-					</StatusFilter>
+						<StatusFilterTrigger data-testid='pages-status-filter'>
+							<PriSelect.Value />
+							<PriSelect.Icon>
+								<ChevronsUpDown size={12} aria-hidden />
+							</PriSelect.Icon>
+						</StatusFilterTrigger>
+						<PriSelect.Options
+							items={statusItems}
+							optionTestId={value => `pages-status-filter-${value || 'all'}`}
+						/>
+					</PriSelect.Root>
 				</HeaderActions>
 			</Header>
 
@@ -290,15 +308,18 @@ const HeaderActions = styled.div.withConfig({
 	gap: var(--space-sm);
 `
 
-const StatusFilter = styled.select.withConfig({
-	displayName: 'PagesListStatusFilter',
+// Kept at the body size rather than smaller: below 16px an iPhone zooms the
+// page the moment the control is tapped.
+const StatusFilterTrigger = styled(PriSelect.Trigger).withConfig({
+	displayName: 'PagesListStatusFilterTrigger',
 })`
+	gap: var(--space-2xs);
 	padding: var(--space-xs) var(--space-sm);
-	border-radius: 6px;
-	border: 1px solid var(--color-outline);
-	background: var(--color-surface);
-	color: var(--color-on-surface);
-	font-size: var(--typescale-body-medium-size);
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-large-size);
+	font-weight: var(--font-weight-regular);
+	letter-spacing: var(--typescale-body-large-tracking);
+	text-transform: none;
 `
 
 const Table = styled.table.withConfig({ displayName: 'PagesListTable' })`
