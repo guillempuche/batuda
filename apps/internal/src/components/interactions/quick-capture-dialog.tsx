@@ -4,7 +4,7 @@ import { msg } from '@lingui/core/macro'
 import { useLingui as useLinguiCore } from '@lingui/react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { AsyncResult } from 'effect/unstable/reactivity'
-import { X } from 'lucide-react'
+import { ChevronsUpDown, X } from 'lucide-react'
 import type { FormEvent } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
@@ -14,6 +14,7 @@ import {
 	PriDialog,
 	PriInput,
 	PriNumberField,
+	PriSelect,
 	PriToggleGroup,
 	usePriToast,
 } from '@batuda/ui/pri'
@@ -105,6 +106,11 @@ export function QuickCaptureDialog() {
 		}
 		return result.sort((a, b) => a.name.localeCompare(b.name, 'ca'))
 	}, [companiesResult])
+	const companyItems = useMemo(
+		() =>
+			companyOptions.map(option => ({ value: option.id, label: option.name })),
+		[companyOptions],
+	)
 
 	useEffect(() => {
 		if (!isOpen) return
@@ -208,22 +214,30 @@ export function QuickCaptureDialog() {
 								<Label htmlFor='qc-company'>
 									<Trans>Company</Trans>
 								</Label>
-								<Select
-									id='qc-company'
-									data-testid='quick-capture-company'
+								<PriSelect.Root
+									items={companyItems}
 									value={companyId}
-									onChange={event => setCompanyId(event.target.value)}
-									required
+									onValueChange={next => {
+										const picked = companyItems.find(
+											item => item.value === next,
+										)
+										if (picked) setCompanyId(picked.value)
+									}}
 								>
-									<option value='' disabled>
-										{t`— Select a company —`}
-									</option>
-									{companyOptions.map(option => (
-										<option key={option.id} value={option.id}>
-											{option.name}
-										</option>
-									))}
-								</Select>
+									<CompanyTrigger
+										id='qc-company'
+										data-testid='quick-capture-company'
+									>
+										<CompanyValue placeholder={t`— Select a company —`} />
+										<PriSelect.Icon>
+											<ChevronsUpDown size={12} aria-hidden />
+										</PriSelect.Icon>
+									</CompanyTrigger>
+									<PriSelect.Options
+										items={companyItems}
+										optionTestId={value => `quick-capture-company-${value}`}
+									/>
+								</PriSelect.Root>
 							</Field>
 						)}
 
@@ -514,24 +528,30 @@ const Label = styled.label.withConfig({ displayName: 'QuickCaptureLabel' })`
 	font-size: var(--typescale-label-small-size);
 `
 
-const Select = styled.select.withConfig({ displayName: 'QuickCaptureSelect' })`
-	display: block;
+// Sized like the text fields beside it, and at the body size rather than
+// smaller: below 16px an iPhone zooms the page the moment the control is
+// tapped, which on a full-screen sheet is hard to get back from.
+const CompanyTrigger = styled(PriSelect.Trigger).withConfig({
+	displayName: 'QuickCaptureCompanyTrigger',
+})`
+	justify-content: space-between;
 	width: 100%;
+	min-width: 0;
 	padding: var(--space-2xs) var(--space-sm);
-	min-height: 2.25rem;
-	border: none;
-	border-bottom: 2px solid var(--color-outline);
-	background: var(--color-paper-aged);
-	color: var(--color-on-surface);
 	font-family: var(--font-body);
-	font-size: var(--typescale-body-medium-size);
-	line-height: var(--typescale-body-medium-line);
-	border-radius: 0;
+	font-size: var(--typescale-body-large-size);
+	font-weight: var(--font-weight-regular);
+	letter-spacing: var(--typescale-body-large-tracking);
+	text-transform: none;
+`
 
-	&:focus-visible {
-		outline: none;
-		border-bottom-color: var(--color-primary);
-	}
+const CompanyValue = styled(PriSelect.Value).withConfig({
+	displayName: 'QuickCaptureCompanyValue',
+})`
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 `
 
 const Textarea = styled.textarea.withConfig({

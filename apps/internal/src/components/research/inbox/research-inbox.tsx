@@ -3,12 +3,12 @@ import type { MessageDescriptor } from '@lingui/core'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
-import { ArrowRight, Microscope, Search } from 'lucide-react'
+import { ArrowRight, ChevronsUpDown, Microscope, Search } from 'lucide-react'
 import { type ReactNode, useCallback, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
 import { ATTENTION_RESEARCH_STATUSES } from '@batuda/domain'
-import { PriButton, PriInput, usePriToast } from '@batuda/ui/pri'
+import { PriButton, PriInput, PriSelect, usePriToast } from '@batuda/ui/pri'
 
 import {
 	type PendingProposal,
@@ -131,6 +131,15 @@ export function ResearchInbox() {
 	const [search, setSearch] = useState('')
 	const [minConfidence, setMinConfidence] = useState(0)
 	const [machineOnly, setMachineOnly] = useState(false)
+	const confidenceItems = useMemo(
+		() => [
+			{ value: '0', label: t`Any confidence` },
+			{ value: '50', label: t`50%+` },
+			{ value: '70', label: t`70%+` },
+			{ value: '90', label: t`90%+` },
+		],
+		[t],
+	)
 
 	// Filtering happens where the rows live. Sifting a fetched page in the browser
 	// only ever searched the newest hundred, so a matching change beyond that was
@@ -434,17 +443,28 @@ export function ResearchInbox() {
 						data-testid='research-inbox-search'
 						onChange={e => setSearch(e.target.value)}
 					/>
-					<FilterSelect
+					<PriSelect.Root
+						items={confidenceItems}
 						value={String(minConfidence)}
-						aria-label={t`Minimum confidence`}
-						data-testid='research-inbox-min-confidence'
-						onChange={e => setMinConfidence(Number(e.target.value))}
+						onValueChange={next => {
+							const picked = confidenceItems.find(item => item.value === next)
+							if (picked) setMinConfidence(Number(picked.value))
+						}}
 					>
-						<option value='0'>{t`Any confidence`}</option>
-						<option value='50'>{t`50%+`}</option>
-						<option value='70'>{t`70%+`}</option>
-						<option value='90'>{t`90%+`}</option>
-					</FilterSelect>
+						<FilterTrigger
+							aria-label={t`Minimum confidence`}
+							data-testid='research-inbox-min-confidence'
+						>
+							<PriSelect.Value />
+							<PriSelect.Icon>
+								<ChevronsUpDown size={11} aria-hidden />
+							</PriSelect.Icon>
+						</FilterTrigger>
+						<PriSelect.Options
+							items={confidenceItems}
+							optionTestId={value => `research-inbox-min-confidence-${value}`}
+						/>
+					</PriSelect.Root>
 					<ToggleLabel>
 						<input
 							type='checkbox'
@@ -983,19 +1003,16 @@ const Filters = styled.div`
 	gap: var(--space-2xs);
 `
 
-const FilterSelect = styled.select`
-	font-family: var(--font-body);
-	font-size: var(--typescale-body-small-size);
+// A compact filter chip, kept at the body size rather than smaller: below 16px
+// an iPhone zooms the page the moment the control is tapped.
+const FilterTrigger = styled(PriSelect.Trigger)`
+	gap: var(--space-3xs);
 	padding: var(--space-3xs) var(--space-2xs);
-	border-radius: var(--shape-2xs);
-	border: 1px solid color-mix(in oklab, var(--color-on-surface) 24%, transparent);
-	background: var(--color-surface);
-	color: var(--color-on-surface);
-
-	&:focus-visible {
-		outline: none;
-		box-shadow: var(--glow-active);
-	}
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-large-size);
+	font-weight: var(--font-weight-regular);
+	letter-spacing: var(--typescale-body-large-tracking);
+	text-transform: none;
 `
 
 const ToggleLabel = styled.label`

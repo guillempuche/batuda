@@ -45,18 +45,27 @@ test.describe('quick capture', () => {
 			// THEN the dialog is visible
 			await expect(page.getByTestId('quick-capture-form')).toBeVisible()
 
-			// AND when she selects a seeded company and fills subject + summary
+			// AND when she selects a seeded company and fills subject + summary.
+			// The picker is a PriSelect — a button plus a popup that lives elsewhere
+			// on the page — so the option is opened and pressed rather than set the
+			// way a plain select would be.
 			const companySelect = page.getByTestId('quick-capture-company')
 			await expect(companySelect).toBeVisible()
-			const firstCompanyId = await companySelect
-				.locator('option:not([value=""])')
+			await companySelect.click()
+			const firstOption = page
+				.locator('[data-testid^="quick-capture-company-"]')
 				.first()
-				.getAttribute('value')
+			await firstOption.waitFor({ state: 'visible' })
+			const firstCompanyId = (
+				await firstOption.getAttribute('data-testid')
+			)?.replace('quick-capture-company-', '')
 			expect(
 				firstCompanyId,
 				'seed should provide at least one company',
-			).not.toBeNull()
-			await companySelect.selectOption(firstCompanyId as string)
+			).toBeTruthy()
+			await firstOption.hover()
+			await page.keyboard.press('Enter')
+			await firstOption.waitFor({ state: 'hidden' })
 			await page
 				.getByTestId('quick-capture-subject')
 				.fill('e2e — quick capture smoke')
