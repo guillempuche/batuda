@@ -35,12 +35,16 @@ let mxCalls: string[] = []
 let verifyCalls: string[] = []
 let charges: string[] = []
 
+// Three listings, two people: a register records an office, so Dolors holding
+// two of them is named twice. The junior office comes first, as a register is
+// under no obligation to order them.
 const registryDirectors = [
 	{ name: 'Dolors Puig', role: 'Administradora única' },
 	{ name: 'Jordi Serra', role: 'Apoderat' },
+	{ name: 'Dolors Puig', role: 'Presidenta' },
 ]
 
-// A registry that names two officers and no addresses, which is what a national
+// A registry that names its officers and no addresses, which is what a national
 // business register actually holds.
 const registryLayer = Layer.succeed(RegistryRouter)(
 	RegistryRouter.of({
@@ -166,8 +170,11 @@ describe('discover_contacts for a company with no website', () => {
 			// AND each carries their role but no way of reaching them — which is the
 			// whole point: a name and a job title beat reporting nobody was found
 			expect(contacts.every(c => c.channels.length === 0)).toBe(true)
+			// Both her offices, the one that can carry a purchase first, and she is
+			// one row rather than two — the register listed an office twice, not a
+			// person twice
 			expect(contacts.find(c => c.name === 'Dolors Puig')?.role).toBe(
-				'Administradora única',
+				'Presidenta, Administradora única',
 			)
 
 			// AND no enrichment vendor was asked or charged for a lookup keyed on a

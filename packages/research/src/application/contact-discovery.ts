@@ -62,6 +62,17 @@ export interface SourcePerson {
 	readonly phone?: string | undefined
 }
 
+// Who a record is about. Named rather than written inline because two things
+// have to agree on it exactly: the merge that folds a person's duplicate
+// listings together, and the gathering of the offices those listings named.
+// Group by one rule and merge by another and a person's offices end up
+// attached to somebody else.
+const personKey = (person: SourcePerson): string =>
+	`${person.firstName} ${person.lastName}`.trim().toLowerCase() ||
+	person.email?.toLowerCase() ||
+	person.linkedin ||
+	''
+
 // Merge people gathered from more than one enrichment vendor into one entry per
 // person (union mode). Keyed by name — so the same person from two vendors
 // collapses to a single contact — with a record that carries an email winning
@@ -71,11 +82,7 @@ export const dedupePeople = (
 ): SourcePerson[] => {
 	const byPerson = new Map<string, SourcePerson>()
 	for (const person of people) {
-		const key =
-			`${person.firstName} ${person.lastName}`.trim().toLowerCase() ||
-			person.email?.toLowerCase() ||
-			person.linkedin ||
-			''
+		const key = personKey(person)
 		const existing = byPerson.get(key)
 		if (
 			existing === undefined ||
@@ -383,16 +390,58 @@ export const compareByBuyingRole = (
 	return aDecides ? -1 : 1
 }
 
-// The list the paid checks work through: one person once, and whoever can
-// carry a purchase forward at the front.
+// Every distinct office one person is listed under, as one line. The register's
+// own words in its own language — the separator is the only text added here, so
+// the line can still be split back apart.
 //
-// Sorted before the merge, not after. The merge keeps the first copy of a
-// person, so a director the register happens to list under a junior title
-// first would otherwise survive as the junior one — losing both the title
-// that says they can buy and their place at the front of the queue.
+// A title is dropped only when the very same title is listed twice. Never
+// because one sits inside another: a register's offices genuinely nest, and
+// "Administrador Solidario" is a different office from "Administrador", not a
+// longer way of writing it.
+const joinPositions = (
+	positions: ReadonlyArray<string>,
+): string | undefined => {
+	const seen = new Set<string>()
+	const kept: string[] = []
+	for (const raw of positions) {
+		const title = raw.trim().replace(/\s+/g, ' ')
+		if (title === '' || seen.has(title.toLowerCase())) continue
+		seen.add(title.toLowerCase())
+		kept.push(title)
+	}
+	return kept.length === 0 ? undefined : kept.join(', ')
+}
+
+// The list the paid checks work through: one person once, carrying every office
+// the register lists them under, whoever can carry a purchase forward first.
+//
+// Sorted before the merge, for two reasons that outlast the merge. The paid
+// checks below stop at a ceiling and take whoever is in front, so this order
+// decides who the money is spent on. And it settles the order inside the joined
+// title, so the office that can sign off reads first.
+//
+// The joining lives here rather than inside the merge, because the merge is also
+// what folds two paid vendors' answers together — and those two describe the
+// same job in different words. "CTO" beside "Chief Technology Officer" is one
+// office written twice, not two offices, and joining them there would say a
+// person holds both.
 export const peopleToReach = (
 	people: ReadonlyArray<SourcePerson>,
-): SourcePerson[] => dedupePeople([...people].sort(compareByBuyingRole))
+): SourcePerson[] => {
+	const sorted = [...people].sort(compareByBuyingRole)
+	const heldBy = new Map<string, string[]>()
+	for (const person of sorted) {
+		if (person.position === undefined) continue
+		const key = personKey(person)
+		const held = heldBy.get(key)
+		if (held === undefined) heldBy.set(key, [person.position])
+		else held.push(person.position)
+	}
+	return dedupePeople(sorted).map(person => {
+		const position = joinPositions(heldBy.get(personKey(person)) ?? [])
+		return position === undefined ? person : { ...person, position }
+	})
+}
 
 export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 	'ContactDiscovery',
