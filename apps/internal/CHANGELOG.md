@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-25 (internal-v2026.8.25)
+
+### Features
+
+* **internal:** name the reason a research run went unchecked ([ede6be1](https://github.com/guillempuche/batuda/commit/ede6be1bb735c8229b6024b35d1257562bc583ce))
+* **ui:** add the list half of a dropdown as one piece ([417ff11](https://github.com/guillempuche/batuda/commit/417ff11417f36dd2f4c9f113a68d92e00ec0f04c))
+
+### Bug Fixes
+
+* **internal:** make the research dialog usable on a phone ([8a6bac5](https://github.com/guillempuche/batuda/commit/8a6bac522e77792ef01747c99ea399a5a56591d6))
+* **internal:** stop three dropdowns zooming the page on iPhone ([e218ab2](https://github.com/guillempuche/batuda/commit/e218ab2d67619355eeff66755d99a1011c037309))
+* make a discovery scan tell the truth about what it found ([cad35ef](https://github.com/guillempuche/batuda/commit/cad35ef6bac4b639f3d66c17a0bc9b6eecac117e))
+* read the countries a scan reports, not the field it replaced ([44ca0ba](https://github.com/guillempuche/batuda/commit/44ca0babe330b34bbd9e267f9c0119ea2b2e910d))
+* **research:** buy every company a website before anybody a headcount ([c19a1d8](https://github.com/guillempuche/batuda/commit/c19a1d85025fda36c77d123dfa060272092f065c)), closes [#496](https://github.com/guillempuche/batuda/issues/496)
+* **research:** drop the marketplaces and suppliers a word list missed ([3b817bb](https://github.com/guillempuche/batuda/commit/3b817bb6a5b2e9c0adcded2f483b573c44448f0a))
+* **research:** keep every office a register lists a person under ([e4c31aa](https://github.com/guillempuche/batuda/commit/e4c31aafb35fc7ca91c8e485f1ad4c31e413e074))
+* **research:** reach a person once, whatever roles they are listed under ([844ce7b](https://github.com/guillempuche/batuda/commit/844ce7bd5a0b846484866efbfb4bc592ef1a5e08))
+* **research:** say when a company's name cannot be read, instead of checking nothing ([f7f472f](https://github.com/guillempuche/batuda/commit/f7f472fc5a4c0e2244f329c1e88f6e0de59b799d))
+* **research:** stop a round starting a read it has no time to finish ([0b64997](https://github.com/guillempuche/batuda/commit/0b64997556b3696493f7a2bae49fd36b68da2038))
+* **research:** stop the eval scoring a vendor to the trade as a company ([da9b6d1](https://github.com/guillempuche/batuda/commit/da9b6d1ea86ec340e183b84c775e66ee89c3262f))
+* **ui:** let a full-screen dialog scroll what will not fit ([ff258c2](https://github.com/guillempuche/batuda/commit/ff258c2c9d9697f599f0ec98906a4ab75904d6fe))
+
 ## 2026-08-22 (internal-v2026.8.22)
 
 ### Features
