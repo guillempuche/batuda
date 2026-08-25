@@ -1,4 +1,5 @@
 import { Select } from '@base-ui/react/select'
+import type { ComponentProps } from 'react'
 import styled from 'styled-components'
 
 /**
@@ -252,8 +253,78 @@ const PriScrollDownArrow = styled(Select.ScrollDownArrow).withConfig({
 	}
 `
 
+// Drawn here rather than pulled from an icon set: this package ships to other
+// projects, and one tick is not worth making every one of them install a
+// library for.
+function CheckMark() {
+	return (
+		<svg
+			width='12'
+			height='12'
+			viewBox='0 0 24 24'
+			fill='none'
+			stroke='currentColor'
+			strokeWidth='2'
+			strokeLinecap='round'
+			strokeLinejoin='round'
+			aria-hidden='true'
+		>
+			<path d='M20 6 9 17l-5-5' />
+		</svg>
+	)
+}
+
+/**
+ * The list half of a dropdown: the portal, the positioning, the popup and the
+ * options inside it, which are the same everywhere and are the part that gets
+ * copied when a new selector is written.
+ *
+ * A selector whose options need their own look keeps composing the pieces by
+ * hand — this covers the ordinary case, not every case.
+ */
+function PriOptions<T extends string>({
+	items,
+	optionTestId,
+	...positioner
+}: ComponentProps<typeof Select.Positioner> & {
+	readonly items: ReadonlyArray<{ readonly value: T; readonly label: string }>
+	// Each option needs its own hook for tests to press, since a popup that
+	// lives outside the trigger cannot be driven the way a plain select is.
+	readonly optionTestId?: (value: T) => string
+}) {
+	return (
+		<Select.Portal>
+			<Select.Positioner
+				alignItemWithTrigger={false}
+				sideOffset={6}
+				{...positioner}
+			>
+				<PriPopup>
+					<Select.List>
+						{items.map(item => (
+							<PriItem
+								key={item.value}
+								value={item.value}
+								{...(optionTestId
+									? { 'data-testid': optionTestId(item.value) }
+									: {})}
+							>
+								<PriItemIndicator>
+									<CheckMark />
+								</PriItemIndicator>
+								<Select.ItemText>{item.label}</Select.ItemText>
+							</PriItem>
+						))}
+					</Select.List>
+				</PriPopup>
+			</Select.Positioner>
+		</Select.Portal>
+	)
+}
+
 export const PriSelect = {
 	Root: Select.Root,
+	Options: PriOptions,
 	Portal: Select.Portal,
 	Backdrop: Select.Backdrop,
 	Positioner: Select.Positioner,
