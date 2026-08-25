@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-25 (ui-v2026.8.25)
+
+### Features
+
+* **ui:** add the list half of a dropdown as one piece ([417ff11](https://github.com/guillempuche/batuda/commit/417ff11417f36dd2f4c9f113a68d92e00ec0f04c))
+
+### Bug Fixes
+
+* **ui:** let a full-screen dialog scroll what will not fit ([ff258c2](https://github.com/guillempuche/batuda/commit/ff258c2c9d9697f599f0ec98906a4ab75904d6fe))
+
 ## 2026-08-14 (ui-v2026.8.14)
 
 ### Bug Fixes
