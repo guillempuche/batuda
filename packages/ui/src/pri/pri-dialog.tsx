@@ -113,6 +113,11 @@ const StyledPopup = styled(Dialog.Popup).withConfig({
 	 * tracks the visual viewport (--pri-dialog-vh, set from window.visualViewport)
 	 * so the on-screen keyboard shrinks the sheet instead of hiding the footer.
 	 * 40rem is the app's phone breakpoint.
+	 *
+	 * The sheet is a fixed height, so anything taller has to scroll somewhere.
+	 * A dialog that wants a footer standing still while the fields move builds
+	 * its own scrolling area inside; this scrolls whatever is left over, so a
+	 * form can never grow past the bottom edge and strand its buttons.
 	 */
 	&[data-mobile='sheet'] {
 		@media (max-width: 40rem) {
@@ -124,7 +129,11 @@ const StyledPopup = styled(Dialog.Popup).withConfig({
 			height: var(--pri-dialog-vh, 100dvh);
 			max-height: var(--pri-dialog-vh, 100dvh);
 			border-radius: 0;
-			overflow: hidden;
+			/* Sideways is still clipped — a stray wide element should not turn the
+			 * whole sheet into something that slides left and right under a thumb. */
+			overflow-x: hidden;
+			overflow-y: auto;
+			overscroll-behavior: contain;
 			padding: calc(env(safe-area-inset-top, 0px) + var(--space-lg))
 				var(--space-lg)
 				calc(env(safe-area-inset-bottom, 0px) + var(--space-md));
