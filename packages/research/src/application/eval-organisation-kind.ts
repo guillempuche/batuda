@@ -2,19 +2,20 @@
  * Asks a model what kind of organisation each row of a market list is, so the eval
  * can judge a list without sharing the blind spot of the check it is judging.
  *
- * A search for a trade runs straight through the bodies that represent it — the
- * associations, federations and guilds whose pages are where the member companies
- * are named — and brings them back looking like companies. Two things decide that
- * today and both are narrow: the golden file names the bodies somebody thought to
- * list, and the shipped check that drops them reads word lists in three languages,
- * recognising four of fifteen European bodies. A body in French or German passes
- * both, so the figure that exists to catch them reports a clean list.
+ * A search for a trade runs straight through the pages where that trade's companies
+ * are named — an association's member list, a business directory, a quotes
+ * marketplace — and brings whoever published the page back looking like a company.
+ * The golden file catches only the ones somebody thought to list, which in practice
+ * means the trade bodies; the other kinds are not names anybody can enumerate in
+ * advance, and a marketplace listing installers reads exactly like an installer.
  *
- * A model reads every one of those languages and a body says what it is in its own
- * words on its own page, so asking is both more accurate and less to maintain. What
- * matters for a measurement is that this asks *separately* from the check the
- * pipeline uses: if the eval decided kind the same way the pipeline does, it could
- * never show the pipeline being wrong.
+ * A model reads every language a market answers in and reads a sentence rather than
+ * a word, so asking is both more accurate and less to maintain. What matters for a
+ * measurement is that this asks *separately* from the check the pipeline uses: if
+ * the eval decided kind the same way the pipeline does, it could never show the
+ * pipeline being wrong. The two ask the same question in deliberately different
+ * words, and both follow #456 §4.1 — does the organisation do the trade's work, or
+ * do the ones who do it belong to it, buy from it, or get pointed at by it.
  *
  * Three rules keep the answer honest:
  *  - a row the golden file names is a body whatever the model says, because a person
@@ -47,7 +48,7 @@ export type KindMethod =
 
 /** What one row was decided to be, and by what. */
 export interface OrganisationKind {
-	/** False for a trade body, federation, guild, chamber or system operator. */
+	/** False for anything the trade belongs to, buys from, or is listed by. */
 	readonly isCompany: boolean
 	readonly method: KindMethod
 }
@@ -86,11 +87,12 @@ export const organisationKindPrompt = (
 		'You are reading rows returned by a search for companies in a trade.',
 		'',
 		'For each row, say what kind of organisation it is:',
-		'  "company" — it does the work of the trade itself (it installs, manufactures, supplies, services).',
-		'  "other"   — it represents, regulates, certifies, lobbies for or lists the ones that do: a trade association, federation, employers\' body, guild, chamber of commerce, professional college, standards body, or a sector system operator.',
+		'  "company" — it does the work of the trade itself, for customers who want that work done: it installs, manufactures, builds or services.',
+		'  "other"   — the ones who do that work are its members, its customers, or the people it lists. That covers a trade association, federation, employers\' body, guild, chamber of commerce, professional college, standards body or sector system operator; a directory, listings site or marketplace that lists them; and a supplier whose customers are the trade itself, such as a firm selling software, tools or parts to installers.',
 		'  "unsure"  — the row does not say enough to tell.',
 		'',
 		'Judge only what the row says about itself. A company that belongs to an association is still a company. A body trading under initials is still a body.',
+		'Who buys is what separates a company from a supplier: an installer sells installation work to the people who want it, while a firm selling design software to installers sells to the trade.',
 		'',
 		'Rows:',
 		...rows.map(

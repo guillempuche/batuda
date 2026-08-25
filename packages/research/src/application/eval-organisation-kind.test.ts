@@ -6,7 +6,9 @@ import {
 	type KindCandidate,
 	type OrganisationKindJudge,
 	type OrganisationKindVerdicts,
+	organisationKindPrompt,
 } from './eval-organisation-kind'
+import { organisationKindGuardPrompt } from './organisation-kind-guard'
 
 const row = (name: string, describedAs = ''): KindCandidate => ({
 	name,
@@ -156,6 +158,54 @@ describe('deciding what kind of organisation each row is', () => {
 			// market spends nothing on a model
 			expect(seen).toEqual([])
 			expect(kinds.every(kind => kind.method === 'golden-listed')).toBe(true)
+		})
+	})
+})
+
+describe('the question put to the model', () => {
+	describe('when a row could be a company or a supplier to the trade', () => {
+		it('should place a supplier to the trade with the organisations that are not companies', () => {
+			// GIVEN the question as it is asked
+			const prompt = organisationKindPrompt([row('GeoTapp', 'Software')])
+			const other = prompt
+				.split('\n')
+				.find(line => line.trim().startsWith('"other"'))
+
+			// WHEN the "other" answer is read
+			// THEN a firm whose customers are the trade belongs to it. Left off, a
+			// vendor selling to installers reads as an installer, and the figure
+			// meant to catch it scores the list clean.
+			expect(other).toBeDefined()
+			expect(other).toMatch(/customers are the trade/i)
+		})
+
+		it('should not offer "supplies" as a bare mark of a company', () => {
+			// GIVEN the question as it is asked
+			const prompt = organisationKindPrompt([row('GeoTapp', 'Software')])
+			const company = prompt
+				.split('\n')
+				.find(line => line.trim().startsWith('"company"'))
+
+			// WHEN the "company" answer is read
+			// THEN it does not claim supplying as the trade's own work: every firm
+			// supplies somebody, so the word placed a vendor on the wrong side.
+			expect(company).toBeDefined()
+			expect(company).not.toMatch(/supplies/i)
+		})
+	})
+
+	describe('when held against the check it measures', () => {
+		it('should ask in different words from the pipeline it grades', () => {
+			// GIVEN both questions over the same row
+			const candidate = { id: '0', name: 'GeoTapp', describedAs: 'Software' }
+
+			// WHEN each is put together
+			// THEN they are not the same text. An instrument that asked exactly as
+			// the thing it measures could never catch that thing being wrong, so the
+			// two are kept apart on purpose rather than shared.
+			expect(organisationKindPrompt([row('GeoTapp', 'Software')])).not.toBe(
+				organisationKindGuardPrompt([candidate]),
+			)
 		})
 	})
 })
