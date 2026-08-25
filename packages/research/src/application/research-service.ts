@@ -123,7 +123,12 @@ import {
 import { type GuardLink, runGuardChain } from './guard-chain'
 import { citedSourceIds as rowCitedSourceIds } from './guard-shapes'
 import { markNameOnlyRows } from './name-only-guard'
-import { dropNonCompanies } from './organisation-kind-guard'
+import {
+	dropNonCompanies,
+	OrganisationKindGuardVerdictsSchema,
+	organisationKindGuardPrompt,
+	type RememberedKind,
+} from './organisation-kind-guard'
 import { normalizePaidActionTool } from './paid-action-tool'
 import {
 	mergePerFieldSearch,
@@ -319,6 +324,11 @@ const MAX_BRIEF_SUBJECT_CHARS = 120
 // Cap how many per-field grounding drops a run logs in detail, so a pathological
 // extraction can't flood the log; the aggregate counts still cover the rest.
 const MAX_LOGGED_FIELD_DROPS = 20
+
+// How much of a dropped row's stated reason reaches the log. It is asked for in a
+// few words; this is what a model ignoring that costs, per row, on a scan that
+// dropped twenty.
+const MAX_DROP_REASON_CHARS = 200
 
 // How many about/contact/team pages to fetch up front from the anchor site's own
 // links. Small on purpose — these carry the location and named leaders a homepage
@@ -2718,6 +2728,13 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// gathering and gap-closing are different work; stays 0 on a resume
 					// that reuses the earlier attempt's findings.
 					let gapRounds = 0
+					// What kind of organisation each row was already found to be, kept for
+					// the whole run and keyed by the row's own words. A scan asks this once
+					// per extraction and then again after each gap round, over a list that
+					// mostly did not change — so without this the same sixty rows are
+					// bought five or six times out of the same purse the confirming step
+					// draws on.
+					const organisationKinds = new Map<string, RememberedKind>()
 					// Every piece of real page text gathered this run — the corpus the value
 					// guard checks findings against. Kept separate from the model-facing
 					// transcript (capped per page); empty on a resume that skips phase 1.
@@ -3318,11 +3335,16 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							const guardChain: ReadonlyArray<GuardLink> = [
 								{
 									// Organisation kind: a search for a trade's companies runs through
-									// that trade's association and federation pages, because that is
-									// where the companies are named — and the body that published the
-									// list comes back as one of the answers. Drop a row whose own words
-									// say it is a body of another kind, and only then: a row that says
-									// nothing about its kind is kept, unconfirmed or not.
+									// the pages where that trade's companies are named — an
+									// association's member list, a directory, a marketplace — and
+									// whoever published the page comes back as one of the answers. Ask
+									// the model what each row's own words make it, and drop only a
+									// clear "one of the other kinds": a row it is unsure about, or one
+									// it never ruled on, is kept, unconfirmed or not.
+									//
+									// Fails open on purpose. A judge that errors returns no verdicts,
+									// which keeps every row — the reading the list had before any model
+									// was involved. An outage must never empty a list.
 									//
 									// First in the chain, because it reads a row's own words and the
 									// links below rewrite them — the vocabulary link blanks an industry
@@ -3331,10 +3353,46 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									name: 'organisation-kind',
 									run: findings =>
 										Effect.gen(function* () {
-											const check = dropNonCompanies(
+											const check = yield* dropNonCompanies(
 												findings,
 												discoveryResultField(schemaName),
+												rows =>
+													extractLlm
+														.generateObject({
+															schema: OrganisationKindGuardVerdictsSchema,
+															prompt: organisationKindGuardPrompt(rows),
+														})
+														.pipe(
+															Effect.map(response => ({
+																verdicts: response.value.verdicts,
+															})),
+															// Every way this can fail keeps every row, which is the
+															// whole safety property. A cancelled run says nothing
+															// — it is not a judge that fell over, and the run is
+															// unwinding anyway.
+															Effect.catchCause(cause =>
+																Cause.hasInterruptsOnly(cause)
+																	? Effect.succeed({ verdicts: [] })
+																	: Effect.logWarning(
+																			'research.organisation_kind.skipped',
+																		).pipe(
+																			Effect.annotateLogs({
+																				event:
+																					'research.organisation_kind.skipped',
+																				research_id: researchId,
+																				rows: rows.length,
+																				cause: Cause.pretty(cause),
+																			}),
+																			Effect.as({ verdicts: [] }),
+																		),
+															),
+														),
+												organisationKinds,
 											)
+											// What this pass learned is carried into the next one, so a
+											// gap round only pays for the rows it actually added.
+											for (const [key, kind] of check.learned)
+												organisationKinds.set(key, kind)
 											for (const row of check.dropped.slice(
 												0,
 												MAX_LOGGED_FIELD_DROPS,
@@ -3346,7 +3404,13 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														event: 'research.prospects.not_a_company',
 														research_id: researchId,
 														name: row.name,
-														kind: row.kind,
+														// The reason is the model's own words, so it is
+														// bounded the way every other piece of text a model
+														// hands back is before it reaches a log line.
+														reason: boundedToolResult(
+															row.reason,
+															MAX_DROP_REASON_CHARS,
+														),
 													}),
 												)
 											}
@@ -3355,6 +3419,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												spanCounts: {
 													'research.prospects.not_a_company':
 														check.dropped.length,
+													// Both, because one cannot answer on its own. Nothing
+													// dropped out of sixty RULED is a real, quiet "they are
+													// all companies"; nothing dropped out of sixty ASKED and
+													// none ruled is a check that never ran at all.
+													'research.prospects.kind_asked': check.asked,
+													'research.prospects.kind_ruled': check.ruled,
 												},
 											}
 										}),
@@ -4013,9 +4083,15 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// How many company fields the per-source checks removed. The caller
 							// reports it, so that link hands the count back out through here.
 							let entityFieldsDropped = 0
-							// The second half of the chain: the links that ask a model, plus the
+							// The second half of the chain: the per-field judgements, plus the
 							// per-source checks that need the pages this run fetched. Same reading
-							// rule as the deterministic half — the array order is the run order.
+							// rule as the first half — the array order is the run order.
+							//
+							// Not "the half that asks a model": the organisation-kind link in the
+							// first half asks one too, and has to, because it reads a row's own
+							// words before the links between here and there rewrite them. What
+							// divides the two is when they can run — everything here needs the
+							// whole list settled first.
 							const criticChain: ReadonlyArray<GuardLink> = [
 								{
 									// Critic: a final per-field second look. For each value still

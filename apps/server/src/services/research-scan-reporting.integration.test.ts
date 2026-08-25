@@ -130,6 +130,10 @@ const agentLlm: LanguageModel.Service = {
 // company the request asks for, then the structured findings. They are told apart
 // by a phrase only the splitting prompt carries.
 const SPLITTER_MARKER = 'kinds of company it asks for'
+// A phrase only the organisation-kind question carries, so a reading and a kind
+// check are never mistaken for one another.
+const ORGANISATION_KIND_MARKER =
+	'You are checking a list returned by a search for companies in a trade.'
 
 // How many splitting prompts the stub recognised. A case that expects parts asserts
 // on this, so rewording the splitting prompt fails as "the stub never saw the
@@ -154,6 +158,16 @@ const extractLlm: LanguageModel.Service = {
 			if (isSplitter) {
 				splitterCalls++
 				return { usage, value: { parts: scenario.parts ?? [] } }
+			}
+			// The organisation-kind check asks the same model what each row is. It
+			// passes every row here — this file is about what a scan reports, not
+			// about which rows survive — and it must not count as a reading, or the
+			// script below serves the next extraction somebody else's answer.
+			if (
+				typeof options.prompt === 'string' &&
+				options.prompt.includes(ORGANISATION_KIND_MARKER)
+			) {
+				return { usage, value: { verdicts: [] } }
 			}
 			extractionCalls++
 			// Past the end of the list, the last answer stands — a case that does not
