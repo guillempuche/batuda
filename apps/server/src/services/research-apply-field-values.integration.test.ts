@@ -37,7 +37,9 @@ const deps = Layer.mergeAll(
 ).pipe(Layer.provide(FetchHttpClient.layer), Layer.provideMerge(PgLive))
 
 const apply = (runId: string, proposalId: string) =>
-	resolveResearchProposedUpdate(runId, proposalId, 'apply', null).pipe(
+	resolveResearchProposedUpdate(runId, proposalId, 'apply', null, {
+		origin: 'person',
+	}).pipe(
 		Effect.provideService(CurrentOrg, {
 			id: ORG,
 			name: 'c',
@@ -170,6 +172,58 @@ describe('resolveResearchProposedUpdate field values', () => {
 			const row = await companyRow(companyId)
 			expect(row?.status).toBe('contacted')
 			expect(row?.industry).toBe('transport')
+		})
+	})
+})
+
+// The other half of the rule the unattended path enforces: when a person IS the
+// one applying, the run's written brief is meant to land. Nothing else covers
+// this — the enrichment suite drives the write directly and so never exercises
+// the step that decides, from who asked, whether the run's words may be written.
+describe("resolveResearchProposedUpdate, on the run's written brief", () => {
+	describe('when a person applies a change to the company the run was about', () => {
+		it("should write the run's brief onto that company", async () => {
+			// GIVEN a company the run was pinned to, and a run that wrote a brief
+			const companyId = await seedCompany()
+			const proposalId = randomUUID()
+			const run = await pool.query<{ id: string }>(
+				`INSERT INTO research_runs
+					(organization_id, query, status, created_by, findings, brief_md, context)
+				 VALUES ($1, 'q', 'succeeded', 'u1', $2::jsonb, $3, $4::jsonb) RETURNING id`,
+				[
+					ORG,
+					JSON.stringify({
+						proposed_updates: [
+							{
+								id: proposalId,
+								status: 'pending',
+								subject_table: 'companies',
+								operation: 'update',
+								subject_id: companyId,
+								expected_version: 0,
+								fields: { industry: 'logistics' },
+								citations: [],
+							},
+						],
+					}),
+					'## Acme — 2026-08-25\n\nA carrier.',
+					JSON.stringify({
+						subjects: [{ table: 'companies', id: companyId }],
+					}),
+				],
+			)
+
+			// WHEN a person applies it
+			await apply(run.rows[0]!.id, proposalId)
+
+			// THEN the brief is on the company, because somebody chose to put it there
+			const r = await pool.query<{ account_brief: string | null }>(
+				`SELECT account_brief FROM companies WHERE id = $1`,
+				[companyId],
+			)
+			expect(r.rows[0]?.account_brief).toBe(
+				'## Acme — 2026-08-25\n\nA carrier.',
+			)
 		})
 	})
 })

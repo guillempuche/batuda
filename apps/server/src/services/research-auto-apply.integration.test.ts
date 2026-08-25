@@ -78,7 +78,9 @@ const autoApply = (research: string, threshold: number) =>
 			autoApplyMinConfidence: threshold,
 		})
 		yield* Effect.forEach(toApply, id =>
-			resolveResearchProposedUpdate(research, id, 'apply', null),
+			resolveResearchProposedUpdate(research, id, 'apply', null, {
+				origin: 'unattended',
+			}),
 		)
 		return toApply
 	}).pipe(
@@ -283,5 +285,62 @@ describe('auto-apply decision', () => {
 			findings: { proposed_updates: Array<{ id: string; status: string }> }
 		}>(`SELECT findings FROM research_runs WHERE id = $1`, [run.rows[0]!.id])
 		expect(res.rows[0]!.findings.proposed_updates[0]!.status).toBe('pending')
+	})
+})
+
+describe('what an unattended apply may write onto a company', () => {
+	it("should leave a person's account notes alone", async () => {
+		// GIVEN a company whose notes a person wrote
+		const company = await pool.query<{ id: string }>(
+			`INSERT INTO companies (organization_id, slug, name, account_brief)
+			 VALUES ($1, $2, 'Notas', 'Met them at the fair. Ask for Mar.')
+			 RETURNING id`,
+			[ORG, `notas-${randomUUID()}`],
+		)
+		const id = company.rows[0]!.id
+
+		// AND a finished run about that company, carrying its own written brief
+		// and one reachable address for the company itself
+		const run = await pool.query<{ id: string }>(
+			`INSERT INTO research_runs (organization_id, query, status, created_by, findings, brief_md, context)
+			 VALUES ($1, 'q', 'succeeded', $2, $3::jsonb, $4, $5::jsonb) RETURNING id`,
+			[
+				ORG,
+				USER,
+				JSON.stringify({
+					proposed_updates: [
+						pending({
+							id: 'companymail',
+							subject_table: 'companies',
+							subject_id: id,
+							operation: 'update',
+							expected_version: 0,
+							fields: {
+								industry: 'logistics',
+								channels: [channel('deliverable', 0.95)],
+							},
+						}),
+					],
+				}),
+				'## Notas — 2026-08-25\n\nWritten by the run.',
+				JSON.stringify({ subjects: [{ table: 'companies', id }] }),
+			],
+		)
+
+		// WHEN the server applies what it may on its own
+		const applied = await autoApply(run.rows[0]!.id, 50)
+
+		// THEN whatever it decided to write, the person's notes are still theirs
+		const row = await pool.query<{
+			account_brief: string | null
+			industry: string | null
+		}>(`SELECT account_brief, industry FROM companies WHERE id = $1`, [id])
+		expect(row.rows[0]?.account_brief).toBe(
+			'Met them at the fair. Ask for Mar.',
+		)
+		expect(applied).toEqual(['companymail'])
+		// The write really landed — without this the assertion above passes just
+		// as happily on a proposal that never reached the company at all.
+		expect(row.rows[0]?.industry).toBe('logistics')
 	})
 })

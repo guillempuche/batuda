@@ -73,7 +73,9 @@ export const ResearchLive = HttpApiBuilder.group(
 				decision: 'apply' | 'reject',
 				userId: string,
 			) =>
-				resolveResearchProposedUpdate(id, puId, decision, userId).pipe(
+				resolveResearchProposedUpdate(id, puId, decision, userId, {
+					origin: 'person',
+				}).pipe(
 					Effect.provideService(CompanyService, companyService),
 					Effect.provideService(Geocoder, geocoder),
 					Effect.provideService(SqlClient.SqlClient, sql),

@@ -450,6 +450,15 @@ export type CompanyEnrichment = {
 	readonly fitConflicts?: unknown
 	/** The run's brief, in markdown, already carrying its own dated heading. */
 	readonly brief?: string | null
+	/**
+	 * True only when a person is deciding on this change with the run in front
+	 * of them. Left out, the run's opinion above and its written brief stay as
+	 * they are: both are a model's words, and a writer that has not said
+	 * somebody is watching has not earned the right to replace what a person
+	 * wrote. Saying nothing therefore keeps what is already there, rather than
+	 * quietly taking a person's freedom the way the unattended path once did.
+	 */
+	readonly attended?: boolean
 }
 
 // Serialize a json column value, or null to leave the stored one alone.
@@ -511,10 +520,19 @@ export const occUpdate = (
 			RETURNING version
 		`
 	const isRunTarget = enrichment?.isRunTarget ?? false
-	const fitVerdict = isRunTarget ? (enrichment?.fitVerdict ?? null) : null
-	const fitChecks = isRunTarget ? jsonOrNull(enrichment?.fitChecks) : null
-	const fitConflicts = isRunTarget ? jsonOrNull(enrichment?.fitConflicts) : null
-	const brief = isRunTarget ? (enrichment?.brief ?? null) : null
+	// The run's own words about the company — how it judged the fit, and the brief
+	// it wrote — as opposed to the values it went and found. These belong to the
+	// company the run was about and need a person to read them: the brief is one
+	// shared page with no earlier version kept, so replacing it with nobody
+	// looking loses whatever somebody had written. The values themselves still
+	// land, and so does the record of where each came from.
+	const writesRunOpinion = isRunTarget && enrichment?.attended === true
+	const fitVerdict = writesRunOpinion ? (enrichment?.fitVerdict ?? null) : null
+	const fitChecks = writesRunOpinion ? jsonOrNull(enrichment?.fitChecks) : null
+	const fitConflicts = writesRunOpinion
+		? jsonOrNull(enrichment?.fitConflicts)
+		: null
+	const brief = writesRunOpinion ? (enrichment?.brief ?? null) : null
 	return sql<{ version: number }>`
 		UPDATE companies
 		SET ${setFields}
@@ -698,18 +716,27 @@ export type ResolveOutcome =
 			readonly outcome: 'needs_review'
 	  }
 
+/**
+ * Who set an apply going. Each kind is trusted with a different amount.
+ *
+ * `person` is somebody deciding on one suggestion with the run in front of them.
+ * `bulk` is somebody pressing apply on all of them at once, and a run that needs
+ * reading first is exactly what a sweep must not pick up. `unattended` is the
+ * server applying on its own because the organisation asked it to; nobody sees
+ * it happen, so it may only write what a machine checked.
+ *
+ * Every caller has to say which it is. One that could stay quiet would get a
+ * person's freedom without anybody choosing that, which is how the unattended
+ * path came to be replacing account notes nobody had read.
+ */
+export type ApplyOrigin = 'person' | 'bulk' | 'unattended'
+
 export const resolveResearchProposedUpdate = (
 	runId: string,
 	proposedUpdateId: string,
 	decision: 'apply' | 'reject',
 	actorUserId: string | null,
-	/**
-	 * Whether this is one of many resolved in a single request. A person deciding
-	 * on one suggestion with the run in front of them may apply anything; a batch
-	 * is an automation, and a run that needs reading is precisely what an
-	 * automation must not act on.
-	 */
-	options?: { readonly inBatch?: boolean },
+	options: { readonly origin: ApplyOrigin },
 ) =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
@@ -775,9 +802,11 @@ export const resolveResearchProposedUpdate = (
 		if (!run) return { outcome: 'run_not_found' } satisfies ResolveOutcome
 		// The screens hide their "apply everything" buttons for such a run, but the
 		// same request can be sent without them, so the rule is kept here where no
-		// caller can go round it.
+		// caller can go round it. Only a sweep is stopped here: the server applying
+		// on its own never reaches a run that needs reading, because it takes none
+		// but a plain success in the first place.
 		if (
-			options?.inBatch === true &&
+			options.origin === 'bulk' &&
 			decision === 'apply' &&
 			run.status === 'succeeded_low_confidence'
 		)
@@ -1011,6 +1040,7 @@ export const resolveResearchProposedUpdate = (
 						fitChecks: findings?.fit_checks ?? null,
 						fitConflicts: findings?.conflicts ?? null,
 						brief: run.briefMd,
+						attended: options.origin !== 'unattended',
 					}
 				: { provenance: sources },
 		).pipe(
@@ -1105,7 +1135,7 @@ export const resolveResearchProposedUpdatesBatch = (
 			item.proposedUpdateId,
 			item.decision,
 			actorUserId,
-			{ inBatch: true },
+			{ origin: 'bulk' },
 		).pipe(
 			Effect.map(
 				outcome =>

@@ -107,6 +107,24 @@ type ResearchRunDetail = {
 	readonly context: unknown
 }
 
+// The companies a run was asked about, read back off the request it was started
+// with. A company the run merely mentioned is not one of these, and its notes are
+// left alone, so only these are worth warning anybody about.
+const subjectCompanyIds = (context: unknown): ReadonlySet<string> => {
+	const subjects = (context as { subjects?: unknown } | null)?.subjects
+	if (!Array.isArray(subjects)) return new Set()
+	const ids = subjects
+		.filter(
+			(subject): subject is { table: string; id: string } =>
+				typeof subject === 'object' &&
+				subject !== null &&
+				(subject as { table?: unknown }).table === 'companies' &&
+				typeof (subject as { id?: unknown }).id === 'string',
+		)
+		.map(subject => subject.id)
+	return new Set(ids)
+}
+
 export function RunDetail({ researchId }: { readonly researchId: string }) {
 	const { t, i18n } = useLingui()
 	const result = useAtomValue(researchDetailAtom(researchId))
@@ -297,7 +315,13 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 
 				{run.children.length > 0 ? <BatchRuns runs={run.children} /> : null}
 
-				{isRunning ? null : <ProposedUpdatesReview researchId={run.id} />}
+				{isRunning ? null : (
+					<ProposedUpdatesReview
+						researchId={run.id}
+						briefMd={run.briefMd}
+						subjectCompanyIds={subjectCompanyIds(run.context)}
+					/>
+				)}
 
 				<Section data-testid='research-run-findings'>
 					<SectionTitle>

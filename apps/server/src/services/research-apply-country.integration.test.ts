@@ -37,7 +37,9 @@ const deps = Layer.mergeAll(
 ).pipe(Layer.provide(FetchHttpClient.layer), Layer.provideMerge(PgLive))
 
 const apply = (runId: string, proposalId: string) =>
-	resolveResearchProposedUpdate(runId, proposalId, 'apply', null).pipe(
+	resolveResearchProposedUpdate(runId, proposalId, 'apply', null, {
+		origin: 'person',
+	}).pipe(
 		Effect.provideService(CurrentOrg, {
 			id: ORG,
 			name: 'c',

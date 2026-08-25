@@ -55,8 +55,14 @@ type RunContext = {
 
 export function ProposedUpdatesReview({
 	researchId,
+	briefMd,
+	subjectCompanyIds,
 }: {
 	readonly researchId: string
+	/** What this run wrote up, which applying puts onto the company's page. */
+	readonly briefMd: string | null
+	/** The companies this run was asked about, as opposed to ones it mentioned. */
+	readonly subjectCompanyIds: ReadonlySet<string>
 }) {
 	const { t } = useLingui()
 	const toast = usePriToast()
@@ -133,6 +139,19 @@ export function ProposedUpdatesReview({
 	// automation, and what is in doubt here is which company these values belong
 	// to — something no deliverability check can settle.
 	const needsReading = context.status === 'succeeded_low_confidence'
+	// Applying any of these writes more than the fields it lists: on the company
+	// the run was asked about, it also replaces that company's account brief with
+	// what this run wrote. The notes are one shared page and no earlier version is
+	// kept, so somebody who wrote them there loses them without being told.
+	const notesAtStake =
+		briefMd !== null &&
+		briefMd.trim() !== '' &&
+		pending.some(
+			proposal =>
+				proposal.subjectTable === 'companies' &&
+				proposal.subjectId !== null &&
+				subjectCompanyIds.has(proposal.subjectId),
+		)
 	const verifiedPending = needsReading
 		? []
 		: pending.filter(
@@ -199,6 +218,14 @@ export function ProposedUpdatesReview({
 							<Trans>
 								Apply these one at a time — this run wasn't sure it found the
 								right company.
+							</Trans>
+						</BatchNote>
+					) : null}
+					{notesAtStake ? (
+						<BatchNote data-testid='research-review-brief-warning'>
+							<Trans>
+								Applying also replaces the company's account brief with this
+								run's write-up. Nothing keeps what is there now.
 							</Trans>
 						</BatchNote>
 					) : null}

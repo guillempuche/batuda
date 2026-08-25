@@ -696,6 +696,10 @@ msgstr "S'estan aplicant {0} canvis…"
 msgid "Applying a discovered contact merges it into a matching record if one already exists."
 msgstr "En aplicar un contacte descobert, es fusiona amb un registre coincident si ja existeix."
 
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Applying also replaces the company's account brief with this run's write-up. Nothing keeps what is there now."
+msgstr "En aplicar-ho també se substitueix el dossier del compte de l'empresa pel resum d'aquesta cerca. No es desa el que hi ha ara."
+
 #: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/resolve-status.tsx
 #: src/components/research/review/proposed-updates-review.tsx
