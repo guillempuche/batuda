@@ -141,6 +141,23 @@ describe('buyingRoleFromTitle', () => {
 			)
 		})
 	})
+
+	describe('when a person holds several offices joined into one line', () => {
+		it('should read the buying office whichever end of the line it sits at', () => {
+			// GIVEN one director's offices carried as a single line, in both orders —
+			// the shape `peopleToReach` now hands on for a register that named them
+			// twice
+			// THEN the line still reads as somebody who can carry a purchase: the
+			// separator cannot hide the office, and cannot invent one either
+			expect(
+				buyingRoleFromTitle('Presidente, Consejera Delegada', undefined),
+			).toBe('economic_buyer')
+			expect(
+				buyingRoleFromTitle('Consejera Delegada, Presidente', undefined),
+			).toBe('economic_buyer')
+			expect(buyingRoleFromTitle('Secretario, Apoderado', undefined)).toBeNull()
+		})
+	})
 })
 
 describe('compareContacts', () => {
@@ -276,19 +293,92 @@ describe('peopleToReach', () => {
 		{ firstName: 'Marta', lastName: 'Ferrer', position: 'Presidente' },
 	]
 
-	describe('when a register names one person under two roles', () => {
-		it('should keep her once, under the role that can carry a purchase', () => {
-			// GIVEN the register above, where merging on first-seen would keep
-			// 'Consejera Delegada' and throw away the listing that marks her a buyer
+	describe('when a register names one person under two offices', () => {
+		it('should keep her once, carrying both, the buying one first', () => {
+			// GIVEN the register above, where keeping only the first listing would
+			// throw away the office that marks her a buyer
 			const reached = peopleToReach(fromRegister)
-			// THEN she appears once, as the president, at the front — so she is the
-			// one the limited address checks are spent on
+			// THEN she appears once, holding both offices with the president first —
+			// so she is who the limited address checks are spent on, and neither
+			// office the register recorded is lost
 			expect(reached).toHaveLength(2)
 			expect(reached[0]).toEqual({
 				firstName: 'Marta',
 				lastName: 'Ferrer',
-				position: 'Presidente',
+				position: 'Presidente, Consejera Delegada',
 			})
+		})
+	})
+
+	describe('when a register names one person under many offices', () => {
+		it('should carry every one of them', () => {
+			// GIVEN a director holding four offices at the same company
+			const reached = peopleToReach([
+				{ firstName: 'Nuria', lastName: 'Sala', position: 'Secretaria' },
+				{ firstName: 'Nuria', lastName: 'Sala', position: 'Consejera' },
+				{ firstName: 'Nuria', lastName: 'Sala', position: 'Apoderada' },
+				{ firstName: 'Nuria', lastName: 'Sala', position: 'Presidenta' },
+			])
+			// THEN none is dropped: what a register recorded about a person is not
+			// ours to trim, and the buying office still reads first
+			expect(reached).toHaveLength(1)
+			expect(reached[0]?.position).toBe(
+				'Presidenta, Secretaria, Consejera, Apoderada',
+			)
+		})
+	})
+
+	describe('when the same office is listed twice', () => {
+		it('should carry it once, however it was spelled', () => {
+			// GIVEN one office recorded twice, once in capitals and once padded
+			const reached = peopleToReach([
+				{ firstName: 'Pau', lastName: 'Roig', position: 'Administrador' },
+				{ firstName: 'Pau', lastName: 'Roig', position: '  ADMINISTRADOR ' },
+			])
+			// THEN it reads once — the same office spelled two ways is one office
+			expect(reached[0]?.position).toBe('Administrador')
+		})
+	})
+
+	describe('when one office sits inside the name of another', () => {
+		it('should keep both, because a register nests real offices', () => {
+			// GIVEN a director recorded as both, which Spanish company law treats as
+			// two distinct appointments rather than one restated
+			const reached = peopleToReach([
+				{ firstName: 'Marta', lastName: 'Ferrer', position: 'Administrador' },
+				{
+					firstName: 'Marta',
+					lastName: 'Ferrer',
+					position: 'Administrador Solidario',
+				},
+			])
+			// THEN neither is swallowed by the other
+			expect(reached[0]?.position).toBe(
+				'Administrador, Administrador Solidario',
+			)
+		})
+	})
+
+	describe('when only one of a person’s listings carries an office', () => {
+		it('should carry the one there is', () => {
+			// GIVEN the same person listed twice, once with no office recorded
+			const reached = peopleToReach([
+				{ firstName: 'Jordi', lastName: 'Vila' },
+				{ firstName: 'Jordi', lastName: 'Vila', position: 'Presidente' },
+			])
+			// THEN the office that was recorded survives the merge
+			expect(reached).toHaveLength(1)
+			expect(reached[0]?.position).toBe('Presidente')
+		})
+	})
+
+	describe('when a register named somebody with no office at all', () => {
+		it('should leave the office unset rather than blank', () => {
+			// GIVEN a person the register names without a position
+			const reached = peopleToReach([{ firstName: 'Anna', lastName: 'Puig' }])
+			// THEN it stays absent: an empty string would read as an office recorded
+			// as nothing, which is not what the register said
+			expect(reached[0]?.position).toBeUndefined()
 		})
 	})
 
@@ -657,10 +747,10 @@ describe('dedupePeople', () => {
 		})
 	})
 
-	describe('when a register lists one person under two roles', () => {
+	describe('when two vendors both name the same person', () => {
 		it('should collapse them to one', () => {
-			// GIVEN a company register that lists positions rather than people, so a
-			// director holding two active roles arrives twice under the same name
+			// GIVEN two paid finders that both return the same person, which is what
+			// union mode is for — this merge is the vendor one, not the register one
 			const merged = dedupePeople([
 				somePerson('Marta', 'Ferrer'),
 				somePerson('Marta', 'Ferrer'),
