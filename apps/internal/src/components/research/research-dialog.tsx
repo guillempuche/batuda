@@ -7,8 +7,8 @@ import { Plural, Trans, useLingui } from '@lingui/react/macro'
 import { Link } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { Check, ChevronsUpDown, X } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import styled from 'styled-components'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import styled, { css } from 'styled-components'
 
 import type { SchemaName } from '@batuda/research'
 import {
@@ -24,7 +24,10 @@ import {
 	instructionTemplatesAtom,
 } from '#/atoms/instruction-atoms'
 import { createResearchAtom } from '#/atoms/research-atoms'
-import { narrowStacks } from '#/components/instructions/instruction-shapes'
+import {
+	narrowStacks,
+	narrowTemplates,
+} from '#/components/instructions/instruction-shapes'
 import {
 	type StackOption,
 	StackPicker,
@@ -33,6 +36,7 @@ import { STATUS_ORDER, statusLabels } from '#/components/shared/status-badge'
 import { formatMoneyCents } from '#/lib/format-money'
 import { taggedFailure } from '#/lib/tagged-failure'
 import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
+import { buildResearchContext, researchRequestKey } from './research-request'
 
 // The registry's own names, so a schema retired or renamed server-side fails the
 // build here until its card goes too. Adding one does not force a card: an
@@ -89,10 +93,8 @@ const defaultSchema = (isDiscovery: boolean): SchemaOption =>
 const QUERY_MAX_LENGTH = 2000
 const FILTER_MAX_LENGTH = 120
 
-// Stages come from the one list the rest of the app shares. Keeping a private
-// copy here left out "closed" and "dead", so companies in those stages could
-// never be covered by a run at all — and it showed the reader the raw stored
-// words rather than their proper names.
+// '' leaves the sources unrestricted; the rest name one language to read in.
+type SourcesLanguage = '' | 'ca' | 'es' | 'en'
 
 export function ResearchDialog({
 	open,
@@ -120,22 +122,26 @@ export function ResearchDialog({
 	// Discovery-only scope fields: hints steer a net-new search, the selector
 	// filters fan the run out over existing companies.
 	const [location, setLocation] = useState('')
-	const [language, setLanguage] = useState<'' | 'ca' | 'es' | 'en'>('')
+	const [language, setLanguage] = useState<SourcesLanguage>('')
 	const [filterStatus, setFilterStatus] = useState('')
 	const [filterIndustry, setFilterIndustry] = useState('')
 	const [filterCountry, setFilterCountry] = useState('')
 	const [filterTags, setFilterTags] = useState('')
 	// Set once a selector fan-out returns needing confirmation, so the footer
-	// swaps to a cost prompt instead of starting straight away.
+	// swaps to a cost prompt instead of starting straight away. `requestKey` is
+	// the form as it stood when the price was quoted: a quote only answers for
+	// the question it was asked, so editing anything below puts the prompt away
+	// rather than letting one run be approved and a bigger one started.
 	const [pendingConfirm, setPendingConfirm] = useState<{
 		readonly subjectCount: number
 		readonly estimatedCostCents: number
+		readonly requestKey: string
 	} | null>(null)
 	const templatesResult = useAtomValue(instructionTemplatesAtom)
 	const templateOptions = useMemo<ReadonlyArray<StackOption>>(
 		() =>
 			AsyncResult.isSuccess(templatesResult)
-				? narrowOptions(templatesResult.value)
+				? narrowTemplates(templatesResult.value)
 				: [],
 		[templatesResult],
 	)
@@ -166,8 +172,12 @@ export function ResearchDialog({
 		]
 	}, [stacksResult, t])
 
+	// Emptied on the way out rather than on the way in. This component outlives
+	// the popup, so whatever was typed last time is still in hand when it opens
+	// again — and clearing it then happens a frame too late to stop the old
+	// question being painted first.
 	useEffect(() => {
-		if (!open) return
+		if (open) return
 		setQuery('')
 		setSchema(defaultSchema(isDiscovery))
 		setSubmitting(false)
@@ -185,46 +195,95 @@ export function ResearchDialog({
 
 	const canSubmit = query.trim().length > 0 && !submitting
 
-	const buildContext = useCallback((): Record<string, unknown> | undefined => {
-		const context: Record<string, unknown> = {}
-		if (companyId !== undefined) {
-			context['subjects'] = [{ table: 'companies', id: companyId }]
+	const languageItems = useMemo<ReadonlyArray<SelectItem<SourcesLanguage>>>(
+		() => [
+			{ value: '', label: t`Any` },
+			{ value: 'ca', label: t`Catalan` },
+			{ value: 'es', label: t`Spanish` },
+			{ value: 'en', label: t`English` },
+		],
+		[t],
+	)
+
+	const stageItems = useMemo<ReadonlyArray<SelectItem<string>>>(
+		() => [
+			{ value: '', label: t`Find net-new` },
+			...STATUS_ORDER.map(stage => ({
+				value: stage,
+				label: i18n._(statusLabels[stage]),
+			})),
+		],
+		[i18n, t],
+	)
+
+	const context = useMemo(
+		() =>
+			buildResearchContext({
+				companyId,
+				location,
+				language,
+				filterStatus,
+				filterIndustry,
+				filterCountry,
+				filterTags,
+			}),
+		[
+			companyId,
+			filterStatus,
+			filterIndustry,
+			filterCountry,
+			filterTags,
+			language,
+			location,
+		],
+	)
+
+	const requestKey = useMemo(
+		() => researchRequestKey({ query, schema, stackId, templateIds, context }),
+		[query, schema, stackId, templateIds, context],
+	)
+
+	// The prompt stands only while the form still asks what was priced. Anything
+	// edited after the quote arrives leaves this null, so the ordinary Start
+	// button comes back and the next run is quoted afresh.
+	const confirming =
+		pendingConfirm !== null && pendingConfirm.requestKey === requestKey
+			? pendingConfirm
+			: null
+
+	// The button that asked for a price is gone once the prompt takes its place,
+	// and the prompt's own buttons go when it is put away, so a keyboard reader
+	// would be left standing nowhere at both ends. Focus follows the prompt in
+	// and comes back to the button that raised it on the way out.
+	//
+	// This watches the answer itself, not whether the prompt happens to be
+	// showing: editing a field and typing it back would put the prompt up again,
+	// and pulling the caret out of the field at that moment is the last thing
+	// anybody wants.
+	const confirmPanelRef = useRef<HTMLDivElement>(null)
+	const startButtonRef = useRef<HTMLButtonElement>(null)
+	const promptWasUpRef = useRef(false)
+	useEffect(() => {
+		// A dialog on its way out returns focus wherever it was opened from, so
+		// there is nothing to put right here.
+		if (!open) {
+			promptWasUpRef.current = false
+			return
 		}
-		if (isDiscovery) {
-			const filter: Record<string, unknown> = {}
-			if (filterStatus) filter['status'] = filterStatus
-			if (filterIndustry.trim()) filter['industry'] = filterIndustry.trim()
-			if (filterCountry.trim()) filter['country'] = filterCountry.trim()
-			const tags = filterTags
-				.split(',')
-				.map(s => s.trim())
-				.filter(Boolean)
-			if (tags.length > 0) filter['tags'] = tags
-			if (Object.keys(filter).length > 0) {
-				context['selector'] = { table: 'companies', filter }
-			}
-			const hints: Record<string, unknown> = {}
-			if (language) hints['language'] = language
-			if (location.trim()) hints['location'] = location.trim()
-			if (Object.keys(hints).length > 0) context['hints'] = hints
+		if (pendingConfirm !== null) {
+			promptWasUpRef.current = true
+			confirmPanelRef.current?.focus()
+			return
 		}
-		return Object.keys(context).length > 0 ? context : undefined
-	}, [
-		companyId,
-		isDiscovery,
-		filterStatus,
-		filterIndustry,
-		filterCountry,
-		filterTags,
-		language,
-		location,
-	])
+		if (!promptWasUpRef.current) return
+		promptWasUpRef.current = false
+		startButtonRef.current?.focus()
+	}, [open, pendingConfirm])
 
 	const submit = useCallback(
 		async (confirm: boolean) => {
 			setSubmitting(true)
 			setErrorMessage(null)
-			const context = buildContext()
 			const exit = await createResearch({
 				payload: {
 					query: query.trim(),
@@ -237,8 +296,11 @@ export function ResearchDialog({
 			})
 
 			if (exit._tag === 'Success') {
-				const value = exit.value as Record<string, unknown> | null
-				const newId = typeof value?.['id'] === 'string' ? value['id'] : null
+				const reply =
+					typeof exit.value === 'object' && exit.value !== null
+						? (exit.value as Record<string, unknown>)
+						: null
+				const newId = typeof reply?.['id'] === 'string' ? reply['id'] : null
 				// A reply with no run to open means nothing was queued. Closing here
 				// would leave the reader believing their research had started.
 				if (newId === null) {
@@ -267,10 +329,14 @@ export function ResearchDialog({
 						typeof confirmErr['estimatedCostCents'] === 'number'
 							? confirmErr['estimatedCostCents']
 							: 0,
+					requestKey,
 				})
 				setSubmitting(false)
 				return
 			}
+			// Whatever went wrong, the quote on screen is spent: leaving it up would
+			// offer a price the server has just declined to honour.
+			setPendingConfirm(null)
 			const budgetErr = taggedFailure(exit.cause, 'InsufficientBudget')
 			// A saved set of instructions that has since been deleted, or belongs to
 			// someone else, is refused outright rather than quietly swapped.
@@ -285,12 +351,13 @@ export function ResearchDialog({
 			setSubmitting(false)
 		},
 		[
-			buildContext,
+			context,
 			createResearch,
 			query,
 			schema,
 			stackId,
 			templateIds,
+			requestKey,
 			onCreated,
 			onOpenChange,
 			t,
@@ -427,37 +494,25 @@ export function ResearchDialog({
 										<ScopeLabel htmlFor='discovery-language'>
 											<Trans>Sources language</Trans>
 										</ScopeLabel>
-										<SelectInput
+										<ScopeSelect
 											id='discovery-language'
-											data-testid='discovery-language'
+											testId='discovery-language'
 											value={language}
-											onChange={e =>
-												setLanguage(e.target.value as '' | 'ca' | 'es' | 'en')
-											}
-										>
-											<option value=''>{t`Any`}</option>
-											<option value='ca'>{t`Catalan`}</option>
-											<option value='es'>{t`Spanish`}</option>
-											<option value='en'>{t`English`}</option>
-										</SelectInput>
+											onValueChange={setLanguage}
+											items={languageItems}
+										/>
 									</ScopeField>
 									<ScopeField>
 										<ScopeLabel htmlFor='discovery-status'>
 											<Trans>Across companies in stage</Trans>
 										</ScopeLabel>
-										<SelectInput
+										<ScopeSelect
 											id='discovery-status'
-											data-testid='discovery-status'
+											testId='discovery-status'
 											value={filterStatus}
-											onChange={e => setFilterStatus(e.target.value)}
-										>
-											<option value=''>{t`Find net-new`}</option>
-											{STATUS_ORDER.map(stage => (
-												<option key={stage} value={stage}>
-													{i18n._(statusLabels[stage])}
-												</option>
-											))}
-										</SelectInput>
+											onValueChange={setFilterStatus}
+											items={stageItems}
+										/>
 									</ScopeField>
 									<ScopeField>
 										<ScopeLabel htmlFor='discovery-industry'>
@@ -522,27 +577,7 @@ export function ResearchDialog({
 										<ChevronsUpDown size={12} aria-hidden />
 									</PriSelect.Icon>
 								</PriSelect.Trigger>
-								<PriSelect.Portal>
-									<PriSelect.Positioner
-										alignItemWithTrigger={false}
-										sideOffset={6}
-									>
-										<PriSelect.Popup>
-											<PriSelect.List>
-												{stackItems.map(item => (
-													<PriSelect.Item key={item.value} value={item.value}>
-														<PriSelect.ItemIndicator>
-															<Check size={12} aria-hidden />
-														</PriSelect.ItemIndicator>
-														<PriSelect.ItemText>
-															{item.label}
-														</PriSelect.ItemText>
-													</PriSelect.Item>
-												))}
-											</PriSelect.List>
-										</PriSelect.Popup>
-									</PriSelect.Positioner>
-								</PriSelect.Portal>
+								<SelectOptions items={stackItems} />
 							</PriSelect.Root>
 						</Field>
 
@@ -578,23 +613,41 @@ export function ResearchDialog({
 							<ErrorBanner role='alert'>{errorMessage}</ErrorBanner>
 						) : null}
 
-						{pendingConfirm !== null ? (
-							<ConfirmPanel role='alert' data-testid='research-confirm'>
-								<ConfirmText>
+						{confirming !== null ? (
+							<ConfirmPanel
+								ref={confirmPanelRef}
+								tabIndex={-1}
+								// Deliberately not a dialog role: nothing here traps focus or
+								// makes the rest inert, so claiming one would announce a modal
+								// the reader can tab straight out of while the real dialog is
+								// still open. Focus lands here and the price is named twice —
+								// once as this group's name, once on the button that spends
+								// the money — so it is heard either way round.
+								role='group'
+								aria-labelledby='research-confirm-text'
+								data-testid='research-confirm'
+							>
+								<ConfirmText id='research-confirm-text'>
 									<Trans>
-										This runs research on {pendingConfirm.subjectCount}{' '}
-										companies, up to about{' '}
-										{formatMoneyCents(pendingConfirm.estimatedCostCents, {
+										This runs research on{' '}
+										<Plural
+											value={confirming.subjectCount}
+											one='# company'
+											other='# companies'
+										/>
+										, up to about{' '}
+										{formatMoneyCents(confirming.estimatedCostCents, {
 											locale: i18n.locale,
 										})}{' '}
 										in paid data. Start the batch?
 									</Trans>
 								</ConfirmText>
-								<Footer>
+								<ConfirmActions>
 									<PriButton
 										type='button'
 										$variant='filled'
 										data-testid='research-confirm-start'
+										aria-describedby='research-confirm-text'
 										disabled={submitting}
 										onClick={() => {
 											void submit(true)
@@ -604,7 +657,7 @@ export function ResearchDialog({
 											<Trans>Starting…</Trans>
 										) : (
 											<Plural
-												value={pendingConfirm.subjectCount}
+												value={confirming.subjectCount}
 												one='Start # run'
 												other='Start # runs'
 											/>
@@ -619,11 +672,12 @@ export function ResearchDialog({
 									>
 										<Trans>Back</Trans>
 									</PriButton>
-								</Footer>
+								</ConfirmActions>
 							</ConfirmPanel>
 						) : (
 							<Footer>
 								<PriButton
+									ref={startButtonRef}
 									type='submit'
 									$variant='filled'
 									data-testid='research-dialog-submit'
@@ -658,23 +712,74 @@ export function ResearchDialog({
 	)
 }
 
-function narrowOptions(value: unknown): ReadonlyArray<StackOption> {
-	if (!Array.isArray(value)) return []
-	const out: Array<StackOption> = []
-	for (const row of value) {
-		if (!row || typeof row !== 'object') continue
-		const r = row as Record<string, unknown>
-		const id = typeof r['id'] === 'string' ? r['id'] : null
-		const name = typeof r['name'] === 'string' ? r['name'] : null
-		if (id === null || name === null) continue
-		out.push({
-			id,
-			name,
-			ownerUserId:
-				typeof r['ownerUserId'] === 'string' ? r['ownerUserId'] : null,
-		})
-	}
-	return out
+// One option in a dropdown: the value that gets stored, and what to call it.
+type SelectItem<T extends string> = {
+	readonly value: T
+	readonly label: string
+}
+
+// The list half of a dropdown, shared by every selector in this dialog so the
+// options look and behave the same wherever they are opened from.
+function SelectOptions<T extends string>({
+	items,
+}: {
+	readonly items: ReadonlyArray<SelectItem<T>>
+}) {
+	return (
+		<PriSelect.Portal>
+			<PriSelect.Positioner alignItemWithTrigger={false} sideOffset={6}>
+				<PriSelect.Popup>
+					<PriSelect.List>
+						{items.map(item => (
+							<PriSelect.Item key={item.value} value={item.value}>
+								<PriSelect.ItemIndicator>
+									<Check size={12} aria-hidden />
+								</PriSelect.ItemIndicator>
+								<PriSelect.ItemText>{item.label}</PriSelect.ItemText>
+							</PriSelect.Item>
+						))}
+					</PriSelect.List>
+				</PriSelect.Popup>
+			</PriSelect.Positioner>
+		</PriSelect.Portal>
+	)
+}
+
+// A dropdown in the scope grid. The trigger is a button, which a `<label for>`
+// may point at, so each field keeps the same label markup as the text fields
+// around it. What comes back is matched against the options rather than trusted,
+// so the caller is handed one of its own values and needs no cast.
+function ScopeSelect<T extends string>({
+	id,
+	testId,
+	value,
+	onValueChange,
+	items,
+}: {
+	readonly id: string
+	readonly testId: string
+	readonly value: T
+	readonly onValueChange: (next: T) => void
+	readonly items: ReadonlyArray<SelectItem<T>>
+}) {
+	return (
+		<PriSelect.Root
+			items={items}
+			value={value}
+			onValueChange={next => {
+				const picked = items.find(item => item.value === next)
+				if (picked) onValueChange(picked.value)
+			}}
+		>
+			<ScopeTrigger id={id} data-testid={testId}>
+				<ScopeValue />
+				<PriSelect.Icon>
+					<ChevronsUpDown size={12} aria-hidden />
+				</PriSelect.Icon>
+			</ScopeTrigger>
+			<SelectOptions items={items} />
+		</PriSelect.Root>
+	)
 }
 
 const HelpText = styled.p`
@@ -715,6 +820,12 @@ const CloseButton = styled.button`
 	width: 1.75rem;
 	height: 1.75rem;
 	padding: 0;
+
+	/* Bigger tap target on touch, matching the other sheet dialogs. */
+	@media (pointer: coarse) {
+		width: 2.75rem;
+		height: 2.75rem;
+	}
 	border: none;
 	border-radius: var(--shape-2xs);
 	background: transparent;
@@ -731,6 +842,14 @@ const Form = styled.form`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
+
+	/* The phone sheet is a fixed height and this form is far taller than it, so
+	 * the fields scroll here and the actions below them stay put. */
+	@media (max-width: 40rem) {
+		flex: 1;
+		min-height: 0;
+		overflow-y: auto;
+	}
 `
 
 const Field = styled.div`
@@ -747,14 +866,19 @@ const Label = styled.label`
 	color: var(--color-on-surface-variant);
 `
 
+// Columns follow the room there is: fields sit side by side wherever two fit at
+// a readable width and drop to one where they don't, with no screen width named
+// anywhere. `min()` keeps the single column from overflowing a very narrow
+// phone, where 13rem is already wider than the dialog.
+const FIELD_MIN_WIDTH = '13rem'
+
 const ScopeGrid = styled.div`
 	display: grid;
-	grid-template-columns: 1fr;
+	grid-template-columns: repeat(
+		auto-fit,
+		minmax(min(${FIELD_MIN_WIDTH}, 100%), 1fr)
+	);
 	gap: var(--space-sm);
-
-	@media (min-width: 32rem) {
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-	}
 `
 
 const ScopeField = styled.div`
@@ -769,19 +893,27 @@ const ScopeLabel = styled.label`
 	color: var(--color-on-surface-variant);
 `
 
-const SelectInput = styled.select`
+// Sized like the text fields it sits beside in the grid, rather than like the
+// compact metal selectors elsewhere, so a row of scope fields lines up.
+const ScopeTrigger = styled(PriSelect.Trigger)`
+	justify-content: space-between;
+	width: 100%;
+	min-width: 0;
+	padding: var(--space-xs) var(--space-sm);
 	font-family: var(--font-body);
-	font-size: var(--typescale-body-medium-size);
-	padding: var(--space-2xs) var(--space-xs);
-	border-radius: var(--shape-2xs);
-	border: 1px solid color-mix(in oklab, var(--color-on-surface) 24%, transparent);
-	background: var(--color-surface);
-	color: var(--color-on-surface);
+	font-size: var(--typescale-body-large-size);
+	font-weight: var(--font-weight-regular);
+	letter-spacing: var(--typescale-body-large-tracking);
+	text-transform: none;
+`
 
-	&:focus-visible {
-		outline: none;
-		box-shadow: var(--glow-active);
-	}
+// A label longer than the field trails off rather than shouldering the chevron
+// out of the trigger.
+const ScopeValue = styled(PriSelect.Value)`
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 `
 
 const ErrorBanner = styled.div`
@@ -801,6 +933,27 @@ const ConfirmPanel = styled.div`
 	border: 1px solid var(--color-primary);
 	border-radius: var(--shape-2xs);
 	background: color-mix(in oklab, var(--color-primary) 8%, transparent);
+
+	/* Takes focus when it appears, so it says where the reader has been sent. */
+	&:focus-visible {
+		outline: none;
+		box-shadow: var(--glow-active);
+	}
+
+	/* Held at the bottom of the phone sheet the way the ordinary actions are, so
+	 * the decision that spends money does not scroll away while the fields above
+	 * it are being checked over. The tint goes opaque here — left translucent it
+	 * would have the scrolling text sliding through it. */
+	@media (max-width: 40rem) {
+		position: sticky;
+		bottom: 0;
+		background: color-mix(
+			in oklab,
+			var(--color-primary) 8%,
+			var(--color-paper-aged)
+		);
+		box-shadow: 0 -0.75rem 0.75rem -0.5rem var(--shadow-color-deep);
+	}
 `
 
 const ConfirmText = styled.p`
@@ -810,20 +963,53 @@ const ConfirmText = styled.p`
 	margin: 0;
 `
 
-const Footer = styled.div`
+// Side by side on a desk, full width and stacked within thumb reach on a phone,
+// the button that acts on top.
+const actionRow = css`
 	display: flex;
 	gap: var(--space-sm);
 	justify-content: flex-end;
+
+	@media (max-width: 40rem) {
+		flex-direction: column;
+		align-items: stretch;
+		gap: var(--space-2xs);
+
+		& > * {
+			width: 100%;
+		}
+	}
+`
+
+// The form's own actions, held at the bottom of the phone sheet while the
+// fields scroll behind them. The paper fill and the shadow above it keep that
+// scrolling text readable as it passes underneath.
+const Footer = styled.div`
+	${actionRow}
+
+	@media (max-width: 40rem) {
+		position: sticky;
+		bottom: 0;
+		padding-top: var(--space-2xs);
+		background: var(--color-paper-aged);
+		box-shadow: 0 -0.75rem 0.75rem -0.5rem var(--shadow-color-deep);
+	}
+`
+
+// The cost prompt's own actions. Stacked like the form's, but never held to the
+// bottom: the prompt is short and already in view, and a paper fill here would
+// cut a pale slab across the prompt's tint.
+const ConfirmActions = styled.div`
+	${actionRow}
 `
 
 const SchemaGrid = styled(RadioGroup)`
 	display: grid;
-	grid-template-columns: 1fr;
+	grid-template-columns: repeat(
+		auto-fit,
+		minmax(min(${FIELD_MIN_WIDTH}, 100%), 1fr)
+	);
 	gap: var(--space-2xs);
-
-	@media (min-width: 32rem) {
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-	}
 `
 
 // `<label>` so a click anywhere on the card toggles the embedded

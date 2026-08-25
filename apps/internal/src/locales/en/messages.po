@@ -95,7 +95,7 @@ msgstr "{0, plural, one {# task} other {# tasks}}"
 msgid "{0, plural, one {# template} other {# templates}}"
 msgstr "{0, plural, one {# template} other {# templates}}"
 
-#. placeholder {0}: pendingConfirm.subjectCount
+#. placeholder {0}: confirming.subjectCount
 #: src/components/research/research-dialog.tsx
 msgid "{0, plural, one {Start # run} other {Start # runs}}"
 msgstr "{0, plural, one {Start # run} other {Start # runs}}"
@@ -6022,11 +6022,11 @@ msgstr "This run found no changes to review."
 msgid "This run has finished."
 msgstr "This run has finished."
 
-#. placeholder {0}: pendingConfirm.subjectCount
-#. placeholder {1}: formatMoneyCents(pendingConfirm.estimatedCostCents, { locale: i18n.locale, })
+#. placeholder {0}: confirming.subjectCount
+#. placeholder {1}: formatMoneyCents(confirming.estimatedCostCents, { locale: i18n.locale, })
 #: src/components/research/research-dialog.tsx
-msgid "This runs research on {0} companies, up to about {1} in paid data. Start the batch?"
-msgstr "This runs research on {0} companies, up to about {1} in paid data. Start the batch?"
+msgid "This runs research on {0, plural, one {# company} other {# companies}}, up to about {1} in paid data. Start the batch?"
+msgstr "This runs research on {0, plural, one {# company} other {# companies}}, up to about {1} in paid data. Start the batch?"
 
 #: src/components/instructions/stack-editor.tsx
 msgid "This stack no longer exists."

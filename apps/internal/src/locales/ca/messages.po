@@ -95,7 +95,7 @@ msgstr "{0, plural, one {# tasca} other {# tasques}}"
 msgid "{0, plural, one {# template} other {# templates}}"
 msgstr "{0, plural, one {# plantilla} other {# plantilles}}"
 
-#. placeholder {0}: pendingConfirm.subjectCount
+#. placeholder {0}: confirming.subjectCount
 #: src/components/research/research-dialog.tsx
 msgid "{0, plural, one {Start # run} other {Start # runs}}"
 msgstr "{0, plural, one {Inicia # execució} other {Inicia # execucions}}"
@@ -6022,11 +6022,11 @@ msgstr "Aquesta execució no ha trobat cap canvi per revisar."
 msgid "This run has finished."
 msgstr "Aquesta execució ha acabat."
 
-#. placeholder {0}: pendingConfirm.subjectCount
-#. placeholder {1}: formatMoneyCents(pendingConfirm.estimatedCostCents, { locale: i18n.locale, })
+#. placeholder {0}: confirming.subjectCount
+#. placeholder {1}: formatMoneyCents(confirming.estimatedCostCents, { locale: i18n.locale, })
 #: src/components/research/research-dialog.tsx
-msgid "This runs research on {0} companies, up to about {1} in paid data. Start the batch?"
-msgstr "Això farà recerca sobre {0} empreses, fins a uns {1} en dades de pagament. Vols iniciar el lot?"
+msgid "This runs research on {0, plural, one {# company} other {# companies}}, up to about {1} in paid data. Start the batch?"
+msgstr "Això farà recerca sobre {0, plural, one {# empresa} other {# empreses}}, fins a uns {1} en dades de pagament. Vols iniciar el lot?"
 
 #: src/components/instructions/stack-editor.tsx
 msgid "This stack no longer exists."
