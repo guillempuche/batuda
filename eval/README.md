@@ -181,7 +181,7 @@ That reach only runs downward, which is the thing to remember: `fontaneria` does
 
 Terms match loosely and coverage is a "≥ 1 row" figure, so a single unrelated row can carry a whole part — "alquiler de elevadores para obra" answers lifts, "correduría de seguros contra incendios" answers fire protection. Prefer terms that name the trade rather than its subject matter, and avoid one that is an ordinary word in another field (`pci` is a fire-protection term in Spain and a payments standard everywhere else).
 
-- `notCompanies` — the organisations known **not** to be the kind asked for: the trade bodies, federations, guilds and system operators a search for a trade runs straight through on its way to the members. **Organisation-kind precision** is the share of returned rows that are none of them. Required, and an empty array is a legitimate answer that has to be typed out — a market whose bodies nobody has listed scores a perfect 100%, and that reading must be a stated "none known" rather than something a forgotten key produced.
+- `notCompanies` — the organisations known **not** to be the kind asked for: the trade bodies, federations, guilds and system operators a search for a trade runs straight through on its way to the members, and any directory, marketplace or supplier-to-the-trade you already know comes back on this market's list. **Organisation-kind precision** is the share of returned rows that are none of them. In practice you will only be able to name the bodies — the rest have no fixed list, which is why the model below carries them. Required, and an empty array is a legitimate answer that has to be typed out — a market whose bodies nobody has listed scores a perfect 100%, and that reading must be a stated "none known" rather than something a forgotten key produced.
 
 A row counts as one of them when the listed name appears in the row's name as those words, in that order, next to each other. Whole words, not a run of letters — a body is usually known by its initials, and three letters land inside an unrelated name by accident (`RTE` sits inside "No**rte** Instalaciones").
 
@@ -213,7 +213,7 @@ That limit is the point of the **`By market`** breakdown, which prints whenever 
 
 ### The model settles what a name cannot
 
-Every returned row the golden file says nothing about is put to a model, which is asked whether the row is an organisation that does the work of the trade or one that represents, regulates, supplies or lists the ones that do. That is what closes the gap above: a model reads every language a market answers in, and a body describes itself as one on its own page.
+Every returned row the golden file says nothing about is put to a model, which is asked whether the row does the trade's work for customers who want that work done, or whether the ones who do it are its members, its customers, or the people it lists. That is what closes the gap above, in both directions: a model reads every language a market answers in, and it reads a sentence rather than a word, so it reaches a marketplace or a software vendor selling to the trade — neither of which any list of names could have caught.
 
 Three rules keep it honest, and the printed table shows which of them settled what:
 
