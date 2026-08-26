@@ -308,6 +308,88 @@ describe('occUpdate, on the enrichment it records for a company', () => {
 		})
 	})
 
+	// The writer model sometimes hands back nothing but its own reasoning, which
+	// strips to blank. Both warnings a person gets before an apply read that as no
+	// brief, so a write here would take their notes with nothing having said so.
+	describe('when the run wrote a brief that came back empty', () => {
+		it("should leave a person's notes where they are", async () => {
+			// GIVEN notes a person wrote
+			const id = await seedCompany()
+			await personEdits(id, {
+				accountBrief: 'Met them at the fair. Ask for Mar.',
+			})
+
+			// WHEN a run whose brief came back blank is applied with somebody watching
+			await apply(
+				id,
+				1,
+				{ industry: 'transport' },
+				{
+					provenance: {},
+					isRunTarget: true,
+					attended: true,
+					fitVerdict: null,
+					fitChecks: null,
+					fitConflicts: null,
+					brief: '   ',
+				},
+			)
+
+			// THEN their notes are exactly as they left them
+			const row = await readCompany(id)
+			expect(row.account_brief).toBe('Met them at the fair. Ask for Mar.')
+			// AND the value the run did check still landed
+			expect(row.industry).toBe('transport')
+		})
+	})
+
+	// The fit rules a run checks come back as one row per rule. A run that listed
+	// none judged nothing, so it must not wipe what an earlier one found.
+	describe('when a later run lists no fit rules at all', () => {
+		it('should keep the rules an earlier run checked', async () => {
+			// GIVEN a company an earlier run judged rule by rule
+			const id = await seedCompany()
+			await apply(
+				id,
+				0,
+				{ industry: 'transport' },
+				{
+					provenance: {},
+					isRunTarget: true,
+					attended: true,
+					fitVerdict: 'strong_fit',
+					fitChecks: [{ criterion: 'asset carrier', result: 'pass' }],
+					fitConflicts: null,
+					brief: null,
+				},
+			)
+
+			// WHEN a later run judges the company but lists no rules
+			await apply(
+				id,
+				1,
+				{ industry: 'logistics' },
+				{
+					provenance: {},
+					isRunTarget: true,
+					attended: true,
+					fitVerdict: 'possible_fit',
+					fitChecks: [],
+					fitConflicts: null,
+					brief: null,
+				},
+			)
+
+			// THEN the earlier rules are still there
+			const row = await readCompany(id)
+			expect(row.fit_checks).toEqual([
+				{ criterion: 'asset carrier', result: 'pass' },
+			])
+			// AND the later run's own verdict did land
+			expect(row.fit_verdict).toBe('possible_fit')
+		})
+	})
+
 	describe('when the company is one the run merely mentioned', () => {
 		it('should record its sources but none of the run-level judgement', async () => {
 			// GIVEN a competitor the run named, not the company it researched
