@@ -289,7 +289,7 @@ const ListResearchProposedUpdates = Tool.make(
 	'list_research_proposed_updates',
 	{
 		description:
-			"List proposed CRM updates surfaced by a research run. Each row is a proposal awaiting human review (apply or reject) before mutating the target table. A row is a smaller change than applying it: applying any one of them, on the company the run was about, also replaces that company's account brief and its fit judgement. Returns at most `limit` rows (default 100, max 500); `hasMore` says whether the run proposed more than were returned.",
+			'List proposed CRM updates surfaced by a research run. Each row is a proposal awaiting human review (apply or reject) before mutating the target table. A row is a smaller change than applying it: applying any one of them, on the company the run was about, also stores what that run produced about the company — its fit judgement, and its account brief where the run wrote one, replacing the existing brief whole. Returns at most `limit` rows (default 100, max 500); `hasMore` says whether the run proposed more than were returned.',
 		parameters: Schema.Struct({
 			id: Schema.String.annotate({ description: RESEARCH_ID_SOURCE }),
 			limit: Schema.optional(McpPageLimit),
@@ -307,7 +307,7 @@ const ResolveResearchProposedUpdate = Tool.make(
 	'resolve_research_proposed_update',
 	{
 		description:
-			'Resolve a proposed CRM update from a research run. decision=apply writes the proposed change to the target row. It writes more than the fields named in the proposal: when the row is the company the run was about, the same write replaces that company\'s whole account brief with the run\'s own write-up and stores the run\'s fit judgement. The brief is one shared page with no earlier version kept, so anything a person had written there is gone — read it first if it matters. It changes the customer\'s own records, so the person is asked first and nothing is written until they agree ({status:"cancelled"} if they said no, {status:"confirmation_required"} if this client cannot ask them; relay nextStep rather than retrying). decision=reject discards the proposal without changing the row and needs no approval.',
+			'Resolve a proposed CRM update from a research run. decision=apply writes the proposed change to the target row. It writes more than the fields named in the proposal: when the row is the company the run was about, the same write also stores what that run produced about the company: its fit judgement, and — only if the run wrote one — its account brief, which replaces the existing brief whole. A run that wrote no brief leaves the existing one untouched. The brief is one shared page with no earlier version kept, so where a run did write one, anything a person had put there is gone — read it first if it matters. It changes the customer\'s own records, so the person is asked first and nothing is written until they agree ({status:"cancelled"} if they said no, {status:"confirmation_required"} if this client cannot ask them; relay nextStep rather than retrying). decision=reject discards the proposal without changing the row and needs no approval.',
 		parameters: Schema.Struct({
 			id: Schema.String.annotate({ description: RESEARCH_ID_SOURCE }),
 			proposed_update_id: Schema.String.annotate({

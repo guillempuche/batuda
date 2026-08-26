@@ -451,12 +451,13 @@ export type CompanyEnrichment = {
 	/** The run's brief, in markdown, already carrying its own dated heading. */
 	readonly brief?: string | null
 	/**
-	 * True only when a person is deciding on this change with the run in front
-	 * of them. Left out, the run's opinion above and its written brief stay as
-	 * they are: both are a model's words, and a writer that has not said
-	 * somebody is watching has not earned the right to replace what a person
-	 * wrote. Saying nothing therefore keeps what is already there, rather than
-	 * quietly taking a person's freedom the way the unattended path once did.
+	 * True whenever a person set this apply going — one at a time or as a batch.
+	 * Only the server acting on its own leaves it out, and then the run's opinion
+	 * above and its written brief stay as they are: both are a model's words, and
+	 * a writer that has not said somebody is watching has not earned the right to
+	 * replace what a person wrote. Saying nothing therefore keeps what is already
+	 * there, rather than quietly taking a person's freedom the way the unattended
+	 * path once did.
 	 */
 	readonly attended?: boolean
 }
@@ -722,8 +723,9 @@ export type ResolveOutcome =
  * `person` is somebody deciding on one suggestion with the run in front of them.
  * `bulk` is somebody pressing apply on all of them at once, and a run that needs
  * reading first is exactly what a sweep must not pick up. `unattended` is the
- * server applying on its own because the organisation asked it to; nobody sees
- * it happen, so it may only write what a machine checked.
+ * server applying on its own, because whoever started the run set a threshold
+ * asking for it; nobody sees it happen, so it may only write what a machine
+ * checked.
  *
  * Every caller has to say which it is. One that could stay quiet would get a
  * person's freedom without anybody choosing that, which is how the unattended
