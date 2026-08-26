@@ -504,6 +504,12 @@ export type CompanyEnrichment = {
 const jsonOrNull = (value: unknown): string | null =>
 	value === null || value === undefined ? null : JSON.stringify(value)
 
+// Absent and empty both mean the run recorded no rows, so neither should replace
+// what is stored. An empty array is still valid json, so plain `jsonOrNull` would
+// write it over the rows an earlier run put there.
+const rowsOrNull = (value: unknown): string | null =>
+	Array.isArray(value) && value.length === 0 ? null : jsonOrNull(value)
+
 // Optimistic-concurrency write: lands only if `version` still equals the version
 // the proposal was made against, and bumps it. Branches on the table so the name
 // is never interpolated. Returns the new row (empty on a version/id mismatch).
@@ -567,11 +573,19 @@ export const occUpdate = (
 	// land, and so does the record of where each came from.
 	const writesRunOpinion = isRunTarget && enrichment?.attended === true
 	const fitVerdict = writesRunOpinion ? (enrichment?.fitVerdict ?? null) : null
-	const fitChecks = writesRunOpinion ? jsonOrNull(enrichment?.fitChecks) : null
+	// A run that listed no fit rules judged nothing, so it must not wipe the rules
+	// an earlier run did check. Conflicts below are left alone on purpose: an
+	// empty list there is a real finding — the run looked, and the sources agreed.
+	const fitChecks = writesRunOpinion ? rowsOrNull(enrichment?.fitChecks) : null
 	const fitConflicts = writesRunOpinion
 		? jsonOrNull(enrichment?.fitConflicts)
 		: null
-	const brief = writesRunOpinion ? (enrichment?.brief ?? null) : null
+	// A brief that came back empty is not a brief. The writer model sometimes
+	// returns nothing but its own reasoning, which strips to blank, and both
+	// warnings a person gets before an apply already read that as nothing to
+	// write — so writing it here would take their notes with nothing said.
+	const written = writesRunOpinion ? (enrichment?.brief ?? null) : null
+	const brief = written !== null && written.trim() !== '' ? written : null
 	return sql<{ version: number }>`
 		UPDATE companies
 		SET ${setFields}
