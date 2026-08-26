@@ -2,6 +2,9 @@
 // them, nothing is held back by what the last writer left, so what matters is
 // that a write replaces the stored text outright rather than adding to it.
 //
+// The rule these cases hold to is written out in docs/architecture.md, under
+// "What an apply writes". Changing what happens here means changing it there.
+//
 // Prereq: `pnpm cli services up` — this suite's globalSetup builds and migrates
 // the disposable batuda_it database it runs against.
 
