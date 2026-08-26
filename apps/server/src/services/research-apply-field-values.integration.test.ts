@@ -227,3 +227,178 @@ describe("resolveResearchProposedUpdate, on the run's written brief", () => {
 		})
 	})
 })
+
+// A proposal is written by a model. The two doors a person or an assistant come
+// through decode a schema first, so a value that could never be what it claims to
+// be never reaches a row from there. Applying was a third door and checked almost
+// nothing: an empty company name, a map link that was not one, and addresses
+// nobody could ever write to all landed, and the apply reported success.
+describe('resolveResearchProposedUpdate, on values that could never be right', () => {
+	const seedRunWith = async (
+		companyId: string,
+		fields: Record<string, unknown>,
+	) => {
+		const proposalId = randomUUID()
+		const r = await pool.query<{ id: string }>(
+			`INSERT INTO research_runs
+				(organization_id, query, status, created_by, findings)
+			 VALUES ($1, 'q', 'succeeded', 'u1', $2::jsonb) RETURNING id`,
+			[
+				ORG,
+				JSON.stringify({
+					proposed_updates: [
+						{
+							id: proposalId,
+							status: 'pending',
+							subject_table: 'companies',
+							operation: 'update',
+							subject_id: companyId,
+							expected_version: 0,
+							fields,
+							citations: [],
+						},
+					],
+				}),
+			],
+		)
+		return { runId: r.rows[0]!.id, proposalId }
+	}
+
+	const addressesOn = async (subjectId: string) => {
+		const r = await pool.query<{ channel: string; address: string }>(
+			`SELECT channel, address FROM channels WHERE subject_id = $1 ORDER BY channel`,
+			[subjectId],
+		)
+		return r.rows
+	}
+
+	describe('when a run proposes an address nobody could ever write to', () => {
+		it('should leave it out and still write the rest', async () => {
+			// GIVEN a run offering three addresses, none of them possible
+			const companyId = await seedCompany()
+			const { runId, proposalId } = await seedRunWith(companyId, {
+				industry: 'logistics',
+				email: 'not-an-email',
+				phone: 'banana',
+				website: 'nope',
+			})
+
+			// WHEN a person applies it
+			await apply(runId, proposalId)
+
+			// THEN none of them reached the company
+			expect(await addressesOn(companyId)).toEqual([])
+			// AND what was fine still landed, so one bad address did not cost the
+			// run everything else it found
+			expect((await companyRow(companyId))?.industry).toBe('logistics')
+		})
+	})
+
+	describe('when a run proposes addresses that are possible', () => {
+		it('should write them', async () => {
+			// GIVEN a run offering two well-formed addresses
+			const companyId = await seedCompany()
+			const { runId, proposalId } = await seedRunWith(companyId, {
+				email: 'hola@acme.es',
+				website: 'https://acme.es',
+			})
+
+			// WHEN a person applies it
+			await apply(runId, proposalId)
+
+			// THEN both are on the company
+			expect(await addressesOn(companyId)).toEqual([
+				{ channel: 'email', address: 'hola@acme.es' },
+				{ channel: 'website', address: 'https://acme.es' },
+			])
+		})
+	})
+
+	describe('when a run proposes a company with no name', () => {
+		it('should refuse the change rather than blank the name', async () => {
+			// GIVEN a run proposing to empty the company's name
+			const companyId = await seedCompany()
+			const { runId, proposalId } = await seedRunWith(companyId, {
+				name: '   ',
+			})
+
+			// WHEN a person applies it
+			const outcome = await apply(runId, proposalId)
+
+			// THEN it is refused, and said why
+			expect(outcome).toMatchObject({ outcome: 'invalid' })
+			expect((outcome as { reason: string }).reason).toContain('name')
+		})
+	})
+
+	describe('when a run proposes a map link that is not one', () => {
+		it('should refuse the change', async () => {
+			// GIVEN a run offering prose where a map link belongs
+			const companyId = await seedCompany()
+			const { runId, proposalId } = await seedRunWith(companyId, {
+				googleMapsUrl: 'definitely not a url',
+			})
+
+			// WHEN a person applies it
+			const outcome = await apply(runId, proposalId)
+
+			// THEN it is refused, and said why
+			expect(outcome).toMatchObject({ outcome: 'invalid' })
+			expect((outcome as { reason: string }).reason).toContain('googleMapsUrl')
+		})
+	})
+
+	// A discovered person arrives by a different road than a company's own
+	// addresses — a list on the proposal rather than named fields — so the two
+	// need holding to the rule separately.
+	describe('when a run discovers a person reachable at an impossible address', () => {
+		it('should keep the person and leave the address out', async () => {
+			// GIVEN a run proposing somebody real with one made-up mailbox, one
+			// number that is not a number, and one page that is fine
+			const companyId = await seedCompany()
+			const proposalId = randomUUID()
+			const run = await pool.query<{ id: string }>(
+				`INSERT INTO research_runs (organization_id, query, status, created_by, findings)
+				 VALUES ($1, 'q', 'succeeded', 'u1', $2::jsonb) RETURNING id`,
+				[
+					ORG,
+					JSON.stringify({
+						proposed_updates: [
+							{
+								id: proposalId,
+								status: 'pending',
+								operation: 'create',
+								subject_table: 'contacts',
+								citations: [],
+								fields: {
+									name: 'Mar Soler',
+									company_id: companyId,
+									channels: [
+										{ kind: 'email', value: 'not-an-email' },
+										{ kind: 'phone', value: 'banana' },
+										{ kind: 'linkedin', value: 'https://linkedin.com/in/mar' },
+									],
+								},
+							},
+						],
+					}),
+				],
+			)
+
+			// WHEN a person applies it
+			await apply(run.rows[0]!.id, proposalId)
+
+			// THEN the person is on file
+			const people = await pool.query<{ id: string }>(
+				`SELECT id FROM contacts WHERE company_id = $1 AND name = 'Mar Soler'`,
+				[companyId],
+			)
+			expect(people.rows).toHaveLength(1)
+
+			// AND only the address that could be one was kept
+			expect(await addressesOn(people.rows[0]!.id)).toEqual([
+				{ channel: 'linkedin', address: 'https://linkedin.com/in/mar' },
+			])
+		})
+	})
+})

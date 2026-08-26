@@ -7,7 +7,9 @@ import {
 	COMPANY_PRIORITIES,
 	COMPANY_SIZE_RANGES,
 	COMPANY_STATUSES,
+	channelAddressIsValid,
 	isVerificationVerdict,
+	MAPS_ADDRESS_PATTERN,
 } from '@batuda/domain'
 import {
 	canonicalizeUrl,
@@ -249,6 +251,27 @@ type FieldVocabulary = {
 	readonly allowed: ReadonlyArray<string | number>
 }
 
+// Fields whose value has to look like something, as opposed to being one of a
+// handful of allowed words. Held here rather than left to the column, because a
+// proposal is written by a model and the two doors a person or an assistant
+// comes through already turn these away — this is the third door.
+const COMPANY_FIELD_SHAPES: ReadonlyArray<{
+	readonly field: string
+	readonly ok: (value: string) => boolean
+	readonly wanted: string
+}> = [
+	{
+		field: 'name',
+		ok: value => value.trim() !== '',
+		wanted: 'a name with something in it',
+	},
+	{
+		field: 'googleMapsUrl',
+		ok: value => MAPS_ADDRESS_PATTERN.test(value),
+		wanted: 'a Google Maps link',
+	},
+]
+
 const COMPANY_FIELD_VOCABULARIES: ReadonlyArray<FieldVocabulary> = [
 	{ field: 'status', allowed: COMPANY_STATUSES },
 	{ field: 'priority', allowed: COMPANY_PRIORITIES },
@@ -290,6 +313,16 @@ export const checkFieldValues = (
 			continue
 		return `${field} must be one of ${allowed.join(', ')} — got ${JSON.stringify(raw)}`
 	}
+	if (table === 'companies')
+		for (const { field, ok, wanted } of COMPANY_FIELD_SHAPES) {
+			if (!(field in fields)) continue
+			const raw = fields[field]
+			// Left out and cleared are both a caller not setting it, which the
+			// column already answers for; only a value actually offered is checked.
+			if (raw === null || raw === undefined) continue
+			if (typeof raw === 'string' && ok(raw)) continue
+			return `${field} must be ${wanted} — got ${JSON.stringify(raw)}`
+		}
 	return null
 }
 
@@ -347,6 +380,11 @@ const parseChannels = (raw: unknown): ReadonlyArray<ChannelInput> => {
 		const kind = record['kind']
 		const value = record['value']
 		if (typeof kind !== 'string' || typeof value !== 'string') continue
+		// An address nobody could ever write to is stepped over, the same way the
+		// company side does it: a person discovered this way is still worth having,
+		// and a made-up mailbox beside a real name should not cost the whole row.
+		// A platform nothing describes passes, so a new one is never turned away.
+		if (!channelAddressIsValid(kind, value)) continue
 		const verification = record['verification']
 		const confidence = record['confidence']
 		const isPrimary = record['is_primary']
