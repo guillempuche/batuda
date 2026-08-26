@@ -237,8 +237,9 @@ describe('the /mcp route meeting a protocol revision it does not know', () => {
 			expect(body.error.message).toContain('2026-07-28')
 		})
 
-		it('should leave a warning naming the refusal', async () => {
-			// GIVEN the same refused request
+		it('should leave an ordinary line when only a probe was refused', async () => {
+			// GIVEN a client probing for a newer era on a settled connection, which
+			//       is how a client finds out which revisions a server speaks
 			const opening = await initialize()
 			const sessionId = opening.headers.get('mcp-session-id') as string
 			lines.length = 0
@@ -251,10 +252,11 @@ describe('the /mcp route meeting a protocol revision it does not know', () => {
 				},
 			)
 
-			// THEN the refusal is a warning, not another routine info line, and it
-			// names the revision that was turned down
+			// THEN the refusal reads as routine: a probe being told "no" is the answer
+			// it went looking for, and warning about it would bury the refusals that
+			// do mean something
 			const refusal = lineFor('mcp.protocol_version.refused')
-			expect(refusal?.level).toBe('Warn')
+			expect(refusal?.level).toBe('Info')
 			expect(refusal?.annotations['mcp.protocol_version.named']).toBe(
 				'2026-07-28',
 			)
@@ -267,6 +269,50 @@ describe('the /mcp route meeting a protocol revision it does not know', () => {
 				'2026-07-28',
 			)
 			expect(request?.annotations['http.status']).toBe(400)
+		})
+
+		it('should warn when the refused call was real work', async () => {
+			// GIVEN a client naming an unknown revision on a call meant to do
+			//       something, rather than on a probe
+			const opening = await initialize()
+			const sessionId = opening.headers.get('mcp-session-id') as string
+			lines.length = 0
+			await post(
+				{
+					jsonrpc: '2.0',
+					id: 6,
+					method: 'tools/call',
+					params: { name: 'ping', arguments: {} },
+				},
+				{
+					'mcp-session-id': sessionId,
+					'mcp-protocol-version': '2026-07-28',
+					'mcp-method': 'tools/call',
+				},
+			)
+
+			// THEN it is worth a warning — the client asked for work and did not get
+			// it, which is a client to fix rather than one looking around
+			expect(lineFor('mcp.protocol_version.refused')?.level).toBe('Warn')
+		})
+
+		it('should warn when the client names no call at all', async () => {
+			// GIVEN a client that sends no method header, as one that does not
+			//       implement the newer routing headers will not
+			const opening = await initialize()
+			const sessionId = opening.headers.get('mcp-session-id') as string
+			lines.length = 0
+			await post(
+				{ jsonrpc: '2.0', id: 7, method: 'tools/call', params: {} },
+				{
+					'mcp-session-id': sessionId,
+					'mcp-protocol-version': '2026-07-28',
+				},
+			)
+
+			// THEN the louder level stands: nothing here says this was a probe, and
+			// guessing that it was would silence the case worth hearing about
+			expect(lineFor('mcp.protocol_version.refused')?.level).toBe('Warn')
 		})
 	})
 

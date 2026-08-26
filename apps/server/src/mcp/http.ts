@@ -97,8 +97,9 @@ export const recordCall = (request: HttpServerRequest.HttpServerRequest) => {
  *
  * A request naming a revision the library does not know is answered with an
  * empty 400: no body for the client to act on, and a line that says 400 without
- * saying why. This says why in both directions — a warning line naming the
- * revision, and a JSON-RPC error body telling the client what to do instead.
+ * saying why. This says why in both directions — a line naming the revision,
+ * written loudly only where a real call was turned down rather than a discovery
+ * probe, and a JSON-RPC error body telling the client what to do instead.
  *
  * Only a response the route RETURNED is looked at, and the one empty 400 the
  * route returns is that refusal — the RPC layer under it returns none. A request
@@ -119,7 +120,15 @@ export const explainRefusedVersion = <E, R>(
 			response.body._tag !== 'Empty'
 		)
 			return Effect.succeed(response)
-		return Effect.logWarning('MCP protocol version refused').pipe(
+		// A refused discovery probe is the exchange working — that call exists to
+		// ask which revisions a server speaks, so "no" is its ordinary answer. A
+		// refused real call means work the client wanted did not happen, and keeps
+		// the louder level. The method is the caller's own word: fine for choosing
+		// how loudly to write a line, never for deciding what a caller may do. A
+		// client that names no method leaves no way to tell, so it stays a warning.
+		const probing = request.headers[METHOD_HEADER] === 'server/discover'
+		const write = probing ? Effect.logInfo : Effect.logWarning
+		return write('MCP protocol version refused').pipe(
 			Effect.annotateLogs({
 				event: 'mcp.protocol_version.refused',
 				'mcp.protocol_version.named': bounded(named),
