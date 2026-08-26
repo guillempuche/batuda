@@ -288,6 +288,8 @@ describe('auto-apply decision', () => {
 	})
 })
 
+// The rule this holds to is written out in docs/architecture.md, under "What an
+// apply writes". Changing what happens here means changing it there.
 describe('what an unattended apply may write onto a company', () => {
 	it("should leave a person's account notes alone", async () => {
 		// GIVEN a company whose notes a person wrote

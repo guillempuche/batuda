@@ -5,10 +5,9 @@ import { SqlClient } from 'effect/unstable/sql'
 //
 // These two columns existed to answer one question: may research replace the
 // notes, or must it add underneath? A person writing put their id here, and an
-// apply read it and appended rather than overwriting. That rule is gone — the
-// notes are one shared page that a person, an agent and a research run all
-// rewrite, each replacing what the last one left — so nothing reads the answer
-// any more.
+// apply read it and appended rather than overwriting. That rule went, and the
+// notes became one shared page every side rewrites, so nothing read the answer
+// any more. How that page works now is in docs/architecture.md.
 //
 // Nothing is kept in their place. The notes say what the last writer wrote, and
 // `updated_at` says when the row last changed; a record of who wrote which

@@ -13,9 +13,8 @@ export type AccountBriefCompany = {
 }
 
 /**
- * The account's running notes — one shared page that the salesperson, an agent
- * and research all write to. Saving replaces whatever was there, and no earlier
- * version is kept.
+ * The account's running notes. Saving replaces whatever was there, and no
+ * earlier version is kept. Who else writes them is in docs/architecture.md.
  *
  * Editing is a plain textarea of markdown rather than a rich editor, because
  * what research writes is markdown too — keeping one format means a person and

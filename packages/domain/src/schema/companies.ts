@@ -202,9 +202,8 @@ export class Company extends Model.Class<Company>('Company')({
 	// What research found out about this company, and where it came from.
 	//
 	// accountBrief is the running written summary of the account, in markdown.
-	// A person, an agent and the research pipeline all write it, and each write
-	// replaces the whole text. Nothing keeps the earlier versions or who wrote
-	// them.
+	// A write replaces the whole text, and nothing keeps the earlier versions or
+	// who wrote them. Who else writes it, and when, is in docs/architecture.md.
 	//
 	// fieldProvenance answers "where did this come from?" for the individual
 	// facts on the row: for each field name, the page it was read from, the run

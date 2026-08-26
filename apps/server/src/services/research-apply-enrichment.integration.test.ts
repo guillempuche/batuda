@@ -4,6 +4,9 @@
 // the row as it stands at write time, so only a real database can prove they
 // behave.
 //
+// The rule these cases hold to is written out in docs/architecture.md, under
+// "What an apply writes". Changing what happens here means changing it there.
+//
 // Prereq: `pnpm cli services up` — this suite's globalSetup builds and migrates
 // the disposable batuda_it database it runs against.
 

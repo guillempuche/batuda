@@ -245,7 +245,7 @@ const UpdateCompany = Tool.make('update_company', {
 		accountBrief: Schema.optional(
 			Schema.String.annotate({
 				description:
-					"The account's running notes, in markdown. One shared page that people, agents and research runs all rewrite — what you send replaces what is there, so read it first and carry over anything still worth keeping.",
+					"The account's running notes, in markdown. One shared page — what you send replaces what is there and no earlier version is kept, so read it first and carry over anything still worth keeping.",
 			}),
 		),
 		metadata: Schema.optional(Schema.Unknown),
