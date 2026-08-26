@@ -75,10 +75,15 @@ const CompanySuppressionCleared = Schema.Struct({
 	channels: Schema.Array(Schema.Unknown),
 })
 
-// What a caller may write. The shapes come from the domain so the browser, the
-// agent tools and the research apply path all turn away the same values — and
-// they sit here rather than on `Company`, which has to keep reading rows written
-// before any of this existed.
+// What a caller may write. The shapes come from the domain so the browser and
+// the agent tools turn away the same values — and they sit here rather than on
+// `Company`, which has to keep reading rows written before any of this existed.
+//
+// A research run's apply is a third door and a deliberately looser one: it holds
+// the closed word lists, refuses a name or a map link that could never be one,
+// and steps over an address nobody could ever write to rather than losing
+// everything else the run found. It does not decode these shapes, so do not read
+// this as covering it.
 export const CreateCompanyInput = Schema.Struct({
 	name: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
 	slug: CompanySlug,

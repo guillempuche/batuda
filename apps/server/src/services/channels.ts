@@ -105,6 +105,11 @@ export const splitCompanyChannelFields = (
 				const address = entry['value']
 				if (typeof kind !== 'string' || typeof address !== 'string') continue
 				if (kind.trim() === '' || address.trim() === '') continue
+				// An address that could never be one of its kind is stepped over for
+				// the same reason a missing one is: it came out of a model's answer,
+				// and one bad entry should not cost the write. A platform nothing
+				// describes passes, so naming a new one never starts refusing it.
+				if (!channelAddressIsValid(kind.trim(), address.trim())) continue
 				channels.push({ kind: kind.trim(), value: address.trim() })
 			}
 			continue
@@ -115,7 +120,15 @@ export const splitCompanyChannelFields = (
 		}
 		// A blank is a caller clearing the field, which is a removal rather than a
 		// write; nothing to add, and the row it would have written is left alone.
-		if (typeof value === 'string' && value.trim() !== '') {
+		//
+		// An address that could never be one of its kind is left out too. The two
+		// doors that decode a schema have already turned those away, so this only
+		// ever fires on a research run's proposal, where nothing had checked.
+		if (
+			typeof value === 'string' &&
+			value.trim() !== '' &&
+			channelAddressIsValid(key, value.trim())
+		) {
 			channels.push({ kind: key, value: value.trim(), is_primary: true })
 		}
 	}
