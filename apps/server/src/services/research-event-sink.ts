@@ -178,6 +178,9 @@ export const ResearchEventSinkLive = Layer.effect(
 									proposedUpdateId,
 									'apply',
 									null,
+									// Nobody sees this land, so the run's own notes and
+									// judgement stay out of it — only the checked value lands.
+									{ origin: 'unattended' },
 								).pipe(
 									Effect.provideService(CompanyService, companyService),
 									Effect.provideService(Geocoder, geocoder),

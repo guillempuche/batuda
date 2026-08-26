@@ -69,13 +69,14 @@ type CompanyRow = {
 	industry: string | null
 	fit_verdict: string | null
 	fit_checks: unknown
+	fit_conflicts: unknown
 	version: number
 }
 
 const readCompany = async (id: string): Promise<CompanyRow> => {
 	const r = await pool.query<CompanyRow>(
 		`SELECT account_brief, last_enriched_at, industry,
-		        field_provenance, fit_verdict, fit_checks, version
+		        field_provenance, fit_verdict, fit_checks, fit_conflicts, version
 		 FROM companies WHERE id = $1`,
 		[id],
 	)
@@ -229,6 +230,7 @@ describe('occUpdate, on the enrichment it records for a company', () => {
 				{
 					provenance: {},
 					isRunTarget: true,
+					attended: true,
 					fitVerdict: 'strong_fit',
 					fitChecks: [{ criterion: 'asset carrier', result: 'pass' }],
 					fitConflicts: null,
@@ -261,6 +263,7 @@ describe('occUpdate, on the enrichment it records for a company', () => {
 				{
 					provenance: {},
 					isRunTarget: true,
+					attended: true,
 					fitVerdict: 'possible_fit',
 					fitChecks: null,
 					fitConflicts: null,
@@ -291,6 +294,7 @@ describe('occUpdate, on the enrichment it records for a company', () => {
 				{
 					provenance: {},
 					isRunTarget: true,
+					attended: true,
 					fitVerdict: 'possible_fit',
 					fitChecks: null,
 					fitConflicts: null,
@@ -337,6 +341,139 @@ describe('occUpdate, on the enrichment it records for a company', () => {
 		})
 	})
 
+	// The run's judgement and its written notes are the two things on a company
+	// that nobody can check by machine, so they are the two an apply nobody
+	// watched has to leave alone. Everything else it found still lands.
+	describe('when nobody was looking as the apply landed', () => {
+		it("should leave a person's notes exactly as they wrote them", async () => {
+			// GIVEN notes a person wrote
+			const id = await seedCompany()
+			await personEdits(id, {
+				accountBrief: 'Met them at the fair. Ask for Mar.',
+			})
+			const before = await readCompany(id)
+
+			// WHEN the server applies a finding on its own
+			await apply(
+				id,
+				before.version,
+				{ industry: 'transport' },
+				{
+					provenance: {},
+					isRunTarget: true,
+					fitVerdict: 'strong_fit',
+					fitChecks: null,
+					fitConflicts: null,
+					brief: '## Acme — 2026-08-25\n\nWritten by the run.',
+				},
+			)
+
+			// THEN their text is still there, word for word
+			const row = await readCompany(id)
+			expect(row.account_brief).toBe('Met them at the fair. Ask for Mar.')
+		})
+
+		it('should leave the fit judgement as it stood', async () => {
+			// GIVEN a company already judged a weak fit
+			const id = await seedCompany()
+			await apply(
+				id,
+				0,
+				{},
+				{
+					provenance: {},
+					isRunTarget: true,
+					attended: true,
+					fitVerdict: 'weak_fit',
+					fitChecks: [{ criterion: 'size', result: 'fail' }],
+					fitConflicts: [{ field: 'employee_count', note: 'two figures' }],
+					brief: null,
+				},
+			)
+
+			// WHEN a later run applies on its own, judging it differently
+			await apply(
+				id,
+				1,
+				{ industry: 'transport' },
+				{
+					provenance: {},
+					isRunTarget: true,
+					fitVerdict: 'strong_fit',
+					fitChecks: [{ criterion: 'size', result: 'pass' }],
+					fitConflicts: null,
+					brief: null,
+				},
+			)
+
+			// THEN the earlier verdict, its checks and its conflicts all stand
+			const row = await readCompany(id)
+			expect(row.fit_verdict).toBe('weak_fit')
+			expect(row.fit_checks).toEqual([{ criterion: 'size', result: 'fail' }])
+			expect(row.fit_conflicts).toEqual([
+				{ field: 'employee_count', note: 'two figures' },
+			])
+		})
+
+		it('should still write the value, where it came from, and the freshness stamp', async () => {
+			// GIVEN a company with nothing filled in
+			const id = await seedCompany()
+
+			// WHEN the server applies a finding on its own
+			await apply(
+				id,
+				0,
+				{ industry: 'transport' },
+				{
+					provenance: {
+						industry: { sourceUrl: 'https://acme.es', runId: RUN_ID },
+					},
+					isRunTarget: true,
+					fitVerdict: 'strong_fit',
+					fitChecks: null,
+					fitConflicts: null,
+					brief: '## Acme\n\nShould not land.',
+				},
+			)
+
+			// THEN the value landed, carrying the page it came from
+			const row = await readCompany(id)
+			expect(row.industry).toBe('transport')
+			expect(row.field_provenance?.['industry']?.sourceUrl).toBe(
+				'https://acme.es',
+			)
+			// AND the row counts as freshly researched, which is what tells a
+			// later reader anything was learned about it at all
+			expect(row.last_enriched_at).not.toBeNull()
+		})
+	})
+
+	describe('when nobody was looking and the company has no notes yet', () => {
+		it('should leave the page blank rather than filling it', async () => {
+			// GIVEN a company nobody has written notes for
+			const id = await seedCompany()
+
+			// WHEN the server applies a finding on its own
+			await apply(
+				id,
+				0,
+				{ industry: 'transport' },
+				{
+					provenance: {},
+					isRunTarget: true,
+					fitVerdict: null,
+					fitChecks: null,
+					fitConflicts: null,
+					brief: '## Acme — 2026-08-25\n\nWritten by the run.',
+				},
+			)
+
+			// THEN nothing was written there — an empty page is not an invitation
+			const row = await readCompany(id)
+			expect(row.account_brief).toBeNull()
+		})
+	})
+
 	describe('when the row moved on since the proposal was made', () => {
 		it('should land nothing, so a stale enrichment cannot overwrite', async () => {
 			// GIVEN a company already at version 1
@@ -358,6 +495,7 @@ describe('occUpdate, on the enrichment it records for a company', () => {
 						industry: { sourceUrl: 'https://stale.es', runId: RUN_ID },
 					},
 					isRunTarget: true,
+					attended: true,
 					fitVerdict: 'no_fit',
 					fitChecks: null,
 					fitConflicts: null,
@@ -394,6 +532,7 @@ describe('occUpdate, on the enrichment it records for a company', () => {
 						industry: { sourceUrl: 'https://acme.es', runId: RUN_ID },
 					},
 					isRunTarget: true,
+					attended: true,
 					fitVerdict: 'strong_fit',
 					fitChecks: null,
 					fitConflicts: null,

@@ -272,3 +272,84 @@ test.describe('research review', () => {
 		})
 	})
 })
+
+// Applying writes more than the fields a proposal lists: on the company a run was
+// asked about, it also replaces that company's account brief with what the run
+// wrote, and nothing keeps the earlier text. The warning that says so is the only
+// place a person finds out before it happens, and it is deliberately quiet on the
+// changes it is not true of — so both halves are checked here.
+const BRIEF_RUN_ID = '9f000000-0000-4000-8000-0000000000e3'
+const PU_ON_SUBJECT = 'dddddddd-0000-4000-8000-0000000000e3'
+
+test.describe('research review, on notes the run would replace', () => {
+	test.afterAll(() => {
+		psql(`delete from research_runs where id='${BRIEF_RUN_ID}'`)
+	})
+
+	const seedBriefRun = (context: string) => {
+		const findings = JSON.stringify({
+			proposed_updates: [
+				{
+					id: PU_ON_SUBJECT,
+					status: 'pending',
+					operation: 'update',
+					subject_table: 'companies',
+					subject_id: companyId,
+					expected_version: 0,
+					reason: 'The site names the trade.',
+					fields: { industry: 'Restaurant' },
+					citations: [{ source_id: 'https://calpepfonda.cat' }],
+				},
+			],
+		}).replace(/'/g, "''")
+		psql(
+			`insert into research_runs (id, organization_id, created_by, kind, query, mode, schema_name, status, phase, findings, brief_md, context, completed_at, started_at)
+			 values ('${BRIEF_RUN_ID}','${orgId}','${userId}','leaf','E2E brief fixture','deep','company_enrichment_v1','succeeded',3,'${findings}'::jsonb,'## Cal Pep Fonda','${context}'::jsonb, now(), now())
+			 on conflict (id) do update set findings=excluded.findings, brief_md=excluded.brief_md, context=excluded.context`,
+		)
+	}
+
+	test.describe('when the change is about the company the run was asked about', () => {
+		test('should say the account brief goes with it', async ({ page }) => {
+			// GIVEN a run pinned to that company, which wrote a brief
+			seedBriefRun(
+				JSON.stringify({
+					subjects: [{ table: 'companies', id: companyId }],
+				}).replace(/'/g, "''"),
+			)
+
+			// WHEN the review is opened
+			await page.goto(`/research/${BRIEF_RUN_ID}`, { waitUntil: 'networkidle' })
+			await waitForInteractive(page, 'research-review')
+
+			// THEN the warning is on screen, before anything is applied
+			await expect(
+				page.getByTestId('research-review-brief-warning'),
+			).toBeVisible()
+		})
+	})
+
+	test.describe('when the company was only mentioned, not researched', () => {
+		test('should stay quiet, so the warning still means something', async ({
+			page,
+		}) => {
+			// GIVEN the same run with its subject pointing at some other company
+			seedBriefRun(
+				JSON.stringify({
+					subjects: [
+						{ table: 'companies', id: '00000000-0000-4000-8000-000000000999' },
+					],
+				}).replace(/'/g, "''"),
+			)
+
+			// WHEN the review is opened
+			await page.goto(`/research/${BRIEF_RUN_ID}`, { waitUntil: 'networkidle' })
+			await waitForInteractive(page, 'research-review')
+
+			// THEN nothing is claimed about notes this apply would not touch
+			await expect(
+				page.getByTestId('research-review-brief-warning'),
+			).toHaveCount(0)
+		})
+	})
+})

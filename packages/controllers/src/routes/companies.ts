@@ -121,8 +121,9 @@ export const DeleteCompanyResult = Schema.Struct({
 })
 
 export const UpdateCompanyInput = Schema.Struct({
-	// The account's running notes, in markdown. A person editing them takes
-	// ownership of them, which is what stops later research replacing their text.
+	// The account's running notes, in markdown. One shared page: a person, an
+	// assistant and a research run all rewrite it, each replacing what the last
+	// one left, and no earlier version is kept.
 	accountBrief: Schema.optional(Schema.NullOr(Schema.String)),
 	name: Schema.optional(
 		Schema.String.pipe(Schema.check(Schema.isMinLength(1))),

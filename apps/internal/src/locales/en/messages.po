@@ -696,6 +696,10 @@ msgstr "Applying {0} changes…"
 msgid "Applying a discovered contact merges it into a matching record if one already exists."
 msgstr "Applying a discovered contact merges it into a matching record if one already exists."
 
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Applying also replaces the company's account brief with this run's write-up. Nothing keeps what is there now."
+msgstr "Applying also replaces the company's account brief with this run's write-up. Nothing keeps what is there now."
+
 #: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/resolve-status.tsx
 #: src/components/research/review/proposed-updates-review.tsx

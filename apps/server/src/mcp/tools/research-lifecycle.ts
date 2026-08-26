@@ -85,6 +85,49 @@ const notApproved = (
 //
 // Reading the run is enough for both: a run this organization cannot see comes
 // back empty, and the item is named inside that run's own findings.
+// Whether applying this one proposal would also replace the company's account
+// brief — the running notes somebody may have written by hand, of which no
+// earlier version is kept.
+//
+// Three things have to hold: the run wrote a brief at all, the proposal is about
+// a company rather than a person, and that company is one the run was pinned to
+// rather than a rival it merely mentioned. Asked on every apply instead, the
+// warning would be false for most of them — a run's proposals are mostly about
+// people — and a warning that is usually wrong is one nobody reads by the time
+// it is right.
+export const replacesAccountBrief = (
+	run: unknown,
+	proposedUpdateId: string,
+): boolean => {
+	const r = run as {
+		findings?: { proposed_updates?: unknown } | null
+		briefMd?: unknown
+		context?: { subjects?: unknown } | null
+	} | null
+	if (typeof r?.briefMd !== 'string' || r.briefMd.trim() === '') return false
+	const rows = r.findings?.proposed_updates
+	if (!Array.isArray(rows)) return false
+	const row = rows.find(
+		entry =>
+			typeof entry === 'object' &&
+			entry !== null &&
+			(entry as { id?: unknown }).id === proposedUpdateId,
+	) as { subject_table?: unknown; subject_id?: unknown } | undefined
+	if (row?.subject_table !== 'companies' || typeof row.subject_id !== 'string')
+		return false
+	const subjects = r.context?.subjects
+	return (
+		Array.isArray(subjects) &&
+		subjects.some(
+			subject =>
+				typeof subject === 'object' &&
+				subject !== null &&
+				(subject as { table?: unknown }).table === 'companies' &&
+				(subject as { id?: unknown }).id === row.subject_id,
+		)
+	)
+}
+
 const findingsHas = (
 	run: unknown,
 	list: 'pending_paid_actions' | 'proposed_updates',
@@ -246,7 +289,7 @@ const ListResearchProposedUpdates = Tool.make(
 	'list_research_proposed_updates',
 	{
 		description:
-			'List proposed CRM updates surfaced by a research run. Each row is a proposal awaiting human review (apply or reject) before mutating the target table. Returns at most `limit` rows (default 100, max 500); `hasMore` says whether the run proposed more than were returned.',
+			'List proposed CRM updates surfaced by a research run. Each row is a proposal awaiting human review (apply or reject) before mutating the target table. A row is a smaller change than applying it: applying any one of them, on the company the run was about, also stores what that run produced about the company — its fit judgement, and its account brief where the run wrote one, replacing the existing brief whole. Returns at most `limit` rows (default 100, max 500); `hasMore` says whether the run proposed more than were returned.',
 		parameters: Schema.Struct({
 			id: Schema.String.annotate({ description: RESEARCH_ID_SOURCE }),
 			limit: Schema.optional(McpPageLimit),
@@ -264,7 +307,7 @@ const ResolveResearchProposedUpdate = Tool.make(
 	'resolve_research_proposed_update',
 	{
 		description:
-			'Resolve a proposed CRM update from a research run. decision=apply writes the proposed change to the target row — it changes the customer\'s own records, so the person is asked first and nothing is written until they agree ({status:"cancelled"} if they said no, {status:"confirmation_required"} if this client cannot ask them; relay nextStep rather than retrying). decision=reject discards the proposal without changing the row and needs no approval.',
+			'Resolve a proposed CRM update from a research run. decision=apply writes the proposed change to the target row. It writes more than the fields named in the proposal: when the row is the company the run was about, the same write also stores what that run produced about the company: its fit judgement, and — only if the run wrote one — its account brief, which replaces the existing brief whole. A run that wrote no brief leaves the existing one untouched. The brief is one shared page with no earlier version kept, so where a run did write one, anything a person had put there is gone — read it first if it matters. It changes the customer\'s own records, so the person is asked first and nothing is written until they agree ({status:"cancelled"} if they said no, {status:"confirmation_required"} if this client cannot ask them; relay nextStep rather than retrying). decision=reject discards the proposal without changing the row and needs no approval.',
 		parameters: Schema.Struct({
 			id: Schema.String.annotate({ description: RESEARCH_ID_SOURCE }),
 			proposed_update_id: Schema.String.annotate({
@@ -444,7 +487,9 @@ export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 						if (!findingsHas(run, 'proposed_updates', proposed_update_id, true))
 							return { outcome: 'proposal_not_found' as const }
 						const answer = yield* requireApproval(
-							`Apply the proposed change from research run ${id} to your CRM records?`,
+							replacesAccountBrief(run, proposed_update_id)
+								? `Apply the proposed change from research run ${id} to your CRM records? This also replaces that company's account brief with the run's own write-up, and no earlier version is kept.`
+								: `Apply the proposed change from research run ${id} to your CRM records?`,
 						)
 						if (answer !== 'confirmed')
 							return notApproved(answer, 'apply this change', runPage(id))
@@ -455,6 +500,7 @@ export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 						proposed_update_id,
 						decision,
 						userId,
+						{ origin: 'person' },
 					).pipe(
 						Effect.provideService(CompanyService, companyService),
 						Effect.provideService(Geocoder, geocoder),
