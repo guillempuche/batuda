@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-27 (internal-v2026.8.27)
+
+### Bug Fixes
+
+* **research:** keep a run's own words out of a write nobody watched ([88e6027](https://github.com/guillempuche/batuda/commit/88e6027f8edc32eea154ae2a7a20b5746eb6ceb2)), closes [#546](https://github.com/guillempuche/batuda/issues/546)
+* **research:** stop an apply writing values nothing could ever read ([dfe0040](https://github.com/guillempuche/batuda/commit/dfe0040fb64225c0087a77825436087a3f596bf0)), closes [#557](https://github.com/guillempuche/batuda/issues/557)
+
+### Documentation
+
+* keep the account-brief rule in one place ([ee667a5](https://github.com/guillempuche/batuda/commit/ee667a516f029bfab7931496b846e6c0f08fca30)), closes [#558](https://github.com/guillempuche/batuda/issues/558)
+
+### CI/CD
+
+* **release:** ui v2026.8.25 ([cf21346](https://github.com/guillempuche/batuda/commit/cf2134621433412d3e42ae7bd42b823a38078ae9))
+
 ## 2026-08-25 (internal-v2026.8.25)
 
 ### Features
