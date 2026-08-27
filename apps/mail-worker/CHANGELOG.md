@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-27 (mail-worker-v2026.8.27)
+
+### Documentation
+
+* keep the account-brief rule in one place ([ee667a5](https://github.com/guillempuche/batuda/commit/ee667a516f029bfab7931496b846e6c0f08fca30)), closes [#558](https://github.com/guillempuche/batuda/issues/558)
+
 ## 2026-08-22 (mail-worker-v2026.8.22)
 
 ### Features
