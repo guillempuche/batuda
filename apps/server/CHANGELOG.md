@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-27 (server-v2026.8.27)
+
+### Bug Fixes
+
+* **research:** keep a run's own words out of a write nobody watched ([88e6027](https://github.com/guillempuche/batuda/commit/88e6027f8edc32eea154ae2a7a20b5746eb6ceb2)), closes [#546](https://github.com/guillempuche/batuda/issues/546)
+* **research:** stop an apply writing values nothing could ever read ([dfe0040](https://github.com/guillempuche/batuda/commit/dfe0040fb64225c0087a77825436087a3f596bf0)), closes [#557](https://github.com/guillempuche/batuda/issues/557)
+* **research:** stop an empty result wiping what an earlier run found ([a67f56e](https://github.com/guillempuche/batuda/commit/a67f56eaa045781419fbf892430b59ba54f15734))
+* **server:** log a refused version probe as routine, not a warning ([d75ed10](https://github.com/guillempuche/batuda/commit/d75ed10a3b9d82b0ffddd4e835a56f0699565d30))
+
+### Documentation
+
+* keep the account-brief rule in one place ([ee667a5](https://github.com/guillempuche/batuda/commit/ee667a516f029bfab7931496b846e6c0f08fca30)), closes [#558](https://github.com/guillempuche/batuda/issues/558)
+
+### CI/CD
+
+* **release:** ui v2026.8.25 ([cf21346](https://github.com/guillempuche/batuda/commit/cf2134621433412d3e42ae7bd42b823a38078ae9))
+
 ## 2026-08-25 (server-v2026.8.25)
 
 ### Features
