@@ -67,8 +67,10 @@ const PriPopup = styled(Autocomplete.Popup).withConfig({
 })`
 	position: relative;
 	/* Never narrower than the field it belongs to, or a suggestion reads as
-	 * belonging to something else on the page. */
+	 * belonging to something else on the page; never wider than the screen has
+	 * room for, or a long trade name would run off the side of a phone. */
 	min-width: var(--anchor-width);
+	max-width: var(--available-width);
 	max-height: min(18rem, var(--available-height));
 	overflow-y: auto;
 	box-sizing: border-box;
@@ -102,9 +104,9 @@ const PriItem = styled(Autocomplete.Item).withConfig({
 })`
 	position: relative;
 	z-index: 1;
-	display: flex;
-	align-items: center;
-	gap: var(--space-2xs);
+	/* A plain block, not a row of parts: a suggestion is one piece of text, and
+	 * only text sitting directly in a block trails off with an ellipsis. */
+	display: block;
 	padding: var(--space-2xs) var(--space-sm);
 	border-radius: var(--shape-2xs);
 	font-family: var(--font-display);
@@ -117,7 +119,11 @@ const PriItem = styled(Autocomplete.Item).withConfig({
 	cursor: pointer;
 	user-select: none;
 	outline: none;
+	/* One line each, so the list widens to its longest suggestion rather than
+	 * wrapping them all; past the width it may reach, a name trails off. */
 	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 
 	&[data-highlighted] {
 		background: color-mix(in srgb, var(--color-highlight-amber), transparent);
