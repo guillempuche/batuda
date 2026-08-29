@@ -40,12 +40,21 @@ const bounded = (value: string) => value.slice(0, 64)
 // session yet, the named revision is dropped and the exchange goes ahead, which
 // is what settles the revision both sides use. After that the client has been
 // told which revision it got, so naming another one is its own mistake to fix
-// and the refusal stands.
+// and the refusal stands. Dropping the revision is only safe where something
+// else can still settle one, which is why a discovery call is excluded below.
 export const withNegotiableProtocolVersion = (
 	request: HttpServerRequest.HttpServerRequest,
 ) => {
 	const named = request.headers[PROTOCOL_VERSION_HEADER]
 	if (named === undefined || request.headers[SESSION_ID_HEADER] !== undefined)
+		return Effect.succeed(request)
+	// The opening handshake names its revision in the body as well, so it can
+	// still settle one with the header gone. A discovery call has nothing to fall
+	// back on: unnamed, it sails past the revision check into an RPC layer with no
+	// handler for it, and that crash comes back to the client as a success it
+	// cannot read. Keeping its revision named earns it the same plain refusal an
+	// established connection already gets.
+	if (request.headers[METHOD_HEADER] === 'server/discover')
 		return Effect.succeed(request)
 	return Effect.as(
 		Effect.logInfo('mcp.protocol_version.deferred_to_negotiation').pipe(
