@@ -316,6 +316,59 @@ describe('the /mcp route meeting a protocol revision it does not know', () => {
 		})
 	})
 
+	describe('when a client asks what this server speaks, with no session yet', () => {
+		it('should refuse it plainly rather than hand back a crash as a success', async () => {
+			// GIVEN an assistant asking which revisions this server speaks before any
+			//       connection exists, which is how one looks for a newer era
+			lines.length = 0
+			const response = await post(
+				{ jsonrpc: '2.0', id: 8, method: 'server/discover', params: {} },
+				{
+					'mcp-protocol-version': '2026-07-28',
+					'mcp-method': 'server/discover',
+				},
+			)
+
+			// THEN it is turned down the same way an established connection is turned
+			// down, instead of being let through to a layer with no handler for it
+			expect(response.status).toBe(400)
+			const body = Schema.decodeUnknownSync(JsonRpcError)(await response.json())
+			expect(body.error.code).toBe(-32000)
+			expect(body.error.message).toContain('2026-07-28')
+		})
+
+		it("should keep the runtime's own failure shape away from the client", async () => {
+			// GIVEN the same question asked the same way
+			const response = await post(
+				{ jsonrpc: '2.0', id: 9, method: 'server/discover', params: {} },
+				{
+					'mcp-protocol-version': '2026-07-28',
+					'mcp-method': 'server/discover',
+				},
+			)
+
+			// THEN nothing describing how this server fails internally reaches the
+			// caller — it used to receive the crash itself, wrapped in a success
+			const text = await response.text()
+			expect(text).not.toContain('Unknown request tag')
+			expect(text).not.toContain('Die')
+		})
+
+		it('should still let an opening handshake settle a revision', async () => {
+			// GIVEN the negotiation this exclusion sits beside: an opening call naming
+			//       a revision the library does not know, sent as an assistant sends it
+			const response = await initialize({
+				'mcp-protocol-version': '2026-07-28',
+				'mcp-method': 'initialize',
+			})
+
+			// THEN it is still served — that call names its revision in the body too,
+			// so it can settle one with the header gone
+			expect(response.status).toBe(200)
+			expect(response.headers.get('mcp-session-id')).toBeTruthy()
+		})
+	})
+
 	describe('when the body is broken rather than the revision', () => {
 		it('should not blame the revision for it', async () => {
 			// GIVEN a settled connection naming a revision this server DOES know
