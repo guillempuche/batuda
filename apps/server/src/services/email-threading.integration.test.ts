@@ -237,7 +237,7 @@ const sendDraft = (draftId: string) =>
 	runExit(
 		Effect.gen(function* () {
 			const svc = yield* EmailService
-			return yield* svc.sendDraft(inboxId, draftId)
+			return yield* svc.sendDraft(inboxId, draftId, null)
 		}),
 	)
 
@@ -248,7 +248,7 @@ const reply = (
 	runExit(
 		Effect.gen(function* () {
 			const svc = yield* EmailService
-			return yield* svc.reply(threadId, body, extras)
+			return yield* svc.reply(threadId, body, { ...extras, actor: null })
 		}),
 	)
 
@@ -582,6 +582,8 @@ describe('EmailService.send', () => {
 						'your pallet pools',
 						body,
 						companyId,
+						undefined,
+						{ actor: null },
 					)
 				}),
 			)
@@ -604,6 +606,8 @@ describe('EmailService.send', () => {
 						'Re: your pallet pools',
 						body,
 						companyId,
+						undefined,
+						{ actor: null },
 					)
 				}),
 			)
@@ -624,6 +628,8 @@ describe('EmailService.send', () => {
 						'',
 						body,
 						companyId,
+						undefined,
+						{ actor: null },
 					)
 				}),
 			)
@@ -644,6 +650,8 @@ describe('EmailService.send', () => {
 						'Re: your pallet pools',
 						body,
 						companyId,
+						undefined,
+						{ actor: null },
 					)
 				}),
 			)
@@ -1172,7 +1180,7 @@ describe('the record a send that never got through leaves', () => {
 				FAILING_ORG,
 				Effect.gen(function* () {
 					const svc = yield* EmailService
-					return yield* svc.reply(threadId, body)
+					return yield* svc.reply(threadId, body, { actor: null })
 				}),
 			).pipe(Effect.provide(capture)) as Effect.Effect<unknown, unknown, never>,
 		)
@@ -1265,7 +1273,7 @@ describe('the record a failed clean-up leaves', () => {
 				PURGE_ORG,
 				Effect.gen(function* () {
 					const svc = yield* EmailService
-					return yield* svc.reply(threadId, body)
+					return yield* svc.reply(threadId, body, { actor: null })
 				}),
 			).pipe(Effect.provide(capture)) as Effect.Effect<unknown, unknown, never>,
 		)
@@ -1329,6 +1337,8 @@ describe('the record a refused send leaves', () => {
 					'Re: your pallet pools',
 					body,
 					companyId,
+					undefined,
+					{ actor: null },
 				)
 			}),
 		)
@@ -1350,6 +1360,8 @@ describe('the record a refused send leaves', () => {
 					'',
 					body,
 					companyId,
+					undefined,
+					{ actor: null },
 				)
 			}),
 		)
@@ -1372,6 +1384,8 @@ describe('the record a refused send leaves', () => {
 					'Re: pressupost pallets Barcelona',
 					body,
 					companyId,
+					undefined,
+					{ actor: null },
 				)
 			}),
 		)

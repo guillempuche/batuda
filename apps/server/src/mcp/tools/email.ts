@@ -883,6 +883,7 @@ export const EmailHandlersLive = EmailTools.toLayer(
 							}
 						}
 					}
+					const session = yield* SessionContext
 					return yield* svc
 						.send(
 							params.inbox_id,
@@ -892,6 +893,10 @@ export const EmailHandlersLive = EmailTools.toLayer(
 							params.company_id,
 							params.contact_id,
 							{
+								actor: {
+									userId: session.userId,
+									isAgent: session.isAgent,
+								},
 								...(params.cc !== undefined && { cc: [...params.cc] }),
 								...(params.bcc !== undefined && { bcc: [...params.bcc] }),
 								...(params.reply_to !== undefined && {
@@ -971,8 +976,10 @@ export const EmailHandlersLive = EmailTools.toLayer(
 							}
 						}
 					}
+					const session = yield* SessionContext
 					return yield* svc
 						.reply(params.thread_id, params.body_json, {
+							actor: { userId: session.userId, isAgent: session.isAgent },
 							...(params.cc !== undefined && { cc: [...params.cc] }),
 							...(params.bcc !== undefined && { bcc: [...params.bcc] }),
 							...(params.preview !== undefined && {
@@ -1379,7 +1386,11 @@ export const EmailHandlersLive = EmailTools.toLayer(
 										}
 								}
 							}
-							return yield* svc.sendDraft(params.inbox_id, draftId)
+							const session = yield* SessionContext
+							return yield* svc.sendDraft(params.inbox_id, draftId, {
+								userId: session.userId,
+								isAgent: session.isAgent,
+							})
 						}).pipe(
 							Effect.map(r =>
 								'_tag' in r

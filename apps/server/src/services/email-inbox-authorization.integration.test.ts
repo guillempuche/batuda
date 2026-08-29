@@ -551,7 +551,7 @@ describe('who may reach a mailbox', () => {
 				(inboxId, draftId) =>
 					Effect.gen(function* () {
 						const svc = yield* EmailService
-						return yield* svc.sendDraft(inboxId, draftId)
+						return yield* svc.sendDraft(inboxId, draftId, null)
 					}),
 			],
 		]

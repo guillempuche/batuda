@@ -866,6 +866,16 @@ Inbound parent inline images (`<img src="cid:…">`) map to `{ type: 'image', so
 
 Threading headers (`In-Reply-To`, `References`) are set by the server when it builds the reply MIME, from the parent message's `Message-ID` (and the inherited `References` chain), so the reply stitches into the thread in the recipient's client.
 
+### Sending claims the lead
+
+Every outbound path — `send`, `reply`, `sendDraft` — funnels through the private `recordOutbound` helper in `apps/server/src/services/email.ts`, which writes the `email_messages` row and the `email_sent` history entry inside one transaction. It then calls `claimLeadOnEmail` (`apps/server/src/services/company-lead-assignment.ts`): if the company has no `owner_id` it becomes the sender's, and if it is still at `prospect` it moves to `contacted`, each recorded on the company's history.
+
+The rule reads `owner_id IS NULL` and `status = 'prospect'`, **not** "has this company been emailed before". That second question has no reliable answer: `apps/mail-worker` tracks both `INBOX` and `Sent` and stores every message it fetches with `direction = 'inbound'`, so a mailbox connected with existing history fills `email_messages` and `companies.last_email_at` with mail Batuda never sent. Asking who has taken the lead is both answerable and the thing worth knowing.
+
+Each write is a single conditional `UPDATE … RETURNING`, so two people emailing the same company at once cannot both win it — and with no row lock, because the whole request already runs in one transaction (`enterOrgScope`): a `FOR UPDATE` here would be held until the response, and would block the mail worker's inbound writes for that company. Both writes bump `version`, the token a research proposal is checked against, so a proposal prepared before the send cannot quietly restore the old owner and stage. The claim runs in its own nested transaction (a savepoint) and swallows its own failures — by the time it runs the message has already left over SMTP, and losing the record of it would have somebody send it twice.
+
+Who is sending is a required `actor` argument rather than an ambient `SessionContext` read, so a new way of sending has to say who it is. Agents pass their identity but never become owners, and the two calendar dispatchers pass `null` — an RSVP or a forwarded invitation is not somebody reaching out.
+
 ### Footer CRUD
 
 `inbox_footers.body_json JSONB` (replacing the prior `html` + `text_fallback` columns). Authored in `FooterManageDialog` via the same `EmailEditor` used for compose, just with `mode="footer"` — narrower palette (no H1, no divider, no lists; paragraphs + inline formatting + `image` blocks for logo-in-signature). No structured author/city/brand fields; the user composes the signature freely. At send time, footer blocks are appended to the user's block tree before `renderBlocks` runs — a single render step yields consistent footer placement in both `html` and `text`.

@@ -125,6 +125,9 @@ export const dispatchRsvpReply = (args: {
 
 		yield* email
 			.reply(threadLinkId, body, {
+				// An answer to an invitation somebody else sent is not somebody
+				// reaching out, so it never claims the company.
+				actor: null,
 				skipFooter: true,
 				...(eventTitle !== null &&
 					eventTitle.trim() !== '' && { fallbackSubject: eventTitle }),

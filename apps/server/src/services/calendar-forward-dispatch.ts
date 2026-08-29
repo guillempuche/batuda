@@ -157,6 +157,9 @@ export const dispatchForwardInvitation = (args: {
 				companyId,
 				contactId ?? undefined,
 				{
+					// Passing an invitation on is not somebody reaching out, so it
+					// never claims the company.
+					actor: null,
 					rawAttachments: [
 						{
 							filename: 'invite.ics',

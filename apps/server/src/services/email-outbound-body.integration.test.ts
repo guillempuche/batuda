@@ -257,6 +257,8 @@ describe('EmailService.send', () => {
 							},
 						],
 						companyId,
+						undefined,
+						{ actor: null },
 					)
 				}),
 			)
@@ -284,6 +286,8 @@ describe('EmailService.send', () => {
 						'Long one',
 						[{ type: 'paragraph', spans: [{ kind: 'text', value: long }] }],
 						companyId,
+						undefined,
+						{ actor: null },
 					)
 				}),
 			)
@@ -311,12 +315,16 @@ describe('EmailService.reply', () => {
 			await run(
 				Effect.gen(function* () {
 					const svc = yield* EmailService
-					return yield* svc.reply(threadId, [
-						{
-							type: 'paragraph',
-							spans: [{ kind: 'text', value: 'Sending the revised figure.' }],
-						},
-					])
+					return yield* svc.reply(
+						threadId,
+						[
+							{
+								type: 'paragraph',
+								spans: [{ kind: 'text', value: 'Sending the revised figure.' }],
+							},
+						],
+						{ actor: null },
+					)
 				}),
 			)
 
@@ -361,7 +369,7 @@ describe('EmailService.sendDraft', () => {
 			await run(
 				Effect.gen(function* () {
 					const svc = yield* EmailService
-					return yield* svc.sendDraft(inboxId, draftId)
+					return yield* svc.sendDraft(inboxId, draftId, null)
 				}),
 			)
 

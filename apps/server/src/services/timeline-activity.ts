@@ -1,11 +1,11 @@
 import { Context, Data, DateTime, Effect, Layer } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { CurrentOrg } from '@batuda/controllers'
-import type {
-	TimelineDirection,
-	TimelineEntityType,
-	TimelineKind,
+import {
+	CurrentOrg,
+	type TimelineDirection,
+	type TimelineEntityType,
+	type TimelineKind,
 } from '@batuda/domain'
 
 export class EmailSent extends Data.TaggedClass('EmailSent')<{
@@ -209,6 +209,18 @@ export class CompanyRestored extends Data.TaggedClass('CompanyRestored')<{
 	readonly occurredAt: Date
 }> {}
 
+// A lead nobody had claimed became somebody's. Written when the first person to
+// email a company takes it, so the history says why the owner appeared rather
+// than leaving it to be noticed. `ownerUserId` is who got it; `actorUserId` is
+// who did it — the same person today, kept apart because handing a lead to
+// somebody else is the obvious next thing to want.
+export class LeadAssigned extends Data.TaggedClass('LeadAssigned')<{
+	readonly companyId: string
+	readonly ownerUserId: string
+	readonly actorUserId: string | null
+	readonly occurredAt: Date
+}> {}
+
 export type TimelineEvent =
 	| EmailSent
 	| EmailReceived
@@ -221,6 +233,7 @@ export type TimelineEvent =
 	| StageChanged
 	| CompanyDeleted
 	| CompanyRestored
+	| LeadAssigned
 	| MeetingScheduled
 	| MeetingRescheduled
 	| MeetingCancelled
@@ -251,6 +264,7 @@ export const denormColumnFor = (
 		case 'MeetingRescheduled':
 			return isPast(event.startAt, now) ? 'last_meeting_at' : null
 		case 'StageChanged':
+		case 'LeadAssigned':
 			return null
 		case 'DocumentCreated':
 		case 'ProposalEvent':
@@ -455,6 +469,21 @@ const rowBase = (event: TimelineEvent): TimelineRowBase => {
 				summary: null,
 				payload: { from: event.from, to: event.to },
 			}
+		case 'LeadAssigned':
+			return {
+				kind: 'lead_assigned',
+				entityType: 'system',
+				companyId: event.companyId,
+				contactId: null,
+				channel: null,
+				direction: null,
+				actorUserId: event.actorUserId,
+				occurredAt: event.occurredAt,
+				summary: null,
+				// `reason` says what put the owner there, so a later way of
+				// assigning is told apart without guessing from the timestamp.
+				payload: { ownerUserId: event.ownerUserId, reason: 'first_email' },
+			}
 		case 'MeetingScheduled':
 			return {
 				kind: 'meeting_scheduled',
@@ -650,7 +679,8 @@ export const mapEventToInteraction = (
 			}
 		case 'CompanyDeleted':
 		case 'CompanyRestored':
-		case 'StageChanged': {
+		case 'StageChanged':
+		case 'LeadAssigned': {
 			return null
 		}
 		case 'DocumentCreated':
@@ -698,6 +728,7 @@ const entityIdFor = (
 		case 'StageChanged':
 		case 'CompanyDeleted':
 		case 'CompanyRestored':
+		case 'LeadAssigned':
 			return event.companyId
 		case 'MeetingScheduled':
 		case 'MeetingRescheduled':

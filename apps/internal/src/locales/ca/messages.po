@@ -329,6 +329,10 @@ msgstr "Una etiqueta curta. Si vols, comença-la amb un [tag] com ara [research]
 msgid "A stack with that name already exists."
 msgstr "Ja existeix una pila amb aquest nom."
 
+#: src/routes/companies/$slug.tsx
+msgid "A team member"
+msgstr "Algú de l'equip"
+
 #: src/components/companies/about-section.tsx
 msgid "About"
 msgstr "Sobre l'empresa"
@@ -3025,6 +3029,10 @@ msgstr "Latitud"
 #: src/components/research/research-dialog.tsx
 msgid "Layered after the stack, in order."
 msgstr "S'apliquen després de la pila, en ordre."
+
+#: src/routes/companies/$slug.tsx
+msgid "Lead assigned"
+msgstr "Oportunitat assignada"
 
 #: src/components/companies/company-channels-section.tsx
 msgid "Let mail through again"

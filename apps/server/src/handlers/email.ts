@@ -2,7 +2,7 @@ import { Effect, Stream } from 'effect'
 import { HttpServerResponse, Multipart } from 'effect/unstable/http'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 
-import { BatudaApi } from '@batuda/controllers'
+import { BatudaApi, SessionContext } from '@batuda/controllers'
 
 import { EmailService } from '../services/email'
 import {
@@ -38,8 +38,9 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 		return (
 			handlers
 				.handle('send', _ =>
-					svc
-						.send(
+					Effect.gen(function* () {
+						const session = yield* SessionContext
+						return yield* svc.send(
 							_.payload.inboxId,
 							typeof _.payload.to === 'string'
 								? _.payload.to
@@ -49,6 +50,10 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 							_.payload.companyId,
 							_.payload.contactId,
 							{
+								actor: {
+									userId: session.userId,
+									isAgent: session.isAgent,
+								},
 								...(_.payload.cc !== undefined && { cc: [..._.payload.cc] }),
 								...(_.payload.bcc !== undefined && {
 									bcc: [..._.payload.bcc],
@@ -67,19 +72,21 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 								}),
 							},
 						)
-						.pipe(
-							// Surface the inbox-state failures as the route's declared
-							// 409s; collapse internal errors to die(). A refused send is
-							// declared separately and travels on its own, so the reader
-							// is told what to fix while a real fault still reads as one.
-							Effect.catchTag('EmailError', e => Effect.die(e)),
-							Effect.catchTag('SqlError', e => Effect.die(e)),
-							Effect.catchTag('SmtpSendFailed', e => Effect.die(e)),
-						),
+					}).pipe(
+						// Surface the inbox-state failures as the route's declared
+						// 409s; collapse internal errors to die(). A refused send is
+						// declared separately and travels on its own, so the reader
+						// is told what to fix while a real fault still reads as one.
+						Effect.catchTag('EmailError', e => Effect.die(e)),
+						Effect.catchTag('SqlError', e => Effect.die(e)),
+						Effect.catchTag('SmtpSendFailed', e => Effect.die(e)),
+					),
 				)
 				.handle('reply', _ =>
-					svc
-						.reply(_.payload.threadId, _.payload.bodyJson, {
+					Effect.gen(function* () {
+						const session = yield* SessionContext
+						return yield* svc.reply(_.payload.threadId, _.payload.bodyJson, {
+							actor: { userId: session.userId, isAgent: session.isAgent },
 							...(_.payload.cc !== undefined && { cc: [..._.payload.cc] }),
 							...(_.payload.bcc !== undefined && {
 								bcc: [..._.payload.bcc],
@@ -97,11 +104,11 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 								skipFooter: _.payload.skipFooter,
 							}),
 						})
-						.pipe(
-							Effect.catchTag('EmailError', e => Effect.die(e)),
-							Effect.catchTag('SqlError', e => Effect.die(e)),
-							Effect.catchTag('SmtpSendFailed', e => Effect.die(e)),
-						),
+					}).pipe(
+						Effect.catchTag('EmailError', e => Effect.die(e)),
+						Effect.catchTag('SqlError', e => Effect.die(e)),
+						Effect.catchTag('SmtpSendFailed', e => Effect.die(e)),
+					),
 				)
 				.handle('listThreads', _ =>
 					svc.listThreads({
@@ -383,7 +390,13 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 						),
 				)
 				.handle('sendDraft', _ =>
-					svc.sendDraft(_.payload.inboxId, _.params.draftId).pipe(
+					Effect.gen(function* () {
+						const session = yield* SessionContext
+						return yield* svc.sendDraft(_.payload.inboxId, _.params.draftId, {
+							userId: session.userId,
+							isAgent: session.isAgent,
+						})
+					}).pipe(
 						Effect.catchTags({
 							// A refused send is declared on the route and travels out on
 							// its own; only real faults are collapsed here.

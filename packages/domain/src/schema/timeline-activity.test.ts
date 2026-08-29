@@ -84,6 +84,17 @@ describe('TimelineKind', () => {
 		)
 	})
 
+	it('should accept a lead being claimed', () => {
+		// GIVEN the kind written when the first person to email a company takes
+		// it as their own
+		// WHEN it is decoded
+		// THEN it round-trips — without it the row fails to decode and takes
+		// the whole company timeline down with it
+		expect(Schema.decodeUnknownSync(TimelineKind)('lead_assigned')).toBe(
+			'lead_assigned',
+		)
+	})
+
 	it('should reject unknown kinds like "meeting_ended"', () => {
 		// GIVEN 'meeting_ended' (close to a real kind but not modelled — the
 		// existing 'meeting_cancelled' covers the end-of-life case)
