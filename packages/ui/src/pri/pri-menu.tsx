@@ -110,14 +110,22 @@ const PriCheckboxItem = styled(Menu.CheckboxItem).withConfig({
 	displayName: 'PriMenuCheckboxItem',
 })`
 	${itemStyles}
-	display: grid;
-	grid-template-columns: 1rem 1fr;
+	position: relative;
+	/* Only the rows that are on carry a tick, so the room for one is kept on
+	 * every row — otherwise the names would not line up. */
+	padding-inline-start: calc(var(--space-sm) + 1rem + var(--space-2xs));
 `
 
 const PriCheckboxItemIndicator = styled(Menu.CheckboxItemIndicator).withConfig({
 	displayName: 'PriMenuCheckboxItemIndicator',
 })`
-	grid-column-start: 1;
+	/* Sits in the room the row keeps for it, outside the row's own layout, so
+	 * only the name decides how wide the menu opens. */
+	position: absolute;
+	inset-inline-start: var(--space-sm);
+	top: 0;
+	bottom: 0;
+	width: 1rem;
 	display: flex;
 	align-items: center;
 	justify-content: center;

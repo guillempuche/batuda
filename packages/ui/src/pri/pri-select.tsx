@@ -68,8 +68,11 @@ const PriPopup = styled(Select.Popup).withConfig({
 	displayName: 'PriSelectPopup',
 })`
 	position: relative;
-	/* Match the popup to at least the trigger width so options never look narrower than the selector. */
+	/* Never narrower than the selector, or the options read as belonging to
+	 * something else; never wider than the screen has room for, or the longest
+	 * option would open off the edge. */
 	min-width: var(--anchor-width);
+	max-width: var(--available-width);
 	box-sizing: border-box;
 	background-color: var(--color-metal);
 	background-image:
@@ -135,11 +138,13 @@ const PriItem = styled(Select.Item).withConfig({
 })`
 	position: relative;
 	z-index: 1;
-	display: grid;
-	grid-template-columns: 1rem 1fr;
+	display: flex;
 	align-items: center;
 	gap: var(--space-2xs);
 	padding: var(--space-2xs) var(--space-sm);
+	/* Only the chosen option carries a tick, so the room for one is kept on
+	 * every row — otherwise the names would not line up. */
+	padding-inline-start: calc(var(--space-sm) + 1rem + var(--space-2xs));
 	border-radius: var(--shape-2xs);
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-medium-size);
@@ -164,10 +169,27 @@ const PriItem = styled(Select.Item).withConfig({
 const PriItemIndicator = styled(Select.ItemIndicator).withConfig({
 	displayName: 'PriSelectItemIndicator',
 })`
+	/* Sits in the room the row keeps for it, outside the row's own layout, so
+	 * only the name decides how wide the list opens. */
+	position: absolute;
+	inset-inline-start: var(--space-sm);
+	top: 0;
+	bottom: 0;
+	width: 1rem;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	color: var(--color-primary);
+`
+
+const PriItemText = styled(Select.ItemText).withConfig({
+	displayName: 'PriSelectItemText',
+})`
+	/* Once the list has grown as wide as it may, a name too long for it trails
+	 * off; the zero minimum is what lets it shrink inside the row at all. */
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
 `
 
 const PriGroupLabel = styled(Select.GroupLabel).withConfig({
@@ -312,7 +334,7 @@ function PriOptions<T extends string>({
 								<PriItemIndicator>
 									<CheckMark />
 								</PriItemIndicator>
-								<Select.ItemText>{item.label}</Select.ItemText>
+								<PriItemText>{item.label}</PriItemText>
 							</PriItem>
 						))}
 					</Select.List>
@@ -341,6 +363,6 @@ export const PriSelect = {
 	GroupLabel: PriGroupLabel,
 	Separator: PriSeparator,
 	Item: PriItem,
-	ItemText: Select.ItemText,
+	ItemText: PriItemText,
 	ItemIndicator: PriItemIndicator,
 }
