@@ -27,6 +27,9 @@ export const TimelineKind = Schema.Literals([
 	// go with it, so the account's own log is where that has to be visible.
 	'company_deleted',
 	'company_restored',
+	// A lead that nobody had claimed became somebody's, because they were the
+	// first to email the company. Who it went to is in the payload.
+	'lead_assigned',
 	'meeting_scheduled',
 	'meeting_rescheduled',
 	'meeting_cancelled',

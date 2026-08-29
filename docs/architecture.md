@@ -300,6 +300,19 @@ User fills interaction form
   → Response returns updated company
 ```
 
+### Somebody emails a company
+
+```
+User (or agent over MCP) sends an email
+  → SMTP dispatch, then APPEND to the sender's Sent folder
+  → Server writes the email_messages row + the "email_sent" history entry
+  → If nobody owns the company yet, it becomes the sender's
+  → If it is still at "prospect", it moves to "contacted"
+  → Both are recorded on the company's history, just after the email
+```
+
+The claim asks whether anybody has *taken* the lead, not whether the company has been emailed before. That second question cannot be answered: a mailbox connected with existing history has its Sent folder read in as inbound (`apps/mail-worker` marks everything it fetches that way), so the stored mail cannot say which side sent what. Both writes are conditional, so neither ever overrides a person's own choice — an owned company keeps its owner, and one already past `prospect` keeps its stage. An agent never becomes an owner, and neither does an automated calendar reply, which carries no sender at all.
+
 ### AI agent creates a prospect page
 
 ```

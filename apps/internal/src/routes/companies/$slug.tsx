@@ -145,6 +145,7 @@ import { dehydrateAtom } from '#/lib/atom-hydration'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import { languageName } from '#/lib/country-name'
 import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
+import { useOrgMembers } from '#/lib/org-members'
 import type { PaginatedList } from '#/lib/paginated-list'
 import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
@@ -497,6 +498,8 @@ function DetailBody({
 	const { t } = useLingui()
 	const buyingRoleLabel = useBuyingRoleLabel()
 	const { labelFor } = useCompanyIndustries()
+	// Turns the owner id a history entry carries into the name to show.
+	const { byUserId } = useOrgMembers()
 	const { open: openQuickCapture } = useQuickCapture()
 	const { openCompose } = useComposeEmail()
 	const [tab, setTab] = useTabSearchParam<CompanyTab>(COMPANY_TABS, 'overview')
@@ -822,7 +825,8 @@ function DetailBody({
 						entry.kind !== 'system_event' &&
 						entry.kind !== 'stage_changed' &&
 						entry.kind !== 'company_deleted' &&
-						entry.kind !== 'company_restored',
+						entry.kind !== 'company_restored' &&
+						entry.kind !== 'lead_assigned',
 				)
 				.map(entry => ({
 					id: entry.id,
@@ -1378,6 +1382,13 @@ function DetailBody({
 																<TimelineEntry
 																	key={row.id}
 																	entry={toTimelineEntry(row, {
+																		leadAssignedLabel: t`Lead assigned`,
+																		// The directory is client-only, so an
+																		// owner it cannot name yet reads as
+																		// somebody, not a raw id.
+																		describeLeadAssigned: ownerUserId =>
+																			byUserId(ownerUserId)?.name ??
+																			t`A team member`,
 																		stageChangedLabel: t`Stage changed`,
 																		companyDeletedLabel: t`Company deleted`,
 																		companyRestoredLabel: t`Company restored`,
@@ -2069,6 +2080,8 @@ function toTimelineEntry(
 			from: CompanyStatus,
 			to: CompanyStatus,
 		) => string
+		readonly leadAssignedLabel: string
+		readonly describeLeadAssigned: (ownerUserId: string | null) => string
 	},
 ): TimelineEntryData {
 	const payload = row.payload ?? {}
@@ -2083,6 +2096,19 @@ function toTimelineEntry(
 					? labels.companyDeletedLabel
 					: labels.companyRestoredLabel,
 			summary: labels.describePeopleAffected(affected),
+			outcome: null,
+			nextAction: null,
+			date: row.date,
+			threadId: null,
+		}
+	}
+
+	if (row.kind === 'lead_assigned') {
+		return {
+			id: row.id,
+			channel: row.channel,
+			subject: labels.leadAssignedLabel,
+			summary: labels.describeLeadAssigned(textOrNull(payload['ownerUserId'])),
 			outcome: null,
 			nextAction: null,
 			date: row.date,
@@ -2153,6 +2179,7 @@ function timelineKindToChannel(kind: string, fallback: string | null): string {
 		case 'stage_changed':
 		case 'company_deleted':
 		case 'company_restored':
+		case 'lead_assigned':
 			return 'system'
 		default:
 			return fallback ?? 'other'

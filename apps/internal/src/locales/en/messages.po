@@ -329,6 +329,10 @@ msgstr "A short label. Start it with a [tag] like [research] to group related te
 msgid "A stack with that name already exists."
 msgstr "A stack with that name already exists."
 
+#: src/routes/companies/$slug.tsx
+msgid "A team member"
+msgstr "A team member"
+
 #: src/components/companies/about-section.tsx
 msgid "About"
 msgstr "About"
@@ -3025,6 +3029,10 @@ msgstr "Latitude"
 #: src/components/research/research-dialog.tsx
 msgid "Layered after the stack, in order."
 msgstr "Layered after the stack, in order."
+
+#: src/routes/companies/$slug.tsx
+msgid "Lead assigned"
+msgstr "Lead assigned"
 
 #: src/components/companies/company-channels-section.tsx
 msgid "Let mail through again"

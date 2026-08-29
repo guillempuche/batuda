@@ -54,6 +54,8 @@ const UUID_PATTERN =
 import { textAnywhere } from '../lib/search-text'
 import { CalendarService } from './calendar.js'
 import { suppressedAmong } from './channels.js'
+import type { EmailActor } from './company-lead-assignment.js'
+import { claimLeadOnEmail } from './company-lead-assignment.js'
 import { CredentialCrypto } from './credential-crypto.js'
 import type { ResolvedStaging, StagingRef } from './email-attachment-staging.js'
 import { EmailAttachmentStaging } from './email-attachment-staging.js'
@@ -1098,6 +1100,7 @@ export class EmailService extends Context.Service<EmailService>()(
 				// sits in their mailbox.
 				textBody: string | null
 				htmlBody: string | null
+				actor: EmailActor | null
 			}) =>
 				Effect.gen(function* () {
 					const currentOrg = yield* CurrentOrg
@@ -1213,9 +1216,23 @@ export class EmailService extends Context.Service<EmailService>()(
 										subject: args.subject,
 										summary: null,
 										threadLinkId,
-										actorUserId: null,
+										actorUserId: args.actor?.userId ?? null,
 										occurredAt: sentAt,
 									}),
+								)
+
+								// Emailing a company nobody has picked up makes it theirs.
+								// Swallows its own failures, so a message already
+								// delivered still leaves a record. Handed the service's
+								// own sql and timeline rather than asking for them, so a
+								// caller of send has nothing extra to hand over.
+								yield* claimLeadOnEmail({
+									companyId: args.companyId,
+									actor: args.actor,
+									sentAt,
+								}).pipe(
+									Effect.provideService(SqlClient.SqlClient, sql),
+									Effect.provideService(TimelineActivityService, timeline),
 								)
 							}
 						}),
@@ -1229,8 +1246,13 @@ export class EmailService extends Context.Service<EmailService>()(
 					subject: string,
 					bodyJson: EmailBlocks,
 					companyId: string,
-					contactId?: string,
-					extras?: {
+					contactId: string | undefined,
+					extras: {
+						// Who is sending. Required rather than optional so a new way of
+						// sending has to say who, instead of quietly defaulting to
+						// nobody — a send with no person behind it (an automated
+						// calendar reply) passes null and says so.
+						actor: EmailActor | null
 						cc?: string[] | undefined
 						bcc?: string[] | undefined
 						replyTo?: string | undefined
@@ -1324,6 +1346,7 @@ export class EmailService extends Context.Service<EmailService>()(
 							rawRfc822Ref: dispatched.rawRef,
 							textBody: rendered.text,
 							htmlBody: rendered.html,
+							actor: extras.actor,
 						})
 
 						if (staged.length > 0) {
@@ -1364,7 +1387,8 @@ export class EmailService extends Context.Service<EmailService>()(
 				reply: (
 					threadId: string,
 					bodyJson: EmailBlocks,
-					extras?: {
+					extras: {
+						actor: EmailActor | null
 						cc?: string[] | undefined
 						bcc?: string[] | undefined
 						preview?: string | undefined
@@ -1568,6 +1592,7 @@ export class EmailService extends Context.Service<EmailService>()(
 							rawRfc822Ref: dispatched.rawRef,
 							textBody: rendered.text,
 							htmlBody: rendered.html,
+							actor: extras.actor,
 						})
 
 						if (staged.length > 0) {
@@ -2965,7 +2990,11 @@ export class EmailService extends Context.Service<EmailService>()(
 						}
 					}),
 
-				sendDraft: (inboxId: string | undefined, draftId: string) =>
+				sendDraft: (
+					inboxId: string | undefined,
+					draftId: string,
+					actor: EmailActor | null,
+				) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
 						const named = namedInbox(inboxId)
@@ -3211,6 +3240,7 @@ export class EmailService extends Context.Service<EmailService>()(
 							rawRfc822Ref: dispatched.rawRef,
 							textBody: rendered.text,
 							htmlBody: rendered.html,
+							actor,
 						})
 
 						if (staged.length > 0) {

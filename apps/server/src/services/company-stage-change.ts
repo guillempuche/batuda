@@ -9,11 +9,16 @@ import { StageChanged, TimelineActivityService } from './timeline-activity'
 // `to` is the incoming status (undefined when the update didn't touch it).
 // `actorUserId` is the person who made the change, or null for agent-driven ones.
 // Kept free of SessionContext so both the HTTP handler and the MCP tool can call it.
+//
+// `occurredAt` is for a caller that changed the stage as a consequence of
+// something else: it passes the moment it wants the history to show, so its
+// entries stay in the order they happened. Everyone else lets it default to now.
 export const recordStageChange = (params: {
 	readonly companyId: string
 	readonly from: string | null
 	readonly to: string | undefined
 	readonly actorUserId: string | null
+	readonly occurredAt?: Date | undefined
 }): Effect.Effect<void, never, TimelineActivityService | CurrentOrg> =>
 	Effect.gen(function* () {
 		if (params.to === undefined || params.to === params.from) return
@@ -24,7 +29,8 @@ export const recordStageChange = (params: {
 				from: params.from,
 				to: params.to,
 				actorUserId: params.actorUserId,
-				occurredAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
+				occurredAt:
+					params.occurredAt ?? DateTime.toDateUtc(DateTime.nowUnsafe()),
 			}),
 		)
 	})

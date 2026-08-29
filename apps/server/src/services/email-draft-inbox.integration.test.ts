@@ -397,7 +397,7 @@ describe('EmailService.sendDraft', () => {
 				ALICE,
 				Effect.gen(function* () {
 					const svc = yield* EmailService
-					return yield* svc.sendDraft(undefined, draftId)
+					return yield* svc.sendDraft(undefined, draftId, null)
 				}),
 			)
 
@@ -420,7 +420,7 @@ describe('EmailService.sendDraft', () => {
 				ALICE,
 				Effect.gen(function* () {
 					const svc = yield* EmailService
-					return yield* svc.sendDraft(aliceInboxId, draftId)
+					return yield* svc.sendDraft(aliceInboxId, draftId, null)
 				}),
 			)
 
@@ -451,7 +451,7 @@ describe('EmailService.sendDraft', () => {
 				ALICE,
 				Effect.gen(function* () {
 					const svc = yield* EmailService
-					return yield* svc.sendDraft(undefined, draftId)
+					return yield* svc.sendDraft(undefined, draftId, null)
 				}),
 			)
 
