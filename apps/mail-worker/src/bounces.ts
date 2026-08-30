@@ -1,6 +1,9 @@
-import { Effect } from 'effect'
+import { DateTime, Effect } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 import type { ParsedMail } from 'mailparser'
+
+import { CurrentOrg } from '@batuda/domain'
+import { EmailBounced, TimelineActivityService } from '@batuda/timeline'
 
 // RFC 3464 Delivery Status Notification parsing. A DSN is a
 // multipart/report;report-type=delivery-status with three parts:
@@ -232,40 +235,43 @@ export const applyBounce = (args: {
 			`
 		}
 
-		// One activity row per affected contact (so the bounce shows on
-		// each contact's timeline). When no contact matched a recipient,
-		// emit a single contact-less row so the bounce isn't silent.
-		const payload = JSON.stringify({
-			originalMessageId: bounce.originalMessageId,
-			status: bounce.statusCode,
-			diagnostic: bounce.diagnostic,
-			recipients: [...bounce.recipients],
-			bounceType: bounce.bounceType,
+		// Through the shared recorder rather than an INSERT of its own, so the
+		// entry a bounce leaves is built from the same description as every
+		// other kind. One entry per person it could not reach; one against
+		// nobody in particular when the address belongs to no contact, because
+		// a send that failed is still worth saying so.
+		const timeline = yield* TimelineActivityService
+		const inOrg = Effect.provideService(CurrentOrg, {
+			id: organizationId,
+			name: '',
+			slug: '',
+			// Delivering mail is nobody's request, so it manages nothing.
+			role: null,
 		})
+		const bouncedAt = DateTime.toDateUtc(DateTime.nowUnsafe())
+		const bounced = (companyId: string | null, contactId: string | null) =>
+			timeline
+				.record(
+					new EmailBounced({
+						emailMessageId: originalId,
+						companyId,
+						contactId,
+						originalMessageId: bounce.originalMessageId,
+						bounceType: bounce.bounceType,
+						status: bounce.statusCode,
+						diagnostic: bounce.diagnostic,
+						recipients: [...bounce.recipients],
+						occurredAt: bouncedAt,
+					}),
+				)
+				.pipe(inOrg)
 
 		if (updatedContacts.length > 0) {
-			yield* sql`
-				INSERT INTO timeline_activity (
-					organization_id, kind, entity_type, entity_id, company_id, contact_id,
-					channel, direction, occurred_at, payload
-				)
-				SELECT ${organizationId}, 'email_bounced', 'email_message', ${originalId}::uuid,
-				       c.company_id, c.id,
-				       'email', 'outbound', now(), ${payload}::jsonb
-				FROM contacts c
-				WHERE c.id = ANY(${updatedContacts.map(r => r.id) as unknown as string[]})
-			`
+			for (const contact of updatedContacts) {
+				yield* bounced(contact.companyId, contact.id)
+			}
 		} else {
-			yield* sql`
-				INSERT INTO timeline_activity (
-					organization_id, kind, entity_type, entity_id,
-					channel, direction, occurred_at, payload
-				)
-				VALUES (
-					${organizationId}, 'email_bounced', 'email_message', ${originalId}::uuid,
-					'email', 'outbound', now(), ${payload}::jsonb
-				)
-			`
+			yield* bounced(null, null)
 		}
 
 		return {

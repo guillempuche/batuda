@@ -3,10 +3,10 @@ import { SqlClient } from 'effect/unstable/sql'
 
 import type { CurrentOrg } from '@batuda/domain'
 import { boundedCause, recordFacts } from '@batuda/observability'
+import { LeadAssigned, TimelineActivityService } from '@batuda/timeline'
 
 import { recordStageChange } from './company-stage-change'
 import { requireOrgMembers } from './org-members'
-import { LeadAssigned, TimelineActivityService } from './timeline-activity'
 
 // Who a sent email is attributed to. Agents are carried so the history can say
 // one of them wrote it, but they never become owners: a lead belongs to

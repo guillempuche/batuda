@@ -4,12 +4,9 @@ import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
 import { Proposal } from '@batuda/domain'
+import { ProposalEvent, TimelineActivityService } from '@batuda/timeline'
 
 import { companyVisible } from '../../services/company-liveness'
-import {
-	ProposalEvent,
-	TimelineActivityService,
-} from '../../services/timeline-activity'
 import { CompanyIdParam, ProposalIdParam } from './_ids'
 import { McpPageLimit, TruncatableResult, toTruncatable } from './_result'
 

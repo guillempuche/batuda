@@ -23,6 +23,7 @@ import {
 	GrantConnectFailed,
 	SessionContext,
 } from '@batuda/controllers'
+import { TimelineActivityService } from '@batuda/timeline'
 
 import { PgLive } from '../db/client.js'
 import { enterOrgScope } from '../middleware/org.js'
@@ -37,7 +38,6 @@ import { DraftStore } from './email-draft-store.js'
 import { EmailProvider } from './email-provider.js'
 import { MailTransport, type OutboundMessage } from './mail-transport.js'
 import { StorageProvider } from './storage-provider.js'
-import { TimelineActivityService } from './timeline-activity.js'
 
 /** What the transport was handed, for suites that assert on the wire message. */
 export type SentMessage = OutboundMessage

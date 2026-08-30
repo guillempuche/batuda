@@ -27,8 +27,28 @@ export class EmailReceived extends Data.TaggedClass('EmailReceived')<{
 	readonly contactId: string | null
 	readonly subject: string | null
 	readonly summary: string | null
+	// The conversation this message belongs to, so the history entry can open
+	// it — the same field a sent one carries.
+	readonly threadLinkId: string | null
 	readonly occurredAt: Date
 	readonly classification: 'normal' | 'spam' | 'blocked'
+}> {}
+
+// A message we sent came back undelivered. Filed against the person it could
+// not reach where the address belongs to one, and against nobody in particular
+// where it does not — a bounce from an address on no contact still says the
+// send failed.
+export class EmailBounced extends Data.TaggedClass('EmailBounced')<{
+	readonly emailMessageId: string
+	readonly companyId: string | null
+	readonly contactId: string | null
+	// The bounced message's own RFC id, as the mail server named it back to us.
+	readonly originalMessageId: string | null
+	readonly bounceType: string | null
+	readonly status: string | null
+	readonly diagnostic: string | null
+	readonly recipients: ReadonlyArray<string>
+	readonly occurredAt: Date
 }> {}
 
 export class InteractionLogged extends Data.TaggedClass('InteractionLogged')<{
@@ -224,6 +244,7 @@ export class LeadAssigned extends Data.TaggedClass('LeadAssigned')<{
 export type TimelineEvent =
 	| EmailSent
 	| EmailReceived
+	| EmailBounced
 	| InteractionLogged
 	| DocumentCreated
 	| ProposalEvent
@@ -265,6 +286,9 @@ export const denormColumnFor = (
 			return isPast(event.startAt, now) ? 'last_meeting_at' : null
 		case 'StageChanged':
 		case 'LeadAssigned':
+		// A bounce is a send that did not arrive. The send already moved the
+		// date, and failing to arrive is not a later contact.
+		case 'EmailBounced':
 			return null
 		case 'DocumentCreated':
 		case 'ProposalEvent':
@@ -342,6 +366,28 @@ const rowBase = (event: TimelineEvent): TimelineRowBase => {
 				payload: {
 					subject: event.subject,
 					classification: event.classification,
+					threadLinkId: event.threadLinkId,
+				},
+			}
+		case 'EmailBounced':
+			return {
+				kind: 'email_bounced',
+				entityType: 'email_message',
+				companyId: event.companyId,
+				contactId: event.contactId,
+				channel: 'email',
+				// The failure is about a message we sent, so it reads with the
+				// send rather than against it.
+				direction: 'outbound',
+				actorUserId: null,
+				occurredAt: event.occurredAt,
+				summary: null,
+				payload: {
+					originalMessageId: event.originalMessageId,
+					status: event.status,
+					diagnostic: event.diagnostic,
+					recipients: event.recipients,
+					bounceType: event.bounceType,
 				},
 			}
 		case 'InteractionLogged':
@@ -680,7 +726,9 @@ export const mapEventToInteraction = (
 		case 'CompanyDeleted':
 		case 'CompanyRestored':
 		case 'StageChanged':
-		case 'LeadAssigned': {
+		case 'LeadAssigned':
+		// Nobody was reached, so there is no touchpoint to log.
+		case 'EmailBounced': {
 			return null
 		}
 		case 'DocumentCreated':
@@ -706,6 +754,7 @@ const entityIdFor = (
 	switch (event._tag) {
 		case 'EmailSent':
 		case 'EmailReceived':
+		case 'EmailBounced':
 			return event.emailMessageId
 		case 'InteractionLogged': {
 			const id = event.attachInteractionId ?? resolvedInteractionId

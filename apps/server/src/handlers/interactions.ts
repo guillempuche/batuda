@@ -5,6 +5,7 @@ import { SqlClient } from 'effect/unstable/sql'
 
 import { BatudaApi } from '@batuda/controllers'
 import { Interaction } from '@batuda/domain'
+import { InteractionLogged, TimelineActivityService } from '@batuda/timeline'
 
 import {
 	pageOf,
@@ -14,10 +15,6 @@ import {
 	totalColumn,
 } from '../lib/sql-pagination'
 import { companyVisible } from '../services/company-liveness'
-import {
-	InteractionLogged,
-	TimelineActivityService,
-} from '../services/timeline-activity'
 
 const decodeInteraction = Schema.decodeUnknownEffect(Interaction)
 const decodeInteractions = Schema.decodeUnknownEffect(Schema.Array(Interaction))

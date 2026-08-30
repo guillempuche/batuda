@@ -19,13 +19,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import type { CurrentOrg } from '@batuda/controllers'
 import { foldLabel, slugFromLabel } from '@batuda/domain'
+import { TimelineActivityService } from '@batuda/timeline'
 
 import { PgLive } from '../../db/client'
 import { EnvVars } from '../../lib/env'
 import { enterOrgScope } from '../../middleware/org'
 import { CompanyService } from '../../services/companies'
 import { Geocoder } from '../../services/geocoder'
-import { TimelineActivityService } from '../../services/timeline-activity'
 import { applyTestEnv } from '../../test-env'
 import { CurrentUser } from '../current-user'
 import {

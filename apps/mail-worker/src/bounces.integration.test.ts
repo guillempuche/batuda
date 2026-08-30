@@ -18,6 +18,8 @@ import { Config, Effect, Redacted } from 'effect'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { TimelineActivityService } from '@batuda/timeline'
+
 import { applyBounce, type ParsedBounce } from './bounces.js'
 
 const DATABASE_URL =
@@ -47,6 +49,7 @@ let contactId: string
 const apply = (bounce: ParsedBounce) =>
 	Effect.runPromise(
 		applyBounce({ organizationId: ORG_ID, bounce }).pipe(
+			Effect.provide(TimelineActivityService.layer),
 			Effect.provide(PgLive),
 		),
 	)

@@ -11,6 +11,7 @@ import {
 	RecordingDetail,
 	RecordingSummary,
 } from '@batuda/controllers'
+import { InteractionLogged, TimelineActivityService } from '@batuda/timeline'
 
 import {
 	type CountMode,
@@ -20,10 +21,6 @@ import {
 	totalColumn,
 } from '../lib/sql-pagination'
 import { StorageProvider } from './storage-provider.js'
-import {
-	InteractionLogged,
-	TimelineActivityService,
-} from './timeline-activity.js'
 import { WebhookService } from './webhooks.js'
 
 export interface IngestParams {

@@ -20,6 +20,7 @@ import {
 	ResearchDispatch,
 	ResearchService,
 } from '@batuda/research'
+import { TimelineActivityService } from '@batuda/timeline'
 
 import { PgLive } from './db/client'
 import { ApiKeysLive } from './handlers/api-keys'
@@ -80,7 +81,6 @@ import { ResearchEventSinkLive } from './services/research-event-sink'
 import { ResearchRetention } from './services/research-retention'
 import { S3StorageProviderLive } from './services/s3-storage-provider'
 import { TaskService } from './services/tasks'
-import { TimelineActivityService } from './services/timeline-activity'
 import { WebhookService } from './services/webhooks'
 
 const ApiLive = HttpApiBuilder.layer(BatudaApi).pipe(

@@ -4,6 +4,7 @@ import type { ParsedMail } from 'mailparser'
 
 import { CurrentOrg } from '@batuda/domain'
 import { NoMatch, ParticipantMatcher } from '@batuda/email/participant-matcher'
+import { EmailReceived, TimelineActivityService } from '@batuda/timeline'
 
 import { resolveThreadId } from './threading.js'
 
@@ -350,34 +351,34 @@ export const persistMessage = (args: {
 		// folder is us, so filing it here would show our own message as
 		// something the company said to us.
 		if (companyId && args.direction === 'inbound') {
-			yield* sql`
-				INSERT INTO timeline_activity (
-					organization_id, kind, entity_type, entity_id, company_id, contact_id,
-					channel, direction, occurred_at, summary, payload
-				)
-				VALUES (
-					${args.organizationId}, 'email_received', 'email_message',
-					${messageDbId}::uuid, ${companyId}, ${contactId},
-					'email', 'inbound', ${args.parsed.receivedAt},
-					${args.parsed.textPreview},
-					${JSON.stringify({
+			// Through the shared recorder rather than an INSERT of its own. It
+			// writes the history entry, moves the dates the company page reads
+			// as stored values, and files the touchpoint — a message arriving is
+			// one, and writing the row here by hand had meant it never counted
+			// as one, so an account read as though it only ever sent.
+			const timeline = yield* TimelineActivityService
+			yield* timeline
+				.record(
+					new EmailReceived({
+						emailMessageId: messageDbId,
+						companyId,
+						contactId,
 						subject: args.parsed.subject,
-						classification: 'normal',
+						summary: args.parsed.textPreview,
 						threadLinkId,
-					})}::jsonb
+						occurredAt: args.parsed.receivedAt,
+						classification: 'normal',
+					}),
 				)
-			`
-
-			// The company page reads these dates as stored values rather than
-			// working them out on the fly, so an arriving reply has to move
-			// them here or the page keeps showing the older outbound date.
-			yield* sql`
-				UPDATE companies SET
-					last_email_at = GREATEST(last_email_at, ${args.parsed.receivedAt}),
-					last_contacted_at = GREATEST(last_contacted_at, ${args.parsed.receivedAt}),
-					updated_at = now()
-				WHERE id = ${companyId} AND deleted_at IS NULL
-			`
+				.pipe(
+					Effect.provideService(CurrentOrg, {
+						id: args.organizationId,
+						name: '',
+						slug: '',
+						// Delivering mail is nobody's request, so it manages nothing.
+						role: null,
+					}),
+				)
 		}
 
 		// One line per message taken in, so "is mail still arriving, and whose"

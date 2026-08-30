@@ -1,6 +1,7 @@
 import { Layer } from 'effect'
 
 import { ParticipantMatcher } from '@batuda/email/participant-matcher'
+import { TimelineActivityService } from '@batuda/timeline'
 
 import { PgLive } from '../db.js'
 import { CredentialDecryptor } from '../decrypt.js'
@@ -20,9 +21,12 @@ export const Live = Layer.mergeAll(
 	CredentialDecryptor.layer,
 	RawMessageStorage.layer,
 	ParticipantMatcher.layer,
+	// Arriving mail and bounced sends are written to the company's history
+	// through the same recorder the server uses, so the two cannot drift.
+	TimelineActivityService.layer,
 ).pipe(
-	// ParticipantMatcher reads contacts/companies via SqlClient, so PgLive must
-	// be PROVIDED to the merged layers — `mergeAll` alongside it leaves that
+	// ParticipantMatcher and the history recorder both reach the database via
+	// SqlClient, so PgLive must be PROVIDED to the merged layers — `mergeAll` alongside it leaves that
 	// requirement unsatisfied. provideMerge also hands SqlClient back out, for
 	// the inbox claim and session queries the worker loop runs.
 	Layer.provideMerge(PgLive),

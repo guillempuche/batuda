@@ -12,6 +12,7 @@ import type { ImapFlow } from 'imapflow'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ParticipantMatcher } from '@batuda/email/participant-matcher'
+import { TimelineActivityService } from '@batuda/timeline'
 
 import { ingestRawMessage } from './ingest.js'
 import { RawMessageStorage } from './storage.js'
@@ -42,13 +43,17 @@ const stubs = Layer.mergeAll(
 	Layer.succeed(SqlClient.SqlClient, (() => Effect.void) as never),
 	Layer.succeed(ParticipantMatcher, {} as never),
 	Layer.succeed(RawMessageStorage, {} as never),
+	Layer.succeed(TimelineActivityService, {} as never),
 )
 
 const run = <A, E>(
 	effect: Effect.Effect<
 		A,
 		E,
-		SqlClient.SqlClient | ParticipantMatcher | RawMessageStorage
+		| SqlClient.SqlClient
+		| ParticipantMatcher
+		| RawMessageStorage
+		| TimelineActivityService
 	>,
 ) => Effect.runPromise(effect.pipe(Effect.provide(stubs)))
 

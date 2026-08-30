@@ -2,6 +2,7 @@ import { Cause, DateTime, Effect, Layer } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { ResearchEventSink } from '@batuda/research'
+import { ResearchRunCompleted, TimelineActivityService } from '@batuda/timeline'
 
 import { resolveSystemOrg } from '../middleware/org'
 import { CompanyService } from './companies'
@@ -9,10 +10,6 @@ import { geocodeCompany } from './company-geocoding'
 import { Geocoder } from './geocoder'
 import { resolveResearchProposedUpdate } from './research-apply'
 import { proposalsToAutoApply } from './research-auto-apply'
-import {
-	ResearchRunCompleted,
-	TimelineActivityService,
-} from './timeline-activity'
 import { WebhookService } from './webhooks'
 
 // Wire research event sink → WebhookService + TimelineActivityService

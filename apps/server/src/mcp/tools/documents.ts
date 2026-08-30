@@ -8,6 +8,7 @@ import {
 	Document,
 	DocumentSubjectTable,
 } from '@batuda/domain'
+import { DocumentCreated, TimelineActivityService } from '@batuda/timeline'
 
 import { textAnywhere } from '../../lib/search-text'
 import {
@@ -20,10 +21,6 @@ import {
 	unlinkDocument,
 } from '../../services/documents'
 import { StorageProvider } from '../../services/storage-provider'
-import {
-	DocumentCreated,
-	TimelineActivityService,
-} from '../../services/timeline-activity'
 import { ToolMessage } from '../tool-message'
 import { DocumentIdParam, SUBJECT_ID_SOURCE, SubjectIdParam } from './_ids'
 import { McpPageLimit, TruncatableResult, toTruncatable } from './_result'

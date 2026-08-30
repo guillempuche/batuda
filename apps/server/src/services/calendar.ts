@@ -33,15 +33,15 @@ import {
 	NoMatch,
 	ParticipantMatcher,
 } from '@batuda/email/participant-matcher'
-
-import { companyVisible } from './company-liveness'
 import {
 	MeetingCancelled,
 	MeetingRescheduled,
 	MeetingRsvp,
 	MeetingScheduled,
 	TimelineActivityService,
-} from './timeline-activity'
+} from '@batuda/timeline'
+
+import { companyVisible } from './company-liveness'
 
 // ── Service-level errors ───────────────────────────────────────────
 // Narrow tagged classes kept at the service boundary so handlers +

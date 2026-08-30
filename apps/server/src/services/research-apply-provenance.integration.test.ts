@@ -19,13 +19,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { CurrentOrg } from '@batuda/controllers'
 import { Company } from '@batuda/domain'
+import { TimelineActivityService } from '@batuda/timeline'
 
 import { PgLive } from '../db/client'
 import { applyTestEnv } from '../test-env'
 import { CompanyService } from './companies'
 import { Geocoder } from './geocoder'
 import { resolveResearchProposedUpdate } from './research-apply'
-import { TimelineActivityService } from './timeline-activity'
 
 applyTestEnv()
 

@@ -16,10 +16,10 @@ import pg from 'pg'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { CurrentOrg } from '@batuda/domain'
+import { TimelineActivityService } from '@batuda/timeline'
 
 import { PgLive } from '../db/client'
 import { claimLeadOnEmail, type EmailActor } from './company-lead-assignment'
-import { TimelineActivityService } from './timeline-activity'
 
 const DATABASE_URL =
 	process.env['DATABASE_URL'] ??

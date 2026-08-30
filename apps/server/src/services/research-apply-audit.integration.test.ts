@@ -12,13 +12,13 @@ import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { CurrentOrg } from '@batuda/controllers'
-
-import { PgLive } from '../db/client'
-import { applyTestEnv } from '../test-env'
 import {
 	ResearchProposalApplied,
 	TimelineActivityService,
-} from './timeline-activity'
+} from '@batuda/timeline'
+
+import { PgLive } from '../db/client'
+import { applyTestEnv } from '../test-env'
 
 applyTestEnv()
 

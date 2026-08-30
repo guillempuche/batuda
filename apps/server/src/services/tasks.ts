@@ -4,6 +4,12 @@ import { SqlClient } from 'effect/unstable/sql'
 
 import { BadRequest, Conflict, CurrentOrg, NotFound } from '@batuda/controllers'
 import { Task } from '@batuda/domain'
+import {
+	TaskCompleted,
+	TaskCreated,
+	TaskUpdated,
+	TimelineActivityService,
+} from '@batuda/timeline'
 
 import { textAnywhere } from '../lib/search-text'
 import {
@@ -15,12 +21,6 @@ import {
 } from '../lib/sql-pagination'
 import { companyVisible } from './company-liveness'
 import { requireOrgMembers } from './org-members'
-import {
-	TaskCompleted,
-	TaskCreated,
-	TaskUpdated,
-	TimelineActivityService,
-} from './timeline-activity'
 
 const decodeTask = Schema.decodeUnknownEffect(Task)
 const decodeTasks = Schema.decodeUnknownEffect(Schema.Array(Task))

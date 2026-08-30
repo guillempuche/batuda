@@ -17,8 +17,6 @@ import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { CurrentOrg } from '@batuda/controllers'
-
-import { PgLive } from '../db/client'
 import {
 	EmailSent,
 	MeetingCancelled,
@@ -26,7 +24,9 @@ import {
 	ResearchRunCompleted,
 	TimelineActivityService,
 	type TimelineEvent,
-} from './timeline-activity'
+} from '@batuda/timeline'
+
+import { PgLive } from '../db/client'
 
 const DATABASE_URL =
 	process.env['DATABASE_URL'] ??
