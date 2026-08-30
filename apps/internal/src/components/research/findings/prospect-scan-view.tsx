@@ -6,6 +6,7 @@ import { useId, useState } from 'react'
 import styled from 'styled-components'
 
 import { NAME_ONLY_EVIDENCE } from '@batuda/research/application/name-only-guard'
+import { OUTSIDE_REQUESTED_PLACE } from '@batuda/research/application/row-marks'
 import { PriButton, usePriToast } from '@batuda/ui/pri'
 
 import { SafeLink } from '#/components/research/safe-link'
@@ -55,12 +56,22 @@ type ProspectEntry = {
 	readonly tax_id?: string
 	readonly industry?: string
 	readonly countries?: ReadonlyArray<string>
-	readonly location?: string
+	// Paired with the page it was read on, like the website above. Runs stored
+	// before it was paired hold a bare string, so both shapes are read.
+	readonly location?: unknown
 	readonly why_relevant: string
 	readonly unconfirmed_reason?: string
 	// Doubt the run did not put into words but the engine established on its own, so
 	// the wording belongs here rather than in the finding.
 	readonly unconfirmed_evidence?: string
+	// What the guards found out about this row, as words rather than sentences, so
+	// each is written here in the reader's own language. A list rather than one
+	// field, because a row can be more than one thing at once and a second
+	// single-value field would quietly overwrite the first.
+	readonly marks?: ReadonlyArray<string>
+	// Why the run placed this company outside the area that was asked for. Its own
+	// field, because a mark is a word and the reason is the run's own sentence.
+	readonly outside_place_reason?: string
 	readonly citations?: ReadonlyArray<Citation>
 }
 
@@ -105,6 +116,7 @@ export function ProspectScanView({
 // write a company nobody has vouched for.
 function ProspectRow({ prospect }: { readonly prospect: ProspectEntry }) {
 	const doubtId = useId()
+	const placeId = useId()
 	const { t } = useLingui()
 	// A reason with nothing written in it is not a doubt anybody can weigh, and runs
 	// stored before the engine started taking those back still carry them. Read as a
@@ -116,24 +128,38 @@ function ProspectRow({ prospect }: { readonly prospect: ProspectEntry }) {
 	// stored as a sentence, so it reads in the language the reader is using.
 	const nameOnly = prospect.unconfirmed_evidence === NAME_ONLY_EVIDENCE
 	const spoken = doubt !== undefined && doubt !== ''
-	const unconfirmed = spoken || nameOnly
+	// The evidence puts this company somewhere other than the area the search was
+	// asked about. A separate statement from "could not be confirmed": here the run
+	// established something rather than failing to, and saying both with one badge
+	// would tell the reader neither.
+	const outsidePlace =
+		prospect.marks?.includes(OUTSIDE_REQUESTED_PLACE) ?? false
+	const outsideReason = prospect.outside_place_reason?.trim()
+	const couldNotConfirm = spoken || nameOnly
 	// The address on its own: a scan reports it paired with the page it was read
-	// on, so the value here is not the string a link needs.
+	// on, so the value here is not the string a link needs. The place is reported
+	// the same way, and read the same way.
 	const site = sourcedText(prospect.website)
+	const place = sourcedText(prospect.location)
 
 	return (
 		<ListItem>
 			<RowHead>
 				<Pill>{prospect.name}</Pill>
-				{unconfirmed ? (
+				{couldNotConfirm ? (
 					<CandidatePill data-testid='prospect-candidate'>
 						<Trans>Unconfirmed company</Trans>
+					</CandidatePill>
+				) : null}
+				{outsidePlace ? (
+					<CandidatePill data-testid='prospect-outside-place'>
+						<Trans>Outside the area searched</Trans>
 					</CandidatePill>
 				) : null}
 				{site !== undefined ? <SafeLink href={site}>{site}</SafeLink> : null}
 			</RowHead>
 			<Reason>{prospect.why_relevant}</Reason>
-			{unconfirmed ? (
+			{couldNotConfirm ? (
 				<Reason id={doubtId}>
 					<ReasonLabel>
 						<Trans>Could not be confirmed:</Trans>
@@ -143,13 +169,26 @@ function ProspectRow({ prospect }: { readonly prospect: ProspectEntry }) {
 						: t`Only found named in a list of companies, with no website and no location of its own.`}
 				</Reason>
 			) : null}
+			{/* Said separately from the doubt above, and never in its words: a company
+			    placed elsewhere usually has both a website and a location, so the
+			    sentence there would be plainly untrue of it. */}
+			{outsidePlace ? (
+				<Reason id={placeId}>
+					<ReasonLabel>
+						<Trans>Outside the area searched:</Trans>
+					</ReasonLabel>{' '}
+					{outsideReason !== undefined && outsideReason !== ''
+						? outsideReason
+						: t`The evidence places this company outside the area the search asked about.`}
+				</Reason>
+			) : null}
 			<FieldsTable>
-				{prospect.location !== undefined ? (
+				{place !== undefined ? (
 					<FieldRow>
 						<FieldKey>
 							<Trans>Location</Trans>
 						</FieldKey>
-						<FieldValue>{prospect.location}</FieldValue>
+						<FieldValue>{place}</FieldValue>
 					</FieldRow>
 				) : null}
 				{prospect.industry !== undefined ? (
@@ -180,8 +219,18 @@ function ProspectRow({ prospect }: { readonly prospect: ProspectEntry }) {
 			<CitationList citations={prospect.citations} />
 			<AddAsLeadButton
 				prospect={prospect}
-				unconfirmed={unconfirmed}
-				describedBy={unconfirmed ? doubtId : undefined}
+				// Either badge holds back the vouching step, which is what stops a company
+				// the run could not place being written in as a checked one.
+				unconfirmed={couldNotConfirm || outsidePlace}
+				// Both reasons, not the first of them. A row can carry the doubt and
+				// the place at once, and the place is the half likelier to stop
+				// somebody adding the company — read out only one, and that is the
+				// half they never hear.
+				describedBy={
+					[couldNotConfirm ? doubtId : '', outsidePlace ? placeId : '']
+						.filter(Boolean)
+						.join(' ') || undefined
+				}
 			/>
 		</ListItem>
 	)
@@ -229,7 +278,10 @@ function AddAsLeadButton({
 	readonly prospect: ProspectEntry
 	/** Whether the run left a real reason it could not confirm this company. */
 	readonly unconfirmed: boolean
-	/** The reason this company could not be confirmed, for a reader to be pointed at. */
+	/**
+	 * The reasons this company was held back, for a reader to be pointed at —
+	 * space-separated when there is more than one, as the attribute allows.
+	 */
 	readonly describedBy?: string | undefined
 }) {
 	const { t } = useLingui()
@@ -265,7 +317,12 @@ function AddAsLeadButton({
 				// A company row holds one country, and a scan may have named several. The
 				// first is the one it is registered in, which is what the row means.
 				...(prospect.countries?.[0] ? { country: prospect.countries[0] } : {}),
-				...(prospect.location ? { location: prospect.location } : {}),
+				// The place goes onto the company record and from there onto a map, so
+				// it is read off the pairing rather than written across whole — an
+				// object put here would reach the CRM as one.
+				...(sourcedText(prospect.location)
+					? { location: sourcedText(prospect.location) }
+					: {}),
 				...(sourcedText(prospect.website)
 					? { website: sourcedText(prospect.website) }
 					: {}),

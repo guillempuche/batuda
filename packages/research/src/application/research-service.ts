@@ -123,7 +123,10 @@ import {
 	withRoleMailbox,
 } from './generic-emails'
 import { type GuardLink, runGuardChain } from './guard-chain'
-import { citedSourceIds as rowCitedSourceIds } from './guard-shapes'
+import {
+	readTextValue,
+	citedSourceIds as rowCitedSourceIds,
+} from './guard-shapes'
 import { markNameOnlyRows } from './name-only-guard'
 import {
 	type DroppedOrganisation,
@@ -142,6 +145,12 @@ import {
 	roundChangedNothing,
 	rowsMissing,
 } from './per-field-search'
+import {
+	markRowsOutsidePlace,
+	PlaceVerdictsSchema,
+	placeGuardPrompt,
+	type RememberedPlace,
+} from './place-guard'
 import { resolvePolicy, type SystemDefaults } from './policy'
 import {
 	AgentLanguageModel,
@@ -352,6 +361,14 @@ const MAX_CITED_SCRAPES_PER_ROUND = 3
 const GAP_ROUND_CONCURRENCY = 3
 // No new gap round starts beyond this share of the run deadline.
 const GAP_ROUND_DEADLINE_FRACTION = 0.8
+
+// No place check is asked beyond this share of the run deadline. The judge runs
+// its batches one after another and the chain is entered once per extraction and
+// again after each gap round, so on a long list it is tens of seconds — and it
+// sits near the end of a window whose overrun does not degrade a run but destroys
+// it. Past this point every row is kept and the skip is logged, which is a list
+// that was not checked rather than a run that was lost.
+const PLACE_CHECK_DEADLINE_FRACTION = 0.85
 
 // No verification search starts beyond this share of the run deadline. Later
 // than the gap rounds, because verification is the last thing before the brief
@@ -2781,6 +2798,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							.filter(([key]) => !present.has(key))
 							.map(([, row]) => row)
 					}
+					// And where each row was already placed against the area the run asked
+					// about, kept for the same reason. Held the other way round, though:
+					// see `RememberedPlace` — a company is inside the area if any of its
+					// places is, so more evidence can only soften that answer, and the gap
+					// rounds go looking for exactly the fields it reads.
+					const placeVerdicts = new Map<string, RememberedPlace>()
 					// Every piece of real page text gathered this run — the corpus the value
 					// guard checks findings against. Kept separate from the model-facing
 					// transcript (capped per page); empty on a resume that skips phase 1.
@@ -4041,6 +4064,149 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												findings: check.findings,
 												spanCounts: {
 													'research.prospects.deduplicated': check.merged,
+												},
+											}
+										}),
+								},
+								{
+									// Where the company is, against where the run was told to look. A
+									// request scoped to a place has always been a hint to the search
+									// and never a test of the answer, so a scan asked for Texas
+									// returned companies in Nevada, Utah and Missouri with nothing
+									// to tell them apart. Marks; never drops — the filter above drops
+									// on two country codes that differ, which is arithmetic, while
+									// this is a model reading prose, and a wrong answer that drops
+									// deletes a company somebody paid to find.
+									//
+									// After the fold above, for two reasons. Judging one company
+									// once is cheaper than judging its three spellings; and a mark
+									// written before the fold would be carried onto whichever row
+									// survives it, so a company in Dallas met again as its own Reno
+									// branch would wear the branch's answer. (The fold refuses to
+									// carry a mark across for the same reason — the merge that runs
+									// after this chain folds again, where this link cannot reach.)
+									name: 'place',
+									run: findings =>
+										Effect.gen(function* () {
+											// Only a prospect scan, the way the size-and-place filter
+											// above is. A competitor scan puts its answers through a
+											// view that has nowhere to show a mark, so marking one
+											// there would write a finding into the stored answer that
+											// a reader is never told about while an assistant reading
+											// the same run is — the two surfaces disagreeing about
+											// one row. Widen it when that view can say so.
+											if (schemaName !== 'prospect_scan_v1') return { findings }
+											const area = hintPlace?.trim() ?? ''
+											// Past the margin the judge is not asked: it runs its
+											// batches one after another, and overrunning the run
+											// deadline destroys a run rather than degrading it. Read
+											// as a clock rather than a reading, so a long list stops
+											// partway instead of committing to every question on the
+											// strength of one look before the first.
+											const outOfTime = (): boolean =>
+												DateTime.toEpochMillis(DateTime.nowUnsafe()) -
+													runStartedAtMs >
+												runDeadlineSeconds *
+													1000 *
+													PLACE_CHECK_DEADLINE_FRACTION
+											const check = yield* markRowsOutsidePlace(
+												findings,
+												discoveryResultField(schemaName),
+												area,
+												(place, rows) =>
+													extractLlm
+														.generateObject({
+															schema: PlaceVerdictsSchema,
+															prompt: placeGuardPrompt(place, rows),
+														})
+														.pipe(
+															Effect.map(response => ({
+																verdicts: response.value.verdicts,
+															})),
+															// Every way this can fail keeps every row unmarked,
+															// which is the safety property. A cancelled run says
+															// nothing — it is not a judge that fell over.
+															Effect.catchCause(cause =>
+																Cause.hasInterruptsOnly(cause)
+																	? Effect.succeed({ verdicts: [] })
+																	: Effect.logWarning(
+																			'research.place.skipped',
+																		).pipe(
+																			Effect.annotateLogs({
+																				event: 'research.place.skipped',
+																				research_id: researchId,
+																				rows: rows.length,
+																				cause: Cause.pretty(cause),
+																			}),
+																			Effect.as({ verdicts: [] }),
+																		),
+															),
+														),
+												placeVerdicts,
+												outOfTime,
+											)
+											for (const [key, verdict] of check.learned)
+												placeVerdicts.set(key, verdict)
+											if (outOfTime() && area !== '') {
+												yield* Effect.logInfo('research.place.deadline').pipe(
+													Effect.annotateLogs({
+														event: 'research.place.deadline',
+														research_id: researchId,
+													}),
+												)
+											}
+											// A scan whose caller named no place filters on nothing, and
+											// used to look exactly like one that checked and found every
+											// row in the right country. Saying so is what makes a place
+											// that never left the query text visible.
+											if (area === '') {
+												yield* Effect.logInfo('research.place.none_asked').pipe(
+													Effect.annotateLogs({
+														event: 'research.place.none_asked',
+														research_id: researchId,
+													}),
+												)
+											}
+											if (check.locationsDropped > 0) {
+												yield* Effect.logInfo(
+													'research.place.location_not_a_place',
+												).pipe(
+													Effect.annotateLogs({
+														event: 'research.place.location_not_a_place',
+														research_id: researchId,
+														dropped: check.locationsDropped,
+													}),
+												)
+											}
+											for (const row of check.marked.slice(
+												0,
+												MAX_LOGGED_FIELD_DROPS,
+											)) {
+												yield* Effect.logWarning('research.place.outside').pipe(
+													Effect.annotateLogs({
+														event: 'research.place.outside',
+														research_id: researchId,
+														name: row.name,
+														reason: row.reason.slice(0, MAX_DROP_REASON_CHARS),
+													}),
+												)
+											}
+											return {
+												findings: check.findings,
+												spanCounts: {
+													// Asked and ruled apart, because neither answers alone:
+													// nothing marked out of sixty RULED is a real quiet
+													// pass, and nothing marked out of sixty ASKED with none
+													// ruled is a check that never ran. `unclear` is the
+													// third, and it catches what the other two cannot — a
+													// judge rerouted to a weaker model answers "unclear" to
+													// everything, which counts as ruled and marks nothing.
+													'research.place.asked': check.asked,
+													'research.place.ruled': check.ruled,
+													'research.place.unclear': check.unclear,
+													'research.place.outside': check.marked.length,
+													'research.place.location_not_a_place':
+														check.locationsDropped,
 												},
 											}
 										}),
@@ -6076,7 +6242,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							const rowWebsite = (
 								row: Record<string, unknown>,
 							): string | undefined =>
-								typeof row['website'] === 'string' ? row['website'] : undefined
+								readTextValue(row['website']) ?? undefined
 							// Rebuilt rather than reused: the websites guard worked its map
 							// out during an extraction, and the searches below add addresses
 							// it never saw. A verdict read against the older map would ignore

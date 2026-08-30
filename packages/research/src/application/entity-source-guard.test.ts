@@ -35,6 +35,94 @@ describe('classifyNamespace', () => {
 				'ugc',
 			)
 		})
+
+		it('should classify a post published on an Instagram profile as ugc', () => {
+			// GIVEN the two ways Instagram addresses one post. Only the first was
+			// read, and this file's own opening example is three "executives" taken
+			// from a reel — so the shape it was written for escaped it under a
+			// handle, exactly as Facebook's did
+			// WHEN each is classified
+			// THEN both read as a post
+			expect(classifyNamespace('https://www.instagram.com/reel/Cabc123/')).toBe(
+				'ugc',
+			)
+			expect(
+				classifyNamespace('https://www.instagram.com/acmelifts/reel/Cabc123/'),
+			).toBe('ugc')
+			expect(
+				classifyNamespace('https://www.instagram.com/acmelifts/p/Cabc123/'),
+			).toBe('ugc')
+			// A profile itself is not a post.
+			expect(
+				classifyNamespace('https://www.instagram.com/acmelifts/'),
+			).toBeNull()
+		})
+
+		it('should classify a post published on a Facebook page as ugc', () => {
+			// GIVEN the ways a page's own post is addressed. None of these matched
+			// before, because the check only read the very start of the address and
+			// a page's name comes first — so a video posted by a San Jose radio
+			// station about a San Jose company read as an ordinary page and reached
+			// a Texas scan as evidence the company existed
+			// WHEN each is classified
+			// THEN each reads as a post
+			expect(
+				classifyNamespace(
+					'https://www.facebook.com/mix1065sanjose/videos/123/',
+				),
+			).toBe('ugc')
+			expect(
+				classifyNamespace(
+					'https://www.facebook.com/TorredonjimenoActual/posts/1603128045156569/',
+				),
+			).toBe('ugc')
+			expect(classifyNamespace('https://facebook.com/acme/photos/99')).toBe(
+				'ugc',
+			)
+			expect(classifyNamespace('https://www.facebook.com/share/v/abc/')).toBe(
+				'ugc',
+			)
+			expect(classifyNamespace('https://www.facebook.com/video.php?v=1')).toBe(
+				'ugc',
+			)
+			// The same site under its shorter name, and the short-link host that
+			// serves nothing else.
+			expect(classifyNamespace('https://fb.com/acme/posts/12')).toBe('ugc')
+			expect(classifyNamespace('https://fb.watch/aBcD/')).toBe('ugc')
+		})
+	})
+
+	describe("when a Facebook address is a company's own page", () => {
+		it('should leave it alone, however its name begins', () => {
+			// GIVEN pages whose names begin with the words that name a post. The
+			// check had no boundary after those words, so every one of these read as
+			// a post — and a company whose only citation is its own Facebook page is
+			// exactly the small firm a scan is for, dropped for the spelling of its
+			// name
+			// WHEN each is classified
+			// THEN none reads as a post
+			expect(
+				classifyNamespace('https://www.facebook.com/photography-studio-bcn'),
+			).toBeNull()
+			expect(
+				classifyNamespace('https://www.facebook.com/watchmakers-of-geneva'),
+			).toBeNull()
+			expect(
+				classifyNamespace('https://www.facebook.com/postscript-printing'),
+			).toBeNull()
+			expect(
+				classifyNamespace('https://www.facebook.com/reeltime-charters'),
+			).toBeNull()
+			expect(classifyNamespace('https://www.facebook.com/ARodAuto')).toBeNull()
+			expect(
+				classifyNamespace('https://www.facebook.com/ARodAuto/about'),
+			).toBeNull()
+			// The page's own listing of its videos is not one post, so it is not
+			// evidence about one post either.
+			expect(
+				classifyNamespace('https://www.facebook.com/ARodAuto/videos/'),
+			).toBeNull()
+		})
 	})
 
 	describe('when the URL is a person or people-search profile', () => {

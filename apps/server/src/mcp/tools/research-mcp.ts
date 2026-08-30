@@ -94,6 +94,14 @@ const subjectRefusal = (e: SubjectUnavailable) =>
 
 const decodeContext = Schema.decodeUnknownEffect(ContextInput)
 
+// Refuse a key the shape does not name, rather than dropping it in silence.
+// A caller that misspells one otherwise gets a run that quietly ignores what it
+// asked for: the web dialog spent its whole life sending the place as
+// `location`, which is not a name this shape knows, so every scan it started
+// searched nowhere in particular and said nothing about it. A refusal carrying
+// the shape below is something a caller can correct itself from.
+const STRICT_CONTEXT = { onExcessProperty: 'error' } as const
+
 // The exact shape a caller's `context` must take, spelled out in the rejection so
 // an agent can correct the call without reading the source.
 const CONTEXT_SHAPE_HINT =
@@ -106,11 +114,15 @@ const describeContextError = (error: unknown): string => {
 
 // Validate a caller's `context` (absent is valid) and fold a decode failure into
 // a tagged result the handler can return directly. The decode is the same one the
-// HTTP route runs, so both entry points reject a malformed selector the same way.
+// HTTP route runs, so both entry points reject a malformed selector the same way —
+// but only this one refuses an unknown key. The web app reaches the HTTP route,
+// whose parser is fixed by the framework and strips such a key before a handler
+// ever sees it; that app is instead held to the shape's own key names as it
+// builds a request, which stops the same mistake a step earlier.
 const readContext = (raw: unknown) =>
 	Effect.gen(function* () {
 		if (raw === undefined) return { ok: true as const, value: undefined }
-		const decoded = yield* Effect.result(decodeContext(raw))
+		const decoded = yield* Effect.result(decodeContext(raw, STRICT_CONTEXT))
 		return Result.isFailure(decoded)
 			? { ok: false as const, error: describeContextError(decoded.failure) }
 			: { ok: true as const, value: decoded.success }
@@ -180,7 +192,7 @@ const StartResearch = Tool.make('start_research', {
 
 const GetResearch = Tool.make('get_research', {
 	description:
-		"Get the current state of a research run. Returns status, progressSteps, poll_after_ms, findings (if complete), cost, sources, and applied_instructions — the instruction templates that shaped the run. progressSteps counts the rounds of work the run has got through: null until the first round finishes, then climbing as the run works. It sits unchanged for minutes at a time by design — a late round scrapes and searches every gap it is still closing, and writing up the brief does not move it at all — so a count that is not moving is a slow run, not a stuck one. Keep polling: a run that really is stuck is failed by the server on its own deadline, so a stalled count is never a reason to call cancel_research. poll_after_ms is how many milliseconds to wait before calling this again; it is absent once the run has ended, which means stop calling. The full instruction-template text is omitted by default to keep the response small; pass include:['instruction_segments'] to get it back.",
+		"Get the current state of a research run. Returns status, progressSteps, poll_after_ms, findings (if complete), cost, sources, and applied_instructions — the instruction templates that shaped the run. progressSteps counts the rounds of work the run has got through: null until the first round finishes, then climbing as the run works. It sits unchanged for minutes at a time by design — a late round scrapes and searches every gap it is still closing, and writing up the brief does not move it at all — so a count that is not moving is a slow run, not a stuck one. Keep polling: a run that really is stuck is failed by the server on its own deadline, so a stalled count is never a reason to call cancel_research. poll_after_ms is how many milliseconds to wait before calling this again; it is absent once the run has ended, which means stop calling. The full instruction-template text is omitted by default to keep the response small; pass include:['instruction_segments'] to get it back. A company on a scan's list may carry `marks` — findings the run established about that row rather than about the company's own business. `outside_requested_place` means the evidence puts it somewhere other than the area the run was asked about, with the run's reason in `outside_place_reason`: say so before adding such a company, and never record it as verified on this run's word alone.",
 	parameters: Schema.Struct({
 		id: describedUuid(RESEARCH_ID_SOURCE),
 		// Opt back into heavy fields dropped by default. Only the full instruction

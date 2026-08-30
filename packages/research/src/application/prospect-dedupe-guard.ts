@@ -102,9 +102,11 @@ import {
 	nameCoreTokens,
 	withoutFormDots,
 } from './entity-guard'
-import { isPlainObject } from './guard-shapes'
+import { isPlainObject, readTextValue } from './guard-shapes'
+import { NAME_ONLY_EVIDENCE_FIELD } from './name-only-guard'
 import { ownSiteVerdict } from './own-site'
 import { rowGroups } from './row-groups'
+import { MARKS_FIELD, OUTSIDE_PLACE_REASON_FIELD } from './row-marks'
 import type { RunWords } from './run-words'
 import { hostOf, isBareWebAddress } from './source-key'
 
@@ -116,10 +118,8 @@ const SITE_KEY_PREFIX = 'host:'
 // be read from. Null is also what a branch page looks like: it is the head office
 // that registers the domain, and the branch is a page on it at most.
 const siteHostOf = (row: Record<string, unknown>): string | null => {
-	const website = row['website']
-	return typeof website === 'string' && isBareWebAddress(website)
-		? hostOf(website)
-		: null
+	const website = readTextValue(row['website'])
+	return website !== null && isBareWebAddress(website) ? hostOf(website) : null
 }
 
 // A name and the note somebody wrote after it in brackets — "KBE Energy (Annuaire
@@ -166,11 +166,11 @@ export const hostsEstablishedAsOwn = (
 	const hosts = new Set<string>()
 	for (const row of rows) {
 		if (!isPlainObject(row)) continue
-		const website = row['website']
+		const website = readTextValue(row['website'])
 		const name = row['name']
 		// Nothing to read: no address, or no company for a domain to spell. Either
 		// way nothing is established, which is the answer rather than a missing one.
-		if (typeof website !== 'string' || typeof name !== 'string') continue
+		if (website === null || typeof name !== 'string') continue
 		// Filed under the host the identity key would file it under, so the row that
 		// establishes a site and the row that needs it meet on the same spelling.
 		const host = siteHostOf(row)
@@ -311,8 +311,8 @@ export const branchOfficeParents = (
 		const name = names[at]
 		if (!isPlainObject(row) || name == null) return
 		if (siteHostOf(row) !== null) return
-		const place = row['location']
-		if (typeof place !== 'string') return
+		const place = readTextValue(row['location'])
+		if (place === null) return
 		const town = new Set(foldTokens(place))
 		const trailing = name[name.length - 1]
 		if (trailing === undefined || !town.has(trailing)) return
@@ -505,6 +505,16 @@ const alsoAt = (places: unknown, added: string): string => {
 	return alreadyNamed(held, place) ? held : `${held}; ${place}`
 }
 
+// What a guard worked out about one row, which is true of that row and of nothing
+// else. Every other field is a fact about the company and so belongs to whichever
+// row survives; these are findings about the meeting, and carrying one across the
+// fold states it of a company nobody looked at.
+const VERDICTS_ABOUT_THE_ROW_FOLDED_AWAY: ReadonlySet<string> = new Set([
+	MARKS_FIELD,
+	OUTSIDE_PLACE_REASON_FIELD,
+	NAME_ONLY_EVIDENCE_FIELD,
+])
+
 // Fold a later meeting of the same company into the row that stays: fields it never
 // filled get filled, and the pages behind the later row are added to its own.
 //
@@ -524,13 +534,35 @@ const foldInto = (
 			merged['citations'] = mergeCitations(kept['citations'], value)
 			continue
 		}
-		if (field === 'location' && alsoElsewhere && typeof value === 'string') {
+		if (field === 'location' && alsoElsewhere) {
 			// A row that names nowhere leaves the field as it found it, rather than
 			// putting an empty reading where there was no field at all.
-			const places = alsoAt(merged['location'], value)
-			if (places !== '') merged['location'] = places
+			const added = readTextValue(value)
+			if (added === null) continue
+			const places = alsoAt(readTextValue(merged['location']), added)
+			if (places === '') continue
+			// Written back in the shape it arrived in, so whatever reads it next
+			// still finds the page behind it. The page named stays the surviving
+			// row's; each branch's own page joins this row's citations a few lines
+			// up, which is where the evidence for the towns added here lives.
+			const paired = isPlainObject(merged['location'])
+				? merged['location']
+				: isPlainObject(value)
+					? value
+					: null
+			merged['location'] =
+				paired === null ? places : { ...paired, value: places }
 			continue
 		}
+		// What a guard concluded about the row being folded away stays with it.
+		// These are the fields where filling a gap would say something new rather
+		// than carry something across: a company in Dallas met a second time as its
+		// own Reno branch would take on the branch's "outside the area asked for"
+		// and wear it as if somebody had judged the company itself, and a company
+		// with a website and a place would take on a branch's "found only as a name
+		// on a list" and report that of itself. A fold may drop such a finding,
+		// never hand one out.
+		if (VERDICTS_ABOUT_THE_ROW_FOLDED_AWAY.has(field)) continue
 		const held = merged[field]
 		if (held === undefined || held === null) merged[field] = value
 	}

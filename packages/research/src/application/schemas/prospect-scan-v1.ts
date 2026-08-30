@@ -43,11 +43,19 @@ export const ProspectScanV1Schema = Schema.Struct({
 			// tells a reader working through the list nothing; the town and the
 			// province are what decide who to call first, and a search that turns up a
 			// company almost always turns those up with it.
+			// Paired with the page it was read on, like the website and the headcount
+			// above. Written bare, it was the one field on this row that no check
+			// could reach: the per-field guard only grades a value that names its
+			// source, so a place nothing supported — the requested area, with the
+			// towns around it in brackets — travelled all the way onto a CRM record
+			// and then onto a map.
 			location: Schema.optionalKey(
-				Schema.String.annotate({
-					description:
-						'Where the company is, written the way the evidence writes it — the town, the province, or both ("Córdoba", "Alcobendas, Madrid"). Only when a source states it for this company.',
-				}),
+				Sourced(
+					Schema.String.annotate({
+						description:
+							'Where the company is, written the way the evidence writes it — the town, the province, or both ("Córdoba", "Alcobendas, Madrid"). Only when a source states it for this company: name the page you read it on. The area the request asked about is not an answer — a company is somewhere, and the places it will travel to are a different question.',
+					}),
+				),
 			),
 			employee_estimate: Schema.optionalKey(
 				Sourced(

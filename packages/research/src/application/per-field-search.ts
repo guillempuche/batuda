@@ -130,10 +130,11 @@ const hasValue = (fieldValue: unknown): boolean =>
 /**
  * Whether one company's field in a scan carries a real value.
  *
- * A scan's fields are not shaped like a profile's: most are plain strings, and
- * the headcount is a number paired with the page it was read on. Reading past
- * that pairing keeps a headcount of 40 from being mistaken for a blank simply
- * because it is not a string.
+ * Some of a scan's fields are plain strings and some are paired with the page
+ * they were read on — the website, the place, and the headcount, which is a
+ * number. Reading past that pairing is what keeps a headcount of 40, or a place
+ * that names its source, from being mistaken for a blank and bought again every
+ * round.
  */
 const hasRowValue = (fieldValue: unknown): boolean => {
 	const held = unwrapValue(fieldValue)

@@ -88,16 +88,18 @@ describe('buildResearchContext', () => {
 			})
 		})
 
-		it('should carry hints for location and language', () => {
+		it('should carry the place under the name the server reads', () => {
 			// GIVEN steering hints but no filters
-			// THEN only the hints section is present
+			// THEN the place travels as `place`, the only hint name the server
+			// knows for it — sent as `location` it was dropped without a word and
+			// the search was never told where to look
 			expect(
 				buildResearchContext({
 					...emptyScope,
 					location: 'Catalonia',
 					language: 'ca',
 				}),
-			).toEqual({ hints: { language: 'ca', location: 'Catalonia' } })
+			).toEqual({ hints: { language: 'ca', place: 'Catalonia' } })
 		})
 
 		it('should split tags on commas and drop the blanks', () => {
@@ -171,7 +173,7 @@ describe('researchRequestKey', () => {
 					}),
 				),
 			).toBe(
-				'{"selector":{"table":"companies","filter":{"status":"lead","industry":"hospitality","country":"ES","tags":["vip"]}},"hints":{"language":"ca","location":"Barcelona"}}',
+				'{"selector":{"table":"companies","filter":{"status":"lead","industry":"hospitality","country":"ES","tags":["vip"]}},"hints":{"language":"ca","place":"Barcelona"}}',
 			)
 		})
 

@@ -4213,6 +4213,14 @@ msgstr "Resultat"
 msgid "Outcome: {outcomeLabel}"
 msgstr "Resultat: {outcomeLabel}"
 
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Outside the area searched"
+msgstr "Fora de la zona cercada"
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Outside the area searched:"
+msgstr "Fora de la zona cercada:"
+
 #: src/components/companies/next-action-card.tsx
 #: src/routes/index.tsx
 #: src/routes/index.tsx
@@ -5764,6 +5772,10 @@ msgstr "Les dades han arribat en un format que aquesta pàgina no pot llegir, ai
 #: src/components/companies/documents-panel.tsx
 msgid "The documents filed here could not be fetched. Check that the session is valid, then try again."
 msgstr "No s'han pogut recuperar els documents arxivats aquí. Comprova que la sessió sigui vàlida i torna-ho a provar."
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "The evidence places this company outside the area the search asked about."
+msgstr "Les proves situen aquesta empresa fora de la zona que demanava la cerca."
 
 #: src/components/companies/where-panel-client.client.tsx
 msgid "The geocoder did not return a match. Try editing the location field."

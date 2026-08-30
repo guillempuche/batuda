@@ -26,9 +26,17 @@
 			"types": "./src/application/paid-action-tool.ts",
 			"import": "./src/application/paid-action-tool.ts"
 		},
+		"./application/place-guard": {
+			"types": "./src/application/place-guard.ts",
+			"import": "./src/application/place-guard.ts"
+		},
 		"./application/request-parts": {
 			"types": "./src/application/request-parts.ts",
 			"import": "./src/application/request-parts.ts"
+		},
+		"./application/row-marks": {
+			"types": "./src/application/row-marks.ts",
+			"import": "./src/application/row-marks.ts"
 		},
 		"./application/schemas": {
 			"types": "./src/application/schemas/index.ts",

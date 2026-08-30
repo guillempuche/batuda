@@ -43,6 +43,27 @@ export const unwrapValue = (value: unknown): unknown =>
 	isValueWrapper(value) ? value.value : value
 
 /**
+ * The text a field holds, whether it is written bare or paired with the page it
+ * was read on. Null when it holds neither.
+ *
+ * A field gains its provenance one day and every reader written against the bare
+ * string goes quiet the same day — not wrong in a way anything reports, just
+ * always answering "nothing here". That is what happened when a prospect's
+ * website was paired with its source: four readers went on asking whether it was
+ * a string, so site-based de-duplication, own-site establishment, the
+ * shared-host verdict and the existence check's reading of a website all stopped
+ * doing anything at all, and no test noticed because every fixture still held a
+ * bare string.
+ *
+ * Both shapes have to be read for good: findings already stored keep whatever
+ * shape they were written in, and nothing migrates them.
+ */
+export const readTextValue = (value: unknown): string | null => {
+	const text = unwrapValue(value)
+	return typeof text === 'string' && text.trim() !== '' ? text : null
+}
+
+/**
  * A per-field Sourced wrapper: `{ value, source_id?, quote?, confidence? }`.
  * The provenance key is what separates it from an arbitrary `{ value }` object.
  */

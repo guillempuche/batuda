@@ -9,6 +9,18 @@
  * lives here, away from the dialog, so it can be tested.
  */
 
+import type { Schema } from 'effect'
+
+import type { ContextInput } from '@batuda/controllers'
+
+/**
+ * The names the server accepts inside `context.hints`, taken from the schema it
+ * validates against so the two cannot drift apart.
+ */
+type HintName = keyof NonNullable<
+	Schema.Schema.Type<typeof ContextInput>['hints']
+>
+
 /** Everything the discovery scope fields contribute to a request. */
 export type ResearchScope = {
 	// Present for a run pinned to one company; absent for a discovery run.
@@ -62,9 +74,14 @@ export function buildResearchContext(
 		context['selector'] = { table: 'companies', filter }
 	}
 
-	const hints: Record<string, unknown> = {}
-	if (scope.language) hints['language'] = scope.language
-	if (scope.location.trim()) hints['location'] = scope.location.trim()
+	// Keyed against the server's own hint names rather than free strings. The
+	// dialog spent its whole life sending `location`, which is not one of them:
+	// the server drops a key it does not know without a word, so the box the
+	// person typed a place into never reached the search. Values stay `unknown`
+	// because each hint has its own type and this only needs the names checked.
+	const hints: Partial<Record<HintName, unknown>> = {}
+	if (scope.language) hints.language = scope.language
+	if (scope.location.trim()) hints.place = scope.location.trim()
 	if (Object.keys(hints).length > 0) context['hints'] = hints
 
 	return Object.keys(context).length > 0 ? context : undefined

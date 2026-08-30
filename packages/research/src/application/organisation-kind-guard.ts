@@ -58,13 +58,15 @@
 
 import { Effect, Schema } from 'effect'
 
-import {
-	domainHost,
-	foldReadsEveryLetter,
-	nameCore,
-	withoutFormDots,
-} from './entity-guard'
+import { domainHost } from './entity-guard'
 import { isPlainObject, unwrapValue } from './guard-shapes'
+import {
+	JUDGE_BATCH_ROWS,
+	JUDGE_DESCRIPTION_CHARS,
+	judgeBatches,
+	judgedRowKey,
+	judgedRowText,
+} from './judged-rows'
 
 /** What a row says it is, in the judge's answer. */
 export type OrganisationKindType = 'company' | 'other' | 'unsure'
@@ -127,26 +129,6 @@ export interface OrganisationKindGuardJudgeResult {
 export type OrganisationKindGuardJudge<E = never, R = never> = (
 	rows: ReadonlyArray<OrganisationCandidate>,
 ) => Effect.Effect<OrganisationKindGuardJudgeResult, E, R>
-
-/**
- * How many rows go in one question.
- *
- * A whole market list in one prompt is how this check comes to be skipped on
- * exactly the lists it is for: a live Spanish market came back with 66 rows, each
- * carrying a rationale, a description and a trade, and the longest lists are both
- * the most likely to outgrow the model's window and the most likely to be holding
- * a directory. A call that outgrows it fails, and a failed call keeps every row.
- */
-const JUDGE_BATCH_ROWS = 25
-
-/**
- * How much of a row's own words are shown.
- *
- * Enough to say what an organisation is — a body, a marketplace and a vendor all
- * announce themselves in their first sentence — while a row carrying a scraped
- * page's worth of prose cannot spend the whole window on its own.
- */
-const DESCRIPTION_CHARS = 300
 
 // The strict json_schema the wired judge is asked to fill — also written into the
 // prompt, per the extract tier's schema-in-both-places rule.
@@ -296,51 +278,6 @@ export interface RememberedKind {
 	readonly judgedOnHost?: string | undefined
 }
 
-/**
- * What a row is remembered under: the company itself, folded the way the rest of
- * the package folds a company's name — legal form off the end, accents folded.
- *
- * The question asks what an ORGANISATION is, and the answer is about the
- * organisation rather than about the sentence a pass happened to write around it.
- * Remembering it under the words instead let a drop be undone by a re-wording: a
- * scan re-reads its list several times and each reading writes the rationale
- * afresh, so a row dropped as "provides technical guides and legislative
- * information" came back as "technical guides for photovoltaic installations — a
- * PV-installation company or specialist" and shipped. Both readings are of one
- * organisation, and the run had already answered for it.
- *
- * Folded with `nameCore`, which is what the de-duplication two links along folds
- * rows onto one company by. Two keys for the same question would let this check
- * and that one disagree about whether two rows are the same company.
- *
- * Nothing to fold on gives no key, and a row with no key is asked about every
- * time rather than filed under the empty string beside every other nameless row.
- */
-const rowKey = (row: OrganisationCandidate): string | undefined => {
-	// A name written in a script the fold has no letters for comes back as
-	// whatever Latin sat beside it, which is not this company and may well be
-	// another's whole key.
-	if (!foldReadsEveryLetter(row.name)) return undefined
-	// The dots come out before the fold, or a form written "S.L." survives it as
-	// two stray letters and "URANOGAS S.L." files apart from "Uranogas SL" — two
-	// spellings of one company on one list is the ordinary case here, not an
-	// exotic one. `coreSpellings` folds in that order for the same reason.
-	const core = nameCore(withoutFormDots(row.name))
-	return core === '' ? undefined : core
-}
-
-// The rows in runs of at most `size`. An empty list gives no runs, so a caller
-// with nothing to ask makes no call.
-const batches = <A>(
-	items: ReadonlyArray<A>,
-	size: number,
-): ReadonlyArray<ReadonlyArray<A>> => {
-	const out: Array<ReadonlyArray<A>> = []
-	for (let at = 0; at < items.length; at += size)
-		out.push(items.slice(at, at + size))
-	return out
-}
-
 export interface OrganisationKindResult {
 	readonly findings: unknown
 	readonly dropped: ReadonlyArray<DroppedOrganisation>
@@ -372,9 +309,6 @@ export interface OrganisationKindResult {
 // are read, so neither list can quietly go unchecked for the want of a field name.
 const DESCRIPTION_FIELDS = ['why_relevant', 'description', 'industry'] as const
 
-const textAt = (row: Record<string, unknown>, field: string): string =>
-	typeof row[field] === 'string' ? row[field].trim() : ''
-
 /**
  * The bare host of whatever the row put in its website field, or nothing when it
  * gave none or gave something that is not an address.
@@ -397,11 +331,11 @@ const hostOfRow = (row: Record<string, unknown>): string => {
 // worth of prose and the line breaks that came with it, and neither belongs in a
 // question about what kind of organisation this is.
 const describedAs = (row: Record<string, unknown>): string =>
-	DESCRIPTION_FIELDS.map(field => textAt(row, field))
+	DESCRIPTION_FIELDS.map(field => judgedRowText(row, field))
 		.filter(part => part !== '')
 		.join(' · ')
 		.replace(/\s+/g, ' ')
-		.slice(0, DESCRIPTION_CHARS)
+		.slice(0, JUDGE_DESCRIPTION_CHARS)
 
 /**
  * Every row of the scan's list, in the order they are met, each mapped back to the
@@ -443,7 +377,7 @@ const candidatesOf = (
 					idOf.set(item, id)
 					rows.push({
 						id,
-						name: textAt(item, 'name'),
+						name: judgedRowText(item, 'name'),
 						describedAs: describedAs(item),
 						websiteHost: hostOfRow(item),
 					})
@@ -494,7 +428,7 @@ export const dropNonCompanies = <E, R>(
 		const heldFor = (
 			row: OrganisationCandidate,
 		): RememberedKind | undefined => {
-			const key = rowKey(row)
+			const key = judgedRowKey(row.name)
 			const held = key === undefined ? undefined : remembered.get(key)
 			if (held === undefined) return undefined
 			if (held.kind === 'other') return held
@@ -514,7 +448,7 @@ export const dropNonCompanies = <E, R>(
 		const toAsk = rows.filter(row => heldFor(row) === undefined)
 
 		const fresh: Array<OrganisationKindVerdict> = []
-		for (const batch of batches(toAsk, JUDGE_BATCH_ROWS)) {
+		for (const batch of judgeBatches(toAsk, JUDGE_BATCH_ROWS)) {
 			const ruling = yield* judge(batch)
 			// A judge that answers with something other than a list of verdicts is a
 			// judge that did not answer. Read as none rather than trusted, because
@@ -538,7 +472,7 @@ export const dropNonCompanies = <E, R>(
 			// A verdict naming a row nobody was asked about is remembered by nothing
 			// and, below, drops nothing.
 			if (row === undefined) continue
-			const key = rowKey(row)
+			const key = judgedRowKey(row.name)
 			// A name this fold cannot read is asked about every time rather than
 			// filed under a key that is really some other company's.
 			if (key === undefined) continue
@@ -563,7 +497,7 @@ export const dropNonCompanies = <E, R>(
 		>()
 		let ruled = 0
 		for (const row of rows) {
-			const key = rowKey(row)
+			const key = judgedRowKey(row.name)
 			const answer =
 				key === undefined
 					? fresh.find(verdict => verdict.id === row.id)
@@ -599,7 +533,7 @@ export const dropNonCompanies = <E, R>(
 						const held = id === undefined ? undefined : reasonById.get(id)
 						if (held === undefined) return true
 						dropped.push({
-							name: textAt(item, 'name'),
+							name: judgedRowText(item, 'name'),
 							reason: held.reason,
 							describedAs: held.judgedOn,
 							websiteHost: held.judgedOnHost,

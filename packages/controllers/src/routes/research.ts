@@ -78,6 +78,21 @@ export const ContextInput = Schema.Struct({
 	subjects: Schema.optional(Schema.Array(SubjectRef)),
 	selector: Schema.optional(SelectorRef),
 	hints: Schema.optional(Hints),
+	// The two things the engine writes into a run's own stored context: the web
+	// address a rerun is pinned to, and the paid step a follow-up run was spawned
+	// to carry out. Both have to be shapes the check below accepts, or a caller
+	// that reads a run and sends its context back is refused a value it never
+	// wrote. Spelled as the engine spells them, because renaming one would strip
+	// the field off every run already on file.
+	anchorDomain: Schema.optional(Schema.String),
+	paid_action: Schema.optional(
+		Schema.Struct({
+			tool: Schema.optional(Schema.String),
+			args: Schema.optional(Schema.Unknown),
+			origin_run_id: Schema.optional(Schema.String),
+			action_id: Schema.optional(Schema.String),
+		}),
+	),
 })
 
 // Exported for the test next door, which pins schema_name to the closed set —
