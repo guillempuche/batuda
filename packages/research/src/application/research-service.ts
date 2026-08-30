@@ -32,7 +32,7 @@ import {
 	SNAPSHOT_COMPANY_FIELDS,
 	SNAPSHOT_CONTACT_FIELDS,
 } from '../domain/crm-vocabulary'
-import { SubjectUnavailable } from '../domain/errors'
+import { ProviderError, SubjectUnavailable } from '../domain/errors'
 import type { ReasonCode, ResolvedPolicy } from '../domain/types'
 import { aboutPageCandidates } from './about-pages'
 import { canAffordAnotherRound, runAgentResearchLoop } from './agent-loop'
@@ -5417,6 +5417,38 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									return (yield* extractOverEverything()).findings
 								})
 
+							// An extra pass is worth trying; it is never worth the run. When a
+							// provider refuses one, everything the passes before it found still
+							// stands, so the search keeps that and stops going back out rather
+							// than failing and losing the lot.
+							//
+							// The flag answers for the pass that just ran, so a refused refine
+							// cannot be read as a refused coverage pass later on.
+							let lastPassRefused = false
+							const searchAgainOrKeep = (instruction: string, soFar: unknown) =>
+								Effect.gen(function* () {
+									lastPassRefused = false
+									return yield* searchAgain(instruction).pipe(
+										Effect.catchIf(
+											(error: unknown) => error instanceof ProviderError,
+											error =>
+												Effect.gen(function* () {
+													lastPassRefused = true
+													yield* Effect.logWarning(
+														'research.pass.abandoned',
+													).pipe(
+														Effect.annotateLogs({
+															event: 'research.pass.abandoned',
+															research_id: researchId,
+															cause: error.message,
+														}),
+													)
+													return soFar
+												}),
+										),
+									)
+								})
+
 							// A discovery scan (prospect / competitor) that comes back with too
 							// few results gets ONE refined retry before we accept the list:
 							// only here does a short primary list mean the search — not the
@@ -5440,7 +5472,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									isDiscoveryScanThin(schemaName, findings) &&
 									canAffordAnotherRound(yield* budget.snapshot())
 								) {
-									refined = true
 									yield* Effect.logInfo('research.refining').pipe(
 										Effect.annotateLogs({
 											event: 'research.refining',
@@ -5451,7 +5482,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									yield* publishEvent(researchId, 'run.refining', {
 										schema: schemaName,
 									})
-									findings = yield* searchAgain(REFINE_HINT)
+									findings = yield* searchAgainOrKeep(REFINE_HINT, findings)
+									// Only a pass that came back counts as having refined. A
+									// reader told the search was refined and still found nothing
+									// reads an empty list as an empty market, so a pass the
+									// provider refused must not be reported as one that ran.
+									refined = !lastPassRefused
 								}
 
 								// Then the parts of the request nothing came back for. The retry
@@ -5509,9 +5545,15 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									yield* publishEvent(researchId, 'run.covering', {
 										uncovered: coverage.uncovered,
 									})
-									findings = yield* searchAgain(
+									findings = yield* searchAgainOrKeep(
 										uncoveredPartsDirective(coverage.uncovered),
+										findings,
 									)
+									if (lastPassRefused) {
+										coverageStopped = 'provider_failed'
+										coverageLastMissing = coverage.uncovered
+										break
+									}
 								}
 							}
 

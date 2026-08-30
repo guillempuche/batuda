@@ -128,13 +128,19 @@ export const MAX_COVERAGE_PASSES = 2
  */
 const COVERAGE_PASS_DEADLINE_FRACTION = 0.5
 
-/** Why the search is, or is not, going back out for the parts nothing answered. */
+/**
+ * Why the search is, or is not, going back out for the parts nothing answered.
+ *
+ * All but `provider_failed` are decided before a pass goes out; that one is only
+ * known afterwards, when the pass went out and the provider would not answer it.
+ */
 export type CoveragePassVerdict =
 	| 'go'
 	| 'answered'
 	| 'passes_spent'
 	| 'deadline_margin'
 	| 'budget_margin'
+	| 'provider_failed'
 
 /**
  * Whether to spend another searching pass on the parts nothing came back for.
