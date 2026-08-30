@@ -7,7 +7,80 @@ import { computeRunQuality } from './research-quality'
 // other signal is measuring only that one.
 const FULL_LIST = DISCOVERY_THIN_RESULT_COUNT + 7
 
+// A scan's input, with only the fields a test about removals cares about set.
+const scanInput = {
+	schemaName: 'prospect_scan_v1',
+	entityMatch: null,
+	rounds: 2,
+	gapRounds: 0,
+	sourcesTotal: 5,
+	sourcesFirstParty: 0,
+	ownDomainKnown: false,
+	subjectUnreadable: false,
+	fieldsGrounded: 0,
+	fieldsTotal: 0,
+	citationsSeen: 4,
+	citationsKept: 4,
+	scanResults: FULL_LIST,
+	refined: false,
+	coverage: null,
+	coverageStopped: null,
+	coverageLastMissing: [],
+	existence: null,
+} as const
+
 describe('computeRunQuality', () => {
+	describe('when a run reports what it took off its list', () => {
+		it('should report only what the answer actually lacks', () => {
+			// GIVEN the removals a run settled on, already held against the answer it
+			//   hands back
+			const quality = computeRunQuality({
+				...scanInput,
+				notCompanies: [
+					{
+						name: 'Habitissimo',
+						reason: 'quotes marketplace',
+						describedAs: '',
+						websiteHost: 'habitissimo.es',
+					},
+					{
+						name: 'SABEKO',
+						reason: 'supplier to the trade',
+						describedAs: '',
+						websiteHost: '',
+					},
+				],
+			})
+
+			// THEN both are reported, because this block is given what the caller
+			//   already settled against the answer. The settling itself is the
+			//   caller's, and is covered where it happens.
+			expect(quality.not_companies).toEqual([
+				{
+					name: 'Habitissimo',
+					reason: 'quotes marketplace',
+					describedAs: '',
+					websiteHost: 'habitissimo.es',
+				},
+				{
+					name: 'SABEKO',
+					reason: 'supplier to the trade',
+					describedAs: '',
+					websiteHost: '',
+				},
+			])
+		})
+
+		it('should leave the key out entirely for a run that removed nothing', () => {
+			// GIVEN a run that took nothing off its list
+			const quality = computeRunQuality({ ...scanInput, notCompanies: [] })
+
+			// THEN the key is absent rather than an empty list, so a reader cannot
+			//   mistake "removed nothing" for "reported nothing about removals"
+			expect('not_companies' in quality).toBe(false)
+		})
+	})
+
 	describe('for an enrichment run', () => {
 		const base = {
 			schemaName: 'company_enrichment_v1',
@@ -19,6 +92,7 @@ describe('computeRunQuality', () => {
 			subjectUnreadable: false,
 			fieldsGrounded: 4,
 			fieldsTotal: 6,
+			notCompanies: [],
 			citationsSeen: 4,
 			citationsKept: 4,
 			scanResults: null,
@@ -109,6 +183,7 @@ describe('computeRunQuality', () => {
 			subjectUnreadable: false,
 			fieldsGrounded: 0,
 			fieldsTotal: 0,
+			notCompanies: [],
 			citationsSeen: 10,
 			citationsKept: 10,
 			scanResults: FULL_LIST,
@@ -218,6 +293,7 @@ describe('computeRunQuality', () => {
 			subjectUnreadable: false,
 			fieldsGrounded: 0,
 			fieldsTotal: 0,
+			notCompanies: [],
 			citationsSeen: 10,
 			citationsKept: 10,
 			refined: true,
@@ -270,6 +346,7 @@ describe('computeRunQuality', () => {
 				subjectUnreadable: false,
 				fieldsGrounded: 4,
 				fieldsTotal: 6,
+				notCompanies: [],
 				citationsSeen: 4,
 				citationsKept: 4,
 				scanResults: null,
@@ -299,6 +376,7 @@ describe('computeRunQuality', () => {
 			subjectUnreadable: false,
 			fieldsGrounded: 0,
 			fieldsTotal: 0,
+			notCompanies: [],
 			citationsSeen: 60,
 			citationsKept: 60,
 			scanResults: 62,
@@ -446,6 +524,7 @@ describe('computeRunQuality', () => {
 			// pointing at a page it never reached
 			const quality = computeRunQuality({
 				...scanBase,
+				notCompanies: [],
 				citationsSeen: 31,
 				citationsKept: 0,
 			})
@@ -460,6 +539,7 @@ describe('computeRunQuality', () => {
 			// GIVEN a scan that offered no citations, so the guard rejected none
 			const quality = computeRunQuality({
 				...scanBase,
+				notCompanies: [],
 				citationsSeen: 0,
 				citationsKept: 0,
 			})
@@ -472,6 +552,7 @@ describe('computeRunQuality', () => {
 			// GIVEN a scan where most citations were rejected but one resolved
 			const quality = computeRunQuality({
 				...scanBase,
+				notCompanies: [],
 				citationsSeen: 12,
 				citationsKept: 1,
 			})
@@ -493,6 +574,7 @@ describe('computeRunQuality', () => {
 				subjectUnreadable: false,
 				fieldsGrounded: 0,
 				fieldsTotal: 0,
+				notCompanies: [],
 				citationsSeen: 8,
 				citationsKept: 8,
 				scanResults: FULL_LIST,
@@ -531,6 +613,7 @@ describe('computeRunQuality', () => {
 				subjectUnreadable: false,
 				fieldsGrounded: 0,
 				fieldsTotal: 0,
+				notCompanies: [],
 				citationsSeen: 8,
 				citationsKept: 8,
 				scanResults: FULL_LIST,
@@ -558,6 +641,7 @@ describe('computeRunQuality', () => {
 			subjectUnreadable: false,
 			fieldsGrounded: 0,
 			fieldsTotal: 0,
+			notCompanies: [],
 			citationsSeen: 3,
 			citationsKept: 3,
 			scanResults: null,
@@ -630,6 +714,7 @@ describe('computeRunQuality', () => {
 			subjectUnreadable: false,
 			fieldsGrounded: 0,
 			fieldsTotal: 0,
+			notCompanies: [],
 			citationsSeen: 60,
 			citationsKept: 60,
 			scanResults: FULL_LIST,
@@ -667,6 +752,7 @@ describe('computeRunQuality', () => {
 				subjectUnreadable: false,
 				fieldsGrounded: 6,
 				fieldsTotal: 6,
+				notCompanies: [],
 				citationsSeen: 4,
 				citationsKept: 4,
 				scanResults: null,
@@ -728,6 +814,7 @@ describe('computeRunQuality — how the list split', () => {
 		subjectUnreadable: false,
 		fieldsGrounded: 0,
 		fieldsTotal: 0,
+		notCompanies: [],
 		citationsSeen: 20,
 		citationsKept: 20,
 		scanResults: FULL_LIST,
@@ -791,6 +878,7 @@ describe('computeRunQuality — when the run could not read its own subject', ()
 		subjectUnreadable: false,
 		fieldsGrounded: 5,
 		fieldsTotal: 6,
+		notCompanies: [],
 		citationsSeen: 4,
 		citationsKept: 4,
 		scanResults: null,

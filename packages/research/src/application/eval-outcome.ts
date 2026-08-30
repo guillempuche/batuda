@@ -151,6 +151,35 @@ export const outcomeFromRun = (input: {
 		typeof findings === 'object' &&
 		(findings as { registry_confirmed?: unknown }).registry_confirmed === true
 
+	// The organisations the run took OFF its list for not being companies of the
+	// trade. Read from the run's own quality block, which is where a finished run
+	// records them: they are gone from the answer itself, so this is the only place
+	// left that knows they were ever there. A run that removed none, and every run
+	// that is not a scan, gives an empty list.
+	const removedNotCompanies = (
+		value: unknown,
+	): ReadonlyArray<{ name: string; reason: string; describedAs: string }> => {
+		const quality = (value as { quality?: unknown } | null)?.quality
+		const rows = (quality as { not_companies?: unknown } | undefined)
+			?.not_companies
+		if (!Array.isArray(rows)) return []
+		return rows.flatMap(row => {
+			const name = readFieldValue((row as { name?: unknown })?.name)
+			if (name === null || name.trim() === '') return []
+			const reason = readFieldValue((row as { reason?: unknown })?.reason)
+			const describedAs = readFieldValue(
+				(row as { describedAs?: unknown })?.describedAs,
+			)
+			return [
+				{
+					name: name.trim(),
+					reason: reason ?? '',
+					describedAs: describedAs ?? '',
+				},
+			]
+		})
+	}
+
 	// The companies a scan came back with, which is the whole of a scan's answer
 	// and so the only thing a scan can be scored on. A row with no name is left out:
 	// there is nothing to tell it from another row, so counting it would make every
@@ -186,6 +215,7 @@ export const outcomeFromRun = (input: {
 	return {
 		status: toTerminalStatus(input.status),
 		reachedDomains,
+		removed: removedNotCompanies(findings),
 		fields,
 		contacts,
 		companies,

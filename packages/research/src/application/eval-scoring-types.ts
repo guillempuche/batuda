@@ -212,6 +212,20 @@ export interface RunOutcome {
 		 */
 		readonly thoughtAnswered: number
 	} | null
+	/**
+	 * What the run removed from its list for not being a company of the trade.
+	 * Empty for a run that removed nothing, and for one that answers with a profile
+	 * rather than a list.
+	 */
+	readonly removed: ReadonlyArray<{
+		readonly name: string
+		readonly reason: string
+		/**
+		 * The row's own words, which are what a second opinion must read. The reason
+		 * is the pipeline's verdict and is kept for a person, never for the judge.
+		 */
+		readonly describedAs: string
+	}>
 	readonly companies: ReadonlyArray<{
 		readonly name: string
 		/** The address the row carries, as written, or null when it carries none. */
@@ -285,6 +299,26 @@ export interface MarketScore {
 	 * into the figures: a check that could not run must never pass for one that ran.
 	 */
 	readonly rowsNameUnreadable: number
+	/**
+	 * What the run took OFF its list for not being a company of the trade, and how
+	 * many of those the judge says were companies after all.
+	 *
+	 * Every other figure here reads the rows that survived, so a real company
+	 * struck off scores as nothing at all — it is simply absent, the same as one
+	 * the search never found. This is the only figure that looks the other way,
+	 * and it is the one guarding the direction a check like that can do harm in.
+	 * `rowsWronglyRemoved` above zero is a precision gain being bought with real
+	 * companies.
+	 */
+	readonly rowsRemoved: number
+	readonly rowsWronglyRemoved: number
+	/**
+	 * Of those removals, how many the judge came back with an answer for. Reported
+	 * beside the others because a judge that never answered removes nobody
+	 * wrongly, which is the same figure as a pass that removed only real
+	 * non-companies — the two must not read alike.
+	 */
+	readonly rowsRemovedRuled: number
 	/**
 	 * Rows the scan came back with. The scale the figures below read against, and
 	 * what checking that every row is a real company would cost, so it is reported
@@ -463,6 +497,16 @@ export interface EvalSummary {
 	 * so a market that found nothing still reads nought rather than nothing.
 	 */
 	readonly organisationKindPrecision: number | null
+	/**
+	 * Of the organisations a pass REMOVED for not being companies, the share that
+	 * really were not — so a precision gain bought with real companies is visible
+	 * instead of scoring as an improvement. Null when nothing was removed.
+	 */
+	readonly keptRealCompanies: number | null
+	/** How many were removed, as the scale that share reads against. */
+	readonly rowsRemovedTotal: number
+	/** Of those, how many the judge ruled on — what the share is actually over. */
+	readonly rowsRemovedRuledTotal: number
 	/**
 	 * Of every row that came back, the share the run established as a real
 	 * company. This is where requiring two independent sources shows up: it is

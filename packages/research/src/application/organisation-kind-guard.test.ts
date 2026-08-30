@@ -59,7 +59,12 @@ describe('dropNonCompanies', () => {
 			// THEN only the federation goes, and the run is told why
 			expect(namesIn(result.findings)).toEqual(['Instalaciones Perez'])
 			expect(result.dropped).toEqual([
-				{ name: 'FENIE', reason: 'not a company of this trade' },
+				{
+					name: 'FENIE',
+					reason: 'not a company of this trade',
+					describedAs: expect.any(String),
+					websiteHost: '',
+				},
 			])
 			expect(result.asked).toBe(2)
 		})
@@ -97,8 +102,18 @@ describe('dropNonCompanies', () => {
 			// THEN both go, each carrying the judge's own reason
 			expect(namesIn(result.findings)).toEqual(['Instalaciones Perez'])
 			expect(result.dropped).toEqual([
-				{ name: 'Starofservice', reason: 'lists installers' },
-				{ name: 'GeoTapp', reason: 'sells software to installers' },
+				{
+					name: 'Starofservice',
+					reason: 'lists installers',
+					describedAs: expect.any(String),
+					websiteHost: '',
+				},
+				{
+					name: 'GeoTapp',
+					reason: 'sells software to installers',
+					describedAs: expect.any(String),
+					websiteHost: '',
+				},
 			])
 		})
 
@@ -184,8 +199,95 @@ describe('dropNonCompanies', () => {
 					name: 'FENIE',
 					describedAs:
 						'Federación de instaladores · Representa a las empresas · Asociación sectorial',
+					websiteHost: '',
 				},
 			])
+		})
+
+		it('should show the judge the host of the website a row gave', async () => {
+			// GIVEN a quotes site returned under its own name plus the trade it lists
+			const findings = {
+				prospects: [
+					{
+						name: 'Cronoshare Fontaneros',
+						why_relevant:
+							'Cronoshare marketing page mentions plumbing services',
+						website: 'https://www.cronoshare.com/servicios/fontaneros',
+					},
+				],
+			}
+			const judge = vi.fn<OrganisationKindGuardJudge>(() =>
+				Effect.succeed({ verdicts: [] }),
+			)
+
+			// WHEN the list is checked
+			await Effect.runPromise(dropNonCompanies(findings, 'prospects', judge))
+
+			// THEN the bare host goes with it. Without it the row is a sentence about
+			//   plumbing and nothing more, and a live pass read it as a plumber four
+			//   times out of four.
+			expect(judge.mock.calls[0]?.[0]?.[0]?.websiteHost).toBe('cronoshare.com')
+		})
+
+		it('should show the host when the website comes paired with its page', async () => {
+			// GIVEN the same row in the other shape a run returns — the address paired
+			//   with the page it was read on, which is what three of seven stored runs
+			//   returned for every row they held
+			const findings = {
+				prospects: [
+					{
+						name: 'Cronoshare Fontaneros',
+						why_relevant:
+							'Cronoshare marketing page mentions plumbing services',
+						website: {
+							value: 'https://www.cronoshare.com/servicios/fontaneros',
+							source_id: 'src_1',
+							quote: 'Fontaneros en Barcelona',
+						},
+					},
+				],
+			}
+			const judge = vi.fn<OrganisationKindGuardJudge>(() =>
+				Effect.succeed({ verdicts: [] }),
+			)
+
+			// WHEN the list is checked
+			await Effect.runPromise(dropNonCompanies(findings, 'prospects', judge))
+
+			// THEN the host still reaches the judge. Read as a bare string only, this
+			//   whole reading switches off for a run at a time and says nothing about
+			//   it — which is how it shipped once already.
+			expect(judge.mock.calls[0]?.[0]?.[0]?.websiteHost).toBe('cronoshare.com')
+		})
+
+		it('should keep the description slot when a row has a host but nothing to say', () => {
+			// GIVEN a row that gave a website and describes itself nowhere
+			const prompt = organisationKindGuardPrompt([
+				{ id: 'r0', name: 'Acme', describedAs: '', websiteHost: 'acme.com' },
+			])
+
+			// WHEN the row line is read
+			// THEN the empty description is written out. Left out, the host sits where
+			//   a description is expected and is read as what the row says it is.
+			expect(prompt).toContain('[r0] "Acme" "" "acme.com"')
+		})
+
+		it('should show no host for a row whose website is not an address', async () => {
+			// GIVEN a row whose website field holds prose, and one with none at all
+			const findings = {
+				prospects: [{ name: 'A', website: 'not a url' }, { name: 'B' }],
+			}
+			const judge = vi.fn<OrganisationKindGuardJudge>(() =>
+				Effect.succeed({ verdicts: [] }),
+			)
+
+			// WHEN the list is checked
+			await Effect.runPromise(dropNonCompanies(findings, 'prospects', judge))
+
+			// THEN neither carries one, rather than carrying something that is not a
+			//   host — most of the small firms a scan is for give no website at all
+			const shown = judge.mock.calls[0]?.[0] ?? []
+			expect(shown.map(row => row.websiteHost)).toEqual(['', ''])
 		})
 
 		it('should show a row that describes itself nowhere as a bare name', async () => {
@@ -200,7 +302,12 @@ describe('dropNonCompanies', () => {
 
 			// THEN it is still put to the judge, with nothing invented around it
 			expect(judge).toHaveBeenCalledWith([
-				{ id: 'r0', name: 'Instalaciones Perez', describedAs: '' },
+				{
+					id: 'r0',
+					name: 'Instalaciones Perez',
+					describedAs: '',
+					websiteHost: '',
+				},
 			])
 		})
 
@@ -482,6 +589,174 @@ describe('dropNonCompanies', () => {
 		})
 	})
 
+	describe('when a drop is held over from an earlier pass', () => {
+		it('should record the words and the host the verdict was reached on, not the later ones', async () => {
+			// GIVEN a row removed on thin early words
+			const first = {
+				prospects: [{ name: 'TK Elevator France', why_relevant: 'ascenseurs' }],
+			}
+			const judge = vi.fn<OrganisationKindGuardJudge>(rows =>
+				Effect.succeed({
+					verdicts: rows.map(row => ({
+						id: row.id,
+						kind: 'other' as const,
+						reason: 'too thin to be an installer',
+					})),
+				}),
+			)
+			const pass1 = await Effect.runPromise(
+				dropNonCompanies(first, 'prospects', judge),
+			)
+
+			// WHEN a later pass describes the same organisation much better, and the
+			//   drop stands because a drop is final for the run
+			const second = {
+				prospects: [
+					{
+						name: 'TK Elevator France',
+						why_relevant:
+							'Propose des postes de technicien de maintenance ascenseurs',
+						website: 'https://www.tkelevator.com/fr-fr/',
+					},
+				],
+			}
+			const pass2 = await Effect.runPromise(
+				dropNonCompanies(second, 'prospects', judge, pass1.learned),
+			)
+
+			// THEN the record carries the words AND the host the judge actually saw,
+			//   which for this drop is no host at all. A row reaches the judge as
+			//   three fields, so a record filed against the later two describes a
+			//   question nobody asked — and anything re-reading this removal then
+			//   calls a correct removal a mistake, or the reverse.
+			expect(judge).toHaveBeenCalledTimes(1)
+			expect(pass2.dropped).toEqual([
+				{
+					name: 'TK Elevator France',
+					reason: 'too thin to be an installer',
+					describedAs: 'ascenseurs',
+					websiteHost: '',
+				},
+			])
+		})
+
+		it('should record the host a drop was judged with where it had one', async () => {
+			// GIVEN a row removed in a pass where it did carry a website
+			const findings = {
+				prospects: [
+					{
+						name: 'Cronoshare Fontaneros',
+						why_relevant: 'marketing page mentions plumbing services',
+						website: 'https://www.cronoshare.com/servicios/fontaneros',
+					},
+				],
+			}
+
+			// WHEN the judge takes it off the list
+			const result = await Effect.runPromise(
+				dropNonCompanies(
+					findings,
+					'prospects',
+					rules({
+						'Cronoshare Fontaneros': {
+							kind: 'other',
+							reason: 'marketing page',
+						},
+					}),
+				),
+			)
+
+			// THEN the host travels into the record beside the words, so the removal
+			//   can be put back to a model exactly as it was asked
+			expect(result.dropped).toEqual([
+				{
+					name: 'Cronoshare Fontaneros',
+					reason: 'marketing page',
+					describedAs: expect.stringContaining('marketing page'),
+					websiteHost: 'cronoshare.com',
+				},
+			])
+		})
+	})
+
+	describe('when a website arrives after a row was already judged', () => {
+		it('should ask again once the row has a host it did not have', async () => {
+			// GIVEN a first pass over a row with no website, judged a company on its
+			//   words alone
+			const first = {
+				prospects: [
+					{
+						name: 'Cronoshare Fontaneros',
+						why_relevant: 'plumbing services across Barcelona',
+					},
+				],
+			}
+			const judge = vi.fn<OrganisationKindGuardJudge>(rows =>
+				Effect.succeed({
+					verdicts: rows.map(row => ({
+						id: row.id,
+						kind:
+							row.websiteHost === ''
+								? ('company' as const)
+								: ('other' as const),
+					})),
+				}),
+			)
+			const pass1 = await Effect.runPromise(
+				dropNonCompanies(first, 'prospects', judge),
+			)
+			expect(namesIn(pass1.findings)).toEqual(['Cronoshare Fontaneros'])
+
+			// WHEN a later round buys it a website and the run checks again
+			const second = {
+				prospects: [
+					{
+						name: 'Cronoshare Fontaneros',
+						why_relevant: 'plumbing services across Barcelona',
+						website: 'https://www.cronoshare.com/servicios/fontaneros',
+					},
+				],
+			}
+			const pass2 = await Effect.runPromise(
+				dropNonCompanies(second, 'prospects', judge, pass1.learned),
+			)
+
+			// THEN it is asked afresh, now with its host, and goes. Held on the older
+			//   answer it would keep the verdict reached without the one thing that
+			//   places it — and buying websites is what those rounds are for
+			expect(judge).toHaveBeenCalledTimes(2)
+			expect(namesIn(pass2.findings)).toEqual([])
+		})
+	})
+
+	describe('when the judge answers about a row nobody asked about', () => {
+		it('should not drop a row that was never put to it', async () => {
+			// GIVEN one row already answered for and one still to ask about, and a
+			//   judge that renumbers its answers from the start of the whole list
+			const first = { prospects: [{ name: 'Alfa', why_relevant: 'installs' }] }
+			const settled = await Effect.runPromise(
+				dropNonCompanies(first, 'prospects', rules({ Alfa: 'company' })),
+			)
+			const second = {
+				prospects: [
+					{ name: 'Alfa', why_relevant: 'installs' },
+					{ name: 'Beta', why_relevant: 'installs' },
+				],
+			}
+			const renumbering: OrganisationKindGuardJudge = () =>
+				Effect.succeed({ verdicts: [{ id: 'r0', kind: 'other' as const }] })
+
+			// WHEN the second pass asks only about Beta, and the judge answers 'r0'
+			const pass2 = await Effect.runPromise(
+				dropNonCompanies(second, 'prospects', renumbering, settled.learned),
+			)
+
+			// THEN Alfa survives: 'r0' is its id in the full list but nobody asked
+			//   about it this time, and a verdict may only land where a question went
+			expect(namesIn(pass2.findings)).toContain('Alfa')
+		})
+	})
+
 	describe('when the list is longer than one question', () => {
 		it('should ask in batches and act on every batch', async () => {
 			// GIVEN a list well past what one question carries
@@ -601,8 +876,13 @@ describe('organisationKindGuardPrompt', () => {
 		it('should name each row under the id its verdict must carry', () => {
 			// GIVEN two rows, one of them describing itself
 			const prompt = organisationKindGuardPrompt([
-				{ id: 'r0', name: 'FENIE', describedAs: 'Federación de instaladores' },
-				{ id: 'r1', name: 'Perez', describedAs: '' },
+				{
+					id: 'r0',
+					name: 'FENIE',
+					describedAs: 'Federación de instaladores',
+					websiteHost: '',
+				},
+				{ id: 'r1', name: 'Perez', describedAs: '', websiteHost: '' },
 			])
 
 			// WHEN the prompt is read
@@ -620,7 +900,7 @@ describe('organisationKindGuardPrompt', () => {
 		it('should tell the model that belonging to a body is not being one', () => {
 			// GIVEN the question as it is asked
 			const prompt = organisationKindGuardPrompt([
-				{ id: 'r0', name: 'Perez', describedAs: '' },
+				{ id: 'r0', name: 'Perez', describedAs: '', websiteHost: '' },
 			])
 
 			// WHEN the rules under the three answers are read
@@ -633,7 +913,7 @@ describe('organisationKindGuardPrompt', () => {
 		it('should tell the model that size and selling to businesses are not marks of another kind', () => {
 			// GIVEN the question as it is asked
 			const prompt = organisationKindGuardPrompt([
-				{ id: 'r0', name: 'Perez', describedAs: '' },
+				{ id: 'r0', name: 'Perez', describedAs: '', websiteHost: '' },
 			])
 
 			// WHEN the same rules are read
@@ -645,7 +925,7 @@ describe('organisationKindGuardPrompt', () => {
 		it('should tell the model to say it is unsure rather than guess', () => {
 			// GIVEN the question as it is asked
 			const prompt = organisationKindGuardPrompt([
-				{ id: 'r0', name: 'Perez', describedAs: '' },
+				{ id: 'r0', name: 'Perez', describedAs: '', websiteHost: '' },
 			])
 
 			// WHEN the instruction above the rows is read
@@ -659,7 +939,7 @@ describe('organisationKindGuardPrompt', () => {
 		it('should offer all three answers, so being unsure is sayable', () => {
 			// GIVEN any row
 			const prompt = organisationKindGuardPrompt([
-				{ id: 'r0', name: 'Perez', describedAs: '' },
+				{ id: 'r0', name: 'Perez', describedAs: '', websiteHost: '' },
 			])
 
 			// WHEN the prompt is read

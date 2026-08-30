@@ -7,6 +7,7 @@ import {
 	type OrganisationKindJudge,
 	type OrganisationKindVerdicts,
 	organisationKindPrompt,
+	removalAsCandidate,
 } from './eval-organisation-kind'
 import { organisationKindGuardPrompt } from './organisation-kind-guard'
 
@@ -65,8 +66,8 @@ describe('deciding what kind of organisation each row is', () => {
 			// WHEN decided — THEN each carries the model's ruling, marked as judged so
 			// a reader can tell which figures rest on a model
 			expect(kinds).toEqual([
-				{ isCompany: false, method: 'judged' },
-				{ isCompany: true, method: 'judged' },
+				{ isCompany: false, method: 'judged', said: expect.any(String) },
+				{ isCompany: true, method: 'judged', said: expect.any(String) },
 			])
 		})
 
@@ -78,7 +79,9 @@ describe('deciding what kind of organisation each row is', () => {
 			// WHEN decided — THEN it stays a company, since not knowing is not a
 			// reason to call something a fault, but it counts as judged because the
 			// model did answer
-			expect(kinds).toEqual([{ isCompany: true, method: 'judged' }])
+			expect(kinds).toEqual([
+				{ isCompany: true, method: 'judged', said: expect.any(String) },
+			])
 		})
 	})
 
@@ -101,9 +104,9 @@ describe('deciding what kind of organisation each row is', () => {
 				"Gremi d'Instal·ladors",
 			])
 			expect(kinds).toEqual([
-				{ isCompany: true, method: 'judged' },
+				{ isCompany: true, method: 'judged', said: expect.any(String) },
 				{ isCompany: false, method: 'golden-listed' },
-				{ isCompany: false, method: 'judged' },
+				{ isCompany: false, method: 'judged', said: expect.any(String) },
 			])
 		})
 	})
@@ -138,7 +141,7 @@ describe('deciding what kind of organisation each row is', () => {
 			// WHEN decided — THEN the unanswered row is unjudged rather than assumed,
 			// so a partial answer cannot quietly become a verdict
 			expect(kinds).toEqual([
-				{ isCompany: false, method: 'judged' },
+				{ isCompany: false, method: 'judged', said: expect.any(String) },
 				{ isCompany: true, method: 'unjudged' },
 			])
 		})
@@ -197,7 +200,12 @@ describe('the question put to the model', () => {
 	describe('when held against the check it measures', () => {
 		it('should ask in different words from the pipeline it grades', () => {
 			// GIVEN both questions over the same row
-			const candidate = { id: '0', name: 'GeoTapp', describedAs: 'Software' }
+			const candidate = {
+				id: 'r0',
+				name: 'GeoTapp',
+				describedAs: 'Software',
+				websiteHost: '',
+			}
 
 			// WHEN each is put together
 			// THEN they are not the same text. An instrument that asked exactly as
@@ -206,6 +214,44 @@ describe('the question put to the model', () => {
 			expect(organisationKindPrompt([row('GeoTapp', 'Software')])).not.toBe(
 				organisationKindGuardPrompt([candidate]),
 			)
+		})
+	})
+})
+
+describe('putting a removed row to the judge', () => {
+	describe('when the run recorded why it removed the row', () => {
+		it('should show the judge the row own words and never the verdict', () => {
+			// GIVEN a removal carrying both the row's words and the reason it went
+			const candidate = removalAsCandidate({
+				name: 'Cronoshare Fontaneros',
+				reason: 'quotes marketplace',
+				describedAs: 'Cronoshare marketing page mentions plumbing services',
+			})
+
+			// WHEN it is put to the judge
+			// THEN it carries the row's words. The reason is this check's own answer,
+			//   phrased in the words the judge's "other" bucket already lists, so
+			//   handing it over would tell the judge what to say and the figure would
+			//   agree with the thing it exists to disagree with.
+			expect(candidate.describedAs).toBe(
+				'Cronoshare marketing page mentions plumbing services',
+			)
+			expect(candidate.describedAs).not.toContain('marketplace')
+			expect(JSON.stringify(candidate)).not.toContain('quotes marketplace')
+		})
+
+		it('should show nothing rather than the fallback reason for a row that said nothing', () => {
+			// GIVEN a row the run removed without the model offering words for it
+			const candidate = removalAsCandidate({
+				name: 'Unknown SL',
+				reason: 'not a company of this trade',
+				describedAs: '',
+			})
+
+			// WHEN it is put to the judge
+			// THEN it goes as a bare name. The fallback reason states the conclusion
+			//   outright, so a judge shown it could only ever agree.
+			expect(candidate).toEqual({ name: 'Unknown SL', describedAs: '' })
 		})
 	})
 })

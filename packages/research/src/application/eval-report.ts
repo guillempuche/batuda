@@ -110,6 +110,20 @@ export const scorePayloadsForRun = (score: RunScore): ScorePayload[] => {
 				feedback: `${market.partsAnswered}/${market.partsExpected} requested parts answered`,
 			})
 		}
+		// Reported whenever the run removed anything, which is a different condition
+		// from having returned rows: a search can remove companies and come back with
+		// none, and that is the case most worth seeing.
+		// Only where the judge actually ruled on something. A run that removed rows
+		// the judge never answered for has nothing to report here, and publishing a
+		// pass for it would score an unasked question as a clean one.
+		if (market.rowsRemovedRuled > 0) {
+			payloads.push({
+				name: 'kept_real_companies',
+				value: 1 - market.rowsWronglyRemoved / market.rowsRemovedRuled,
+				passed: market.rowsWronglyRemoved === 0,
+				feedback: `${market.rowsWronglyRemoved}/${market.rowsRemovedRuled} organisations the run removed were companies after all (${market.rowsRemoved} removed in all)`,
+			})
+		}
 		if (market.rowsReturned > 0) {
 			payloads.push(
 				{
@@ -240,6 +254,9 @@ export const evalSpanAttributes = (
 		attributes['eval.market'] = market.name
 		attributes['eval.rows_returned'] = market.rowsReturned
 		attributes['eval.rows_right_kind'] = market.rowsRightKind
+		attributes['eval.rows_removed'] = market.rowsRemoved
+		attributes['eval.rows_removed_ruled'] = market.rowsRemovedRuled
+		attributes['eval.rows_wrongly_removed'] = market.rowsWronglyRemoved
 		attributes['eval.rows_located'] = market.rowsLocated
 		attributes['eval.rows_duplicated'] = market.rowsDuplicated
 		attributes['eval.rows_possibly_duplicated'] = market.rowsPossiblyDuplicated
