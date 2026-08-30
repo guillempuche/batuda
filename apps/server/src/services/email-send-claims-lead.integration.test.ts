@@ -1,322 +1,223 @@
+// Sending really does claim the lead — the wiring between EmailService and the
+// claim, which the claim's own suite cannot see. All three outbound paths are
+// exercised, because each hands the sender over differently: `send` and `reply`
+// through their extras, `sendDraft` as an argument of its own.
+//
+// Prereq: `pnpm cli services up` and a migrated database.
+
 // PgLive reads DATABASE_URL at layer-build time (no default). Set it so the
 // suite runs without a loaded .env, matching the other integration tests.
 process.env['DATABASE_URL'] ??=
 	'postgresql://batuda:batuda@localhost:5433/batuda'
 
-import { randomUUID } from 'node:crypto'
-
-import { Effect, Layer } from 'effect'
+import { Effect } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
-import pg from 'pg'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
-import { CurrentOrg, SessionContext } from '@batuda/controllers'
+import type { CurrentOrg, SessionContext } from '@batuda/controllers'
 
 import { PgLive } from '../db/client.js'
-import { enterOrgScope } from '../middleware/org.js'
-import { CalendarService } from './calendar.js'
-import { CredentialCrypto } from './credential-crypto.js'
 import { EmailService } from './email.js'
-import { EmailAttachmentStaging } from './email-attachment-staging.js'
-import { DraftStore } from './email-draft-store.js'
-import { EmailProvider } from './email-provider.js'
-import { MailTransport } from './mail-transport.js'
-import { StorageProvider } from './storage-provider.js'
-import { TimelineActivityService } from './timeline-activity.js'
+import { makeOrgRuntime, scopedAsOrg } from './email-harness.js'
 
-// Sending really does claim the lead — the wiring between EmailService.send and
-// the claim, which the claim's own suite cannot see. Everything below the send
-// is stubbed (no SMTP, no object storage); Postgres and the timeline service are
-// real, because the rows they write are what is being checked.
-//
-// Prereq: `pnpm cli services up` and a seeded `taller` org.
+const ORG = 'send-claims-test-org'
+// The sender is a real member below: the claim refuses to hand a lead to
+// somebody the organisation does not list, so an invented id would make every
+// case here fail for the wrong reason.
+const SENDER = 'send-claims-user'
+// Deliberately never created: the case below is about somebody the
+// organisation does not list.
+const STRANGER = 'send-claims-stranger'
 
-const DATABASE_URL =
-	process.env['DATABASE_URL'] ??
-	'postgresql://batuda:batuda@localhost:5433/batuda'
+// One harness, shared with the other EmailService suites — see
+// `email-harness.ts` for why the SqlClient has to be the same one the org scope
+// is entered on.
+let sentCount = 0
+const asOrg = {
+	orgId: ORG,
+	orgName: 'Send Claims Test',
+	orgSlug: 'send-claims-test',
+	userId: SENDER,
+	// Numbered, so two sends in one test cannot collide on the unique index
+	// over (organisation, message id).
+	onSend: () => {
+		sentCount += 1
+		return `<send-claims-${sentCount}@taller.test>`
+	},
+	// This suite is about what a send leaves on the company's history, so the
+	// entries have to be written rather than swallowed.
+	recordsHistory: true,
+} as const
 
-const FIXTURE_SLUG = `send-claims-${randomUUID()}`
+// Built once for the file; disposed in afterAll.
+const runtime = makeOrgRuntime(asOrg)
 
-let pool: pg.Pool
-let orgId: string
-let orgSlug: string
-let companyId: string
-let inboxId: string
-// Only the mailbox's own owner may send through it, so the fixture mailbox
-// below is created owned by this id.
-const sender = `send-claims-${randomUUID()}`
+const run = <A, E>(
+	effect: Effect.Effect<
+		A,
+		E,
+		EmailService | SqlClient.SqlClient | CurrentOrg | SessionContext
+	>,
+) => runtime.runPromise(scopedAsOrg(asOrg, effect))
 
-const stubCrypto = Layer.succeed(CredentialCrypto, {
-	encryptPassword: () => ({
-		ciphertext: new Uint8Array([0]),
-		nonce: new Uint8Array([0]),
-		tag: new Uint8Array([0]),
-	}),
-	decryptPassword: () => 'stubbed-password',
-} as never)
+// Fixture writes that must not go through the organisation's own scope, so the
+// suite can set up and read back regardless of what the rules under test allow.
+const sqlOnly = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
+	Effect.runPromise(effect.pipe(Effect.provide(PgLive)))
 
-// Accepts the message and hands back a Message-ID, the way a real SMTP server
-// would. Nothing leaves the machine.
-const stubTransport = Layer.succeed(MailTransport, {
-	probe: () => Effect.void,
-	send: () =>
-		Effect.succeed({
-			messageId: `<${randomUUID()}@send-claims.test>`,
-			raw: Buffer.from('stub'),
-		}),
-	appendToSent: () => Effect.void,
-} as never)
+const body = [
+	{
+		type: 'paragraph' as const,
+		spans: [{ kind: 'text' as const, value: 'Getting in touch.' }],
+	},
+]
 
-const stubStorage = Layer.succeed(StorageProvider, {
-	put: () => Effect.void,
-} as never)
-
-const stubStaging = Layer.succeed(EmailAttachmentStaging, {
-	resolve: () => Effect.succeed([]),
-	markSentAndCleanup: () => Effect.void,
-} as never)
-
-const serviceLayer = EmailService.layer.pipe(
-	Layer.provide([
-		stubCrypto,
-		stubTransport,
-		stubStorage,
-		stubStaging,
-		Layer.succeed(EmailProvider, {} as never),
-		Layer.succeed(CalendarService, {} as never),
-		// Real: the history entries and the claim it triggers are the point.
-		TimelineActivityService.layer.pipe(Layer.provide(PgLive)),
-		DraftStore.layer.pipe(Layer.provide(PgLive)),
-	]),
-	Layer.provide(PgLive),
-)
+let inboxId = ''
+let companyId = ''
 
 beforeAll(async () => {
-	pool = new pg.Pool({ connectionString: DATABASE_URL, max: 4 })
-	await pool.query('GRANT app_user TO CURRENT_USER')
-	const org = await pool.query<{ id: string; slug: string }>(
-		`SELECT id, slug FROM organization WHERE slug = 'taller' LIMIT 1`,
-	)
-	const row = org.rows[0]
-	if (!row) {
-		throw new Error(
-			"taller org missing — run 'pnpm cli db reset && pnpm cli seed' first",
-		)
-	}
-	orgId = row.id
-	orgSlug = row.slug
-	// Its own mailbox rather than a seeded one: suites run side by side and
-	// several of them flip grant_status on the seeded inboxes, so borrowing one
-	// makes this pass on its own and fail once the others run alongside it.
-	const placeholder = new Uint8Array([0])
-	const inbox = await pool.query<{ id: string }>(
-		`INSERT INTO inboxes (
-			organization_id, email, owner_user_id, is_default, is_private,
-			grant_status, imap_host, imap_port, imap_security,
-			smtp_host, smtp_port, smtp_security, username,
-			password_ciphertext, password_nonce, password_tag
-		) VALUES (
-			$1, $2, $3, false, false,
-			'connected', 'imap.test', 993, 'tls', 'smtp.test', 465, 'tls', $2,
-			$4, $4, $4
-		) RETURNING id`,
-		[orgId, `${FIXTURE_SLUG}@test.local`, sender, placeholder],
-	)
-	inboxId = inbox.rows[0]!.id
-	const insertedCompany = await pool.query<{ id: string }>(
-		`INSERT INTO companies (organization_id, slug, name, status)
-		 VALUES ($1, $2, $2, 'prospect') RETURNING id`,
-		[orgId, FIXTURE_SLUG],
-	)
-	companyId = insertedCompany.rows[0]!.id
-	// The sender has to really work here — the claim refuses a lead to somebody
-	// the organisation does not list.
-	await pool.query(
-		`INSERT INTO "user" (id, name, email, "emailVerified")
-		 VALUES ($1, $1, $2, true) ON CONFLICT (id) DO NOTHING`,
-		[sender, `${sender}@test.local`],
-	)
-	await pool.query(
-		`INSERT INTO member (id, "organizationId", "userId", role, "createdAt")
-		 VALUES ($1, $2, $3, 'member', now()) ON CONFLICT (id) DO NOTHING`,
-		[`m-${FIXTURE_SLUG}`, orgId, sender],
+	await sqlOnly(
+		Effect.gen(function* () {
+			const sql = yield* SqlClient.SqlClient
+			yield* sql`
+				INSERT INTO "organization" (id, name, slug, "createdAt")
+				VALUES (${ORG}, ${asOrg.orgName}, ${asOrg.orgSlug}, now())
+				ON CONFLICT (id) DO NOTHING`
+			yield* sql`
+				INSERT INTO "user" (id, name, email, "emailVerified")
+				VALUES (${SENDER}, ${SENDER}, ${`${SENDER}@test.local`}, true)
+				ON CONFLICT (id) DO NOTHING`
+			yield* sql`
+				INSERT INTO member (id, "organizationId", "userId", role, "createdAt")
+				VALUES (${`m-${SENDER}`}, ${ORG}, ${SENDER}, 'owner', now())
+				ON CONFLICT (id) DO NOTHING`
+			const placeholder = new Uint8Array([0])
+			const inboxes = yield* sql<{ id: string }>`
+				INSERT INTO inboxes (
+					organization_id, email, owner_user_id, is_default, is_private,
+					grant_status, imap_host, imap_port, imap_security,
+					smtp_host, smtp_port, smtp_security, username,
+					password_ciphertext, password_nonce, password_tag
+				) VALUES (
+					${ORG}, ${'sender@send-claims.test'}, ${SENDER}, true, false,
+					'connected', 'imap.test', 993, 'tls', 'smtp.test', 465, 'tls',
+					${'sender@send-claims.test'},
+					${placeholder}, ${placeholder}, ${placeholder}
+				) RETURNING id`
+			inboxId = inboxes[0]!.id
+			const companies = yield* sql<{ id: string }>`
+				INSERT INTO companies (organization_id, slug, name, status)
+				VALUES (${ORG}, 'send-claims-co', 'Send Claims Co', 'prospect')
+				RETURNING id`
+			companyId = companies[0]!.id
+		}),
 	)
 }, 30_000)
 
 afterAll(async () => {
-	await pool.query(`DELETE FROM timeline_activity WHERE company_id = $1`, [
-		companyId,
-	])
-	await pool.query(`DELETE FROM interactions WHERE company_id = $1`, [
-		companyId,
-	])
-	await pool.query(`DELETE FROM email_messages WHERE company_id = $1`, [
-		companyId,
-	])
-	await pool.query(`DELETE FROM email_thread_links WHERE company_id = $1`, [
-		companyId,
-	])
-	await pool.query(`DELETE FROM companies WHERE id = $1`, [companyId])
-	await pool.query(`DELETE FROM inboxes WHERE id = $1`, [inboxId])
-	await pool.query(`DELETE FROM member WHERE id = $1`, [`m-${FIXTURE_SLUG}`])
-	await pool.query(`DELETE FROM "user" WHERE id = $1`, [sender])
-	await pool.end()
-})
-
-beforeEach(async () => {
-	await pool.query(
-		`UPDATE companies SET owner_id = NULL, status = 'prospect' WHERE id = $1`,
-		[companyId],
+	await runtime.dispose()
+	await sqlOnly(
+		Effect.gen(function* () {
+			const sql = yield* SqlClient.SqlClient
+			yield* sql`DELETE FROM timeline_activity WHERE organization_id = ${ORG}`
+			yield* sql`DELETE FROM interactions WHERE organization_id = ${ORG}`
+			yield* sql`DELETE FROM email_messages WHERE organization_id = ${ORG}`
+			yield* sql`DELETE FROM email_thread_links WHERE organization_id = ${ORG}`
+			yield* sql`DELETE FROM email_drafts WHERE organization_id = ${ORG}`
+			yield* sql`DELETE FROM companies WHERE organization_id = ${ORG}`
+			yield* sql`DELETE FROM inboxes WHERE organization_id = ${ORG}`
+			yield* sql`DELETE FROM member WHERE "organizationId" = ${ORG}`
+			yield* sql`DELETE FROM "user" WHERE id = ${SENDER}`
+			yield* sql`DELETE FROM "organization" WHERE id = ${ORG}`
+		}),
 	)
-	await pool.query(`DELETE FROM timeline_activity WHERE company_id = $1`, [
-		companyId,
-	])
 })
 
-// Sends the way a request does: inside the organization's own database scope,
-// as a member with a session — the same shape the HTTP route establishes.
-const sendAs = (actor: {
+// Back to an untouched lead with an empty history, so each case starts from the
+// same place whatever the one before it did.
+beforeEach(async () => {
+	await sqlOnly(
+		Effect.gen(function* () {
+			const sql = yield* SqlClient.SqlClient
+			yield* sql`
+				UPDATE companies SET owner_id = NULL, status = 'prospect'
+				WHERE id = ${companyId}`
+			yield* sql`DELETE FROM timeline_activity WHERE company_id = ${companyId}`
+		}),
+	)
+})
+
+const company = () =>
+	sqlOnly(
+		Effect.gen(function* () {
+			const sql = yield* SqlClient.SqlClient
+			const rows = yield* sql<{ ownerId: string | null; status: string }>`
+				SELECT owner_id, status FROM companies WHERE id = ${companyId}`
+			return rows[0]!
+		}),
+	)
+
+const historyKinds = () =>
+	sqlOnly(
+		Effect.gen(function* () {
+			const sql = yield* SqlClient.SqlClient
+			const rows = yield* sql<{ kind: string }>`
+				SELECT kind FROM timeline_activity
+				WHERE company_id = ${companyId} ORDER BY occurred_at ASC`
+			return rows.map(r => r.kind)
+		}),
+	)
+
+const sentEmailActor = () =>
+	sqlOnly(
+		Effect.gen(function* () {
+			const sql = yield* SqlClient.SqlClient
+			const rows = yield* sql<{ actorUserId: string | null }>`
+				SELECT actor_user_id FROM timeline_activity
+				WHERE company_id = ${companyId} AND kind = 'email_sent'
+				ORDER BY occurred_at DESC LIMIT 1`
+			return rows[0]?.actorUserId ?? null
+		}),
+	)
+
+const person = { userId: SENDER, isAgent: false, claimsLead: true } as const
+
+const sendFresh = (actor: {
 	readonly userId: string
 	readonly isAgent: boolean
 	readonly claimsLead: boolean
-}): Promise<unknown> =>
-	Effect.runPromise(
+}) =>
+	run(
 		Effect.gen(function* () {
-			const sql = yield* SqlClient.SqlClient
-			return yield* enterOrgScope(sql, {
-				org: { id: orgId, name: 'Taller', slug: orgSlug } as never,
-				userId: actor.userId,
-				role: 'member',
-			})(
-				Effect.gen(function* () {
-					const svc = yield* EmailService
-					return yield* svc.send(
-						inboxId,
-						'someone@example.test',
-						'Hello from the first-email check',
-						[
-							{
-								type: 'paragraph' as const,
-								spans: [{ kind: 'text' as const, value: 'Hello.' }],
-							},
-						],
-						companyId,
-						undefined,
-						{ actor, skipFooter: true },
-					)
-				}).pipe(
-					Effect.provide(serviceLayer),
-					Effect.provideService(SessionContext, {
-						userId: actor.userId,
-						email: `${actor.userId}@test.local`,
-						name: undefined,
-						isAgent: actor.isAgent,
-					}),
-					Effect.provideService(CurrentOrg, {
-						id: orgId,
-						name: 'Taller',
-						slug: orgSlug,
-						role: 'member',
-					}),
-				),
+			const svc = yield* EmailService
+			return yield* svc.send(
+				inboxId,
+				'client@example.com',
+				'Getting in touch',
+				body,
+				companyId,
+				undefined,
+				{ actor, skipFooter: true },
 			)
-		}).pipe(Effect.provide(PgLive), Effect.orDie),
+		}),
 	)
 
-// Replies on an existing thread, the same way a request does. The reply path
-// hands `actor` over through a different argument than `send` does, so covering
-// one says nothing about the other.
-const replyAs = (
-	threadLinkId: string,
-	actor: {
-		readonly userId: string
-		readonly isAgent: boolean
-		readonly claimsLead: boolean
-	},
-): Promise<unknown> =>
-	Effect.runPromise(
-		Effect.gen(function* () {
-			const sql = yield* SqlClient.SqlClient
-			return yield* enterOrgScope(sql, {
-				org: { id: orgId, name: 'Taller', slug: orgSlug } as never,
-				userId: actor.userId,
-				role: 'member',
-			})(
-				Effect.gen(function* () {
-					const svc = yield* EmailService
-					return yield* svc.reply(
-						threadLinkId,
-						[
-							{
-								type: 'paragraph' as const,
-								spans: [{ kind: 'text' as const, value: 'Following up.' }],
-							},
-						],
-						{ actor, skipFooter: true },
-					)
-				}).pipe(
-					Effect.provide(serviceLayer),
-					Effect.provideService(SessionContext, {
-						userId: actor.userId,
-						email: `${actor.userId}@test.local`,
-						name: undefined,
-						isAgent: actor.isAgent,
-					}),
-					Effect.provideService(CurrentOrg, {
-						id: orgId,
-						name: 'Taller',
-						slug: orgSlug,
-						role: 'member',
-					}),
-				),
-			)
-		}).pipe(Effect.provide(PgLive), Effect.orDie),
-	)
-
-const firstThreadLinkId = async (): Promise<string> => {
-	const rows = await pool.query<{ id: string }>(
-		`SELECT id FROM email_thread_links WHERE company_id = $1 ORDER BY created_at ASC LIMIT 1`,
-		[companyId],
-	)
-	return rows.rows[0]!.id
-}
-
-const company = async (): Promise<{
-	owner_id: string | null
-	status: string
-}> => {
-	const rows = await pool.query<{ owner_id: string | null; status: string }>(
-		`SELECT owner_id, status FROM companies WHERE id = $1`,
-		[companyId],
-	)
-	return rows.rows[0]!
-}
-
-const historyKinds = async (): Promise<ReadonlyArray<string>> => {
-	const rows = await pool.query<{ kind: string }>(
-		`SELECT kind FROM timeline_activity WHERE company_id = $1
-		 ORDER BY occurred_at ASC`,
-		[companyId],
-	)
-	return rows.rows.map(r => r.kind)
-}
-
-describe('EmailService.send', () => {
-	describe('when a person emails a lead nobody has taken', () => {
+describe('EmailService — sending claims the lead', () => {
+	describe('when a person opens with a company nobody has taken', () => {
 		it('should hand them the lead and move it out of prospect', async () => {
 			// GIVEN an unowned company still at prospect
-			// WHEN Alice sends it an email through the service
-			await sendAs({ userId: sender, isAgent: false, claimsLead: true })
-			// THEN the send claimed it for her and counted as contact
+			// WHEN they send it an email through the service
+			await sendFresh(person)
+			// THEN the send claimed it and counted as reaching out
 			const row = await company()
-			expect(row.owner_id).toBe(sender)
+			expect(row.ownerId).toBe(SENDER)
 			expect(row.status).toBe('contacted')
 		})
 
 		it('should tell the history the email came first', async () => {
 			// GIVEN an unowned company still at prospect
-			// WHEN Alice sends it an email
-			await sendAs({ userId: sender, isAgent: false, claimsLead: true })
+			// WHEN they send it an email
+			await sendFresh(person)
 			// THEN all three entries are there, cause before effect
 			expect(await historyKinds()).toEqual([
 				'email_sent',
@@ -325,64 +226,110 @@ describe('EmailService.send', () => {
 			])
 		})
 
-		it('should attribute the sent email to her, not to nobody', async () => {
+		it('should attribute the sent email to them, not to nobody', async () => {
 			// GIVEN an unowned company
-			// WHEN Alice sends it an email
-			await sendAs({ userId: sender, isAgent: false, claimsLead: true })
+			// WHEN they send it an email
+			await sendFresh(person)
 			// THEN the email entry names who sent it
-			const rows = await pool.query<{ actor_user_id: string | null }>(
-				`SELECT actor_user_id FROM timeline_activity
-				 WHERE company_id = $1 AND kind = 'email_sent'`,
-				[companyId],
-			)
-			expect(rows.rows[0]?.actor_user_id).toBe(sender)
+			expect(await sentEmailActor()).toBe(SENDER)
 		})
 	})
 
-	describe('when the follow-up is a reply on an existing thread', () => {
-		it('should claim the lead and name the sender, same as a first send', async () => {
-			// GIVEN a thread this org already started, on a company nobody owns —
-			// the first send is only here to leave a thread behind, so what it
-			// claimed goes back the way it was before the reply
-			await sendAs({ userId: sender, isAgent: false, claimsLead: true })
-			await pool.query(
-				`UPDATE companies SET owner_id = NULL, status = 'prospect' WHERE id = $1`,
-				[companyId],
+	describe('when the send is a reply on a thread that already exists', () => {
+		it('should claim the lead and name the sender, same as opening one', async () => {
+			// GIVEN a thread this organisation already started, and a company
+			// back to unowned so the reply is what claims it
+			await sendFresh(person)
+			const threadLinkId = await sqlOnly(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					yield* sql`
+						UPDATE companies SET owner_id = NULL, status = 'prospect'
+						WHERE id = ${companyId}`
+					yield* sql`DELETE FROM timeline_activity WHERE company_id = ${companyId}`
+					const rows = yield* sql<{ id: string }>`
+						SELECT id FROM email_thread_links WHERE company_id = ${companyId}
+						ORDER BY created_at ASC LIMIT 1`
+					return rows[0]!.id
+				}),
 			)
-			await pool.query(`DELETE FROM timeline_activity WHERE company_id = $1`, [
-				companyId,
-			])
 			// WHEN the reply goes out
-			await replyAs(await firstThreadLinkId(), {
-				userId: sender,
-				isAgent: false,
-				claimsLead: true,
-			})
-			// THEN replying carries the sender the same way sending does
-			const row = await company()
-			expect(row.owner_id).toBe(sender)
-			expect(row.status).toBe('contacted')
-			const attributed = await pool.query<{ actor_user_id: string | null }>(
-				`SELECT actor_user_id FROM timeline_activity
-				 WHERE company_id = $1 AND kind = 'email_sent'`,
-				[companyId],
+			await run(
+				Effect.gen(function* () {
+					const svc = yield* EmailService
+					return yield* svc.reply(threadLinkId, body, {
+						actor: person,
+						skipFooter: true,
+					})
+				}),
 			)
-			expect(attributed.rows[0]?.actor_user_id).toBe(sender)
+			// THEN replying carries the sender the way sending does — the two
+			// paths hand the sender over differently, so covering one says
+			// nothing about the other
+			const row = await company()
+			expect(row.ownerId).toBe(SENDER)
+			expect(row.status).toBe('contacted')
+			expect(await sentEmailActor()).toBe(SENDER)
 		})
 	})
 
-	describe("when an agent sends on the org's behalf", () => {
+	describe('when the send is a draft written earlier', () => {
+		it('should claim the lead and name the sender, same as sending directly', async () => {
+			// GIVEN a draft written against this company
+			// WHEN it is sent
+			await run(
+				Effect.gen(function* () {
+					const svc = yield* EmailService
+					const draft = yield* svc.createDraft(
+						inboxId,
+						{
+							to: 'client@example.com',
+							subject: 'Picking this back up',
+							bodyJson: body,
+						},
+						{ companyId },
+					)
+					return yield* svc.sendDraft(inboxId, draft.draftId, person)
+				}),
+			)
+			// THEN a draft sent later claims exactly as a direct send does. This
+			// path takes the sender as an argument of its own rather than through
+			// the extras the other two use, so it is the one a hardcoded "nobody"
+			// would slip through unnoticed
+			const row = await company()
+			expect(row.ownerId).toBe(SENDER)
+			expect(row.status).toBe('contacted')
+			expect(await sentEmailActor()).toBe(SENDER)
+		})
+	})
+
+	describe('when an agent sends on the organisation behalf', () => {
 		it('should send but hand it no lead', async () => {
-			// GIVEN an unowned company and an agent, sending under the mailbox
-			// owner's id because that is the only id the mailbox lets through
+			// GIVEN an unowned company and an agent principal
 			// WHEN the agent emails it
-			await sendAs({ userId: sender, isAgent: true, claimsLead: true })
+			await sendFresh({ userId: SENDER, isAgent: true, claimsLead: true })
 			// THEN the email is recorded and attributed, but nothing was claimed:
 			// an owner has to be somebody who can be asked about the account
 			expect(await historyKinds()).toEqual(['email_sent'])
 			const row = await company()
-			expect(row.owner_id).toBeNull()
+			expect(row.ownerId).toBeNull()
 			expect(row.status).toBe('prospect')
+		})
+	})
+
+	describe('when the sender no longer works here', () => {
+		it('should send, move the stage, and hand them no lead', async () => {
+			// GIVEN somebody the organisation does not list, whose session still
+			// points at it
+			// WHEN they email an untouched company
+			await sendFresh({ userId: STRANGER, isAgent: false, claimsLead: true })
+			// THEN the lead stays unclaimed — the owner column has nothing in the
+			// database behind it, so this check is what refuses them — while the
+			// stage still moves, because an email did go out
+			const row = await company()
+			expect(row.ownerId).toBeNull()
+			expect(row.status).toBe('contacted')
+			expect(await historyKinds()).toEqual(['email_sent', 'stage_changed'])
 		})
 	})
 })
