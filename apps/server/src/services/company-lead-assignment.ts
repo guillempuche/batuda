@@ -22,7 +22,8 @@ export interface EmailActor {
 }
 
 // Emailing a company nobody has picked up makes it yours, and moves it out of
-// the untouched column.
+// the untouched column — to `contacted` when we wrote first, or `responded`
+// when we are writing back to a company that already wrote to us.
 //
 // Two conditions, checked separately because they answer different questions:
 // `owner_id IS NULL` is "nobody has claimed this", `status = 'prospect'` is
@@ -105,27 +106,49 @@ export const claimLeadOnEmail = (params: {
 					)
 				}
 
+				// Where the lead lands depends on who started it. Writing first
+				// to somebody who has never answered is `contacted`; writing back
+				// to a company that already wrote to us is `responded`, and the
+				// difference is the strongest signal in the funnel — one is a
+				// stranger, the other is a conversation. Flattening both into
+				// `contacted` would lose it for good, since this only ever fires
+				// while the stage is still `prospect`.
+				//
+				// Read from the company's own history rather than the stored
+				// mail: an `email_received` entry is written only for a message
+				// that arrived and matched this company, so our own copies in the
+				// Sent folder cannot be mistaken for them answering.
+				//
 				// `version` is the token a research proposal is checked against,
 				// and `status` is a field a proposal may write — so moving the
 				// stage without bumping it would let one prepared beforehand put
 				// the old stage back. The owner write leaves it alone: research
 				// cannot write an owner, so bumping there would only invalidate
 				// proposals about unrelated fields.
-				const advanced = yield* sql<{ id: string }>`
+				const advanced = yield* sql<{ id: string; status: string }>`
 					UPDATE companies SET
-						status = 'contacted',
+						status = CASE
+							WHEN EXISTS (
+								SELECT 1 FROM timeline_activity
+								WHERE company_id = ${params.companyId}
+									AND kind = 'email_received'
+							)
+							THEN 'responded'
+							ELSE 'contacted'
+						END,
 						version = version + 1,
 						updated_at = now()
 					WHERE id = ${params.companyId}
 						AND status = 'prospect'
 						AND deleted_at IS NULL
-					RETURNING id`
+					RETURNING id, status`
 
-				if (advanced.length > 0) {
+				const landedOn = advanced[0]?.status
+				if (landedOn !== undefined) {
 					yield* recordStageChange({
 						companyId: params.companyId,
 						from: 'prospect',
-						to: 'contacted',
+						to: landedOn,
 						actorUserId: actor.userId,
 						occurredAt: new Date(params.sentAt.getTime() + 2),
 					})
