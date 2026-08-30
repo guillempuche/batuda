@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-30 (ui-v2026.8.30-1)
+
+### Features
+
+* narrow the company filters to what each one would find ([cc510a4](https://github.com/guillempuche/batuda/commit/cc510a41c52e334e261ac618eff15996af959235))
+
+### Bug Fixes
+
+* **ui:** stop consumers installing a second copy of Base UI ([4f8ee6a](https://github.com/guillempuche/batuda/commit/4f8ee6a7cd9f362b34fdff8ac56484dbada3e6bf))
+
 ## 2026-08-30 (ui-v2026.8.30)
 
 ### Features
