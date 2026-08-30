@@ -72,7 +72,9 @@ const WebSearchParams = Schema.Struct({
 	query: Schema.String.annotate({
 		description: 'Search query; concise keywords work best',
 	}),
-	limit: describedLenientNumber('Max results to return (default 10)'),
+	limit: describedLenientNumber(
+		'Max results to return. Null for the default of 10.',
+	),
 	recency_days: describedLenientNumber(
 		'Restrict to results published within the last N days. Null for no filter.',
 	),

@@ -69,6 +69,26 @@ const mkAuthError = (): AiError.AiError =>
 		reason: new AiError.AuthenticationError({ kind: 'InvalidKey' }),
 	})
 
+// The 400 a provider sends when it checks the model's tool call against the
+// tool's schema itself and will not run it. Read as a plain invalid request it
+// would end the run; the harness re-reads it as the model's mistake.
+const mkToolCallRefusedError = (): AiError.AiError =>
+	new AiError.AiError({
+		module: 'OpenAiClient',
+		method: 'createResponse',
+		reason: new AiError.InvalidRequestError({
+			description:
+				'Tool call validation failed: parameters for tool web_search did not match schema',
+			metadata: {
+				openai: {
+					errorCode: 'tool_use_failed',
+					errorType: 'invalid_request_error',
+					requestId: 'req_1',
+				},
+			},
+		}),
+	})
+
 const mkRateLimitError = (retryAfter: Duration.Duration): AiError.AiError =>
 	new AiError.AiError({
 		module: 'test',
@@ -165,6 +185,46 @@ describe('hardenLanguageModel', () => {
 		// AND exactly one attempt was recorded — no retries on non-recoverable errors
 		expect(Exit.isFailure(exit)).toBe(true)
 		expect(Ref.getUnsafe(attemptsRef)).toBe(1)
+	})
+
+	it('should retry a tool call the provider refused for not fitting its schema', async () => {
+		// GIVEN a stub LM whose first call is refused because the model named an
+		// argument the tool does not have, and whose second call goes through —
+		// the same prompt sampled twice, which is why re-asking is worth anything
+		const attemptsRef = Ref.makeUnsafe(0)
+		const stub = makeStubLm(attemptsRef, attempt =>
+			attempt === 1
+				? Effect.fail(mkToolCallRefusedError())
+				: Effect.succeed({ text: `ok@${attempt}`, usage: {} }),
+		)
+		const hardened = hardenLanguageModel(stub, 'groq')
+
+		// WHEN generateText runs under TestClock
+		const exit = await runWithVirtualClock(() => invokeGenerateText(hardened))
+
+		// THEN the second attempt's payload surfaces
+		// AND the refusal cost one attempt rather than the whole call
+		expect(Exit.isSuccess(exit)).toBe(true)
+		expect(Ref.getUnsafe(attemptsRef)).toBe(2)
+	})
+
+	it('should give up on a refused tool call once its retry budget is spent', async () => {
+		// GIVEN a stub LM that refuses the tool call every time — a tool schema no
+		// sampling of the model will ever satisfy
+		const attemptsRef = Ref.makeUnsafe(0)
+		const stub = makeStubLm(attemptsRef, () =>
+			Effect.fail(mkToolCallRefusedError()),
+		)
+		const hardened = hardenLanguageModel(stub, 'groq')
+
+		// WHEN generateText is invoked
+		const exit = await runWithVirtualClock(() => invokeGenerateText(hardened))
+
+		// THEN it fails as a ProviderError after the budgeted attempts, so a
+		// permanently bad call cannot retry forever
+		expect(Exit.isFailure(exit)).toBe(true)
+		expect(failureOf(exit)).toBeInstanceOf(ProviderError)
+		expect(Ref.getUnsafe(attemptsRef)).toBe(3)
 	})
 
 	it('should sleep for the RateLimitError retryAfter before re-attempting', async () => {

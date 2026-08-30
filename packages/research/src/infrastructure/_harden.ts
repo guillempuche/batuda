@@ -12,6 +12,9 @@
  *     behavior against a provider that has already told us how long to wait.
  *   - `Effect.retry` with jittered exponential backoff (3 attempts, 500ms base)
  *   - Retry gated on `AiError.isRetryable` (network, 5xx, 429, structured-output)
+ *   - A tool call the provider refused because the model's arguments did not fit
+ *     the tool's schema is re-read as the model's mistake before that gate, so it
+ *     is retried like the same mistake caught on our side (`_tool-call-rejection`)
  *   - `Schedule.tapOutput` emits a `research.llm.retry` log ONLY when the
  *     schedule actually decides to retry — not on the final exhausted attempt.
  *   - AiError → `ProviderError { provider, message, recoverable }` at the exit,
@@ -39,6 +42,7 @@ import type { LanguageModel } from 'effect/unstable/ai'
 import { AiError } from 'effect/unstable/ai'
 
 import { ProviderError } from '../domain/errors'
+import { reclassifyRejectedToolCall } from './_tool-call-rejection'
 
 const DEFAULT_TIMEOUT: Duration.Input = '60 seconds'
 const DEFAULT_MAX_ATTEMPTS = 3
@@ -248,7 +252,9 @@ const harden =
 	) =>
 	<A, R>(eff: Effect.Effect<A, AiError.AiError, R>) => {
 		const schedule = makeRetrySchedule(provider, tier)
-		const withRetryAfter = sleepForRetryAfter(eff)
+		// First of all, so the retry below judges the failure by what it really was.
+		const reread = reclassifyRejectedToolCall(provider, tier)(eff)
+		const withRetryAfter = sleepForRetryAfter(reread)
 		const timed = Effect.timeout(withRetryAfter, timeout) as Effect.Effect<
 			A,
 			unknown,
