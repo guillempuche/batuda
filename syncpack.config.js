@@ -3,6 +3,17 @@ export default {
 	indent: '\t',
 	versionGroups: [
 		{
+			// A peer range says what a consumer is allowed to bring; a dependency
+			// pin says what we install. `@batuda/ui` accepts `@base-ui/react`
+			// `^1.3.0` so a consumer on 1.3.0 keeps one copy, while this repo
+			// installs 1.6.0. Holding both to one string would force either a
+			// hostile exact peer or a loose install pin.
+			label: 'Peer ranges, which are broader than install pins',
+			dependencies: ['**'],
+			dependencyTypes: ['peer'],
+			isIgnored: true,
+		},
+		{
 			label: 'TypeScript',
 			dependencies: ['typescript'],
 		},

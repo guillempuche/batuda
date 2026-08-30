@@ -340,6 +340,12 @@ App-local primitives at the time of writing: `PriCombobox`, `PriCopyButton`,
 
 Adding a primitive needs no build change — `packages/ui/tsdown.config.ts` globs the directory, and `pnpm build` fails if an `exports` path names a module the build did not write. `src/blocks/` and `src/layout/` are emitted per file the same way, though neither exposes a per-file subpath.
 
+#### What a consumer has to install
+
+`@base-ui/react` and `styled-components` are **peer** dependencies, not bundled ones. Both keep state in React context — Base UI's hooks and styled-components' stylesheet registry — so two copies in one tree produce "Invalid hook call" inside a `Select.Root`, or styles that render server-side and vanish on hydration. A peer makes the consumer's copy the only copy. The declared ranges track what this package is built against rather than the oldest version that happens to work, so a consumer behind on either has to catch up. Both are optional, because `@batuda/ui/blocks` needs neither.
+
+`effect` and `@tiptap/core` are still ordinary dependencies, so `blocks` carries its own. That is a deliberate trade and it has a sharp edge: `blocks` exports `TiptapDocument` and `BlockNode` as `Schema` instances, and a consumer that composes one into its own `Schema.Struct` is mixing two copies of `effect`. When the versions differ the inferred type silently collapses to `{}` and every field access on it fails to compile — it does not error at the import, it errors pages away in whatever consumed the type. A consumer of `blocks` should pin the same `effect` version this package does.
+
 **Styling a router `Link`.** `styled(Link)` keeps the styling but drops
 TanStack Router's typing of `to`, `params` and `search`, so a wrong destination
 becomes a dead click instead of a compile error. Style a wrapper and put a bare

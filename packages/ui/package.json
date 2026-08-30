@@ -40,20 +40,22 @@
 		"check-contrast": "tsx scripts/check-contrast.ts"
 	},
 	"dependencies": {
-		"@base-ui/react": "1.6.0",
 		"@tiptap/core": "^3.28.0",
 		"@tiptap/pm": "^3.28.0",
-		"effect": "4.0.0-beta.102",
-		"styled-components": "6.3.12"
+		"effect": "4.0.0-beta.102"
 	},
 	"peerDependencies": {
+		"@base-ui/react": "^1.6.0",
 		"react": "^19",
 		"react-dom": "^19",
+		"styled-components": "^6.3.12",
 		"tailwindcss": ">=4"
 	},
 	"devDependencies": {
+		"@base-ui/react": "1.6.0",
 		"@types/react": "19.2.17",
 		"publint": "^0.3.24",
+		"styled-components": "6.3.12",
 		"tailwindcss": ">=4",
 		"tsdown": "^0.22.7",
 		"tsx": "^4.20.3",
@@ -66,6 +68,14 @@
 		"src/tailwind.css"
 	],
 	"license": "MIT",
+	"peerDependenciesMeta": {
+		"@base-ui/react": {
+			"optional": true
+		},
+		"styled-components": {
+			"optional": true
+		}
+	},
 	"publishConfig": {
 		"access": "public",
 		"exports": {
