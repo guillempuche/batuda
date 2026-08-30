@@ -18,6 +18,7 @@ import {
 	ExtractLanguageModel,
 	MapProvider,
 	RegistryRouter,
+	ResearchDispatch,
 	ResearchEventSink,
 	ResearchService,
 	ScrapeProvider,
@@ -94,31 +95,41 @@ const providersLayer = Layer.mergeAll(
 	),
 )
 
-const ResearchLive = ResearchService.layer.pipe(
-	Layer.provide(
-		Layer.mergeAll(
-			Layer.succeed(AgentLanguageModel)(capturingAgentLlm),
-			Layer.succeed(ExtractLanguageModel)(quietLlm),
-			Layer.succeed(WriterLanguageModel)(quietLlm),
+// `carriesRuns` says whether this copy of the service picks queued runs up and
+// starts them. A test that needs the database to be in a particular state
+// before a run reads it builds one that does not, so the two cannot race.
+const research = (carriesRuns: boolean) =>
+	ResearchService.layer.pipe(
+		Layer.provide(
+			Layer.mergeAll(
+				Layer.succeed(AgentLanguageModel)(capturingAgentLlm),
+				Layer.succeed(ExtractLanguageModel)(quietLlm),
+				Layer.succeed(WriterLanguageModel)(quietLlm),
+			),
 		),
-	),
-	Layer.provide(providersLayer),
-	Layer.provide(
-		Layer.succeed(ContactDiscovery)({
-			discover: () =>
-				Effect.succeed({
-					status: 'no_reliable_contact' as const,
-					researchId: 'test',
-				}),
-		}),
-	),
-	Layer.provide(
-		Layer.succeed(ResearchEventSink)(
-			ResearchEventSink.of({ fire: () => Effect.void }),
+		Layer.provide(providersLayer),
+		Layer.provide(
+			Layer.succeed(ContactDiscovery)({
+				discover: () =>
+					Effect.succeed({
+						status: 'no_reliable_contact' as const,
+						researchId: 'test',
+					}),
+			}),
 		),
-	),
-	Layer.provideMerge(PgLive),
-)
+		Layer.provide(
+			Layer.succeed(ResearchEventSink)(
+				ResearchEventSink.of({ fire: () => Effect.void }),
+			),
+		),
+		Layer.provide(Layer.succeed(ResearchDispatch)(carriesRuns)),
+		Layer.provideMerge(PgLive),
+	)
+
+const ResearchLive = research(true)
+// Accepts a run and leaves it queued, for a test that has to change something
+// underneath it before anything starts reading.
+const ResearchQueueOnly = research(false)
 
 const systemDefaults: SystemDefaults = {
 	budgetCents: 100,
@@ -320,8 +331,8 @@ describe('research subject scoping', () => {
 
 	describe('when the company is deleted between asking and the run starting', () => {
 		it('should fail the run rather than research an unnamed company', async () => {
-			// GIVEN a run accepted while its company still existed
-			// WHEN the company is soft-deleted before the fiber reads it
+			// GIVEN a run accepted while its company still existed, and left queued
+			// WHEN the company is soft-deleted, and only then is the run carried
 			// THEN the run ends failed with subject_unavailable, rather than
 			//   carrying on with nothing to ground itself against
 			const [doomed] = await run(
@@ -335,17 +346,31 @@ describe('research subject scoping', () => {
 				}),
 			)
 
-			const outcome = await Effect.runPromise(
+			// Accepted by a copy of the service that does not carry runs, so it is
+			// still sitting queued and nothing has read the company yet.
+			const runId = await Effect.runPromise(
+				startRun(doomed!.id).pipe(
+					Effect.provide(ResearchQueueOnly),
+					Effect.orDie,
+				),
+			)
+
+			// Soft-deleted the way a person deleting a company while research is
+			// queued would, and committed before anything can start the run — the
+			// point of the test is what a run does with a company it cannot read,
+			// not which of the two got there first.
+			await run(
 				Effect.gen(function* () {
-					const runId = yield* startRun(doomed!.id)
-					// Soft-delete it out from under the queued run, the way a person
-					// deleting a company while research is queued would.
 					const sql = yield* SqlClient.SqlClient
 					yield* sql`
 						UPDATE companies SET deleted_at = now() WHERE id = ${doomed!.id}::uuid
 					`
-					return yield* pollToTerminal(runId)
-				}).pipe(Effect.provide(ResearchLive), Effect.orDie),
+				}),
+			)
+
+			// A service that does carry runs picks the queued one up on the way in.
+			const outcome = await Effect.runPromise(
+				pollToTerminal(runId).pipe(Effect.provide(ResearchLive), Effect.orDie),
 			)
 
 			expect(outcome?.status).toBe('failed')
