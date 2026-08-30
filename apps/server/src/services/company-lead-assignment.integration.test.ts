@@ -27,12 +27,18 @@ const DATABASE_URL =
 
 const FIXTURE_SLUG = `lead-claim-${randomUUID()}`
 const SENT_AT = new Date('2026-03-01T10:00:00.000Z')
-const ALICE: EmailActor = { userId: 'user-alice', isAgent: false }
-const BOB: EmailActor = { userId: 'user-bob', isAgent: false }
+const ALICE: EmailActor = {
+	userId: 'user-alice',
+	isAgent: false,
+	claimsLead: true,
+}
+const BOB: EmailActor = { userId: 'user-bob', isAgent: false, claimsLead: true }
 
 let pool: pg.Pool
 let tallerOrgId: string
 let companyId: string
+// Its own mailbox, because another suite truncates the seeded ones.
+let inboxId: string
 
 beforeAll(async () => {
 	pool = new pg.Pool({ connectionString: DATABASE_URL, max: 4 })
@@ -52,6 +58,36 @@ beforeAll(async () => {
 		[tallerOrgId, FIXTURE_SLUG],
 	)
 	companyId = insertedCompany.rows[0]!.id
+	const placeholder = new Uint8Array([0])
+	const inbox = await pool.query<{ id: string }>(
+		`INSERT INTO inboxes (
+			organization_id, email, owner_user_id, is_default, is_private,
+			grant_status, imap_host, imap_port, imap_security,
+			smtp_host, smtp_port, smtp_security, username,
+			password_ciphertext, password_nonce, password_tag
+		) VALUES (
+			$1, $2, NULL, false, false,
+			'connected', 'imap.test', 993, 'tls', 'smtp.test', 465, 'tls', $2,
+			$3, $3, $3
+		) RETURNING id`,
+		[tallerOrgId, `${FIXTURE_SLUG}@test.local`, placeholder],
+	)
+	inboxId = inbox.rows[0]!.id
+	// Alice and Bob have to really work here: the claim refuses to hand a lead
+	// to somebody the organisation does not list, so invented ids would make
+	// every case below fail for the wrong reason.
+	for (const userId of [ALICE.userId, BOB.userId]) {
+		await pool.query(
+			`INSERT INTO "user" (id, name, email, "emailVerified")
+			 VALUES ($1, $1, $2, true) ON CONFLICT (id) DO NOTHING`,
+			[userId, `${userId}@test.local`],
+		)
+		await pool.query(
+			`INSERT INTO member (id, "organizationId", "userId", role, "createdAt")
+			 VALUES ($1, $2, $3, 'member', now()) ON CONFLICT (id) DO NOTHING`,
+			[`m-${FIXTURE_SLUG}-${userId}`, tallerOrgId, userId],
+		)
+	}
 }, 30_000)
 
 afterAll(async () => {
@@ -63,6 +99,10 @@ afterAll(async () => {
 		companyId,
 	])
 	await pool.query(`DELETE FROM companies WHERE id = $1`, [companyId])
+	await pool.query(`DELETE FROM inboxes WHERE id = $1`, [inboxId])
+	await pool.query(`DELETE FROM member WHERE id LIKE $1`, [
+		`m-${FIXTURE_SLUG}-%`,
+	])
 	await pool.end()
 })
 
@@ -190,10 +230,12 @@ describe('claimLeadOnEmail', () => {
 			const before = await company()
 			// WHEN Alice emails it, claiming it and moving the stage
 			await claimScoped(ALICE)
-			// THEN the version moved for both writes, so a research proposal
-			// prepared beforehand no longer matches and has to be re-checked
+			// THEN the stage write moved it, so a research proposal prepared
+			// beforehand no longer matches and has to be re-checked. The owner
+			// write leaves it alone: research cannot write an owner, so bumping
+			// there would only invalidate proposals about unrelated fields.
 			const after = await company()
-			expect(after.version).toBe(before.version + 2)
+			expect(after.version).toBe(before.version + 1)
 		})
 	})
 
@@ -246,25 +288,27 @@ describe('claimLeadOnEmail', () => {
 
 	describe('when the company has mail on file already', () => {
 		it('should still claim it — stored mail is not what decides', async () => {
-			// GIVEN a company that wrote in first, and a Sent folder read in from
-			// a mailbox connected with history. Both land as direction='inbound'
-			// (apps/mail-worker stores everything it fetches that way), so the
-			// stored mail cannot say who sent what — which is exactly why the
-			// claim never reads it.
-			await pool.query(
+			// GIVEN a company that wrote in first, and a date on the row to match.
+			// The claim never reads either: what the archive holds says nothing
+			// about whether anybody is working the lead now.
+			const seeded = await pool.query(
 				`INSERT INTO email_messages (
 					organization_id, inbox_id, folder, message_id, direction,
 					received_at, status, status_updated_at, company_id, raw_rfc822_ref
 				)
-				SELECT $1, i.id, 'INBOX', $2, 'inbound', now(), 'normal', now(), $3, $4
-				FROM inboxes i WHERE i.organization_id = $1 LIMIT 1`,
+				VALUES ($1, $5, 'INBOX', $2, 'inbound', now(), 'normal', now(), $3, $4)`,
 				[
 					tallerOrgId,
 					`<older-${randomUUID()}@example.test>`,
 					companyId,
 					`raw/${randomUUID()}`,
+					inboxId,
 				],
 			)
+			// This case says nothing unless the older message is really there,
+			// so pin it: a fixture that landed nowhere leaves a copy of the
+			// first test.
+			expect(seeded.rowCount).toBe(1)
 			await pool.query(
 				`UPDATE companies SET last_email_at = now() WHERE id = $1`,
 				[companyId],
@@ -309,7 +353,11 @@ describe('claimLeadOnEmail', () => {
 		it('should claim nothing for an agent', async () => {
 			// GIVEN an agent sending on the org's behalf
 			// WHEN it emails the company
-			await claimScoped({ userId: 'user-agent', isAgent: true })
+			await claimScoped({
+				userId: 'user-agent',
+				isAgent: true,
+				claimsLead: true,
+			})
 			// THEN no lead is handed to it: an owner has to be somebody who can
 			// be asked about the account
 			const row = await company()
@@ -335,6 +383,67 @@ describe('claimLeadOnEmail', () => {
 		})
 	})
 
+	describe('when the company was taken out of view', () => {
+		it('should change nothing on a soft-deleted lead', async () => {
+			// GIVEN a company somebody deleted, still reachable through an open
+			// thread — the mail path never checks whether it is in view
+			await pool.query(
+				`UPDATE companies SET deleted_at = now() WHERE id = $1`,
+				[companyId],
+			)
+			// WHEN Alice emails it
+			await claimScoped(ALICE)
+			// THEN it comes back from restore as it was dropped: no owner nobody
+			// assigned, no stage it never reached, nothing on its history
+			const row = await company()
+			expect(row.owner_id).toBeNull()
+			expect(row.status).toBe('prospect')
+			expect(await historyRows()).toEqual([])
+			await pool.query(`UPDATE companies SET deleted_at = NULL WHERE id = $1`, [
+				companyId,
+			])
+		})
+	})
+
+	describe('when the sender no longer works here', () => {
+		it('should not hand them the lead, but should still move the stage', async () => {
+			// GIVEN somebody removed from the organisation whose session still
+			// points at it — `owner_id` has nothing in the database behind it, so
+			// this check is all that refuses them
+			// WHEN they email an untouched company
+			await claimScoped({
+				userId: 'user-not-a-member',
+				isAgent: false,
+				claimsLead: true,
+			})
+			// THEN the lead stays unclaimed rather than landing on somebody whose
+			// name no per-person view would ever match — but an email did go out,
+			// so the company counts as contacted
+			const row = await company()
+			expect(row.owner_id).toBeNull()
+			expect(row.status).toBe('contacted')
+			expect((await historyRows()).map(h => h.kind)).toEqual(['stage_changed'])
+		})
+	})
+
+	describe('when the send is somebody answering, not reaching out', () => {
+		it('should claim nothing even though a person sent it', async () => {
+			// GIVEN a real person's reply to an invitation they were sent
+			// WHEN it goes out
+			await claimScoped({
+				userId: 'user-alice',
+				isAgent: false,
+				claimsLead: false,
+			})
+			// THEN they are still the sender for attribution's sake, but the lead
+			// is untouched — answering is not outreach
+			const row = await company()
+			expect(row.owner_id).toBeNull()
+			expect(row.status).toBe('prospect')
+			expect(await historyRows()).toEqual([])
+		})
+	})
+
 	describe('when the claim itself fails', () => {
 		it('should keep the surrounding transaction alive', async () => {
 			// GIVEN a claim pointed at something that cannot be a company id, so
@@ -345,6 +454,13 @@ describe('claimLeadOnEmail', () => {
 			// wraps it still went through — by this point the message has left
 			// over SMTP, and losing its record would have somebody send it twice
 			expect(result).toEqual([{ marker: 'outer-survived' }])
+			// AND the claim left nothing behind. This one dies on its first
+			// statement, so there is no half-done claim to undo here — that case
+			// is the savepoint's own job.
+			const row = await company()
+			expect(row.owner_id).toBeNull()
+			expect(row.status).toBe('prospect')
+			expect(await historyRows()).toEqual([])
 		})
 	})
 })

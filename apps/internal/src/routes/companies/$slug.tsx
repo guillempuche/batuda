@@ -895,9 +895,22 @@ function DetailBody({
 		[timelineEntries, showSystemEvents],
 	)
 
+	// Sending can hand this company an owner and move it out of prospect, and
+	// the tray sends from outside the page — so re-read the header and the
+	// history rather than leaving the change to be noticed on the next reload.
+	const refreshAfterSend = useCallback(() => {
+		refreshCompany()
+		refreshTimeline()
+		refreshEmails()
+	}, [refreshCompany, refreshTimeline, refreshEmails])
+
 	const handleComposeEmail = useCallback(() => {
-		openCompose({ mode: 'new', companyId: company.id })
-	}, [openCompose, company.id])
+		openCompose({
+			mode: 'new',
+			companyId: company.id,
+			onSent: refreshAfterSend,
+		})
+	}, [openCompose, company.id, refreshAfterSend])
 
 	const handleEmailContact = useCallback(
 		(contactId: string, email: string | null) => {
@@ -905,10 +918,11 @@ function DetailBody({
 				mode: 'new',
 				companyId: company.id,
 				contactId,
+				onSent: refreshAfterSend,
 				...(email ? { to: email } : {}),
 			})
 		},
-		[openCompose, company.id],
+		[openCompose, company.id, refreshAfterSend],
 	)
 
 	const clearSuppression = useAtomSet(

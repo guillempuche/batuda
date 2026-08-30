@@ -1,17 +1,24 @@
-import { Cause, Effect } from 'effect'
+import { Effect } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import type { CurrentOrg } from '@batuda/domain'
+import { boundedCause, recordFacts } from '@batuda/observability'
 
 import { recordStageChange } from './company-stage-change'
+import { requireOrgMembers } from './org-members'
 import { LeadAssigned, TimelineActivityService } from './timeline-activity'
 
 // Who a sent email is attributed to. Agents are carried so the history can say
 // one of them wrote it, but they never become owners: a lead belongs to
 // somebody who can be asked about it.
+//
+// `claimsLead` separates the two things the sender is used for. Answering an
+// invitation somebody else sent still has their name on it, but it is not
+// reaching out, so it names them without taking the lead.
 export interface EmailActor {
 	readonly userId: string
 	readonly isAgent: boolean
+	readonly claimsLead: boolean
 }
 
 // Emailing a company nobody has picked up makes it yours, and moves it out of
@@ -22,18 +29,19 @@ export interface EmailActor {
 // "nobody has worked this". A lead can be either without being both, and each
 // step should happen on its own terms.
 //
-// Deliberately NOT "has this company been emailed before". That cannot be
-// answered: a mailbox connected with years of history has its Sent folder read
-// in as inbound (apps/mail-worker stores every message it fetches that way), so
-// the stored mail cannot say which side sent what. Asking whether anybody has
-// taken the lead is both answerable and the thing actually worth knowing.
+// Deliberately NOT "has this company been emailed before", even though the
+// stored mail could answer it. Whether somebody emailed a company two years ago
+// from a mailbox that has since been connected says nothing about whether the
+// lead is being worked now — an account nobody has claimed and nobody has moved
+// off the first column is unworked whatever its archive holds. Asking who has
+// taken it is the question with a consequence.
 //
 // Each write is one conditional UPDATE, so two people emailing the same company
-// at once cannot both win it — the second one matches no row and does nothing.
-// No SELECT first, and no row lock: the whole request runs in one transaction
-// (see enterOrgScope), so a lock taken here would be held until the response,
-// and a FOR UPDATE would block the mail worker's inbound writes for the same
-// company.
+// at once cannot both win it: the second blocks on the first one's row lock,
+// then re-reads the committed row, matches nothing and does nothing. That lock
+// costs nothing extra here — recording the sent email bumps the same row's
+// `last_email_at` a moment earlier in this same transaction, so the request is
+// already holding it.
 export const claimLeadOnEmail = (params: {
 	readonly companyId: string
 	readonly actor: EmailActor | null
@@ -49,10 +57,20 @@ export const claimLeadOnEmail = (params: {
 > =>
 	Effect.gen(function* () {
 		const { actor } = params
-		if (!actor || actor.isAgent) return
+		if (!actor || actor.isAgent || !actor.claimsLead) return
 
 		const sql = yield* SqlClient.SqlClient
 		const timeline = yield* TimelineActivityService
+
+		// The owner column holds a plain user id with nothing in the database
+		// behind it, so this is all that stands between a session still pointing
+		// at an organisation somebody has left and a lead handed to them there.
+		// A stranger loses the lead, not the stage move: an email still went out,
+		// whoever sent it.
+		const senderWorksHere = yield* requireOrgMembers(sql, [actor.userId]).pipe(
+			Effect.as(true),
+			Effect.catchTag('BadRequest', () => Effect.succeed(false)),
+		)
 
 		// Its own transaction, which nesting turns into a savepoint. By the time
 		// this runs the message has already left over SMTP, so a failure here has
@@ -61,17 +79,20 @@ export const claimLeadOnEmail = (params: {
 		// again.
 		yield* sql.withTransaction(
 			Effect.gen(function* () {
-				// Bump `version` on both writes: it is the token a research
-				// proposal is checked against, so leaving it alone would let a
-				// proposal prepared before this send quietly put the old owner
-				// and stage back.
-				const claimed = yield* sql<{ id: string }>`
-					UPDATE companies SET
-						owner_id = ${actor.userId},
-						version = version + 1,
-						updated_at = now()
-					WHERE id = ${params.companyId} AND owner_id IS NULL
-					RETURNING id`
+				// A company taken out of view is not brought back by anything
+				// arriving for it, so restoring one shows the account as it was
+				// when it was dropped — the same rule the sent email's own date
+				// bump follows.
+				const claimed = senderWorksHere
+					? yield* sql<{ id: string }>`
+						UPDATE companies SET
+							owner_id = ${actor.userId},
+							updated_at = now()
+						WHERE id = ${params.companyId}
+							AND owner_id IS NULL
+							AND deleted_at IS NULL
+						RETURNING id`
+					: []
 
 				if (claimed.length > 0) {
 					yield* timeline.record(
@@ -84,12 +105,20 @@ export const claimLeadOnEmail = (params: {
 					)
 				}
 
+				// `version` is the token a research proposal is checked against,
+				// and `status` is a field a proposal may write — so moving the
+				// stage without bumping it would let one prepared beforehand put
+				// the old stage back. The owner write leaves it alone: research
+				// cannot write an owner, so bumping there would only invalidate
+				// proposals about unrelated fields.
 				const advanced = yield* sql<{ id: string }>`
 					UPDATE companies SET
 						status = 'contacted',
 						version = version + 1,
 						updated_at = now()
-					WHERE id = ${params.companyId} AND status = 'prospect'
+					WHERE id = ${params.companyId}
+						AND status = 'prospect'
+						AND deleted_at IS NULL
 					RETURNING id`
 
 				if (advanced.length > 0) {
@@ -101,16 +130,41 @@ export const claimLeadOnEmail = (params: {
 						occurredAt: new Date(params.sentAt.getTime() + 2),
 					})
 				}
+
+				// Nobody asked for either of these, so this is what answers why an
+				// owner appeared. On the request's own record rather than a line
+				// of its own, so it arrives beside what the send was doing and
+				// reaches the trace with it.
+				if (claimed.length > 0 || advanced.length > 0) {
+					yield* recordFacts({
+						'company.id': params.companyId,
+						'company.lead_claimed': claimed.length > 0,
+						'company.lead_owner': claimed.length > 0 ? actor.userId : null,
+						'company.stage_advanced': advanced.length > 0,
+					})
+				}
 			}),
 		)
 	}).pipe(
+		// This one keeps a line of its own as well: the send has already answered
+		// the caller, so a claim that failed unnoticed would otherwise leave
+		// nothing behind. The cause is cut to a length the log exporter can
+		// carry — a database one arrives holding the failing statement and the
+		// values in it.
 		Effect.catchCause(cause =>
-			Effect.logWarning('Lead claim after send failed').pipe(
-				Effect.annotateLogs({
-					event: 'company.lead_claim_failed',
-					companyId: params.companyId,
-					cause: Cause.pretty(cause),
-				}),
+			recordFacts({
+				'company.id': params.companyId,
+				'company.lead_claim_failed': true,
+			}).pipe(
+				Effect.andThen(
+					Effect.logWarning('Lead claim after send failed').pipe(
+						Effect.annotateLogs({
+							event: 'company.lead_claim_failed',
+							companyId: params.companyId,
+							cause: boundedCause(cause),
+						}),
+					),
+				),
 			),
 		),
 	)

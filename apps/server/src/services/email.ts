@@ -1263,10 +1263,10 @@ export class EmailService extends Context.Service<EmailService>()(
 					},
 				) =>
 					Effect.gen(function* () {
-						const cc = extras?.cc ?? []
-						const bcc = extras?.bcc ?? []
-						const attachmentRefs = extras?.attachmentRefs ?? []
-						const rawAttachments = extras?.rawAttachments ?? []
+						const cc = extras.cc ?? []
+						const bcc = extras.bcc ?? []
+						const attachmentRefs = extras.attachmentRefs ?? []
+						const rawAttachments = extras.rawAttachments ?? []
 
 						// Resolve to the calling member's primary human inbox when no
 						// id is supplied — the contract for /v1/email/send.
@@ -1285,14 +1285,14 @@ export class EmailService extends Context.Service<EmailService>()(
 
 						const staged = yield* staging.resolve(inbox.id, attachmentRefs)
 						let blocks: EmailBlocks = bodyJson
-						if (!extras?.skipFooter) {
+						if (!extras.skipFooter) {
 							const footerBlocks = yield* resolveDefaultFooter(inbox.id)
 							if (footerBlocks) blocks = [...bodyJson, ...footerBlocks]
 						}
 						const rendered = yield* Effect.tryPromise({
 							try: () =>
 								renderBlocks(blocks, {
-									...(extras?.preview !== undefined && {
+									...(extras.preview !== undefined && {
 										preview: extras.preview,
 									}),
 									attachments: toStagedRefs(staged),
@@ -1316,7 +1316,7 @@ export class EmailService extends Context.Service<EmailService>()(
 							html: rendered.html,
 							...(cc.length > 0 && { cc }),
 							...(bcc.length > 0 && { bcc }),
-							...(extras?.replyTo !== undefined && {
+							...(extras.replyTo !== undefined && {
 								replyTo: toRecipientArray(extras.replyTo),
 							}),
 							...(sendAttachments.length > 0 && {
@@ -1403,10 +1403,10 @@ export class EmailService extends Context.Service<EmailService>()(
 				) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
-						const cc = extras?.cc ?? []
-						const bcc = extras?.bcc ?? []
-						const attachmentRefs = extras?.attachmentRefs ?? []
-						const rawAttachments = extras?.rawAttachments ?? []
+						const cc = extras.cc ?? []
+						const bcc = extras.bcc ?? []
+						const attachmentRefs = extras.attachmentRefs ?? []
+						const rawAttachments = extras.rawAttachments ?? []
 
 						const links = yield* sql<{
 							id: string
@@ -1501,14 +1501,14 @@ export class EmailService extends Context.Service<EmailService>()(
 
 						const staged = yield* staging.resolve(inbox.id, attachmentRefs)
 						let blocks: EmailBlocks = bodyJson
-						if (!extras?.skipFooter) {
+						if (!extras.skipFooter) {
 							const footerBlocks = yield* resolveDefaultFooter(inbox.id)
 							if (footerBlocks) blocks = [...bodyJson, ...footerBlocks]
 						}
 						const rendered = yield* Effect.tryPromise({
 							try: () =>
 								renderBlocks(blocks, {
-									...(extras?.preview !== undefined && {
+									...(extras.preview !== undefined && {
 										preview: extras.preview,
 									}),
 									attachments: toStagedRefs(staged),
@@ -1534,9 +1534,9 @@ export class EmailService extends Context.Service<EmailService>()(
 						// would refuse the send with nothing the caller could do.
 						// Each one trimmed before it is judged, or a subject of nothing
 						// but spaces reads as a real one and goes out as a bare "Re:".
-						const chosenSubject = extras?.subject?.trim()
+						const chosenSubject = extras.subject?.trim()
 						const borrowedSubject = link.subject?.trim()
-						const fallbackSubject = extras?.fallbackSubject?.trim()
+						const fallbackSubject = extras.fallbackSubject?.trim()
 						const replySubject = chosenSubject
 							? chosenSubject
 							: borrowedSubject
