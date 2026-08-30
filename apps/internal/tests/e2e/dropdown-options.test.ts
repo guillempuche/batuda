@@ -56,57 +56,78 @@ test.describe('dropdown options', () => {
 			// workers and repeated runs never fight over the same row.
 			const trade = `Maquinaria agricola i manteniment de vehicles industrials ${Date.now()}`
 
-			// GIVEN that trade is one the organisation offers — written onto a
-			// company, then taken off again so the seeded data is as it was
+			// GIVEN a company's own trade, remembered so the seed can be put back
 			await page.goto('/companies/cal-pep-fonda', { waitUntil: 'networkidle' })
 			await openAboutSection(page)
 			const field = page.getByTestId('company-industry')
 			await expect(field).toBeVisible()
 			const before = (await field.innerText()).trim()
-			await field.click()
-			await field.fill(trade)
-			await field.press('Enter')
-			await expect(field).toHaveText(trade, { timeout: 10_000 })
 
-			await field.click()
-			await field.fill(before)
-			await field.press('Enter')
-			await expect(field).toHaveText(before, { timeout: 10_000 })
+			// AND that company written onto the throwaway trade, inside the try
+			// because from here on there is something to undo. It stays on that
+			// trade for the measurement: the filter offers the trades somebody is
+			// actually on, so one put on and taken off again would not be listed.
+			try {
+				await field.click()
+				await field.fill(trade)
+				await field.press('Enter')
+				await expect(field).toHaveText(trade, { timeout: 10_000 })
 
-			// WHEN the trade filter on the companies list is opened
-			await page.goto('/companies', { waitUntil: 'networkidle' })
-			const trigger = page.getByTestId('companies-filter-industry')
-			await expect(trigger).toBeVisible()
-			await trigger.click()
-			const option = page.getByRole('option', { name: trade })
-			await expect(option).toBeVisible({ timeout: 10_000 })
+				// WHEN the trade filter on the companies list is opened
+				await page.goto('/companies', { waitUntil: 'networkidle' })
+				const trigger = page.getByTestId('companies-filter-industry')
+				await expect(trigger).toBeVisible()
+				await trigger.click()
+				const option = page.getByRole('option', { name: trade })
+				await expect(option).toBeVisible({ timeout: 10_000 })
 
-			// THEN the whole name is on screen, and the list has grown past the
-			// button rather than cutting the name off at it
-			const measured = await option.evaluate(row => {
-				const popup = row.parentElement
-				return {
-					nameFullyShown: row.scrollWidth <= row.clientWidth,
-					popupWidth: popup === null ? 0 : popup.getBoundingClientRect().width,
+				// THEN the whole name is on screen, and the list has grown past the
+				// button rather than cutting the name off at it
+				const measured = await option.evaluate(row => {
+					const popup = row.parentElement
+					return {
+						nameFullyShown: row.scrollWidth <= row.clientWidth,
+						popupWidth:
+							popup === null ? 0 : popup.getBoundingClientRect().width,
+					}
+				})
+				const triggerWidth = await trigger.evaluate(
+					button => button.getBoundingClientRect().width,
+				)
+				expect(measured.nameFullyShown).toBe(true)
+				expect(measured.popupWidth).toBeGreaterThan(triggerWidth)
+			} finally {
+				// Put the company and the organisation's trades back whatever the
+				// measurement said, or a failed assertion strands this company on a
+				// throwaway trade and every scenario after it reads that instead of
+				// the seed. Tidy-up failures are swallowed: a wrongly laid-out popup
+				// can sit over the page, so this is liable to fail exactly when the
+				// measurement already has, and its error would bury the one worth
+				// reading.
+				try {
+					await page.keyboard.press('Escape')
+					await page.goto('/companies/cal-pep-fonda', {
+						waitUntil: 'networkidle',
+					})
+					await openAboutSection(page)
+					await field.click()
+					await field.fill(before)
+					await field.press('Enter')
+					await expect(field).toHaveText(before, { timeout: 10_000 })
+
+					await page.goto('/settings/organization/industries', {
+						waitUntil: 'networkidle',
+					})
+					const remove = page.getByRole('button', { name: `Remove ${trade}` })
+					await remove.scrollIntoViewIfNeeded()
+					await remove.click()
+					await expect(
+						page.getByRole('button', { name: `Rename ${trade}` }),
+					).toHaveCount(0, { timeout: 10_000 })
+				} catch (couldNotTidy) {
+					console.warn(`[dropdown-options] left ${trade} behind:`, couldNotTidy)
 				}
-			})
-			const triggerWidth = await trigger.evaluate(
-				button => button.getBoundingClientRect().width,
-			)
-			expect(measured.nameFullyShown).toBe(true)
-			expect(measured.popupWidth).toBeGreaterThan(triggerWidth)
-
-			// Leave the organisation's trades as they were found.
-			await page.keyboard.press('Escape')
-			await page.goto('/settings/organization/industries', {
-				waitUntil: 'networkidle',
-			})
-			const remove = page.getByRole('button', { name: `Remove ${trade}` })
-			await remove.scrollIntoViewIfNeeded()
-			await remove.click()
-			await expect(
-				page.getByRole('button', { name: `Rename ${trade}` }),
-			).toHaveCount(0, { timeout: 10_000 })
+			}
 		})
 	})
 })

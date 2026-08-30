@@ -816,7 +816,7 @@ Every list on this page is decided by the server, not assembled in the browser. 
 
 ### Company list (`/companies`)
 
-- Filter bar: status, country, industry, priority, product_fit (pills, multi-select)
+- Filter bar: status (pills), then country, industry, priority, owner and sort (dropdowns)
 - Search input (name)
 - Company cards: name, location, status chip, industry, last contacted date, priority dot
 - Sorted by priority ASC, then last_contacted_at DESC

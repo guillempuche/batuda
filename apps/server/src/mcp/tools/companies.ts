@@ -55,15 +55,31 @@ import { McpPageLimit, McpPageOffset, PageResult, toPage } from './_result'
 
 const REQUEST_DEPENDENCIES = [CurrentOrg, CurrentUser]
 
+// Which countries and trades are worth narrowing by, counted against the filters
+// already given. Carried on the search itself rather than by a tool of its own,
+// because the answer only means anything alongside a particular set of filters
+// and a separate call could easily be made with different ones.
+export const CompanyFilterOptions = Schema.Struct({
+	countries: Schema.Array(
+		Schema.Struct({ code: Schema.String, company_count: Schema.Number }),
+	),
+	industries: Schema.Array(
+		Schema.Struct({
+			slug: Schema.String,
+			label: Schema.String,
+			company_count: Schema.Number,
+		}),
+	),
+})
+
 const SearchCompanies = Tool.make('search_companies', {
 	description:
-		'Filter companies by status, country (ISO 3166-1 alpha-2, e.g. US/ES/DE), industry, priority, search query, the research fit verdict (strong_fit / possible_fit / weak_fit / no_fit), a fit criterion the company passed (matched loosely against the criterion text), or a geographic bounding box. The box is any subset of min_lat/max_lat/min_lng/max_lng (decimal degrees); each bound is applied independently and only matches companies with stored coordinates. Returns summaries (including latitude/longitude) — call get_company for full details. `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true.',
+		'Filter companies by status, country (ISO 3166-1 alpha-2, e.g. US/ES/DE), industry, priority, search query, the research fit verdict (strong_fit / possible_fit / weak_fit / no_fit), a fit criterion the company passed (matched loosely against the criterion text), or a geographic bounding box. The box is any subset of min_lat/max_lat/min_lng/max_lng (decimal degrees); each bound is applied independently and only matches companies with stored coordinates. Returns summaries (including latitude/longitude) — call get_company for full details. Set `include_filter_options` to be told which countries and trades actually narrow this list, rather than guessing a value and getting nothing back. `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true.',
 	parameters: Schema.Struct({
 		status: Schema.optional(Schema.String),
 		country: Schema.optional(Schema.String),
 		industry: Schema.optional(Schema.String),
 		priority: Schema.optional(Schema.Number),
-		product_fit: Schema.optional(Schema.String),
 		fit_verdict: Schema.optional(Schema.String),
 		fit_criterion_passed: Schema.optional(Schema.String),
 		query: Schema.optional(Schema.String),
@@ -77,8 +93,15 @@ const SearchCompanies = Tool.make('search_companies', {
 		max_lng: Schema.optional(Schema.Number),
 		limit: Schema.optional(McpPageLimit),
 		offset: Schema.optional(McpPageOffset),
+		include_filter_options: Schema.optional(Schema.Boolean).annotate({
+			description:
+				'Also return which countries and trades are worth narrowing by, each with how many companies it would find under the filters already given. Ask for this instead of guessing a value: a `company_count` of 0 means that value exists but finds nothing here, and a value absent from the list finds nothing at all.',
+		}),
 	}),
-	success: PageResult(Company.json),
+	success: Schema.Struct({
+		...PageResult(Company.json).fields,
+		filter_options: Schema.optional(CompanyFilterOptions),
+	}),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Search Companies')
@@ -374,7 +397,7 @@ const ManageCompanyRelations = Tool.make('manage_company_relations', {
 
 const ListIndustries = Tool.make('list_industries', {
 	description:
-		'List the trades this organisation sells to — its own list, not a fixed one, so another organisation has different entries. Read it before filtering companies by industry or writing a trade onto one: search_companies matches a trade this organisation actually has, and naming one it does not returns nothing. Writing a company with a trade that is not on the list adds it, so prefer an entry that is already here over a new wording of the same thing. `needsReview` marks a trade research suggested that nobody has confirmed yet.',
+		'List the trades this organisation sells to — its own list, not a fixed one, so another organisation has different entries. Read it before writing a trade onto a company: writing one that is not on the list adds it, so prefer an entry that is already here over a new wording of the same thing. `company_count` counts deleted companies too, because they still hold the trade and it cannot be removed while they do — so it says whether the trade is in use, not how many a search would find. To filter, use search_companies with `include_filter_options`, which counts only what that search would return. `needs_review` marks a trade research suggested that nobody has confirmed yet.',
 	parameters: Schema.Struct({
 		needs_review: Schema.optional(Schema.Boolean).annotate({
 			description:
@@ -461,12 +484,11 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 		return {
 			search_companies: params =>
 				Effect.gen(function* () {
-					const companies = yield* service.search({
+					const filters = {
 						status: params.status,
 						country: params.country,
 						industry: params.industry,
 						priority: params.priority,
-						productFit: params.product_fit,
 						fitVerdict: params.fit_verdict,
 						fitCriterionPassed: params.fit_criterion_passed,
 						query: params.query,
@@ -477,8 +499,27 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 						maxLng: params.max_lng,
 						limit: params.limit,
 						offset: params.offset,
-					})
-					return toPage(companies)
+					}
+					const companies = yield* service.search(filters)
+					const page = toPage(companies)
+					if (params.include_filter_options !== true) return page
+					// Counted from the same filters the rows were read with, so the
+					// values offered and the rows returned answer one question.
+					const facets = yield* service.facets(filters)
+					return {
+						...page,
+						filter_options: {
+							countries: facets.country.map(c => ({
+								code: c.value,
+								company_count: c.count,
+							})),
+							industries: facets.industry.map(i => ({
+								slug: i.slug,
+								label: i.label,
+								company_count: i.count,
+							})),
+						},
+					}
 				}).pipe(Effect.orDie),
 			get_company: ({ id_or_slug }) =>
 				service.getWithRelations(id_or_slug).pipe(
