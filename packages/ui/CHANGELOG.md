@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-30 (ui-v2026.8.30)
+
+### Features
+
+* **ui:** let consumers download only the components they import ([ae0979e](https://github.com/guillempuche/batuda/commit/ae0979eeff53e8b8ad28c0641ed9c62f00d9be7a))
+
+### Bug Fixes
+
+* size dropdown options to their longest name, not to the button ([16bc959](https://github.com/guillempuche/batuda/commit/16bc9592b589ba2c07c50c0b7740bac38b8b1a3f))
+
 ## 2026-08-25 (ui-v2026.8.25)
 
 ### Features
