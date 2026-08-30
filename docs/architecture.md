@@ -307,7 +307,8 @@ User (or agent over MCP) sends an email
   → SMTP dispatch, then APPEND to the sender's Sent folder
   → Server writes the email_messages row + the "email_sent" history entry
   → If nobody owns the company yet, it becomes the sender's
-  → If it is still at "prospect", it moves to "contacted"
+  → If it is still at "prospect", it moves on: "responded" when they wrote
+    to us first, "contacted" when we are the ones opening
   → Both are recorded on the company's history, just after the email
 ```
 

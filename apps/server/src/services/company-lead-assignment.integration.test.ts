@@ -383,6 +383,37 @@ describe('claimLeadOnEmail', () => {
 		})
 	})
 
+	describe('when the company wrote to us first', () => {
+		it('should land on responded, not contacted', async () => {
+			// GIVEN a company that emailed us — the worker files an entry on the
+			// company's history for a message that arrived and matched it
+			await pool.query(
+				`INSERT INTO timeline_activity (
+					organization_id, kind, entity_type, entity_id, company_id,
+					channel, direction, occurred_at, payload
+				) VALUES ($1, 'email_received', 'email_message', gen_random_uuid(),
+					$2, 'email', 'inbound', now(), '{}'::jsonb)`,
+				[tallerOrgId, companyId],
+			)
+			// WHEN Alice writes back
+			await claimScoped(ALICE)
+			// THEN the lead reads as a conversation rather than a cold approach.
+			// The stage only ever moves off prospect once, so getting this wrong
+			// would lose the difference for good
+			expect((await company()).status).toBe('responded')
+			const staged = (await historyRows()).find(h => h.kind === 'stage_changed')
+			expect(staged?.payload).toEqual({ from: 'prospect', to: 'responded' })
+		})
+
+		it('should still land on contacted when we wrote first', async () => {
+			// GIVEN a company that has never written to us
+			// WHEN Alice emails it
+			await claimScoped(ALICE)
+			// THEN it reads as outreach nobody has answered yet
+			expect((await company()).status).toBe('contacted')
+		})
+	})
+
 	describe('when the company was taken out of view', () => {
 		it('should change nothing on a soft-deleted lead', async () => {
 			// GIVEN a company somebody deleted, still reachable through an open
