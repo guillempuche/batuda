@@ -129,6 +129,18 @@ beforeAll(async () => {
 		[orgId, FIXTURE_SLUG],
 	)
 	companyId = insertedCompany.rows[0]!.id
+	// The sender has to really work here — the claim refuses a lead to somebody
+	// the organisation does not list.
+	await pool.query(
+		`INSERT INTO "user" (id, name, email, "emailVerified")
+		 VALUES ($1, $1, $2, true) ON CONFLICT (id) DO NOTHING`,
+		[sender, `${sender}@test.local`],
+	)
+	await pool.query(
+		`INSERT INTO member (id, "organizationId", "userId", role, "createdAt")
+		 VALUES ($1, $2, $3, 'member', now()) ON CONFLICT (id) DO NOTHING`,
+		[`m-${FIXTURE_SLUG}`, orgId, sender],
+	)
 }, 30_000)
 
 afterAll(async () => {
@@ -146,6 +158,8 @@ afterAll(async () => {
 	])
 	await pool.query(`DELETE FROM companies WHERE id = $1`, [companyId])
 	await pool.query(`DELETE FROM inboxes WHERE id = $1`, [inboxId])
+	await pool.query(`DELETE FROM member WHERE id = $1`, [`m-${FIXTURE_SLUG}`])
+	await pool.query(`DELETE FROM "user" WHERE id = $1`, [sender])
 	await pool.end()
 })
 
@@ -164,6 +178,7 @@ beforeEach(async () => {
 const sendAs = (actor: {
 	readonly userId: string
 	readonly isAgent: boolean
+	readonly claimsLead: boolean
 }): Promise<unknown> =>
 	Effect.runPromise(
 		Effect.gen(function* () {
@@ -208,6 +223,64 @@ const sendAs = (actor: {
 		}).pipe(Effect.provide(PgLive), Effect.orDie),
 	)
 
+// Replies on an existing thread, the same way a request does. The reply path
+// hands `actor` over through a different argument than `send` does, so covering
+// one says nothing about the other.
+const replyAs = (
+	threadLinkId: string,
+	actor: {
+		readonly userId: string
+		readonly isAgent: boolean
+		readonly claimsLead: boolean
+	},
+): Promise<unknown> =>
+	Effect.runPromise(
+		Effect.gen(function* () {
+			const sql = yield* SqlClient.SqlClient
+			return yield* enterOrgScope(sql, {
+				org: { id: orgId, name: 'Taller', slug: orgSlug } as never,
+				userId: actor.userId,
+				role: 'member',
+			})(
+				Effect.gen(function* () {
+					const svc = yield* EmailService
+					return yield* svc.reply(
+						threadLinkId,
+						[
+							{
+								type: 'paragraph' as const,
+								spans: [{ kind: 'text' as const, value: 'Following up.' }],
+							},
+						],
+						{ actor, skipFooter: true },
+					)
+				}).pipe(
+					Effect.provide(serviceLayer),
+					Effect.provideService(SessionContext, {
+						userId: actor.userId,
+						email: `${actor.userId}@test.local`,
+						name: undefined,
+						isAgent: actor.isAgent,
+					}),
+					Effect.provideService(CurrentOrg, {
+						id: orgId,
+						name: 'Taller',
+						slug: orgSlug,
+						role: 'member',
+					}),
+				),
+			)
+		}).pipe(Effect.provide(PgLive), Effect.orDie),
+	)
+
+const firstThreadLinkId = async (): Promise<string> => {
+	const rows = await pool.query<{ id: string }>(
+		`SELECT id FROM email_thread_links WHERE company_id = $1 ORDER BY created_at ASC LIMIT 1`,
+		[companyId],
+	)
+	return rows.rows[0]!.id
+}
+
 const company = async (): Promise<{
 	owner_id: string | null
 	status: string
@@ -233,7 +306,7 @@ describe('EmailService.send', () => {
 		it('should hand them the lead and move it out of prospect', async () => {
 			// GIVEN an unowned company still at prospect
 			// WHEN Alice sends it an email through the service
-			await sendAs({ userId: sender, isAgent: false })
+			await sendAs({ userId: sender, isAgent: false, claimsLead: true })
 			// THEN the send claimed it for her and counted as contact
 			const row = await company()
 			expect(row.owner_id).toBe(sender)
@@ -243,7 +316,7 @@ describe('EmailService.send', () => {
 		it('should tell the history the email came first', async () => {
 			// GIVEN an unowned company still at prospect
 			// WHEN Alice sends it an email
-			await sendAs({ userId: sender, isAgent: false })
+			await sendAs({ userId: sender, isAgent: false, claimsLead: true })
 			// THEN all three entries are there, cause before effect
 			expect(await historyKinds()).toEqual([
 				'email_sent',
@@ -255,7 +328,7 @@ describe('EmailService.send', () => {
 		it('should attribute the sent email to her, not to nobody', async () => {
 			// GIVEN an unowned company
 			// WHEN Alice sends it an email
-			await sendAs({ userId: sender, isAgent: false })
+			await sendAs({ userId: sender, isAgent: false, claimsLead: true })
 			// THEN the email entry names who sent it
 			const rows = await pool.query<{ actor_user_id: string | null }>(
 				`SELECT actor_user_id FROM timeline_activity
@@ -266,12 +339,44 @@ describe('EmailService.send', () => {
 		})
 	})
 
+	describe('when the follow-up is a reply on an existing thread', () => {
+		it('should claim the lead and name the sender, same as a first send', async () => {
+			// GIVEN a thread this org already started, on a company nobody owns —
+			// the first send is only here to leave a thread behind, so what it
+			// claimed goes back the way it was before the reply
+			await sendAs({ userId: sender, isAgent: false, claimsLead: true })
+			await pool.query(
+				`UPDATE companies SET owner_id = NULL, status = 'prospect' WHERE id = $1`,
+				[companyId],
+			)
+			await pool.query(`DELETE FROM timeline_activity WHERE company_id = $1`, [
+				companyId,
+			])
+			// WHEN the reply goes out
+			await replyAs(await firstThreadLinkId(), {
+				userId: sender,
+				isAgent: false,
+				claimsLead: true,
+			})
+			// THEN replying carries the sender the same way sending does
+			const row = await company()
+			expect(row.owner_id).toBe(sender)
+			expect(row.status).toBe('contacted')
+			const attributed = await pool.query<{ actor_user_id: string | null }>(
+				`SELECT actor_user_id FROM timeline_activity
+				 WHERE company_id = $1 AND kind = 'email_sent'`,
+				[companyId],
+			)
+			expect(attributed.rows[0]?.actor_user_id).toBe(sender)
+		})
+	})
+
 	describe("when an agent sends on the org's behalf", () => {
 		it('should send but hand it no lead', async () => {
 			// GIVEN an unowned company and an agent, sending under the mailbox
 			// owner's id because that is the only id the mailbox lets through
 			// WHEN the agent emails it
-			await sendAs({ userId: sender, isAgent: true })
+			await sendAs({ userId: sender, isAgent: true, claimsLead: true })
 			// THEN the email is recorded and attributed, but nothing was claimed:
 			// an owner has to be somebody who can be asked about the account
 			expect(await historyKinds()).toEqual(['email_sent'])

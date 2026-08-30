@@ -311,7 +311,7 @@ User (or agent over MCP) sends an email
   → Both are recorded on the company's history, just after the email
 ```
 
-The claim asks whether anybody has *taken* the lead, not whether the company has been emailed before. That second question cannot be answered: a mailbox connected with existing history has its Sent folder read in as inbound (`apps/mail-worker` marks everything it fetches that way), so the stored mail cannot say which side sent what. Both writes are conditional, so neither ever overrides a person's own choice — an owned company keeps its owner, and one already past `prospect` keeps its stage. An agent never becomes an owner, and neither does an automated calendar reply, which carries no sender at all.
+The claim asks whether anybody has *taken* the lead, not whether the company has been emailed before. The stored mail could answer that second question — the worker files Sent-folder mail as outbound — but it is the wrong question: what somebody sent two years ago from a mailbox that has since been connected says nothing about whether the lead is being worked now, while an account nobody has claimed and nobody has moved off the first column is unworked whatever its archive holds. Both writes are conditional, so neither ever overrides a person's own choice — an owned company keeps its owner, one already past `prospect` keeps its stage, and a company somebody has deleted is left as it was dropped. An agent acting under a shared API key claims nothing at all, and neither does an automated calendar reply: answering an invitation names the person who answered without taking the lead.
 
 ### AI agent creates a prospect page
 

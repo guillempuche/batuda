@@ -158,7 +158,8 @@ export const dispatchForwardInvitation = (args: {
 				contactId ?? undefined,
 				{
 					// Passing an invitation on is not somebody reaching out, so it
-					// never claims the company.
+					// never claims the company. Nobody is named either: this path
+					// is never told who asked for it.
 					actor: null,
 					rawAttachments: [
 						{

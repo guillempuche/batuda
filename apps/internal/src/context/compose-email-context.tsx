@@ -28,6 +28,10 @@ export type Draft = {
 	readonly subject: string
 	readonly to: string
 	readonly bodyJson?: EmailBlocks
+	// Run once the message is away. The page that opened the tray uses it to
+	// re-read what the send changed behind it — an email can hand a company an
+	// owner and move its stage, and the tray has no way to know that.
+	readonly onSent?: () => void
 }
 
 export type OpenComposeInput = {
@@ -39,6 +43,7 @@ export type OpenComposeInput = {
 	readonly to?: string
 	readonly cc?: string
 	readonly bcc?: string
+	readonly onSent?: () => void
 	readonly subject?: string
 	readonly bodyJson?: EmailBlocks
 }
@@ -129,6 +134,7 @@ export function ComposeEmailProvider({
 			...(input.companyId !== undefined && { companyId: input.companyId }),
 			...(input.contactId !== undefined && { contactId: input.contactId }),
 			...(input.bodyJson !== undefined && { bodyJson: input.bodyJson }),
+			...(input.onSent !== undefined && { onSent: input.onSent }),
 		}
 		setDrafts(prev => [draft, ...prev])
 		return id

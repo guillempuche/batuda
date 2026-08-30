@@ -896,6 +896,7 @@ export const EmailHandlersLive = EmailTools.toLayer(
 								actor: {
 									userId: session.userId,
 									isAgent: session.isAgent,
+									claimsLead: true,
 								},
 								...(params.cc !== undefined && { cc: [...params.cc] }),
 								...(params.bcc !== undefined && { bcc: [...params.bcc] }),
@@ -979,7 +980,11 @@ export const EmailHandlersLive = EmailTools.toLayer(
 					const session = yield* SessionContext
 					return yield* svc
 						.reply(params.thread_id, params.body_json, {
-							actor: { userId: session.userId, isAgent: session.isAgent },
+							actor: {
+								userId: session.userId,
+								isAgent: session.isAgent,
+								claimsLead: true,
+							},
 							...(params.cc !== undefined && { cc: [...params.cc] }),
 							...(params.bcc !== undefined && { bcc: [...params.bcc] }),
 							...(params.preview !== undefined && {
@@ -1390,6 +1395,7 @@ export const EmailHandlersLive = EmailTools.toLayer(
 							return yield* svc.sendDraft(params.inbox_id, draftId, {
 								userId: session.userId,
 								isAgent: session.isAgent,
+								claimsLead: true,
 							})
 						}).pipe(
 							Effect.map(r =>

@@ -390,6 +390,7 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 			}
 			refreshList()
 			if (draft.threadId) refreshThread()
+			draft.onSent?.()
 			close(draft.id)
 		} catch (error) {
 			setSendState('error')

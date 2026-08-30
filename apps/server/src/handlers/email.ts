@@ -53,6 +53,7 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 								actor: {
 									userId: session.userId,
 									isAgent: session.isAgent,
+									claimsLead: true,
 								},
 								...(_.payload.cc !== undefined && { cc: [..._.payload.cc] }),
 								...(_.payload.bcc !== undefined && {
@@ -86,7 +87,11 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 					Effect.gen(function* () {
 						const session = yield* SessionContext
 						return yield* svc.reply(_.payload.threadId, _.payload.bodyJson, {
-							actor: { userId: session.userId, isAgent: session.isAgent },
+							actor: {
+								userId: session.userId,
+								isAgent: session.isAgent,
+								claimsLead: true,
+							},
 							...(_.payload.cc !== undefined && { cc: [..._.payload.cc] }),
 							...(_.payload.bcc !== undefined && {
 								bcc: [..._.payload.bcc],
@@ -395,6 +400,7 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 						return yield* svc.sendDraft(_.payload.inboxId, _.params.draftId, {
 							userId: session.userId,
 							isAgent: session.isAgent,
+							claimsLead: true,
 						})
 					}).pipe(
 						Effect.catchTags({
