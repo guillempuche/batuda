@@ -31,7 +31,7 @@ const companyServiceWith = (
 				return [{ ...company, ...data }] as unknown as ReadonlyArray<Company>
 			}),
 		search: () => Effect.die(unused),
-		countries: () => Effect.die(unused),
+		facets: () => Effect.die(unused),
 		softDelete: () => Effect.die(unused),
 		restore: () => Effect.die(unused),
 		findBySlug: () => Effect.die(unused),

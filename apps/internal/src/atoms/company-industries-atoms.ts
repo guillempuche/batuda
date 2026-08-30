@@ -5,11 +5,10 @@ import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 /**
  * The organisation's own list of trades.
  *
- * One atom for the whole app: the company page offers it while typing, the
- * companies list filters by it, and the settings page curates it. Filtering it
- * from the companies already on screen — what the list used to do — only ever
- * offered the trades on the page being looked at, so a trade further down the
- * list could not be filtered for at all.
+ * One atom for the whole app: the company page offers it while typing and the
+ * settings page curates it. This is the organisation's whole list, used or not,
+ * which is why the companies list does not filter from it — that menu offers
+ * the trades somebody is on, counted against the filters already set.
  *
  * Kept alive because it changes rarely and is read on nearly every screen. One
  * atom for all of them means the settings page refreshing it after a rename

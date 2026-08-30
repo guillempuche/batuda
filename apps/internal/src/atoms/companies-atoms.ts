@@ -11,11 +11,11 @@ import {
 } from '#/lib/list-page'
 
 /**
- * Shape of the validated `/companies` search params. Mirrors the query
- * schema in `packages/controllers/src/routes/companies.ts:62` — every
- * field is optional and only present when set. Keeping this shape
- * canonical (no `undefined` literals, no empty strings) makes the
- * cache-key helper below stable across equivalent searches.
+ * Shape of the validated `/companies` search params: the company filters this
+ * screen offers, each present only when set. Keeping the shape canonical (no
+ * `undefined` literals, no empty strings) is what makes the cache key below
+ * stable across equivalent searches, so a field added here has to be added to
+ * that key too or two different searches will answer to one entry.
  */
 export type CompaniesSearch = {
 	readonly status?: string

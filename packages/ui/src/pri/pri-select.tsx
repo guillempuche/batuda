@@ -182,6 +182,20 @@ const PriItemIndicator = styled(Select.ItemIndicator).withConfig({
 	color: var(--color-primary);
 `
 
+// Base UI only makes a select scroll when it draws the popup over the trigger.
+// `PriOptions` opens below it instead, where nothing bounds the height, so a
+// long list runs off the bottom of the screen with its last items out of reach.
+// Capping the list rather than the frame keeps the frame's corners where they
+// are while the items scroll.
+const PriList = styled(Select.List).withConfig({
+	displayName: 'PriSelectList',
+})`
+	display: block;
+	max-height: min(20rem, var(--available-height));
+	overflow-y: auto;
+	overscroll-behavior: contain;
+`
+
 const PriItemText = styled(Select.ItemText).withConfig({
 	displayName: 'PriSelectItemText',
 })`
@@ -322,7 +336,7 @@ function PriOptions<T extends string>({
 				{...positioner}
 			>
 				<PriPopup>
-					<Select.List>
+					<PriList>
 						{items.map(item => (
 							<PriItem
 								key={item.value}
@@ -337,7 +351,7 @@ function PriOptions<T extends string>({
 								<PriItemText>{item.label}</PriItemText>
 							</PriItem>
 						))}
-					</Select.List>
+					</PriList>
 				</PriPopup>
 			</Select.Positioner>
 		</Select.Portal>
@@ -358,7 +372,7 @@ export const PriSelect = {
 	Value: Select.Value,
 	Icon: Select.Icon,
 	Label: Select.Label,
-	List: Select.List,
+	List: PriList,
 	Group: Select.Group,
 	GroupLabel: PriGroupLabel,
 	Separator: PriSeparator,

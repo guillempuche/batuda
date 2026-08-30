@@ -20,7 +20,6 @@ import {
  * old form. Neither is worth a hyphenated word on the screen.
  */
 export function useCompanyIndustries(): {
-	readonly industries: ReadonlyArray<CompanyIndustry>
 	readonly labels: ReadonlyArray<string>
 	readonly labelFor: (slug: string | null | undefined) => string | null
 } {
@@ -34,7 +33,6 @@ export function useCompanyIndustries(): {
 			: []
 		const bySlug = new Map(industries.map(i => [i.slug, i.label]))
 		return {
-			industries,
 			labels: industries.map(i => i.label),
 			labelFor: (slug: string | null | undefined) =>
 				slug === null || slug === undefined || slug === ''
@@ -44,6 +42,7 @@ export function useCompanyIndustries(): {
 	}, [result])
 }
 
+/** A stored trade read back as words: `auto-repair` becomes `Auto repair`. */
 const spellOut = (slug: string): string => {
 	const words = slug.replaceAll('-', ' ')
 	return words.charAt(0).toUpperCase() + words.slice(1)

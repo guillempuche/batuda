@@ -1,9 +1,9 @@
-import { useAtomSet } from '@effect/atom-react'
+import { useAtomRefresh, useAtomSet } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { DateTime, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
-import { Check, ChevronsUpDown, Search, X } from 'lucide-react'
+import { ChevronsUpDown, Search, X } from 'lucide-react'
 import { LayoutGroup, motion } from 'motion/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
@@ -22,6 +22,7 @@ import {
 	companiesSearchAtom,
 } from '#/atoms/companies-atoms'
 import { restoreCompanyAtom } from '#/atoms/company-atoms'
+import { companyFacetsAtom, facetsQuery } from '#/atoms/company-facets-atoms'
 import { CompaniesHeader } from '#/components/companies/companies-header'
 import { SavedViews } from '#/components/companies/saved-views'
 import { CompanyCard } from '#/components/shared/company-card'
@@ -39,8 +40,7 @@ import {
 	StatusBadge,
 } from '#/components/shared/status-badge'
 import { useQuickCapture } from '#/context/quick-capture-context'
-import { useCompanyCountries } from '#/hooks/use-company-countries'
-import { useCompanyIndustries } from '#/hooks/use-company-industries'
+import { useCompanyFilterOptions } from '#/hooks/use-company-filter-options'
 import { useInfiniteList } from '#/hooks/use-infinite-list'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { useOrgMembers } from '#/lib/org-members'
@@ -51,7 +51,7 @@ import { brushedMetalPlate } from '#/lib/workshop-mixins'
 /**
  * Narrow row shape for the list view. The server returns `Schema.Unknown`
  * so we runtime-narrow at the boundary. Shares the same fields the
- * dashboard needs plus `country` (used by the Country filter).
+ * dashboard needs.
  */
 type CompanyRow = {
 	readonly id: string
@@ -109,15 +109,36 @@ async function loadCompaniesOnServer(search: CompaniesSearch) {
 	])
 	const program = Effect.gen(function* () {
 		const client = yield* makeBatudaApiServer(cookie ?? undefined)
-		// Matches `companiesSearchAtom` exactly, counting included — the browser
-		// picks this answer up by the shape of the question, so a difference
-		// here means the page silently refetches and shows no count meanwhile.
-		return yield* client.companies.list({
-			query: { ...search, limit: COMPANIES_PAGE_SIZE, count: 'exact' as const },
-		})
+		// Asked for side by side, each allowed to come back empty-handed on its
+		// own: the counts fill the filter menus and the list fills the page, so
+		// losing one is no reason to give up the other, and asking in turn would
+		// put the two waits end to end for nothing.
+		return yield* Effect.all(
+			{
+				// Matches `companiesSearchAtom` exactly, counting included — the
+				// browser picks this answer up by the shape of the question, so a
+				// difference here means the page silently refetches and shows no
+				// count meanwhile.
+				companies: client.companies
+					.list({
+						query: {
+							...search,
+							limit: COMPANIES_PAGE_SIZE,
+							count: 'exact' as const,
+						},
+					})
+					.pipe(Effect.catchCause(() => Effect.succeed(undefined))),
+				// Fetched with the page rather than after it: a menu that arrives
+				// late repopulates under the reader's cursor, so a name they were
+				// already reaching for moves and the press lands on its neighbour.
+				facets: client.companies
+					.facets({ query: facetsQuery(search) })
+					.pipe(Effect.catchCause(() => Effect.succeed(undefined))),
+			},
+			{ concurrency: 2 },
+		)
 	})
-	const companies = await Effect.runPromise(program)
-	return { companies }
+	return await Effect.runPromise(program)
 }
 
 export const Route = createFileRoute('/companies/')({
@@ -131,14 +152,28 @@ export const Route = createFileRoute('/companies/')({
 			return { dehydrated: [] as const }
 		}
 		try {
-			const { companies } = await loadCompaniesOnServer(search)
+			const { companies, facets } = await loadCompaniesOnServer(search)
+			// Whichever arrived is handed over. The other is left for the browser to
+			// ask for again, rather than costing the page the half that did arrive.
 			return {
 				dehydrated: [
-					dehydrateAtom(
-						companiesSearchAtom(search, COMPANIES_FIRST_PAGE),
-						AsyncResult.success(companies),
-					),
-				] as const,
+					...(companies === undefined
+						? []
+						: [
+								dehydrateAtom(
+									companiesSearchAtom(search, COMPANIES_FIRST_PAGE),
+									AsyncResult.success(companies),
+								),
+							]),
+					...(facets === undefined
+						? []
+						: [
+								dehydrateAtom(
+									companyFacetsAtom(search),
+									AsyncResult.success(facets),
+								),
+							]),
+				],
 			}
 		} catch (error) {
 			console.warn('[CompaniesLoader] falling back to empty hydration:', error)
@@ -235,6 +270,10 @@ function CompaniesListPage() {
 	)
 	const toast = usePriToast()
 	const restoreCompany = useAtomSet(restoreCompanyAtom, { mode: 'promiseExit' })
+	// The menus are counted from the same companies the list holds, so putting
+	// one back has to re-ask for them: otherwise its country stays on offer in
+	// the bin it just left.
+	const refreshFilterOptions = useAtomRefresh(companyFacetsAtom(search))
 	const [restoringId, setRestoringId] = useState<string | null>(null)
 	const handleRestore = useCallback(
 		async (id: string, name: string) => {
@@ -244,6 +283,7 @@ function CompaniesListPage() {
 			if (exit._tag === 'Success') {
 				toast.add({ title: t`${name} is back`, type: 'success' })
 				list.refresh()
+				refreshFilterOptions()
 				return
 			}
 			// The usual reason is that the name was taken while it was away, and
@@ -254,7 +294,7 @@ function CompaniesListPage() {
 				type: 'error',
 			})
 		},
-		[restoreCompany, toast, t, list],
+		[restoreCompany, toast, t, list, refreshFilterOptions],
 	)
 
 	const handleClearFilters = useCallback(() => {
@@ -270,19 +310,15 @@ function CompaniesListPage() {
 		[openQuickCapture],
 	)
 
-	// Countries come from the organisation's own set rather than from the
-	// companies on screen: a country only used further down the list was not
-	// offered at all. Same fix the trades filter already had.
-	const { countries } = useCompanyCountries()
-	// Trades come from the organisation's own list rather than from the companies
-	// on screen: a trade only used further down the list was not offered at all,
-	// so there was no way to filter for it.
-	const { industries } = useCompanyIndustries()
+	// Counted against the filters already set, and asked for in the same words as
+	// the list itself: a menu offers a narrowing that finds something, plus
+	// whatever is already chosen so it can be taken off again.
+	const { countries, industries, countryValue, industryValue } =
+		useCompanyFilterOptions(search)
 
 	const activeFilters = hasActiveFilters(search)
-	// The filtered count says "1 company" too. Landing on a single match is
-	// ordinary now that the filter offers every trade the organisation has, and
-	// it used to read "1 companies".
+	// Both counts have a singular form: narrowing down to a single match is
+	// ordinary, and "1 companies" reads as a bug.
 	const countLabel = activeFilters
 		? total === 1
 			? t`1 company with filters applied`
@@ -293,13 +329,13 @@ function CompaniesListPage() {
 
 	const countryItems = [
 		{ value: ALL, label: t`All countries` },
-		...countries.map(c => ({ value: c.code, label: c.label })),
+		...countries.map(c => ({ value: c.value, label: c.label })),
 	]
 	// Filtered by the web-address form, which is what the row carries and what a
 	// shared link keeps working with; the name is what the reader picks from.
 	const industryItems = [
 		{ value: ALL, label: t`All industries` },
-		...industries.map(i => ({ value: i.slug, label: i.label })),
+		...industries.map(i => ({ value: i.value, label: i.label })),
 	]
 	const priorityItems = [
 		{ value: ALL, label: t`Any priority` },
@@ -405,14 +441,14 @@ function CompaniesListPage() {
 				<DropdownRow>
 					<FilterSelect
 						label={t`Country`}
-						value={search.country ?? ALL}
+						value={countryValue ?? ALL}
 						options={countryItems}
 						onChange={v => applyPatch({ country: v === ALL ? undefined : v })}
 						testId='companies-filter-country'
 					/>
 					<FilterSelect
 						label={t`Industry`}
-						value={search.industry ?? ALL}
+						value={industryValue ?? ALL}
 						options={industryItems}
 						onChange={v => applyPatch({ industry: v === ALL ? undefined : v })}
 						testId='companies-filter-industry'
@@ -606,24 +642,11 @@ function FilterSelect({
 					<ChevronsUpDown size={14} aria-hidden />
 				</PriSelect.Icon>
 			</PriSelect.Trigger>
-			<PriSelect.Portal>
-				<PriSelect.Positioner sideOffset={6}>
-					<PriSelect.Popup>
-						{options.map(opt => (
-							<PriSelect.Item
-								key={opt.value}
-								value={opt.value}
-								data-testid={`${testId}-option-${opt.value}`}
-							>
-								<PriSelect.ItemIndicator>
-									<Check size={12} aria-hidden />
-								</PriSelect.ItemIndicator>
-								<PriSelect.ItemText>{opt.label}</PriSelect.ItemText>
-							</PriSelect.Item>
-						))}
-					</PriSelect.Popup>
-				</PriSelect.Positioner>
-			</PriSelect.Portal>
+			<PriSelect.Options
+				items={options}
+				sideOffset={6}
+				optionTestId={v => `${testId}-option-${v}`}
+			/>
 		</PriSelect.Root>
 	)
 }

@@ -38,7 +38,6 @@ export interface CompanyFilters {
 	readonly country?: string | undefined
 	readonly industry?: string | undefined
 	readonly priority?: number | undefined
-	readonly productFit?: string | undefined
 	// The run's overall judgement of whether this company is worth selling to.
 	readonly fitVerdict?: string | undefined
 	// Narrows to companies whose fit checks marked a matching rule passed, so a
@@ -83,6 +82,106 @@ export interface CompanyFilters {
 export const normalizeTaxId = (taxId: string): string =>
 	taxId.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
 
+/**
+ * The conditions a company search is narrowed by.
+ *
+ * The per-value counts are built from these same conditions, so what a count
+ * promises about a value and what a search does with it cannot drift apart.
+ *
+ * `omit` leaves one filter out. A value is counted under every filter except
+ * its own: counted under the chosen country, every other country would read
+ * zero and there would be no way to swap one for another.
+ */
+const companyConditions = (
+	sql: SqlClient.SqlClient,
+	orgId: string,
+	filters: CompanyFilters,
+	omit?: 'country' | 'industry',
+) =>
+	Effect.gen(function* () {
+		const conditions: Array<Statement.Fragment> = [
+			sql`organization_id = ${orgId}`,
+		]
+		// Deleted companies are out of view unless they are what was asked for.
+		// Rows and totals alike are read through here, so a page's count can never
+		// disagree with what it lists.
+		if (filters.deleted === 'only') conditions.push(sql`deleted_at IS NOT NULL`)
+		else if (filters.deleted !== 'include')
+			conditions.push(sql`deleted_at IS NULL`)
+		if (filters.status) conditions.push(sql`status = ${filters.status}`)
+		if (filters.country && omit !== 'country')
+			conditions.push(sql`country = ${filters.country}`)
+		if (filters.industry && omit !== 'industry') {
+			const trade = yield* findIndustryByName(sql, orgId, filters.industry)
+			conditions.push(
+				trade === undefined ? sql`false` : sql`industry_id = ${trade.id}`,
+			)
+		}
+		if (filters.priority !== undefined)
+			conditions.push(sql`priority = ${filters.priority}`)
+		// 'none' narrows to unassigned leads; any other value matches one owner.
+		if (filters.owner === 'none') conditions.push(sql`owner_id IS NULL`)
+		else if (filters.owner) conditions.push(sql`owner_id = ${filters.owner}`)
+		if (filters.fitVerdict)
+			conditions.push(sql`fit_verdict = ${filters.fitVerdict}`)
+		// A missing or empty fit_checks simply matches nothing, rather than
+		// tripping the element expansion on a null.
+		if (filters.fitCriterionPassed)
+			conditions.push(
+				sql`EXISTS (
+					SELECT 1 FROM jsonb_array_elements(COALESCE(fit_checks, '[]'::jsonb)) fc
+					WHERE fc->>'result' = 'pass'
+						AND fc->>'criterion' ILIKE ${textAnywhere(filters.fitCriterionPassed)}
+				)`,
+			)
+		if (filters.attention)
+			conditions.push(
+				attentionCondition(sql, filters.attention, filters.staleDays),
+			)
+		if (filters.query)
+			conditions.push(sql`name ILIKE ${textAnywhere(filters.query)}`)
+		// A rectangle on the map matches a company when the company's own pin is
+		// inside it, or when any of its branches is. Without the second half, a
+		// chain registered in one city is invisible to somebody drawing a box
+		// around another — even with a shop on that city's main street. Each bound
+		// is still applied on its own, so a half-drawn box narrows rather than
+		// matching nothing.
+		const box: Array<Statement.Fragment> = []
+		const siteBox: Array<Statement.Fragment> = []
+		if (filters.minLat !== undefined) {
+			box.push(sql`latitude >= ${filters.minLat}`)
+			siteBox.push(sql`s.latitude >= ${filters.minLat}`)
+		}
+		if (filters.maxLat !== undefined) {
+			box.push(sql`latitude <= ${filters.maxLat}`)
+			siteBox.push(sql`s.latitude <= ${filters.maxLat}`)
+		}
+		if (filters.minLng !== undefined) {
+			box.push(sql`longitude >= ${filters.minLng}`)
+			siteBox.push(sql`s.longitude >= ${filters.minLng}`)
+		}
+		if (filters.maxLng !== undefined) {
+			box.push(sql`longitude <= ${filters.maxLng}`)
+			siteBox.push(sql`s.longitude <= ${filters.maxLng}`)
+		}
+		if (box.length > 0)
+			conditions.push(
+				sql`(
+					(${sql.and(box)})
+					OR EXISTS (
+						SELECT 1 FROM sites s
+						WHERE s.company_id = companies.id
+							AND s.organization_id = ${orgId}
+							AND s.latitude IS NOT NULL
+							AND s.longitude IS NOT NULL
+							AND ${sql.and(siteBox)}
+					)
+				)`,
+			)
+
+		return conditions
+	})
+
 export class CompanyService extends Context.Service<CompanyService>()(
 	'CompanyService',
 	{
@@ -93,93 +192,11 @@ export class CompanyService extends Context.Service<CompanyService>()(
 				search: (filters: CompanyFilters) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
-						const conditions: Array<Statement.Fragment> = [
-							sql`organization_id = ${currentOrg.id}`,
-						]
-						// Deleted companies are out of view unless they are what was
-						// asked for. The count below reads the same list, so this covers
-						// the total a page shows as well as its rows.
-						if (filters.deleted === 'only')
-							conditions.push(sql`deleted_at IS NOT NULL`)
-						else if (filters.deleted !== 'include')
-							conditions.push(sql`deleted_at IS NULL`)
-						if (filters.status) conditions.push(sql`status = ${filters.status}`)
-						if (filters.country)
-							conditions.push(sql`country = ${filters.country}`)
-						if (filters.industry) {
-							const trade = yield* findIndustryByName(
-								sql,
-								currentOrg.id,
-								filters.industry,
-							)
-							conditions.push(
-								trade === undefined
-									? sql`false`
-									: sql`industry_id = ${trade.id}`,
-							)
-						}
-						if (filters.priority)
-							conditions.push(sql`priority = ${filters.priority}`)
-						// 'none' narrows to unassigned leads; any other value matches one owner.
-						if (filters.owner === 'none') conditions.push(sql`owner_id IS NULL`)
-						else if (filters.owner)
-							conditions.push(sql`owner_id = ${filters.owner}`)
-						if (filters.fitVerdict)
-							conditions.push(sql`fit_verdict = ${filters.fitVerdict}`)
-						// A missing or empty fit_checks simply matches nothing, rather than
-						// tripping the element expansion on a null.
-						if (filters.fitCriterionPassed)
-							conditions.push(
-								sql`EXISTS (
-									SELECT 1 FROM jsonb_array_elements(COALESCE(fit_checks, '[]'::jsonb)) fc
-									WHERE fc->>'result' = 'pass'
-										AND fc->>'criterion' ILIKE ${textAnywhere(filters.fitCriterionPassed)}
-								)`,
-							)
-						if (filters.attention)
-							conditions.push(
-								attentionCondition(sql, filters.attention, filters.staleDays),
-							)
-						if (filters.query)
-							conditions.push(sql`name ILIKE ${textAnywhere(filters.query)}`)
-						// A rectangle on the map matches a company when the company's own
-						// pin is inside it, or when any of its branches is. Without the
-						// second half, a chain registered in one city is invisible to
-						// somebody drawing a box around another — even with a shop on that
-						// city's main street. Each bound is still applied on its own, so a
-						// half-drawn box narrows rather than matching nothing.
-						const box: Array<Statement.Fragment> = []
-						const siteBox: Array<Statement.Fragment> = []
-						if (filters.minLat !== undefined) {
-							box.push(sql`latitude >= ${filters.minLat}`)
-							siteBox.push(sql`s.latitude >= ${filters.minLat}`)
-						}
-						if (filters.maxLat !== undefined) {
-							box.push(sql`latitude <= ${filters.maxLat}`)
-							siteBox.push(sql`s.latitude <= ${filters.maxLat}`)
-						}
-						if (filters.minLng !== undefined) {
-							box.push(sql`longitude >= ${filters.minLng}`)
-							siteBox.push(sql`s.longitude >= ${filters.minLng}`)
-						}
-						if (filters.maxLng !== undefined) {
-							box.push(sql`longitude <= ${filters.maxLng}`)
-							siteBox.push(sql`s.longitude <= ${filters.maxLng}`)
-						}
-						if (box.length > 0)
-							conditions.push(
-								sql`(
-									(${sql.and(box)})
-									OR EXISTS (
-										SELECT 1 FROM sites s
-										WHERE s.company_id = companies.id
-											AND s.organization_id = ${currentOrg.id}
-											AND s.latitude IS NOT NULL
-											AND s.longitude IS NOT NULL
-											AND ${sql.and(siteBox)}
-									)
-								)`,
-							)
+						const conditions = yield* companyConditions(
+							sql,
+							currentOrg.id,
+							filters,
+						)
 
 						// Whitelisted sort key → a fixed ORDER BY fragment; never
 						// interpolate raw sort text into the query.
@@ -227,21 +244,71 @@ export class CompanyService extends Context.Service<CompanyService>()(
 						}
 					}),
 
-				// Every country this organisation actually trades with. The list page
-				// used to build its country filter from whichever companies happened
-				// to be on screen, so a country further down the list could not be
-				// filtered for at all.
-				countries: () =>
+				// The countries and trades worth narrowing by, each with how many
+				// companies sit behind it once the rest of the filters are applied. A
+				// value nothing matches still comes back, carrying zero, so a caller
+				// can tell one that exists here from one that does not exist at all.
+				facets: (filters: CompanyFilters) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
-						const rows = yield* sql<{ country: string }>`
-							SELECT DISTINCT country FROM companies
-							WHERE organization_id = ${currentOrg.id}
+						// What exists at all takes the same view of the bin as the search,
+						// so a country only a deleted company ever had is not offered.
+						const onOffer = yield* companyConditions(sql, currentOrg.id, {
+							deleted: filters.deleted,
+						})
+						const countryMatches = yield* companyConditions(
+							sql,
+							currentOrg.id,
+							filters,
+							'country',
+						)
+						const industryMatches = yield* companyConditions(
+							sql,
+							currentOrg.id,
+							filters,
+							'industry',
+						)
+
+						const country = yield* sql<{
+							readonly value: string
+							readonly count: number
+						}>`
+							SELECT country AS value,
+								count(*) FILTER (WHERE ${sql.and(countryMatches)})::int AS count
+							FROM companies
+							WHERE ${sql.and(onOffer)}
 								AND country IS NOT NULL
 								AND country <> ''
+							GROUP BY country
 							ORDER BY country
 						`
-						return rows.map(r => r.country)
+						// Counted in one pass whose FROM is only `companies`, so the bare
+						// column names the conditions carry can only mean a company. In a
+						// correlated subquery they would bind to the trades table for any
+						// name the two share, and answer the wrong question without failing.
+						//
+						// The join is also what puts a trade on offer: somebody has to be
+						// on it, since a trade nothing can match is only a way to empty the
+						// list.
+						const industry = yield* sql<{
+							readonly slug: string
+							readonly label: string
+							readonly count: number
+						}>`
+							SELECT i.slug, i.label, counted.count
+							FROM company_industries i
+							JOIN (
+								SELECT industry_id,
+									count(*) FILTER (WHERE ${sql.and(industryMatches)})::int AS count
+								FROM companies
+								WHERE ${sql.and(onOffer)} AND industry_id IS NOT NULL
+								GROUP BY industry_id
+							) counted ON counted.industry_id = i.id
+							WHERE i.organization_id = ${currentOrg.id}
+							ORDER BY i.label
+						`
+
+						return { country, industry }
 					}),
 
 				findBySlug: (slug: string) =>

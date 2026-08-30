@@ -456,6 +456,13 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 						items={inboxItems}
 						value={effectiveInboxId ?? ''}
 						onValueChange={value => {
+							// Take a cleared value or a mailbox the list holds, nothing
+							// else: the list is refetched and can change under an open
+							// draft, and a selector whose list stops holding the value it
+							// is set to un-picks it on its own, quietly emptying the From
+							// line of a draft nobody touched.
+							if (value !== '' && !inboxItems.some(i => i.value === value))
+								return
 							patchForm({ inboxId: value === '' ? null : value })
 						}}
 					>

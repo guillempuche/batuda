@@ -161,47 +161,81 @@ export const UpdateCompanyInput = Schema.Struct({
 	metadata: Schema.optional(Schema.Unknown),
 })
 
+/**
+ * Everything a company list can be narrowed by.
+ *
+ * The per-value counts are asked for in exactly these words too, so the values
+ * a caller is offered and the list it gets back answer the same question.
+ */
+const companyFilterQuery = {
+	status: Schema.optional(Schema.String),
+	country: Schema.optional(Schema.String),
+	industry: Schema.optional(Schema.String),
+	priority: Schema.optional(Schema.NumberFromString),
+	owner: Schema.optional(Schema.String),
+	// Narrows to what needs doing, in the same words the dashboard uses:
+	// `overdue` missed its follow-up date, `stale` is mid-chase and has
+	// gone quiet, `no-next-action` has nothing written down at all. The
+	// rules are shared with the dashboard's own lists, so a count there
+	// opens a list of the same size here.
+	attention: Schema.optional(Schema.Literals(ATTENTION_FILTERS)),
+	// How long counts as quiet, for `attention=stale`. Rides along on the
+	// link so the list matches whatever the dashboard was showing.
+	staleDays: Schema.optional(StaleDays),
+	fitVerdict: Schema.optional(Schema.String),
+	fitCriterionPassed: Schema.optional(Schema.String),
+	query: Schema.optional(Schema.String),
+	// Which companies to look at. Omitted means the live ones; 'only' is
+	// how somebody finds a deleted company again in order to restore it,
+	// and without it a deletion cannot be undone from outside the code.
+	deleted: Schema.optional(Schema.Literals(['only', 'include'])),
+	minLat: Schema.optional(Schema.NumberFromString),
+	maxLat: Schema.optional(Schema.NumberFromString),
+	minLng: Schema.optional(Schema.NumberFromString),
+	maxLng: Schema.optional(Schema.NumberFromString),
+}
+
+/**
+ * The values a company list can be narrowed by, each with how many companies
+ * sit behind it once the other filters are applied.
+ *
+ * A count of zero is still an entry, on purpose: it says the value exists but
+ * finds nothing under these filters, which is what lets a caller go on offering
+ * a choice already made rather than stranding it. Countries come back as the
+ * stored code and trades as the name the organisation wrote; putting either
+ * into a reader's own language is the caller's job.
+ */
+export const CompanyFacets = Schema.Struct({
+	country: Schema.Array(
+		Schema.Struct({ value: Schema.String, count: Schema.Number }),
+	),
+	industry: Schema.Array(
+		Schema.Struct({
+			slug: Schema.String,
+			label: Schema.String,
+			count: Schema.Number,
+		}),
+	),
+})
+
 export const CompaniesGroup = HttpApiGroup.make('companies')
 	.add(
 		HttpApiEndpoint.get('list', '/companies', {
 			query: {
-				status: Schema.optional(Schema.String),
-				country: Schema.optional(Schema.String),
-				industry: Schema.optional(Schema.String),
-				priority: Schema.optional(Schema.NumberFromString),
-				owner: Schema.optional(Schema.String),
-				// Narrows to what needs doing, in the same words the dashboard uses:
-				// `overdue` missed its follow-up date, `stale` is mid-chase and has
-				// gone quiet, `no-next-action` has nothing written down at all. The
-				// rules are shared with the dashboard's own lists, so a count there
-				// opens a list of the same size here.
-				attention: Schema.optional(Schema.Literals(ATTENTION_FILTERS)),
-				// How long counts as quiet, for `attention=stale`. Rides along on the
-				// link so the list matches whatever the dashboard was showing.
-				staleDays: Schema.optional(StaleDays),
-				fitVerdict: Schema.optional(Schema.String),
-				fitCriterionPassed: Schema.optional(Schema.String),
+				...companyFilterQuery,
 				sort: Schema.optional(Schema.String),
-				query: Schema.optional(Schema.String),
-				// Which companies to look at. Omitted means the live ones; 'only' is
-				// how somebody finds a deleted company again in order to restore it,
-				// and without it a deletion cannot be undone from outside the code.
-				deleted: Schema.optional(Schema.Literals(['only', 'include'])),
-				minLat: Schema.optional(Schema.NumberFromString),
-				maxLat: Schema.optional(Schema.NumberFromString),
-				minLng: Schema.optional(Schema.NumberFromString),
-				maxLng: Schema.optional(Schema.NumberFromString),
 				...pageQuery,
 			},
 			success: PaginatedList(Company.json),
 		}),
 	)
 	.add(
-		// The countries this organisation trades with, so the list page can offer
-		// every one of them rather than only those on the page being read. Its own
-		// path, not `/companies/countries`, which a slug would answer to.
-		HttpApiEndpoint.get('countries', '/company-countries', {
-			success: Schema.Array(Schema.String),
+		// Its own path, not `/companies/facets`: a company's own route reads
+		// `/companies/:slug`, which would answer to "facets" as though it were
+		// somebody's name.
+		HttpApiEndpoint.get('facets', '/company-facets', {
+			query: companyFilterQuery,
+			success: CompanyFacets,
 		}),
 	)
 	.add(
