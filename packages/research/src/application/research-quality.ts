@@ -31,6 +31,7 @@
  */
 
 import { DISCOVERY_THIN_RESULT_COUNT, isDiscoveryScan } from './discovery-scan'
+import type { DroppedOrganisation } from './organisation-kind-guard'
 import {
 	type CoveragePassVerdict,
 	partsThoughtAnswered,
@@ -70,6 +71,19 @@ export interface RunQualityInput {
 	readonly fieldsGrounded: number
 	/** Profile fields in scope — 0 for any run that fills no company profile. */
 	readonly fieldsTotal: number
+	/**
+	 * The organisations a scan removed for not being companies of the trade, with
+	 * the reason each was removed for.
+	 *
+	 * Carried on the finished run rather than left in the log, because a removal
+	 * is the one thing about a list nothing downstream can see: the answer holds
+	 * what survived, so a real company struck off by mistake reads as if it had
+	 * never been found. Anything grading a list from the outside — the quality
+	 * eval most of all — can only weigh that harm if the run says what it took
+	 * out. Empty for a run that removed nothing, and for every run that is not a
+	 * scan.
+	 */
+	readonly notCompanies: ReadonlyArray<DroppedOrganisation>
 	/** Citations the run offered for its findings. */
 	readonly citationsSeen: number
 	/** Of those, how many resolved to a page the run actually reached. */
@@ -164,6 +178,12 @@ export interface RunQuality {
 	 * rather than reconstructed from logs — it is the main lever on a thin list.
 	 */
 	readonly refined?: boolean
+	/**
+	 * What the run removed from its list for not being a company of the trade, and
+	 * why — the counterweight to every other figure here, which are all read off
+	 * the rows that survived. Absent for a run that removed nothing.
+	 */
+	readonly not_companies?: ReadonlyArray<DroppedOrganisation>
 	readonly citations_seen: number
 	/** Of those, how many pointed at a page the run actually reached. */
 	readonly citations_kept: number
@@ -261,6 +281,9 @@ export const computeRunQuality = (input: RunQualityInput): RunQuality => {
 				}
 			: {}),
 		...(isScan ? { refined: input.refined } : {}),
+		...(input.notCompanies.length > 0
+			? { not_companies: input.notCompanies }
+			: {}),
 		citations_seen: input.citationsSeen,
 		citations_kept: input.citationsKept,
 		...(input.coverage !== null

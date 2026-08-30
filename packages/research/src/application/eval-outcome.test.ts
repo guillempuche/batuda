@@ -18,6 +18,109 @@ describe('outcomeFromRun', () => {
 		})
 	})
 
+	describe('when a scan removed organisations from its list', () => {
+		it('should read them back off the finished run', () => {
+			// GIVEN a stored run in the shape the pipeline actually writes: the
+			//   removals live in the quality block, because they are gone from the
+			//   list itself
+			const outcome = outcomeFromRun({
+				status: 'succeeded',
+				schemaName: 'prospect_scan_v1',
+				findings: {
+					prospects: [{ name: 'Instalaciones Perez' }],
+					quality: {
+						not_companies: [
+							{ name: 'Habitissimo', reason: 'quotes marketplace' },
+							{ name: 'GeoTapp', reason: 'sells software to installers' },
+						],
+					},
+				},
+				fetchedUrls: [],
+			})
+
+			// THEN both come through with their reasons. Nothing else reading a
+			//   finished run can see a removal happened, so a read that missed them
+			//   would report every pass as having struck nobody off
+			expect(outcome.removed).toEqual([
+				{ name: 'Habitissimo', reason: 'quotes marketplace', describedAs: '' },
+				{
+					name: 'GeoTapp',
+					reason: 'sells software to installers',
+					describedAs: '',
+				},
+			])
+		})
+
+		it('should carry the row own words, which are what a judge must read', () => {
+			// GIVEN a stored removal recording both the verdict and the row's own words
+			const outcome = outcomeFromRun({
+				status: 'succeeded',
+				schemaName: 'prospect_scan_v1',
+				findings: {
+					prospects: [],
+					quality: {
+						not_companies: [
+							{
+								name: 'Cronoshare Fontaneros',
+								reason: 'quotes marketplace',
+								describedAs: 'Cronoshare marketing page mentions plumbing',
+							},
+						],
+					},
+				},
+				fetchedUrls: [],
+			})
+
+			// THEN the words come through beside the reason. A second opinion shown
+			//   the reason instead is being told the answer, and would agree with the
+			//   check it exists to disagree with.
+			expect(outcome.removed[0]?.describedAs).toBe(
+				'Cronoshare marketing page mentions plumbing',
+			)
+			expect(outcome.removed[0]?.reason).toBe('quotes marketplace')
+		})
+
+		it('should report none for a run whose quality block holds no such list', () => {
+			// GIVEN a run that removed nothing — and, the same case, one stored before
+			//   a run recorded removals at all
+			const outcome = outcomeFromRun({
+				status: 'succeeded',
+				schemaName: 'prospect_scan_v1',
+				findings: { prospects: [{ name: 'Perez' }], quality: { rounds: 2 } },
+				fetchedUrls: [],
+			})
+
+			// THEN none, rather than anything that would read as a fault
+			expect(outcome.removed).toEqual([])
+		})
+
+		it('should ignore a removal carrying no name', () => {
+			// GIVEN a malformed entry beside a good one
+			const outcome = outcomeFromRun({
+				status: 'succeeded',
+				schemaName: 'prospect_scan_v1',
+				findings: {
+					prospects: [],
+					quality: {
+						not_companies: [
+							{ reason: 'no name at all' },
+							{ name: '  ', reason: 'blank' },
+							{ name: 'Habitissimo', reason: 'quotes marketplace' },
+						],
+					},
+				},
+				fetchedUrls: [],
+			})
+
+			// THEN only the one that names an organisation counts: a nameless removal
+			//   is nothing the judge could rule on, and counting it would inflate the
+			//   figure it is weighed against
+			expect(outcome.removed).toEqual([
+				{ name: 'Habitissimo', reason: 'quotes marketplace', describedAs: '' },
+			])
+		})
+	})
+
 	describe('when a field is a per-field citation wrapper', () => {
 		it('should read the inner value regardless of where its citation points', () => {
 			// GIVEN a value that carries its own source — a third-party fact-source

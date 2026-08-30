@@ -87,8 +87,10 @@ import {
 	isConfirmedRegistryMatch,
 	isEntityGroundedSchema,
 	isOwnSiteHost,
+	nameCore,
 	queryName,
 	reachedOwnSite,
+	withoutFormDots,
 	withRedirectDomain,
 } from './entity-guard'
 import { classifyNamespace, guardEntitySources } from './entity-source-guard'
@@ -124,6 +126,7 @@ import { type GuardLink, runGuardChain } from './guard-chain'
 import { citedSourceIds as rowCitedSourceIds } from './guard-shapes'
 import { markNameOnlyRows } from './name-only-guard'
 import {
+	type DroppedOrganisation,
 	dropNonCompanies,
 	OrganisationKindGuardVerdictsSchema,
 	organisationKindGuardPrompt,
@@ -2735,6 +2738,49 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// bought five or six times out of the same purse the confirming step
 					// draws on.
 					const organisationKinds = new Map<string, RememberedKind>()
+					// What a company is filed under here and in the answer alike: the name
+					// folded the way the rest of the package folds one, legal form off and
+					// dots put back together first. Two spellings of one company on one
+					// list is the ordinary case in these markets, and a raw-string
+					// comparison would call "URANOGAS S.L." and "Uranogas SL" two
+					// different organisations — reporting one as removed while it stands
+					// in the answer under the other.
+					const companyKey = (name: string): string =>
+						nameCore(withoutFormDots(name))
+					// Every organisation this run took off its list, kept for the finished
+					// run to report. Keyed by the folded name so the several passes over
+					// one list name each removal once, however many of them saw it and
+					// however each spelled it.
+					const notCompanies = new Map<string, DroppedOrganisation>()
+					// Of those, the ones actually absent from the answer being reported.
+					//
+					// A name lands in the map above whenever ANY pass of the chain drops
+					// it, and a run reads its list several times: a refined retry whose
+					// findings were then set aside, and a gap round that folds a fresh
+					// extraction into the list it already had. So a row dropped by a pass
+					// nobody kept can still stand in the answer, and reporting it as
+					// removed would overstate what the run took out and — worse — send a
+					// reader off to judge a removal that never happened. Measured on a
+					// live French search: six names recorded, three of them still in the
+					// delivered list.
+					//
+					// Settled against the answer itself rather than by tracking which
+					// pass won, because the answer is the only thing that says what a
+					// reader actually got.
+					const notCompaniesAbsentFrom = (
+						answer: unknown,
+					): ReadonlyArray<DroppedOrganisation> => {
+						const present = new Set(
+							discoveryRows(schemaName, answer).flatMap(row =>
+								typeof row['name'] === 'string'
+									? [companyKey(row['name'])]
+									: [],
+							),
+						)
+						return [...notCompanies]
+							.filter(([key]) => !present.has(key))
+							.map(([, row]) => row)
+					}
 					// Every piece of real page text gathered this run — the corpus the value
 					// guard checks findings against. Kept separate from the model-facing
 					// transcript (capped per page); empty on a resume that skips phase 1.
@@ -3393,6 +3439,17 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											// gap round only pays for the rows it actually added.
 											for (const [key, kind] of check.learned)
 												organisationKinds.set(key, kind)
+											for (const row of check.dropped)
+												notCompanies.set(companyKey(row.name), {
+													...row,
+													// Bounded here as well as in the log line: this text is a
+													// model's, and it is stored on the run rather than only
+													// printed.
+													reason: boundedToolResult(
+														row.reason,
+														MAX_DROP_REASON_CHARS,
+													),
+												})
 											for (const row of check.dropped.slice(
 												0,
 												MAX_LOGGED_FIELD_DROPS,
@@ -6406,6 +6463,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						ownDomainKnown: (entityTargets?.domains ?? []).length > 0,
 						fieldsGrounded: 0,
 						fieldsTotal: 0,
+						// Held against nothing, like every figure in this block: the run
+						// hands back no list, so everything it took out is absent from
+						// what a reader got.
+						notCompanies: notCompaniesAbsentFrom(undefined),
 						citationsSeen,
 						citationsKept,
 						scanResults: isDiscoveryScan(schemaName) ? 0 : null,
@@ -6516,6 +6577,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						ownDomainKnown: targetDomains.length > 0,
 						fieldsGrounded: fill.filled,
 						fieldsTotal: fill.total,
+						notCompanies: notCompaniesAbsentFrom(findings),
 						citationsSeen,
 						citationsKept,
 						scanResults: discoveryResultCount(schemaName, findings),

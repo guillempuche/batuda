@@ -27,6 +27,7 @@ const outcome = (over: Partial<RunOutcome>): RunOutcome => ({
 	fields: {},
 	contacts: [],
 	companies: [],
+	removed: [],
 	reportedCoverage: null,
 	...over,
 })
@@ -1432,6 +1433,9 @@ describe('scoring a run that answered for a whole market', () => {
 				rowsJudged: 0,
 				rowsUnjudged: 0,
 				rowsNameUnreadable: 0,
+				rowsRemoved: 0,
+				rowsWronglyRemoved: 0,
+				rowsRemovedRuled: 0,
 				rowsReturned: 0,
 				rowsRightKind: 0,
 				rowsConfirmed: 0,
@@ -1482,6 +1486,9 @@ describe('summarizeScores', () => {
 				fieldPrecision: null,
 				fieldRecall: null,
 				contactRecall: null,
+				keptRealCompanies: null,
+				rowsRemovedTotal: 0,
+				rowsRemovedRuledTotal: 0,
 				organisationKindPrecision: null,
 				rowsJudgedShare: null,
 				rowsGoldenListedShare: null,
@@ -1758,6 +1765,114 @@ describe('summarizing a pass that held market requests', () => {
 		...over,
 	})
 
+	describe('when a run removed organisations from its list', () => {
+		it('should count a removal the judge calls a company as one wrongly removed', () => {
+			// GIVEN a run that removed two organisations, and a judge that says one of
+			//   them was a company after all
+			const run = outcome({
+				companies: [company({ name: 'Instalaciones Perez' })],
+				removed: [
+					{
+						name: 'Habitissimo',
+						reason: 'quotes marketplace',
+						describedAs: '',
+					},
+					{
+						name: 'Electricidad Mora SL',
+						reason: 'sells equipment',
+						describedAs: '',
+					},
+				],
+			})
+
+			// WHEN the removals are put to the judge alongside the returned rows
+			const scored = scoreRun(
+				marketGolden(),
+				run,
+				[{ isCompany: true, method: 'judged', said: 'company' }],
+				[
+					{ isCompany: false, method: 'judged', said: 'other' },
+					{ isCompany: true, method: 'judged', said: 'company' },
+				],
+			)
+
+			// THEN both removals are counted, and the one that was a company shows as
+			//   harm. Every other figure here reads the surviving rows, so without this
+			//   a real company struck off is simply absent and scores as nothing.
+			expect(scored.market?.rowsRemoved).toBe(2)
+			expect(scored.market?.rowsWronglyRemoved).toBe(1)
+		})
+
+		it('should not call a removal wrong when the judge could not place it', () => {
+			// GIVEN a removal the judge never ruled on
+			const run = outcome({
+				companies: [company({ name: 'Instalaciones Perez' })],
+				removed: [
+					{
+						name: 'Unknown SL',
+						reason: 'not a company of this trade',
+						describedAs: '',
+					},
+				],
+			})
+
+			// WHEN it is scored
+			const scored = scoreRun(
+				marketGolden(),
+				run,
+				[{ isCompany: true, method: 'judged', said: 'company' }],
+				[{ isCompany: true, method: 'judged', said: 'unsure' }],
+			)
+
+			// THEN it counts as removed and as ruled on, but not as harm. Read off
+			//   `isCompany` it would score as a real company struck off, because that
+			//   flag folds "a company" together with "cannot tell".
+			expect(scored.market?.rowsRemoved).toBe(1)
+			expect(scored.market?.rowsRemovedRuled).toBe(1)
+			expect(scored.market?.rowsWronglyRemoved).toBe(0)
+		})
+
+		it('should say nothing was ruled on when the judge fell over', async () => {
+			// GIVEN two removals and a judge that answered for neither
+			const scored = scoreRun(
+				marketGolden(),
+				outcome({
+					companies: [company({ name: 'Perez' })],
+					removed: [
+						{ name: 'A', reason: 'r', describedAs: 'd' },
+						{ name: 'B', reason: 'r', describedAs: 'd' },
+					],
+				}),
+				[{ isCompany: true, method: 'judged', said: 'company' }],
+				[
+					{ isCompany: true, method: 'unjudged' },
+					{ isCompany: true, method: 'unjudged' },
+				],
+			)
+
+			// THEN both count as removed and neither as ruled on. Without the second
+			//   figure an outage reads as nought wrongly removed, which is the same
+			//   number a genuinely clean pass reports.
+			expect(scored.market?.rowsRemoved).toBe(2)
+			expect(scored.market?.rowsRemovedRuled).toBe(0)
+			expect(scored.market?.rowsWronglyRemoved).toBe(0)
+		})
+
+		it('should report no removals for a run that took nothing out', () => {
+			// GIVEN a run that removed nothing and so was asked nothing
+			const scored = scoreRun(
+				marketGolden(),
+				outcome({ companies: [company({ name: 'Instalaciones Perez' })] }),
+				[{ isCompany: true, method: 'judged' }],
+			)
+
+			// THEN both figures are nought, which reads as "nothing to weigh" rather
+			//   than as a clean bill
+			expect(scored.market?.rowsRemoved).toBe(0)
+			expect(scored.market?.rowsWronglyRemoved).toBe(0)
+		})
+	})
+
 	const marketScore = (
 		over: Partial<RunScore['market']> = {},
 		alsoOnScore: Partial<RunScore> = {},
@@ -1772,6 +1887,9 @@ describe('summarizing a pass that held market requests', () => {
 				rowsJudged: 0,
 				rowsUnjudged: 0,
 				rowsNameUnreadable: 0,
+				rowsRemoved: 0,
+				rowsWronglyRemoved: 0,
+				rowsRemovedRuled: 0,
 				rowsReturned: 10,
 				rowsRightKind: 10,
 				rowsConfirmed: 0,
@@ -1854,6 +1972,9 @@ describe('summarizing a pass that held market requests', () => {
 					rowsJudged: 0,
 					rowsUnjudged: 0,
 					rowsNameUnreadable: 0,
+					rowsRemoved: 0,
+					rowsWronglyRemoved: 0,
+					rowsRemovedRuled: 0,
 					rowsReturned: 60,
 					rowsRightKind: 30,
 					rowsLocated: 15,
@@ -1868,6 +1989,9 @@ describe('summarizing a pass that held market requests', () => {
 					rowsJudged: 0,
 					rowsUnjudged: 0,
 					rowsNameUnreadable: 0,
+					rowsRemoved: 0,
+					rowsWronglyRemoved: 0,
+					rowsRemovedRuled: 0,
 					rowsReturned: 6,
 					rowsRightKind: 6,
 					rowsLocated: 6,

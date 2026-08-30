@@ -62,6 +62,7 @@ export {
 	type OrganisationKindJudge,
 	OrganisationKindVerdictsSchema,
 	organisationKindPrompt,
+	removalAsCandidate,
 } from './application/eval-organisation-kind'
 export { outcomeFromRun } from './application/eval-outcome'
 export {

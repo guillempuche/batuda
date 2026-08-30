@@ -103,6 +103,11 @@ export const scoreRun = (
 	// outside because asking a model is not something a scoring function can do, and
 	// left out entirely by a pass that did not ask.
 	organisationKinds?: ReadonlyArray<OrganisationKind>,
+	// What the same model made of each row the run REMOVED, in the order the run
+	// recorded them. Left out by a pass that did not ask, which reads as none
+	// wrongly removed — the figure this had before anybody asked, and the safe
+	// direction: an unasked question must never invent a fault.
+	removedKinds?: ReadonlyArray<OrganisationKind>,
 ): RunScore => {
 	const anchors = [
 		...(expected.officialDomain === null ? [] : [expected.officialDomain]),
@@ -278,6 +283,23 @@ export const scoreRun = (
 						.length,
 					rowsJudged: kinds.filter(k => k.method === 'judged').length,
 					rowsUnjudged: kinds.filter(k => k.method === 'unjudged').length,
+					rowsRemoved: outcome.removed.length,
+					// A removed row the judge calls a company, in those words, is a real
+					// company struck off. Read off what it actually said rather than off
+					// `isCompany`, which folds "a company" together with "cannot tell" —
+					// right for a row that came back, since both mean leave it alone, and
+					// exactly wrong for a row that went, where it would turn every
+					// unplaceable removal into harm.
+					rowsWronglyRemoved: (removedKinds ?? []).filter(
+						kind => kind.said === 'company',
+					).length,
+					// How many removals the judge came back with an answer for. Without
+					// it a judge that fell over reads as none wrongly removed, which is
+					// the same number as a pass that removed only real non-companies —
+					// and the outage would score as the clean result.
+					rowsRemovedRuled: (removedKinds ?? []).filter(
+						kind => kind.said !== undefined,
+					).length,
 					rowsNameUnreadable: kinds.filter(k => k.method === 'name-unreadable')
 						.length,
 					rowsReturned: outcome.companies.length,
@@ -336,6 +358,9 @@ export const summarizeScores = (
 			fieldRecall: null,
 			contactRecall: null,
 			organisationKindPrecision: null,
+			keptRealCompanies: null,
+			rowsRemovedTotal: 0,
+			rowsRemovedRuledTotal: 0,
 			confirmationRate: null,
 			rowsJudgedShare: null,
 			rowsGoldenListedShare: null,
@@ -394,6 +419,9 @@ export const summarizeScores = (
 	let scansScored = 0
 	let totalRowsReturned = 0
 	let totalRowsRightKind = 0
+	let totalRowsRemoved = 0
+	let totalRowsRemovedRuled = 0
+	let totalRowsWronglyRemoved = 0
 	let totalRowsConfirmed = 0
 	let totalRowsJudged = 0
 	let totalRowsGoldenListed = 0
@@ -444,6 +472,9 @@ export const summarizeScores = (
 			scansScored++
 			totalRowsReturned += score.market.rowsReturned
 			totalRowsRightKind += score.market.rowsRightKind
+			totalRowsRemoved += score.market.rowsRemoved
+			totalRowsRemovedRuled += score.market.rowsRemovedRuled
+			totalRowsWronglyRemoved += score.market.rowsWronglyRemoved
 			totalRowsConfirmed += score.market.rowsConfirmed
 			totalRowsJudged += score.market.rowsJudged
 			totalRowsGoldenListed += score.market.rowsGoldenListed
@@ -513,6 +544,20 @@ export const summarizeScores = (
 				? null
 				: totalContactsFound / totalContactsExpected,
 		organisationKindPrecision: perRow(totalRowsRightKind),
+		// Read against what was REMOVED, not against what came back: the question is
+		// what share of the removals were mistakes, and dividing by the surviving
+		// rows would answer a different one. Null when a pass removed nothing, which
+		// is "no removals to judge" rather than "none were wrong".
+		// Read against the removals the judge actually RULED on, not against every
+		// removal: dividing by the unanswered ones would let an outage read as a
+		// clean pass. Null when it ruled on none, which says "not measured" rather
+		// than "nothing was wrong".
+		keptRealCompanies:
+			totalRowsRemovedRuled === 0
+				? null
+				: 1 - totalRowsWronglyRemoved / totalRowsRemovedRuled,
+		rowsRemovedTotal: totalRowsRemoved,
+		rowsRemovedRuledTotal: totalRowsRemovedRuled,
 		confirmationRate: perRow(totalRowsConfirmed),
 		rowsJudgedShare: perRow(totalRowsJudged),
 		rowsGoldenListedShare: perRow(totalRowsGoldenListed),

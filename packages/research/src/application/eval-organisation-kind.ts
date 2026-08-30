@@ -51,7 +51,21 @@ export interface OrganisationKind {
 	/** False for anything the trade belongs to, buys from, or is listed by. */
 	readonly isCompany: boolean
 	readonly method: KindMethod
+	/**
+	 * What the model actually answered, where it answered.
+	 *
+	 * `isCompany` folds "a company" and "cannot tell" into one value, which is the
+	 * right reading for the rows a search RETURNED — an unplaceable row is left
+	 * alone, and left alone means kept. It is the wrong reading for the rows a
+	 * search REMOVED, where the same fold would turn "cannot tell" into "a real
+	 * company struck off". So the answer itself is carried, and a caller that
+	 * needs the difference reads this instead.
+	 */
+	readonly said?: OrganisationKindType | undefined
 }
+
+/** The three answers the model may give. */
+export type OrganisationKindType = 'company' | 'other' | 'unsure'
 
 /**
  * The model's ruling per row: a company that does the work of the trade, or an
@@ -100,6 +114,25 @@ export const organisationKindPrompt = (
 				`  ${index}. ${row.name}${row.describedAs ? ` — ${row.describedAs}` : ''}`,
 		),
 	].join('\n')
+
+/**
+ * What a REMOVED row is put to the judge as.
+ *
+ * Its own words, and deliberately not the reason it was removed for. The reason
+ * is the pipeline's verdict, written in the same vocabulary this prompt uses for
+ * the answer it is asking for — "quotes marketplace", "sells software to
+ * installers" — so handing it over tells the judge what to say, and the figure
+ * then reads clean because the measurement agreed with itself.
+ *
+ * A function rather than a mapping written at the call site, because the call
+ * site is the command line and this repo does not test that: put there, the one
+ * property this whole measurement rests on would have nothing holding it.
+ */
+export const removalAsCandidate = (row: {
+	readonly name: string
+	readonly reason: string
+	readonly describedAs: string
+}): KindCandidate => ({ name: row.name, describedAs: row.describedAs })
 
 /**
  * What the caller supplies: ask the model, hand back its rulings. Whatever it needs
@@ -158,6 +191,10 @@ export const judgeOrganisationKinds = <R = never>(
 			}
 			// `unsure` is an answer, and its answer is "leave it alone" — the row stays
 			// a company, but the model did rule on it, so it counts as judged.
-			return { isCompany: kind !== 'other', method: 'judged' as const }
+			return {
+				isCompany: kind !== 'other',
+				method: 'judged' as const,
+				said: kind,
+			}
 		})
 	})

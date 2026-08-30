@@ -58,6 +58,7 @@ import {
 	type ResolvedInstructions,
 	type RunScore,
 	type RunUsage,
+	removalAsCandidate,
 	researchProviderEndpoints,
 	researchToolkitWireFormat,
 	type SystemDefaults,
@@ -430,7 +431,27 @@ const driveOne = (
 						golden.market.notCompanies,
 						askExtractTierForKinds,
 					)
-		return scoreRun(golden, outcome, kinds)
+		// The rows the run took OFF its list, put to the same judge.
+		//
+		// Shown the row's OWN words, never the reason it was removed for. The reason
+		// is the pipeline's verdict, phrased in the very vocabulary this prompt uses
+		// for the answer it wants — hand it over and the judge is being told what to
+		// say, and the figure reads clean because it agreed with itself. That is the
+		// one thing this measurement exists not to do.
+		//
+		// Asked apart from the returned rows, and against no golden list: that list
+		// names the bodies somebody wrote down, and a removal it does not name is
+		// exactly the one needing a fresh reading. Nothing is asked, and nothing
+		// spent, when the run removed nothing.
+		const removedKinds =
+			golden.market === undefined || outcome.removed.length === 0
+				? undefined
+				: yield* judgeOrganisationKinds(
+						outcome.removed.map(removalAsCandidate),
+						[],
+						askExtractTierForKinds,
+					)
+		return scoreRun(golden, outcome, kinds, removedKinds)
 	})
 
 /**
@@ -516,6 +537,17 @@ const formatMarketRuns = (
 		`${id.padEnd(20)} market ${market.name.padEnd(6)}`,
 		`rows ${rowsPerRun.toFixed(0).padStart(3)}`,
 		`right kind ${share(total(market => market.rowsRightKind))}`,
+		// Printed only where something was removed: a nought here on every ordinary
+		// pass would bury the passes where it means something.
+		...(total(market => market.rowsRemoved) === 0
+			? []
+			: [
+					`removed ${total(market => market.rowsRemoved)} (${total(
+						market => market.rowsRemovedRuled,
+					)} ruled on, ${total(
+						market => market.rowsWronglyRemoved,
+					)} were companies)`,
+				]),
 		`confirmed ${share(total(market => market.rowsConfirmed))}`,
 		`duplicates ${share(total(market => market.rowsDuplicated))}`,
 		`maybe ${share(total(market => market.rowsPossiblyDuplicated))}`,
@@ -602,6 +634,7 @@ const formatMarketFigures = (summary: EvalSummary): ReadonlyArray<string> =>
 		: [
 				`Rows per market:        ${decimal(summary.rowsPerScan)}`,
 				`  right kind:           ${pct(summary.organisationKindPrecision)}`,
+				`  kept real companies:  ${pct(summary.keptRealCompanies)} of ${summary.rowsRemovedRuledTotal} ruled on (${summary.rowsRemovedTotal} removed)`,
 				`  confirmed:            ${pct(summary.confirmationRate)}`,
 				`    model ruled on:     ${pct(summary.rowsJudgedShare)}`,
 				`    already listed:     ${pct(summary.rowsGoldenListedShare)}`,
