@@ -143,12 +143,42 @@ const REACH_WORDS = new Set([
 const PLACE_COUNT_RE =
 	/\b\d[\d.,]*\s+(?:countr|office|location|site|branch|warehouse|facilit|cit(?:y|ies)|continent|market|region|hub|terminal|depot)/i
 
-// A location has to name a place. This rejects the two shapes that answer a
-// different question — how far the company reaches, or how many places it runs —
-// and leaves every real place name alone, however long ("Sant Cugat del Vallès,
-// Barcelona, Catalonia, Spain" is fine).
+// How many places named inside one bracket stop being an address and become the
+// list of towns a company covers: "Greater Houston, Texas (Houston, Katy, Sugar
+// Land, The Woodlands, Pearland, Pasadena, Spring)" is a service area wearing
+// the clothes of a place, and it is how a company in Reno came back filed under
+// Houston.
+//
+// Five, not three, because an address puts real parts in brackets too — a town
+// followed by its province, region and country ("Vilanova i la Geltrú
+// (Barcelona, Catalunya, Spain)") is the ordinary form across the markets this
+// serves, and refusing it would take the place off a company that stated one
+// perfectly well.
+//
+// Counting inside the brackets rather than across the whole value is what keeps
+// this off a genuine long address. A comma count over the whole string cannot
+// tell "Pol. Ind. Les Comes, C/ Anoia 12, Igualada, Barcelona, Catalunya, Spain"
+// from a list of towns, and it also refuses the pipeline's own output: the fold
+// that merges a company's branch offices joins them with semicolons, but each
+// branch carries its own comma, so five branches written "Town, Province" reach
+// any threshold a single address can.
+const BRACKETED_PLACES_THAT_MAKE_A_LIST = 5
+
+const commaParts = (value: string): number => value.split(',').length
+
+const listsPlacesInBrackets = (value: string): boolean =>
+	[...value.matchAll(/\(([^)]*)\)/g)].some(
+		group => commaParts(group[1] ?? '') >= BRACKETED_PLACES_THAT_MAKE_A_LIST,
+	)
+
+// A location has to name a place. This rejects the shapes that answer a
+// different question — how far the company reaches, how many places it runs, or
+// which places it serves — and leaves every real place name alone, however long
+// ("Sant Cugat del Vallès, Barcelona, Catalonia, Spain" is fine).
 const isPlaceValue = (value: string): boolean =>
-	!REACH_WORDS.has(normalize(value)) && !PLACE_COUNT_RE.test(value)
+	!REACH_WORDS.has(normalize(value)) &&
+	!PLACE_COUNT_RE.test(value) &&
+	!listsPlacesInBrackets(value)
 
 // Fields whose value must be a particular kind of thing, beyond simply "not a
 // placeholder". A location is the clear case; other fields impose no such shape.

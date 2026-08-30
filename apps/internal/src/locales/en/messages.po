@@ -4213,6 +4213,14 @@ msgstr "Outcome"
 msgid "Outcome: {outcomeLabel}"
 msgstr "Outcome: {outcomeLabel}"
 
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Outside the area searched"
+msgstr "Outside the area searched"
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Outside the area searched:"
+msgstr "Outside the area searched:"
+
 #: src/components/companies/next-action-card.tsx
 #: src/routes/index.tsx
 #: src/routes/index.tsx
@@ -5764,6 +5772,10 @@ msgstr "The details arrived in a form this page cannot read, so there is nothing
 #: src/components/companies/documents-panel.tsx
 msgid "The documents filed here could not be fetched. Check that the session is valid, then try again."
 msgstr "The documents filed here could not be fetched. Check that the session is valid, then try again."
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "The evidence places this company outside the area the search asked about."
+msgstr "The evidence places this company outside the area the search asked about."
 
 #: src/components/companies/where-panel-client.client.tsx
 msgid "The geocoder did not return a match. Try editing the location field."

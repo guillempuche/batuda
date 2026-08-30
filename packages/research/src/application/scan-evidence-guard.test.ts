@@ -5,6 +5,12 @@ import { guardScanEvidence } from './scan-evidence-guard'
 const POST = 'https://www.instagram.com/p/DbBL2EVm9FK/'
 const REEL = 'https://www.instagram.com/reel/DagUf0xgB1d/'
 const DIRECTORY = 'https://www.thomasnet.com/suppliers/eastern-massachusetts'
+// A post on a page of the poster's own, and the page itself — the pair the
+// classifier used to read backwards.
+const PAGE_VIDEO = 'https://www.facebook.com/mix1065sanjose/videos/123/'
+const PAGE_POST =
+	'https://www.facebook.com/TorredonjimenoActual/posts/1603128045156569/'
+const COMPANY_PAGE = 'https://www.facebook.com/photography-studio-bcn'
 
 const scan = (
 	prospects: ReadonlyArray<{
@@ -45,6 +51,42 @@ describe('guardScanEvidence', () => {
 				'WeldFab manufacturing',
 				'Machine & Tool Co.',
 			])
+		})
+	})
+
+	describe('when the only evidence is a post on a Facebook page', () => {
+		it('should drop the company, as it does for any other post', () => {
+			// GIVEN the shape that reached a Texas scan from California: a video
+			// posted by a San Jose radio station, and nothing else. A page's own
+			// post was read as an ordinary page until now, so this rule — which
+			// exists to say a post is not a record that a company exists — was
+			// never handed it, and the company came back as an ordinary prospect
+			const findings = scan([
+				{ name: 'A-Rod Auto Collision', sources: [PAGE_VIDEO] },
+				{ name: 'Electricidad García', sources: [PAGE_POST] },
+			])
+
+			// WHEN checked — THEN neither survives
+			const result = guardScanEvidence('prospect_scan_v1', findings)
+			expect(namesOf(result.findings)).toEqual([])
+			expect(result.dropped).toBe(2)
+		})
+	})
+
+	describe("when the only evidence is a company's own Facebook page", () => {
+		it('should keep the company', () => {
+			// GIVEN a firm whose page name happens to begin with a word that also
+			// names a post. Read as a post, this row would be dropped for the
+			// spelling of its name — and a page is often the whole web presence of
+			// exactly the small firm a scan is for
+			const findings = scan([
+				{ name: 'Photography Studio BCN', sources: [COMPANY_PAGE] },
+			])
+
+			// WHEN checked — THEN it stays
+			const result = guardScanEvidence('prospect_scan_v1', findings)
+			expect(namesOf(result.findings)).toEqual(['Photography Studio BCN'])
+			expect(result.dropped).toBe(0)
 		})
 	})
 

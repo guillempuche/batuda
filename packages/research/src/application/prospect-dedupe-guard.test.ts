@@ -93,6 +93,38 @@ describe('dedupeDiscoveryRows', () => {
 			expect(rowsOf(result.findings)).toHaveLength(1)
 		})
 
+		it('should fold two rows sharing a site given with the page it was read on', () => {
+			// GIVEN the same pair as above, but with each website written the way the
+			// scan schema actually asks for it — the address paired with the page it
+			// came from. Every fixture here had held a bare string, a shape the
+			// pipeline stopped producing when the field gained its source, so the
+			// whole site-based fold had been quietly doing nothing and no test said so
+			const findings = scan([
+				{
+					name: 'SICE',
+					website: {
+						value: 'https://www.sice.com',
+						source_id: 'https://www.sice.com',
+						confidence: null,
+					},
+					why_relevant: 'A.',
+				},
+				{
+					name: 'Sociedad Ibérica de Construcciones Eléctricas',
+					website: {
+						value: 'https://sice.com/es',
+						source_id: 'https://sice.com/es',
+						confidence: null,
+					},
+					why_relevant: 'B.',
+				},
+			])
+
+			// WHEN de-duplicated — THEN the host still settles it
+			const result = dedupeDiscoveryRows(findings, 'prospects', noRunWords)
+			expect(rowsOf(result.findings)).toHaveLength(1)
+		})
+
 		it('should carry sameness across rows that meet by different keys', () => {
 			// GIVEN A and B meeting by name, and B and C meeting by site
 			const findings = scan([
@@ -389,6 +421,66 @@ describe('dedupeDiscoveryRows', () => {
 			expect(rowsOf(result.findings)).toHaveLength(1)
 			expect(rowsOf(result.findings)[0]?.['name']).toBe('Terre Solaire')
 			expect(result.merged).toBe(4)
+		})
+
+		it("should leave a branch office's mark behind when it folds", () => {
+			// GIVEN a company in the area a scan asked about, met a second time as
+			// its own branch somewhere else — and that branch marked as outside the
+			// area. The fold fills any field the surviving row is missing, so without
+			// a rule the mark would cross over and the company itself would come back
+			// badged as being somewhere it is not
+			const findings = scan([
+				{
+					name: 'Terre Solaire',
+					website: 'https://terresolaire.com/',
+					location: 'Montpellier',
+					why_relevant: 'Solar installer.',
+				},
+				{
+					name: 'Terre Solaire – agence Douains',
+					location: 'Douains',
+					marks: ['outside_requested_place'],
+				},
+			])
+
+			// WHEN de-duplicated
+			// THEN one company comes back, wearing no mark: a fold can take a mark
+			// away, never hand one out
+			const result = dedupeDiscoveryRows(findings, 'prospects', noRunWords)
+			expect(rowsOf(result.findings)).toHaveLength(1)
+			expect(rowsOf(result.findings)[0]?.['marks']).toBeUndefined()
+		})
+
+		it('should leave behind everything a guard concluded about the branch', () => {
+			// GIVEN a branch carrying not just the mark but the reason behind it and
+			// the older single-value mark beside it. Withholding the mark alone
+			// leaves its reason attached to a company nobody judged, and the tool
+			// description tells an assistant that reason IS the mark's
+			const findings = scan([
+				{
+					name: 'Terre Solaire',
+					website: 'https://terresolaire.com/',
+					location: 'Montpellier',
+					why_relevant: 'Solar installer.',
+				},
+				{
+					name: 'Terre Solaire – agence Douains',
+					location: 'Douains',
+					marks: ['outside_requested_place'],
+					outside_place_reason: 'Douains is in Normandy',
+					unconfirmed_evidence: 'name_only_listing',
+				},
+			])
+
+			// WHEN de-duplicated
+			// THEN none of the three crosses over. The surviving company has a site
+			// and a place, so "found only as a name on a list" would be plainly
+			// untrue of it, and it was never judged to be anywhere but Montpellier
+			const result = dedupeDiscoveryRows(findings, 'prospects', noRunWords)
+			const kept = rowsOf(result.findings)[0]
+			expect(kept?.['marks']).toBeUndefined()
+			expect(kept?.['outside_place_reason']).toBeUndefined()
+			expect(kept?.['unconfirmed_evidence']).toBeUndefined()
 		})
 
 		it('should keep every town the branches work from', () => {
@@ -1328,6 +1420,30 @@ describe('hostsEstablishedAsOwn', () => {
 			const rows = [{ name: 'Fontanería García', website: 'https://garcia.es' }]
 
 			// WHEN the owned hosts are worked out — THEN that host is one of them
+			expect(hostsEstablishedAsOwn(rows, runWordsOf(['fontanería']))).toEqual(
+				new Set(['garcia.es']),
+			)
+		})
+	})
+
+	describe('when the address is paired with the page it was read on', () => {
+		it('should read it just the same as a bare one', () => {
+			// GIVEN the shape a scan actually returns today — the address and the page
+			// it came from together. Read as a bare string, this row establishes no
+			// host at all, which is what every scan since the field gained its source
+			// has been doing
+			const rows = [
+				{
+					name: 'Fontanería García',
+					website: {
+						value: 'https://garcia.es',
+						source_id: 'https://garcia.es',
+						confidence: null,
+					},
+				},
+			]
+
+			// WHEN the owned hosts are worked out — THEN the host is established
 			expect(hostsEstablishedAsOwn(rows, runWordsOf(['fontanería']))).toEqual(
 				new Set(['garcia.es']),
 			)

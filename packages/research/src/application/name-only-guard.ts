@@ -34,10 +34,17 @@
  * reason built from field names, and this deliberately says nothing about fields.
  */
 
-import { isPlainObject } from './guard-shapes'
+import { isPlainObject, readTextValue } from './guard-shapes'
 
 /** What this leaves on a row, for the reader to be told in their own language. */
 export const NAME_ONLY_EVIDENCE = 'name_only_listing'
+
+/**
+ * The key it is left under. Named so the de-duplication fold can recognise it as
+ * a finding about one meeting of a company rather than a fact about the company,
+ * and leave it behind when two rows become one.
+ */
+export const NAME_ONLY_EVIDENCE_FIELD = 'unconfirmed_evidence'
 
 export interface NameOnlyResult {
 	readonly findings: unknown
@@ -49,11 +56,13 @@ export interface NameOnlyResult {
  * A field that holds something, as opposed to being absent or blank. A null counts
  * as absent: a model writing `"website": null` is saying it has none, and reading
  * that as a site would let the very rows this looks for slip past unmarked.
+ *
+ * Both fields this reads are now paired with the page they were read on, and an
+ * emptied pairing is as absent as a missing field — otherwise a guard upstream
+ * taking a made-up place away would leave a wrapper behind that still counted as
+ * a place, and the row would go on looking better for having had one.
  */
-const isFilled = (value: unknown): boolean =>
-	typeof value === 'string'
-		? value.trim() !== ''
-		: value !== undefined && value !== null
+const isFilled = (value: unknown): boolean => readTextValue(value) !== null
 
 /** The pages one row cites, without repeats. */
 const citedPages = (row: Record<string, unknown>): ReadonlySet<string> => {

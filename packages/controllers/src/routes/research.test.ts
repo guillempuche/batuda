@@ -17,6 +17,21 @@ const decodeExit = <S extends Schema.Decoder<unknown>>(
 	input: unknown,
 ) => Schema.decodeUnknownExit(Schema.toCodecJson(schema))(input)
 
+// The MCP door reads a caller's context this way: a key the shape does not name
+// is an error rather than something quietly thrown away.
+const STRICT = { onExcessProperty: 'error' } as const
+
+const decodeStrict = <S extends Schema.Decoder<unknown>>(
+	schema: S,
+	input: unknown,
+): S['Type'] =>
+	Schema.decodeUnknownSync(Schema.toCodecJson(schema))(input, STRICT)
+
+const decodeStrictExit = <S extends Schema.Decoder<unknown>>(
+	schema: S,
+	input: unknown,
+) => Schema.decodeUnknownExit(Schema.toCodecJson(schema))(input, STRICT)
+
 describe('ContextInput', () => {
 	describe('when the selector is well formed', () => {
 		it('should accept a selector wrapped in table + filter', () => {
@@ -65,6 +80,41 @@ describe('ContextInput', () => {
 			// THEN it succeeds with everything absent
 			const out = decode(ContextInput, {})
 			expect(out.selector).toBeUndefined()
+		})
+
+		it('should accept the web address a rerun pins itself to', () => {
+			// GIVEN the context the engine writes for itself when a run is rerun
+			// against one company's site
+			// WHEN decode runs
+			// THEN it survives: a caller that reads a run and sends its own context
+			// back must not be refused a value it never wrote
+			const out = decode(ContextInput, { anchorDomain: 'acme.example' })
+			expect(out.anchorDomain).toBe('acme.example')
+		})
+	})
+
+	describe('when a key is not one the shape names', () => {
+		it('should refuse it rather than drop it, so a misspelling is visible', () => {
+			// GIVEN the place sent under `location` — the name the web dialog used
+			// for its whole life, and one this shape has never known
+			// WHEN decode runs with unknown keys refused
+			// THEN it fails, naming the key. Left to drop in silence this started a
+			// scan that searched nowhere in particular and reported nothing amiss
+			const exit = decodeStrictExit(ContextInput, {
+				hints: { language: 'en', location: 'Texas, United States' },
+			})
+			expect(exit._tag).toBe('Failure')
+			expect(String(exit)).toContain('location')
+		})
+
+		it('should still accept the same place under the name it knows', () => {
+			// GIVEN the identical request with the place under `place`
+			// WHEN decode runs with unknown keys refused
+			// THEN it succeeds — strictness rejects the misspelling, not the request
+			const out = decodeStrict(ContextInput, {
+				hints: { language: 'en', place: 'Texas, United States' },
+			})
+			expect(out.hints?.place).toBe('Texas, United States')
 		})
 	})
 

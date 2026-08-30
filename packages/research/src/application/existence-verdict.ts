@@ -93,7 +93,7 @@ import {
 	registrableDomain,
 	spellingsWithoutForms,
 } from './entity-guard'
-import { citedSourceIds, isPlainObject } from './guard-shapes'
+import { citedSourceIds, isPlainObject, readTextValue } from './guard-shapes'
 import { ownSiteVerdict } from './own-site'
 import type { RunWords } from './run-words'
 import { hostOf, isBareWebAddress } from './source-key'
@@ -470,7 +470,12 @@ export const awaitsConfirmation = (
 ): boolean =>
 	existenceOf({
 		name: typeof row['name'] === 'string' ? row['name'] : '',
-		website: typeof row['website'] === 'string' ? row['website'] : undefined,
+		// Read past the pairing with its source. Asking whether it was a plain
+		// string made every row look as though it had no site of its own, so the
+		// count that sets money aside for the confirming step and the step itself
+		// answered differently about the same row — the one thing this module
+		// exists to keep in step.
+		website: readTextValue(row['website']) ?? undefined,
 		sources: citedSourceIds(row),
 		directorySites,
 		runWords,

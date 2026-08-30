@@ -249,6 +249,28 @@ describe('needsPerFieldSearch', () => {
 			expect(forScan(findings)).toEqual([])
 		})
 
+		it('should treat a place paired with its page as filled', () => {
+			// GIVEN the shape a scan returns now the place names the page it was read
+			// on. Read as a bare string it would look empty, and every round would go
+			// out and buy a place the run already had
+			const findings = {
+				prospects: [
+					{
+						name: 'Acme',
+						website: {
+							value: 'https://acme.test',
+							source_id: 'https://acme.test',
+						},
+						employee_estimate: { value: 42, source_id: 'https://acme.test' },
+						location: { value: 'Valencia', source_id: 'https://acme.test' },
+					},
+				],
+			}
+
+			// WHEN computed — THEN nothing is left to search for
+			expect(forScan(findings)).toEqual([])
+		})
+
 		it('should treat a blanked or absent value as still missing', () => {
 			// GIVEN a website blanked by a guard, one that is only whitespace, and a
 			// headcount whose value was nulled
@@ -1529,7 +1551,11 @@ describe('the fields each shape rescues', () => {
 					source_id: 'https://acme.test',
 					confidence: null,
 				},
-				location: 'Valencia',
+				location: {
+					value: 'Valencia',
+					source_id: 'https://acme.test',
+					confidence: null,
+				},
 				social_profiles: [
 					{
 						kind: 'facebook',

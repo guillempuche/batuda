@@ -146,6 +146,133 @@ describe('guardScalarFields', () => {
 			expect(result.droppedWrongKind).toBe(0)
 		})
 
+		it('should drop a list of the towns a company covers', () => {
+			// GIVEN the value a Reno company came back with in a Texas scan: the
+			// requested area, then every town around it in brackets. Nothing caught
+			// it — it names no number, so the tally rule stays quiet, and the row
+			// then read as a Houston company on a page that never said so
+			const findings = {
+				enrichment: {
+					location: {
+						value:
+							'Greater Houston, Texas (Houston, Katy, Sugar Land, The Woodlands, Pearland, Pasadena, Spring)',
+						source_id: 'https://premiumautocarereno.com',
+						quote: 'serving the Houston area',
+						confidence: null,
+					},
+				},
+			}
+
+			// WHEN grounded — THEN dropped: a company is in one place, and the
+			// places it will drive to are a different answer
+			const result = guardScalarFields(findings, 'houston katy sugar land')
+			expect(enrichment(result.findings).location).toBeNull()
+			expect(result.droppedWrongKind).toBe(1)
+		})
+
+		it('should keep an address however long it runs', () => {
+			// GIVEN a real Spanish industrial-estate address written out in full,
+			// six parts. Counting commas across the whole value refused this — and
+			// no comma count can tell it from a list of towns, which is why the rule
+			// reads inside the brackets instead
+			const findings = {
+				enrichment: {
+					location: {
+						value:
+							'Pol. Ind. Les Comes, C/ Anoia 12, Igualada, Barcelona, Catalunya, Spain',
+						source_id: 'https://acme.es',
+						quote: 'Pol. Ind. Les Comes, C/ Anoia 12, Igualada',
+						confidence: null,
+					},
+				},
+			}
+
+			// WHEN grounded — THEN kept: an address names one place at length, which
+			// is not the same as naming several
+			const result = guardScalarFields(
+				findings,
+				'pol. ind. les comes, c/ anoia 12, igualada, barcelona, catalunya, spain',
+			)
+			expect(enrichment(result.findings).location).not.toBeNull()
+			expect(result.droppedWrongKind).toBe(0)
+		})
+
+		it('should keep a town that names its province and country in brackets', () => {
+			// GIVEN the ordinary way a listing in these markets writes one precise
+			// address. Three parts inside the brackets is an address, not a service
+			// area, and refusing it takes the place off a company that stated one
+			const findings = {
+				enrichment: {
+					location: {
+						value: 'Vilanova i la Geltrú (Barcelona, Catalunya, Spain)',
+						source_id: 'https://acme.cat',
+						quote: 'Vilanova i la Geltrú (Barcelona)',
+						confidence: null,
+					},
+				},
+			}
+
+			// WHEN grounded — THEN kept
+			const result = guardScalarFields(
+				findings,
+				'vilanova i la geltrú (barcelona, catalunya, spain)',
+			)
+			expect(enrichment(result.findings).location).not.toBeNull()
+			expect(result.droppedWrongKind).toBe(0)
+		})
+
+		it('should keep the branch towns the fold joins, provinces and all', () => {
+			// GIVEN what the merge writes when a company's branch offices are folded
+			// onto it, each branch stating its own province — which is the ordinary
+			// form. Counting commas across the whole value refused this, so the
+			// pipeline was refusing its own output
+			const findings = {
+				enrichment: {
+					location: {
+						value:
+							'Alcobendas, Madrid; Getafe, Madrid; Leganés, Madrid; Móstoles, Madrid; Alcorcón, Madrid',
+						source_id: 'https://acme.es',
+						quote: 'delegaciones en Alcobendas, Getafe, Leganés',
+						confidence: null,
+					},
+				},
+			}
+
+			// WHEN grounded — THEN kept
+			const result = guardScalarFields(
+				findings,
+				'delegaciones en alcobendas, getafe, leganés, móstoles, alcorcón, madrid',
+			)
+			expect(enrichment(result.findings).location).not.toBeNull()
+			expect(result.droppedWrongKind).toBe(0)
+		})
+
+		it("should drop a scanned company's place when it names no page", () => {
+			// GIVEN a company on a scan's list claiming the very area the request
+			// asked about, with no page behind it. Until the field named its source
+			// this guard could not see a scanned company's place at all — it only
+			// grades a value that carries provenance — so a place nothing supported
+			// travelled onto a CRM record and from there onto a map
+			const findings = {
+				prospects: [
+					{
+						name: 'Premium Auto Care',
+						why_relevant: 'auto repair',
+						location: { value: 'Houston, Texas', confidence: null },
+						citations: [],
+					},
+				],
+			}
+
+			// WHEN grounded — THEN the claim is gone, counted as unsourced
+			const result = guardScalarFields(findings, 'houston texas auto repair')
+			const rows = (
+				result.findings as { prospects: Array<{ location: unknown }> }
+			).prospects
+			expect(rows[0]?.location).toBeNull()
+			expect(result.droppedUngrounded).toBe(1)
+		})
+
 		it('should keep a reach word that only prefixes a real place', () => {
 			// GIVEN a value whose reach word is not the whole answer
 			const findings = {

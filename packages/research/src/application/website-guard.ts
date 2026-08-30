@@ -59,7 +59,7 @@ import {
 	namesNobodyInParticular,
 	spellingsWithoutForms,
 } from './entity-guard'
-import { citedSourceIds, isPlainObject } from './guard-shapes'
+import { citedSourceIds, isPlainObject, readTextValue } from './guard-shapes'
 import { ownSiteHostVerdict, ownSiteVerdict } from './own-site'
 import type { RunWords } from './run-words'
 import { isSocialPlatformHost } from './social-sites'
@@ -204,8 +204,12 @@ const collectHostClaims = (
 		}
 		if (!isPlainObject(value)) return
 		const name = value['name']
-		const website = value['website']
-		if (typeof name === 'string' && typeof website === 'string') {
+		// Read through the pairing with its source, the same way the verdict below
+		// reads it. Asking whether it is a string left this map empty on every scan
+		// once a prospect's website started arriving paired, and an empty map is a
+		// shared-host verdict that can never fire.
+		const website = readTextValue(value['website']) ?? undefined
+		if (typeof name === 'string' && website !== undefined) {
 			const host = isBareWebAddress(website) ? hostOf(website) : null
 			const spellings = spellingsWithoutForms(name)
 			const identity = spellings[0]
@@ -312,15 +316,6 @@ const hostBelongsTo = (
 					collapse(host).includes(spelling),
 			) || ownSiteHostVerdict({ name, host, runWords }) === 'established',
 	)
-
-// The address itself, whether the model gave it bare or paired with the page it
-// was read on. A field a guard already emptied reads as no address at all.
-const websiteAddress = (website: unknown): string | undefined => {
-	if (typeof website === 'string') return website
-	if (isPlainObject(website) && typeof website['value'] === 'string')
-		return website['value']
-	return undefined
-}
 
 type WebsiteVerdict =
 	| 'keep'
@@ -622,7 +617,7 @@ export const guardCompanyWebsites = (args: {
 		// letting the address descend to the branch above would judge it against the
 		// run's target instead, which for a scan is nobody in particular.
 		const name = value['name']
-		const address = websiteAddress(value['website'])
+		const address = readTextValue(value['website']) ?? undefined
 		if (typeof name === 'string' && address !== undefined) {
 			countNamedNobodyInParticular(name)
 			const verdict = classifyWebsite({

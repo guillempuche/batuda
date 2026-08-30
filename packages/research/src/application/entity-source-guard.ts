@@ -48,6 +48,23 @@ type NamespaceTier = 'ugc' | 'profile' | null
 const hostMatches = (host: string, site: string): boolean =>
 	host === site || host.endsWith(`.${site}`)
 
+// A post published at the top of the site. The trailing boundary is the whole
+// point: without it the word `photo` also begins `photography-studio-barcelona`,
+// and `posts`, `watch` and `reel` likewise begin the names of real firms, so a
+// company whose only citation was its own page read as a post and the row was
+// dropped.
+const FACEBOOK_POST_AT_ROOT =
+	/^\/(?:reels?|watch|share|photo|posts|story\.php|permalink\.php|video\.php|photo\.php)(?:[/?]|$)/
+
+// A post published on a page of its own — `/<page>/posts/<id>`, and the same for
+// videos, photos and reels. This is how a page's own post is addressed, and
+// nothing matched it before: a video posted by a radio station read as an
+// ordinary page, so the check that exists to say "a post is not a record that a
+// company exists" was never given it. An id has to follow, or the page's own
+// listing tab (`/acme/videos/`) would be mistaken for a single post.
+const FACEBOOK_POST_ON_A_PAGE =
+	/^\/[^/]+\/(?:posts|videos|photos|reels)\/[^/?#]/
+
 // Classify a source URL's namespace. `ugc` is a user-posted item (blocked for any
 // field); `profile` is a person/people-search page (blocked for company fields
 // only); null is an ordinary page, left alone here — the tier and entity guards
@@ -60,15 +77,26 @@ export const classifyNamespace = (sourceId: string): NamespaceTier => {
 	const path = pathOf(sourceId) ?? ''
 
 	// Social posts / short-form video — a post, not a record.
-	if (hostMatches(host, 'instagram.com') && /^\/(reel|p|tv)\//.test(path))
+	// Read at the root and under a handle alike. Anchoring at the root alone is
+	// what let a page's own post pass as an ordinary page on Facebook for months,
+	// and Instagram addresses a post both ways too.
+	if (
+		hostMatches(host, 'instagram.com') &&
+		(/^\/(?:reels?|p|tv)\//.test(path) ||
+			/^\/[^/]+\/(?:reels?|p|tv)\/[^/?#]/.test(path))
+	)
 		return 'ugc'
 	if (hostMatches(host, 'tiktok.com') && /\/video\//.test(path)) return 'ugc'
 	if (hostMatches(host, 'youtube.com') && path.startsWith('/watch'))
 		return 'ugc'
 	if (hostMatches(host, 'youtu.be')) return 'ugc'
+	// Serves nothing but posts, so its address alone settles it — the same reading
+	// `youtu.be` gets above.
+	if (hostMatches(host, 'fb.watch')) return 'ugc'
+	// `fb.com` is the same site under a shorter name, so it reads by the same rules.
 	if (
-		hostMatches(host, 'facebook.com') &&
-		/^\/(reel|watch|posts|photo|story\.php|permalink\.php)/.test(path)
+		(hostMatches(host, 'facebook.com') || hostMatches(host, 'fb.com')) &&
+		(FACEBOOK_POST_AT_ROOT.test(path) || FACEBOOK_POST_ON_A_PAGE.test(path))
 	)
 		return 'ugc'
 	if (
