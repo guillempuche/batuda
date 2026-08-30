@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-30 (mail-worker-v2026.8.30)
+
+### Features
+
+* let the first email claim the lead ([d8e7109](https://github.com/guillempuche/batuda/commit/d8e71093d25f0d934f6666c7a5f83d86fcaa7829))
+
 ## 2026-08-27 (mail-worker-v2026.8.27)
 
 ### Documentation
