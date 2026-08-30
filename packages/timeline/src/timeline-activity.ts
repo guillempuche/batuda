@@ -835,6 +835,9 @@ export class TimelineActivityService extends Context.Service<TimelineActivitySer
 				}
 			}
 
+			// Somebody out of view is left where they were, for the same reason
+			// their company is: restoring them should show what was true when
+			// they were dropped, not what has arrived for them since.
 			const bumpContact = (
 				column: DenormColumn,
 				contactId: string,
@@ -846,19 +849,19 @@ export class TimelineActivityService extends Context.Service<TimelineActivitySer
 							UPDATE contacts SET
 								last_email_at = GREATEST(last_email_at, ${at}),
 								updated_at = now()
-							WHERE id = ${contactId}`
+							WHERE id = ${contactId} AND deleted_at IS NULL`
 					case 'last_call_at':
 						return sql`
 							UPDATE contacts SET
 								last_call_at = GREATEST(last_call_at, ${at}),
 								updated_at = now()
-							WHERE id = ${contactId}`
+							WHERE id = ${contactId} AND deleted_at IS NULL`
 					case 'last_meeting_at':
 						return sql`
 							UPDATE contacts SET
 								last_meeting_at = GREATEST(last_meeting_at, ${at}),
 								updated_at = now()
-							WHERE id = ${contactId}`
+							WHERE id = ${contactId} AND deleted_at IS NULL`
 				}
 			}
 

@@ -2,10 +2,10 @@ import { Effect } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 import type { ParsedMail } from 'mailparser'
 
-import { CurrentOrg } from '@batuda/domain'
 import { NoMatch, ParticipantMatcher } from '@batuda/email/participant-matcher'
 import { EmailReceived, TimelineActivityService } from '@batuda/timeline'
 
+import { asOrg } from './lib/as-org.js'
 import { resolveThreadId } from './threading.js'
 
 // Whether an id is one a conversation can be keyed on.
@@ -216,15 +216,7 @@ export const persistMessage = (args: {
 						email: counterpartAddress,
 						createPolicy: 'never',
 					})
-					.pipe(
-						Effect.provideService(CurrentOrg, {
-							id: args.organizationId,
-							name: '',
-							slug: '',
-							// Delivering mail is nobody's request, so it manages nothing.
-							role: null,
-						}),
-					)
+					.pipe(asOrg(args.organizationId))
 			: new NoMatch({ email: '' })
 
 		// Ambiguous and NoMatch deliberately fall through to null on both
@@ -351,11 +343,10 @@ export const persistMessage = (args: {
 		// folder is us, so filing it here would show our own message as
 		// something the company said to us.
 		if (companyId && args.direction === 'inbound') {
-			// Through the shared recorder rather than an INSERT of its own. It
-			// writes the history entry, moves the dates the company page reads
-			// as stored values, and files the touchpoint — a message arriving is
-			// one, and writing the row here by hand had meant it never counted
-			// as one, so an account read as though it only ever sent.
+			// The shared recorder writes all of it: the history entry, the dates
+			// the company and contact pages read as stored values, and the
+			// touchpoint — a message arriving is one, the same as a message
+			// going out.
 			const timeline = yield* TimelineActivityService
 			yield* timeline
 				.record(
@@ -370,15 +361,7 @@ export const persistMessage = (args: {
 						classification: 'normal',
 					}),
 				)
-				.pipe(
-					Effect.provideService(CurrentOrg, {
-						id: args.organizationId,
-						name: '',
-						slug: '',
-						// Delivering mail is nobody's request, so it manages nothing.
-						role: null,
-					}),
-				)
+				.pipe(asOrg(args.organizationId))
 		}
 
 		// One line per message taken in, so "is mail still arriving, and whose"

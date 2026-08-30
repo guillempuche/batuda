@@ -187,6 +187,63 @@ describe('applyBounce', () => {
 			expect(row?.company_id).toBe(companyId)
 		})
 
+		it('should reach every person it could not deliver to', async () => {
+			// GIVEN a second contact at the same company, also on the send
+			const second = await pool.query<{ id: string }>(
+				`INSERT INTO contacts (organization_id, company_id, name)
+				 VALUES ($1, $2, 'Second Target') RETURNING id`,
+				[ORG_ID, companyId],
+			)
+			const secondId = second.rows[0]!.id
+			const secondAddress = `also-nobody@${DOMAIN}`
+			await pool.query(
+				`INSERT INTO channels (organization_id, subject_table, subject_id, channel, address, is_primary)
+				 VALUES ($1, 'contacts', $2, 'email', $3, true)`,
+				[ORG_ID, secondId, secondAddress],
+			)
+			const messageId = await seedOutbound()
+
+			// WHEN one notice reports both addresses as undeliverable
+			await apply(bounceFor(messageId, [`nobody@${DOMAIN}`, secondAddress]))
+
+			// THEN it lands on each of their timelines, not just the first —
+			// a bounce nobody sees on their own card reads as a message that
+			// simply went quiet
+			const rows = await pool.query<{ contact_id: string | null }>(
+				`SELECT t.contact_id FROM timeline_activity t
+				 JOIN email_messages m ON m.id = t.entity_id
+				 WHERE m.message_id = $1 AND t.kind = 'email_bounced'`,
+				[messageId],
+			)
+			expect(rows.rows.map(r => r.contact_id).sort()).toEqual(
+				[contactId, secondId].sort(),
+			)
+		})
+
+		it('should keep what the mail server said about the failure', async () => {
+			// GIVEN a bounce carrying a status and a diagnostic
+			const messageId = await seedOutbound()
+
+			// WHEN it is applied
+			await apply(bounceFor(messageId, [`nobody@${DOMAIN}`]))
+
+			// THEN the entry names which message failed, who it could not reach
+			// and how final the failure is — enough to read the card without
+			// going hunting for the notice in the inbox
+			const rows = await pool.query<{
+				payload: Record<string, unknown> | null
+			}>(
+				`SELECT t.payload FROM timeline_activity t
+				 JOIN email_messages m ON m.id = t.entity_id
+				 WHERE m.message_id = $1 AND t.kind = 'email_bounced'`,
+				[messageId],
+			)
+			const payload = rows.rows[0]?.payload
+			expect(payload?.['originalMessageId']).toBe(messageId)
+			expect(payload?.['recipients']).toEqual([`nobody@${DOMAIN}`])
+			expect(payload?.['bounceType']).toEqual(expect.any(String))
+		})
+
 		it('should still record a bounce for an address matching no contact', async () => {
 			// GIVEN a bounce for someone we hold no contact for
 			const messageId = await seedOutbound()

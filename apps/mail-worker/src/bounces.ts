@@ -2,8 +2,9 @@ import { DateTime, Effect } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 import type { ParsedMail } from 'mailparser'
 
-import { CurrentOrg } from '@batuda/domain'
 import { EmailBounced, TimelineActivityService } from '@batuda/timeline'
+
+import { asOrg } from './lib/as-org.js'
 
 // RFC 3464 Delivery Status Notification parsing. A DSN is a
 // multipart/report;report-type=delivery-status with three parts:
@@ -235,19 +236,12 @@ export const applyBounce = (args: {
 			`
 		}
 
-		// Through the shared recorder rather than an INSERT of its own, so the
-		// entry a bounce leaves is built from the same description as every
-		// other kind. One entry per person it could not reach; one against
-		// nobody in particular when the address belongs to no contact, because
-		// a send that failed is still worth saying so.
+		// One entry per person it could not reach, so the failure shows on each
+		// of their cards; one against nobody in particular when the address
+		// belongs to no contact, because a send that failed is worth saying so
+		// either way.
 		const timeline = yield* TimelineActivityService
-		const inOrg = Effect.provideService(CurrentOrg, {
-			id: organizationId,
-			name: '',
-			slug: '',
-			// Delivering mail is nobody's request, so it manages nothing.
-			role: null,
-		})
+		const inOrg = asOrg(organizationId)
 		const bouncedAt = DateTime.toDateUtc(DateTime.nowUnsafe())
 		const bounced = (companyId: string | null, contactId: string | null) =>
 			timeline
