@@ -71,6 +71,15 @@ export interface HarnessOptions {
 	 * this needs a generous timeout.
 	 */
 	readonly sendFailure?: string
+	/**
+	 * Writes the company's history for real instead of swallowing it.
+	 *
+	 * Off by default, because most of these suites are about what reaches the
+	 * mail server and the history would only be rows nobody reads. A suite that
+	 * asserts on what a send leaves behind — the entries, their order, who they
+	 * name — needs the real one, and had no way to ask for it before.
+	 */
+	readonly recordsHistory?: boolean
 }
 
 export const emailDependencies = (options?: HarnessOptions) =>
@@ -113,9 +122,11 @@ export const emailDependencies = (options?: HarnessOptions) =>
 					? Effect.void
 					: Effect.fail(new BadRequest({ message: options.purgeFailure })),
 		} as never),
-		Layer.succeed(TimelineActivityService, {
-			record: () => Effect.void,
-		} as never),
+		options?.recordsHistory === true
+			? TimelineActivityService.layer
+			: Layer.succeed(TimelineActivityService, {
+					record: () => Effect.void,
+				} as never),
 		Layer.succeed(EmailProvider, {} as never),
 		Layer.succeed(CalendarService, {} as never),
 		DraftStore.layer,
