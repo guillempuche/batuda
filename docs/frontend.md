@@ -332,6 +332,14 @@ Library primitives at the time of writing: `PriAvatar`, `PriButton`,
 App-local primitives at the time of writing: `PriCombobox`, `PriCopyButton`,
 `PriPasswordInput`, `PriRichText`, `PriTable`.
 
+#### Importing a library primitive
+
+`@batuda/ui/pri` is what every consumer imports and what they should keep importing. The build emits each file in `src/pri/` as its own module, so the barrel is a re-export and a consumer downloads only the primitives it names — before that a marketing page needing two primitives paid for all twenty-one, 86.7 KB gzipped.
+
+`@batuda/ui/pri/pri-select` reaches a single file directly, for anyone who would rather be explicit than trust the shaking. That subpath is the **file** name, not the component name, and two files carry more than one primitive: `PriToggle` ships from `pri-toggle-group`, `usePriToast` and `createPriToastManager` from `pri-toast`. So `@batuda/ui/pri/pri-toggle` does not resolve.
+
+Adding a primitive needs no build change — `packages/ui/tsdown.config.ts` globs the directory, and `pnpm build` fails if an `exports` path names a module the build did not write. `src/blocks/` and `src/layout/` are emitted per file the same way, though neither exposes a per-file subpath.
+
 **Styling a router `Link`.** `styled(Link)` keeps the styling but drops
 TanStack Router's typing of `to`, `params` and `search`, so a wrong destination
 becomes a dead click instead of a compile error. Style a wrapper and put a bare
