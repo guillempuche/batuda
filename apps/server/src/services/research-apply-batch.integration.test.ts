@@ -15,6 +15,7 @@ import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { CurrentOrg } from '@batuda/controllers'
+import { TimelineActivityService } from '@batuda/timeline'
 
 import { PgLive } from '../db/client'
 import { applyTestEnv } from '../test-env'
@@ -24,7 +25,6 @@ import {
 	type BatchResolveItem,
 	resolveResearchProposedUpdatesBatch,
 } from './research-apply'
-import { TimelineActivityService } from './timeline-activity'
 
 applyTestEnv()
 

@@ -18,6 +18,7 @@ import {
 } from '@batuda/domain'
 import { resolveInstructions, resolveStackRef } from '@batuda/instructions'
 import { type CreateResearchInput, ResearchService } from '@batuda/research'
+import { TimelineActivityService } from '@batuda/timeline'
 
 import { ResearchDefaults } from '../lib/research-defaults'
 import { CompanyService } from '../services/companies'
@@ -26,7 +27,6 @@ import {
 	resolveResearchProposedUpdate,
 	resolveResearchProposedUpdatesBatch,
 } from '../services/research-apply'
-import { TimelineActivityService } from '../services/timeline-activity'
 
 // The pending-proposals query returns each run's `created_at` as a raw Date;
 // decode it from a Date so it lands as a wire-safe DateTime.Utc, mirroring the

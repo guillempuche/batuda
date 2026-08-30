@@ -51,6 +51,8 @@ import {
 const UUID_PATTERN =
 	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+import { EmailSent, TimelineActivityService } from '@batuda/timeline'
+
 import { textAnywhere } from '../lib/search-text'
 import { CalendarService } from './calendar.js'
 import { suppressedAmong } from './channels.js'
@@ -71,7 +73,6 @@ import type {
 import { MailTransport } from './mail-transport.js'
 import { recipientAddresses, replyAddressees } from './recipient-address.js'
 import { StorageProvider } from './storage-provider.js'
-import { EmailSent, TimelineActivityService } from './timeline-activity.js'
 
 // Raw Postgres rows carry Date objects; these decoders read each entity's
 // own columns (dates from a Date → DateTime.Utc) so the wire schema can

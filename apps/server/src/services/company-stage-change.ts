@@ -1,8 +1,7 @@
 import { DateTime, Effect } from 'effect'
 
 import type { CurrentOrg } from '@batuda/controllers'
-
-import { StageChanged, TimelineActivityService } from './timeline-activity'
+import { StageChanged, TimelineActivityService } from '@batuda/timeline'
 
 // Record a pipeline stage transition on the company's timeline, but only when
 // the status actually changed. `from` is the status captured before the write;

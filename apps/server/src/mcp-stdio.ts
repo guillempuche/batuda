@@ -13,6 +13,7 @@ import {
 	ResearchDispatch,
 	ResearchService,
 } from '@batuda/research'
+import { TimelineActivityService } from '@batuda/timeline'
 
 import { PgLive } from './db/client'
 import { McpLoggerLive } from './lib/logger'
@@ -37,7 +38,6 @@ import { ResearchBlobStorageLive } from './services/research-blob-storage'
 import { ResearchEventSinkLive } from './services/research-event-sink'
 import { S3StorageProviderLive } from './services/s3-storage-provider'
 import { TaskService } from './services/tasks'
-import { TimelineActivityService } from './services/timeline-activity'
 import { WebhookService } from './services/webhooks'
 
 const ServicesLive = Layer.mergeAll(

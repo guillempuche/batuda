@@ -5,6 +5,7 @@ import { SqlClient } from 'effect/unstable/sql'
 
 import { BatudaApi, CurrentOrg, NotFound } from '@batuda/controllers'
 import { Proposal } from '@batuda/domain'
+import { ProposalEvent, TimelineActivityService } from '@batuda/timeline'
 
 import {
 	pageOf,
@@ -14,10 +15,6 @@ import {
 	totalColumn,
 } from '../lib/sql-pagination'
 import { companyVisible } from '../services/company-liveness'
-import {
-	ProposalEvent,
-	TimelineActivityService,
-} from '../services/timeline-activity'
 
 const decodeProposal = Schema.decodeUnknownEffect(Proposal)
 const decodeProposals = Schema.decodeUnknownEffect(Schema.Array(Proposal))

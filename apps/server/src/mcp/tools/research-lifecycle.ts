@@ -10,12 +10,12 @@ import {
 } from '@batuda/controllers'
 import { RESEARCH_SUBJECT_TABLES, ResearchSubjectTable } from '@batuda/domain'
 import { ResearchService, resolvePolicy } from '@batuda/research'
+import { TimelineActivityService } from '@batuda/timeline'
 
 import { ResearchDefaults } from '../../lib/research-defaults'
 import { CompanyService } from '../../services/companies'
 import { Geocoder } from '../../services/geocoder'
 import { resolveResearchProposedUpdate } from '../../services/research-apply'
-import { TimelineActivityService } from '../../services/timeline-activity'
 import { requireApproval } from './_elicit'
 import { RESEARCH_ID_SOURCE, SUBJECT_ID_SOURCE } from './_ids'
 import { describedUuid, redactDbErrors, Uuid } from './_research-shared'

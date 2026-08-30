@@ -23,6 +23,11 @@ import {
 	CompanyWebsite,
 	HandSetVerificationVerdict,
 } from '@batuda/domain'
+import {
+	CompanyDeleted,
+	CompanyRestored,
+	TimelineActivityService,
+} from '@batuda/timeline'
 
 import {
 	addChannel,
@@ -43,11 +48,6 @@ import {
 import { listIndustries } from '../../services/company-industries'
 import { recordStageChange } from '../../services/company-stage-change'
 import { Geocoder } from '../../services/geocoder'
-import {
-	CompanyDeleted,
-	CompanyRestored,
-	TimelineActivityService,
-} from '../../services/timeline-activity'
 import { CurrentUser } from '../current-user'
 import { ToolMessage } from '../tool-message'
 import { CompanyIdOrSlugParam, CompanyIdParam } from './_ids'

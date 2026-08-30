@@ -14,6 +14,7 @@ import { SqlClient } from 'effect/unstable/sql'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { CurrentOrg, SessionContext } from '@batuda/controllers'
+import { TimelineActivityService } from '@batuda/timeline'
 
 import { PgLive } from '../db/client.js'
 import { enterOrgScope } from '../middleware/org.js'
@@ -25,7 +26,6 @@ import { DraftStore } from './email-draft-store.js'
 import { EmailProvider } from './email-provider.js'
 import { MailTransport } from './mail-transport.js'
 import { StorageProvider } from './storage-provider.js'
-import { TimelineActivityService } from './timeline-activity.js'
 
 const ORG = 'draft-inbox-test-org'
 const ALICE = 'draft-inbox-alice'

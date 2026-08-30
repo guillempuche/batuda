@@ -15,6 +15,16 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const SERVER_SRC = join(import.meta.dirname, '..')
+// The activity log moved into a package the mail worker shares, and it still
+// writes these rows — so the guard follows it rather than losing sight of it.
+// An entry starting `@` names a package; anything else is under the server.
+const REPO_ROOT = join(import.meta.dirname, '..', '..', '..', '..')
+const PACKAGES: Record<string, string> = {
+	'@timeline/timeline-activity.ts': join(
+		REPO_ROOT,
+		'packages/timeline/src/timeline-activity.ts',
+	),
+}
 
 // The tables whose rows belong to a company and have no deleted mark of their
 // own, so their visibility is the company's.
@@ -53,7 +63,7 @@ const READERS = [
 	'services/pipeline.ts',
 	'services/recordings.ts',
 	'services/tasks.ts',
-	'services/timeline-activity.ts',
+	'@timeline/timeline-activity.ts',
 ]
 
 // Files that read these tables without asking, on purpose. Anything not listed
@@ -64,7 +74,7 @@ const EXEMPT = new Map<string, string>([
 		'Names the company itself in each query, joining companies directly rather than through the shared predicate.',
 	],
 	[
-		'services/timeline-activity.ts',
+		'@timeline/timeline-activity.ts',
 		'Writes the rows rather than listing them, and the company it writes against is checked before the write.',
 	],
 	[
@@ -114,7 +124,7 @@ const EXEMPT = new Map<string, string>([
 ])
 
 const read = (relative: string): string =>
-	readFileSync(join(SERVER_SRC, relative), 'utf8')
+	readFileSync(PACKAGES[relative] ?? join(SERVER_SRC, relative), 'utf8')
 
 describe('reads of a company’s records', () => {
 	describe('when a file lists rows that belong to a company', () => {

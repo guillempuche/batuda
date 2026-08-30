@@ -18,6 +18,7 @@ import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { ParticipantMatcher } from '@batuda/email/participant-matcher'
+import { TimelineActivityService } from '@batuda/timeline'
 
 import { type ParsedInbound, persistMessage } from './persist.js'
 
@@ -127,7 +128,11 @@ const persistIn = (
 		rawRfc822Ref: 'sentinel',
 		parsed,
 		attachments: [],
-	}).pipe(Effect.provide(ParticipantMatcher.layer), Effect.provide(PgLive))
+	}).pipe(
+		Effect.provide(ParticipantMatcher.layer),
+		Effect.provide(TimelineActivityService.layer),
+		Effect.provide(PgLive),
+	)
 
 const persist = (parsed: ParsedInbound) =>
 	persistIn(parsed, { folder: 'INBOX', direction: 'inbound' })
@@ -193,6 +198,43 @@ const fetchMessage = async (messageId: string) => {
 	return rows.rows[0]
 }
 
+const fetchTimelineFor = async (emailMessageId: string) => {
+	const rows = await pool.query<{
+		kind: string
+		company_id: string | null
+		contact_id: string | null
+		summary: string | null
+		payload: Record<string, unknown> | null
+	}>(
+		`SELECT kind, company_id, contact_id, summary, payload
+		 FROM timeline_activity WHERE entity_id = $1::uuid`,
+		[emailMessageId],
+	)
+	return rows.rows[0]
+}
+
+const fetchInteractionFor = async (emailMessageId: string) => {
+	const rows = await pool.query<{
+		channel: string
+		direction: string
+		company_id: string
+		contact_id: string | null
+	}>(
+		`SELECT channel, direction, company_id, contact_id FROM interactions
+		 WHERE metadata->>'emailMessageId' = $1`,
+		[emailMessageId],
+	)
+	return rows.rows[0]
+}
+
+const contactLastEmailAt = async (contactId: string) => {
+	const rows = await pool.query<{ last_email_at: Date | null }>(
+		`SELECT last_email_at FROM contacts WHERE id = $1`,
+		[contactId],
+	)
+	return rows.rows[0]?.last_email_at ?? null
+}
+
 const fetchThreadLink = async (externalThreadId: string) => {
 	const rows = await pool.query<{
 		company_id: string | null
@@ -204,6 +246,69 @@ const fetchThreadLink = async (externalThreadId: string) => {
 	)
 	return rows.rows[0]
 }
+
+describe('what an arriving message leaves behind', () => {
+	describe('when it comes from a known contact at a known company', () => {
+		it('should log it as a touchpoint, not only as history', async () => {
+			// GIVEN an inbound email from a seeded contact
+			const messageId = `<touchpoint-${randomUUID()}@example>`
+			await runIngest(
+				persist(
+					buildParsed({ messageId, fromAddress: `alice@${ACME_DOMAIN}` }),
+				),
+			)
+
+			// THEN it counts as contact with the company, the same way a message
+			// we send does. Written by hand this row was never created, so an
+			// account's history read as though it only ever sent
+			const row = await fetchMessage(messageId)
+			const interaction = await fetchInteractionFor(row!.id)
+			expect(interaction?.channel).toBe('email')
+			expect(interaction?.direction).toBe('inbound')
+			expect(interaction?.company_id).toBe(acmeCompanyId)
+			expect(interaction?.contact_id).toBe(aliceContactId)
+		})
+
+		it('should move the date on the person as well as the company', async () => {
+			// GIVEN a contact with no mail on file yet
+			await pool.query(
+				`UPDATE contacts SET last_email_at = NULL WHERE id = $1`,
+				[aliceContactId],
+			)
+
+			// WHEN a message arrives from them
+			const messageId = `<contact-date-${randomUUID()}@example>`
+			await runIngest(
+				persist(
+					buildParsed({ messageId, fromAddress: `alice@${ACME_DOMAIN}` }),
+				),
+			)
+
+			// THEN their own card shows it. Bumping only the company had meant a
+			// contact's last-email date answered when we last wrote to them,
+			// never when they last wrote to us
+			expect(await contactLastEmailAt(aliceContactId)).not.toBeNull()
+		})
+
+		it('should carry the conversation on the history entry', async () => {
+			// GIVEN an inbound email that opens a conversation
+			const messageId = `<thread-payload-${randomUUID()}@example>`
+			await runIngest(
+				persist(
+					buildParsed({ messageId, fromAddress: `alice@${ACME_DOMAIN}` }),
+				),
+			)
+
+			// THEN the entry names the conversation, which is what lets the page
+			// open it from the history
+			const row = await fetchMessage(messageId)
+			const entry = await fetchTimelineFor(row!.id)
+			expect(entry?.kind).toBe('email_received')
+			expect(entry?.company_id).toBe(acmeCompanyId)
+			expect(entry?.payload?.['threadLinkId']).toEqual(expect.any(String))
+		})
+	})
+})
 
 describe('persistMessage — CRM auto-link', () => {
 	describe('when the sender matches an existing contact', () => {

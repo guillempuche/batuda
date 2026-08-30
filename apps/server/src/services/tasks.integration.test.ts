@@ -19,6 +19,7 @@ import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { CurrentOrg } from '@batuda/controllers'
+import { TimelineActivityService } from '@batuda/timeline'
 
 import { PgLive } from '../db/client'
 import {
@@ -27,7 +28,6 @@ import {
 	type TaskPage,
 	TaskService,
 } from './tasks'
-import { TimelineActivityService } from './timeline-activity'
 
 const DATABASE_URL =
 	process.env['DATABASE_URL'] ??

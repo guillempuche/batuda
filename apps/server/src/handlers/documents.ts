@@ -13,6 +13,7 @@ import {
 	NotFound,
 } from '@batuda/controllers'
 import { Document, type DocumentSubjectTable } from '@batuda/domain'
+import { DocumentCreated, TimelineActivityService } from '@batuda/timeline'
 
 import { textAnywhere } from '../lib/search-text'
 import {
@@ -35,10 +36,6 @@ import {
 	unlinkDocument,
 } from '../services/documents'
 import { StorageProvider } from '../services/storage-provider'
-import {
-	DocumentCreated,
-	TimelineActivityService,
-} from '../services/timeline-activity'
 
 const decodeDocument = Schema.decodeUnknownEffect(Document)
 

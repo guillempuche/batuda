@@ -3,6 +3,11 @@ import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { BatudaApi, NotFound, SessionContext } from '@batuda/controllers'
+import {
+	CompanyDeleted,
+	CompanyRestored,
+	TimelineActivityService,
+} from '@batuda/timeline'
 
 import { channelsJsonFor, clearEmailSuppression } from '../services/channels'
 import { CompanyService } from '../services/companies'
@@ -12,11 +17,6 @@ import {
 } from '../services/company-geocoding'
 import { recordStageChange } from '../services/company-stage-change'
 import { Geocoder } from '../services/geocoder'
-import {
-	CompanyDeleted,
-	CompanyRestored,
-	TimelineActivityService,
-} from '../services/timeline-activity'
 
 export const CompaniesLive = HttpApiBuilder.group(
 	BatudaApi,

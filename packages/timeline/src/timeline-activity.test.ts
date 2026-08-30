@@ -45,6 +45,7 @@ const emailReceived = () =>
 		contactId: 'ct-1',
 		subject: 'Re: Hello',
 		summary: null,
+		threadLinkId: null,
 		occurredAt: at,
 		classification: 'normal',
 	})
@@ -447,6 +448,7 @@ describe('mapEventToInteraction', () => {
 				contactId: null,
 				subject: null,
 				summary: null,
+				threadLinkId: null,
 				occurredAt: at,
 				classification: 'normal',
 			}),

@@ -23,6 +23,7 @@ import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { ParticipantMatcher } from '@batuda/email/participant-matcher'
+import { TimelineActivityService } from '@batuda/timeline'
 
 import { fetchAndIngestNewerThan, markExpunged } from './folder-sync'
 import { RawMessageStorage } from './storage'
@@ -184,6 +185,7 @@ describe.skipIf(!process.env['MAIL_CATCHER_LIVE'])(
 							Effect.provide(RawMessageStorage.layer),
 							Effect.provide(WorkerEnvVars.layer),
 							Effect.provide(ParticipantMatcher.layer),
+							Effect.provide(TimelineActivityService.layer),
 							Effect.provide(PgLive),
 						),
 					)
@@ -244,6 +246,7 @@ describe.skipIf(!process.env['MAIL_CATCHER_LIVE'])(
 							Effect.provide(RawMessageStorage.layer),
 							Effect.provide(WorkerEnvVars.layer),
 							Effect.provide(ParticipantMatcher.layer),
+							Effect.provide(TimelineActivityService.layer),
 							Effect.provide(PgLive),
 						),
 					)
@@ -262,6 +265,7 @@ describe.skipIf(!process.env['MAIL_CATCHER_LIVE'])(
 							Effect.provide(RawMessageStorage.layer),
 							Effect.provide(WorkerEnvVars.layer),
 							Effect.provide(ParticipantMatcher.layer),
+							Effect.provide(TimelineActivityService.layer),
 							Effect.provide(PgLive),
 						),
 					)
@@ -313,6 +317,7 @@ describe.skipIf(!process.env['MAIL_CATCHER_LIVE'])(
 							Effect.provide(RawMessageStorage.layer),
 							Effect.provide(WorkerEnvVars.layer),
 							Effect.provide(ParticipantMatcher.layer),
+							Effect.provide(TimelineActivityService.layer),
 							Effect.provide(PgLive),
 						),
 					)

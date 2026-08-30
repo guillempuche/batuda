@@ -23,6 +23,11 @@ export {
 	researchProvenance,
 } from './research-provenance'
 
+import {
+	ResearchProposalApplied,
+	TimelineActivityService,
+} from '@batuda/timeline'
+
 import { pgErrorCode } from '../lib/pg-error'
 import {
 	type ChannelInput,
@@ -30,10 +35,6 @@ import {
 	writeChannels,
 } from './channels'
 import { forkCompanyRegeocode } from './company-geocoding'
-import {
-	ResearchProposalApplied,
-	TimelineActivityService,
-} from './timeline-activity'
 
 /**
  * Apply (or reject) a research-proposed CRM update — the one place a research

@@ -16,12 +16,12 @@ import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import type { CurrentOrg } from '@batuda/controllers'
+import { TimelineActivityService } from '@batuda/timeline'
 
 import { PgLive } from '../../db/client'
 import { EnvVars } from '../../lib/env'
 import { enterOrgScope } from '../../middleware/org'
 import { TaskService } from '../../services/tasks'
-import { TimelineActivityService } from '../../services/timeline-activity'
 import { applyTestEnv } from '../../test-env'
 import { TaskHandlersLive, TaskTools } from './tasks'
 

@@ -4,15 +4,12 @@ import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
 import { Interaction } from '@batuda/domain'
+import { InteractionLogged, TimelineActivityService } from '@batuda/timeline'
 
 import {
 	companyVisible,
 	requireLiveCompany,
 } from '../../services/company-liveness'
-import {
-	InteractionLogged,
-	TimelineActivityService,
-} from '../../services/timeline-activity'
 import { ToolMessage } from '../tool-message'
 import { CompanyIdParam } from './_ids'
 import { McpPageLimit, TruncatableResult, toTruncatable } from './_result'

@@ -15,6 +15,7 @@ import {
 	GrantAuthFailed,
 	SessionContext,
 } from '@batuda/controllers'
+import { TimelineActivityService } from '@batuda/timeline'
 
 import { PgLive } from '../db/client.js'
 import { CalendarService } from './calendar.js'
@@ -29,7 +30,6 @@ import { DraftStore } from './email-draft-store.js'
 import { EmailProvider } from './email-provider.js'
 import { type DecryptedCreds, MailTransport } from './mail-transport.js'
 import { StorageProvider } from './storage-provider.js'
-import { TimelineActivityService } from './timeline-activity.js'
 
 // Real Postgres + real SqlClient + stubbed MailTransport/CredentialCrypto. The
 // contract under test is updateInbox's re-probe: a credential or transport
