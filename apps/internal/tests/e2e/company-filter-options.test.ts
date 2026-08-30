@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 
+import { failApi } from './helpers/block-api'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 // What the trade and country menus offer once a stage has been picked: only a
@@ -13,6 +14,7 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 const CERAMICA = 'companies-filter-industry-option-ceramica'
 const CLIMA = 'companies-filter-industry-option-climatitzacio'
+const SPAIN = 'companies-filter-country-option-ES'
 
 // Reset Alice to Taller before every scenario — sibling files flip her active
 // org, and the trades offered here are whichever org is active.
@@ -114,6 +116,32 @@ test.describe('company filter options', () => {
 			// with no way back except clearing every filter
 			await page.getByTestId('companies-filter-industry').click()
 			await expect(page.getByTestId(CERAMICA)).toBeVisible({ timeout: 10_000 })
+		})
+	})
+
+	test.describe('when the counts cannot be fetched', () => {
+		test('should keep naming the filter in force, so it can still be lifted', async ({
+			page,
+		}) => {
+			// GIVEN the list filtered to one country, with its menu populated
+			await page.goto('/companies?country=ES', { waitUntil: 'networkidle' })
+			const countries = page.getByTestId('companies-filter-country')
+			await countries.click()
+			await expect(page.getByTestId(SPAIN)).toBeVisible({ timeout: 10_000 })
+			await page.keyboard.press('Escape')
+
+			// WHEN every further count fails, and a filter change asks for one
+			await failApi(page, 'company-facets')
+			await page.getByTestId('companies-status-client').click()
+			await expect(page).toHaveURL(/status=client/)
+
+			// THEN the country is still filtering and still named in its own menu.
+			// A menu emptied by a failure would set the selector to a value its list
+			// no longer held, and the filter would clear itself with nothing said.
+			await expect(page).toHaveURL(/country=ES/)
+			await expect(countries).toHaveText(/spain/i)
+			await countries.click()
+			await expect(page.getByTestId(SPAIN)).toBeVisible({ timeout: 10_000 })
 		})
 	})
 })
