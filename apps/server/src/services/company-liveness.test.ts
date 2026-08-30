@@ -15,9 +15,9 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const SERVER_SRC = join(import.meta.dirname, '..')
-// The activity log moved into a package the mail worker shares, and it still
-// writes these rows — so the guard follows it rather than losing sight of it.
-// An entry starting `@` names a package; anything else is under the server.
+// The activity log lives in a package the mail worker shares, and it writes
+// these rows too, so the guard has to look outside the server to see them. An
+// entry starting `@` names a package; anything else is under the server.
 const REPO_ROOT = join(import.meta.dirname, '..', '..', '..', '..')
 const PACKAGES: Record<string, string> = {
 	'@timeline/timeline-activity.ts': join(

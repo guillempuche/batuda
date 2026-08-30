@@ -259,8 +259,8 @@ describe('what an arriving message leaves behind', () => {
 			)
 
 			// THEN it counts as contact with the company, the same way a message
-			// we send does. Written by hand this row was never created, so an
-			// account's history read as though it only ever sent
+			// we send does — an account that only ever receives has still been
+			// in touch
 			const row = await fetchMessage(messageId)
 			const interaction = await fetchInteractionFor(row!.id)
 			expect(interaction?.channel).toBe('email')
@@ -284,9 +284,8 @@ describe('what an arriving message leaves behind', () => {
 				),
 			)
 
-			// THEN their own card shows it. Bumping only the company had meant a
-			// contact's last-email date answered when we last wrote to them,
-			// never when they last wrote to us
+			// THEN their own card shows it: a person's last-email date answers
+			// when this conversation last moved, whichever way it went
 			expect(await contactLastEmailAt(aliceContactId)).not.toBeNull()
 		})
 

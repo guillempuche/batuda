@@ -165,8 +165,8 @@ The company activity log — what happened to an account, in the one vocabulary 
 Holds the event types (an email sent, one arriving, one that bounced, a stage change, a lead claimed, a meeting, a task), the pure mapping from an event to the row it becomes, and `TimelineActivityService`, which writes that row, files the touchpoint where the event is one, and moves the dates the company and contact pages read as stored values.
 
 In a package rather than in the server because it is not the server's alone: `apps/mail-worker` records arriving mail and bounced sends through the same door.
-It used to hand-write those `INSERT`s, and the two writers drifted — inbound mail moved the company's date but not the person's and left no interaction row, so an account's history read as though it only ever sent.
-One description of what an event is means that cannot happen again, and it is why adding a column to the table is a change in one place instead of a silent outage in the other.
+Two writers over one table drift apart — one gains a column or a rule the other never learns, and the same table quietly means two different things depending on who filled the row.
+One description of what an event is keeps them together, and it is why adding a column to the table is a change in one place instead of a silent outage in the other.
 
 ### `packages/controllers`
 

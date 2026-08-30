@@ -770,7 +770,7 @@ Outbound email (outreach, follow-ups, replies) goes through a bring-your-own IMA
 The send path stores the rendered `text` and `html` on the `email_messages` row alongside the wire bytes it puts in object storage. It has to: SMTP is one-way, so a message whose body is only in the recipient's mailbox cannot be read back here, and the thread view would show an empty card. `pnpm cli email backfill-bodies` fills in messages sent before this was true, reading each one back from storage.
 
 The worker syncs two folders per inbox, and which one a message came from decides its direction — inbox means it arrived, sent folder means we sent it. Folders are matched on the IMAP special-use flags the server reports (`\Inbox`, `\Sent`) rather than their names, because Gmail calls its sent folder `[Gmail]/Sent Mail` and Outlook `Sent Items`; matching by name syncs no sent mail at all on either. `resolveTrackedFolders` in `apps/mail-worker/src/inbox-session.ts` settles this once per session and hands the answer down, so nothing lower has to re-derive it from a folder name. Only mail that arrived is written to a company's history — what we send is recorded where it is sent from.
-The worker writes it through `@batuda/timeline`, the same recorder the server uses, rather than an `INSERT` of its own: two writers over one table drift, and these two had, so an arriving message moved the company's date but not the person's and left no touchpoint at all.
+The worker writes it through `@batuda/timeline`, the same recorder the server uses, so an arriving message leaves what a sent one leaves: the history entry, the dates both the company and the contact are read by, and a touchpoint.
 
 ### Package layout — `packages/email`
 
