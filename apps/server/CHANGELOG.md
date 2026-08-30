@@ -3,6 +3,29 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-30 (server-v2026.8.30)
+
+### Features
+
+* land a lead that wrote to us first on responded ([2e19164](https://github.com/guillempuche/batuda/commit/2e191646ebc2f35d10cd2a337375cf26ad09694f))
+* let the first email claim the lead ([d8e7109](https://github.com/guillempuche/batuda/commit/d8e71093d25f0d934f6666c7a5f83d86fcaa7829))
+* narrow the company filters to what each one would find ([cc510a4](https://github.com/guillempuche/batuda/commit/cc510a41c52e334e261ac618eff15996af959235))
+* **research:** count the companies a search struck off by mistake ([#560](https://github.com/guillempuche/batuda/issues/560)) ([7c4c563](https://github.com/guillempuche/batuda/commit/7c4c5635a6efa1ed12256d113149d1ebf1b17da8))
+* **ui:** let consumers download only the components they import ([ae0979e](https://github.com/guillempuche/batuda/commit/ae0979eeff53e8b8ad28c0641ed9c62f00d9be7a))
+
+### Bug Fixes
+
+* keep a discovery scan inside the place it was asked about ([69d169e](https://github.com/guillempuche/batuda/commit/69d169e306ca7b8fd186ae5d70db95add2a685d9))
+* **server:** stop handing a discovery call an internal crash ([b12402c](https://github.com/guillempuche/batuda/commit/b12402c570b68ecfe3d8f4edaf34e5a2f5fc274d)), closes [#562](https://github.com/guillempuche/batuda/issues/562)
+* size dropdown options to their longest name, not to the button ([16bc959](https://github.com/guillempuche/batuda/commit/16bc9592b589ba2c07c50c0b7740bac38b8b1a3f))
+* stop the lead claim touching a deleted company ([4d195ab](https://github.com/guillempuche/batuda/commit/4d195ab0bf0637da4e52dad4312ededed2f7b892))
+* **ui:** stop consumers installing a second copy of Base UI ([4f8ee6a](https://github.com/guillempuche/batuda/commit/4f8ee6a7cd9f362b34fdff8ac56484dbada3e6bf))
+
+### CI/CD
+
+* **release:** ui v2026.8.30 ([30a72c5](https://github.com/guillempuche/batuda/commit/30a72c59d7f10053d35f98e85ec36927f9817cf2))
+* **release:** ui v2026.8.30-1 ([e74fc03](https://github.com/guillempuche/batuda/commit/e74fc03c687f63fa45da655e5146f14b4de5b97f))
+
 ## 2026-08-27 (server-v2026.8.27)
 
 ### Bug Fixes
