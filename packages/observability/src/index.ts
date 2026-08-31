@@ -4,7 +4,28 @@
 
 export { boundedCause } from './bounded-cause'
 export { buildMeta } from './build-meta'
-export { makeOtlpObservability } from './otlp'
+export {
+	defaultFailingAfter,
+	type ExportFailure,
+	type ExportHealth,
+	type ExportReport,
+	type ExportSignal,
+	type ExportSnapshot,
+	exportHealth,
+	exportReport,
+	exportSignals,
+	failingSignals,
+	isFailing,
+	makeExportHealth,
+	observingHttpClient,
+	type SignalHealth,
+	type SignalReport,
+} from './export-health'
+export {
+	type ExportCadence,
+	endpointOf,
+	makeOtlpObservability,
+} from './otlp'
 export {
 	makeWorkRecord,
 	recordFacts,
