@@ -40,6 +40,32 @@ export interface LoopRound {
 
 export type LoopStopReason = 'model-final' | 'step-cap' | 'budget' | 'context'
 
+/**
+ * The reason to keep when a search runs the loop more than once.
+ *
+ * Only `model-final` says the search had nothing left it wanted to do; the
+ * other three say it was stopped. So once a pass has run into a ceiling, that
+ * is what the whole search did, however the passes after it ended: a run that
+ * hit the step cap and then sent one more short pass out that the model
+ * finished on its own did not finish looking.
+ *
+ * Between two ceilings the first is kept, because it is the one that shaped
+ * every pass after it.
+ */
+export const stopReasonAcrossPasses = (
+	soFar: LoopStopReason,
+	next: LoopStopReason,
+): LoopStopReason => (soFar === 'model-final' ? next : soFar)
+
+/**
+ * Whether the searching was cut off rather than ending because it had run out
+ * of things to try. The one place that question is answered, so a reason added
+ * to the list above cannot be read as a ceiling in one caller and as the search
+ * settling in another.
+ */
+export const wasCutOff = (reason: LoopStopReason): boolean =>
+	reason !== 'model-final'
+
 export interface AgentLoopResult {
 	/** Rendered transcript of the whole loop — the grounding input for phase 2. */
 	readonly researchText: string

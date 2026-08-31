@@ -6,6 +6,7 @@ import {
 	canAffordAnotherRound,
 	type LoopRound,
 	runAgentResearchLoop,
+	stopReasonAcrossPasses,
 } from './agent-loop'
 
 // A tool-calling round (the model wants to keep going) carries the page it
@@ -315,6 +316,50 @@ describe('runAgentResearchLoop — token budget', () => {
 			)
 			// THEN the token cap is a no-op and the model finishing ends it
 			expect(result.stopReason).toBe('model-final')
+		})
+	})
+})
+
+describe('stopReasonAcrossPasses', () => {
+	describe('when every pass ended on the model finishing', () => {
+		it('should say the search finished looking', () => {
+			// GIVEN a first pass and a second that both ran out of things to do
+			const reason = stopReasonAcrossPasses('model-final', 'model-final')
+
+			// THEN nothing stopped the search, so that is what it reports
+			expect(reason).toBe('model-final')
+		})
+	})
+
+	describe('when an earlier pass ran into a ceiling', () => {
+		it('should keep that ceiling over a later pass finishing on its own', () => {
+			// GIVEN a first pass stopped at the step cap, then a short extra pass
+			// the model ended by itself
+			const reason = stopReasonAcrossPasses('step-cap', 'model-final')
+
+			// THEN the search is reported as stopped: the extra pass was sent out
+			// for one narrow thing and its finishing says nothing about the ceiling
+			// the pass before it hit
+			expect(reason).toBe('step-cap')
+		})
+
+		it('should keep the first ceiling when a later pass hits a different one', () => {
+			// GIVEN a first pass out of money and a second out of context
+			const reason = stopReasonAcrossPasses('budget', 'context')
+
+			// THEN the first is kept, because it is the one that shaped every pass
+			// after it
+			expect(reason).toBe('budget')
+		})
+	})
+
+	describe('when only the later pass ran into a ceiling', () => {
+		it('should report that ceiling', () => {
+			// GIVEN a first pass the model finished and a second stopped on money
+			const reason = stopReasonAcrossPasses('model-final', 'budget')
+
+			// THEN the search was stopped, whichever pass it happened in
+			expect(reason).toBe('budget')
 		})
 	})
 })

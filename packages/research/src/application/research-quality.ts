@@ -30,6 +30,7 @@
  * is for, so it says so and the run is read before it is acted on.
  */
 
+import type { LoopStopReason } from './agent-loop'
 import { DISCOVERY_THIN_RESULT_COUNT, isDiscoveryScan } from './discovery-scan'
 import type { DroppedOrganisation } from './organisation-kind-guard'
 import {
@@ -37,6 +38,27 @@ import {
 	partsThoughtAnswered,
 	type RequestCoverage,
 } from './request-parts'
+
+/**
+ * Why a scan's searching stopped, said in the words a reader needs rather than
+ * in the loop's own.
+ *
+ * Only the first says the search ran out of things it wanted to do. The other
+ * three say it was stopped while it still had more to do, and that is what turns
+ * a short list from a reading of the market into a ceiling worth raising.
+ */
+export type SearchingStopped =
+	| 'finished_looking'
+	| 'round_cap_reached'
+	| 'budget_exhausted'
+	| 'context_full'
+
+const SEARCHING_STOPPED: Record<LoopStopReason, SearchingStopped> = {
+	'model-final': 'finished_looking',
+	'step-cap': 'round_cap_reached',
+	budget: 'budget_exhausted',
+	context: 'context_full',
+}
 
 export interface RunQualityInput {
 	readonly schemaName: string
@@ -92,6 +114,19 @@ export interface RunQualityInput {
 	readonly scanResults: number | null
 	/** Whether the one refined retry fired after a thin first pass. */
 	readonly refined: boolean
+	/**
+	 * Why the search for companies stopped, taken over every pass that went out
+	 * looking for them. The rounds that follow, which fill in fields on companies
+	 * already found, are not in it: they change how full a row is, never how many
+	 * rows there are. Null on a run that never searched.
+	 *
+	 * Asked of every run, not only of one whose request named several kinds of
+	 * company, because it answers a different question from the coverage below:
+	 * coverage says which of the kinds asked for came back empty, this says
+	 * whether the search had finished looking. A request naming a single kind has
+	 * no coverage reading at all and still needs that answer.
+	 */
+	readonly searchStopped: LoopStopReason | null
 	/**
 	 * Which of the parts the request named came back with companies. Null when the
 	 * question does not arise — every run that is not a scan, and a request naming
@@ -178,6 +213,19 @@ export interface RunQuality {
 	 * rather than reconstructed from logs — it is the main lever on a thin list.
 	 */
 	readonly refined?: boolean
+	/**
+	 * Why the searching stopped. Reported on any scan that searched, above all
+	 * the ones that came back with almost nothing — those are the runs it is
+	 * for: a thin market and a search that was cut off look identical from the
+	 * outside, and they call for opposite next steps.
+	 *
+	 * Reported, not gated on. Whether a thorough search of a thin market is good
+	 * enough is a decision about that list, and the run's job is to give the
+	 * reader what the decision needs rather than to take it for them.
+	 *
+	 * Absent for a non-scan, and for a run that never searched.
+	 */
+	readonly searching_stopped?: SearchingStopped
 	/**
 	 * What the run removed from its list for not being a company of the trade, and
 	 * why — the counterweight to every other figure here, which are all read off
@@ -281,6 +329,9 @@ export const computeRunQuality = (input: RunQualityInput): RunQuality => {
 				}
 			: {}),
 		...(isScan ? { refined: input.refined } : {}),
+		...(isScan && input.searchStopped !== null
+			? { searching_stopped: SEARCHING_STOPPED[input.searchStopped] }
+			: {}),
 		...(input.notCompanies.length > 0
 			? { not_companies: input.notCompanies }
 			: {}),

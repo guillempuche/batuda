@@ -827,6 +827,7 @@ describe('buildBriefPrompt', () => {
 			transcript: '',
 			uncoveredParts: [],
 			unsearchedParts: [],
+			searchWasCutOff: false,
 			...over,
 		})
 
@@ -1051,6 +1052,38 @@ describe('buildBriefPrompt', () => {
 			// THEN the brief and the heading are both asked for in it
 			expect(prompt).toContain('research brief in ca')
 			expect(prompt).toContain('worded in ca')
+		})
+	})
+
+	describe('when the searching was stopped before it had finished', () => {
+		it('should ask the brief to say so, as something about the search', () => {
+			// GIVEN a scan cut off at a ceiling while it still had more to do
+			const prompt = brief({
+				schemaName: 'prospect_scan_v1',
+				searchWasCutOff: true,
+			})
+
+			// THEN the brief is told to say the search did not finish looking, and
+			// told just as plainly not to turn that into a claim about the market —
+			// a stopped search cannot say there are more companies out there any
+			// more than it can say there are none
+			expect(prompt).toContain('did not finish looking')
+			expect(prompt).toContain('Never write that more companies exist')
+			expect(prompt).toContain('never write that these are all there are')
+		})
+	})
+
+	describe('when the searching ran out of things to try', () => {
+		it('should say nothing about how the search ended', () => {
+			// GIVEN a scan whose model stopped of its own accord
+			const prompt = brief({
+				schemaName: 'prospect_scan_v1',
+				searchWasCutOff: false,
+			})
+
+			// THEN nothing is added: the sentence exists to correct a reading that
+			// would otherwise be wrong, and here the plain reading is the right one
+			expect(prompt).not.toContain('did not finish looking')
 		})
 	})
 
@@ -1643,6 +1676,7 @@ describe('buildBriefPrompt — telling confirmed companies from candidates', () 
 			transcript: '',
 			uncoveredParts: [],
 			unsearchedParts: [],
+			searchWasCutOff: false,
 			existence,
 		})
 

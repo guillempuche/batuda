@@ -66,6 +66,12 @@ interface Scenario {
 		readonly label: string
 		readonly terms: ReadonlyArray<string>
 	}>
+	/**
+	 * Whether the agent keeps asking for tools rather than settling. Set for a
+	 * case about a search that was stopped at a ceiling: every other scan here
+	 * has the model finish of its own accord after one pass.
+	 */
+	readonly neverSettles?: boolean
 }
 
 let scenario: Scenario
@@ -95,8 +101,8 @@ const usage = {
 	outputTokens: { total: 0, text: undefined, reasoning: undefined },
 }
 
-// Agent pass: hand back two web_search results carrying real page text, and no
-// further tool calls, so each pass gathers the seeded sources then stops.
+// Agent pass: hand back two web_search results carrying real page text, so
+// every pass gathers the seeded sources.
 const agentLlm: LanguageModel.Service = {
 	generateText: () =>
 		Effect.succeed({
@@ -104,7 +110,12 @@ const agentLlm: LanguageModel.Service = {
 			content: [],
 			reasoning: [],
 			reasoningText: undefined,
-			toolCalls: [],
+			// An empty list is the model settling, which ends the loop. A scenario
+			// that never settles keeps asking, so the loop runs until a ceiling
+			// stops it — which is the only way to reach that reporting from here.
+			toolCalls: scenario.neverSettles
+				? [{ id: 'again', name: 'web_search', params: { query: 'more' } }]
+				: [],
 			toolResults: [
 				{
 					name: 'web_search',
@@ -290,6 +301,7 @@ const runScan = async (args: {
 	refined: boolean
 	covering: boolean
 	coverage: StoredCoverage | undefined
+	searchingStopped: string | undefined
 	splitterAsked: boolean
 	extractions: number
 	briefPrompt: string
@@ -349,13 +361,21 @@ const runScan = async (args: {
 			const findings = row?.findings
 			const quality =
 				findings !== null && typeof findings === 'object'
-					? (findings as { quality?: { coverage?: StoredCoverage } }).quality
+					? (
+							findings as {
+								quality?: {
+									coverage?: StoredCoverage
+									searching_stopped?: string
+								}
+							}
+						).quality
 					: undefined
 			return {
 				status,
 				refined: firedEvents.includes('research.refining'),
 				covering: firedEvents.includes('research.covering'),
 				coverage: quality?.coverage,
+				searchingStopped: quality?.searching_stopped,
 				splitterAsked: splitterCalls > 0,
 				extractions: extractionCalls,
 				briefPrompt,
@@ -454,6 +474,79 @@ describe('what a discovery scan reports about itself', () => {
 			//   that came back with forty
 			expect(result.refined).toBe(true)
 			expect(result.status).toBe('succeeded_low_confidence')
+		}, 60_000)
+	})
+
+	describe('when a scan for one kind of company comes back with almost nobody', () => {
+		it('should say the searching finished rather than leave a short list unexplained', async () => {
+			// GIVEN a request naming a single kind of company — so there is no list
+			//   of parts to hold it to and no coverage reading at all — answered by
+			//   two companies, with the model settling of its own accord
+			const result = await runScan({
+				schemaName: 'prospect_scan_v1',
+				query:
+					'Independent multi-location auto repair groups in Greater Houston, Texas',
+				scenario: {
+					evidence:
+						'A directory of independent multi-location auto repair groups in Houston.',
+					findings: [
+						{
+							prospects: [
+								{
+									name: 'Bayou Auto Group',
+									why_relevant: 'Independent repair group, four Houston shops',
+									citations: [],
+								},
+								{
+									name: 'Katy Service Partners',
+									why_relevant: 'Independent repair group, two Houston shops',
+									citations: [],
+								},
+							],
+						},
+					],
+				},
+			})
+
+			// THEN the run still answers whether it had finished looking, which is
+			//   what tells a thin market from a search that stopped — and the
+			//   coverage block, which needs two kinds of company to mean anything,
+			//   is rightly absent
+			expect(result.coverage).toBeUndefined()
+			expect(result.searchingStopped).toBe('finished_looking')
+		}, 60_000)
+	})
+
+	describe('when a scan is stopped at a ceiling with more it would have done', () => {
+		it('should name the ceiling rather than report having finished looking', async () => {
+			// GIVEN a scan whose model never settles, so the gathering runs until
+			//   the round cap stops it
+			const result = await runScan({
+				schemaName: 'prospect_scan_v1',
+				query:
+					'Independent multi-location auto repair groups in the Austin metropolitan area, Texas',
+				scenario: {
+					neverSettles: true,
+					evidence:
+						'A directory of independent multi-location auto repair groups in Austin.',
+					findings: [
+						{
+							prospects: [
+								{
+									name: 'Colorado River Automotive',
+									why_relevant: 'Independent repair group, three Austin shops',
+									citations: [],
+								},
+							],
+						},
+					],
+				},
+			})
+
+			// THEN the short list is reported as where the run was cut off. Without
+			//   this the same one-company answer reads as a market with one such
+			//   firm in it, and those two call for opposite next steps
+			expect(result.searchingStopped).toBe('round_cap_reached')
 		}, 60_000)
 	})
 
