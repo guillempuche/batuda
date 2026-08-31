@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-31 (mail-worker-v2026.8.31)
+
+### Bug Fixes
+
+* keep a deleted contact out of the meeting recompute too ([0569765](https://github.com/guillempuche/batuda/commit/05697650337acd409984430f5b730a3a3d6c2e3e))
+* leave a deleted contact's dates where they are ([39e6138](https://github.com/guillempuche/batuda/commit/39e613875a927ba2452b0d92391936e92363b307))
+* say when telemetry stops leaving the process ([9f9b013](https://github.com/guillempuche/batuda/commit/9f9b013e0ee87b61f7a19614218c1925afd28234))
+
+### Refactoring
+
+* write a company's history through one recorder ([b122c2e](https://github.com/guillempuche/batuda/commit/b122c2e77ec2612cce953f579d84903c89af7f32))
+
 ## 2026-08-30 (mail-worker-v2026.8.30)
 
 ### Features
