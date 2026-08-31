@@ -24,6 +24,7 @@ const scanInput = {
 	scanResults: FULL_LIST,
 	refined: false,
 	coverage: null,
+	searchStopped: null,
 	coverageStopped: null,
 	coverageLastMissing: [],
 	existence: null,
@@ -98,6 +99,7 @@ describe('computeRunQuality', () => {
 			scanResults: null,
 			refined: false,
 			coverage: null,
+			searchStopped: null,
 			coverageStopped: null,
 			coverageLastMissing: [],
 			existence: null,
@@ -189,6 +191,7 @@ describe('computeRunQuality', () => {
 			scanResults: FULL_LIST,
 			refined: false,
 			coverage: null,
+			searchStopped: null,
 			coverageStopped: null,
 			coverageLastMissing: [],
 			existence: null,
@@ -298,6 +301,7 @@ describe('computeRunQuality', () => {
 			citationsKept: 10,
 			refined: true,
 			coverage: null,
+			searchStopped: null,
 			coverageStopped: null,
 			coverageLastMissing: [],
 			existence: null,
@@ -352,6 +356,7 @@ describe('computeRunQuality', () => {
 				scanResults: null,
 				refined: false,
 				coverage: null,
+				searchStopped: null,
 				coverageStopped: null,
 				coverageLastMissing: [],
 				existence: null,
@@ -382,6 +387,7 @@ describe('computeRunQuality', () => {
 			scanResults: 62,
 			refined: false,
 			coverage: null,
+			searchStopped: null,
 			coverageStopped: null,
 			coverageLastMissing: [],
 			existence: null,
@@ -514,6 +520,7 @@ describe('computeRunQuality', () => {
 			scanResults: FULL_LIST,
 			refined: false,
 			coverage: null,
+			searchStopped: null,
 			coverageStopped: null,
 			coverageLastMissing: [],
 			existence: null,
@@ -580,6 +587,7 @@ describe('computeRunQuality', () => {
 				scanResults: FULL_LIST,
 				refined: false,
 				coverage: null,
+				searchStopped: null,
 				coverageStopped: null,
 				coverageLastMissing: [],
 				existence: null,
@@ -619,6 +627,7 @@ describe('computeRunQuality', () => {
 				scanResults: FULL_LIST,
 				refined: false,
 				coverage: null,
+				searchStopped: null,
 				coverageStopped: null,
 				coverageLastMissing: [],
 				existence: null,
@@ -647,6 +656,7 @@ describe('computeRunQuality', () => {
 			scanResults: null,
 			refined: false,
 			coverage: null,
+			searchStopped: null,
 			coverageStopped: null,
 			coverageLastMissing: [],
 			existence: null,
@@ -720,6 +730,7 @@ describe('computeRunQuality', () => {
 			scanResults: FULL_LIST,
 			refined: true,
 			coverage: null,
+			searchStopped: null,
 			coverageStopped: null,
 			coverageLastMissing: [],
 			existence: null,
@@ -758,6 +769,7 @@ describe('computeRunQuality', () => {
 				scanResults: null,
 				refined: false,
 				coverage: null,
+				searchStopped: null,
 				coverageStopped: null,
 				coverageLastMissing: [],
 				existence: null,
@@ -820,6 +832,7 @@ describe('computeRunQuality — how the list split', () => {
 		scanResults: FULL_LIST,
 		refined: false,
 		coverage: null,
+		searchStopped: null,
 		coverageStopped: null,
 		coverageLastMissing: [],
 	} as const
@@ -884,6 +897,7 @@ describe('computeRunQuality — when the run could not read its own subject', ()
 		scanResults: null,
 		refined: false,
 		coverage: null,
+		searchStopped: null,
 		coverageStopped: null,
 		coverageLastMissing: [],
 		existence: null,
@@ -961,6 +975,144 @@ describe('computeRunQuality — when the run could not read its own subject', ()
 			// THEN the checks had nothing to check, which costs nothing and is not
 			// this reason
 			expect('subject_unreadable' in quality).toBe(false)
+			expect(quality.low_confidence).toBe(false)
+		})
+	})
+})
+
+describe('computeRunQuality — saying why the searching stopped', () => {
+	const scan = { ...scanInput, notCompanies: [] } as const
+	// A thin list is the case this signal exists for: a market that holds only
+	// this many companies and a search stopped after this many look identical
+	// from the outside.
+	const thinScan = {
+		...scan,
+		scanResults: DISCOVERY_THIN_RESULT_COUNT - 3,
+	} as const
+
+	describe('when the search ran out of things it wanted to do', () => {
+		it('should say it finished looking', () => {
+			// GIVEN a scan whose model stopped calling tools of its own accord
+			const quality = computeRunQuality({
+				...thinScan,
+				searchStopped: 'finished_looking',
+			})
+
+			// THEN the short list is the search's own answer about this market,
+			// and the run says so
+			expect(quality.searching_stopped).toBe('finished_looking')
+		})
+	})
+
+	describe('when the search was stopped with more it would have done', () => {
+		it('should name the round cap', () => {
+			// GIVEN a scan whose gathering ran to its last permitted round
+			const quality = computeRunQuality({
+				...thinScan,
+				searchStopped: 'round_cap_reached',
+			})
+
+			// THEN the short list is where the run was cut off, not what the market
+			// holds — so the reader can tell the two apart and run it again
+			expect(quality.searching_stopped).toBe('round_cap_reached')
+		})
+
+		it('should name the money running out', () => {
+			// GIVEN a scan that could no longer afford a round
+			const quality = computeRunQuality({
+				...thinScan,
+				searchStopped: 'budget_exhausted',
+			})
+
+			// THEN what stopped it is named rather than left as a short list
+			expect(quality.searching_stopped).toBe('budget_exhausted')
+		})
+
+		it('should name the prompt outgrowing its window', () => {
+			// GIVEN a scan whose accumulated prompt reached the context ceiling
+			const quality = computeRunQuality({
+				...thinScan,
+				searchStopped: 'context_full',
+			})
+
+			// THEN that ceiling is named too: it is a limit on the run, not on the
+			// market
+			expect(quality.searching_stopped).toBe('context_full')
+		})
+	})
+
+	describe('when the request named a single kind of company', () => {
+		it('should still say why the searching stopped', () => {
+			// GIVEN a scan with no coverage reading at all — one kind of company
+			// asked for, so there is no list of parts to hold it to
+			const quality = computeRunQuality({
+				...thinScan,
+				coverage: null,
+				searchStopped: 'round_cap_reached',
+			})
+
+			// THEN the run still answers whether it had finished looking. This is
+			// the case the coverage block cannot reach and the one a thin list is
+			// most often judged on
+			expect('coverage' in quality).toBe(false)
+			expect(quality.searching_stopped).toBe('round_cap_reached')
+		})
+	})
+
+	describe('when the scan came back with nothing at all', () => {
+		it('should still say why the searching stopped', () => {
+			// GIVEN a scan that hands back an empty list
+			const quality = computeRunQuality({
+				...scan,
+				scanResults: 0,
+				searchStopped: 'budget_exhausted',
+			})
+
+			// THEN an empty answer is exactly where the reason matters: nothing
+			// found because the money ran out is not nothing found in this market
+			expect(quality.searching_stopped).toBe('budget_exhausted')
+		})
+	})
+
+	describe('when the run never searched', () => {
+		it('should leave the reason out rather than claim it finished', () => {
+			// GIVEN a resume that reuses an earlier attempt and gathers nothing
+			const quality = computeRunQuality({ ...scan, searchStopped: null })
+
+			// THEN there is no answer to give, and reporting one would say this
+			// run had looked
+			expect('searching_stopped' in quality).toBe(false)
+		})
+	})
+
+	describe('when the run fills one company profile', () => {
+		it('should leave the reason out', () => {
+			// GIVEN an enrichment, which reports fields rather than a list
+			const quality = computeRunQuality({
+				...scan,
+				schemaName: 'company_enrichment_v1',
+				scanResults: null,
+				searchStopped: 'round_cap_reached',
+			})
+
+			// THEN how far the searching got is not what a reader of that run
+			// weighs, so it is left out rather than reported as a shortfall
+			expect('searching_stopped' in quality).toBe(false)
+		})
+	})
+
+	describe('when a search was stopped but came back with a full list', () => {
+		it('should report the reason without marking the run for a read', () => {
+			// GIVEN a scan cut off at the round cap that still returned a full list
+			const quality = computeRunQuality({
+				...scan,
+				scanResults: FULL_LIST,
+				searchStopped: 'round_cap_reached',
+			})
+
+			// THEN it is reported, never gated on: what to do about a search that was
+			// cut off is the reader's decision, so the run is not marked for a read
+			expect(quality.searching_stopped).toBe('round_cap_reached')
 			expect(quality.low_confidence).toBe(false)
 		})
 	})

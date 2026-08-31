@@ -15,6 +15,7 @@
 import { Effect } from 'effect'
 
 import type { BudgetSnapshot } from '../domain/types'
+import type { SearchStopped } from './search-stopped'
 import { stripReasoning } from './strip-reasoning'
 import { CHEAP_MIN_COST_CENTS, REGISTRY_LOOKUP_COST_CENTS } from './tool-costs'
 
@@ -38,8 +39,6 @@ export interface LoopRound {
 	readonly inputTokens: number
 }
 
-export type LoopStopReason = 'model-final' | 'step-cap' | 'budget' | 'context'
-
 export interface AgentLoopResult {
 	/** Rendered transcript of the whole loop — the grounding input for phase 2. */
 	readonly researchText: string
@@ -51,7 +50,7 @@ export interface AgentLoopResult {
 	readonly evidenceText: string
 	readonly scrapedUrlHashes: ReadonlyArray<string>
 	readonly rounds: number
-	readonly stopReason: LoopStopReason
+	readonly stopReason: SearchStopped
 }
 
 /**
@@ -107,7 +106,7 @@ export const runAgentResearchLoop = <E, R>(
 		const urlHashes = new Set<string>()
 		let round = 0
 		let totalPromptChars = 0
-		let stopReason: LoopStopReason = 'model-final'
+		let stopReason: SearchStopped = 'finished_looking'
 
 		while (true) {
 			round++
@@ -125,26 +124,31 @@ export const runAgentResearchLoop = <E, R>(
 			// outgrowing the context window (a token budget on the latest round's
 			// occupancy, with the char cap as a provider-independent backstop), and
 			// the budget each end the loop on their own.
-			if (!result.hasToolCalls) {
+
+			// The hook below can send a finished model back out, and a ceiling met on
+			// a round the model had already finished stopped the hook's errand rather
+			// than the searching — so each cap below asks this before naming itself.
+			const modelHadFinished = !result.hasToolCalls
+			if (modelHadFinished) {
 				const keepGoing = params.shouldContinueAfterFinal
 					? yield* params.shouldContinueAfterFinal()
 					: false
 				if (!keepGoing) {
-					stopReason = 'model-final'
+					stopReason = 'finished_looking'
 					break
 				}
 				// The caller appended a corrective instruction; fall through to the
 				// step and budget caps, then let the next round search again.
 			}
 			if (round >= params.maxSteps) {
-				stopReason = 'step-cap'
+				stopReason = modelHadFinished ? 'finished_looking' : 'round_cap_reached'
 				break
 			}
 			if (
 				params.maxPromptChars !== undefined &&
 				totalPromptChars >= params.maxPromptChars
 			) {
-				stopReason = 'context'
+				stopReason = modelHadFinished ? 'finished_looking' : 'context_full'
 				break
 			}
 			// Token budget: the latest round's full-prompt occupancy (not the
@@ -155,12 +159,12 @@ export const runAgentResearchLoop = <E, R>(
 				params.maxPromptTokens !== undefined &&
 				result.inputTokens >= params.maxPromptTokens
 			) {
-				stopReason = 'context'
+				stopReason = modelHadFinished ? 'finished_looking' : 'context_full'
 				break
 			}
 			const snapshot = yield* params.budgetSnapshot
 			if (!canAffordAnotherRound(snapshot)) {
-				stopReason = 'budget'
+				stopReason = modelHadFinished ? 'finished_looking' : 'budget_exhausted'
 				break
 			}
 		}
