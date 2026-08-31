@@ -28,6 +28,11 @@ const normalize = (raw: string): string =>
 		.toLowerCase()
 		.normalize('NFD')
 		.replace(/\p{Diacritic}/gu, '')
+		// Put back together at the end. Taking accents off starts by pulling every
+		// letter into the pieces it is built from, and a Korean letter is built from
+		// two or three — so left there, "대한민국" is a key nobody writing the country
+		// down would produce, and the table below could never be matched.
+		.normalize('NFC')
 
 // Text that can never be a category value — a link, an email, an empty string, or
 // a "no value" placeholder — is always blanked, before any keyword match.
@@ -37,10 +42,43 @@ const isHardJunk = (n: string): boolean =>
 	n.includes('@') ||
 	['n/a', 'na', 'none', 'null', 'unknown', 'tbd', '-'].includes(n)
 
+// The writing systems that put no space between one word and the next.
+const UNSPACED_LETTER =
+	/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]/u
+
+// How much of a value is written in one of those, counted in letters. The marks
+// that sit on a letter come off first, so a Thai word — whose vowels are written as
+// marks around its letters — is measured by what it says rather than by how much of
+// it is drawn above and below the line.
+//
+// Only that part is counted, because only that part has no words to count. Measuring
+// the whole value instead refused a perfectly good Spanish trade for carrying a
+// single Chinese character.
+const unspacedLetterCount = (n: string): number =>
+	[...n.normalize('NFD').replace(/\p{M}/gu, '')].filter(letter =>
+		UNSPACED_LETTER.test(letter),
+	).length
+
 // More than five words reads as a whole sentence rather than the name of a
 // trade. A model that answers the question in prose is saying it did not find a
 // trade, and storing the sentence would put it in the organisation's list.
-const isSentence = (n: string): boolean => n.split(/\s+/).length > 5
+const MAX_LABEL_WORDS = 5
+
+// The same judgement where there are no words to count, because the writing puts
+// no space between them. Counting spaces made every Chinese, Japanese and Thai
+// answer one single word, so a whole sentence explaining that no trade was found
+// was stored as the trade.
+//
+// Twenty, measured against real labels and real refusals in those languages: the
+// longest genuine trade name found was fourteen letters ("一般社団法人 日本電設工業協会")
+// and the shortest prose refusal twenty-five, so this sits clear of both.
+const MAX_LABEL_LETTERS = 20
+
+// Either reading can call it prose: the words where there are words to count, and
+// the letters of the part that has none.
+const isSentence = (n: string): boolean =>
+	n.split(/\s+/).length > MAX_LABEL_WORDS ||
+	unspacedLetterCount(n) > MAX_LABEL_LETTERS
 
 /**
  * Keep the trade the evidence names, rather than deciding which of a fixed few
@@ -157,6 +195,31 @@ const COUNTRY_NAME_TO_ALPHA2: Record<string, string> = {
 	morocco: 'MA',
 	egypt: 'EG',
 	russia: 'RU',
+	// The same countries as their own people write them. Without these a run
+	// answering in the country's own language left "中国" or "Россия" standing where
+	// a two-letter code belongs, and that is what a person reads in the findings.
+	// Only countries already named above, since the question is how a country is
+	// written and not which countries are known.
+	中国: 'CN',
+	中國: 'CN',
+	日本: 'JP',
+	한국: 'KR',
+	대한민국: 'KR',
+	россия: 'RU',
+	'российская федерация': 'RU',
+	ελλαδα: 'GR',
+	مصر: 'EG',
+	المغرب: 'MA',
+	السعودية: 'SA',
+	'المملكة العربية السعودية': 'SA',
+	// Both spellings of the opening alef. Taking marks off does not reach the hamza
+	// — it makes a different letter rather than decorating one — so the form people
+	// actually write has to be listed beside the plain one.
+	الإمارات: 'AE',
+	'الإمارات العربية المتحدة': 'AE',
+	الامارات: 'AE',
+	ישראל: 'IL',
+	भारत: 'IN',
 }
 
 // Fold the model's country to an ISO alpha-2 code: keep a code it already emitted,

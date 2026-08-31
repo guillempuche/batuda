@@ -149,5 +149,58 @@
 				]
 			}
 		}
+	},
+	{
+		"id": "jp-installations",
+		"query": "日本の設備工事会社：電気設備工事、給排水衛生設備工事と空調工事、太陽光発電、消防設備工事、エレベーター保守。各社について都道府県を示すこと。",
+		"expectedOutput": {
+			"market": {
+				"name": "JP",
+				"parts": [
+					{
+						"id": "electrical",
+						"terms": [
+							"電気設備工事",
+							"電気工事",
+							"電設",
+							"electrical installation"
+						]
+					},
+					{
+						"id": "plumbing-heating",
+						"terms": [
+							"給排水衛生設備",
+							"空調工事",
+							"管工事",
+							"配管工事",
+							"plumbing",
+							"hvac"
+						]
+					},
+					{
+						"id": "solar",
+						"terms": ["太陽光発電", "太陽電池", "solar energy"]
+					},
+					{
+						"id": "fire-protection",
+						"terms": ["消防設備", "消火設備", "fire protection"]
+					},
+					{
+						"id": "lifts",
+						"terms": ["エレベーター", "昇降機", "elevator"]
+					}
+				],
+				"notCompanies": [
+					"一般社団法人 日本電設工業協会",
+					"日本電設工業協会",
+					"一般社団法人 日本空調衛生工事業協会",
+					"全国管工事業協同組合連合会",
+					"一般社団法人 太陽光発電協会",
+					"一般社団法人 日本消防設備安全センター",
+					"一般社団法人 日本エレベーター協会",
+					"国土交通省"
+				]
+			}
+		}
 	}
 ]

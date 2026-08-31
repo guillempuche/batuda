@@ -341,3 +341,82 @@ describe('mapBuyingRole', () => {
 		})
 	})
 })
+
+describe('a trade written in a system with no word spaces', () => {
+	describe('when a model answers in prose instead of naming a trade', () => {
+		it('should refuse the sentence rather than store it as the trade', () => {
+			// GIVEN a model saying, in Chinese, Japanese and Thai, that it could not
+			// find what the company does
+			// WHEN each is cleaned
+			// THEN each is refused. Counting spaces made every one of these a single
+			// word, so a whole sentence was stored in the organisation's trade list —
+			// where it also takes a key with a uniqueness rule on it
+			expect(
+				cleanIndustryLabel(
+					'我们没有找到这家公司从事的具体行业，因此无法给出答案',
+				),
+			).toBeNull()
+			expect(
+				cleanIndustryLabel(
+					'この会社が具体的にどのような業種に従事しているかは見つかりませんでした',
+				),
+			).toBeNull()
+			expect(cleanIndustryLabel('ไม่พบข้อมูลว่าบริษัทนี้ประกอบธุรกิจประเภทใด')).toBeNull()
+		})
+	})
+
+	describe('when the value really is a trade', () => {
+		it('should keep it, short or long', () => {
+			// GIVEN real trade names of two, six and fourteen letters, and a Thai one
+			// whose vowels are written as marks around its letters
+			// WHEN cleaned
+			// THEN each is kept. A rule that refused these would have moved the
+			// failure rather than fixed it
+			expect(cleanIndustryLabel('物流')).toBe('物流')
+			expect(cleanIndustryLabel('建筑安装工程')).toBe('建筑安装工程')
+			expect(cleanIndustryLabel('一般社団法人 日本電設工業協会')).toBe(
+				'一般社団法人 日本電設工業協会',
+			)
+			expect(cleanIndustryLabel('รับเหมาก่อสร้าง')).toBe('รับเหมาก่อสร้าง')
+		})
+
+		it('should keep a trade in another language for carrying one such letter', () => {
+			// GIVEN a Spanish trade that happens to name a Chinese market
+			// WHEN cleaned
+			// THEN kept. Only the part with no words to count is measured by its
+			// letters — measuring the whole value refused this for one character
+			expect(
+				cleanIndustryLabel('Instalaciones eléctricas y climatización 中国'),
+			).toBe('Instalaciones eléctricas y climatización 中国')
+		})
+	})
+})
+
+describe('a country named in its own writing', () => {
+	describe('when a run answers in the language of the country it searched', () => {
+		it('should give the code the CRM stores, not the name as written', () => {
+			// GIVEN countries written as their own people write them
+			// WHEN mapped
+			// THEN each comes back as its two-letter code. Left unmapped, the name
+			// itself is what a person reads in the findings where a code belongs
+			expect(mapCountry('中国')).toBe('CN')
+			expect(mapCountry('日本')).toBe('JP')
+			expect(mapCountry('Россия')).toBe('RU')
+			expect(mapCountry('대한민국')).toBe('KR')
+			expect(mapCountry('مصر')).toBe('EG')
+			// Both spellings of an opening alef, since taking marks off does not reach
+			// the hamza — it makes a different letter rather than decorating one
+			expect(mapCountry('الإمارات')).toBe('AE')
+		})
+	})
+
+	describe('when the country is one this table has never been told about', () => {
+		it('should pass it through rather than drop a real answer', () => {
+			// GIVEN a country name the table does not carry
+			// WHEN mapped
+			// THEN it survives as written. Refusing what cannot be mapped would throw
+			// away real countries simply for being absent from a hand-written list
+			expect(mapCountry('Freedonia')).toBe('Freedonia')
+		})
+	})
+})

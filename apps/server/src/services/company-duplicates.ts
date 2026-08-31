@@ -52,16 +52,63 @@ const LEGAL_SUFFIXES = new Set([
 	'oy',
 	'ab',
 	'as',
+	// The same words in the other alphabets a run answers in. Korean and Russian
+	// write the form as a word of its own, and a name that is nothing but the form
+	// arrives as one word too — both are dropped here. Left out, two unrelated
+	// Korean firms shared "주식회사" and read as half a match.
+	'ооо',
+	'оао',
+	'зао',
+	'株式会社',
+	'有限会社',
+	'有限公司',
+	'有限責任公司',
+	'股份有限公司',
+	'集团',
+	'주식회사',
+	'유한회사',
 ])
+
+// The legal forms that are written joined to the rest of the name, longest first so
+// "股份有限公司" is taken off before "有限公司" matches inside it.
+const JOINED_LEGAL_FORMS = [
+	'股份有限公司',
+	'有限責任公司',
+	'有限公司',
+	'株式会社',
+	'有限会社',
+	'주식회사',
+	'유한회사',
+].sort((a, b) => b.length - a.length)
 
 /**
  * The words of a name worth comparing: folded so spelling, case and accents stop
  * mattering, with the company-form words dropped.
+ *
+ * Splitting on spaces alone gave one word for a whole Chinese, Japanese or Korean
+ * name, so "北京物流有限公司" and "北京物流" shared no word and scored zero — the two rows
+ * a person would have merged at a glance never came up for review. Where the writing
+ * uses no space, the legal form is taken off whichever end it is written at, and
+ * what is left stands as the name's own word.
  */
 export const nameTokens = (name: string): ReadonlyArray<string> =>
 	foldLabel(name)
 		.split(' ')
+		.map(withoutJoinedLegalForm)
 		.filter(token => token.length > 0 && !LEGAL_SUFFIXES.has(token))
+
+// A legal form written joined to the name, taken off either end. Japanese writes it
+// at the front as readily as at the back — 株式会社山田電気 and 山田電気株式会社 are the same
+// company written two ways — and what is left either way is what the company is
+// called. Never taken off a name that is nothing but the form itself.
+const withoutJoinedLegalForm = (token: string): string => {
+	for (const form of JOINED_LEGAL_FORMS) {
+		if (token.length <= form.length) continue
+		if (token.endsWith(form)) return token.slice(0, -form.length)
+		if (token.startsWith(form)) return token.slice(form.length)
+	}
+	return token
+}
 
 /**
  * How much a word is worth as a name in this organisation. A word used by one

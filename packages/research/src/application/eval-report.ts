@@ -283,7 +283,6 @@ export const evalSpanAttributes = (
 			attributes['eval.rows_judged'] = market.rowsJudged
 			attributes['eval.rows_golden_listed'] = market.rowsGoldenListed
 			attributes['eval.rows_unjudged'] = market.rowsUnjudged
-			attributes['eval.rows_name_unreadable'] = market.rowsNameUnreadable
 			attributes['eval.duplicate_rate'] =
 				market.rowsDuplicated / market.rowsReturned
 			attributes['eval.possible_duplicate_rate'] =

@@ -244,16 +244,11 @@ export const scoreRun = (
 					? ('not-listed' as const)
 					: goldenKindOf(row.name, expectedMarket.notCompanies)
 			return {
-				// A row the list could not be read against stays a company, which is
-				// the safe direction — but it is counted apart, so a pass over a
-				// market this reading is blind to says so rather than reading clean.
 				isCompany: verdict !== 'listed',
 				method:
 					verdict === 'listed'
 						? ('golden-listed' as const)
-						: verdict === 'unreadable'
-							? ('name-unreadable' as const)
-							: ('unjudged' as const),
+						: ('unjudged' as const),
 			}
 		})
 	const rightKindRows = outcome.companies.filter(
@@ -300,8 +295,6 @@ export const scoreRun = (
 					rowsRemovedRuled: (removedKinds ?? []).filter(
 						kind => kind.said !== undefined,
 					).length,
-					rowsNameUnreadable: kinds.filter(k => k.method === 'name-unreadable')
-						.length,
 					rowsReturned: outcome.companies.length,
 					rowsConfirmed: outcome.companies.filter(row => row.confirmed).length,
 					rowsRightKind: rightKindRows.length,

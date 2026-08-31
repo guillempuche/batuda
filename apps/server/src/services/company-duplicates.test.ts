@@ -167,3 +167,49 @@ describe('hostOf', () => {
 		})
 	})
 })
+
+describe('nameTokens — names written without spaces between their words', () => {
+	describe('when a company writes its legal form joined to its name', () => {
+		it('should drop the form wherever it is written', () => {
+			// GIVEN one Japanese company written three ways: form at the front, form at
+			// the back, and no form at all
+			// WHEN each is read for the words worth comparing
+			// THEN all three come back as the same word. Japanese writes the form at
+			// either end, and left in it is the only thing two unrelated companies
+			// would share
+			expect(nameTokens('株式会社山田電気')).toEqual(['山田電気'])
+			expect(nameTokens('山田電気株式会社')).toEqual(['山田電気'])
+			expect(nameTokens('山田電気')).toEqual(['山田電気'])
+		})
+
+		it('should let two spellings of one company meet', () => {
+			// GIVEN a Chinese company written with and without its legal form
+			// WHEN both are read
+			// THEN they share a word. Splitting on spaces alone gave one whole-name
+			// word for each, so these shared nothing and the pair was never raised for
+			// review — the very thing this check exists to do
+			expect(nameTokens('北京物流有限公司')).toEqual(nameTokens('北京物流'))
+		})
+	})
+
+	describe('when the name is nothing but a legal form', () => {
+		it('should keep no words at all', () => {
+			// GIVEN a name carrying only the form
+			// WHEN read
+			// THEN nothing is left. A form names no company, so two rows sharing only
+			// this must not read as a match
+			expect(nameTokens('株式会社')).toEqual([])
+			expect(nameTokens('有限公司')).toEqual([])
+		})
+	})
+
+	describe('when the form is a separate word, as Korean and Russian write it', () => {
+		it('should drop it like any other company-form word', () => {
+			// GIVEN Korean and Russian names carrying their form as its own word
+			// WHEN read
+			// THEN the form is gone and the company's own name is what is left
+			expect(nameTokens('삼성전자 주식회사')).toEqual(['삼성전자'])
+			expect(nameTokens('ООО Логистика Плюс')).toEqual(['логистика', 'плюс'])
+		})
+	})
+})

@@ -1,3 +1,4 @@
 export * from './current-org'
+export * from './letter-equivalences.generated'
 export * from './schema/index'
 export * from './text-fold'

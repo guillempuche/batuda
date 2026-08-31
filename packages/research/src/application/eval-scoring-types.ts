@@ -294,12 +294,6 @@ export interface MarketScore {
 	readonly rowsJudged: number
 	readonly rowsUnjudged: number
 	/**
-	 * Rows whose name the golden's list could not be held against, because nothing
-	 * in it is written in letters this reading has. Reported rather than folded
-	 * into the figures: a check that could not run must never pass for one that ran.
-	 */
-	readonly rowsNameUnreadable: number
-	/**
 	 * What the run took OFF its list for not being a company of the trade, and how
 	 * many of those the judge says were companies after all.
 	 *

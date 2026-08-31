@@ -39,7 +39,7 @@ import { Schema } from 'effect'
 import { foldLabel } from '@batuda/domain'
 
 import { discoveryRowText } from './discovery-scan'
-import { anyTermAppearsIn, termTokens } from './term-match'
+import { anyTermAppearsIn, readText, termTokens } from './term-match'
 
 /** One kind of company a request asks for, and the wordings that place a row in it. */
 export interface RequestPart {
@@ -343,12 +343,12 @@ export const coverRequestParts = (
 	searched: ReadonlySet<string>,
 ): RequestCoverage | null => {
 	if (parts.length < MIN_COVERAGE_PARTS) return null
-	const rowWords = rows.map(row => termTokens(discoveryRowText(row)))
+	const rowTexts = rows.map(row => readText(discoveryRowText(row)))
 	const covered: string[] = []
 	const uncovered: string[] = []
 	const unsearched: string[] = []
 	for (const part of parts) {
-		if (anyTermAppearsIn([part.label, ...part.terms], rowWords)) {
+		if (anyTermAppearsIn([part.label, ...part.terms], rowTexts)) {
 			covered.push(part.label)
 		} else {
 			uncovered.push(part.label)

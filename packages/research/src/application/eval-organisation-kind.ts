@@ -33,18 +33,7 @@ import { Effect, Schema } from 'effect'
 import { goldenKindOf } from './eval-scoring-market'
 
 /** Which way settled what a row is. */
-export type KindMethod =
-	| 'golden-listed'
-	| 'judged'
-	| 'unjudged'
-	/**
-	 * The golden's list could not be held against this name at all — nothing in it
-	 * is written in letters this reading has. Apart from `unjudged`, because "the
-	 * model was not asked" and "the list could not be read" are different answers,
-	 * and averaging the second into a clean figure is how a pass reports the
-	 * precision of a market it is blind to.
-	 */
-	| 'name-unreadable'
+export type KindMethod = 'golden-listed' | 'judged' | 'unjudged'
 
 /** What one row was decided to be, and by what. */
 export interface OrganisationKind {

@@ -31,7 +31,7 @@ import { fileURLToPath } from 'node:url'
 // the only thing that does.
 const OUT_FILE = fileURLToPath(
 	new URL(
-		'../packages/research/src/application/letter-equivalences.generated.ts',
+		'../packages/domain/src/letter-equivalences.generated.ts',
 		import.meta.url,
 	),
 )

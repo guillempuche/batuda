@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
+import { EQUIVALENT_LETTERS } from '@batuda/domain'
+
 import {
 	cityGate,
 	classifyEntityMatch,
@@ -27,7 +29,6 @@ import {
 	spellingsWithoutForms,
 	withRedirectDomain,
 } from './entity-guard'
-import { EQUIVALENT_LETTERS } from './letter-equivalences.generated'
 import { ownSiteVerdict } from './own-site'
 import { runWordsOf } from './run-words'
 
