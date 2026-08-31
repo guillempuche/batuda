@@ -885,7 +885,7 @@ export class TimelineActivityService extends Context.Service<TimelineActivitySer
 							AND start_at > now()
 					),
 					updated_at = now()
-				WHERE id = ${contactId}`
+				WHERE id = ${contactId} AND deleted_at IS NULL`
 
 			return {
 				record: (

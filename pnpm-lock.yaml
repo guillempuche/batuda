@@ -444,9 +444,6 @@ importers:
       '@aws-sdk/s3-request-presigner':
         specifier: ^3.1026.0
         version: 3.1026.0
-      '@batuda/timeline':
-        specifier: workspace:*
-        version: link:../../packages/timeline
       '@better-auth/api-key':
         specifier: 1.6.11
         version: 1.6.11(@better-auth/core@1.6.11(@better-auth/utils@0.4.0)(@better-fetch/fetch@1.1.21)(better-call@1.3.5(zod@4.4.3))(jose@6.2.2)(kysely@0.28.15)(nanostores@1.2.0))(@better-auth/utils@0.4.0)(better-auth@1.6.11(@tanstack/react-start@1.168.27(esbuild@0.27.5)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rolldown@1.1.5)(vite@8.0.3(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)(@types/node@22.19.15)(esbuild@0.27.5)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0)))(pg@8.20.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vitest@4.1.4(@types/node@22.19.15)(happy-dom@20.9.0)(jsdom@28.1.0(@noble/hashes@2.0.1))(vite@8.0.3(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)(@types/node@22.19.15)(esbuild@0.27.5)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0))))
@@ -505,6 +502,9 @@ importers:
       '@batuda/research':
         specifier: workspace:*
         version: link:../../packages/research
+      '@batuda/timeline':
+        specifier: workspace:*
+        version: link:../../packages/timeline
       '@batuda/ui':
         specifier: workspace:*
         version: link:../../packages/ui

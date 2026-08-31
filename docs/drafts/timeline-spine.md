@@ -225,7 +225,7 @@ Sliced into PR-sized units. The default is a **shared worktree, one PR per slice
 **Changes.**
 
 - `packages/domain/src/schema/timeline-activity.ts` — add `status_changed` to `TimelineKind`; keep `entityType='company'` (add `company` to `TimelineEntityType` if absent). Define a typed payload `{ from: Status, to: Status }`. **No migration** — `timeline_activity.kind` is `TEXT` with no CHECK (verified `0001_initial.ts:556`); the kind set is a code union and `idx_timeline_activity_kind` already covers reads.
-- `apps/server/src/services/timeline-activity.ts` — add a `StatusChanged` tagged event to the `record()` union + its `rowBase` mapping. `occurredAt`/`actor` come from the existing `occurred_at`/`actor_user_id` columns; only `{from, to}` goes in payload. No `interactions` row for this kind (it is not a touchpoint).
+- `packages/timeline/src/timeline-activity.ts` — add a `StatusChanged` tagged event to the `record()` union + its `rowBase` mapping. `occurredAt`/`actor` come from the existing `occurred_at`/`actor_user_id` columns; only `{from, to}` goes in payload. No `interactions` row for this kind (it is not a touchpoint).
 - The company-update path (`apps/server/src/services/companies.ts` / `handlers/companies.ts` — today only a log annotation at `companies.ts:44`) — detect a status delta in the same transaction as the update and call `record(StatusChanged{...})`.
 
 **Tests.** Updating status emits exactly one `status_changed` event with correct `from`/`to`/`actor`; a no-op update (same status) emits none; cross-org update is rejected.
@@ -240,7 +240,7 @@ Sliced into PR-sized units. The default is a **shared worktree, one PR per slice
 
 **Changes.**
 
-- `apps/server/src/services/timeline-activity.ts` — `kindForInteractionChannel` (~`:290`) currently maps only phone→`call_logged`, else `system_event`. Either add the missing `TimelineKind`s (e.g. `dm_logged`, `visit_logged`) or carry the raw channel in the event payload and stop flattening. Prefer payload-carried channel to avoid a kind explosion; add a kind only where a consumer filters on it.
+- `packages/timeline/src/timeline-activity.ts` — `kindForInteractionChannel` (~`:290`) currently maps only phone→`call_logged`, else `system_event`. Either add the missing `TimelineKind`s (e.g. `dm_logged`, `visit_logged`) or carry the raw channel in the event payload and stop flattening. Prefer payload-carried channel to avoid a kind explosion; add a kind only where a consumer filters on it.
 
 **Tests.** Each interaction channel round-trips its channel onto the timeline row; the phone→`call_logged` mapping is unchanged.
 
@@ -256,7 +256,7 @@ Sliced into PR-sized units. The default is a **shared worktree, one PR per slice
 
 **Changes.**
 
-- `apps/server/src/services/timeline-activity.ts` — `record()` authors only `timeline_activity`; `interactions` becomes derived. Choose: a `VIEW` over `timeline_activity` (zero duplication) or a materialized table rebuilt from the event in the same txn (keeps existing indexes). Recommend the materialized form to preserve the fast "list calls with Garcia" reads.
+- `packages/timeline/src/timeline-activity.ts` — `record()` authors only `timeline_activity`; `interactions` becomes derived. Choose: a `VIEW` over `timeline_activity` (zero duplication) or a materialized table rebuilt from the event in the same txn (keeps existing indexes). Recommend the materialized form to preserve the fast "list calls with Garcia" reads.
 - Re-point every `interactions` reader — the `interactions` MCP tools, the frontend Interactions tab, any direct query — at the derived source.
 - Migration + backfill: existing `interactions` rows reconciled with / rebuilt from the spine.
 
