@@ -3,6 +3,27 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-08-31 (server-v2026.8.31)
+
+### Features
+
+* **research:** say why a run stopped looking for companies ([ddf1339](https://github.com/guillempuche/batuda/commit/ddf13398e09c25b2f20d6626efbdc09db8ae4617))
+
+### Bug Fixes
+
+* keep a deleted contact out of the meeting recompute too ([0569765](https://github.com/guillempuche/batuda/commit/05697650337acd409984430f5b730a3a3d6c2e3e))
+* leave a deleted contact's dates where they are ([39e6138](https://github.com/guillempuche/batuda/commit/39e613875a927ba2452b0d92391936e92363b307))
+* say when telemetry stops leaving the process ([9f9b013](https://github.com/guillempuche/batuda/commit/9f9b013e0ee87b61f7a19614218c1925afd28234))
+
+### Refactoring
+
+* write a company's history through one recorder ([b122c2e](https://github.com/guillempuche/batuda/commit/b122c2e77ec2612cce953f579d84903c89af7f32))
+
+### Tests
+
+* **server:** cover sending a draft, and share the send harness ([90550d5](https://github.com/guillempuche/batuda/commit/90550d57fee92d7c359756b614616a7b1e5ce7cd))
+* **server:** stop the deleted-subject run racing its own deletion ([c64b5b0](https://github.com/guillempuche/batuda/commit/c64b5b0a8122c895b3a644e362091b85455d4be6))
+
 ## 2026-08-30 (server-v2026.8.30)
 
 ### Features
