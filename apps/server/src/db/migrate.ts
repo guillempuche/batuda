@@ -5,9 +5,11 @@ import type { BetterAuthOptions } from 'better-auth'
 import { getMigrations } from 'better-auth/db/migration'
 import { admin, bearer, jwt, openAPI, organization } from 'better-auth/plugins'
 import { Effect } from 'effect'
+import { SqlClient } from 'effect/unstable/sql'
 import { PostgresDialect } from 'kysely'
 import pg from 'pg'
 
+import { PgLive } from './client'
 import { MigratorLive } from './migrator'
 
 /**
@@ -117,11 +119,59 @@ const logMigrationTarget = Effect.gen(function* () {
 	)
 })
 
+// A word written in Chinese, Russian, Greek or Hindi, asked of the database as a
+// run of letters. Under a database built with the `C` locale, "letter" means a-z
+// and nothing else, so this comes back empty.
+const A_WORD_IN_EVERY_ALPHABET = '北京 Логистика Μεταφορές निर्माण'
+
+// Refuse to migrate a database that cannot tell a letter from punctuation outside
+// a-z.
+//
+// The locale a database is built with cannot be changed afterwards — it is fixed
+// at CREATE DATABASE — so the only safe moment to find out is before anything is
+// written. Under a `C` locale, migrations that fold a name by asking Postgres for
+// its letters quietly reduce every non-Latin one to nothing, and a row that folds
+// to nothing is dropped: the companies simply never get their trade, and no error
+// is raised at any point.
+const refuseUnlessEveryAlphabetReads = Effect.gen(function* () {
+	const sql = yield* SqlClient.SqlClient
+	const rows = yield* sql<{
+		readable: string
+		ctype: string
+	}>`SELECT regexp_replace(${A_WORD_IN_EVERY_ALPHABET}, '[^[:alnum:]]+', '', 'g') AS readable,
+			(SELECT datctype FROM pg_database WHERE datname = current_database()) AS ctype`
+	const readable = rows[0]?.readable ?? ''
+	const ctype = rows[0]?.ctype ?? 'unknown'
+	if (readable === '') {
+		return yield* Effect.die(
+			new Error(
+				`Refusing to migrate a database that cannot read letters outside a-z ` +
+					`(LC_CTYPE is "${ctype}"). Every company name, trade and search term ` +
+					`written in another alphabet would fold to nothing and be dropped ` +
+					`without an error. A database's locale is fixed when it is created, so ` +
+					`this one has to be rebuilt: CREATE DATABASE … LOCALE 'en_US.utf8' ` +
+					`TEMPLATE template0.`,
+			),
+		)
+	}
+	yield* Effect.log(`Database reads every alphabet (LC_CTYPE "${ctype}")`)
+})
+
+// Skipped, connection layer and all, when no database is named: building the layer
+// is itself what reads the setting, so asking first has to happen out here. The
+// migration steps below surface a missing database on their own.
+const refuseUnreadableCollation = Effect.suspend(() =>
+	process.env['DATABASE_URL']
+		? Effect.provide(refuseUnlessEveryAlphabetReads, PgLive)
+		: Effect.void,
+)
+
 // Better Auth migrations run first so the CRM migrations can reference Better
 // Auth tables — 0001_initial alters `member`, which has to exist by the time
 // that ALTER TABLE fires.
 const program = Effect.gen(function* () {
 	yield* logMigrationTarget
+	yield* refuseUnreadableCollation
 	yield* Effect.log('Running Better Auth migrations...')
 	yield* authMigrate
 	yield* Effect.log('Better Auth migrations complete')
