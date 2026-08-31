@@ -21,6 +21,7 @@ import {
 	CompanySocialProfile,
 	CompanyStatus,
 	CompanyWebsite,
+	companySlugFromName,
 	HandSetVerificationVerdict,
 } from '@batuda/domain'
 import {
@@ -126,7 +127,10 @@ const GetCompany = Tool.make('get_company', {
 // The fields a new company carries — one array element of a create_companies call.
 const companyInputFields = {
 	name: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
-	slug: CompanySlug,
+	slug: Schema.optional(CompanySlug).annotate({
+		description:
+			'Leave this out and it is worked out from the name. Supply one only to choose a particular web address — it has to be plain lowercase a-z, digits and single hyphens, which an accented or non-Latin name cannot be written in directly.',
+	}),
 	taxId: Schema.optional(Schema.String).annotate({
 		description:
 			'The number the company is registered or taxed under — a Spanish NIF/CIF, a UK company number, an EU VAT number. Copy it exactly as printed; punctuation and case are ignored when matching. Supplying it is the surest way to avoid creating a company you already hold under a different name.',
@@ -171,7 +175,7 @@ const CompanyInput = Schema.Struct(companyInputFields)
 // version drifted: it offered three statuses the app has never had and a priority
 // range twice the real one, and assistants followed it into rows that show up in
 // no board column. Now the sentence cannot say anything the schema would refuse.
-export const CREATE_COMPANIES_DESCRIPTION = `Create one or more companies in a single call — pass \`companies\` as an array (a single element to create just one, the whole shortlist to load a batch). Slug: unique kebab-case from name. Status: ${COMPANY_STATUSES.join('|')} (default: prospect). ownerId assigns the colleague who will work the company — pass a user id from list_members, or leave it out to create it unowned. It only lands on companies actually created: a skipped duplicate keeps the owner it already had, so re-sending a list is never a way to hand companies over. Use update_company for that. Priority: ${COMPANY_PRIORITIES[0]} (highest) to ${COMPANY_PRIORITIES[COMPANY_PRIORITIES.length - 1]} (lowest, default: 2). Pass taxId whenever you know it: a company is skipped if its slug already exists OR its registration number already does, so the number catches the same firm arriving under a different trading name. Runs in one transaction; a skip is not an error, so re-running an overlapping list is safe. Returns { created, skipped, created_needs_review }. Read the split this way: created and created_needs_review were both WRITTEN; only skipped was not. \`skipped\` gives each left-out slug plus matched_on — "slug" or "tax_id" when that identity was already on file before this call, "slug_in_request" or "tax_id_in_request" when the same company appeared twice in the list you just sent (a mistake in the list, not a company already in the CRM). \`created_needs_review\` gives companies that DID land but resemble another one: matches_slug and matches_name name the lookalike, matches says whether it is "on_file" (already in the CRM) or "in_request" (another entry in this same call), and matched_on says whether they share a web address or just a similar name — a website match reports confidence 100, which only means the host was identical, never that the row was rejected. Check those before treating them as separate companies.`
+export const CREATE_COMPANIES_DESCRIPTION = `Create one or more companies in a single call — pass \`companies\` as an array (a single element to create just one, the whole shortlist to load a batch). Slug: leave it out and it is worked out from the name — supply one only to choose a particular web address. It must be plain lowercase a-z, digits and single hyphens, so an accented or non-Latin name cannot be written into one directly. Status: ${COMPANY_STATUSES.join('|')} (default: prospect). ownerId assigns the colleague who will work the company — pass a user id from list_members, or leave it out to create it unowned. It only lands on companies actually created: a skipped duplicate keeps the owner it already had, so re-sending a list is never a way to hand companies over. Use update_company for that. Priority: ${COMPANY_PRIORITIES[0]} (highest) to ${COMPANY_PRIORITIES[COMPANY_PRIORITIES.length - 1]} (lowest, default: 2). Pass taxId whenever you know it: a company is skipped if its slug already exists OR its registration number already does, so the number catches the same firm arriving under a different trading name. Runs in one transaction; a skip is not an error, so re-running an overlapping list is safe. Returns { created, skipped, created_needs_review }. Read the split this way: created and created_needs_review were both WRITTEN; only skipped was not. \`skipped\` gives each left-out slug plus matched_on — "slug" or "tax_id" when that identity was already on file before this call, "slug_in_request" or "tax_id_in_request" when the same company appeared twice in the list you just sent (a mistake in the list, not a company already in the CRM). \`created_needs_review\` gives companies that DID land but resemble another one: matches_slug and matches_name name the lookalike, matches says whether it is "on_file" (already in the CRM) or "in_request" (another entry in this same call), and matched_on says whether they share a web address or just a similar name — a website match reports confidence 100, which only means the host was identical, never that the row was rejected. Check those before treating them as separate companies.`
 
 // What the service calls a skip, in the words the tool answers with.
 const SKIPPED_BECAUSE = {
@@ -529,19 +533,28 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 			create_companies: params =>
 				Effect.gen(function* () {
 					const currentOrg = yield* CurrentOrg
+					// A caller that has to invent a slug gets it wrong for any name that is
+					// not plain a-z, and the whole batch is refused over one accent — an
+					// everyday name here, "Calderería Sentmenat". Worked out from the name
+					// where none was given, once, so the duplicate check below and the write
+					// after it are looking at the same slug.
+					const companies = params.companies.map(c => ({
+						...c,
+						slug: c.slug ?? companySlugFromName(c.name),
+					}))
 					// Looked for before the write: each company is compared against what is
 					// already on file, and — inside — against the entries ahead of it in this
 					// same request.
 					const needsReview = yield* findDuplicateCompanies(
 						sql,
 						currentOrg.id,
-						params.companies.map(c => ({
+						companies.map(c => ({
 							slug: c.slug,
 							name: c.name,
 							website: c.website,
 						})),
 					)
-					const batch = yield* service.createMany(params.companies)
+					const batch = yield* service.createMany(companies)
 					return {
 						created: batch.created,
 						skipped: batch.skipped.map(skip => ({

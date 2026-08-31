@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { foldLabel, slugFromLabel } from './text-fold'
+import { companySlugFromName, foldLabel, slugFromLabel } from './text-fold'
 
 describe('foldLabel', () => {
 	describe('when the same trade is written several ways', () => {
@@ -221,6 +221,137 @@ describe('slugFromLabel', () => {
 			expect(foldLabel('metal-fabrication')).toBe(
 				foldLabel('Metal fabrication'),
 			)
+		})
+	})
+})
+
+describe('companySlugFromName', () => {
+	// A slug goes into a web address, so it holds plain a-z, digits and single
+	// hyphens and nothing else. What a caller cannot do is work that out from a name
+	// itself: writing the accent straight in has the whole batch refused, and
+	// stripping what cannot be used leaves nothing at all for some names.
+	const A_VALID_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+
+	// Characters chosen to attack a slug: path separators, web-address
+	// punctuation, whitespace, a right-to-left override, a zero-width joiner, a
+	// byte-order mark, an emoji, and letters from scripts that fold differently.
+	const SLUG_HOSTILE_CHARACTERS = [
+		...'../\\<>&"\'`;|%#?=:@ {}[]()*+~^$!.-_0123456789abzAZ',
+		'\t',
+		'\n',
+		'\r',
+		'\u202e',
+		'\u200d',
+		'\ufeff',
+		'\u{1f600}',
+		'中',
+		'ß',
+		'ø',
+		'ł',
+		'ي',
+		'א',
+		'ก',
+		'서',
+		'\u0301',
+		'\u0655',
+		'\u1173',
+	]
+
+	describe('when the name carries accents', () => {
+		it('should take them off rather than have the name refused', () => {
+			// GIVEN names of the kind that are ordinary in Catalan and Spanish
+			// WHEN a slug is worked out
+			// THEN the accents are gone and the name is still readable. Sent as typed,
+			// one of these failed the whole call it arrived in
+			expect(companySlugFromName('Calderería Sentmenat')).toBe(
+				'caldereria-sentmenat',
+			)
+			expect(companySlugFromName('Ñandú')).toBe('nandu')
+		})
+	})
+
+	describe('when a letter stands for plain letters the company writes itself', () => {
+		it('should write those, rather than cut the word in half', () => {
+			// GIVEN names carrying a letter that is not a-z and is not a marked a-z
+			// WHEN a slug is worked out
+			// THEN the letter is spelled the way the company registers its own
+			// address. Dropped as unusable instead, "strasse" came out "stra-e"
+			expect(companySlugFromName('Straße & Co. GmbH')).toBe('strasse-co-gmbh')
+			expect(companySlugFromName('Bjørn Larsen AS')).toBe('bjorn-larsen-as')
+			expect(companySlugFromName('Łukasz Sp. z o.o.')).toBe('lukasz-sp-z-o-o')
+		})
+	})
+
+	describe('when the name has no a-z letters at all', () => {
+		it('should give the same slug every time that name is written', () => {
+			// GIVEN a Chinese name, which leaves nothing to build an address from
+			const once = companySlugFromName('北京科技有限公司')
+			const again = companySlugFromName('北京科技有限公司')
+
+			// WHEN a slug is worked out twice
+			// THEN both are the same. A random one made every resend a new row, so the
+			// same company arrived again and again instead of being recognised
+			expect(once).toBe(again)
+			expect(once).toMatch(A_VALID_SLUG)
+		})
+
+		it('should give different names different slugs', () => {
+			// GIVEN two different Chinese companies
+			// WHEN slugs are worked out
+			// THEN they differ, so one cannot be mistaken for the other
+			expect(companySlugFromName('北京科技有限公司')).not.toBe(
+				companySlugFromName('上海科技有限公司'),
+			)
+		})
+	})
+
+	describe('whatever name it is handed', () => {
+		it('should always produce something a slug is allowed to be', () => {
+			// GIVEN thousands of names built from path separators, web-address
+			// punctuation, whitespace, a right-to-left override, a zero-width joiner,
+			// a byte-order mark, an emoji, and letters from scripts that fold in
+			// different ways
+			// WHEN a slug is worked out for each
+			// THEN every one of them is a slug the schema would accept. Nothing checks
+			// this at runtime — a slug worked out from a name is produced after the
+			// call has been parsed — so it has to hold by construction
+			for (let seed = 0; seed < 4000; seed++) {
+				let name = ''
+				const length = seed % 25
+				for (let at = 0; at <= length; at++) {
+					name +=
+						SLUG_HOSTILE_CHARACTERS[
+							(seed * 7 + at * 13) % SLUG_HOSTILE_CHARACTERS.length
+						]
+				}
+				const slug = companySlugFromName(name)
+				expect(
+					slug,
+					`name=${JSON.stringify(name)} slug=${JSON.stringify(slug)}`,
+				).toMatch(A_VALID_SLUG)
+			}
+		})
+
+		it('should hold for names written to break it', () => {
+			// GIVEN names shaped like an attack on a web address
+			// WHEN a slug is worked out
+			// THEN each is still a plain, legal slug
+			for (const name of [
+				'../../etc/passwd',
+				'<script>alert(1)</script>',
+				'%2e%2e%2f',
+				'javascript:alert(1)',
+				'?q=1&x=2',
+				'#frag',
+				'\u202eevil',
+				'..',
+				'---',
+				'   ',
+				'',
+				'A'.repeat(5000),
+			]) {
+				expect(companySlugFromName(name), name).toMatch(A_VALID_SLUG)
+			}
 		})
 	})
 })

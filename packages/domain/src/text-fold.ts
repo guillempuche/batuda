@@ -52,6 +52,16 @@
  * stored.
  */
 
+import { EQUIVALENT_LETTERS } from './letter-equivalences.generated'
+
+// The letters a company itself writes out when it registers an address, so a slug
+// can spell one it cannot otherwise use. Read from the same table the rest of the
+// product reads, rather than a second list that would drift from it.
+const LETTERS_TO_REWRITE = new RegExp(
+	`[${[...EQUIVALENT_LETTERS.keys()].join('')}]`,
+	'gu',
+)
+
 // Letters whose marks are decoration a reader can leave off. Written as the
 // scripts rather than as the marks, because the same mark means different things
 // under different letters.
@@ -105,3 +115,57 @@ export const foldLabel = (raw: string): string => {
  */
 export const slugFromLabel = (raw: string): string =>
 	foldLabel(raw).replaceAll(' ', '-')
+
+// A web address holds plain letters and digits, so everything else goes. The fold
+// above keeps a name's own characters on purpose — that is what makes two spellings
+// of one trade meet — but a slug is read by browsers and typed by people, so it
+// keeps only what every one of them handles.
+const NOT_PLAIN = /[^a-z0-9]+/g
+const EDGE_DASHES = /^-+|-+$/g
+
+// Long enough for any name to still be recognisable, short enough for an address
+// bar. A dash left hanging by the cut comes off, so a slug never ends in one.
+const SLUG_MAX_CHARS = 60
+
+// A short code standing for a name, the same every time that name is written, so a
+// company sent twice is recognised as the one already on file rather than written
+// again as a second company. The two constants are FNV-1a's own — any small mixing
+// function would do, since nothing here rests on it being hard to guess.
+const stableCode = (value: string): string => {
+	let hash = 0x811c9dc5
+	for (const character of value.normalize('NFC')) {
+		hash ^= character.codePointAt(0) ?? 0
+		hash = Math.imul(hash, 0x01000193) >>> 0
+	}
+	return hash.toString(36).padStart(6, '0').slice(-6)
+}
+
+/**
+ * A company's web address form, worked out from its name.
+ *
+ * Two kinds of name it has to handle, and they fail in opposite directions if the
+ * caller is left to guess. An accented one is ordinary in the markets this serves —
+ * "Calderería Sentmenat" — and a caller writing the accent straight into a slug has
+ * it refused, taking the whole batch down with it. A name with no a-z in it at all —
+ * "北京科技有限公司" — leaves nothing to build an address from, and a caller stripping
+ * what it cannot use is left with an empty string and reaches for a random one,
+ * which erases the company's identity and differs on every resend.
+ *
+ * So the accents come off, and a name with no plain letters is given a short code
+ * standing for the whole name rather than a random one: still not readable, but the
+ * same every time, so sending the same company twice recognises it rather than
+ * writing it again.
+ */
+export const companySlugFromName = (name: string): string => {
+	const plain = slugFromLabel(name)
+		// A letter that stands for plain letters is written as those, because that is
+		// what the company registers itself: Straßenbau lives at strassenbau.de.
+		// Dropping it as unusable instead cut the word in half — "strasse" became
+		// "stra-e" — and the same goes for Nørgaard, Łukasz and Đurđević.
+		.replace(LETTERS_TO_REWRITE, letter => EQUIVALENT_LETTERS.get(letter) ?? '')
+		.replace(NOT_PLAIN, '-')
+		.replace(EDGE_DASHES, '')
+		.slice(0, SLUG_MAX_CHARS)
+		.replace(EDGE_DASHES, '')
+	return plain === '' ? `company-${stableCode(name)}` : plain
+}
