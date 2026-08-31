@@ -50,6 +50,14 @@ const RESEARCH_SYNC_MAX_WAIT_SECONDS = 10
 const RunWithInstructions = Schema.Struct({
 	...ResearchRunDetail.fields,
 	instructionSegments: Schema.optional(Schema.Unknown),
+	// Optional for the same reason as the segments above, and a heavier one: the
+	// list of pages a run read is the bulk of every answer — a wide scan reads
+	// well over a hundred — and a caller polling for findings pays for all of it
+	// on every check, often past what the answer is allowed to be.
+	sources: Schema.optional(Schema.Array(Schema.Unknown)),
+	// How many pages the run read. Sent in place of the list, because "how much
+	// did it read" is the question most callers were asking it.
+	source_count: Schema.optional(Schema.Number),
 	applied_instructions: Schema.Array(Schema.String),
 	// Absent once the run has ended, which is how a caller knows to stop asking.
 	poll_after_ms: Schema.optional(Schema.Number),
@@ -192,13 +200,13 @@ const StartResearch = Tool.make('start_research', {
 
 const GetResearch = Tool.make('get_research', {
 	description:
-		"Get the current state of a research run. Returns status, progressSteps, poll_after_ms, findings (if complete), cost, sources, and applied_instructions — the instruction templates that shaped the run. progressSteps counts the rounds of work the run has got through: null until the first round finishes, then climbing as the run works. It sits unchanged for minutes at a time by design — a late round scrapes and searches every gap it is still closing, and writing up the brief does not move it at all — so a count that is not moving is a slow run, not a stuck one. Keep polling: a run that really is stuck is failed by the server on its own deadline, so a stalled count is never a reason to call cancel_research. poll_after_ms is how many milliseconds to wait before calling this again; it is absent once the run has ended, which means stop calling. The full instruction-template text is omitted by default to keep the response small; pass include:['instruction_segments'] to get it back. A company on a scan's list may carry `marks` — findings the run established about that row rather than about the company's own business. `outside_requested_place` means the evidence puts it somewhere other than the area the run was asked about, with the run's reason in `outside_place_reason`: say so before adding such a company, and never record it as verified on this run's word alone.",
+		"Get the current state of a research run. Returns status, progressSteps, poll_after_ms, findings (if complete), cost, source_count, and applied_instructions — the instruction templates that shaped the run. progressSteps counts the rounds of work the run has got through: null until the first round finishes, then climbing as the run works. It sits unchanged for minutes at a time by design — a late round scrapes and searches every gap it is still closing, and writing up the brief does not move it at all — so a count that is not moving is a slow run, not a stuck one. Keep polling: a run that really is stuck is failed by the server on its own deadline, so a stalled count is never a reason to call cancel_research. poll_after_ms is how many milliseconds to wait before calling this again; it is absent once the run has ended, which means stop calling. Two heavy fields are omitted by default to keep the response small: the full instruction-template text, and the list of pages the run read — a wide scan reads well over a hundred, which alone can push the answer past what a tool result may hold. `source_count` always says how many there were; pass include:['sources'] for the list itself, and include:['instruction_segments'] for the template text. A company on a scan's list may carry `marks` — findings the run established about that row rather than about the company's own business. `outside_requested_place` means the evidence puts it somewhere other than the area the run was asked about, with the run's reason in `outside_place_reason`: say so before adding such a company, and never record it as verified on this run's word alone.",
 	parameters: Schema.Struct({
 		id: describedUuid(RESEARCH_ID_SOURCE),
 		// Opt back into heavy fields dropped by default. Only the full instruction
 		// text qualifies today; kept as a list so more can join without a shape change.
 		include: Schema.optional(
-			Schema.Array(Schema.Literals(['instruction_segments'])),
+			Schema.Array(Schema.Literals(['instruction_segments', 'sources'])),
 		),
 	}),
 	success: GetResearchResult,
@@ -246,9 +254,10 @@ export const ResearchMcpTools = Toolkit.make(
 // start_research returns. The full instruction text (`instructionSegments`) is
 // dropped unless the caller opted back in — it is ~9k chars repeated on every
 // fetch and templateNames + templateFingerprint already identify the stack.
-const withAppliedInstructions = (
+export const withAppliedInstructions = (
 	run: typeof ResearchRunDetail.Type,
 	includeSegments = false,
+	includeSources = false,
 ) => {
 	const names = run.templateNames
 	const nextPoll = pollAfterMs(run.status)
@@ -257,15 +266,19 @@ const withAppliedInstructions = (
 		applied_instructions: Array.isArray(names)
 			? names.filter((name): name is string => typeof name === 'string')
 			: [],
+		// Counted whether or not the list goes with it, so a caller can say how much
+		// the run read without asking for every page to prove it.
+		source_count: run.sources.length,
 		// Left off a run that has ended rather than sent as zero: a missing field
 		// reads as "nothing more is coming" without inviting one last check.
 		...(nextPoll === undefined ? {} : { poll_after_ms: nextPoll }),
 	}
-	if (includeSegments) return withInstructions
-	// Drop the heavy instruction text while keeping the run's typed shape — cast
-	// only the delete operand, so the returned object stays fully typed.
+	// Drop the heavy fields while keeping the run's typed shape — cast only the
+	// delete operand, so the returned object stays fully typed.
 	const trimmed = { ...withInstructions }
-	delete (trimmed as { instructionSegments?: unknown }).instructionSegments
+	if (!includeSegments)
+		delete (trimmed as { instructionSegments?: unknown }).instructionSegments
+	if (!includeSources) delete (trimmed as { sources?: unknown }).sources
 	return trimmed
 }
 
@@ -353,10 +366,12 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 				Effect.gen(function* () {
 					const run = yield* svc.get(params.id)
 					if (!run) return { error: 'not found' }
-					const includeSegments = (params.include ?? []).includes(
-						'instruction_segments',
+					const asked = params.include ?? []
+					return withAppliedInstructions(
+						run,
+						asked.includes('instruction_segments'),
+						asked.includes('sources'),
 					)
-					return withAppliedInstructions(run, includeSegments)
 				}).pipe(redactDbErrors),
 
 			research_sync: params =>
