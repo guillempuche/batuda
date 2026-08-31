@@ -715,6 +715,42 @@ describe('dedupeDiscoveryRows', () => {
 		})
 	})
 
+	describe("when the brackets hold the company's other name", () => {
+		it('should meet the row written under that other name', () => {
+			// GIVEN the three spellings a Castellbisbal scan actually returned. The
+			// middle row is the only thing tying the other two together, because it
+			// is the only one that says both names.
+			const findings = scan([
+				{ name: 'SOPREMA (Castellbisbal)', location: 'Castellbisbal' },
+				{ name: 'SOPREMA (SOPREMA IBERIA, S.L.)', location: 'Castellbisbal' },
+				{ name: 'SOPREMA IBERIA S.L.U.', location: 'Castellbisbal' },
+			])
+
+			// WHEN the list is de-duplicated
+			// THEN the two rows that name SOPREMA IBERIA become one. The row naming
+			// only the town stays out: with no plain "SOPREMA" on the list, there is
+			// nothing saying it is the same company rather than another arm.
+			const result = dedupeDiscoveryRows(findings, 'prospects', noRunWords)
+			expect(rowsOf(result.findings)).toHaveLength(2)
+			expect(result.merged).toBe(1)
+		})
+
+		it('should not let a town in brackets join two unrelated companies', () => {
+			// GIVEN two different companies each written with the same town after it
+			const findings = scan([
+				{ name: 'SOPREMA (Castellbisbal)', location: 'Castellbisbal' },
+				{ name: 'Fusteria Roca (Castellbisbal)', location: 'Castellbisbal' },
+			])
+
+			// WHEN the list is de-duplicated
+			// THEN both survive: the brackets have to repeat the name outside them to
+			// count as a second name, and a town never does
+			const result = dedupeDiscoveryRows(findings, 'prospects', noRunWords)
+			expect(rowsOf(result.findings)).toHaveLength(2)
+			expect(result.merged).toBe(0)
+		})
+	})
+
 	describe('when a scan wrote a note after a name it had already written down', () => {
 		it('should fold a row whose name carries the directory it was met on', () => {
 			// GIVEN the pair a French market run actually returned, the second row's
