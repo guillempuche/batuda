@@ -44,6 +44,14 @@ export interface CompanyFilters {
 	// salesperson can ask "who actually meets this criterion?" rather than
 	// trusting the one-word verdict alone.
 	readonly fitCriterionPassed?: string | undefined
+	// Every one of these tags has to be on the company. Naming a second tag is
+	// how a list gets narrower, so matching either would do the opposite.
+	readonly tags?: ReadonlyArray<string> | undefined
+	// One thing written under `metadata`, named and matched as a pair. Both halves
+	// are needed: a key on its own would ask whether anything was written there,
+	// which is not a question anybody has asked for.
+	readonly metadataKey?: string | undefined
+	readonly metadataValue?: string | undefined
 	// Owner id to match, or the literal 'none' to match only unassigned companies.
 	readonly owner?: string | undefined
 	// Narrows to what needs doing: a missed follow-up, a company gone quiet, or
@@ -133,6 +141,17 @@ const companyConditions = (
 					WHERE fc->>'result' = 'pass'
 						AND fc->>'criterion' ILIKE ${textAnywhere(filters.fitCriterionPassed)}
 				)`,
+			)
+		// An empty list is the same as not asking, rather than a condition nothing
+		// can satisfy: it is what a caller sends when it read no tags from a form.
+		if (filters.tags && filters.tags.length > 0)
+			conditions.push(sql`tags @> ${filters.tags}::text[]`)
+		if (
+			filters.metadataKey !== undefined &&
+			filters.metadataValue !== undefined
+		)
+			conditions.push(
+				sql`metadata->>${filters.metadataKey} = ${filters.metadataValue}`,
 			)
 		if (filters.attention)
 			conditions.push(
