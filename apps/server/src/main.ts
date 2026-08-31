@@ -295,8 +295,9 @@ const program = HttpRouter.serve(AppLive, {
 	// mergeWithExisting). The reverse order would let LoggerLive — which REPLACES
 	// the logger set — drop the OTLP logger, so non-span logs (detached fibers,
 	// boot, Better Auth callbacks) would never reach Honeycomb's /v1/logs. When
-	// OTLP is off, OtlpObservability is Layer.empty and LoggerLive's set shows
-	// through unchanged (no duplicated default logger).
+	// OTLP is off it adds no logger of its own, so LoggerLive's set shows through
+	// unchanged (no duplicated default logger) — the repeating "not exporting"
+	// line goes out on that set.
 	Layer.provide(OtlpObservability),
 	Layer.provide(LoggerLive),
 	// Bottom of the stack so the baked-file ConfigProvider underlies every

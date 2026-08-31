@@ -62,6 +62,11 @@ Timestamps and trace ids are added by the framework.
 | `mcp.tool_called`              | MCP tool invoked by agent                                  |
 | `mcp.auth.rejected`            | An MCP call was refused, and why                           |
 | `mcp.protocol_version.refused` | A call named a protocol revision this server does not know |
+| `otlp.export.failing`          | This process has stopped being able to export, and why     |
+| `otlp.export.recovered`        | Exporting works again                                      |
+| `otlp.export.health`           | Whether this process is exporting, repeated on a timer     |
+
+The three `otlp.export.*` lines are the exception to one record per unit of work: they report on the reporting itself, so they belong to the process rather than to any piece of work it did. See [When export itself fails](#when-export-itself-fails).
 
 A request leaves exactly one of `http.request`, `http.server_error`, `http.defect` or `http.not_found`. "Every request that ended badly" is the middle two: a route that does not exist is the caller's mistake rather than a fault of ours, and it is kept out of the error channel on purpose — recorded as a crash, every bot probing for `/robots.txt` leaves a stack trace at error level and buries the failures that matter.
 
@@ -77,6 +82,8 @@ A request also leaves exactly **one span**, not two. The platform opens that spa
 | `debug` | Development details             |
 
 `MIN_LOG_LEVEL` sets the floor per process. In production it comes from `config.production.json`, which is copied into the image — so changing it means a rebuild and a redeploy, not a live switch. Worth knowing before an incident, when the instinct is to turn the detail up and read more.
+
+That floor is not only ours to spend. A library can report something important at `debug` and have it dropped before any logger sees it — which is how the exporter reports that it has stopped sending anything at all. Anything a library says that we would want during an incident has to be re-said at a level production keeps.
 
 ## Counters: the narrow exception
 
@@ -153,12 +160,15 @@ As a solo operation there is no on-call rotation or war room. Two questions matt
 
 **Start with few, high-signal alerts.** Alert fatigue is worse than no alerts.
 
-| Alert                | Condition                             | Severity |
-| -------------------- | ------------------------------------- | -------- |
-| **API Down**         | Health check fails for > 2 min        | Critical |
-| **High Error Rate**  | > 10% API 5xx responses in 15 min     | High     |
-| **Email Failures**   | > 5 consecutive email send failures   | High     |
-| **Webhook Failures** | > 20% webhook 5xx responses in 15 min | High     |
+| Alert                | Condition                                  | Severity |
+| -------------------- | ------------------------------------------ | -------- |
+| **API Down**         | Health check fails for > 2 min             | Critical |
+| **Telemetry Silent** | No spans from any prod dataset over 15 min | Critical |
+| **High Error Rate**  | > 10% API 5xx responses in 15 min          | High     |
+| **Email Failures**   | > 5 consecutive email send failures        | High     |
+| **Webhook Failures** | > 20% webhook 5xx responses in 15 min      | High     |
+
+**Telemetry Silent is the one alert that cannot be raised from inside.** Every other row above is a question asked of the records, so it needs the records to be arriving. This one has to be evaluated by the vendor, environment-wide, so it still fires when the services are stopped or cut off and cannot report for themselves — the gap that let the 2026-08-31 outage run seven hours unnoticed while `/health` answered 200 throughout. Note the consequence: once it fires it stays fired until export is restored, so it cannot warn about a second outage in the meantime.
 
 1. **Alert on symptoms, not causes** — "API returning errors" > "Database connection failed"
 2. **Include runbook link** — What to do when this fires
@@ -257,7 +267,9 @@ Swapping environments is a pure env-var change:
 | `GIT_SHA`                     | Full commit SHA; short SHA derived at runtime.                                                                |
 | `REGION`                      | Deployment region.                                                                                            |
 
-The endpoint is non-secret, so it lives in each app's `config.production.json` alongside the other endpoints — not a CI secret. It is deliberately left out until a vendor is set up, so export stays dark by default.
+The endpoint is non-secret, so it lives in each app's `config.production.json` alongside the other endpoints — not a CI secret. It is deliberately left out until a vendor is set up, so export stays dark by default — quietly outside production, and at `error` inside it, where its absence means the image was built wrong.
+
+The headers are the half that does not ship in the image: they carry the vendor key, so they arrive as `-e` on the boot command line and live only in whatever the platform kept for that instance. The two halves can therefore disagree — the endpoint is always present, so export always switches itself on, whether or not a key came with it. Export enabled with no key is a 401 on every batch, which now says so rather than going quiet.
 
 **Per-service datasets.** Traces route to a Honeycomb dataset named after `service.name`, so each process separates on its own. Logs and metrics route by the `x-honeycomb-dataset` header instead, so each deploy workflow appends its own dataset name to the shared team-key secret. One environment-scoped API key covers every process.
 
@@ -265,11 +277,29 @@ A process only reports if it **merges** the observability layer into the layer i
 
 Note the consequence: logs and traces from the same request land in different datasets. That is the vendor's routing, not a choice — it is why the per-request record has to be self-sufficient rather than something you assemble by joining a log to a trace.
 
+## When export itself fails
+
+A process that cannot export looks exactly like a healthy one. It serves traffic, writes its lines, and the vendor simply has nothing — which reads as a quiet night rather than a fault. Prod ran that way for seven hours on 2026-08-31 before anyone noticed, and the reason nothing surfaced is worth stating plainly: the exporter reports a refused batch at `debug` and disables itself for sixty seconds, and both deployed services run at `info`, so the runtime discarded the only diagnostic before a logger saw it. That was the entire failure report.
+
+So the export path reports on itself, on the one channel that still works when export does not — the process's own console. It says `otlp.export.failing` once when export breaks and `otlp.export.recovered` once when it comes back, rather than on every attempt, because a backend that is down produces a failure every interval and repeating it buries the console it is trying to reach. And it repeats `otlp.export.health` every few minutes regardless, because the platform hands back the end of an instance's console log rather than the beginning: a line written once at start-up has scrolled away by the time anyone asks, which is what made the 2026-08-31 outage undiagnosable without a restart. A line that comes back is always in the part you can still read.
+
+Deliberately not sent to the backend. A report that export is broken is worth nothing if it goes out the way that is broken.
+
+**Silence is not failure.** The alarm asks whether the last attempt failed and has kept failing — never whether something arrived recently. Logs and traces skip a batch with nothing in it, so a quiet service legitimately posts neither, and a staleness test would call every overnight service broken. What keeps a genuinely dead channel from hiding behind a quiet one is metrics, which posts on every interval whether or not it has anything to say.
+
+**A missing endpoint is loud in production, but never fatal.** In production the endpoint ships inside the image, so its absence is a broken build and is said at `error`. It still does not stop the process: telemetry is not needed to serve a request, and refusing to boot over a monitoring setting would turn being unable to watch production into being unable to run it. Outside production, export being off is ordinary and stays at `info`.
+
+**The three signals are tracked apart.** A backend can take our logs and refuse our traces, so one "is export working" flag would read healthy while traces were being dropped.
+
 ## Health endpoint
 
-`/health` returns build metadata for uptime checks and deploy verification: CalVer version, short commit SHA, region.
+`/health` returns build metadata for uptime checks and deploy verification — CalVer version, short commit SHA, region — plus whether this instance is still reaching the telemetry backend.
 
-**Security note:** only those. No framework or dependency versions, no internal paths, no stack traces. It is also exempt from tracing — an uptime checker polls it constantly and would drown the real traces.
+The telemetry block is there because of the failure above: the console of a deployed instance is not always reachable, and an instance that cannot export cannot report that through the thing it exports to. One unauthenticated request answers it from anywhere, which is the point.
+
+**Security note:** those, and nothing more. No framework or dependency versions, no internal paths, no stack traces — and from the telemetry block, no backend host, no vendor wording and no status line: only a closed set of reasons (`unauthorized`, `rate_limited`, `rejected`, `unreachable`), enough to tell a rejected key from a quota from a dead route. The reason is a fixed set rather than whatever the backend said on purpose: the backend's wording is derived from our request, and our request carries the API key in a header.
+
+It is also exempt from tracing — an uptime checker polls it constantly and would drown the real traces.
 
 ## Where this lives in the code
 
@@ -278,6 +308,7 @@ Pointers, not copies — read the files for detail.
 | Concern                                                       | Where                                              |
 | ------------------------------------------------------------- | -------------------------------------------------- |
 | Shared exporter, sampling, span scrubbing, cause bounding     | `packages/observability`                           |
+| Export health: per-signal outcomes, the watchdog, the report  | `packages/observability/src/export-health.ts`      |
 | Per-request record, route sanitizing, catch-all error logging | `apps/server/src/lib/observability-middleware.ts`  |
 | Logger set and level                                          | `apps/server/src/lib/logger.ts`                    |
 | Tracing exemptions for secret-carrying routes                 | `apps/server/src/main.ts`                          |
