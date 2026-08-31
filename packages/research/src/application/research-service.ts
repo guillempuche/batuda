@@ -136,6 +136,7 @@ import {
 	type RememberedKind,
 } from './organisation-kind-guard'
 import { normalizePaidActionTool } from './paid-action-tool'
+import { settlePairedFields } from './paired-field-shape'
 import {
 	mergePerFieldSearch,
 	needsPerFieldSearch,
@@ -4498,6 +4499,33 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														event: 'research.source_tier.capped',
 														research_id: researchId,
 														capped: check.capped,
+													}),
+												)
+											}
+											return { findings: check.findings }
+										}),
+								},
+								{
+									// Last of all: a field that carries its own evidence goes out
+									// paired with the page it was read on, whatever shape the guards
+									// above left it in. Reading a value off one run and off the next
+									// is otherwise two different jobs.
+									name: 'paired-fields',
+									run: findings =>
+										Effect.gen(function* () {
+											const check = settlePairedFields(
+												findings,
+												schemaName,
+												discoveryResultField(schemaName),
+											)
+											if (check.wrapped > 0) {
+												yield* Effect.logInfo(
+													'research.paired_fields.settled',
+												).pipe(
+													Effect.annotateLogs({
+														event: 'research.paired_fields.settled',
+														research_id: researchId,
+														wrapped: check.wrapped,
 													}),
 												)
 											}

@@ -21,6 +21,7 @@ import {
 	RegistryRouter,
 	ResearchEventSink,
 	ResearchService,
+	readTextValue,
 	ScrapeProvider,
 	SearchProvider,
 	SearchResult,
@@ -303,8 +304,7 @@ const runScan = async (args: {
 						const held = row as Record<string, unknown>
 						return {
 							name: String(held['name'] ?? ''),
-							location:
-								typeof held['location'] === 'string' ? held['location'] : null,
+							location: readTextValue(held['location']),
 						}
 					})
 				: []
