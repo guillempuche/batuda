@@ -591,31 +591,53 @@ export const schemaVersionFor = (schemaName: string): number => {
 // tool name below).
 const withPendingIds = (
 	items: unknown,
-	transform?: (item: Record<string, unknown>) => Record<string, unknown>,
+	settle?: (item: Record<string, unknown>) => Record<string, unknown>,
 ): unknown =>
 	Array.isArray(items)
-		? items.map(item =>
-				typeof item === 'object' && item !== null && !Array.isArray(item)
-					? {
-							...(transform
-								? transform(item as Record<string, unknown>)
-								: item),
-							id: randomUUID(),
-							status: 'pending',
-						}
-					: item,
-			)
+		? items.map(item => {
+				if (typeof item !== 'object' || item === null || Array.isArray(item))
+					return item
+				const stamped = {
+					...(item as Record<string, unknown>),
+					id: randomUUID(),
+					status: 'pending',
+				}
+				// The settling step runs after the stamp rather than before it,
+				// because it belongs to this system too and may need to say the entry
+				// is not waiting on anybody.
+				return settle ? settle(stamped) : stamped
+			})
 		: items
 
-// Rewrite a paid action's tool to the real tool it names before storing, so a
-// stored action a human later approves points at a tool a follow-up can run. A
-// name that matches nothing real is left as the model wrote it — visible to the
-// user, and reported as unsupported at approval time.
-const coercePaidActionTool = (
+// What a paid follow-up really costs, where the answer is a single figure.
+// Contact discovery is not one: it pays per candidate it checks, so there the
+// run's own estimate is the best number available and is left alone.
+const KNOWN_PAID_ACTION_CENTS: Record<string, number> = {
+	registry_lookup: REGISTRY_LOOKUP_COST_CENTS,
+}
+
+// A paid action as it will be stored: pointed at the real tool it names, and
+// priced at what that tool really costs.
+//
+// Both the name and the price are free text the model fills in, and it can write
+// a tool that does not exist at a price that does not exist — one run offered a
+// 200¢ "employee_count_estimation", which is neither: the real follow-ups are a
+// register lookup and contact discovery. An entry naming nothing real is kept,
+// because what the run wanted to do is worth seeing, but it stops waiting on a
+// person: it can never be approved, so putting it in front of somebody asks for a
+// decision nobody can give.
+const settlePaidAction = (
 	item: Record<string, unknown>,
 ): Record<string, unknown> => {
 	const canonical = normalizePaidActionTool(item['tool'])
-	return canonical ? { ...item, tool: canonical } : item
+	if (canonical === null)
+		return { ...item, status: 'unsupported', estimated_cents: null }
+	const realCost = KNOWN_PAID_ACTION_CENTS[canonical]
+	return {
+		...item,
+		tool: canonical,
+		...(realCost === undefined ? {} : { estimated_cents: realCost }),
+	}
 }
 
 /**
@@ -645,7 +667,7 @@ export const withProposalIds = (findings: unknown): unknown => {
 			? {
 					pending_paid_actions: withPendingIds(
 						record['pending_paid_actions'],
-						coercePaidActionTool,
+						settlePaidAction,
 					),
 				}
 			: {}),
