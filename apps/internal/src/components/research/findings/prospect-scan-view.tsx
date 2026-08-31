@@ -5,6 +5,7 @@ import { Plus } from 'lucide-react'
 import { useId, useState } from 'react'
 import styled from 'styled-components'
 
+import { companySlugFromName } from '@batuda/domain'
 import { NAME_ONLY_EVIDENCE } from '@batuda/research/application/name-only-guard'
 import { OUTSIDE_REQUESTED_PLACE } from '@batuda/research/application/row-marks'
 import { PriButton, usePriToast } from '@batuda/ui/pri'
@@ -384,15 +385,13 @@ function AddAsLeadButton({
 	)
 }
 
-// A URL-safe slug from a free-text name, with a short random suffix so two
-// prospects with the same name (or an existing company) don't collide.
+// A web address for a prospect, with a short random suffix so two prospects of the
+// same name (or an existing company) don't collide.
+//
+// The name is read by the shared rule rather than here, because reading it here got
+// it wrong both ways: "Calderería Sentmenat" came out "caldereri-a-sentmenat", and
+// "北京科技有限公司" came out "lead-x7f2q" with the company's own name nowhere in it.
 function toSlug(name: string): string {
-	const base = name
-		.toLowerCase()
-		.normalize('NFKD')
-		.replace(/[^a-z0-9]+/g, '-')
-		.replace(/^-+|-+$/g, '')
-		.slice(0, 40)
 	const suffix = Math.random().toString(36).slice(2, 7)
-	return base.length > 0 ? `${base}-${suffix}` : `lead-${suffix}`
+	return `${companySlugFromName(name)}-${suffix}`
 }
