@@ -114,18 +114,18 @@ export const ingestRawMessage = (args: {
 				yield* sql`SET LOCAL ROLE app_service`
 				yield* sql`SELECT set_config('app.current_org_id', ${args.organizationId}, true)`
 
-				// Bounce check first: a DSN both updates the original message
-				// status AND gets persisted as its own inbound row so the user
-				// sees "Mail Delivery Subsystem" in the inbox list.
-				const bounce = parseBounce(mail)
-				if (bounce) {
-					yield* applyBounce({
-						organizationId: args.organizationId,
-						bounce,
-					})
-				}
-
-				yield* persistMessage({
+				// The notice is stored first, and what applying it does to the
+				// rest of the account follows only when storing it was new.
+				//
+				// A delivery notice is a message like any other, so it is kept
+				// as its own inbound row and the user sees "Mail Delivery
+				// Subsystem" in the inbox list. That row is also the only record
+				// that this notice has been seen: a mailbox whose uid numbering
+				// resets is read again from the start, and applying the same
+				// notice twice counts its failures twice — three passes over one
+				// soft bounce is enough to suppress an address that never bounced
+				// three times.
+				const stored = yield* persistMessage({
 					organizationId: args.organizationId,
 					inboxId: args.inboxId,
 					folder: args.folder,
@@ -136,6 +136,16 @@ export const ingestRawMessage = (args: {
 					parsed: withMessageId,
 					attachments: attachmentsMeta,
 				})
+
+				if (stored.messageId !== null) {
+					const bounce = parseBounce(mail)
+					if (bounce) {
+						yield* applyBounce({
+							organizationId: args.organizationId,
+							bounce,
+						})
+					}
+				}
 			}),
 		)
 	})
