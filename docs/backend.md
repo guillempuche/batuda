@@ -776,6 +776,14 @@ The send path stores the rendered `text` and `html` on the `email_messages` row 
 The worker syncs two folders per inbox, and which one a message came from decides its direction — inbox means it arrived, sent folder means we sent it. Folders are matched on the IMAP special-use flags the server reports (`\Inbox`, `\Sent`) rather than their names, because Gmail calls its sent folder `[Gmail]/Sent Mail` and Outlook `Sent Items`; matching by name syncs no sent mail at all on either. `resolveTrackedFolders` in `apps/mail-worker/src/inbox-session.ts` settles this once per session and hands the answer down, so nothing lower has to re-derive it from a folder name. Only mail that arrived is written to a company's history — what we send is recorded where it is sent from.
 The worker writes it through `@batuda/timeline`, the same recorder the server uses, so an arriving message leaves what a sent one leaves: the history entry, the dates both the company and the contact are read by, and a touchpoint.
 
+How far each folder has been read is kept per folder in `inboxes.folder_state`, and the cursor only moves past a message that was actually taken in.
+A message that fails stops the pass where it is, so the next one starts again from it rather than leaving it behind — a message that landed nowhere is not something to walk past quietly, and nothing would ever go looking for it.
+The same message failing five passes running is given up on at error level (`email.ingest_abandoned`) and the folder moves on, because one message nobody can read must not hold every message behind it.
+
+Applying a delivery notice is gated on storing it being new.
+Storing a message is already idempotent — the dedupe index turns a second insert into a no-op — but what a notice *means* is not: it counts a failure against an address, and three counted failures suppress it.
+A mailbox whose uid numbering resets is read again from the start, so without that gate a re-read would suppress an address that bounced once.
+
 ### Package layout — `packages/email`
 
 Shared Node+browser library, consumed by `apps/server` (render at send time), `apps/internal` (compose + footer editors), and `packages/controllers` (HTTP schema).

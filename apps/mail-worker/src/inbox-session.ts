@@ -149,7 +149,7 @@ const syncOneFolderTick = (args: {
 		const needsBackfill =
 			known === null || known.uidvalidity !== serverUidvalidity
 
-		const highest = needsBackfill
+		const progress = needsBackfill
 			? yield* backfillSinceDate({
 					client: args.client,
 					organizationId: args.inbox.organizationId,
@@ -169,22 +169,33 @@ const syncOneFolderTick = (args: {
 					direction: args.folder.direction,
 					uidvalidity: serverUidvalidity,
 					sinceUid: known.lastUid,
+					stuckUid: known.stuckUid,
+					attempts: known.attempts,
 				})
+
+		// A backfill answers with a plain uid; the incremental pass answers with
+		// where it got to, including whether it is waiting on a message.
+		const next: FolderState =
+			typeof progress === 'number'
+				? {
+						uidvalidity: serverUidvalidity,
+						lastUid: progress,
+						syncedAt: null,
+						stuckUid: null,
+						attempts: 0,
+					}
+				: { ...progress, syncedAt: null }
 
 		if (needsBackfill) {
 			yield* recordFolderHead({
 				inboxId: args.inbox.id,
 				folder: args.folder.path,
 				uidvalidity: serverUidvalidity,
-				lastUid: highest,
+				lastUid: next.lastUid,
 			})
 		}
 
-		args.progress.set(args.folder.path, {
-			uidvalidity: serverUidvalidity,
-			lastUid: highest,
-			syncedAt: null,
-		})
+		args.progress.set(args.folder.path, next)
 	})
 
 // One inbox = one IMAP connection per tracked folder. We keep things

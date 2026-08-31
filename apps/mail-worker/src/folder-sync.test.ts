@@ -35,6 +35,27 @@ const clientWith = (uid: number): ImapFlow =>
 		},
 	}) as unknown as ImapFlow
 
+// A folder holding several messages, answered in uid order.
+const clientWithAll = (uids: readonly number[]): ImapFlow =>
+	({
+		search: async () => [...uids],
+		fetch: async function* () {
+			for (const uid of uids) {
+				yield { uid, source: Buffer.from('raw bytes') }
+			}
+		},
+	}) as unknown as ImapFlow
+
+// Makes exactly one message refuse to be taken in, the way a database error
+// during ingest does.
+const failingOn = (badUid: number) => {
+	ingestMock.mockImplementation((a: { imapUid: number }) =>
+		a.imapUid === badUid
+			? (Effect.fail(new Error('ingest failed')) as never)
+			: Effect.void,
+	)
+}
+
 // Recording the folder head is the only database work in this path, and it is
 // not what these tests are about. The matcher and the object store are named
 // because storing a message asks for them, but it is stubbed out here, so
@@ -61,6 +82,116 @@ const directionPassedToIngest = () => ingestMock.mock.calls[0]?.[0]?.direction
 
 beforeEach(() => {
 	ingestMock.mockClear()
+	ingestMock.mockImplementation(() => Effect.void)
+})
+
+describe('how far a folder is read when a message will not load', () => {
+	describe('when one message in the batch fails', () => {
+		it('should leave the folder waiting on it rather than reading past', async () => {
+			// GIVEN three new messages, the middle one of which cannot be taken in
+			failingOn(6)
+
+			// WHEN the folder is read
+			const progress = await run(
+				fetchAndIngestNewerThan({
+					client: clientWithAll([5, 6, 7]),
+					organizationId: 'org',
+					inboxId: 'inbox',
+					folder: 'INBOX',
+					direction: 'inbound',
+					uidvalidity: 1,
+					sinceUid: 4,
+					stuckUid: null,
+					attempts: 0,
+				}),
+			)
+
+			// THEN it stops there and says so, so the next pass starts from that
+			// message again. Reading past it would leave mail that landed nowhere
+			// behind, and nothing would ever go looking for it
+			expect(progress.lastUid).toBe(5)
+			expect(progress.stuckUid).toBe(6)
+			expect(progress.attempts).toBe(1)
+		})
+
+		it('should not read the ones behind it either', async () => {
+			// GIVEN the same batch
+			failingOn(6)
+
+			// WHEN the folder is read
+			await run(
+				fetchAndIngestNewerThan({
+					client: clientWithAll([5, 6, 7]),
+					organizationId: 'org',
+					inboxId: 'inbox',
+					folder: 'INBOX',
+					direction: 'inbound',
+					uidvalidity: 1,
+					sinceUid: 4,
+					stuckUid: null,
+					attempts: 0,
+				}),
+			)
+
+			// THEN the message after it waits for the next pass, so the folder is
+			// read in order rather than around the gap
+			expect(ingestMock.mock.calls.map(c => c[0].imapUid)).toEqual([5, 6])
+		})
+	})
+
+	describe('when the same message has already failed several times', () => {
+		it('should move on without it, loudly', async () => {
+			// GIVEN a message that has failed four passes already
+			failingOn(6)
+
+			// WHEN a fifth pass tries it
+			const progress = await run(
+				fetchAndIngestNewerThan({
+					client: clientWithAll([6, 7]),
+					organizationId: 'org',
+					inboxId: 'inbox',
+					folder: 'INBOX',
+					direction: 'inbound',
+					uidvalidity: 1,
+					sinceUid: 5,
+					stuckUid: 6,
+					attempts: 4,
+				}),
+			)
+
+			// THEN the folder gives up on it and carries on, because one message
+			// nobody can read must not hold every message behind it
+			expect(progress.stuckUid).toBeNull()
+			expect(progress.attempts).toBe(0)
+			expect(progress.lastUid).toBe(7)
+			expect(ingestMock.mock.calls.map(c => c[0].imapUid)).toEqual([6, 7])
+		})
+	})
+
+	describe('when a message that had been failing goes through', () => {
+		it('should stop waiting on it', async () => {
+			// GIVEN a message the folder has been waiting on, which now loads
+			const progress = await run(
+				fetchAndIngestNewerThan({
+					client: clientWithAll([6]),
+					organizationId: 'org',
+					inboxId: 'inbox',
+					folder: 'INBOX',
+					direction: 'inbound',
+					uidvalidity: 1,
+					sinceUid: 5,
+					stuckUid: 6,
+					attempts: 3,
+				}),
+			)
+
+			// THEN the count is cleared, so an earlier bad patch does not spend
+			// the allowance of a message that is fine now
+			expect(progress.stuckUid).toBeNull()
+			expect(progress.attempts).toBe(0)
+			expect(progress.lastUid).toBe(6)
+		})
+	})
 })
 
 describe('fetchAndIngestNewerThan', () => {
@@ -77,6 +208,8 @@ describe('fetchAndIngestNewerThan', () => {
 					direction: 'outbound',
 					uidvalidity: 1,
 					sinceUid: 6,
+					stuckUid: null,
+					attempts: 0,
 				}),
 			)
 
@@ -99,6 +232,8 @@ describe('fetchAndIngestNewerThan', () => {
 					direction: 'inbound',
 					uidvalidity: 1,
 					sinceUid: 2,
+					stuckUid: null,
+					attempts: 0,
 				}),
 			)
 

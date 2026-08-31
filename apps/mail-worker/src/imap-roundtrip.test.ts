@@ -181,6 +181,8 @@ describe.skipIf(!process.env['MAIL_CATCHER_LIVE'])(
 							direction: 'inbound',
 							uidvalidity,
 							sinceUid: 0,
+							stuckUid: null,
+							attempts: 0,
 						}).pipe(
 							Effect.provide(RawMessageStorage.layer),
 							Effect.provide(WorkerEnvVars.layer),
@@ -242,6 +244,8 @@ describe.skipIf(!process.env['MAIL_CATCHER_LIVE'])(
 							direction: 'inbound',
 							uidvalidity,
 							sinceUid: 0,
+							stuckUid: null,
+							attempts: 0,
 						}).pipe(
 							Effect.provide(RawMessageStorage.layer),
 							Effect.provide(WorkerEnvVars.layer),
@@ -261,6 +265,8 @@ describe.skipIf(!process.env['MAIL_CATCHER_LIVE'])(
 							direction: 'inbound',
 							uidvalidity,
 							sinceUid: 0,
+							stuckUid: null,
+							attempts: 0,
 						}).pipe(
 							Effect.provide(RawMessageStorage.layer),
 							Effect.provide(WorkerEnvVars.layer),
@@ -313,6 +319,8 @@ describe.skipIf(!process.env['MAIL_CATCHER_LIVE'])(
 							direction: 'inbound',
 							uidvalidity,
 							sinceUid: 0,
+							stuckUid: null,
+							attempts: 0,
 						}).pipe(
 							Effect.provide(RawMessageStorage.layer),
 							Effect.provide(WorkerEnvVars.layer),
