@@ -111,13 +111,17 @@ export const SHORTEST_KIND_OF_COMPANY = 4
 export const MAX_WORDING_CHARS = 80
 
 /**
- * How many extra searching passes a request's unanswered parts are worth. The first
- * is the one that does the work and the second is for what it could not reach; a
- * part still empty past that is far more likely a trade this market has nobody for
- * online than one more pass would turn up, and saying so beats spending the rest of
- * the run on it.
+ * How many extra searching passes a request's unanswered parts are worth.
+ *
+ * Two was set for a request naming a trade or two, where the first pass does the
+ * work and the second reaches what it missed. A request naming nine trades gets
+ * the same two, and a run that asked for nine came back having covered one of
+ * them, from 139 pages read — the parts it never searched for were not a market
+ * with nobody in it, they were a plan it was stopped part-way through. Four is
+ * enough for a request of that width and still bounded by the clock and the money
+ * below, which are the limits that should decide when to stop.
  */
-export const MAX_COVERAGE_PASSES = 2
+export const MAX_COVERAGE_PASSES = 4
 
 /**
  * And no pass starts once this much of the run's clock is gone. A whole-market
