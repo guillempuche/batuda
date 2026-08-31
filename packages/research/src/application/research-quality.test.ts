@@ -995,7 +995,7 @@ describe('computeRunQuality — saying why the searching stopped', () => {
 			// GIVEN a scan whose model stopped calling tools of its own accord
 			const quality = computeRunQuality({
 				...thinScan,
-				searchStopped: 'model-final',
+				searchStopped: 'finished_looking',
 			})
 
 			// THEN the short list is the search's own answer about this market,
@@ -1009,7 +1009,7 @@ describe('computeRunQuality — saying why the searching stopped', () => {
 			// GIVEN a scan whose gathering ran to its last permitted round
 			const quality = computeRunQuality({
 				...thinScan,
-				searchStopped: 'step-cap',
+				searchStopped: 'round_cap_reached',
 			})
 
 			// THEN the short list is where the run was cut off, not what the market
@@ -1021,7 +1021,7 @@ describe('computeRunQuality — saying why the searching stopped', () => {
 			// GIVEN a scan that could no longer afford a round
 			const quality = computeRunQuality({
 				...thinScan,
-				searchStopped: 'budget',
+				searchStopped: 'budget_exhausted',
 			})
 
 			// THEN what stopped it is named rather than left as a short list
@@ -1032,7 +1032,7 @@ describe('computeRunQuality — saying why the searching stopped', () => {
 			// GIVEN a scan whose accumulated prompt reached the context ceiling
 			const quality = computeRunQuality({
 				...thinScan,
-				searchStopped: 'context',
+				searchStopped: 'context_full',
 			})
 
 			// THEN that ceiling is named too: it is a limit on the run, not on the
@@ -1048,7 +1048,7 @@ describe('computeRunQuality — saying why the searching stopped', () => {
 			const quality = computeRunQuality({
 				...thinScan,
 				coverage: null,
-				searchStopped: 'step-cap',
+				searchStopped: 'round_cap_reached',
 			})
 
 			// THEN the run still answers whether it had finished looking. This is
@@ -1065,7 +1065,7 @@ describe('computeRunQuality — saying why the searching stopped', () => {
 			const quality = computeRunQuality({
 				...scan,
 				scanResults: 0,
-				searchStopped: 'budget',
+				searchStopped: 'budget_exhausted',
 			})
 
 			// THEN an empty answer is exactly where the reason matters: nothing
@@ -1092,7 +1092,7 @@ describe('computeRunQuality — saying why the searching stopped', () => {
 				...scan,
 				schemaName: 'company_enrichment_v1',
 				scanResults: null,
-				searchStopped: 'step-cap',
+				searchStopped: 'round_cap_reached',
 			})
 
 			// THEN how far the searching got is not what a reader of that run
@@ -1107,7 +1107,7 @@ describe('computeRunQuality — saying why the searching stopped', () => {
 			const quality = computeRunQuality({
 				...scan,
 				scanResults: FULL_LIST,
-				searchStopped: 'step-cap',
+				searchStopped: 'round_cap_reached',
 			})
 
 			// THEN it is reported, never gated on: what to do about a search that was

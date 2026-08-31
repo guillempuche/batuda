@@ -72,7 +72,17 @@ interface Scenario {
 	 * has the model finish of its own accord after one pass.
 	 */
 	readonly neverSettles?: boolean
+	/**
+	 * How many rounds the agent keeps asking for tools before it settles. Set for
+	 * a case about a first pass stopped at a ceiling and a second that settles:
+	 * the round cap here is 4, so a value of 4 runs the first pass into it and
+	 * lets the pass sent out after it finish on its own.
+	 */
+	readonly settlesAfterRounds?: number
 }
+
+// Rounds the agent has been asked for across every pass of the current run.
+let agentRounds = 0
 
 let scenario: Scenario
 
@@ -105,32 +115,38 @@ const usage = {
 // every pass gathers the seeded sources.
 const agentLlm: LanguageModel.Service = {
 	generateText: () =>
-		Effect.succeed({
-			text: '',
-			content: [],
-			reasoning: [],
-			reasoningText: undefined,
-			// An empty list is the model settling, which ends the loop. A scenario
-			// that never settles keeps asking, so the loop runs until a ceiling
-			// stops it — which is the only way to reach that reporting from here.
-			toolCalls: scenario.neverSettles
-				? [{ id: 'again', name: 'web_search', params: { query: 'more' } }]
-				: [],
-			toolResults: [
-				{
-					name: 'web_search',
-					isFailure: false,
-					encodedResult: undefined,
-					result: {
-						items: [
-							{ url: SEED_URL, content: scenario.evidence },
-							{ url: SECOND_URL, content: scenario.evidence },
-						],
+		Effect.sync(() => {
+			agentRounds++
+			return {
+				text: '',
+				content: [],
+				reasoning: [],
+				reasoningText: undefined,
+				// An empty list is the model settling, which ends the loop. A scenario
+				// that never settles keeps asking, so the loop runs until a ceiling
+				// stops it — which is the only way to reach that reporting from here.
+				toolCalls:
+					scenario.neverSettles ||
+					(scenario.settlesAfterRounds !== undefined &&
+						agentRounds <= scenario.settlesAfterRounds)
+						? [{ id: 'again', name: 'web_search', params: { query: 'more' } }]
+						: [],
+				toolResults: [
+					{
+						name: 'web_search',
+						isFailure: false,
+						encodedResult: undefined,
+						result: {
+							items: [
+								{ url: SEED_URL, content: scenario.evidence },
+								{ url: SECOND_URL, content: scenario.evidence },
+							],
+						},
 					},
-				},
-			],
-			finishReason: 'stop' as const,
-			usage,
+				],
+				finishReason: 'stop' as const,
+				usage,
+			}
 		}) as never,
 	generateObject: () => Effect.succeed({ usage, value: {} }) as never,
 	streamText: () =>
@@ -311,6 +327,7 @@ const runScan = async (args: {
 	splitterCalls = 0
 	extractionCalls = 0
 	briefPrompt = ''
+	agentRounds = 0
 	return runtime.runPromise(
 		Effect.gen(function* () {
 			const svc = yield* ResearchService
@@ -514,6 +531,10 @@ describe('what a discovery scan reports about itself', () => {
 			//   is rightly absent
 			expect(result.coverage).toBeUndefined()
 			expect(result.searchingStopped).toBe('finished_looking')
+			// AND the brief says nothing about a ceiling, because there was none to
+			//   report — the sentence exists to correct a reading that would be
+			//   wrong, and here the plain reading of the list is the right one
+			expect(result.briefPrompt).not.toContain('did not finish looking')
 		}, 60_000)
 	})
 
@@ -547,6 +568,44 @@ describe('what a discovery scan reports about itself', () => {
 			//   this the same one-company answer reads as a market with one such
 			//   firm in it, and those two call for opposite next steps
 			expect(result.searchingStopped).toBe('round_cap_reached')
+			// AND the person reading the brief is told too. The stored reason is for
+			//   whatever calls this; the brief is the only part of a run most people
+			//   ever read, so a shortfall it does not carry is one they never see
+			expect(result.briefPrompt).toContain('did not finish looking')
+		}, 60_000)
+
+		it('should keep that ceiling when a later stretch of looking settles', async () => {
+			// GIVEN a scan whose model asks for tools through the whole of the first
+			//   pass — so its round cap stops it — and then settles, which is what
+			//   the pass sent out after a thin list does
+			const result = await runScan({
+				schemaName: 'prospect_scan_v1',
+				query:
+					'Independent multi-location auto repair groups in the Austin metropolitan area, Texas',
+				scenario: {
+					settlesAfterRounds: 4,
+					evidence:
+						'A directory of independent multi-location auto repair groups in Austin.',
+					findings: [
+						{
+							prospects: [
+								{
+									name: 'Colorado River Automotive',
+									why_relevant: 'Independent repair group, three Austin shops',
+									citations: [],
+								},
+							],
+						},
+					],
+				},
+			})
+
+			// THEN the ceiling the first pass met is what the run reports. Reading
+			//   only the last pass would call this run finished, which is the one
+			//   answer it must not give: the looking was cut short before the pass
+			//   that settled ever ran
+			expect(result.searchingStopped).toBe('round_cap_reached')
+			expect(result.briefPrompt).toContain('did not finish looking')
 		}, 60_000)
 	})
 
@@ -841,6 +900,12 @@ describe('what a discovery scan reports about itself', () => {
 			//   anything to chase
 			expect(result.coverage?.thought_answered).toEqual([])
 			expect(result.coverage?.stopped_because).toBe('passes_spent')
+			// AND the run says it was cut off, not that it finished looking. The
+			//   chase for the trades nothing answered is looking too, so a run that
+			//   ran out of passes mid-chase has not finished — and saying it had,
+			//   next to a coverage block naming the chase it abandoned, would be the
+			//   run contradicting itself in one breath
+			expect(result.searchingStopped).toBe('round_cap_reached')
 			expect(result.status).toBe('succeeded_low_confidence')
 			// AND the written brief does name it, because here the search really did
 			//   go out for it and come back with nobody

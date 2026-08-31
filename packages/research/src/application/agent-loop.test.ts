@@ -6,7 +6,6 @@ import {
 	canAffordAnotherRound,
 	type LoopRound,
 	runAgentResearchLoop,
-	stopReasonAcrossPasses,
 } from './agent-loop'
 
 // A tool-calling round (the model wants to keep going) carries the page it
@@ -65,7 +64,7 @@ describe('runAgentResearchLoop', () => {
 
 			// THEN it ran three rounds and stopped because the model finished
 			expect(result.rounds).toBe(3)
-			expect(result.stopReason).toBe('model-final')
+			expect(result.stopReason).toBe('finished_looking')
 			// AND the transcript carries both tool results and the final text
 			expect(result.researchText).toContain('page 1')
 			expect(result.researchText).toContain('page 2')
@@ -89,7 +88,7 @@ describe('runAgentResearchLoop', () => {
 
 			// THEN it stopped at the cap after exactly two rounds
 			expect(result.rounds).toBe(2)
-			expect(result.stopReason).toBe('step-cap')
+			expect(result.stopReason).toBe('round_cap_reached')
 			// AND the transcript is non-empty even though no round produced final text
 			expect(result.researchText).toContain('page 1')
 		})
@@ -107,7 +106,7 @@ describe('runAgentResearchLoop', () => {
 			)
 
 			// THEN the budget stopped it after the first round, far from the cap
-			expect(result.stopReason).toBe('budget')
+			expect(result.stopReason).toBe('budget_exhausted')
 			expect(result.rounds).toBe(1)
 		})
 	})
@@ -126,7 +125,7 @@ describe('runAgentResearchLoop', () => {
 			)
 
 			// THEN it stopped on context after the second round (2 × 100 ≥ 150)
-			expect(result.stopReason).toBe('context')
+			expect(result.stopReason).toBe('context_full')
 			expect(result.rounds).toBe(2)
 		})
 	})
@@ -154,7 +153,7 @@ describe('runAgentResearchLoop', () => {
 
 			// THEN the first final answer triggered exactly one extra round
 			expect(result.rounds).toBe(2)
-			expect(result.stopReason).toBe('model-final')
+			expect(result.stopReason).toBe('finished_looking')
 			expect(result.researchText).toContain('grounded')
 		})
 
@@ -170,7 +169,7 @@ describe('runAgentResearchLoop', () => {
 
 			// THEN it stops after the single final round
 			expect(result.rounds).toBe(1)
-			expect(result.stopReason).toBe('model-final')
+			expect(result.stopReason).toBe('finished_looking')
 		})
 
 		it('should still stop at the step cap when the hook always asks to continue', async () => {
@@ -186,7 +185,12 @@ describe('runAgentResearchLoop', () => {
 
 			// THEN the step cap bounds the retries rather than looping forever
 			expect(result.rounds).toBe(3)
-			expect(result.stopReason).toBe('step-cap')
+			// AND the looking is reported as finished, not as stopped at a ceiling:
+			// the model ended every one of those rounds with nothing it wanted to
+			// do, and what the cap cut short was the hook's errand of grounding the
+			// company, which is a different question from whether the search had
+			// more companies to find
+			expect(result.stopReason).toBe('finished_looking')
 		})
 	})
 })
@@ -240,7 +244,7 @@ describe('runAgentResearchLoop — token budget', () => {
 			)
 			// THEN it stops at round 3 (3000 >= 2500), not round 2 — an accumulated
 			// sum would have tripped at round 2 (1000 + 2000)
-			expect(result.stopReason).toBe('context')
+			expect(result.stopReason).toBe('context_full')
 			expect(result.rounds).toBe(3)
 		})
 	})
@@ -257,7 +261,7 @@ describe('runAgentResearchLoop — token budget', () => {
 				}),
 			)
 			// THEN the token cap never fires (0 < 100) and the step cap ends it
-			expect(result.stopReason).toBe('step-cap')
+			expect(result.stopReason).toBe('round_cap_reached')
 			expect(result.rounds).toBe(2)
 		})
 	})
@@ -281,7 +285,7 @@ describe('runAgentResearchLoop — token budget', () => {
 				}),
 			)
 			// THEN the token cap stays inert and the char cap trips at round 2 (200 >= 150)
-			expect(result.stopReason).toBe('context')
+			expect(result.stopReason).toBe('context_full')
 			expect(result.rounds).toBe(2)
 		})
 	})
@@ -298,7 +302,7 @@ describe('runAgentResearchLoop — token budget', () => {
 				}),
 			)
 			// THEN it stops on the very first round
-			expect(result.stopReason).toBe('context')
+			expect(result.stopReason).toBe('context_full')
 			expect(result.rounds).toBe(1)
 		})
 	})
@@ -315,51 +319,7 @@ describe('runAgentResearchLoop — token budget', () => {
 				}),
 			)
 			// THEN the token cap is a no-op and the model finishing ends it
-			expect(result.stopReason).toBe('model-final')
-		})
-	})
-})
-
-describe('stopReasonAcrossPasses', () => {
-	describe('when every pass ended on the model finishing', () => {
-		it('should say the search finished looking', () => {
-			// GIVEN a first pass and a second that both ran out of things to do
-			const reason = stopReasonAcrossPasses('model-final', 'model-final')
-
-			// THEN nothing stopped the search, so that is what it reports
-			expect(reason).toBe('model-final')
-		})
-	})
-
-	describe('when an earlier pass ran into a ceiling', () => {
-		it('should keep that ceiling over a later pass finishing on its own', () => {
-			// GIVEN a first pass stopped at the step cap, then a short extra pass
-			// the model ended by itself
-			const reason = stopReasonAcrossPasses('step-cap', 'model-final')
-
-			// THEN the search is reported as stopped: the extra pass was sent out
-			// for one narrow thing and its finishing says nothing about the ceiling
-			// the pass before it hit
-			expect(reason).toBe('step-cap')
-		})
-
-		it('should keep the first ceiling when a later pass hits a different one', () => {
-			// GIVEN a first pass out of money and a second out of context
-			const reason = stopReasonAcrossPasses('budget', 'context')
-
-			// THEN the first is kept, because it is the one that shaped every pass
-			// after it
-			expect(reason).toBe('budget')
-		})
-	})
-
-	describe('when only the later pass ran into a ceiling', () => {
-		it('should report that ceiling', () => {
-			// GIVEN a first pass the model finished and a second stopped on money
-			const reason = stopReasonAcrossPasses('model-final', 'budget')
-
-			// THEN the search was stopped, whichever pass it happened in
-			expect(reason).toBe('budget')
+			expect(result.stopReason).toBe('finished_looking')
 		})
 	})
 })

@@ -15,6 +15,7 @@
 import { Effect } from 'effect'
 
 import type { BudgetSnapshot } from '../domain/types'
+import type { SearchStopped } from './search-stopped'
 import { stripReasoning } from './strip-reasoning'
 import { CHEAP_MIN_COST_CENTS, REGISTRY_LOOKUP_COST_CENTS } from './tool-costs'
 
@@ -38,34 +39,6 @@ export interface LoopRound {
 	readonly inputTokens: number
 }
 
-export type LoopStopReason = 'model-final' | 'step-cap' | 'budget' | 'context'
-
-/**
- * The reason to keep when a search runs the loop more than once.
- *
- * Only `model-final` says the search had nothing left it wanted to do; the
- * other three say it was stopped. So once a pass has run into a ceiling, that
- * is what the whole search did, however the passes after it ended: a run that
- * hit the step cap and then sent one more short pass out that the model
- * finished on its own did not finish looking.
- *
- * Between two ceilings the first is kept, because it is the one that shaped
- * every pass after it.
- */
-export const stopReasonAcrossPasses = (
-	soFar: LoopStopReason,
-	next: LoopStopReason,
-): LoopStopReason => (soFar === 'model-final' ? next : soFar)
-
-/**
- * Whether the searching was cut off rather than ending because it had run out
- * of things to try. The one place that question is answered, so a reason added
- * to the list above cannot be read as a ceiling in one caller and as the search
- * settling in another.
- */
-export const wasCutOff = (reason: LoopStopReason): boolean =>
-	reason !== 'model-final'
-
 export interface AgentLoopResult {
 	/** Rendered transcript of the whole loop — the grounding input for phase 2. */
 	readonly researchText: string
@@ -77,7 +50,7 @@ export interface AgentLoopResult {
 	readonly evidenceText: string
 	readonly scrapedUrlHashes: ReadonlyArray<string>
 	readonly rounds: number
-	readonly stopReason: LoopStopReason
+	readonly stopReason: SearchStopped
 }
 
 /**
@@ -133,7 +106,7 @@ export const runAgentResearchLoop = <E, R>(
 		const urlHashes = new Set<string>()
 		let round = 0
 		let totalPromptChars = 0
-		let stopReason: LoopStopReason = 'model-final'
+		let stopReason: SearchStopped = 'finished_looking'
 
 		while (true) {
 			round++
@@ -151,26 +124,31 @@ export const runAgentResearchLoop = <E, R>(
 			// outgrowing the context window (a token budget on the latest round's
 			// occupancy, with the char cap as a provider-independent backstop), and
 			// the budget each end the loop on their own.
-			if (!result.hasToolCalls) {
+
+			// The hook below can send a finished model back out, and a ceiling met on
+			// a round the model had already finished stopped the hook's errand rather
+			// than the searching — so each cap below asks this before naming itself.
+			const modelHadFinished = !result.hasToolCalls
+			if (modelHadFinished) {
 				const keepGoing = params.shouldContinueAfterFinal
 					? yield* params.shouldContinueAfterFinal()
 					: false
 				if (!keepGoing) {
-					stopReason = 'model-final'
+					stopReason = 'finished_looking'
 					break
 				}
 				// The caller appended a corrective instruction; fall through to the
 				// step and budget caps, then let the next round search again.
 			}
 			if (round >= params.maxSteps) {
-				stopReason = 'step-cap'
+				stopReason = modelHadFinished ? 'finished_looking' : 'round_cap_reached'
 				break
 			}
 			if (
 				params.maxPromptChars !== undefined &&
 				totalPromptChars >= params.maxPromptChars
 			) {
-				stopReason = 'context'
+				stopReason = modelHadFinished ? 'finished_looking' : 'context_full'
 				break
 			}
 			// Token budget: the latest round's full-prompt occupancy (not the
@@ -181,12 +159,12 @@ export const runAgentResearchLoop = <E, R>(
 				params.maxPromptTokens !== undefined &&
 				result.inputTokens >= params.maxPromptTokens
 			) {
-				stopReason = 'context'
+				stopReason = modelHadFinished ? 'finished_looking' : 'context_full'
 				break
 			}
 			const snapshot = yield* params.budgetSnapshot
 			if (!canAffordAnotherRound(snapshot)) {
-				stopReason = 'budget'
+				stopReason = modelHadFinished ? 'finished_looking' : 'budget_exhausted'
 				break
 			}
 		}

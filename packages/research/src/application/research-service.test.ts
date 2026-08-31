@@ -827,7 +827,7 @@ describe('buildBriefPrompt', () => {
 			transcript: '',
 			uncoveredParts: [],
 			unsearchedParts: [],
-			searchWasCutOff: false,
+			searchStopped: 'finished_looking',
 			...over,
 		})
 
@@ -1060,7 +1060,7 @@ describe('buildBriefPrompt', () => {
 			// GIVEN a scan cut off at a ceiling while it still had more to do
 			const prompt = brief({
 				schemaName: 'prospect_scan_v1',
-				searchWasCutOff: true,
+				searchStopped: 'round_cap_reached',
 			})
 
 			// THEN the brief is told to say the search did not finish looking, and
@@ -1078,7 +1078,7 @@ describe('buildBriefPrompt', () => {
 			// GIVEN a scan whose model stopped of its own accord
 			const prompt = brief({
 				schemaName: 'prospect_scan_v1',
-				searchWasCutOff: false,
+				searchStopped: 'finished_looking',
 			})
 
 			// THEN nothing is added: the sentence exists to correct a reading that
@@ -1676,7 +1676,7 @@ describe('buildBriefPrompt — telling confirmed companies from candidates', () 
 			transcript: '',
 			uncoveredParts: [],
 			unsearchedParts: [],
-			searchWasCutOff: false,
+			searchStopped: 'finished_looking',
 			existence,
 		})
 
