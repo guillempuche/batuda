@@ -74,7 +74,7 @@ export const CompanyFilterOptions = Schema.Struct({
 
 const SearchCompanies = Tool.make('search_companies', {
 	description:
-		'Filter companies by status, country (ISO 3166-1 alpha-2, e.g. US/ES/DE), industry, priority, search query, the research fit verdict (strong_fit / possible_fit / weak_fit / no_fit), a fit criterion the company passed (matched loosely against the criterion text), or a geographic bounding box. The box is any subset of min_lat/max_lat/min_lng/max_lng (decimal degrees); each bound is applied independently and only matches companies with stored coordinates. Returns summaries (including latitude/longitude) — call get_company for full details. Set `include_filter_options` to be told which countries and trades actually narrow this list, rather than guessing a value and getting nothing back. `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true.',
+		'Filter companies by status, country (ISO 3166-1 alpha-2, e.g. US/ES/DE), industry, priority, search query, the research fit verdict (strong_fit / possible_fit / weak_fit / no_fit), a fit criterion the company passed (matched loosely against the criterion text), a tag or tags the company carries (every one named has to be on it, so a second tag narrows the list), one thing written under `metadata` given as `metadata_key` plus `metadata_value`, or a geographic bounding box. The box is any subset of min_lat/max_lat/min_lng/max_lng (decimal degrees); each bound is applied independently and only matches companies with stored coordinates. Returns summaries (including latitude/longitude) — call get_company for full details. Set `include_filter_options` to be told which countries and trades actually narrow this list, rather than guessing a value and getting nothing back. `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true.',
 	parameters: Schema.Struct({
 		status: Schema.optional(Schema.String),
 		country: Schema.optional(Schema.String),
@@ -82,6 +82,18 @@ const SearchCompanies = Tool.make('search_companies', {
 		priority: Schema.optional(Schema.Number),
 		fit_verdict: Schema.optional(Schema.String),
 		fit_criterion_passed: Schema.optional(Schema.String),
+		tags: Schema.optional(Schema.Array(Schema.String)).annotate({
+			description:
+				'Tags the company must carry — every one of them, not any of them. Tags are free text set when the company was written, so ask for one you know was used rather than guessing.',
+		}),
+		metadata_key: Schema.optional(Schema.String).annotate({
+			description:
+				"Name of one thing written under the company's `metadata`, to be matched together with `metadata_value`. Neither half filters on its own.",
+		}),
+		metadata_value: Schema.optional(Schema.String).annotate({
+			description:
+				'The value `metadata_key` must hold, compared as written. Give both or neither.',
+		}),
 		query: Schema.optional(Schema.String),
 		deleted: Schema.optional(Schema.Literals(['only', 'include'])).annotate({
 			description:
@@ -491,6 +503,9 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 						priority: params.priority,
 						fitVerdict: params.fit_verdict,
 						fitCriterionPassed: params.fit_criterion_passed,
+						tags: params.tags,
+						metadataKey: params.metadata_key,
+						metadataValue: params.metadata_value,
 						query: params.query,
 						deleted: params.deleted,
 						minLat: params.min_lat,

@@ -1,4 +1,4 @@
-import { Schema } from 'effect'
+import { Schema, SchemaGetter } from 'effect'
 import {
 	HttpApiEndpoint,
 	HttpApiGroup,
@@ -167,6 +167,26 @@ export const UpdateCompanyInput = Schema.Struct({
  * The per-value counts are asked for in exactly these words too, so the values
  * a caller is offered and the list it gets back answer the same question.
  */
+/**
+ * Tags to narrow by, written as one comma-separated value on the link.
+ *
+ * A query string has no way of its own to carry a list, and a repeated key is
+ * read differently by each client, so the list travels as text and is split here.
+ */
+const TagList = Schema.String.pipe(
+	Schema.decodeTo(Schema.Array(Schema.String), {
+		decode: SchemaGetter.transform((raw: string) =>
+			raw
+				.split(',')
+				.map(tag => tag.trim())
+				.filter(tag => tag.length > 0),
+		),
+		encode: SchemaGetter.transform((tags: ReadonlyArray<string>) =>
+			tags.join(','),
+		),
+	}),
+)
+
 const companyFilterQuery = {
 	status: Schema.optional(Schema.String),
 	country: Schema.optional(Schema.String),
@@ -184,6 +204,14 @@ const companyFilterQuery = {
 	staleDays: Schema.optional(StaleDays),
 	fitVerdict: Schema.optional(Schema.String),
 	fitCriterionPassed: Schema.optional(Schema.String),
+	// Every tag has to be on the company, not just one of them: naming a second
+	// tag is how somebody narrows a list, and matching either would widen it.
+	tags: Schema.optional(TagList),
+	// One thing written under `metadata`, named and matched as a pair. The
+	// research engine files its own judgements there and callers file their own
+	// notes, none of which could be searched for before.
+	metadataKey: Schema.optional(Schema.String),
+	metadataValue: Schema.optional(Schema.String),
 	query: Schema.optional(Schema.String),
 	// Which companies to look at. Omitted means the live ones; 'only' is
 	// how somebody finds a deleted company again in order to restore it,
