@@ -226,6 +226,8 @@ export const discoveryRowIdentityKeys = (
 		const filedAs =
 			core === '' && foldReadsEveryLetter(name) ? collapse(name) : core
 		if (filedAs !== '') keys.push(`name:${filedAs}`)
+		const alsoCalled = legalNameInBrackets(name)
+		if (alsoCalled !== null) keys.push(`name:${alsoCalled}`)
 	}
 	const host = siteHostOf(row)
 	if (host !== null && ownSiteHosts.has(host))
@@ -252,6 +254,39 @@ const saysThenMore = (
 	opening: ReadonlyArray<string>,
 ): boolean =>
 	opening.length < name.length && opening.every((word, at) => name[at] === word)
+
+/**
+ * The company's other name, when it was written in brackets after the first one.
+ *
+ * A scan writes one company three ways — "SOPREMA (Castellbisbal)", "SOPREMA
+ * (SOPREMA IBERIA, S.L.)" and "SOPREMA IBERIA S.L.U." — and the middle one is the
+ * only thing tying the other two together, because it says both names. Filing it
+ * under the bracketed name as well lets it meet the row written that way.
+ *
+ * Only when the brackets repeat the name outside them. That is what tells a
+ * second name from a note: "SOPREMA (SOPREMA IBERIA, S.L.)" is also SOPREMA
+ * IBERIA, while "SOPREMA (Castellbisbal)" is not also Castellbisbal, and
+ * "Acme (UK)" is not also UK — which is what keeps that row from meeting an
+ * unrelated company that happens to sit in the same place. Taking the brackets
+ * off every name instead would fold "Acme (UK)" into "Acme (US)", which is why
+ * the rule above still asks for the plain name to be on the list.
+ *
+ * Null when there are no brackets, when they hold a note rather than a name, or
+ * when both spellings come to the same key and the row is already filed there.
+ */
+const BRACKETED_QUALIFIER = /^(.*?)[([]([^)\]]+)[)\]]\s*$/
+
+const legalNameInBrackets = (name: string): string | null => {
+	const match = BRACKETED_QUALIFIER.exec(name.trim())
+	const outside = match?.[1]?.trim()
+	const inside = match?.[2]?.trim()
+	if (outside === undefined || outside === '' || inside === undefined)
+		return null
+	const outsideCore = nameCore(withoutFormDots(outside))
+	const insideCore = nameCore(withoutFormDots(inside))
+	if (outsideCore === '' || insideCore === outsideCore) return null
+	return insideCore.includes(outsideCore) ? insideCore : null
+}
 
 /**
  * For each row that reads as another row's branch office, which row it belongs to,
