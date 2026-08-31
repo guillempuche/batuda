@@ -391,12 +391,17 @@ const databaseExists = (db: string) =>
 		Effect.orElseSucceed(() => false),
 	)
 
+// Spelled out rather than inherited. Under the `C` locale Postgres reads only a-z
+// as letters, so a trade written in Chinese or Cyrillic folds to nothing in SQL and
+// the row is dropped with no error — and a database's locale is fixed at creation,
+// so a wrong one means rebuilding it. `template0` because a template carrying its
+// own locale refuses to be given a different one.
 const createDatabase = (db: string) =>
 	Effect.gen(function* () {
 		if (yield* databaseExists(db)) return
 		yield* dockerFail(
 			exec(
-				`docker exec ${DB_CONTAINER} psql -U ${PG_USER} -d postgres -c "CREATE DATABASE ${db}"`,
+				`docker exec ${DB_CONTAINER} psql -U ${PG_USER} -d postgres -c "CREATE DATABASE ${db} LOCALE 'en_US.utf8' TEMPLATE template0"`,
 			),
 		)
 	})

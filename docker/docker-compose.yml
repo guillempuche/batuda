@@ -13,6 +13,12 @@ services:
       POSTGRES_DB: batuda
       POSTGRES_USER: batuda
       POSTGRES_PASSWORD: batuda
+      # Spelled out rather than taken from whatever the image defaults to. Under
+      # the `C` locale Postgres reads only a-z as letters, so a company name or
+      # trade written in another alphabet folds to nothing in SQL and its row is
+      # dropped with no error. A database's locale is fixed when it is created, so
+      # an image bump that changed this default would be found only by the damage.
+      POSTGRES_INITDB_ARGS: "--locale=en_US.utf8"
     # `docker compose up --wait db` blocks until this reports healthy, which is
     # when Postgres actually accepts connections — not merely when the container
     # has started. CI relies on it so the migrate step never runs against a

@@ -62,9 +62,12 @@ export default function setup(): void {
 	const sh = (cmd: string, env: NodeJS.ProcessEnv = process.env) =>
 		execSync(cmd, { stdio: 'inherit', shell: '/bin/bash', env })
 
-	// CREATE DATABASE can't run inside a transaction; ignore "already exists".
+	// CREATE DATABASE can't run inside a transaction; ignore "already exists". The
+	// locale is spelled out for the same reason the dev databases spell it out: under
+	// `C` the suite would pass against a database that reads only a-z, which is the
+	// one thing these tests must not do.
 	sh(
-		`docker exec batuda-db psql -U batuda -d postgres -c "CREATE DATABASE ${resolveIntegrationDbName()}" 2>/dev/null || true`,
+		`docker exec batuda-db psql -U batuda -d postgres -c "CREATE DATABASE ${resolveIntegrationDbName()} LOCALE 'en_US.utf8' TEMPLATE template0" 2>/dev/null || true`,
 	)
 	// `db reset` migrates to HEAD AND truncates, so a reused integration DB starts
 	// from a clean slate (the seed refuses to run against leftover CRM rows).
