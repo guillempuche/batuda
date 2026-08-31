@@ -141,6 +141,20 @@ describe('finding a company by a tag it carries', () => {
 		})
 	})
 
+	describe('when a blank slipped into the list of tags', () => {
+		it('should ignore the blank rather than find nothing at all', async () => {
+			// GIVEN a caller that read its tags from a form and sent a stray empty one
+			const found = await search({ tags: ['podcast', '  '], limit: 200 })
+
+			// THEN the real tag still narrows the list. Asking for a blank tag as
+			// well would find nothing, since no company carries one — a silent
+			// nothing, where the caller only meant "podcast"
+			expect(slugsIn(found)).toContain(`both-${suffix}`)
+			expect(slugsIn(found)).toContain(`podcast-only-${suffix}`)
+			expect(slugsIn(found)).not.toContain(`untagged-${suffix}`)
+		})
+	})
+
 	describe('when a tag nobody used is given', () => {
 		it('should return nothing rather than everything', async () => {
 			// WHEN the search asks for a tag no company carries

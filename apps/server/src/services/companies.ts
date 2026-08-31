@@ -142,10 +142,14 @@ const companyConditions = (
 						AND fc->>'criterion' ILIKE ${textAnywhere(filters.fitCriterionPassed)}
 				)`,
 			)
-		// An empty list is the same as not asking, rather than a condition nothing
-		// can satisfy: it is what a caller sends when it read no tags from a form.
-		if (filters.tags && filters.tags.length > 0)
-			conditions.push(sql`tags @> ${filters.tags}::text[]`)
+		// Blanks are dropped before the list is judged empty, and an empty list is
+		// the same as not asking rather than a condition nothing can satisfy. Both
+		// are what a caller sends when it read its tags from a form: asking for a
+		// tag no company carries would answer "there are none of those", which is
+		// true of the blank and false of what was meant.
+		const tags = filters.tags?.filter(tag => tag.trim() !== '')
+		if (tags !== undefined && tags.length > 0)
+			conditions.push(sql`tags @> ${tags}::text[]`)
 		if (
 			filters.metadataKey !== undefined &&
 			filters.metadataValue !== undefined
