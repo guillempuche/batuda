@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { guardScalarFields } from './scalar-field-guard'
+import { guardScalarFields, isInCorpus } from './scalar-field-guard'
 
 // The evidence the run gathered, against which quotes are checked. Kept small and
 // explicit per test so it is obvious what is and isn't grounded.
@@ -705,6 +705,89 @@ describe('guardScalarFields', () => {
 				},
 				{ field: 'country', reason: 'ungrounded', value: 'ES', sourceId: null },
 			])
+		})
+	})
+})
+
+describe('isInCorpus — holding a value to what the run actually read', () => {
+	const UNRELATED = 'totally unrelated english page about bicycles'
+
+	describe('when a value is written in a system with no word spaces', () => {
+		it('should refuse one the evidence never mentioned', () => {
+			// GIVEN addresses invented in Chinese, Japanese and Thai, and a corpus
+			// about something else entirely
+			// WHEN each is held to that corpus
+			// THEN each is refused. Reading only a-z found no words to look for, and a
+			// value with no words to look for was given the benefit of the doubt — so
+			// an invented address shipped as evidence-backed with not one of its
+			// characters ever searched for
+			expect(isInCorpus('北京市朝阳区建国路', UNRELATED)).toBe(false)
+			expect(isInCorpus('東京都渋谷区', UNRELATED)).toBe(false)
+			expect(isInCorpus('ถนนสุขุมวิท กรุงเทพ', UNRELATED)).toBe(false)
+		})
+
+		it('should keep one the evidence does carry', () => {
+			// GIVEN the same kind of value, against a page that really contains it
+			// WHEN held to that corpus
+			// THEN kept. A check that refused everything it could not read before
+			// would only have moved the failure, not fixed it
+			expect(
+				isInCorpus(
+					'北京市朝阳区建国路',
+					'公司地址：北京市朝阳区建国路88号，电话010-1234',
+				),
+			).toBe(true)
+			expect(isInCorpus('ถนนสุขุมวิท', 'บริษัทตั้งอยู่ที่ถนนสุขุมวิท กรุงเทพมหานคร')).toBe(
+				true,
+			)
+		})
+	})
+
+	describe('when a value is written in an alphabet with no capital letters', () => {
+		it('should answer the same as it does for the Latin control', () => {
+			// GIVEN an Arabic address and a Spanish one, neither in the corpus
+			// WHEN both are held to it
+			// THEN both refused. The Arabic one passed before only because it carried
+			// no digits for the reading to catch hold of
+			expect(isInCorpus('شارع الملك فهد', UNRELATED)).toBe(
+				isInCorpus('Calle Mayor Madrid', UNRELATED),
+			)
+			expect(isInCorpus('شارع الملك فهد', UNRELATED)).toBe(false)
+		})
+	})
+
+	describe('when a value is too short to hold to anything', () => {
+		it('should keep it rather than drop a real value on no evidence', () => {
+			// GIVEN a value of nothing but short function words
+			// WHEN held to an unrelated corpus
+			// THEN kept. There is nothing distinctive to look for, and dropping on
+			// that would take away real values that happen to be short
+			expect(isInCorpus('SL', UNRELATED)).toBe(true)
+		})
+	})
+})
+
+describe('isInCorpus — a value and a page that spell a town differently', () => {
+	describe('when the page writes the town without its accents', () => {
+		it('should still find it, rather than drop a real place', () => {
+			// GIVEN Catalan and Spanish towns as a model writes them, against pages
+			// that print the same towns with the accents left off
+			// WHEN each is held to its page
+			// THEN each is found. The two sides are written by different hands, and a
+			// place that cannot find itself on the page naming it is dropped as
+			// unevidenced — which is a real address lost over a missing accent
+			expect(isInCorpus('Vallès', 'oficina al valles occidental')).toBe(true)
+			expect(isInCorpus('Alcúdia', 'nostra seu a alcudia, mallorca')).toBe(true)
+			expect(isInCorpus('Cádiz', 'planta en cadiz')).toBe(true)
+			expect(isInCorpus('Gijón', 'fabrica en gijon, asturias')).toBe(true)
+		})
+
+		it('should still refuse a town the page never named', () => {
+			// GIVEN a place the page does not mention at all
+			// WHEN held to it
+			// THEN refused. Ignoring accents must not become ignoring the difference
+			// between one town and another
+			expect(isInCorpus('Gijón', 'fabrica en sevilla, andalucia')).toBe(false)
 		})
 	})
 })

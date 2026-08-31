@@ -19,7 +19,8 @@
 
 import { domainToUnicode } from 'node:url'
 
-import { EQUIVALENT_LETTERS } from './letter-equivalences.generated'
+import { EQUIVALENT_LETTERS } from '@batuda/domain'
+
 import { isSocialPlatformHost } from './social-sites'
 
 // Legal-form suffixes dropped before matching, so "Acme Logistics S.L." and a

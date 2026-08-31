@@ -19,7 +19,6 @@
 
 import {
 	DISTINCTIVE_NAME_LENGTH,
-	foldReadsEveryLetter,
 	nameCoreTokens,
 	withoutFormDots,
 } from './entity-guard'
@@ -32,21 +31,26 @@ import {
 } from './prospect-dedupe-guard'
 import { rowGroups } from './row-groups'
 import type { RunWords } from './run-words'
-import { anyTermAppearsIn, termTokens } from './term-match'
+import {
+	anyTermAppearsIn,
+	readText,
+	termTokens,
+	writtenWithoutWordSpaces,
+} from './term-match'
 
 export const partsAnsweredBy = (
 	rows: RunOutcome['companies'],
 	parts: ReadonlyArray<MarketPart>,
 ): number => {
-	const rowWords = rows.map(row => termTokens(`${row.name} ${row.describedAs}`))
-	return parts.filter(part => anyTermAppearsIn(part.terms, rowWords)).length
+	const rowTexts = rows.map(row => readText(`${row.name} ${row.describedAs}`))
+	return parts.filter(part => anyTermAppearsIn(part.terms, rowTexts)).length
 }
 
-export type GoldenKindVerdict = 'listed' | 'not-listed' | 'unreadable'
+export type GoldenKindVerdict = 'listed' | 'not-listed'
 
 /**
- * What the golden's list says about a row's name: it names this organisation, it
- * does not, or this reading found nothing in the name to hold the list against.
+ * What the golden's list says about a row's name: it names this organisation, or it
+ * does not.
  *
  * The listed name has to appear in the row's name as those words, in that order,
  * next to each other. A run writes a body's name longer than the golden does —
@@ -81,20 +85,27 @@ export const goldenKindOf = (
 	name: string,
 	notCompanies: ReadonlyArray<string>,
 ): GoldenKindVerdict => {
-	// Nothing written at all is not the same as something written this reading
-	// cannot take in: one is a gap in the row, the other a gap in the eval.
-	if (name.trim() === '') return 'not-listed'
-	// The reading has letters only for a-z, so a name written in another script
-	// comes back as nothing — or, worse, as whatever Latin happened to be written
-	// beside it. Holding the list against that fragment answered a question nobody
-	// asked, in both directions: a Chinese trade body counted as a company and the
-	// pass reported the precision of a list it could not read, while a real Chinese
-	// company whose brackets held a place name was marked a body off that one word.
-	if (!foldReadsEveryLetter(name)) return 'unreadable'
+	// A name with nothing in it, or nothing but punctuation, stays a company. That
+	// is the safe direction: an empty name is a gap in the row, and nothing the
+	// golden's list says can be held against it either way.
 	const words = termTokens(name)
+	if (words.length === 0) return 'not-listed'
+	const nameRun = words.join('')
 	const namedByTheList = notCompanies.some(listed => {
 		const listedWords = termTokens(listed)
 		if (listedWords.length === 0) return false
+		// A body written in a system with no word spaces has no words to line up, so
+		// it is looked for inside the row's name as a run of characters instead.
+		if (writtenWithoutWordSpaces(listed)) {
+			const listedRun = listedWords.join('')
+			// Same rule as the initials case below: written as one run, a body is
+			// conclusive only when it is the whole of what the row is called. The
+			// legal form Japanese bodies open with is itself one such run, and it is
+			// shared by thousands of them.
+			return listedWords.length === 1
+				? nameRun === listedRun
+				: nameRun.includes(listedRun)
+		}
 		// A body known by its initials shares that word with the companies trading
 		// under it — the retailer FENIE Energía beside the federation FENIE, Grupo
 		// Unef Solar beside UNEF, RTE Ascenseurs beside the grid operator. One word

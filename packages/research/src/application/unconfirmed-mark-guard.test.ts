@@ -178,3 +178,93 @@ describe('clearFieldOnlyDoubt', () => {
 		})
 	})
 })
+
+describe('a doubt written in letters this check has no words for', () => {
+	const rowWith = (reason: string) => ({
+		companies: [{ name: 'X', unconfirmed_reason: reason }],
+	})
+
+	describe('when the reason is written in a non-Latin alphabet', () => {
+		it('should keep the mark rather than take it off unread', () => {
+			// GIVEN the same doubt written in four alphabets this check holds no
+			// vocabulary for
+			const reasons = [
+				'未找到该公司的网站和电话',
+				'Не найден сайт компании',
+				'لم يتم العثور على موقع الشركة',
+				'회사 웹사이트를 찾을 수 없습니다',
+			]
+
+			// WHEN each row is checked
+			// THEN the mark stays on every one. Reading only a-z gave no words at all,
+			// and no words was read as "this names no cause" — so the mark came off
+			// precisely the rows nobody had managed to confirm
+			for (const reason of reasons) {
+				const result = clearFieldOnlyDoubt(rowWith(reason), 'companies')
+				expect(result.cleared).toBe(0)
+				const kept = (result.findings as { companies: Array<object> })
+					.companies[0]
+				expect(kept).toHaveProperty('unconfirmed_reason', reason)
+			}
+		})
+
+		it('should count them, so a run cannot report a check it never made', () => {
+			// GIVEN two rows doubted in Chinese and one in English naming its own gaps
+			const findings = {
+				companies: [
+					{ name: 'A', unconfirmed_reason: '未找到该公司的网站' },
+					{ name: 'B', unconfirmed_reason: '未找到该公司的电话' },
+					{ name: 'C', unconfirmed_reason: 'no website, no employee figure' },
+				],
+			}
+
+			// WHEN checked
+			// THEN the two nobody could read are counted apart from the one that was
+			// read and cleared — a silent skip and a stated one differ only if the
+			// stated one is counted somewhere
+			const result = clearFieldOnlyDoubt(findings, 'companies')
+			expect(result.unreadable).toBe(2)
+			expect(result.cleared).toBe(1)
+		})
+	})
+
+	describe('when the reason mixes a non-Latin name with wording it can read', () => {
+		it('should treat it exactly as it treats a Latin name in the same place', () => {
+			// GIVEN the same reason twice, naming a company the row has no website
+			// for — once in Latin letters and once in Chinese
+			const latin = clearFieldOnlyDoubt(
+				rowWith('no website for Acme SL, no employee figure'),
+				'companies',
+			)
+			const chinese = clearFieldOnlyDoubt(
+				rowWith('no website for 北京科技, no employee figure'),
+				'companies',
+			)
+
+			// WHEN both are checked
+			// THEN they answer the same. A named company is a word the row's own
+			// columns cannot account for either way, so the mark stays either way —
+			// and the reason is read rather than skipped, so neither counts as unread
+			expect(chinese.cleared).toBe(latin.cleared)
+			expect(chinese.unreadable).toBe(latin.unreadable)
+			expect(chinese.cleared).toBe(0)
+			expect(chinese.unreadable).toBe(0)
+		})
+	})
+
+	describe('when the reason says something real in a non-Latin alphabet', () => {
+		it('should keep the mark, the same as it would in English', () => {
+			// GIVEN a doubt that is about the company rather than about blank columns
+			const result = clearFieldOnlyDoubt(
+				rowWith('该公司已于2019年注销'),
+				'companies',
+			)
+
+			// WHEN checked
+			// THEN the mark stays. The safe answer is the same either way — what
+			// changes is that this one is now counted as unread rather than cleared
+			expect(result.cleared).toBe(0)
+			expect(result.unreadable).toBe(1)
+		})
+	})
+})

@@ -4262,7 +4262,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												findings,
 												discoveryResultField(schemaName),
 											)
-											if (check.cleared > 0) {
+											if (check.cleared > 0 || check.unreadable > 0) {
 												yield* Effect.logInfo(
 													'research.prospects.doubt_cleared',
 												).pipe(
@@ -4270,6 +4270,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														event: 'research.prospects.doubt_cleared',
 														research_id: researchId,
 														cleared: check.cleared,
+														// Rows whose doubt nobody could read. Kept, which is
+														// the safe answer, but a run where these are most of
+														// the list checked far less than its status suggests.
+														unreadable: check.unreadable,
 													}),
 												)
 											}
@@ -4277,6 +4281,8 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												findings: check.findings,
 												spanCounts: {
 													'research.prospects.doubt_cleared': check.cleared,
+													'research.prospects.doubt_unreadable':
+														check.unreadable,
 												},
 											}
 										}),

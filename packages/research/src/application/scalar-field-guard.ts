@@ -27,6 +27,7 @@
  */
 
 import { isSourcedField } from './guard-shapes'
+import { writtenWithoutWordSpaces } from './term-match'
 
 // Generic non-answers a model emits when it has nothing — never a real value.
 const PLACEHOLDER_VALUES = new Set([
@@ -102,20 +103,78 @@ const SKIP_KEYS = new Set(['citations', 'proposed_updates'])
 // and only a wholesale-invented one (almost none of its words present) is dropped.
 const QUOTE_PRESENCE_THRESHOLD = 0.5
 
-const normalize = (value: string): string =>
+// Accents come off both sides of every comparison here, because the two sides are
+// written by different hands: the value is what a model typed and the corpus is what
+// a page printed, and "Vallès" on one against "Valles" on the other is one place
+// twice. Without this, four of seven real Catalan and Spanish towns failed to find
+// themselves on the page that named them, and the field was dropped as unevidenced.
+const foldAccents = (value: string): string =>
 	value
+		.normalize('NFD')
+		.replace(/\p{Diacritic}/gu, '')
+		// Korean is built from pieces that come apart in the line above, so it is put
+		// back together here — otherwise it matches only another copy of itself.
+		.normalize('NFC')
+
+const normalize = (value: string): string =>
+	foldAccents(value)
 		.toLowerCase()
 		.trim()
 		.replace(/\s+/g, ' ')
 		.replace(/[.,;:!?"'`()]+$/g, '')
 
-// The distinctive words of a string: long-enough words and multi-digit numbers,
+// The corpus with its accents off, remembered between calls. The whole of what a run
+// read is folded here, and every field of every row asks about the same one — so it
+// is done once and handed back, rather than once per question.
+let lastCorpus = ''
+let lastFoldedCorpus = ''
+const accentFreeCorpus = (lowerCorpus: string): string => {
+	if (lowerCorpus !== lastCorpus) {
+		lastCorpus = lowerCorpus
+		lastFoldedCorpus = foldAccents(lowerCorpus)
+	}
+	return lastFoldedCorpus
+}
+
+// Below this length a word is a function word rather than a distinctive one, so it
+// is dropped: matching on it would create overlaps that mean nothing.
+const SALIENT_MIN_CHARS = 4
+
+// A run of characters this long is the unit compared in a writing system with no
+// word spaces. Two, because that is roughly what a word is there — asking those for
+// a four-letter word asks for a whole phrase, and one character alone appears in far
+// too much to say anything.
+const SALIENT_RUN_CHARS = 2
+
+// Every run of this length inside a piece of text, so two texts can be compared by
+// how much of one appears in the other where neither has words to compare.
+const runsOf = (token: string): ReadonlyArray<string> => {
+	const letters = [...token]
+	if (letters.length < SALIENT_RUN_CHARS) return []
+	return letters
+		.slice(0, letters.length - SALIENT_RUN_CHARS + 1)
+		.map((_, at) => letters.slice(at, at + SALIENT_RUN_CHARS).join(''))
+}
+
+// The distinctive parts of a string: long-enough words and multi-digit numbers,
 // which carry the meaning (place names, tool names, employee counts) — short
 // function words are dropped so they can't create coincidental overlaps.
+//
+// A word written without word spaces is compared as short runs of characters
+// instead. Reading only a-z gave nothing at all for a value written in Chinese,
+// Japanese or Thai, and nothing was then given the benefit of the doubt — so an
+// invented Chinese address was applied as evidence-backed without a single one of
+// its characters being looked for.
 const salientTokens = (value: string): ReadonlyArray<string> =>
 	normalize(value)
-		.split(/[^a-z0-9]+/)
-		.filter(token => token.length >= 4 || /^\d{2,}$/.test(token))
+		.split(/[^\p{L}\p{N}]+/u)
+		.flatMap(token =>
+			writtenWithoutWordSpaces(token)
+				? runsOf(token)
+				: token.length >= SALIENT_MIN_CHARS || /^\d{2,}$/.test(token)
+					? [token]
+					: [],
+		)
 
 const isPlaceholderValue = (value: string, key: string): boolean => {
 	const n = normalize(value)
@@ -211,7 +270,8 @@ const quoteSupportsValue = (quote: string, value: string): boolean => {
 export const isInCorpus = (text: string, lowerCorpus: string): boolean => {
 	const tokens = salientTokens(text)
 	if (tokens.length === 0) return true
-	const present = tokens.filter(token => lowerCorpus.includes(token)).length
+	const corpus = accentFreeCorpus(lowerCorpus)
+	const present = tokens.filter(token => corpus.includes(token)).length
 	return present / tokens.length >= QUOTE_PRESENCE_THRESHOLD
 }
 

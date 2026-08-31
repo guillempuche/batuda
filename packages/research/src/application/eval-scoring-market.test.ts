@@ -36,32 +36,56 @@ describe('goldenKindOf', () => {
 		})
 	})
 
-	describe('when the name is written in letters this eval does not have', () => {
-		it('should say it could not be read rather than that it is a company', () => {
-			// GIVEN trade bodies named in scripts the word reading has no letters for
+	describe('when the name is written in another alphabet', () => {
+		it('should recognise the body the list names', () => {
+			// GIVEN trade bodies named in four writing systems
 			// WHEN each is held against a list naming that very body
-			// THEN unreadable — not "not one of them". Answering the latter counted
-			// each of these as a company and reported a precision nobody could trust
+			// THEN each is found. These could not be held against the list at all
+			// before, so a market in any of these alphabets could be written into the
+			// golden set but never actually scored by it
 			for (const body of [
 				'中国光伏行业协会',
 				'Ассоциация Электромонтажников',
 				'نقابة المقاولين',
 				'일본전기공사협회',
 			] as const) {
-				expect(goldenKindOf(body, [body])).toBe('unreadable')
+				expect(goldenKindOf(body, [body])).toBe('listed')
 			}
 		})
 
-		it('should not read a body into the one word it happens to see', () => {
-			// GIVEN a real Chinese company whose only word this reading can see is
-			// the place written after it, and a list naming that place
+		it('should find a body written longer than the list writes it', () => {
+			// GIVEN a body the run names with its legal form attached, and a list
+			// carrying the plain name with a space in it
 			// WHEN held against the list
-			// THEN unreadable rather than listed. Judging a name on the fragment that
-			// survives the reading marked a real company as the wrong kind, which
-			// overstates the very problem being measured
+			// THEN listed. Where the writing puts no space between words, the listed
+			// name is looked for inside the row's rather than lined up word by word
+			expect(
+				goldenKindOf('一般社団法人日本電設工業協会', [
+					'一般社団法人 日本電設工業協会',
+				]),
+			).toBe('listed')
+		})
+
+		it('should not read a body into the one word it happens to see', () => {
+			// GIVEN a real Chinese company whose only Latin word is the place written
+			// after it, and a list naming that place
+			// WHEN held against the list
+			// THEN not listed. The whole name is read now, so this is answered
+			// outright rather than set aside as something that could not be read
 			expect(goldenKindOf('上海某某太阳能公司 (Shanghai)', ['Shanghai'])).toBe(
-				'unreadable',
+				'not-listed',
 			)
+		})
+
+		it('should not read a body into the legal form thousands of them share', () => {
+			// GIVEN a list carrying only the legal form Japanese bodies open with
+			// WHEN a real body is held against it
+			// THEN not listed. Written as one run with no space, an entry is only
+			// conclusive when it is the whole of what the row is called — otherwise
+			// one shared prefix would mark every body and company carrying it
+			expect(
+				goldenKindOf('一般社団法人日本電設工業協会', ['一般社団法人']),
+			).toBe('not-listed')
 		})
 	})
 

@@ -553,6 +553,10 @@ describe('parseGoldenSet — the shipped market example', () => {
 			const markets = result.golden.map(g => g.market?.name)
 			expect(markets).toContain('ES')
 			expect(markets).toContain('FR')
+			// AND one written in an alphabet with no word spaces at all. A market the
+			// eval refuses cannot be scored, so a regression there would not show as a
+			// worse number — there would be no number
+			expect(markets).toContain('JP')
 			for (const golden of result.golden) {
 				expect(golden.market?.parts.length).toBeGreaterThan(0)
 				expect(golden.market?.notCompanies.length).toBeGreaterThan(0)
@@ -598,22 +602,26 @@ describe('parseGoldenRow — a market entry that says nothing', () => {
 	})
 
 	describe('when a known non-company is written in another script', () => {
-		it('should name the entry rather than say it has no words in it', () => {
-			// GIVEN a trade body listed in a script this eval's word reading has no
-			// letters for
-			const result = parseGoldenRow(
+		it('should accept it, so a market in that script can be held here at all', () => {
+			// GIVEN trade bodies listed in writing systems that space their words and
+			// in ones that do not
+			const chinese = parseGoldenRow(
 				marketWith({ notCompanies: ['中国光伏行业协会'] }),
+			)
+			const russian = parseGoldenRow(
+				marketWith({ notCompanies: ['Гильдия электромонтажников России'] }),
+			)
+			const thai = parseGoldenRow(
+				marketWith({ notCompanies: ['สมาคมผู้รับเหมาก่อสร้างไทย'] }),
 			)
 
 			// WHEN parsed
-			// THEN refused, and the refusal names the entry and says what is wrong. The
-			// words are all there — this reading is the thing that cannot see them, and
-			// saying otherwise sends somebody looking for a typo that is not there
-			expect(result.ok).toBe(false)
-			if (!result.ok) {
-				expect(result.error).toContain('中国光伏行业协会')
-				expect(result.error).toContain('cannot read')
-			}
+			// THEN each is accepted. A market whose bodies could not be written down
+			// could not be added to the golden set at all, so a wrong answer in that
+			// market was not scored badly — it was never scored
+			expect(chinese.ok).toBe(true)
+			expect(russian.ok).toBe(true)
+			expect(thai.ok).toBe(true)
 		})
 	})
 
