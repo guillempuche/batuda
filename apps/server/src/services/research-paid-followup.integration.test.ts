@@ -602,6 +602,30 @@ describe('paid-action follow-up', () => {
 		})
 	})
 
+	describe('when the action was already marked as naming no real tool', () => {
+		it('should still say the tool is the problem, not the status', async () => {
+			// GIVEN an action stored the way a run writes one now: a tool that does
+			// not exist, marked so it stops waiting on anybody
+			const user = `u-unsup-${randomUUID()}`
+			const origin = await seedOrigin(user, [
+				{
+					id: 'pa1',
+					status: 'unsupported',
+					tool: 'employee_count_estimation',
+					args: {},
+				},
+			])
+
+			// WHEN somebody holding its id approves it anyway
+			const result = await approve(origin, 'pa1', user)
+
+			// THEN it is told what actually happened. Reading the status first would
+			// answer "somebody already decided this", which nobody did
+			expect(result.status).toBe('unsupported_tool')
+			expect(await spendCount(user)).toBe(0)
+		})
+	})
+
 	describe('when the action names a tool we do not execute', () => {
 		it('should refuse it without spending', async () => {
 			// GIVEN an action for a tool outside the whitelist

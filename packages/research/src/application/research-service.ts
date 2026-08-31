@@ -1826,10 +1826,14 @@ export class ResearchService extends Context.Service<ResearchService>()(
 			).pipe(Config.withDefault(60))
 			// Whole-run wall-clock cap (applied on the run pipe below). Generous
 			// default — above a deep run's normal duration — so it only fires on a
-			// run that wedges, never on a slow-but-healthy one.
+			// run that wedges, never on a slow-but-healthy one. It has to stay ahead
+			// of the searching passes a wide request gets, which is a fixed number in
+			// this package rather than a setting: an environment that sets nothing
+			// would otherwise run every one of those passes against the old, shorter
+			// clock, and reaching it fails the run and discards what it found.
 			const runDeadlineSeconds = yield* Config.int(
 				'RESEARCH_RUN_DEADLINE_SEC',
-			).pipe(Config.withDefault(1200))
+			).pipe(Config.withDefault(3600))
 
 			// Fail 'running' rows whose worker died — detected by a heartbeat that
 			// stopped refreshing (a live long run keeps beating, so it is spared).
@@ -8061,12 +8065,14 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						const existing = action['followup_run_id']
 						if (typeof existing === 'string')
 							return { status: 'approved' as const, followup_run_id: existing }
-						if (action['status'] !== 'pending')
-							return { status: 'not_pending' as const }
-						// Coerce the model-written tool to a real paid tool; a name that
-						// matches none can only be skipped, so it stays unsupported.
+						// Asked before the status is, because an action naming no real tool
+						// is now stored as unsupported rather than pending: reading the
+						// status first would answer "somebody already decided this", which
+						// is not what happened and not what a caller can act on.
 						const tool = normalizePaidActionTool(action['tool'])
 						if (tool === null) return { status: 'unsupported_tool' as const }
+						if (action['status'] !== 'pending')
+							return { status: 'not_pending' as const }
 
 						// A discover_contacts gate whose args carry neither the company
 						// name nor its domain can't be run as written. When the run is
