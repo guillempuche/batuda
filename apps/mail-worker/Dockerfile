@@ -18,8 +18,9 @@ COPY ./turbo.json ./
 RUN sed -i 's/"prepare": "[^"]*"/"prepare": ""/' package.json
 
 # Copy the full workspace so the turbo filter has the complete graph.
-# @batuda/mail-worker transitively depends on auth, calendar, controllers,
-# domain, email, research, ui — turbo's `^build` resolves them all.
+# The whole of `packages` goes in rather than the ones this app names, so
+# adding a package is never a Dockerfile edit — turbo's `^build` resolves
+# which of them actually get built.
 COPY ./apps ./apps
 COPY ./packages ./packages
 
