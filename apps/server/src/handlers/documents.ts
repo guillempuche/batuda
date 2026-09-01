@@ -99,7 +99,7 @@ export const DocumentsLive = HttpApiBuilder.group(
 							conditions.push(
 								// An HTML body is not in the database, so its plain words
 								// are what the search has to match against.
-								sql`(d.title ILIKE ${needle} OR d.content ILIKE ${needle} OR d.search_text ILIKE ${needle})`,
+								sql`(normalize(d.title) ILIKE ${needle} OR d.content ILIKE ${needle} OR d.search_text ILIKE ${needle})`,
 							)
 						}
 						const whereClause =

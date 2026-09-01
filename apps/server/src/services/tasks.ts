@@ -219,13 +219,13 @@ export class TaskService extends Context.Service<TaskService>()('TaskService', {
 				// They are documents now, so a search that only read the row would
 				// quietly stop finding half of what it used to.
 				conditions.push(sql`(
-					title ILIKE ${needle}
+					normalize(title) ILIKE ${needle}
 					OR EXISTS (
 						SELECT 1 FROM document_links dl
 						JOIN documents d ON d.id = dl.document_id
 						WHERE dl.subject_table = 'tasks' AND dl.subject_id = tasks.id
 							AND (
-								d.title ILIKE ${needle}
+								normalize(d.title) ILIKE ${needle}
 								OR d.content ILIKE ${needle}
 								OR d.search_text ILIKE ${needle}
 							)

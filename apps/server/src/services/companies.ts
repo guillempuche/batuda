@@ -139,7 +139,7 @@ const companyConditions = (
 				sql`EXISTS (
 					SELECT 1 FROM jsonb_array_elements(COALESCE(fit_checks, '[]'::jsonb)) fc
 					WHERE fc->>'result' = 'pass'
-						AND fc->>'criterion' ILIKE ${textAnywhere(filters.fitCriterionPassed)}
+						AND normalize(fc->>'criterion') ILIKE ${textAnywhere(filters.fitCriterionPassed)}
 				)`,
 			)
 		// Blanks are dropped before the list is judged empty, and an empty list is
@@ -162,7 +162,7 @@ const companyConditions = (
 				attentionCondition(sql, filters.attention, filters.staleDays),
 			)
 		if (filters.query)
-			conditions.push(sql`name ILIKE ${textAnywhere(filters.query)}`)
+			conditions.push(sql`normalize(name) ILIKE ${textAnywhere(filters.query)}`)
 		// A rectangle on the map matches a company when the company's own pin is
 		// inside it, or when any of its branches is. Without the second half, a
 		// chain registered in one city is invisible to somebody drawing a box
