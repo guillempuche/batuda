@@ -61,6 +61,16 @@ A few vendors want an unusual shape:
 - Set the jwt plugin's `rotationInterval` so keys expire and regenerate on a schedule, or
 - weigh `jwks.disablePrivateKeyEncryption` — removes the secret↔key coupling but stores the signing private key **unencrypted** in the DB.
 
+## Restarting a stopped production instance
+
+**Redeploy it. Never start it.**
+
+A unikernel's clock does not advance while the instance is stopped, and nothing re-syncs it when the instance comes back. Start one that has been down for seven hours and it resumes seven hours behind, and stays there. Deploying creates a fresh instance, which gets a correct clock.
+
+The damage is quiet. A machine with a wrong clock serves traffic normally and exports telemetry normally — every span and log is accepted and stored, just stamped at the wrong moment. Nothing fails and nothing retries, so the only symptom is that any question about a recent window comes back empty, which reads as a quiet service rather than a broken one. Production ran a day like that on 2026-08-31 before anyone worked out why.
+
+Two things now say so within a minute: the process writes `otlp.clock.skewed` at error level, and `/health` carries `clockOffsetSeconds` — how far the instance sits from the telemetry backend, negative when behind. To check by hand, send a request to any traced route at a noted time and find its span; `/health` itself is exempt from tracing, so it will not appear.
+
 ## Applying database migrations
 
 Where migrations run depends on the environment, and the boundary is deliberate.
