@@ -205,16 +205,32 @@ jobs:
       # this is an idempotent safety net for a from-scratch environment.
       - name: Ensure Unikraft Cloud service exists
         run: |
-          if unikraft services get batuda-server >/dev/null 2>&1; then
+          # Read for what the CLI printed, not for how it exited: it asks every
+          # metro and reports failure when any of them is unwell, even though
+          # the one being deployed to answered perfectly. Going by the exit
+          # code, an outage in another metro sends this down the else branch
+          # and the deploy dies creating a service that already exists
+          # (2026-08-31). The filter keeps the answer to this metro, so a
+          # service of the same name elsewhere cannot stand in for it.
+          if unikraft services list \
+               --filter 'metro=="${{ env.KRAFTCLOUD_METRO }}"' \
+               -f name -o quiet 2>/dev/null | grep -qx batuda-server; then
             echo "Service batuda-server already exists"
           else
             echo "Creating service batuda-server"
-            unikraft services create \
-              --name batuda-server \
-              --metro ${{ env.KRAFTCLOUD_METRO }} \
-              --domains api.batuda.co \
-              --services 443:3000/tls+http \
-              --services 80:443/http+redirect
+            # "Already exists" is the state we want, so it is not a failure —
+            # which keeps this step safe to rerun even when the check above got
+            # no answer at all and sent us here. Any other failure still stops
+            # the deploy.
+            if ! unikraft services create \
+                   --name batuda-server \
+                   --metro ${{ env.KRAFTCLOUD_METRO }} \
+                   --domains api.batuda.co \
+                   --services 443:3000/tls+http \
+                   --services 80:443/http+redirect >/tmp/svc-create.log 2>&1; then
+              cat /tmp/svc-create.log
+              grep -q "already exists" /tmp/svc-create.log
+            fi
           fi
 
       - name: Pre-flight cmdline size guard

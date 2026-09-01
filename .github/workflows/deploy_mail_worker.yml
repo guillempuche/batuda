@@ -142,6 +142,25 @@ jobs:
             # instances delete/get/logs take a bare name and reject --metro
             # (only run/services create accept it); the login profile spans metros.
             unikraft instances delete batuda-mail-worker 2>&1 | grep -v "not found" || true
+
+            # Confirm the name is really free instead of trusting the delete.
+            # The CLI asks every metro and reports failure when any of them is
+            # unwell, so an outage somewhere else can leave the old instance
+            # standing while the delete still looks like it worked — `run` then
+            # collides on the name and the deploy dies three attempts later
+            # saying nothing about the real cause (2026-08-31). `list` is read
+            # for what it printed, not for how it exited.
+            for _ in 1 2 3 4 5; do
+              unikraft instances list --filter 'name=="batuda-mail-worker"' \
+                -f name -o quiet 2>/dev/null | grep -qx batuda-mail-worker || break
+              sleep 3
+              unikraft instances delete batuda-mail-worker >/dev/null 2>&1 || true
+            done
+            if unikraft instances list --filter 'name=="batuda-mail-worker"' \
+                 -f name -o quiet 2>/dev/null | grep -qx batuda-mail-worker; then
+              echo "::error::batuda-mail-worker is still there after repeated deletes. Check https://status.unikraft.com/ — a metro being down makes every CLI call fail, including ones aimed elsewhere."
+              exit 1
+            fi
             unikraft run \
               --timeout 5m \
               --metro ${{ env.KRAFTCLOUD_METRO }} \
