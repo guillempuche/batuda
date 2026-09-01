@@ -594,7 +594,10 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 							const record =
 								looked._tag === 'already_charged' ? null : looked.value
 							people = (record?.directors ?? []).map(d => {
-								const { firstName, lastName } = splitPersonName(d.name)
+								const { firstName, lastName } = splitPersonName(
+									d.name,
+									input.country,
+								)
 								return { firstName, lastName, position: d.role }
 							})
 						}
