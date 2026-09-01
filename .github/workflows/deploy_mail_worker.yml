@@ -75,7 +75,17 @@ jobs:
             --output ${{ env.KRAFTCLOUD_ORG }}/batuda-mail-worker:${{ steps.meta.outputs.version }}
 
       - name: Pre-flight cmdline size guard
+        env:
+          OTLP_HEADERS: ${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }}
         run: |
+          # The dataset name is appended to the secret, so anything the secret
+          # carries at its end lands in the middle of the value. A stray newline
+          # there truncates everything after it, which is how both instances
+          # ended up holding the team key and no dataset (seen 2026-09-01). Read
+          # from the environment rather than pasted into the command, and
+          # stripped of line breaks before anything is added to it.
+          headers="$(printf '%s' "$OTLP_HEADERS" | tr -d '\r\n'),x-honeycomb-dataset=batuda-mail-worker"
+
           # Unikraft Cloud bakes every -e var into the unikernel kernel command
           # line, which Unikraft caps at 4096 bytes / 60 args: past the byte
           # cap the boot aborts with -E2BIG, past the arg cap argv is silently
@@ -89,7 +99,7 @@ jobs:
             -e SERVICE_VERSION="${{ steps.meta.outputs.version }}"
             -e GIT_SHA="${{ github.sha }}"
             -e REGION="${{ env.KRAFTCLOUD_METRO }}"
-            -e OTEL_EXPORTER_OTLP_HEADERS="${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }},x-honeycomb-dataset=batuda-mail-worker"
+            -e OTEL_EXPORTER_OTLP_HEADERS="$headers"
             -e DATABASE_URL="${{ secrets.DATABASE_URL }}"
             -e EMAIL_CREDENTIAL_KEY="${{ secrets.EMAIL_CREDENTIAL_KEY }}"
             -e STORAGE_ACCESS_KEY_ID="${{ secrets.STORAGE_ACCESS_KEY_ID }}"
@@ -110,6 +120,8 @@ jobs:
 
       - name: Deploy to Unikraft Cloud
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        env:
+          OTLP_HEADERS: ${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }}
         with:
           max_attempts: 3
           retry_wait_seconds: 30
@@ -139,6 +151,11 @@ jobs:
           #   Scale-to-zero stays off via the Kraftfile label (baked into the
           #     image), keeping the IDLE-holding worker always-warm.
           command: |
+            # Line breaks stripped before the dataset name is appended: a stray
+            # one at the end of the secret would land mid-value and truncate
+            # everything after it (seen 2026-09-01).
+            headers="$(printf '%s' "$OTLP_HEADERS" | tr -d '\r\n'),x-honeycomb-dataset=batuda-mail-worker"
+
             # instances delete/get/logs take a bare name and reject --metro
             # (only run/services create accept it); the login profile spans metros.
             unikraft instances delete batuda-mail-worker 2>&1 | grep -v "not found" || true
@@ -172,7 +189,7 @@ jobs:
               -e SERVICE_VERSION="${{ steps.meta.outputs.version }}" \
               -e GIT_SHA="${{ github.sha }}" \
               -e REGION="${{ env.KRAFTCLOUD_METRO }}" \
-              -e OTEL_EXPORTER_OTLP_HEADERS="${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }},x-honeycomb-dataset=batuda-mail-worker" \
+              -e OTEL_EXPORTER_OTLP_HEADERS="$headers" \
               -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
               -e EMAIL_CREDENTIAL_KEY="${{ secrets.EMAIL_CREDENTIAL_KEY }}" \
               -e STORAGE_ACCESS_KEY_ID="${{ secrets.STORAGE_ACCESS_KEY_ID }}" \
@@ -182,6 +199,16 @@ jobs:
         run: |
           sleep 5
           unikraft instances get batuda-mail-worker
+
+          # Confirm the dataset name survived into the running instance. Only
+          # the count is read: this API hands back the whole environment in
+          # clear text, so nothing from it is ever printed. A warning rather
+          # than a failure — traces route by service name and land either way;
+          # what goes astray without it is where metrics are filed.
+          if [ "$(unikraft instances get batuda-mail-worker -o json 2>/dev/null \
+                    | grep -c 'x-honeycomb-dataset')" -eq 0 ]; then
+            echo "::warning::x-honeycomb-dataset is missing from the running instance; metrics will be filed under a shared default dataset"
+          fi
           # claimAvailableInboxes runs every 5 s, so an IDLE-established
           # log line should appear within ~10 s if any inbox is provisioned.
           unikraft instances logs batuda-mail-worker --tail 100 || echo "::warning::No logs yet"
