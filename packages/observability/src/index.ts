@@ -5,6 +5,7 @@
 export { boundedCause } from './bounded-cause'
 export { buildMeta } from './build-meta'
 export {
+	defaultClockTolerance,
 	defaultFailingAfter,
 	type ExportFailure,
 	type ExportHealth,
@@ -15,6 +16,7 @@ export {
 	exportReport,
 	exportSignals,
 	failingSignals,
+	isClockSkewed,
 	isFailing,
 	makeExportHealth,
 	observingHttpClient,

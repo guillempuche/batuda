@@ -32,6 +32,13 @@ const SignalReport = Schema.Struct({
  */
 const TelemetryReport = Schema.Struct({
 	exporting: Schema.Boolean,
+	/**
+	 * Seconds this instance's clock sits ahead of the telemetry backend's;
+	 * negative means behind. Absent until a reply has been read. A large figure
+	 * means the data is arriving stamped at the wrong moment, which reads as a
+	 * silent service rather than a broken one.
+	 */
+	clockOffsetSeconds: Schema.optional(Schema.Number),
 	signals: Schema.Struct({
 		traces: SignalReport,
 		logs: SignalReport,

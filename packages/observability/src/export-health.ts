@@ -60,6 +60,12 @@ export interface ExportHealth {
 	readonly setExporting: (exporting: boolean) => void
 	readonly snapshot: () => ExportSnapshot
 	readonly exporting: () => boolean
+	/**
+	 * How far this process's clock sits from the backend's, in milliseconds,
+	 * positive when we are ahead. `undefined` until a reply has been read.
+	 */
+	readonly recordClockOffset: (offsetMs: number) => void
+	readonly clockOffset: () => number | undefined
 }
 
 const untried: SignalHealth = {
@@ -84,12 +90,17 @@ export const makeExportHealth = (): ExportHealth => {
 		metrics: untried,
 	}
 	let exporting = false
+	let clockOffset: number | undefined
 
 	return {
 		setExporting: next => {
 			exporting = next
 		},
 		exporting: () => exporting,
+		recordClockOffset: offsetMs => {
+			clockOffset = offsetMs
+		},
+		clockOffset: () => clockOffset,
 		recordSuccess: (signal, at) => {
 			state[signal] = {
 				lastAttemptAt: at,
@@ -157,6 +168,32 @@ export const failingSignals = (
  */
 export const defaultFailingAfter: Duration.Duration = Duration.minutes(2)
 
+/**
+ * How far our clock may sit from the backend's before it is worth saying so.
+ *
+ * Generous on purpose. The reply's clock has one-second resolution and the
+ * round trip adds more, so a healthy process is always off by a little. What
+ * this is looking for is not drift but a clock that stopped: a machine paused
+ * and resumed keeps the time it went to sleep with, and comes back hours out.
+ */
+export const defaultClockTolerance: Duration.Duration = Duration.minutes(2)
+
+/**
+ * Whether this process and the backend disagree about the time by more than
+ * they should.
+ *
+ * Worth its own check because a wrong clock is invisible to everything else
+ * here: the batches are accepted, so nothing fails and nothing is retried. What
+ * breaks is the reading — every span arrives stamped at the wrong moment, so
+ * any question about a recent window comes back empty and the process looks
+ * idle rather than misconfigured. That is what happened on 2026-08-31.
+ */
+export const isClockSkewed = (
+	offsetMs: number | undefined,
+	tolerance: Duration.Duration,
+): boolean =>
+	offsetMs !== undefined && Math.abs(offsetMs) > Duration.toMillis(tolerance)
+
 export interface SignalReport {
 	readonly failing: boolean
 	readonly failure?: ExportFailure
@@ -165,6 +202,8 @@ export interface SignalReport {
 
 export interface ExportReport {
 	readonly exporting: boolean
+	/** Seconds this process's clock sits ahead of the backend's; negative behind. */
+	readonly clockOffsetSeconds?: number
 	readonly signals: Readonly<Record<ExportSignal, SignalReport>>
 }
 
@@ -188,17 +227,44 @@ export const exportReport = (
 	now: number,
 ): ExportReport => {
 	const snapshot = health.snapshot()
+	const offsetMs = health.clockOffset()
+
 	// Written out rather than built from the list of signals: building it needs a
 	// cast to claim all three keys are there, and a cast would let a dropped
 	// signal go out missing from the report with nothing complaining.
 	return {
 		exporting: health.exporting(),
+		// Rounded to seconds: the reply's clock has no finer resolution, and a
+		// millisecond figure would read as precision that is not there.
+		...(offsetMs === undefined
+			? {}
+			: { clockOffsetSeconds: Math.round(offsetMs / 1000) }),
 		signals: {
 			traces: reportOf(snapshot.traces, now),
 			logs: reportOf(snapshot.logs, now),
 			metrics: reportOf(snapshot.metrics, now),
 		},
 	}
+}
+
+/**
+ * Reads the backend's own clock off its reply and keeps how far ours sits from
+ * it.
+ *
+ * Every HTTP reply carries a `Date`, so this costs no extra request and no
+ * extra dependency — the one thing we already do constantly is talk to a
+ * machine that knows the time. Treated as a number and nothing else: it is a
+ * value from outside, so an unreadable one is ignored rather than trusted.
+ */
+const readClock = (
+	dateHeader: string | undefined,
+	ourTime: number,
+	health: ExportHealth,
+): void => {
+	if (dateHeader === undefined) return
+	const theirTime = Date.parse(dateHeader)
+	if (Number.isNaN(theirTime)) return
+	health.recordClockOffset(ourTime - theirTime)
 }
 
 const failureOfStatus = (status: number): ExportFailure => {
@@ -277,9 +343,10 @@ export const observingHttpClient = (
 				Effect.map(Clock.currentTimeMillis, at => {
 					// Read below `filterStatusOk`, which the exporter applies on top of
 					// this client — so the real status arrives here, refusals included.
-					if (response.status >= 200 && response.status < 300)
+					if (response.status >= 200 && response.status < 300) {
 						health.recordSuccess(signal, at)
-					else
+						readClock(response.headers['date'], at, health)
+					} else
 						health.recordFailure(
 							signal,
 							failureOfStatus(response.status),

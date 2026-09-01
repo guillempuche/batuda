@@ -65,8 +65,10 @@ Timestamps and trace ids are added by the framework.
 | `otlp.export.failing`          | This process has stopped being able to export, and why     |
 | `otlp.export.recovered`        | Exporting works again                                      |
 | `otlp.export.health`           | Whether this process is exporting, repeated on a timer     |
+| `otlp.clock.skewed`            | This process and the backend disagree about the time       |
+| `otlp.clock.agreed`            | This process and the backend agree again                   |
 
-The three `otlp.export.*` lines are the exception to one record per unit of work: they report on the reporting itself, so they belong to the process rather than to any piece of work it did. See [When export itself fails](#when-export-itself-fails).
+The `otlp.*` lines are the exception to one record per unit of work: they report on the reporting itself, so they belong to the process rather than to any piece of work it did. See [When export itself fails](#when-export-itself-fails).
 
 A request leaves exactly one of `http.request`, `http.server_error`, `http.defect` or `http.not_found`. "Every request that ended badly" is the middle two: a route that does not exist is the caller's mistake rather than a fault of ours, and it is kept out of the error channel on purpose — recorded as a crash, every bot probing for `/robots.txt` leaves a stack trace at error level and buries the failures that matter.
 
@@ -291,11 +293,21 @@ Deliberately not sent to the backend. A report that export is broken is worth no
 
 **The three signals are tracked apart.** A backend can take our logs and refuse our traces, so one "is export working" flag would read healthy while traces were being dropped.
 
+### A wrong clock is the failure none of that catches
+
+Everything above asks whether a batch was refused. A machine with a wrong clock refuses nothing: every span and log is sent, accepted, and stored — at the wrong moment. Nothing fails, nothing retries, and the only symptom is that questions about a recent window come back empty, which reads as a quiet service rather than a broken one. Production spent a day like that on 2026-08-31, and the export watchdog would have called it healthy throughout.
+
+So the export path also compares its own clock against the backend's. Every HTTP reply carries a `Date`, and we are already talking to that backend constantly, so this costs no extra request and no extra dependency — the difference is read off replies we were making anyway. Only off accepted ones: a proxy or an error page is not the backend, and its idea of the time proves nothing. `otlp.clock.skewed` is said the first time the difference passes a two-minute tolerance — generous, because a reply's clock has one-second resolution and the round trip adds more. What it is looking for is not drift but a clock that stopped.
+
+The cause worth knowing: a stopped machine keeps the time it went to sleep with. Restarting a stopped instance resumes it hours behind, while **deploying a fresh one gets a correct clock** — so redeploy, do not start.
+
 ## Health endpoint
 
 `/health` returns build metadata for uptime checks and deploy verification — CalVer version, short commit SHA, region — plus whether this instance is still reaching the telemetry backend.
 
 The telemetry block is there because of the failure above: the console of a deployed instance is not always reachable, and an instance that cannot export cannot report that through the thing it exports to. One unauthenticated request answers it from anywhere, which is the point.
+
+It also carries how far the instance's clock sits from the backend's, in seconds, negative when behind — absent until a reply has been read, because absent means unknown rather than zero.
 
 **Security note:** those, and nothing more. No framework or dependency versions, no internal paths, no stack traces — and from the telemetry block, no backend host, no vendor wording and no status line: only a closed set of reasons (`unauthorized`, `rate_limited`, `rejected`, `unreachable`), enough to tell a rejected key from a quota from a dead route. The reason is a fixed set rather than whatever the backend said on purpose: the backend's wording is derived from our request, and our request carries the API key in a header.
 
