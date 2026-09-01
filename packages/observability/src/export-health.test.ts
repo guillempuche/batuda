@@ -11,12 +11,14 @@ import {
 	HttpClient,
 	HttpClientRequest,
 } from 'effect/unstable/http'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import {
+	defaultClockTolerance,
 	type ExportHealth,
 	exportReport,
 	failingSignals,
+	isClockSkewed,
 	isFailing,
 	makeExportHealth,
 	observingHttpClient,
@@ -26,6 +28,9 @@ import {
 // a `hang` request is accepted and then left open, which is the failure the
 // exporter cannot see on its own.
 let status = 200
+// Lets a test put a specific time on the backend's reply, which is where the
+// clock comparison reads from.
+let replyDate: string | undefined
 let server: Server
 let origin: string
 const hungSockets: Array<import('node:net').Socket> = []
@@ -39,7 +44,10 @@ const startSink = () =>
 					hungSockets.push(request.socket)
 					return
 				}
-				response.writeHead(status)
+				response.writeHead(
+					status,
+					replyDate === undefined ? undefined : { date: replyDate },
+				)
 				response.end('{}')
 			})
 		})
@@ -68,6 +76,14 @@ describe('the export health record', () => {
 			throw new Error('expected a TCP address for the sink')
 		origin = `http://127.0.0.1:${address.port}`
 	}, 30_000)
+
+	// Put the fake backend back to plain, agreeable answers between cases, so a
+	// test that fails part-way cannot leave a refusal or a wrong time behind for
+	// whatever runs next.
+	afterEach(() => {
+		status = 200
+		replyDate = undefined
+	})
 
 	afterAll(async () => {
 		for (const socket of hungSockets) socket.destroy()
@@ -198,6 +214,69 @@ describe('the export health record', () => {
 		})
 	})
 
+	describe('comparing our clock against the backend', () => {
+		it('should read the time off the reply and keep the difference', async () => {
+			// GIVEN a backend that says it is an hour later than we think it is —
+			//       the shape of a machine resumed with the clock it went to sleep on
+			const health = makeExportHealth()
+			status = 200
+			replyDate = new Date(Date.now() + 3_600_000).toUTCString()
+
+			// WHEN a batch is accepted
+			await post(`${origin}/v1/traces`, health, second)
+
+			// THEN we know we are roughly an hour behind, and say so as a negative
+			const offset = health.clockOffset()
+			expect(offset).toBeTypeOf('number')
+			expect(offset ?? 0).toBeLessThan(-3_500_000)
+		})
+
+		it('should stay quiet about the ordinary difference of a healthy process', async () => {
+			// GIVEN a backend whose clock agrees with ours, give or take the round
+			//       trip and the one-second resolution of the reply's own clock
+			const health = makeExportHealth()
+			status = 200
+
+			// WHEN a batch is accepted
+			await post(`${origin}/v1/logs`, health, second)
+
+			// THEN an offset was read, and it is not worth telling anyone about
+			expect(health.clockOffset()).toBeTypeOf('number')
+			expect(isClockSkewed(health.clockOffset(), defaultClockTolerance)).toBe(
+				false,
+			)
+		})
+
+		it('should ignore a reply whose time cannot be read', async () => {
+			// GIVEN a backend sending something that is not a date — this value
+			//       comes from outside, so it is checked rather than trusted
+			const health = makeExportHealth()
+			status = 200
+			replyDate = 'not a date at all'
+
+			// WHEN a batch is accepted
+			await post(`${origin}/v1/traces`, health, second)
+
+			// THEN nothing is claimed about the clock
+			expect(health.clockOffset()).toBeUndefined()
+		})
+
+		it('should not read a clock off a reply that refused the batch', async () => {
+			// GIVEN a backend refusing the batch, whatever time it puts on the reply
+			const health = makeExportHealth()
+			status = 401
+			replyDate = new Date(Date.now() + 3_600_000).toUTCString()
+
+			// WHEN a batch is posted
+			await post(`${origin}/v1/traces`, health, second)
+
+			// THEN the refusal is recorded and the clock is left alone: a proxy or
+			//      an error page is not the backend, and its time proves nothing
+			expect(health.snapshot().traces.failure).toBe('unauthorized')
+			expect(health.clockOffset()).toBeUndefined()
+		})
+	})
+
 	describe('when one signal fails while another is accepted', () => {
 		it('should report them independently', async () => {
 			// GIVEN a backend that refuses everything
@@ -299,6 +378,28 @@ describe('deciding whether a signal is worth complaining about', () => {
 			expect(
 				isFailing(health.snapshot().traces, 300_001, Duration.minutes(2)),
 			).toBe(false)
+		})
+	})
+
+	describe('deciding whether the clocks disagree enough to say so', () => {
+		it('should say nothing before any reply has been read', () => {
+			// GIVEN a process that has not yet had a batch accepted
+			// THEN there is nothing to compare, so nothing is claimed
+			expect(isClockSkewed(undefined, defaultClockTolerance)).toBe(false)
+		})
+
+		it('should ignore a difference inside the tolerance', () => {
+			// GIVEN a minute of difference, which a round trip and a coarse clock
+			//       can account for
+			expect(isClockSkewed(60_000, defaultClockTolerance)).toBe(false)
+		})
+
+		it('should catch a clock that stopped, in either direction', () => {
+			// GIVEN the 7h25m the production machines came back with on 2026-08-31
+			const stopped = 7 * 3_600_000 + 25 * 60_000
+			expect(isClockSkewed(-stopped, defaultClockTolerance)).toBe(true)
+			// AND the same distance the other way, which is just as wrong
+			expect(isClockSkewed(stopped, defaultClockTolerance)).toBe(true)
 		})
 	})
 

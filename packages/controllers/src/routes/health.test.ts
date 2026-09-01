@@ -80,6 +80,31 @@ describe('the health response', () => {
 		})
 	})
 
+	describe('when the clocks have been compared', () => {
+		it('should carry how far apart they are', () => {
+			// GIVEN an instance whose clock sits 7h25m behind the backend's — the
+			//       state the production machines came back in on 2026-08-31, where
+			//       everything is sent and accepted but stamped at the wrong moment
+			// WHEN the response is encoded
+			const exit = encode({
+				...healthy,
+				telemetry: { ...healthy.telemetry, clockOffsetSeconds: -26_700 },
+			})
+
+			// THEN the wire format carries it, negative meaning behind
+			expect(exit._tag).toBe('Success')
+		})
+
+		it('should accept a report from a process that has not compared yet', () => {
+			// GIVEN a process that has had no reply back to read a time from
+			// WHEN the response is encoded without the field
+			const exit = encode(healthy)
+
+			// THEN it is accepted: absent means unknown, not zero
+			expect(exit._tag).toBe('Success')
+		})
+	})
+
 	describe('when a reason outside the known set is reported', () => {
 		it('should be rejected', () => {
 			// GIVEN a reason carrying something the backend said, rather than one of

@@ -4,6 +4,7 @@ import { Otlp } from 'effect/unstable/observability'
 
 import { buildMeta } from './build-meta'
 import {
+	defaultClockTolerance,
 	defaultFailingAfter,
 	type ExportHealth,
 	type ExportSignal,
@@ -11,6 +12,7 @@ import {
 	exportHealth,
 	exportSignals,
 	failingSignals,
+	isClockSkewed,
 	observingHttpClient,
 } from './export-health'
 import { redactingTracer } from './redact-spans'
@@ -40,6 +42,7 @@ export interface ExportCadence {
 	readonly checkEvery: Duration.Duration
 	readonly failingAfter: Duration.Duration
 	readonly heartbeatEvery: Duration.Duration
+	readonly clockTolerance: Duration.Duration
 }
 
 const defaultCadence: ExportCadence = {
@@ -47,6 +50,7 @@ const defaultCadence: ExportCadence = {
 	checkEvery: Duration.seconds(60),
 	failingAfter: defaultFailingAfter,
 	heartbeatEvery: Duration.minutes(5),
+	clockTolerance: defaultClockTolerance,
 }
 
 /**
@@ -120,6 +124,7 @@ const watchdog = (options: {
 			),
 		)
 		let broken = false
+		let wasSkewed = false
 		let tick = 0
 
 		while (true) {
@@ -150,6 +155,27 @@ const watchdog = (options: {
 			}
 			broken = failing.length > 0
 
+			const offsetMs = health.clockOffset()
+			const skewed = isClockSkewed(offsetMs, cadence.clockTolerance)
+			// `skewed` is never true without an offset; the check is repeated so
+			// the number itself can be reported below.
+			if (skewed && !wasSkewed && offsetMs !== undefined) {
+				yield* Effect.logError(
+					'This process and the backend disagree about the time',
+				).pipe(
+					Effect.annotateLogs({
+						...annotations,
+						event: 'otlp.clock.skewed',
+						clockOffsetSeconds: Math.round(offsetMs / 1000),
+					}),
+				)
+			} else if (!skewed && wasSkewed) {
+				yield* Effect.logInfo('Clocks agree again').pipe(
+					Effect.annotateLogs({ ...annotations, event: 'otlp.clock.agreed' }),
+				)
+			}
+			wasSkewed = skewed
+
 			if (tick % ticksPerHeartbeat === 0) {
 				yield* Effect.logInfo('Telemetry export health').pipe(
 					Effect.annotateLogs({
@@ -159,6 +185,11 @@ const watchdog = (options: {
 						// so one search answers the question for every process.
 						exporting: true,
 						failing: failing.length > 0,
+						// Left out entirely until a reply has been read: the console
+						// formatter writes an absent value as the word `undefined`.
+						...(offsetMs === undefined
+							? {}
+							: { clockOffsetSeconds: Math.round(offsetMs / 1000) }),
 						signals: detailOf(snapshot, exportSignals),
 					}),
 				)
