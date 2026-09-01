@@ -51,7 +51,7 @@ export const MemberHandlersLive = MemberTools.toLayer(
 					if (query !== undefined) {
 						const like = textAnywhere(query)
 						conditions.push(
-							sql`(u.name ILIKE ${like} OR u.email ILIKE ${like})`,
+							sql`(normalize(u.name) ILIKE ${like} OR u.email ILIKE ${like})`,
 						)
 					}
 					// Read back camelCase whatever the column is called — the SQL client

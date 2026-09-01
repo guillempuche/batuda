@@ -211,7 +211,7 @@ export const DocumentHandlersLive = DocumentTools.toLayer(
 					if (params.q) {
 						const needle = textAnywhere(params.q)
 						conditions.push(
-							sql`(d.title ILIKE ${needle} OR d.content ILIKE ${needle})`,
+							sql`(normalize(d.title) ILIKE ${needle} OR d.content ILIKE ${needle})`,
 						)
 					}
 					const whereClause =
