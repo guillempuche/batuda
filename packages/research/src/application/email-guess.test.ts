@@ -246,3 +246,177 @@ describe('splitPersonName', () => {
 		})
 	})
 })
+
+describe('splitting a name that may carry two surnames', () => {
+	describe('when the company is in a Spanish-speaking country', () => {
+		it('should use the surname the person is actually called by', () => {
+			// GIVEN ordinary names from this market, where the father's surname comes
+			// first and the mother's second
+			// WHEN split
+			// THEN the first of the two is what comes back. Taking the last word gives
+			// the mother's surname, which is neither what the person is called nor how
+			// their address is built
+			expect(splitPersonName('María García López', 'ES')).toEqual({
+				firstName: 'María',
+				lastName: 'García',
+			})
+			expect(splitPersonName('Guillem Puche Sanz', 'ES')).toEqual({
+				firstName: 'Guillem',
+				lastName: 'Puche',
+			})
+			expect(splitPersonName('Carlos Ruiz Mendoza', 'MX')).toEqual({
+				firstName: 'Carlos',
+				lastName: 'Ruiz',
+			})
+		})
+
+		it('should read a name whose two surnames are joined by a little word', () => {
+			// GIVEN the Catalan shape, where "i" sits between the two surnames
+			// WHEN split
+			// THEN the joining word belongs to neither and the first surname stands
+			expect(splitPersonName('Jordi Pujol i Soley', 'ES')).toEqual({
+				firstName: 'Jordi',
+				lastName: 'Pujol',
+			})
+		})
+
+		it('should keep a surname whole when it opens with a little word', () => {
+			// GIVEN a surname of several words, as many here are
+			// WHEN split
+			// THEN it comes back whole rather than cut at its first word
+			expect(splitPersonName('Ana de la Torre Ruiz', 'ES')).toEqual({
+				firstName: 'Ana',
+				lastName: 'de la Torre',
+			})
+		})
+
+		it('should not be fooled by a given name of two words', () => {
+			// GIVEN a compound given name, which is ordinary here
+			// WHEN split
+			// THEN still the first surname. The two surnames sit at the end whatever
+			// the given name is, so nothing has to count the words in front of them
+			expect(splitPersonName('José María García López', 'ES')).toEqual({
+				firstName: 'José',
+				lastName: 'García',
+			})
+		})
+
+		it('should leave a name carrying only one surname alone', () => {
+			// GIVEN a two-word name
+			// WHEN split
+			// THEN the one surname it has. Two surnames is the norm, not a rule
+			expect(splitPersonName('Ada Lovelace', 'ES')).toEqual({
+				firstName: 'Ada',
+				lastName: 'Lovelace',
+			})
+		})
+	})
+
+	describe('when the country reads its surnames the other way round', () => {
+		it('should take the last word as the surname', () => {
+			// GIVEN Portugal and Brazil, which also carry two surnames but put the
+			// mother's first and the father's last, and a country with one surname
+			// WHEN split
+			// THEN the last word, which is right for all three
+			expect(splitPersonName('João Silva Santos', 'PT')).toEqual({
+				firstName: 'João',
+				lastName: 'Santos',
+			})
+			expect(splitPersonName('Mary Jane Watson', 'US')).toEqual({
+				firstName: 'Mary',
+				lastName: 'Watson',
+			})
+		})
+	})
+
+	describe('when no country is known', () => {
+		it('should fall back to the last word', () => {
+			// GIVEN no country to settle it. "María García López" and "Mary Jane
+			// Watson" are the same shape, and nothing in either says which it is
+			// WHEN split
+			// THEN the last word — a guess at the country would be a guess at the
+			// answer
+			expect(splitPersonName('María García López')).toEqual({
+				firstName: 'María',
+				lastName: 'López',
+			})
+			expect(splitPersonName('Mary Jane Watson')).toEqual({
+				firstName: 'Mary',
+				lastName: 'Watson',
+			})
+		})
+	})
+
+	describe('when the name arrives the way a register writes it', () => {
+		it('should pick the same surname as it would from the plain shape', () => {
+			// GIVEN the "SURNAME, Forename" shape a register hands back. It says which
+			// words are surnames, but not which of them the person goes by
+			const fromRegister = splitPersonName('GARCÍA LÓPEZ, María', 'ES')
+			const fromPlain = splitPersonName('María García López', 'ES')
+
+			// WHEN both are read
+			// THEN the same woman comes back the same way. She was arriving as
+			// garcialopez@ from the register and garcia@ from a page, and only one of
+			// those reaches her
+			expect(fromRegister.lastName).toBe('GARCÍA')
+			expect(guessEmails({ ...fromRegister, domain: 'acme.es' })[0]).toBe(
+				guessEmails({ ...fromPlain, domain: 'acme.es' })[0],
+			)
+		})
+
+		it('should leave the surnames whole where they are read the other way', () => {
+			// GIVEN the same shape from countries that do not put the father's
+			// surname first
+			// WHEN read
+			// THEN what the register gave stands, as it always did
+			expect(splitPersonName('SMITH, John', 'GB').lastName).toBe('SMITH')
+			expect(splitPersonName('SILVA SANTOS, João', 'PT').lastName).toBe(
+				'SILVA SANTOS',
+			)
+			expect(splitPersonName('VAN DEN BERG, Jan', 'NL').lastName).toBe(
+				'VAN DEN BERG',
+			)
+		})
+	})
+
+	describe('when a little word carries a surname', () => {
+		it('should keep the surname whole rather than cut off its opening', () => {
+			// GIVEN names whose surname opens with a little word
+			// WHEN split
+			// THEN the whole surname. Taking the last word alone addressed Jan van den
+			// Berg as jan.berg@, which is not his name
+			expect(splitPersonName('Jan van den Berg').lastName).toBe('van den Berg')
+			expect(splitPersonName('Ludwig von Mises').lastName).toBe('von Mises')
+		})
+
+		it('should treat the same word as a first name when it opens one', () => {
+			// GIVEN people whose given name is spelled like one of those little words
+			// WHEN split
+			// THEN it is their first name. Carried onto what follows, Van Morrison
+			// became one long first name with no surname at all, and no address could
+			// be built for him
+			expect(splitPersonName('Van Morrison')).toEqual({
+				firstName: 'Van',
+				lastName: 'Morrison',
+			})
+			expect(splitPersonName('Do Kim')).toEqual({
+				firstName: 'Do',
+				lastName: 'Kim',
+			})
+		})
+	})
+
+	describe('when the addresses are guessed from it', () => {
+		it('should build them on the surname the person goes by', () => {
+			// GIVEN a Spanish name at a Spanish company
+			const name = splitPersonName('María García López', 'ES')
+
+			// WHEN addresses are guessed
+			// THEN they are built on García. Only the first guess is ever tried, and a
+			// wrong one fails its check and leaves the person with no address at all
+			expect(guessEmails({ ...name, domain: 'acme.es' })[0]).toBe(
+				'maria.garcia@acme.es',
+			)
+		})
+	})
+})
