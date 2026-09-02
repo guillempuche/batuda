@@ -23,6 +23,8 @@
 import { Config, Effect, Redacted, Schema } from 'effect'
 import { HttpClient, HttpClientResponse } from 'effect/unstable/http'
 
+import { clipText } from '@batuda/domain'
+
 import { type SearchInput, SearchProvider } from '../../application/ports'
 import { parseCountryAlpha2 } from '../../domain/country'
 import { ProviderError } from '../../domain/errors'
@@ -155,7 +157,7 @@ export const makeBraveLlmContextSearch = (slot: number) =>
 									new SearchResultItem({
 										url,
 										title: item.title ?? url,
-										snippet: content.slice(0, 300),
+										snippet: clipText(content, 300),
 										content,
 									}),
 								]

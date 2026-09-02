@@ -2,6 +2,7 @@ import { Effect } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 import type { ParsedMail } from 'mailparser'
 
+import { clipText } from '@batuda/domain'
 import { NoMatch, ParticipantMatcher } from '@batuda/email/participant-matcher'
 import { EmailReceived, TimelineActivityService } from '@batuda/timeline'
 
@@ -83,7 +84,7 @@ export const fromParsedMail = (mail: ParsedMail): ParsedInbound => {
 				? [inReplyTo]
 				: []
 	const text = typeof mail.text === 'string' ? mail.text : null
-	const preview = text ? text.slice(0, 200) : null
+	const preview = text ? clipText(text, 200) : null
 	return {
 		messageId,
 		inReplyTo,

@@ -17,6 +17,8 @@
  *    kept as the quote, so it is grounded by construction.
  */
 
+import { clipText } from '@batuda/domain'
+
 // Role / department local parts across the languages the pipeline researches in.
 // A person's name is never in this list, so only shared mailboxes are captured.
 const ROLE_LOCALPARTS = new Set([
@@ -117,7 +119,7 @@ export const harvestGenericEmails = (
 				found.push({
 					value: email,
 					source_id: page.sourceId,
-					quote: line.trim().slice(0, 200),
+					quote: clipText(line.trim(), 200),
 					rank: rankOf(localPart),
 				})
 			}

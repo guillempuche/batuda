@@ -22,6 +22,8 @@ import {
 	HttpClientResponse,
 } from 'effect/unstable/http'
 
+import { clipText } from '@batuda/domain'
+
 import { type SearchInput, SearchProvider } from '../../application/ports'
 import { parseCountryAlpha2 } from '../../domain/country'
 import { ProviderError } from '../../domain/errors'
@@ -161,7 +163,7 @@ export const makeFirecrawlSearch = (slot: number) =>
 									title: r.title ?? '',
 									// A preview at the same cut-off the Brave context adapter
 									// uses; the whole passage goes in `content` below.
-									snippet: passage.slice(0, 300),
+									snippet: clipText(passage, 300),
 									...(passage.length > 0 ? { content: passage } : {}),
 								})
 							}),
