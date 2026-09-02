@@ -13,6 +13,8 @@
  * in every findings schema, so it filters wherever it finds a `citations` array.
  */
 
+import { clipText } from '@batuda/domain'
+
 import { isCitedField } from './guard-shapes'
 import { canonicalizeUrl, hostOf } from './source-key'
 
@@ -37,9 +39,15 @@ export interface CitationValidation {
 }
 
 // Bound a dropped value so a long string in the value slot can't bloat a log line.
+//
+// The mark goes on only when something was actually taken off. Asking whether the
+// text is long and then cutting it are two readings of "long", and where they
+// disagree — text of few characters stored in many units — a value that was never
+// shortened wears a mark saying it was.
 const boundDropValue = (value: unknown): string => {
 	const text = typeof value === 'string' ? value : JSON.stringify(value)
-	return text.length > 120 ? `${text.slice(0, 120)}…` : text
+	const bounded = clipText(text, 120)
+	return bounded === text ? text : `${bounded}…`
 }
 
 /**

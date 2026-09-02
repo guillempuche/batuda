@@ -2,6 +2,7 @@ import { DateTime, Effect } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 import type { ParsedMail } from 'mailparser'
 
+import { clipText } from '@batuda/domain'
 import { EmailBounced, TimelineActivityService } from '@batuda/timeline'
 
 import { asOrg } from './lib/as-org.js'
@@ -80,7 +81,7 @@ const parseDeliveryStatus = (
 		} else if (name === 'status' && status === null) {
 			status = value
 		} else if (name === 'diagnostic-code' && diagnostic === null) {
-			diagnostic = value.slice(0, 500)
+			diagnostic = clipText(value, 500)
 		}
 	}
 	return { recipients, status, diagnostic }

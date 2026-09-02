@@ -26,6 +26,8 @@
  * mistaken for a scalar field.
  */
 
+import { clipText } from '@batuda/domain'
+
 import { isSourcedField } from './guard-shapes'
 import { writtenWithoutWordSpaces } from './term-match'
 
@@ -310,9 +312,13 @@ export interface ScalarFieldGuardResult {
 }
 
 // A dropped value is short (a place, an industry code); cap it anyway so a runaway
-// string in the value slot can never bloat the per-drop log the guard emits.
-const truncateDropValue = (value: string): string =>
-	value.length > 120 ? `${value.slice(0, 120)}…` : value
+// string in the value slot can never bloat the per-drop log the guard emits. The
+// mark goes on only when something was actually taken off, since a value that was
+// never shortened must not wear one saying it was.
+const truncateDropValue = (value: string): string => {
+	const bounded = clipText(value, 120)
+	return bounded === value ? value : `${bounded}…`
+}
 
 /**
  * Enforce the grounded-or-absent contract on every per-field `Sourced` scalar in a
