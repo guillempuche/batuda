@@ -107,6 +107,40 @@ describe('coverageStoppedLooking', () => {
 		})
 	})
 
+	describe('when the provider refused a pass of the chase', () => {
+		it('should report that, not one of the ceilings the run sets itself', () => {
+			// GIVEN a chase stopped because the provider would not answer a pass
+			// THEN it is its own reason: a reader told the round cap was reached
+			// would go and raise a number that never stopped anything
+			expect(coverageStoppedLooking('provider_failed')).toBe('provider_refused')
+			expect(coverageStoppedLooking('provider_failed')).not.toBe(
+				'round_cap_reached',
+			)
+		})
+
+		it('should count as having cut the looking short', () => {
+			// GIVEN the reason a refused pass reports
+			// THEN the run knows its list is short because it was stopped, which is
+			// the whole question this answers — a thin market reads the same way
+			expect(wasCutOff('provider_refused')).toBe(true)
+		})
+
+		it('should not hide a harder reason from another stretch', () => {
+			// GIVEN a gathering stretch that ran out of money and a chase the
+			// provider refused
+			// THEN the money is reported, because it leaves no room to look again
+			// while a refused pass does not
+			expect(mostBindingStop('budget_exhausted', 'provider_refused')).toBe(
+				'budget_exhausted',
+			)
+			// AND against a stretch that simply settled, the refusal is what the
+			// reader needs
+			expect(mostBindingStop('finished_looking', 'provider_refused')).toBe(
+				'provider_refused',
+			)
+		})
+	})
+
 	describe('when the chase ran out of something', () => {
 		it('should name what it ran out of, in the words the run reports', () => {
 			// GIVEN each way the chase can be stopped with parts still unanswered

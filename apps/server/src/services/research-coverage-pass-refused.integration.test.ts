@@ -226,7 +226,10 @@ const runRow = (id: string) =>
 				status?: string
 				reason_code?: string | null
 				findings?: {
-					quality?: { coverage?: { stopped_because?: string } }
+					quality?: {
+						coverage?: { stopped_because?: string }
+						searching_stopped?: string
+					}
 				} | null
 			} | null
 		}),
@@ -282,6 +285,12 @@ describe('a refused covering pass', () => {
 			expect(row?.findings?.quality?.coverage?.stopped_because).toBe(
 				'provider_failed',
 			)
+
+			// AND the run reports that a provider refusal is what stopped it looking,
+			// rather than one of the ceilings it sets itself — a reader told the
+			// round cap was reached would go and raise a number that never stopped
+			// anything
+			expect(row?.findings?.quality?.searching_stopped).toBe('provider_refused')
 
 			// AND it really did go back out for the uncovered trades
 			expect(firedEvents).toContain('research.covering')

@@ -33,6 +33,7 @@ export type SearchStopped =
 	| 'context_full'
 	| 'deadline_reached'
 	| 'budget_exhausted'
+	| 'provider_refused'
 
 /**
  * How hard each reason bound the run.
@@ -46,6 +47,12 @@ const HOW_BINDING: Record<SearchStopped, number> = {
 	finished_looking: 0,
 	round_cap_reached: 1,
 	context_full: 1,
+	// Counted with the per-stretch ceilings: the stretch it happened in ended,
+	// and the run went on to what comes after with the money and the clock it
+	// still had. It is not one of our own ceilings, which is why it is its own
+	// reason rather than being folded into the round cap — a reader told the cap
+	// was reached would go and raise a number that never stopped anything.
+	provider_refused: 1,
 	deadline_reached: 2,
 	budget_exhausted: 2,
 }
@@ -92,6 +99,8 @@ export const coverageStoppedLooking = (
 			return 'deadline_reached'
 		case 'budget_margin':
 			return 'budget_exhausted'
+		case 'provider_failed':
+			return 'provider_refused'
 		default:
 			return null
 	}
