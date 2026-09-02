@@ -1584,7 +1584,7 @@ export const buildBriefPrompt = (args: {
 		args.searchStopped !== null &&
 		wasCutOff(args.searchStopped)
 			? [
-					`The search did not finish looking — it reached one of the limits set on how far a single run may go while it still had more it would have done. Say so plainly in ${args.language}, in a sentence of its own, as something about this search rather than about the market: what follows is what the search had reached, not everything there is. Name no particular limit — you have not been told which one. Never write that more companies exist, and never write that these are all there are.`,
+					`The search did not finish looking — it stopped while it still had more it would have done. Say so plainly in ${args.language}, in a sentence of its own, as something about this search rather than about the market: what follows is what the search had reached, not everything there is. Name no particular reason — you have not been told which one. Never write that more companies exist, and never write that these are all there are.`,
 				]
 			: []
 	// Every row carries what the run could establish about whether the company is
