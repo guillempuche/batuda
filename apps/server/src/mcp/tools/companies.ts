@@ -75,7 +75,7 @@ export const CompanyFilterOptions = Schema.Struct({
 
 const SearchCompanies = Tool.make('search_companies', {
 	description:
-		'Filter companies by status, country (ISO 3166-1 alpha-2, e.g. US/ES/DE), industry, priority, search query, the research fit verdict (strong_fit / possible_fit / weak_fit / no_fit), a fit criterion the company passed (matched loosely against the criterion text), a tag or tags the company carries (every one named has to be on it, so a second tag narrows the list), one thing written under `metadata` given as `metadata_key` plus `metadata_value`, or a geographic bounding box. The box is any subset of min_lat/max_lat/min_lng/max_lng (decimal degrees); each bound is applied independently and only matches companies with stored coordinates. Returns summaries (including latitude/longitude) — call get_company for full details. Set `include_filter_options` to be told which countries and trades actually narrow this list, rather than guessing a value and getting nothing back. `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true.',
+		'Filter companies by status, country (ISO 3166-1 alpha-2, e.g. US/ES/DE), industry, priority, search query, the research fit verdict (strong_fit / possible_fit / weak_fit / no_fit) — what a research run concluded, which nothing but a run writes, so a view of your own lives under `metadata` and is found with the pair below — a fit criterion the company passed (matched loosely against the criterion text), a tag or tags the company carries (every one named has to be on it, so a second tag narrows the list), one thing written under `metadata` given as `metadata_key` plus `metadata_value`, or a geographic bounding box. The box is any subset of min_lat/max_lat/min_lng/max_lng (decimal degrees); each bound is applied independently and only matches companies with stored coordinates. Returns summaries (including latitude/longitude) — call get_company for full details. Set `include_filter_options` to be told which countries and trades actually narrow this list, rather than guessing a value and getting nothing back. `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true.',
 	parameters: Schema.Struct({
 		status: Schema.optional(Schema.String),
 		country: Schema.optional(Schema.String),
@@ -179,7 +179,10 @@ const companyInputFields = {
 	longitude: Schema.optional(CompanyLongitude),
 	geocodedAt: Schema.optional(Schema.String),
 	geocodeSource: Schema.optional(Schema.String),
-	metadata: Schema.optional(Schema.Unknown),
+	metadata: Schema.optional(Schema.Unknown).annotate({
+		description:
+			'Anything else worth keeping on this company, as a JSON object of your own shape. Searchable later through search_companies with metadata_key + metadata_value. Your own view of whether a company is worth selling to belongs here, by convention as `fitVerdict`: the separate fit_verdict field is what a research run concluded and nothing but a run writes it, so a judgement of your own has nowhere else to live.',
+	}),
 }
 const CompanyInput = Schema.Struct(companyInputFields)
 
@@ -287,7 +290,10 @@ const UpdateCompany = Tool.make('update_company', {
 					"The account's running notes, in markdown. One shared page — what you send replaces what is there and no earlier version is kept, so read it first and carry over anything still worth keeping.",
 			}),
 		),
-		metadata: Schema.optional(Schema.Unknown),
+		metadata: Schema.optional(Schema.Unknown).annotate({
+			description:
+				'Anything else worth keeping on this company, as a JSON object of your own shape. Searchable later through search_companies with metadata_key + metadata_value. Your own view of whether a company is worth selling to belongs here, by convention as `fitVerdict`: the separate fit_verdict field is what a research run concluded and nothing but a run writes it, so a judgement of your own has nowhere else to live.',
+		}),
 	}),
 	success: Schema.NullOr(Company.json),
 	dependencies: REQUEST_DEPENDENCIES,

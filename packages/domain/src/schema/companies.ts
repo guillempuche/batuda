@@ -219,6 +219,15 @@ export class Company extends Model.Class<Company>('Company')({
 	// fitVerdict values: strong_fit | possible_fit | weak_fit | no_fit
 	// fitChecks[].result values: pass | fail | unknown
 	//
+	// These three are the research engine's own: a run writes them when its
+	// findings are applied, and no tool a person or an assistant can call sets
+	// them. That is deliberate — the field answers "what did the run conclude",
+	// and letting anything else write it would leave nobody able to tell a run's
+	// reading from somebody's disagreement with it. A view of your own about
+	// whether a company is worth selling to belongs under `metadata`, by
+	// convention as `fitVerdict` there, which search_companies can filter on with
+	// its metadata_key / metadata_value pair.
+	//
 	// The fit checks and conflicts are kept word for word as the research run
 	// wrote them, so their inner names are the ones the research schema defines.
 	// The provenance map is built entry by entry instead, so it carries this
