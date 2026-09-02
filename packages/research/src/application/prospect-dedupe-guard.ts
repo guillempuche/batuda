@@ -285,7 +285,12 @@ const legalNameInBrackets = (name: string): string | null => {
 	const outsideCore = nameCore(withoutFormDots(outside))
 	const insideCore = nameCore(withoutFormDots(inside))
 	if (outsideCore === '' || insideCore === outsideCore) return null
-	return insideCore.includes(outsideCore) ? insideCore : null
+	// The brackets have to *start* on the name outside them, not merely contain
+	// it somewhere. A short name turns up inside an unrelated word by chance —
+	// "Ara (Zaragoza)" would file a company called Ara under Zaragoza, and meet
+	// any company actually called that — while the case this exists for reads the
+	// name and then more: SOPREMA, then SOPREMA IBERIA.
+	return insideCore.startsWith(outsideCore) ? insideCore : null
 }
 
 /**

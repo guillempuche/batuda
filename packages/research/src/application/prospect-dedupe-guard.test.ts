@@ -735,6 +735,24 @@ describe('dedupeDiscoveryRows', () => {
 			expect(result.merged).toBe(1)
 		})
 
+		it('should not join on a name the brackets only happen to contain', () => {
+			// GIVEN a short company name that turns up inside its own town by
+			// chance — "ara" sits inside "zaragoza" — beside a company actually
+			// called that town
+			const findings = scan([
+				{ name: 'Ara (Zaragoza)', location: 'Zaragoza' },
+				{ name: 'Zaragoza SL', location: 'Zaragoza' },
+			])
+
+			// WHEN the list is de-duplicated
+			// THEN both survive: the brackets have to start on the name outside
+			// them to be read as that company's other name, so a chance substring
+			// cannot make two companies one
+			const result = dedupeDiscoveryRows(findings, 'prospects', noRunWords)
+			expect(rowsOf(result.findings)).toHaveLength(2)
+			expect(result.merged).toBe(0)
+		})
+
 		it('should not let a town in brackets join two unrelated companies', () => {
 			// GIVEN two different companies each written with the same town after it
 			const findings = scan([
