@@ -3,6 +3,31 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-09-02 (internal-v2026.9.2)
+
+### Features
+
+* **research:** say why a run stopped looking for companies ([ddf1339](https://github.com/guillempuche/batuda/commit/ddf13398e09c25b2f20d6626efbdc09db8ae4617))
+* search companies by tag and by a metadata value ([c2bf969](https://github.com/guillempuche/batuda/commit/c2bf969ac4b8e4e0e0946743301b22ad59d5fd70))
+
+### Bug Fixes
+
+* answer a caller with what actually stopped their request ([1a3cdd2](https://github.com/guillempuche/batuda/commit/1a3cdd298a37793457a79623ef5de1b706c40684))
+* fold a company written under both of its names ([5aea902](https://github.com/guillempuche/batuda/commit/5aea902af70a6ae2bc8765e3c6ac25de9e414202))
+* give a company's town one shape on every run ([398b2e8](https://github.com/guillempuche/batuda/commit/398b2e84cdbbf53c4f9bfb296feb1b0a051cf528))
+* keep what a run found when an extra search fails ([c7a56d4](https://github.com/guillempuche/batuda/commit/c7a56d49050629e0370e216f59e4e622076828f3))
+* let a wide request finish the search it planned ([ae8f36b](https://github.com/guillempuche/batuda/commit/ae8f36b9b3ff2eb90303ff74041a4f09f1aab747))
+* notice when a machine's clock is wrong ([be39ade](https://github.com/guillempuche/batuda/commit/be39ade33cecd91f3d22abde9a519ca1facd70bd))
+* read a name in whatever alphabet wrote it, and say when you cannot ([94be057](https://github.com/guillempuche/batuda/commit/94be0575751a89187e631602b6abd8fbd7cf4a86))
+* **research:** retry a tool call the model got wrong ([94b2e39](https://github.com/guillempuche/batuda/commit/94b2e39eeb2f26420bb62b5d43a627607f9cda0f))
+* **research:** use the surname a person is actually called by ([7ed8e66](https://github.com/guillempuche/batuda/commit/7ed8e6632fefc1c03d561464a70bf1fd41a1b191))
+* say a provider refusal stopped the search, not a limit we set ([3ea0fac](https://github.com/guillempuche/batuda/commit/3ea0fac1e00170fb75af294efa8a13bd296ccd6f))
+* say when telemetry stops leaving the process ([9f9b013](https://github.com/guillempuche/batuda/commit/9f9b013e0ee87b61f7a19614218c1925afd28234))
+* stop a cut through the middle of a character failing a write ([f083081](https://github.com/guillempuche/batuda/commit/f083081d85aa83af985e979b10e89dc804238240))
+* stop a run offering to buy something that does not exist ([8a52c31](https://github.com/guillempuche/batuda/commit/8a52c315490b1cde5a12c5a6e7041731e3d0a5ec))
+* stop two companies meeting on a name one only contains ([5da82a5](https://github.com/guillempuche/batuda/commit/5da82a58abcf670b15fc03169e84e6ddf8ca6bd6))
+* work out a company web address instead of asking a caller to guess ([79a03ab](https://github.com/guillempuche/batuda/commit/79a03ab51151c261c45c9942edcf306a0ad2355e))
+
 ## 2026-08-30 (internal-v2026.8.30)
 
 ### Features
