@@ -328,7 +328,7 @@ const buildTierLayer = <Self>(
 						tier,
 					)
 					const rate = yield* slotRate(vendor, envPrefix, i)
-					return { service, model: slotModel, rate }
+					return { service, model: slotModel, rate, vendor }
 				}),
 			)
 			// Cache each slot on its own so the row records the model that actually
@@ -338,8 +338,15 @@ const buildTierLayer = <Self>(
 			return Layer.effect(
 				Tag,
 				Effect.map(
-					Effect.forEach(slots, ({ service, model: answered, rate }) =>
-						makeCachedLanguageModel(service, tier, model, answered, rate),
+					Effect.forEach(slots, ({ service, model: answered, rate, vendor }) =>
+						makeCachedLanguageModel(
+							service,
+							tier,
+							model,
+							answered,
+							rate,
+							vendor,
+						),
 					),
 					withFallbackLanguageModel,
 				),

@@ -138,6 +138,9 @@ export const makeCachedLanguageModel = (
 	// What this slot charges. Only a call that reaches the provider is priced, so
 	// an answer served from the cache costs nothing without any special case.
 	rate: LlmRate = { inCentsPer1k: 0, outCentsPer1k: 0 },
+	// Which vendor this slot reaches. Recorded beside the model because a tier
+	// cascades between vendors silently, and the two are not interchangeable.
+	vendor = 'unknown',
 ): Effect.Effect<
 	LanguageModel.Service,
 	Config.ConfigError,
@@ -212,6 +215,7 @@ export const makeCachedLanguageModel = (
 				yield* meter.value.recordLlm({
 					tier,
 					model: answeredModel,
+					provider: vendor,
 					tokensIn,
 					tokensOut,
 					microcents: priceLlmMicrocents(tokensIn, tokensOut, rate),
