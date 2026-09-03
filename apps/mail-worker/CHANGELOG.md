@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-09-03 (mail-worker-v2026.9.3)
+
+### Bug Fixes
+
+* make the MCP tool surface tell callers the truth ([dbf03e8](https://github.com/guillempuche/batuda/commit/dbf03e8afa19d690af89c8c35e58308a29dc5e8b)), closes [#600](https://github.com/guillempuche/batuda/issues/600)
+* notice when a machine's clock is wrong ([be39ade](https://github.com/guillempuche/batuda/commit/be39ade33cecd91f3d22abde9a519ca1facd70bd))
+* read a name in whatever alphabet wrote it, and say when you cannot ([94be057](https://github.com/guillempuche/batuda/commit/94be0575751a89187e631602b6abd8fbd7cf4a86))
+* stop a cut through the middle of a character failing a write ([f083081](https://github.com/guillempuche/batuda/commit/f083081d85aa83af985e979b10e89dc804238240))
+* work out a company web address instead of asking a caller to guess ([79a03ab](https://github.com/guillempuche/batuda/commit/79a03ab51151c261c45c9942edcf306a0ad2355e))
+
+### Documentation
+
+* say who may write a company fit verdict ([4f89a81](https://github.com/guillempuche/batuda/commit/4f89a81af961dae4b3e2cc34f5aa0f3fad5ef694))
+
 ## 2026-08-31 (mail-worker-v2026.8.31)
 
 ### Bug Fixes
