@@ -479,8 +479,9 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 					// it. Charging first meant a country Batuda has no register for
 					// cost the run real money to be told so.
 					if (!isRegistryCountry(country)) return noRegistryResult(country)
-					// Deterministic key: a resumed run re-charging the same lookup is
-					// a DB no-op, so a crash mid-run never double-charges for it.
+					// Deterministic key, scoped to this run: the same lookup reaching here
+					// twice — a discovery-scan retry, a gap round going back over a row —
+					// is a DB no-op rather than a second charge.
 					const idempotencyKey = `${researchId}:registry:${country}:${params.tax_id ?? params.query ?? ''}`
 					const outcome = yield* budget.withPaidCharge(
 						'registry',

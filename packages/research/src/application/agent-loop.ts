@@ -87,8 +87,6 @@ export interface RunAgentResearchLoopParams<E, R> {
 	readonly shouldContinueAfterFinal?:
 		| (() => Effect.Effect<boolean, E, R>)
 		| undefined
-	/** Carried across a resume so the transcript survives a restart. */
-	readonly priorText?: string | undefined
 }
 
 // A failing round (e.g. the model provider erroring after its retries) is not
@@ -98,8 +96,7 @@ export const runAgentResearchLoop = <E, R>(
 	params: RunAgentResearchLoopParams<E, R>,
 ): Effect.Effect<AgentLoopResult, E, R> =>
 	Effect.gen(function* () {
-		const transcript: string[] =
-			params.priorText && params.priorText.length > 0 ? [params.priorText] : []
+		const transcript: string[] = []
 		// Tool results only — never the model's own text — so the value guard's
 		// evidence can't be poisoned by a value the model merely asserted.
 		const evidenceParts: string[] = []
