@@ -15,6 +15,7 @@ export {
 	InboxInactive,
 	InsufficientBudget,
 	NoDefaultInbox,
+	type NoDefaultInboxReason,
 	NotFound,
 	StorageError,
 	StorageErrorOperation,

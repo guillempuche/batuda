@@ -177,6 +177,36 @@ const draftInboxOf = (draftId: string) =>
 		}),
 	)
 
+const draftThreadLinkOf = (draftId: string) =>
+	sqlOnly(
+		Effect.gen(function* () {
+			const sql = yield* SqlClient.SqlClient
+			const rows = yield* sql<{ threadLinkId: string | null }>`
+				SELECT thread_link_id FROM email_drafts WHERE draft_id = ${draftId}
+			`
+			return rows[0]?.threadLinkId ?? null
+		}),
+	)
+
+// A conversation already under way, for a draft to be attached to.
+let threadSeq = 0
+const insertThreadLink = () =>
+	sqlOnly(
+		Effect.gen(function* () {
+			const sql = yield* SqlClient.SqlClient
+			threadSeq += 1
+			const rows = yield* sql<{ id: string }>`
+				INSERT INTO email_thread_links (
+					organization_id, external_thread_id, subject
+				) VALUES (
+					${ORG}, ${`<thread-${threadSeq}@taller.test>`}, 'your quote'
+				)
+				RETURNING id
+			`
+			return rows[0]!.id
+		}),
+	)
+
 const body = [
 	{ type: 'paragraph', spans: [{ kind: 'text', value: 'Half written.' }] },
 ] as never
@@ -247,6 +277,31 @@ const createDraft = (inboxId: string | undefined) =>
 		}),
 	)
 
+// Leaves Alice with a mailbox of her own that she no longer sends from, which
+// is the state every fallback below starts from.
+const clearAliceDefault = () =>
+	sqlOnly(
+		Effect.gen(function* () {
+			const sql = yield* SqlClient.SqlClient
+			yield* sql`
+				UPDATE inboxes SET is_default = false WHERE id = ${aliceInboxId}
+			`
+		}),
+	)
+
+// Takes a mailbox out of use the way removing one does, so a test can reach
+// the state of having none rather than merely none chosen.
+const deactivate = (inboxId: string) =>
+	sqlOnly(
+		Effect.gen(function* () {
+			const sql = yield* SqlClient.SqlClient
+			yield* sql`
+				UPDATE inboxes SET active = false, is_default = false
+				WHERE id = ${inboxId}
+			`
+		}),
+	)
+
 // The draft a create answered with, or a failed expectation naming the exit.
 const draftOf = (exit: Exit.Exit<unknown, unknown>) => {
 	expect(
@@ -257,6 +312,9 @@ const draftOf = (exit: Exit.Exit<unknown, unknown>) => {
 		draftId: string
 		inboxId: string
 		subject?: string
+		clientId?: string
+		mode: 'new' | 'reply'
+		threadLinkId?: string
 	}
 }
 
@@ -295,23 +353,103 @@ describe('EmailService.createDraft', () => {
 			expect(draftOf(exit).inboxId).toBe(aliceInboxId)
 		})
 
-		it('should say so plainly when there is no such mailbox to fall back on', async () => {
-			// GIVEN a member who has connected no mailbox at all
-			await sqlOnly(
-				Effect.gen(function* () {
-					const sql = yield* SqlClient.SqlClient
-					yield* sql`
-						UPDATE inboxes SET is_default = false WHERE id = ${aliceInboxId}
-					`
+		it('should fall back to the mailbox the whole team shares', async () => {
+			// GIVEN a member who owns no mailbox — the shape an organization is
+			// in once everybody's mailbox belongs to the team — and one mailbox
+			// the team shares
+			await deactivate(aliceInboxId)
+
+			// WHEN she starts a draft without naming one
+			const exit = await createDraft(undefined)
+
+			// THEN it is written in the shared one. Every member may already send
+			// through a mailbox nobody owns, and one can never be made anybody's
+			// default — so refusing here left an organization whose mailboxes are
+			// all shared unable to write a draft at all, while naming the very
+			// same mailbox by hand worked
+			expect(draftOf(exit).inboxId).toBe(teamInboxId)
+		})
+
+		it('should prefer the shared mailbox carrying the member’s own address', async () => {
+			// GIVEN a member who owns no mailbox, and two shared ones, of which
+			// one is at her own address
+			await deactivate(aliceInboxId)
+			const hers = await sqlOnly(
+				insertInbox({
+					email: `${ALICE}@test.local`,
+					ownerUserId: null,
+					isDefault: false,
 				}),
 			)
+
+			// WHEN she starts a draft without naming one
+			const exit = await createDraft(undefined)
+
+			// THEN the one at her address is chosen. Which mailbox a message goes
+			// out from is not a thing to settle by row order — sending as a
+			// colleague because their row sorted first is the failure this rule
+			// exists to prevent
+			expect(draftOf(exit).inboxId).toBe(hers)
+		})
+
+		it('should refuse to choose between shared mailboxes that are equally hers', async () => {
+			// GIVEN a member with no mailbox of her own — the state an
+			// organization is in once everybody's mailbox belongs to the team —
+			// and two shared ones, with nothing to say which is hers
+			await deactivate(aliceInboxId)
+			await sqlOnly(
+				insertInbox({
+					email: 'second-team@taller.test',
+					ownerUserId: null,
+					isDefault: false,
+				}),
+			)
+
+			// WHEN she starts a draft without naming one
+			const exit = await createDraft(undefined)
+
+			// THEN it is refused, and the refusal names them so the next call can
+			// pass one — guessing would send mail from a mailbox nobody picked
+			const failure = failureOf(exit)
+			expect(failure).toContain('NoDefaultInbox')
+			expect(failure).toContain('no_shared_default')
+			expect(failure).toContain(teamInboxId)
+		})
+
+		it('should tell a member who owns one to say it is the one they send from', async () => {
+			// GIVEN a member whose own mailbox is connected and working, but who
+			// has never said it is the one she sends from, and no shared mailbox
+			await clearAliceDefault()
+			await deactivate(teamInboxId)
+
+			// WHEN she starts a draft without naming one
+			const exit = await createDraft(undefined)
+
+			// THEN the refusal says she has one and has not chosen it, and names
+			// it. Reporting this as nothing connected would send her off to make
+			// a second copy of the mailbox she already has, and unlike a shared
+			// mailbox her own can be made the one she sends from — which is why
+			// the reason travels rather than a sentence, so each surface can name
+			// the call that fits it
+			const failure = failureOf(exit)
+			expect(failure).toContain('NoDefaultInbox')
+			expect(failure).toContain('no_default_chosen')
+			expect(failure).toContain(aliceInboxId)
+		})
+
+		it('should say so plainly when there is no mailbox to fall back on', async () => {
+			// GIVEN a member with no mailbox of her own and no shared one either
+			await deactivate(aliceInboxId)
+			await deactivate(teamInboxId)
 
 			// WHEN they start a draft without naming one
 			const exit = await createDraft(undefined)
 
-			// THEN nothing is written and the answer names what is missing, rather
-			// than reporting a mailbox that could not be found
-			expect(failureOf(exit)).toContain('NoDefaultInbox')
+			// THEN nothing is written, and the answer says to connect one, which
+			// is the true remedy only when there really is none
+			const failure = failureOf(exit)
+			expect(failure).toContain('NoDefaultInbox')
+			expect(failure).toContain('none_connected')
 		})
 	})
 
@@ -359,6 +497,77 @@ describe('EmailService.updateDraft', () => {
 			// says which mailbox it is in, so nothing has to be repeated back
 			expect(draftOf(exit).subject).toBe('Quote, revised')
 			expect(await draftInboxOf(draftId)).toBe(teamInboxId)
+		})
+	})
+
+	describe('when the conversation it answers is settled afterwards', () => {
+		it('should attach the draft to that conversation', async () => {
+			// GIVEN a draft written before anybody knew which conversation it
+			// answers, and a conversation to attach it to
+			const draftId = draftOf(await createDraft(undefined)).draftId
+			const threadLinkId = await insertThreadLink()
+
+			// WHEN the conversation is named on an update
+			const exit = await runAs(
+				ALICE,
+				Effect.gen(function* () {
+					const svc = yield* EmailService
+					return yield* svc.updateDraft(undefined, draftId, {
+						mode: 'reply',
+						threadLinkId,
+					})
+				}),
+			)
+
+			// THEN it is attached, and says so when read back. An update that
+			// answers with a success and a fresh updatedAt while changing
+			// nothing sends the message as a brand-new conversation, and the
+			// only way to notice is to read the sent mail afterwards
+			const draft = draftOf(exit)
+			expect(draft.threadLinkId).toBe(threadLinkId)
+			expect(draft.mode).toBe('reply')
+			expect(await draftThreadLinkOf(draftId)).toBe(threadLinkId)
+		})
+
+		it('should say the same thing in the clientId the composer reads', async () => {
+			// GIVEN the same draft, attached to a conversation
+			const draftId = draftOf(await createDraft(undefined)).draftId
+			const threadLinkId = await insertThreadLink()
+			const exit = await runAs(
+				ALICE,
+				Effect.gen(function* () {
+					const svc = yield* EmailService
+					return yield* svc.updateDraft(undefined, draftId, {
+						mode: 'reply',
+						threadLinkId,
+					})
+				}),
+			)
+
+			// THEN the clientId string carries it too. It holds its own copy of
+			// the same facts for the editor that re-opens a draft, and a draft
+			// whose column names one conversation and whose clientId names
+			// another leaves no way to tell which is true
+			expect(draftOf(exit).clientId).toContain(`threadLinkId=${threadLinkId}`)
+		})
+
+		it('should let a subject already written be cleared', async () => {
+			// GIVEN a draft that carries a subject of its own
+			const draftId = draftOf(await createDraft(undefined)).draftId
+
+			// WHEN it is cleared, which is what a draft turned into a reply needs
+			// so the conversation's own subject is used
+			const exit = await runAs(
+				ALICE,
+				Effect.gen(function* () {
+					const svc = yield* EmailService
+					return yield* svc.updateDraft(undefined, draftId, { subject: null })
+				}),
+			)
+
+			// THEN it is gone. Leaving the key out means "unchanged", so without
+			// an explicit null there was no way to take a subject back off
+			expect(draftOf(exit).subject).toBeUndefined()
 		})
 	})
 })

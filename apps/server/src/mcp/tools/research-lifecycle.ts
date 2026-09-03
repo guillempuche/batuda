@@ -194,13 +194,13 @@ const ListResearch = Tool.make('list_research', {
 	description:
 		'List research runs in the organization, newest first. All filters are optional and combinable: subject_table + subject_id narrows to runs linked to a CRM row (companies|contacts); created_by filters by user; status filters by lifecycle state; since accepts an ISO datetime. Returns slim rows (id, kind, query, mode, schema_name, status, cost_cents, paid_cost_cents, created_by, created_at, completed_at). `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true.',
 	parameters: Schema.Struct({
-		created_by: Schema.optional(Schema.String),
-		status: Schema.optional(Schema.String),
-		subject_table: Schema.optional(Schema.String),
-		subject_id: Schema.optional(Uuid),
-		since: Schema.optional(Schema.String),
-		limit: Schema.optional(McpPageLimit),
-		offset: Schema.optional(McpPageOffset),
+		created_by: Schema.optionalKey(Schema.String),
+		status: Schema.optionalKey(Schema.String),
+		subject_table: Schema.optionalKey(Schema.String),
+		subject_id: Schema.optionalKey(Uuid),
+		since: Schema.optionalKey(Schema.String),
+		limit: Schema.optionalKey(McpPageLimit),
+		offset: Schema.optionalKey(McpPageOffset),
 	}),
 	success: PageResult(ResearchRunSummary),
 	dependencies: REQUEST_DEPENDENCIES,
@@ -292,7 +292,7 @@ const ListResearchProposedUpdates = Tool.make(
 			'List proposed CRM updates surfaced by a research run. Each row is a proposal awaiting human review (apply or reject) before mutating the target table. A row is a smaller change than applying it: applying any one of them, on the company the run was about, also stores what that run produced about the company — its fit judgement, and its account brief where the run wrote one, replacing the existing brief whole. Returns at most `limit` rows (default 100, max 500); `hasMore` says whether the run proposed more than were returned.',
 		parameters: Schema.Struct({
 			id: Schema.String.annotate({ description: RESEARCH_ID_SOURCE }),
-			limit: Schema.optional(McpPageLimit),
+			limit: Schema.optionalKey(McpPageLimit),
 		}),
 		success: TruncatableResult(Schema.Unknown),
 		dependencies: REQUEST_DEPENDENCIES,
@@ -329,10 +329,10 @@ const ResearchPolicy = Tool.make('research_policy', {
 		'Get or update research budget limits. action=get returns the active limits: three per-run limits belonging to the calling user (free budget, paid budget, paid-action auto-approve threshold) plus paid_monthly_cap_cents, which is the ORGANIZATION\'s ceiling on paid research spend for the calendar month and applies to everyone in it. action=set upserts the provided fields; unspecified fields keep their current value. Cents-denominated. Raising any limit lets more money be spent without anyone being asked, so the person is asked before a raise takes effect ({status:"cancelled"} if they said no, {status:"confirmation_required"} if this client has no way to ask them — relay nextStep rather than retrying). Lowering a limit, or leaving it where it is, needs no approval.',
 	parameters: Schema.Struct({
 		action: PolicyAction,
-		budget_cents: Schema.optional(Schema.Number),
-		paid_budget_cents: Schema.optional(Schema.Number),
-		auto_approve_paid_cents: Schema.optional(Schema.Number),
-		paid_monthly_cap_cents: Schema.optional(Schema.Number),
+		budget_cents: Schema.optionalKey(Schema.Number),
+		paid_budget_cents: Schema.optionalKey(Schema.Number),
+		auto_approve_paid_cents: Schema.optionalKey(Schema.Number),
+		paid_monthly_cap_cents: Schema.optionalKey(Schema.Number),
 	}),
 	// get → the policy wrapped in an object (a bare null isn't valid MCP output);
 	// set → the upserted policy directly.
@@ -355,8 +355,8 @@ const GetResearchSpend = Tool.make('get_research_spend', {
 	description:
 		'Aggregate research paid spending for the organization. range defaults to "all" (also accepts "month" for current calendar month, "30d" for last 30 days); group_by defaults to "provider" (also accepts "user", "tool"). Returns rows of {key, amount_cents, calls} sorted by amount_cents desc.',
 	parameters: Schema.Struct({
-		range: Schema.optional(SpendRange),
-		group_by: Schema.optional(SpendGroupBy),
+		range: Schema.optionalKey(SpendRange),
+		group_by: Schema.optionalKey(SpendGroupBy),
 	}),
 	success: ListResult(Schema.Unknown),
 	dependencies: REQUEST_DEPENDENCIES,

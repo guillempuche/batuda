@@ -13,7 +13,7 @@ const ListMembers = Tool.make('list_members', {
 	description:
 		"The people who work in this organization — colleagues, not the contacts at companies you sell to. Read it to turn a name somebody said out loud into an id: each row's `user_id` is what a company's ownerId and a task's assignee_id take. It reads the other way too, for putting a name to an owner you were shown, but only by looking down the list — `query` matches names and emails, never ids. Names repeat and nicknames are not stored, so if more than one person matches, stop and ask which; do not take the first row, the order is alphabetical and means nothing. Assigning work to the wrong colleague is quiet, and nobody finds out until the work is missed. Everyone comes back at once — this list is short and never paged.",
 	parameters: Schema.Struct({
-		query: Schema.optional(Schema.String).annotate({
+		query: Schema.optionalKey(Schema.String).annotate({
 			description:
 				'Part of a name or email address. Matched loosely and case-insensitively, so "ana" finds Ana Ruiz and ana@…',
 		}),

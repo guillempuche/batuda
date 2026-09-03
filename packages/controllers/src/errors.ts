@@ -72,10 +72,29 @@ export class EmailNotSendable extends Schema.TaggedErrorClass<EmailNotSendable>(
 
 // ── Inbox lifecycle errors (route-level, status-mapped) ──
 
-/** No default inbox configured for the calling member. Returned as 409. */
+/**
+ * No mailbox the calling member could be sending from when they named none.
+ *
+ * It carries the reason rather than a sentence, for the same cause as
+ * `EmailNotSendable` above: the way out differs by reason and only one of them
+ * is "connect a mailbox" — a mailbox of your own can be made the one you send
+ * from, while one the team shares never can and has to be named on the call.
+ * `inboxIds` are the mailboxes that could be named, empty when there are none
+ * to offer. Returned as 409.
+ */
+export const noDefaultInboxReasons = [
+	'none_connected',
+	'no_default_chosen',
+	'no_shared_default',
+] as const
+export type NoDefaultInboxReason = (typeof noDefaultInboxReasons)[number]
+
 export class NoDefaultInbox extends Schema.TaggedErrorClass<NoDefaultInbox>()(
 	'NoDefaultInbox',
-	{ message: Schema.String },
+	{
+		reason: Schema.Literals(noDefaultInboxReasons),
+		inboxIds: Schema.Array(Schema.String),
+	},
 ) {}
 
 /** Inbox row exists but is `active=false`. Returned as 409. */

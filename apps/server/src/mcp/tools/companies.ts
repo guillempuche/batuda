@@ -77,43 +77,43 @@ const SearchCompanies = Tool.make('search_companies', {
 	description:
 		'Filter companies by status, country (ISO 3166-1 alpha-2, e.g. US/ES/DE), industry, priority, search query, the research fit verdict (strong_fit / possible_fit / weak_fit / no_fit) — what a research run concluded, which nothing but a run writes, so a view of your own lives under `metadata` and is found with the pair below — a fit criterion the company passed (matched loosely against the criterion text), a tag or tags the company carries (every one named has to be on it, so a second tag narrows the list), one thing written under `metadata` given as `metadata_key` plus `metadata_value`, or a geographic bounding box. The box is any subset of min_lat/max_lat/min_lng/max_lng (decimal degrees); each bound is applied independently and only matches companies with stored coordinates. Returns summaries (including latitude/longitude) — call get_company for full details. Set `include_filter_options` to be told which countries and trades actually narrow this list, rather than guessing a value and getting nothing back. `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true.',
 	parameters: Schema.Struct({
-		status: Schema.optional(Schema.String),
-		country: Schema.optional(Schema.String),
-		industry: Schema.optional(Schema.String),
-		priority: Schema.optional(Schema.Number),
-		fit_verdict: Schema.optional(Schema.String),
-		fit_criterion_passed: Schema.optional(Schema.String),
-		tags: Schema.optional(Schema.Array(Schema.String)).annotate({
+		status: Schema.optionalKey(Schema.String),
+		country: Schema.optionalKey(Schema.String),
+		industry: Schema.optionalKey(Schema.String),
+		priority: Schema.optionalKey(Schema.Number),
+		fit_verdict: Schema.optionalKey(Schema.String),
+		fit_criterion_passed: Schema.optionalKey(Schema.String),
+		tags: Schema.optionalKey(Schema.Array(Schema.String)).annotate({
 			description:
 				'Tags the company must carry — every one of them, not any of them. Tags are free text set when the company was written, so ask for one you know was used rather than guessing.',
 		}),
-		metadata_key: Schema.optional(Schema.String).annotate({
+		metadata_key: Schema.optionalKey(Schema.String).annotate({
 			description:
 				"Name of one thing written under the company's `metadata`, to be matched together with `metadata_value`. Neither half filters on its own.",
 		}),
-		metadata_value: Schema.optional(Schema.String).annotate({
+		metadata_value: Schema.optionalKey(Schema.String).annotate({
 			description:
 				'The value `metadata_key` must hold, compared as written. Give both or neither.',
 		}),
-		query: Schema.optional(Schema.String),
-		deleted: Schema.optional(Schema.Literals(['only', 'include'])).annotate({
+		query: Schema.optionalKey(Schema.String),
+		deleted: Schema.optionalKey(Schema.Literals(['only', 'include'])).annotate({
 			description:
 				"Which companies to look at. Omit for the ones in use, 'only' for the ones that were deleted — that is how you find one again to restore it, since a deleted company answers to no name — or 'include' for both together.",
 		}),
-		min_lat: Schema.optional(Schema.Number),
-		max_lat: Schema.optional(Schema.Number),
-		min_lng: Schema.optional(Schema.Number),
-		max_lng: Schema.optional(Schema.Number),
-		limit: Schema.optional(McpPageLimit),
-		offset: Schema.optional(McpPageOffset),
-		include_filter_options: Schema.optional(Schema.Boolean).annotate({
+		min_lat: Schema.optionalKey(Schema.Number),
+		max_lat: Schema.optionalKey(Schema.Number),
+		min_lng: Schema.optionalKey(Schema.Number),
+		max_lng: Schema.optionalKey(Schema.Number),
+		limit: Schema.optionalKey(McpPageLimit),
+		offset: Schema.optionalKey(McpPageOffset),
+		include_filter_options: Schema.optionalKey(Schema.Boolean).annotate({
 			description:
 				'Also return which countries and trades are worth narrowing by, each with how many companies it would find under the filters already given. Ask for this instead of guessing a value: a `company_count` of 0 means that value exists but finds nothing here, and a value absent from the list finds nothing at all.',
 		}),
 	}),
 	success: Schema.Struct({
 		...PageResult(Company.json).fields,
-		filter_options: Schema.optional(CompanyFilterOptions),
+		filter_options: Schema.optionalKey(CompanyFilterOptions),
 	}),
 	dependencies: REQUEST_DEPENDENCIES,
 })
@@ -139,46 +139,48 @@ const GetCompany = Tool.make('get_company', {
 // The fields a new company carries — one array element of a create_companies call.
 const companyInputFields = {
 	name: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
-	slug: Schema.optional(CompanySlug).annotate({
+	slug: Schema.optionalKey(CompanySlug).annotate({
 		description:
 			'Leave this out and it is worked out from the name. Supply one only to choose a particular web address — it has to be plain lowercase a-z, digits and single hyphens, which an accented or non-Latin name cannot be written in directly.',
 	}),
-	taxId: Schema.optional(Schema.String).annotate({
+	taxId: Schema.optionalKey(Schema.String).annotate({
 		description:
 			'The number the company is registered or taxed under — a Spanish NIF/CIF, a UK company number, an EU VAT number. Copy it exactly as printed; punctuation and case are ignored when matching. Supplying it is the surest way to avoid creating a company you already hold under a different name.',
 	}),
-	status: Schema.optional(CompanyStatus),
-	ownerId: Schema.optional(Schema.String).annotate({
+	status: Schema.optionalKey(CompanyStatus),
+	ownerId: Schema.optionalKey(Schema.String).annotate({
 		description:
 			'The colleague who will work this company, as a user id from list_members — a name or an email address is not one. Leave it out to create the company unowned and assign it later with update_company.',
 	}),
-	industry: Schema.optional(Schema.String),
-	sizeRange: Schema.optional(CompanySizeRange),
-	country: Schema.optional(CompanyCountry),
-	location: Schema.optional(Schema.String),
-	priority: Schema.optional(CompanyPriority),
-	website: Schema.optional(CompanyWebsite),
-	email: Schema.optional(CompanyEmail),
-	phone: Schema.optional(CompanyPhone),
-	instagram: Schema.optional(CompanyInstagram),
-	linkedin: Schema.optional(CompanyLinkedin),
-	socialProfiles: Schema.optional(Schema.Array(CompanySocialProfile)).annotate({
+	industry: Schema.optionalKey(Schema.String),
+	sizeRange: Schema.optionalKey(CompanySizeRange),
+	country: Schema.optionalKey(CompanyCountry),
+	location: Schema.optionalKey(Schema.String),
+	priority: Schema.optionalKey(CompanyPriority),
+	website: Schema.optionalKey(CompanyWebsite),
+	email: Schema.optionalKey(CompanyEmail),
+	phone: Schema.optionalKey(CompanyPhone),
+	instagram: Schema.optionalKey(CompanyInstagram),
+	linkedin: Schema.optionalKey(CompanyLinkedin),
+	socialProfiles: Schema.optionalKey(
+		Schema.Array(CompanySocialProfile),
+	).annotate({
 		description:
 			"The pages this company keeps on social platforms, each as { kind, value } — kind lowercase and on its own ('facebook', 'tiktok'), value the full address. A page on a platform is not a website: put it here, never in `website`. Use manage_company_channels to change one later.",
 	}),
-	googleMapsUrl: Schema.optional(CompanyGoogleMapsUrl),
-	productsFit: Schema.optional(Schema.Array(Schema.String)),
-	tags: Schema.optional(Schema.Array(Schema.String)),
-	painPoints: Schema.optional(Schema.String),
-	currentTools: Schema.optional(Schema.String),
-	nextAction: Schema.optional(Schema.String),
-	nextActionAt: Schema.optional(Schema.String),
+	googleMapsUrl: Schema.optionalKey(CompanyGoogleMapsUrl),
+	productsFit: Schema.optionalKey(Schema.Array(Schema.String)),
+	tags: Schema.optionalKey(Schema.Array(Schema.String)),
+	painPoints: Schema.optionalKey(Schema.String),
+	currentTools: Schema.optionalKey(Schema.String),
+	nextAction: Schema.optionalKey(Schema.String),
+	nextActionAt: Schema.optionalKey(Schema.String),
 	// Finite, not a plain number: a plain number also admits NaN, which reaches
 	// the database as a server error rather than a refused value.
-	latitude: Schema.optional(CompanyLatitude),
-	longitude: Schema.optional(CompanyLongitude),
-	geocodedAt: Schema.optional(Schema.String),
-	geocodeSource: Schema.optional(Schema.String),
+	latitude: Schema.optionalKey(CompanyLatitude),
+	longitude: Schema.optionalKey(CompanyLongitude),
+	geocodedAt: Schema.optionalKey(Schema.String),
+	geocodeSource: Schema.optionalKey(Schema.String),
 	metadata: Schema.optional(Schema.Unknown).annotate({
 		description:
 			'Anything else worth keeping on this company, as a JSON object of your own shape. Searchable later through search_companies with metadata_key + metadata_value. Your own view of whether a company is worth selling to belongs here, by convention as `fitVerdict`: the separate fit_verdict field is what a research run concluded and nothing but a run writes it, so a judgement of your own has nowhere else to live.',
@@ -246,45 +248,45 @@ const UpdateCompany = Tool.make('update_company', {
 		"Update one or more fields on an existing company by UUID. Only include fields to change; omitted fields stay unchanged. Set clear_email_suppression=true to let mail go to the company's own mailboxes again after a bounce or a spam report turns out to have been wrong — a role address like info@ or orders@ has nobody listed under it, so nothing on a contact can lift its block. It frees all of the company's own held-back mailboxes in one go, and any that bounces again is held straight back. An address somebody has vouched for is left as it is — that is not a block, and this does not throw the vouch away. A block is recorded against every record in the organisation holding that address, and this speaks only for the company's own — so if a contact or a branch holds the same address, their copy goes on refusing the send until it is cleared too. A branch's copy cannot be cleared at all yet.",
 	parameters: Schema.Struct({
 		id: CompanyIdParam,
-		clear_email_suppression: Schema.optional(Schema.Boolean),
-		name: Schema.optional(Schema.String),
-		taxId: Schema.optional(Schema.String).annotate({
+		clear_email_suppression: Schema.optionalKey(Schema.Boolean),
+		name: Schema.optionalKey(Schema.String),
+		taxId: Schema.optionalKey(Schema.String).annotate({
 			description:
 				'The number the company is registered or taxed under. Worth writing down once a registry lookup returns it — a later lookup can then resolve this company exactly instead of paying to search by name again.',
 		}),
-		ownerId: Schema.optional(Schema.NullOr(Schema.String)).annotate({
+		ownerId: Schema.optionalKey(Schema.NullOr(Schema.String)).annotate({
 			description:
 				'The colleague responsible for working this company through the pipeline, as a user id from list_members — a name or an email address is not one. Send null to release it, leaving the company unowned. Read list_members first rather than guessing an id: an id belonging to nobody here is refused, and one belonging to the wrong colleague is not.',
 		}),
-		status: Schema.optional(CompanyStatus),
-		industry: Schema.optional(Schema.String),
-		sizeRange: Schema.optional(CompanySizeRange),
-		country: Schema.optional(CompanyCountry),
-		location: Schema.optional(Schema.String),
-		priority: Schema.optional(CompanyPriority),
-		website: Schema.optional(CompanyWebsite),
-		email: Schema.optional(CompanyEmail),
-		phone: Schema.optional(CompanyPhone),
-		instagram: Schema.optional(CompanyInstagram),
-		socialProfiles: Schema.optional(
+		status: Schema.optionalKey(CompanyStatus),
+		industry: Schema.optionalKey(Schema.String),
+		sizeRange: Schema.optionalKey(CompanySizeRange),
+		country: Schema.optionalKey(CompanyCountry),
+		location: Schema.optionalKey(Schema.String),
+		priority: Schema.optionalKey(CompanyPriority),
+		website: Schema.optionalKey(CompanyWebsite),
+		email: Schema.optionalKey(CompanyEmail),
+		phone: Schema.optionalKey(CompanyPhone),
+		instagram: Schema.optionalKey(CompanyInstagram),
+		socialProfiles: Schema.optionalKey(
 			Schema.Array(CompanySocialProfile),
 		).annotate({
 			description:
 				'The pages this company keeps on social platforms, each as { kind, value }. A page on a platform is not a website: put it here, never in `website`.',
 		}),
-		linkedin: Schema.optional(CompanyLinkedin),
-		googleMapsUrl: Schema.optional(CompanyGoogleMapsUrl),
-		productsFit: Schema.optional(Schema.Array(Schema.String)),
-		tags: Schema.optional(Schema.Array(Schema.String)),
-		painPoints: Schema.optional(Schema.String),
-		currentTools: Schema.optional(Schema.String),
-		nextAction: Schema.optional(Schema.String),
-		nextActionAt: Schema.optional(Schema.String),
-		latitude: Schema.optional(CompanyLatitude),
-		longitude: Schema.optional(CompanyLongitude),
-		geocodedAt: Schema.optional(Schema.String),
-		geocodeSource: Schema.optional(Schema.String),
-		accountBrief: Schema.optional(
+		linkedin: Schema.optionalKey(CompanyLinkedin),
+		googleMapsUrl: Schema.optionalKey(CompanyGoogleMapsUrl),
+		productsFit: Schema.optionalKey(Schema.Array(Schema.String)),
+		tags: Schema.optionalKey(Schema.Array(Schema.String)),
+		painPoints: Schema.optionalKey(Schema.String),
+		currentTools: Schema.optionalKey(Schema.String),
+		nextAction: Schema.optionalKey(Schema.String),
+		nextActionAt: Schema.optionalKey(Schema.String),
+		latitude: Schema.optionalKey(CompanyLatitude),
+		longitude: Schema.optionalKey(CompanyLongitude),
+		geocodedAt: Schema.optionalKey(Schema.String),
+		geocodeSource: Schema.optionalKey(Schema.String),
+		accountBrief: Schema.optionalKey(
 			Schema.String.annotate({
 				description:
 					"The account's running notes, in markdown. One shared page — what you send replaces what is there and no earlier version is kept, so read it first and carry over anything still worth keeping.",
@@ -334,14 +336,14 @@ const ManageCompanySites = Tool.make('manage_company_sites', {
 	parameters: Schema.Struct({
 		action: Schema.Literals(['list', 'add', 'update', 'remove']),
 		company_id: CompanyIdParam,
-		site_id: Schema.optional(Schema.String),
-		name: Schema.optional(Schema.String),
-		address: Schema.optional(Schema.String),
-		location: Schema.optional(Schema.String),
-		country: Schema.optional(Schema.String),
-		latitude: Schema.optional(Schema.Number),
-		longitude: Schema.optional(Schema.Number),
-		is_primary: Schema.optional(Schema.Boolean),
+		site_id: Schema.optionalKey(Schema.String),
+		name: Schema.optionalKey(Schema.String),
+		address: Schema.optionalKey(Schema.String),
+		location: Schema.optionalKey(Schema.String),
+		country: Schema.optionalKey(Schema.String),
+		latitude: Schema.optionalKey(Schema.Number),
+		longitude: Schema.optionalKey(Schema.Number),
+		is_primary: Schema.optionalKey(Schema.Boolean),
 	}),
 	success: Schema.Struct({
 		sites: Schema.Array(Schema.Unknown),
@@ -368,13 +370,13 @@ const ManageCompanyChannels = Tool.make('manage_company_channels', {
 			'unvouch',
 		]),
 		company_id: CompanyIdParam,
-		site_id: Schema.optional(Schema.String),
-		channel_id: Schema.optional(Schema.String),
-		kind: Schema.optional(Schema.String),
-		value: Schema.optional(Schema.String),
-		label: Schema.optional(Schema.NullOr(Schema.String)),
-		is_primary: Schema.optional(Schema.Boolean),
-		verification: Schema.optional(
+		site_id: Schema.optionalKey(Schema.String),
+		channel_id: Schema.optionalKey(Schema.String),
+		kind: Schema.optionalKey(Schema.String),
+		value: Schema.optionalKey(Schema.String),
+		label: Schema.optionalKey(Schema.NullOr(Schema.String)),
+		is_primary: Schema.optionalKey(Schema.Boolean),
+		verification: Schema.optionalKey(
 			Schema.NullOr(HandSetVerificationVerdict),
 		).annotate({
 			description:
@@ -382,7 +384,7 @@ const ManageCompanyChannels = Tool.make('manage_company_channels', {
 		}),
 		// Why somebody stands behind the address, kept with the vouch so a later
 		// reader knows what it rested on.
-		note: Schema.optional(Schema.String),
+		note: Schema.optionalKey(Schema.String),
 	}),
 	success: Schema.Struct({
 		channels: Schema.Array(Schema.Unknown),
@@ -401,12 +403,12 @@ const ManageCompanyRelations = Tool.make('manage_company_relations', {
 	parameters: Schema.Struct({
 		action: Schema.Literals(['list', 'add', 'remove']),
 		company_id: CompanyIdParam,
-		related_company_id: Schema.optional(Schema.String),
-		kind: Schema.optional(
+		related_company_id: Schema.optionalKey(Schema.String),
+		kind: Schema.optionalKey(
 			Schema.Literals(['parent', 'franchise_of', 'acquired_by']),
 		),
-		note: Schema.optional(Schema.String),
-		relation_id: Schema.optional(Schema.String),
+		note: Schema.optionalKey(Schema.String),
+		relation_id: Schema.optionalKey(Schema.String),
 	}),
 	success: Schema.Struct({
 		relations: Schema.Array(Schema.Unknown),
@@ -421,7 +423,7 @@ const ListIndustries = Tool.make('list_industries', {
 	description:
 		'List the trades this organisation sells to — its own list, not a fixed one, so another organisation has different entries. Read it before writing a trade onto a company: writing one that is not on the list adds it, so prefer an entry that is already here over a new wording of the same thing. `company_count` counts deleted companies too, because they still hold the trade and it cannot be removed while they do — so it says whether the trade is in use, not how many a search would find. To filter, use search_companies with `include_filter_options`, which counts only what that search would return. `needs_review` marks a trade research suggested that nobody has confirmed yet.',
 	parameters: Schema.Struct({
-		needs_review: Schema.optional(Schema.Boolean).annotate({
+		needs_review: Schema.optionalKey(Schema.Boolean).annotate({
 			description:
 				'Only the trades waiting for somebody to confirm them. Omit for all of them.',
 		}),

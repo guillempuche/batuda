@@ -7,6 +7,8 @@ import {
 	type Toolkit,
 } from 'effect/unstable/ai'
 
+import { recordFacts } from '@batuda/observability'
+
 import { isToolMessage } from './tool-message'
 
 // A copy of the library's toolkit registration, registering into the same shared
@@ -35,6 +37,15 @@ export const toStructuredContent = (
 	if (value !== null && typeof value === 'object')
 		return value as Record<string, unknown>
 	return undefined
+}
+
+// The tag on an answer that names what kind of answer it is — `suppressed`,
+// `cancelled`, and the rest. Read generically: any tool may adopt the shape,
+// and this file has no business knowing which tags exist.
+export const answerTag = (value: unknown): string | undefined => {
+	if (value === null || typeof value !== 'object') return undefined
+	const tag = (value as { _tag?: unknown })._tag
+	return typeof tag === 'string' ? tag : undefined
 }
 
 // What a caller is told when a tool fails. Anything not deliberately worded for
@@ -107,6 +118,31 @@ const registerToolkitSafe = <Tools extends Record<string, Tool.Any>>(
 						Stream.run(Sink.last()),
 						Effect.flatMap(Effect.fromOption),
 						Effect.provide(services as Context.Context<never>),
+						// Which tool ran and how it went, onto the record the request
+						// already opens. A refused call is a JSON-RPC error inside a
+						// perfectly good HTTP response, so the only other line the
+						// work leaves says 200, where a refusal reads the same as an
+						// answer — and a client turns a refusal into a silent retry,
+						// so this is where it becomes visible at all. A request
+						// carrying several calls refines the same line rather than
+						// adding one, so the last call wins, as elsewhere on the
+						// record.
+						Effect.tap((result: { readonly encodedResult: unknown }) =>
+							recordFacts({
+								'mcp.tool': tool.name,
+								'mcp.tool.outcome': 'ok',
+								// Most refusals a caller cares about come back as an
+								// ordinary answer carrying a tag — a suppressed
+								// recipient, a send nobody confirmed — so the outcome
+								// alone would count them as ok. The tag rides along
+								// rather than being classified here, which would put
+								// one domain's vocabulary inside a wrapper that serves
+								// every tool.
+								...(answerTag(result.encodedResult) !== undefined && {
+									'mcp.tool.answer': answerTag(result.encodedResult),
+								}),
+							}),
+						),
 						Effect.map((result: { readonly encodedResult: unknown }) => {
 							const structured = toStructuredContent(result.encodedResult)
 							return new McpSchema.CallToolResult({
@@ -127,11 +163,30 @@ const registerToolkitSafe = <Tools extends Record<string, Tool.Any>>(
 						// Named, so one line says which tool failed. A failure the tool
 						// meant to give is written at debug instead, so the error log
 						// keeps holding only what nobody expected.
+						// A pure interrupt is a client that hung up or a shutdown,
+						// not a fault of the tool's — recording it as one would put
+						// every dropped connection in the channel reserved for what
+						// nobody intended. The request record next door skips them
+						// for the same reason.
 						Effect.tapCause(cause =>
-							(isExpectedFailure(cause)
-								? Effect.logDebug(cause)
-								: Effect.logError(cause)
-							).pipe(Effect.annotateLogs({ 'mcp.tool': tool.name })),
+							Cause.hasInterruptsOnly(cause)
+								? Effect.void
+								: Effect.andThen(
+										recordFacts({
+											'mcp.tool': tool.name,
+											// A refusal is the tool answering; a fault is nobody's
+											// intention. Telling them apart on the record is what
+											// makes "which tools are turning callers away" a
+											// question anybody can ask.
+											'mcp.tool.outcome': isExpectedFailure(cause)
+												? 'refused'
+												: 'failed',
+										}),
+										(isExpectedFailure(cause)
+											? Effect.logDebug(cause)
+											: Effect.logError(cause)
+										).pipe(Effect.annotateLogs({ 'mcp.tool': tool.name })),
+									),
 						),
 						Effect.catch(error =>
 							Effect.succeed(

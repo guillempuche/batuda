@@ -28,6 +28,8 @@ import { McpServer, Tool, Toolkit } from 'effect/unstable/ai'
 import { HttpRouter, HttpServer } from 'effect/unstable/http'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { makeWorkRecord, WorkRecord } from '@batuda/observability'
+
 import {
 	clientFacingMessage,
 	isExpectedFailure,
@@ -190,12 +192,14 @@ const MissTool = Tool.make('missing_thing', { success: Schema.Unknown })
 const RecordTool = Tool.make('one_thing', { success: Schema.Unknown })
 const SpeakingTool = Tool.make('speaking_thing', { success: Schema.Unknown })
 const BoomTool = Tool.make('boom_thing', { success: Schema.Unknown })
+const TaggedTool = Tool.make('tagged_thing', { success: Schema.Unknown })
 const SafeTools = Toolkit.make(
 	ListTool,
 	MissTool,
 	RecordTool,
 	SpeakingTool,
 	BoomTool,
+	TaggedTool,
 )
 
 const SafeHandlersLive = SafeTools.toLayer(
@@ -205,6 +209,7 @@ const SafeHandlersLive = SafeTools.toLayer(
 		one_thing: () => Effect.succeed({ ok: true }),
 		speaking_thing: () =>
 			Effect.die(new ToolMessage('footer_id is required to update a footer')),
+		tagged_thing: () => Effect.succeed({ _tag: 'suppressed', recipient: 'x' }),
 		boom_thing: () => {
 			const err = new Error('provider exploded at /app/dist/thing-9f.mjs')
 			err.stack =
@@ -227,6 +232,12 @@ const CaptureLogs = Logger.layer([
 	}),
 ]).pipe(Layer.provideMerge(Layer.succeed(References.MinimumLogLevel, 'Debug')))
 
+// The record a request opens in production, opened here for the whole server
+// instead so the test can read what a call wrote onto it. Facts refine rather
+// than accumulate, so each call leaves the latest answer under the same keys.
+const workRecord = Effect.runSync(makeWorkRecord)
+const factsNow = () => Effect.runSync(workRecord.read)
+
 const McpHttpLive = mcpToolkitSafe(SafeTools).pipe(
 	Layer.provide(SafeHandlersLive),
 	Layer.provide(
@@ -239,6 +250,7 @@ const ServerLive = HttpRouter.serve(McpHttpLive, {
 }).pipe(
 	Layer.provideMerge(NodeHttpServer.layer(createServer, { port: 0 })),
 	Layer.provideMerge(CaptureLogs),
+	Layer.provideMerge(Layer.succeed(WorkRecord, workRecord)),
 )
 
 const runtime = ManagedRuntime.make(ServerLive)
@@ -314,6 +326,54 @@ describe('a tool served through mcpToolkitSafe', () => {
 	}, 30_000)
 
 	afterAll(() => runtime.dispose())
+
+	describe('when a tool has answered, however it answered', () => {
+		it('should leave the tool’s name and how it went on the request’s record', async () => {
+			// WHEN a tool answers normally
+			await callTool('one_thing')
+
+			// THEN the record says which tool ran and that it went fine. A tool
+			// call is a JSON-RPC payload inside an ordinary 200, so without this
+			// the only line the request leaves cannot say what was called
+			expect(factsNow()['mcp.tool']).toBe('one_thing')
+			expect(factsNow()['mcp.tool.outcome']).toBe('ok')
+		})
+
+		it('should mark a refusal as the tool answering, not as a fault', async () => {
+			// WHEN a tool refuses in words meant for the caller
+			await callTool('speaking_thing')
+
+			// THEN the record says refused. This is the outcome that was
+			// invisible: the client shows it as a silent retry, and the request
+			// still ended 200, so nothing anywhere said a caller had been turned
+			// away
+			expect(factsNow()['mcp.tool']).toBe('speaking_thing')
+			expect(factsNow()['mcp.tool.outcome']).toBe('refused')
+		})
+
+		it('should name the tag on an answer that turned the caller away', async () => {
+			// WHEN a tool answers with a refusal carrying a tag, the way a send
+			// reports a suppressed recipient
+			await callTool('tagged_thing')
+
+			// THEN the tag is on the record. The call succeeded, so the outcome
+			// is ok and would count it as an answer — most of the refusals worth
+			// counting arrive in this shape rather than as a failure
+			expect(factsNow()['mcp.tool.outcome']).toBe('ok')
+			expect(factsNow()['mcp.tool.answer']).toBe('suppressed')
+		})
+
+		it('should mark an internal fault apart from a refusal', async () => {
+			// WHEN a tool breaks in a way nobody intended
+			await callTool('boom_thing')
+
+			// THEN the record says failed rather than refused — counting the two
+			// together would bury the faults among ordinary answers, which is the
+			// same reason the log level differs
+			expect(factsNow()['mcp.tool']).toBe('boom_thing')
+			expect(factsNow()['mcp.tool.outcome']).toBe('failed')
+		})
+	})
 
 	describe('when the handler returns a bare array', () => {
 		it('should deliver it as an items record, not a bare array', async () => {

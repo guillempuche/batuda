@@ -59,7 +59,6 @@ Timestamps and trace ids are added by the framework.
 | `page.viewed`                  | Prospect viewed a sales page                               |
 | `task.created`                 | CRM task raised                                            |
 | `research.run`                 | A research run finished, with what it spent                |
-| `mcp.tool_called`              | MCP tool invoked by agent                                  |
 | `mcp.auth.rejected`            | An MCP call was refused, and why                           |
 | `mcp.protocol_version.refused` | A call named a protocol revision this server does not know |
 | `otlp.export.failing`          | This process has stopped being able to export, and why     |
@@ -71,6 +70,8 @@ Timestamps and trace ids are added by the framework.
 The `otlp.*` lines are the exception to one record per unit of work: they report on the reporting itself, so they belong to the process rather than to any piece of work it did. See [When export itself fails](#when-export-itself-fails).
 
 A request leaves exactly one of `http.request`, `http.server_error`, `http.defect` or `http.not_found`. "Every request that ended badly" is the middle two: a route that does not exist is the caller's mistake rather than a fault of ours, and it is kept out of the error channel on purpose — recorded as a crash, every bot probing for `/robots.txt` leaves a stack trace at error level and buries the failures that matter.
+
+A refused MCP tool call is the case that makes the rule concrete: the refusal travels as a JSON-RPC error inside a perfectly successful HTTP response, so the request's own line reads `http.status: 200` and a tool that turned the caller away is indistinguishable from one that answered. So the tool's name and how the call went ride on that same record as `mcp.tool` and `mcp.tool.outcome` (`ok` / `refused` / `failed`) rather than on a line of their own — recorded once, where every tool call already funnels through `apps/server/src/mcp/safe-toolkit.ts`. A refusal is the tool answering and a fault is nobody's intention, which is why the two are told apart rather than counted together. This matters more here than elsewhere because an MCP client shows a refusal as a silent retry rather than a visible error, so the record is the only place it surfaces at all.
 
 A request also leaves exactly **one span**, not two. The platform opens that span itself, so the server passes no tracer of its own when it starts serving; passing one as well used to open a second span per request, and every count taken from the traces read double until 2026-08-18. A trace older than that carries the twins.
 
@@ -113,15 +114,15 @@ Routes whose URL itself carries a secret are exempt from tracing entirely rather
 
 ### Critical paths
 
-| Flow                     | Key Events                             | Why Critical               |
-| ------------------------ | -------------------------------------- | -------------------------- |
-| **Pipeline Progression** | `company.status_changed`               | Core business flow         |
-| **Interaction Logging**  | `interaction.logged`, `task.created`   | Drives daily work          |
-| **Email Outbound**       | `email.sent`, `email.failed`           | Primary outreach channel   |
-| **Email Inbound**        | `email.received`, `interaction.logged` | Reply tracking             |
-| **Webhook Fan-out**      | `webhook.fired`, `webhook.failed`      | Integration reliability    |
-| **Page Publishing**      | `page.published`, `page.viewed`        | Sales page effectiveness   |
-| **MCP Tool Calls**       | `mcp.tool_called`, `mcp.auth.rejected` | Agent workflow reliability |
+| Flow                     | Key Events                                                            | Why Critical               |
+| ------------------------ | --------------------------------------------------------------------- | -------------------------- |
+| **Pipeline Progression** | `company.status_changed`                                              | Core business flow         |
+| **Interaction Logging**  | `interaction.logged`, `task.created`                                  | Drives daily work          |
+| **Email Outbound**       | `email.sent`, `email.failed`                                          | Primary outreach channel   |
+| **Email Inbound**        | `email.received`, `interaction.logged`                                | Reply tracking             |
+| **Webhook Fan-out**      | `webhook.fired`, `webhook.failed`                                     | Integration reliability    |
+| **Page Publishing**      | `page.published`, `page.viewed`                                       | Sales page effectiveness   |
+| **MCP Tool Calls**       | `mcp.auth.rejected`; the tool and its outcome on the request's record | Agent workflow reliability |
 
 ### Errors
 

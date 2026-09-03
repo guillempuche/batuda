@@ -16,14 +16,14 @@ const ListTimeline = Tool.make('list_timeline', {
 	description:
 		'List timeline activity. company_id or contact_id gives a company or person their whole history; entity_type + entity_id gives one record its own — the events about a single task, proposal or meeting. Covers emails, calls, meetings, documents, proposals, research runs. Filter by channel, kind, since (ISO 8601). Returns at most `limit` rows (default 50, max 500); `hasMore` says whether more exist than were returned.',
 	parameters: Schema.Struct({
-		company_id: Schema.optional(Schema.String),
-		contact_id: Schema.optional(Schema.String),
-		entity_type: Schema.optional(TimelineEntityType),
-		entity_id: Schema.optional(Schema.String),
-		channel: Schema.optional(Schema.String),
-		kind: Schema.optional(Schema.String),
-		since: Schema.optional(Schema.String),
-		limit: Schema.optional(McpPageLimit),
+		company_id: Schema.optionalKey(Schema.String),
+		contact_id: Schema.optionalKey(Schema.String),
+		entity_type: Schema.optionalKey(TimelineEntityType),
+		entity_id: Schema.optionalKey(Schema.String),
+		channel: Schema.optionalKey(Schema.String),
+		kind: Schema.optionalKey(Schema.String),
+		since: Schema.optionalKey(Schema.String),
+		limit: Schema.optionalKey(McpPageLimit),
 	}),
 	success: TruncatableResult(TimelineActivity.json),
 })

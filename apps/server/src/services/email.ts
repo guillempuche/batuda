@@ -26,6 +26,7 @@ import {
 	GrantUnavailable,
 	InboxInactive,
 	NoDefaultInbox,
+	type NoDefaultInboxReason,
 	NotFound,
 	SessionContext,
 } from '@batuda/controllers'
@@ -254,10 +255,10 @@ export const assertSendable = (message: {
 // is camelCase even though the SQL selects use snake_case.
 
 const encodeClientId = (ctx: {
-	companyId?: string
-	contactId?: string
+	companyId?: string | null
+	contactId?: string | null
 	mode?: string
-	threadLinkId?: string
+	threadLinkId?: string | null
 }): string => {
 	const parts = ['batuda:draft']
 	if (ctx.companyId) parts.push(`companyId=${ctx.companyId}`)
@@ -385,16 +386,23 @@ type DraftProviderShape = {
 	readonly clientId?: string
 	readonly subject?: string
 	readonly inReplyTo?: string
+	// Threading, carried out as its own fields so what a draft answers can be
+	// read off it directly, rather than by picking a `threadLinkId=` fragment
+	// out of clientId.
+	readonly mode: 'new' | 'reply'
+	readonly threadLinkId?: string
 }
 const draftRowToProviderShape = (row: {
 	readonly draftId: string
 	readonly inboxId: string
 	readonly clientId: string | null
+	readonly mode: 'new' | 'reply'
 	readonly toAddresses: ReadonlyArray<string>
 	readonly ccAddresses: ReadonlyArray<string>
 	readonly bccAddresses: ReadonlyArray<string>
 	readonly subject: string | null
 	readonly inReplyTo: string | null
+	readonly threadLinkId: string | null
 	readonly bodyJson: unknown
 	readonly createdAt: Date
 	readonly updatedAt: Date
@@ -407,9 +415,11 @@ const draftRowToProviderShape = (row: {
 	bodyJson: row.bodyJson,
 	createdAt: row.createdAt,
 	updatedAt: row.updatedAt,
+	mode: row.mode,
 	...(row.clientId !== null && { clientId: row.clientId }),
 	...(row.subject !== null && { subject: row.subject }),
 	...(row.inReplyTo !== null && { inReplyTo: row.inReplyTo }),
+	...(row.threadLinkId !== null && { threadLinkId: row.threadLinkId }),
 })
 
 // Strip server-internal fields from the attachments JSONB before a row
@@ -854,26 +864,85 @@ export class EmailService extends Context.Service<EmailService>()(
 					return yield* decodeInbox(rows[0]!).pipe(Effect.orDie)
 				})
 
+			// Where a member sends from when they name no mailbox, as a choice
+			// or the reason there isn't one. A mailbox nobody owns belongs to
+			// the whole team and `mayActThrough` lets every member send through
+			// one, so an organization whose mailboxes are all shared still has
+			// somewhere to send from without naming it by hand.
+			//
+			// A member who owns a mailbox is asked rather than answered for: a
+			// message going out from the team's address when they have an
+			// address of their own is not a thing to decide on their behalf.
+			type SendableWhenUnnamed =
+				| { readonly _tag: 'chosen'; readonly inbox: InboxRow }
+				| {
+						readonly _tag: 'none'
+						readonly reason: NoDefaultInboxReason
+						readonly candidates: ReadonlyArray<InboxRow>
+				  }
+
+			const sendableWhenUnnamed = (
+				organizationId: string,
+				session: { readonly userId: string; readonly email: string },
+			): Effect.Effect<SendableWhenUnnamed> =>
+				Effect.gen(function* () {
+					// Every mailbox of their own, not only the one they send from,
+					// so a refusal can tell "you have none" apart from "you have
+					// one and never said it was the one".
+					const own = yield* sql<InboxRow>`
+						SELECT ${selectInboxColumns} FROM inboxes
+						WHERE organization_id = ${organizationId}
+						  AND owner_user_id = ${session.userId}
+						  AND active = true
+						ORDER BY created_at
+					`.pipe(Effect.orDie)
+					const theirDefault = own.find(row => row.isDefault)
+					if (theirDefault) return { _tag: 'chosen', inbox: theirDefault }
+					if (own.length > 0)
+						return {
+							_tag: 'none',
+							reason: 'no_default_chosen',
+							candidates: own,
+						}
+
+					const team = yield* sql<InboxRow>`
+						SELECT ${selectInboxColumns} FROM inboxes
+						WHERE organization_id = ${organizationId}
+						  AND owner_user_id IS NULL
+						  AND active = true
+						ORDER BY created_at
+					`.pipe(Effect.orDie)
+					if (team.length === 0)
+						return { _tag: 'none', reason: 'none_connected', candidates: [] }
+					// Which shared mailbox is picked has to be the same every time
+					// and defensible afterwards: the one at the member's own
+					// address, else the only one there is. Beyond that it is the
+					// caller's to name — sending as a colleague because their
+					// mailbox sorted first is worse than asking.
+					const atTheirAddress = team.find(
+						row => row.email.toLowerCase() === session.email.toLowerCase(),
+					)
+					const only = team.length === 1 ? team[0] : undefined
+					const chosen = atTheirAddress ?? only
+					return chosen
+						? { _tag: 'chosen', inbox: chosen }
+						: { _tag: 'none', reason: 'no_shared_default', candidates: team }
+				})
+
+			// Carries which situation it is and which mailboxes could be named,
+			// and leaves the advice to whoever is being spoken to: the call that
+			// fixes it is not the same for an assistant as for somebody looking
+			// at a settings page.
 			const resolveDefaultInboxForCurrentUser = () =>
 				Effect.gen(function* () {
 					const currentOrg = yield* CurrentOrg
 					const session = yield* SessionContext
-					const rows = yield* sql<InboxRow>`
-						SELECT ${selectInboxColumns} FROM inboxes
-						WHERE organization_id = ${currentOrg.id}
-						  AND owner_user_id = ${session.userId}
-						  AND is_default = true
-						  AND active = true
-						LIMIT 1
-					`.pipe(Effect.orDie)
-					const row = rows[0]
-					if (!row) {
-						return yield* new NoDefaultInbox({
-							message:
-								'No primary inbox configured. Connect a mailbox in Settings → Email.',
-						})
-					}
-					return row
+					const sendable = yield* sendableWhenUnnamed(currentOrg.id, session)
+					if (sendable._tag === 'chosen') return sendable.inbox
+					return yield* new NoDefaultInbox({
+						reason: sendable.reason,
+						inboxIds: sendable.candidates.map(row => row.id),
+					})
 				})
 
 			// Single guard used before every send/reply so the inbox-state
@@ -2239,25 +2308,25 @@ export class EmailService extends Context.Service<EmailService>()(
 						return yield* decodeInboxes(rows)
 					}).pipe(Effect.orDie),
 
+				// Answers the same question the send paths ask, through the same
+				// rule: a composer reads this to decide whether to prompt for a
+				// mailbox, so an answer of "no default" here while a send would
+				// have found one — or the reverse — sends people to fix
+				// something that is not broken.
 				inboxStatus: () =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
 						const session = yield* SessionContext
-						const rows = yield* sql<{ id: string; email: string }>`
-							SELECT id, email FROM inboxes
-							WHERE organization_id = ${currentOrg.id}
-							  AND owner_user_id = ${session.userId}
-							  AND is_default = true
-							  AND active = true
-							LIMIT 1
-						`.pipe(Effect.orDie)
-						const row = rows[0]
-						if (!row) {
+						const sendable = yield* sendableWhenUnnamed(currentOrg.id, session)
+						if (sendable._tag === 'none') {
 							return { hasDefault: false, primary: null as null }
 						}
 						return {
 							hasDefault: true,
-							primary: { inboxId: row.id, email: row.email },
+							primary: {
+								inboxId: sendable.inbox.id,
+								email: sendable.inbox.email,
+							},
 						}
 					}),
 
@@ -2840,15 +2909,15 @@ export class EmailService extends Context.Service<EmailService>()(
 						to?: string | string[] | undefined
 						cc?: string | string[] | undefined
 						bcc?: string | string[] | undefined
-						subject?: string | undefined
+						subject?: string | null | undefined
 						bodyJson?: EmailBlocks | undefined
-						inReplyTo?: string | undefined
+						inReplyTo?: string | null | undefined
 					},
 					context?: {
-						companyId?: string
-						contactId?: string
+						companyId?: string | null
+						contactId?: string | null
 						mode?: string
-						threadLinkId?: string
+						threadLinkId?: string | null
 					},
 				) =>
 					Effect.gen(function* () {
@@ -2892,14 +2961,103 @@ export class EmailService extends Context.Service<EmailService>()(
 						to?: string | string[] | undefined
 						cc?: string | string[] | undefined
 						bcc?: string | string[] | undefined
-						subject?: string | undefined
+						subject?: string | null | undefined
 						bodyJson?: EmailBlocks | undefined
+						mode?: 'new' | 'reply' | undefined
+						inReplyTo?: string | null | undefined
+						threadLinkId?: string | null | undefined
+						companyId?: string | null | undefined
+						contactId?: string | null | undefined
 					},
 				) =>
 					Effect.gen(function* () {
+						const currentOrg = yield* CurrentOrg
 						const named = namedInbox(inboxId)
 						yield* assertNamedInboxReachable(named)
-						yield* reachableDraft(named, draftId)
+						const existing = yield* reachableDraft(named, draftId)
+
+						// A blank string is how a client that cannot send null spells
+						// "nothing"; read as a value it would reach a uuid column and
+						// fail the statement, so it is settled here into a clear.
+						const blankIsNothing = (
+							value: string | null | undefined,
+						): string | null | undefined =>
+							typeof value === 'string' && value.trim() === '' ? null : value
+						const givenThreadLinkId = blankIsNothing(params.threadLinkId)
+						const givenInReplyTo = blankIsNothing(params.inReplyTo)
+
+						// A conversation has to exist, belong to this organization,
+						// and be one the draft's own mailbox takes part in. Written
+						// straight to the column, a value that is none of those
+						// reaches Postgres as a bad uuid or a broken reference and
+						// comes back as an internal fault — losing the body edits
+						// sent in the same call, and telling the caller nothing
+						// about the id it got wrong. Compared as text so a value
+						// that is not a uuid at all answers "no such thread" rather
+						// than failing the statement.
+						if (givenThreadLinkId) {
+							const links = yield* sql<{ inboxId: string | null }>`
+								SELECT inbox_id FROM email_thread_links
+								WHERE id::text = ${givenThreadLinkId}
+								  AND organization_id = ${currentOrg.id}
+								LIMIT 1
+							`.pipe(Effect.orDie)
+							const link = links[0]
+							if (!link || (link.inboxId && link.inboxId !== existing.inboxId))
+								return yield* new NotFound({
+									entity: 'EmailThread',
+									id: givenThreadLinkId,
+								})
+						}
+
+						// Which conversation a draft answers is usually learned after
+						// it is written, so an update can attach it to one; a draft
+						// left unattached goes out as a new conversation.
+						const linkChanged =
+							params.mode !== undefined ||
+							params.threadLinkId !== undefined ||
+							params.companyId !== undefined ||
+							params.contactId !== undefined
+
+						// The columns are what the send path reads, but the clientId
+						// string carries its own copy of the same facts for the
+						// composer that re-opens a draft. Rewriting it from the
+						// merged view keeps the two from disagreeing — a draft whose
+						// column names one conversation and whose clientId names
+						// another leaves no way to tell which is true.
+						const carried = parseClientId(existing.clientId ?? undefined)
+						// Not mentioned means keep what is there; an explicit null
+						// means clear it. A null either way ends as `undefined`,
+						// which encodeClientId reads as "leave this out".
+						const settled = (
+							given: string | null | undefined,
+							current: string | null,
+						): string | undefined =>
+							(given === undefined ? current : given) ?? undefined
+						const companyId = settled(
+							blankIsNothing(params.companyId),
+							carried.companyId,
+						)
+						const contactId = settled(
+							blankIsNothing(params.contactId),
+							carried.contactId,
+						)
+						// The column first, then the string. Both are written from the
+						// same place so they agree today, but the send path reads the
+						// string when the column is empty — so rebuilding the string
+						// from the column alone is the one way the two could ever
+						// come apart, and it would detach the draft silently.
+						const threadLinkId = settled(
+							givenThreadLinkId,
+							existing.threadLinkId ?? carried.threadLinkId,
+						)
+						const clientId = encodeClientId({
+							...(companyId !== undefined && { companyId }),
+							...(contactId !== undefined && { contactId }),
+							mode: params.mode ?? existing.mode,
+							...(threadLinkId !== undefined && { threadLinkId }),
+						})
+
 						const updated = yield* drafts.update(draftId, {
 							...(params.to !== undefined && {
 								to: toRecipientArray(params.to) ?? [],
@@ -2914,6 +3072,14 @@ export class EmailService extends Context.Service<EmailService>()(
 							...(params.bodyJson !== undefined && {
 								bodyJson: params.bodyJson,
 							}),
+							...(params.mode !== undefined && { mode: params.mode }),
+							...(givenInReplyTo !== undefined && {
+								inReplyTo: givenInReplyTo,
+							}),
+							...(givenThreadLinkId !== undefined && {
+								threadLinkId: givenThreadLinkId,
+							}),
+							...(linkChanged && { clientId }),
 						})
 						return yield* decodeDraft(draftRowToProviderShape(updated)).pipe(
 							Effect.orDie,

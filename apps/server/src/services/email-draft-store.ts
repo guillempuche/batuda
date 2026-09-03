@@ -51,6 +51,13 @@ export interface UpdateDraftInput {
 	readonly bcc?: ReadonlyArray<string>
 	readonly subject?: string | null
 	readonly bodyJson?: unknown
+	// Threading, changeable after the draft exists: a draft is often written
+	// before anybody knows which conversation it answers, and it should not
+	// have to be deleted and written again to attach one.
+	readonly mode?: 'new' | 'reply'
+	readonly inReplyTo?: string | null
+	readonly threadLinkId?: string | null
+	readonly clientId?: string | null
 }
 
 const SELECT_COLUMNS = `
@@ -144,6 +151,12 @@ export class DraftStore extends Context.Service<DraftStore>()('DraftStore', {
 				if (input.bodyJson !== undefined) {
 					patch['bodyJson'] = JSON.stringify(input.bodyJson)
 				}
+				if (input.mode !== undefined) patch['mode'] = input.mode
+				if (input.inReplyTo !== undefined) patch['inReplyTo'] = input.inReplyTo
+				if (input.threadLinkId !== undefined) {
+					patch['threadLinkId'] = input.threadLinkId
+				}
+				if (input.clientId !== undefined) patch['clientId'] = input.clientId
 				const rows = yield* sql<DraftRow>`
 					UPDATE email_drafts SET ${sql.update(patch)}
 					WHERE draft_id = ${draftId}
