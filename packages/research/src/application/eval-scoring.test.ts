@@ -28,6 +28,7 @@ const outcome = (over: Partial<RunOutcome>): RunOutcome => ({
 	contacts: [],
 	companies: [],
 	removed: [],
+	searchingStopped: null,
 	reportedCoverage: null,
 	...over,
 })
@@ -1444,6 +1445,7 @@ describe('scoring a run that answered for a whole market', () => {
 				partsExpected: 2,
 				partsAnswered: 0,
 				reportedCoverage: null,
+				searchingStopped: null,
 			})
 			expect(score.empty).toBe(true)
 		})
@@ -1456,6 +1458,7 @@ describe('summarizeScores', () => {
 		fields: [],
 		grounded: true,
 		groundable: true,
+		marketWentUnanswered: false,
 		wrongCompany: false,
 		wrongCompanyAutoApplicable: false,
 		lowConfidence: false,
@@ -1494,6 +1497,9 @@ describe('summarizeScores', () => {
 				requestCoverage: null,
 				neverSearchedShare: null,
 				scansReportingCoverage: null,
+				scansSayingWhyTheyStopped: null,
+				scansThatNeverAnswered: null,
+				scansCutOff: null,
 				partsThoughtAnswered: null,
 				duplicateRate: null,
 				possibleDuplicateRate: null,
@@ -1752,6 +1758,7 @@ describe('summarizing a pass that held market requests', () => {
 		fields: [],
 		grounded: true,
 		groundable: true,
+		marketWentUnanswered: false,
 		wrongCompany: false,
 		wrongCompanyAutoApplicable: false,
 		lowConfidence: false,
@@ -1897,6 +1904,7 @@ describe('summarizing a pass that held market requests', () => {
 				partsExpected: 5,
 				partsAnswered: 5,
 				reportedCoverage: null,
+				searchingStopped: null,
 				...over,
 			},
 		})
@@ -2128,6 +2136,70 @@ describe('summarizing a pass that held market requests', () => {
 			// every shortfall went unlooked-for
 			expect(summary.neverSearchedShare).toBe(1)
 			expect(summary.scansReportingCoverage).toBe(1)
+		})
+	})
+
+	describe('when a pass held runs that said why they stopped', () => {
+		it('should count both the ones that spoke and the ones cut off', () => {
+			// GIVEN four market runs: three stopped at a limit, one that ran out of
+			// things to try
+			const summary = summarizeScores([
+				marketScore({ searchingStopped: 'round_cap_reached' }),
+				marketScore({ name: 'FR', searchingStopped: 'budget_exhausted' }),
+				marketScore({ name: 'PT', searchingStopped: 'deadline_reached' }),
+				marketScore({ name: 'IT', searchingStopped: 'finished_looking' }),
+			])
+
+			// THEN both halves are reported, the one that ran out of things to try
+			// counting as having spoken but not as cut off
+			expect(summary.scansSayingWhyTheyStopped).toBe(4)
+			expect(summary.scansCutOff).toBe(3)
+		})
+
+		it('should report that no run said why, and no cut-off count at all', () => {
+			// GIVEN a pass whose runs all finished before the reason was recorded
+			const summary = summarizeScores([
+				marketScore(),
+				marketScore({ name: 'FR' }),
+			])
+
+			// THEN the count of runs that spoke is nought and the cut-off count is
+			// absent altogether: nought cut off would say every run finished
+			// looking, which is exactly what nobody knows
+			expect(summary.scansSayingWhyTheyStopped).toBe(0)
+			expect(summary.scansCutOff).toBeNull()
+		})
+	})
+
+	describe('when a pass lost runs before they could answer', () => {
+		it('should count them, so nothing cut off is not read as an all-clear', () => {
+			// GIVEN four market runs that finished having run out of things to try,
+			// and two that died before they came back with anything to score
+			const summary = summarizeScores([
+				marketScore({ searchingStopped: 'finished_looking' }),
+				marketScore({ name: 'FR', searchingStopped: 'finished_looking' }),
+				marketScore({ name: 'PT', searchingStopped: 'finished_looking' }),
+				marketScore({ name: 'IT', searchingStopped: 'finished_looking' }),
+				score({ groundable: false, marketWentUnanswered: true }),
+				score({ groundable: false, marketWentUnanswered: true }),
+			])
+
+			// THEN the two that died are counted. The runs likeliest to have been
+			// stopped are exactly the ones that store no reason, so without this the
+			// pass reports four runs that all finished and nothing cut off — an
+			// all-clear for a pass that lost a third of itself mid-search
+			expect(summary.scansSayingWhyTheyStopped).toBe(4)
+			expect(summary.scansCutOff).toBe(0)
+			expect(summary.scansThatNeverAnswered).toBe(2)
+		})
+
+		it('should say nothing at all for a pass that held no market', () => {
+			// GIVEN a pass of profile runs, none of which asked for a market
+			const summary = summarizeScores([score({}), score({})])
+
+			// THEN the count is absent rather than nought: no market went
+			// unanswered because none was asked for
+			expect(summary.scansThatNeverAnswered).toBeNull()
 		})
 	})
 

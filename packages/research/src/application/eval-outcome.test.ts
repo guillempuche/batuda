@@ -296,6 +296,50 @@ describe('outcomeFromRun', () => {
 		})
 	})
 
+	describe('when a scan said why it stopped looking', () => {
+		it('should read the reason off the run', () => {
+			// GIVEN a run stopped at its round cap
+			const outcome = outcomeFromRun({
+				status: 'succeeded',
+				findings: {
+					prospects: [],
+					quality: { searching_stopped: 'round_cap_reached' },
+				},
+				fetchedUrls: [],
+			})
+
+			// THEN the reason is carried through
+			expect(outcome.searchingStopped).toBe('round_cap_reached')
+		})
+
+		it('should refuse a reason it cannot place', () => {
+			// GIVEN a run stored by a later build, naming a reason this one has
+			// never heard of
+			const outcome = outcomeFromRun({
+				status: 'succeeded',
+				findings: { prospects: [], quality: { searching_stopped: 'gave_up' } },
+				fetchedUrls: [],
+			})
+
+			// THEN nothing is carried: a word this build cannot place must not read
+			// as a reason it can
+			expect(outcome.searchingStopped).toBeNull()
+		})
+
+		it('should refuse a word every object already carries', () => {
+			// GIVEN a run whose stored reason is the name every object answers to
+			// rather than a reason
+			const outcome = outcomeFromRun({
+				status: 'succeeded',
+				findings: { prospects: [], quality: { searching_stopped: 'toString' } },
+				fetchedUrls: [],
+			})
+
+			// THEN it is refused like any other word this build cannot place
+			expect(outcome.searchingStopped).toBeNull()
+		})
+	})
+
 	describe('when a scan finished before these counts existed', () => {
 		it('should report no reckoning rather than a clean one', () => {
 			// GIVEN a block stored by an older run: it names what came back missing

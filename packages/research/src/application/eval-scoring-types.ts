@@ -26,6 +26,9 @@
  * measured on — a golden row's `officialDomain` — so scoring it here would report
  * the same success twice and make a change to grounding look twice as large.
  */
+
+import type { SearchStopped } from './search-stopped'
+
 export const SCORABLE_FIELDS = [
 	'industry',
 	'size_range',
@@ -195,9 +198,10 @@ export interface RunOutcome {
 	 */
 	/**
 	 * What the run said about the trades its request named: how many it reported
-	 * nothing for, how many of those it never went looking for, and why it stopped
-	 * looking. Read off the run's own reckoning rather than recomputed, because
-	 * whether it looked is not something its rows can say.
+	 * nothing for, how many of those it never went looking for, and how many it
+	 * finished believing it had already found. Read off the run's own reckoning
+	 * rather than recomputed, because whether it looked is not something its rows
+	 * can say.
 	 *
 	 * Null where the run stored no such reckoning — a run that answers with a
 	 * profile rather than a list, one whose request named a single trade, and every
@@ -212,6 +216,13 @@ export interface RunOutcome {
 		 */
 		readonly thoughtAnswered: number
 	} | null
+	/**
+	 * Why the run stopped looking for companies, in its own words. Null for a run
+	 * that stored none — one that answers with a profile rather than a list, one
+	 * that never went looking, one finished before this was recorded, and one
+	 * whose stored word this build cannot place.
+	 */
+	readonly searchingStopped: SearchStopped | null
 	/**
 	 * What the run removed from its list for not being a company of the trade.
 	 * Empty for a run that removed nothing, and for one that answers with a profile
@@ -375,6 +386,11 @@ export interface MarketScore {
 		readonly neverSearched: number
 		readonly thoughtAnswered: number
 	} | null
+	/**
+	 * Why this run stopped looking, carried through from its own reckoning. Null
+	 * where it stored none.
+	 */
+	readonly searchingStopped: SearchStopped | null
 }
 
 /**
@@ -444,6 +460,20 @@ export interface RunScore {
 	readonly country?: string
 	/** How full the profile came back, independent of the golden answers. */
 	readonly profile?: ProfileFullness
+	/**
+	 * Whether this row asked for a market and the run came back with nothing to
+	 * score at all — it failed, or it was cancelled, so it carries no `market`
+	 * below however much searching it had done.
+	 *
+	 * Counted because those are the runs likeliest to have been stopped: a run
+	 * killed on the run deadline stores no reason, so a pass that lost a third of
+	 * its runs that way would otherwise report that none of them was cut off.
+	 *
+	 * Not every run the stopped-reason figures miss — one that came back with an
+	 * answer can still have stored no reason — but the ones that came back with
+	 * nothing to score at all.
+	 */
+	readonly marketWentUnanswered: boolean
 	/** What the list got right, present only for a row that asked for a market. */
 	readonly market?: MarketScore
 }
@@ -552,6 +582,36 @@ export interface EvalSummary {
 	 * its worst runs are simply absent.
 	 */
 	readonly scansReportingCoverage: number | null
+	/**
+	 * How many scans said why they stopped looking, and how many of those were
+	 * cut off rather than having settled of their own accord.
+	 *
+	 * Settling is a fact about a run's last turn — the model asked for nothing
+	 * further — never a claim that there was nothing left to find. So a short
+	 * list from a settled run is still only that run's answer; what it rules out
+	 * is the reading that the looking was stopped before it got there.
+	 *
+	 * These are what let a thin pass be judged at all: fewer results are fine
+	 * where the run genuinely tried, and no threshold on the figures above
+	 * settles that from the outside.
+	 *
+	 * Counted rather than shared, since a share cannot say whether it rests on
+	 * four scans or on one. The cut-off count is null where no scan said why —
+	 * nought there would read as every one of them having finished looking.
+	 */
+	readonly scansSayingWhyTheyStopped: number | null
+	readonly scansCutOff: number | null
+	/**
+	 * Market runs that came back with nothing to score — failed, or cancelled.
+	 *
+	 * Counted beside the two figures above rather than within them: those speak
+	 * only for runs that came back with something to score, and these came back
+	 * with nothing, so no run is in both. A run killed on the deadline is both
+	 * the likeliest to have been cut off and the one that stores no reason at
+	 * all, so without this a pass reports nothing cut off while a third of it was
+	 * killed mid-search.
+	 */
+	readonly scansThatNeverAnswered: number | null
 	readonly duplicateRate: number | null
 	/**
 	 * The share of rows that may repeat a company, read loosely enough to see the

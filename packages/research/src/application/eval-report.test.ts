@@ -13,6 +13,7 @@ const score = (over: Partial<RunScore>): RunScore => ({
 	fields: [],
 	grounded: true,
 	groundable: true,
+	marketWentUnanswered: false,
 	wrongCompany: false,
 	wrongCompanyAutoApplicable: false,
 	lowConfidence: false,
@@ -182,6 +183,9 @@ describe('evalSummaryAttributes', () => {
 				requestCoverage: null,
 				neverSearchedShare: null,
 				scansReportingCoverage: null,
+				scansSayingWhyTheyStopped: null,
+				scansThatNeverAnswered: null,
+				scansCutOff: null,
 				partsThoughtAnswered: null,
 				duplicateRate: null,
 				possibleDuplicateRate: null,
@@ -234,6 +238,9 @@ describe('evalSummaryAttributes', () => {
 				requestCoverage: null,
 				neverSearchedShare: null,
 				scansReportingCoverage: null,
+				scansSayingWhyTheyStopped: null,
+				scansThatNeverAnswered: null,
+				scansCutOff: null,
 				partsThoughtAnswered: null,
 				duplicateRate: null,
 				possibleDuplicateRate: null,
@@ -321,9 +328,32 @@ describe('reporting a pass that held market requests', () => {
 				partsExpected: 5,
 				partsAnswered: 1,
 				reportedCoverage: null,
+				searchingStopped: null,
 				...over,
 			},
 		})
+
+	describe('when a market run said why it stopped looking', () => {
+		it('should chart the reason per run, so a thin row can be read', () => {
+			// GIVEN a run stopped at its round cap
+			const attrs = evalSpanAttributes(
+				marketScore({ searchingStopped: 'round_cap_reached' }),
+			)
+
+			// THEN the reason rides on that run's own span, beside its counts
+			expect(attrs['eval.searching_stopped']).toBe('round_cap_reached')
+		})
+
+		it('should chart nothing for a run that said nothing', () => {
+			// GIVEN a run finished before the reason was recorded
+			const attrs = evalSpanAttributes(marketScore())
+
+			// THEN the key is absent rather than carrying a stand-in: charting one
+			// would say the run finished looking, which is the one thing nobody
+			// knows about it
+			expect('eval.searching_stopped' in attrs).toBe(false)
+		})
+	})
 
 	describe('when a market run carried a reckoning of its own', () => {
 		it('should chart its counts per run, so a moved rate names the run', () => {
@@ -482,6 +512,9 @@ describe('reporting a pass that held market requests', () => {
 			requestCoverage: null,
 			neverSearchedShare: null,
 			scansReportingCoverage: null,
+			scansSayingWhyTheyStopped: null,
+			scansThatNeverAnswered: null,
+			scansCutOff: null,
 			partsThoughtAnswered: null,
 			duplicateRate: null,
 			possibleDuplicateRate: null,
@@ -523,6 +556,9 @@ describe('reporting a pass that held market requests', () => {
 					requestCoverage: 0.2,
 					neverSearchedShare: null,
 					scansReportingCoverage: null,
+					scansSayingWhyTheyStopped: null,
+					scansThatNeverAnswered: null,
+					scansCutOff: null,
 					partsThoughtAnswered: null,
 					duplicateRate: 0.16,
 					locationFill: 0.4,

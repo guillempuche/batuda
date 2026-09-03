@@ -26,6 +26,7 @@ import {
 import { isConfirmedRow } from './existence-verdict'
 import { contactFill, enrichmentFill } from './extraction-fill'
 import { unwrapValue } from './guard-shapes'
+import { isSearchStopped, type SearchStopped } from './search-stopped'
 import { hostOf } from './source-key'
 
 const TERMINAL_STATUSES: ReadonlySet<string> = new Set<TerminalStatus>([
@@ -117,6 +118,18 @@ export const outcomeFromRun = (input: {
 		missing !== null && neverSearched !== null && thoughtAnswered !== null
 			? { missing, neverSearched, thoughtAnswered }
 			: null
+
+	// Why the run stopped looking for companies, taken off the same block. Read
+	// through `isSearchStopped` because it arrives as plain JSON: a word this
+	// build cannot place is dropped rather than carried, since anything but
+	// `finished_looking` counts as a run that was cut off.
+	const storedStop =
+		quality !== null && typeof quality === 'object'
+			? (quality as { searching_stopped?: unknown }).searching_stopped
+			: undefined
+	const searchingStopped: SearchStopped | null = isSearchStopped(storedStop)
+		? storedStop
+		: null
 
 	// The people the run kept (after the entity + grounding guards), each with the
 	// title it found or null — so the scorer can measure how many known contacts
@@ -221,6 +234,7 @@ export const outcomeFromRun = (input: {
 		companies,
 		registryConfirmed,
 		reportedCoverage,
+		searchingStopped,
 		// Only a run that was asked for a profile is measured on how full it came back.
 		// A search answers with a list and is never given one, so counting it reports
 		// every search as having filled none of a shape nobody asked it for — a failing
