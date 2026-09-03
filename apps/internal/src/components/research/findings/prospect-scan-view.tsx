@@ -6,8 +6,7 @@ import { useId, useState } from 'react'
 import styled from 'styled-components'
 
 import { companySlugFromName } from '@batuda/domain'
-import { NAME_ONLY_EVIDENCE } from '@batuda/research/application/name-only-guard'
-import { OUTSIDE_REQUESTED_PLACE } from '@batuda/research/application/row-marks'
+import { prospectHoldBack } from '@batuda/research/application/prospect-hold-back'
 import { PriButton, usePriToast } from '@batuda/ui/pri'
 
 import { SafeLink } from '#/components/research/safe-link'
@@ -119,24 +118,11 @@ function ProspectRow({ prospect }: { readonly prospect: ProspectEntry }) {
 	const doubtId = useId()
 	const placeId = useId()
 	const { t } = useLingui()
-	// A reason with nothing written in it is not a doubt anybody can weigh, and runs
-	// stored before the engine started taking those back still carry them. Read as a
-	// mark it would badge the row and hold back the vouching step while naming no
-	// cause at all.
-	const doubt = prospect.unconfirmed_reason?.trim()
-	// The engine's own finding: every page this row cites was a page listing many
-	// companies, and it carries neither a site nor a place. Told here rather than
-	// stored as a sentence, so it reads in the language the reader is using.
-	const nameOnly = prospect.unconfirmed_evidence === NAME_ONLY_EVIDENCE
-	const spoken = doubt !== undefined && doubt !== ''
-	// The evidence puts this company somewhere other than the area the search was
-	// asked about. A separate statement from "could not be confirmed": here the run
-	// established something rather than failing to, and saying both with one badge
-	// would tell the reader neither.
-	const outsidePlace =
-		prospect.marks?.includes(OUTSIDE_REQUESTED_PLACE) ?? false
+	// What the run held back about this company. The same answer gates the
+	// vouching step below, so it is read from one place rather than two.
+	const { couldNotConfirm, outsidePlace, holdsBack, spokenReason } =
+		prospectHoldBack(prospect)
 	const outsideReason = prospect.outside_place_reason?.trim()
-	const couldNotConfirm = spoken || nameOnly
 	// The address on its own: a scan reports it paired with the page it was read
 	// on, so the value here is not the string a link needs. The place is reported
 	// the same way, and read the same way.
@@ -165,9 +151,11 @@ function ProspectRow({ prospect }: { readonly prospect: ProspectEntry }) {
 					<ReasonLabel>
 						<Trans>Could not be confirmed:</Trans>
 					</ReasonLabel>{' '}
-					{spoken
-						? doubt
-						: t`Only found named in a list of companies, with no website and no location of its own.`}
+					{/* The fallback is the engine's finding rather than the run's, so it
+					    is said here rather than stored, and reads in the reader's
+					    language. */}
+					{spokenReason ??
+						t`Only found named in a list of companies, with no website and no location of its own.`}
 				</Reason>
 			) : null}
 			{/* Said separately from the doubt above, and never in its words: a company
@@ -220,9 +208,7 @@ function ProspectRow({ prospect }: { readonly prospect: ProspectEntry }) {
 			<CitationList citations={prospect.citations} />
 			<AddAsLeadButton
 				prospect={prospect}
-				// Either badge holds back the vouching step, which is what stops a company
-				// the run could not place being written in as a checked one.
-				unconfirmed={couldNotConfirm || outsidePlace}
+				heldBack={holdsBack}
 				// Both reasons, not the first of them. A row can carry the doubt and
 				// the place at once, and the place is the half likelier to stop
 				// somebody adding the company — read out only one, and that is the
@@ -273,12 +259,12 @@ const ReasonLabel = styled.strong`
 // the one step where it still shows.
 function AddAsLeadButton({
 	prospect,
-	unconfirmed,
+	heldBack,
 	describedBy,
 }: {
 	readonly prospect: ProspectEntry
-	/** Whether the run left a real reason it could not confirm this company. */
-	readonly unconfirmed: boolean
+	/** Either kind of hold-back; both stop the vouching step. */
+	readonly heldBack: boolean
 	/**
 	 * The reasons this company was held back, for a reader to be pointed at —
 	 * space-separated when there is more than one, as the attribute allows.
@@ -340,19 +326,34 @@ function AddAsLeadButton({
 		const row = exit.value as Record<string, unknown>
 		const id = typeof row['id'] === 'string' ? row['id'] : null
 		const newSlug = typeof row['slug'] === 'string' ? row['slug'] : slug
-		const confirmed = !unconfirmed
-		if (id !== null && confirmed) {
-			await verifyCompany({
-				params: { id },
-				payload: { verified: true },
+		// What the company ended up as, not what this click meant it to be: the
+		// vouching step is a second call that can fail on its own, and a message
+		// read off the intent would say verified when it is not.
+		const vouchWanted = id !== null && !heldBack
+		const verified =
+			vouchWanted &&
+			(
+				await verifyCompany({
+					params: { id },
+					payload: { verified: true },
+				})
+			)._tag === 'Success'
+		// A wanted vouch that did not land is its own outcome: the company is on
+		// file, and 'unverified' would read as the run's doing rather than as
+		// something to try again.
+		if (vouchWanted && !verified) {
+			toast.add({
+				title: t`Added, but could not be marked verified`,
+				type: 'error',
+			})
+		} else {
+			toast.add({
+				title: verified
+					? t`Added as a verified lead`
+					: t`Added as an unverified lead`,
+				type: 'success',
 			})
 		}
-		toast.add({
-			title: confirmed
-				? t`Added as a verified lead`
-				: t`Added as an unverified lead`,
-			type: 'success',
-		})
 		void navigate({ to: '/companies/$slug', params: { slug: newSlug } })
 	}
 
@@ -364,7 +365,7 @@ function AddAsLeadButton({
 			// Every row carries this button, so the visible words alone leave a reader
 			// moving between them with no idea which company each one adds.
 			aria-label={
-				unconfirmed
+				heldBack
 					? t`Add ${prospect.name} as an unverified lead`
 					: t`Add ${prospect.name} as lead`
 			}
@@ -380,7 +381,13 @@ function AddAsLeadButton({
 			onClick={() => void add()}
 		>
 			<Plus size={14} aria-hidden />
-			{busy ? t`Adding…` : t`Add as lead`}
+			{/* Says which of the two this does, as the screen-reader label and the
+			    message afterwards already do. */}
+			{busy
+				? t`Adding…`
+				: heldBack
+					? t`Add as unverified lead`
+					: t`Add as lead`}
 		</PriButton>
 	)
 }
