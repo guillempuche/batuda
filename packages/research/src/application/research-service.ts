@@ -5556,6 +5556,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						// The flag answers for the pass that just ran, so a refused refine
 						// cannot be read as a refused coverage pass later on.
 						let lastPassRefused = false
+						// Whether the thin-list retry was the pass the provider turned
+						// away. Held apart from the covering loop's own record below,
+						// because a request naming a single kind of company never runs that
+						// loop and this is then the only refusal there is.
+						let refinePassRefused = false
 						const searchAgainOrKeep = (instruction: string, soFar: unknown) =>
 							Effect.gen(function* () {
 								lastPassRefused = false
@@ -5619,6 +5624,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								// reads an empty list as an empty market, so a pass the
 								// provider refused must not be reported as one that ran.
 								refined = !lastPassRefused
+								// A pass the provider turned away is a pass that did not
+								// happen, so the looking stopped here rather than where the
+								// pass before it ended. Without this the run reports the first
+								// pass's contented ending and a short list reads as a thin
+								// market.
+								if (lastPassRefused) refinePassRefused = true
 							}
 
 							// Then the parts of the request nothing came back for. The retry
@@ -5709,6 +5720,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									? findings
 									: undefined,
 							refined,
+							refinePassRefused,
 							cheapCents,
 						}
 					}).pipe(
@@ -5731,15 +5743,23 @@ export class ResearchService extends Context.Service<ResearchService>()(
 
 					const loopResult = phaseOutcome.loop
 					runRounds = loopResult.rounds
-					// The chase for a part nothing answered is looking too, and it
-					// stops for reasons of its own: a run whose chase ran out of
-					// passes has not finished looking, however contentedly its last
-					// gathering pass ended.
-					const chaseStopped = coverageStoppedLooking(coverageStopped)
-					searchStopped =
-						chaseStopped === null
-							? loopResult.stopReason
-							: mostBindingStop(loopResult.stopReason, chaseStopped)
+					// Every stretch that went looking, read down to the one that bound
+					// the run hardest. The gathering passes are only the first: the retry
+					// after a thin list and the chase for a part nothing answered each
+					// stop for reasons of their own, and a run whose chase ran out of
+					// passes has not finished looking however contentedly its last
+					// gathering pass ended. A pass the provider turned away is a pass
+					// that never happened, so it counts the same way.
+					searchStopped = [
+						phaseOutcome.refinePassRefused
+							? ('provider_refused' as const)
+							: null,
+						coverageStoppedLooking(coverageStopped),
+					].reduce<SearchStopped>(
+						(sofar, reason) =>
+							reason === null ? sofar : mostBindingStop(sofar, reason),
+						loopResult.stopReason,
+					)
 					// Why the gathering stopped. A run that ran out of room to think,
 					// rather than finishing what it set out to do, had more it wanted
 					// to read — so a thin profile there is a ceiling to raise, not a

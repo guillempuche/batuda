@@ -205,7 +205,10 @@ const runRow = (id: string) =>
 			return (yield* svc.get(id).pipe(Effect.orDie)) as {
 				status?: string
 				reason_code?: string | null
-				findings?: { error?: string } | null
+				findings?: {
+					error?: string
+					quality?: { searching_stopped?: string } | null
+				} | null
 			} | null
 		}),
 	)
@@ -261,6 +264,13 @@ describe('a refused extra searching pass', () => {
 			// the refined pass never ran, and an empty list read as a refined one
 			// reads as an empty market
 			expect(row?.findings?.error ?? '').not.toContain('refined retry')
+
+			// AND it says a provider refusal is what stopped it looking. This is the
+			// run's own account of why its list is short, and the first pass having
+			// settled is not that account: the retry was sent because the list was
+			// thin, and it never ran. Reported as finished looking, a short list
+			// here reads as a thin market
+			expect(row?.findings?.quality?.searching_stopped).toBe('provider_refused')
 
 			// AND it really did try to refine — the pass the provider refused
 			expect(firedEvents).toContain('research.refining')
