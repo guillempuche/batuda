@@ -63,11 +63,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1783689353,
-        "narHash": "sha256-gLPPj83ltHjNXbtOVxiAMmBieTPoZwTQefpCAhXmGaI=",
+        "lastModified": 1787855135,
+        "narHash": "sha256-EcdRVb9a624sy0cI4nK+tw2htA1mTCD5noMQeePcV1s=",
         "owner": "unikraft",
         "repo": "nur",
-        "rev": "e5b33203b32b9b84ff277051934ee05c7ef11e66",
+        "rev": "9c521222a2ad93d2c915fe832de0549a9639e5bc",
         "type": "github"
       },
       "original": {
