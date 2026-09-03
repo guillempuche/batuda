@@ -79,6 +79,14 @@ interface Scenario {
 	 * lets the pass sent out after it finish on its own.
 	 */
 	readonly settlesAfterRounds?: number
+	/**
+	 * The area the splitter reads out of the request. Absent — every other case
+	 * here — leaves the run nothing to hold its rows to, which is how a request
+	 * naming no place reads.
+	 */
+	readonly place?: string
+	/** What the place judge says about every row it is handed. */
+	readonly placeVerdict?: 'inside' | 'outside' | 'unclear'
 }
 
 // Rounds the agent has been asked for across every pass of the current run.
@@ -161,6 +169,10 @@ const SPLITTER_MARKER = 'kinds of company it asks for'
 // check are never mistaken for one another.
 const ORGANISATION_KIND_MARKER =
 	'You are checking a list returned by a search for companies in a trade.'
+// And a phrase only the place check carries, so where a row is and what kind of
+// thing it is are never answered with each other's script.
+const PLACE_JUDGE_MARKER =
+	'You are checking a list of companies a search returned for a request confined to one area.'
 
 // How many splitting prompts the stub recognised. A case that expects parts asserts
 // on this, so rewording the splitting prompt fails as "the stub never saw the
@@ -184,7 +196,35 @@ const extractLlm: LanguageModel.Service = {
 				options.prompt.includes(SPLITTER_MARKER)
 			if (isSplitter) {
 				splitterCalls++
-				return { usage, value: { parts: scenario.parts ?? [] } }
+				return {
+					usage,
+					value: { parts: scenario.parts ?? [], place: scenario.place ?? '' },
+				}
+			}
+			// The place check asks the same tier where each row is. Every row gets
+			// the case's own verdict, keyed back to the ids the prompt itself hands
+			// out — reading them off the prompt rather than counting rows, so a case
+			// fails as "the judge answered nobody" if that numbering ever changes.
+			if (
+				typeof options.prompt === 'string' &&
+				options.prompt.includes(PLACE_JUDGE_MARKER)
+			) {
+				const where = scenario.placeVerdict ?? 'unclear'
+				const ids = [...options.prompt.matchAll(/^\[(r\d+)\]/gm)].map(
+					match => match[1],
+				)
+				return {
+					usage,
+					value: {
+						verdicts: ids.map(id => ({
+							id,
+							where,
+							...(where === 'outside'
+								? { reason: 'stated somewhere else' }
+								: {}),
+						})),
+					},
+				}
 			}
 			// The organisation-kind check asks the same model what each row is. It
 			// passes every row here — this file is about what a scan reports, not
@@ -320,6 +360,14 @@ interface StoredCoverage {
 	readonly stopped_because?: string | null
 }
 
+// And what it says about the area it was asked about, read the same way.
+interface StoredPlace {
+	readonly asked: number
+	readonly inside: number
+	readonly outside: number
+	readonly unclear: number
+}
+
 // Run one scan to its terminal state and report how it finished.
 const runScan = async (args: {
 	readonly schemaName: string
@@ -332,6 +380,7 @@ const runScan = async (args: {
 	covering: boolean
 	coverage: StoredCoverage | undefined
 	searchingStopped: string | undefined
+	place: StoredPlace | undefined
 	splitterAsked: boolean
 	extractions: number
 	briefPrompt: string
@@ -403,6 +452,7 @@ const runScan = async (args: {
 									searching_stopped?: string
 									citations_seen?: number
 									citations_kept?: number
+									place?: StoredPlace
 								}
 							}
 						).quality
@@ -413,6 +463,7 @@ const runScan = async (args: {
 				covering: firedEvents.includes('research.covering'),
 				coverage: quality?.coverage,
 				searchingStopped: quality?.searching_stopped,
+				place: quality?.place,
 				splitterAsked: splitterCalls > 0,
 				extractions: extractionCalls,
 				briefPrompt,
@@ -1164,6 +1215,83 @@ describe('what a discovery scan reports about itself', () => {
 			expect(result.covering).toBe(false)
 			expect(result.coverage?.uncovered).toEqual([])
 			expect(result.coverage?.unsearched).toEqual([])
+			expect(result.status).toBe('succeeded')
+		}, 60_000)
+	})
+
+	describe('when the request names a place and the caller passed none', () => {
+		it('should hold the list to the place it read out of the request', async () => {
+			// GIVEN a request naming a town in its own words, with no place hint on
+			//   the call — the shape every scan in production arrives in — and a
+			//   judge that places every company somewhere else
+			const result = await runScan({
+				schemaName: 'prospect_scan_v1',
+				query:
+					'Empresas fabricantes industriales con taller propio en Ripollet (Barcelona)',
+				scenario: {
+					evidence: 'A directory listing of Spanish industrial manufacturers.',
+					place: 'Ripollet (Barcelona)',
+					placeVerdict: 'outside',
+					findings: [
+						{
+							prospects: Array.from({ length: 6 }, (_, index) => ({
+								name: `Fabricacions Industrials ${index}`,
+								why_relevant: 'Fabricante industrial con taller propio',
+								citations: [
+									{ source_id: SEED_URL, quote: 'Fabricante', confidence: 0.9 },
+								],
+							})),
+						},
+					],
+				},
+			})
+
+			// THEN the check ran — which is the whole point, since the hint nobody
+			//   fills is what used to leave it with nothing to hold rows to
+			expect(result.place).toEqual({
+				asked: 6,
+				inside: 0,
+				outside: 6,
+				unclear: 0,
+			})
+			// AND a list with nobody in the area asked about does not finish as
+			//   green as one that answered the question
+			expect(result.status).toBe('succeeded_low_confidence')
+		}, 60_000)
+
+		it('should finish clean when the companies are in the place asked for', async () => {
+			// GIVEN the same request and list, and a judge that places every company
+			//   inside the area
+			const result = await runScan({
+				schemaName: 'prospect_scan_v1',
+				query:
+					'Empresas fabricantes industriales con taller propio en Ripollet (Barcelona)',
+				scenario: {
+					evidence: 'A directory listing of Spanish industrial manufacturers.',
+					place: 'Ripollet (Barcelona)',
+					placeVerdict: 'inside',
+					findings: [
+						{
+							prospects: Array.from({ length: 6 }, (_, index) => ({
+								name: `Tallers Ripollet ${index}`,
+								why_relevant: 'Fabricante industrial con taller propio',
+								citations: [
+									{ source_id: SEED_URL, quote: 'Fabricante', confidence: 0.9 },
+								],
+							})),
+						},
+					],
+				},
+			})
+
+			// THEN the same block is reported, and the run finishes plain succeeded:
+			//   the flag is a floor, not a reading of how the list split
+			expect(result.place).toEqual({
+				asked: 6,
+				inside: 6,
+				outside: 0,
+				unclear: 0,
+			})
 			expect(result.status).toBe('succeeded')
 		}, 60_000)
 	})

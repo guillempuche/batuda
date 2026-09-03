@@ -178,6 +178,10 @@ export const RequestPartsSchema = Schema.Struct({
 		}),
 	),
 	kindsOfCompany: Schema.Array(Schema.String),
+	// Required and often empty rather than left out: a strict provider reads an
+	// absent key and a key holding nothing as two different answers, and only one
+	// of them is a request that named no place.
+	place: Schema.String,
 })
 
 /**
@@ -191,7 +195,7 @@ export const requestPartsPrompt = (query: string): string =>
 		'A part is one kind of company the request names — a trade, a sector, a speciality, a line of work. Where the request names one kind of company, return exactly one part. Never split a single kind into the words it is made of ("industrial refrigeration" is one part, not "industrial" and "refrigeration"), and never add a kind the request does not name.',
 		'Where two wordings sit either side of an "and", settle this before anything else: do they name the same work? Two words for one trade are one part, whatever joins them — a request naming a trade in both the local word and the ordinary one, or in two languages, is asking for one kind of company, and the second wording goes among that part\'s terms rather than becoming a part of its own. A trade whose own name contains the word is the same case: health and safety is one line of work, not two.',
 		'Only where the two really are different work does it matter where the "and" sits. A request that lists its trades separated by commas closes that list with an "and", and that last one is the list\'s own punctuation: it separates the final trade from the one before it, so they are two parts — fire protection and lifts, closing such a list, are two. An "and" inside one of the earlier items is joining two words within a single item, so ask whether one firm ordinarily does both: plumbing and heating, sitting mid-list, is one part, because the firms that do one do the other and asking separately would ask twice for the same companies.',
-		'A place is not a part. A request for companies across a country, a region, or a list of provinces still asks for one kind of company per trade it names; leave the places out.',
+		'A place is not a part. A request for companies across a country, a region, or a list of provinces still asks for one kind of company per trade it names; leave the places out of the parts and give the place separately, below.',
 		'A request that names no kind of company at all — one that names a single company and asks who competes with it, or who resembles it — has no parts. Return an empty list for it rather than guessing at the trades that company might be in.',
 		'',
 		'For each part:',
@@ -203,7 +207,9 @@ export const requestPartsPrompt = (query: string): string =>
 		'Separately, list the words a COMPANY NAME uses to say what kind of company it is rather than which company it is — group, holding, services, associates and the like. Give them in the language of the request, in the language of the country it is about, and in English, in the plural and singular forms a name actually writes. "Grup Puig" is a firm called Puig, so "grup" belongs on this list; "Puig" never does.',
 		'These are words for a KIND of company, never for a trade and never for a place: plumbing, lifts, Barcelona and France are all wrong here. A family name, a coined name or a brand is wrong here too, and putting one on this list takes its own name away from every firm called it — so leave out anything you are not sure of. Between 4 and 12 words. Return an empty list rather than guessing at a language you cannot place.',
 		'',
-		'Return {"parts": [{"label": "...", "terms": ["...", "..."]}], "kindsOfCompany": ["...", "..."]} and nothing else.',
+		'Separately again, name the place the request wants its companies to BE IN, in the words the request uses ("Ripollet (Barcelona)", "Texas", "Baltimore metro"). Only where the request confines its answer to a place: a company named in passing, a place it sells into or travels to, and the country a language happens to belong to are all somewhere a company is not required to be, and each of them is an empty answer. Where the request names several, give the widest one that contains them all. Answer with an empty string whenever the request asks for companies anywhere.',
+		'',
+		'Return {"parts": [{"label": "...", "terms": ["...", "..."]}], "kindsOfCompany": ["...", "..."], "place": "..."} and nothing else.',
 		'',
 		`Request:\n${query}`,
 	].join('\n')
@@ -326,6 +332,24 @@ export const readKindsOfCompany = (raw: unknown): ReadonlyArray<string> => {
 		kinds.push(word)
 	}
 	return kinds
+}
+
+/**
+ * The place the request confines its answer to, read off the same answer.
+ *
+ * Empty for a request that asks for companies anywhere, and empty again for
+ * anything unreadable — which is the same answer the run gave itself before this
+ * was asked, so nothing is worse off for a splitter that fumbles it.
+ *
+ * It is only ever read as a place to hold an answer AGAINST. What a run spends
+ * money searching for stays the caller's own `hints.place`, which is a filter the
+ * caller asked for; this is the run reading the request back to itself, and a
+ * place it read wrongly would otherwise send every search somewhere nobody asked
+ * about.
+ */
+export const readRequestPlace = (raw: unknown): string => {
+	if (raw === null || typeof raw !== 'object') return ''
+	return readWording((raw as { place?: unknown }).place) ?? ''
 }
 
 /**
