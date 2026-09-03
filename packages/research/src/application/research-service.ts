@@ -1678,7 +1678,7 @@ export interface ResearchEvent {
 	readonly data: unknown
 }
 
-// ── Tool log entry (accumulated in-memory, persisted at completion) ──
+// ── Tool log entry (accumulated in-memory, written to the row as the run goes) ──
 
 export interface ToolLogEntry {
 	readonly timestamp: string
@@ -2536,14 +2536,67 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// the run, rather than finding it already taken and stepping aside.
 					yield* (yield* WorkRecord).add({ run_claimed: true })
 
+					// What the run has done so far, in its own words: a line per model
+					// call, search and page fetch. It lives out here because the beat
+					// below carries it to the row.
+					const toolLog = yield* Ref.make<ToolLogEntry[]>([])
+					// How much of that log the row already holds. Entries are only ever
+					// appended, so a length that has not moved means nothing new to write.
+					let loggedToRow = 0
+
 					// Refresh the heartbeat while this run works, so the sweep can
 					// tell a live long-running job from one whose worker died. Forked
 					// into the run's own scope (below), so it stops when the run ends.
-					yield* sql`
+					//
+					// The stamp gets its own statement and its own failure: sharing one
+					// with the log means a rejected log write costs the stamp too, and a
+					// few missed stamps are all the sweep needs to fail a healthy run.
+					const beat = sql`
 						UPDATE research_runs SET heartbeat_at = now()
 						WHERE id = ${researchId} AND status = 'running'
 					`.pipe(
-						Effect.catchCause(() => Effect.void),
+						Effect.catchCause(cause =>
+							Cause.hasInterruptsOnly(cause)
+								? Effect.failCause(cause)
+								: Effect.logWarning('research.run.heartbeat_failed').pipe(
+										Effect.annotateLogs({
+											event: 'research.run.heartbeat_failed',
+											research_id: researchId,
+											cause: Cause.pretty(cause),
+										}),
+									),
+						),
+					)
+					// The log rides the same beat, so it is readable before a run is over
+					// and survives a run that fails. Skipped when nothing new was logged,
+					// since this rewrites a jsonb column that grows all run. The guard on
+					// 'running' stops a late beat overwriting the complete log a terminal
+					// write has already put there.
+					const flushToolLog = Effect.gen(function* () {
+						const soFar = yield* Ref.get(toolLog)
+						if (soFar.length === loggedToRow) return
+						yield* sql`
+							UPDATE research_runs SET tool_log = ${JSON.stringify(soFar)}
+							WHERE id = ${researchId} AND status = 'running'
+						`
+						loggedToRow = soFar.length
+					}).pipe(
+						Effect.catchCause(cause =>
+							Cause.hasInterruptsOnly(cause)
+								? Effect.failCause(cause)
+								: Effect.logWarning('research.run.tool_log_flush_failed').pipe(
+										Effect.annotateLogs({
+											event: 'research.run.tool_log_flush_failed',
+											research_id: researchId,
+											cause: Cause.pretty(cause),
+										}),
+									),
+						),
+					)
+					yield* Effect.gen(function* () {
+						yield* beat
+						yield* flushToolLog
+					}).pipe(
 						Effect.repeat(
 							Schedule.spaced(`${heartbeatIntervalSeconds} seconds`),
 						),
@@ -2741,8 +2794,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						return
 					}
 
-					// Tool log accumulator
-					const toolLog = yield* Ref.make<ToolLogEntry[]>([])
 					// Counted apart from the log itself so the cap applies only to the
 					// per-call entries; see `MAX_LOGGED_PROVIDER_CALLS`.
 					let providerCallsLogged = 0
@@ -6072,9 +6123,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// and once after it — because eight different conditions end a round and
 					// a write at each of them is eight chances to add a ninth and miss it.
 					// Whichever way a round leaves, the next turn or the loop's end closes
-					// it. There is no matching entry when the round OPENS: a run that dies
-					// mid-round would not persist one anyway, since `tool_log` reaches the
-					// row only when the run reaches a terminal state.
+					// it. A round also writes an entry when it OPENS, the way a phase-1
+					// round does: without one the log says nothing about a round still
+					// going, or about the round a run died inside.
 					let pendingGapRound: {
 						round: number
 						startedAtMs: number
@@ -6186,11 +6237,23 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						gapRounds++
 						// Opened alongside that count and for the same reason: past every
 						// stop check, so a round the loop declined to run leaves no trace of
-						// having run. Written out on the next turn, or after the loop.
+						// having run. Closed on the next turn, or after the loop.
+						const gapRoundStartedAtMs = DateTime.toEpochMillis(
+							DateTime.nowUnsafe(),
+						)
 						pendingGapRound = {
 							round: gapRound,
-							startedAtMs: DateTime.toEpochMillis(DateTime.nowUnsafe()),
+							startedAtMs: gapRoundStartedAtMs,
 						}
+						yield* Ref.update(toolLog, log => [
+							...log,
+							{
+								timestamp: new Date(gapRoundStartedAtMs).toISOString(),
+								type: 'call' as const,
+								tool: 'research.gap_round',
+								input: { round: gapRound },
+							},
+						])
 						yield* recordProgress
 						const roundHashes: string[] = []
 						// Fetch the cited pages first: cheap certainty about sources

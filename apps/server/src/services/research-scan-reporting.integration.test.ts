@@ -819,12 +819,19 @@ describe('what a discovery scan reports about itself', () => {
 			//   written when the loop turned rather than when a round was actually
 			//   taken, so a run that closed every gap still reported one.
 			const gapRounds = result.toolLog.filter(
-				entry => entry.tool === 'research.gap_round',
+				entry => entry.type === 'result' && entry.tool === 'research.gap_round',
 			)
 			const phase2 = result.toolLog.find(
 				entry => entry.type === 'result' && entry.tool === 'llm.generateObject',
 			)
 			expect(gapRounds.length).toBe(phase2?.output?.gapRounds ?? 0)
+			// AND each one opened as well as closed. A round is the longest quiet
+			//   stretch of a run, so without an opening entry the log says nothing
+			//   about a round still going, or about the round a run died inside.
+			const gapRoundOpens = result.toolLog.filter(
+				entry => entry.type === 'call' && entry.tool === 'research.gap_round',
+			)
+			expect(gapRoundOpens.length).toBe(gapRounds.length)
 			// AND the gathering round in particular is timed. Keyed on the round
 			//   rather than on the tool name, because the writer that produces the
 			//   brief is another `llm.generateText` — matched by name alone, its

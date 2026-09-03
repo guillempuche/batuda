@@ -185,12 +185,14 @@ afterAll(async () => {
 
 describe('ResearchService heartbeat', () => {
 	describe('when a run stays running across a heartbeat interval', () => {
-		it('should advance heartbeat_at past the run’s started_at', async () => {
+		it('should advance heartbeat_at and publish the log so far', async () => {
 			// GIVEN a run whose Agent tier sleeps for several seconds, so it stays
 			//   'running' while the background heartbeat loop ticks (~1s interval)
 			// WHEN we let it run past a couple of intervals and read the run row
 			// THEN heartbeat_at has advanced well past started_at (the claim time),
-			//   proving the beat keeps a live long run fresh so the sweep spares it
+			//   proving the beat keeps a live long run fresh so the sweep spares it,
+			//   and the row already carries what the run has done — the round it is
+			//   sitting in opened before the model call it is waiting on
 			const outcome = await Effect.runPromise(
 				Effect.gen(function* () {
 					const svc = yield* ResearchService
@@ -231,10 +233,12 @@ describe('ResearchService heartbeat', () => {
 					const [row] = yield* sql<{
 						gapSeconds: number
 						status: string
+						toolLog: ReadonlyArray<{ tool?: string }>
 					}>`
 						SELECT
 							EXTRACT(EPOCH FROM (heartbeat_at - started_at))::float8 AS gap_seconds,
-							status
+							status,
+							tool_log
 						FROM research_runs WHERE id = ${created.id}::uuid
 					`.pipe(Effect.orDie)
 
@@ -243,9 +247,10 @@ describe('ResearchService heartbeat', () => {
 					return {
 						status: row?.status ?? 'missing',
 						gap: row?.gapSeconds ?? -1,
+						logged: row?.toolLog?.length ?? -1,
 					}
 				}).pipe(Effect.provide(ResearchLive)) as Effect.Effect<
-					{ status: string; gap: number },
+					{ status: string; gap: number; logged: number },
 					never,
 					never
 				>,
@@ -253,6 +258,9 @@ describe('ResearchService heartbeat', () => {
 
 			expect(outcome.status).toBe('running')
 			expect(outcome.gap).toBeGreaterThan(0.5)
+			// Read before the run reaches any terminal state, so this can only have
+			// come from a beat: nothing else writes the column mid-run.
+			expect(outcome.logged).toBeGreaterThan(0)
 		}, 30_000)
 	})
 })
