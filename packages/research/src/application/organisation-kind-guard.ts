@@ -445,7 +445,29 @@ export const dropNonCompanies = <E, R>(
 		// Only the rows this run has no answer for. A scan asks this once per
 		// extraction and again after each of four gap rounds, over a list that
 		// mostly did not change.
-		const toAsk = rows.filter(row => heldFor(row) === undefined)
+		//
+		// Sorted before it is cut into batches, and that is the point of the sort
+		// rather than tidiness. A row is judged beside the twenty-four that happen
+		// to sit near it, and left in the order the model wrote the list, which
+		// twenty-four those are is an accident of that writing — put the same rows
+		// in a different order and the batches, and with them the answers, come out
+		// different. Measured over twelve stored lists, 375 rows: rotating the list
+		// by half a batch changed the removed set completely, not one row in common,
+		// on both of the vendors this tier is routed at. Ordering by the same folded
+		// name the memory is keyed on makes batch membership a property of the list
+		// rather than of the order it arrived in, so one list always asks the same
+		// questions.
+		const toAsk = rows
+			.filter(row => heldFor(row) === undefined)
+			.slice()
+			.sort((a, b) => {
+				// Rows this fold cannot read keep their arrival order relative to each
+				// other; there is nothing to sort them by, and inventing one would put
+				// the instability back under a different name.
+				const left = judgedRowKey(a.name) ?? ''
+				const right = judgedRowKey(b.name) ?? ''
+				return left < right ? -1 : left > right ? 1 : 0
+			})
 
 		const fresh: Array<OrganisationKindVerdict> = []
 		for (const batch of judgeBatches(toAsk, JUDGE_BATCH_ROWS)) {

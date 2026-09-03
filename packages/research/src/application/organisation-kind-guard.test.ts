@@ -589,6 +589,40 @@ describe('dropNonCompanies', () => {
 		})
 	})
 
+	describe('when the same list arrives in a different order', () => {
+		it('should put the same rows in the same batches either way', async () => {
+			// GIVEN thirty rows — more than one batch holds — and the same thirty
+			//   shuffled into another order
+			const names = Array.from({ length: 30 }, (_, index) => `Empresa ${index}`)
+			const rowsFor = (order: ReadonlyArray<string>) => ({
+				prospects: order.map(name => ({ name, why_relevant: 'Instala' })),
+			})
+			const batchesSeen = async (order: ReadonlyArray<string>) => {
+				const seen: Array<ReadonlyArray<string>> = []
+				const judge = vi.fn<OrganisationKindGuardJudge>(batch => {
+					seen.push(batch.map(row => row.name))
+					return Effect.succeed({ verdicts: [] })
+				})
+				await Effect.runPromise(
+					dropNonCompanies(rowsFor(order), 'prospects', judge),
+				)
+				return seen
+			}
+
+			// WHEN each is put to the judge
+			const inOrder = await batchesSeen(names)
+			const shuffled = await batchesSeen([...names].reverse())
+
+			// THEN both ask exactly the same questions. Left in the order the model
+			//   wrote the list, which rows share a batch is an accident of that
+			//   writing — and a row's verdict moves with the company it keeps, so an
+			//   accident of ordering decides whether a company is struck off.
+			expect(shuffled).toEqual(inOrder)
+			// AND it really is more than one batch, or the claim is vacuous
+			expect(inOrder.length).toBeGreaterThan(1)
+		})
+	})
+
 	describe('when a drop is held over from an earlier pass', () => {
 		it('should record the words and the host the verdict was reached on, not the later ones', async () => {
 			// GIVEN a row removed on thin early words
