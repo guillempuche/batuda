@@ -12,7 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { PgLive } from '../db/client'
 import { enterOrgScope } from '../middleware/org'
-import { CompanyService } from './companies'
+import { type CompanyFilters, CompanyService } from './companies'
 
 // Finding a company by a tag it carries, or by something written under its
 // `metadata`.
@@ -34,7 +34,7 @@ const runtime = ManagedRuntime.make(
 	CompanyService.layer.pipe(Layer.provideMerge(PgLive)),
 )
 
-const search = (filters: Record<string, unknown>) =>
+const search = (filters: CompanyFilters) =>
 	runtime.runPromise(
 		Effect.gen(function* () {
 			const sql = yield* SqlClient.SqlClient
@@ -43,7 +43,7 @@ const search = (filters: Record<string, unknown>) =>
 		}).pipe(Effect.orDie),
 	)
 
-const facets = (filters: Record<string, unknown>) =>
+const facets = (filters: CompanyFilters) =>
 	runtime.runPromise(
 		Effect.gen(function* () {
 			const sql = yield* SqlClient.SqlClient

@@ -404,6 +404,10 @@ export interface EditableChipsProps {
 	readonly onSave: (next: ReadonlyArray<string>) => Promise<void>
 	readonly placeholder?: string
 	readonly emptyHint?: ReactNode
+	// Whether a typed comma starts the next chip. Only for values that may not
+	// contain one themselves — a tag, whose list travels as a single
+	// comma-separated value — and never where a comma is ordinary text.
+	readonly splitOnComma?: boolean
 }
 
 /**
@@ -416,6 +420,7 @@ export function EditableChips({
 	onSave,
 	placeholder,
 	emptyHint,
+	splitOnComma = false,
 }: EditableChipsProps) {
 	const { t } = useLingui()
 	const [draft, setDraft] = useState('')
@@ -430,15 +435,18 @@ export function EditableChips({
 		}
 	}
 
+	// A comma separates one chip from the next rather than living inside one.
+	// It has to: several of these travel to the server as a single
+	// comma-separated value, so a chip holding a comma would be split back into
+	// pieces nobody carries and the companies under it would stop being findable.
+	// Splitting here is also what somebody typing or pasting "a, b" means.
 	const addChip = async () => {
-		const next = draft.trim()
-		if (next.length === 0) return
-		if (values.includes(next)) {
-			setDraft('')
-			return
-		}
+		const added = (splitOnComma ? draft.split(',') : [draft])
+			.map(part => part.trim())
+			.filter(part => part.length > 0 && !values.includes(part))
 		setDraft('')
-		await mutate([...values, next])
+		if (added.length === 0) return
+		await mutate([...values, ...new Set(added)])
 	}
 
 	const removeChip = (chip: string) => mutate(values.filter(v => v !== chip))

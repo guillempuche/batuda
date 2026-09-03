@@ -136,7 +136,12 @@ const stalePlusStatus = (status: string) =>
 				yield* sql`SET LOCAL ROLE app_user`
 				yield* sql`SELECT set_config('app.current_org_id', ${orgId}, true)`
 				return yield* companies
-					.search({ attention: 'stale', status, limit: 500, count: 'exact' })
+					.search({
+						attention: 'stale',
+						status: [status],
+						limit: 500,
+						count: 'exact',
+					})
 					.pipe(Effect.provideService(CurrentOrg, { ...asMember, id: orgId }))
 			}),
 		)

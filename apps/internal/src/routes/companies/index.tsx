@@ -8,9 +8,14 @@ import { LayoutGroup, motion } from 'motion/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
+import { CommaList } from '@batuda/controllers'
 import {
+	ATTENTION_FILTERS,
 	type AttentionFilter,
 	AttentionFilter as AttentionFilterSchema,
+	COMPANY_SORTS,
+	type CompanySort,
+	CompanySort as CompanySortSchema,
 } from '@batuda/domain'
 import { PriButton, PriInput, PriSelect, usePriToast } from '@batuda/ui/pri'
 
@@ -30,10 +35,12 @@ import { EmptyState } from '#/components/shared/empty-state'
 import { ErrorState } from '#/components/shared/error-state'
 import { InfiniteListFooter } from '#/components/shared/infinite-list-footer'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
+import { MultiSelectFilter } from '#/components/shared/multi-select-filter'
 import {
 	PRIORITY_LEVELS,
 	priorityShortLabels,
 } from '#/components/shared/priority-dot'
+import { SrOnly } from '#/components/shared/sr-only'
 import {
 	type CompanyStatus,
 	STATUS_ORDER,
@@ -43,6 +50,7 @@ import { useQuickCapture } from '#/context/quick-capture-context'
 import { useCompanyFilterOptions } from '#/hooks/use-company-filter-options'
 import { useInfiniteList } from '#/hooks/use-infinite-list'
 import { dehydrateAtom } from '#/lib/atom-hydration'
+import { companiesSearchToQuery } from '#/lib/companies-search-params'
 import { useOrgMembers } from '#/lib/org-members'
 import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
@@ -66,6 +74,12 @@ type CompanyRow = {
 	readonly ownerId: string | null
 }
 
+// A filter holding several values arrives one of two ways, and both have to
+// decode: comma-separated from a link somebody wrote or a link this page built,
+// and as a list from the router's own round-trip of what it last put in the URL.
+// The same two cases `priority` already had, for the same reason.
+const ValueList = Schema.Union([Schema.Array(Schema.NonEmptyString), CommaList])
+
 /**
  * TanStack Router `validateSearch` — runs on every search-param change
  * and produces the canonical `CompaniesSearch` shape. Empty strings and
@@ -77,22 +91,27 @@ type CompanyRow = {
  * first hit). Both decode to `number`.
  */
 const validateSearch = validateSearchWith({
-	status: Schema.NonEmptyString,
-	country: Schema.NonEmptyString,
+	status: ValueList,
+	country: ValueList,
 	industry: Schema.NonEmptyString,
 	priority: Schema.Union([Schema.Number, Schema.NumberFromString]),
-	owner: Schema.NonEmptyString,
-	sort: Schema.NonEmptyString,
+	owner: ValueList,
+	// What a research run concluded. Not a closed set: nothing stops a run
+	// writing a word nobody listed, and a company carrying one still has to be
+	// findable.
+	fitVerdict: ValueList,
+	tags: ValueList,
+	sort: CompanySortSchema,
 	query: Schema.NonEmptyString,
 	// Set when arriving from a dashboard heading, so the list opens on exactly
 	// what that heading was counting rather than on everything.
 	attention: AttentionFilterSchema,
 	staleDays: Schema.Union([Schema.Number, Schema.NumberFromString]),
-	// 'only' shows the ones taken out of view, so somebody can put one back.
-	// Absent means the companies in use, which is the page's ordinary job. A URL
+	// Shows the ones taken out of view, so somebody can put one back. Absent
+	// means the companies in use, which is the page's ordinary job. A URL
 	// carrying anything else is dropped rather than passed on as a filter the
 	// server would not recognise.
-	deleted: Schema.Literals(['only', 'include']),
+	deleted: Schema.Literals(['only']),
 })
 
 /**
@@ -194,7 +213,10 @@ const SEARCH_DEBOUNCE_MS = 300
 const ALL = '__all__'
 
 /** Strip `status` from the search when linking to the board — its columns are
- * the statuses, so a status filter there makes no sense. */
+ * the statuses, so a status filter there makes no sense. Everything else goes
+ * across, including what needs attention: a heading on the dashboard opens a
+ * narrowed list, and dropping a filter on the way would quietly widen it
+ * again. */
 function boardSearch(search: CompaniesSearch): CompaniesSearch {
 	const { status: _status, ...rest } = search
 	return rest
@@ -262,12 +284,42 @@ function CompaniesListPage() {
 		},
 		[navigate],
 	)
-	const handleStatusFilter = useCallback(
-		(status: CompanyStatus | undefined) => {
-			applyPatch({ status })
+	// Ticking a value works off the search the router is about to hand back, not
+	// the one this render captured: two ticks land inside one navigation window
+	// often enough — that is what the popover is for — and building both on the
+	// same captured list would let the second quietly undo the first.
+	const toggleValue = useCallback(
+		(
+			key: 'status' | 'tags' | 'fitVerdict' | 'country' | 'owner',
+			value: string,
+		) => {
+			void navigate({
+				to: '/companies',
+				search: prev => {
+					const chosen = prev[key] ?? []
+					const next = chosen.includes(value)
+						? chosen.filter(other => other !== value)
+						: [...chosen, value]
+					return mergeSearch(prev, {
+						[key]: next.length === 0 ? undefined : next,
+					})
+				},
+			})
 		},
-		[applyPatch],
+		[navigate],
 	)
+	// Stages are alternatives, so picking a second widens rather than narrows:
+	// "everything mid-conversation" is one question, asked of one control.
+	const chosenStatuses = search.status ?? []
+	const toggleStatus = useCallback(
+		(status: CompanyStatus) => {
+			toggleValue('status', status)
+		},
+		[toggleValue],
+	)
+	const clearStatus = useCallback(() => {
+		applyPatch({ status: undefined })
+	}, [applyPatch])
 	const toast = usePriToast()
 	const restoreCompany = useAtomSet(restoreCompanyAtom, { mode: 'promiseExit' })
 	// The menus are counted from the same companies the list holds, so putting
@@ -313,7 +365,7 @@ function CompaniesListPage() {
 	// Counted against the filters already set, and asked for in the same words as
 	// the list itself: a menu offers a narrowing that finds something, plus
 	// whatever is already chosen so it can be taken off again.
-	const { countries, industries, countryValue, industryValue } =
+	const { countries, industries, tags, fitVerdicts, industryValue } =
 		useCompanyFilterOptions(search)
 
 	const activeFilters = hasActiveFilters(search)
@@ -327,10 +379,7 @@ function CompaniesListPage() {
 			? t`1 company`
 			: t`${total} companies`
 
-	const countryItems = [
-		{ value: ALL, label: t`All countries` },
-		...countries.map(c => ({ value: c.value, label: c.label })),
-	]
+	const countryOptions = countries
 	// Filtered by the web-address form, which is what the row carries and what a
 	// shared link keeps working with; the name is what the reader picks from.
 	const industryItems = [
@@ -344,19 +393,49 @@ function CompaniesListPage() {
 			label: i18n._(priorityShortLabels[p]),
 		})),
 	]
-	const ownerItems = [
-		{ value: ALL, label: t`All owners` },
+	// No counts: the colleagues come from the organisation's own list, not from a
+	// tally of the companies, so there is no number to put beside a name.
+	const ownerOptions = [
 		...(meUserId ? [{ value: meUserId, label: t`My leads` }] : []),
 		{ value: 'none', label: t`Unassigned` },
 		...members
 			.filter(m => m.userId !== meUserId)
 			.map(m => ({ value: m.userId, label: m.name })),
 	]
-	const sortItems = [
-		{ value: 'priority', label: t`Priority` },
-		{ value: 'name', label: t`Name` },
-		{ value: 'recent_contact', label: t`Recently contacted` },
-		{ value: 'recent_update', label: t`Recently updated` },
+	// Read off the orders the server actually holds, so a new one cannot be
+	// offered here and quietly ignored there — nor added there and missed here,
+	// since a word without a label below fails to compile.
+	// Each one names the order rather than the field, because the trigger shows
+	// only the value it is set to: a bare "Priority" would sit beside the priority
+	// filter's own "Any priority" and the two would read as the same control.
+	const sortLabels: Record<CompanySort, string> = {
+		priority: t`By priority`,
+		name: t`By name`,
+		recent_contact: t`By last contact`,
+		recent_update: t`By last update`,
+	}
+	const sortItems = COMPANY_SORTS.map(value => ({
+		value,
+		label: sortLabels[value],
+	}))
+	// The threshold rides in the label rather than getting a control of its own:
+	// it only qualifies "gone quiet" and means nothing beside it, but it changes
+	// what the words are worth, so a reader arriving from a heading counted at
+	// sixty days should not read them as the usual fortnight.
+	const attentionLabels: Record<AttentionFilter, string> = {
+		overdue: t`Overdue`,
+		stale:
+			search.staleDays === undefined
+				? t`Gone quiet`
+				: t`Gone quiet · ${search.staleDays}+ days`,
+		'no-next-action': t`Nothing planned`,
+	}
+	const attentionItems = [
+		{ value: ALL, label: t`Anything` },
+		...ATTENTION_FILTERS.map(value => ({
+			value,
+			label: attentionLabels[value],
+		})),
 	]
 
 	return (
@@ -368,6 +447,20 @@ function CompaniesListPage() {
 				boardHref={boardHref(boardSearch(search))}
 				{...(hasResult && total !== undefined ? { subtitle: countLabel } : {})}
 			/>
+
+			{/* Every control in the bar below changes the list without the keyboard
+			 * moving anywhere, so anyone not looking at the screen gets no sign of
+			 * it — including when a control quietly lifts another filter, as the
+			 * bin and what-needs-doing do to each other. This line sits outside the
+			 * block that swaps, because a spoken message that disappears with the
+			 * list it describes is often never read out. */}
+			<SrOnly
+				role='status'
+				aria-live='polite'
+				data-testid='companies-count-announcement'
+			>
+				{hasResult && total !== undefined ? countLabel : ''}
+			</SrOnly>
 
 			<Filters role='group' aria-label={t`Filter companies`}>
 				<SearchWrap>
@@ -388,8 +481,14 @@ function CompaniesListPage() {
 				<StatusFilters role='group' aria-label={t`Filter by status`}>
 					<StatusFilterButton
 						type='button'
-						$active={search.status === undefined}
-						onClick={() => handleStatusFilter(undefined)}
+						$active={chosenStatuses.length === 0}
+						onClick={clearStatus}
+						// It is the one chip that lights up while carrying no state a
+						// listener can hear, so the strip reads as eight toggles and one
+						// plain button with no way to tell which is on. And "All" alone
+						// says nothing about what it is all of.
+						aria-pressed={chosenStatuses.length === 0}
+						aria-label={t`All stages`}
 						data-testid='companies-status-all'
 					>
 						{t`All`}
@@ -398,13 +497,9 @@ function CompaniesListPage() {
 						<StatusFilterButton
 							key={status}
 							type='button'
-							$active={search.status === status}
-							onClick={() =>
-								handleStatusFilter(
-									search.status === status ? undefined : status,
-								)
-							}
-							aria-pressed={search.status === status}
+							$active={chosenStatuses.includes(status)}
+							onClick={() => toggleStatus(status)}
+							aria-pressed={chosenStatuses.includes(status)}
 							data-testid={`companies-status-${status}`}
 						>
 							<StatusBadge status={status} />
@@ -421,6 +516,10 @@ function CompaniesListPage() {
 								// A stage filter would narrow the deleted ones by a stage
 								// nobody is working, which reads as "none of them".
 								status: undefined,
+								// What needs doing is worse: a deleted company is on none of
+								// those lists by definition, so the two together find nothing
+								// at all, every time, with nothing on screen to say why.
+								attention: undefined,
 							})
 						}
 						aria-pressed={search.deleted === 'only'}
@@ -439,11 +538,13 @@ function CompaniesListPage() {
 				/>
 
 				<DropdownRow>
-					<FilterSelect
+					<MultiSelectFilter
 						label={t`Country`}
-						value={countryValue ?? ALL}
-						options={countryItems}
-						onChange={v => applyPatch({ country: v === ALL ? undefined : v })}
+						options={countryOptions}
+						selected={search.country ?? []}
+						onToggle={value => toggleValue('country', value)}
+						onClear={() => applyPatch({ country: undefined })}
+						describeCount={count => t`${count} companies`}
 						testId='companies-filter-country'
 					/>
 					<FilterSelect
@@ -464,18 +565,56 @@ function CompaniesListPage() {
 						}
 						testId='companies-filter-priority'
 					/>
-					<FilterSelect
+					<MultiSelectFilter
 						label={t`Owner`}
-						value={search.owner ?? ALL}
-						options={ownerItems}
-						onChange={v => applyPatch({ owner: v === ALL ? undefined : v })}
+						options={ownerOptions}
+						selected={search.owner ?? []}
+						onToggle={value => toggleValue('owner', value)}
+						onClear={() => applyPatch({ owner: undefined })}
+						describeCount={count => t`${count} companies`}
 						testId='companies-filter-owner'
+					/>
+					<FilterSelect
+						label={t`Attention`}
+						value={search.attention ?? ALL}
+						options={attentionItems}
+						onChange={v =>
+							applyPatch({
+								attention: v === ALL ? undefined : (v as AttentionFilter),
+								// The threshold only qualifies "gone quiet"; left behind on
+								// any other choice it would sit in the link meaning nothing.
+								...(v === 'stale' ? {} : { staleDays: undefined }),
+								// Nothing on these lists is deleted, so asking for both finds
+								// nothing — put the bin down rather than empty the list.
+								...(v === ALL ? {} : { deleted: undefined }),
+							})
+						}
+						testId='companies-filter-attention'
+					/>
+					<MultiSelectFilter
+						label={t`Tags`}
+						options={tags}
+						selected={search.tags ?? []}
+						onToggle={value => toggleValue('tags', value)}
+						onClear={() => applyPatch({ tags: undefined })}
+						describeCount={count => t`${count} companies`}
+						testId='companies-filter-tags'
+					/>
+					<MultiSelectFilter
+						label={t`Fit`}
+						options={fitVerdicts}
+						selected={search.fitVerdict ?? []}
+						onToggle={value => toggleValue('fitVerdict', value)}
+						onClear={() => applyPatch({ fitVerdict: undefined })}
+						describeCount={count => t`${count} companies`}
+						testId='companies-filter-fit'
+						countsStandAlone
 					/>
 					<FilterSelect
 						label={t`Sort`}
 						value={search.sort ?? 'priority'}
 						options={sortItems}
-						onChange={v => applyPatch({ sort: v })}
+						onChange={v => applyPatch({ sort: v as CompanySort })}
 						testId='companies-filter-sort'
 					/>
 					{activeFilters && (
@@ -603,16 +742,7 @@ function CompaniesListPage() {
 
 /** Build the /companies/board URL, carrying the shared filters as query params. */
 function boardHref(search: CompaniesSearch): string {
-	const params = new URLSearchParams()
-	if (search.country) params.set('country', search.country)
-	if (search.industry) params.set('industry', search.industry)
-	if (search.priority !== undefined)
-		params.set('priority', String(search.priority))
-	if (search.owner) params.set('owner', search.owner)
-	if (search.sort) params.set('sort', search.sort)
-	if (search.query) params.set('query', search.query)
-	const qs = params.toString()
-	return qs ? `/companies/board?${qs}` : '/companies/board'
+	return `/companies/board${companiesSearchToQuery(search)}`
 }
 
 function FilterSelect({
@@ -654,83 +784,55 @@ function FilterSelect({
 // ── Helpers ──────────────────────────────────────────────────────
 
 /**
- * Produce the next `CompaniesSearch` from a partial patch while keeping
- * the result strict: any field in `next` that's undefined or empty is
- * *dropped* from the result instead of set to undefined. This is the
- * only way to clear a search param under `exactOptionalPropertyTypes`
- * — assigning `undefined` to an optional field is a TS error.
+ * Produce the next `CompaniesSearch` from a partial patch while keeping the
+ * result strict: any value in `next` that is undefined, blank, or an empty list
+ * is *dropped* from the result instead of set to undefined. That is the only way
+ * to clear a search param under `exactOptionalPropertyTypes` — assigning
+ * `undefined` to an optional field is a TS error.
+ *
+ * Written once over whatever the search holds, rather than a block per field: a
+ * block per field has to be extended for every new filter, and a filter that is
+ * missed simply never clears.
  */
 function mergeSearch(
 	prev: CompaniesSearch,
 	next: Partial<{
-		status: string | undefined
-		country: string | undefined
-		industry: string | undefined
-		priority: number | undefined
-		owner: string | undefined
-		sort: string | undefined
-		query: string | undefined
-		attention: AttentionFilter | undefined
-		staleDays: number | undefined
-		deleted: 'only' | 'include' | undefined
+		[K in keyof CompaniesSearch]: CompaniesSearch[K] | undefined
 	}>,
 ): CompaniesSearch {
-	const result: {
-		status?: string
-		country?: string
-		industry?: string
-		priority?: number
-		owner?: string
-		sort?: string
-		query?: string
-		attention?: AttentionFilter
-		staleDays?: number
-		deleted?: 'only' | 'include'
-	} = {}
-
-	const status = 'status' in next ? next.status : prev.status
-	if (status !== undefined && status !== '') result.status = status
-
-	const country = 'country' in next ? next.country : prev.country
-	if (country !== undefined && country !== '') result.country = country
-
-	const industry = 'industry' in next ? next.industry : prev.industry
-	if (industry !== undefined && industry !== '') result.industry = industry
-
-	const priority = 'priority' in next ? next.priority : prev.priority
-	if (priority !== undefined) result.priority = priority
-
-	const query = 'query' in next ? next.query : prev.query
-	if (query !== undefined && query !== '') result.query = query
-
-	const owner = 'owner' in next ? next.owner : prev.owner
-	if (owner !== undefined && owner !== '') result.owner = owner
-
-	const sort = 'sort' in next ? next.sort : prev.sort
-	if (sort !== undefined && sort !== '') result.sort = sort
-
-	const attention = 'attention' in next ? next.attention : prev.attention
-	if (attention !== undefined) result.attention = attention
-
-	const staleDays = 'staleDays' in next ? next.staleDays : prev.staleDays
-	if (staleDays !== undefined) result.staleDays = staleDays
-
-	const deleted = 'deleted' in next ? next.deleted : prev.deleted
-	if (deleted !== undefined) result.deleted = deleted
-
-	return result
+	const merged: Record<string, unknown> = { ...prev, ...next }
+	const result: Record<string, unknown> = {}
+	for (const [key, value] of Object.entries(merged)) {
+		if (value === undefined || value === null || value === '') continue
+		if (Array.isArray(value)) {
+			const values = (value as ReadonlyArray<string>).filter(v => v !== '')
+			if (values.length === 0) continue
+			result[key] = values
+			continue
+		}
+		result[key] = value
+	}
+	return result as CompaniesSearch
 }
 
+// The two the search holds that do not narrow it: the order to read it in, and
+// how long counts as quiet, which only qualifies the attention filter and means
+// nothing on its own.
+const NON_NARROWING_KEYS = new Set(['sort', 'staleDays'])
+
+/**
+ * Whether anything is narrowing the list.
+ *
+ * Asking the object rather than naming the filters is what stops a new filter
+ * from narrowing the list with nothing on screen offering to clear it.
+ */
 function hasActiveFilters(search: CompaniesSearch): boolean {
-	return (
-		search.status !== undefined ||
-		search.country !== undefined ||
-		search.industry !== undefined ||
-		search.priority !== undefined ||
-		search.owner !== undefined ||
-		search.attention !== undefined ||
-		search.query !== undefined
-	)
+	return Object.entries(search).some(([key, value]) => {
+		if (NON_NARROWING_KEYS.has(key)) return false
+		if (value === undefined || value === null || value === '') return false
+		if (Array.isArray(value)) return value.length > 0
+		return true
+	})
 }
 
 // Typed date fields decode to DateTime.Utc on the wire; fall back to their
@@ -943,7 +1045,12 @@ const DropdownRow = styled.div.withConfig({
 })`
 	display: flex;
 	flex-wrap: wrap;
-	align-items: center;
+	/* Stretch, not centre: one control carries a longer label than the rest —
+	 * "Gone quiet · 30+ days" — and on a narrow row it takes two lines. Centred,
+	 * it would stand taller than its neighbours and the row would read as broken;
+	 * stretched, every control on a line is the same height whatever its label
+	 * does. */
+	align-items: stretch;
 	gap: var(--space-2xs);
 
 	/* Each dropdown takes a share of the line and stops shrinking once it is

@@ -8,7 +8,13 @@ import {
 	CurrentOrg,
 	NotFound,
 } from '@batuda/controllers'
-import { Company, Contact, Interaction } from '@batuda/domain'
+import {
+	Company,
+	type CompanySort,
+	Contact,
+	Interaction,
+	normalizeCountry,
+} from '@batuda/domain'
 
 import { textAnywhere } from '../lib/search-text'
 import {
@@ -27,6 +33,7 @@ import {
 import { type AttentionFilter, attentionCondition } from './company-attention'
 import {
 	findIndustryByName,
+	type Industry,
 	industryForWrite,
 	withIndustry,
 } from './company-industries'
@@ -34,12 +41,15 @@ import { requireOrgMembers } from './org-members'
 import { researchProvenance } from './research-provenance'
 
 export interface CompanyFilters {
-	readonly status?: string | undefined
-	readonly country?: string | undefined
+	// Several values mean any of them. An empty list means nobody asked, not a
+	// condition nothing can meet — which is what a caller sends when it read the
+	// filter off a form and the reader had cleared it.
+	readonly status?: ReadonlyArray<string> | undefined
+	readonly country?: ReadonlyArray<string> | undefined
 	readonly industry?: string | undefined
 	readonly priority?: number | undefined
 	// The run's overall judgement of whether this company is worth selling to.
-	readonly fitVerdict?: string | undefined
+	readonly fitVerdict?: ReadonlyArray<string> | undefined
 	// Narrows to companies whose fit checks marked a matching rule passed, so a
 	// salesperson can ask "who actually meets this criterion?" rather than
 	// trusting the one-word verdict alone.
@@ -52,8 +62,10 @@ export interface CompanyFilters {
 	// which is not a question anybody has asked for.
 	readonly metadataKey?: string | undefined
 	readonly metadataValue?: string | undefined
-	// Owner id to match, or the literal 'none' to match only unassigned companies.
-	readonly owner?: string | undefined
+	// Owner ids to match, and/or the literal 'none' for the companies nobody has
+	// taken. Both together is a real question — what I am working, plus what is
+	// going spare.
+	readonly owner?: ReadonlyArray<string> | undefined
 	// Narrows to what needs doing: a missed follow-up, a company gone quiet, or
 	// one with nothing written down as the next step. Same rules the dashboard
 	// counts by, so a heading there opens a list of the same size here.
@@ -64,8 +76,9 @@ export interface CompanyFilters {
 	// Which companies to look at: the live ones by default, 'only' for the ones
 	// taken out of view (how somebody finds one to put back), 'include' for both.
 	readonly deleted?: 'only' | 'include' | undefined
-	// One of the whitelisted sort keys below; anything else falls back to priority.
-	readonly sort?: string | undefined
+	// Which order to read the list in. A closed set, so an order the server does
+	// not hold is turned away at the door rather than quietly ignored here.
+	readonly sort?: CompanySort | undefined
 	readonly query?: string | undefined
 	// Bounding box on the geocoded coordinates. Each bound is applied
 	// independently, so a partial box (e.g. only a southern edge) still narrows.
@@ -90,23 +103,65 @@ export interface CompanyFilters {
 export const normalizeTaxId = (taxId: string): string =>
 	taxId.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
 
+/** A filter that offers a menu of its values, each with how many it would find. */
+export type CompanyFacetKey = 'country' | 'industry' | 'tags' | 'fitVerdict'
+
+/**
+ * The filters whose values are requirements rather than alternatives.
+ *
+ * This one fact decides how a menu is counted, so it is written here instead of
+ * being remembered at each call. Naming a second country swaps the first, so
+ * every country has to be counted with the country filter lifted — otherwise the
+ * one already chosen is the only entry above zero and there is no way to change
+ * it. Naming a second tag adds to the first, so a tag is counted with the tags
+ * already chosen still in force: the number then says what is left if you add it,
+ * which is what adding it will actually do.
+ *
+ */
+const FILTERS_NEEDING_EVERY_VALUE = new Set<CompanyFacetKey>(['tags'])
+
+/**
+ * The values actually being asked for, with the blanks dropped.
+ *
+ * Blanks, and an empty list once they are gone, are what a caller sends when it
+ * read the filter off a form the reader had cleared — or off a link with a
+ * trailing comma. Left in, `IN ('')` matches nothing and the screen reports the
+ * organisation as empty; treated as nobody asking, the list is simply unfiltered,
+ * which is what was meant.
+ */
+const asked = (
+	values: ReadonlyArray<string> | undefined,
+): ReadonlyArray<string> | undefined => {
+	if (values === undefined) return undefined
+	const kept = values.filter(value => value.trim() !== '')
+	return kept.length === 0 ? undefined : kept
+}
+
 /**
  * The conditions a company search is narrowed by.
  *
  * The per-value counts are built from these same conditions, so what a count
  * promises about a value and what a search does with it cannot drift apart.
  *
- * `omit` leaves one filter out. A value is counted under every filter except
- * its own: counted under the chosen country, every other country would read
- * zero and there would be no way to swap one for another.
+ * `facetFor` says which menu is being counted, not which condition to skip —
+ * whether the filter is lifted follows from the rule above, so a caller cannot
+ * get it wrong by guessing.
  */
 const companyConditions = (
 	sql: SqlClient.SqlClient,
 	orgId: string,
 	filters: CompanyFilters,
-	omit?: 'country' | 'industry',
+	facetFor?: CompanyFacetKey,
+	// The trade the filter names, already looked up. Several condition sets are
+	// built for one request and all but one of them keep the trade filter, so
+	// without this each would ask the database for the same trade again.
+	trade?: Industry | undefined,
 ) =>
 	Effect.gen(function* () {
+		const lifted =
+			facetFor !== undefined && !FILTERS_NEEDING_EVERY_VALUE.has(facetFor)
+				? facetFor
+				: undefined
 		const conditions: Array<Statement.Fragment> = [
 			sql`organization_id = ${orgId}`,
 		]
@@ -116,22 +171,38 @@ const companyConditions = (
 		if (filters.deleted === 'only') conditions.push(sql`deleted_at IS NOT NULL`)
 		else if (filters.deleted !== 'include')
 			conditions.push(sql`deleted_at IS NULL`)
-		if (filters.status) conditions.push(sql`status = ${filters.status}`)
-		if (filters.country && omit !== 'country')
-			conditions.push(sql`country = ${filters.country}`)
-		if (filters.industry && omit !== 'industry') {
-			const trade = yield* findIndustryByName(sql, orgId, filters.industry)
+		const statuses = asked(filters.status)
+		if (statuses !== undefined)
+			conditions.push(sql`status IN ${sql.in(statuses)}`)
+		// Raised to capitals to match how they are stored, so a link written by
+		// hand with a lowercase code still finds the companies it names.
+		const countries = asked(filters.country)?.map(normalizeCountry)
+		if (countries !== undefined && lifted !== 'country')
+			conditions.push(sql`country IN ${sql.in(countries)}`)
+		if (filters.industry && lifted !== 'industry') {
+			const found =
+				trade ?? (yield* findIndustryByName(sql, orgId, filters.industry))
 			conditions.push(
-				trade === undefined ? sql`false` : sql`industry_id = ${trade.id}`,
+				found === undefined ? sql`false` : sql`industry_id = ${found.id}`,
 			)
 		}
 		if (filters.priority !== undefined)
 			conditions.push(sql`priority = ${filters.priority}`)
-		// 'none' narrows to unassigned leads; any other value matches one owner.
-		if (filters.owner === 'none') conditions.push(sql`owner_id IS NULL`)
-		else if (filters.owner) conditions.push(sql`owner_id = ${filters.owner}`)
-		if (filters.fitVerdict)
-			conditions.push(sql`fit_verdict = ${filters.fitVerdict}`)
+		// 'none' is the companies nobody has taken, and it sits beside the ids
+		// rather than replacing them: "mine or going spare" is one question, and
+		// an owner column has no value standing for nobody to match against.
+		const owners = asked(filters.owner)
+		if (owners !== undefined) {
+			const unassigned = owners.includes('none')
+			const ids = owners.filter(id => id !== 'none')
+			if (ids.length === 0) conditions.push(sql`owner_id IS NULL`)
+			else if (!unassigned) conditions.push(sql`owner_id IN ${sql.in(ids)}`)
+			else
+				conditions.push(sql`(owner_id IS NULL OR owner_id IN ${sql.in(ids)})`)
+		}
+		const verdicts = asked(filters.fitVerdict)
+		if (verdicts !== undefined && lifted !== 'fitVerdict')
+			conditions.push(sql`fit_verdict IN ${sql.in(verdicts)}`)
 		// A missing or empty fit_checks simply matches nothing, rather than
 		// tripping the element expansion on a null.
 		if (filters.fitCriterionPassed)
@@ -142,13 +213,10 @@ const companyConditions = (
 						AND normalize(fc->>'criterion') ILIKE ${textAnywhere(filters.fitCriterionPassed)}
 				)`,
 			)
-		// Blanks are dropped before the list is judged empty, and an empty list is
-		// the same as not asking rather than a condition nothing can satisfy. Both
-		// are what a caller sends when it read its tags from a form: asking for a
-		// tag no company carries would answer "there are none of those", which is
-		// true of the blank and false of what was meant.
-		const tags = filters.tags?.filter(tag => tag.trim() !== '')
-		if (tags !== undefined && tags.length > 0)
+		// Every tag named has to be on the company, which is the one filter here
+		// whose values narrow rather than widen.
+		const tags = asked(filters.tags)
+		if (tags !== undefined && lifted !== 'tags')
 			conditions.push(sql`tags @> ${tags}::text[]`)
 		if (
 			filters.metadataKey !== undefined &&
@@ -279,20 +347,39 @@ export class CompanyService extends Context.Service<CompanyService>()(
 						const onOffer = yield* companyConditions(sql, currentOrg.id, {
 							deleted: filters.deleted,
 						})
-						const countryMatches = yield* companyConditions(
-							sql,
-							currentOrg.id,
-							filters,
-							'country',
-						)
-						const industryMatches = yield* companyConditions(
-							sql,
-							currentOrg.id,
-							filters,
-							'industry',
-						)
+						const trade = filters.industry
+							? yield* findIndustryByName(sql, currentOrg.id, filters.industry)
+							: undefined
+						const [countryMatches, industryMatches, tagMatches, fitMatches] =
+							yield* Effect.all(
+								[
+									companyConditions(
+										sql,
+										currentOrg.id,
+										filters,
+										'country',
+										trade,
+									),
+									companyConditions(
+										sql,
+										currentOrg.id,
+										filters,
+										'industry',
+										trade,
+									),
+									companyConditions(sql, currentOrg.id, filters, 'tags', trade),
+									companyConditions(
+										sql,
+										currentOrg.id,
+										filters,
+										'fitVerdict',
+										trade,
+									),
+								],
+								{ concurrency: 'unbounded' },
+							)
 
-						const country = yield* sql<{
+						const countryQuery = sql<{
 							readonly value: string
 							readonly count: number
 						}>`
@@ -313,7 +400,7 @@ export class CompanyService extends Context.Service<CompanyService>()(
 						// The join is also what puts a trade on offer: somebody has to be
 						// on it, since a trade nothing can match is only a way to empty the
 						// list.
-						const industry = yield* sql<{
+						const industryQuery = sql<{
 							readonly slug: string
 							readonly label: string
 							readonly count: number
@@ -331,7 +418,51 @@ export class CompanyService extends Context.Service<CompanyService>()(
 							ORDER BY i.label
 						`
 
-						return { country, industry }
+						// Counted per distinct company, not per row: expanding the array
+						// gives one row per tag a company carries, and nothing stops the
+						// same tag being written onto a company twice — which would then
+						// count it twice. The expansion is named `tag`, deliberately not
+						// `tags`: an alias of that name shadows the column, and the
+						// `tags @> …` condition above would quietly bind to it instead.
+						const tagsQuery = sql<{
+							readonly value: string
+							readonly count: number
+						}>`
+							SELECT tag AS value,
+								count(DISTINCT companies.id) FILTER (
+									WHERE ${sql.and(tagMatches)}
+								)::int AS count
+							FROM companies, unnest(tags) AS tag
+							WHERE ${sql.and(onOffer)}
+								AND tag <> ''
+							GROUP BY tag
+							ORDER BY count DESC, value ASC
+						`
+						// Whatever a run actually wrote, not the four words expected of it.
+						// The column is free text on purpose, so a fifth verdict has to be
+						// offered rather than hide every company carrying it.
+						const fitVerdictQuery = sql<{
+							readonly value: string
+							readonly count: number
+						}>`
+							SELECT fit_verdict AS value,
+								count(*) FILTER (WHERE ${sql.and(fitMatches)})::int AS count
+							FROM companies
+							WHERE ${sql.and(onOffer)}
+								AND fit_verdict IS NOT NULL
+								AND fit_verdict <> ''
+							GROUP BY fit_verdict
+							ORDER BY count DESC, value ASC
+						`
+
+						// Asked side by side: four counts of the same companies, none of
+						// which needs another's answer, and a filter bar re-asks for all of
+						// them every time somebody ticks anything.
+						const [country, industry, tags, fitVerdict] = yield* Effect.all(
+							[countryQuery, industryQuery, tagsQuery, fitVerdictQuery],
+							{ concurrency: 'unbounded' },
+						)
+						return { country, industry, tags, fitVerdict }
 					}),
 
 				findBySlug: (slug: string) =>

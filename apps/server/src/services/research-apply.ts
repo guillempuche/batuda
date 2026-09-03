@@ -1,4 +1,4 @@
-import { Cause, DateTime, Effect } from 'effect'
+import { Cause, DateTime, Effect, Schema } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
@@ -7,6 +7,8 @@ import {
 	COMPANY_PRIORITIES,
 	COMPANY_SIZE_RANGES,
 	COMPANY_STATUSES,
+	CompanyCountry,
+	CompanyTag,
 	channelAddressIsValid,
 	isVerificationVerdict,
 	MAPS_ADDRESS_PATTERN,
@@ -271,6 +273,28 @@ const COMPANY_FIELD_SHAPES: ReadonlyArray<{
 		ok: value => MAPS_ADDRESS_PATTERN.test(value),
 		wanted: 'a Google Maps link',
 	},
+	{
+		field: 'country',
+		ok: value => Schema.is(CompanyCountry)(value.toUpperCase()),
+		wanted: 'a two-letter country code',
+	},
+]
+
+// Fields holding a list, whose every entry has to look like something. A model
+// writing a label list will happily put a comma inside one entry, and several
+// tags travel to and from a screen as a single comma-separated value — so a tag
+// holding one is split on the way back into tags nobody carries, and the company
+// stops being findable under the tag it is actually wearing.
+const COMPANY_LIST_FIELD_SHAPES: ReadonlyArray<{
+	readonly field: string
+	readonly ok: (value: string) => boolean
+	readonly wanted: string
+}> = [
+	{
+		field: 'tags',
+		ok: value => Schema.is(CompanyTag)(value),
+		wanted: 'a tag with no comma in it and no blank ends',
+	},
 ]
 
 const COMPANY_FIELD_VOCABULARIES: ReadonlyArray<FieldVocabulary> = [
@@ -323,6 +347,17 @@ export const checkFieldValues = (
 			if (raw === null || raw === undefined) continue
 			if (typeof raw === 'string' && ok(raw)) continue
 			return `${field} must be ${wanted} — got ${JSON.stringify(raw)}`
+		}
+	if (table === 'companies')
+		for (const { field, ok, wanted } of COMPANY_LIST_FIELD_SHAPES) {
+			if (!(field in fields)) continue
+			const raw = fields[field]
+			if (raw === null || raw === undefined) continue
+			if (!Array.isArray(raw))
+				return `${field} must be a list — got ${JSON.stringify(raw)}`
+			const bad = raw.find(entry => typeof entry !== 'string' || !ok(entry))
+			if (bad !== undefined)
+				return `every ${field} entry must be ${wanted} — got ${JSON.stringify(bad)}`
 		}
 	return null
 }

@@ -167,8 +167,10 @@ msgstr "{0} ready to apply, {1} need reading, {attentionTotal} runs need attenti
 msgid "{0} reported a message as spam, so it is blocked."
 msgstr "{0} reported a message as spam, so it is blocked."
 
+#. placeholder {0}: selected.length
 #. placeholder {0}: selection.selectedCount
 #: src/components/companies/pipeline-board.tsx
+#: src/components/shared/multi-select-filter.tsx
 msgid "{0} selected"
 msgstr "{0} selected"
 
@@ -191,6 +193,13 @@ msgstr "{addedEmail} is now a member. They've been emailed."
 #: src/routes/settings/mcp/connections.tsx
 msgid "{confirmLabel}'s assistant stops reaching this organization on its next request. It keeps working in any other organization they belong to, and they can't undo this themselves."
 msgstr "{confirmLabel}'s assistant stops reaching this organization on its next request. It keeps working in any other organization they belong to, and they can't undo this themselves."
+
+#: src/routes/companies/index.tsx
+#: src/routes/companies/index.tsx
+#: src/routes/companies/index.tsx
+#: src/routes/companies/index.tsx
+msgid "{count} companies"
+msgstr "{count} companies"
 
 #: src/routes/companies/$slug.tsx
 msgid "{count} people went with it"
@@ -534,10 +543,6 @@ msgstr "AI assistants you've connected over MCP. Each works in the organizations
 msgid "All"
 msgstr "All"
 
-#: src/routes/companies/index.tsx
-msgid "All countries"
-msgstr "All countries"
-
 #: src/routes/emails/index.tsx
 #: src/routes/emails/index.tsx
 msgid "All inboxes"
@@ -547,13 +552,13 @@ msgstr "All inboxes"
 msgid "All industries"
 msgstr "All industries"
 
-#: src/routes/companies/index.tsx
-msgid "All owners"
-msgstr "All owners"
-
 #: src/components/research/inbox/research-inbox.tsx
 msgid "All runs"
 msgstr "All runs"
+
+#: src/routes/companies/index.tsx
+msgid "All stages"
+msgstr "All stages"
 
 #: src/routes/pages/index.tsx
 msgid "All statuses"
@@ -645,6 +650,10 @@ msgstr "Any confidence"
 #: src/routes/companies/index.tsx
 msgid "Any priority"
 msgstr "Any priority"
+
+#: src/routes/companies/index.tsx
+msgid "Anything"
+msgstr "Anything"
 
 #: src/routes/settings/api-keys/index.tsx
 #: src/routes/settings/profile/index.tsx
@@ -789,6 +798,10 @@ msgstr "Attach"
 #: src/routes/emails/$threadId.tsx
 msgid "attachment"
 msgstr "attachment"
+
+#: src/routes/companies/index.tsx
+msgid "Attention"
+msgstr "Attention"
 
 #: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/inbox/research-inbox.tsx
@@ -940,6 +953,22 @@ msgstr "Bullet list"
 #: src/routes/settings/api-keys/index.tsx
 msgid "by {creatorName}"
 msgstr "by {creatorName}"
+
+#: src/routes/companies/index.tsx
+msgid "By last contact"
+msgstr "By last contact"
+
+#: src/routes/companies/index.tsx
+msgid "By last update"
+msgstr "By last update"
+
+#: src/routes/companies/index.tsx
+msgid "By name"
+msgstr "By name"
+
+#: src/routes/companies/index.tsx
+msgid "By priority"
+msgstr "By priority"
 
 #: src/routes/settings/organization/spend.tsx
 msgid "By provider"
@@ -1101,6 +1130,7 @@ msgid "Claude Desktop can't reach a remote server directly, so this bridges thro
 msgstr "Claude Desktop can't reach a remote server directly, so this bridges through <0>mcp-remote</0> (needs Node installed). Or add it as an OAuth connector instead."
 
 #: src/components/companies/pipeline-board.tsx
+#: src/components/shared/multi-select-filter.tsx
 #: src/components/shared/task-item.tsx
 #: src/routes/companies/$slug.tsx
 #: src/routes/emails/index.tsx
@@ -2555,6 +2585,7 @@ msgstr "First outreach sent"
 #: src/components/companies/company-fit-section.tsx
 #: src/components/companies/company-fit-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
+#: src/routes/companies/index.tsx
 msgid "Fit"
 msgstr "Fit"
 
@@ -2670,6 +2701,15 @@ msgstr "Go to connections"
 #: src/routes/reset-password.tsx
 msgid "Go to sign in"
 msgstr "Go to sign in"
+
+#: src/routes/companies/index.tsx
+msgid "Gone quiet"
+msgstr "Gone quiet"
+
+#. placeholder {0}: search.staleDays
+#: src/routes/companies/index.tsx
+msgid "Gone quiet · {0}+ days"
+msgstr "Gone quiet · {0}+ days"
 
 #: src/components/instructions/template-transfer-dialog.tsx
 msgid "Hand it over"
@@ -3456,7 +3496,6 @@ msgstr "My stacks"
 #: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/instructions/stack-editor.tsx
 #: src/components/instructions/template-dialog.tsx
-#: src/routes/companies/index.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/settings/api-keys/index.tsx
 msgid "Name"
@@ -3473,6 +3512,14 @@ msgstr "name@company.com"
 #: src/components/emails/compose-form.tsx
 msgid "name@example.com, another@example.com"
 msgstr "name@example.com, another@example.com"
+
+#: src/components/shared/multi-select-filter.tsx
+msgid "Narrow this list"
+msgstr "Narrow this list"
+
+#: src/components/shared/multi-select-filter.tsx
+msgid "Narrow this list…"
+msgstr "Narrow this list…"
 
 #: src/routes/index.tsx
 #: src/routes/index.tsx
@@ -3885,7 +3932,7 @@ msgstr "Normal priority"
 msgid "Not a contact on file yet"
 msgstr "Not a contact on file yet"
 
-#: src/components/companies/company-fit-section.tsx
+#: src/lib/company-fit-verdict.ts
 msgid "Not a fit"
 msgstr "Not a fit"
 
@@ -3953,6 +4000,10 @@ msgstr "Nothing is connected to this organization yet."
 msgid "Nothing later in the queue"
 msgstr "Nothing later in the queue"
 
+#: src/components/shared/multi-select-filter.tsx
+msgid "Nothing matches"
+msgstr "Nothing matches"
+
 #: src/components/research/inbox/research-inbox.tsx
 msgid "nothing on file, would add"
 msgstr "nothing on file, would add"
@@ -3960,6 +4011,10 @@ msgstr "nothing on file, would add"
 #: src/routes/tasks/index.tsx
 msgid "Nothing overdue"
 msgstr "Nothing overdue"
+
+#: src/routes/companies/index.tsx
+msgid "Nothing planned"
+msgstr "Nothing planned"
 
 #: src/routes/tasks/index.tsx
 msgid "Nothing snoozed"
@@ -4230,6 +4285,7 @@ msgid "Outside the area searched:"
 msgstr "Outside the area searched:"
 
 #: src/components/companies/next-action-card.tsx
+#: src/routes/companies/index.tsx
 #: src/routes/index.tsx
 #: src/routes/index.tsx
 #: src/routes/tasks/index.tsx
@@ -4468,8 +4524,8 @@ msgstr "Plain"
 msgid "Please try again."
 msgstr "Please try again."
 
-#: src/components/companies/company-fit-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
+#: src/lib/company-fit-verdict.ts
 msgid "Possible fit"
 msgstr "Possible fit"
 
@@ -4511,7 +4567,6 @@ msgstr "Primary inbox set"
 msgid "Primary navigation"
 msgstr "Primary navigation"
 
-#: src/routes/companies/index.tsx
 #: src/routes/companies/index.tsx
 #: src/routes/tasks/index.tsx
 msgid "Priority"
@@ -4692,14 +4747,6 @@ msgstr "Recent runs"
 #: src/components/companies/research-summary-card.tsx
 msgid "recently"
 msgstr "recently"
-
-#: src/routes/companies/index.tsx
-msgid "Recently contacted"
-msgstr "Recently contacted"
-
-#: src/routes/companies/index.tsx
-msgid "Recently updated"
-msgstr "Recently updated"
 
 #: src/routes/companies/$slug.tsx
 msgid "Recipient marked as spam"
@@ -5581,8 +5628,8 @@ msgstr "Strengths"
 msgid "Strikethrough"
 msgstr "Strikethrough"
 
-#: src/components/companies/company-fit-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
+#: src/lib/company-fit-verdict.ts
 msgid "Strong fit"
 msgstr "Strong fit"
 
@@ -5618,6 +5665,7 @@ msgstr "System"
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/run-labels.ts
+#: src/routes/companies/index.tsx
 msgid "Tags"
 msgstr "Tags"
 
@@ -6371,8 +6419,8 @@ msgstr "We don't recognize that email. Ask an admin to invite you."
 msgid "We sent a sign-in link to"
 msgstr "We sent a sign-in link to"
 
-#: src/components/companies/company-fit-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
+#: src/lib/company-fit-verdict.ts
 msgid "Weak fit"
 msgstr "Weak fit"
 

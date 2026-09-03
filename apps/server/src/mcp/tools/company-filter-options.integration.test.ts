@@ -181,7 +181,7 @@ describe('search_companies filter options', () => {
 			// GIVEN an ordinary search
 
 			// WHEN it is run without asking for the filter values
-			const result = await search({ status: 'client', limit: 5 })
+			const result = await search({ status: ['client'], limit: 5 })
 
 			// THEN no options come back — an assistant that did not ask pays neither
 			// the extra query nor the tokens
@@ -196,7 +196,7 @@ describe('search_companies filter options', () => {
 
 			// WHEN the search asks for the filter values
 			const result = await search({
-				status: 'client',
+				status: ['client'],
 				limit: 5,
 				include_filter_options: true,
 			})
@@ -212,7 +212,7 @@ describe('search_companies filter options', () => {
 
 			// WHEN the filter values are asked for at a stage neither company is in
 			const result = await search({
-				status: 'prospect',
+				status: ['prospect'],
 				limit: 5,
 				include_filter_options: true,
 			})

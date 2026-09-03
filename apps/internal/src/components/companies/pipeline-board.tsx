@@ -311,7 +311,7 @@ function BoardColumn({
 }) {
 	const { t } = useLingui()
 	const columnSearch = useMemo<CompaniesSearch>(
-		() => ({ ...search, status }),
+		() => ({ ...search, status: [status] }),
 		[search, status],
 	)
 	const list = useInfiniteList({

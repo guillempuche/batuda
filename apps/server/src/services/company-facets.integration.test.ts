@@ -59,12 +59,16 @@ const insertCompany = async (options: {
 	readonly tradeId: string
 	readonly deleted?: boolean
 	readonly organizationId?: string
+	readonly tags?: ReadonlyArray<string>
+	readonly fitVerdict?: string | null
 }): Promise<void> => {
 	const slug = `${TAG}-${options.name}`
 	await pool.query(
 		`INSERT INTO companies (
-			organization_id, slug, name, status, country, industry_id, deleted_at
-		 ) VALUES ($1, $2, $2, $3, $4, $5, CASE WHEN $6 THEN now() ELSE NULL END)`,
+			organization_id, slug, name, status, country, industry_id, deleted_at,
+			tags, fit_verdict
+		 ) VALUES ($1, $2, $2, $3, $4, $5, CASE WHEN $6 THEN now() ELSE NULL END,
+			$7, $8)`,
 		[
 			options.organizationId ?? orgId,
 			slug,
@@ -72,6 +76,8 @@ const insertCompany = async (options: {
 			options.country,
 			options.tradeId,
 			options.deleted ?? false,
+			options.tags ?? [],
+			options.fitVerdict ?? null,
 		],
 	)
 }
@@ -142,18 +148,28 @@ beforeAll(async () => {
 		country: 'PT',
 		tradeId: binTrade,
 		deleted: true,
+		// Only the deleted company carries this tag and this verdict, so both must
+		// be absent from the menus that describe the companies in use.
+		tags: [`${TAG}-gone`],
+		fitVerdict: `${TAG}-buried`,
 	})
 	await insertCompany({
 		name: 'client',
 		status: 'client',
 		country: 'IT',
 		tradeId: quietTrade,
+		tags: [`${TAG}-beta`],
+		fitVerdict: `${TAG}-strong`,
 	})
 	await insertCompany({
 		name: 'prospect',
 		status: 'prospect',
 		country: 'FR',
 		tradeId: busyTrade,
+		// The only one on both tags, so asking for one has something to keep and
+		// something to drop.
+		tags: [`${TAG}-alpha`, `${TAG}-beta`],
+		fitVerdict: `${TAG}-strong`,
 	})
 	// Live, and in a country nothing in this organisation is in — so only the
 	// organisation boundary can keep it out of these counts.
@@ -171,6 +187,8 @@ beforeAll(async () => {
 		status: 'prospect',
 		country: 'FR',
 		tradeId: busyTrade,
+		tags: [`${TAG}-alpha`],
+		fitVerdict: `${TAG}-possible`,
 	})
 	// One with no country and one with an empty string: both are absences that
 	// must never be offered as something to narrow by.
@@ -179,12 +197,20 @@ beforeAll(async () => {
 		status: 'prospect',
 		country: null,
 		tradeId: busyTrade,
+		// The same tag written twice, which nothing prevents. Expanding the array
+		// gives this company two rows for it, so a naive count would say two
+		// companies carry it.
+		tags: [`${TAG}-dupe`, `${TAG}-dupe`],
 	})
 	await insertCompany({
 		name: 'blank',
 		status: 'prospect',
 		country: '',
 		tradeId: busyTrade,
+		// A blank tag and a blank verdict are absences too, and must not be
+		// offered as something to narrow by.
+		tags: [''],
+		fitVerdict: '',
 	})
 }, 60_000)
 
@@ -260,7 +286,7 @@ describe('company filter options', () => {
 			// GIVEN one prospect in France and one client in Italy
 
 			// WHEN the options are read for prospects
-			const facets = await facetsFor({ status: 'prospect' })
+			const facets = await facetsFor({ status: ['prospect'] })
 
 			// THEN both countries are still returned, and only France has anything
 			// behind it — a zero says the value exists but finds nothing here, which
@@ -296,7 +322,7 @@ describe('company filter options', () => {
 			// GIVEN France is the chosen country
 
 			// WHEN the options are read
-			const facets = await facetsFor({ country: 'FR' })
+			const facets = await facetsFor({ country: ['FR'] })
 
 			// THEN the countries are counted as though nothing were chosen — counting
 			// them under their own filter would leave every other one reading zero
@@ -330,6 +356,104 @@ describe('company filter options', () => {
 			expect(mine(facets.country, c => c.value)).toEqual([
 				['FR', 2],
 				['IT', 0],
+			])
+		})
+	})
+
+	describe('when tags are offered', () => {
+		it('should count each tag once per company, however often it was written', async () => {
+			// GIVEN one company carries the same tag twice, and none of the tags on
+			// the deleted company belong to a company in use
+
+			// WHEN the tags are read with nothing filtered
+			const facets = await facetsFor({})
+
+			// THEN each tag names the companies carrying it, the doubly-written one
+			// counting for the single company it is on, and the deleted company's own
+			// tag is not offered at all
+			expect(mine(facets.tags, t => t.value)).toEqual([
+				[`${TAG}-alpha`, 2],
+				[`${TAG}-beta`, 2],
+				[`${TAG}-dupe`, 1],
+			])
+		})
+
+		it('should not offer a blank tag as something to narrow by', async () => {
+			// GIVEN a company was written with an empty string among its tags
+
+			// WHEN the tags are read
+			const facets = await facetsFor({})
+
+			// THEN nothing empty is on offer — it is an absence, not a value
+			expect(facets.tags.map(t => t.value)).not.toContain('')
+		})
+	})
+
+	describe('when a tag is already chosen', () => {
+		it('should count the others as what adding them would leave', async () => {
+			// GIVEN alpha is chosen, and only one of its two companies also has beta
+
+			// WHEN the tags are read
+			const facets = await facetsFor({ tags: [`${TAG}-alpha`] })
+
+			// THEN each tag says what would be left if it were added to alpha, which
+			// is the opposite of how a country is counted: naming a second country
+			// swaps the first, naming a second tag narrows what the first found
+			expect(mine(facets.tags, t => t.value)).toEqual([
+				[`${TAG}-alpha`, 2],
+				[`${TAG}-beta`, 1],
+				[`${TAG}-dupe`, 0],
+			])
+		})
+
+		it('should narrow the other menus by it, since they are not its own', async () => {
+			// GIVEN alpha is chosen, and both its companies are French
+
+			// WHEN the countries are read
+			const facets = await facetsFor({ tags: [`${TAG}-alpha`] })
+
+			// THEN Italy finds nothing under it
+			expect(mine(facets.country, c => c.value)).toEqual([
+				['FR', 2],
+				['IT', 0],
+			])
+		})
+	})
+
+	describe('when fit verdicts are offered', () => {
+		it('should count whatever a run wrote, not only the words expected of it', async () => {
+			// GIVEN the verdicts on file are none of strong_fit / possible_fit /
+			// weak_fit / no_fit — the column is free text, so a run may write a word
+			// nobody listed
+
+			// WHEN the verdicts are read
+			const facets = await facetsFor({})
+
+			// THEN each one is offered with its count, and neither the blank nor the
+			// deleted company's verdict appears
+			expect(mine(facets.fitVerdict, v => v.value)).toEqual([
+				[`${TAG}-strong`, 2],
+				[`${TAG}-possible`, 1],
+			])
+		})
+
+		it('should keep offering the others once one is chosen', async () => {
+			// GIVEN one verdict is chosen
+
+			// WHEN the verdicts are read
+			const facets = await facetsFor({ fitVerdict: [`${TAG}-strong`] })
+
+			// THEN they are counted as though nothing were chosen, so a different one
+			// can be picked — the same rule the countries follow
+			expect(mine(facets.fitVerdict, v => v.value)).toEqual([
+				[`${TAG}-strong`, 2],
+				[`${TAG}-possible`, 1],
+			])
+
+			// AND the countries respect it, since that filter is not their own
+			expect(mine(facets.country, c => c.value)).toEqual([
+				['FR', 1],
+				['IT', 1],
 			])
 		})
 	})

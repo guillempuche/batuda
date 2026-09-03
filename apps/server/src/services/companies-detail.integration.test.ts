@@ -216,7 +216,7 @@ describe('filtering companies by how well they fit', () => {
 			])
 
 			// WHEN the strong fits are asked for
-			const rows = await searchWith({ fitVerdict: 'strong_fit' })
+			const rows = await searchWith({ fitVerdict: ['strong_fit'] })
 
 			// THEN only the strong one comes back
 			const ids = rows.map(r => r['id'])
