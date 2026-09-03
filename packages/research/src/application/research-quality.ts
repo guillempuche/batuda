@@ -8,7 +8,7 @@
  * `low_confidence` flag from signals the run already produced. The flag is deliberately conservative: it should catch the
  * clearly-thin runs, not second-guess a solid one.
  *
- * Six signals raise it. Whenever a run was pinned to one company, anything short
+ * Seven signals raise it. Whenever a run was pinned to one company, anything short
  * of clearly reaching that company counts — which covers an enrichment filling
  * that company's profile and equally a scan launched from it, since a scan can be
  * pinned to a subject too and a wrong one there is just as misleading. On top of
@@ -28,6 +28,13 @@
  * that ask whether its pages are that company's — not weaker checks, no checks —
  * and every one of them was skipped in silence. That is exactly what this flag
  * is for, so it says so and the run is read before it is acted on.
+ *
+ * The seventh reads the one thing a place-scoped request is actually about. A
+ * scan asked for companies in a town can hand back a full, well-cited list with
+ * not one company established as being in that town, and every count above reads
+ * it as a good result — the companies are real, the pages were reached, the list
+ * is long. Only the place check knows, and until it is read here it told the logs
+ * and not the reader.
  */
 
 import { DISCOVERY_THIN_RESULT_COUNT, isDiscoveryScan } from './discovery-scan'
@@ -138,6 +145,36 @@ export interface RunQualityInput {
 		readonly confirmed: number
 		readonly candidates: number
 	} | null
+	/**
+	 * Where the list stands against the area the run was asked about. Null when
+	 * that question does not arise — a request that named no area, or a kind of
+	 * run the place check does not read.
+	 */
+	readonly place: PlaceStanding | null
+}
+
+/**
+ * How a scan's list stands against the area it was asked about.
+ *
+ * Four numbers rather than one, because a quiet result has several causes and
+ * only telling them apart says whether anything was actually checked. `asked` is
+ * the scale the other three read against: rows that said enough about where they
+ * are to be held to the area at all. A row that said nothing is not in it, which
+ * is the same silence-is-not-a-conflict rule the check itself follows.
+ *
+ * The three then split `asked` between rows placed in the area, rows placed
+ * outside it, and rows the check read and could not place. What is left over is
+ * the rows it never reached — a list it ran out of time on partway through.
+ */
+export interface PlaceStanding {
+	/** Rows that said enough about where they are to be held to the area. */
+	readonly asked: number
+	/** Of those, the ones established as being in it. */
+	readonly inside: number
+	/** Of those, the ones established as being somewhere else. */
+	readonly outside: number
+	/** Of those, the ones read and not placed either way. */
+	readonly unclear: number
 }
 
 /**
@@ -241,6 +278,17 @@ export interface RunQuality {
 		readonly candidates: number
 	}
 	/**
+	 * Where the list stands against the area asked for. Absent where the question
+	 * does not arise — a request that named no area.
+	 *
+	 * Reported as well as gated on, because the flag below only fires in the one
+	 * case where nothing at all was placed inside, and everything short of that
+	 * is a judgement about this list that belongs to its reader. It is also the
+	 * only place a reader learns the check ran: a list nothing was marked on and
+	 * a list nothing was checked on look identical without it.
+	 */
+	readonly place?: PlaceStanding
+	/**
 	 * Present, and only ever true, when the run's own subject could not be read,
 	 * so the checks that hold its pages against it never ran. Written down as the
 	 * run's own stated reason rather than left in the logs, because a reader
@@ -291,13 +339,30 @@ export const computeRunQuality = (input: RunQualityInput): RunQuality => {
 	// is no verdict to be unsure of, so the run arrives here carrying the same
 	// empty verdict as a scan that was about nobody in particular.
 	const subjectWentUnchecked = input.subjectUnreadable
+	// And a run asked for companies in a place, whose answer puts none of them
+	// there, has not answered the question it was asked, however long its list is.
+	// The three ways that happens are one signal on purpose: the check never ran,
+	// it read every row and could place none of them, or every row it did place
+	// was somewhere else. All three leave a reader holding a list that vouches for
+	// nobody on the one thing the request was about.
+	//
+	// A single row placed inside keeps this quiet, which is what stops it firing
+	// on an honest scan — this is the floor, not a share to argue over. The rows
+	// count guards the empty list, which has its own reading elsewhere and would
+	// otherwise raise this for having nothing to place.
+	const noneWereInThePlaceAsked =
+		input.place !== null &&
+		input.scanResults !== null &&
+		input.scanResults > 0 &&
+		input.place.inside === 0
 	const lowConfidence =
 		unsureOfTheCompany ||
 		thinlyVetted ||
 		thinResultList ||
 		nothingStandsBehindIt ||
 		partsWentUnanswered ||
-		subjectWentUnchecked
+		subjectWentUnchecked ||
+		noneWereInThePlaceAsked
 
 	return {
 		rounds: input.rounds,
@@ -334,6 +399,7 @@ export const computeRunQuality = (input: RunQualityInput): RunQuality => {
 				}
 			: {}),
 		...(input.existence !== null ? { existence: input.existence } : {}),
+		...(input.place !== null ? { place: input.place } : {}),
 		...(subjectWentUnchecked ? { subject_unreadable: true as const } : {}),
 		low_confidence: lowConfidence,
 	}

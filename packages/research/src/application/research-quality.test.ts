@@ -28,6 +28,7 @@ const scanInput = {
 	coverageStopped: null,
 	coverageLastMissing: [],
 	existence: null,
+	place: null,
 } as const
 
 describe('computeRunQuality', () => {
@@ -103,6 +104,7 @@ describe('computeRunQuality', () => {
 			coverageStopped: null,
 			coverageLastMissing: [],
 			existence: null,
+			place: null,
 		} as const
 
 		it('should not flag a strong, well-grounded run', () => {
@@ -195,6 +197,7 @@ describe('computeRunQuality', () => {
 			coverageStopped: null,
 			coverageLastMissing: [],
 			existence: null,
+			place: null,
 		} as const
 
 		it('should flag a scan vetted against a single source', () => {
@@ -305,6 +308,7 @@ describe('computeRunQuality', () => {
 			coverageStopped: null,
 			coverageLastMissing: [],
 			existence: null,
+			place: null,
 		} as const
 
 		it('should flag a well-sourced scan that still found only a handful', () => {
@@ -360,6 +364,7 @@ describe('computeRunQuality', () => {
 				coverageStopped: null,
 				coverageLastMissing: [],
 				existence: null,
+				place: null,
 			})
 			// THEN the thin-list signal stays quiet — a missing list is "does not
 			// apply", not "found nothing"
@@ -391,6 +396,7 @@ describe('computeRunQuality', () => {
 			coverageStopped: null,
 			coverageLastMissing: [],
 			existence: null,
+			place: null,
 		} as const
 
 		it('should flag a long list that answered one of the trades asked about', () => {
@@ -524,6 +530,7 @@ describe('computeRunQuality', () => {
 			coverageStopped: null,
 			coverageLastMissing: [],
 			existence: null,
+			place: null,
 		} as const
 
 		it('should flag a run whose citations were all rejected', () => {
@@ -591,6 +598,7 @@ describe('computeRunQuality', () => {
 				coverageStopped: null,
 				coverageLastMissing: [],
 				existence: null,
+				place: null,
 			}).low_confidence
 
 		it('should flag one that never clearly reached that company', () => {
@@ -631,6 +639,7 @@ describe('computeRunQuality', () => {
 				coverageStopped: null,
 				coverageLastMissing: [],
 				existence: null,
+				place: null,
 			})
 			// THEN the count still stands: 'absent' is a verdict on what the evidence
 			// showed, not the run having no company to be about
@@ -660,6 +669,7 @@ describe('computeRunQuality', () => {
 			coverageStopped: null,
 			coverageLastMissing: [],
 			existence: null,
+			place: null,
 		} as const
 
 		it('should leave out the profile numbers a brief never fills', () => {
@@ -734,6 +744,7 @@ describe('computeRunQuality', () => {
 			coverageStopped: null,
 			coverageLastMissing: [],
 			existence: null,
+			place: null,
 		} as const
 
 		it('should report each phase of rounds as its own number', () => {
@@ -773,6 +784,7 @@ describe('computeRunQuality', () => {
 				coverageStopped: null,
 				coverageLastMissing: [],
 				existence: null,
+				place: null,
 			})
 			// THEN zero is reported rather than left out: a run that went back for
 			// nothing is a run that needed nothing, which is worth knowing
@@ -835,6 +847,7 @@ describe('computeRunQuality — how the list split', () => {
 		searchStopped: null,
 		coverageStopped: null,
 		coverageLastMissing: [],
+		place: null,
 	} as const
 
 	describe('when a scan verified its list', () => {
@@ -843,6 +856,7 @@ describe('computeRunQuality — how the list split', () => {
 			const quality = computeRunQuality({
 				...scan,
 				existence: { confirmed: 4, candidates: 8 },
+				place: null,
 			})
 
 			// THEN a reader can see what the run stands behind without opening it
@@ -854,6 +868,7 @@ describe('computeRunQuality — how the list split', () => {
 			const quality = computeRunQuality({
 				...scan,
 				existence: { confirmed: 0, candidates: 12 },
+				place: null,
 			})
 
 			// THEN the run is reported, not flagged. What to do about a list of
@@ -901,6 +916,7 @@ describe('computeRunQuality — when the run could not read its own subject', ()
 		coverageStopped: null,
 		coverageLastMissing: [],
 		existence: null,
+		place: null,
 	} as const
 
 	describe('when the subject name yielded no key', () => {
@@ -1113,6 +1129,140 @@ describe('computeRunQuality — saying why the searching stopped', () => {
 			// THEN it is reported, never gated on: what to do about a search that was
 			// cut off is the reader's decision, so the run is not marked for a read
 			expect(quality.searching_stopped).toBe('round_cap_reached')
+			expect(quality.low_confidence).toBe(false)
+		})
+	})
+})
+
+describe('computeRunQuality — how the list stands against the place asked for', () => {
+	const scan = { ...scanInput, notCompanies: [] } as const
+
+	describe('when the check placed companies inside the area', () => {
+		it('should report the counts and leave the run a clean finish', () => {
+			// GIVEN a scan whose check read twelve rows, put nine of them in the area
+			//   asked for, one somewhere else, and could not place two
+			const quality = computeRunQuality({
+				...scan,
+				place: { asked: 12, inside: 9, outside: 1, unclear: 2 },
+			})
+
+			// THEN the four counts are handed to the reader, who can see both that
+			//   the check ran and what it made of the list
+			expect(quality.place).toEqual({
+				asked: 12,
+				inside: 9,
+				outside: 1,
+				unclear: 2,
+			})
+			// AND the run finishes clean: one company somewhere else is a judgement
+			//   about that row, not about the list
+			expect(quality.low_confidence).toBe(false)
+		})
+	})
+
+	describe('when the check placed nobody inside the area', () => {
+		it('should refuse a clean finish to a list it never placed', () => {
+			// GIVEN a check that had rows it could have held to the area and came
+			//   back with no answer for any of them — the shape a check that never
+			//   ran leaves behind
+			const quality = computeRunQuality({
+				...scan,
+				place: { asked: 12, inside: 0, outside: 0, unclear: 0 },
+			})
+
+			// THEN the run is marked for a read: nothing here says the list is in the
+			//   place the request was about
+			expect(quality.low_confidence).toBe(true)
+		})
+
+		it('should refuse a clean finish when every answer was unclear', () => {
+			// GIVEN a judge that read every row and could place none of them, which
+			//   counts as ruled and marks nobody
+			const quality = computeRunQuality({
+				...scan,
+				place: { asked: 12, inside: 0, outside: 0, unclear: 12 },
+			})
+
+			// THEN it reads the same as a check that never ran, because for the
+			//   reader it is the same: no company was put in the area asked for
+			expect(quality.low_confidence).toBe(true)
+		})
+
+		it('should refuse a clean finish when every company placed was elsewhere', () => {
+			// GIVEN a list the check could place, every row of it somewhere other
+			//   than the area asked about
+			const quality = computeRunQuality({
+				...scan,
+				place: { asked: 12, inside: 0, outside: 12, unclear: 0 },
+			})
+
+			// THEN the run answered a different question than the one asked
+			expect(quality.low_confidence).toBe(true)
+		})
+
+		it('should keep quiet on the strength of a single company inside', () => {
+			// GIVEN a list where eleven of twelve are somewhere else and one is not
+			const quality = computeRunQuality({
+				...scan,
+				place: { asked: 12, inside: 1, outside: 11, unclear: 0 },
+			})
+
+			// THEN the flag stays down. It is a floor rather than a share: what to
+			//   do about eleven wrong rows is the reader's call, and the counts are
+			//   in front of them to make it
+			expect(quality.low_confidence).toBe(false)
+			expect(quality.place?.outside).toBe(11)
+		})
+	})
+
+	describe('when the run named no place to hold its list to', () => {
+		it('should leave the block out rather than reporting nought', () => {
+			// GIVEN a run that asked about no area at all
+			const quality = computeRunQuality({ ...scan, place: null })
+
+			// THEN the question does not arise, and a block of zeros would read as a
+			//   check that ran and placed nobody — which is the opposite of true
+			expect('place' in quality).toBe(false)
+			expect(quality.low_confidence).toBe(false)
+		})
+	})
+
+	describe('when a place was asked about and the list came back empty', () => {
+		it('should not raise the flag for having nothing to place', () => {
+			// GIVEN a place-scoped scan that returned no companies, and the same run
+			//   read without the place block at all
+			const empty = { ...scan, scanResults: 0 } as const
+			const quality = computeRunQuality({
+				...empty,
+				place: { asked: 0, inside: 0, outside: 0, unclear: 0 },
+			})
+			const control = computeRunQuality({ ...empty, place: null })
+
+			// THEN the counts are still reported
+			expect(quality.place).toEqual({
+				asked: 0,
+				inside: 0,
+				outside: 0,
+				unclear: 0,
+			})
+			// AND this signal added nothing: an empty list is already read as thin,
+			//   and saying a run put its companies in the wrong place when it
+			//   returned none would be a second, wrong reason for the same flag
+			expect(quality.low_confidence).toBe(control.low_confidence)
+		})
+	})
+
+	describe('when a run that is not a scan carries no list', () => {
+		it('should not raise the flag on a run with nothing to place', () => {
+			// GIVEN an enrichment, which reports no list of companies at all
+			const quality = computeRunQuality({
+				...scan,
+				schemaName: 'company_enrichment_v1',
+				scanResults: null,
+				place: { asked: 0, inside: 0, outside: 0, unclear: 0 },
+			})
+
+			// THEN the signal has nothing to say about it
 			expect(quality.low_confidence).toBe(false)
 		})
 	})

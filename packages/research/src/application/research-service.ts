@@ -180,12 +180,13 @@ import {
 	RequestPartsSchema,
 	readKindsOfCompany,
 	readRequestParts,
+	readRequestPlace,
 	requestPartsDirective,
 	requestPartsPrompt,
 	searchedAndEmptyParts,
 	uncoveredPartsDirective,
 } from './request-parts'
-import { computeRunQuality } from './research-quality'
+import { computeRunQuality, type PlaceStanding } from './research-quality'
 import { type RunWords, runWordsOf } from './run-words'
 import { guardScalarFields } from './scalar-field-guard'
 import { guardScanEvidence } from './scan-evidence-guard'
@@ -2637,6 +2638,17 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// the country a provider searches from is its own field.
 					const hintPlace = (context?.hints as { place?: string } | undefined)
 						?.place
+					// The area the answer is held to, which is not the same thing as the
+					// hint above. The hint is a filter the caller asked for and is spent
+					// on searching; this is only ever used to hold what came back against
+					// the request. They part company because nobody fills the hint: over
+					// the place check's first week in production every run reached it with
+					// nothing to hold rows to, while the requests themselves named towns
+					// and provinces in their own words. So the run reads its own request
+					// for a place when the caller named none, and holds the answer to
+					// that. It stays out of the searching, where a place read wrongly
+					// would spend the run's money somewhere nobody asked about.
+					let areaAsked = hintPlace?.trim() ?? ''
 					const hintCountryCode = (
 						context?.hints as { country?: string } | undefined
 					)?.country
@@ -3069,6 +3081,13 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// double-counting a row that was extracted twice; see #457.
 					let citationsSeen = 0
 					let citationsKept = 0
+					// Where the list stands against the area the run was asked about, kept
+					// for the quality block the run finishes with. Overwritten by each
+					// pass for the same reason the two tallies above are: a gap round
+					// judges the list again, and the answer that ships is the last one.
+					// Left null by a run that named no area, so a block of zeros is never
+					// mistaken for a check that ran and found nothing.
+					let placeStanding: PlaceStanding | null = null
 
 					// The company the run is about, however it is known: the subject's name when
 					// the run was started from a company on file, and the question itself when it
@@ -4183,7 +4202,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											// the same run is — the two surfaces disagreeing about
 											// one row. Widen it when that view can say so.
 											if (schemaName !== 'prospect_scan_v1') return { findings }
-											const area = hintPlace?.trim() ?? ''
 											// Past the margin the judge is not asked: it runs its
 											// batches one after another, and overrunning the run
 											// deadline destroys a run rather than degrading it. Read
@@ -4199,7 +4217,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											const check = yield* markRowsOutsidePlace(
 												findings,
 												discoveryResultField(schemaName),
-												area,
+												areaAsked,
 												(place, rows) =>
 													extractLlm
 														.generateObject({
@@ -4234,7 +4252,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											)
 											for (const [key, verdict] of check.learned)
 												placeVerdicts.set(key, verdict)
-											if (outOfTime() && area !== '') {
+											if (outOfTime() && areaAsked !== '') {
 												yield* Effect.logInfo('research.place.deadline').pipe(
 													Effect.annotateLogs({
 														event: 'research.place.deadline',
@@ -4246,7 +4264,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											// used to look exactly like one that checked and found every
 											// row in the right country. Saying so is what makes a place
 											// that never left the query text visible.
-											if (area === '') {
+											if (areaAsked === '') {
 												yield* Effect.logInfo('research.place.none_asked').pipe(
 													Effect.annotateLogs({
 														event: 'research.place.none_asked',
@@ -4278,6 +4296,29 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													}),
 												)
 											}
+
+											placeStanding =
+												areaAsked === ''
+													? null
+													: {
+															asked: check.asked,
+															// Ruled, less the two answers that place nobody:
+															// what is left is the rows the check put inside
+															// the area. Derived here rather than counted
+															// again, so the quality block and the span can
+															// never come to different answers. Floored at
+															// nought because a number below it would be read
+															// as "some were inside" by the flag downstream,
+															// which is the one reading this must never give.
+															inside: Math.max(
+																0,
+																check.ruled -
+																	check.unclear -
+																	check.marked.length,
+															),
+															outside: check.marked.length,
+															unclear: check.unclear,
+														}
 											return {
 												findings: check.findings,
 												spanCounts: {
@@ -4723,6 +4764,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									Effect.map(response => ({
 										parts: readRequestParts(response.value),
 										kinds: readKindsOfCompany(response.value),
+										place: readRequestPlace(response.value),
 									})),
 									Effect.catchCause(cause =>
 										Cause.hasInterruptsOnly(cause)
@@ -4738,11 +4780,25 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													Effect.as({
 														parts: [] as ReadonlyArray<RequestPart>,
 														kinds: [] as ReadonlyArray<string>,
+														place: '',
 													}),
 												),
 									),
 								)
 							requestParts = split.parts
+							// Only where the caller named none: a hint that was given is what
+							// the caller asked to be held to, and a run overruling it with its
+							// own reading would answer a question nobody asked.
+							if (areaAsked === '' && split.place !== '') {
+								areaAsked = split.place
+								yield* Effect.logInfo('research.place.read_from_request').pipe(
+									Effect.annotateLogs({
+										event: 'research.place.read_from_request',
+										research_id: researchId,
+										place: areaAsked,
+									}),
+								)
+							}
 							// Both answer the one question every reading asks of a word — does
 							// it identify anybody — so both go into one vocabulary. They are
 							// handed over apart because only the request's own wordings are
@@ -6927,6 +6983,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						coverageStopped,
 						coverageLastMissing,
 						existence: null,
+						place: null,
 					})
 
 					if ((sources?.n ?? 0) < MIN_GROUNDED_SOURCES) {
@@ -7039,6 +7096,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						coverageStopped,
 						coverageLastMissing,
 						existence: existenceCounts ?? null,
+						place: placeStanding,
 					})
 					const findingsWithQuality = {
 						...withRegistryFlag(findings as Record<string, unknown>),

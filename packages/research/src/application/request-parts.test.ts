@@ -11,6 +11,7 @@ import {
 	type RequestPart,
 	readKindsOfCompany,
 	readRequestParts,
+	readRequestPlace,
 	requestPartsDirective,
 	requestPartsPrompt,
 	searchedAndEmptyParts,
@@ -350,6 +351,60 @@ describe('readKindsOfCompany', () => {
 					kindsOfCompany: ['grupo', '', '   ', 42, null, '...', 'servicios'],
 				}),
 			).toEqual(['grupo', 'servicios'])
+		})
+	})
+})
+
+describe('readRequestPlace', () => {
+	describe('when the request confines its answer to a place', () => {
+		it('should keep the place in the words the request used', () => {
+			// GIVEN a splitter naming the town and its province the way the request
+			//   wrote them
+			// WHEN read — THEN kept as written, because the check that follows reads
+			//   prose in whatever language the market answers in
+			expect(readRequestPlace({ place: 'Ripollet (Barcelona)' })).toBe(
+				'Ripollet (Barcelona)',
+			)
+		})
+
+		it('should trim it and cut it to the length a name is allowed', () => {
+			// GIVEN a place padded with spaces, and one longer than any place is
+			const long = 'a'.repeat(MAX_WORDING_CHARS + 40)
+
+			// WHEN each is read
+			// THEN trimmed, and cut rather than refused: the first words of an
+			//   overlong answer are still the place it names
+			expect(readRequestPlace({ place: '  Texas  ' })).toBe('Texas')
+			expect(readRequestPlace({ place: long })).toHaveLength(MAX_WORDING_CHARS)
+		})
+	})
+
+	describe('when the request asks for companies anywhere', () => {
+		it('should come back empty rather than inventing an area', () => {
+			// GIVEN answers with the place empty, missing, wrongly shaped, or not an
+			//   answer at all
+			// WHEN each is read
+			// THEN empty every time — which is what the run held before it asked, so
+			//   a splitter that fumbles this leaves the run exactly as it was
+			for (const raw of [
+				{ place: '' },
+				{ place: '   ' },
+				{ parts: [] },
+				{ place: 42 },
+				{ place: null },
+				{ place: ['Texas'] },
+				null,
+				'Texas',
+			]) {
+				expect(readRequestPlace(raw)).toBe('')
+			}
+		})
+
+		it('should refuse an answer that names no place a row could be held to', () => {
+			// GIVEN punctuation where a place was asked for
+			// WHEN read — THEN empty, because holding a list against it would mark
+			//   every row on a word that means nothing
+			expect(readRequestPlace({ place: '...' })).toBe('')
 		})
 	})
 })
