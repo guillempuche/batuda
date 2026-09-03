@@ -60,13 +60,13 @@ const SUBJECT_TABLE_CHOICES = DOCUMENT_SUBJECT_TABLES.join('|')
 const GetDocuments = Tool.make('get_documents', {
 	description: `List documents filed against a CRM record. subject_table (${SUBJECT_TABLE_CHOICES}) + subject_id narrows to one record; type and q (substring of title or body) filter further; all are optional and combinable. Returns id, type, title, timestamps, a short snippet and where each document is filed — NOT the full body. Call get_document for that.`,
 	parameters: Schema.Struct({
-		subject_table: Schema.optional(DocumentSubjectTable),
-		subject_id: Schema.optional(Schema.String).annotate({
+		subject_table: Schema.optionalKey(DocumentSubjectTable),
+		subject_id: Schema.optionalKey(Schema.String).annotate({
 			description: SUBJECT_ID_SOURCE,
 		}),
-		type: Schema.optional(Document.json.fields.type),
-		q: Schema.optional(Schema.String),
-		limit: Schema.optional(McpPageLimit),
+		type: Schema.optionalKey(Document.json.fields.type),
+		q: Schema.optionalKey(Schema.String),
+		limit: Schema.optionalKey(McpPageLimit),
 	}),
 	success: TruncatableResult(DocumentSummary),
 	dependencies: REQUEST_DEPENDENCIES,
@@ -105,7 +105,7 @@ const CreateDocument = Tool.make('create_document', {
 		subject_table: DocumentSubjectTable,
 		subject_id: SubjectIdParam,
 		type: Document.json.fields.type,
-		title: Schema.optional(Schema.String),
+		title: Schema.optionalKey(Schema.String),
 		content: Schema.String,
 	}),
 	success: Document.json,
@@ -120,9 +120,9 @@ const UpdateDocument = Tool.make('update_document', {
 		'Update a document title, body or type. Only the fields you pass change.',
 	parameters: Schema.Struct({
 		id: DocumentIdParam,
-		type: Schema.optional(Document.json.fields.type),
-		title: Schema.optional(Schema.String),
-		content: Schema.optional(Schema.String),
+		type: Schema.optionalKey(Document.json.fields.type),
+		title: Schema.optionalKey(Schema.String),
+		content: Schema.optionalKey(Schema.String),
 	}),
 	success: Schema.NullOr(Document.json),
 	dependencies: REQUEST_DEPENDENCIES,

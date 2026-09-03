@@ -54,13 +54,13 @@ const RunWithInstructions = Schema.Struct({
 	// list of pages a run read is the bulk of every answer — a wide scan reads
 	// well over a hundred — and a caller polling for findings pays for all of it
 	// on every check, often past what the answer is allowed to be.
-	sources: Schema.optional(Schema.Array(Schema.Unknown)),
+	sources: Schema.optionalKey(Schema.Array(Schema.Unknown)),
 	// How many pages the run read. Sent in place of the list, because "how much
 	// did it read" is the question most callers were asking it.
-	source_count: Schema.optional(Schema.Number),
+	source_count: Schema.optionalKey(Schema.Number),
 	applied_instructions: Schema.Array(Schema.String),
 	// Absent once the run has ended, which is how a caller knows to stop asking.
-	poll_after_ms: Schema.optional(Schema.Number),
+	poll_after_ms: Schema.optionalKey(Schema.Number),
 })
 const NotFoundResult = Schema.Struct({ error: Schema.String })
 
@@ -171,9 +171,9 @@ const StartResearch = Tool.make('start_research', {
 		query: ResearchQuery,
 		context: Schema.optional(Schema.Unknown),
 		schema_name: SchemaNameParam,
-		stack: Schema.optional(Schema.String),
-		instructions: Schema.optional(InstructionsOverride),
-		confirm: Schema.optional(Schema.Boolean),
+		stack: Schema.optionalKey(Schema.String),
+		instructions: Schema.optionalKey(InstructionsOverride),
+		confirm: Schema.optionalKey(Schema.Boolean),
 	}),
 	success: Schema.Union([
 		Schema.Struct({
@@ -183,7 +183,7 @@ const StartResearch = Tool.make('start_research', {
 			applied_instructions: Schema.Array(Schema.String),
 			// Absent when the answer came straight from the cache, since there is
 			// nothing left to wait for.
-			poll_after_ms: Schema.optional(Schema.Number),
+			poll_after_ms: Schema.optionalKey(Schema.Number),
 		}),
 		ConfirmRequired,
 		InstructionClarification,
@@ -205,7 +205,7 @@ const GetResearch = Tool.make('get_research', {
 		id: describedUuid(RESEARCH_ID_SOURCE),
 		// Opt back into heavy fields dropped by default. Only the full instruction
 		// text qualifies today; kept as a list so more can join without a shape change.
-		include: Schema.optional(
+		include: Schema.optionalKey(
 			Schema.Array(Schema.Literals(['instruction_segments', 'sources'])),
 		),
 	}),
@@ -228,10 +228,10 @@ const ResearchSync = Tool.make('research_sync', {
 		query: ResearchQuery,
 		context: Schema.optional(Schema.Unknown),
 		schema_name: SchemaNameParam,
-		stack: Schema.optional(Schema.String),
-		instructions: Schema.optional(InstructionsOverride),
-		max_wait_seconds: Schema.optional(MaxWaitSeconds),
-		confirm: Schema.optional(Schema.Boolean),
+		stack: Schema.optionalKey(Schema.String),
+		instructions: Schema.optionalKey(InstructionsOverride),
+		max_wait_seconds: Schema.optionalKey(MaxWaitSeconds),
+		confirm: Schema.optionalKey(Schema.Boolean),
 	}),
 	success: ResearchSyncResult,
 	dependencies: REQUEST_DEPENDENCIES,

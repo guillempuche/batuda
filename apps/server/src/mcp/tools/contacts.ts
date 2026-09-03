@@ -43,15 +43,15 @@ const decodeChannels = Schema.decodeUnknownEffect(Schema.Array(ContactChannel))
 const ChannelInput = Schema.Struct({
 	kind: Schema.String,
 	value: Schema.String,
-	label: Schema.optional(Schema.String).annotate({
+	label: Schema.optionalKey(Schema.String).annotate({
 		description:
 			'Which of several this is, in the words a person would use: "Girona shop", "sales office", "switchboard". Give it whenever somebody holds more than one of a kind — without it a second address is indistinguishable from the first.',
 	}),
-	verification: Schema.optional(HandSetVerificationVerdict).annotate({
+	verification: Schema.optionalKey(HandSetVerificationVerdict).annotate({
 		description:
 			"How far this address is trusted, and only ever downwards: 'risky' or 'undeliverable' to record doubt, 'unknown' for a check that settled nothing, or null to take a verdict back off entirely. An address is only ever called deliverable by a check that reached the mailbox.",
 	}),
-	is_primary: Schema.optional(Schema.Boolean),
+	is_primary: Schema.optionalKey(Schema.Boolean),
 })
 
 const ListContacts = Tool.make('list_contacts', {
@@ -59,7 +59,7 @@ const ListContacts = Tool.make('list_contacts', {
 		'List contacts for a company, each with its channels. Returns at most `limit` rows (default 100, max 500); `hasMore` says whether more matched than were returned — read it before saying how many there are.',
 	parameters: Schema.Struct({
 		company_id: CompanyIdParam,
-		limit: Schema.optional(McpPageLimit),
+		limit: Schema.optionalKey(McpPageLimit),
 	}),
 	success: TruncatableResult(ContactSummary),
 })
@@ -73,13 +73,13 @@ const CreateContact = Tool.make('create_contact', {
 		'Create a contact linked to a company. Role examples: CEO, CTO, Marketing Director, Sales Manager. Pass channels[] for every reachable address (kind: email | phone | linkedin | x | website | bluesky | …); the primary email channel is the address used for sending.',
 	parameters: Schema.Struct({
 		company_id: CompanyIdParam,
-		site_id: Schema.optional(Schema.String).annotate({
+		site_id: Schema.optionalKey(Schema.String).annotate({
 			description:
 				'The branch this person works at, when the company has more than one and it is known which. Leave it out for someone who works for the company at large or moves between its branches — most people, and guessing here is worse than saying nothing.',
 		}),
 		name: Schema.String,
-		role: Schema.optional(Schema.String),
-		channels: Schema.optional(Schema.Array(ChannelInput)),
+		role: Schema.optionalKey(Schema.String),
+		channels: Schema.optionalKey(Schema.Array(ChannelInput)),
 	}),
 	success: ContactWithChannels,
 	dependencies: [CurrentOrg],
@@ -93,14 +93,14 @@ const UpdateContact = Tool.make('update_contact', {
 		'Update one or more fields on an existing contact by UUID. Only include fields to change. channels[] only adds an address or refreshes one already on file — it never removes or replaces one, so correcting an address here leaves the old one behind and the person ends up holding both. Use manage_contact_channels to correct, remove, label or re-elect a single channel. Set clear_email_suppression=true to let mail go again to every held-back address on this contact, after a bounce or a spam report turns out to have been wrong — it lifts blocks and nothing else, so an address somebody has vouched for is left as it is. A block is recorded against every record in the organisation holding that address, and this speaks only for the rows on this contact — so if a company or a branch holds the same address, the block stays in place until those are cleared too.',
 	parameters: Schema.Struct({
 		id: ContactIdParam,
-		site_id: Schema.optional(Schema.NullOr(Schema.String)).annotate({
+		site_id: Schema.optionalKey(Schema.NullOr(Schema.String)).annotate({
 			description:
 				'The branch this person works at, when the company has more than one and it is known which. Leave it out for someone who works for the company at large or moves between its branches — most people, and guessing here is worse than saying nothing. Pass null to clear a branch somebody no longer works at; leaving it out changes nothing.',
 		}),
-		name: Schema.optional(Schema.String),
-		role: Schema.optional(Schema.String),
-		channels: Schema.optional(Schema.Array(ChannelInput)),
-		clear_email_suppression: Schema.optional(Schema.Boolean),
+		name: Schema.optionalKey(Schema.String),
+		role: Schema.optionalKey(Schema.String),
+		channels: Schema.optionalKey(Schema.Array(ChannelInput)),
+		clear_email_suppression: Schema.optionalKey(Schema.Boolean),
 	}),
 	success: ContactWithChannels,
 	dependencies: [CurrentOrg],
@@ -142,16 +142,16 @@ const ManageContactChannels = Tool.make('manage_contact_channels', {
 			'unvouch',
 		]),
 		contact_id: ContactIdParam,
-		channel_id: Schema.optional(Schema.String),
-		kind: Schema.optional(Schema.String),
-		value: Schema.optional(Schema.String),
+		channel_id: Schema.optionalKey(Schema.String),
+		kind: Schema.optionalKey(Schema.String),
+		value: Schema.optionalKey(Schema.String),
 		// Nullable so a name given by mistake can be taken back off.
-		label: Schema.optional(Schema.NullOr(Schema.String)),
-		is_primary: Schema.optional(Schema.Boolean),
-		verification: Schema.optional(Schema.NullOr(HandSetVerificationVerdict)),
+		label: Schema.optionalKey(Schema.NullOr(Schema.String)),
+		is_primary: Schema.optionalKey(Schema.Boolean),
+		verification: Schema.optionalKey(Schema.NullOr(HandSetVerificationVerdict)),
 		// Why somebody stands behind the address, kept with the vouch so a later
 		// reader knows what it rested on.
-		note: Schema.optional(Schema.String),
+		note: Schema.optionalKey(Schema.String),
 	}),
 	success: Schema.Struct({
 		channels: Schema.Array(ContactChannel.json),

@@ -25,10 +25,10 @@ const CreatePage = Tool.make('create_page', {
 	description:
 		'Create a prospect sales page (draft). One language per prospect is the norm; default lang is "en". slug is optional — omit it for prospect pages (company_id set) and the server generates a safe random URL like "acme-a3f2k1"; pass it explicitly only when cloning an existing prospect page into another language or creating a generic page without a company.',
 	parameters: Schema.Struct({
-		company_id: Schema.optional(Schema.String),
-		slug: Schema.optional(Schema.String),
+		company_id: Schema.optionalKey(Schema.String),
+		slug: Schema.optionalKey(Schema.String),
 		lang: Schema.String,
-		template: Schema.optional(Schema.String),
+		template: Schema.optionalKey(Schema.String),
 		title: Schema.String,
 		content: TiptapDocument,
 	}),
@@ -43,8 +43,8 @@ const UpdatePage = Tool.make('update_page', {
 	description: 'Update page content, title, or meta.',
 	parameters: Schema.Struct({
 		id: PageIdParam,
-		title: Schema.optional(Schema.String),
-		content: Schema.optional(TiptapDocument),
+		title: Schema.optionalKey(Schema.String),
+		content: Schema.optionalKey(TiptapDocument),
 		meta: Schema.optional(Schema.Unknown),
 	}),
 	success: Schema.NullOr(Page.json),
@@ -72,11 +72,11 @@ const ListPages = Tool.make('list_pages', {
 	description:
 		'List pages filtered by company, status, or language. `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true.',
 	parameters: Schema.Struct({
-		company_id: Schema.optional(Schema.String),
-		status: Schema.optional(Schema.String),
-		lang: Schema.optional(Schema.String),
-		limit: Schema.optional(McpPageLimit),
-		offset: Schema.optional(McpPageOffset),
+		company_id: Schema.optionalKey(Schema.String),
+		status: Schema.optionalKey(Schema.String),
+		lang: Schema.optionalKey(Schema.String),
+		limit: Schema.optionalKey(McpPageLimit),
+		offset: Schema.optionalKey(McpPageOffset),
 	}),
 	success: PageResult(PageSummary),
 })
@@ -89,7 +89,7 @@ const GetPage = Tool.make('get_page', {
 	description: 'Get full page content by ID or slug+lang.',
 	parameters: Schema.Struct({
 		id_or_slug: PageIdOrSlugParam,
-		lang: Schema.optional(Schema.String),
+		lang: Schema.optionalKey(Schema.String),
 	}),
 	success: Page.json,
 })
@@ -104,11 +104,11 @@ const EditPageBlock = Tool.make('edit_page_block', {
 	parameters: Schema.Struct({
 		page_id: PageIdParam,
 		action: Schema.Literals(['insert', 'update', 'move', 'remove']),
-		position: Schema.optional(Schema.Number),
-		block: Schema.optional(BlockNode),
+		position: Schema.optionalKey(Schema.Number),
+		block: Schema.optionalKey(BlockNode),
 		attrs: Schema.optional(Schema.Unknown),
-		from: Schema.optional(Schema.Number),
-		to: Schema.optional(Schema.Number),
+		from: Schema.optionalKey(Schema.Number),
+		to: Schema.optionalKey(Schema.Number),
 	}),
 	success: Schema.NullOr(Page.json),
 })

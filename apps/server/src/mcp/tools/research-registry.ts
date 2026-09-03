@@ -23,8 +23,8 @@ const LookupRegistry = Tool.make('lookup_registry', {
 			description:
 				'ISO 3166-1 alpha-2 country code (any case). Determines which national registry to query.',
 		}),
-		query: Schema.optional(Schema.String),
-		tax_id: Schema.optional(Schema.String),
+		query: Schema.optionalKey(Schema.String),
+		tax_id: Schema.optionalKey(Schema.String),
 	}),
 	success: Schema.Unknown,
 })

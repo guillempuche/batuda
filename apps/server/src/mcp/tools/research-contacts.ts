@@ -27,7 +27,7 @@ const DiscoverContacts = Tool.make('discover_contacts', {
 			description:
 				'Company web domain, e.g. "acme.com" (no scheme, no @); null when the company has no website.',
 		}),
-		country: Schema.optional(Schema.String).annotate({
+		country: Schema.optionalKey(Schema.String).annotate({
 			description: 'ISO-3166 country hint for enrichment (optional).',
 		}),
 	}),

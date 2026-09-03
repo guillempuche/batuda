@@ -26,7 +26,7 @@ const InstructionCandidate = Schema.Struct({
 	name: Schema.String,
 	scope: Schema.Literals(['personal', 'org']),
 	// Present on stack candidates; absent on template candidates.
-	agent: Schema.optional(Schema.String),
+	agent: Schema.optionalKey(Schema.String),
 })
 
 // Returned in place of the normal result when a name can't be resolved. Shared

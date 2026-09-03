@@ -2,7 +2,7 @@
 // annotation hygiene. Imports every toolkit, walks its tools, and asserts
 // the contract every MCP client relies on. New invariants belong here.
 
-import { Context } from 'effect'
+import { Context, Effect, Schema } from 'effect'
 import { Tool } from 'effect/unstable/ai'
 import { describe, expect, it } from 'vitest'
 
@@ -124,6 +124,61 @@ const resultShape = (
 		: published
 }
 
+// Whether a published parameter shape lists null among the things it takes.
+const offersNull = (shape: unknown): boolean => {
+	if (typeof shape !== 'object' || shape === null) return false
+	const record = shape as {
+		type?: unknown
+		anyOf?: ReadonlyArray<{ type?: unknown }>
+	}
+	if (record.type === 'null') return true
+	return (record.anyOf ?? []).some(branch => branch.type === 'null')
+}
+
+// An anyOf holding another anyOf. Written as a walk rather than a look at the
+// top level, because the shape that caused it — an optional wrapped around a
+// nullable — can sit at any depth inside an object or array parameter.
+const hasNestedAnyOf = (shape: unknown): boolean => {
+	const walk = (node: unknown, insideAnyOf: boolean): boolean => {
+		if (Array.isArray(node)) return node.some(child => walk(child, insideAnyOf))
+		if (typeof node !== 'object' || node === null) return false
+		const record = node as Record<string, unknown>
+		const branches = record['anyOf']
+		if (Array.isArray(branches)) {
+			if (insideAnyOf) return true
+			return branches.some(branch => walk(branch, true))
+		}
+		return Object.values(record).some(value => walk(value, false))
+	}
+	return walk(shape, false)
+}
+
+// Whether the tool's own decoder takes null on that key, asked of that key's
+// own schema rather than of the whole parameter object. Sending `{key: null}`
+// at the struct instead reports the first thing wrong with it, which on any
+// tool that has a required parameter is the required one going missing — so
+// the answer came back about a different key and every optional parameter on
+// those tools went unchecked.
+const takesNull = (tool: Tool.Any, key: string): boolean => {
+	const fields = (
+		tool.parametersSchema as unknown as {
+			readonly fields?: Record<string, Schema.Top>
+		}
+	).fields
+	const field = fields?.[key]
+	if (field === undefined) return true
+	try {
+		Effect.runSync(
+			Schema.decodeUnknownEffect(
+				field as Schema.Codec<unknown, unknown, never, never>,
+			)(null),
+		)
+		return true
+	} catch {
+		return false
+	}
+}
+
 describe('MCP tool annotation coverage', () => {
 	describe('given the set of tools every rule below walks', () => {
 		it('should let no tool go unchecked', () => {
@@ -192,6 +247,56 @@ describe('MCP tool annotation coverage', () => {
 					`${name} asks for approval but cannot answer that it did not get it`,
 				).toBe(true)
 			}
+		})
+
+		it('should offer no parameter a null it will not take', () => {
+			// GIVEN every parameter whose published shape offers null
+			// WHEN sending exactly that — null, on that one key
+			// THEN it is taken. A client reads the shape it was given and sends
+			//      what the shape allows; a key that offers null and then refuses
+			//      it fails the caller for doing as it was told, and the caller
+			//      has nowhere to learn better. `Schema.optional` renders as
+			//      `string | null` while decoding only `string | undefined`,
+			//      which is why no tool parameter here is built with it
+			const lying: Array<string> = []
+			for (const [toolkitName, toolkit] of Object.entries(TOOLKITS))
+				for (const [toolName, tool] of Object.entries(toolkit.tools)) {
+					const input = Tool.getJsonSchema(tool as Tool.Any) as {
+						properties?: Record<string, unknown>
+					}
+					for (const [key, shape] of Object.entries(input.properties ?? {})) {
+						if (!offersNull(shape)) continue
+						if (takesNull(tool as Tool.Any, key)) continue
+						lying.push(`${toolkitName}.${toolName}.${key}`)
+					}
+				}
+			expect(
+				lying,
+				`these parameters publish null and refuse it:\n${lying.join('\n')}`,
+			).toEqual([])
+		})
+
+		it('should nest no parameter shape a strict provider would refuse', () => {
+			// GIVEN the published shape of every parameter
+			// WHEN looking for an anyOf whose own branch is another anyOf
+			// THEN there is none. Some providers reject a nested union outright
+			//      rather than ignoring it, which loses the whole tool rather
+			//      than the one field — and a nullable wrapped in an optional,
+			//      `Schema.optional(Schema.NullOr(…))`, builds exactly that shape
+			const nested: Array<string> = []
+			for (const [toolkitName, toolkit] of Object.entries(TOOLKITS))
+				for (const [toolName, tool] of Object.entries(toolkit.tools)) {
+					const input = Tool.getJsonSchema(tool as Tool.Any) as {
+						properties?: Record<string, unknown>
+					}
+					for (const [key, shape] of Object.entries(input.properties ?? {}))
+						if (hasNestedAnyOf(shape))
+							nested.push(`${toolkitName}.${toolName}.${key}`)
+				}
+			expect(
+				nested,
+				`these parameters publish an anyOf inside an anyOf:\n${nested.join('\n')}`,
+			).toEqual([])
 		})
 
 		it('should let the tools that write a message take a mailbox the same way', () => {

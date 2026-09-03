@@ -12,10 +12,12 @@ import { Schema } from 'effect'
  * They live together so one record reads the same way everywhere it is asked
  * for, rather than being described afresh, and differently, in each tool.
  *
- * These are for parameters a tool insists on. For one it can do without, wrap
- * the note round the outside — `Schema.optional(Schema.String).annotate({
- * description: SOME_SOURCE })` — because `Schema.optional(AnnotatedThing)`
- * drops the note and publishes a bare string, with nothing to say it did.
+ * For a parameter a tool can do without, `Schema.optionalKey(SomeIdParam)`
+ * keeps the note: the key goes missing from `required` and the description
+ * stays on the published property. `Schema.optional` does not — it publishes
+ * the property as a choice between the type and null, leaving the note on the
+ * inner branch where a client reading the property finds none, and offering a
+ * null the decoder then refuses. That is why nothing here uses it.
  */
 const from = (source: string) => Schema.String.annotate({ description: source })
 

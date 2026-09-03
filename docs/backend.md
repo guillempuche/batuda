@@ -483,9 +483,13 @@ import { Tool, Toolkit } from 'effect/unstable/ai'
 const SearchCompanies = Tool.make('search_companies', {
   description: 'Filter companies by status, country, industry, priority, or query.',
   parameters: Schema.Struct({
-    status: Schema.optional(Schema.String),
-    country: Schema.optional(Schema.String),
-    limit: Schema.optional(Schema.Number),
+    // `optionalKey`, never `optional`: an optional parameter publishes as a
+    // choice between the type and null while the decoder takes only the type,
+    // so a client that sends the null it was offered is refused. `_annotations.test.ts`
+    // fails any tool parameter built the other way.
+    status: Schema.optionalKey(Schema.String),
+    country: Schema.optionalKey(Schema.String),
+    limit: Schema.optionalKey(Schema.Number),
   }),
   success: Schema.Unknown,
 }).annotate(Tool.Title, 'Search Companies')

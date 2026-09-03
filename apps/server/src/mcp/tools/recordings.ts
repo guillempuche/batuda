@@ -23,8 +23,8 @@ const ListCallRecordings = Tool.make('list_call_recordings', {
 		'List call recordings for a company, newest first by interaction date. Returns metadata only (no audio bytes, no transcript yet — transcription ships in a later phase). `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true.',
 	parameters: Schema.Struct({
 		company_id: CompanyIdParam,
-		limit: Schema.optional(McpPageLimit),
-		offset: Schema.optional(McpPageOffset),
+		limit: Schema.optionalKey(McpPageLimit),
+		offset: Schema.optionalKey(McpPageOffset),
 	}),
 	success: PageResult(RecordingSummary),
 })
@@ -38,7 +38,7 @@ const GetCallRecording = Tool.make('get_call_recording', {
 		'Get a single call recording by id, joined with its parent interaction. Set include_playback_url=true to also return a short-lived signed playback URL (expires in ~10 min) alongside metadata.',
 	parameters: Schema.Struct({
 		recording_id: RecordingIdParam,
-		include_playback_url: Schema.optional(Schema.Boolean),
+		include_playback_url: Schema.optionalKey(Schema.Boolean),
 	}),
 	success: Schema.Union([RecordingDetail, RecordingWithPlayback]),
 })

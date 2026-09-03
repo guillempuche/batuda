@@ -8,6 +8,7 @@ import {
 	EmailMessageRecord,
 	EmailThreadDetail,
 	EmailThreadListItem,
+	type NoDefaultInboxReason,
 	SessionContext,
 } from '@batuda/controllers'
 import { EmailDraft, Inbox, InboxFooter } from '@batuda/domain'
@@ -115,8 +116,8 @@ const Recipients = Schema.Union([Schema.String, Schema.Array(Schema.String)])
 // inline at MIME time and lets the body reference the image via `cid`.
 const AttachmentRef = Schema.Struct({
 	staging_id: Schema.String,
-	inline: Schema.optional(Schema.Boolean),
-	cid: Schema.optional(Schema.String),
+	inline: Schema.optionalKey(Schema.Boolean),
+	cid: Schema.optionalKey(Schema.String),
 })
 
 // What a refused send is told, in the words the caller can act on. The service
@@ -146,23 +147,23 @@ const refusalMessage = (reason: 'no_subject' | 'forged_reply'): string =>
 
 const SendEmail = Tool.make('send_email', {
 	description:
-		'Send a new email, starting a new conversation. To answer or follow up on a conversation that already exists use reply_email instead, or a draft carrying thread_link_id — this tool sets no threading headers, so a "Re: " subject here would reach the recipient as a forged reply and is refused. The body is a structured block tree (paragraph / heading / list / quote / divider / image) — not raw html/text. Omit inbox_id to use the calling member’s primary inbox in the active org. Attachments reference staging_ids returned by stage_email_attachment; set inline=true for cid-referenced inline images. Before composing, read the member’s standing email instructions (writing style, sign-off, do/don’t rules) from the batuda://instructions/email resource and write the body to follow them. Returns {_tag:"sent"} on success; {_tag:"suppressed"} if a recipient once hard-bounced or reported spam, which is a hard block on every path; or {_tag:"cancelled"} if an address being written to carries a deliverability verdict of "undeliverable" or "risky" and nobody confirmed it — either the answer was no, or this client cannot put a question to anybody, and the reason says which. Verdicts of "catch_all" and "unknown", and addresses nobody has checked, are not gated. Read `verification` on a contact\'s channels (list_contacts) before composing to see this coming; when a send is stopped, the reason names the exact call that lifts it. Set skip_footer=true to omit the inbox default footer.',
+		'Send a new email, starting a new conversation. To answer or follow up on a conversation that already exists use reply_email instead, or a draft carrying thread_link_id — this tool sets no threading headers, so a "Re: " subject here would reach the recipient as a forged reply and is refused. The body is a structured block tree (paragraph / heading / list / quote / divider / image) — not raw html/text. Omit inbox_id to use the mailbox the calling member sends from in the active org — their own default, or the mailbox the team shares when they have set none. Attachments reference staging_ids returned by stage_email_attachment; set inline=true for cid-referenced inline images. Before composing, read the member’s standing email instructions (writing style, sign-off, do/don’t rules) from the batuda://instructions/email resource and write the body to follow them. Returns {_tag:"sent"} on success; {_tag:"suppressed"} if a recipient once hard-bounced or reported spam, which is a hard block on every path; or {_tag:"cancelled"} if an address being written to carries a deliverability verdict of "undeliverable" or "risky" and nobody confirmed it — either the answer was no, or this client cannot put a question to anybody, and the reason says which. Verdicts of "catch_all" and "unknown", and addresses nobody has checked, are not gated. Read `verification` on a contact\'s channels (list_contacts) before composing to see this coming; when a send is stopped, the reason names the exact call that lifts it. Set skip_footer=true to omit the inbox default footer.',
 	parameters: Schema.Struct({
-		inbox_id: Schema.optional(Schema.String).annotate({
+		inbox_id: Schema.optionalKey(Schema.String).annotate({
 			description:
 				'A mailbox of yours, from list_email_inboxes. Leave it out to send from the one you send from by default.',
 		}),
 		to: Recipients,
-		cc: Schema.optional(Schema.Array(Schema.String)),
-		bcc: Schema.optional(Schema.Array(Schema.String)),
-		reply_to: Schema.optional(Schema.String),
+		cc: Schema.optionalKey(Schema.Array(Schema.String)),
+		bcc: Schema.optionalKey(Schema.Array(Schema.String)),
+		reply_to: Schema.optionalKey(Schema.String),
 		subject: Schema.String,
 		body_json: EmailBlocks,
-		preview: Schema.optional(Schema.String),
+		preview: Schema.optionalKey(Schema.String),
 		company_id: CompanyIdParam,
-		contact_id: Schema.optional(Schema.String),
-		attachments: Schema.optional(Schema.Array(AttachmentRef)),
-		skip_footer: Schema.optional(Schema.Boolean),
+		contact_id: Schema.optionalKey(Schema.String),
+		attachments: Schema.optionalKey(Schema.Array(AttachmentRef)),
+		skip_footer: Schema.optionalKey(Schema.Boolean),
 	}),
 	success: SendEmailResult,
 	dependencies: REQUEST_DEPENDENCIES,
@@ -177,16 +178,16 @@ const ReplyEmail = Tool.make('reply_email', {
 	parameters: Schema.Struct({
 		thread_id: EmailThreadIdParam,
 		body_json: EmailBlocks,
-		preview: Schema.optional(Schema.String),
-		subject: Schema.optional(Schema.String).annotate({
+		preview: Schema.optionalKey(Schema.String),
+		subject: Schema.optionalKey(Schema.String).annotate({
 			description:
 				'Subject line. Leave it out and the thread\'s own subject is used, prefixed "Re: " — that is what you want almost always. Pass one to change the subject mid-thread, or to answer a thread whose messages never carried a subject: there is nothing to borrow there, and a send with no subject is refused because it would arrive as "(no subject)".',
 		}),
-		cc: Schema.optional(Schema.Array(Schema.String)),
-		bcc: Schema.optional(Schema.Array(Schema.String)),
-		attachments: Schema.optional(Schema.Array(AttachmentRef)),
-		skip_footer: Schema.optional(Schema.Boolean),
-		acknowledge_thread_length: Schema.optional(Schema.Boolean).annotate({
+		cc: Schema.optionalKey(Schema.Array(Schema.String)),
+		bcc: Schema.optionalKey(Schema.Array(Schema.String)),
+		attachments: Schema.optionalKey(Schema.Array(AttachmentRef)),
+		skip_footer: Schema.optionalKey(Schema.Boolean),
+		acknowledge_thread_length: Schema.optionalKey(Schema.Boolean).annotate({
 			description:
 				'Set true to go ahead on a thread that already holds several outbound messages, when the person has said to keep going. It answers only that count — an address with something recorded against it still stops the send, and an address that bounced is still refused outright. Nothing is remembered: a later reply on the same thread asks again.',
 		}),
@@ -209,7 +210,7 @@ const StageEmailAttachmentResult = Schema.Struct({
 	content_type: Schema.String,
 	size: Schema.Number,
 	is_inline: Schema.Boolean,
-	preview_url: Schema.optional(Schema.String),
+	preview_url: Schema.optionalKey(Schema.String),
 })
 
 const StageEmailAttachment = Tool.make('stage_email_attachment', {
@@ -223,8 +224,8 @@ const StageEmailAttachment = Tool.make('stage_email_attachment', {
 		filename: Schema.String,
 		content_type: Schema.String,
 		content_base64: Schema.String,
-		inline: Schema.optional(Schema.Boolean),
-		draft_id: Schema.optional(Schema.String),
+		inline: Schema.optionalKey(Schema.Boolean),
+		draft_id: Schema.optionalKey(Schema.String),
 	}),
 	success: StageEmailAttachmentResult,
 	dependencies: REQUEST_DEPENDENCIES,
@@ -239,15 +240,15 @@ const ListEmailThreads = Tool.make('list_email_threads', {
 	description:
 		'List email threads with filters. Returns an envelope {items, limit, offset, hasMore} — `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true. Each item carries message_count, last_message_at, last_message_direction, last_inbound_at, is_unread, and the linked inbox {email, displayName, description}. Supports search by subject (query) and status (open/closed/archived). Default limit is 100, max 500.',
 	parameters: Schema.Struct({
-		inbox_id: Schema.optional(Schema.String).annotate({
+		inbox_id: Schema.optionalKey(Schema.String).annotate({
 			description:
 				'Narrow to one mailbox, from list_email_inboxes. Leave it out to look across every mailbox you can see — unlike the tools that write a message, where leaving it out means the one you send from by default.',
 		}),
-		company_id: Schema.optional(Schema.String),
-		status: Schema.optional(ThreadStatus),
-		query: Schema.optional(Schema.String),
-		limit: Schema.optional(McpPageLimit),
-		offset: Schema.optional(McpPageOffset),
+		company_id: Schema.optionalKey(Schema.String),
+		status: Schema.optionalKey(ThreadStatus),
+		query: Schema.optionalKey(Schema.String),
+		limit: Schema.optionalKey(McpPageLimit),
+		offset: Schema.optionalKey(McpPageOffset),
 	}),
 	success: PageResult(EmailThreadListItem),
 	dependencies: REQUEST_DEPENDENCIES,
@@ -322,11 +323,11 @@ const ListEmailMessages = Tool.make('list_email_messages', {
 	description:
 		'List per-message deliverability records (sent, delivered, bounced, complained, rejected). Filter by contact, company, or status. Use this to audit which sends failed and why. `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true.',
 	parameters: Schema.Struct({
-		contact_id: Schema.optional(Schema.String),
-		company_id: Schema.optional(Schema.String),
-		status: Schema.optional(Schema.String),
-		limit: Schema.optional(McpPageLimit),
-		offset: Schema.optional(McpPageOffset),
+		contact_id: Schema.optionalKey(Schema.String),
+		company_id: Schema.optionalKey(Schema.String),
+		status: Schema.optionalKey(Schema.String),
+		limit: Schema.optionalKey(McpPageLimit),
+		offset: Schema.optionalKey(McpPageOffset),
 	}),
 	success: PageResult(EmailMessageRecord),
 	dependencies: REQUEST_DEPENDENCIES,
@@ -368,7 +369,7 @@ const DownloadEmailAttachment = Tool.make('download_email_attachment', {
 			// Finite rather than plain Number: a byte count is never infinite, and
 			// a plain number also publishes the words "Infinity" and "NaN" as a
 			// second choice inside this one, which some providers refuse to read.
-			size: Schema.optional(Schema.Finite),
+			size: Schema.optionalKey(Schema.Finite),
 		}),
 	),
 	dependencies: REQUEST_DEPENDENCIES,
@@ -392,8 +393,8 @@ const ListEmailInboxes = Tool.make('list_email_inboxes', {
 	description:
 		"List the mailboxes visible to the calling member in the active organization. Each row carries description (free text saying what the mailbox is for, may be empty), ownerUserId, isDefault, active flag, IMAP/SMTP transport hosts, and grant_status. ownerUserId is what matters for what you can do: it is the member the mailbox belongs to, or null when the mailbox belongs to the whole team. You can send through your own mailboxes and the team's, but not a colleague's. Filter by active flag or owner. Private mailboxes belonging to other members are hidden automatically. The response also reports whether the caller has a mailbox they send from by default (hasDefault plus its id and address), so a composer can check before send_email whether to prompt the user to connect one first.",
 	parameters: Schema.Struct({
-		active: Schema.optional(Schema.Boolean),
-		owner_user_id: Schema.optional(Schema.String),
+		active: Schema.optionalKey(Schema.Boolean),
+		owner_user_id: Schema.optionalKey(Schema.String),
 	}),
 	success: Schema.Struct({
 		items: Schema.Array(Inbox.json),
@@ -431,31 +432,31 @@ const ManageEmailInbox = Tool.make('manage_email_inbox', {
 			'set_primary',
 		]),
 		// Required by every action except create, which mints the row.
-		id: Schema.optional(Schema.String).annotate({
+		id: Schema.optionalKey(Schema.String).annotate({
 			description:
 				'A mailbox id from list_email_inboxes. Every action but create needs one.',
 		}),
 		// Required to create; on update, any of these may be passed alone.
-		email: Schema.optional(Schema.String),
-		password: Schema.optional(Schema.String),
-		imap_host: Schema.optional(Schema.String),
-		imap_port: Schema.optional(Schema.Number),
-		imap_security: Schema.optional(ImapSecurity),
-		smtp_host: Schema.optional(Schema.String),
-		smtp_port: Schema.optional(Schema.Number),
-		smtp_security: Schema.optional(SmtpSecurity),
-		username: Schema.optional(Schema.String),
-		display_name: Schema.optional(Schema.NullOr(Schema.String)),
+		email: Schema.optionalKey(Schema.String),
+		password: Schema.optionalKey(Schema.String),
+		imap_host: Schema.optionalKey(Schema.String),
+		imap_port: Schema.optionalKey(Schema.Number),
+		imap_security: Schema.optionalKey(ImapSecurity),
+		smtp_host: Schema.optionalKey(Schema.String),
+		smtp_port: Schema.optionalKey(Schema.Number),
+		smtp_security: Schema.optionalKey(SmtpSecurity),
+		username: Schema.optionalKey(Schema.String),
+		display_name: Schema.optionalKey(Schema.NullOr(Schema.String)),
 		// Free text saying what the mailbox is for. Nothing depends on it.
-		description: Schema.optional(Schema.NullOr(Schema.String)),
-		owner_user_id: Schema.optional(Schema.NullOr(Schema.String)),
+		description: Schema.optionalKey(Schema.NullOr(Schema.String)),
+		owner_user_id: Schema.optionalKey(Schema.NullOr(Schema.String)),
 		// Set up for the whole team rather than one person, which only an
 		// organization admin may do. Such a mailbox has no owner, so it can be
 		// neither private nor anybody's default sender.
-		shared: Schema.optional(Schema.Boolean),
-		is_default: Schema.optional(Schema.Boolean),
-		is_private: Schema.optional(Schema.Boolean),
-		active: Schema.optional(Schema.Boolean),
+		shared: Schema.optionalKey(Schema.Boolean),
+		is_default: Schema.optionalKey(Schema.Boolean),
+		is_private: Schema.optionalKey(Schema.Boolean),
+		active: Schema.optionalKey(Schema.Boolean),
 	}),
 	// Every action answers with the mailbox row it acted on, including delete,
 	// which soft-deletes and hands back the deactivated row.
@@ -472,36 +473,36 @@ const ManageEmailInbox = Tool.make('manage_email_inbox', {
 
 const ManageEmailDraft = Tool.make('manage_email_draft', {
 	description:
-		'Manage an email draft a human can review before sending. Omit inbox_id: a new draft is written in the calling member’s primary inbox in the active org, the same rule send_email follows, and update / send / delete act on the mailbox the draft already lives in. action=create makes a new draft (optionally linked to CRM via company_id/contact_id, and to an existing conversation via thread_link_id or in_reply_to — pass one of those whenever the draft answers a thread, or it goes out as a brand-new conversation); update changes fields on an existing draft_id; send dispatches draft_id through the same thread-link/interaction/message pipeline as a direct send, and runs the same deliverability guard on the addresses, so writing a message down first is not a way past that (it does not re-count how many outbound messages a thread already holds, which only reply_email does) (returns {_tag:"sent"}, {_tag:"suppressed"}, or {_tag:"cancelled"} — see send_email for what each means); delete permanently removes draft_id. body_json is the typed block tree preserved for lossless editor re-hydration.',
+		'Manage an email draft a human can review before sending. Omit inbox_id: a new draft is written in the mailbox the calling member sends from — their own default, or the mailbox the team shares when they have set none — the same rule send_email follows, and update / send / delete act on the mailbox the draft already lives in. action=create makes a new draft (optionally linked to CRM via company_id/contact_id, and to an existing conversation via thread_link_id or in_reply_to — pass one of those whenever the draft answers a thread, or it goes out as a brand-new conversation); update changes fields on an existing draft_id, threading included — pass thread_link_id there to attach a draft to a conversation settled after it was written, and subject:null to clear a subject the reply no longer needs; send dispatches draft_id through the same thread-link/interaction/message pipeline as a direct send, and runs the same deliverability guard on the addresses, so writing a message down first is not a way past that (it does not re-count how many outbound messages a thread already holds, which only reply_email does) (returns {_tag:"sent"}, {_tag:"suppressed"}, or {_tag:"cancelled"} — see send_email for what each means); delete permanently removes draft_id. body_json is the typed block tree preserved for lossless editor re-hydration.',
 	parameters: Schema.Struct({
 		action: Schema.Literals(['create', 'update', 'send', 'delete']),
-		inbox_id: Schema.optional(Schema.String).annotate({
+		inbox_id: Schema.optionalKey(Schema.String).annotate({
 			description:
 				'A mailbox of yours, from list_email_inboxes. Leave it out: a new draft is written in the mailbox you send from by default, and update, send and delete act on the mailbox the draft already lives in. Name one on send only to send from a different mailbox than the draft was written in.',
 		}),
-		draft_id: Schema.optional(Schema.String).annotate({
+		draft_id: Schema.optionalKey(Schema.String).annotate({
 			description:
 				'A draftId from list_email_drafts, or the one create answered with. Every action but create needs one.',
 		}),
-		to: Schema.optional(Recipients),
-		cc: Schema.optional(Schema.Array(Schema.String)),
-		bcc: Schema.optional(Schema.Array(Schema.String)),
-		subject: Schema.optional(Schema.String).annotate({
+		to: Schema.optionalKey(Recipients),
+		cc: Schema.optionalKey(Schema.Array(Schema.String)),
+		bcc: Schema.optionalKey(Schema.Array(Schema.String)),
+		subject: Schema.optionalKey(Schema.NullOr(Schema.String)).annotate({
 			description:
-				'Subject line. Leave it out on a draft that answers an existing thread and the thread\'s own subject is used, prefixed "Re: ". On a draft that starts a new conversation a subject is required — a send with none is refused, because a message with no subject line arrives as "(no subject)".',
+				'Subject line. Leave it out on a draft that answers an existing thread and the thread\'s own subject is used, prefixed "Re: ". On a draft that starts a new conversation a subject is required — a send with none is refused, because a message with no subject line arrives as "(no subject)". Pass null on update to clear one already set, which is what a draft turned into a reply needs.',
 		}),
-		body_json: Schema.optional(EmailBlocks),
-		in_reply_to: Schema.optional(Schema.String).annotate({
+		body_json: Schema.optionalKey(EmailBlocks),
+		in_reply_to: Schema.optionalKey(Schema.NullOr(Schema.String)).annotate({
 			description:
 				'Message-ID of the message this one answers, angle brackets and all. An alternative to thread_link_id when you have the parent message but not the thread: the thread it belongs to is looked up from it. Ignored when thread_link_id is given.',
 		}),
-		company_id: Schema.optional(Schema.String),
-		contact_id: Schema.optional(Schema.String),
-		mode: Schema.optional(Schema.Literals(['new', 'reply'])).annotate({
+		company_id: Schema.optionalKey(Schema.NullOr(Schema.String)),
+		contact_id: Schema.optionalKey(Schema.NullOr(Schema.String)),
+		mode: Schema.optionalKey(Schema.Literals(['new', 'reply'])).annotate({
 			description:
 				'What kind of message this is, recorded for the composer that re-opens the draft. It does not decide threading: a draft is threaded when it carries thread_link_id or in_reply_to, whichever mode says.',
 		}),
-		thread_link_id: Schema.optional(Schema.String).annotate({
+		thread_link_id: Schema.optionalKey(Schema.NullOr(Schema.String)).annotate({
 			description:
 				'The thread this draft answers, as returned by list_email_threads or get_email_thread. This is what attaches the sent message to an existing conversation — with it the message carries In-Reply-To and References and lands in the same thread for the recipient; without it the message starts a new conversation, and a "Re: " subject on a message that starts a new conversation is refused, because that pairing reads as a forged reply.',
 		}),
@@ -519,12 +520,12 @@ const ListEmailDrafts = Tool.make('list_email_drafts', {
 	description:
 		'List drafts for a specific inbox. Returns draft metadata (no body). If inbox_id is omitted, lists across all active inboxes. `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true.',
 	parameters: Schema.Struct({
-		inbox_id: Schema.optional(Schema.String).annotate({
+		inbox_id: Schema.optionalKey(Schema.String).annotate({
 			description:
 				'Narrow to one mailbox, from list_email_inboxes. Leave it out to list drafts across every mailbox you can see.',
 		}),
-		limit: Schema.optional(McpPageLimit),
-		offset: Schema.optional(McpPageOffset),
+		limit: Schema.optionalKey(McpPageLimit),
+		offset: Schema.optionalKey(McpPageOffset),
 	}),
 	success: PageResult(EmailDraft.json),
 	dependencies: REQUEST_DEPENDENCIES,
@@ -538,7 +539,7 @@ const GetEmailDraft = Tool.make('get_email_draft', {
 	description:
 		'Get a single draft by id. Returns full draft contents including body_json. inbox_id is not needed: a draft is found by its own id, in whichever of your mailboxes it sits. Returns null when no draft of that id is one you can reach — a colleague’s private draft reads the same as one that was never written.',
 	parameters: Schema.Struct({
-		inbox_id: Schema.optional(Schema.String).annotate({
+		inbox_id: Schema.optionalKey(Schema.String).annotate({
 			description:
 				'A mailbox of yours, from list_email_inboxes. Naming one only checks it is yours; the draft is still found by its own id. Leave it out.',
 		}),
@@ -587,16 +588,16 @@ const ManageInboxFooter = Tool.make('manage_inbox_footer', {
 	parameters: Schema.Struct({
 		action: Schema.Literals(['list', 'get', 'create', 'update', 'delete']),
 		// Required by list; on create it says which inbox the footer belongs to.
-		inbox_id: Schema.optional(Schema.String).annotate({
+		inbox_id: Schema.optionalKey(Schema.String).annotate({
 			description:
 				'Which mailbox’s footers, from list_email_inboxes. list and create need one; get, update and delete find the footer by footer_id instead.',
 		}),
-		footer_id: Schema.optional(Schema.String).annotate({
+		footer_id: Schema.optionalKey(Schema.String).annotate({
 			description: 'A footer id from manage_inbox_footer(action:"list").',
 		}),
-		name: Schema.optional(Schema.String),
-		body_json: Schema.optional(EmailBlocks),
-		is_default: Schema.optional(Schema.Boolean),
+		name: Schema.optionalKey(Schema.String),
+		body_json: Schema.optionalKey(EmailBlocks),
+		is_default: Schema.optionalKey(Schema.Boolean),
 	}),
 	// list returns the collection, get / create / update a single footer, and
 	// delete the tagged marker.
@@ -620,11 +621,24 @@ const dieMissing = (message: string) => Effect.die(new ToolMessage(message))
 // Every tool that writes a message takes the mailbox the same way — name one
 // or get the one you send from by default — so every one says the same thing
 // when there is no default to fall back on. Naming the call that fixes it is
-// what stops a caller repeating the same request until it gives up.
-const noPrimaryInbox = () =>
-	dieMissing(
-		'You have no mailbox you send from by default, and none was named. Call list_email_inboxes for the mailboxes you can send through and pass one as inbox_id, or connect one with manage_email_inbox(action:"create").',
-	)
+// what stops a caller repeating the same request until it gives up, and which
+// call that is depends on why there is no default: a mailbox of your own can
+// be made the one you send from, one the team shares never can and has to be
+// named on the call, and only where there is nothing at all is connecting one
+// the answer.
+const noPrimaryInbox = (error: {
+	readonly reason: NoDefaultInboxReason
+	readonly inboxIds: ReadonlyArray<string>
+}) => {
+	const named = error.inboxIds.join(', ')
+	const said =
+		error.reason === 'none_connected'
+			? 'No mailbox is connected yet. Connect one with manage_email_inbox(action:"create").'
+			: error.reason === 'no_default_chosen'
+				? `You have not said which of your mailboxes you send from. Choose one with manage_email_inbox(action:"set_primary"), or pass one as inbox_id: ${named}.`
+				: `This organization's mailboxes are all shared and none of them is at your own address, so there is no one of them to send from by default. Pass one as inbox_id: ${named}.`
+	return dieMissing(said)
+}
 
 // The row named does not exist. Access is filtered by the database rather than
 // refused, so a row belonging to another organization arrives here the same way
@@ -1307,8 +1321,9 @@ export const EmailHandlersLive = EmailTools.toLayer(
 				}
 			},
 			manage_email_draft: params => {
-				// Shared body fields apply to both create and update; in_reply_to and
-				// the CRM-link object are create-only.
+				// The body fields both create and update take. Threading goes to
+				// both as well, but create takes it as a separate link argument
+				// and update flat alongside the body, so each branch adds its own.
 				const fields = {
 					...(params.to !== undefined && {
 						to: typeof params.to === 'string' ? params.to : [...params.to],
@@ -1355,7 +1370,22 @@ export const EmailHandlersLive = EmailTools.toLayer(
 								'draft_id is required to update a draft — a draftId from list_email_drafts.',
 							)
 						return svc
-							.updateDraft(params.inbox_id, params.draft_id, fields)
+							.updateDraft(params.inbox_id, params.draft_id, {
+								...fields,
+								...(params.in_reply_to !== undefined && {
+									inReplyTo: params.in_reply_to,
+								}),
+								...(params.mode !== undefined && { mode: params.mode }),
+								...(params.thread_link_id !== undefined && {
+									threadLinkId: params.thread_link_id,
+								}),
+								...(params.company_id !== undefined && {
+									companyId: params.company_id,
+								}),
+								...(params.contact_id !== undefined && {
+									contactId: params.contact_id,
+								}),
+							})
 							.pipe(Effect.catchTag('NotFound', dieNotFound), Effect.orDie)
 					case 'send': {
 						if (params.draft_id === undefined)

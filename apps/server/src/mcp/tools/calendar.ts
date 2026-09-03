@@ -56,7 +56,7 @@ const RsvpChoice = Schema.Literals(['accepted', 'declined', 'tentative'])
 
 const AttendeeInput = Schema.Struct({
 	email: Schema.String,
-	name: Schema.optional(Schema.NullOr(Schema.String)),
+	name: Schema.optionalKey(Schema.NullOr(Schema.String)),
 })
 
 // ── Availability ─────────────────────────────────────────────────
@@ -87,9 +87,9 @@ const ScheduleMeeting = Tool.make('schedule_meeting', {
 		start_at: Schema.String,
 		attendees: Schema.Array(AttendeeInput),
 		organizer_email: OwnEmailParam,
-		company_id: Schema.optional(Schema.NullOr(Schema.String)),
-		contact_id: Schema.optional(Schema.NullOr(Schema.String)),
-		metadata: Schema.optional(Schema.NullOr(Schema.Unknown)),
+		company_id: Schema.optionalKey(Schema.NullOr(Schema.String)),
+		contact_id: Schema.optionalKey(Schema.NullOr(Schema.String)),
+		metadata: Schema.optionalKey(Schema.NullOr(Schema.Unknown)),
 	}),
 	success: CalendarEvent.json,
 	dependencies: REQUEST_DEPENDENCIES,
@@ -118,7 +118,7 @@ const CancelMeeting = Tool.make('cancel_meeting', {
 		'Cancel a calendar event. Source decides the outbound path: booking -> provider cancel; email -> status flip only (we cannot cancel an invitation we did not own); internal -> row update with no network. Fires MeetingCancelled on the timeline so next_calendar_event_at is recomputed from the remaining confirmed rows.',
 	parameters: Schema.Struct({
 		calendar_event_id: CalendarEventIdParam,
-		reason: Schema.optional(Schema.NullOr(Schema.String)),
+		reason: Schema.optionalKey(Schema.NullOr(Schema.String)),
 	}),
 	success: CalendarEvent.json,
 	dependencies: REQUEST_DEPENDENCIES,
@@ -139,8 +139,8 @@ const RespondToInvitation = Tool.make('respond_to_invitation', {
 				'Which attendee is replying — one of the addresses on the event, as get_calendar_event lists them. Replying for the person you are working for means their own address, `primary.email` from list_email_inboxes.',
 		}),
 		rsvp: RsvpChoice,
-		comment: Schema.optional(Schema.NullOr(Schema.String)),
-		actor_user_id: Schema.optional(Schema.NullOr(Schema.String)),
+		comment: Schema.optionalKey(Schema.NullOr(Schema.String)),
+		actor_user_id: Schema.optionalKey(Schema.NullOr(Schema.String)),
 	}),
 	success: Schema.Unknown,
 	dependencies: REQUEST_DEPENDENCIES,
@@ -157,7 +157,7 @@ const RsvpPendingInvitations = Tool.make('rsvp_pending_invitations', {
 			description:
 				'Whose invitations to look at. For the person you are working for, that is `primary.email` from list_email_inboxes — the mailbox they send from by default. A colleague’s address works too when the request names one.',
 		}),
-		limit: Schema.optional(McpPageLimit),
+		limit: Schema.optionalKey(McpPageLimit),
 	}),
 	success: TruncatableResult(PendingInvitation),
 	dependencies: REQUEST_DEPENDENCIES,
@@ -173,7 +173,7 @@ const ForwardInvitation = Tool.make('forward_invitation', {
 	parameters: Schema.Struct({
 		calendar_event_id: CalendarEventIdParam,
 		to_email: Schema.String,
-		note: Schema.optional(Schema.NullOr(Schema.String)),
+		note: Schema.optionalKey(Schema.NullOr(Schema.String)),
 	}),
 	success: Schema.Struct({
 		ics_base64: Schema.String,
@@ -190,10 +190,12 @@ const ListUpcoming = Tool.make('list_upcoming_meetings', {
 	description:
 		'List upcoming calendar events (status!=cancelled, start_at > now()) with filters. Returns the raw calendar_events rows so the agent can pick by source, title, or attendee. Returns at most `limit` rows (default 25, max 500); `hasMore` says whether more matched than were returned — read it before saying how many there are.',
 	parameters: Schema.Struct({
-		company_id: Schema.optional(Schema.String),
-		contact_id: Schema.optional(Schema.String),
-		source: Schema.optional(Schema.Literals(['booking', 'email', 'internal'])),
-		limit: Schema.optional(McpPageLimit),
+		company_id: Schema.optionalKey(Schema.String),
+		contact_id: Schema.optionalKey(Schema.String),
+		source: Schema.optionalKey(
+			Schema.Literals(['booking', 'email', 'internal']),
+		),
+		limit: Schema.optionalKey(McpPageLimit),
 	}),
 	success: TruncatableResult(CalendarEvent.json),
 	dependencies: REQUEST_DEPENDENCIES,
@@ -209,7 +211,7 @@ const ManageEventTypes = Tool.make('manage_event_types', {
 	parameters: Schema.Struct({
 		action: Schema.Literals(['list', 'sync']),
 		// Narrows the list; ignored when syncing.
-		active: Schema.optional(Schema.Boolean),
+		active: Schema.optionalKey(Schema.Boolean),
 	}),
 	// list returns the event types, sync reports how many it refreshed.
 	success: Schema.Union([
@@ -247,13 +249,13 @@ const CreateInternalBlock = Tool.make('create_internal_block', {
 		start_at: Schema.String,
 		end_at: Schema.String,
 		organizer_email: OwnEmailParam,
-		company_id: Schema.optional(Schema.NullOr(Schema.String)),
-		contact_id: Schema.optional(Schema.NullOr(Schema.String)),
-		location_type: Schema.optional(
+		company_id: Schema.optionalKey(Schema.NullOr(Schema.String)),
+		contact_id: Schema.optionalKey(Schema.NullOr(Schema.String)),
+		location_type: Schema.optionalKey(
 			Schema.Literals(['video', 'phone', 'address', 'link', 'none']),
 		),
-		location_value: Schema.optional(Schema.NullOr(Schema.String)),
-		metadata: Schema.optional(Schema.NullOr(Schema.Unknown)),
+		location_value: Schema.optionalKey(Schema.NullOr(Schema.String)),
+		metadata: Schema.optionalKey(Schema.NullOr(Schema.Unknown)),
 	}),
 	success: CalendarEvent.json,
 	dependencies: REQUEST_DEPENDENCIES,
