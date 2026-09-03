@@ -153,6 +153,7 @@ export function AboutSection({
 								values={company.tags}
 								onSave={next => onSave('tags', next)}
 								emptyHint={t`No tags yet`}
+								splitOnComma
 							/>
 							<EditableChips
 								label={t`Products fit`}

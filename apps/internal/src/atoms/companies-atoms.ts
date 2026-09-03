@@ -1,6 +1,6 @@
 import { Atom } from 'effect/unstable/reactivity'
 
-import type { AttentionFilter } from '@batuda/domain'
+import type { AttentionFilter, CompanySort } from '@batuda/domain'
 
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import {
@@ -18,21 +18,29 @@ import {
  * that key too or two different searches will answer to one entry.
  */
 export type CompaniesSearch = {
-	readonly status?: string
-	readonly country?: string
+	// Four of these hold a list and match any of the values in it, while
+	// different filters still narrow one another. `tags` is the exception and
+	// reads the other way round: every tag has to be on the company.
+	readonly status?: ReadonlyArray<string>
+	readonly country?: ReadonlyArray<string>
 	readonly industry?: string
 	readonly priority?: number
-	readonly owner?: string
-	readonly sort?: string
+	// User ids, and/or the word 'none' for the companies nobody has taken.
+	readonly owner?: ReadonlyArray<string>
+	// What a research run concluded about whether the company is worth selling
+	// to. Free text on the row, so the menu comes from what is actually stored.
+	readonly fitVerdict?: ReadonlyArray<string>
+	readonly tags?: ReadonlyArray<string>
+	readonly sort?: CompanySort
 	readonly query?: string
 	// What needs doing, in the dashboard's own words: a missed follow-up, a
 	// company gone quiet, or one with nothing planned. Arriving here from a
 	// dashboard heading sets this, and the threshold it was showing rides along.
 	readonly attention?: AttentionFilter
 	readonly staleDays?: number
-	// 'only' asks for the companies taken out of view, which is how one is found
-	// again to be put back. Absent means the ones in use.
-	readonly deleted?: 'only' | 'include'
+	// The companies taken out of view, which is how one is found again to be put
+	// back. Absent means the ones in use.
+	readonly deleted?: 'only'
 }
 
 /**
@@ -99,46 +107,31 @@ export function companiesSearchAtom(
 /**
  * Produce a stable cache key from a search object. Normalizes away:
  *   - key order (`{a,b}` vs `{b,a}`) via sorted keys
- *   - empty-string values (treated as absent, same as undefined)
+ *   - the order of the values inside one filter, and any blanks among them
+ *   - empty-string and empty-list values (treated as absent, same as undefined)
  *   - nullish values
  *
- * Using `JSON.stringify` on a sorted plain object gives identical keys
- * for identical searches without pulling in a stable-stringify dep.
+ * Every field the search holds is read, rather than a list kept in step by
+ * hand: a filter left out of that list would answer to another filter's key, and
+ * two different searches would quietly share one entry.
+ *
+ * Sorting the values inside a filter is what makes `?tags=a,b` and `?tags=b,a`
+ * one list rather than two atoms fetching the same rows twice.
  */
 export function canonicalSearchKey(search: CompaniesSearch): string {
 	const entries: Array<[string, string | number]> = []
-	if (search.status !== undefined && search.status !== '') {
-		entries.push(['status', search.status])
-	}
-	if (search.country !== undefined && search.country !== '') {
-		entries.push(['country', search.country])
-	}
-	if (search.industry !== undefined && search.industry !== '') {
-		entries.push(['industry', search.industry])
-	}
-	if (search.priority !== undefined) {
-		entries.push(['priority', search.priority])
-	}
-	if (search.owner !== undefined && search.owner !== '') {
-		entries.push(['owner', search.owner])
-	}
-	if (search.sort !== undefined && search.sort !== '') {
-		entries.push(['sort', search.sort])
-	}
-	if (search.query !== undefined && search.query !== '') {
-		entries.push(['query', search.query])
-	}
-	if (search.attention !== undefined) {
-		entries.push(['attention', search.attention])
-	}
-	if (search.staleDays !== undefined) {
-		entries.push(['staleDays', search.staleDays])
-	}
-	// Part of the key, not just the query: the deleted companies and the ones in
-	// use are two different lists. Left out, both answer to the same key and
-	// asking for one serves whatever the other last fetched.
-	if (search.deleted !== undefined) {
-		entries.push(['deleted', search.deleted])
+	for (const [key, raw] of Object.entries(search)) {
+		if (raw === undefined || raw === null || raw === '') continue
+		if (Array.isArray(raw)) {
+			const values = (raw as ReadonlyArray<string>)
+				.filter(value => value !== '')
+				.slice()
+				.sort()
+			if (values.length === 0) continue
+			entries.push([key, values.join(',')])
+			continue
+		}
+		entries.push([key, raw as string | number])
 	}
 	entries.sort(([a], [b]) => a.localeCompare(b))
 	return JSON.stringify(Object.fromEntries(entries))

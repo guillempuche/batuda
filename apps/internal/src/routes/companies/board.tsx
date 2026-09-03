@@ -3,20 +3,42 @@ import { ClientOnly, createFileRoute } from '@tanstack/react-router'
 import { Schema } from 'effect'
 import styled from 'styled-components'
 
-import type { CompaniesSearch } from '#/atoms/companies-atoms'
+import { CommaList } from '@batuda/controllers'
+import {
+	AttentionFilter as AttentionFilterSchema,
+	CompanySort as CompanySortSchema,
+} from '@batuda/domain'
+
 import { CompaniesHeader } from '#/components/companies/companies-header'
 import { PipelineBoard } from '#/components/companies/pipeline-board'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
+import { companiesSearchToQuery } from '#/lib/companies-search-params'
 import { validateSearchWith } from '#/lib/search-schema'
 
+// Either comma-separated text from a link somebody wrote, or the list the router
+// hands back from what it last put in the address.
+const ValueList = Schema.Union([Schema.Array(Schema.NonEmptyString), CommaList])
+
 // Same filters as the list minus `status` — the board's columns are the statuses.
+//
+// Every one of the others is named here, including what needs doing: a filter
+// left out is not merely unshown, it is dropped, so arriving from a dashboard
+// heading and switching to the board would silently widen the list.
 const validateSearch = validateSearchWith({
-	country: Schema.NonEmptyString,
+	country: ValueList,
 	industry: Schema.NonEmptyString,
 	priority: Schema.Union([Schema.Number, Schema.NumberFromString]),
-	owner: Schema.NonEmptyString,
-	sort: Schema.NonEmptyString,
+	owner: ValueList,
+	fitVerdict: ValueList,
+	tags: ValueList,
+	sort: CompanySortSchema,
 	query: Schema.NonEmptyString,
+	attention: AttentionFilterSchema,
+	staleDays: Schema.Union([Schema.Number, Schema.NumberFromString]),
+	// Carried like the rest: the list hands over whatever it holds, and a filter
+	// this route does not name is not merely unshown, it is dropped — so going
+	// from the bin to the board would quietly show the live pipeline instead.
+	deleted: Schema.Literals(['only']),
 })
 
 export const Route = createFileRoute('/companies/board')({
@@ -29,19 +51,9 @@ function BoardPage() {
 	const { t } = useLingui()
 	const search = Route.useSearch()
 
-	// Carry the active filters back to the list view.
-	const listHref = (() => {
-		const params = new URLSearchParams()
-		if (search.country) params.set('country', search.country)
-		if (search.industry) params.set('industry', search.industry)
-		if (search.priority !== undefined)
-			params.set('priority', String(search.priority))
-		if (search.owner) params.set('owner', search.owner)
-		if (search.sort) params.set('sort', search.sort)
-		if (search.query) params.set('query', search.query)
-		const qs = params.toString()
-		return qs ? `/companies?${qs}` : '/companies'
-	})()
+	// Carry the active filters back to the list view — all of them, through the
+	// one place that knows how to write them.
+	const listHref = `/companies${companiesSearchToQuery(search)}`
 
 	return (
 		<Page>
@@ -54,7 +66,7 @@ function BoardPage() {
 			/>
 
 			<ClientOnly fallback={<LoadingSpinner label={t`Loading board…`} />}>
-				<PipelineBoard search={search as CompaniesSearch} />
+				<PipelineBoard search={search} />
 			</ClientOnly>
 		</Page>
 	)

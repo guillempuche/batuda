@@ -223,8 +223,10 @@ test.describe('company industries', () => {
 			// THEN the list narrows to that trade, and the count reads in the
 			// singular rather than "1 companies"
 			await expect(page).toHaveURL(/industry=serralleria/)
+			// The header's own line, not the spoken one beside it: the count is
+			// deliberately in the page twice, visible and announced
 			await expect(
-				page.getByText('1 company with filters applied'),
+				page.locator('p', { hasText: '1 company with filters applied' }),
 			).toBeVisible({ timeout: 10_000 })
 		})
 	})

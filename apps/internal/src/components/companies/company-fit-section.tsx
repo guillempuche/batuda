@@ -1,5 +1,3 @@
-import type { MessageDescriptor } from '@lingui/core'
-import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Link } from '@tanstack/react-router'
 import {
@@ -16,6 +14,7 @@ import { PriCollapsible } from '@batuda/ui/pri'
 
 import { normalizeConfidence } from '#/components/research/proposal-logic'
 import { RelativeDate } from '#/components/shared/relative-date'
+import { verdictLabel } from '#/lib/company-fit-verdict'
 import { agedPaperSurface, stenciledTitle } from '#/lib/workshop-mixins'
 
 export type FitCheck = {
@@ -111,7 +110,7 @@ export function CompanyFitSection({
 							$verdict={company.fitVerdict}
 							data-testid='company-fit-verdict'
 						>
-							{verdictOf(i18n, company.fitVerdict)}
+							{verdictLabel(i18n, company.fitVerdict)}
 						</Verdict>
 					) : null}
 				</PriCollapsible.Trigger>
@@ -243,24 +242,6 @@ export function CompanyFitSection({
 			</PriCollapsible.Panel>
 		</PriCollapsible.Root>
 	)
-}
-
-// The verdict is stored as the research vocabulary wrote it; the reader sees it
-// in their own language, and a value the vocabulary does not know is shown
-// as-is rather than hidden.
-const VERDICT_LABEL: Record<string, MessageDescriptor> = {
-	strong_fit: msg`Strong fit`,
-	possible_fit: msg`Possible fit`,
-	weak_fit: msg`Weak fit`,
-	no_fit: msg`Not a fit`,
-}
-
-function verdictOf(
-	i18n: { _: (descriptor: MessageDescriptor) => string },
-	verdict: string,
-): string {
-	const label = VERDICT_LABEL[verdict]
-	return label === undefined ? verdict : i18n._(label)
 }
 
 function hostOf(url: string): string {

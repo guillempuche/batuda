@@ -167,8 +167,10 @@ msgstr "{0} a punt d’aplicar, {1} per llegir, {attentionTotal} execucions requ
 msgid "{0} reported a message as spam, so it is blocked."
 msgstr "{0} ha marcat un missatge com a brossa, així que està bloquejada."
 
+#. placeholder {0}: selected.length
 #. placeholder {0}: selection.selectedCount
 #: src/components/companies/pipeline-board.tsx
+#: src/components/shared/multi-select-filter.tsx
 msgid "{0} selected"
 msgstr "{0} seleccionats"
 
@@ -191,6 +193,13 @@ msgstr "{addedEmail} ja és membre. Se li ha enviat un correu."
 #: src/routes/settings/mcp/connections.tsx
 msgid "{confirmLabel}'s assistant stops reaching this organization on its next request. It keeps working in any other organization they belong to, and they can't undo this themselves."
 msgstr "L'assistent de {confirmLabel} deixarà d'accedir a aquesta organització a la següent petició. Continuarà funcionant a qualsevol altra organització de la qual formi part, i no ho podrà desfer pel seu compte."
+
+#: src/routes/companies/index.tsx
+#: src/routes/companies/index.tsx
+#: src/routes/companies/index.tsx
+#: src/routes/companies/index.tsx
+msgid "{count} companies"
+msgstr "{count} empreses"
 
 #: src/routes/companies/$slug.tsx
 msgid "{count} people went with it"
@@ -534,10 +543,6 @@ msgstr "Assistents d'IA que has connectat per MCP. Cadascun treballa a les organ
 msgid "All"
 msgstr "Tots"
 
-#: src/routes/companies/index.tsx
-msgid "All countries"
-msgstr "Tots els països"
-
 #: src/routes/emails/index.tsx
 #: src/routes/emails/index.tsx
 msgid "All inboxes"
@@ -547,13 +552,13 @@ msgstr "Totes les safates"
 msgid "All industries"
 msgstr "Tots els sectors"
 
-#: src/routes/companies/index.tsx
-msgid "All owners"
-msgstr "Tots els responsables"
-
 #: src/components/research/inbox/research-inbox.tsx
 msgid "All runs"
 msgstr "Totes les execucions"
+
+#: src/routes/companies/index.tsx
+msgid "All stages"
+msgstr "Totes les etapes"
 
 #: src/routes/pages/index.tsx
 msgid "All statuses"
@@ -645,6 +650,10 @@ msgstr "Qualsevol confiança"
 #: src/routes/companies/index.tsx
 msgid "Any priority"
 msgstr "Qualsevol prioritat"
+
+#: src/routes/companies/index.tsx
+msgid "Anything"
+msgstr "Qualsevol"
 
 #: src/routes/settings/api-keys/index.tsx
 #: src/routes/settings/profile/index.tsx
@@ -789,6 +798,10 @@ msgstr "Adjunta"
 #: src/routes/emails/$threadId.tsx
 msgid "attachment"
 msgstr "adjunt"
+
+#: src/routes/companies/index.tsx
+msgid "Attention"
+msgstr "Atenció"
 
 #: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/inbox/research-inbox.tsx
@@ -940,6 +953,22 @@ msgstr "Llista de punts"
 #: src/routes/settings/api-keys/index.tsx
 msgid "by {creatorName}"
 msgstr "per {creatorName}"
+
+#: src/routes/companies/index.tsx
+msgid "By last contact"
+msgstr "Per últim contacte"
+
+#: src/routes/companies/index.tsx
+msgid "By last update"
+msgstr "Per última actualització"
+
+#: src/routes/companies/index.tsx
+msgid "By name"
+msgstr "Per nom"
+
+#: src/routes/companies/index.tsx
+msgid "By priority"
+msgstr "Per prioritat"
 
 #: src/routes/settings/organization/spend.tsx
 msgid "By provider"
@@ -1101,6 +1130,7 @@ msgid "Claude Desktop can't reach a remote server directly, so this bridges thro
 msgstr "Claude Desktop no es pot connectar directament a un servidor remot, així que això fa de pont amb <0>mcp-remote</0> (cal tenir Node instal·lat). O afegeix-lo com a connector OAuth."
 
 #: src/components/companies/pipeline-board.tsx
+#: src/components/shared/multi-select-filter.tsx
 #: src/components/shared/task-item.tsx
 #: src/routes/companies/$slug.tsx
 #: src/routes/emails/index.tsx
@@ -2555,6 +2585,7 @@ msgstr "Primer contacte enviat"
 #: src/components/companies/company-fit-section.tsx
 #: src/components/companies/company-fit-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
+#: src/routes/companies/index.tsx
 msgid "Fit"
 msgstr "Encaix"
 
@@ -2670,6 +2701,15 @@ msgstr "Ves a connexions"
 #: src/routes/reset-password.tsx
 msgid "Go to sign in"
 msgstr "Ves a iniciar sessió"
+
+#: src/routes/companies/index.tsx
+msgid "Gone quiet"
+msgstr "En silenci"
+
+#. placeholder {0}: search.staleDays
+#: src/routes/companies/index.tsx
+msgid "Gone quiet · {0}+ days"
+msgstr "En silenci · {0}+ dies"
 
 #: src/components/instructions/template-transfer-dialog.tsx
 msgid "Hand it over"
@@ -3456,7 +3496,6 @@ msgstr "Les meves piles"
 #: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/instructions/stack-editor.tsx
 #: src/components/instructions/template-dialog.tsx
-#: src/routes/companies/index.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/settings/api-keys/index.tsx
 msgid "Name"
@@ -3473,6 +3512,14 @@ msgstr "nom@empresa.com"
 #: src/components/emails/compose-form.tsx
 msgid "name@example.com, another@example.com"
 msgstr "nom@exemple.cat, altre@exemple.cat"
+
+#: src/components/shared/multi-select-filter.tsx
+msgid "Narrow this list"
+msgstr "Filtra aquesta llista"
+
+#: src/components/shared/multi-select-filter.tsx
+msgid "Narrow this list…"
+msgstr "Filtra aquesta llista…"
 
 #: src/routes/index.tsx
 #: src/routes/index.tsx
@@ -3885,7 +3932,7 @@ msgstr "Prioritat normal"
 msgid "Not a contact on file yet"
 msgstr "Encara no és un contacte registrat"
 
-#: src/components/companies/company-fit-section.tsx
+#: src/lib/company-fit-verdict.ts
 msgid "Not a fit"
 msgstr "No encaixa"
 
@@ -3953,6 +4000,10 @@ msgstr "Encara no hi ha res connectat a aquesta organització."
 msgid "Nothing later in the queue"
 msgstr "Res més endavant a la cua"
 
+#: src/components/shared/multi-select-filter.tsx
+msgid "Nothing matches"
+msgstr "Cap coincidència"
+
 #: src/components/research/inbox/research-inbox.tsx
 msgid "nothing on file, would add"
 msgstr "no hi ha res, s'afegiria"
@@ -3960,6 +4011,10 @@ msgstr "no hi ha res, s'afegiria"
 #: src/routes/tasks/index.tsx
 msgid "Nothing overdue"
 msgstr "Res endarrerit"
+
+#: src/routes/companies/index.tsx
+msgid "Nothing planned"
+msgstr "Sense res programat"
 
 #: src/routes/tasks/index.tsx
 msgid "Nothing snoozed"
@@ -4230,6 +4285,7 @@ msgid "Outside the area searched:"
 msgstr "Fora de la zona cercada:"
 
 #: src/components/companies/next-action-card.tsx
+#: src/routes/companies/index.tsx
 #: src/routes/index.tsx
 #: src/routes/index.tsx
 #: src/routes/tasks/index.tsx
@@ -4468,8 +4524,8 @@ msgstr "Sense xifrar"
 msgid "Please try again."
 msgstr "Torna-ho a provar."
 
-#: src/components/companies/company-fit-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
+#: src/lib/company-fit-verdict.ts
 msgid "Possible fit"
 msgstr "Encaix possible"
 
@@ -4511,7 +4567,6 @@ msgstr "Bústia principal establerta"
 msgid "Primary navigation"
 msgstr "Navegació principal"
 
-#: src/routes/companies/index.tsx
 #: src/routes/companies/index.tsx
 #: src/routes/tasks/index.tsx
 msgid "Priority"
@@ -4692,14 +4747,6 @@ msgstr "Execucions recents"
 #: src/components/companies/research-summary-card.tsx
 msgid "recently"
 msgstr "fa poc"
-
-#: src/routes/companies/index.tsx
-msgid "Recently contacted"
-msgstr "Contactats recentment"
-
-#: src/routes/companies/index.tsx
-msgid "Recently updated"
-msgstr "Actualitzats recentment"
 
 #: src/routes/companies/$slug.tsx
 msgid "Recipient marked as spam"
@@ -5581,8 +5628,8 @@ msgstr "Punts forts"
 msgid "Strikethrough"
 msgstr "Ratllat"
 
-#: src/components/companies/company-fit-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
+#: src/lib/company-fit-verdict.ts
 msgid "Strong fit"
 msgstr "Encaix fort"
 
@@ -5618,6 +5665,7 @@ msgstr "Sistema"
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/run-labels.ts
+#: src/routes/companies/index.tsx
 msgid "Tags"
 msgstr "Etiquetes"
 
@@ -6371,8 +6419,8 @@ msgstr "No reconeixem aquest correu. Demana a un administrador que t'inviti."
 msgid "We sent a sign-in link to"
 msgstr "S'ha enviat un enllaç d'inici de sessió a"
 
-#: src/components/companies/company-fit-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
+#: src/lib/company-fit-verdict.ts
 msgid "Weak fit"
 msgstr "Encaix feble"
 

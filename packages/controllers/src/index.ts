@@ -30,12 +30,14 @@ export {
 	PaginatedList,
 	pageQuery,
 } from './pagination'
+export { CommaList } from './query-list'
 export { AuthGroup } from './routes/auth'
 export { CalcomWebhookGroup } from './routes/calcom-webhook'
 export { CalendarGroup, Slot } from './routes/calendar'
 export {
 	CompaniesGroup,
 	CompanyDetail,
+	CompanyFacets,
 	CompanyResearchRun,
 } from './routes/companies'
 export { CompanyIndustriesGroup } from './routes/company-industries'

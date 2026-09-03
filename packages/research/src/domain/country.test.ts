@@ -29,12 +29,14 @@ describe('AcceptedCountry', () => {
 			expect(decodeCountry('FR')).toBe('FR')
 		})
 
-		it('should accept any case and preserve it (the handler normalizes)', () => {
+		it('should accept any case and raise it to capitals', () => {
 			// GIVEN a lower- or mixed-case code
 			// WHEN it is decoded
-			// THEN the boundary leaves case untouched — upper-casing is the handler's job
-			expect(decodeCountry('gb')).toBe('gb')
-			expect(decodeCountry('Us')).toBe('Us')
+			// THEN it comes back in capitals, the one spelling everything downstream
+			// compares against — a company stored lower-case is missed by anyone
+			// asking for the capitals, and counted as a country of its own
+			expect(decodeCountry('gb')).toBe('GB')
+			expect(decodeCountry('Us')).toBe('US')
 		})
 	})
 

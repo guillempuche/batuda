@@ -40,6 +40,7 @@ export {
 	AttentionFilter,
 	COMPANY_PRIORITIES,
 	COMPANY_SIZE_RANGES,
+	COMPANY_SORTS,
 	COMPANY_STATUSES,
 	Company,
 	CompanyCountry,
@@ -55,8 +56,11 @@ export {
 	CompanySizeRange,
 	CompanySlug,
 	CompanySocialProfile,
+	CompanySort,
 	CompanyStatus,
+	CompanyTag,
 	CompanyWebsite,
+	normalizeCountry,
 } from './companies'
 export {
 	ContactChannel,

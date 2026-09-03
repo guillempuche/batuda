@@ -1,4 +1,4 @@
-import { Schema, SchemaGetter } from 'effect'
+import { Schema } from 'effect'
 import {
 	HttpApiEndpoint,
 	HttpApiGroup,
@@ -20,7 +20,9 @@ import {
 	CompanySizeRange,
 	CompanySlug,
 	CompanySocialProfile,
+	CompanySort,
 	CompanyStatus,
+	CompanyTag,
 	CompanyWebsite,
 	Contact,
 	Interaction,
@@ -30,6 +32,7 @@ import { BadRequest, NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 import { PaginatedList, pageQuery } from '../pagination'
+import { CommaList } from '../query-list'
 import { StaleDays } from './pipeline'
 
 // One research run whose findings were applied to a company, with the pages its
@@ -104,7 +107,7 @@ export const CreateCompanyInput = Schema.Struct({
 	socialProfiles: Schema.optional(Schema.Array(CompanySocialProfile)),
 	googleMapsUrl: Schema.optional(CompanyGoogleMapsUrl),
 	productsFit: Schema.optional(Schema.Array(Schema.String)),
-	tags: Schema.optional(Schema.Array(Schema.String)),
+	tags: Schema.optional(Schema.Array(CompanyTag)),
 	painPoints: Schema.optional(Schema.String),
 	currentTools: Schema.optional(Schema.String),
 	nextAction: Schema.optional(Schema.String),
@@ -149,7 +152,7 @@ export const UpdateCompanyInput = Schema.Struct({
 	socialProfiles: Schema.optional(Schema.Array(CompanySocialProfile)),
 	googleMapsUrl: Schema.optional(Schema.NullOr(CompanyGoogleMapsUrl)),
 	productsFit: Schema.optional(Schema.NullOr(Schema.Array(Schema.String))),
-	tags: Schema.optional(Schema.NullOr(Schema.Array(Schema.String))),
+	tags: Schema.optional(Schema.NullOr(Schema.Array(CompanyTag))),
 	painPoints: Schema.optional(Schema.NullOr(Schema.String)),
 	currentTools: Schema.optional(Schema.NullOr(Schema.String)),
 	nextAction: Schema.optional(Schema.NullOr(Schema.String)),
@@ -167,32 +170,19 @@ export const UpdateCompanyInput = Schema.Struct({
  * The per-value counts are asked for in exactly these words too, so the values
  * a caller is offered and the list it gets back answer the same question.
  */
-/**
- * Tags to narrow by, written as one comma-separated value on the link.
- *
- * A query string has no way of its own to carry a list, and a repeated key is
- * read differently by each client, so the list travels as text and is split here.
- */
-const TagList = Schema.String.pipe(
-	Schema.decodeTo(Schema.Array(Schema.String), {
-		decode: SchemaGetter.transform((raw: string) =>
-			raw
-				.split(',')
-				.map(tag => tag.trim())
-				.filter(tag => tag.length > 0),
-		),
-		encode: SchemaGetter.transform((tags: ReadonlyArray<string>) =>
-			tags.join(','),
-		),
-	}),
-)
-
 const companyFilterQuery = {
-	status: Schema.optional(Schema.String),
-	country: Schema.optional(Schema.String),
+	// Four of these take several values, comma-separated, and match any of them —
+	// "everything mid-conversation", "mine or nobody's". Different filters still
+	// narrow one another, so a country and two stages means those stages in that
+	// country. `tags` is the one exception and reads the other way round; its own
+	// note below says why.
+	status: Schema.optional(CommaList),
+	country: Schema.optional(CommaList),
 	industry: Schema.optional(Schema.String),
 	priority: Schema.optional(Schema.NumberFromString),
-	owner: Schema.optional(Schema.String),
+	// A user id, or the word `none` for the companies nobody has taken. Both at
+	// once is a real question — what I am working plus what is going spare.
+	owner: Schema.optional(CommaList),
 	// Narrows to what needs doing, in the same words the dashboard uses:
 	// `overdue` missed its follow-up date, `stale` is mid-chase and has
 	// gone quiet, `no-next-action` has nothing written down at all. The
@@ -202,11 +192,12 @@ const companyFilterQuery = {
 	// How long counts as quiet, for `attention=stale`. Rides along on the
 	// link so the list matches whatever the dashboard was showing.
 	staleDays: Schema.optional(StaleDays),
-	fitVerdict: Schema.optional(Schema.String),
+	fitVerdict: Schema.optional(CommaList),
 	fitCriterionPassed: Schema.optional(Schema.String),
 	// Every tag has to be on the company, not just one of them: naming a second
-	// tag is how somebody narrows a list, and matching either would widen it.
-	tags: Schema.optional(TagList),
+	// tag is how somebody narrows a list, and matching either would widen it. That
+	// is the opposite of the four above, and it is what a tag means.
+	tags: Schema.optional(CommaList),
 	// One thing written under `metadata`, named and matched as a pair. The
 	// research engine files its own judgements there and callers file their own
 	// notes, none of which could be searched for before.
@@ -232,6 +223,15 @@ const companyFilterQuery = {
  * a choice already made rather than stranding it. Countries come back as the
  * stored code and trades as the name the organisation wrote; putting either
  * into a reader's own language is the caller's job.
+ *
+ * Each count is how many companies carry that value under the OTHER filters in
+ * force — so for a filter whose values are alternatives it is what the value
+ * would bring in, not the size of the list you would end up with, since a second
+ * alternative widens. Tags are the one exception and read both ways at once.
+ *
+ * Fit verdicts come back as whatever a research run wrote. The four expected
+ * words are not enforced anywhere, so counting them is the only way to offer a
+ * fifth rather than hide the companies carrying it.
  */
 export const CompanyFacets = Schema.Struct({
 	country: Schema.Array(
@@ -244,6 +244,12 @@ export const CompanyFacets = Schema.Struct({
 			count: Schema.Number,
 		}),
 	),
+	tags: Schema.Array(
+		Schema.Struct({ value: Schema.String, count: Schema.Number }),
+	),
+	fitVerdict: Schema.Array(
+		Schema.Struct({ value: Schema.String, count: Schema.Number }),
+	),
 })
 
 export const CompaniesGroup = HttpApiGroup.make('companies')
@@ -251,7 +257,10 @@ export const CompaniesGroup = HttpApiGroup.make('companies')
 		HttpApiEndpoint.get('list', '/companies', {
 			query: {
 				...companyFilterQuery,
-				sort: Schema.optional(Schema.String),
+				// Refused rather than ignored when it is not one of these: the server
+				// holds one fixed order per word, so anything else would quietly be
+				// served in priority order with nothing saying so.
+				sort: Schema.optional(CompanySort),
 				...pageQuery,
 			},
 			success: PaginatedList(Company.json),

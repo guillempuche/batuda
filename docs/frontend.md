@@ -830,10 +830,16 @@ Every list on this page is decided by the server, not assembled in the browser. 
 
 ### Company list (`/companies`)
 
-- Filter bar: status (pills), then country, industry, priority, owner and sort (dropdowns)
+- Filter bar: stage (pills, several at once), then country, industry, priority, owner, what needs doing, tags, fit verdict and sort (dropdowns)
 - Search input (name)
 - Company cards: name, location, status chip, industry, last contacted date, priority dot
 - Sorted by priority ASC, then last_contacted_at DESC
+
+Several values inside one filter match any of them; different filters narrow each other. Tags read the other way round — every tag named has to be on the company — so the menu counts what would be left if that tag were added, and a tag already chosen shows no count because it would always report the whole list. The menus themselves are counted by the server against the filters already set, so a value that finds nothing is not offered unless it is the one in force, which has to stay on offer so it can be taken off again.
+
+Every filter the list can be narrowed by is reachable from this bar except two, deliberately: the free-form `metadata` key/value pair, whose control would be a query builder, and the map bounding box, which is a viewport's language. Both remain available to agents and to a hand-written link.
+
+The bar announces the resulting count through a live region, because every control here changes the list without moving the keyboard — including the two that quietly lift another filter (opening the bin puts down a stage or attention filter, since a deleted company is on none of those lists and the two together would always find nothing).
 
 ### Company detail (`/companies/$slug`)
 

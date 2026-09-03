@@ -7525,7 +7525,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							if (filter.status) conds.push(sql`status = ${filter.status}`)
 							if (filter.industry)
 								conds.push(sql`industry = ${filter.industry}`)
-							if (filter.country) conds.push(sql`country = ${filter.country}`)
+							// Raised the same way the rows are, or a selector written in
+							// lower case matches nothing at all.
+							if (filter.country)
+								conds.push(sql`country = ${filter.country.toUpperCase()}`)
 							if (filter.tags && filter.tags.length > 0)
 								conds.push(sql`tags && ${filter.tags}`)
 

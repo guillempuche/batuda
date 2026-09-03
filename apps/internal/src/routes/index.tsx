@@ -353,7 +353,11 @@ function PipelinePage() {
 			<StatusStrip>
 				{STATUS_ORDER.map(status => (
 					<StatusChip key={status} data-testid={`pipeline-column-${status}`}>
-						<Link to='/companies' search={{ status }} aria-label={status} />
+						<Link
+							to='/companies'
+							search={{ status: [status] }}
+							aria-label={status}
+						/>
 						<StatusBadge status={status} size='lg' />
 						<StatusCount>{countFor(status)}</StatusCount>
 					</StatusChip>

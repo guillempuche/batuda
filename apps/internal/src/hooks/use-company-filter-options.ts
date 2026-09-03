@@ -1,10 +1,12 @@
 import { useAtomValue } from '@effect/atom-react'
+import type { I18n } from '@lingui/core'
 import { useLingui } from '@lingui/react'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { useEffect, useMemo, useRef } from 'react'
 
 import type { CompaniesSearch } from '#/atoms/companies-atoms'
 import { companyFacetsAtom } from '#/atoms/company-facets-atoms'
+import { verdictLabel } from '#/lib/company-fit-verdict'
 import { countryName } from '#/lib/country-name'
 import { useCompanyIndustries } from './use-company-industries'
 
@@ -17,17 +19,53 @@ type FilterOption = {
 type FilterOptions = {
 	readonly countries: ReadonlyArray<FilterOption>
 	readonly industries: ReadonlyArray<FilterOption>
+	// Picked several at a time, so there is no single chosen value to spell the
+	// menu's way — the entries carry what was counted and whatever is already
+	// ticked, and the control matches them by value.
+	readonly tags: ReadonlyArray<FilterOption>
+	readonly fitVerdicts: ReadonlyArray<FilterOption>
 	// The entry the filter in force corresponds to, spelled the menu's way. A
 	// filter can be written more than one way — a trade by its stored form or
 	// its name, a country code in either casing — and a selector can only point
 	// at a value its own list holds.
-	readonly countryValue: string | undefined
 	readonly industryValue: string | undefined
 }
 
 const NOTHING_YET = {
 	countries: [] as ReadonlyArray<FilterOption>,
 	industries: [] as ReadonlyArray<FilterOption>,
+	tags: [] as ReadonlyArray<FilterOption>,
+	fitVerdicts: [] as ReadonlyArray<FilterOption>,
+}
+
+/**
+ * The same two halves as `menuFor`, for a filter that holds several values at
+ * once: whatever would find something, plus whatever is already ticked.
+ *
+ * The order is the server's — commonest first — because a list of tags has no
+ * natural order the reader already knows, unlike a country or a trade name.
+ */
+const multiMenuFor = (
+	counted: ReadonlyArray<FilterOption>,
+	chosen: ReadonlyArray<string> | undefined,
+	// How to name a value the counts do not mention. Without it such a row falls
+	// back to the stored value, and the one moment a reader most needs to
+	// recognise the filter in force is the moment it reads `strong_fit`.
+	labelOf: (value: string) => string = value => value,
+): ReadonlyArray<FilterOption> => {
+	const picked = new Set(chosen ?? [])
+	const offered = counted.filter(
+		option => option.count > 0 || picked.has(option.value),
+	)
+	// A value in force that the count no longer mentions still belongs on the
+	// list, or there is no way to untick it.
+	const missing = [...picked].filter(
+		value => !offered.some(option => option.value === value),
+	)
+	return [
+		...offered,
+		...missing.map(value => ({ value, label: labelOf(value), count: 0 })),
+	]
 }
 
 /**
@@ -71,10 +109,6 @@ const menuFor = (
 	}
 }
 
-/** Two ways of writing one country: the stored code, in any casing. */
-const sameCountry = (option: FilterOption, chosen: string): boolean =>
-	option.value.toUpperCase() === chosen.toUpperCase()
-
 /**
  * The countries and trades to offer beside a filtered list of companies.
  *
@@ -101,16 +135,16 @@ export function useCompanyFilterOptions(
 	const shown = useMemo(() => {
 		if (!AsyncResult.isSuccess(result)) return undefined
 		const facets = result.value
-		const countries = menuFor(
-			facets.country.map(c => ({
-				value: c.value,
-				label: countryName(c.value, locale) ?? c.value,
-				count: c.count,
-			})),
+		const countries = multiMenuFor(
+			facets.country
+				.map(c => ({
+					value: c.value,
+					label: countryName(c.value, locale) ?? c.value,
+					count: c.count,
+				}))
+				.sort((a, b) => a.label.localeCompare(b.label, locale)),
 			search.country,
 			code => countryName(code, locale) ?? code,
-			sameCountry,
-			locale,
 		)
 		const industries = menuFor(
 			facets.industry.map(i => ({
@@ -129,12 +163,37 @@ export function useCompanyFilterOptions(
 			locale,
 		)
 		return {
-			countries: countries.entries,
+			countries,
 			industries: industries.entries,
-			countryValue: countries.chosenValue,
+			tags: multiMenuFor(
+				facets.tags.map(t => ({
+					value: t.value,
+					label: t.value,
+					count: t.count,
+				})),
+				search.tags,
+			),
+			fitVerdicts: multiMenuFor(
+				facets.fitVerdict.map(v => ({
+					value: v.value,
+					label: verdictLabel(i18n, v.value),
+					count: v.count,
+				})),
+				search.fitVerdict,
+				value => verdictLabel(i18n, value),
+			),
 			industryValue: industries.chosenValue,
 		}
-	}, [result, locale, search.country, search.industry, labelFor])
+	}, [
+		result,
+		locale,
+		i18n,
+		search.country,
+		search.industry,
+		search.tags,
+		search.fitVerdict,
+		labelFor,
+	])
 
 	// Kept after the render is committed, never during it: a render React throws
 	// away must not leave these menus behind for filters nobody ever saw.
@@ -143,13 +202,15 @@ export function useCompanyFilterOptions(
 			lastShown.current = {
 				countries: shown.countries,
 				industries: shown.industries,
+				tags: shown.tags,
+				fitVerdicts: shown.fitVerdicts,
 			}
 	}, [shown])
 
 	if (shown !== undefined) return shown
 	// Nothing has arrived yet, or the count failed. Either way the filters in
 	// force still belong on screen, so they can be read and lifted.
-	return keepChosen(lastShown.current, search, labelFor, locale)
+	return keepChosen(lastShown.current, search, labelFor, locale, i18n)
 }
 
 /**
@@ -162,17 +223,18 @@ const keepChosen = (
 	shown: {
 		readonly countries: ReadonlyArray<FilterOption>
 		readonly industries: ReadonlyArray<FilterOption>
+		readonly tags: ReadonlyArray<FilterOption>
+		readonly fitVerdicts: ReadonlyArray<FilterOption>
 	},
 	search: CompaniesSearch,
 	labelFor: (slug: string) => string | null,
 	locale: string,
+	i18n: I18n,
 ): FilterOptions => {
-	const countries = menuFor(
+	const countries = multiMenuFor(
 		shown.countries,
 		search.country,
 		code => countryName(code, locale) ?? code,
-		sameCountry,
-		locale,
 	)
 	const industries = menuFor(
 		shown.industries,
@@ -184,9 +246,12 @@ const keepChosen = (
 		locale,
 	)
 	return {
-		countries: countries.entries,
+		countries,
 		industries: industries.entries,
-		countryValue: countries.chosenValue,
+		tags: multiMenuFor(shown.tags, search.tags),
+		fitVerdicts: multiMenuFor(shown.fitVerdicts, search.fitVerdict, value =>
+			verdictLabel(i18n, value),
+		),
 		industryValue: industries.chosenValue,
 	}
 }

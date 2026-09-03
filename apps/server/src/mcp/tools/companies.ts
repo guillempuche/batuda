@@ -2,8 +2,13 @@ import { DateTime, Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { CompanyDetail, CurrentOrg } from '@batuda/controllers'
 import {
+	CompanyDetail,
+	CurrentOrg,
+	STALE_DAYS_BOUNDS,
+} from '@batuda/controllers'
+import {
+	AttentionFilter,
 	COMPANY_PRIORITIES,
 	COMPANY_STATUSES,
 	Company,
@@ -19,7 +24,9 @@ import {
 	CompanySizeRange,
 	CompanySlug,
 	CompanySocialProfile,
+	CompanySort,
 	CompanyStatus,
+	CompanyTag,
 	CompanyWebsite,
 	companySlugFromName,
 	HandSetVerificationVerdict,
@@ -71,19 +78,53 @@ export const CompanyFilterOptions = Schema.Struct({
 			company_count: Schema.Number,
 		}),
 	),
+	// The tags actually in use, so a caller stops guessing at free text. The count
+	// is how many are left if this tag is added to the ones already asked for, so
+	// a tag already asked for reports the whole current list.
+	tags: Schema.Array(
+		Schema.Struct({ tag: Schema.String, company_count: Schema.Number }),
+	),
+	// The verdicts runs have actually written, which need not be the four expected
+	// words — the column is free text, so counting is the only honest menu.
+	fit_verdicts: Schema.Array(
+		Schema.Struct({ verdict: Schema.String, company_count: Schema.Number }),
+	),
 })
 
 const SearchCompanies = Tool.make('search_companies', {
 	description:
-		'Filter companies by status, country (ISO 3166-1 alpha-2, e.g. US/ES/DE), industry, priority, search query, the research fit verdict (strong_fit / possible_fit / weak_fit / no_fit) — what a research run concluded, which nothing but a run writes, so a view of your own lives under `metadata` and is found with the pair below — a fit criterion the company passed (matched loosely against the criterion text), a tag or tags the company carries (every one named has to be on it, so a second tag narrows the list), one thing written under `metadata` given as `metadata_key` plus `metadata_value`, or a geographic bounding box. The box is any subset of min_lat/max_lat/min_lng/max_lng (decimal degrees); each bound is applied independently and only matches companies with stored coordinates. Returns summaries (including latitude/longitude) — call get_company for full details. Set `include_filter_options` to be told which countries and trades actually narrow this list, rather than guessing a value and getting nothing back. `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true.',
+		'Filter companies by status, country (ISO 3166-1 alpha-2, e.g. US/ES/DE), industry, priority, owner, search query, what needs attention, the research fit verdict, a fit criterion the company passed, tags, one thing written under `metadata`, or a geographic bounding box. `status`, `country`, `owner` and `fit_verdict` each take a list and match ANY of the values in it, while different filters narrow one another — so status ["contacted","responded"] with country ["ES"] is those two stages in Spain. `tags` reads the other way round: every tag named has to be on the company, so a second tag narrows the list. `owner` takes user ids from list_members and/or the word "none" for companies nobody has taken; pass both to ask for yours plus the unclaimed. `attention` is what needs doing, in the same words the daily lists use: "overdue" missed its follow-up date, "stale" is mid-chase and unheard from for `stale_days` (default 14), "no-next-action" has nothing written down at all — a deleted company counts as none of these, so `attention` with `deleted: "only"` finds nothing at all, and with `deleted: "include"` simply leaves the deleted ones out. `fit_verdict` is what a research run concluded (strong_fit / possible_fit / weak_fit / no_fit), which nothing but a run writes, so a view of your own lives under `metadata` and is found with the pair below — a fit criterion is matched loosely against the criterion text. One thing under `metadata` is given as `metadata_key` plus `metadata_value`. The box is any subset of min_lat/max_lat/min_lng/max_lng (decimal degrees); each bound is applied independently and only matches companies with stored coordinates. `sort` picks the order: priority (the default), name, recent_contact, recent_update. Returns summaries (including latitude/longitude) — call get_company for full details. Set `include_filter_options` to be told which countries, trades, tags and fit verdicts are worth asking for, rather than guessing a value and getting nothing back. Each count is how many companies carry that value under the OTHER filters in force — for `status`, `country` and `fit_verdict` that is what adding it would bring in, not the size of the list you would end up with, since a second value there widens. For `tags` it is both, because every tag named has to be on the company, so a tag already chosen just reports the whole current list. `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true.',
 	parameters: Schema.Struct({
-		status: Schema.optionalKey(Schema.String),
-		country: Schema.optionalKey(Schema.String),
+		// The same closed word lists the write tools below use. A stage the model
+		// invented used to come back as an empty list, which reads as "you have
+		// none of those" rather than "that is not a stage".
+		status: Schema.optionalKey(Schema.Array(CompanyStatus)),
+		country: Schema.optionalKey(Schema.Array(CompanyCountry)),
 		industry: Schema.optionalKey(Schema.String),
-		priority: Schema.optionalKey(Schema.Number),
-		fit_verdict: Schema.optionalKey(Schema.String),
+		priority: Schema.optionalKey(CompanyPriority),
+		owner: Schema.optionalKey(Schema.Array(Schema.String)).annotate({
+			description:
+				'User ids from list_members, and/or the literal "none" for companies nobody has taken. Several values match any of them, so ["none", "<my id>"] is what I am working plus what is going spare.',
+		}),
+		attention: Schema.optionalKey(AttentionFilter).annotate({
+			description:
+				'What needs doing. Narrows to the same companies the daily lists report, so a count there and a list here agree. A deleted company is on none of these lists, so pairing this with `deleted: "only"` finds nothing.',
+		}),
+		stale_days: Schema.optionalKey(
+			Schema.Number.pipe(
+				Schema.check(Schema.isInt(), Schema.isBetween(STALE_DAYS_BOUNDS)),
+			),
+		).annotate({
+			description:
+				'How long a company may go quiet before `attention: "stale"` counts it, in days (default 14). Raise it for long sales cycles. Means nothing on its own.',
+		}),
+		sort: Schema.optionalKey(CompanySort).annotate({
+			description:
+				'The order to read the list in. Defaults to priority, so ask for recent_contact or recent_update when the question is about what happened lately — a page of the default order cannot be re-sorted after the fact.',
+		}),
+		fit_verdict: Schema.optionalKey(Schema.Array(Schema.String)),
 		fit_criterion_passed: Schema.optionalKey(Schema.String),
-		tags: Schema.optionalKey(Schema.Array(Schema.String)).annotate({
+		tags: Schema.optionalKey(Schema.Array(CompanyTag)).annotate({
 			description:
 				'Tags the company must carry — every one of them, not any of them. Tags are free text set when the company was written, so ask for one you know was used rather than guessing.',
 		}),
@@ -108,7 +149,7 @@ const SearchCompanies = Tool.make('search_companies', {
 		offset: Schema.optionalKey(McpPageOffset),
 		include_filter_options: Schema.optionalKey(Schema.Boolean).annotate({
 			description:
-				'Also return which countries and trades are worth narrowing by, each with how many companies it would find under the filters already given. Ask for this instead of guessing a value: a `company_count` of 0 means that value exists but finds nothing here, and a value absent from the list finds nothing at all.',
+				'Also return which countries, trades, tags and fit verdicts are worth narrowing by, each with how many companies carry it under the other filters already given. Ask for this instead of guessing a value: a `company_count` of 0 means that value exists but finds nothing here, and a value absent from the list finds nothing at all.',
 		}),
 	}),
 	success: Schema.Struct({
@@ -170,7 +211,7 @@ const companyInputFields = {
 	}),
 	googleMapsUrl: Schema.optionalKey(CompanyGoogleMapsUrl),
 	productsFit: Schema.optionalKey(Schema.Array(Schema.String)),
-	tags: Schema.optionalKey(Schema.Array(Schema.String)),
+	tags: Schema.optionalKey(Schema.Array(CompanyTag)),
 	painPoints: Schema.optionalKey(Schema.String),
 	currentTools: Schema.optionalKey(Schema.String),
 	nextAction: Schema.optionalKey(Schema.String),
@@ -277,7 +318,7 @@ const UpdateCompany = Tool.make('update_company', {
 		linkedin: Schema.optionalKey(CompanyLinkedin),
 		googleMapsUrl: Schema.optionalKey(CompanyGoogleMapsUrl),
 		productsFit: Schema.optionalKey(Schema.Array(Schema.String)),
-		tags: Schema.optionalKey(Schema.Array(Schema.String)),
+		tags: Schema.optionalKey(Schema.Array(CompanyTag)),
 		painPoints: Schema.optionalKey(Schema.String),
 		currentTools: Schema.optionalKey(Schema.String),
 		nextAction: Schema.optionalKey(Schema.String),
@@ -513,6 +554,10 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 						country: params.country,
 						industry: params.industry,
 						priority: params.priority,
+						owner: params.owner,
+						attention: params.attention,
+						staleDays: params.stale_days,
+						sort: params.sort,
 						fitVerdict: params.fit_verdict,
 						fitCriterionPassed: params.fit_criterion_passed,
 						tags: params.tags,
@@ -544,6 +589,14 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 								slug: i.slug,
 								label: i.label,
 								company_count: i.count,
+							})),
+							tags: facets.tags.map(t => ({
+								tag: t.value,
+								company_count: t.count,
+							})),
+							fit_verdicts: facets.fitVerdict.map(v => ({
+								verdict: v.value,
+								company_count: v.count,
 							})),
 						},
 					}

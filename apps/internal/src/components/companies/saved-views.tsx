@@ -3,7 +3,10 @@ import { Bookmark, BookmarkPlus, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import styled from 'styled-components'
 
-import type { CompaniesSearch } from '#/atoms/companies-atoms'
+import {
+	type CompaniesSearch,
+	canonicalSearchKey,
+} from '#/atoms/companies-atoms'
 import { stenciledTitle } from '#/lib/workshop-mixins'
 
 const STORAGE_KEY = 'batuda.companies.savedViews'
@@ -45,8 +48,12 @@ export function SavedViews({
 	}, [])
 
 	const hasFilters = Object.keys(current).length > 0
+	// The list's own way of spelling a search, rather than a second one here: it
+	// ignores the order of the filters and of the values inside each one, so a
+	// saved view still reads as the one in force when its two tags come back the
+	// other way round.
 	const activeName = views.find(
-		v => canonical(v.search) === canonical(current),
+		v => canonicalSearchKey(v.search) === canonicalSearchKey(current),
 	)?.name
 
 	const save = () => {
@@ -93,15 +100,6 @@ export function SavedViews({
 				</Chip>
 			)}
 		</Wrap>
-	)
-}
-
-/** Order-independent, so the same filters chosen in a different order match. */
-function canonical(search: CompaniesSearch): string {
-	return JSON.stringify(
-		Object.fromEntries(
-			Object.entries(search).sort(([a], [b]) => (a < b ? -1 : 1)),
-		),
 	)
 }
 

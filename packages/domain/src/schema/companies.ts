@@ -1,4 +1,4 @@
-import { Schema } from 'effect'
+import { Schema, SchemaGetter } from 'effect'
 import { Model } from 'effect/unstable/schema'
 
 import { DbNumberOrNull } from './_common'
@@ -76,6 +76,19 @@ export const ATTENTION_FILTERS = ['overdue', 'stale', 'no-next-action'] as const
 export const AttentionFilter = Schema.Literals(ATTENTION_FILTERS)
 export type AttentionFilter = typeof AttentionFilter.Type
 
+// The orders a company list can be read in. A closed set, because each word
+// stands for one fixed ordering held elsewhere: a word that is not on the list
+// would be taken and then ignored, and the caller would be handed priority order
+// believing it had asked for something else.
+export const COMPANY_SORTS = [
+	'priority',
+	'name',
+	'recent_contact',
+	'recent_update',
+] as const
+export const CompanySort = Schema.Literals(COMPANY_SORTS)
+export type CompanySort = typeof CompanySort.Type
+
 // The shape each written-in value has to have. They live beside the vocabularies
 // above so every way into a company row checks the same thing, and something that
 // could never be a real address or phone number is turned away where it is typed
@@ -87,9 +100,48 @@ export type AttentionFilter = typeof AttentionFilter.Type
 export const CompanySlug = Schema.String.pipe(
 	Schema.check(Schema.isPattern(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)),
 )
+
+// A label somebody groups companies by. Anything except a comma, because a
+// query string has no list of its own and several tags travel as one
+// comma-separated value — so a tag holding a comma would be split back into two
+// tags nobody carries, and the companies under it would quietly stop being
+// findable. Refused where it is typed rather than mangled where it is read.
+export const CompanyTag = Schema.String.pipe(
+	Schema.check(
+		Schema.isMinLength(1),
+		Schema.isPattern(/^[^,]+$/),
+		// No leading or trailing blanks, and not blank all through. Several tags
+		// travel as one comma-separated value and each is trimmed on the way back,
+		// so a padded tag is offered in the menu under one spelling and asked for
+		// under another, and a blank one asks for nothing at all.
+		Schema.isPattern(/^\S(.*\S)?$/s),
+	),
+)
+// Raised to capitals as it comes in, because narrowing by a country and counting
+// how many carry it both compare the stored text exactly: a company written `es`
+// would be missed by anyone asking for `ES`, and would be offered as a second
+// Spain with a count of its own. Only what a caller sends passes through here —
+// a row already stored is read as written, by the plain string on the row below.
 export const CompanyCountry = Schema.String.pipe(
 	Schema.check(Schema.isPattern(/^[A-Za-z]{2}$/)),
+	// The same shape on the far side of the raising, not only before it. A check
+	// that sits only on the way in leaves the finished type a plain string, and
+	// anything asking "is this a country code?" of a finished value — a guard on
+	// a paid lookup, most of all — quietly answers yes to every word there is.
+	Schema.decodeTo(
+		Schema.String.pipe(Schema.check(Schema.isPattern(/^[A-Z]{2}$/))),
+		{
+			decode: SchemaGetter.transform((code: string) => code.toUpperCase()),
+			encode: SchemaGetter.transform((code: string) => code),
+		},
+	),
 )
+
+/**
+ * The same raising, for a country arriving anywhere a schema does not decode it —
+ * a filter value, most of all, which has to compare against what was stored.
+ */
+export const normalizeCountry = (code: string): string => code.toUpperCase()
 // The four ways of reaching a company are the same shapes a person's channels
 // use, read from one place — a company's email and a contact's email are the same
 // question, and answering it twice is how the two doors start disagreeing.
