@@ -25,6 +25,12 @@ export interface LlmUsage {
 	readonly tier: LlmTier
 	/** The model that answered — a fallback slot bills at its own vendor's rate. */
 	readonly model: string
+	/**
+	 * The vendor that answered. Two vendors can serve one model name, and a tier
+	 * falls back between them without saying so, so the model alone cannot tell a
+	 * cascaded answer from a primary one.
+	 */
+	readonly provider: string
 	readonly tokensIn: number
 	readonly tokensOut: number
 	readonly microcents: number
@@ -59,6 +65,15 @@ export interface UsageSnapshot {
 	 * Counted apart from the cost buckets on purpose: those are summed to reach
 	 * the run's total, so a second entry describing the same spend would charge
 	 * the run twice.
+	 *
+	 * Keyed by the VENDOR as well as the model — `extract@custom:openai/gpt-oss-120b`
+	 * — because a tier falls back to a second vendor without saying so, and two
+	 * vendors serving one model name would otherwise be one indistinguishable
+	 * entry. They are not interchangeable: put the same 375 rows to the two the
+	 * extract tier is routed at, and they take out disjoint sets, one reading the
+	 * question as who buys from a company and the other as where the row was
+	 * found. A run that fell back was judged by something else, and this is where
+	 * a reader can see that it did.
 	 */
 	readonly callsByModel: Record<string, number>
 }
@@ -168,7 +183,7 @@ export const makeUsageMeter: Effect.Effect<UsageMeterService> = Effect.gen(
 						),
 						callsByModel: add(
 							s.callsByModel,
-							`${usage.tier}@${usage.model}`,
+							`${usage.tier}@${usage.provider}:${usage.model}`,
 							1,
 						),
 					}))

@@ -14,6 +14,7 @@ describe('the record of what a run spent', () => {
 						yield* meter.recordLlm({
 							tier: 'agent',
 							model: 'a-model',
+							provider: 'a-vendor',
 							tokensIn: 10,
 							tokensOut: 5,
 							microcents: 4000,
@@ -33,6 +34,40 @@ describe('the record of what a run spent', () => {
 		})
 	})
 
+	describe('when a tier falls back to its second vendor', () => {
+		it('should count the two apart even where they serve one model name', async () => {
+			// GIVEN one tier answered twice by the primary vendor and once by the
+			//   fallback, both serving a model under the same name — which is what
+			//   the extract tier's two slots do
+			const snapshot = await Effect.runPromise(
+				Effect.gen(function* () {
+					const meter = yield* makeUsageMeter
+					for (const provider of ['nebius', 'nebius', 'fireworks']) {
+						yield* meter.recordLlm({
+							tier: 'extract',
+							model: 'gpt-oss-120b',
+							provider,
+							tokensIn: 10,
+							tokensOut: 5,
+							microcents: 1000,
+						})
+					}
+					return yield* meter.snapshot()
+				}),
+			)
+
+			// THEN the tally names the vendor beside the model, so a run that fell
+			//   back says so. Keyed on the model alone the three calls collapse into
+			//   one entry, and nothing in a finished run distinguishes an answer from
+			//   the primary from one the fallback gave — which matters because the
+			//   two do not judge alike.
+			expect(snapshot.callsByModel).toEqual({
+				'extract@nebius:gpt-oss-120b': 2,
+				'extract@fireworks:gpt-oss-120b': 1,
+			})
+		})
+	})
+
 	describe('when several kinds of work were charged', () => {
 		it('should keep each kind apart, and credits by provider', async () => {
 			// GIVEN model calls on two tiers and a search that consumed credits
@@ -42,6 +77,7 @@ describe('the record of what a run spent', () => {
 					yield* meter.recordLlm({
 						tier: 'agent',
 						model: 'a-model',
+						provider: 'a-vendor',
 						tokensIn: 100,
 						tokensOut: 50,
 						microcents: 2_000_000,
@@ -49,6 +85,7 @@ describe('the record of what a run spent', () => {
 					yield* meter.recordLlm({
 						tier: 'writer',
 						model: 'w-model',
+						provider: 'a-vendor',
 						tokensIn: 20,
 						tokensOut: 80,
 						microcents: 1_000_000,
@@ -87,6 +124,7 @@ describe('the record of what a run spent', () => {
 					yield* meter.recordLlm({
 						tier: 'extract',
 						model: 'x-model',
+						provider: 'a-vendor',
 						tokensIn: 100,
 						tokensOut: 50,
 						microcents: 5_000_000,
