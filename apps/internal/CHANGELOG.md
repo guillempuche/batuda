@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-09-03 (internal-v2026.9.3)
+
+### Features
+
+* **research:** let the eval see why a run stopped looking ([d204f77](https://github.com/guillempuche/batuda/commit/d204f77a52e03908cdb703819f4b9e6b68c3e498))
+* **research:** make a search's own record say what it did ([2f23161](https://github.com/guillempuche/batuda/commit/2f231613d05a3e0a268184729fde4c33ba91197a)), closes [#579](https://github.com/guillempuche/batuda/issues/579)
+* **research:** record which vendor answered, not just which model ([9e7d001](https://github.com/guillempuche/batuda/commit/9e7d001607ded1817303bbfff8a96f6118c3cc75))
+
+### Bug Fixes
+
+* make the MCP tool surface tell callers the truth ([dbf03e8](https://github.com/guillempuche/batuda/commit/dbf03e8afa19d690af89c8c35e58308a29dc5e8b)), closes [#600](https://github.com/guillempuche/batuda/issues/600)
+* **research:** ask the same questions however the list is ordered ([1bccfe7](https://github.com/guillempuche/batuda/commit/1bccfe7180f6e6817d57eb4d90f24cd3f165e8c4))
+* **research:** stop a refused retry reporting itself as finished looking ([81eb4f8](https://github.com/guillempuche/batuda/commit/81eb4f85caa4c3fb1b1ea37c178d651406992f07))
+
+### Documentation
+
+* say who may write a company fit verdict ([4f89a81](https://github.com/guillempuche/batuda/commit/4f89a81af961dae4b3e2cc34f5aa0f3fad5ef694))
+
 ## 2026-09-02 (internal-v2026.9.2)
 
 ### Features
