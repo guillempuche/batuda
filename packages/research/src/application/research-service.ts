@@ -292,8 +292,16 @@ const sha256Hex = (input: string): string =>
 
 // Cap a tool result before it goes into the phase-1 transcript, so a large
 // scraped page can't blow up the phase-2 prompt or the next round's context.
+// How a tool result reads as text, before anything trims it. Shared with
+// `boundedToolResult` so the size a log reports and the text it would have
+// stored can never be measuring two different things — a result that is an
+// object, which most of them are, reads as JSON either way rather than as the
+// string "[object Object]".
+const toolResultText = (value: unknown): string =>
+	typeof value === 'string' ? value : (JSON.stringify(value) ?? '')
+
 const boundedToolResult = (value: unknown, maxChars = 4000): string => {
-	const text = typeof value === 'string' ? value : (JSON.stringify(value) ?? '')
+	const text = toolResultText(value)
 	return text.length > maxChars
 		? `${text.slice(0, maxChars)}…[truncated]`
 		: text
@@ -343,6 +351,24 @@ const MAX_BRIEF_SUBJECT_CHARS = 120
 // Cap how many per-field grounding drops a run logs in detail, so a pathological
 // extraction can't flood the log; the aggregate counts still cover the rest.
 const MAX_LOGGED_FIELD_DROPS = 20
+
+/**
+ * How many SUCCESSFUL provider calls one run writes into its own tool log.
+ *
+ * Logging every provider call is what closes the blind spot — a live scan made
+ * eighty-two of them and recorded none — but eighty-two is also the number that
+ * makes an unbounded list a problem on a column stored whole on the run.
+ *
+ * A failure is never capped. It carries the error text, which is the entry
+ * somebody is actually looking for, and counting the two together let a run
+ * whose first sixty calls succeeded record none of the failures that came
+ * after — throwing away exactly what the log is read for.
+ *
+ * The brackets that give a run its shape — one per gathering round, per gap
+ * round, and per phase — are few, bounded by their own limits, and never
+ * capped, so a capped log still reads end to end.
+ */
+const MAX_LOGGED_PROVIDER_CALLS = 60
 
 // How much of a dropped row's stated reason reaches the log. It is asked for in a
 // few words; this is what a model ignoring that costs, per row, on a scan that
@@ -1353,8 +1379,17 @@ const proposeContactDirective = (companyId: string): string =>
 // as much weight as the opening one: a company whose site the evidence never
 // gives must still be listed, or asking for the site would quietly shrink the
 // list.
+//
+// It asks for the companies a member list NAMES AS MEMBERS, not for everything
+// named on the page. "Every one named on an association member list" reads as an
+// invitation to include the association too, since its own name is the most
+// prominent one there — and the kind directive below then has to argue it back
+// out. Taking the invitation away is the fix that works: a prompt sentence
+// forbidding a kind makes the model go looking for that kind, measured on the
+// organisation-kind question, where one raised directory removals from ten to
+// sixteen over the same rows.
 const DISCOVERY_BREADTH_DIRECTIVE =
-	'List EVERY company the evidence identifies that matches the request — every one named on a directory page, an association or trade-body member list, a sector ranking, a news article, a register extract, or a search result — not only the ones the evidence describes at length. The evidence routinely names far more companies than a first pass returns, and coming back with a handful while it names dozens is an incomplete extraction, not a small market. Cover every part of the request: where it asks about several sectors, trades, regions, or countries, each one needs its own companies in the list rather than whichever the evidence happened to describe first. For each company give its own official website wherever the evidence states one, and its employee count wherever a source states one. Never drop a company for want of a website or a headcount — list it by name with the fields the evidence does support.'
+	'List EVERY company the evidence identifies that matches the request — every one named on a directory page, every company an association or trade body lists as a member, every one in a sector ranking, a news article, a register extract, or a search result — not only the ones the evidence describes at length. The evidence routinely names far more companies than a first pass returns, and coming back with a handful while it names dozens is an incomplete extraction, not a small market. Cover every part of the request: where it asks about several sectors, trades, regions, or countries, each one needs its own companies in the list rather than whichever the evidence happened to describe first. For each company give its own official website wherever the evidence states one, and its employee count wherever a source states one. Never drop a company for want of a website or a headcount — list it by name with the fields the evidence does support.'
 
 // What a scan's list is not allowed to hold. The breadth directive above sends the
 // search onto association and federation pages on purpose, because that is where a
@@ -1601,6 +1636,12 @@ export const buildBriefPrompt = (args: {
 		`Write a concise human-readable research brief in ${args.language}, summarizing ONLY the material below.`,
 		heading,
 		'Do not add any fact, number, name, or contact detail that is not present in the material.',
+		// A brief shipped to a reader carrying "(Nota: Este resumen no incluye datos
+		// de CRM ni extrapolaciones ficticias…)" — the writer acknowledging the rules
+		// below back to the person reading. This is about the shape of the output
+		// rather than any kind of finding, which is why it can be stated as a
+		// prohibition without sending the model hunting for something.
+		'Write the brief and nothing else. Never add a note about these instructions, about what you did or did not include, or about what the material does not contain.',
 		...standing,
 		'`proposed_updates`, `pending_paid_actions` and `discovered_existing` are how the run hands work back to the CRM, not things it found out. Never report one as a finding, and never let one be the whole brief.',
 		'When the material carries news or dated events, give recent developments (roughly the last 12 months) a short section of their own.',
@@ -2535,28 +2576,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						context,
 					})
 
-					// ── Checkpoint state from any prior partial run ──
-					// `phase` + `research_text` + `findings` are persisted after each
-					// phase; on resume we skip already-completed phases.
-					const checkpointPhase = ((run as { phase?: number | null }).phase ??
-						0) as number
-					const cachedResearchText = (run as { researchText?: string | null })
-						.researchText
-					const [findingsRow] = yield* sql<{
-						findings: Record<string, unknown> | null
-					}>`
-						SELECT findings FROM research_runs WHERE id = ${researchId}
-					`
-					const existingFindings = findingsRow?.findings ?? null
-					const existingFindingsHasValue =
-						existingFindings !== null &&
-						typeof existingFindings === 'object' &&
-						Object.keys(existingFindings).length > 0 &&
-						!('error' in existingFindings)
-
-					// What this run has really cost. A resumed run carries the earlier
-					// attempt's totals forward, so finishing adds to them instead of
-					// replacing them with only what this attempt spent.
+					// What this run has really cost. Added to what the row already carries
+					// rather than replacing it, so a total is never quietly reduced to what
+					// the last write happened to see.
 					const meter = yield* UsageMeter
 					yield* meter.seed(
 						(run as { costCents?: number | null }).costCents ?? 0,
@@ -2598,8 +2620,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// The keys that prove the fetched evidence is about the requested
 					// company (its name or its own domain). A scan or freeform run with
 					// no anchored subject is not entity-gated (targets is null). The
-					// verdict is computed from the phase-1 evidence below and, on resume,
-					// read back from the row so the weak-match handling survives a restart.
+					// verdict is computed from the phase-1 evidence below.
 					const subjectTargets = subjects.map(s => {
 						const row = s.snapshot as Record<string, unknown>
 						return {
@@ -2650,8 +2671,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						queryName((run as { query: string }).query)
 
 					// Said once an attempt, so a starved market shows up in the telemetry
-					// rather than being guessed at. A resumed run comes back through here
-					// and says it again, so counting HOW MANY RUNS goes by the stored
+					// rather than being guessed at. Counting HOW MANY RUNS goes by the stored
 					// `quality.subject_unreadable`, which is written once per run; this
 					// pair is for watching the rate and for finding the run afterwards.
 					if (subjectUnreadable) {
@@ -2711,13 +2731,15 @@ export class ResearchService extends Context.Service<ResearchService>()(
 
 					// Tool log accumulator
 					const toolLog = yield* Ref.make<ToolLogEntry[]>([])
+					// Counted apart from the log itself so the cap applies only to the
+					// per-call entries; see `MAX_LOGGED_PROVIDER_CALLS`.
+					let providerCallsLogged = 0
 
 					// True once a registry_lookup this run resolved the target company by
 					// its legal name — a strong, site-independent confirmation the run
 					// reached the right entity. Stamped onto the findings so the eval can
 					// count it toward grounding even when the company's own site was never
-					// fetched; nothing in the product reads it. A resumed run skips phase 1
-					// and so never sets it (the eval always runs fresh, so it never resumes).
+					// fetched; nothing in the product reads it.
 					let registryConfirmed = false
 					const withRegistryFlag = (
 						obj: Record<string, unknown>,
@@ -2725,8 +2747,8 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						registryConfirmed ? { ...obj, registry_confirmed: true } : obj
 
 					// Fail a run closed as no_reliable_data because nothing in its evidence
-					// was about the requested company. Called by the phase-1 entity gate and
-					// again on resume, where that gate is skipped. Takes only 'absent' — a
+					// was about the requested company. Called by the phase-1 entity gate.
+					// Takes only 'absent' — a
 					// glancing mention still has something worth showing a person, so it
 					// finishes marked for review rather than being thrown away.
 					const failClosedOnEntity = (
@@ -2793,23 +2815,19 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// Wall-clock epoch for the gap rounds' stop-with-margin check —
 					// aligned with the whole-run deadline, which starts with the run body.
 					const runStartedAtMs = DateTime.toEpochMillis(DateTime.nowUnsafe())
-					// Skipped on resume if the checkpoint captured research_text.
 					let researchText: string
 					// Evidence-only corpus (tool results, no model prose) for the value
-					// guard; empty on a resume that skips phase 1.
+					// guard.
 					let evidenceText = ''
 					// How many reflect-loop rounds phase 1 ran, for the run's quality
-					// signal; stays 0 on a resume that skips phase 1.
+					// signal.
 					let runRounds = 0
 					// And why that searching stopped. Held out here for the same reason
 					// as the count beside it: the run reports it long after the phase
-					// that knows it has ended. Null on a resume that skips phase 1 —
-					// nothing searched, so there is no answer rather than an answer of
-					// "finished".
+					// that knows it has ended.
 					let searchStopped: SearchStopped | null = null
 					// And how many gap rounds phase 2 ran after it, counted apart because
-					// gathering and gap-closing are different work; stays 0 on a resume
-					// that reuses the earlier attempt's findings.
+					// gathering and gap-closing are different work.
 					let gapRounds = 0
 					// What kind of organisation each row was already found to be, kept for
 					// the whole run and keyed by the row's own words. A scan asks this once
@@ -2869,7 +2887,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					const placeVerdicts = new Map<string, RememberedPlace>()
 					// Every piece of real page text gathered this run — the corpus the value
 					// guard checks findings against. Kept separate from the model-facing
-					// transcript (capped per page); empty on a resume that skips phase 1.
+					// transcript (capped per page).
 					const scrapeCorpus: Array<{
 						urlHash: string
 						text: string
@@ -2891,8 +2909,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// returned, each page it fetched, and the addresses those pages link to.
 					// Full addresses rather than hosts, because what says a site is a
 					// directory is which companies it files and where, and only the path
-					// shows that. Empty on a resume that skips phase 1, which leaves every
-					// host unknown — the safe direction.
+					// shows that.
 					const gatheredAddresses = new Set<string>()
 					// The anchor site fetched up front (see below): its url hash to link as
 					// a source, and its capped rendered text to prepend to the transcript so
@@ -2918,17 +2935,15 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// searching started. Carried out of phase 1 because what came back is
 					// held against it once more at the end, over the findings phase 2
 					// settles on rather than the ones phase 1 measured. Stays empty for
-					// every run that is not a scan, and on a resume that skips phase 1 —
-					// there is no list then, so the run says nothing about coverage rather
-					// than reporting that it covered none of it.
+					// every run that is not a scan — there is no list then, so the run says
+					// nothing about coverage rather than reporting it covered none.
 					let requestParts: ReadonlyArray<RequestPart> = []
 					// The words those parts use for the trades, which is how every check
 					// that weighs an address against a name tells the trade in the name
 					// from the company (`run-words.ts`). Held beside the parts so the two
 					// cannot say different things, and empty wherever they are — a run
-					// about one company on file names no trades, and so does a resume that
-					// skipped the phase they are split in. Both then read a name with only
-					// the shared list behind them.
+					// about one company on file names no trades. Both then read a name with
+					// only the shared list behind them.
 					let wordsTheRunBrings: RunWords = runWordsOf([])
 					// Which of those parts a pass actually went back out for. Carried
 					// alongside the list because the rows cannot say whether the run
@@ -2947,8 +2962,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					let coverageLastMissing: ReadonlyArray<string> = []
 					// What the run's spending limit was charged for cheap work in phase 1,
 					// read off the budget once phase 1 ends. Feeds the gap rounds' check
-					// that there is still room for another one. Stays 0 on a resume that
-					// skips phase 1 — the budget only counts this attempt.
+					// that there is still room for another one.
 					let cheapSpentCents = 0
 					// What the phase-2 gap rounds charge on top: they run outside the
 					// phase-1 Budget scope, so they tally their own scrape/search cost here
@@ -3042,8 +3056,17 @@ export class ResearchService extends Context.Service<ResearchService>()(
 
 					// How the citation guard fared on the last extraction. A run can extract
 					// more than once — a discovery scan retries, gap rounds re-extract — and
-					// what matters is the tally behind the findings that actually ship, so
-					// the guard overwrites them each time rather than adding them up.
+					// the guard overwrites these each time rather than adding them up.
+					//
+					// Known wrong, and left alone deliberately: this describes ONE extraction
+					// while the list a reader gets is the fold of several, measured at 35 seen
+					// against 62 delivered. Re-running the guard over the folded list is not
+					// the fix — the fold's input has already been through this same guard
+					// inside the re-extraction that produced it, so a second pass counts only
+					// survivors, reports nothing invented, and silences the low-confidence
+					// rule that fires on `citationsSeen > 0 && citationsKept === 0`. Counting
+					// the shipped list needs `seen` to accumulate across passes without
+					// double-counting a row that was extracted twice; see #457.
 					let citationsSeen = 0
 					let citationsKept = 0
 
@@ -3075,6 +3098,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// needs is gone before the rule is asked. Remembering it is the only reading
 					// in which the two are ever together.
 					let websiteClaims: HostClaims = new Map()
+
 					const checkWebsites = (
 						answer: unknown,
 						pass: 'extraction' | 'folded',
@@ -4590,506 +4614,318 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							}
 						})
 
-					if (checkpointPhase >= 1 && cachedResearchText) {
-						researchText = cachedResearchText
-						yield* Effect.logInfo('research.phase1.resume').pipe(
-							Effect.annotateLogs({
-								event: 'research.phase1.resume',
-								research_id: researchId,
-								text_length: researchText.length,
-							}),
-						)
-						// Reusing the earlier attempt's gathering skips the per-round
-						// counting below, so tick once here rather than leave the count
-						// sitting where that attempt left it.
-						yield* recordProgress
-					} else {
-						const organizationId = (run as { organizationId: string })
-							.organizationId
-						const query = (run as { query: string }).query
+					const organizationId = (run as { organizationId: string })
+						.organizationId
+					const query = (run as { query: string }).query
 
-						// The policy was validated and frozen onto the row at create
-						// time, so it round-trips back here as a ResolvedPolicy.
-						const policy = (run as { paidPolicy: ResolvedPolicy }).paidPolicy
-						// Per-run budget, built from that frozen policy plus the system
-						// ceiling. The tool handlers charge it before each vendor call,
-						// and the loop reads it to halt when spend runs out. The fiber's
-						// own connection backs the cap check.
-						const budgetLayer = makeBudgetLayer({
-							organizationId,
-							userId,
-							researchId,
-							policy,
-							defaultCapCents: defaultMonthlyCapCents,
-							systemCeiling: monthlyCapHardCeilingCents,
-							// A run's own paid tool calls can't spend past the user's
-							// auto-approve limit without an approval gate — the agent turns
-							// a refusal into a pending paid action instead of charging.
-							enforceAutoApprove: true,
-						}).pipe(Layer.provide(Layer.succeed(SqlClient.SqlClient)(sql)))
+					// The policy was validated and frozen onto the row at create
+					// time, so it round-trips back here as a ResolvedPolicy.
+					const policy = (run as { paidPolicy: ResolvedPolicy }).paidPolicy
+					// Per-run budget, built from that frozen policy plus the system
+					// ceiling. The tool handlers charge it before each vendor call,
+					// and the loop reads it to halt when spend runs out. The fiber's
+					// own connection backs the cap check.
+					const budgetLayer = makeBudgetLayer({
+						organizationId,
+						userId,
+						researchId,
+						policy,
+						defaultCapCents: defaultMonthlyCapCents,
+						systemCeiling: monthlyCapHardCeilingCents,
+						// A run's own paid tool calls can't spend past the user's
+						// auto-approve limit without an approval gate — the agent turns
+						// a refusal into a pending paid action instead of charging.
+						enforceAutoApprove: true,
+					}).pipe(Layer.provide(Layer.succeed(SqlClient.SqlClient)(sql)))
 
-						// One tool-log pair, one live-stream pair and one progress tick per
-						// round, so a multi-round run is visible in the run's toolLog, in
-						// its live stream, and on its row.
-						const emitRound = (
-							round: number,
-							textLength: number,
-							toolCalls: number,
-						) =>
-							Effect.gen(function* () {
-								yield* publishEvent(researchId, 'tool.called', {
-									tool: 'llm.generateText',
-									phase: 1,
-									round,
-								})
-								yield* Ref.update(toolLog, log => [
-									...log,
-									{
-										timestamp: DateTime.formatIso(DateTime.nowUnsafe()),
-										type: 'call' as const,
-										tool: 'llm.generateText',
-										// The query is on the run's own row; repeating it every round
-										// adds thousands of characters the reader already has.
-										input: { phase: 1, round },
-									},
-									{
-										timestamp: DateTime.formatIso(DateTime.nowUnsafe()),
-										type: 'result' as const,
-										tool: 'llm.generateText',
-										output: { round, toolCalls, textLength },
-									},
-								])
-								yield* publishEvent(researchId, 'tool.result', {
-									tool: 'llm.generateText',
-									phase: 1,
-									round,
-									toolCalls,
-									textLength,
-								})
-								// Counted here rather than from the round number: a discovery
-								// scan can start a second pass whose rounds number from one
-								// again, and what a watcher sees must never go backwards.
-								yield* recordProgress
+					// One tool-log pair, one live-stream pair and one progress tick per
+					// round, so a multi-round run is visible in the run's toolLog, in
+					// its live stream, and on its row.
+					//
+					// This closes the round its caller opened, and says how long it took.
+					// Both entries used to be written here, after the round returned, so a
+					// call and its result carried the same instant and no duration could be
+					// worked out from the pair — on a fourteen-minute run, eight entries
+					// that all read as having taken no time at all.
+					const emitRound = (
+						round: number,
+						textLength: number,
+						toolCalls: number,
+						startedAtMs: number,
+					) =>
+						Effect.gen(function* () {
+							yield* publishEvent(researchId, 'tool.called', {
+								tool: 'llm.generateText',
+								phase: 1,
+								round,
 							})
+							const endedAtMs = DateTime.toEpochMillis(DateTime.nowUnsafe())
+							yield* Ref.update(toolLog, log => [
+								...log,
+								{
+									timestamp: new Date(endedAtMs).toISOString(),
+									type: 'result' as const,
+									tool: 'llm.generateText',
+									output: { round, toolCalls, textLength },
+									// Clamped: wall-clock rather than a monotonic reading, so a
+									// machine whose clock steps back mid-run would otherwise
+									// report a round that took less than no time.
+									durationMs: Math.max(0, endedAtMs - startedAtMs),
+								},
+							])
+							yield* publishEvent(researchId, 'tool.result', {
+								tool: 'llm.generateText',
+								phase: 1,
+								round,
+								toolCalls,
+								textLength,
+							})
+							// Counted here rather than from the round number: a discovery
+							// scan can start a second pass whose rounds number from one
+							// again, and what a watcher sees must never go backwards.
+							yield* recordProgress
+						})
 
-						// The reflect-and-retry loop runs under the per-run Budget +
-						// ResearchRunContext, resolving the toolkit so paid tools charge
-						// this run. `runRound` threads the growing prompt — each round's
-						// assistant text and tool results feed the next — and maps the
-						// model response into the plain data the loop decides on.
-						const phaseOutcome = yield* Effect.gen(function* () {
-							const budget = yield* Budget
-							const toolkit = yield* researchToolkit
-							const scrape = yield* ScrapeProvider
-							const siteMap = yield* MapProvider
-							const registry = yield* RegistryRouter
-							const anchorSearch = yield* SearchProvider
+					// The reflect-and-retry loop runs under the per-run Budget +
+					// ResearchRunContext, resolving the toolkit so paid tools charge
+					// this run. `runRound` threads the growing prompt — each round's
+					// assistant text and tool results feed the next — and maps the
+					// model response into the plain data the loop decides on.
+					const phaseOutcome = yield* Effect.gen(function* () {
+						const budget = yield* Budget
+						const toolkit = yield* researchToolkit
+						const scrape = yield* ScrapeProvider
+						const siteMap = yield* MapProvider
+						const registry = yield* RegistryRouter
+						const anchorSearch = yield* SearchProvider
 
-							// Bound to a const so the null check holds inside the closure
-							// below; `entityTargets` is a reassignable `let`.
-							const anchorTargets = entityTargets
+						// Bound to a const so the null check holds inside the closure
+						// below; `entityTargets` is a reassignable `let`.
+						const anchorTargets = entityTargets
 
-							// Split the request into the kinds of company it asks for, before
-							// a single search goes out. This is the list the run works through
-							// and is held to at the end. It fails open to no list at all: a
-							// search that refused to start because the split came back badly
-							// would be a worse run than one that searches without it.
-							if (isDiscoveryScan(schemaName)) {
-								// One answer, two things read off it: the parts the run works
-								// through, and the words that say what KIND of company a name is
-								// naming. The second is asked here because this is the one place a
-								// run reads its own request, and a request written in a market's
-								// language is what says which language those words are in.
-								const split = yield* extractLlm
-									.generateObject({
-										schema: RequestPartsSchema,
-										prompt: requestPartsPrompt(query),
-									})
-									.pipe(
-										Effect.map(response => ({
-											parts: readRequestParts(response.value),
-											kinds: readKindsOfCompany(response.value),
-										})),
-										Effect.catchCause(cause =>
-											Cause.hasInterruptsOnly(cause)
-												? Effect.failCause(cause)
-												: Effect.logWarning(
-														'research.request_parts.skipped',
-													).pipe(
-														Effect.annotateLogs({
-															event: 'research.request_parts.skipped',
-															research_id: researchId,
-															cause: Cause.pretty(cause),
-														}),
-														Effect.as({
-															parts: [] as ReadonlyArray<RequestPart>,
-															kinds: [] as ReadonlyArray<string>,
-														}),
-													),
-										),
-									)
-								requestParts = split.parts
-								// Both answer the one question every reading asks of a word — does
-								// it identify anybody — so both go into one vocabulary. They are
-								// handed over apart because only the request's own wordings are
-								// trusted to come off the front of a domain: see `RunWords`.
-								wordsTheRunBrings = runWordsOf(
-									split.parts.flatMap(part => [part.label, ...part.terms]),
-									split.kinds,
+						// Split the request into the kinds of company it asks for, before
+						// a single search goes out. This is the list the run works through
+						// and is held to at the end. It fails open to no list at all: a
+						// search that refused to start because the split came back badly
+						// would be a worse run than one that searches without it.
+						if (isDiscoveryScan(schemaName)) {
+							// One answer, two things read off it: the parts the run works
+							// through, and the words that say what KIND of company a name is
+							// naming. The second is asked here because this is the one place a
+							// run reads its own request, and a request written in a market's
+							// language is what says which language those words are in.
+							const split = yield* extractLlm
+								.generateObject({
+									schema: RequestPartsSchema,
+									prompt: requestPartsPrompt(query),
+								})
+								.pipe(
+									Effect.map(response => ({
+										parts: readRequestParts(response.value),
+										kinds: readKindsOfCompany(response.value),
+									})),
+									Effect.catchCause(cause =>
+										Cause.hasInterruptsOnly(cause)
+											? Effect.failCause(cause)
+											: Effect.logWarning(
+													'research.request_parts.skipped',
+												).pipe(
+													Effect.annotateLogs({
+														event: 'research.request_parts.skipped',
+														research_id: researchId,
+														cause: Cause.pretty(cause),
+													}),
+													Effect.as({
+														parts: [] as ReadonlyArray<RequestPart>,
+														kinds: [] as ReadonlyArray<string>,
+													}),
+												),
+									),
 								)
-								if (requestParts.length > 0) {
-									yield* Effect.logInfo('research.request_parts').pipe(
-										Effect.annotateLogs({
-											event: 'research.request_parts',
-											research_id: researchId,
-											parts: requestParts.map(part => part.label),
-										}),
-									)
-									yield* Effect.annotateCurrentSpan({
-										'research.request.parts': requestParts.length,
-									})
-								}
-							}
-
-							// What the searching passes are told about that list. Empty when
-							// there is no list to work through, so those prompts carry nothing
-							// extra — a request naming one kind of company included.
-							const partsDirective = requestPartsDirective(requestParts)
-							const partsInstruction =
-								partsDirective === '' ? '' : `\n\n${partsDirective}`
-
-							// A company's own site is where its people, its address and its
-							// size are actually written, and a small company with no website
-							// on file has no domain anywhere — without one, every own-site
-							// page below goes unread. One search by name finds it, and the
-							// first result that is the company's own site rather than a
-							// directory listing it counts from here on as a given domain does.
-							// Only for a run whose whole job is this one company — a scan
-							// anchored to a subject uses it as a starting point for finding
-							// other firms, so its own site is not what that run is after.
-							const searchedOwnHost =
-								anchorHost === undefined &&
-								anchorTargets !== null &&
-								isEntityGroundedSchema(schemaName)
-									? yield* Effect.gen(function* () {
-											yield* budget.chargeCheap('search', SEARCH_COST_CENTS)
-											// Plenty of small firms share a name, so the town the
-											// caller asked about is what tells the one being
-											// researched from its namesakes. It has to be the town
-											// as the caller wrote it: the run's place words are
-											// every long word of the query's tail, which for a
-											// query like "Acme, find their CEO" is "find".
-											const found = yield* anchorSearch.search({
-												query:
-													hintPlace === undefined
-														? entityName
-														: `${entityName} ${hintPlace}`,
-												limit: 5,
-												...(hints?.country ? { country: hints.country } : {}),
-											})
-											for (const item of found.items) {
-												const host = domainHost(item.url)
-												if (
-													host !== undefined &&
-													isOwnSiteHost(anchorTargets, host)
-												)
-													return host
-											}
-											return undefined
-										}).pipe(
-											// Never let this stop the run: with no host found, the
-											// loop does its own searching instead.
-											Effect.catchCause(cause =>
-												Cause.hasInterruptsOnly(cause)
-													? Effect.failCause(cause)
-													: Effect.logInfo(
-															'research.anchor.search_failed',
-														).pipe(
-															Effect.annotateLogs({
-																event: 'research.anchor.search_failed',
-																research_id: researchId,
-																cause: Cause.pretty(cause),
-															}),
-															Effect.as(undefined),
-														),
-											),
-										)
-									: undefined
-
-							// The company's own site for the rest of phase 1, whether the
-							// caller gave it or the search found it.
-							const ownHost = anchorHost ?? searchedOwnHost
-
-							if (searchedOwnHost !== undefined) {
-								// Treat it exactly as a domain the caller supplied. Without
-								// this the site's own pages are still fetched but then read as
-								// somebody else's: a contact page showing only an address and a
-								// phone never spells the company name, so it is judged as being
-								// about nobody and dropped — the very page the search went
-								// looking for. It is also what holds a third-party estimate to
-								// a lower confidence than the company's own word.
-								if (entityTargets !== null) {
-									entityTargets = withRedirectDomain(
-										entityTargets,
-										searchedOwnHost,
-									)
-								}
-								yield* Effect.logInfo('research.anchor.host_found').pipe(
+							requestParts = split.parts
+							// Both answer the one question every reading asks of a word — does
+							// it identify anybody — so both go into one vocabulary. They are
+							// handed over apart because only the request's own wordings are
+							// trusted to come off the front of a domain: see `RunWords`.
+							wordsTheRunBrings = runWordsOf(
+								split.parts.flatMap(part => [part.label, ...part.terms]),
+								split.kinds,
+							)
+							if (requestParts.length > 0) {
+								yield* Effect.logInfo('research.request_parts').pipe(
 									Effect.annotateLogs({
-										event: 'research.anchor.host_found',
+										event: 'research.request_parts',
 										research_id: researchId,
-										host: searchedOwnHost,
+										parts: requestParts.map(part => part.label),
 									}),
 								)
+								yield* Effect.annotateCurrentSpan({
+									'research.request.parts': requestParts.length,
+								})
 							}
+						}
 
-							// Anchor: fetch the company's official site once now so grounding
-							// has its page even if the model never navigates there.
-							// Best-effort — a refused, unreachable, or empty site just falls
-							// back to the model's own searching, and a people directory
-							// (LinkedIn) is left to discover_contacts rather than fetched here.
-							if (
-								ownHost !== undefined &&
-								!isUnsupportedScrapeUrl(`https://${ownHost}`)
-							) {
-								yield* Effect.gen(function* () {
-									yield* budget.chargeCheap('scrape', SCRAPE_COST_CENTS)
-									// The homepage fetch keeps its own error handler so a site
-									// that cannot be reached or cannot be read costs only
-									// itself: the about pages and the sitemap walk below still
-									// run, reaching the same site by their own routes.
-									const homepage = yield* Effect.gen(function* () {
-										const page = yield* scrape.scrape({
-											url: `https://${ownHost}`,
-											formats: ['markdown', 'links'],
+						// What the searching passes are told about that list. Empty when
+						// there is no list to work through, so those prompts carry nothing
+						// extra — a request naming one kind of company included.
+						const partsDirective = requestPartsDirective(requestParts)
+						const partsInstruction =
+							partsDirective === '' ? '' : `\n\n${partsDirective}`
+
+						// A company's own site is where its people, its address and its
+						// size are actually written, and a small company with no website
+						// on file has no domain anywhere — without one, every own-site
+						// page below goes unread. One search by name finds it, and the
+						// first result that is the company's own site rather than a
+						// directory listing it counts from here on as a given domain does.
+						// Only for a run whose whole job is this one company — a scan
+						// anchored to a subject uses it as a starting point for finding
+						// other firms, so its own site is not what that run is after.
+						const searchedOwnHost =
+							anchorHost === undefined &&
+							anchorTargets !== null &&
+							isEntityGroundedSchema(schemaName)
+								? yield* Effect.gen(function* () {
+										yield* budget.chargeCheap('search', SEARCH_COST_CENTS)
+										// Plenty of small firms share a name, so the town the
+										// caller asked about is what tells the one being
+										// researched from its namesakes. It has to be the town
+										// as the caller wrote it: the run's place words are
+										// every long word of the query's tail, which for a
+										// query like "Acme, find their CEO" is "find".
+										const found = yield* anchorSearch.search({
+											query:
+												hintPlace === undefined
+													? entityName
+													: `${entityName} ${hintPlace}`,
+											limit: 5,
+											...(hints?.country ? { country: hints.country } : {}),
 										})
-										if (
-											page.markdown !== undefined &&
-											page.markdown.trim().length > 0
-										) {
-											const hash = urlHashForScrape(page.url)
-											// The company's own domain may 301 to a different host (a
-											// rebrand); the fetch followed it, so the destination is the
-											// same company's official site. Fold that host in as a
-											// strong-match key and put the reached URL in the corpus, so
-											// grounding lands on the live site instead of failing closed
-											// when the rebranded page never names the old domain.
-											const resolvedUrl = page.resolvedUrl ?? page.url
-											const destHost = domainHost(resolvedUrl)
-											const followedRedirect =
-												destHost !== undefined && destHost !== ownHost
-											scrapeCorpus.push({
-												urlHash: hash,
-												text: followedRedirect
-													? `${resolvedUrl}\n${page.markdown}`
-													: page.markdown,
-												host: destHost,
-												kind: 'page',
-											})
-											if (followedRedirect && entityTargets !== null) {
-												entityTargets = withRedirectDomain(
-													entityTargets,
-													destHost,
-												)
-											}
-											seededAnchorHashes.push(hash)
-											seededTranscriptParts.push(
-												`[scrape_page] ${boundedToolResult({ url: page.url, markdown: page.markdown })}`,
+										for (const item of found.items) {
+											const host = domainHost(item.url)
+											if (
+												host !== undefined &&
+												isOwnSiteHost(anchorTargets, host)
 											)
-											yield* Effect.logInfo(
-												followedRedirect
-													? 'research.anchor.redirect_followed'
-													: 'research.anchor.seeded',
-											).pipe(
-												Effect.annotateLogs({
-													event: followedRedirect
-														? 'research.anchor.redirect_followed'
-														: 'research.anchor.seeded',
-													research_id: researchId,
-													host: ownHost,
-													...(followedRedirect
-														? { resolved_host: destHost }
-														: {}),
-												}),
-											)
+												return host
 										}
-										return page
+										return undefined
 									}).pipe(
+										// Never let this stop the run: with no host found, the
+										// loop does its own searching instead.
 										Effect.catchCause(cause =>
 											Cause.hasInterruptsOnly(cause)
 												? Effect.failCause(cause)
-												: Effect.logWarning('research.anchor.seed_failed').pipe(
+												: Effect.logInfo('research.anchor.search_failed').pipe(
 														Effect.annotateLogs({
-															event: 'research.anchor.seed_failed',
+															event: 'research.anchor.search_failed',
 															research_id: researchId,
-															host: ownHost,
 															cause: Cause.pretty(cause),
 														}),
 														Effect.as(undefined),
 													),
 										),
 									)
-									// About / contact / team pages carry the location and the named leaders a homepage
-									// rarely spells; fetch a few, chosen from the homepage's own links so no path is
-									// guessed, and let own-host grounding keep what they hold. Each fetch is isolated
-									// so one failure never sinks the rest, and bounded by MAX_ABOUT_PAGES.
-									const reachedHost =
-										(homepage === undefined
-											? undefined
-											: domainHost(homepage.resolvedUrl ?? homepage.url)) ??
-										ownHost
-									for (const aboutUrl of aboutPageCandidates(
-										homepage?.links ?? [],
-										reachedHost,
-										MAX_ABOUT_PAGES,
-									)) {
-										if (isUnsupportedScrapeUrl(aboutUrl)) continue
-										yield* Effect.gen(function* () {
-											yield* budget.chargeCheap('scrape', SCRAPE_COST_CENTS)
-											const about = yield* scrape.scrape({
-												url: aboutUrl,
-												formats: ['markdown'],
-											})
-											if (
-												about.markdown !== undefined &&
-												about.markdown.trim().length > 0
-											) {
-												const aboutHash = urlHashForScrape(about.url)
-												scrapeCorpus.push({
-													urlHash: aboutHash,
-													text: about.markdown,
-													host: domainHost(about.resolvedUrl ?? about.url),
-													kind: 'page',
-												})
-												seededAnchorHashes.push(aboutHash)
-												seededTranscriptParts.push(
-													`[scrape_page] ${boundedToolResult({ url: about.url, markdown: about.markdown })}`,
-												)
-												yield* Effect.logInfo(
-													'research.anchor.about_seeded',
-												).pipe(
-													Effect.annotateLogs({
-														event: 'research.anchor.about_seeded',
-														research_id: researchId,
-														url: aboutUrl,
-													}),
-												)
-											}
-										}).pipe(
-											Effect.catchCause(cause =>
-												Cause.hasInterruptsOnly(cause)
-													? Effect.failCause(cause)
-													: Effect.logWarning(
-															'research.anchor.about_skipped',
-														).pipe(
-															Effect.annotateLogs({
-																event: 'research.anchor.about_skipped',
-																research_id: researchId,
-																url: aboutUrl,
-																cause: Cause.pretty(cause),
-															}),
-														),
-											),
+								: undefined
+
+						// The company's own site for the rest of phase 1, whether the
+						// caller gave it or the search found it.
+						const ownHost = anchorHost ?? searchedOwnHost
+
+						if (searchedOwnHost !== undefined) {
+							// Treat it exactly as a domain the caller supplied. Without
+							// this the site's own pages are still fetched but then read as
+							// somebody else's: a contact page showing only an address and a
+							// phone never spells the company name, so it is judged as being
+							// about nobody and dropped — the very page the search went
+							// looking for. It is also what holds a third-party estimate to
+							// a lower confidence than the company's own word.
+							if (entityTargets !== null) {
+								entityTargets = withRedirectDomain(
+									entityTargets,
+									searchedOwnHost,
+								)
+							}
+							yield* Effect.logInfo('research.anchor.host_found').pipe(
+								Effect.annotateLogs({
+									event: 'research.anchor.host_found',
+									research_id: researchId,
+									host: searchedOwnHost,
+								}),
+							)
+						}
+
+						// Anchor: fetch the company's official site once now so grounding
+						// has its page even if the model never navigates there.
+						// Best-effort — a refused, unreachable, or empty site just falls
+						// back to the model's own searching, and a people directory
+						// (LinkedIn) is left to discover_contacts rather than fetched here.
+						if (
+							ownHost !== undefined &&
+							!isUnsupportedScrapeUrl(`https://${ownHost}`)
+						) {
+							yield* Effect.gen(function* () {
+								yield* budget.chargeCheap('scrape', SCRAPE_COST_CENTS)
+								// The homepage fetch keeps its own error handler so a site
+								// that cannot be reached or cannot be read costs only
+								// itself: the about pages and the sitemap walk below still
+								// run, reaching the same site by their own routes.
+								const homepage = yield* Effect.gen(function* () {
+									const page = yield* scrape.scrape({
+										url: `https://${ownHost}`,
+										formats: ['markdown', 'links'],
+									})
+									if (
+										page.markdown !== undefined &&
+										page.markdown.trim().length > 0
+									) {
+										const hash = urlHashForScrape(page.url)
+										// The company's own domain may 301 to a different host (a
+										// rebrand); the fetch followed it, so the destination is the
+										// same company's official site. Fold that host in as a
+										// strong-match key and put the reached URL in the corpus, so
+										// grounding lands on the live site instead of failing closed
+										// when the rebranded page never names the old domain.
+										const resolvedUrl = page.resolvedUrl ?? page.url
+										const destHost = domainHost(resolvedUrl)
+										const followedRedirect =
+											destHost !== undefined && destHost !== ownHost
+										scrapeCorpus.push({
+											urlHash: hash,
+											text: followedRedirect
+												? `${resolvedUrl}\n${page.markdown}`
+												: page.markdown,
+											host: destHost,
+											kind: 'page',
+										})
+										if (followedRedirect && entityTargets !== null) {
+											entityTargets = withRedirectDomain(
+												entityTargets,
+												destHost,
+											)
+										}
+										seededAnchorHashes.push(hash)
+										seededTranscriptParts.push(
+											`[scrape_page] ${boundedToolResult({ url: page.url, markdown: page.markdown })}`,
+										)
+										yield* Effect.logInfo(
+											followedRedirect
+												? 'research.anchor.redirect_followed'
+												: 'research.anchor.seeded',
+										).pipe(
+											Effect.annotateLogs({
+												event: followedRedirect
+													? 'research.anchor.redirect_followed'
+													: 'research.anchor.seeded',
+												research_id: researchId,
+												host: ownHost,
+												...(followedRedirect
+													? { resolved_host: destHost }
+													: {}),
+											}),
 										)
 									}
-									// Site discovery: the homepage nav only links part of a site,
-									// so ask the map provider for the site's own page list (sitemap
-									// + crawl) and fetch the best people/about pages it finds that
-									// the seeds above did not already cover. Environments without a
-									// vendor run with map 'none', so any map failure is a logged
-									// skip here, never a failed run.
-									yield* Effect.gen(function* () {
-										const mapped = yield* siteMap.map({
-											url: `https://${reachedHost}`,
-											limit: 100,
-										})
-										// One provider unit, charged after the call returns so a
-										// disabled ('none') map never bills the run.
-										yield* budget.chargeCheap('scrape', SCRAPE_COST_CENTS)
-										// Drop already-seeded pages before ranking, so an overlap with
-										// the homepage-linked seeds never wastes a discovery slot.
-										const seeded = new Set(seededAnchorHashes)
-										const discovered = aboutPageCandidates(
-											mapped.links.filter(
-												url => !seeded.has(urlHashForScrape(url)),
-											),
-											reachedHost,
-											MAX_DISCOVERY_PAGES,
-										)
-										if (discovered.length > 0) {
-											yield* Effect.logInfo('research.discovery.mapped').pipe(
-												Effect.annotateLogs({
-													event: 'research.discovery.mapped',
-													research_id: researchId,
-													mapped: mapped.links.length,
-													fetching: discovered.length,
-												}),
-											)
-										}
-										for (const url of discovered) {
-											if (isUnsupportedScrapeUrl(url)) continue
-											yield* Effect.gen(function* () {
-												yield* budget.chargeCheap('scrape', SCRAPE_COST_CENTS)
-												const found = yield* scrape.scrape({
-													url,
-													formats: ['markdown'],
-												})
-												if (
-													found.markdown !== undefined &&
-													found.markdown.trim().length > 0
-												) {
-													const foundHash = urlHashForScrape(found.url)
-													scrapeCorpus.push({
-														urlHash: foundHash,
-														text: found.markdown,
-														host: domainHost(found.resolvedUrl ?? found.url),
-														kind: 'page',
-													})
-													seededAnchorHashes.push(foundHash)
-													seededTranscriptParts.push(
-														`[scrape_page] ${boundedToolResult({ url: found.url, markdown: found.markdown })}`,
-													)
-													yield* Effect.logInfo(
-														'research.discovery.page_seeded',
-													).pipe(
-														Effect.annotateLogs({
-															event: 'research.discovery.page_seeded',
-															research_id: researchId,
-															url,
-														}),
-													)
-												}
-											}).pipe(
-												Effect.catchCause(cause =>
-													Cause.hasInterruptsOnly(cause)
-														? Effect.failCause(cause)
-														: Effect.logWarning(
-																'research.discovery.page_skipped',
-															).pipe(
-																Effect.annotateLogs({
-																	event: 'research.discovery.page_skipped',
-																	research_id: researchId,
-																	url,
-																	cause: Cause.pretty(cause),
-																}),
-															),
-												),
-											)
-										}
-									}).pipe(
-										Effect.catchCause(cause =>
-											Cause.hasInterruptsOnly(cause)
-												? Effect.failCause(cause)
-												: Effect.logInfo('research.discovery.skipped').pipe(
-														Effect.annotateLogs({
-															event: 'research.discovery.skipped',
-															research_id: researchId,
-															host: reachedHost,
-															cause: Cause.pretty(cause),
-														}),
-													),
-										),
-									)
+									return page
 								}).pipe(
 									Effect.catchCause(cause =>
 										Cause.hasInterruptsOnly(cause)
@@ -5101,1265 +4937,1548 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														host: ownHost,
 														cause: Cause.pretty(cause),
 													}),
+													Effect.as(undefined),
 												),
 									),
 								)
-							}
-
-							// Register: for a company pinned to a country with a national
-							// register, look it up once now. The register holds the authoritative,
-							// niche facts — the legal name, the tax id, the named directors — that
-							// a thin company website never states, and folds them into the evidence
-							// the extraction reads. Only for a run whose whole job is this one
-							// company — enrichment or contact discovery — never a scan that
-							// happens to be anchored, whose subject is a starting point for
-							// finding other firms, not the thing being looked up.
-							const registrySnapshot = subjects[0]?.snapshot as
-								| Record<string, unknown>
-								| undefined
-							// A subject whose name went unread is left out here for a reason of
-							// its own, not as one more skipped check: the register is searched
-							// BY that name, and a hit cannot be confirmed against keys that do
-							// not exist, so the lookup would only spend money.
-							const registryCountry =
-								entityTargets !== null && isEntityGroundedSchema(schemaName)
-									? resolveRegistryCountry({
-											subjectCountry:
-												typeof registrySnapshot?.['country'] === 'string'
-													? registrySnapshot['country']
-													: undefined,
-											locationHint: hints?.country ?? hints?.place,
-											// An address the run found points at a country's
-											// register just as well as one the caller gave.
-											anchorHost: ownHost,
+								// About / contact / team pages carry the location and the named leaders a homepage
+								// rarely spells; fetch a few, chosen from the homepage's own links so no path is
+								// guessed, and let own-host grounding keep what they hold. Each fetch is isolated
+								// so one failure never sinks the rest, and bounded by MAX_ABOUT_PAGES.
+								const reachedHost =
+									(homepage === undefined
+										? undefined
+										: domainHost(homepage.resolvedUrl ?? homepage.url)) ??
+									ownHost
+								for (const aboutUrl of aboutPageCandidates(
+									homepage?.links ?? [],
+									reachedHost,
+									MAX_ABOUT_PAGES,
+								)) {
+									if (isUnsupportedScrapeUrl(aboutUrl)) continue
+									yield* Effect.gen(function* () {
+										yield* budget.chargeCheap('scrape', SCRAPE_COST_CENTS)
+										const about = yield* scrape.scrape({
+											url: aboutUrl,
+											formats: ['markdown'],
 										})
-									: undefined
-							if (registryCountry !== undefined) {
-								const registryQuery =
-									typeof registrySnapshot?.['name'] === 'string'
-										? registrySnapshot['name']
-										: (run as { query: string }).query
+										if (
+											about.markdown !== undefined &&
+											about.markdown.trim().length > 0
+										) {
+											const aboutHash = urlHashForScrape(about.url)
+											scrapeCorpus.push({
+												urlHash: aboutHash,
+												text: about.markdown,
+												host: domainHost(about.resolvedUrl ?? about.url),
+												kind: 'page',
+											})
+											seededAnchorHashes.push(aboutHash)
+											seededTranscriptParts.push(
+												`[scrape_page] ${boundedToolResult({ url: about.url, markdown: about.markdown })}`,
+											)
+											yield* Effect.logInfo(
+												'research.anchor.about_seeded',
+											).pipe(
+												Effect.annotateLogs({
+													event: 'research.anchor.about_seeded',
+													research_id: researchId,
+													url: aboutUrl,
+												}),
+											)
+										}
+									}).pipe(
+										Effect.catchCause(cause =>
+											Cause.hasInterruptsOnly(cause)
+												? Effect.failCause(cause)
+												: Effect.logWarning(
+														'research.anchor.about_skipped',
+													).pipe(
+														Effect.annotateLogs({
+															event: 'research.anchor.about_skipped',
+															research_id: researchId,
+															url: aboutUrl,
+															cause: Cause.pretty(cause),
+														}),
+													),
+										),
+									)
+								}
+								// Site discovery: the homepage nav only links part of a site,
+								// so ask the map provider for the site's own page list (sitemap
+								// + crawl) and fetch the best people/about pages it finds that
+								// the seeds above did not already cover. Environments without a
+								// vendor run with map 'none', so any map failure is a logged
+								// skip here, never a failed run.
 								yield* Effect.gen(function* () {
-									// Paid for under this run's own key for this company and
-									// spelling. The agent looking the same company up the same way
-									// later costs nothing and does not reach the register again; a
-									// lookup by tax id or a different spelling is a different
-									// purchase, so the register costs a small, limit-capped handful
-									// per run.
-									const looked = yield* budget.withPaidCharge(
-										'registry',
-										REGISTRY_LOOKUP_COST_CENTS,
-										'registry_lookup',
-										`${researchId}:registry:${registryCountry}:${registryQuery}`,
-									)(() =>
-										registry.lookup({
-											country: registryCountry,
-											query: registryQuery,
-										}),
-									)
-									if (looked._tag === 'already_charged') return
-									const record = looked.value
-									const hash = urlHashForScrape(record.sourceUrl)
-									// A record read from a national register sits in `sources`
-									// alongside the fetched pages, so a value taken from it grounds
-									// the same way a scraped fact does. Nothing of the register page
-									// itself is kept, only the record, so it is written down as seen
-									// rather than as a page held on file.
-									yield* recordSeenSource(sql, {
-										url: record.sourceUrl,
-										title: record.legalName,
-										contentHash: hash,
-										provider: `registry-${registryCountry.toLowerCase()}`,
-										kind: 'registry',
+									const mapped = yield* siteMap.map({
+										url: `https://${reachedHost}`,
+										limit: 100,
 									})
-									seededRegistryHashes.push(hash)
-									seededTranscriptParts.push(
-										`[registry_lookup] ${boundedToolResult({ url: record.sourceUrl, ...record })}`,
+									// One provider unit, charged after the call returns so a
+									// disabled ('none') map never bills the run.
+									yield* budget.chargeCheap('scrape', SCRAPE_COST_CENTS)
+									// Drop already-seeded pages before ranking, so an overlap with
+									// the homepage-linked seeds never wastes a discovery slot.
+									const seeded = new Set(seededAnchorHashes)
+									const discovered = aboutPageCandidates(
+										mapped.links.filter(
+											url => !seeded.has(urlHashForScrape(url)),
+										),
+										reachedHost,
+										MAX_DISCOVERY_PAGES,
 									)
-									seededEvidenceParts.push(
-										`${record.sourceUrl}\n${JSON.stringify(record)}`,
-									)
-									// A register match on the legal name confirms the run reached the
-									// right company, the same as reaching its own site.
-									if (
-										!registryConfirmed &&
-										isConfirmedRegistryMatch(entityTargets, record)
-									) {
-										registryConfirmed = true
+									if (discovered.length > 0) {
+										yield* Effect.logInfo('research.discovery.mapped').pipe(
+											Effect.annotateLogs({
+												event: 'research.discovery.mapped',
+												research_id: researchId,
+												mapped: mapped.links.length,
+												fetching: discovered.length,
+											}),
+										)
 									}
-									yield* Effect.logInfo('research.registry.seeded').pipe(
-										Effect.annotateLogs({
-											event: 'research.registry.seeded',
-											research_id: researchId,
-											country: registryCountry,
-										}),
-									)
+									for (const url of discovered) {
+										if (isUnsupportedScrapeUrl(url)) continue
+										yield* Effect.gen(function* () {
+											yield* budget.chargeCheap('scrape', SCRAPE_COST_CENTS)
+											const found = yield* scrape.scrape({
+												url,
+												formats: ['markdown'],
+											})
+											if (
+												found.markdown !== undefined &&
+												found.markdown.trim().length > 0
+											) {
+												const foundHash = urlHashForScrape(found.url)
+												scrapeCorpus.push({
+													urlHash: foundHash,
+													text: found.markdown,
+													host: domainHost(found.resolvedUrl ?? found.url),
+													kind: 'page',
+												})
+												seededAnchorHashes.push(foundHash)
+												seededTranscriptParts.push(
+													`[scrape_page] ${boundedToolResult({ url: found.url, markdown: found.markdown })}`,
+												)
+												yield* Effect.logInfo(
+													'research.discovery.page_seeded',
+												).pipe(
+													Effect.annotateLogs({
+														event: 'research.discovery.page_seeded',
+														research_id: researchId,
+														url,
+													}),
+												)
+											}
+										}).pipe(
+											Effect.catchCause(cause =>
+												Cause.hasInterruptsOnly(cause)
+													? Effect.failCause(cause)
+													: Effect.logWarning(
+															'research.discovery.page_skipped',
+														).pipe(
+															Effect.annotateLogs({
+																event: 'research.discovery.page_skipped',
+																research_id: researchId,
+																url,
+																cause: Cause.pretty(cause),
+															}),
+														),
+											),
+										)
+									}
 								}).pipe(
-									// The register may be unreachable, out of credit, or simply not
-									// list this company. None of that is a reason to abandon the
-									// research — the run carries on with what the web tells it.
 									Effect.catchCause(cause =>
 										Cause.hasInterruptsOnly(cause)
 											? Effect.failCause(cause)
-											: Effect.logWarning(
-													'research.registry.seed_skipped',
-												).pipe(
+											: Effect.logInfo('research.discovery.skipped').pipe(
 													Effect.annotateLogs({
-														event: 'research.registry.seed_skipped',
+														event: 'research.discovery.skipped',
 														research_id: researchId,
-														country: registryCountry,
+														host: reachedHost,
 														cause: Cause.pretty(cause),
 													}),
 												),
 									),
 								)
-							}
+							}).pipe(
+								Effect.catchCause(cause =>
+									Cause.hasInterruptsOnly(cause)
+										? Effect.failCause(cause)
+										: Effect.logWarning('research.anchor.seed_failed').pipe(
+												Effect.annotateLogs({
+													event: 'research.anchor.seed_failed',
+													research_id: researchId,
+													host: ownHost,
+													cause: Cause.pretty(cause),
+												}),
+											),
+								),
+							)
+						}
 
-							// One agent pass = a fresh reflect-and-retry loop. Both the initial
-							// pass and a refined retry run here, under the SAME budget + toolkit:
-							// re-providing the layer would build a fresh MemoMap and reset the
-							// per-run spend, letting one run silently pay twice.
-							const runPass = (basePrompt: string) =>
-								Effect.gen(function* () {
-									let prompt: Prompt.Prompt = Prompt.make(basePrompt)
-									const runRound = (round: number) =>
-										Effect.gen(function* () {
-											const response = yield* agentLlm.generateText({
-												prompt,
-												toolkit,
-												// Force a tool on the first round so the model can't
-												// answer from memory without gathering evidence (which
-												// would leave zero sources and fail the grounding gate
-												// on a legitimate company); reflect freely after.
-												toolChoice: round === 1 ? 'required' : 'auto',
-											})
-											prompt = Prompt.concat(
-												prompt,
-												Prompt.fromResponseParts(response.content),
-											)
-											// Attribute sources only to scrapes that actually returned
-											// content this round — read off the tool RESULTS, not the
-											// requested calls — so a failed or empty scrape can never
-											// count toward grounding; keep the content for the value guard.
-											const scrapeUrlHashes: string[] = []
-											for (const tr of response.toolResults) {
-												if (tr.name === 'scrape_page') {
-													const page = tr.result as
-														| { url?: unknown; markdown?: unknown }
-														| null
-														| undefined
+						// Register: for a company pinned to a country with a national
+						// register, look it up once now. The register holds the authoritative,
+						// niche facts — the legal name, the tax id, the named directors — that
+						// a thin company website never states, and folds them into the evidence
+						// the extraction reads. Only for a run whose whole job is this one
+						// company — enrichment or contact discovery — never a scan that
+						// happens to be anchored, whose subject is a starting point for
+						// finding other firms, not the thing being looked up.
+						const registrySnapshot = subjects[0]?.snapshot as
+							| Record<string, unknown>
+							| undefined
+						// A subject whose name went unread is left out here for a reason of
+						// its own, not as one more skipped check: the register is searched
+						// BY that name, and a hit cannot be confirmed against keys that do
+						// not exist, so the lookup would only spend money.
+						const registryCountry =
+							entityTargets !== null && isEntityGroundedSchema(schemaName)
+								? resolveRegistryCountry({
+										subjectCountry:
+											typeof registrySnapshot?.['country'] === 'string'
+												? registrySnapshot['country']
+												: undefined,
+										locationHint: hints?.country ?? hints?.place,
+										// An address the run found points at a country's
+										// register just as well as one the caller gave.
+										anchorHost: ownHost,
+									})
+								: undefined
+						if (registryCountry !== undefined) {
+							const registryQuery =
+								typeof registrySnapshot?.['name'] === 'string'
+									? registrySnapshot['name']
+									: (run as { query: string }).query
+							yield* Effect.gen(function* () {
+								// Paid for under this run's own key for this company and
+								// spelling. The agent looking the same company up the same way
+								// later costs nothing and does not reach the register again; a
+								// lookup by tax id or a different spelling is a different
+								// purchase, so the register costs a small, limit-capped handful
+								// per run.
+								const looked = yield* budget.withPaidCharge(
+									'registry',
+									REGISTRY_LOOKUP_COST_CENTS,
+									'registry_lookup',
+									`${researchId}:registry:${registryCountry}:${registryQuery}`,
+								)(() =>
+									registry.lookup({
+										country: registryCountry,
+										query: registryQuery,
+									}),
+								)
+								if (looked._tag === 'already_charged') return
+								const record = looked.value
+								const hash = urlHashForScrape(record.sourceUrl)
+								// A record read from a national register sits in `sources`
+								// alongside the fetched pages, so a value taken from it grounds
+								// the same way a scraped fact does. Nothing of the register page
+								// itself is kept, only the record, so it is written down as seen
+								// rather than as a page held on file.
+								yield* recordSeenSource(sql, {
+									url: record.sourceUrl,
+									title: record.legalName,
+									contentHash: hash,
+									provider: `registry-${registryCountry.toLowerCase()}`,
+									kind: 'registry',
+								})
+								seededRegistryHashes.push(hash)
+								seededTranscriptParts.push(
+									`[registry_lookup] ${boundedToolResult({ url: record.sourceUrl, ...record })}`,
+								)
+								seededEvidenceParts.push(
+									`${record.sourceUrl}\n${JSON.stringify(record)}`,
+								)
+								// A register match on the legal name confirms the run reached the
+								// right company, the same as reaching its own site.
+								if (
+									!registryConfirmed &&
+									isConfirmedRegistryMatch(entityTargets, record)
+								) {
+									registryConfirmed = true
+								}
+								yield* Effect.logInfo('research.registry.seeded').pipe(
+									Effect.annotateLogs({
+										event: 'research.registry.seeded',
+										research_id: researchId,
+										country: registryCountry,
+									}),
+								)
+							}).pipe(
+								// The register may be unreachable, out of credit, or simply not
+								// list this company. None of that is a reason to abandon the
+								// research — the run carries on with what the web tells it.
+								Effect.catchCause(cause =>
+									Cause.hasInterruptsOnly(cause)
+										? Effect.failCause(cause)
+										: Effect.logWarning('research.registry.seed_skipped').pipe(
+												Effect.annotateLogs({
+													event: 'research.registry.seed_skipped',
+													research_id: researchId,
+													country: registryCountry,
+													cause: Cause.pretty(cause),
+												}),
+											),
+								),
+							)
+						}
+
+						// One agent pass = a fresh reflect-and-retry loop. Both the initial
+						// pass and a refined retry run here, under the SAME budget + toolkit:
+						// re-providing the layer would build a fresh MemoMap and reset the
+						// per-run spend, letting one run silently pay twice.
+						const runPass = (basePrompt: string) =>
+							Effect.gen(function* () {
+								let prompt: Prompt.Prompt = Prompt.make(basePrompt)
+								const runRound = (round: number) =>
+									Effect.gen(function* () {
+										const roundStartedAtMs = DateTime.toEpochMillis(
+											DateTime.nowUnsafe(),
+										)
+										// Written before the round runs, not after it returns.
+										// Stamped at the start but appended at the end, it landed
+										// in the array behind the provider results it precedes, so
+										// the log no longer read in the order things happened —
+										// and a round whose model call failed left no trace of
+										// having been attempted.
+										yield* Ref.update(toolLog, log => [
+											...log,
+											{
+												timestamp: new Date(roundStartedAtMs).toISOString(),
+												type: 'call' as const,
+												tool: 'llm.generateText',
+												// The query is on the run's own row; repeating it
+												// every round adds thousands of characters the
+												// reader already has.
+												input: { phase: 1, round },
+											},
+										])
+										const response = yield* agentLlm.generateText({
+											prompt,
+											toolkit,
+											// Force a tool on the first round so the model can't
+											// answer from memory without gathering evidence (which
+											// would leave zero sources and fail the grounding gate
+											// on a legitimate company); reflect freely after.
+											toolChoice: round === 1 ? 'required' : 'auto',
+										})
+										prompt = Prompt.concat(
+											prompt,
+											Prompt.fromResponseParts(response.content),
+										)
+										// Attribute sources only to scrapes that actually returned
+										// content this round — read off the tool RESULTS, not the
+										// requested calls — so a failed or empty scrape can never
+										// count toward grounding; keep the content for the value guard.
+										const scrapeUrlHashes: string[] = []
+										for (const tr of response.toolResults) {
+											if (tr.name === 'scrape_page') {
+												const page = tr.result as
+													| { url?: unknown; markdown?: unknown }
+													| null
+													| undefined
+												if (
+													page != null &&
+													typeof page.url === 'string' &&
+													typeof page.markdown === 'string' &&
+													page.markdown.trim().length > 0
+												) {
+													gatheredAddresses.add(page.url)
+													// And where this page points. A listing found by a
+													// search is met at its category page, which names no
+													// company; the addresses that do are the ones it links
+													// to, and they are already in the text.
+													for (const linked of linkedAddresses(page.markdown)) {
+														gatheredAddresses.add(linked)
+													}
+													scrapeUrlHashes.push(urlHashForScrape(page.url))
+													scrapeCorpus.push({
+														urlHash: urlHashForScrape(page.url),
+														text: page.markdown,
+														host: domainHost(page.url),
+														kind: 'page',
+													})
+												}
+											} else if (tr.name === 'web_search') {
+												// A search result that arrived with real page text counts
+												// as a page the run has read — ground on it exactly like a
+												// scrape. The sources row was recorded by the search cache
+												// when the tool ran.
+												const searchResult = tr.result as
+													| { items?: ReadonlyArray<unknown> }
+													| null
+													| undefined
+												for (const raw of searchResult?.items ?? []) {
+													const item = raw as {
+														url?: unknown
+														content?: unknown
+													}
+													if (typeof item.url !== 'string') continue
+													// Every result the run surfaced counts as seen, so a
+													// value the model cites to its URL grounds even when
+													// only the snippet — not the full page — was read.
+													const resultHost = domainHost(item.url)
+													if (resultHost !== undefined)
+														searchResultHosts.add(resultHost)
+													// A result the search returned without any text still
+													// shows WHERE a site filed a company, which is all the
+													// directory check reads, so it is gathered here even
+													// though it grounds nothing.
+													gatheredAddresses.add(item.url)
 													if (
-														page != null &&
-														typeof page.url === 'string' &&
-														typeof page.markdown === 'string' &&
-														page.markdown.trim().length > 0
+														typeof item.content === 'string' &&
+														item.content.trim().length > 0
 													) {
-														gatheredAddresses.add(page.url)
-														// And where this page points. A listing found by a
-														// search is met at its category page, which names no
-														// company; the addresses that do are the ones it links
-														// to, and they are already in the text.
-														for (const linked of linkedAddresses(
-															page.markdown,
-														)) {
-															gatheredAddresses.add(linked)
-														}
-														scrapeUrlHashes.push(urlHashForScrape(page.url))
+														scrapeUrlHashes.push(urlHashForScrape(item.url))
 														scrapeCorpus.push({
-															urlHash: urlHashForScrape(page.url),
-															text: page.markdown,
-															host: domainHost(page.url),
-															kind: 'page',
+															urlHash: urlHashForScrape(item.url),
+															text: item.content,
+															host: domainHost(item.url),
+															kind: 'passage',
 														})
 													}
-												} else if (tr.name === 'web_search') {
-													// A search result that arrived with real page text counts
-													// as a page the run has read — ground on it exactly like a
-													// scrape. The sources row was recorded by the search cache
-													// when the tool ran.
-													const searchResult = tr.result as
-														| { items?: ReadonlyArray<unknown> }
-														| null
-														| undefined
-													for (const raw of searchResult?.items ?? []) {
-														const item = raw as {
-															url?: unknown
-															content?: unknown
-														}
-														if (typeof item.url !== 'string') continue
-														// Every result the run surfaced counts as seen, so a
-														// value the model cites to its URL grounds even when
-														// only the snippet — not the full page — was read.
-														const resultHost = domainHost(item.url)
-														if (resultHost !== undefined)
-															searchResultHosts.add(resultHost)
-														// A result the search returned without any text still
-														// shows WHERE a site filed a company, which is all the
-														// directory check reads, so it is gathered here even
-														// though it grounds nothing.
-														gatheredAddresses.add(item.url)
-														if (
-															typeof item.content === 'string' &&
-															item.content.trim().length > 0
-														) {
-															scrapeUrlHashes.push(urlHashForScrape(item.url))
-															scrapeCorpus.push({
-																urlHash: urlHashForScrape(item.url),
-																text: item.content,
-																host: domainHost(item.url),
-																kind: 'passage',
-															})
-														}
-													}
 												}
 											}
-											const renderedResults = response.toolResults.map(
-												tr =>
-													`[${tr.name}] ${boundedToolResult(tr.encodedResult ?? tr.result)}`,
-											)
-											// Record each fetch the model gave up on (a dead URL, a
-											// provider 4xx) so the skipped page shows in the run's tool
-											// log; the run keeps going and only fails if nothing grounds it.
-											for (const tr of response.toolResults) {
-												if (!tr.isFailure) continue
-												yield* Ref.update(toolLog, log => [
-													...log,
-													{
-														timestamp: DateTime.formatIso(DateTime.nowUnsafe()),
-														type: 'result' as const,
-														tool: tr.name,
-														error: boundedToolResult(
-															tr.encodedResult ?? tr.result,
-														),
-													},
-												])
-											}
-											// A registry_lookup that resolved the target by its legal name
-											// strongly confirms the run reached the right company, even if
-											// its own site was never scraped. OR-accumulate across rounds.
-											if (!registryConfirmed) {
-												for (const tr of response.toolResults) {
-													if (
-														!tr.isFailure &&
-														tr.name === 'registry_lookup' &&
-														isConfirmedRegistryMatch(entityTargets, tr.result)
-													) {
-														registryConfirmed = true
-														break
-													}
-												}
-											}
-											yield* emitRound(
-												round,
-												response.text.length,
-												response.toolCalls.length,
-											)
-											return {
-												text: response.text,
-												hasToolCalls: response.toolCalls.length > 0,
-												scrapeUrlHashes,
-												renderedResults,
-												promptChars: JSON.stringify(response.content).length,
-												inputTokens: response.usage.inputTokens.total ?? 0,
-											}
-										})
-									// When the model stops early without the evidence confirming the
-									// target, nudge it to find and read the company's own site before
-									// finishing; bounded so a run that still cannot ground fails closed.
-									let groundingRetries = 0
-									let headcountRetries = 0
-									const shouldContinueAfterFinal = () =>
-										Effect.sync(() => {
-											const corpus = scrapeCorpus
-												.map(page => page.text)
-												.join('\n')
-											const verdict =
-												entityTargets === null
-													? null
-													: classifyEntityMatch(entityTargets, corpus)
-											// Grounding gate: reach the target's own site before answering; bounded
-											// so a run that still cannot ground fails closed rather than looping.
-											// With no keys there is no verdict to fall short of, so the
-											// nudge never fires and the run answers without ever having
-											// reached a page anyone held against the company.
-											if (
-												entityTargets !== null &&
-												verdict !== 'strong' &&
-												groundingRetries < MAX_GROUNDING_RETRIES
-											) {
-												groundingRetries++
-												prompt = Prompt.concat(
-													prompt,
-													Prompt.make(GROUNDING_RETRY_INSTRUCTION),
-												)
-												return true
-											}
-											// Fact-completeness gate: an enrichment run that reached the company but
-											// has gathered no employee-count signal is pushed to search for the
-											// headcount once — it is rarely on the homepage, so a run that stops there
-											// leaves size_range empty. Bounded like the grounding gate above.
-											if (
-												schemaName === 'company_enrichment_v1' &&
-												verdict === 'strong' &&
-												headcountRetries < MAX_HEADCOUNT_RETRIES &&
-												!hasHeadcountSignal(corpus)
-											) {
-												headcountRetries++
-												prompt = Prompt.concat(
-													prompt,
-													Prompt.make(HEADCOUNT_SEARCH_INSTRUCTION),
-												)
-												return true
-											}
-											return false
-										})
-									return yield* runAgentResearchLoop({
-										maxSteps: maxAgentSteps,
-										maxPromptChars: MAX_LOOP_PROMPT_CHARS,
-										maxPromptTokens: maxLoopPromptTokens,
-										runRound,
-										shouldContinueAfterFinal,
-										budgetSnapshot: budget.snapshot(),
-									})
-								})
-
-							let loop = yield* runPass(
-								`${systemPrompt}\n\n${query}${anchorInstruction}${partsInstruction}`,
-							)
-
-							// Everything gathered so far, read as one. Every pass after the
-							// first folds its transcript into what came before and the whole of
-							// it is extracted again, so a company found on any pass lands in
-							// the list once rather than in a list of its own.
-							const extractOverEverything = () =>
-								extractStructuredFindings(
-									loop.researchText,
-									[
-										loop.evidenceText,
-										...scrapeCorpus.map(page => page.text),
-									].join('\n'),
-									scrapeCorpus.map(page => page.text),
-								)
-
-							// Send the search out once more, with the reason for going appended
-							// to the prompt the first pass had. It carries the anchor
-							// instruction and the request's parts along: a re-search that drops
-							// the anchor looks for anyone's competitors, and one that drops the
-							// parts forgets what it was working through.
-							const searchAgain = (instruction: string) =>
-								Effect.gen(function* () {
-									const again = yield* runPass(
-										`${systemPrompt}\n\n${query}${anchorInstruction}${partsInstruction}\n\n${instruction}`,
-									)
-									loop = {
-										researchText: [loop.researchText, again.researchText]
-											.filter(t => t.length > 0)
-											.join('\n\n'),
-										evidenceText: [loop.evidenceText, again.evidenceText]
-											.filter(t => t.length > 0)
-											.join('\n\n'),
-										scrapedUrlHashes: [
-											...new Set([
-												...loop.scrapedUrlHashes,
-												...again.scrapedUrlHashes,
-											]),
-										],
-										rounds: loop.rounds + again.rounds,
-										// Whichever of the two bound the run hardest: a pass that
-										// settles cannot bury a ceiling an earlier one met, and an
-										// earlier ceiling cannot bury a harder one met here.
-										stopReason: mostBindingStop(
-											loop.stopReason,
-											again.stopReason,
-										),
-									}
-									yield* linkRunSources(again.scrapedUrlHashes)
-									return (yield* extractOverEverything()).findings
-								})
-
-							// An extra pass is worth trying; it is never worth the run. When a
-							// provider refuses one, everything the passes before it found still
-							// stands, so the search keeps that and stops going back out rather
-							// than failing and losing the lot.
-							//
-							// The flag answers for the pass that just ran, so a refused refine
-							// cannot be read as a refused coverage pass later on.
-							let lastPassRefused = false
-							const searchAgainOrKeep = (instruction: string, soFar: unknown) =>
-								Effect.gen(function* () {
-									lastPassRefused = false
-									return yield* searchAgain(instruction).pipe(
-										Effect.catchIf(
-											(error: unknown) => error instanceof ProviderError,
-											error =>
-												Effect.gen(function* () {
-													lastPassRefused = true
-													yield* Effect.logWarning(
-														'research.pass.abandoned',
-													).pipe(
-														Effect.annotateLogs({
-															event: 'research.pass.abandoned',
-															research_id: researchId,
-															cause: error.message,
-														}),
-													)
-													return soFar
-												}),
-										),
-									)
-								})
-
-							// A discovery scan (prospect / competitor) that comes back with too
-							// few results gets ONE refined retry before we accept the list:
-							// only here does a short primary list mean the search — not the
-							// data — fell short. Extraction runs now so that check sees real
-							// structured findings; the retry reuses this pass's budget.
-							//
-							// A scan pinned to a company earns the retry just as an open-ended
-							// one does — "find this company's competitors" that finds none has
-							// searched badly, not proved the company has no rivals — but it
-							// keeps phase 2's own extraction, which orders its own site first,
-							// re-judges the pages it cited, and can downgrade the entity
-							// verdict. So the findings below are handed on only when there is
-							// no anchor; an anchored scan probes for thinness here and extracts
-							// again there, over everything the passes gathered.
-							let findings: unknown
-							let refined = false
-							if (isDiscoveryScan(schemaName)) {
-								yield* linkRunSources(loop.scrapedUrlHashes)
-								findings = (yield* extractOverEverything()).findings
-								if (
-									isDiscoveryScanThin(schemaName, findings) &&
-									canAffordAnotherRound(yield* budget.snapshot())
-								) {
-									yield* Effect.logInfo('research.refining').pipe(
-										Effect.annotateLogs({
-											event: 'research.refining',
-											research_id: researchId,
-											schema: schemaName,
-										}),
-									)
-									yield* publishEvent(researchId, 'run.refining', {
-										schema: schemaName,
-									})
-									findings = yield* searchAgainOrKeep(REFINE_HINT, findings)
-									// Only a pass that came back counts as having refined. A
-									// reader told the search was refined and still found nothing
-									// reads an empty list as an empty market, so a pass the
-									// provider refused must not be reported as one that ran.
-									refined = !lastPassRefused
-								}
-
-								// Then the parts of the request nothing came back for. The retry
-								// above asks whether enough came back; this asks whether what
-								// came back answers what was asked, which a long list of one
-								// trade does not. Each pass names the trades still missing and
-								// searches for those alone, and the loop stops as soon as they
-								// are answered — so a request naming one kind of company, or one
-								// whose kinds are all answered, costs nothing extra.
-								for (let passesSpent = 0; ; passesSpent++) {
-									const coverage = coverRequestParts(
-										requestParts,
-										discoveryRows(schemaName, findings),
-										partsSearchedFor,
-									)
-									if (coverage === null) break
-									const verdict = coveragePassVerdict({
-										uncovered: coverage.uncovered.length,
-										passesSpent,
-										elapsedMs:
-											DateTime.toEpochMillis(DateTime.nowUnsafe()) -
-											runStartedAtMs,
-										deadlineMs: runDeadlineSeconds * 1000,
-										canAfford: canAffordAnotherRound(yield* budget.snapshot()),
-									})
-									if (verdict !== 'go') {
-										coverageStopped = verdict
-										coverageLastMissing = coverage.uncovered
-										if (coverage.uncovered.length > 0) {
-											yield* Effect.logInfo('research.covering.stopped').pipe(
-												Effect.annotateLogs({
-													event: 'research.covering.stopped',
-													research_id: researchId,
-													reason: verdict,
-													uncovered: coverage.uncovered,
-												}),
-											)
 										}
-										break
-									}
-
-									// Noted before the pass rather than after it, so a pass cut
-									// short still counts as having gone looking.
-									for (const label of coverage.uncovered) {
-										partsSearchedFor.add(label)
-									}
-
-									yield* Effect.logInfo('research.covering').pipe(
-										Effect.annotateLogs({
-											event: 'research.covering',
-											research_id: researchId,
-											uncovered: coverage.uncovered,
-										}),
-									)
-									yield* publishEvent(researchId, 'run.covering', {
-										uncovered: coverage.uncovered,
+										const renderedResults = response.toolResults.map(
+											tr =>
+												`[${tr.name}] ${boundedToolResult(tr.encodedResult ?? tr.result)}`,
+										)
+										// Every provider call the round made, not only the ones that
+										// failed. A fourteen-minute run used to log eight entries, all
+										// of them model calls, while its own quota breakdown counted
+										// eighty-two searches and scrapes — so the expensive part of a
+										// run left no trace, and a reader could not tell a search that
+										// went out and found nothing from one that never went.
+										//
+										// The output is a short shape rather than the provider's
+										// answer: a scraped page is tens of thousands of characters and
+										// is already stored as a source.
+										for (const tr of response.toolResults) {
+											if (!tr.isFailure) providerCallsLogged += 1
+											if (
+												!tr.isFailure &&
+												providerCallsLogged === MAX_LOGGED_PROVIDER_CALLS
+											) {
+												yield* Effect.logInfo(
+													'research.tool_log.provider_calls_capped',
+												).pipe(
+													Effect.annotateLogs({
+														event: 'research.tool_log.provider_calls_capped',
+														research_id: researchId,
+														cap: MAX_LOGGED_PROVIDER_CALLS,
+													}),
+												)
+											}
+											if (
+												!tr.isFailure &&
+												providerCallsLogged > MAX_LOGGED_PROVIDER_CALLS
+											)
+												continue
+											yield* Ref.update(toolLog, log => [
+												...log,
+												{
+													timestamp: DateTime.formatIso(DateTime.nowUnsafe()),
+													type: 'result' as const,
+													tool: tr.name,
+													...(tr.isFailure
+														? {
+																error: boundedToolResult(
+																	tr.encodedResult ?? tr.result,
+																),
+															}
+														: {
+																output: {
+																	round,
+																	// The answer's own size, not the trimmed copy's:
+																	// bounded, every large page reports the same
+																	// number and a page that came back empty reads
+																	// like one that came back whole.
+																	chars: toolResultText(
+																		tr.encodedResult ?? tr.result,
+																	).length,
+																},
+															}),
+												},
+											])
+										}
+										// A registry_lookup that resolved the target by its legal name
+										// strongly confirms the run reached the right company, even if
+										// its own site was never scraped. OR-accumulate across rounds.
+										if (!registryConfirmed) {
+											for (const tr of response.toolResults) {
+												if (
+													!tr.isFailure &&
+													tr.name === 'registry_lookup' &&
+													isConfirmedRegistryMatch(entityTargets, tr.result)
+												) {
+													registryConfirmed = true
+													break
+												}
+											}
+										}
+										yield* emitRound(
+											round,
+											response.text.length,
+											response.toolCalls.length,
+											roundStartedAtMs,
+										)
+										return {
+											text: response.text,
+											hasToolCalls: response.toolCalls.length > 0,
+											scrapeUrlHashes,
+											renderedResults,
+											promptChars: JSON.stringify(response.content).length,
+											inputTokens: response.usage.inputTokens.total ?? 0,
+										}
 									})
-									findings = yield* searchAgainOrKeep(
-										uncoveredPartsDirective(coverage.uncovered),
-										findings,
-									)
-									if (lastPassRefused) {
-										coverageStopped = 'provider_failed'
-										coverageLastMissing = coverage.uncovered
-										break
-									}
-								}
-							}
+								// When the model stops early without the evidence confirming the
+								// target, nudge it to find and read the company's own site before
+								// finishing; bounded so a run that still cannot ground fails closed.
+								let groundingRetries = 0
+								let headcountRetries = 0
+								const shouldContinueAfterFinal = () =>
+									Effect.sync(() => {
+										const corpus = scrapeCorpus
+											.map(page => page.text)
+											.join('\n')
+										const verdict =
+											entityTargets === null
+												? null
+												: classifyEntityMatch(entityTargets, corpus)
+										// Grounding gate: reach the target's own site before answering; bounded
+										// so a run that still cannot ground fails closed rather than looping.
+										// With no keys there is no verdict to fall short of, so the
+										// nudge never fires and the run answers without ever having
+										// reached a page anyone held against the company.
+										if (
+											entityTargets !== null &&
+											verdict !== 'strong' &&
+											groundingRetries < MAX_GROUNDING_RETRIES
+										) {
+											groundingRetries++
+											prompt = Prompt.concat(
+												prompt,
+												Prompt.make(GROUNDING_RETRY_INSTRUCTION),
+											)
+											return true
+										}
+										// Fact-completeness gate: an enrichment run that reached the company but
+										// has gathered no employee-count signal is pushed to search for the
+										// headcount once — it is rarely on the homepage, so a run that stops there
+										// leaves size_range empty. Bounded like the grounding gate above.
+										if (
+											schemaName === 'company_enrichment_v1' &&
+											verdict === 'strong' &&
+											headcountRetries < MAX_HEADCOUNT_RETRIES &&
+											!hasHeadcountSignal(corpus)
+										) {
+											headcountRetries++
+											prompt = Prompt.concat(
+												prompt,
+												Prompt.make(HEADCOUNT_SEARCH_INSTRUCTION),
+											)
+											return true
+										}
+										return false
+									})
+								return yield* runAgentResearchLoop({
+									maxSteps: maxAgentSteps,
+									maxPromptChars: MAX_LOOP_PROMPT_CHARS,
+									maxPromptTokens: maxLoopPromptTokens,
+									runRound,
+									shouldContinueAfterFinal,
+									budgetSnapshot: budget.snapshot(),
+								})
+							})
 
-							// Read the cheap-tier tally before the budget layer goes out of
-							// scope, so the terminal transitions below can stamp it.
-							const cheapCents = (yield* budget.snapshot()).cheapSpent
-							return {
-								loop,
-								// Only an unanchored scan hands its findings on; an anchored one
-								// extracted here to measure the list and lets phase 2 do the
-								// grounded extraction it needs.
-								//
-								// Asked of the anchor rather than of the keys: a scan anchored to
-								// a company whose name went unread has an anchor all the same, and
-								// going by the keys would send it down the unanchored path for the
-								// one reason that should never buy a run less care. It costs that
-								// scan a second extraction, and buys the two things phase 2 does
-								// without any keys at all: each page labelled with the host it sits
-								// on, and the anchor's own pages read first.
-								findings:
-									entityTargets === null && !subjectUnreadable
-										? findings
-										: undefined,
-								refined,
-								cheapCents,
-							}
-						}).pipe(
-							Effect.provide(researchToolkitLayer),
-							Effect.provide(budgetLayer),
-							Effect.provide(
-								Layer.succeed(ResearchRunContext)({
-									researchId,
-									language: hints?.language,
-									country: hints?.country,
-									place: hints?.place,
-									entityTargets,
-									entityName,
-								}),
-							),
-							Effect.withSpan('research.phase1', {
-								attributes: { 'research.run_id': researchId },
-							}),
+						let loop = yield* runPass(
+							`${systemPrompt}\n\n${query}${anchorInstruction}${partsInstruction}`,
 						)
 
-						const loopResult = phaseOutcome.loop
-						runRounds = loopResult.rounds
-						// The chase for a part nothing answered is looking too, and it
-						// stops for reasons of its own: a run whose chase ran out of
-						// passes has not finished looking, however contentedly its last
-						// gathering pass ended.
-						const chaseStopped = coverageStoppedLooking(coverageStopped)
-						searchStopped =
-							chaseStopped === null
-								? loopResult.stopReason
-								: mostBindingStop(loopResult.stopReason, chaseStopped)
-						// Why the gathering stopped. A run that ran out of room to think,
-						// rather than finishing what it set out to do, had more it wanted
-						// to read — so a thin profile there is a ceiling to raise, not a
-						// prompt to reword. Whether the refined retry fired rides along:
-						// it is the main lever on a thin list, and a run that ends with
-						// nothing to report keeps no findings to record it in.
-						yield* Effect.annotateCurrentSpan({
-							'research.phase1.stop_reason': loopResult.stopReason,
-							'research.phase1.rounds': loopResult.rounds,
-							'research.phase1.refined': phaseOutcome.refined,
-						})
-						// Prepend the anchor site's content so phase-2 extraction reads the
-						// official page first; empty when nothing was seeded.
-						researchText = [...seededTranscriptParts, loopResult.researchText]
-							.filter(part => part.length > 0)
-							.join('\n\n')
-						evidenceText = loopResult.evidenceText
-						retryFindings = phaseOutcome.findings
-						refinedRetry = phaseOutcome.refined
-						cheapSpentCents = phaseOutcome.cheapCents
-
-						// Entity grounding gate: from the fetched evidence alone (never the
-						// model's prose), classify how strongly the pages concern the
-						// requested company. Nothing about the target at all ('absent')
-						// fails closed here, before phase 2 can turn a lookalike's pages
-						// into a confident profile. A glancing mention ('weak') carries on
-						// and finishes marked for reading.
-						const entityCorpus = [
-							evidenceText,
-							...scrapeCorpus.map(page => page.text),
-						].join('\n')
-						// Null for a run with no keys — whether because it is about nobody
-						// in particular or because its subject's name went unread. The two
-						// are told apart in the quality block, which is where the second one
-						// costs the run its clean finish; here there is simply no verdict to
-						// reach.
-						entityMatch = entityTargets
-							? classifyEntityMatch(entityTargets, entityCorpus)
-							: null
-						// A page that merely spells the company name reads as 'strong' even
-						// for a different same-named company, or a stale mention of one since
-						// renamed or acquired. When a city was queried but the run reached no
-						// official site and no register confirmed the match, require that city
-						// in the evidence too — otherwise fail closed rather than profile a
-						// lookalike.
-						if (
-							entityMatch === 'strong' &&
-							entityTargets &&
-							cityGate({
-								targets: entityTargets,
-								corpus: entityCorpus,
-								// Pages only: this asks whether the run reached the company's
-								// own site, and a search quoting a sentence off a namesake's
-								// site is not having been there.
-								pages: openedPages(scrapeCorpus),
-								registryConfirmed,
-							}) === 'downgrade'
-						) {
-							yield* Effect.annotateCurrentSpan({
-								'research.entity.city_downgraded': true,
-							})
-							yield* Effect.logInfo('research.entity.city_downgraded').pipe(
-								Effect.annotateLogs({
-									event: 'research.entity.city_downgraded',
-									research_id: researchId,
-								}),
+						// Everything gathered so far, read as one. Every pass after the
+						// first folds its transcript into what came before and the whole of
+						// it is extracted again, so a company found on any pass lands in
+						// the list once rather than in a list of its own.
+						const extractOverEverything = () =>
+							extractStructuredFindings(
+								loop.researchText,
+								[
+									loop.evidenceText,
+									...scrapeCorpus.map(page => page.text),
+								].join('\n'),
+								scrapeCorpus.map(page => page.text),
 							)
-							entityMatch = 'absent'
-						}
-						if (entityMatch === 'absent') {
-							yield* failClosedOnEntity(entityMatch)
-							return
+
+						// Send the search out once more, with the reason for going appended
+						// to the prompt the first pass had. It carries the anchor
+						// instruction and the request's parts along: a re-search that drops
+						// the anchor looks for anyone's competitors, and one that drops the
+						// parts forgets what it was working through.
+						const searchAgain = (instruction: string) =>
+							Effect.gen(function* () {
+								const again = yield* runPass(
+									`${systemPrompt}\n\n${query}${anchorInstruction}${partsInstruction}\n\n${instruction}`,
+								)
+								loop = {
+									researchText: [loop.researchText, again.researchText]
+										.filter(t => t.length > 0)
+										.join('\n\n'),
+									evidenceText: [loop.evidenceText, again.evidenceText]
+										.filter(t => t.length > 0)
+										.join('\n\n'),
+									scrapedUrlHashes: [
+										...new Set([
+											...loop.scrapedUrlHashes,
+											...again.scrapedUrlHashes,
+										]),
+									],
+									rounds: loop.rounds + again.rounds,
+									// Whichever of the two bound the run hardest: a pass that
+									// settles cannot bury a ceiling an earlier one met, and an
+									// earlier ceiling cannot bury a harder one met here.
+									stopReason: mostBindingStop(
+										loop.stopReason,
+										again.stopReason,
+									),
+								}
+								yield* linkRunSources(again.scrapedUrlHashes)
+								return (yield* extractOverEverything()).findings
+							})
+
+						// An extra pass is worth trying; it is never worth the run. When a
+						// provider refuses one, everything the passes before it found still
+						// stands, so the search keeps that and stops going back out rather
+						// than failing and losing the lot.
+						//
+						// The flag answers for the pass that just ran, so a refused refine
+						// cannot be read as a refused coverage pass later on.
+						let lastPassRefused = false
+						const searchAgainOrKeep = (instruction: string, soFar: unknown) =>
+							Effect.gen(function* () {
+								lastPassRefused = false
+								return yield* searchAgain(instruction).pipe(
+									Effect.catchIf(
+										(error: unknown) => error instanceof ProviderError,
+										error =>
+											Effect.gen(function* () {
+												lastPassRefused = true
+												yield* Effect.logWarning(
+													'research.pass.abandoned',
+												).pipe(
+													Effect.annotateLogs({
+														event: 'research.pass.abandoned',
+														research_id: researchId,
+														cause: error.message,
+													}),
+												)
+												return soFar
+											}),
+									),
+								)
+							})
+
+						// A discovery scan (prospect / competitor) that comes back with too
+						// few results gets ONE refined retry before we accept the list:
+						// only here does a short primary list mean the search — not the
+						// data — fell short. Extraction runs now so that check sees real
+						// structured findings; the retry reuses this pass's budget.
+						//
+						// A scan pinned to a company earns the retry just as an open-ended
+						// one does — "find this company's competitors" that finds none has
+						// searched badly, not proved the company has no rivals — but it
+						// keeps phase 2's own extraction, which orders its own site first,
+						// re-judges the pages it cited, and can downgrade the entity
+						// verdict. So the findings below are handed on only when there is
+						// no anchor; an anchored scan probes for thinness here and extracts
+						// again there, over everything the passes gathered.
+						let findings: unknown
+						let refined = false
+						if (isDiscoveryScan(schemaName)) {
+							yield* linkRunSources(loop.scrapedUrlHashes)
+							findings = (yield* extractOverEverything()).findings
+							if (
+								isDiscoveryScanThin(schemaName, findings) &&
+								canAffordAnotherRound(yield* budget.snapshot())
+							) {
+								yield* Effect.logInfo('research.refining').pipe(
+									Effect.annotateLogs({
+										event: 'research.refining',
+										research_id: researchId,
+										schema: schemaName,
+									}),
+								)
+								yield* publishEvent(researchId, 'run.refining', {
+									schema: schemaName,
+								})
+								findings = yield* searchAgainOrKeep(REFINE_HINT, findings)
+								// Only a pass that came back counts as having refined. A
+								// reader told the search was refined and still found nothing
+								// reads an empty list as an empty market, so a pass the
+								// provider refused must not be reported as one that ran.
+								refined = !lastPassRefused
+							}
+
+							// Then the parts of the request nothing came back for. The retry
+							// above asks whether enough came back; this asks whether what
+							// came back answers what was asked, which a long list of one
+							// trade does not. Each pass names the trades still missing and
+							// searches for those alone, and the loop stops as soon as they
+							// are answered — so a request naming one kind of company, or one
+							// whose kinds are all answered, costs nothing extra.
+							for (let passesSpent = 0; ; passesSpent++) {
+								const coverage = coverRequestParts(
+									requestParts,
+									discoveryRows(schemaName, findings),
+									partsSearchedFor,
+								)
+								if (coverage === null) break
+								const verdict = coveragePassVerdict({
+									uncovered: coverage.uncovered.length,
+									passesSpent,
+									elapsedMs:
+										DateTime.toEpochMillis(DateTime.nowUnsafe()) -
+										runStartedAtMs,
+									deadlineMs: runDeadlineSeconds * 1000,
+									canAfford: canAffordAnotherRound(yield* budget.snapshot()),
+								})
+								if (verdict !== 'go') {
+									coverageStopped = verdict
+									coverageLastMissing = coverage.uncovered
+									if (coverage.uncovered.length > 0) {
+										yield* Effect.logInfo('research.covering.stopped').pipe(
+											Effect.annotateLogs({
+												event: 'research.covering.stopped',
+												research_id: researchId,
+												reason: verdict,
+												uncovered: coverage.uncovered,
+											}),
+										)
+									}
+									break
+								}
+
+								// Noted before the pass rather than after it, so a pass cut
+								// short still counts as having gone looking.
+								for (const label of coverage.uncovered) {
+									partsSearchedFor.add(label)
+								}
+
+								yield* Effect.logInfo('research.covering').pipe(
+									Effect.annotateLogs({
+										event: 'research.covering',
+										research_id: researchId,
+										uncovered: coverage.uncovered,
+									}),
+								)
+								yield* publishEvent(researchId, 'run.covering', {
+									uncovered: coverage.uncovered,
+								})
+								findings = yield* searchAgainOrKeep(
+									uncoveredPartsDirective(coverage.uncovered),
+									findings,
+								)
+								if (lastPassRefused) {
+									coverageStopped = 'provider_failed'
+									coverageLastMissing = coverage.uncovered
+									break
+								}
+							}
 						}
 
-						// Commit the phase-1 checkpoint and its source links together, so a
-						// crash between them can't leave a resumed run citing sources it
-						// never recorded. The status guard mirrors the terminal writes: a
-						// run cancelled mid-loop keeps its 'cancelled' row rather than
-						// having this checkpoint overwrite it with partial progress.
-						yield* Effect.gen(function* () {
-							yield* sql`
-								UPDATE research_runs
-								SET phase = 1,
-									research_text = ${researchText},
-									entity_match = ${entityMatch},
-									updated_at = now()
-								WHERE id = ${researchId} AND status = 'running'
-							`
+						// Read the cheap-tier tally before the budget layer goes out of
+						// scope, so the terminal transitions below can stamp it.
+						const cheapCents = (yield* budget.snapshot()).cheapSpent
+						return {
+							loop,
+							// Only an unanchored scan hands its findings on; an anchored one
+							// extracted here to measure the list and lets phase 2 do the
+							// grounded extraction it needs.
+							//
+							// Asked of the anchor rather than of the keys: a scan anchored to
+							// a company whose name went unread has an anchor all the same, and
+							// going by the keys would send it down the unanchored path for the
+							// one reason that should never buy a run less care. It costs that
+							// scan a second extraction, and buys the two things phase 2 does
+							// without any keys at all: each page labelled with the host it sits
+							// on, and the anchor's own pages read first.
+							findings:
+								entityTargets === null && !subjectUnreadable
+									? findings
+									: undefined,
+							refined,
+							cheapCents,
+						}
+					}).pipe(
+						Effect.provide(researchToolkitLayer),
+						Effect.provide(budgetLayer),
+						Effect.provide(
+							Layer.succeed(ResearchRunContext)({
+								researchId,
+								language: hints?.language,
+								country: hints?.country,
+								place: hints?.place,
+								entityTargets,
+								entityName,
+							}),
+						),
+						Effect.withSpan('research.phase1', {
+							attributes: { 'research.run_id': researchId },
+						}),
+					)
 
-							// Link every page scraped across the loop's rounds — plus the
-							// anchor site and any register entry seeded before the loop — to
-							// the run so findings cite real sources (a discovery-scan retry
-							// may have linked some already — ON CONFLICT makes the re-link a
-							// no-op).
-							yield* linkRunSources([
-								...loopResult.scrapedUrlHashes,
-								...seededAnchorHashes,
-								...seededRegistryHashes,
-							])
-						}).pipe(sql.withTransaction)
+					const loopResult = phaseOutcome.loop
+					runRounds = loopResult.rounds
+					// The chase for a part nothing answered is looking too, and it
+					// stops for reasons of its own: a run whose chase ran out of
+					// passes has not finished looking, however contentedly its last
+					// gathering pass ended.
+					const chaseStopped = coverageStoppedLooking(coverageStopped)
+					searchStopped =
+						chaseStopped === null
+							? loopResult.stopReason
+							: mostBindingStop(loopResult.stopReason, chaseStopped)
+					// Why the gathering stopped. A run that ran out of room to think,
+					// rather than finishing what it set out to do, had more it wanted
+					// to read — so a thin profile there is a ceiling to raise, not a
+					// prompt to reword. Whether the refined retry fired rides along:
+					// it is the main lever on a thin list, and a run that ends with
+					// nothing to report keeps no findings to record it in.
+					yield* Effect.annotateCurrentSpan({
+						'research.phase1.stop_reason': loopResult.stopReason,
+						'research.phase1.rounds': loopResult.rounds,
+						'research.phase1.refined': phaseOutcome.refined,
+					})
+					// Prepend the anchor site's content so phase-2 extraction reads the
+					// official page first; empty when nothing was seeded.
+					researchText = [...seededTranscriptParts, loopResult.researchText]
+						.filter(part => part.length > 0)
+						.join('\n\n')
+					evidenceText = loopResult.evidenceText
+					retryFindings = phaseOutcome.findings
+					refinedRetry = phaseOutcome.refined
+					cheapSpentCents = phaseOutcome.cheapCents
+
+					// Entity grounding gate: from the fetched evidence alone (never the
+					// model's prose), classify how strongly the pages concern the
+					// requested company. Nothing about the target at all ('absent')
+					// fails closed here, before phase 2 can turn a lookalike's pages
+					// into a confident profile. A glancing mention ('weak') carries on
+					// and finishes marked for reading.
+					const entityCorpus = [
+						evidenceText,
+						...scrapeCorpus.map(page => page.text),
+					].join('\n')
+					// Null for a run with no keys — whether because it is about nobody
+					// in particular or because its subject's name went unread. The two
+					// are told apart in the quality block, which is where the second one
+					// costs the run its clean finish; here there is simply no verdict to
+					// reach.
+					entityMatch = entityTargets
+						? classifyEntityMatch(entityTargets, entityCorpus)
+						: null
+					// A page that merely spells the company name reads as 'strong' even
+					// for a different same-named company, or a stale mention of one since
+					// renamed or acquired. When a city was queried but the run reached no
+					// official site and no register confirmed the match, require that city
+					// in the evidence too — otherwise fail closed rather than profile a
+					// lookalike.
+					if (
+						entityMatch === 'strong' &&
+						entityTargets &&
+						cityGate({
+							targets: entityTargets,
+							corpus: entityCorpus,
+							// Pages only: this asks whether the run reached the company's
+							// own site, and a search quoting a sentence off a namesake's
+							// site is not having been there.
+							pages: openedPages(scrapeCorpus),
+							registryConfirmed,
+						}) === 'downgrade'
+					) {
+						yield* Effect.annotateCurrentSpan({
+							'research.entity.city_downgraded': true,
+						})
+						yield* Effect.logInfo('research.entity.city_downgraded').pipe(
+							Effect.annotateLogs({
+								event: 'research.entity.city_downgraded',
+								research_id: researchId,
+							}),
+						)
+						entityMatch = 'absent'
 					}
-
-					// The phase-1 entity gate is skipped when a run resumes from a checkpoint
-					// (the loop that decides the verdict does not re-run), so re-check the stored
-					// verdict here: evidence about no company at all fails closed before phase 2
-					// instead of extracting a lookalike's profile on resume.
 					if (entityMatch === 'absent') {
 						yield* failClosedOnEntity(entityMatch)
 						return
 					}
 
-					// ── Phase 2: Structured output ──
-					// Skipped on resume if findings were already captured.
-					let findings: unknown
-					if (checkpointPhase >= 2 && existingFindingsHasValue) {
-						findings = existingFindings
-						yield* Effect.logInfo('research.phase2.resume').pipe(
-							Effect.annotateLogs({
-								event: 'research.phase2.resume',
-								research_id: researchId,
-							}),
-						)
-						// Same as the gathering checkpoint above: reusing the earlier
-						// attempt's findings skips the work that would otherwise report,
-						// so tick once to show the run is moving.
-						yield* recordProgress
-					} else {
-						// The company's own (anchor-seeded) pages. Both the first extraction
-						// and the gap rounds below put them ahead of everything else, so the
-						// set is built once here rather than inside either.
-						const anchorHashes = new Set(seededAnchorHashes)
-						if (retryFindings !== undefined) {
-							// The discovery-scan retry path already ran extraction under the
-							// shared budget — reuse those findings.
-							findings = retryFindings
-						} else {
-							// Fill the phase-2 page budget with the company's own
-							// (anchor-seeded) pages first, so if the budget truncates it drops
-							// third-party pages, never the official site the run grounds on.
-							const anchorFirstCorpus = [...scrapeCorpus].sort(
-								(a, b) =>
-									(anchorHashes.has(a.urlHash) ? 0 : 1) -
-									(anchorHashes.has(b.urlHash) ? 0 : 1),
-							)
-							const extracted = yield* extractStructuredFindings(
-								researchText,
-								[
-									evidenceText,
-									...seededEvidenceParts,
-									...groundedPageTexts(entityTargets, scrapeCorpus),
-								].join('\n'),
-								labelledGroundedPages(entityTargets, anchorFirstCorpus),
-							)
-							findings = extracted.findings
-							// A company field dropped for coming from a person page or a social
-							// post means the strong whole-corpus match was partly built on a
-							// source that can't speak for the company. Downgrade the verdict so
-							// the run reports honestly (and the quality signal sees it).
-							if (
-								extracted.entityFieldsDropped > 0 &&
-								entityMatch === 'strong'
-							) {
-								entityMatch = 'weak'
-								yield* Effect.logWarning(
-									'research.entity.downgraded_source',
-								).pipe(
-									Effect.annotateLogs({
-										event: 'research.entity.downgraded_source',
-										research_id: researchId,
-									}),
-								)
-							}
-						}
-						// Gap rounds: for each high-value fact the broad pass and the
-						// focused rescues still left empty, first fetch the cited
-						// pages the run never opened (turning the per-source check's
-						// fail-open into a real verdict on the cited page), then fire one
-						// focused web search per missing fact, and re-extract over the
-						// enlarged evidence.
-						//
-						// The gaps are read per subject, so a scan's list is reached the
-						// same way a single company profile is: one company missing its
-						// website is a gap exactly as a profile missing its country is.
-						// This sits outside the branch above so a scan that came back thin
-						// gets its rounds too — it takes the refined-retry path, and it is
-						// the run with the most left to fill in.
-						//
-						// Loops while the gaps keep closing — hard-capped, and every round
-						// first checks the wall-clock and budget margin, because finishing
-						// low-confidence is a result while riding into the terminal run
-						// deadline loses the run. Phase-2 runs outside the loop's Budget
-						// scope, so each round tallies its scrape/search cost into
-						// gapSpentCents to keep the margin check and the stamped cost
-						// honest.
-						const gapSearch = yield* SearchProvider
-						const gapScrape = yield* ScrapeProvider
-						// Cited pages already attempted this run (fetched, empty, or errored),
-						// so one that yields nothing is not re-fetched every round — otherwise
-						// it never enters the corpus and keeps reappearing as cited-but-unscraped.
-						const citedAttempted = new Set<string>()
-						// Every gap already searched for, so a round moves on to the
-						// companies behind it. A round takes the first few gaps it finds, and
-						// a headcount a small firm never publishes stays a gap however often
-						// it is asked — without this, those first few would take every round's
-						// searches and the rest of a long list would never be reached at all.
-						const gapsSearched = new Set<string>()
-						// Every address the check took off the list a fold produced, added up
-						// over the whole loop. Counted here rather than reported round by round,
-						// because what it answers is whether the run ever condemned an address
-						// no single extraction had the evidence to condemn — and a round that
-						// took none would otherwise overwrite the round that took one.
-						let blankedAfterFolds = 0
-						// Companies the rounds set out to ask for a site. Held apart from
-						// how many end up without one: a company never asked about and one
-						// asked about whose search found nothing want opposite fixes, and a
-						// single figure covering both cannot tell an operator which they have.
-						let websiteSearchesAsked = 0
-						const gapPolicy = (run as { paidPolicy: ResolvedPolicy | null })
-							.paidPolicy
-						// How many searches the step that confirms the list still has to buy.
-						// It runs last and spends whatever these rounds leave, so its share is
-						// set aside before they spend: a round that took the lot would turn
-						// companies the run could have stood behind into ones reported as
-						// unchecked for want of money, which says nothing about the company.
-						// Counted by the rule that step uses, so the two cannot disagree.
-						const searchesHeldForConfirming = (): number => {
-							const listField = discoveryResultField(schemaName)
-							if (listField === undefined) return 0
-							return rowsAwaitingConfirmation(
-								discoveryRows(schemaName, findings),
-								observeDirectorySites({
-									findings,
-									listField,
-									addresses: [...gatheredAddresses],
-									runWords: wordsTheRunBrings,
-								}).sites,
-								wordsTheRunBrings,
-							)
-						}
-						// What this round may spend at all, on anything. Both a fetch and a
-						// search come out of this one figure, so neither can quietly eat what
-						// was set aside for the other or for the confirming step. The margin
-						// that step keeps back for the brief comes off here too: left in, the
-						// rounds would spend it and that step would come up exactly that far
-						// short of the companies it was counting on.
-						const spendableThisRound = (): number =>
-							Math.max(
-								0,
-								(gapPolicy?.budgetCents ?? 0) -
-									cheapSpentCents -
-									gapSpentCents -
-									searchesHeldForConfirming() * SEARCH_COST_CENTS -
-									VERIFICATION_BUDGET_MARGIN_CENTS,
-							)
-						for (let gapRound = 1; gapRound <= MAX_GAP_ROUNDS; gapRound++) {
-							const openedHashes = new Set(
-								openedPages(scrapeCorpus).map(page => page.urlHash),
-							)
-							// Worked out before anything is bought, so what the round spends
-							// on fetches is known rather than assumed: reserving a fixed three
-							// would starve the searches on every round that has no cited page
-							// left to fetch, which is most of the later ones.
-							const citedWaiting = citedUnscrapedSources(
-								schemaName,
-								findings,
-								hash => openedHashes.has(hash) || citedAttempted.has(hash),
-								MAX_CITED_SCRAPES_PER_ROUND,
-							)
-							// Who the focused searches are about. A company profile searches
-							// under the anchored subject's name, which is the same name the
-							// entity guard holds the run's evidence to. A scan is handed it
-							// and ignores it: every company it found carries its own name.
-							const perFieldGaps = needsPerFieldSearch({
-								findings,
-								schemaName,
-								subjectName: entityName,
-							})
-							const unbought = perFieldGaps.filter(
-								target => !gapsSearched.has(perFieldSearchKey(target)),
-							)
-
-							const spendable = spendableThisRound()
-							// Fetches are bought before searches, so they are taken off first.
-							const citedToFetch = citedWaiting.slice(
-								0,
-								Math.floor(spendable / SCRAPE_COST_CENTS),
-							)
-							const perFieldTargets = perFieldSearchRound(
-								schemaName,
-								unbought,
-								gapsSearched,
-								Math.floor(
-									(spendable - citedToFetch.length * SCRAPE_COST_CENTS) /
-										SEARCH_COST_CENTS,
-								),
-							)
-
-							// Grounded and fully fetched — nothing left to close.
-							if (unbought.length === 0 && citedWaiting.length === 0) break
-							// Something left to buy and nothing to buy it with. Said out loud:
-							// a run stopped for want of money leaves the same silence as one
-							// that closed every gap, and only the first is worth acting on.
-							if (perFieldTargets.length === 0 && citedToFetch.length === 0) {
-								yield* Effect.logInfo('research.gap_rounds.stopped').pipe(
-									Effect.annotateLogs({
-										event: 'research.gap_rounds.stopped',
-										research_id: researchId,
-										round: gapRound,
-										reason: 'budget_margin',
-									}),
-								)
-								break
-							}
-							const elapsedMs =
-								DateTime.toEpochMillis(DateTime.nowUnsafe()) - runStartedAtMs
-							const thinDeadline =
-								elapsedMs >
-								runDeadlineSeconds * 1000 * GAP_ROUND_DEADLINE_FRACTION
-							if (thinDeadline) {
-								yield* Effect.logInfo('research.gap_rounds.stopped').pipe(
-									Effect.annotateLogs({
-										event: 'research.gap_rounds.stopped',
-										research_id: researchId,
-										round: gapRound,
-										reason: 'deadline_margin',
-									}),
-								)
-								break
-							}
-							// Counted here, past every stop check: the body below can leave by
-							// several different exits, so a round counted at the end would go
-							// unreported whenever it takes one of them. What the round set out
-							// to buy is remembered here for the same reason, so a later round
-							// moves on rather than asking the same question again.
-							for (const target of perFieldTargets) {
-								gapsSearched.add(perFieldSearchKey(target))
-							}
-							gapRounds++
-							yield* recordProgress
-							const roundHashes: string[] = []
-							// Fetch the cited pages first: cheap certainty about sources
-							// the run already leans on.
-							yield* Effect.forEach(
-								citedToFetch,
-								citedUrl =>
-									Effect.gen(function* () {
-										// Mark the attempt (fetched, empty, or errored) so a page that
-										// yields nothing is not re-fetched next round.
-										citedAttempted.add(urlHashForScrape(citedUrl))
-										if (isUnsupportedScrapeUrl(citedUrl)) return
-										const cited = yield* gapScrape.scrape({
-											url: citedUrl,
-											formats: ['markdown'],
-										})
-										// Charged once the fetch is back, so a URL that errors out
-										// leaves the round's remaining budget intact.
-										gapSpentCents += SCRAPE_COST_CENTS
-										if (
-											cited.markdown !== undefined &&
-											cited.markdown.trim().length > 0
-										) {
-											gatheredAddresses.add(cited.url)
-											for (const linked of linkedAddresses(cited.markdown)) {
-												gatheredAddresses.add(linked)
-											}
-											const citedHash = urlHashForScrape(cited.url)
-											roundHashes.push(citedHash)
-											scrapeCorpus.push({
-												urlHash: citedHash,
-												text: cited.markdown,
-												host: domainHost(cited.resolvedUrl ?? cited.url),
-												kind: 'page',
-											})
-										}
-									}).pipe(
-										// Let a pure interruption (cancel/deploy) unwind the run instead of
-										// being logged as a skip while the loop keeps spending.
-										Effect.catchCause(cause =>
-											Cause.hasInterruptsOnly(cause)
-												? Effect.failCause(cause)
-												: Effect.logInfo(
-														'research.gap_rounds.cited_scrape_skipped',
-													).pipe(
-														Effect.annotateLogs({
-															event: 'research.gap_rounds.cited_scrape_skipped',
-															research_id: researchId,
-															url: citedUrl,
-															cause: Cause.pretty(cause),
-														}),
-													),
-										),
-									),
-								{ concurrency: GAP_ROUND_CONCURRENCY },
-							)
-							// Cited pages fetched: re-judge the kept fields against them
-							// right away — the point of fetching is that a wrong-company
-							// page can now void the field it sourced, no LLM call needed.
-							// Fields this round took away because a page it fetched turned out
-							// to be about somebody else. Held for the round's end: taking a
-							// field away is work the round did, and a round judged on what it
-							// gained alone would read as having done nothing.
-							let voidedThisRound = 0
-							// Same as the per-source guard above: with no keys there is nothing
-							// to re-judge the fetched pages against, so the round voids no
-							// field and the run's own answer says the check was skipped.
-							if (roundHashes.length > 0 && entityTargets) {
-								const gapOpenedByHash = new Map(
-									openedPages(scrapeCorpus).map(
-										page =>
-											[
-												page.urlHash,
-												{ text: page.text, host: page.host },
-											] as const,
-									),
-								)
-								const recheck = guardEntitySources(
-									findings,
-									entityTargets,
-									sourceId => gapOpenedByHash.get(urlHashForScrape(sourceId)),
-								)
-								findings = recheck.findings
-								voidedThisRound = recheck.droppedOffEntity
-								if (recheck.droppedOffEntity > 0) {
-									if (entityMatch === 'strong') entityMatch = 'weak'
-									yield* Effect.logWarning(
-										'research.gap_rounds.cited_voided',
-									).pipe(
-										Effect.annotateLogs({
-											event: 'research.gap_rounds.cited_voided',
-											research_id: researchId,
-											dropped: recheck.droppedOffEntity,
-										}),
-									)
-								}
-							}
-							// Nothing missing: the cited fetches were the whole round —
-							// link them and let the next round's top check close the loop.
-							if (perFieldTargets.length === 0) {
-								if (roundHashes.length > 0) yield* linkRunSources(roundHashes)
-								continue
-							}
-							// Counted as they fire rather than from the batch's length: the
-							// clock check below turns searches away once the batch is drawn
-							// up, and reporting the length would say the run went looking for
-							// companies it never reached.
-							let perFieldFired = 0
-							yield* Effect.forEach(
-								perFieldTargets,
-								target =>
-									Effect.gen(function* () {
-										// Checked per search, not once for the batch: a round of
-										// these is long enough to cross the whole-run deadline
-										// part way through, and crossing it does not degrade the
-										// run, it destroys it — the timeout fails the run and its
-										// findings are replaced with an error.
-										const searchElapsedMs =
-											DateTime.toEpochMillis(DateTime.nowUnsafe()) -
-											runStartedAtMs
-										if (
-											searchElapsedMs >
-											runDeadlineSeconds * 1000 * GAP_ROUND_DEADLINE_FRACTION
-										)
-											return
-										perFieldFired++
-										if (target.field === 'website') websiteSearchesAsked++
-										gapSpentCents += SEARCH_COST_CENTS
-										const searched = yield* gapSearch
-											.search({
-												query: perFieldSearchQuery(
-													target.name,
-													hintPlace,
-													target.field,
-												),
-												limit: 3,
-												country: hintCountryCode,
-											})
-											.pipe(
-												// Let a pure interruption (cancel/deploy) unwind the run instead of
-												// being swallowed as an empty result while the loop keeps spending.
-												Effect.catchCause(cause =>
-													Cause.hasInterruptsOnly(cause)
-														? Effect.failCause(cause)
-														: Effect.succeed(null),
-												),
-											)
-										for (const item of searched?.items ?? []) {
-											const host = domainHost(item.url)
-											if (host !== undefined) searchResultHosts.add(host)
-											gatheredAddresses.add(item.url)
-											if (item.content && item.content.trim().length > 0) {
-												const hash = urlHashForScrape(item.url)
-												roundHashes.push(hash)
-												scrapeCorpus.push({
-													urlHash: hash,
-													text: item.content,
-													host,
-													kind: 'passage',
-												})
-											}
-										}
-									}),
-								{ concurrency: GAP_ROUND_CONCURRENCY },
-							)
-							// Nothing new reached the evidence — more rounds would only
-							// repeat the same searches, so the remaining gaps are treated
-							// as absent and the quality signal reports the thinness.
-							if (roundHashes.length === 0) break
-							yield* linkRunSources(roundHashes)
-							// The read below is the long part of a round, and nothing inside
-							// it watches the clock. Started too late it does not come back
-							// with less — it takes the whole run down with it, because the
-							// run's answer is written after this loop and a run past its
-							// deadline is failed rather than finished. What this round bought
-							// keeps: the evidence is held for the rest of the run, so the
-							// reading of it is what is given up, not the buying.
-							const beforeReadMs =
-								DateTime.toEpochMillis(DateTime.nowUnsafe()) - runStartedAtMs
-							if (
-								beforeReadMs >
-								runDeadlineSeconds * 1000 * GAP_ROUND_DEADLINE_FRACTION
-							) {
-								yield* Effect.logInfo('research.gap_rounds.stopped').pipe(
-									Effect.annotateLogs({
-										event: 'research.gap_rounds.stopped',
-										research_id: researchId,
-										round: gapRound,
-										reason: 'deadline_margin',
-									}),
-								)
-								break
-							}
-							// What this round just bought goes to the front, then the
-							// company's own pages. The extraction prompt fills to a character
-							// budget and stops, and a broad scan's corpus reaches that budget
-							// on the pages phase 1 already gathered — so evidence appended at
-							// the end is paid for and then never read.
-							const roundFirst = new Set(roundHashes)
-							const perFieldAnchorFirst = [...scrapeCorpus].sort((a, b) => {
-								const rank = (page: (typeof scrapeCorpus)[number]): number =>
-									roundFirst.has(page.urlHash)
-										? 0
-										: anchorHashes.has(page.urlHash)
-											? 1
-											: 2
-								return rank(a) - rank(b)
-							})
-							// A scan's answer is a list of other companies, so holding its
-							// evidence against the anchor's name would drop exactly the pages
-							// these searches went and bought — a competitor's own site does not
-							// mention the company it competes with.
-							const roundTargets = isDiscoveryScan(schemaName)
-								? null
-								: entityTargets
-							const refreshed = yield* extractStructuredFindings(
-								researchText,
-								[
-									evidenceText,
-									...seededEvidenceParts,
-									...groundedPageTexts(roundTargets, scrapeCorpus),
-								].join('\n'),
-								labelledGroundedPages(roundTargets, perFieldAnchorFirst),
-							).pipe(
-								// A round is a best-effort extra. A vendor that times out on the
-								// enlarged evidence must not take the run down with it: what the
-								// run already found is worth keeping, and it is what a person
-								// asked for. A cancel or a deploy still unwinds the run.
-								Effect.catchCause(cause =>
-									Cause.hasInterruptsOnly(cause)
-										? Effect.failCause(cause)
-										: Effect.logWarning('research.gap_rounds.refresh_failed')
-												.pipe(
-													Effect.annotateLogs({
-														event: 'research.gap_rounds.refresh_failed',
-														research_id: researchId,
-														round: gapRound,
-														cause: Cause.pretty(cause),
-													}),
-												)
-												.pipe(Effect.as(null)),
-								),
-							)
-							if (refreshed === null) break
-							const merged = mergePerFieldSearch(
-								findings,
-								refreshed.findings,
-								schemaName,
-								wordsTheRunBrings,
-							)
-							findings = merged.findings
-							// Nothing has judged this list yet: every extraction was judged on
-							// its own and then folded in, so an address one round condemned for
-							// one company can still be standing on a row another round carried
-							// in. Judged here against every claim the run has read, and after
-							// each fold rather than once at the end, so what the next round
-							// searches for is what the list is actually missing.
-							const foldedWebsites = yield* checkWebsites(findings, 'folded')
-							findings = foldedWebsites.check.findings
-							blankedAfterFolds += foldedWebsites.blanked
-							yield* Effect.annotateCurrentSpan({
-								'research.gap_rounds.round': gapRound,
-								'research.per_field_search.fired': perFieldFired,
-								'research.per_field_search.filled': merged.filled,
-								'research.per_field_search.added': merged.added,
-								'research.per_field_search.folded': merged.folded,
-								// What only a folded list could show: an address no single
-								// extraction had the evidence to condemn, over every round so far.
-								'research.websites.blanked_folded': blankedAfterFolds,
-								'research.gap_rounds.contacts_kept':
-									contactFill(findings).named,
-								'research.gap_rounds.titled_kept': contactFill(findings).titled,
-							})
-							yield* Effect.logInfo('research.gap_rounds.closed').pipe(
-								Effect.annotateLogs({
-									event: 'research.gap_rounds.closed',
-									research_id: researchId,
-									round: gapRound,
-									cited_fetched: citedToFetch.length,
-									fired: perFieldFired,
-									filled: merged.filled,
-									added: merged.added,
-									// Ordinarily none, and not every one is a mistake — but a
-									// company this round found and never shipped is counted here
-									// and nowhere else.
-									folded: merged.folded,
-								}),
-							)
-							// This round put new evidence in front of the model and nothing
-							// about the answer moved at all — so the gaps that are left are not
-							// going to close, and another round would buy the same nothing. A
-							// scan cites a page or three per company, so waiting for the cited
-							// pages to run out first would never stop it.
-							//
-							// Every way a round can change the answer counts here, not only
-							// the two that read as gains. A company written twice becoming a
-							// company written once carries the blanks of both onto the row
-							// that stays; a run about a single company can only ever gain
-							// people, never companies; and a round that takes away an address
-							// belonging to somebody else has opened a gap the next round can
-							// go and fill. Judged on gains alone, each of those reads as a
-							// round that did nothing, and the run stops with the rest of the
-							// list never asked about.
-							if (
-								roundChangedNothing({
-									filled: merged.filled,
-									added: merged.added,
-									folded: merged.folded,
-									contactsChanged: merged.contactsChanged,
-									websitesBlanked: foldedWebsites.blanked,
-									fieldsVoided: voidedThisRound,
-								})
-							)
-								break
-						}
-						// How far the rounds reached, counted in companies: a cap on searches
-						// says nothing about how much of the list was served, and a company
-						// left with no site of its own has to be reached some other way
-						// before anybody can use it. Silent when the rounds served the whole
-						// list, which has nothing to report.
-						const listedRows = discoveryRows(schemaName, findings)
-						const withoutWebsite = rowsMissing(listedRows, 'website')
-						if (withoutWebsite > 0) {
-							yield* Effect.logInfo('research.gap_rounds.unreached').pipe(
-								Effect.annotateLogs({
-									event: 'research.gap_rounds.unreached',
-									research_id: researchId,
-									listed: listedRows.length,
-									without_website: withoutWebsite,
-									asked: websiteSearchesAsked,
-									rounds: gapRounds,
-								}),
-							)
-						}
-						yield* Ref.update(toolLog, log => [
-							...log,
-							{
-								timestamp: DateTime.formatIso(DateTime.nowUnsafe()),
-								type: 'result' as const,
-								tool: 'llm.generateObject',
-								output: { schema: schemaName },
-							},
-						])
-						// Skip this write if the run was cancelled during phase 2, so a
-						// stopped run keeps its 'cancelled' state instead of gaining findings.
+					// Commit the phase-1 checkpoint and its source links together, so a
+					// crash between them can't leave a run citing sources it never
+					// recorded. The status guard mirrors the terminal writes: a run
+					// cancelled mid-loop keeps its 'cancelled' row rather than having this
+					// overwrite it with partial progress.
+					//
+					// `research_text` is deliberately NOT written. The only thing that ever
+					// read it back was the resume that skipped phase 1, and no run can
+					// resume — so it was a raw provider transcript, twelve kilobytes of
+					// search-result JSON per run, stored for a reader that does not exist.
+					// The transcript still does its real job in memory, where it is what
+					// phase 2 grounds on.
+					yield* Effect.gen(function* () {
 						yield* sql`
 							UPDATE research_runs
-							SET phase = 2,
-								findings = ${JSON.stringify(findings)},
+							SET phase = 1,
+								entity_match = ${entityMatch},
 								updated_at = now()
 							WHERE id = ${researchId} AND status = 'running'
 						`
+
+						// Link every page scraped across the loop's rounds — plus the
+						// anchor site and any register entry seeded before the loop — to
+						// the run so findings cite real sources (a discovery-scan retry
+						// may have linked some already — ON CONFLICT makes the re-link a
+						// no-op).
+						yield* linkRunSources([
+							...loopResult.scrapedUrlHashes,
+							...seededAnchorHashes,
+							...seededRegistryHashes,
+						])
+					}).pipe(sql.withTransaction)
+
+					// ── Phase 2: Structured output ──
+					// Opened here and closed once the findings settle, so extraction and
+					// the gap rounds inside it are bracketed rather than showing up as a
+					// lone result nothing asked for.
+					const phase2StartedAtMs = DateTime.toEpochMillis(DateTime.nowUnsafe())
+					yield* Ref.update(toolLog, log => [
+						...log,
+						{
+							timestamp: new Date(phase2StartedAtMs).toISOString(),
+							type: 'call' as const,
+							tool: 'llm.generateObject',
+							input: { phase: 2, schema: schemaName },
+						},
+					])
+					let findings: unknown
+					// The company's own (anchor-seeded) pages. Both the first extraction
+					// and the gap rounds below put them ahead of everything else, so the
+					// set is built once here rather than inside either.
+					const anchorHashes = new Set(seededAnchorHashes)
+					if (retryFindings !== undefined) {
+						// The discovery-scan retry path already ran extraction under the
+						// shared budget — reuse those findings.
+						findings = retryFindings
+					} else {
+						// Fill the phase-2 page budget with the company's own
+						// (anchor-seeded) pages first, so if the budget truncates it drops
+						// third-party pages, never the official site the run grounds on.
+						const anchorFirstCorpus = [...scrapeCorpus].sort(
+							(a, b) =>
+								(anchorHashes.has(a.urlHash) ? 0 : 1) -
+								(anchorHashes.has(b.urlHash) ? 0 : 1),
+						)
+						const extracted = yield* extractStructuredFindings(
+							researchText,
+							[
+								evidenceText,
+								...seededEvidenceParts,
+								...groundedPageTexts(entityTargets, scrapeCorpus),
+							].join('\n'),
+							labelledGroundedPages(entityTargets, anchorFirstCorpus),
+						)
+						findings = extracted.findings
+						// A company field dropped for coming from a person page or a social
+						// post means the strong whole-corpus match was partly built on a
+						// source that can't speak for the company. Downgrade the verdict so
+						// the run reports honestly (and the quality signal sees it).
+						if (extracted.entityFieldsDropped > 0 && entityMatch === 'strong') {
+							entityMatch = 'weak'
+							yield* Effect.logWarning(
+								'research.entity.downgraded_source',
+							).pipe(
+								Effect.annotateLogs({
+									event: 'research.entity.downgraded_source',
+									research_id: researchId,
+								}),
+							)
+						}
 					}
+					// Gap rounds: for each high-value fact the broad pass and the
+					// focused rescues still left empty, first fetch the cited
+					// pages the run never opened (turning the per-source check's
+					// fail-open into a real verdict on the cited page), then fire one
+					// focused web search per missing fact, and re-extract over the
+					// enlarged evidence.
+					//
+					// The gaps are read per subject, so a scan's list is reached the
+					// same way a single company profile is: one company missing its
+					// website is a gap exactly as a profile missing its country is.
+					// This sits outside the branch above so a scan that came back thin
+					// gets its rounds too — it takes the refined-retry path, and it is
+					// the run with the most left to fill in.
+					//
+					// Loops while the gaps keep closing — hard-capped, and every round
+					// first checks the wall-clock and budget margin, because finishing
+					// low-confidence is a result while riding into the terminal run
+					// deadline loses the run. Phase-2 runs outside the loop's Budget
+					// scope, so each round tallies its scrape/search cost into
+					// gapSpentCents to keep the margin check and the stamped cost
+					// honest.
+					const gapSearch = yield* SearchProvider
+					const gapScrape = yield* ScrapeProvider
+					// Cited pages already attempted this run (fetched, empty, or errored),
+					// so one that yields nothing is not re-fetched every round — otherwise
+					// it never enters the corpus and keeps reappearing as cited-but-unscraped.
+					const citedAttempted = new Set<string>()
+					// Every gap already searched for, so a round moves on to the
+					// companies behind it. A round takes the first few gaps it finds, and
+					// a headcount a small firm never publishes stays a gap however often
+					// it is asked — without this, those first few would take every round's
+					// searches and the rest of a long list would never be reached at all.
+					const gapsSearched = new Set<string>()
+					// Every address the check took off the list a fold produced, added up
+					// over the whole loop. Counted here rather than reported round by round,
+					// because what it answers is whether the run ever condemned an address
+					// no single extraction had the evidence to condemn — and a round that
+					// took none would otherwise overwrite the round that took one.
+					let blankedAfterFolds = 0
+					// Companies the rounds set out to ask for a site. Held apart from
+					// how many end up without one: a company never asked about and one
+					// asked about whose search found nothing want opposite fixes, and a
+					// single figure covering both cannot tell an operator which they have.
+					let websiteSearchesAsked = 0
+					const gapPolicy = (run as { paidPolicy: ResolvedPolicy | null })
+						.paidPolicy
+					// How many searches the step that confirms the list still has to buy.
+					// It runs last and spends whatever these rounds leave, so its share is
+					// set aside before they spend: a round that took the lot would turn
+					// companies the run could have stood behind into ones reported as
+					// unchecked for want of money, which says nothing about the company.
+					// Counted by the rule that step uses, so the two cannot disagree.
+					const searchesHeldForConfirming = (): number => {
+						const listField = discoveryResultField(schemaName)
+						if (listField === undefined) return 0
+						return rowsAwaitingConfirmation(
+							discoveryRows(schemaName, findings),
+							observeDirectorySites({
+								findings,
+								listField,
+								addresses: [...gatheredAddresses],
+								runWords: wordsTheRunBrings,
+							}).sites,
+							wordsTheRunBrings,
+						)
+					}
+					// What this round may spend at all, on anything. Both a fetch and a
+					// search come out of this one figure, so neither can quietly eat what
+					// was set aside for the other or for the confirming step. The margin
+					// that step keeps back for the brief comes off here too: left in, the
+					// rounds would spend it and that step would come up exactly that far
+					// short of the companies it was counting on.
+					const spendableThisRound = (): number =>
+						Math.max(
+							0,
+							(gapPolicy?.budgetCents ?? 0) -
+								cheapSpentCents -
+								gapSpentCents -
+								searchesHeldForConfirming() * SEARCH_COST_CENTS -
+								VERIFICATION_BUDGET_MARGIN_CENTS,
+						)
+					// A gap round is the longest quiet stretch of a run — searches, scrapes
+					// and a re-extraction, ten minutes of it on a live scan, with nothing in
+					// the run's own tool log between the last phase-1 entry and the
+					// extraction result. One entry per round that really ran, written when
+					// the round is over so it can carry how long it took.
+					//
+					// Written from exactly two places — the top of the next turn of the loop,
+					// and once after it — because eight different conditions end a round and
+					// a write at each of them is eight chances to add a ninth and miss it.
+					// Whichever way a round leaves, the next turn or the loop's end closes
+					// it. There is no matching entry when the round OPENS: a run that dies
+					// mid-round would not persist one anyway, since `tool_log` reaches the
+					// row only when the run reaches a terminal state.
+					let pendingGapRound: {
+						round: number
+						startedAtMs: number
+						outcome?: Record<string, number>
+					} | null = null
+					const closePendingGapRound = Effect.gen(function* () {
+						const pending = pendingGapRound
+						if (pending === null) return
+						pendingGapRound = null
+						const endedAtMs = DateTime.toEpochMillis(DateTime.nowUnsafe())
+						yield* Ref.update(toolLog, log => [
+							...log,
+							{
+								timestamp: new Date(endedAtMs).toISOString(),
+								type: 'result' as const,
+								tool: 'research.gap_round',
+								output: { round: pending.round, ...(pending.outcome ?? {}) },
+								// Clamped, because this is wall-clock rather than a monotonic
+								// reading: a machine whose clock steps back mid-run would
+								// otherwise report a round that took less than no time.
+								durationMs: Math.max(0, endedAtMs - pending.startedAtMs),
+							},
+						])
+					})
+					for (let gapRound = 1; gapRound <= MAX_GAP_ROUNDS; gapRound++) {
+						yield* closePendingGapRound
+						const openedHashes = new Set(
+							openedPages(scrapeCorpus).map(page => page.urlHash),
+						)
+						// Worked out before anything is bought, so what the round spends
+						// on fetches is known rather than assumed: reserving a fixed three
+						// would starve the searches on every round that has no cited page
+						// left to fetch, which is most of the later ones.
+						const citedWaiting = citedUnscrapedSources(
+							schemaName,
+							findings,
+							hash => openedHashes.has(hash) || citedAttempted.has(hash),
+							MAX_CITED_SCRAPES_PER_ROUND,
+						)
+						// Who the focused searches are about. A company profile searches
+						// under the anchored subject's name, which is the same name the
+						// entity guard holds the run's evidence to. A scan is handed it
+						// and ignores it: every company it found carries its own name.
+						const perFieldGaps = needsPerFieldSearch({
+							findings,
+							schemaName,
+							subjectName: entityName,
+						})
+						const unbought = perFieldGaps.filter(
+							target => !gapsSearched.has(perFieldSearchKey(target)),
+						)
+
+						const spendable = spendableThisRound()
+						// Fetches are bought before searches, so they are taken off first.
+						const citedToFetch = citedWaiting.slice(
+							0,
+							Math.floor(spendable / SCRAPE_COST_CENTS),
+						)
+						const perFieldTargets = perFieldSearchRound(
+							schemaName,
+							unbought,
+							gapsSearched,
+							Math.floor(
+								(spendable - citedToFetch.length * SCRAPE_COST_CENTS) /
+									SEARCH_COST_CENTS,
+							),
+						)
+
+						// Grounded and fully fetched — nothing left to close.
+						if (unbought.length === 0 && citedWaiting.length === 0) break
+						// Something left to buy and nothing to buy it with. Said out loud:
+						// a run stopped for want of money leaves the same silence as one
+						// that closed every gap, and only the first is worth acting on.
+						if (perFieldTargets.length === 0 && citedToFetch.length === 0) {
+							yield* Effect.logInfo('research.gap_rounds.stopped').pipe(
+								Effect.annotateLogs({
+									event: 'research.gap_rounds.stopped',
+									research_id: researchId,
+									round: gapRound,
+									reason: 'budget_margin',
+								}),
+							)
+							break
+						}
+						const elapsedMs =
+							DateTime.toEpochMillis(DateTime.nowUnsafe()) - runStartedAtMs
+						const thinDeadline =
+							elapsedMs >
+							runDeadlineSeconds * 1000 * GAP_ROUND_DEADLINE_FRACTION
+						if (thinDeadline) {
+							yield* Effect.logInfo('research.gap_rounds.stopped').pipe(
+								Effect.annotateLogs({
+									event: 'research.gap_rounds.stopped',
+									research_id: researchId,
+									round: gapRound,
+									reason: 'deadline_margin',
+								}),
+							)
+							break
+						}
+						// Counted here, past every stop check: the body below can leave by
+						// several different exits, so a round counted at the end would go
+						// unreported whenever it takes one of them. What the round set out
+						// to buy is remembered here for the same reason, so a later round
+						// moves on rather than asking the same question again.
+						for (const target of perFieldTargets) {
+							gapsSearched.add(perFieldSearchKey(target))
+						}
+						gapRounds++
+						// Opened alongside that count and for the same reason: past every
+						// stop check, so a round the loop declined to run leaves no trace of
+						// having run. Written out on the next turn, or after the loop.
+						pendingGapRound = {
+							round: gapRound,
+							startedAtMs: DateTime.toEpochMillis(DateTime.nowUnsafe()),
+						}
+						yield* recordProgress
+						const roundHashes: string[] = []
+						// Fetch the cited pages first: cheap certainty about sources
+						// the run already leans on.
+						yield* Effect.forEach(
+							citedToFetch,
+							citedUrl =>
+								Effect.gen(function* () {
+									// Mark the attempt (fetched, empty, or errored) so a page that
+									// yields nothing is not re-fetched next round.
+									citedAttempted.add(urlHashForScrape(citedUrl))
+									if (isUnsupportedScrapeUrl(citedUrl)) return
+									const cited = yield* gapScrape.scrape({
+										url: citedUrl,
+										formats: ['markdown'],
+									})
+									// Charged once the fetch is back, so a URL that errors out
+									// leaves the round's remaining budget intact.
+									gapSpentCents += SCRAPE_COST_CENTS
+									if (
+										cited.markdown !== undefined &&
+										cited.markdown.trim().length > 0
+									) {
+										gatheredAddresses.add(cited.url)
+										for (const linked of linkedAddresses(cited.markdown)) {
+											gatheredAddresses.add(linked)
+										}
+										const citedHash = urlHashForScrape(cited.url)
+										roundHashes.push(citedHash)
+										scrapeCorpus.push({
+											urlHash: citedHash,
+											text: cited.markdown,
+											host: domainHost(cited.resolvedUrl ?? cited.url),
+											kind: 'page',
+										})
+									}
+								}).pipe(
+									// Let a pure interruption (cancel/deploy) unwind the run instead of
+									// being logged as a skip while the loop keeps spending.
+									Effect.catchCause(cause =>
+										Cause.hasInterruptsOnly(cause)
+											? Effect.failCause(cause)
+											: Effect.logInfo(
+													'research.gap_rounds.cited_scrape_skipped',
+												).pipe(
+													Effect.annotateLogs({
+														event: 'research.gap_rounds.cited_scrape_skipped',
+														research_id: researchId,
+														url: citedUrl,
+														cause: Cause.pretty(cause),
+													}),
+												),
+									),
+								),
+							{ concurrency: GAP_ROUND_CONCURRENCY },
+						)
+						// Cited pages fetched: re-judge the kept fields against them
+						// right away — the point of fetching is that a wrong-company
+						// page can now void the field it sourced, no LLM call needed.
+						// Fields this round took away because a page it fetched turned out
+						// to be about somebody else. Held for the round's end: taking a
+						// field away is work the round did, and a round judged on what it
+						// gained alone would read as having done nothing.
+						let voidedThisRound = 0
+						// Same as the per-source guard above: with no keys there is nothing
+						// to re-judge the fetched pages against, so the round voids no
+						// field and the run's own answer says the check was skipped.
+						if (roundHashes.length > 0 && entityTargets) {
+							const gapOpenedByHash = new Map(
+								openedPages(scrapeCorpus).map(
+									page =>
+										[
+											page.urlHash,
+											{ text: page.text, host: page.host },
+										] as const,
+								),
+							)
+							const recheck = guardEntitySources(
+								findings,
+								entityTargets,
+								sourceId => gapOpenedByHash.get(urlHashForScrape(sourceId)),
+							)
+							findings = recheck.findings
+							voidedThisRound = recheck.droppedOffEntity
+							if (recheck.droppedOffEntity > 0) {
+								if (entityMatch === 'strong') entityMatch = 'weak'
+								yield* Effect.logWarning(
+									'research.gap_rounds.cited_voided',
+								).pipe(
+									Effect.annotateLogs({
+										event: 'research.gap_rounds.cited_voided',
+										research_id: researchId,
+										dropped: recheck.droppedOffEntity,
+									}),
+								)
+							}
+						}
+						// Nothing missing: the cited fetches were the whole round —
+						// link them and let the next round's top check close the loop.
+						if (perFieldTargets.length === 0) {
+							if (roundHashes.length > 0) yield* linkRunSources(roundHashes)
+							continue
+						}
+						// Counted as they fire rather than from the batch's length: the
+						// clock check below turns searches away once the batch is drawn
+						// up, and reporting the length would say the run went looking for
+						// companies it never reached.
+						let perFieldFired = 0
+						yield* Effect.forEach(
+							perFieldTargets,
+							target =>
+								Effect.gen(function* () {
+									// Checked per search, not once for the batch: a round of
+									// these is long enough to cross the whole-run deadline
+									// part way through, and crossing it does not degrade the
+									// run, it destroys it — the timeout fails the run and its
+									// findings are replaced with an error.
+									const searchElapsedMs =
+										DateTime.toEpochMillis(DateTime.nowUnsafe()) -
+										runStartedAtMs
+									if (
+										searchElapsedMs >
+										runDeadlineSeconds * 1000 * GAP_ROUND_DEADLINE_FRACTION
+									)
+										return
+									perFieldFired++
+									if (target.field === 'website') websiteSearchesAsked++
+									gapSpentCents += SEARCH_COST_CENTS
+									const searched = yield* gapSearch
+										.search({
+											query: perFieldSearchQuery(
+												target.name,
+												hintPlace,
+												target.field,
+											),
+											limit: 3,
+											country: hintCountryCode,
+										})
+										.pipe(
+											// Let a pure interruption (cancel/deploy) unwind the run instead of
+											// being swallowed as an empty result while the loop keeps spending.
+											Effect.catchCause(cause =>
+												Cause.hasInterruptsOnly(cause)
+													? Effect.failCause(cause)
+													: Effect.succeed(null),
+											),
+										)
+									for (const item of searched?.items ?? []) {
+										const host = domainHost(item.url)
+										if (host !== undefined) searchResultHosts.add(host)
+										gatheredAddresses.add(item.url)
+										if (item.content && item.content.trim().length > 0) {
+											const hash = urlHashForScrape(item.url)
+											roundHashes.push(hash)
+											scrapeCorpus.push({
+												urlHash: hash,
+												text: item.content,
+												host,
+												kind: 'passage',
+											})
+										}
+									}
+								}),
+							{ concurrency: GAP_ROUND_CONCURRENCY },
+						)
+						// Nothing new reached the evidence — more rounds would only
+						// repeat the same searches, so the remaining gaps are treated
+						// as absent and the quality signal reports the thinness.
+						if (roundHashes.length === 0) break
+						yield* linkRunSources(roundHashes)
+						// The read below is the long part of a round, and nothing inside
+						// it watches the clock. Started too late it does not come back
+						// with less — it takes the whole run down with it, because the
+						// run's answer is written after this loop and a run past its
+						// deadline is failed rather than finished. What this round bought
+						// keeps: the evidence is held for the rest of the run, so the
+						// reading of it is what is given up, not the buying.
+						const beforeReadMs =
+							DateTime.toEpochMillis(DateTime.nowUnsafe()) - runStartedAtMs
+						if (
+							beforeReadMs >
+							runDeadlineSeconds * 1000 * GAP_ROUND_DEADLINE_FRACTION
+						) {
+							yield* Effect.logInfo('research.gap_rounds.stopped').pipe(
+								Effect.annotateLogs({
+									event: 'research.gap_rounds.stopped',
+									research_id: researchId,
+									round: gapRound,
+									reason: 'deadline_margin',
+								}),
+							)
+							break
+						}
+						// What this round just bought goes to the front, then the
+						// company's own pages. The extraction prompt fills to a character
+						// budget and stops, and a broad scan's corpus reaches that budget
+						// on the pages phase 1 already gathered — so evidence appended at
+						// the end is paid for and then never read.
+						const roundFirst = new Set(roundHashes)
+						const perFieldAnchorFirst = [...scrapeCorpus].sort((a, b) => {
+							const rank = (page: (typeof scrapeCorpus)[number]): number =>
+								roundFirst.has(page.urlHash)
+									? 0
+									: anchorHashes.has(page.urlHash)
+										? 1
+										: 2
+							return rank(a) - rank(b)
+						})
+						// A scan's answer is a list of other companies, so holding its
+						// evidence against the anchor's name would drop exactly the pages
+						// these searches went and bought — a competitor's own site does not
+						// mention the company it competes with.
+						const roundTargets = isDiscoveryScan(schemaName)
+							? null
+							: entityTargets
+						const refreshed = yield* extractStructuredFindings(
+							researchText,
+							[
+								evidenceText,
+								...seededEvidenceParts,
+								...groundedPageTexts(roundTargets, scrapeCorpus),
+							].join('\n'),
+							labelledGroundedPages(roundTargets, perFieldAnchorFirst),
+						).pipe(
+							// A round is a best-effort extra. A vendor that times out on the
+							// enlarged evidence must not take the run down with it: what the
+							// run already found is worth keeping, and it is what a person
+							// asked for. A cancel or a deploy still unwinds the run.
+							Effect.catchCause(cause =>
+								Cause.hasInterruptsOnly(cause)
+									? Effect.failCause(cause)
+									: Effect.logWarning('research.gap_rounds.refresh_failed')
+											.pipe(
+												Effect.annotateLogs({
+													event: 'research.gap_rounds.refresh_failed',
+													research_id: researchId,
+													round: gapRound,
+													cause: Cause.pretty(cause),
+												}),
+											)
+											.pipe(Effect.as(null)),
+							),
+						)
+						if (refreshed === null) break
+						const merged = mergePerFieldSearch(
+							findings,
+							refreshed.findings,
+							schemaName,
+							wordsTheRunBrings,
+						)
+						findings = merged.findings
+						// Nothing has judged this list yet: every extraction was judged on
+						// its own and then folded in, so an address one round condemned for
+						// one company can still be standing on a row another round carried
+						// in. Judged here against every claim the run has read, and after
+						// each fold rather than once at the end, so what the next round
+						// searches for is what the list is actually missing.
+						const foldedWebsites = yield* checkWebsites(findings, 'folded')
+						findings = foldedWebsites.check.findings
+						blankedAfterFolds += foldedWebsites.blanked
+						yield* Effect.annotateCurrentSpan({
+							'research.gap_rounds.round': gapRound,
+							'research.per_field_search.fired': perFieldFired,
+							'research.per_field_search.filled': merged.filled,
+							'research.per_field_search.added': merged.added,
+							'research.per_field_search.folded': merged.folded,
+							// What only a folded list could show: an address no single
+							// extraction had the evidence to condemn, over every round so far.
+							'research.websites.blanked_folded': blankedAfterFolds,
+							'research.gap_rounds.contacts_kept': contactFill(findings).named,
+							'research.gap_rounds.titled_kept': contactFill(findings).titled,
+						})
+						if (pendingGapRound !== null)
+							pendingGapRound.outcome = {
+								citedFetched: citedToFetch.length,
+								searches: perFieldFired,
+								filled: merged.filled,
+								added: merged.added,
+							}
+						yield* Effect.logInfo('research.gap_rounds.closed').pipe(
+							Effect.annotateLogs({
+								event: 'research.gap_rounds.closed',
+								research_id: researchId,
+								round: gapRound,
+								cited_fetched: citedToFetch.length,
+								fired: perFieldFired,
+								filled: merged.filled,
+								added: merged.added,
+								// Ordinarily none, and not every one is a mistake — but a
+								// company this round found and never shipped is counted here
+								// and nowhere else.
+								folded: merged.folded,
+							}),
+						)
+						// This round put new evidence in front of the model and nothing
+						// about the answer moved at all — so the gaps that are left are not
+						// going to close, and another round would buy the same nothing. A
+						// scan cites a page or three per company, so waiting for the cited
+						// pages to run out first would never stop it.
+						//
+						// Every way a round can change the answer counts here, not only
+						// the two that read as gains. A company written twice becoming a
+						// company written once carries the blanks of both onto the row
+						// that stays; a run about a single company can only ever gain
+						// people, never companies; and a round that takes away an address
+						// belonging to somebody else has opened a gap the next round can
+						// go and fill. Judged on gains alone, each of those reads as a
+						// round that did nothing, and the run stops with the rest of the
+						// list never asked about.
+						if (
+							roundChangedNothing({
+								filled: merged.filled,
+								added: merged.added,
+								folded: merged.folded,
+								contactsChanged: merged.contactsChanged,
+								websitesBlanked: foldedWebsites.blanked,
+								fieldsVoided: voidedThisRound,
+							})
+						)
+							break
+					}
+
+					// Whichever way the last round left — finished, or out through one of
+					// the breaks — this is what closes it.
+					yield* closePendingGapRound
+					// How far the rounds reached, counted in companies: a cap on searches
+					// says nothing about how much of the list was served, and a company
+					// left with no site of its own has to be reached some other way
+					// before anybody can use it. Silent when the rounds served the whole
+					// list, which has nothing to report.
+					const listedRows = discoveryRows(schemaName, findings)
+					const withoutWebsite = rowsMissing(listedRows, 'website')
+					if (withoutWebsite > 0) {
+						yield* Effect.logInfo('research.gap_rounds.unreached').pipe(
+							Effect.annotateLogs({
+								event: 'research.gap_rounds.unreached',
+								research_id: researchId,
+								listed: listedRows.length,
+								without_website: withoutWebsite,
+								asked: websiteSearchesAsked,
+								rounds: gapRounds,
+							}),
+						)
+					}
+					const phase2EndedAtMs = DateTime.toEpochMillis(DateTime.nowUnsafe())
+					yield* Ref.update(toolLog, log => [
+						...log,
+						{
+							timestamp: new Date(phase2EndedAtMs).toISOString(),
+							type: 'result' as const,
+							tool: 'llm.generateObject',
+							output: { schema: schemaName, gapRounds },
+							durationMs: Math.max(0, phase2EndedAtMs - phase2StartedAtMs),
+						},
+					])
+					// Skip this write if the run was cancelled during phase 2, so a
+					// stopped run keeps its 'cancelled' state instead of gaining findings.
+					yield* sql`
+						UPDATE research_runs
+						SET phase = 2,
+							findings = ${JSON.stringify(findings)},
+							updated_at = now()
+						WHERE id = ${researchId} AND status = 'running'
+					`
 
 					// ── Existence verification ──
 					// Nothing so far has asked whether the companies on a scan's list are
@@ -6375,9 +6494,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// extraction and the gap rounds extract again and fold the results
 					// together. A row that entered as a candidate would stay one after a
 					// later round found the very website that confirms it. This sits after
-					// the last fold, on the list the run actually reports — and outside the
-					// branch above, so a run resumed from a phase-2 checkpoint is verified
-					// too rather than reporting every row unchecked.
+					// the last fold, on the list the run actually reports.
 
 					// How the list split, carried out of the block so the brief and the
 					// quality signal can report it. Stays undefined for a run that had no
@@ -6695,6 +6812,18 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							language: briefLang,
 						})
 
+						const phase3StartedAtMs = DateTime.toEpochMillis(
+							DateTime.nowUnsafe(),
+						)
+						yield* Ref.update(toolLog, log => [
+							...log,
+							{
+								timestamp: new Date(phase3StartedAtMs).toISOString(),
+								type: 'call' as const,
+								tool: 'llm.generateText',
+								input: { phase: 3 },
+							},
+						])
 						const briefResponse = yield* writerLlm.generateText({
 							prompt: buildBriefPrompt({
 								schemaName,
@@ -6734,13 +6863,15 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						// never shows the model's reasoning.
 						const briefText = stripReasoning(briefResponse.text)
 
+						const phase3EndedAtMs = DateTime.toEpochMillis(DateTime.nowUnsafe())
 						yield* Ref.update(toolLog, log => [
 							...log,
 							{
-								timestamp: DateTime.formatIso(DateTime.nowUnsafe()),
+								timestamp: new Date(phase3EndedAtMs).toISOString(),
 								type: 'result' as const,
 								tool: 'llm.generateText',
 								output: { phase: 3, briefLength: briefText.length },
+								durationMs: Math.max(0, phase3EndedAtMs - phase3StartedAtMs),
 							},
 						])
 
@@ -7520,11 +7651,18 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							-- so the detail view can show why the run failed.
 							SELECT r.*, r.findings->>'error' AS error_message,
 								COALESCE(
+									-- No per-source cost. Nothing attributes one: a search is paid
+									-- once and hands back many sources, a scrape is paid per page,
+									-- and the column has only ever been written as a literal zero.
+									-- Publishing it put a zero on all 131 sources of a run that
+									-- really spent 10 cents, which reads as "these cost nothing"
+									-- rather than "nobody worked this out" -- the same trap
+									-- sources_matched was taken out of the scan block for. What the
+									-- run really spent is on the run itself, in its cost breakdown.
 									(SELECT json_agg(json_build_object(
 										'source_id', rs.source_id,
 										'local_ref', rs.local_ref,
 										'fetched_at', rs.fetched_at,
-										'cost_cents', rs.cost_cents,
 										'source', json_build_object(
 											'id', s.id,
 											'kind', s.kind,

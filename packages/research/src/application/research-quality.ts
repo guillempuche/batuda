@@ -54,9 +54,9 @@ export interface RunQualityInput {
 	 * company: there the checks have nothing to check, which costs nothing.
 	 */
 	readonly subjectUnreadable: boolean
-	/** Reflect-loop rounds phase 1 ran (0 on a resume). */
+	/** Reflect-loop rounds phase 1 ran. */
 	readonly rounds: number
-	/** Gap-closing rounds phase 2 ran after the first extraction (0 on a resume). */
+	/** Gap-closing rounds phase 2 ran after the first extraction. */
 	readonly gapRounds: number
 	/** Distinct sources the run fetched. */
 	readonly sourcesTotal: number

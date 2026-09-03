@@ -148,8 +148,8 @@ export const verifyValueProvenance = (
 		// no email or digits for the check above to catch, so a made-up one (a wrong
 		// city, a company that never operated there) would otherwise sail through.
 		// Hold its wording to the evidence too. Skipped when there is no evidence to
-		// check against, as on a resumed run, so a real value is never dropped for
-		// want of a corpus.
+		// check against at all, so a real value is never dropped for want of a
+		// corpus.
 		if (PAGE_LITERAL_FIELDS.has(key) && ev.lowerCorpus.length > 0) {
 			return isInCorpus(value, ev.lowerCorpus)
 		}

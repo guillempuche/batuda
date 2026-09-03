@@ -603,7 +603,8 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 						}
 						// Universal fallback (paid) when no registry hit. runEnrichmentChain
 						// bills + calls each configured vendor; the idempotency key names the
-						// vendor so a resumed run re-charges it as a DB no-op, not a re-pay.
+						// vendor, so asking the same one twice in a run is a DB no-op rather
+						// than a second charge.
 						//
 						// A company with no website is skipped here rather than asked about:
 						// every vendor is keyed on the domain, so the call could only come

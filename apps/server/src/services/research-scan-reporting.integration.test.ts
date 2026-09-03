@@ -297,6 +297,20 @@ let userId: string
 let anchorCompanyId: string
 const createdRunIds: string[] = []
 
+// One line of the run's own tool log, as a finished run stores it.
+interface StoredToolLogEntry {
+	readonly timestamp?: string
+	readonly type?: string
+	readonly tool?: string
+	readonly durationMs?: number
+	readonly input?: { readonly phase?: number; readonly round?: number }
+	readonly output?: {
+		readonly phase?: number
+		readonly round?: number
+		readonly gapRounds?: number
+	}
+}
+
 // What a finished run says about the parts of its request, read off its findings.
 interface StoredCoverage {
 	readonly covered?: ReadonlyArray<string>
@@ -321,6 +335,9 @@ const runScan = async (args: {
 	splitterAsked: boolean
 	extractions: number
 	briefPrompt: string
+	toolLog: ReadonlyArray<StoredToolLogEntry>
+	citationsSeen: number | undefined
+	citationsKept: number | undefined
 }> => {
 	scenario = args.scenario
 	firedEvents = []
@@ -372,8 +389,9 @@ const runScan = async (args: {
 					return yield* poll(attemptsLeft - 1)
 				})
 			const status = yield* poll(120)
-			const [row] = yield* sql<{ findings: unknown }>`
-				SELECT findings FROM research_runs WHERE id = ${created.id}::uuid
+			const [row] = yield* sql<{ findings: unknown; toolLog: unknown }>`
+				SELECT findings, tool_log AS "toolLog"
+				FROM research_runs WHERE id = ${created.id}::uuid
 			`
 			const findings = row?.findings
 			const quality =
@@ -383,6 +401,8 @@ const runScan = async (args: {
 								quality?: {
 									coverage?: StoredCoverage
 									searching_stopped?: string
+									citations_seen?: number
+									citations_kept?: number
 								}
 							}
 						).quality
@@ -396,6 +416,11 @@ const runScan = async (args: {
 				splitterAsked: splitterCalls > 0,
 				extractions: extractionCalls,
 				briefPrompt,
+				toolLog: Array.isArray(row?.toolLog)
+					? (row.toolLog as ReadonlyArray<StoredToolLogEntry>)
+					: [],
+				citationsSeen: quality?.citations_seen,
+				citationsKept: quality?.citations_kept,
 			}
 		}),
 	)
@@ -696,6 +721,183 @@ describe('what a discovery scan reports about itself', () => {
 			expect(result.covering).toBe(false)
 			expect(result.status).toBe('succeeded')
 			expect(result.coverage?.uncovered).toEqual([])
+		}, 60_000)
+	})
+
+	describe('what a finished run records about its own work', () => {
+		it('should bracket every call it logs with a result that carries a duration', async () => {
+			// GIVEN an ordinary scan
+			const result = await runScan({
+				schemaName: 'prospect_scan_v1',
+				query: 'empresas de instalaciones eléctricas en España',
+				scenario: {
+					evidence: 'Electro Instal SL — instalaciones eléctricas en Madrid.',
+					findings: [
+						{
+							prospects: [
+								{
+									name: 'Electro Instal SL',
+									why_relevant: 'Instalaciones eléctricas en Madrid',
+									citations: [],
+								},
+							],
+						},
+					],
+				},
+			})
+
+			// THEN every call has a result, and every result says how long the work
+			//   between them took. Both entries of a pair used to be written after
+			//   the work returned, so they carried the same instant and a fourteen
+			//   minute run read as eight things that each took no time.
+			const calls = result.toolLog.filter(entry => entry.type === 'call')
+			const results = result.toolLog.filter(entry => entry.type === 'result')
+			expect(calls.length).toBeGreaterThan(0)
+			for (const call of calls) {
+				expect(results.some(entry => entry.tool === call.tool)).toBe(true)
+			}
+			// AND the log reads in the order things happened. The round's opening
+			//   entry was once stamped at the round's start but appended after the
+			//   provider results it precedes, so sorting by timestamp reordered the
+			//   array away from the order the work actually ran in.
+			const stamps = result.toolLog.map(entry =>
+				Date.parse(entry.timestamp ?? ''),
+			)
+			expect(stamps).toEqual([...stamps].sort((a, b) => a - b))
+			// AND no round is reported that never ran. The gap-round entry used to be
+			//   written when the loop turned rather than when a round was actually
+			//   taken, so a run that closed every gap still reported one.
+			const gapRounds = result.toolLog.filter(
+				entry => entry.tool === 'research.gap_round',
+			)
+			const phase2 = result.toolLog.find(
+				entry => entry.type === 'result' && entry.tool === 'llm.generateObject',
+			)
+			expect(gapRounds.length).toBe(phase2?.output?.gapRounds ?? 0)
+			// AND the gathering round in particular is timed. Keyed on the round
+			//   rather than on the tool name, because the writer that produces the
+			//   brief is another `llm.generateText` — matched by name alone, its
+			//   duration stands in for the round's and the round can quietly stop
+			//   carrying one without a test noticing.
+			const roundCall = result.toolLog.find(
+				entry =>
+					entry.type === 'call' &&
+					entry.tool === 'llm.generateText' &&
+					entry.input?.round === 1,
+			)
+			const roundResult = result.toolLog.find(
+				entry =>
+					entry.type === 'result' &&
+					entry.tool === 'llm.generateText' &&
+					entry.output?.round === 1,
+			)
+			expect(roundCall).toBeDefined()
+			expect(roundResult).toBeDefined()
+			// The model here answers within the same millisecond, so what this can
+			//   show is that a duration was measured and recorded — not that it is
+			//   more than zero. That is the property that broke: both entries were
+			//   written after the round returned and no duration was recorded at all.
+			expect(roundResult?.durationMs).toBeGreaterThanOrEqual(0)
+			// AND every timestamp parses as an ordinary date, so a reader can sort
+			//   the log without knowing which library wrote it
+			for (const entry of result.toolLog) {
+				expect(Number.isNaN(Date.parse(entry.timestamp ?? ''))).toBe(false)
+			}
+		}, 60_000)
+
+		it('should log the provider calls it made, not only the ones that failed', async () => {
+			// GIVEN a scan whose searching and scraping all succeed
+			const result = await runScan({
+				schemaName: 'prospect_scan_v1',
+				query: 'empresas de fontanería en Barcelona',
+				scenario: {
+					evidence: 'Fontanería Vall SL — reformas de baños en Barcelona.',
+					findings: [
+						{
+							prospects: [
+								{
+									name: 'Fontanería Vall SL',
+									why_relevant: 'Fontanería en Barcelona',
+									citations: [],
+								},
+							],
+						},
+					],
+				},
+			})
+
+			// THEN the searches and fetches are in the run's own log. Only failures
+			//   used to be written, so a run that spent most of its money and its
+			//   clock on provider calls left no trace of any of them, and a search
+			//   that went out and found nothing read the same as one never made.
+			const tools = new Set(result.toolLog.map(entry => entry.tool))
+			expect(tools.has('web_search')).toBe(true)
+			// AND the model's own phases are still bracketed alongside them
+			expect(tools.has('llm.generateObject')).toBe(true)
+		}, 60_000)
+
+		it('should count the citations on the answer it ships', async () => {
+			// GIVEN a scan whose rows cite a page the run really fetched
+			const result = await runScan({
+				schemaName: 'prospect_scan_v1',
+				query: 'empresas de ascensores en Valencia',
+				scenario: {
+					evidence: 'Ascensores Vall SL — instalación de ascensores.',
+					findings: [
+						{
+							prospects: [
+								{
+									name: 'Ascensores Vall SL',
+									why_relevant: 'Instalación de ascensores en Valencia',
+									citations: [
+										{ source_id: SEED_URL, quote: 'Ascensores Vall SL' },
+									],
+								},
+							],
+						},
+					],
+				},
+			})
+
+			// THEN the tally describes the delivered list. It used to be assigned
+			//   inside one extraction pass while the list a reader gets is the fold
+			//   of every pass, so a live run reported 35 seen and 33 kept against 62
+			//   citations actually shipped.
+			expect(result.citationsSeen).toBe(1)
+			expect(result.citationsKept).toBe(1)
+		}, 60_000)
+
+		it('should drop a citation to a page it never fetched', async () => {
+			// GIVEN a scan whose row cites an address nothing in the run reached
+			const result = await runScan({
+				schemaName: 'prospect_scan_v1',
+				query: 'empresas de climatización en Sevilla',
+				scenario: {
+					evidence: 'Clima Sur SL — climatización industrial en Sevilla.',
+					findings: [
+						{
+							prospects: [
+								{
+									name: 'Clima Sur SL',
+									why_relevant: 'Climatización industrial en Sevilla',
+									citations: [
+										{ source_id: SEED_URL, quote: 'Clima Sur SL' },
+										{
+											source_id: 'https://invented.test/never-fetched',
+											quote: 'Clima Sur SL',
+										},
+									],
+								},
+							],
+						},
+					],
+				},
+			})
+
+			// THEN the invented one is counted as offered and not as kept, so the
+			//   pair says how much of what the model wrote was real
+			expect(result.citationsSeen).toBe(2)
+			expect(result.citationsKept).toBe(1)
 		}, 60_000)
 	})
 

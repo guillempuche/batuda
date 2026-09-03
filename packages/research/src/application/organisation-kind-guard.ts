@@ -459,7 +459,6 @@ export const dropNonCompanies = <E, R>(
 		// questions.
 		const toAsk = rows
 			.filter(row => heldFor(row) === undefined)
-			.slice()
 			.sort((a, b) => {
 				// Rows this fold cannot read keep their arrival order relative to each
 				// other; there is nothing to sort them by, and inventing one would put
