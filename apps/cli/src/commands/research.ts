@@ -628,9 +628,18 @@ const formatSummary = (summary: EvalSummary): string =>
 // What a pass of market requests got right. Silent for a pass of company profiles,
 // which has no list to judge — the figures are all null there, and printing five
 // "n/a" lines on every ordinary pass buries the ones that mean something.
+//
+// A pass whose market runs all died has no rows either, and it is the one pass
+// that must still say something: the count of runs that never came back is the
+// whole of what happened, and dropping the block would report it as a pass of
+// company profiles with no market in it at all.
 const formatMarketFigures = (summary: EvalSummary): ReadonlyArray<string> =>
 	summary.rowsPerScan === null
-		? []
+		? summary.scansThatNeverAnswered === null
+			? []
+			: [
+					`Market runs lost:       ${count(summary.scansThatNeverAnswered)} — every one of them, so there is nothing else to report`,
+				]
 		: [
 				`Rows per market:        ${decimal(summary.rowsPerScan)}`,
 				`  right kind:           ${pct(summary.organisationKindPrecision)}`,
@@ -645,6 +654,9 @@ const formatMarketFigures = (summary: EvalSummary): ReadonlyArray<string> =>
 				`  never looked for:     ${pct(summary.neverSearchedShare)} of what came back missing`,
 				`  scans that reckoned:  ${count(summary.scansReportingCoverage)}`,
 				`  thought it had them:  ${count(summary.partsThoughtAnswered)} (want nought)`,
+				`Said why they stopped:  ${count(summary.scansSayingWhyTheyStopped)}`,
+				`  of those, cut off:    ${count(summary.scansCutOff)} (their lists were cut short)`,
+				`Market runs lost:       ${count(summary.scansThatNeverAnswered)} (came back with nothing, and store no reason)`,
 			]
 
 // Which models actually did the work. A tier is configured with a first choice

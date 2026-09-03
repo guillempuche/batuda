@@ -72,6 +72,7 @@ import {
 	SCORABLE_FIELDS,
 } from './eval-scoring-types'
 import { runWordsOf } from './run-words'
+import { wasCutOff } from './search-stopped'
 
 export { contactNameMatches } from './eval-scoring-company'
 export {
@@ -269,6 +270,11 @@ export const scoreRun = (
 		outcome.companies,
 		runWordsOf(expectedMarket?.parts.flatMap(part => part.terms) ?? []),
 	)
+	// A market row whose run never came back with anything to score. Told apart
+	// from a row that asked for no market at all, because only the first is a
+	// market the pass failed to measure.
+	const marketWentUnanswered =
+		expectedMarket !== undefined && !endedWithAnAnswer(outcome.status)
 	const market: MarketScore | undefined =
 		expectedMarket === undefined || !endedWithAnAnswer(outcome.status)
 			? undefined
@@ -308,12 +314,14 @@ export const scoreRun = (
 					// answered — instead of dropping out of the figure.
 					partsAnswered: partsAnsweredBy(rightKindRows, expectedMarket.parts),
 					reportedCoverage: outcome.reportedCoverage,
+					searchingStopped: outcome.searchingStopped,
 				}
 
 	return {
 		id: expected.id,
 		grounded,
 		groundable: expected.market === undefined,
+		marketWentUnanswered,
 		wrongCompany,
 		wrongCompanyAutoApplicable,
 		lowConfidence,
@@ -360,6 +368,9 @@ export const summarizeScores = (
 			requestCoverage: null,
 			neverSearchedShare: null,
 			scansReportingCoverage: null,
+			scansSayingWhyTheyStopped: null,
+			scansCutOff: null,
+			scansThatNeverAnswered: null,
 			partsThoughtAnswered: null,
 			duplicateRate: null,
 			possibleDuplicateRate: null,
@@ -426,6 +437,11 @@ export const summarizeScores = (
 	// Counted only over the scans that stored a reckoning of their own, so the
 	// share below divides one run's words by the same run's words.
 	let scansReportingCoverage = 0
+	// Counted apart from the coverage reckoning above because a run stores this
+	// one whatever its request named, single trade or five.
+	let scansSayingWhyTheyStopped = 0
+	let scansCutOff = 0
+	let scansThatNeverAnswered = 0
 	let totalReportedMissing = 0
 	let totalReportedNeverSearched = 0
 	let totalReportedThoughtAnswered = 0
@@ -461,6 +477,7 @@ export const summarizeScores = (
 			totalContactsNamed += score.profile.contactsNamed
 			totalContactsTitled += score.profile.contactsTitled
 		}
+		if (score.marketWentUnanswered) scansThatNeverAnswered++
 		if (score.market !== undefined) {
 			scansScored++
 			totalRowsReturned += score.market.rowsReturned
@@ -476,6 +493,11 @@ export const summarizeScores = (
 			totalRowsPossiblyDuplicated += score.market.rowsPossiblyDuplicated
 			totalPartsExpected += score.market.partsExpected
 			totalPartsAnswered += score.market.partsAnswered
+			const stopped = score.market.searchingStopped
+			if (stopped !== null) {
+				scansSayingWhyTheyStopped++
+				if (wasCutOff(stopped)) scansCutOff++
+			}
 			const reckoning = score.market.reportedCoverage
 			if (reckoning !== null) {
 				scansReportingCoverage++
@@ -561,6 +583,13 @@ export const summarizeScores = (
 				? null
 				: totalReportedNeverSearched / totalReportedMissing,
 		scansReportingCoverage: scansScored === 0 ? null : scansReportingCoverage,
+		scansSayingWhyTheyStopped:
+			scansScored === 0 ? null : scansSayingWhyTheyStopped,
+		scansCutOff: scansSayingWhyTheyStopped === 0 ? null : scansCutOff,
+		scansThatNeverAnswered:
+			scansScored + scansThatNeverAnswered === 0
+				? null
+				: scansThatNeverAnswered,
 		partsThoughtAnswered:
 			scansReportingCoverage === 0 ? null : totalReportedThoughtAnswered,
 		duplicateRate: perRow(totalRowsDuplicated),

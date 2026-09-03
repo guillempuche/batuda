@@ -271,6 +271,11 @@ export const evalSpanAttributes = (
 			attributes['eval.reported_never_searched'] = reckoning.neverSearched
 			attributes['eval.reported_thought_answered'] = reckoning.thoughtAnswered
 		}
+		// Absent where the run said nothing, which is not the same as a run that
+		// finished looking.
+		if (market.searchingStopped !== null) {
+			attributes['eval.searching_stopped'] = market.searchingStopped
+		}
 		if (market.partsExpected > 0) {
 			attributes['eval.request_coverage'] =
 				market.partsAnswered / market.partsExpected
@@ -352,8 +357,19 @@ export const evalSummaryAttributes = (
 	if (summary.neverSearchedShare !== null) {
 		attributes['eval.never_searched_share'] = summary.neverSearchedShare
 	}
+	if (summary.scansSayingWhyTheyStopped !== null) {
+		attributes['eval.scans_saying_why_they_stopped'] =
+			summary.scansSayingWhyTheyStopped
+	}
+	if (summary.scansCutOff !== null) {
+		attributes['eval.scans_cut_off'] = summary.scansCutOff
+	}
+	if (summary.scansThatNeverAnswered !== null) {
+		attributes['eval.scans_that_never_answered'] =
+			summary.scansThatNeverAnswered
+	}
 	// Reported whenever any scan ran, including nought — that is the reading that
-	// says the figure above is blind rather than clean.
+	// says the never-searched share above is blind rather than clean.
 	if (summary.scansReportingCoverage !== null) {
 		attributes['eval.scans_reporting_coverage'] = summary.scansReportingCoverage
 	}

@@ -58,6 +58,21 @@ const HOW_BINDING: Record<SearchStopped, number> = {
 }
 
 /**
+ * Whether a value read back off a stored run is one of the reasons above.
+ *
+ * Needed because a finished run's findings are read back as plain JSON, so what
+ * sits there could be anything: nothing at all on a run stored before this was
+ * recorded, or a word a later build knows and this one has never heard of.
+ *
+ * Asked of `HOW_BINDING` rather than of a list of its own, so a reason added
+ * there is recognised here without anyone remembering to add it twice. Own keys
+ * only: every object answers to `toString`, and a run naming that as its reason
+ * must not read as a known one.
+ */
+export const isSearchStopped = (value: unknown): value is SearchStopped =>
+	typeof value === 'string' && Object.hasOwn(HOW_BINDING, value)
+
+/**
  * The reason to report for a run that looked in more than one stretch.
  *
  * Keeps whichever bound the run hardest, so a later stretch settling cannot
