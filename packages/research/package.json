@@ -30,6 +30,10 @@
 			"types": "./src/application/place-guard.ts",
 			"import": "./src/application/place-guard.ts"
 		},
+		"./application/prospect-hold-back": {
+			"types": "./src/application/prospect-hold-back.ts",
+			"import": "./src/application/prospect-hold-back.ts"
+		},
 		"./application/request-parts": {
 			"types": "./src/application/request-parts.ts",
 			"import": "./src/application/request-parts.ts"

@@ -454,6 +454,10 @@ msgstr "Add an org template first."
 msgid "Add as lead"
 msgstr "Add as lead"
 
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Add as unverified lead"
+msgstr "Add as unverified lead"
+
 #: src/components/instructions/stack-editor.tsx
 msgid "Add at least one template before saving."
 msgstr "Add at least one template before saving."
@@ -509,6 +513,10 @@ msgstr "Added as a verified lead"
 #: src/components/research/findings/prospect-scan-view.tsx
 msgid "Added as an unverified lead"
 msgstr "Added as an unverified lead"
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Added, but could not be marked verified"
+msgstr "Added, but could not be marked verified"
 
 #: src/components/research/findings/prospect-scan-view.tsx
 #: src/routes/settings/organization/members.tsx
