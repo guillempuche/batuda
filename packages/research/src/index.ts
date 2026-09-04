@@ -201,6 +201,7 @@ export {
 	SearchResultItem,
 } from './domain/types'
 export type { LlmTier } from './infrastructure/cached-llm'
+export { makeCachedLanguageModel } from './infrastructure/cached-llm'
 export { makeCachedScrape } from './infrastructure/cached-scrape'
 export { makeCachedSearch } from './infrastructure/cached-search'
 export {

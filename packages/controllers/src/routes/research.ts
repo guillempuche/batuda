@@ -27,9 +27,9 @@ import {
 	PendingPaidAction,
 	PendingProposal,
 	ProposedUpdateResult,
-	ResearchEvents,
 	ResearchPolicy,
 	ResearchRunDetail,
+	ResearchRunLive,
 	ResearchRunSummary,
 	ResearchSpendBucket,
 } from './research-schemas'
@@ -183,12 +183,13 @@ export const ResearchGroup = HttpApiGroup.make('research')
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
-	// GET /research/:id/events — 30-second JSON long-poll of run progress; the
-	// client re-polls until `done`. Not a raw event stream.
+	// GET /research/:id/live — server-sent events, one frame per change, held
+	// open until the run ends. Each frame is the whole of where the run is, so
+	// the page never has to fetch anything alongside it to stay current.
 	.add(
-		HttpApiEndpoint.get('events', '/research/:id/events', {
+		HttpApiEndpoint.get('live', '/research/:id/live', {
 			params: { id: Schema.String },
-			success: ResearchEvents,
+			success: HttpApiSchema.StreamSse({ data: ResearchRunLive }),
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)

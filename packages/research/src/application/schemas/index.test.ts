@@ -1,7 +1,10 @@
 import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
 
+import { discoveryResultField } from '../discovery-scan'
 import {
+	countFoundRows,
+	countPendingProposals,
 	isSchemaName,
 	resolveSchema,
 	SchemaNameSchema,
@@ -320,6 +323,103 @@ describe('schemaNameFor', () => {
 					context: { subjects: [{ table: 'companies', id: 'a' }] },
 				}),
 			).toBe('retired_shape_v1')
+		})
+	})
+})
+
+describe('countFoundRows', () => {
+	describe('when the run is a kind that hunts for companies', () => {
+		it('should count the rows it has found so far', () => {
+			// GIVEN a prospect scan partway through, holding two companies
+			const findings = { prospects: [{ name: 'A' }, { name: 'B' }] }
+
+			// THEN both are counted
+			expect(countFoundRows('prospect_scan_v1', findings)).toBe(2)
+		})
+
+		it('should count nothing rather than refuse when the list is not there yet', () => {
+			// GIVEN a scan that has started but written no companies down
+			// THEN a run underway reads as none found, not as an error
+			expect(countFoundRows('prospect_scan_v1', {})).toBe(0)
+			expect(countFoundRows('prospect_scan_v1', null)).toBe(0)
+			// AND a list that came back as something other than a list is no
+			// different: findings are written by a model, so nothing guarantees it
+			expect(countFoundRows('prospect_scan_v1', { prospects: 'lots' })).toBe(0)
+		})
+	})
+
+	describe('when each kind of hunt is asked what it found', () => {
+		it('should read the field belonging to that kind', () => {
+			// GIVEN one row under each kind's own field name
+			// THEN each is counted from its own field, never another's
+			expect(
+				countFoundRows('contact_discovery_v1', { contacts: [{ name: 'A' }] }),
+			).toBe(1)
+			expect(
+				countFoundRows('competitor_scan_v1', { competitors: [{ name: 'A' }] }),
+			).toBe(1)
+			// AND a field belonging to a different kind is not counted
+			expect(
+				countFoundRows('contact_discovery_v1', { prospects: [{ name: 'A' }] }),
+			).toBe(0)
+		})
+	})
+
+	describe('when a scan renames the list its companies live in', () => {
+		it('should read the field from the one file that names the scans', () => {
+			// GIVEN the scan schemas, whose result field is owned by discovery-scan
+			// THEN the count reads that file's answer rather than a copy of it, so
+			// the tile and the run's own thin-result guards can never disagree
+			expect(discoveryResultField('prospect_scan_v1')).toBe('prospects')
+			expect(discoveryResultField('competitor_scan_v1')).toBe('competitors')
+			expect(
+				countFoundRows('prospect_scan_v1', {
+					[discoveryResultField('prospect_scan_v1') as string]: [{}, {}],
+				}),
+			).toBe(2)
+		})
+	})
+
+	describe('when the run went looking for no list at all', () => {
+		it('should answer that there is nothing to count', () => {
+			// GIVEN a brief, which is prose, and an enrichment, which fills in one
+			// company that was already known
+			// THEN neither has a number a reader could act on, and saying "0 found"
+			// would answer a question nobody asked
+			expect(countFoundRows('freeform', { anything: [1, 2] })).toBeNull()
+			expect(countFoundRows('company_enrichment_v1', {})).toBeNull()
+			// AND a run stored before the schema column existed counts as a brief
+			expect(countFoundRows(null, {})).toBeNull()
+			// AND so does a name this build no longer has
+			expect(countFoundRows('retired_scan_v9', { prospects: [{}] })).toBeNull()
+		})
+	})
+})
+
+describe('countPendingProposals', () => {
+	describe('when a run has proposed changes in several states', () => {
+		it('should count only the ones still waiting on a decision', () => {
+			// GIVEN three proposals, two of them already decided
+			const findings = {
+				proposed_updates: [
+					{ status: 'pending' },
+					{ status: 'applied' },
+					{ status: 'rejected' },
+				],
+			}
+
+			// THEN only the undecided one is still waiting on the reader
+			expect(countPendingProposals(findings)).toBe(1)
+		})
+
+		it('should count nothing when there is nothing to decide', () => {
+			// GIVEN findings with no proposals, or none written yet
+			expect(countPendingProposals({})).toBe(0)
+			expect(countPendingProposals(null)).toBe(0)
+			expect(countPendingProposals({ proposed_updates: [] })).toBe(0)
+			// AND a proposal carrying no status at all has not been marked as
+			// waiting, so it is not claimed to be
+			expect(countPendingProposals({ proposed_updates: [{}, null] })).toBe(0)
 		})
 	})
 })

@@ -1,5 +1,7 @@
 import { Schema } from 'effect'
 
+import { discoveryResultField } from '../discovery-scan'
+import { isPlainObject } from '../guard-shapes'
 import { CompanyEnrichmentV1Schema } from './company-enrichment-v1'
 import { CompetitorScanV1Schema } from './competitor-scan-v1'
 import { ContactDiscoveryV1Schema } from './contact-discovery-v1'
@@ -158,6 +160,64 @@ export const schemaFieldNames = (schemaName: string): ReadonlyArray<string> => {
 		for (const inner of Object.keys(nested)) names.push(`${key}.${inner}`)
 	}
 	return names
+}
+
+/**
+ * The field each kind of run fills with the rows it went looking for — beyond
+ * the two open-ended scans, which are not named here.
+ *
+ * Which list holds a scan's companies is `discovery-scan.ts`'s to say, and that
+ * file is deliberately the only place the scan schemas are named, so nothing
+ * here may name one of them and quietly disagree. They are listed as null and
+ * read through `discoveryResultField` below; everything else is named here, so
+ * retiring or renaming a schema fails the build until this table follows.
+ *
+ * `null` marks a kind that goes looking for no such list at all: a brief is
+ * prose, and an enrichment answers about one company that was already known.
+ */
+const NON_SCAN_FOUND_FIELD = {
+	freeform: null,
+	company_enrichment_v1: null,
+	// A hunt for people is not an open-ended scan — it is never retried for
+	// coming back thin — so it stays out of that file's table and is named here.
+	contact_discovery_v1: 'contacts',
+	competitor_scan_v1: null,
+	prospect_scan_v1: null,
+} satisfies Record<SchemaName, string | null>
+
+/**
+ * How many rows a run has found so far, or null for a kind that hunts for none.
+ *
+ * Findings arrive as plain JSON written by a model, so nothing guarantees the
+ * field is there or that it holds a list; anything else counts as none found
+ * rather than as an error, because a half-written run is the normal case while
+ * one is still going.
+ */
+export const countFoundRows = (
+	schemaName: string | null,
+	findings: unknown,
+): number | null => {
+	// A run stored before the schema column existed counts as a brief, and a name
+	// this build no longer has is not one anybody can be told a number for.
+	const name = schemaName ?? 'freeform'
+	if (!isSchemaName(name)) return null
+	const field = discoveryResultField(name) ?? NON_SCAN_FOUND_FIELD[name]
+	if (field === null) return null
+	if (!isPlainObject(findings)) return 0
+	const rows = findings[field]
+	return Array.isArray(rows) ? rows.length : 0
+}
+
+/**
+ * How many of a run's proposed changes are still waiting on a decision. Every
+ * kind of run can carry these, so it is not keyed by schema.
+ */
+export const countPendingProposals = (findings: unknown): number => {
+	if (!isPlainObject(findings)) return 0
+	const proposals = findings['proposed_updates']
+	if (!Array.isArray(proposals)) return 0
+	return proposals.filter(p => isPlainObject(p) && p['status'] === 'pending')
+		.length
 }
 
 export {
