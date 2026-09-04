@@ -56,7 +56,7 @@ export interface UsageSnapshot {
 	/** Credits consumed, per provider and port: `firecrawl_search`. */
 	readonly unitsByProvider: Record<string, number>
 	/**
-	 * How many calls each model answered, per tier: `agent@Qwen/Qwen3-32B`. A
+	 * How many calls each model answered, per tier: `agent@Qwen/Qwen3-235B-A22B-Instruct-2507`. A
 	 * tier with two entries fell back partway through, and the counts say how
 	 * much of it ran on each — which is the difference between reading a run's
 	 * quality as the model it was configured with and as the model that
