@@ -7,16 +7,19 @@
  *     retried, so a wedged endpoint fails fast and cascades to the next slot
  *     instead of hanging the whole run.
  *   - `Retry-After` honoring: when the provider returns a `RateLimitError`
- *     carrying a `retryAfter` Duration, the harness sleeps that long before
- *     letting the retry schedule's own backoff fire. Prevents thundering-herd
- *     behavior against a provider that has already told us how long to wait.
+ *     carrying a `retryAfter` Duration, that becomes the floor under the retry
+ *     schedule's own backoff, capped at `RETRY_AFTER_CEILING`. Prevents
+ *     thundering-herd behavior against a provider that has already told us how
+ *     long to wait. It is a schedule delay rather than a wait inside the call,
+ *     so it is not spent against that call's time limit.
  *   - `Effect.retry` with jittered exponential backoff (3 attempts, 500ms base)
  *   - Retry gated on `AiError.isRetryable` (network, 5xx, 429, structured-output)
  *   - A tool call the provider refused because the model's arguments did not fit
  *     the tool's schema is re-read as the model's mistake before that gate, so it
  *     is retried like the same mistake caught on our side (`_tool-call-rejection`)
- *   - `Schedule.tapOutput` emits a `research.llm.retry` log ONLY when the
- *     schedule actually decides to retry — not on the final exhausted attempt.
+ *   - An `llm.retry` log written ONLY when another attempt is really about to be
+ *     made — not for a failure the gate above refuses, and not on the final
+ *     exhausted attempt.
  *   - AiError → `ProviderError { provider, message, recoverable }` at the exit,
  *     so the fallback cascade can pattern-match on the tagged error.
  *   - Before that mapping erases it, the failure's real shape (timeout vs the
@@ -46,6 +49,10 @@ import { reclassifyRejectedToolCall } from './_tool-call-rejection'
 
 const DEFAULT_TIMEOUT: Duration.Input = '60 seconds'
 const DEFAULT_MAX_ATTEMPTS = 3
+
+// The longest a vendor's `Retry-After` can hold one call back before the run
+// gives up on that slot and tries the next one.
+const RETRY_AFTER_CEILING = Duration.minutes(1)
 
 // Pull a human-usable message out of an arbitrary thrown value, or `undefined`
 // when there is nothing usable (an absent/blank message, or a bare object).
@@ -194,7 +201,30 @@ const integerJitter = <O, I, E, R>(
  */
 const makeRetrySchedule = (provider: string, tier: string | undefined) =>
 	integerJitter(Schedule.exponential('500 millis')).pipe(
+		// A vendor that says how long to wait is taken at its word, as a floor
+		// under the backoff rather than something added to it. This is the wait
+		// between attempts, so it is the schedule's business: waiting inside the
+		// call instead would be spent against that call's own time limit, and a
+		// vendor asking for longer than the limit would be recorded as a call that
+		// hung rather than one that was turned away.
+		Schedule.modifyDelay(({ input, duration }) => {
+			const askedFor = rateLimitRetryAfter(input)
+			return Effect.succeed(
+				Duration.min(
+					askedFor === undefined ? duration : Duration.max(duration, askedFor),
+					// Long enough to honour an ordinary rate limit, short enough that
+					// one header cannot park a run: a vendor asking for longer is left
+					// to the next slot, which is a different vendor.
+					RETRY_AFTER_CEILING,
+				),
+			)
+		}),
 		Schedule.upTo({ times: DEFAULT_MAX_ATTEMPTS - 1 }),
+		// The gate belongs here, ahead of the log, and not in `Effect.retry`'s own
+		// `while`: that one is consulted only once the schedule has already run, so
+		// a failure it refuses has been logged as a retry before anything asks
+		// whether to make one.
+		Schedule.while(({ input }) => isRetryableFailure(input)),
 		Schedule.tap(() =>
 			Effect.logInfo('llm.retry').pipe(
 				Effect.annotateLogs({
@@ -203,28 +233,6 @@ const makeRetrySchedule = (provider: string, tier: string | undefined) =>
 					...(tier !== undefined ? { tier } : {}),
 				}),
 			),
-		),
-	)
-
-/**
- * When a `RateLimitError` carries a `retryAfter`, sleep that long before
- * re-raising the failure. The retry schedule's own jittered backoff still
- * fires afterward — the effective inter-attempt delay becomes
- * `retryAfter + jittered backoff`. Never shorter than the server's ask, which
- * is the correctness invariant we care about.
- */
-const sleepForRetryAfter = <A, R>(
-	eff: Effect.Effect<A, AiError.AiError, R>,
-): Effect.Effect<A, AiError.AiError, R> =>
-	eff.pipe(
-		Effect.catchIf(
-			(err: unknown) => rateLimitRetryAfter(err) !== undefined,
-			err => {
-				const retryAfter = rateLimitRetryAfter(err) ?? Duration.zero
-				return Effect.sleep(retryAfter).pipe(
-					Effect.flatMap(() => Effect.fail(err as AiError.AiError)),
-				)
-			},
 		),
 	)
 
@@ -254,14 +262,13 @@ const harden =
 		const schedule = makeRetrySchedule(provider, tier)
 		// First of all, so the retry below judges the failure by what it really was.
 		const reread = reclassifyRejectedToolCall(provider, tier)(eff)
-		const withRetryAfter = sleepForRetryAfter(reread)
-		const timed = Effect.timeout(withRetryAfter, timeout) as Effect.Effect<
+		const timed = Effect.timeout(reread, timeout) as Effect.Effect<
 			A,
 			unknown,
 			R
 		>
 		const wrapped = timed.pipe(
-			Effect.retry({ schedule, while: isRetryableFailure }),
+			Effect.retry(schedule),
 			Effect.tapError((err: unknown) =>
 				reportFailure(provider, tier, err, timeout),
 			),

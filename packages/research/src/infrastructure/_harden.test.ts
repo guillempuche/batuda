@@ -1,4 +1,14 @@
-import { Cause, Duration, Effect, Exit, Fiber, Ref } from 'effect'
+import {
+	Cause,
+	Duration,
+	Effect,
+	Exit,
+	Fiber,
+	type Layer,
+	Logger,
+	Ref,
+	References,
+} from 'effect'
 import { TestClock } from 'effect/testing'
 import type { LanguageModel } from 'effect/unstable/ai'
 import { AiError } from 'effect/unstable/ai'
@@ -96,6 +106,30 @@ const mkRateLimitError = (retryAfter: Duration.Duration): AiError.AiError =>
 		reason: new AiError.RateLimitError({ retryAfter }),
 	})
 
+interface LoggedLine {
+	readonly message: string
+	readonly annotations: Record<string, unknown>
+}
+
+// Keeps every line a run logs, with the annotations attached to it. The
+// annotations are the point: a retry line is read by the field it is filed
+// under, so a test that checked only the words would pass while the fields
+// something queries on went missing.
+const capturedLogs = (lines: Array<LoggedLine>): Layer.Layer<never> =>
+	Logger.layer([
+		Logger.make(options => {
+			lines.push({
+				message: String(options.message),
+				annotations: options.fiber.getRef(References.CurrentLogAnnotations),
+			})
+		}),
+	])
+
+// The retry lines out of a captured run, which is what every assertion below
+// counts.
+const retryLines = (lines: ReadonlyArray<LoggedLine>) =>
+	lines.filter(line => line.message === 'llm.retry')
+
 /**
  * Run a program with `TestClock` installed, fork the unit-under-test inside it,
  * and tick virtual time forward in small increments until the fiber settles.
@@ -187,6 +221,74 @@ describe('hardenLanguageModel', () => {
 		expect(Ref.getUnsafe(attemptsRef)).toBe(1)
 	})
 
+	it('should stay quiet about retrying when it did not retry', async () => {
+		// GIVEN a model refusing the key, which asking again will never fix
+		const attemptsRef = Ref.makeUnsafe(0)
+		const stub = makeStubLm(attemptsRef, () => Effect.fail(mkAuthError()))
+		const hardened = hardenLanguageModel(stub, 'together', { tier: 'agent' })
+
+		// WHEN the call is made and its log lines are kept
+		const logs: Array<LoggedLine> = []
+		const exit = await runWithVirtualClock(() =>
+			invokeGenerateText(hardened).pipe(Effect.provide(capturedLogs(logs))),
+		)
+
+		// THEN the one attempt fails as a ProviderError and nothing claims a retry
+		expect(failureOf(exit)).toBeInstanceOf(ProviderError)
+		expect(Ref.getUnsafe(attemptsRef)).toBe(1)
+		expect(retryLines(logs)).toHaveLength(0)
+	})
+
+	it('should record the retry it does make, under the field it is read by', async () => {
+		// GIVEN a model whose first call drops the connection and whose second answers
+		const attemptsRef = Ref.makeUnsafe(0)
+		const stub = makeStubLm(attemptsRef, attempt =>
+			attempt === 1
+				? Effect.fail(mkNetworkError())
+				: Effect.succeed({ text: 'ok', usage: {} }),
+		)
+		const hardened = hardenLanguageModel(stub, 'together', { tier: 'agent' })
+
+		// WHEN the call is made and its log lines are kept
+		const logs: Array<LoggedLine> = []
+		const exit = await runWithVirtualClock(() =>
+			invokeGenerateText(hardened).pipe(Effect.provide(capturedLogs(logs))),
+		)
+
+		// THEN the second attempt answers, and the one retry carries the vendor and
+		// phase it happened in — silencing the false lines has not silenced a real
+		// one, nor emptied it
+		expect(Exit.isSuccess(exit)).toBe(true)
+		expect(Ref.getUnsafe(attemptsRef)).toBe(2)
+		expect(retryLines(logs)).toHaveLength(1)
+		expect(retryLines(logs)[0]?.annotations).toMatchObject({
+			event: 'llm.retried',
+			provider: 'together',
+			tier: 'agent',
+		})
+	})
+
+	it('should not count the attempt it gave up on as a retry', async () => {
+		// GIVEN a model that drops the connection every time, so the call uses up
+		// every attempt it is allowed
+		const attemptsRef = Ref.makeUnsafe(0)
+		const stub = makeStubLm(attemptsRef, () => Effect.fail(mkNetworkError()))
+		const hardened = hardenLanguageModel(stub, 'together', { tier: 'agent' })
+
+		// WHEN the call is made and its log lines are kept
+		const logs: Array<LoggedLine> = []
+		const exit = await runWithVirtualClock(() =>
+			invokeGenerateText(hardened).pipe(Effect.provide(capturedLogs(logs))),
+		)
+
+		// THEN three attempts were made and two of them were retries: the last one
+		// is where the call gave up, and counting it would report one more round
+		// trip to the vendor than actually happened
+		expect(Exit.isFailure(exit)).toBe(true)
+		expect(Ref.getUnsafe(attemptsRef)).toBe(3)
+		expect(retryLines(logs)).toHaveLength(2)
+	})
+
 	it('should retry a tool call the provider refused for not fitting its schema', async () => {
 		// GIVEN a stub LM whose first call is refused because the model named an
 		// argument the tool does not have, and whose second call goes through —
@@ -247,6 +349,33 @@ describe('hardenLanguageModel', () => {
 		// AND all three attempts fired within budget
 		expect(Exit.isSuccess(exit)).toBe(true)
 		expect(Ref.getUnsafe(attemptsRef)).toBe(3)
+	})
+
+	it('should still re-attempt when the vendor asks to wait longer than one call may take', async () => {
+		// GIVEN a vendor rate-limiting us and asking for two minutes — longer than
+		// the 90 seconds a single call to this tier is allowed to run
+		const attemptsRef = Ref.makeUnsafe(0)
+		const stub = makeStubLm(attemptsRef, attempt =>
+			attempt === 1
+				? Effect.fail(mkRateLimitError(Duration.minutes(2)))
+				: Effect.succeed({ text: `ok@${attempt}`, usage: {} }),
+		)
+		const hardened = hardenLanguageModel(stub, 'nebius', {
+			timeout: '90 seconds',
+		})
+
+		// WHEN the harness runs
+		const exit = await runWithVirtualClock(
+			() => invokeGenerateText(hardened),
+			240_000,
+		)
+
+		// THEN the wait happens between attempts rather than inside one, so the
+		// second attempt answers. Waiting inside the call would spend the vendor's
+		// two minutes against that call's ninety seconds and report a run that hung
+		// instead of one that was asked to slow down
+		expect(Exit.isSuccess(exit)).toBe(true)
+		expect(Ref.getUnsafe(attemptsRef)).toBe(2)
 	})
 
 	it('should cap concurrent in-flight calls at the configured permit count', async () => {
