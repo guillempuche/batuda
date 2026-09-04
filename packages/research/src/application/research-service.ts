@@ -128,6 +128,7 @@ import {
 	citedSourceIds as rowCitedSourceIds,
 } from './guard-shapes'
 import { markNameOnlyRows } from './name-only-guard'
+import { dropNetworkRows, placesNamed } from './network-guard'
 import {
 	type DroppedOrganisation,
 	dropNonCompanies,
@@ -4250,6 +4251,49 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												findings: check.findings,
 												spanCounts: {
 													'research.prospects.deduplicated': check.merged,
+												},
+											}
+										}),
+								},
+								{
+									// One operator filing itself as several companies: a domain per
+									// trade and per town, each with a page for the town it wants to
+									// rank for, and each coming back as its own row. There is no
+									// company on any of them, so they go rather than being marked.
+									//
+									// After the fold, because that is the list it was graded on: the
+									// corpus behind its numbers is built from stored findings, which are
+									// what this whole chain finally produced. Run before the fold it
+									// would see a longer list than anything measured — more rows on each
+									// host, which is the input its false positives came from.
+									name: 'network',
+									run: findings =>
+										Effect.gen(function* () {
+											if (schemaName !== 'prospect_scan_v1') return { findings }
+											const check = dropNetworkRows(
+												findings,
+												discoveryResultField(schemaName),
+												placesNamed(areaAsked),
+											)
+											if (check.dropped.length > 0) {
+												yield* Effect.logInfo('research.network.dropped').pipe(
+													Effect.annotateLogs({
+														event: 'research.network.dropped',
+														research_id: researchId,
+														dropped: check.dropped.length,
+														hosts: check.hosts,
+														// Capped like every other per-row drop log: a sweep
+														// otherwise puts an unbounded list on one line.
+														names: check.dropped
+															.slice(0, MAX_LOGGED_FIELD_DROPS)
+															.map(row => row.name),
+													}),
+												)
+											}
+											return {
+												findings: check.findings,
+												spanCounts: {
+													'research.network.dropped': check.dropped.length,
 												},
 											}
 										}),
