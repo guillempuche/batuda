@@ -11,6 +11,7 @@ export {
 	Forbidden,
 	GrantAuthFailed,
 	GrantConnectFailed,
+	GrantFailureReason,
 	GrantUnavailable,
 	InboxInactive,
 	InsufficientBudget,
