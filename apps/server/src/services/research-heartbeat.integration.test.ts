@@ -21,6 +21,7 @@ import {
 	type CreateResearchInput,
 	ExtractLanguageModel,
 	MapProvider,
+	makeCachedLanguageModel,
 	RegistryRouter,
 	ResearchEventSink,
 	ResearchService,
@@ -48,7 +49,7 @@ interface Org {
 }
 
 const STUB_TEXT = 'Heartbeat test — deterministic stub response.'
-const stubResponse = {
+const stubResponseBase = {
 	text: STUB_TEXT,
 	content: [{ type: 'text' as const, text: STUB_TEXT }],
 	reasoning: [],
@@ -67,23 +68,66 @@ const stubResponse = {
 	},
 }
 
+// What the agent tier reports having used. The zero-token response above is
+// enough for the beat itself, but a run only has spend to show if a call that
+// reached a provider was priced — so the tier under test reports real tokens.
+const PRICED_TOKENS_IN = 4000
+const PRICED_TOKENS_OUT = 1000
+// Deliberately steep: cost is stored in whole cents and rounded, so a realistic
+// per-thousand rate would price a single call below half a cent and land as
+// zero, which would make the assertion below pass without proving anything.
+const PRICED_RATE = { inCentsPer1k: 1, outCentsPer1k: 2 } as const
+// 4000/1000*1 + 1000/1000*2 = 6 cents from one call.
+const PRICED_CALL_CENTS = 6
+
+const pricedResponse = {
+	...stubResponseBase,
+	usage: {
+		inputTokens: {
+			uncached: undefined,
+			total: PRICED_TOKENS_IN,
+			cacheRead: undefined,
+			cacheWrite: undefined,
+		},
+		outputTokens: {
+			total: PRICED_TOKENS_OUT,
+			text: undefined,
+			reasoning: undefined,
+		},
+	},
+}
+
 const stubLlm: LanguageModel.Service = {
-	generateText: (_options: unknown) => Effect.succeed(stubResponse) as never,
+	generateText: (_options: unknown) =>
+		Effect.succeed(stubResponseBase) as never,
 	generateObject: (_options: unknown) =>
 		Effect.succeed({
-			...stubResponse,
+			...stubResponseBase,
 			value: { summary: STUB_TEXT },
 		}) as never,
 	streamText: (_options: unknown) =>
 		Stream.succeed({ type: 'text-delta' as const, delta: STUB_TEXT }) as never,
 }
 
-// The Agent tier holds the run in phase 1 for a few seconds, so the run stays
-// 'running' across several heartbeat intervals while we observe the beat advance.
+// The agent tier answers at once and reports real tokens, so the run has
+// something it has genuinely spent; the extract tier that follows it stalls, so
+// the run is still running when the assertions read the row.
+//
+// The order matters. A call is only priced once it returns, so a tier that slept
+// through the whole window left the meter empty; and a run whose every tier
+// answered at once was already finished by the time it was read. Spending first
+// and stalling second is the only arrangement that gives both.
 const agentLlm: LanguageModel.Service = {
 	...stubLlm,
-	generateText: (_options: unknown) =>
-		Effect.sleep('3 seconds').pipe(Effect.as(stubResponse)) as never,
+	generateText: (_options: unknown) => Effect.succeed(pricedResponse) as never,
+}
+
+const extractLlm: LanguageModel.Service = {
+	...stubLlm,
+	generateObject: (_options: unknown) =>
+		Effect.sleep('10 seconds').pipe(
+			Effect.as({ ...stubResponseBase, value: { summary: STUB_TEXT } }),
+		) as never,
 }
 
 const unused = 'research provider not exercised by the heartbeat suite'
@@ -100,9 +144,23 @@ const providersLayer = Layer.mergeAll(
 	),
 )
 
+// The agent tier goes through the same wrapper the real one does, because that
+// wrapper — not the model — is what prices a call and tells the run's meter what
+// it spent. Handing the service a bare stub bypasses it, and the meter then
+// reports nothing however many tokens the stub claims.
 const llmLayer = Layer.mergeAll(
-	Layer.succeed(AgentLanguageModel)(agentLlm),
-	Layer.succeed(ExtractLanguageModel)(stubLlm),
+	Layer.effect(
+		AgentLanguageModel,
+		makeCachedLanguageModel(
+			agentLlm,
+			'agent',
+			'heartbeat-test-model',
+			'heartbeat-test-model',
+			PRICED_RATE,
+			'heartbeat-test-vendor',
+		),
+	),
+	Layer.succeed(ExtractLanguageModel)(extractLlm),
 	Layer.succeed(WriterLanguageModel)(stubLlm),
 )
 
@@ -111,7 +169,7 @@ const eventSinkLayer = Layer.succeed(ResearchEventSink)(
 )
 
 const ResearchLive = ResearchService.layer.pipe(
-	Layer.provide(llmLayer),
+	Layer.provide(Layer.provide(llmLayer, PgLive)),
 	Layer.provide(providersLayer),
 	Layer.provide(
 		Layer.succeed(ContactDiscovery)({
@@ -234,11 +292,13 @@ describe('ResearchService heartbeat', () => {
 						gapSeconds: number
 						status: string
 						toolLog: ReadonlyArray<{ tool?: string }>
+						costCents: number
 					}>`
 						SELECT
 							EXTRACT(EPOCH FROM (heartbeat_at - started_at))::float8 AS gap_seconds,
 							status,
-							tool_log
+							tool_log,
+							cost_cents
 						FROM research_runs WHERE id = ${created.id}::uuid
 					`.pipe(Effect.orDie)
 
@@ -248,9 +308,15 @@ describe('ResearchService heartbeat', () => {
 						status: row?.status ?? 'missing',
 						gap: row?.gapSeconds ?? -1,
 						logged: row?.toolLog?.length ?? -1,
+						cost: row?.costCents ?? -1,
 					}
 				}).pipe(Effect.provide(ResearchLive)) as Effect.Effect<
-					{ status: string; gap: number; logged: number },
+					{
+						status: string
+						gap: number
+						logged: number
+						cost: number
+					},
 					never,
 					never
 				>,
@@ -261,6 +327,13 @@ describe('ResearchService heartbeat', () => {
 			// Read before the run reaches any terminal state, so this can only have
 			// come from a beat: nothing else writes the column mid-run.
 			expect(outcome.logged).toBeGreaterThan(0)
+			// And what it has spent is on the row while it is still spending it.
+			// Every other writer of this column runs at a terminal status, so a
+			// figure here on a running run can only have come from the beat. Left
+			// unstamped, a paid run reported costing nothing right up to the moment
+			// it stopped — the one figure worth watching while it can still be
+			// called off.
+			expect(outcome.cost).toBeGreaterThanOrEqual(PRICED_CALL_CENTS)
 		}, 30_000)
 	})
 })

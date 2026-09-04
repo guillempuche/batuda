@@ -2593,9 +2593,38 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									),
 						),
 					)
+					// What the run has spent so far, written down on the same beat.
+					// Without this the figure only ever appears when the run is over —
+					// the columns start at 0 and the terminal stamp was the only writer
+					// — so anybody watching a paid run in flight was told it had cost
+					// nothing right up until it stopped. That is the one question worth
+					// asking while a run can still be called off.
+					// Only the figure, never the breakdown: passing the usage as well
+					// would have this beat overwrite the token counts and per-model
+					// tallies that the run's closing stamp owns, and a beat landing in
+					// the moment after that stamp would put back a slightly older set.
+					// The cost itself only ever climbs, and the paid total is re-summed
+					// from the ledger either way, so a late beat can do no harm.
+					const stampSpendSoFar = Effect.gen(function* () {
+						const usage = yield* (yield* UsageMeter).snapshot()
+						yield* stampRunCostFromLedger(sql, researchId, usage.costCents)
+					}).pipe(
+						Effect.catchCause(cause =>
+							Cause.hasInterruptsOnly(cause)
+								? Effect.failCause(cause)
+								: Effect.logWarning('research.run.spend_stamp_failed').pipe(
+										Effect.annotateLogs({
+											event: 'research.run.spend_stamp_failed',
+											research_id: researchId,
+											cause: Cause.pretty(cause),
+										}),
+									),
+						),
+					)
 					yield* Effect.gen(function* () {
 						yield* beat
 						yield* flushToolLog
+						yield* stampSpendSoFar
 					}).pipe(
 						Effect.repeat(
 							Schedule.spaced(`${heartbeatIntervalSeconds} seconds`),

@@ -1,8 +1,8 @@
-import { useAtomSet, useAtomValue } from '@effect/atom-react'
+import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { DateTime } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
 import { PriButton, usePriToast } from '@batuda/ui/pri'
@@ -77,6 +77,15 @@ export function ProposedUpdatesReview({
 	// it read before the decision.
 	const refreshProposals = proposalList.refresh
 	const detailResult = useAtomValue(researchDetailAtom(researchId))
+	// The run row counts these proposals too — it is where the run page's "to
+	// review" figure comes from — so a decision has to reach it as well. Without
+	// this the panel emptied while the count above it still named the changes
+	// just dealt with, until the page was reloaded.
+	const refreshRunDetail = useAtomRefresh(researchDetailAtom(researchId))
+	const afterResolved = useCallback(() => {
+		refreshProposals()
+		refreshRunDetail()
+	}, [refreshProposals, refreshRunDetail])
 
 	const resolveBatch = useAtomSet(resolveProposalsBatchAtom, {
 		mode: 'promiseExit',
@@ -88,7 +97,7 @@ export function ProposedUpdatesReview({
 		resolve,
 		undo,
 		setResults,
-	} = useProposalResolution({ onResolved: refreshProposals })
+	} = useProposalResolution({ onResolved: afterResolved })
 
 	const [confirmingBatch, setConfirmingBatch] = useState(false)
 	const [batchBusy, setBatchBusy] = useState(false)
@@ -195,7 +204,7 @@ export function ProposedUpdatesReview({
 			})
 			// Re-read so each applied row now carries its saved status, keeping the
 			// outcome after a reload or a remount rather than only in this reply.
-			refreshProposals()
+			afterResolved()
 		} else {
 			toast.add({ title: t`Could not apply the batch.`, type: 'error' })
 		}
@@ -277,7 +286,7 @@ export function ProposedUpdatesReview({
 						type='button'
 						onClick={() => {
 							setResults({})
-							refreshProposals()
+							afterResolved()
 						}}
 					>
 						<Trans>Refresh</Trans>

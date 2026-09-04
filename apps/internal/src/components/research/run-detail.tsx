@@ -3,9 +3,10 @@ import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Link } from '@tanstack/react-router'
+import { Option } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { RefreshCw } from 'lucide-react'
-import type { ComponentType } from 'react'
+import { type ComponentType, useEffect, useRef } from 'react'
 import styled from 'styled-components'
 
 import { isActiveResearchStatus } from '@batuda/domain'
@@ -19,7 +20,7 @@ import {
 } from '@batuda/research/domain/types'
 import { PriButton } from '@batuda/ui/pri'
 
-import { researchDetailAtom } from '#/atoms/research-atoms'
+import { researchDetailAtom, researchRunLiveAtom } from '#/atoms/research-atoms'
 import { MarkdownView } from '#/components/markdown/markdown-view'
 import { Badge, type Tone, toneColor } from '#/components/research/badge'
 import { CompanyEnrichmentView } from '#/components/research/findings/company-enrichment-view'
@@ -32,10 +33,10 @@ import { ProposedUpdatesReview } from '#/components/research/review/proposed-upd
 import { RunActions } from '#/components/research/run-actions'
 import { statusLabel, statusTone } from '#/components/research/run-labels'
 import { phaseMessage, RunProgress } from '#/components/research/run-progress'
+import { RunVitals, vitalsFromRun } from '#/components/research/run-vitals'
 import { TargetCorrection } from '#/components/research/target-correction'
 import { ErrorState } from '#/components/shared/error-state'
 import { SrOnly } from '#/components/shared/sr-only'
-import { useResearchEvents } from '#/hooks/use-research-events'
 import {
 	brushedMetalPlate,
 	rulerUnderRule,
@@ -100,6 +101,16 @@ type ResearchRunDetail = {
 	// Rounds the run reports having got through, so a page opened partway in
 	// still shows the real count.
 	readonly progressSteps: number | null
+	// What the run has cost and was allowed, in whole cents, plus how far
+	// through it is and how many pages it read. All of it is on the row as well
+	// as in the live stream, so the page has figures to show before the first
+	// frame arrives and after the last one.
+	readonly phase: number | null
+	readonly costCents: number
+	readonly paidCostCents: number
+	readonly budgetCents: number
+	readonly paidBudgetCents: number
+	readonly sourceCount: number | null
 	// How clearly the run's evidence was about the company asked for, so the
 	// notice can name the doubt instead of only saying there is one.
 	readonly entityMatch?: string | null
@@ -130,20 +141,64 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 	const result = useAtomValue(researchDetailAtom(researchId))
 	const refreshRun = useAtomRefresh(researchDetailAtom(researchId))
 
-	// Narrow up front so the live-progress hook (a Hook, so it can't sit behind
-	// an early return) knows whether the run is still in flight.
+	// Narrow up front so the hooks below — which can't sit behind an early
+	// return — have the run to work from.
 	const run = AsyncResult.isSuccess(result) ? narrowRun(result.value) : null
-	const isRunning = run !== null && isActiveResearchStatus(run.status)
 	// A batch hands its work to one run per company and does none itself, so it
 	// never reports progress. Listening to it returned nothing and then announced
 	// itself as stalled, on a page that showed no sign of the runs doing the work.
 	const isBatch = run?.kind === 'group'
-	// The raw token was being shown, so a reader saw "succeeded_low_confidence".
-	const runStatusLabel = run !== null ? statusLabel(run.status) : null
-	const { progress, done, failed, stalled, retry } = useResearchEvents(
-		researchId,
-		{ enabled: isRunning && !isBatch },
+
+	// Whether this run is worth listening to at all. A run already over when the
+	// page opened has nothing left to say, and a batch does none of the work
+	// itself — its figures belong to the runs it started, and are shown on each
+	// of them — so neither holds a connection open for frames nobody reads.
+	const rowStatus = run?.status ?? null
+	const listens = run !== null && !isBatch && isActiveResearchStatus(run.status)
+	const liveResult = useAtomValue(
+		researchRunLiveAtom(listens ? researchId : null),
 	)
+	const refreshLive = useAtomRefresh(
+		researchRunLiveAtom(listens ? researchId : null),
+	)
+	// The newest frame, and on a failure the last one that did arrive — thrown
+	// away, the page fell back to the row it was built from and the figures
+	// visibly went backwards at the moment it announced they had stopped.
+	const live = AsyncResult.value(liveResult).pipe(Option.getOrNull)
+	const lost = AsyncResult.isFailure(liveResult)
+
+	// Every figure comes from the stream while it is running, and from the run
+	// row otherwise. The row wins once the run is over, because the row is what
+	// the review panel below refreshes as proposals are decided — the stream's
+	// last frame is frozen at the moment it closed and would keep claiming
+	// changes are waiting after they were dealt with.
+	const done = live?.done ?? false
+	const settledRow = done || !listens
+	const rowVitals = run === null ? null : vitalsFromRun(run)
+	const vitals = settledRow ? (rowVitals ?? live) : (live ?? rowVitals)
+	// Status is the exception to that: the frame saying a run is over carries the
+	// ending itself, and the row does not catch up until the read below lands.
+	const status = live?.status ?? rowStatus
+	const isRunning = status !== null && isActiveResearchStatus(status)
+	// The raw token was being shown, so a reader saw "succeeded_low_confidence".
+	const statusText = status === null ? null : statusLabel(status)
+
+	// The run just ended under a page that was watching it. Its findings, brief
+	// and proposed changes are not in the stream — only the figures are — so the
+	// row is read once more and the page fills in with the result instead of
+	// asking for a reload. A run already over when the page opened is skipped:
+	// the route loader has just fetched that row, and reading it again threw the
+	// fetch away and asked for it a second time on every view of a finished run.
+	//
+	// Keyed by run rather than a plain flag: moving from one run to the next
+	// keeps this component mounted, so a flag would still be set from the last
+	// one and the next run to finish would never fill in.
+	const settled = useRef<string | null>(null)
+	useEffect(() => {
+		if (!done || settled.current === researchId) return
+		settled.current = researchId
+		refreshRun()
+	}, [done, researchId, refreshRun])
 
 	// One short sentence about where the run is, said only when it changes. The
 	// progress panel itself is silent: announcing it re-read every figure in it on
@@ -154,10 +209,10 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 		? null
 		: done
 			? t`This run has finished.`
-			: stalled || failed
+			: lost
 				? t`Live updates have stopped. The run may still be working.`
-				: isRunning
-					? i18n._(phaseMessage(progress.phase))
+				: isRunning && live !== null
+					? i18n._(phaseMessage(live.phase))
 					: null
 
 	// Only a first load has nothing to show. Treating a refresh as "loading" threw
@@ -199,6 +254,10 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 		)
 	}
 
+	// Past every guard above, so the run is real and its status is a string. The
+	// computed one is preferred and can only be null while the run itself is.
+	const shownStatus = status ?? run.status
+
 	return (
 		<ResearchRunIdProvider value={run.id}>
 			<Panel data-testid='research-run-detail'>
@@ -212,10 +271,10 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 					<Heading>{run.query}</Heading>
 					<HeaderMeta>
 						<StatusText
-							$tone={statusTone(run.status)}
+							$tone={statusTone(shownStatus)}
 							data-testid={`research-run-status-${run.id}`}
 						>
-							{runStatusLabel ? i18n._(runStatusLabel) : run.status}
+							{statusText ? i18n._(statusText) : shownStatus}
 						</StatusText>
 						{run.schemaName !== null ? (
 							<SchemaText>{run.schemaName}</SchemaText>
@@ -225,16 +284,20 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 					<RunActions run={run} />
 				</Header>
 
-				{isRunning && !isBatch && !failed && !stalled ? (
-					<RunProgress progress={progress} steps={run.progressSteps} />
+				{!isBatch && vitals !== null ? (
+					<RunVitals vitals={vitals} schemaName={run.schemaName} live={!lost} />
 				) : null}
 
-				{isRunning && !isBatch && (failed || stalled) ? (
+				{isRunning && !isBatch && !lost && live !== null ? (
+					<RunProgress live={live} />
+				) : null}
+
+				{isRunning && !isBatch && lost ? (
 					<StalledNotice role='status' data-testid='research-run-stalled'>
 						<span>
 							<Trans>
-								Live updates paused. This run may still be working — refresh to
-								check its latest status.
+								Live updates stopped. This run may still be working — reload to
+								pick it up again.
 							</Trans>
 						</span>
 						<PriButton
@@ -242,7 +305,7 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 							$variant='outlined'
 							data-testid='research-run-refresh'
 							onClick={() => {
-								retry()
+								refreshLive()
 								refreshRun()
 							}}
 						>
@@ -445,6 +508,9 @@ function narrowChildren(raw: unknown): ReadonlyArray<ChildRun> {
 	return out
 }
 
+const numberOr = (value: unknown, fallback: number): number =>
+	typeof value === 'number' ? value : fallback
+
 function narrowRun(raw: unknown): ResearchRunDetail | null {
 	if (!raw || typeof raw !== 'object') return null
 	const r = raw as Record<string, unknown>
@@ -476,6 +542,12 @@ function narrowRun(raw: unknown): ResearchRunDetail | null {
 				: null,
 		progressSteps:
 			typeof r['progressSteps'] === 'number' ? r['progressSteps'] : null,
+		phase: typeof r['phase'] === 'number' ? r['phase'] : null,
+		costCents: numberOr(r['costCents'], 0),
+		paidCostCents: numberOr(r['paidCostCents'], 0),
+		budgetCents: numberOr(r['budgetCents'], 0),
+		paidBudgetCents: numberOr(r['paidBudgetCents'], 0),
+		sourceCount: Array.isArray(r['sources']) ? r['sources'].length : null,
 		entityMatch: typeof r['entityMatch'] === 'string' ? r['entityMatch'] : null,
 		context: r['context'] ?? null,
 	}
@@ -505,6 +577,12 @@ const Heading = styled.h2`
 	font-size: var(--typescale-title-large-size);
 	line-height: var(--typescale-title-large-line);
 	margin: 0;
+	/* The stencil face shouts everything in capitals, which is right for a label
+	   this page wrote and wrong for the words somebody typed: it turns a company
+	   into an acronym and "Ferreteria Martí" into FERRETERIA MARTÍ. The request
+	   is shown back exactly as it was asked. */
+	text-transform: none;
+	letter-spacing: normal;
 `
 
 const HeaderMeta = styled.div`

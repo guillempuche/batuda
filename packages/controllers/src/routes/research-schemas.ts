@@ -188,20 +188,35 @@ export const ResearchSpendBucket = Schema.Struct({
 export type ResearchSpendBucket = typeof ResearchSpendBucket.Type
 
 /**
- * The web app's live-progress contract: a 30-second JSON long-poll (not a raw
- * event stream). `status` is the run's latest status, `events` are the progress
- * events observed in this poll window, and `done` is true once a terminal event
- * arrived. The client re-polls until `done`.
+ * Where a run is, right now — one frame of the live stream a watcher reads.
  *
- * These events are not replayed, so they only ever cover what happened while
- * someone was watching. A count of the work done so far lives on the run itself.
+ * Every figure the run page shows is in here, so a watcher reads the whole page
+ * from this one frame instead of re-fetching the run beside it. Each frame is
+ * complete rather than a difference from the last, so a watcher that joins late
+ * or misses a frame is still correct.
+ *
+ * All amounts are whole cents. `foundCount` counts the rows this kind of run
+ * looks for — companies, people, competitors — and is null for a kind that
+ * hunts for none. Both counts are null until the run has written down what it
+ * found: zero would say it looked and found none, which is a different thing.
+ * `phase` and `activeTool` come from the run's own events, so both are null
+ * until it says — including on a page that joined after it last did.
  */
-export const ResearchEvents = Schema.Struct({
+export const ResearchRunLive = Schema.Struct({
 	status: Schema.String,
-	events: Schema.Array(Schema.Unknown),
+	phase: Schema.NullOr(Schema.Number),
+	activeTool: Schema.NullOr(Schema.String),
+	sourceCount: Schema.NullOr(Schema.Number),
+	progressSteps: Schema.NullOr(Schema.Number),
+	costCents: Schema.Number,
+	paidCostCents: Schema.Number,
+	budgetCents: Schema.Number,
+	paidBudgetCents: Schema.Number,
+	foundCount: Schema.NullOr(Schema.Number),
+	pendingProposalCount: Schema.NullOr(Schema.Number),
 	done: Schema.Boolean,
 })
-export type ResearchEvents = typeof ResearchEvents.Type
+export type ResearchRunLive = typeof ResearchRunLive.Type
 
 /**
  * One entry in a bulk apply/reject response. Each names the run + proposal it

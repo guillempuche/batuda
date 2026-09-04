@@ -1,4 +1,7 @@
+import { Duration, Effect, Schedule, Stream } from 'effect'
 import { Atom } from 'effect/unstable/reactivity'
+
+import type { ResearchRunLive } from '@batuda/controllers'
 
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import {
@@ -282,20 +285,92 @@ export function pendingPaidActionsAtom(limit: number) {
 	return pendingPaidActionsAtomCache
 }
 
-const eventsCache = new Map<string, ReturnType<typeof makeEventsAtom>>()
+// How long a watcher waits between attempts to pick a dropped stream back up,
+// at the most, and how many attempts it makes before letting the page say the
+// figures have stopped moving. Roughly two minutes of trying.
+const RECONNECT_MAX_WAIT = '15 seconds'
+const RECONNECT_ATTEMPTS = 8
+// How long a watcher waits before opening the next connection after one ends
+// cleanly. Spread rather than exact: the server ends every connection at the
+// same age, so a restart that sends everyone back at once would otherwise keep
+// them in step for good, all returning together every two minutes thereafter.
+const RECONNECT_SETTLE = '1 second'
 
-function makeEventsAtom(researchId: string) {
-	return BatudaApiAtom.query('research', 'events', {
-		params: { id: researchId },
-	})
+const liveCache = new Map<string, ReturnType<typeof makeLiveAtom>>()
+
+function makeLiveAtom(researchId: string) {
+	const connect = Stream.unwrap(
+		BatudaApiAtom.use(client =>
+			client.research.live({ params: { id: researchId } }),
+		),
+	).pipe(
+		// A dropped connection is the ordinary case here, not a fault: a run
+		// takes minutes and anything in between may close an idle socket. Pick
+		// it up again rather than leaving the page frozen on its last frame —
+		// every frame says the whole of where the run is, so a reconnection
+		// needs nothing replayed to be correct.
+		//
+		// Bounded on both counts, because an endless retry is not free: the wait
+		// is capped so a run lasting minutes is not left backing off for a
+		// quarter of an hour, and the attempts are counted so a run that is gone
+		// for good stops being asked for. The count resets once a reconnection
+		// delivers a frame, so the budget is per outage rather than per page.
+		Stream.retry(
+			Schedule.exponential('1 second').pipe(
+				// Spread before capping, never after: the spread reaches a fifth
+				// above the delay it is given, so capping first would let it back
+				// over the ceiling.
+				Schedule.jittered,
+				Schedule.modifyDelay(({ duration }) =>
+					Effect.succeed(
+						Duration.min(
+							duration,
+							Duration.fromInputUnsafe(RECONNECT_MAX_WAIT),
+						),
+					),
+				),
+				Schedule.upTo({ times: RECONNECT_ATTEMPTS }),
+			),
+		),
+	)
+
+	return BatudaApiAtom.runtime.atom(
+		connect.pipe(
+			// A stream that ends without saying the run finished has not finished
+			// telling us — the server caps how long one connection lasts, and a
+			// proxy may cut one shorter still. Neither is a failure, so neither
+			// would be retried above; both mean open another. Without this the
+			// page settled quietly on whatever it last heard and never learned
+			// the run had moved on, which is the likeliest way a long run ends.
+			Stream.repeat(Schedule.spaced(RECONNECT_SETTLE).pipe(Schedule.jittered)),
+			Stream.takeUntil(frame => frame.done),
+		),
+	)
 }
 
-/** One run's live event long-poll ({ status, events, done }). */
-export function researchEventsAtom(researchId: string) {
-	const existing = eventsCache.get(researchId)
+// Stands in for a run nobody is listening to, so a screen that has nothing to
+// watch still calls the same hook in the same order. It never emits, so it never
+// reports a frame and never reports a failure — it simply has nothing to say.
+const idleLiveAtom = BatudaApiAtom.runtime.atom(
+	Stream.never as Stream.Stream<ResearchRunLive>,
+)
+
+/**
+ * Where one run is, kept current by its own server-sent stream.
+ *
+ * The atom holds the newest frame, and each frame carries the whole of the
+ * run's state, so a reader never has to piece one together from several.
+ *
+ * A null id is a run not worth listening to — one already finished, or a batch
+ * whose figures belong to the runs it started — and yields an atom that holds
+ * a connection for nothing.
+ */
+export function researchRunLiveAtom(researchId: string | null) {
+	if (researchId === null) return idleLiveAtom
+	const existing = liveCache.get(researchId)
 	if (existing !== undefined) return existing
-	const atom = makeEventsAtom(researchId)
-	eventsCache.set(researchId, atom)
+	const atom = makeLiveAtom(researchId)
+	liveCache.set(researchId, atom)
 	return atom
 }
 

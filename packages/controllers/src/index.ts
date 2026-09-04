@@ -78,6 +78,7 @@ export {
 	PendingProposal,
 	ResearchPolicy,
 	ResearchRunDetail,
+	ResearchRunLive,
 	ResearchRunSummary,
 	ResearchSpendBucket,
 } from './routes/research-schemas'

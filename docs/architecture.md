@@ -454,7 +454,7 @@ Three safety invariants hold regardless of budget: the agent never mutates a CRM
 
 ### Surfaces
 
-The same loop is reached three ways. External agents call the MCP tools (`start_research`, `get_research`, and the in-loop `web_search` / `scrape_page` / `registry_lookup` / `discover_contacts` and the propose-update family) and read a run as an MCP resource. The web app drives the HTTP API — create a run, poll or stream it over SSE, approve a paid action, apply or reject a proposed update. And the research page renders the findings, the human brief, the source list, with a snapshot for each page the run opened, and the proposals panel where a human applies changes.
+The same loop is reached three ways. External agents call the MCP tools (`start_research`, `get_research`, and the in-loop `web_search` / `scrape_page` / `registry_lookup` / `discover_contacts` and the propose-update family) and read a run as an MCP resource. The web app drives the HTTP API — create a run, stream it over SSE, approve a paid action, apply or reject a proposed update. And the research page renders the findings, the human brief, the source list, with a snapshot for each page the run opened, and the proposals panel where a human applies changes.
 
 ### Data model
 
