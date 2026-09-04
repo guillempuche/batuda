@@ -66,3 +66,7 @@ coverage/
 # AI
 .claude/worktrees
 .claude/*.lock
+# Eval corpora hold real companies somebody verified by hand; only the
+# `.example` templates are shared.
+eval/*.json
+!eval/*.example.json

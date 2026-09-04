@@ -387,6 +387,7 @@ const runScan = async (args: {
 	toolLog: ReadonlyArray<StoredToolLogEntry>
 	citationsSeen: number | undefined
 	citationsKept: number | undefined
+	prospects: ReadonlyArray<string>
 }> => {
 	scenario = args.scenario
 	firedEvents = []
@@ -472,6 +473,14 @@ const runScan = async (args: {
 					: [],
 				citationsSeen: quality?.citations_seen,
 				citationsKept: quality?.citations_kept,
+				// The names left on the list, for a check about which rows a guard took
+				// off rather than about what the run said of itself.
+				prospects: (
+					(findings as { prospects?: ReadonlyArray<{ name?: unknown }> } | null)
+						?.prospects ?? []
+				).flatMap(prospect =>
+					typeof prospect.name === 'string' ? [prospect.name] : [],
+				),
 			}
 		}),
 	)
@@ -611,6 +620,61 @@ describe('what a discovery scan reports about itself', () => {
 			//   report — the sentence exists to correct a reading that would be
 			//   wrong, and here the plain reading of the list is the right one
 			expect(result.briefPrompt).not.toContain('did not finish looking')
+		}, 60_000)
+	})
+
+	describe('when a scan meets one operator filing itself as a company', () => {
+		it('should take that row off the list and leave the real company', async () => {
+			// GIVEN a request naming a town and its province, and a list holding one
+			//   row whose only evidence is a domain that says Barcelona, files its page
+			//   under Ripollet, and spells the company it carries — beside an ordinary
+			//   firm on its own site
+			const result = await runScan({
+				schemaName: 'prospect_scan_v1',
+				query:
+					'Empresas fabricantes industriales con taller propio en Ripollet (Barcelona)',
+				scenario: {
+					place: 'Ripollet (Barcelona)',
+					placeVerdict: 'inside',
+					evidence:
+						'A list of industrial manufacturers with their own workshops.',
+					findings: [
+						{
+							prospects: [
+								{
+									name: 'VKS Estampacions Metalúrgiques',
+									why_relevant:
+										'Fabricació de peces estampades amb taller propi',
+									website: {
+										value:
+											'https://www.vksestampacionsmetalurgiquesbarcelona.es/ripollet',
+										source_id: SEED_URL,
+										confidence: 1,
+									},
+									citations: [
+										{
+											source_id:
+												'https://www.vksestampacionsmetalurgiquesbarcelona.es/ripollet',
+											confidence: 1,
+										},
+									],
+								},
+								{
+									name: 'Cablestyl Fabricació de Cables',
+									why_relevant: 'Fabricant de cables especials a mida',
+									citations: [{ source_id: SEED_URL, confidence: 1 }],
+								},
+							],
+						},
+					],
+				},
+			})
+
+			// THEN the operator's row is gone and the real company is untouched. The
+			//   check runs inside the run rather than on the way out, so a reader and
+			//   an assistant are handed the same list.
+			expect(result.prospects).toContain('Cablestyl Fabricació de Cables')
+			expect(result.prospects).not.toContain('VKS Estampacions Metalúrgiques')
 		}, 60_000)
 	})
 

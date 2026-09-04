@@ -44,6 +44,18 @@ export {
 } from './application/eval-contacts-scoring'
 // ── Application (eval harness) ─────────────────────────────────────────────
 export {
+	type FarmJudge,
+	type FarmLabel,
+	type FarmReplayScore,
+	type FarmRow,
+	type FarmRowParseResult,
+	type FarmVerdict,
+	parseFarmCorpus,
+	parseFarmRow,
+	rowByRow,
+	scoreFarmReplay,
+} from './application/eval-farm-replay'
+export {
 	type GoldenParseResult,
 	parseGoldenRow,
 	parseGoldenSet,
@@ -93,6 +105,12 @@ export {
 // because a caller outside this package reading such a field bare gets null and
 // no complaint — the failure this whole shape has caused before.
 export { readTextValue } from './application/guard-shapes'
+export {
+	type DroppedNetworkRow,
+	dropNetworkRows,
+	type NetworkGuardResult,
+	placesNamed,
+} from './application/network-guard'
 export {
 	type PerRunOverrides,
 	resolvePolicy,

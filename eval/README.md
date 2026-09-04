@@ -331,3 +331,50 @@ A JSON array of companies with their known decision-makers. Copy `golden-contact
 - `expectedContacts` — the known decision-makers. Each needs a `name` (recall matches on it, accent- and middle-name-tolerant); `role` marks decision-makers (scored by decision-maker recall); `email` is the verified sendable address (scored by email precision). **Email is optional** — a name-only row is a valid recall target, and email precision is judged only over rows that carry a verified address.
 
 The shipped example seeds real, durably-public founders/leaders (UK, Spain, LATAM) as name-only recall targets. Two curation steps make the numbers decision-grade: **add verified emails** (so email precision means something), and — since FullEnrich matters most exactly where registries and Hunter come up empty — **add real LATAM SMBs** (Paraguay and the officer-less long tail), the case the FullEnrich spend decision actually turns on. `country` routes the registry (§ *Registries* above), so a Spanish row with the register on confirms officers cheaply.
+
+## Replaying a scan's own rows, offline
+
+The eval above is billable and slow because nothing about it is staged. Some questions do not need any of that. A rule about the SHAPE of an address reads only what a scan already returned, so the way to grade one is to replay rows that came back and ask what the rule would have done to each — no vendor, no money, and the same number twice.
+
+That is `packages/research/src/application/eval-farm-replay.ts`, and it exists because the golden markets cannot answer this. Those are three country-wide requests, and the thing being measured is a page written for ONE TOWN: a country-wide request barely meets those, so a pass over the golden set can move a long way without saying anything about it.
+
+### The corpus
+
+Copy `farm-replay.example.json` to your own `farm-replay.json` and fill it with rows a real scan returned. Each row carries only what a rule may read — the name, the address, the place the row states, the pages it cites — plus the answer, decided by a person:
+
+- `network` — an operator's own page filed as a company. There is no company; the row should go.
+- `serves_not_in` — a real firm, whose place was read off a page about a town it travels to. The firm belongs on the list; its PLACE is what is wrong.
+- `ok` — an ordinary row. Whatever a rule does to this one, it should be nothing.
+
+**The label is read, never derived from the addresses.** One row of the network reached a real scan citing a finance profile and nothing of the network's own, so no rule that reads hosts can catch it. Labelled by its hosts it would have quietly become a pass; labelled for what it is, every host rule reports it as the miss it is.
+
+To build a corpus, dump the runs you want (`get_research`, or a query against the runs table) and take each prospect's `name`, its unwrapped `website` and `location`, and the towns the request asked about. `addresses` is every address the row rests on **with the website among them** — the website itself, plus every `source_id` the row cites. One list, not two, so a rule cannot pass a row by forgetting that the website is an address as well.
+
+The `.example` file uses `.example` domains throughout. A corpus names real businesses, and calling a named firm a farm in a shared file is a claim about that firm, so keep yours out of git — `.gitignore` covers `eval/*.json` and spares the `.example` templates.
+
+### Reading the score
+
+Two figures for what a rule catches — `networkDropped` and `placeRefused` — and two for what it costs, reported **by name** rather than as a rate. `companiesDeleted` is the expensive mistake: a real company somebody paid to find, taken off the list. `placesRefusedInError` is the cheap one: an ordinary row left wearing a doubt it did not earn. A single accuracy figure hides both, and hides them in the direction that flatters a rule which simply drops a lot.
+
+A rule that answers `drop` on a `serves_not_in` row is deleting a real company, and is counted that way. Anything short of `drop` on a `network` row is a miss, because there is no company there to keep.
+
+### Handing it the shipped rule
+
+`dropNetworkRows` takes a findings tree and returns the rows it kept, not a verdict per id, so a runner has to bridge the two. Group the corpus by run first — each row carries the places its own request named, and a rule handed rows from two scans would read hosts across lists that never met:
+
+```ts
+const judge: FarmJudge = all => {
+	const verdicts = new Map<string, FarmVerdict>()
+	for (const group of byRun(all)) {
+		const findings = { prospects: group.map(asProspect) }
+		const gone = new Set(
+			dropNetworkRows(findings, 'prospects', group[0].askedAbout).dropped
+				.map(row => row.name),
+		)
+		for (const row of group) verdicts.set(row.id, gone.has(row.name) ? 'drop' : 'keep')
+	}
+	return verdicts
+}
+```
+
+That join is by name, and a name is not unique — the shipped template carries "Estructures Vallès" twice under different ids, and a real corpus repeats more. Where two rows of one run share a name they take the same verdict, which is right for the fold's purpose and wrong if you need them apart; give such rows distinct names in the corpus, or diff the kept list positionally instead.

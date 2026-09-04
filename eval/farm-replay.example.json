@@ -1,0 +1,111 @@
+[
+	{
+		"id": "example-network-town-page",
+		"askedAbout": ["Sant Quirze del Vallès", "Barcelona"],
+		"name": "VK Estampacions",
+		"website": "https://www.vkestampacionsbarcelona.example",
+		"statedPlace": "Sant Quirze del Vallès, Barcelona",
+		"addresses": [
+			"https://www.vkestampacionsbarcelona.example",
+			"https://www.vkestampacionsbarcelona.example/sant-quirze-del-valles"
+		],
+		"label": "network"
+	},
+	{
+		"id": "example-network-second-town",
+		"askedAbout": ["Cerdanyola del Vallès", "Barcelona"],
+		"name": "VK Estampacions S.L. – Cerdanyola",
+		"website": null,
+		"statedPlace": "Cerdanyola del Vallès",
+		"addresses": [
+			"https://www.vkestampacionsbarcelona.example/cerdanyola-del-valles"
+		],
+		"label": "network"
+	},
+	{
+		"id": "example-network-second-trade",
+		"askedAbout": ["Vacarisses", "Barcelona"],
+		"name": "VK Anoditzats",
+		"website": "https://www.vkanoditzatsbarcelona.example",
+		"statedPlace": "Vacarisses, Barcelona",
+		"addresses": [
+			"https://www.vkanoditzatsbarcelona.example",
+			"https://www.vkanoditzatsbarcelona.example/vacarisses"
+		],
+		"label": "network"
+	},
+	{
+		"id": "example-network-cites-nothing-of-its-own",
+		"askedAbout": ["Sant Quirze del Vallès", "Barcelona"],
+		"name": "VK Projects",
+		"website": null,
+		"statedPlace": null,
+		"addresses": ["https://finance-profiles.example"],
+		"label": "network"
+	},
+	{
+		"id": "example-real-firm-town-page",
+		"askedAbout": ["Castellar del Vallès", "Barcelona"],
+		"name": "Estructures Vallès",
+		"website": "https://estructuresvalles.example",
+		"statedPlace": "Castellar del Vallès",
+		"addresses": [
+			"https://estructuresvalles.example",
+			"https://estructuresvalles.example/estructures-metalliques-castellar-del-valles/"
+		],
+		"label": "serves_not_in"
+	},
+	{
+		"id": "example-real-firm-same-page-other-town",
+		"askedAbout": ["Barberà del Vallès", "Barcelona"],
+		"name": "Estructures Vallès",
+		"website": "https://estructuresvalles.example",
+		"statedPlace": "Barberà del Vallès",
+		"addresses": [
+			"https://estructuresvalles.example",
+			"https://estructuresvalles.example/estructures-metalliques-barbera-del-valles/"
+		],
+		"label": "serves_not_in"
+	},
+	{
+		"id": "example-ordinary-own-site",
+		"askedAbout": ["Sant Quirze del Vallès", "Barcelona"],
+		"name": "Carinsa Group",
+		"website": "https://carinsa.example",
+		"statedPlace": "Sant Quirze del Vallès, Barcelona",
+		"addresses": ["https://carinsa.example"],
+		"label": "ok"
+	},
+	{
+		"id": "example-ordinary-named-after-its-town",
+		"askedAbout": ["Sentmenat", "Barcelona"],
+		"name": "Calderería Sentmenat",
+		"website": "https://caldereria-sentmenat.example",
+		"statedPlace": "Sentmenat, Barcelona",
+		"addresses": [
+			"https://caldereria-sentmenat.example",
+			"https://caldereria-sentmenat.example/"
+		],
+		"label": "ok"
+	},
+	{
+		"id": "example-ordinary-on-a-directory-path",
+		"askedAbout": ["Castellar del Vallès", "Barcelona"],
+		"name": "Delinox Solutions",
+		"website": null,
+		"statedPlace": "Castellar del Vallès",
+		"addresses": [
+			"https://a-directory.example/castellar-del-valles/fabricante/delinox-solutions"
+		],
+		"label": "ok"
+	},
+	{
+		"id": "example-ordinary-no-address-at-all",
+		"askedAbout": ["Ripollet", "Barcelona"],
+		"name": "Indusnow SL",
+		"website": null,
+		"statedPlace": null,
+		"addresses": [],
+		"label": "ok"
+	}
+]
