@@ -9,7 +9,9 @@
  *   - jittered exponential backoff, capped at `DEFAULT_MAX_ATTEMPTS` total.
  *   - retry gated on `ProviderError.recoverable` — a 4xx auth/quota failure
  *     (recoverable=false) fails fast; a 5xx/429/timeout retries.
- *   - a `provider.retried` log on each actual retry decision.
+ *   - a `provider.retried` log written ONLY when another attempt is really about
+ *     to be made — not for a failure the gate above refuses, and not on the
+ *     final exhausted attempt.
  *
  * A timed-out attempt becomes a recoverable `ProviderError`, so the same
  * `recoverable` predicate drives both retry here and the cross-vendor fallback
@@ -37,9 +39,17 @@ const integerJitter = <O, I, E, R>(
 		return Effect.succeed(Duration.millis(Math.round(jittered)))
 	})
 
+const isRecoverable = (err: unknown): boolean =>
+	err instanceof ProviderError && err.recoverable
+
 const makeSchedule = (provider: string) =>
 	integerJitter(Schedule.exponential('500 millis')).pipe(
 		Schedule.upTo({ times: DEFAULT_MAX_ATTEMPTS - 1 }),
+		// The gate belongs here, ahead of the log, and not in `Effect.retry`'s own
+		// `while`: that one is consulted only once the schedule has already run, so
+		// a failure it refuses has been logged as a retry before anything asks
+		// whether to make one.
+		Schedule.while(({ input }) => isRecoverable(input)),
 		Schedule.tap(() =>
 			Effect.logInfo('provider.retry').pipe(
 				Effect.annotateLogs({ event: 'provider.retried', provider }),
@@ -77,11 +87,5 @@ export const hardenHttp =
 					: err,
 			),
 		)
-		return attempt.pipe(
-			Effect.retry({
-				schedule: makeSchedule(provider),
-				while: (e: ProviderError | Ex) =>
-					e instanceof ProviderError && e.recoverable,
-			}),
-		)
+		return attempt.pipe(Effect.retry(makeSchedule(provider)))
 	}
