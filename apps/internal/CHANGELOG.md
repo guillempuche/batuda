@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-09-04 (internal-v2026.9.4)
+
+### Features
+
+* narrow a company list by several values, from the app or an agent ([ac8da5b](https://github.com/guillempuche/batuda/commit/ac8da5b1aacc7512d6dfaf73d3355349355e0d00)), closes [#602](https://github.com/guillempuche/batuda/issues/602) [#603](https://github.com/guillempuche/batuda/issues/603)
+
+### Bug Fixes
+
+* hold a scan's list to the place its request named ([9d0fbbf](https://github.com/guillempuche/batuda/commit/9d0fbbfd818bcfb97e45982110525e1c42804dd9)), closes [#608](https://github.com/guillempuche/batuda/issues/608)
+
 ## 2026-09-03 (internal-v2026.9.3)
 
 ### Features
