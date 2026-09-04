@@ -20,7 +20,7 @@
  *
  * Env scheme (capability-named, no auto-resolution):
  *   RESEARCH_LLM_<TIER>_PROVIDERS=nebius,groq,…          (CSV, slot 0 primary)
- *   RESEARCH_LLM_<TIER>_MODEL=Qwen/Qwen3-32B             (slot 0)
+ *   RESEARCH_LLM_<TIER>_MODEL=Qwen/Qwen3-235B-A22B-Instruct-2507  (slot 0)
  *   RESEARCH_LLM_<TIER>_MODEL_2=openai/gpt-oss-120b      (slot 1; defaults to slot 0)
  *   RESEARCH_LLM_<TIER>_API_KEY=…                        (slot 0)
  *   RESEARCH_LLM_<TIER>_API_KEY_2=…                      (slot 1 via keyForSlot)
@@ -310,7 +310,7 @@ const buildTierLayer = <Self>(
 			const slots = yield* Effect.forEach(vendors, (vendor, i) =>
 				Effect.gen(function* () {
 					// A fallback slot may run a different provider whose model id
-					// differs (`openai/gpt-oss-120b` on Groq vs `Qwen/Qwen3-32B` on
+					// differs (`openai/gpt-oss-120b` on Groq vs a Qwen model on
 					// Nebius), so each slot reads its own model. Slot 0 is the tier's
 					// base model; later slots default to it when they share the id.
 					const slotModel =
