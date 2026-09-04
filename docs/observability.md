@@ -53,6 +53,9 @@ Timestamps and trace ids are added by the framework.
 | `email.sent`                   | Outbound email                                             |
 | `email.received`               | Inbound reply                                              |
 | `email.failed`                 | Email delivery failed                                      |
+| `inbox.created`                | A mailbox was connected                                    |
+| `inbox.probed`                 | A mailbox check that did not pass (a clean one is `debug`) |
+| `inbox.probe_unrecorded`       | A mailbox was checked but the answer could not be stored   |
 | `webhook.fired`                | Webhook fan-out triggered                                  |
 | `webhook.failed`               | Webhook delivery failed                                    |
 | `page.published`               | Sales page made public                                     |

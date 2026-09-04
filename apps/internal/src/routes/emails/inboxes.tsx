@@ -984,6 +984,8 @@ function InboxFormDialog({
 		(draft.imapHost.trim() === '' || draft.smtpHost.trim() === '')
 	const advancedOpen = showAdvanced || needsManualHosts
 
+	// On a new mailbox, an empty login name means the address itself: that is
+	// what nearly every provider signs in with.
 	const usernameForSubmit = draft.username !== '' ? draft.username : draft.email
 
 	// Create requires email + transport + credentials. Edit lets the user
@@ -1028,7 +1030,10 @@ function InboxFormDialog({
 						smtpHost: draft.smtpHost,
 						smtpPort: draft.smtpPort,
 						smtpSecurity: draft.smtpSecurity,
-						username: usernameForSubmit,
+						// On an edit, an empty login name means nothing to change, so a
+						// mailbox that signs in under a different address keeps the one
+						// it has.
+						...(draft.username !== '' && { username: draft.username }),
 						...(changeCredentials && password !== '' && { password }),
 					})
 				: await onCreate({

@@ -23,6 +23,7 @@ import {
 	EmailThreadDetail,
 	EmailThreadList,
 	EmailThreadListItem,
+	type GrantFailureReason,
 	GrantUnavailable,
 	InboxInactive,
 	NoDefaultInbox,
@@ -34,7 +35,7 @@ import { EmailDraft, Inbox, InboxFooter, isOrgManager } from '@batuda/domain'
 import { renderBlocks, type StagedAttachmentRef } from '@batuda/email/render'
 import type { EmailBlocks } from '@batuda/email/schema'
 import { isReplySubject, withReplyPrefix } from '@batuda/email/subject'
-import { boundedCause } from '@batuda/observability'
+import { boundedCause, recordFacts } from '@batuda/observability'
 
 import {
 	type CountMode,
@@ -835,6 +836,7 @@ export class EmailService extends Context.Service<EmailService>()(
 									({
 										status: 'connected' as const,
 										detail: null as string | null,
+										reason: null as GrantFailureReason | null,
 									}) as const,
 								onFailure: err =>
 									({
@@ -843,9 +845,19 @@ export class EmailService extends Context.Service<EmailService>()(
 												? ('auth_failed' as const)
 												: ('connect_failed' as const),
 										detail: err.detail ?? null,
+										reason: err.reason,
 									}) as const,
 							}),
 						)
+
+					// Only the sort of failure travels: the mail server's own words
+					// are about somebody's account.
+					yield* recordFacts({
+						'inbox.probe.outcome': probe.status,
+						...(probe.reason !== null && {
+							'inbox.probe.reason': probe.reason,
+						}),
+					})
 
 					const rows = yield* sql<InboxRow>`
 						UPDATE inboxes
@@ -2351,6 +2363,24 @@ export class EmailService extends Context.Service<EmailService>()(
 						const currentOrg = yield* CurrentOrg
 						const session = yield* SessionContext
 
+						// Pasted from a provider's page, any of these can carry a space or a
+						// newline; the mail server counts that as part of what it was given
+						// and refuses the sign-in.
+						const address = input.email.trim()
+						const username =
+							input.username.trim() === '' ? address : input.username.trim()
+						const password = input.password.trim()
+						const imapHost = input.imapHost.trim()
+						const smtpHost = input.smtpHost.trim()
+
+						// Blank space is not a password: stored, it would only ever be
+						// refused, and the refusals counted against the mailbox.
+						if (password === '') {
+							return yield* new BadRequest({
+								message: 'A password is required to connect a mailbox',
+							})
+						}
+
 						// A mailbox belongs to whoever connects it unless it is being
 						// set up for the whole team.
 						const ownerUserId = input.shared
@@ -2372,7 +2402,7 @@ export class EmailService extends Context.Service<EmailService>()(
 						const alreadyConnected = yield* sql<{ count: number }>`
 							SELECT count(*)::int AS count FROM inboxes
 							WHERE organization_id = ${currentOrg.id}
-							  AND lower(email) = lower(${input.email})
+							  AND lower(email) = lower(${address})
 							  AND active = true
 						`.pipe(Effect.orDie)
 						if ((alreadyConnected[0]?.count ?? 0) > 0) {
@@ -2418,7 +2448,7 @@ export class EmailService extends Context.Service<EmailService>()(
 
 						const encrypted = crypto.encryptPassword({
 							inboxId,
-							plain: input.password,
+							plain: password,
 						})
 
 						// Probe IMAP LOGIN + SMTP EHLO/AUTH against the supplied
@@ -2430,14 +2460,14 @@ export class EmailService extends Context.Service<EmailService>()(
 						const probe = yield* transport
 							.probe({
 								inboxId,
-								imapHost: input.imapHost,
+								imapHost,
 								imapPort: input.imapPort,
 								imapSecurity: input.imapSecurity,
-								smtpHost: input.smtpHost,
+								smtpHost,
 								smtpPort: input.smtpPort,
 								smtpSecurity: input.smtpSecurity,
-								username: input.username,
-								password: input.password,
+								username,
+								password,
 							})
 							.pipe(
 								Effect.match({
@@ -2445,6 +2475,7 @@ export class EmailService extends Context.Service<EmailService>()(
 										({
 											status: 'connected',
 											detail: null,
+											reason: null,
 										}) as const,
 									onFailure: err =>
 										({
@@ -2453,6 +2484,7 @@ export class EmailService extends Context.Service<EmailService>()(
 													? ('auth_failed' as const)
 													: ('connect_failed' as const),
 											detail: err.detail ?? null,
+											reason: err.reason,
 										}) as const,
 								}),
 							)
@@ -2476,20 +2508,20 @@ export class EmailService extends Context.Service<EmailService>()(
 									INSERT INTO inboxes ${sql.insert({
 										id: inboxId,
 										organizationId: currentOrg.id,
-										email: input.email,
+										email: address,
 										displayName: input.displayName ?? null,
 										description: input.description ?? null,
 										ownerUserId,
 										isDefault,
 										isPrivate: input.isPrivate ?? false,
 										active: true,
-										imapHost: input.imapHost,
+										imapHost,
 										imapPort: input.imapPort,
 										imapSecurity: input.imapSecurity,
-										smtpHost: input.smtpHost,
+										smtpHost,
 										smtpPort: input.smtpPort,
 										smtpSecurity: input.smtpSecurity,
-										username: input.username,
+										username,
 										passwordCiphertext: encrypted.ciphertext,
 										passwordNonce: encrypted.nonce,
 										passwordTag: encrypted.tag,
@@ -2519,10 +2551,19 @@ export class EmailService extends Context.Service<EmailService>()(
 						yield* Effect.logInfo('Inbox created').pipe(
 							Effect.annotateLogs({
 								event: 'inbox.created',
-								email: input.email,
+								inboxId,
 								shared: ownerUserId === null,
 							}),
 						)
+
+						// Only the sort of failure travels: the mail server's own words
+						// are about somebody's account.
+						yield* recordFacts({
+							'inbox.probe.outcome': probe.status,
+							...(probe.reason !== null && {
+								'inbox.probe.reason': probe.reason,
+							}),
+						})
 						return yield* decodeInbox(rows[0]!).pipe(Effect.orDie)
 					}),
 
@@ -2616,6 +2657,15 @@ export class EmailService extends Context.Service<EmailService>()(
 							}
 						}
 
+						// Everything that turns a save away is settled before anything is
+						// written, because a refusal raised later can still leave the
+						// surrounding transaction committing what came before it.
+						if (patch.password !== undefined && patch.password.trim() === '') {
+							return yield* new BadRequest({
+								message: 'A password cannot be blank',
+							})
+						}
+
 						// Who a mailbox belongs to is not written from here. The column
 						// is out of this role's reach, so the change goes through a
 						// routine that re-checks the rules for itself — the database
@@ -2648,23 +2698,26 @@ export class EmailService extends Context.Service<EmailService>()(
 						if (patch.active !== undefined)
 							sets.push(sql`active = ${patch.active}`)
 						if (patch.imapHost !== undefined)
-							sets.push(sql`imap_host = ${patch.imapHost}`)
+							sets.push(sql`imap_host = ${patch.imapHost.trim()}`)
 						if (patch.imapPort !== undefined)
 							sets.push(sql`imap_port = ${patch.imapPort}`)
 						if (patch.imapSecurity !== undefined)
 							sets.push(sql`imap_security = ${patch.imapSecurity}`)
 						if (patch.smtpHost !== undefined)
-							sets.push(sql`smtp_host = ${patch.smtpHost}`)
+							sets.push(sql`smtp_host = ${patch.smtpHost.trim()}`)
 						if (patch.smtpPort !== undefined)
 							sets.push(sql`smtp_port = ${patch.smtpPort}`)
 						if (patch.smtpSecurity !== undefined)
 							sets.push(sql`smtp_security = ${patch.smtpSecurity}`)
-						if (patch.username !== undefined)
-							sets.push(sql`username = ${patch.username}`)
+						// Blank space says nothing about what the login name should
+						// become, so the stored one is left alone rather than replaced by
+						// one nothing can sign in with.
+						if (patch.username !== undefined && patch.username.trim() !== '')
+							sets.push(sql`username = ${patch.username.trim()}`)
 						if (patch.password !== undefined) {
 							const encrypted = crypto.encryptPassword({
 								inboxId: id,
-								plain: patch.password,
+								plain: patch.password.trim(),
 							})
 							sets.push(sql`password_ciphertext = ${encrypted.ciphertext}`)
 							sets.push(sql`password_nonce = ${encrypted.nonce}`)
@@ -2692,7 +2745,7 @@ export class EmailService extends Context.Service<EmailService>()(
 						// touches metadata (e.g. display name) skips the probe.
 						const credentialsChanged =
 							patch.password !== undefined ||
-							patch.username !== undefined ||
+							(patch.username !== undefined && patch.username.trim() !== '') ||
 							patch.imapHost !== undefined ||
 							patch.imapPort !== undefined ||
 							patch.imapSecurity !== undefined ||
