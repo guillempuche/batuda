@@ -81,5 +81,10 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # with-mail here and not on the pull-request gate: the IMAP tests need a
+      # real mail server, which costs a pull and about a minute of start-up. This
+      # job is a backstop with room for it; the gate is not.
       - name: Integration suite against a local Postgres
         uses: ./.github/actions/integration-db
+        with:
+          with-mail: "true"
