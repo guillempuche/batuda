@@ -12,10 +12,11 @@ description: >-
 inputs:
   with-mail:
     description: >-
-      Also stand up the mail catcher, so the tests that talk IMAP to a real
-      server run instead of skipping. Off by default: it costs a 320 MB pull and
-      about a minute of start-up, which the pull-request gate cannot spare
-      inside its ten-minute budget. The post-merge backstop turns it on.
+      Also stand up the mail catcher. The tests that need one find it themselves
+      and skip when it is absent, so this is the whole of the switch: bring it
+      up and they run. Off by default, because it costs a 320 MB pull and about
+      a minute of start-up that the pull-request gate cannot spare inside its
+      ten-minute budget. The post-merge backstop turns it on.
     required: false
     default: "false"
 
@@ -125,8 +126,4 @@ runs:
         STORAGE_ACCESS_KEY_ID: batuda
         STORAGE_SECRET_ACCESS_KEY: batuda-secret
         STORAGE_BUCKET: batuda-assets
-        # Set only where the catcher is up. The IMAP tests read this and stay
-        # inert without it, so the gate runs the same suite minus the ones that
-        # need a mail server.
-        MAIL_CATCHER_LIVE: ${{ inputs.with-mail == 'true' && '1' || '' }}
       run: pnpm exec turbo test:integration --concurrency=1

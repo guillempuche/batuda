@@ -1,11 +1,16 @@
 // Live IMAP-roundtrip test — the only place a real mail server is on the wire.
 //
-// Gated behind MAIL_CATCHER_LIVE because it needs one, which the pull-request
-// gate does not stand up: the image is 320 MB and the server takes about a
-// minute to answer, and that gate has a ten-minute budget to keep. So it runs
-// post-merge, where there is room, and stays inert everywhere else. Locally:
-//   pnpm cli services up && pnpm cli db reset && pnpm cli seed
-//   MAIL_CATCHER_LIVE=1 pnpm --filter @batuda/mail-worker test:integration
+// Runs when there is a mail server to talk to and skips when there is not, by
+// asking one before deciding rather than reading a flag somebody has to set.
+// A flag is one more thing between the server being up and the tests running,
+// and when it goes missing they skip while everything still reports green —
+// which is indistinguishable from passing. Asking cannot go quiet that way:
+// either the server answers and they run, or it does not and they cannot.
+//
+// The pull-request gate stands up no mail server, so they skip there: the image
+// is 320 MB and takes about a minute to answer, and that gate has a ten-minute
+// budget to keep. The post-merge run stands one up, so they run. Locally they
+// follow `pnpm cli services up` with no extra step.
 //
 // What it does: SMTP-inject a message → connect ImapFlow as the seeded
 // admin@taller.cat → open INBOX → call `fetchAndIngestNewerThan` against the
@@ -16,6 +21,9 @@
 
 process.env['DATABASE_URL'] ??=
 	'postgresql://batuda:batuda@localhost:5433/batuda'
+
+// GreenMail's REST port, as docker-compose maps it.
+const MAIL_CATCHER_REST = 'http://localhost:8025'
 
 import { PgClient } from '@effect/sql-pg'
 import { Config, Effect, Redacted } from 'effect'
@@ -100,8 +108,19 @@ const clearCatcher = async () => {
 	}
 }
 
-describe.skipIf(!process.env['MAIL_CATCHER_LIVE'])(
-	'IMAP ingest roundtrip (live; set MAIL_CATCHER_LIVE)',
+// Asked once, before the suite is collected. A short deadline: this answers on
+// a loopback port, so anything slower than a moment is nothing listening.
+const mailServerAnswers = await fetch(
+	`${MAIL_CATCHER_REST}/api/service/readiness`,
+	{
+		signal: AbortSignal.timeout(2000),
+	},
+)
+	.then(res => res.ok)
+	.catch(() => false)
+
+describe.skipIf(!mailServerAnswers)(
+	'IMAP ingest roundtrip (needs the mail catcher)',
 	() => {
 		let pool: pg.Pool
 		let orgId: string
