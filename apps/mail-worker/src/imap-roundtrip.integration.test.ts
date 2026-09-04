@@ -1,9 +1,11 @@
-// Live IMAP-roundtrip integration test. Gated behind MAIL_CATCHER_LIVE: it
-// needs the running dev stack (GreenMail IMAP on :1143, Postgres, MinIO),
-// none of which exist in the unit-test CI job, so it stays inert there and
-// runs only when explicitly enabled:
+// Live IMAP-roundtrip test — the only place a real mail server is on the wire.
+//
+// Gated behind MAIL_CATCHER_LIVE because it needs one, which the pull-request
+// gate does not stand up: the image is 320 MB and the server takes about a
+// minute to answer, and that gate has a ten-minute budget to keep. So it runs
+// post-merge, where there is room, and stays inert everywhere else. Locally:
 //   pnpm cli services up && pnpm cli db reset && pnpm cli seed
-//   MAIL_CATCHER_LIVE=1 pnpm --filter @batuda/mail-worker vitest run src/imap-roundtrip
+//   MAIL_CATCHER_LIVE=1 pnpm --filter @batuda/mail-worker test:integration
 //
 // What it does: SMTP-inject a message → connect ImapFlow as the seeded
 // admin@taller.cat → open INBOX → call `fetchAndIngestNewerThan` against the
