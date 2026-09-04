@@ -80,10 +80,15 @@ msgstr "{0, plural, one {# pàgina del web de l'empresa} other {# pàgines del w
 msgid "{0, plural, one {# pass over the evidence} other {# passes over the evidence}}"
 msgstr "{0, plural, one {# passada sobre les proves} other {# passades sobre les proves}}"
 
-#. placeholder {0}: progress.sourceCount
+#. placeholder {0}: live.sourceCount
 #: src/components/research/run-progress.tsx
 msgid "{0, plural, one {# source} other {# sources}}"
 msgstr "{0, plural, one {# font} other {# fonts}}"
+
+#. placeholder {0}: live.progressSteps
+#: src/components/research/run-progress.tsx
+msgid "{0, plural, one {# step run} other {# steps run}}"
+msgstr "{0, plural, one {# pas fet} other {# passos fets}}"
 
 #. placeholder {0}: counts[shelf]
 #: src/routes/tasks/index.tsx
@@ -228,10 +233,6 @@ msgstr "{scoped} (per defecte)"
 #: src/routes/emails/index.tsx
 msgid "{selectedCount} threads selected"
 msgstr "{selectedCount} fils seleccionats"
-
-#: src/components/research/run-progress.tsx
-msgid "{steps, plural, one {# step run} other {# steps run}}"
-msgstr "{steps, plural, one {# pas fet} other {# passos fets}}"
 
 #: src/routes/settings/organization/policy.tsx
 msgid "{threshold}%"
@@ -1099,6 +1100,10 @@ msgstr "Canvia l'estat"
 msgid "Changes have been saved."
 msgstr "S'han desat els canvis."
 
+#: src/components/research/run-vitals.tsx
+msgid "changes waiting on you"
+msgstr "canvis pendents de la teva decisió"
+
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Channel"
 msgstr "Canal"
@@ -1276,6 +1281,10 @@ msgstr "Anàlisi de competidors"
 #: src/components/research/findings/competitor-scan-view.tsx
 msgid "Competitors"
 msgstr "Competidors"
+
+#: src/components/research/run-vitals.tsx
+msgid "Competitors found"
+msgstr "Competidors trobats"
 
 #: src/components/emails/compose-form.tsx
 msgid "complained"
@@ -2873,6 +2882,11 @@ msgstr "Safata actualitzada"
 msgid "Inboxes"
 msgstr "Bústies"
 
+#. placeholder {0}: formatMoneyCents(vitals.paidCostCents, { locale: i18n.locale })
+#: src/components/research/run-vitals.tsx
+msgid "includes {0} on paid lookups"
+msgstr "inclou {0} en consultes de pagament"
+
 #: src/routes/settings/organization/index.tsx
 #: src/routes/settings/organization/industries.tsx
 msgid "Industries"
@@ -3082,6 +3096,10 @@ msgstr "S'apliquen després de la pila, en ordre."
 msgid "Lead assigned"
 msgstr "Oportunitat assignada"
 
+#: src/components/research/run-vitals.tsx
+msgid "Leads found"
+msgstr "Oportunitats trobades"
+
 #: src/components/companies/company-channels-section.tsx
 msgid "Let mail through again"
 msgstr "Deixa passar el correu"
@@ -3110,8 +3128,8 @@ msgid "Live updates have stopped. The run may still be working."
 msgstr "Les actualitzacions en directe s'han aturat. Potser l'execució encara treballa."
 
 #: src/components/research/run-detail.tsx
-msgid "Live updates paused. This run may still be working — refresh to check its latest status."
-msgstr "Actualitzacions en directe pausades. Aquesta execució encara pot estar treballant — actualitza per veure el seu estat més recent."
+msgid "Live updates stopped. This run may still be working — reload to pick it up again."
+msgstr "S'han aturat les actualitzacions en directe. Pot ser que l'execució encara estigui treballant: torna a carregar-la per reprendre-les."
 
 #: src/components/shared/infinite-list-footer.tsx
 msgid "Load more"
@@ -4060,6 +4078,11 @@ msgstr "Notificacions"
 msgid "Numbered list"
 msgstr "Llista numerada"
 
+#. placeholder {0}: formatMoneyCents(budget, { locale: i18n.locale })
+#: src/components/research/run-vitals.tsx
+msgid "of {0} allowed"
+msgstr "de {0} permesos"
+
 #: src/routes/emails/$threadId.tsx
 msgid "On {date}, {who} wrote:"
 msgstr "El {date}, {who} va escriure:"
@@ -4443,6 +4466,10 @@ msgstr "Pendent de revisió"
 #: src/routes/companies/$slug.tsx
 msgid "People"
 msgstr "Persones"
+
+#: src/components/research/run-vitals.tsx
+msgid "People found"
+msgstr "Persones trobades"
 
 #: src/routes/settings/organization/members.tsx
 msgid "People with access to this workspace."
@@ -5537,6 +5564,10 @@ msgstr "Límits de despesa i la confiança necessària per aplicar automàticame
 msgid "Spend ceilings for research and how confident a finding must be to apply on its own."
 msgstr "Límits de despesa per a la recerca i quina confiança ha de tenir una conclusió per aplicar-se sola."
 
+#: src/components/research/run-vitals.tsx
+msgid "Spent"
+msgstr "Gastat"
+
 #: src/routes/settings/organization/templates.tsx
 #: src/routes/settings/profile/templates.tsx
 msgid "Stack deleted"
@@ -5606,7 +5637,7 @@ msgstr "Ha fallat l'actualització d'estat"
 msgid "Steer a net-new search, or set a status/industry/country/tag filter to run across companies you already track."
 msgstr "Orienta una cerca de noves empreses, o defineix un filtre d'estat/sector/país/etiqueta per executar-la sobre empreses que ja segueixes."
 
-#. placeholder {0}: progress.phase
+#. placeholder {0}: live.phase
 #: src/components/research/run-progress.tsx
 msgid "Step {0} of 3"
 msgstr "Pas {0} de 3"
@@ -6166,6 +6197,10 @@ msgstr "TLS"
 #: src/routes/emails/$threadId.tsx
 msgid "To"
 msgstr "Per a"
+
+#: src/components/research/run-vitals.tsx
+msgid "To review"
+msgstr "Per revisar"
 
 #: src/routes/index.tsx
 #: src/routes/tasks/index.tsx

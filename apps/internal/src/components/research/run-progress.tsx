@@ -1,56 +1,53 @@
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
-import { Plural, Trans, useLingui } from '@lingui/react/macro'
+import { Plural, Trans } from '@lingui/react/macro'
 import type { ReactNode } from 'react'
 import styled from 'styled-components'
 
-import type { ResearchProgress } from '#/components/research/event-shapes'
+import type { ResearchRunLive } from '@batuda/controllers'
 
 /**
- * Live status for an in-flight run, driven by the event long-poll. Shows
+ * Live status for an in-flight run, driven by the run's own event stream. Shows
  * which of the three phases the agent is in (gather → extract → write), the
  * step count, and how many sources it has pulled — so a paid, minutes-long
  * job doesn't look frozen.
  *
  * Read silently on purpose. Announcing this panel meant re-reading every figure
- * in it each time a poll returned — "gathering evidence, step 1 of 3, searching
- * and reasoning, 7 steps run, 4 sources", over and over, interrupting whatever
- * the reader was on. The page announces the phase alone, when it changes, from a
- * region that outlives this panel; see `phaseMessage`.
+ * in it each time a frame arrived — "gathering evidence, step 1 of 3, 7 steps
+ * run, 4 sources", over and over, interrupting whatever the reader was on. The
+ * page announces the phase alone, when it changes, from a region that outlives
+ * this panel; see `phaseMessage`.
  */
-export function RunProgress({
-	progress,
-	steps,
-}: {
-	readonly progress: ResearchProgress
-	// Rounds the run itself reports, read off its row: the event stream would
-	// undercount a run that was already working when the page loaded.
-	readonly steps: number | null
-}) {
-	const { t } = useLingui()
+export function RunProgress({ live }: { readonly live: ResearchRunLive }) {
 	return (
 		<Wrap data-testid='research-run-progress'>
 			<Pulse aria-hidden />
 			<Body>
 				<Line>
-					<Phase>{phaseLabel(progress.phase)}</Phase>
-					{progress.phase !== null ? (
-						<Step>{t`Step ${progress.phase} of 3`}</Step>
+					<Phase>{phaseLabel(live.phase)}</Phase>
+					{live.phase !== null ? (
+						<Step>
+							<Trans>Step {live.phase} of 3</Trans>
+						</Step>
 					) : null}
 				</Line>
 				<Meta>
-					{progress.activeTool !== null ? (
-						<MetaItem>{toolLabel(progress.activeTool)}</MetaItem>
+					{live.activeTool !== null ? (
+						<MetaItem>{toolLabel(live.activeTool)}</MetaItem>
 					) : null}
-					{steps !== null && steps > 0 ? (
-						<MetaItem>
-							<Plural value={steps} one='# step run' other='# steps run' />
-						</MetaItem>
-					) : null}
-					{progress.sourceCount !== null ? (
+					{live.progressSteps !== null && live.progressSteps > 0 ? (
 						<MetaItem>
 							<Plural
-								value={progress.sourceCount}
+								value={live.progressSteps}
+								one='# step run'
+								other='# steps run'
+							/>
+						</MetaItem>
+					) : null}
+					{live.sourceCount !== null ? (
+						<MetaItem>
+							<Plural
+								value={live.sourceCount}
 								one='# source'
 								other='# sources'
 							/>
