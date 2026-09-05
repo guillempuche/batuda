@@ -1838,6 +1838,29 @@ export const cloneCacheHitRun = (params: {
 
 // ── ResearchService ──
 
+/**
+ * Where a run is, in the figures a watching page needs — the shape
+ * `liveSnapshot` reads and whatever turns it into a frame consumes.
+ *
+ * Declared once and exported for that reason: the SQL's own type is an
+ * assertion rather than a check, so a column renamed there and nowhere else
+ * arrives as `undefined` wearing the type of a number. Sharing the shape at
+ * least makes the two ends fail together instead of silently disagreeing.
+ */
+export interface ResearchLiveSnapshot {
+	readonly status: string
+	readonly phase: number
+	readonly progressSteps: number | null
+	readonly costCents: number
+	readonly paidCostCents: number
+	readonly budgetCents: number
+	readonly paidBudgetCents: number
+	readonly sourceCount: number
+	readonly hasFindings: boolean
+	readonly foundCount: number | null
+	readonly pendingProposalCount: number
+}
+
 export class ResearchService extends Context.Service<ResearchService>()(
 	'ResearchService',
 	{
@@ -8145,6 +8168,76 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							GROUP BY ${keyFragment}
 							ORDER BY amount_cents DESC
 						`
+					}),
+
+				/**
+				 * Which findings schema a run was started with, or undefined when the
+				 * run is not this reader's to see.
+				 *
+				 * One column, because that is all a watcher needs before it can ask for
+				 * anything else: the schema settles which list holds what the run found,
+				 * and it never changes for the life of a run. Reading the whole run to
+				 * learn it made opening a page the most expensive thing on this route.
+				 */
+				runSchemaName: (researchId: string) =>
+					Effect.gen(function* () {
+						if (!isValidUuid(researchId)) return undefined
+						const [row] = yield* sql<{ schemaName: string | null }>`
+							SELECT r.schema_name
+							FROM research_runs r
+							WHERE r.id = ${researchId} AND r.status != 'deleted'
+						`
+						return row === undefined ? undefined : row.schemaName
+					}),
+
+				/**
+				 * Where a run is, for somebody watching it — the dozen figures a live
+				 * frame carries, and nothing else.
+				 *
+				 * `get` answers the same question, but it answers it with the whole run:
+				 * every page the run has read joined to its source row, every subject
+				 * link, every child of a batch with its own findings and brief, plus the
+				 * transcript and the tool log, which both grow all run. A watcher asks
+				 * this every few seconds for as long as the run lasts, so it reads the
+				 * columns it needs and counts the rest in the database rather than
+				 * carrying a findings blob across the wire to measure its length.
+				 *
+				 * `foundField` names the list this kind of run fills with what it went
+				 * looking for, or null for a kind that hunts for no list. It is settled
+				 * once by the caller from the run's schema, which never changes.
+				 *
+				 * Null when the run is gone — deleted, or never this reader's to see.
+				 */
+				liveSnapshot: (researchId: string, foundField: string | null) =>
+					Effect.gen(function* () {
+						if (!isValidUuid(researchId)) return null
+						const [row] = yield* sql<ResearchLiveSnapshot>`
+							SELECT r.status, r.phase, r.progress_steps,
+								r.cost_cents, r.paid_cost_cents,
+								r.budget_cents, r.paid_budget_cents,
+								(SELECT count(*) FROM research_run_sources rs
+									WHERE rs.research_id = r.id)::int AS source_count,
+								-- A run that has written nothing down yet has no count to
+								-- give, which is not the same as a count of none.
+								(r.findings IS NOT NULL
+									AND jsonb_typeof(r.findings) = 'object'
+									AND r.findings <> '{}'::jsonb) AS has_findings,
+								CASE
+									WHEN ${foundField}::text IS NULL THEN NULL
+									WHEN jsonb_typeof(r.findings -> ${foundField}::text) = 'array'
+										THEN jsonb_array_length(r.findings -> ${foundField}::text)
+									ELSE 0
+								END AS found_count,
+								(SELECT count(*) FROM jsonb_array_elements(
+									CASE WHEN jsonb_typeof(r.findings -> 'proposed_updates') = 'array'
+										THEN r.findings -> 'proposed_updates'
+										ELSE '[]'::jsonb END
+								) pu WHERE pu ->> 'status' = 'pending')::int
+									AS pending_proposal_count
+							FROM research_runs r
+							WHERE r.id = ${researchId} AND r.status != 'deleted'
+						`
+						return row ?? null
 					}),
 
 				/** Subscribe to SSE events for a run. Returns a Stream. */

@@ -155,6 +155,7 @@ export {
 	queryPendingProposals,
 	type ResearchEvent,
 	type ResearchEventType,
+	type ResearchLiveSnapshot,
 	ResearchService,
 	type ResolvedInstructions,
 	stampRunCostFromLedger,

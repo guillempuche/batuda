@@ -186,6 +186,19 @@ const NON_SCAN_FOUND_FIELD = {
 } satisfies Record<SchemaName, string | null>
 
 /**
+ * Which list a kind of run fills with what it went looking for, or null for a
+ * kind that hunts for none. Settled from the run's schema, which never changes,
+ * so a caller reading the same run repeatedly asks once.
+ */
+export const foundRowsField = (schemaName: string | null): string | null => {
+	// A run stored before the schema column existed counts as a brief, and a name
+	// this build no longer has is not one anybody can be told a number for.
+	const name = schemaName ?? 'freeform'
+	if (!isSchemaName(name)) return null
+	return discoveryResultField(name) ?? NON_SCAN_FOUND_FIELD[name]
+}
+
+/**
  * How many rows a run has found so far, or null for a kind that hunts for none.
  *
  * Findings arrive as plain JSON written by a model, so nothing guarantees the
@@ -197,11 +210,7 @@ export const countFoundRows = (
 	schemaName: string | null,
 	findings: unknown,
 ): number | null => {
-	// A run stored before the schema column existed counts as a brief, and a name
-	// this build no longer has is not one anybody can be told a number for.
-	const name = schemaName ?? 'freeform'
-	if (!isSchemaName(name)) return null
-	const field = discoveryResultField(name) ?? NON_SCAN_FOUND_FIELD[name]
+	const field = foundRowsField(schemaName)
 	if (field === null) return null
 	if (!isPlainObject(findings)) return 0
 	const rows = findings[field]
