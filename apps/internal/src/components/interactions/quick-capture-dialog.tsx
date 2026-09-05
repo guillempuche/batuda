@@ -7,7 +7,7 @@ import { AsyncResult } from 'effect/unstable/reactivity'
 import { ChevronsUpDown, X } from 'lucide-react'
 import { styled } from 'next-yak'
 import type { FormEvent } from 'react'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 
 import {
 	PriButton,
@@ -19,6 +19,7 @@ import {
 	usePriToast,
 } from '@batuda/ui/pri'
 
+import { companiesListAtom } from '#/atoms/pipeline-atoms'
 import {
 	ChannelIcon,
 	type InteractionChannel,
@@ -57,9 +58,33 @@ const CHANNELS: ReadonlyArray<InteractionChannel> = [
  * `nextAction`/`nextActionAt` in the same transaction.
  */
 export function QuickCaptureDialog() {
+	const { isOpen, session, close } = useQuickCapture()
+	return (
+		<PriDialog.Root
+			open={isOpen}
+			onOpenChange={(nextOpen: boolean) => {
+				if (!nextOpen) close()
+			}}
+		>
+			<PriDialog.Portal>
+				<PriDialog.Backdrop />
+				<PriDialog.Popup mobile='sheet' data-testid='quick-capture'>
+					{/* The form lives inside the popup, which only exists while the
+					    dialog is open, so the company list it needs is fetched when
+					    somebody opens it and not on every page load. Keyed on the
+					    open count so a reopen during the closing animation still
+					    starts from a blank form. */}
+					<QuickCaptureForm key={session} />
+				</PriDialog.Popup>
+			</PriDialog.Portal>
+		</PriDialog.Root>
+	)
+}
+
+function QuickCaptureForm() {
 	const { t } = useLingui()
 	const { i18n } = useLinguiCore()
-	const { isOpen, prefill, close } = useQuickCapture()
+	const { prefill, close } = useQuickCapture()
 	const toastManager = usePriToast()
 
 	const createInteraction = useAtomSet(
@@ -67,9 +92,11 @@ export function QuickCaptureDialog() {
 		{ mode: 'promiseExit' },
 	)
 
-	// Form state — reset on every open via the effect below.
-	const [companyId, setCompanyId] = useState<string>('')
-	const [contactId, setContactId] = useState<string>('')
+	// Form state. A fresh form is mounted every time the dialog opens, so these
+	// initial values double as the reset.
+	const [companyId, setCompanyId] = useState<string>(prefill?.companyId ?? '')
+	// Only ever comes from the prefill: the form has no contact picker.
+	const contactId = prefill?.contactId ?? ''
 	const [channel, setChannel] = useState<InteractionChannel>('phone')
 	const [direction, setDirection] = useState<'outbound' | 'inbound'>('outbound')
 	const [type, setType] = useState<'call' | 'meeting' | 'email' | 'note'>(
@@ -84,14 +111,9 @@ export function QuickCaptureDialog() {
 	const [submitting, setSubmitting] = useState(false)
 	const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-	const companiesAtom = useMemo(
-		() =>
-			BatudaApiAtom.query('companies', 'list', {
-				query: { limit: 500 },
-			}),
-		[],
-	)
-	const companiesResult = useAtomValue(companiesAtom)
+	// The same list the tasks, calendar and email screens read, so on those
+	// screens the picker is filled from what the page already holds.
+	const companiesResult = useAtomValue(companiesListAtom)
 	const companyOptions = useMemo<ReadonlyArray<CompanyOption>>(() => {
 		if (!AsyncResult.isSuccess(companiesResult)) return []
 		const rows = companiesResult.value.items as ReadonlyArray<unknown>
@@ -111,23 +133,9 @@ export function QuickCaptureDialog() {
 			companyOptions.map(option => ({ value: option.id, label: option.name })),
 		[companyOptions],
 	)
-
-	useEffect(() => {
-		if (!isOpen) return
-		setCompanyId(prefill?.companyId ?? '')
-		setContactId(prefill?.contactId ?? '')
-		setChannel('phone')
-		setDirection('outbound')
-		setType('call')
-		setSubject('')
-		setSummary('')
-		setOutcome('')
-		setNextAction('')
-		setNextActionAt('')
-		setDurationMin(null)
-		setErrorMessage(null)
-		setSubmitting(false)
-	}, [isOpen, prefill])
+	const companiesFailed = AsyncResult.isFailure(companiesResult)
+	const companiesLoading =
+		!companiesFailed && !AsyncResult.isSuccess(companiesResult)
 
 	const canSubmit = companyId.length > 0 && !submitting
 
@@ -166,7 +174,6 @@ export function QuickCaptureDialog() {
 		}
 		const defect = exit.cause
 		setErrorMessage(t`Could not log the interaction. Please try again.`)
-		// biome-ignore lint/suspicious/noConsole: error logging for dev
 		console.error('[batuda] interactions.create failed', defect)
 		setSubmitting(false)
 	}
@@ -174,258 +181,251 @@ export function QuickCaptureDialog() {
 	const showCompanyPicker = !prefill
 
 	return (
-		<PriDialog.Root
-			open={isOpen}
-			onOpenChange={(nextOpen: boolean) => {
-				if (!nextOpen) close()
-			}}
-		>
-			<PriDialog.Portal>
-				<PriDialog.Backdrop />
-				<PriDialog.Popup mobile='sheet' data-testid='quick-capture'>
-					<Header>
-						<PriDialog.Title>
-							<Trans>Log interaction</Trans>
-						</PriDialog.Title>
-						<PriDialog.Close
-							render={props => (
-								<CloseButton
-									type='button'
-									aria-label={t`Close`}
-									data-testid='quick-capture-close'
-									{...props}
-								>
-									<X size={18} />
-								</CloseButton>
-							)}
-						/>
-					</Header>
-					{prefill && (
-						<PrefillChip>
-							<PrefillLabel>
-								<Trans>Company</Trans>
-							</PrefillLabel>
-							<strong>{prefill.companyName}</strong>
-						</PrefillChip>
+		<>
+			<Header>
+				<PriDialog.Title>
+					<Trans>Log interaction</Trans>
+				</PriDialog.Title>
+				<PriDialog.Close
+					render={props => (
+						<CloseButton
+							type='button'
+							aria-label={t`Close`}
+							data-testid='quick-capture-close'
+							{...props}
+						>
+							<X size={18} />
+						</CloseButton>
 					)}
-					<Form onSubmit={handleSubmit} data-testid='quick-capture-form'>
-						{showCompanyPicker && (
-							<Field>
-								<Label htmlFor='qc-company'>
-									<Trans>Company</Trans>
-								</Label>
-								<PriSelect.Root
-									items={companyItems}
-									value={companyId}
-									onValueChange={next => {
-										const picked = companyItems.find(
-											item => item.value === next,
-										)
-										if (picked) setCompanyId(picked.value)
-									}}
-								>
-									<CompanyTrigger
-										id='qc-company'
-										data-testid='quick-capture-company'
-									>
-										<CompanyValue placeholder={t`— Select a company —`} />
-										<PriSelect.Icon>
-											<ChevronsUpDown size={12} aria-hidden />
-										</PriSelect.Icon>
-									</CompanyTrigger>
-									<PriSelect.Options
-										items={companyItems}
-										optionTestId={value => `quick-capture-company-${value}`}
-									/>
-								</PriSelect.Root>
-							</Field>
-						)}
-
-						<Field>
-							<Label>
-								<Trans>Channel</Trans>
-							</Label>
-							<PriToggleGroup.Root
-								value={[channel]}
-								onValueChange={(values: string[]) => {
-									const next = values[0]
-									if (next) setChannel(next as InteractionChannel)
-								}}
+				/>
+			</Header>
+			{prefill && (
+				<PrefillChip>
+					<PrefillLabel>
+						<Trans>Company</Trans>
+					</PrefillLabel>
+					<strong>{prefill.companyName}</strong>
+				</PrefillChip>
+			)}
+			<Form onSubmit={handleSubmit} data-testid='quick-capture-form'>
+				{showCompanyPicker && (
+					<Field>
+						<Label htmlFor='qc-company'>
+							<Trans>Company</Trans>
+						</Label>
+						<PriSelect.Root
+							items={companyItems}
+							value={companyId}
+							onValueChange={next => {
+								const picked = companyItems.find(item => item.value === next)
+								if (picked) setCompanyId(picked.value)
+							}}
+						>
+							<CompanyTrigger
+								id='qc-company'
+								data-testid='quick-capture-company'
+								aria-busy={companiesLoading}
 							>
-								{CHANNELS.map(value => (
-									<PriToggleGroup.Item
-										key={value}
-										value={value}
-										aria-label={value}
-									>
-										<ChannelIcon channel={value} size={14} />
-									</PriToggleGroup.Item>
-								))}
-							</PriToggleGroup.Root>
-						</Field>
-
-						<Row>
-							<Field>
-								<Label>
-									<Trans>Direction</Trans>
-								</Label>
-								<PriToggleGroup.Root
-									value={[direction]}
-									onValueChange={(values: string[]) => {
-										const next = values[0]
-										if (next === 'outbound' || next === 'inbound') {
-											setDirection(next)
-										}
-									}}
-								>
-									<PriToggleGroup.Item value='outbound'>
-										<Trans>Outbound</Trans>
-									</PriToggleGroup.Item>
-									<PriToggleGroup.Item value='inbound'>
-										<Trans>Inbound</Trans>
-									</PriToggleGroup.Item>
-								</PriToggleGroup.Root>
-							</Field>
-							<Field>
-								<Label>
-									<Trans>Type</Trans>
-								</Label>
-								<PriToggleGroup.Root
-									value={[type]}
-									onValueChange={(values: string[]) => {
-										const next = values[0]
-										if (
-											next === 'call' ||
-											next === 'meeting' ||
-											next === 'email' ||
-											next === 'note'
-										) {
-											setType(next)
-										}
-									}}
-								>
-									{(['call', 'meeting', 'email', 'note'] as const).map(
-										value => (
-											<PriToggleGroup.Item key={value} value={value}>
-												{i18n._(typeLabels[value])}
-											</PriToggleGroup.Item>
-										),
-									)}
-								</PriToggleGroup.Root>
-							</Field>
-						</Row>
-
-						<Field>
-							<Label htmlFor='qc-subject'>
-								<Trans>Subject</Trans>
-							</Label>
-							<PriInput
-								id='qc-subject'
-								data-testid='quick-capture-subject'
-								type='text'
-								value={subject}
-								onChange={event => setSubject(event.target.value)}
-								placeholder={t`Brief summary (optional)`}
+								<CompanyValue placeholder={t`— Select a company —`} />
+								<PriSelect.Icon>
+									<ChevronsUpDown size={12} aria-hidden />
+								</PriSelect.Icon>
+							</CompanyTrigger>
+							<PriSelect.Options
+								items={companyItems}
+								optionTestId={value => `quick-capture-company-${value}`}
 							/>
-						</Field>
+						</PriSelect.Root>
+						{/* The list arrives after the dialog opens, so an empty picker
+						    has to say whether it is still on its way or failed. */}
+						{companiesLoading ? (
+							<FieldNote aria-live='polite'>{t`Loading companies…`}</FieldNote>
+						) : null}
+						{companiesFailed ? (
+							<ErrorText role='alert'>
+								{t`Could not load the companies. Close this and try again.`}
+							</ErrorText>
+						) : null}
+					</Field>
+				)}
 
-						<Field>
-							<Label htmlFor='qc-summary'>
-								<Trans>Summary</Trans>
-							</Label>
-							<Textarea
-								id='qc-summary'
-								data-testid='quick-capture-summary'
-								rows={3}
-								value={summary}
-								onChange={event => setSummary(event.target.value)}
-								placeholder={t`What happened?`}
-							/>
-						</Field>
+				<Field>
+					<Label>
+						<Trans>Channel</Trans>
+					</Label>
+					<PriToggleGroup.Root
+						value={[channel]}
+						onValueChange={(values: string[]) => {
+							const next = values[0]
+							if (next) setChannel(next as InteractionChannel)
+						}}
+					>
+						{CHANNELS.map(value => (
+							<PriToggleGroup.Item key={value} value={value} aria-label={value}>
+								<ChannelIcon channel={value} size={14} />
+							</PriToggleGroup.Item>
+						))}
+					</PriToggleGroup.Root>
+				</Field>
 
-						<Field>
-							<Label htmlFor='qc-outcome'>
-								<Trans>Outcome</Trans>
-							</Label>
-							<Textarea
-								id='qc-outcome'
-								rows={2}
-								value={outcome}
-								onChange={event => setOutcome(event.target.value)}
-								placeholder={t`Conclusion or commitment (optional)`}
-							/>
-						</Field>
+				<Row>
+					<Field>
+						<Label>
+							<Trans>Direction</Trans>
+						</Label>
+						<PriToggleGroup.Root
+							value={[direction]}
+							onValueChange={(values: string[]) => {
+								const next = values[0]
+								if (next === 'outbound' || next === 'inbound') {
+									setDirection(next)
+								}
+							}}
+						>
+							<PriToggleGroup.Item value='outbound'>
+								<Trans>Outbound</Trans>
+							</PriToggleGroup.Item>
+							<PriToggleGroup.Item value='inbound'>
+								<Trans>Inbound</Trans>
+							</PriToggleGroup.Item>
+						</PriToggleGroup.Root>
+					</Field>
+					<Field>
+						<Label>
+							<Trans>Type</Trans>
+						</Label>
+						<PriToggleGroup.Root
+							value={[type]}
+							onValueChange={(values: string[]) => {
+								const next = values[0]
+								if (
+									next === 'call' ||
+									next === 'meeting' ||
+									next === 'email' ||
+									next === 'note'
+								) {
+									setType(next)
+								}
+							}}
+						>
+							{(['call', 'meeting', 'email', 'note'] as const).map(value => (
+								<PriToggleGroup.Item key={value} value={value}>
+									{i18n._(typeLabels[value])}
+								</PriToggleGroup.Item>
+							))}
+						</PriToggleGroup.Root>
+					</Field>
+				</Row>
 
-						<Row>
-							<Field>
-								<Label htmlFor='qc-next-action'>
-									<Trans>Next action</Trans>
-								</Label>
-								<PriInput
-									id='qc-next-action'
-									type='text'
-									value={nextAction}
-									onChange={event => setNextAction(event.target.value)}
-									placeholder={t`What needs to happen?`}
-								/>
-							</Field>
-							<Field>
-								<Label htmlFor='qc-next-action-at'>
-									<Trans>Date</Trans>
-								</Label>
-								<PriInput
-									id='qc-next-action-at'
-									type='date'
-									value={nextActionAt}
-									onChange={event => setNextActionAt(event.target.value)}
-								/>
-							</Field>
-						</Row>
+				<Field>
+					<Label htmlFor='qc-subject'>
+						<Trans>Subject</Trans>
+					</Label>
+					<PriInput
+						id='qc-subject'
+						data-testid='quick-capture-subject'
+						type='text'
+						value={subject}
+						onChange={event => setSubject(event.target.value)}
+						placeholder={t`Brief summary (optional)`}
+					/>
+				</Field>
 
-						{(channel === 'phone' || channel === 'visit') && (
-							<Field>
-								<Label htmlFor='qc-duration'>
-									<Trans>Duration (min)</Trans>
-								</Label>
-								<PriNumberField.Root
-									min={0}
-									value={durationMin}
-									onValueChange={next => setDurationMin(next)}
-								>
-									<PriNumberField.Group>
-										<PriNumberField.Decrement>−</PriNumberField.Decrement>
-										<PriNumberField.Input id='qc-duration' />
-										<PriNumberField.Increment>+</PriNumberField.Increment>
-									</PriNumberField.Group>
-								</PriNumberField.Root>
-							</Field>
-						)}
+				<Field>
+					<Label htmlFor='qc-summary'>
+						<Trans>Summary</Trans>
+					</Label>
+					<Textarea
+						id='qc-summary'
+						data-testid='quick-capture-summary'
+						rows={3}
+						value={summary}
+						onChange={event => setSummary(event.target.value)}
+						placeholder={t`What happened?`}
+					/>
+				</Field>
 
-						{errorMessage && <ErrorText role='alert'>{errorMessage}</ErrorText>}
+				<Field>
+					<Label htmlFor='qc-outcome'>
+						<Trans>Outcome</Trans>
+					</Label>
+					<Textarea
+						id='qc-outcome'
+						rows={2}
+						value={outcome}
+						onChange={event => setOutcome(event.target.value)}
+						placeholder={t`Conclusion or commitment (optional)`}
+					/>
+				</Field>
 
-						<Footer>
-							<PriButton
-								type='button'
-								$variant='text'
-								data-testid='quick-capture-cancel'
-								onClick={close}
-								disabled={submitting}
-							>
-								<Trans>Cancel</Trans>
-							</PriButton>
-							<PriButton
-								type='submit'
-								$variant='filled'
-								data-testid='quick-capture-submit'
-								disabled={!canSubmit}
-							>
-								{submitting ? t`Logging…` : t`Log`}
-							</PriButton>
-						</Footer>
-					</Form>
-				</PriDialog.Popup>
-			</PriDialog.Portal>
-		</PriDialog.Root>
+				<Row>
+					<Field>
+						<Label htmlFor='qc-next-action'>
+							<Trans>Next action</Trans>
+						</Label>
+						<PriInput
+							id='qc-next-action'
+							type='text'
+							value={nextAction}
+							onChange={event => setNextAction(event.target.value)}
+							placeholder={t`What needs to happen?`}
+						/>
+					</Field>
+					<Field>
+						<Label htmlFor='qc-next-action-at'>
+							<Trans>Date</Trans>
+						</Label>
+						<PriInput
+							id='qc-next-action-at'
+							type='date'
+							value={nextActionAt}
+							onChange={event => setNextActionAt(event.target.value)}
+						/>
+					</Field>
+				</Row>
+
+				{(channel === 'phone' || channel === 'visit') && (
+					<Field>
+						<Label htmlFor='qc-duration'>
+							<Trans>Duration (min)</Trans>
+						</Label>
+						<PriNumberField.Root
+							min={0}
+							value={durationMin}
+							onValueChange={next => setDurationMin(next)}
+						>
+							<PriNumberField.Group>
+								<PriNumberField.Decrement>−</PriNumberField.Decrement>
+								<PriNumberField.Input id='qc-duration' />
+								<PriNumberField.Increment>+</PriNumberField.Increment>
+							</PriNumberField.Group>
+						</PriNumberField.Root>
+					</Field>
+				)}
+
+				{errorMessage && <ErrorText role='alert'>{errorMessage}</ErrorText>}
+
+				<Footer>
+					<PriButton
+						type='button'
+						$variant='text'
+						data-testid='quick-capture-cancel'
+						onClick={close}
+						disabled={submitting}
+					>
+						<Trans>Cancel</Trans>
+					</PriButton>
+					<PriButton
+						type='submit'
+						$variant='filled'
+						data-testid='quick-capture-submit'
+						disabled={!canSubmit}
+					>
+						{submitting ? t`Logging…` : t`Log`}
+					</PriButton>
+				</Footer>
+			</Form>
+		</>
 	)
 }
 
@@ -569,6 +569,14 @@ const Textarea = styled.textarea`
 		opacity: 0.7;
 		font-style: italic;
 	}
+`
+
+const FieldNote = styled.p`
+	margin: 0;
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+	line-height: var(--typescale-body-small-line);
+	color: var(--color-on-surface-variant);
 `
 
 const ErrorText = styled.p`

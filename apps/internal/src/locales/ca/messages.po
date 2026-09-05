@@ -1607,6 +1607,10 @@ msgstr "No s'han pogut carregar les tasques"
 msgid "Could not load the board"
 msgstr "No s'ha pogut carregar el tauler"
 
+#: src/components/interactions/quick-capture-dialog.tsx
+msgid "Could not load the companies. Close this and try again."
+msgstr "No s'han pogut carregar les empreses. Tanca això i torna-ho a provar."
+
 #: src/routes/settings/organization/industries.tsx
 msgid "Could not load the industries"
 msgstr "No s’han pogut carregar les indústries"
@@ -3143,6 +3147,7 @@ msgstr "S'està carregant el tauler…"
 msgid "Loading calendar…"
 msgstr "S'està carregant el calendari…"
 
+#: src/components/interactions/quick-capture-dialog.tsx
 #: src/routes/companies/index.tsx
 msgid "Loading companies…"
 msgstr "Carregant empreses…"
