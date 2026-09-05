@@ -182,7 +182,7 @@ Borders and dividers. WCAG requires 3:1 for non-text UI components.
 | Display | **Barlow Condensed** | Narrow, industrial, reads like stamped metal labels |
 | Body    | **Barlow**           | Same family, warm and readable at body sizes        |
 
-Tokens: `--font-display` and `--font-body` in `@batuda/ui/tokens.css`. Loaded via Google Fonts in `__root.tsx`.
+Tokens: `--font-display` and `--font-body` in `@batuda/ui/tokens.css`. The font files are self-hosted in `apps/internal/src/fonts/barlow` (Open Font License alongside them) and declared with `@font-face` in `apps/internal/src/styles.css`. The root route preloads the faces every page paints with first.
 
 ### Mascot / Character
 

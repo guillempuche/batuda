@@ -1,0 +1,5 @@
+# Everything under /assets carries a content hash in its name (scripts,
+# stylesheets and fonts alike), so a browser can keep it for a year without
+# ever asking again.
+/assets/*
+  Cache-Control: public, max-age=31556952, immutable

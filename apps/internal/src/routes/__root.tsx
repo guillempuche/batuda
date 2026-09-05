@@ -21,6 +21,11 @@ import { AppShell } from '#/components/layout/app-shell'
 import { BatudaMotionConfig } from '#/components/layout/motion-config'
 import { ComposeEmailProvider } from '#/context/compose-email-context'
 import { QuickCaptureProvider } from '#/context/quick-capture-context'
+import barlowCondensedMedium from '#/fonts/barlow/barlow-condensed-latin-500-normal.woff2?url'
+import barlowCondensedBold from '#/fonts/barlow/barlow-condensed-latin-700-normal.woff2?url'
+import barlowRegular from '#/fonts/barlow/barlow-latin-400-normal.woff2?url'
+import barlowMedium from '#/fonts/barlow/barlow-latin-500-normal.woff2?url'
+import barlowBold from '#/fonts/barlow/barlow-latin-700-normal.woff2?url'
 import { readLangCookieFromHeader } from '#/i18n/cookie'
 import { defaultLang, htmlLang, type LangCode } from '#/i18n/index'
 import { LangProvider } from '#/i18n/lang-provider'
@@ -49,6 +54,27 @@ import appCss from '../styles.css?url'
  * helper and the rationale for not returning atom instances directly.
  */
 export type { DehydratedAtomValue }
+
+/**
+ * The faces every page paints with above the fold, fetched alongside the
+ * stylesheet. `@font-face` declares them `optional`, so a face that has not
+ * arrived by first paint sits out the rest of the visit — preloading is what
+ * decides whether the brand fonts show at all. Font requests are anonymous,
+ * so `crossOrigin` has to say so here too or each face is fetched twice.
+ */
+const fontPreloadLinks = [
+	barlowRegular,
+	barlowMedium,
+	barlowBold,
+	barlowCondensedMedium,
+	barlowCondensedBold,
+].map(href => ({
+	rel: 'preload' as const,
+	as: 'font' as const,
+	type: 'font/woff2',
+	href,
+	crossOrigin: 'anonymous' as const,
+}))
 
 /**
  * Session gate for the whole app. Runs on SSR (initial HTML render)
@@ -164,16 +190,7 @@ export const Route = createRootRoute({
 					href: '/apple-touch-icon.png',
 				},
 				{ rel: 'stylesheet', href: appCss },
-				{ rel: 'preconnect', href: 'https://fonts.googleapis.com' },
-				{
-					rel: 'preconnect',
-					href: 'https://fonts.gstatic.com',
-					crossOrigin: 'anonymous',
-				},
-				{
-					rel: 'stylesheet',
-					href: 'https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;700&family=Barlow:wght@400;500;700&display=swap',
-				},
+				...fontPreloadLinks,
 			],
 		}
 	},

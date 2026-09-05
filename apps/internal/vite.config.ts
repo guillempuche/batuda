@@ -220,27 +220,19 @@ const config = defineConfig(({ command }) => {
 			 * `basePath` is the repo root because `packages/ui` sits outside
 			 * this app's folder. The names of the generated CSS files are
 			 * worked out relative to this path, so pointing it at the app
-			 * instead would put the shared components' styles out of reach. */
-			/* Turns `styled`/`css` templates into real CSS files at build time.
-			 * It has to see the original source, so it runs before the React
-			 * plugin — both ask to run early, and when two plugins both do,
-			 * the order in this array is what settles it.
-			 *
-			 * `basePath` is the repo root because `packages/ui` sits outside
-			 * this app's folder. The names of the generated CSS files are
-			 * worked out relative to this path, so pointing it at the app
 			 * instead would put the shared components' styles out of reach.
 			 *
 			 * `minify` is on in development too, which is not the default.
 			 * Left off, the generated names are built from the file's name —
 			 * and a route file for a changing part of the address is called
 			 * `$slug.tsx`, so they come out as `--$slug_Badge__color_xxx`. A
-			 * `$` cannot appear in a CSS name, so the browser throws those
-			 * declarations away and the page quietly loses styling that is
-			 * perfectly fine once built for real. Shortening the names in
-			 * both places also means what you see while developing is what
-			 * ships. The cost is that class names in devtools read as
-			 * `.yuiqpR8d` rather than the component's name. */
+			 * `$` cannot appear in a CSS name: while developing, the browser
+			 * throws those declarations away and the page quietly loses
+			 * styling, and in a real build the CSS minifier gives up on the
+			 * whole thing (`Unexpected token Delim('$')`). Shortening the
+			 * names in both places also means what you see while developing
+			 * is what ships. The cost is that class names in devtools read
+			 * as `.yuiqpR8d` rather than the component's name. */
 			viteYak({ basePath: resolve(here, '../..'), minify: true }),
 			yakLayers(),
 			viteReact({
