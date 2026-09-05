@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-09-05 (mail-worker-v2026.9.5)
+
+### Bug Fixes
+
+* **mail-worker:** stop a message that failed to load being skipped ([d746082](https://github.com/guillempuche/batuda/commit/d746082963e78d114e82857bef4eb6db45c9f0bf))
+
+### CI/CD
+
+* run the IMAP round-trip after a merge instead of never ([2f9ce30](https://github.com/guillempuche/batuda/commit/2f9ce3075ea69a00ee3f75c2d89831f360f3a380))
+
 ## 2026-09-04 (mail-worker-v2026.9.4)
 
 ### Features
