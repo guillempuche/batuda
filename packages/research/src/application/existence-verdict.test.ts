@@ -497,16 +497,75 @@ describe('rowExistence', () => {
 describe('withExistence', () => {
 	it("should write the verdict without disturbing the row's own fields", () => {
 		// GIVEN a row with fields of its own
-		// WHEN a verdict is written onto it
-		// THEN everything it already held is still there
+		// WHEN a verdict is written onto it — THEN everything it already held is
+		// still there, and a row nothing was doubted about wears no badge: the
+		// count alone says the check reached it
 		const row = withExistence(
 			{ name: NAME, website: OWN },
 			{ verdict: 'confirmed', websites: 2 },
 		)
+		expect(row).toEqual({ name: NAME, website: OWN, websites_seen: 2 })
+	})
+
+	it('should badge a doubted row with the reason and the count', () => {
+		// GIVEN a row the check could not establish
+		// WHEN the verdict is written — THEN the doubt is a word the surface can
+		// say in the reader's own language, with what was missing beside it
+		expect(
+			withExistence(
+				{ name: NAME },
+				{ verdict: 'candidate', reason: 'no_own_site', websites: 2 },
+			),
+		).toEqual({
+			name: NAME,
+			marks: ['existence_unconfirmed'],
+			existence_reason: 'no_own_site',
+			websites_seen: 2,
+		})
+	})
+
+	it('should take the badge off a row it stops doubting', () => {
+		// GIVEN a row an earlier pass doubted, judged again once the run found more
+		const row = withExistence(
+			{
+				name: NAME,
+				marks: ['existence_unconfirmed', 'outside_requested_place'],
+				existence_reason: 'one_website',
+				websites_seen: 1,
+			},
+			{ verdict: 'confirmed', websites: 3 },
+		)
+
+		// WHEN written — THEN the doubt and its reason are gone, the count is the
+		// newer one, and a mark about something else is left alone
 		expect(row).toEqual({
 			name: NAME,
-			website: OWN,
-			existence: { verdict: 'confirmed', websites: 2 },
+			marks: ['outside_requested_place'],
+			websites_seen: 3,
+		})
+	})
+
+	it('should read a run stored before the doubt became a mark', () => {
+		// GIVEN a row written when the verdict was an object, which nothing
+		// migrates
+		// WHEN read — THEN it answers the same as one written today
+		expect(
+			rowExistence({
+				existence: { verdict: 'candidate', reason: 'no_own_site', websites: 2 },
+			}),
+		).toEqual({ verdict: 'candidate', reason: 'no_own_site', websites: 2 })
+		expect(
+			rowExistence({ existence: { verdict: 'confirmed', websites: 4 } }),
+		).toEqual({ verdict: 'confirmed', websites: 4 })
+	})
+
+	it('should read a row nobody reached as one the run does not stand behind', () => {
+		// GIVEN a row carrying no mark, no count and no stored object
+		// WHEN read — THEN it is a candidate, which is the whole of "two states,
+		// never three": no shape reads as confirmed without the check having run
+		expect(rowExistence({ name: NAME })).toEqual({
+			verdict: 'candidate',
+			websites: 0,
 		})
 	})
 

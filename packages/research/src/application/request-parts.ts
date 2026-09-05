@@ -182,6 +182,17 @@ export const RequestPartsSchema = Schema.Struct({
 	// absent key and a key holding nothing as two different answers, and only one
 	// of them is a request that named no place.
 	place: Schema.String,
+	// Every place the request named, beside the one above rather than instead of
+	// it: the searches want one area to ask about, and the checks want the towns
+	// the request actually wrote.
+	//
+	// Optional where `place` is required, and the difference is deliberate. The
+	// answer is decoded against this whole shape before anything reads it, so a
+	// required key the model leaves out fails the call and costs the run its parts
+	// and its kinds of company as well. Those were being asked for before this
+	// list existed and are worth far more; asking for one more thing must not be
+	// able to lose them.
+	places: Schema.optionalKey(Schema.Array(Schema.String)),
 })
 
 /**
@@ -209,7 +220,9 @@ export const requestPartsPrompt = (query: string): string =>
 		'',
 		'Separately again, name the place the request wants its companies to BE IN, in the words the request uses ("Ripollet (Barcelona)", "Texas", "Baltimore metro"). Only where the request confines its answer to a place: a company named in passing, a place it sells into or travels to, and the country a language happens to belong to are all somewhere a company is not required to be, and each of them is an empty answer. Where the request names several, give the widest one that contains them all. Answer with an empty string whenever the request asks for companies anywhere.',
 		'',
-		'Return {"parts": [{"label": "...", "terms": ["...", "..."]}], "kindsOfCompany": ["...", "..."], "place": "..."} and nothing else.',
+		"Separately again, list EVERY place the request names its companies must be in, each in the request's own words and on its own — a request naming three towns gives three, and one naming a town and its province gives both. This is the same reading as the place above, written out rather than collapsed, so a place that is an empty answer there is left out here too. Return an empty list whenever the request asks for companies anywhere.",
+		'',
+		'Return {"parts": [{"label": "...", "terms": ["...", "..."]}], "kindsOfCompany": ["...", "..."], "place": "...", "places": ["...", "..."]} and nothing else.',
 		'',
 		`Request:\n${query}`,
 	].join('\n')
@@ -350,6 +363,37 @@ export const readKindsOfCompany = (raw: unknown): ReadonlyArray<string> => {
 export const readRequestPlace = (raw: unknown): string => {
 	if (raw === null || typeof raw !== 'object') return ''
 	return readWording((raw as { place?: unknown }).place) ?? ''
+}
+
+/**
+ * Every place the request named, read off the same answer.
+ *
+ * The place above is one string because a search asks about one area, and where
+ * a request names several towns that string is the province containing them —
+ * which is a true answer and a useless one to a check that works by telling two
+ * places apart. So both are asked for: this is the list the request actually
+ * wrote, and it holds the single place too, so a caller reads one of them rather
+ * than joining them.
+ *
+ * A splitter that lists none falls back to the single place on its own.
+ */
+export const readRequestPlaces = (raw: unknown): ReadonlyArray<string> => {
+	if (raw === null || typeof raw !== 'object') return []
+	const listed = (raw as { places?: unknown }).places
+	const places = Array.isArray(listed)
+		? listed.flatMap(entry => {
+				const wording = readWording(entry)
+				return wording === null ? [] : [wording]
+			})
+		: []
+	const single = readRequestPlace(raw)
+	// The single place joins the list rather than replacing it: a request naming
+	// three towns has a province the towns sit in, and the pair of a town and the
+	// province containing it is exactly what the reading downstream needs.
+	const all = single === '' ? places : [...places, single]
+	return [
+		...new Set(all.map(place => place.trim()).filter(place => place !== '')),
+	]
 }
 
 /**

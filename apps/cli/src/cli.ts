@@ -32,6 +32,7 @@ import {
 	researchEval,
 	researchEvalContacts,
 	researchEvalInvariance,
+	researchFarmReplay,
 	researchProbe,
 	researchProbeConfig,
 } from './commands/research'
@@ -1240,6 +1241,26 @@ const researchEvalInvarianceCommand = Command.make(
 	),
 )
 
+const researchFarmReplayCommand = Command.make(
+	'farm-replay',
+	{
+		corpus: Flag.string('corpus').pipe(
+			Flag.withDescription(
+				'Path to the labelled corpus of scan rows to grade against; a relative path is read from the repo root (JSON; see eval/farm-replay.example.json for the shape)',
+			),
+			Flag.withDefault('eval/farm-replay.json'),
+		),
+	},
+	({ corpus }) => researchFarmReplay({ corpus }),
+).pipe(
+	Command.withShortDescription(
+		'Grade the operator-network check against rows real scans returned',
+	),
+	Command.withDescription(
+		"Replay rows that production scans already returned past the operator-network check and report what it would have done to each. Free and offline: it fetches nothing and calls no model, because a person decided each row's answer once already. Reports the operator rows it takes off the list, and — by name — any real company it would have deleted, which is the expensive mistake a single accuracy figure hides. The corpus is not in the repository, because it names hundreds of real firms; build it locally following eval/README.md, or point --corpus at your own file.",
+	),
+)
+
 const researchCommand = Command.make('research').pipe(
 	Command.withDescription('Research context tools'),
 	Command.withSubcommands([
@@ -1249,6 +1270,7 @@ const researchCommand = Command.make('research').pipe(
 		researchEvalCommand,
 		researchEvalContactsCommand,
 		researchEvalInvarianceCommand,
+		researchFarmReplayCommand,
 	]),
 )
 

@@ -12,6 +12,7 @@ import {
 	readKindsOfCompany,
 	readRequestParts,
 	readRequestPlace,
+	readRequestPlaces,
 	requestPartsDirective,
 	requestPartsPrompt,
 	searchedAndEmptyParts,
@@ -901,6 +902,89 @@ describe('uncoveredPartsDirective', () => {
 			expect(directive).toContain('"ascensores"')
 			expect(directive).toContain('answers nothing')
 			expect(directive).not.toContain('"instalaciones eléctricas"')
+		})
+	})
+})
+
+describe('readRequestPlaces', () => {
+	describe('when the request names several towns', () => {
+		it('should give every one of them, and the area they sit in', () => {
+			// GIVEN a splitter that listed the towns and gave the province as the
+			//   single area containing them all
+			const places = readRequestPlaces({
+				place: 'Barcelona',
+				places: ['Barberà del Vallès', 'Badia del Vallès'],
+			})
+
+			// THEN all three come back. The single area alone is a true answer and a
+			//   useless one to a check that works by telling two places apart: with
+			//   one place there is no pair to read against, and nothing is ever
+			//   caught.
+			expect(places).toEqual([
+				'Barberà del Vallès',
+				'Badia del Vallès',
+				'Barcelona',
+			])
+		})
+	})
+
+	describe('when the splitter listed nothing', () => {
+		it('should fall back to the single area', () => {
+			// GIVEN an answer holding only the one place
+			// WHEN read — THEN that place is the whole list, which is what the run
+			//   had before this was asked, so a splitter that fumbles the new field
+			//   leaves the run no worse off
+			expect(readRequestPlaces({ place: 'Ripollet (Barcelona)' })).toEqual([
+				'Ripollet (Barcelona)',
+			])
+		})
+	})
+
+	describe('when the same place is named twice', () => {
+		it('should give it once', () => {
+			// GIVEN a splitter repeating the area among the places it listed
+			const places = readRequestPlaces({
+				place: 'Sabadell',
+				places: ['Sabadell', '  Sabadell  ', 'Terrassa'],
+			})
+
+			// THEN each place appears once. Repeated, a place would be read against
+			//   itself and could never be the second one a domain files under.
+			expect(places).toEqual(['Sabadell', 'Terrassa'])
+		})
+	})
+
+	describe('when the request asks for companies anywhere', () => {
+		it('should give nothing', () => {
+			// GIVEN an answer naming no place at all
+			// WHEN read — THEN empty, so the check does nothing rather than reading
+			//   a place nobody asked about
+			expect(readRequestPlaces({ place: '', places: [] })).toEqual([])
+		})
+	})
+
+	describe('when the listed places hold entries that say nothing', () => {
+		it('should keep only the ones that could place a row', () => {
+			// GIVEN a list holding blanks, punctuation and a value of the wrong type
+			const places = readRequestPlaces({
+				place: '',
+				places: ['Olot', '   ', '...', 42, null],
+			})
+
+			// THEN only the real place survives. An entry that names nowhere would
+			//   otherwise count toward the two places the check needs before it runs.
+			expect(places).toEqual(['Olot'])
+		})
+	})
+
+	describe('when the answer is not an object at all', () => {
+		it('should give nothing rather than fail', () => {
+			// GIVEN a splitter answer of the wrong shape entirely
+			// WHEN read — THEN empty, matching how the single place reads it: an
+			//   unreadable answer leaves the run where it was
+			expect(readRequestPlaces(null)).toEqual([])
+			expect(readRequestPlaces('Barcelona')).toEqual([])
+			expect(readRequestPlaces({ places: 'Barcelona' })).toEqual([])
 		})
 	})
 })

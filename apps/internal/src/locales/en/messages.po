@@ -4018,6 +4018,10 @@ msgstr "Nothing changed yet."
 msgid "Nothing completed recently"
 msgstr "Nothing completed recently"
 
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Nothing found on the web names this company."
+msgstr "Nothing found on the web names this company."
+
 #: src/routes/settings/mcp/connections.tsx
 msgid "Nothing is connected to this organization yet."
 msgstr "Nothing is connected to this organization yet."
@@ -4106,6 +4110,10 @@ msgstr "Only found named in a list of companies, with no website and no location
 #: src/routes/settings/organization/policy.tsx
 msgid "Only machine-verified values apply on their own; free-text always waits for review."
 msgstr "Only machine-verified values apply on their own; free-text always waits for review."
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Only one website names this company, so there was nothing to check it against."
+msgstr "Only one website names this company, so there was nothing to check it against."
 
 #: src/components/companies/conversations-tab.tsx
 #: src/components/companies/conversations-tab.tsx
@@ -5848,6 +5856,10 @@ msgstr "The change didn't go through. Try again."
 msgid "The changes could not be applied."
 msgstr "The changes could not be applied."
 
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "The check could not run, so this company was never looked into."
+msgstr "The check could not run, so this company was never looked into."
+
 #: src/routes/companies/$slug.tsx
 msgid "The company could not be fetched. Check that the session is valid, then try again."
 msgstr "The company could not be fetched. Check that the session is valid, then try again."
@@ -5954,9 +5966,21 @@ msgstr "The run finished without proposed updates or paid actions."
 msgid "The search came back with no company for:"
 msgstr "The search came back with no company for:"
 
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "The search could not establish that this is a real, trading company."
+msgstr "The search could not establish that this is a real, trading company."
+
 #: src/components/research/findings/shared.tsx
 msgid "The search did not look for:"
 msgstr "The search did not look for:"
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "The search ran out of time before it reached this company."
+msgstr "The search ran out of time before it reached this company."
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "The search spent its checking allowance before it reached this company."
+msgstr "The search spent its checking allowance before it reached this company."
 
 #: src/routes/companies/$slug.tsx
 msgid "The tasks for this company could not be fetched. Check that the session is valid, then try again."
@@ -6475,6 +6499,10 @@ msgstr "Weaknesses"
 #: src/components/research/run-labels.ts
 msgid "Website"
 msgstr "Website"
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Websites name this company, but none of them could be established as its own."
+msgstr "Websites name this company, but none of them could be established as its own."
 
 #: src/routes/emails/index.tsx
 #: src/routes/emails/index.tsx

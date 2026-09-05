@@ -2,35 +2,35 @@
 	{
 		"id": "example-network-town-page",
 		"askedAbout": ["Sant Quirze del Vallès", "Barcelona"],
-		"name": "VK Estampacions",
-		"website": "https://www.vkestampacionsbarcelona.example",
+		"name": "VK Estampacions Metalúrgiques",
+		"website": "https://www.vkestampacionsmetalurgiquesbarcelona.example",
 		"statedPlace": "Sant Quirze del Vallès, Barcelona",
 		"addresses": [
-			"https://www.vkestampacionsbarcelona.example",
-			"https://www.vkestampacionsbarcelona.example/sant-quirze-del-valles"
+			"https://www.vkestampacionsmetalurgiquesbarcelona.example",
+			"https://www.vkestampacionsmetalurgiquesbarcelona.example/sant-quirze-del-valles"
 		],
 		"label": "network"
 	},
 	{
 		"id": "example-network-second-town",
 		"askedAbout": ["Cerdanyola del Vallès", "Barcelona"],
-		"name": "VK Estampacions S.L. – Cerdanyola",
+		"name": "VK Estampacions Metalúrgiques S.L. – Cerdanyola",
 		"website": null,
 		"statedPlace": "Cerdanyola del Vallès",
 		"addresses": [
-			"https://www.vkestampacionsbarcelona.example/cerdanyola-del-valles"
+			"https://www.vkestampacionsmetalurgiquesbarcelona.example/cerdanyola-del-valles"
 		],
 		"label": "network"
 	},
 	{
 		"id": "example-network-second-trade",
 		"askedAbout": ["Vacarisses", "Barcelona"],
-		"name": "VK Anoditzats",
-		"website": "https://www.vkanoditzatsbarcelona.example",
+		"name": "VK Anoditzats Tècnics",
+		"website": "https://www.vkanoditzatstecnicsbarcelona.example",
 		"statedPlace": "Vacarisses, Barcelona",
 		"addresses": [
-			"https://www.vkanoditzatsbarcelona.example",
-			"https://www.vkanoditzatsbarcelona.example/vacarisses"
+			"https://www.vkanoditzatstecnicsbarcelona.example",
+			"https://www.vkanoditzatstecnicsbarcelona.example/vacarisses"
 		],
 		"label": "network"
 	},

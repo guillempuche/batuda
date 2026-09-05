@@ -14,6 +14,13 @@
  * that arrives bare keeps its value and gains no evidence: it is wrapped with no
  * `source_id`, because there is no page to name and putting one there would turn
  * a missing citation into a false one.
+ *
+ * This settles the shape a row is STORED in, which is the shape the per-field
+ * checks grade. What a reader is handed is settled separately and the other way
+ * round, in `findings-for-readers.ts`: the value under its own name, with the
+ * page beside it. The two are not in tension — a check needs the pair, and a
+ * reader wants the value — but a field the schema pairs belongs in the list
+ * below as well, or in neither.
  */
 
 /**
@@ -24,7 +31,13 @@
  * promise to whoever reads it. A field added to one belongs in the other.
  */
 const PAIRED_FIELDS_BY_SCHEMA: Record<string, ReadonlyArray<string>> = {
-	prospect_scan_v1: ['website', 'location', 'employee_estimate'],
+	prospect_scan_v1: [
+		'website',
+		'location',
+		'employee_estimate',
+		'tax_id',
+		'industry',
+	],
 	competitor_scan_v1: ['website'],
 }
 

@@ -323,3 +323,69 @@ export const scoreFarmReplay = (
 		placesRefusedInError,
 	}
 }
+
+/**
+ * The shipped operator check, as a rule this can grade.
+ *
+ * It lives here rather than in whatever command happens to run it, for the
+ * reason the house keeps its logic out of the CLI: a bridge written at the call
+ * site is a bridge nothing tests, and this one decides every number anybody
+ * quotes about the rule.
+ *
+ * The bridging is real work, not a formality. The check takes a findings tree
+ * and answers with the rows it KEPT, so the ids have to be carried through it
+ * and diffed on the way out. And it has to be asked one run at a time: it reads
+ * hosts across a whole list, so rows from two different scans handed to it
+ * together would be read against each other in a list no scan ever produced.
+ */
+export const networkGuardJudge =
+	(check: {
+		readonly drop: (
+			findings: unknown,
+			listField: string,
+			places: ReadonlyArray<string>,
+		) => { readonly findings: unknown }
+		readonly placesOf: (place: string) => ReadonlyArray<string>
+	}): FarmJudge =>
+	rows => {
+		const byRun = new Map<string, Array<FarmRow>>()
+		for (const row of rows) {
+			const runKey = JSON.stringify(row.askedAbout)
+			const group = byRun.get(runKey)
+			if (group === undefined) byRun.set(runKey, [row])
+			else group.push(row)
+		}
+
+		const verdicts = new Map<string, FarmVerdict>()
+		for (const group of byRun.values()) {
+			const places = [
+				...new Set(
+					group.flatMap(row => row.askedAbout.flatMap(check.placesOf)),
+				),
+			]
+			const { findings: kept } = check.drop(
+				{
+					prospects: group.map(row => ({
+						id: row.id,
+						name: row.name,
+						...(row.website === null ? {} : { website: row.website }),
+						citations: row.addresses.map(address => ({ source_id: address })),
+					})),
+				},
+				'prospects',
+				places,
+			)
+			// Diffed by id rather than by name: a run repeats a name across rows far
+			// more often than it repeats an id, and joined by name two rows would
+			// take each other's verdict.
+			const survived = new Set(
+				(kept as { prospects: ReadonlyArray<{ id: string }> }).prospects.map(
+					prospect => prospect.id,
+				),
+			)
+			for (const row of group) {
+				verdicts.set(row.id, survived.has(row.id) ? 'keep' : 'drop')
+			}
+		}
+		return verdicts
+	}

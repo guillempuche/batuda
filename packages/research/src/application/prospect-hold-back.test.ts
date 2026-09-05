@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { NAME_ONLY_EVIDENCE } from './name-only-guard'
 import { prospectHoldBack } from './prospect-hold-back'
-import { OUTSIDE_REQUESTED_PLACE } from './row-marks'
+import { EXISTENCE_UNCONFIRMED, OUTSIDE_REQUESTED_PLACE } from './row-marks'
 
 describe('prospectHoldBack', () => {
 	describe('when the run stands behind the company', () => {
@@ -16,6 +16,8 @@ describe('prospectHoldBack', () => {
 				outsidePlace: false,
 				holdsBack: false,
 				spokenReason: undefined,
+				missing: undefined,
+				nameOnly: false,
 			})
 		})
 	})
@@ -60,6 +62,10 @@ describe('prospectHoldBack', () => {
 			expect(held.couldNotConfirm).toBe(true)
 			expect(held.holdsBack).toBe(true)
 			expect(held.spokenReason).toBeUndefined()
+			// AND the cause is named, so the surface can say this one rather than
+			//   the sentence for a run that stopped before checking
+			expect(held.nameOnly).toBe(true)
+			expect(held.missing).toBeUndefined()
 		})
 	})
 
@@ -136,6 +142,8 @@ describe('prospectHoldBack', () => {
 				outsidePlace: true,
 				holdsBack: true,
 				spokenReason: 'no register entry',
+				missing: undefined,
+				nameOnly: false,
 			})
 		})
 	})
@@ -147,6 +155,87 @@ describe('prospectHoldBack', () => {
 
 			// THEN it is not held back
 			expect(held.holdsBack).toBe(false)
+		})
+	})
+	describe('when the existence check could not establish the company', () => {
+		it('should hold it back and hand on the word for what was missing', () => {
+			// GIVEN a row the check marked, saying what it did not find
+			const held = prospectHoldBack({
+				marks: [EXISTENCE_UNCONFIRMED],
+				existence_reason: 'no_own_site',
+			})
+
+			// THEN it is held back as unconfirmed, carrying the word rather than a
+			//   sentence, so the surface says it in the reader's language. Before
+			//   this the check wrote to a field only the run itself read, and a row
+			//   it could not stand behind reached the reader looking like one it
+			//   could.
+			expect(held.couldNotConfirm).toBe(true)
+			expect(held.outsidePlace).toBe(false)
+			expect(held.holdsBack).toBe(true)
+			expect(held.missing).toBe('no_own_site')
+			expect(held.nameOnly).toBe(false)
+		})
+	})
+
+	describe('when the run stopped short of checking the company', () => {
+		it("should say so with the run's own word, not a finding", () => {
+			// GIVEN a row marked because the run spent its allowance first
+			const held = prospectHoldBack({
+				marks: [EXISTENCE_UNCONFIRMED],
+				existence_reason: 'budget_exhausted',
+			})
+
+			// THEN the word comes through untouched. Folded into the findings, a
+			//   reader would hear that the search looked and came back empty, when
+			//   it never looked at all.
+			expect(held.missing).toBe('budget_exhausted')
+			expect(held.couldNotConfirm).toBe(true)
+		})
+	})
+
+	describe('when a stored row carries a word this build does not know', () => {
+		it('should still hold it back, without a word for why', () => {
+			// GIVEN a row marked with a reason from some later vocabulary
+			const held = prospectHoldBack({
+				marks: [EXISTENCE_UNCONFIRMED],
+				existence_reason: 'some_future_reason',
+			})
+
+			// THEN the doubt survives and only the wording is lost. Read the other
+			//   way round, an unreadable word would quietly clear the row.
+			expect(held.couldNotConfirm).toBe(true)
+			expect(held.holdsBack).toBe(true)
+			expect(held.missing).toBeUndefined()
+		})
+	})
+
+	describe('when a row carries a reason but no mark', () => {
+		it('should not hold it back on the reason alone', () => {
+			// GIVEN a reason left behind by an earlier pass that later stopped
+			//   doubting the company
+			const held = prospectHoldBack({ existence_reason: 'no_own_site' })
+
+			// THEN nothing is held back: the mark is what says the run doubts the
+			//   row, and a leftover word is not a doubt.
+			expect(held.couldNotConfirm).toBe(false)
+			expect(held.holdsBack).toBe(false)
+			expect(held.missing).toBeUndefined()
+		})
+	})
+
+	describe('when the company is doubted and placed elsewhere at once', () => {
+		it('should report the existence doubt beside the place', () => {
+			// GIVEN a row wearing both marks
+			const held = prospectHoldBack({
+				marks: [OUTSIDE_REQUESTED_PLACE, EXISTENCE_UNCONFIRMED],
+				existence_reason: 'one_website',
+			})
+
+			// THEN each is found wherever it sits in the list
+			expect(held.couldNotConfirm).toBe(true)
+			expect(held.outsidePlace).toBe(true)
+			expect(held.missing).toBe('one_website')
 		})
 	})
 })

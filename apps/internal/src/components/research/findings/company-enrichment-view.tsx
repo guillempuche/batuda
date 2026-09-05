@@ -7,6 +7,8 @@ import {
 	CitationList,
 	type CommonFindings,
 	CommonSections,
+	type EvidenceMap,
+	evidenceCitations,
 	FieldKey,
 	FieldRow,
 	FieldsTable,
@@ -20,7 +22,6 @@ import {
 	Section,
 	Sections,
 	SectionTitle,
-	sourcedText,
 	Tag,
 	TagList,
 } from './shared'
@@ -32,36 +33,14 @@ import {
  * sections, finally the cross-cutting common sections.
  */
 
-// A per-field value paired with the source backing it, as stored.
-type SourcedString = {
-	readonly value: string
-	readonly source_id: string
-	readonly quote?: string
-	readonly confidence?: number
-}
-
-const sourcedToCitations = (
-	field: SourcedString | null | undefined,
-): ReadonlyArray<Citation> =>
-	field != null
-		? [
-				{
-					source_id: field.source_id,
-					...(field.quote !== undefined ? { quote: field.quote } : {}),
-					...(field.confidence !== undefined
-						? { confidence: field.confidence }
-						: {}),
-				},
-			]
-		: []
-
 type EnrichmentBlock = {
-	readonly industry?: SourcedString
-	readonly size_range?: SourcedString
-	readonly current_tools?: SourcedString
+	readonly industry?: string
+	readonly size_range?: string
+	readonly current_tools?: string
 	readonly tags?: ReadonlyArray<string>
-	readonly location?: SourcedString
-	readonly country?: SourcedString
+	readonly location?: string
+	readonly country?: string
+	readonly evidence?: EvidenceMap
 }
 
 // An evidence-backed row (a fit check or a disqualifier): the source URL and,
@@ -109,16 +88,17 @@ type QualityBlock = {
 
 type CompetitorEntry = {
 	readonly name: string
-	readonly website?: unknown
+	readonly website?: string
 	readonly why?: string
 	readonly citations?: ReadonlyArray<Citation>
 }
 
 type ContactEntry = {
 	readonly name: string
-	readonly role?: SourcedString
-	readonly email?: SourcedString
-	readonly phone?: SourcedString
+	readonly role?: string
+	readonly email?: string
+	readonly phone?: string
+	readonly evidence?: EvidenceMap
 }
 
 type CompanyEnrichmentFindings = CommonFindings & {
@@ -177,12 +157,14 @@ const ENRICHMENT_FIELDS: ReadonlyArray<{
 	{ key: 'current_tools', label: <Trans>Current tools</Trans> },
 ]
 
-// A competitor's address, whether the run paired it with its source or, on an
-// older run, stored it bare.
-const CompetitorSite = ({ website }: { readonly website?: unknown }) => {
-	const site = sourcedText(website)
-	return site === undefined ? null : <SafeLink href={site}>{site}</SafeLink>
-}
+const CompetitorSite = ({
+	website,
+}: {
+	readonly website?: string | undefined
+}) =>
+	website === undefined || website === '' ? null : (
+		<SafeLink href={website}>{website}</SafeLink>
+	)
 
 export function CompanyEnrichmentView({
 	findings,
@@ -277,15 +259,17 @@ export function CompanyEnrichmentView({
 					<FieldsTable>
 						{ENRICHMENT_FIELDS.map(({ key, label }) => {
 							const field = e[key]
-							if (field == null || field.value === '') {
+							if (field === undefined || field === '') {
 								return null
 							}
 							return (
 								<FieldRow key={key}>
 									<FieldKey>{label}</FieldKey>
 									<FieldValue>
-										{field.value}
-										<CitationList citations={sourcedToCitations(field)} />
+										{field}
+										<CitationList
+											citations={evidenceCitations(e.evidence, key)}
+										/>
 									</FieldValue>
 								</FieldRow>
 							)
@@ -335,37 +319,37 @@ export function CompanyEnrichmentView({
 					</SectionTitle>
 					<List>
 						{contacts.map(c => (
-							<ListItem
-								key={`${c.name}|${c.email?.value ?? c.phone?.value ?? ''}`}
-							>
+							<ListItem key={`${c.name}|${c.email ?? c.phone ?? ''}`}>
 								<RowHead>
 									<Pill>{c.name}</Pill>
-									{c.role?.value !== undefined ? (
-										<Reason>{c.role.value}</Reason>
-									) : null}
+									{c.role !== undefined ? <Reason>{c.role}</Reason> : null}
 								</RowHead>
 								<FieldsTable>
-									{c.email?.value != null ? (
+									{c.email !== undefined ? (
 										<FieldRow>
 											<FieldKey>
 												<Trans>Email</Trans>
 											</FieldKey>
 											<FieldValue>
-												<SafeLink href={`mailto:${c.email.value}`}>
-													{c.email.value}
+												<SafeLink href={`mailto:${c.email}`}>
+													{c.email}
 												</SafeLink>
-												<CitationList citations={sourcedToCitations(c.email)} />
+												<CitationList
+													citations={evidenceCitations(c.evidence, 'email')}
+												/>
 											</FieldValue>
 										</FieldRow>
 									) : null}
-									{c.phone?.value != null ? (
+									{c.phone !== undefined ? (
 										<FieldRow>
 											<FieldKey>
 												<Trans>Phone</Trans>
 											</FieldKey>
 											<FieldValue>
-												{c.phone.value}
-												<CitationList citations={sourcedToCitations(c.phone)} />
+												{c.phone}
+												<CitationList
+													citations={evidenceCitations(c.evidence, 'phone')}
+												/>
 											</FieldValue>
 										</FieldRow>
 									) : null}

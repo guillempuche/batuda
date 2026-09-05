@@ -28,6 +28,7 @@ import {
 	configuredSlots,
 	contactEvalSpanAttributes,
 	contactEvalSummaryAttributes,
+	dropNetworkRows,
 	type EvalSummary,
 	ExtractLanguageModel,
 	evalSpanAttributes,
@@ -42,13 +43,16 @@ import {
 	makeResearchLlmLive,
 	makeResearchProvidersLive,
 	makeUsageMeter,
+	networkGuardJudge,
 	OrganisationKindVerdictsSchema,
 	organisationKindPrompt,
 	outcomeFromContactRun,
 	outcomeFromRun,
 	ProviderError,
 	parseContactGoldenSet,
+	parseFarmCorpus,
 	parseGoldenSet,
+	placesNamed,
 	probeModelCapabilities,
 	probeReachability,
 	type RawContactGoldenRow,
@@ -63,6 +67,7 @@ import {
 	researchToolkitWireFormat,
 	type SystemDefaults,
 	scoreContactRun,
+	scoreFarmReplay,
 	scoreRun,
 	UsageMeter,
 } from '@batuda/research'
@@ -1418,3 +1423,64 @@ export const researchCap = (input: {
 			'The system ceiling still applies, so a higher figure than that is capped at it.',
 		)
 	}).pipe(Effect.provide(SqlLive))
+
+/**
+ * Grade the operator-network check against rows real scans already returned.
+ *
+ * The rule this grades is the one that ships, read out of the same file the
+ * pipeline runs, so a number printed here is a number about production rather
+ * than about a copy of the rule that drifted. Nothing is fetched and no model is
+ * called: every row was decided by a person once, so a pass costs nothing and
+ * gives the same answer twice.
+ *
+ * The corpus is not in the repository. It names hundreds of real firms, and
+ * calling a named firm an operator in a shared file is a claim about that firm —
+ * so `eval/farm-replay.example.json` is the shape and the real one is built
+ * locally. See `eval/README.md`.
+ */
+export const researchFarmReplay = (input: { readonly corpus: string }) =>
+	Effect.gen(function* () {
+		const path = fromRepoRoot(input.corpus)
+		const raw = yield* Effect.tryPromise({
+			try: () => readFile(path, 'utf8'),
+			catch: cause =>
+				new Error(`could not read the corpus at ${path}: ${String(cause)}`),
+		})
+		const parsed = yield* Effect.try({
+			try: () => JSON.parse(raw) as unknown,
+			catch: cause => new Error(`${path} is not JSON: ${String(cause)}`),
+		})
+		const { rows, errors } = parseFarmCorpus(parsed)
+		for (const error of errors) yield* Console.error(`skipped — ${error}`)
+		if (rows.length === 0) {
+			yield* Console.error('No rows to grade.')
+			return
+		}
+
+		const score = scoreFarmReplay(
+			rows,
+			networkGuardJudge({ drop: dropNetworkRows, placesOf: placesNamed }),
+		)
+		const runs = new Set(rows.map(row => JSON.stringify(row.askedAbout))).size
+
+		yield* Console.log(`${score.rows} rows over ${runs} runs`)
+		yield* Console.log(
+			`operator rows taken off: ${score.networkDropped}/${score.networkTotal}`,
+		)
+		// Printed even at zero, and by name. A count says a rule is a few percent
+		// wrong; a name says which company somebody paid to find would have gone,
+		// and that is the number this exists to protect.
+		yield* Console.log(
+			`real companies deleted: ${score.companiesDeleted.length}`,
+		)
+		for (const name of score.companiesDeleted) {
+			yield* Console.log(`  deleted: ${name}`)
+		}
+		// Always nothing out of however many, because this rule only ever drops a
+		// row or leaves it. It is printed all the same: those rows are a real defect
+		// wearing the same address shape, and a line reading zero is how somebody
+		// finds out nothing yet answers them.
+		yield* Console.log(
+			`per-town landing pages, place refused: ${score.placeRefused}/${score.placeTotal}`,
+		)
+	})
