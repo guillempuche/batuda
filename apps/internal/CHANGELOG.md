@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-09-05 (internal-v2026.9.5-2)
+
+### Features
+
+* **research:** drop scan rows that are one operator, not companies ([cdecc86](https://github.com/guillempuche/batuda/commit/cdecc862f4bdd902038ba78cae6d38b05453a7c0))
+* **research:** give every field on a scan row one shape ([fdf90dd](https://github.com/guillempuche/batuda/commit/fdf90ddd89b06d8f2abcc09b5145f8cbe64e13d0))
+
+### Bug Fixes
+
+* **internal:** fetch the quick-capture company list only when it opens ([72d0623](https://github.com/guillempuche/batuda/commit/72d0623d5e748f500d9e332f7712e6d4de358876))
+* **internal:** paint the dashboard and research inbox with their data ([7e8e65b](https://github.com/guillempuche/batuda/commit/7e8e65b75216579d28a747a20b2f39c8a6032e80))
+* **internal:** ship the brand fonts and cache built files for a year ([f86eda7](https://github.com/guillempuche/batuda/commit/f86eda7db35501f0f74e7387ca6f58d9265e39b4))
+
+### Refactoring
+
+* compile every styled template at build time ([a13e660](https://github.com/guillempuche/batuda/commit/a13e660217c06326eb302f142d55858627e65bc1))
+
 ## 2026-09-05 (internal-v2026.9.5-1)
 
 ### Bug Fixes
