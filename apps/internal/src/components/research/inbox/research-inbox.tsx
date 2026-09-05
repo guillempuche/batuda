@@ -14,6 +14,7 @@ import {
 	type PendingProposal,
 	pendingProposalsAtom,
 	researchListAtom,
+	researchMonthlySpendAtom,
 	resolveProposalsBatchAtom,
 } from '#/atoms/research-atoms'
 import { Badge } from '#/components/research/badge'
@@ -47,7 +48,6 @@ import {
 	type ResolveOutcome,
 	useProposalResolution,
 } from '#/hooks/use-proposal-resolution'
-import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import { dlgNoId } from '#/lib/dlg-search'
 import { formatMoneyCents } from '#/lib/format-money'
 import { firstPage, type ListPage } from '#/lib/list-page'
@@ -80,6 +80,27 @@ export function inboxPendingProposalsAtom(page: ListPage = INBOX_FIRST_PAGE) {
 // locally can only ever find the ones that happened to be fetched, so the tile
 // counted a slice of the truth and called it the total.
 const ATTENTION_STATUS_FILTER = ATTENTION_RESEARCH_STATUSES.join(',')
+
+/** What the attention feed asks for: the runs still waiting on a reader. */
+export const INBOX_ATTENTION_RUNS_PARAMS = {
+	status: ATTENTION_STATUS_FILTER,
+	limit: INBOX_PROPOSAL_LIMIT,
+	count: 'exact',
+} as const
+
+/** What the "runs" tile asks for: one row, but the exact total alongside it. */
+export const INBOX_RUN_COUNT_PARAMS = { limit: 1, count: 'exact' } as const
+
+/** The single atom for the attention feed, so a value fetched ahead of the
+ * page is the one the screen reads. */
+export function inboxAttentionRunsAtom() {
+	return researchListAtom(INBOX_ATTENTION_RUNS_PARAMS)
+}
+
+/** The single atom behind the "runs" tile, shared for the same reason. */
+export function inboxRunCountAtom() {
+	return researchListAtom(INBOX_RUN_COUNT_PARAMS)
+}
 
 function rowKey(p: PendingProposal): string {
 	return `${p.researchId}::${p.proposedUpdateId ?? ''}`
@@ -157,32 +178,14 @@ export function ResearchInbox() {
 	)
 	const proposalsResult = useAtomValue(proposalsAtom)
 	const refreshProposals = useAtomRefresh(proposalsAtom)
-	const runsAtom = useMemo(
-		() =>
-			researchListAtom({
-				status: ATTENTION_STATUS_FILTER,
-				limit: INBOX_PROPOSAL_LIMIT,
-				count: 'exact',
-			}),
-		[],
-	)
-	const runsResult = useAtomValue(runsAtom)
+	// These three come with the page rather than a moment after it, so the queue
+	// below them is not shoved down once it has painted.
+	const runsResult = useAtomValue(inboxAttentionRunsAtom())
 	// Counted, not listed: the tile beside it only states how many runs there
 	// are, and the feed above is narrowed to the ones needing attention, so it
 	// can no longer answer that question.
-	const runCountAtom = useMemo(
-		() => researchListAtom({ limit: 1, count: 'exact' }),
-		[],
-	)
-	const runCountResult = useAtomValue(runCountAtom)
-	const spendAtom = useMemo(
-		() =>
-			BatudaApiAtom.query('research', 'spend', {
-				query: { range: 'month', groupBy: 'provider' },
-			}),
-		[],
-	)
-	const spendResult = useAtomValue(spendAtom)
+	const runCountResult = useAtomValue(inboxRunCountAtom())
+	const spendResult = useAtomValue(researchMonthlySpendAtom)
 
 	const resolveBatch = useAtomSet(resolveProposalsBatchAtom, {
 		mode: 'promiseExit',
