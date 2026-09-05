@@ -1,7 +1,7 @@
 import { useInView } from 'motion/react'
 import { AnimateNumber } from 'motion-plus/react'
+import { styled } from 'next-yak'
 import { useRef } from 'react'
-import styled from 'styled-components'
 
 import { ScrewDot } from '#/components/shared/workshop-decorations'
 import { brushedMetalPlate } from '#/lib/workshop-mixins'
@@ -35,10 +35,10 @@ export function KpiCounter({
 	const inView = useInView(ref, { once: true, amount: 0.4 })
 	return (
 		<MetalPlate ref={ref} $compact={density === 'compact'}>
-			<ScrewDot $position='top-left' $size={6} aria-hidden />
-			<ScrewDot $position='top-right' $size={6} aria-hidden />
-			<ScrewDot $position='bottom-left' $size={6} aria-hidden />
-			<ScrewDot $position='bottom-right' $size={6} aria-hidden />
+			<ScrewDot data-position='top-left' $size={6} aria-hidden />
+			<ScrewDot data-position='top-right' $size={6} aria-hidden />
+			<ScrewDot data-position='bottom-left' $size={6} aria-hidden />
+			<ScrewDot data-position='bottom-right' $size={6} aria-hidden />
 			<Digits $compact={density === 'compact'}>
 				<AnimateNumber
 					format={{ useGrouping: true }}
@@ -56,10 +56,7 @@ export function KpiCounter({
 	)
 }
 
-const MetalPlate = styled.div.withConfig({
-	displayName: 'KpiCounterPlate',
-	shouldForwardProp: prop => prop !== '$compact',
-})<{ $compact?: boolean }>`
+const MetalPlate = styled.div<{ $compact?: boolean }>`
 	${brushedMetalPlate}
 	display: flex;
 	flex-direction: column;
@@ -73,10 +70,7 @@ const MetalPlate = styled.div.withConfig({
 	min-width: 0;
 `
 
-const Digits = styled.div.withConfig({
-	displayName: 'KpiCounterDigits',
-	shouldForwardProp: prop => prop !== '$compact',
-})<{ $compact?: boolean }>`
+const Digits = styled.div<{ $compact?: boolean }>`
 	display: inline-flex;
 	align-items: baseline;
 	gap: var(--space-3xs);
@@ -91,7 +85,7 @@ const Digits = styled.div.withConfig({
 	font-variant-numeric: tabular-nums;
 `
 
-const Suffix = styled.span.withConfig({ displayName: 'KpiCounterSuffix' })`
+const Suffix = styled.span`
 	font-size: 0.55em;
 	font-weight: var(--font-weight-medium);
 	color: var(--color-on-surface-variant);
@@ -99,7 +93,7 @@ const Suffix = styled.span.withConfig({ displayName: 'KpiCounterSuffix' })`
 	text-transform: uppercase;
 `
 
-const Label = styled.p.withConfig({ displayName: 'KpiCounterLabel' })`
+const Label = styled.p`
 	margin: 0;
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);

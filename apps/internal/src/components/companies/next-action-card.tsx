@@ -1,6 +1,6 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Compass } from 'lucide-react'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 import { EditableField } from '#/components/shared/editable-field'
 import { RelativeDate } from '#/components/shared/relative-date'
@@ -61,9 +61,7 @@ export function NextActionCard({
 	)
 }
 
-const Card = styled.section.withConfig({
-	displayName: 'NextActionCard',
-})`
+const Card = styled.section`
 	${agedPaperSurface}
 	display: flex;
 	flex-direction: column;
@@ -71,9 +69,7 @@ const Card = styled.section.withConfig({
 	padding: var(--space-md);
 `
 
-const Header = styled.header.withConfig({
-	displayName: 'NextActionCardHeader',
-})`
+const Header = styled.header`
 	${rulerUnderRule}
 	display: flex;
 	align-items: baseline;
@@ -82,10 +78,7 @@ const Header = styled.header.withConfig({
 	padding-bottom: var(--space-2xs);
 `
 
-const Due = styled.span.withConfig({
-	displayName: 'NextActionCardDue',
-	shouldForwardProp: prop => !prop.startsWith('$'),
-})<{ $overdue: boolean }>`
+const Due = styled.span<{ $overdue: boolean }>`
 	flex-shrink: 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-label-medium-size);
@@ -103,9 +96,7 @@ const Due = styled.span.withConfig({
 	}
 `
 
-const Heading = styled.h3.withConfig({
-	displayName: 'NextActionCardHeading',
-})`
+const Heading = styled.h3`
 	${stenciledTitle}
 	display: inline-flex;
 	align-items: center;
@@ -115,9 +106,7 @@ const Heading = styled.h3.withConfig({
 	line-height: var(--typescale-title-medium-line);
 `
 
-const Body = styled.div.withConfig({
-	displayName: 'NextActionCardBody',
-})`
+const Body = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-xs);

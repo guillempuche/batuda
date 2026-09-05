@@ -46,6 +46,52 @@ test.describe('sign-in', () => {
 		})
 	})
 
+	test.describe('however the styles reach the page', () => {
+		test('should paint the form, not just lay it out', {
+			tag: '@smoke',
+		}, async ({ page }) => {
+			/* An unstyled page still has every element, every test id and every
+			 * bit of text, so the rest of this suite passes on one. The styles
+			 * are prepared while the app is built now, and a build that quietly
+			 * stops producing them — a transform that no longer runs, a
+			 * stylesheet the document forgets to ask for — looks exactly like a
+			 * working app to every other check here.
+			 *
+			 * So read the paint back off the page. Each of these comes only from
+			 * a component's own styles, never from the reset or the tokens. */
+
+			// GIVEN the sign-in page
+			await page.goto('/login')
+			const submit = page.getByTestId('login-submit')
+			await expect(submit).toBeVisible()
+
+			// WHEN the button's painted style is read back
+			const button = await submit.evaluate(el => {
+				const s = window.getComputedStyle(el)
+				return {
+					backgroundImage: s.backgroundImage,
+					textTransform: s.textTransform,
+					borderRadius: s.borderRadius,
+				}
+			})
+
+			// THEN it carries the brushed-metal plate, not a bare button
+			expect(button.backgroundImage).toContain('gradient')
+			expect(button.textTransform).toBe('uppercase')
+			expect(button.borderRadius).not.toBe('0px')
+
+			// AND the card behind it is a surface rather than the page showing
+			// through, which is what a dropped stylesheet would leave
+			const card = await page.getByTestId('login-form').evaluate(el => {
+				const parent = el.parentElement
+				if (!parent) throw new Error('login-form has no parent to paint')
+				return window.getComputedStyle(parent).backgroundColor
+			})
+			expect(card).not.toBe('rgba(0, 0, 0, 0)')
+			expect(card).not.toBe('transparent')
+		})
+	})
+
 	test.describe('with seeded credentials and a safe returnTo', () => {
 		test('should land Alice on the original deep route', async ({ page }) => {
 			// GIVEN /login?returnTo=/settings/profile is open (the gate

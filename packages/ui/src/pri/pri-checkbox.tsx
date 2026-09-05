@@ -1,5 +1,5 @@
 import { Checkbox } from '@base-ui/react/checkbox'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 /**
  * Workshop checkbox — metal bezel with a terracotta dome cap when checked.
@@ -10,9 +10,7 @@ import styled from 'styled-components'
  *     </PriCheckbox.Indicator>
  *   </PriCheckbox.Root>
  */
-const PriRoot = styled(Checkbox.Root).withConfig({
-	displayName: 'PriCheckboxRoot',
-})`
+const PriRoot = styled(Checkbox.Root)`
 	position: relative;
 	display: inline-flex;
 	align-items: center;
@@ -76,9 +74,7 @@ const PriRoot = styled(Checkbox.Root).withConfig({
 	}
 `
 
-const PriIndicator = styled(Checkbox.Indicator).withConfig({
-	displayName: 'PriCheckboxIndicator',
-})`
+const PriIndicator = styled(Checkbox.Indicator)`
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;

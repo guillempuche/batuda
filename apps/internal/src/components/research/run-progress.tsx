@@ -1,8 +1,8 @@
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Plural, Trans } from '@lingui/react/macro'
+import { keyframes, styled } from 'next-yak'
 import type { ReactNode } from 'react'
-import styled from 'styled-components'
 
 import type { ResearchRunLive } from '@batuda/controllers'
 
@@ -93,25 +93,26 @@ const Wrap = styled.div`
 	background: color-mix(in oklab, var(--color-primary) 8%, transparent);
 `
 
+const researchProgressPulse = keyframes`
+	0%,
+	100% {
+		opacity: 0.35;
+		transform: scale(0.85);
+	}
+	50% {
+		opacity: 1;
+		transform: scale(1.15);
+	}
+`
+
 const Pulse = styled.span`
 	flex-shrink: 0;
 	width: 10px;
 	height: 10px;
 	border-radius: var(--shape-full);
 	background: var(--color-primary);
-	animation: research-progress-pulse 1.4s ease-in-out infinite;
+	animation: ${researchProgressPulse} 1.4s ease-in-out infinite;
 
-	@keyframes research-progress-pulse {
-		0%,
-		100% {
-			opacity: 0.35;
-			transform: scale(0.85);
-		}
-		50% {
-			opacity: 1;
-			transform: scale(1.15);
-		}
-	}
 
 	@media (prefers-reduced-motion: reduce) {
 		animation: none;

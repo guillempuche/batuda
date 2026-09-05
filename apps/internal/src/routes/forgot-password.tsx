@@ -1,8 +1,8 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
+import { styled } from 'next-yak'
 import { useState } from 'react'
-import styled from 'styled-components'
 
 import { PriButton, PriInput } from '@batuda/ui/pri'
 
@@ -145,7 +145,7 @@ function ForgotPasswordPage() {
 	)
 }
 
-const Page = styled.div.withConfig({ displayName: 'ForgotPasswordPage' })`
+const Page = styled.div`
 	min-height: 100dvh;
 	display: flex;
 	align-items: center;
@@ -154,7 +154,7 @@ const Page = styled.div.withConfig({ displayName: 'ForgotPasswordPage' })`
 	background-color: var(--color-surface);
 `
 
-const Card = styled.div.withConfig({ displayName: 'ForgotPasswordCard' })`
+const Card = styled.div`
 	position: relative;
 	width: 100%;
 	max-width: 26rem;
@@ -170,7 +170,7 @@ const Card = styled.div.withConfig({ displayName: 'ForgotPasswordCard' })`
 	gap: var(--space-md);
 `
 
-const Brand = styled.h1.withConfig({ displayName: 'ForgotPasswordBrand' })`
+const Brand = styled.h1`
 	${stenciledTitle}
 	font-size: var(--typescale-display-small-size);
 	line-height: var(--typescale-display-small-line);
@@ -179,14 +179,14 @@ const Brand = styled.h1.withConfig({ displayName: 'ForgotPasswordBrand' })`
 	margin: 0;
 `
 
-const Heading = styled.h2.withConfig({ displayName: 'ForgotPasswordHeading' })`
+const Heading = styled.h2`
 	${stenciledTitle}
 	font-size: var(--typescale-headline-small-size);
 	line-height: var(--typescale-headline-small-line);
 	margin: 0;
 `
 
-const Body = styled.p.withConfig({ displayName: 'ForgotPasswordBody' })`
+const Body = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	line-height: var(--typescale-body-medium-line);
@@ -194,25 +194,25 @@ const Body = styled.p.withConfig({ displayName: 'ForgotPasswordBody' })`
 	margin: 0;
 `
 
-const Form = styled.form.withConfig({ displayName: 'ForgotPasswordForm' })`
+const Form = styled.form`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-sm);
 `
 
-const Field = styled.div.withConfig({ displayName: 'ForgotPasswordField' })`
+const Field = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const Label = styled.label.withConfig({ displayName: 'ForgotPasswordLabel' })`
+const Label = styled.label`
 	font-family: var(--font-body);
 	font-size: var(--typescale-label-medium-size);
 	color: var(--color-on-surface-variant);
 `
 
-const ErrorText = styled.p.withConfig({ displayName: 'ForgotPasswordError' })`
+const ErrorText = styled.p`
 	margin: 0;
 	padding: var(--space-2xs) var(--space-sm);
 	border-left: 3px solid var(--color-error);
@@ -223,14 +223,12 @@ const ErrorText = styled.p.withConfig({ displayName: 'ForgotPasswordError' })`
 	font-style: italic;
 `
 
-const BackRow = styled.div.withConfig({ displayName: 'ForgotPasswordBackRow' })`
+const BackRow = styled.div`
 	display: flex;
 	justify-content: center;
 `
 
-const BackLink = styled(Link).withConfig({
-	displayName: 'ForgotPasswordBackLink',
-})`
+const BackLink = styled(Link)`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);

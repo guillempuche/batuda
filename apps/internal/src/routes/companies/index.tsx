@@ -5,8 +5,8 @@ import { DateTime, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { ChevronsUpDown, Search, X } from 'lucide-react'
 import { LayoutGroup, motion } from 'motion/react'
+import { css, styled } from 'next-yak'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import styled from 'styled-components'
 
 import { CommaList } from '@batuda/controllers'
 import {
@@ -872,7 +872,7 @@ function narrowCompanies(
 
 // ── Styles ───────────────────────────────────────────────────────
 
-const Page = styled.div.withConfig({ displayName: 'CompaniesListPage' })`
+const Page = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-lg);
@@ -891,7 +891,7 @@ const Page = styled.div.withConfig({ displayName: 'CompaniesListPage' })`
 	container-type: inline-size;
 `
 
-const Filters = styled.div.withConfig({ displayName: 'CompaniesListFilters' })`
+const Filters = styled.div`
 	${brushedMetalPlate}
 	display: flex;
 	flex-direction: column;
@@ -903,17 +903,13 @@ const Filters = styled.div.withConfig({ displayName: 'CompaniesListFilters' })`
 	border-radius: var(--shape-2xs);
 `
 
-const SearchWrap = styled.div.withConfig({
-	displayName: 'CompaniesListSearchWrap',
-})`
+const SearchWrap = styled.div`
 	position: relative;
 	display: flex;
 	align-items: center;
 `
 
-const SearchIcon = styled.span.withConfig({
-	displayName: 'CompaniesListSearchIcon',
-})`
+const SearchIcon = styled.span`
 	position: absolute;
 	left: var(--space-sm);
 	display: inline-flex;
@@ -922,9 +918,7 @@ const SearchIcon = styled.span.withConfig({
 	z-index: 2;
 `
 
-const StatusFilters = styled.div.withConfig({
-	displayName: 'CompaniesListStatusFilters',
-})`
+const StatusFilters = styled.div`
 	/* Nine stages on one line that slides, rather than wrapping onto four rows.
 	 * Wrapped, they were most of what stood between a phone and the first
 	 * company; sliding, they cost one row at every width. The faded ends say
@@ -955,10 +949,7 @@ const StatusFilters = styled.div.withConfig({
 	}
 `
 
-const StatusFilterButton = styled.button.withConfig({
-	displayName: 'CompaniesListStatusFilterButton',
-	shouldForwardProp: prop => prop !== '$active',
-})<{ $active: boolean }>`
+const StatusFilterButton = styled.button<{ $active: boolean }>`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -987,7 +978,7 @@ const StatusFilterButton = styled.button.withConfig({
 
 	${p =>
 		p.$active &&
-		`
+		css`
 			text-shadow: var(--text-shadow-engrave);
 			box-shadow:
 				inset 0 1px 3px var(--shadow-color-deep),
@@ -1004,9 +995,7 @@ const StatusFilterButton = styled.button.withConfig({
 	}
 `
 
-const Grid = styled(motion.div).withConfig({
-	displayName: 'CompaniesListGrid',
-})`
+const Grid = styled(motion.div)`
 	display: grid;
 	/* minmax(0, …) not a bare 1fr: a plain 1fr track keeps its default
 	 * auto minimum, which is the card's min-content width (the status
@@ -1040,9 +1029,7 @@ const Grid = styled(motion.div).withConfig({
 	}
 `
 
-const DropdownRow = styled.div.withConfig({
-	displayName: 'CompaniesListDropdownRow',
-})`
+const DropdownRow = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	/* Stretch, not centre: one control carries a longer label than the rest —

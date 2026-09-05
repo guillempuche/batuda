@@ -3,8 +3,8 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { ArrowLeft, Wallet } from 'lucide-react'
+import { styled } from 'next-yak'
 import { type ReactNode, useMemo, useState } from 'react'
-import styled from 'styled-components'
 
 import { authClient } from '#/lib/auth-client'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
@@ -372,9 +372,7 @@ const Toolbar = styled.div`
 	gap: var(--space-2xs);
 `
 
-const RangePill = styled.button.withConfig({
-	shouldForwardProp: prop => prop !== '$active',
-})<{ $active: boolean }>`
+const RangePill = styled.button<{ $active: boolean }>`
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.06em;

@@ -1,8 +1,8 @@
 import { Trans } from '@lingui/react/macro'
 import { useNavigate } from '@tanstack/react-router'
 import { KeyRound, X } from 'lucide-react'
+import { styled } from 'next-yak'
 import { useEffect, useState } from 'react'
-import styled from 'styled-components'
 
 import { PriButton } from '@batuda/ui/pri'
 
@@ -152,9 +152,7 @@ function persistLocalDismiss(): void {
 	}
 }
 
-const Banner = styled.section.withConfig({
-	displayName: 'SetPasswordNudge',
-})`
+const Banner = styled.section`
 	${agedPaperSurface}
 	position: relative;
 	display: flex;
@@ -165,11 +163,11 @@ const Banner = styled.section.withConfig({
 	color: var(--color-on-surface);
 `
 
-const Tape = styled.span.withConfig({ displayName: 'SetPasswordNudgeTape' })`
+const Tape = styled.span`
 	${maskingTapeCorner}
 `
 
-const Bezel = styled.span.withConfig({ displayName: 'SetPasswordNudgeBezel' })`
+const Bezel = styled.span`
 	${brushedMetalBezel}
 	display: inline-flex;
 	align-items: center;
@@ -181,9 +179,7 @@ const Bezel = styled.span.withConfig({ displayName: 'SetPasswordNudgeBezel' })`
 	flex-shrink: 0;
 `
 
-const BannerCopy = styled.div.withConfig({
-	displayName: 'SetPasswordNudgeCopy',
-})`
+const BannerCopy = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
@@ -191,18 +187,14 @@ const BannerCopy = styled.div.withConfig({
 	min-width: 240px;
 `
 
-const BannerTitle = styled.p.withConfig({
-	displayName: 'SetPasswordNudgeTitle',
-})`
+const BannerTitle = styled.p`
 	${stenciledTitle}
 	margin: 0;
 	font-size: var(--typescale-title-small-size);
 	line-height: var(--typescale-title-small-line);
 `
 
-const BannerBody = styled.p.withConfig({
-	displayName: 'SetPasswordNudgeBody',
-})`
+const BannerBody = styled.p`
 	margin: 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
@@ -211,18 +203,14 @@ const BannerBody = styled.p.withConfig({
 	font-style: italic;
 `
 
-const BannerActions = styled.div.withConfig({
-	displayName: 'SetPasswordNudgeActions',
-})`
+const BannerActions = styled.div`
 	display: flex;
 	align-items: center;
 	gap: var(--space-sm);
 	flex-wrap: wrap;
 `
 
-const TextButton = styled.button.withConfig({
-	displayName: 'SetPasswordNudgeTextButton',
-})`
+const TextButton = styled.button`
 	background: none;
 	border: none;
 	padding: var(--space-2xs) 0;
@@ -242,9 +230,7 @@ const TextButton = styled.button.withConfig({
 	}
 `
 
-const DismissButton = styled.button.withConfig({
-	displayName: 'SetPasswordNudgeDismissButton',
-})`
+const DismissButton = styled.button`
 	background: none;
 	border: none;
 	padding: var(--space-2xs);

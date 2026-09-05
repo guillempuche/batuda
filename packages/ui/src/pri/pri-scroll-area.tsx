@@ -1,5 +1,5 @@
 import { ScrollArea } from '@base-ui/react/scroll-area'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 /**
  * Workshop scroll area — metal rail scrollbar with a brushed thumb that
@@ -25,18 +25,14 @@ import styled from 'styled-components'
  * `<PriScrollArea.Content style={{ minWidth: 0 }}>` when you don't need
  * horizontal-overflow detection.
  */
-const PriRoot = styled(ScrollArea.Root).withConfig({
-	displayName: 'PriScrollAreaRoot',
-})`
+const PriRoot = styled(ScrollArea.Root)`
 	position: relative;
 	overflow: hidden;
 	width: 100%;
 	height: 100%;
 `
 
-const PriViewport = styled(ScrollArea.Viewport).withConfig({
-	displayName: 'PriScrollAreaViewport',
-})`
+const PriViewport = styled(ScrollArea.Viewport)`
 	width: 100%;
 	height: 100%;
 	/* Contain only the y-axis. Containing the x-axis swallows the macOS
@@ -44,9 +40,7 @@ const PriViewport = styled(ScrollArea.Viewport).withConfig({
 	overscroll-behavior-y: contain;
 `
 
-const PriScrollbar = styled(ScrollArea.Scrollbar).withConfig({
-	displayName: 'PriScrollAreaScrollbar',
-})`
+const PriScrollbar = styled(ScrollArea.Scrollbar)`
 	display: flex;
 	touch-action: none;
 	user-select: none;
@@ -91,9 +85,7 @@ const PriScrollbar = styled(ScrollArea.Scrollbar).withConfig({
 	}
 `
 
-const PriThumb = styled(ScrollArea.Thumb).withConfig({
-	displayName: 'PriScrollAreaThumb',
-})`
+const PriThumb = styled(ScrollArea.Thumb)`
 	position: relative;
 	flex: 1;
 	background: linear-gradient(
@@ -134,9 +126,7 @@ const PriThumb = styled(ScrollArea.Thumb).withConfig({
 	}
 `
 
-const PriCorner = styled(ScrollArea.Corner).withConfig({
-	displayName: 'PriScrollAreaCorner',
-})`
+const PriCorner = styled(ScrollArea.Corner)`
 	background: var(--color-metal-deep);
 `
 

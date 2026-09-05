@@ -1,4 +1,4 @@
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 /**
  * Text only a screen reader reads out. It stays in the page rather than being
@@ -9,7 +9,7 @@ import styled from 'styled-components'
  * that loaded, a retry that is under way — where a sighted reader can see the
  * change but a listener would otherwise get silence.
  */
-export const SrOnly = styled.span.withConfig({ displayName: 'SrOnly' })`
+export const SrOnly = styled.span`
 	position: absolute;
 	width: 1px;
 	height: 1px;

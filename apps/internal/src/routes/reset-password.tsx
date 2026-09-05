@@ -1,10 +1,10 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
+import { styled } from 'next-yak'
 import { useState } from 'react'
-import styled from 'styled-components'
 
-import { PriButton } from '@batuda/ui/pri'
+import { PriButton, priButtonBase, priButtonFilled } from '@batuda/ui/pri'
 
 import { PriPasswordInput } from '#/components/primitives/pri-password-input'
 import { authClient } from '#/lib/auth-client'
@@ -68,14 +68,14 @@ function ResetPasswordPage() {
 							a new one and follow it within the hour.
 						</Trans>
 					</Body>
-					<PriButton
-						as={Link}
-						to='/forgot-password'
-						$variant='filled'
-						data-testid='reset-password-request-new'
-					>
-						<Trans>Request a new link</Trans>
-					</PriButton>
+					<RequestLinkChrome>
+						<Link
+							to='/forgot-password'
+							data-testid='reset-password-request-new'
+						>
+							<Trans>Request a new link</Trans>
+						</Link>
+					</RequestLinkChrome>
 					<BackRow>
 						<BackLink to='/login'>
 							<ArrowLeft size={14} aria-hidden />
@@ -131,14 +131,14 @@ function ResetPasswordPage() {
 							The token expired or was already used. Request a fresh link.
 						</Trans>
 					</Body>
-					<PriButton
-						as={Link}
-						to='/forgot-password'
-						$variant='filled'
-						data-testid='reset-password-request-new'
-					>
-						<Trans>Request a new link</Trans>
-					</PriButton>
+					<RequestLinkChrome>
+						<Link
+							to='/forgot-password'
+							data-testid='reset-password-request-new'
+						>
+							<Trans>Request a new link</Trans>
+						</Link>
+					</RequestLinkChrome>
 				</Card>
 			</Page>
 		)
@@ -247,7 +247,7 @@ function ResetPasswordPage() {
 	)
 }
 
-const Page = styled.div.withConfig({ displayName: 'ResetPasswordPage' })`
+const Page = styled.div`
 	min-height: 100dvh;
 	display: flex;
 	align-items: center;
@@ -256,7 +256,7 @@ const Page = styled.div.withConfig({ displayName: 'ResetPasswordPage' })`
 	background-color: var(--color-surface);
 `
 
-const Card = styled.div.withConfig({ displayName: 'ResetPasswordCard' })`
+const Card = styled.div`
 	position: relative;
 	width: 100%;
 	max-width: 26rem;
@@ -272,7 +272,7 @@ const Card = styled.div.withConfig({ displayName: 'ResetPasswordCard' })`
 	gap: var(--space-md);
 `
 
-const Brand = styled.h1.withConfig({ displayName: 'ResetPasswordBrand' })`
+const Brand = styled.h1`
 	${stenciledTitle}
 	font-size: var(--typescale-display-small-size);
 	line-height: var(--typescale-display-small-line);
@@ -281,14 +281,14 @@ const Brand = styled.h1.withConfig({ displayName: 'ResetPasswordBrand' })`
 	margin: 0;
 `
 
-const Heading = styled.h2.withConfig({ displayName: 'ResetPasswordHeading' })`
+const Heading = styled.h2`
 	${stenciledTitle}
 	font-size: var(--typescale-headline-small-size);
 	line-height: var(--typescale-headline-small-line);
 	margin: 0;
 `
 
-const Body = styled.p.withConfig({ displayName: 'ResetPasswordBody' })`
+const Body = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	line-height: var(--typescale-body-medium-line);
@@ -296,25 +296,25 @@ const Body = styled.p.withConfig({ displayName: 'ResetPasswordBody' })`
 	margin: 0;
 `
 
-const Form = styled.form.withConfig({ displayName: 'ResetPasswordForm' })`
+const Form = styled.form`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-sm);
 `
 
-const Field = styled.div.withConfig({ displayName: 'ResetPasswordField' })`
+const Field = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const Label = styled.label.withConfig({ displayName: 'ResetPasswordLabel' })`
+const Label = styled.label`
 	font-family: var(--font-body);
 	font-size: var(--typescale-label-medium-size);
 	color: var(--color-on-surface-variant);
 `
 
-const ErrorText = styled.p.withConfig({ displayName: 'ResetPasswordError' })`
+const ErrorText = styled.p`
 	margin: 0;
 	padding: var(--space-2xs) var(--space-sm);
 	border-left: 3px solid var(--color-error);
@@ -325,16 +325,26 @@ const ErrorText = styled.p.withConfig({ displayName: 'ResetPasswordError' })`
 	font-style: italic;
 `
 
-const BackRow = styled.div.withConfig({
-	displayName: 'ResetPasswordBackRow',
-})`
+const BackRow = styled.div`
 	display: flex;
 	justify-content: center;
 `
 
-const BackLink = styled(Link).withConfig({
-	displayName: 'ResetPasswordBackLink',
-})`
+/* A link that looks like the filled button. The styling sits on a wrapper
+ * with a plain link inside: routing it through PriButton would hand Base UI
+ * an anchor to treat as a button, which stamps `type="button"` and a tab
+ * index onto it — invalid on an anchor, and it complains on every render. */
+const RequestLinkChrome = styled.span`
+	display: inline-flex;
+
+	& > a {
+		${priButtonBase}
+		${priButtonFilled}
+		text-decoration: none;
+	}
+`
+
+const BackLink = styled(Link)`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);

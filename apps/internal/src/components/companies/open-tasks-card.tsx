@@ -1,6 +1,6 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { CheckCircle } from 'lucide-react'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 import { RelativeDate } from '#/components/shared/relative-date'
 import {
@@ -71,9 +71,7 @@ export function OpenTasksCard({
 	)
 }
 
-const Card = styled.section.withConfig({
-	displayName: 'OpenTasksCard',
-})`
+const Card = styled.section`
 	${agedPaperSurface}
 	display: flex;
 	flex-direction: column;
@@ -81,9 +79,7 @@ const Card = styled.section.withConfig({
 	padding: var(--space-md);
 `
 
-const Header = styled.header.withConfig({
-	displayName: 'OpenTasksCardHeader',
-})`
+const Header = styled.header`
 	${rulerUnderRule}
 	display: flex;
 	align-items: center;
@@ -92,9 +88,7 @@ const Header = styled.header.withConfig({
 	padding-bottom: var(--space-2xs);
 `
 
-const Heading = styled.h3.withConfig({
-	displayName: 'OpenTasksCardHeading',
-})`
+const Heading = styled.h3`
 	${stenciledTitle}
 	display: inline-flex;
 	align-items: center;
@@ -104,9 +98,7 @@ const Heading = styled.h3.withConfig({
 	line-height: var(--typescale-title-medium-line);
 `
 
-const Count = styled.span.withConfig({
-	displayName: 'OpenTasksCardCount',
-})`
+const Count = styled.span`
 	font-family: var(--font-body);
 	font-weight: var(--font-weight-regular);
 	letter-spacing: 0;
@@ -115,9 +107,7 @@ const Count = styled.span.withConfig({
 	margin-left: var(--space-2xs);
 `
 
-const List = styled.ul.withConfig({
-	displayName: 'OpenTasksCardList',
-})`
+const List = styled.ul`
 	display: flex;
 	flex-direction: column;
 	gap: 0;
@@ -126,9 +116,7 @@ const List = styled.ul.withConfig({
 	padding: 0;
 `
 
-const Row = styled.li.withConfig({
-	displayName: 'OpenTasksCardRow',
-})`
+const Row = styled.li`
 	${ruledLedgerRow}
 	display: flex;
 	align-items: center;
@@ -141,9 +129,7 @@ const Row = styled.li.withConfig({
 	}
 `
 
-const Title = styled.span.withConfig({
-	displayName: 'OpenTasksCardTitle',
-})`
+const Title = styled.span`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	color: var(--color-on-surface);
@@ -153,10 +139,7 @@ const Title = styled.span.withConfig({
 	min-width: 0;
 `
 
-const Meta = styled.span.withConfig({
-	displayName: 'OpenTasksCardMeta',
-	shouldForwardProp: prop => !prop.startsWith('$'),
-})<{ $overdue: boolean }>`
+const Meta = styled.span<{ $overdue: boolean }>`
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
 	font-weight: var(--font-weight-bold);
@@ -173,9 +156,7 @@ const Meta = styled.span.withConfig({
 	}
 `
 
-const More = styled.li.withConfig({
-	displayName: 'OpenTasksCardMore',
-})`
+const More = styled.li`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	font-style: italic;
@@ -183,9 +164,7 @@ const More = styled.li.withConfig({
 	padding-top: var(--space-xs);
 `
 
-const Empty = styled.p.withConfig({
-	displayName: 'OpenTasksCardEmpty',
-})`
+const Empty = styled.p`
 	margin: 0;
 	font-family: var(--font-body);
 	font-style: italic;

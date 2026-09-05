@@ -2,8 +2,8 @@ import { useAtomSet } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { useBlocker } from '@tanstack/react-router'
 import { Copy, MoreHorizontal, Trash2, UserRoundPlus, X } from 'lucide-react'
+import { styled } from 'next-yak'
 import { useEffect, useRef, useState } from 'react'
-import styled from 'styled-components'
 
 import {
 	PriButton,

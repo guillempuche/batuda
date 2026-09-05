@@ -1,7 +1,7 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Check, ChevronsUpDown } from 'lucide-react'
+import { styled } from 'next-yak'
 import { useMemo, useState } from 'react'
-import styled from 'styled-components'
 
 import { PriButton, PriDialog, PriSelect } from '@batuda/ui/pri'
 

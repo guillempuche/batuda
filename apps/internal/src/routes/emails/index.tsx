@@ -40,6 +40,7 @@ import {
 	Search,
 	X,
 } from 'lucide-react'
+import { css, styled } from 'next-yak'
 import {
 	useCallback,
 	useContext,
@@ -48,7 +49,6 @@ import {
 	useRef,
 	useState,
 } from 'react'
-import styled, { css } from 'styled-components'
 
 import {
 	PriButton,
@@ -1642,13 +1642,13 @@ function narrowInboxes(
 
 // ── Styles ───────────────────────────────────────────────────────
 
-const Page = styled.div.withConfig({ displayName: 'EmailsIndexPage' })`
+const Page = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-lg);
 `
 
-const Intro = styled.div.withConfig({ displayName: 'EmailsIndexIntro' })`
+const Intro = styled.div`
 	display: grid;
 	gap: var(--space-md);
 	align-items: end;
@@ -1658,9 +1658,7 @@ const Intro = styled.div.withConfig({ displayName: 'EmailsIndexIntro' })`
 	}
 `
 
-const IntroActions = styled.div.withConfig({
-	displayName: 'EmailsIndexIntroActions',
-})`
+const IntroActions = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-xs);
@@ -1671,9 +1669,7 @@ const IntroActions = styled.div.withConfig({
 	}
 `
 
-const IntroText = styled.div.withConfig({
-	displayName: 'EmailsIndexIntroText',
-})`
+const IntroText = styled.div`
 	${rulerUnderRule}
 	display: flex;
 	flex-direction: column;
@@ -1681,14 +1677,14 @@ const IntroText = styled.div.withConfig({
 	padding-bottom: var(--space-xs);
 `
 
-const Title = styled.h2.withConfig({ displayName: 'EmailsIndexTitle' })`
+const Title = styled.h2`
 	${stenciledTitle}
 	font-size: var(--typescale-headline-large-size);
 	line-height: var(--typescale-headline-large-line);
 	margin: 0;
 `
 
-const Subtitle = styled.p.withConfig({ displayName: 'EmailsIndexSubtitle' })`
+const Subtitle = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-large-size);
 	line-height: var(--typescale-body-large-line);
@@ -1697,7 +1693,7 @@ const Subtitle = styled.p.withConfig({ displayName: 'EmailsIndexSubtitle' })`
 	margin: 0;
 `
 
-const Filters = styled.div.withConfig({ displayName: 'EmailsIndexFilters' })`
+const Filters = styled.div`
 	${brushedMetalPlate}
 	display: flex;
 	flex-direction: column;
@@ -1706,26 +1702,20 @@ const Filters = styled.div.withConfig({ displayName: 'EmailsIndexFilters' })`
 	border-radius: var(--shape-2xs);
 `
 
-const FilterControls = styled.div.withConfig({
-	displayName: 'EmailsIndexFilterControls',
-})`
+const FilterControls = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
 	gap: var(--space-sm);
 `
 
-const SearchWrap = styled.div.withConfig({
-	displayName: 'EmailsIndexSearchWrap',
-})`
+const SearchWrap = styled.div`
 	position: relative;
 	display: flex;
 	align-items: center;
 `
 
-const SearchIcon = styled.span.withConfig({
-	displayName: 'EmailsIndexSearchIcon',
-})`
+const SearchIcon = styled.span`
 	position: absolute;
 	left: var(--space-sm);
 	display: inline-flex;
@@ -1734,18 +1724,13 @@ const SearchIcon = styled.span.withConfig({
 	z-index: 2;
 `
 
-const StatusFilters = styled.div.withConfig({
-	displayName: 'EmailsIndexStatusFilters',
-})`
+const StatusFilters = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-2xs);
 `
 
-const StatusFilterButton = styled.button.withConfig({
-	displayName: 'EmailsIndexStatusFilterButton',
-	shouldForwardProp: prop => prop !== '$active',
-})<{ $active: boolean }>`
+const StatusFilterButton = styled.button<{ $active: boolean }>`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -1791,9 +1776,7 @@ const StatusFilterButton = styled.button.withConfig({
 	}
 `
 
-const InboxSelectWrap = styled.div.withConfig({
-	displayName: 'EmailsIndexInboxSelectWrap',
-})`
+const InboxSelectWrap = styled.div`
 	display: flex;
 `
 
@@ -1801,17 +1784,13 @@ const InboxSelectWrap = styled.div.withConfig({
 // stays pinned to the top of the scroll area. The primitive hides the header
 // below the table breakpoint; keep it visible here so the actions remain
 // reachable on a phone.
-const SelectionHead = styled(PriTable.Head).withConfig({
-	displayName: 'EmailsIndexSelectionHead',
-})`
+const SelectionHead = styled(PriTable.Head)`
 	@media (max-width: 1024px) {
 		display: block;
 	}
 `
 
-const SelectionCell = styled(PriTable.ColumnHeader).withConfig({
-	displayName: 'EmailsIndexSelectionCell',
-})`
+const SelectionCell = styled(PriTable.ColumnHeader)`
 	display: flex;
 	width: 100%;
 	padding: var(--space-2xs) var(--space-sm);
@@ -1824,9 +1803,7 @@ const SelectionCell = styled(PriTable.ColumnHeader).withConfig({
 // The bulk buttons group as a toolbar on their own element rather than on the
 // header cell around them: a row owns cells, so a cell that called itself a
 // toolbar would break the table apart for a screen reader.
-const BulkToolbar = styled.div.withConfig({
-	displayName: 'EmailsIndexBulkToolbar',
-})`
+const BulkToolbar = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
@@ -1834,9 +1811,7 @@ const BulkToolbar = styled.div.withConfig({
 	width: 100%;
 `
 
-const BulkLabel = styled.span.withConfig({
-	displayName: 'EmailsIndexBulkLabel',
-})`
+const BulkLabel = styled.span`
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-medium-size);
 	font-weight: var(--font-weight-bold);
@@ -1847,9 +1822,7 @@ const BulkLabel = styled.span.withConfig({
 	margin-right: auto;
 `
 
-const IconAction = styled.button.withConfig({
-	displayName: 'EmailsIndexIconAction',
-})`
+const IconAction = styled.button`
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -1879,16 +1852,12 @@ const IconAction = styled.button.withConfig({
 	}
 `
 
-const NoSubject = styled.span.withConfig({
-	displayName: 'EmailsIndexNoSubject',
-})`
+const NoSubject = styled.span`
 	font-style: italic;
 	color: var(--color-on-surface-variant);
 `
 
-const UnreadDot = styled.span.withConfig({
-	displayName: 'EmailsIndexUnreadDot',
-})`
+const UnreadDot = styled.span`
 	display: inline-block;
 	flex-shrink: 0;
 	width: 0.5rem;
@@ -1898,9 +1867,7 @@ const UnreadDot = styled.span.withConfig({
 	box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-primary) 30%, transparent);
 `
 
-const SuspiciousTag = styled.span.withConfig({
-	displayName: 'EmailsIndexSuspiciousTag',
-})`
+const SuspiciousTag = styled.span`
 	display: inline-flex;
 	align-items: center;
 	gap: 4px;
@@ -1918,9 +1885,7 @@ const SuspiciousTag = styled.span.withConfig({
 
 // Carries no styling of its own — it exists to be focused, and the scroll
 // margin keeps the top of the list clear of the bar pinned above it.
-const ListTop = styled.div.withConfig({
-	displayName: 'EmailsIndexListTop',
-})`
+const ListTop = styled.div`
 	scroll-margin-block-start: var(--space-md);
 
 	&:focus {
@@ -1928,9 +1893,7 @@ const ListTop = styled.div.withConfig({
 	}
 `
 
-const Pagination = styled.nav.withConfig({
-	displayName: 'EmailsIndexPagination',
-})`
+const Pagination = styled.nav`
 	${brushedMetalPlate}
 	display: flex;
 	flex-wrap: wrap;
@@ -1941,9 +1904,7 @@ const Pagination = styled.nav.withConfig({
 	border-radius: var(--shape-2xs);
 `
 
-const PageLabel = styled.span.withConfig({
-	displayName: 'EmailsIndexPageLabel',
-})`
+const PageLabel = styled.span`
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-medium-size);
 	letter-spacing: 0.06em;
@@ -1952,15 +1913,13 @@ const PageLabel = styled.span.withConfig({
 	text-shadow: var(--text-shadow-emboss);
 `
 
-const PageNav = styled.div.withConfig({ displayName: 'EmailsIndexPageNav' })`
+const PageNav = styled.div`
 	display: flex;
 	align-items: center;
 	gap: var(--space-sm);
 `
 
-const PageIndicator = styled.span.withConfig({
-	displayName: 'EmailsIndexPageIndicator',
-})`
+const PageIndicator = styled.span`
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.06em;
@@ -1978,7 +1937,7 @@ const COLUMN_FLEX: Record<string, 'grow' | 'shrink'> = {
 	what: 'grow',
 }
 
-const GridShell = styled.div.withConfig({ displayName: 'EmailsGridShell' })`
+const GridShell = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-xs);
@@ -1986,9 +1945,7 @@ const GridShell = styled.div.withConfig({ displayName: 'EmailsGridShell' })`
 
 // Below the table breakpoint each row is a stacked card: checkbox on the
 // left, sender + subject in the middle, time and actions on the right.
-const GridRow = styled(PriTable.Row).withConfig({
-	displayName: 'EmailsGridRow',
-})`
+const GridRow = styled(PriTable.Row)`
 	&:focus-visible {
 		outline: 2px solid var(--color-primary);
 		outline-offset: -2px;
@@ -2048,29 +2005,27 @@ const GridRow = styled(PriTable.Row).withConfig({
 	}
 `
 
-const GridToolbar = styled.div.withConfig({
-	displayName: 'EmailsGridToolbar',
-})`
+const GridToolbar = styled.div`
 	display: flex;
 	justify-content: flex-end;
 	gap: var(--space-xs);
 `
 
-const GridFrame = styled.div.withConfig({ displayName: 'EmailsGridFrame' })`
+const GridFrame = styled.div`
 	position: relative;
 	border: 1px solid var(--color-outline-variant);
 	border-radius: var(--shape-2xs);
 	background: var(--color-surface);
 `
 
-const WhoStack = styled.div.withConfig({ displayName: 'EmailsWhoStack' })`
+const WhoStack = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
 	min-width: 0;
 `
 
-const WhoLine1 = styled.div.withConfig({ displayName: 'EmailsWhoLine1' })`
+const WhoLine1 = styled.div`
 	display: flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -2079,13 +2034,13 @@ const WhoLine1 = styled.div.withConfig({ displayName: 'EmailsWhoLine1' })`
 	white-space: nowrap;
 `
 
-const WhoName = styled.span.withConfig({ displayName: 'EmailsWhoName' })`
+const WhoName = styled.span`
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 `
 
-const WhoLine2 = styled.div.withConfig({ displayName: 'EmailsWhoLine2' })`
+const WhoLine2 = styled.div`
 	font-size: var(--typescale-label-medium-size);
 	color: var(--color-on-surface-variant);
 	overflow: hidden;
@@ -2093,17 +2048,14 @@ const WhoLine2 = styled.div.withConfig({ displayName: 'EmailsWhoLine2' })`
 	white-space: nowrap;
 `
 
-const WhatStack = styled.div.withConfig({ displayName: 'EmailsWhatStack' })`
+const WhatStack = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
 	min-width: 0;
 `
 
-const WhatLine1 = styled.div.withConfig({
-	displayName: 'EmailsWhatLine1',
-	shouldForwardProp: prop => !prop.startsWith('$'),
-})<{ $unread: boolean }>`
+const WhatLine1 = styled.div<{ $unread: boolean }>`
 	display: flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -2113,23 +2065,19 @@ const WhatLine1 = styled.div.withConfig({
 		p.$unread ? 'var(--font-weight-bold)' : 'var(--font-weight-regular)'};
 `
 
-const WhatSubject = styled.span.withConfig({
-	displayName: 'EmailsWhatSubject',
-})`
+const WhatSubject = styled.span`
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	min-width: 0;
 `
 
-const WhatLine2 = styled.div.withConfig({ displayName: 'EmailsWhatLine2' })`
+const WhatLine2 = styled.div`
 	font-size: var(--typescale-label-medium-size);
 	color: var(--color-on-surface-variant);
 `
 
-const RowActionsRow = styled.div.withConfig({
-	displayName: 'EmailsRowActionsRow',
-})`
+const RowActionsRow = styled.div`
 	display: flex;
 	gap: var(--space-2xs);
 	justify-content: flex-end;
@@ -2137,7 +2085,7 @@ const RowActionsRow = styled.div.withConfig({
 
 // ── DraftsResumeStrip styles ──────────────────────────────────────
 
-const StripPlate = styled.div.withConfig({ displayName: 'EmailsStripPlate' })`
+const StripPlate = styled.div`
 	${brushedMetalPlate}
 	display: flex;
 	flex-wrap: wrap;
@@ -2147,9 +2095,7 @@ const StripPlate = styled.div.withConfig({ displayName: 'EmailsStripPlate' })`
 	border-radius: var(--shape-2xs);
 `
 
-const StripLabel = styled.span.withConfig({
-	displayName: 'EmailsStripLabel',
-})`
+const StripLabel = styled.span`
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-medium-size);
 	font-weight: var(--font-weight-bold);
@@ -2159,14 +2105,14 @@ const StripLabel = styled.span.withConfig({
 	text-shadow: var(--text-shadow-emboss);
 `
 
-const ChipRow = styled.div.withConfig({ displayName: 'EmailsChipRow' })`
+const ChipRow = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-2xs);
 	flex: 1 1 auto;
 `
 
-const DraftChip = styled.button.withConfig({ displayName: 'EmailsDraftChip' })`
+const DraftChip = styled.button`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);

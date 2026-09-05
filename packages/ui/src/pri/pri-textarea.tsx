@@ -1,13 +1,11 @@
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 /**
- * Multiline sibling of PriInput. Native `<textarea>` so styled-components
+ * Multiline sibling of PriInput. Native `<textarea>` so the styles
  * can target `:focus-visible` / `[data-invalid]` directly without a Base UI
  * wrapper (Base UI's `Input` is single-line).
  */
-export const PriTextarea = styled.textarea.withConfig({
-	displayName: 'PriTextarea',
-})`
+export const PriTextarea = styled.textarea`
 	width: 100%;
 	padding: var(--space-xs) var(--space-sm);
 	background: var(--color-paper-aged);

@@ -11,8 +11,8 @@ import {
 	UserPlus,
 	X,
 } from 'lucide-react'
+import { styled } from 'next-yak'
 import { useState } from 'react'
-import styled from 'styled-components'
 
 import { isLangCode, type LangCode } from '@batuda/domain'
 import { PriButton, PriInput, PriSelect } from '@batuda/ui/pri'
@@ -482,13 +482,13 @@ function MembersPage() {
 	)
 }
 
-const Page = styled.div.withConfig({ displayName: 'MembersPage' })`
+const Page = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-lg);
 `
 
-const BackLink = styled(Link).withConfig({ displayName: 'MembersBackLink' })`
+const BackLink = styled(Link)`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -503,7 +503,7 @@ const BackLink = styled(Link).withConfig({ displayName: 'MembersBackLink' })`
 	}
 `
 
-const HeaderRow = styled.div.withConfig({ displayName: 'MembersHeaderRow' })`
+const HeaderRow = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	align-items: flex-end;
@@ -511,7 +511,7 @@ const HeaderRow = styled.div.withConfig({ displayName: 'MembersHeaderRow' })`
 	gap: var(--space-sm);
 `
 
-const Intro = styled.div.withConfig({ displayName: 'MembersIntro' })`
+const Intro = styled.div`
 	${rulerUnderRule}
 	display: flex;
 	flex-direction: column;
@@ -521,14 +521,14 @@ const Intro = styled.div.withConfig({ displayName: 'MembersIntro' })`
 	min-width: 12rem;
 `
 
-const Heading = styled.h2.withConfig({ displayName: 'MembersHeading' })`
+const Heading = styled.h2`
 	${stenciledTitle}
 	font-size: var(--typescale-headline-large-size);
 	line-height: var(--typescale-headline-large-line);
 	margin: 0;
 `
 
-const Subtitle = styled.p.withConfig({ displayName: 'MembersSubtitle' })`
+const Subtitle = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-large-size);
 	line-height: var(--typescale-body-large-line);
@@ -537,7 +537,7 @@ const Subtitle = styled.p.withConfig({ displayName: 'MembersSubtitle' })`
 	margin: 0;
 `
 
-const ErrorBanner = styled.p.withConfig({ displayName: 'MembersErrorBanner' })`
+const ErrorBanner = styled.p`
 	margin: 0;
 	padding: var(--space-2xs) var(--space-sm);
 	border-left: 3px solid var(--color-error);
@@ -550,15 +550,11 @@ const ErrorBanner = styled.p.withConfig({ displayName: 'MembersErrorBanner' })`
 // Wrapper only — it exists so the live region is in the DOM before there is
 // anything to announce. `display: contents` means it adds no box of its own,
 // so the banner still sits directly in the page's flex flow.
-const LiveRegion = styled.div.withConfig({
-	displayName: 'MembersLiveRegion',
-})`
+const LiveRegion = styled.div`
 	display: contents;
 `
 
-const SuccessBanner = styled.p.withConfig({
-	displayName: 'MembersSuccessBanner',
-})`
+const SuccessBanner = styled.p`
 	margin: 0;
 	padding: var(--space-2xs) var(--space-sm);
 	border-left: 3px solid var(--color-status-client);
@@ -570,9 +566,7 @@ const SuccessBanner = styled.p.withConfig({
 	align-items: center;
 `
 
-const DismissButton = styled.button.withConfig({
-	displayName: 'MembersDismissButton',
-})`
+const DismissButton = styled.button`
 	margin-left: auto;
 	display: inline-flex;
 	align-items: center;
@@ -594,10 +588,7 @@ const DismissButton = styled.button.withConfig({
 	}
 `
 
-const Layout = styled.div.withConfig({
-	displayName: 'MembersLayout',
-	shouldForwardProp: prop => prop !== '$open',
-})<{ $open: boolean }>`
+const Layout = styled.div<{ $open: boolean }>`
 	display: grid;
 	gap: var(--space-lg);
 	grid-template-columns: 1fr;
@@ -609,7 +600,7 @@ const Layout = styled.div.withConfig({
 	}
 `
 
-const Main = styled.div.withConfig({ displayName: 'MembersMain' })`
+const Main = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-lg);
@@ -618,7 +609,7 @@ const Main = styled.div.withConfig({ displayName: 'MembersMain' })`
 
 // On a phone the add-member panel reads as an inline form right under the
 // header CTA; on a wide screen it sits as a sticky side panel beside the list.
-const Aside = styled.aside.withConfig({ displayName: 'MembersAside' })`
+const Aside = styled.aside`
 	order: -1;
 
 	@media (min-width: 60rem) {
@@ -629,13 +620,13 @@ const Aside = styled.aside.withConfig({ displayName: 'MembersAside' })`
 	}
 `
 
-const EmptyCard = styled.div.withConfig({ displayName: 'MembersEmptyCard' })`
+const EmptyCard = styled.div`
 	${brushedMetalPlate}
 	padding: var(--space-md);
 	border-radius: var(--shape-2xs);
 `
 
-const MemberList = styled.ul.withConfig({ displayName: 'MembersList' })`
+const MemberList = styled.ul`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-sm);
@@ -646,7 +637,7 @@ const MemberList = styled.ul.withConfig({ displayName: 'MembersList' })`
 
 // Wraps so the role badge + remove button drop below the name on a phone
 // instead of clipping the button off the right edge at ~375px.
-const MemberRow = styled.li.withConfig({ displayName: 'MembersRow' })`
+const MemberRow = styled.li`
 	${brushedMetalPlate}
 	display: flex;
 	flex-wrap: wrap;
@@ -656,18 +647,14 @@ const MemberRow = styled.li.withConfig({ displayName: 'MembersRow' })`
 	border-radius: var(--shape-2xs);
 `
 
-const MemberControls = styled.div.withConfig({
-	displayName: 'MembersControls',
-})`
+const MemberControls = styled.div`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-sm);
 	margin-left: auto;
 `
 
-const AvatarPlate = styled.div.withConfig({
-	displayName: 'MembersAvatarPlate',
-})`
+const AvatarPlate = styled.div`
 	width: 40px;
 	height: 40px;
 	border-radius: var(--shape-full);
@@ -685,14 +672,14 @@ const AvatarPlate = styled.div.withConfig({
 	flex-shrink: 0;
 `
 
-const Initial = styled.span.withConfig({ displayName: 'MembersInitial' })`
+const Initial = styled.span`
 	${stenciledTitle}
 	font-size: var(--typescale-title-medium-size);
 	color: var(--color-on-primary);
 	text-shadow: 0 1px 2px var(--shadow-color-deep);
 `
 
-const MemberInfo = styled.div.withConfig({ displayName: 'MembersInfo' })`
+const MemberInfo = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
@@ -700,7 +687,7 @@ const MemberInfo = styled.div.withConfig({ displayName: 'MembersInfo' })`
 	min-width: 10rem;
 `
 
-const MemberName = styled.p.withConfig({ displayName: 'MembersName' })`
+const MemberName = styled.p`
 	${stenciledTitle}
 	font-size: var(--typescale-title-medium-size);
 	margin: 0;
@@ -708,7 +695,7 @@ const MemberName = styled.p.withConfig({ displayName: 'MembersName' })`
 	text-overflow: ellipsis;
 `
 
-const MemberMeta = styled.p.withConfig({ displayName: 'MembersMeta' })`
+const MemberMeta = styled.p`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -720,10 +707,7 @@ const MemberMeta = styled.p.withConfig({ displayName: 'MembersMeta' })`
 	text-overflow: ellipsis;
 `
 
-const RoleBadge = styled.span.withConfig({
-	displayName: 'MembersRoleBadge',
-	shouldForwardProp: prop => prop !== '$role',
-})<{ $role: string }>`
+const RoleBadge = styled.span<{ $role: string }>`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-3xs);
@@ -751,9 +735,7 @@ const RoleBadge = styled.span.withConfig({
 				: 'var(--color-outline)'};
 `
 
-const AddPanel = styled.div.withConfig({
-	displayName: 'MembersAddPanel',
-})`
+const AddPanel = styled.div`
 	${brushedMetalPlate}
 	display: flex;
 	flex-direction: column;
@@ -762,25 +744,21 @@ const AddPanel = styled.div.withConfig({
 	border-radius: var(--shape-2xs);
 `
 
-const PanelHeader = styled.div.withConfig({
-	displayName: 'MembersPanelHeader',
-})`
+const PanelHeader = styled.div`
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: var(--space-sm);
 `
 
-const PanelTitle = styled.h3.withConfig({ displayName: 'MembersPanelTitle' })`
+const PanelTitle = styled.h3`
 	${stenciledTitle}
 	font-size: var(--typescale-title-large-size);
 	line-height: var(--typescale-title-large-line);
 	margin: 0;
 `
 
-const PanelSubtitle = styled.p.withConfig({
-	displayName: 'MembersPanelSubtitle',
-})`
+const PanelSubtitle = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	line-height: var(--typescale-body-small-line);
@@ -789,26 +767,26 @@ const PanelSubtitle = styled.p.withConfig({
 	margin: 0;
 `
 
-const Form = styled.form.withConfig({ displayName: 'MembersAddForm' })`
+const Form = styled.form`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
 `
 
-const Field = styled.div.withConfig({ displayName: 'MembersAddField' })`
+const Field = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const Label = styled.label.withConfig({ displayName: 'MembersAddLabel' })`
+const Label = styled.label`
 	${stenciledTitle}
 	font-size: var(--typescale-label-medium-size);
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
 `
 
-const Hint = styled.p.withConfig({ displayName: 'MembersAddHint' })`
+const Hint = styled.p`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);

@@ -1,9 +1,9 @@
-import { css } from 'styled-components'
+import { css } from 'next-yak'
 
 /**
  * Reusable CSS fragments for the Batuda workshop visual language.
  *
- * Each helper is a `styled-components` `css` template so callers can
+ * Each helper is a `css` template so callers can
  * interpolate it inside their own styled-component bodies without
  * pulling the entire chrome into a shared component. The goal is to
  * keep the theatrical workshop look consistent across routes, cards,

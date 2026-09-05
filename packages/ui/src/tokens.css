@@ -7,7 +7,7 @@
      --breakpoint-lg: 1024px
 
    CSS spec disallows var() inside @media, so the literal pixel
-   values are used in styled-components @media rules.
+   values are used in the @media rules written alongside components.
 
    Scope rules:
      All tokens below are shared by every consumer (the Batuda

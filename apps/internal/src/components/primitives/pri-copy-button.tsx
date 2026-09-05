@@ -1,7 +1,7 @@
 import { useLingui } from '@lingui/react/macro'
 import { Check, Copy } from 'lucide-react'
+import { styled } from 'next-yak'
 import { useState } from 'react'
-import styled from 'styled-components'
 
 import { usePriToast } from '@batuda/ui/pri'
 
@@ -58,7 +58,7 @@ export function PriCopyButton({
 	)
 }
 
-const Button = styled.button.withConfig({ displayName: 'PriCopyButton' })`
+const Button = styled.button`
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -75,7 +75,7 @@ const Button = styled.button.withConfig({ displayName: 'PriCopyButton' })`
 	}
 `
 
-const SrOnly = styled.span.withConfig({ displayName: 'PriCopySrOnly' })`
+const SrOnly = styled.span`
 	position: absolute;
 	width: 1px;
 	height: 1px;

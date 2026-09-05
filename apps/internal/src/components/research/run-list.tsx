@@ -1,7 +1,7 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { Search } from 'lucide-react'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 import { PriButton } from '@batuda/ui/pri'
 

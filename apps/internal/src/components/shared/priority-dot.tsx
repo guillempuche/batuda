@@ -1,7 +1,7 @@
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { useLingui } from '@lingui/react'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 import { PriTooltip } from '@batuda/ui/pri'
 
@@ -64,10 +64,7 @@ export const priorityShortLabels: Record<PriorityLevel, MessageDescriptor> = {
 	3: msg`Low`,
 }
 
-const Rivet = styled.span.withConfig({
-	displayName: 'PriorityDotRivet',
-	shouldForwardProp: prop => prop !== '$priority',
-})<{ $priority: 1 | 2 | 3 }>`
+const Rivet = styled.span<{ $priority: 1 | 2 | 3 }>`
 	display: inline-block;
 	width: 10px;
 	height: 10px;

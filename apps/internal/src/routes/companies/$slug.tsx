@@ -34,8 +34,8 @@ import {
 	Trash2,
 } from 'lucide-react'
 import { motion } from 'motion/react'
+import { css, styled } from 'next-yak'
 import { useCallback, useMemo, useState } from 'react'
-import styled from 'styled-components'
 
 import type {
 	CompanyDetail as CompanyDetailResponse,
@@ -997,8 +997,8 @@ function DetailBody({
 	return (
 		<Page>
 			<Header layoutId={`company-${company.slug}`}>
-				<ScrewDot $position='top-left' $size={8} aria-hidden />
-				<ScrewDot $position='top-right' $size={8} aria-hidden />
+				<ScrewDot data-position='top-left' $size={8} aria-hidden />
+				<ScrewDot data-position='top-right' $size={8} aria-hidden />
 				<IdentityRow>
 					<Identity>
 						<Name>{company.name}</Name>
@@ -1152,8 +1152,7 @@ function DetailBody({
 							</ExternalLinkButton>
 						)}
 						{company.email && (
-							<ExternalLinkButton
-								as='button'
+							<ExternalLinkAction
 								type='button'
 								data-testid='company-email-compose'
 								aria-label={t`Send email`}
@@ -1166,7 +1165,7 @@ function DetailBody({
 								}
 							>
 								<Mail size={16} aria-hidden />
-							</ExternalLinkButton>
+							</ExternalLinkAction>
 						)}
 						{company.phone && (
 							<ExternalLinkButton
@@ -2064,9 +2063,7 @@ function narrowContactProvenance(
 	return out
 }
 
-const ChannelLabel = styled.span.withConfig({
-	displayName: 'CompanyDetailChannelLabel',
-})`
+const ChannelLabel = styled.span`
 	display: inline-block;
 	padding: 0 var(--space-2xs);
 	border-radius: var(--shape-2xs);
@@ -2253,15 +2250,13 @@ function narrowTasks(rows: ReadonlyArray<unknown>): ReadonlyArray<TaskEntry> {
 
 // ── Styles ────────────────────────────────────────────────────────
 
-const Page = styled.div.withConfig({ displayName: 'CompanyDetailPage' })`
+const Page = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-lg);
 `
 
-const Header = styled(motion.header).withConfig({
-	displayName: 'CompanyDetailHeader',
-})`
+const Header = styled(motion.header)`
 	${brushedMetalPlate}
 	display: flex;
 	flex-direction: column;
@@ -2270,9 +2265,7 @@ const Header = styled(motion.header).withConfig({
 	box-shadow: var(--elevation-workshop-md);
 `
 
-const IdentityRow = styled.div.withConfig({
-	displayName: 'CompanyDetailIdentityRow',
-})`
+const IdentityRow = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	align-items: flex-start;
@@ -2280,9 +2273,7 @@ const IdentityRow = styled.div.withConfig({
 	gap: var(--space-md);
 `
 
-const Identity = styled.div.withConfig({
-	displayName: 'CompanyDetailIdentity',
-})`
+const Identity = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
@@ -2290,7 +2281,7 @@ const Identity = styled.div.withConfig({
 	flex: 1 1 240px;
 `
 
-const Name = styled.h2.withConfig({ displayName: 'CompanyDetailName' })`
+const Name = styled.h2`
 	${stenciledTitle}
 	font-size: var(--typescale-headline-large-size);
 	line-height: var(--typescale-headline-large-line);
@@ -2299,9 +2290,7 @@ const Name = styled.h2.withConfig({ displayName: 'CompanyDetailName' })`
 	overflow-wrap: anywhere;
 `
 
-const SubtitleText = styled.p.withConfig({
-	displayName: 'CompanyDetailSubtitle',
-})`
+const SubtitleText = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-large-size);
 	line-height: var(--typescale-body-large-line);
@@ -2310,9 +2299,7 @@ const SubtitleText = styled.p.withConfig({
 	margin: 0;
 `
 
-const HeaderMeta = styled.div.withConfig({
-	displayName: 'CompanyDetailHeaderMeta',
-})`
+const HeaderMeta = styled.div`
 	display: flex;
 	align-items: center;
 	gap: var(--space-sm);
@@ -2323,10 +2310,7 @@ const HeaderMeta = styled.div.withConfig({
 	flex-wrap: wrap;
 `
 
-const VerifiedControl = styled.button.withConfig({
-	displayName: 'CompanyDetailVerifiedControl',
-	shouldForwardProp: prop => prop !== '$verified',
-})<{ $verified?: boolean }>`
+const VerifiedControl = styled.button<{ $verified?: boolean }>`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-3xs);
@@ -2359,9 +2343,7 @@ const VerifiedControl = styled.button.withConfig({
 	}
 `
 
-const HeaderSelectTrigger = styled(Select.Trigger).withConfig({
-	displayName: 'CompanyDetailHeaderSelectTrigger',
-})`
+const HeaderSelectTrigger = styled(Select.Trigger)`
 	display: inline-flex;
 	background: transparent;
 	border: none;
@@ -2375,9 +2357,7 @@ const HeaderSelectTrigger = styled(Select.Trigger).withConfig({
 	}
 `
 
-const HeaderInlineButton = styled.button.withConfig({
-	displayName: 'CompanyDetailHeaderInlineButton',
-})`
+const HeaderInlineButton = styled.button`
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -2395,9 +2375,7 @@ const HeaderInlineButton = styled.button.withConfig({
 	min-block-size: 2.75rem;
 `
 
-const GhostPriorityDot = styled.span.withConfig({
-	displayName: 'CompanyDetailGhostPriorityDot',
-})`
+const GhostPriorityDot = styled.span`
 	display: inline-block;
 	width: 10px;
 	height: 10px;
@@ -2412,9 +2390,7 @@ const GhostPriorityDot = styled.span.withConfig({
 	}
 `
 
-const HeaderChrome = styled.div.withConfig({
-	displayName: 'CompanyDetailHeaderChrome',
-})`
+const HeaderChrome = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
@@ -2422,17 +2398,13 @@ const HeaderChrome = styled.div.withConfig({
 	gap: var(--space-sm);
 `
 
-const ExternalLinks = styled.div.withConfig({
-	displayName: 'CompanyDetailExternalLinks',
-})`
+const ExternalLinks = styled.div`
 	display: flex;
 	align-items: center;
 	gap: var(--space-2xs);
 `
 
-const ExternalLinkButton = styled.a.withConfig({
-	displayName: 'CompanyDetailExternalLinkButton',
-})`
+const externalLinkType = css`
 	${brushedMetalBezel}
 	display: inline-flex;
 	align-items: center;
@@ -2462,9 +2434,16 @@ const ExternalLinkButton = styled.a.withConfig({
 	}
 `
 
-const LastContact = styled.div.withConfig({
-	displayName: 'CompanyDetailLastContact',
-})`
+const ExternalLinkButton = styled.a`
+	${externalLinkType}
+`
+
+/* Same chip, but it opens the composer here rather than navigating. */
+const ExternalLinkAction = styled.button`
+	${externalLinkType}
+`
+
+const LastContact = styled.div`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -2474,26 +2453,20 @@ const LastContact = styled.div.withConfig({
 	color: var(--color-on-surface-variant);
 `
 
-const LastContactLabel = styled.span.withConfig({
-	displayName: 'CompanyDetailLastContactLabel',
-})`
+const LastContactLabel = styled.span`
 	${stenciledTitle}
 	font-style: normal;
 	opacity: 0.75;
 `
 
-const PrimaryActions = styled.div.withConfig({
-	displayName: 'CompanyDetailPrimaryActions',
-})`
+const PrimaryActions = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
 	gap: var(--space-sm);
 `
 
-const PanelWrap = styled.div.withConfig({
-	displayName: 'CompanyDetailPanelWrap',
-})`
+const PanelWrap = styled.div`
 	/* Establish a query container so panels (Contacts, Files) reflow on
 	 * their own width via @container queries instead of viewport @media
 	 * queries — the company-detail page lives inside a Sidebar primitive
@@ -2503,34 +2476,26 @@ const PanelWrap = styled.div.withConfig({
 	padding: var(--space-md) 0;
 `
 
-const FilesGroup = styled.section.withConfig({
-	displayName: 'CompanyDetailFilesGroup',
-})`
+const FilesGroup = styled.section`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-sm);
 `
 
-const FilesGroupTitle = styled.h3.withConfig({
-	displayName: 'CompanyDetailFilesGroupTitle',
-})`
+const FilesGroupTitle = styled.h3`
 	${stenciledTitle}
 	margin: 0;
 	font-size: var(--typescale-title-medium-size);
 	line-height: var(--typescale-title-medium-line);
 `
 
-const PeopleHeader = styled.div.withConfig({
-	displayName: 'CompanyDetailPeopleHeader',
-})`
+const PeopleHeader = styled.div`
 	display: flex;
 	justify-content: flex-end;
 	margin-bottom: var(--space-sm);
 `
 
-const ContactList = styled.ul.withConfig({
-	displayName: 'CompanyDetailContactList',
-})`
+const ContactList = styled.ul`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-sm);
@@ -2548,9 +2513,7 @@ const ContactList = styled.ul.withConfig({
 	}
 `
 
-const ContactCadence = styled.div.withConfig({
-	displayName: 'CompanyDetailContactCadence',
-})`
+const ContactCadence = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-2xs) var(--space-sm);
@@ -2560,18 +2523,14 @@ const ContactCadence = styled.div.withConfig({
 	color: var(--color-on-surface-variant);
 `
 
-const ContactCadenceItem = styled.span.withConfig({
-	displayName: 'CompanyDetailContactCadenceItem',
-})`
+const ContactCadenceItem = styled.span`
 	display: inline-flex;
 	align-items: baseline;
 	gap: var(--space-3xs);
 	white-space: nowrap;
 `
 
-const ContactNotes = styled.p.withConfig({
-	displayName: 'CompanyDetailContactNotes',
-})`
+const ContactNotes = styled.p`
 	margin: 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
@@ -2580,9 +2539,7 @@ const ContactNotes = styled.p.withConfig({
 	white-space: pre-wrap;
 `
 
-const ContactCard = styled.li.withConfig({
-	displayName: 'CompanyDetailContactCard',
-})`
+const ContactCard = styled.li`
 	${agedPaperSurface}
 	position: relative;
 	display: flex;
@@ -2611,17 +2568,13 @@ const ContactCard = styled.li.withConfig({
 	}
 `
 
-const ContactHeader = styled.div.withConfig({
-	displayName: 'CompanyDetailContactHeader',
-})`
+const ContactHeader = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
 `
 
-const ContactName = styled.span.withConfig({
-	displayName: 'CompanyDetailContactName',
-})`
+const ContactName = styled.span`
 	${stenciledTitle}
 	display: inline-flex;
 	flex-wrap: wrap;
@@ -2633,10 +2586,7 @@ const ContactName = styled.span.withConfig({
 	overflow-wrap: anywhere;
 `
 
-const DecisionBadge = styled.span.withConfig({
-	displayName: 'CompanyDetailDecisionBadge',
-	shouldForwardProp: prop => prop !== '$decides',
-})<{ $decides: boolean }>`
+const DecisionBadge = styled.span<{ $decides: boolean }>`
 	${brushedMetalPlate}
 	${stenciledTitle}
 	display: inline-flex;
@@ -2647,10 +2597,7 @@ const DecisionBadge = styled.span.withConfig({
 	transform: rotate(-0.5deg);
 `
 
-const SuppressionBadge = styled.span.withConfig({
-	displayName: 'CompanyDetailSuppressionBadge',
-	shouldForwardProp: prop => prop !== '$kind',
-})<{ $kind: 'bounced' | 'complained' }>`
+const SuppressionBadge = styled.span<{ $kind: 'bounced' | 'complained' }>`
 	${stenciledTitle}
 	display: inline-flex;
 	align-items: center;
@@ -2666,10 +2613,7 @@ const SuppressionBadge = styled.span.withConfig({
 	text-transform: uppercase;
 `
 
-const SuppressionBanner = styled.div.withConfig({
-	displayName: 'CompanyDetailSuppressionBanner',
-	shouldForwardProp: prop => prop !== '$kind',
-})<{ $kind: 'bounced' | 'complained' }>`
+const SuppressionBanner = styled.div<{ $kind: 'bounced' | 'complained' }>`
 	display: flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -2682,26 +2626,20 @@ const SuppressionBanner = styled.div.withConfig({
 	font-size: var(--typescale-body-small-size);
 `
 
-const SuppressionText = styled.span.withConfig({
-	displayName: 'CompanyDetailSuppressionText',
-})`
+const SuppressionText = styled.span`
 	flex: 1;
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
 `
 
-const SuppressionReason = styled.span.withConfig({
-	displayName: 'CompanyDetailSuppressionReason',
-})`
+const SuppressionReason = styled.span`
 	font-style: italic;
 	font-size: var(--typescale-body-small-size);
 	color: color-mix(in srgb, var(--color-error) 80%, var(--color-on-surface));
 `
 
-const SuppressionAction = styled.button.withConfig({
-	displayName: 'CompanyDetailSuppressionAction',
-})`
+const SuppressionAction = styled.button`
 	${stenciledTitle}
 	background: transparent;
 	border: 1px dashed currentColor;
@@ -2717,9 +2655,7 @@ const SuppressionAction = styled.button.withConfig({
 	}
 `
 
-const ContactRole = styled.span.withConfig({
-	displayName: 'CompanyDetailContactRole',
-})`
+const ContactRole = styled.span`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	line-height: var(--typescale-body-small-line);
@@ -2727,25 +2663,19 @@ const ContactRole = styled.span.withConfig({
 	color: var(--color-on-surface-variant);
 `
 
-const ContactLinks = styled.div.withConfig({
-	displayName: 'CompanyDetailContactLinks',
-})`
+const ContactLinks = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-sm);
 `
 
-const ChannelGroup = styled.span.withConfig({
-	displayName: 'CompanyDetailChannelGroup',
-})`
+const ChannelGroup = styled.span`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
 `
 
-const ContactLink = styled.a.withConfig({
-	displayName: 'CompanyDetailContactLink',
-})`
+const ContactLink = styled.a`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-3xs);
@@ -2761,9 +2691,7 @@ const ContactLink = styled.a.withConfig({
 	}
 `
 
-const ContactLinkButton = styled.button.withConfig({
-	displayName: 'CompanyDetailContactLinkButton',
-})`
+const ContactLinkButton = styled.button`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-3xs);
@@ -2781,17 +2709,13 @@ const ContactLinkButton = styled.button.withConfig({
 	}
 `
 
-const OverviewTimeline = styled.section.withConfig({
-	displayName: 'CompanyDetailOverviewTimeline',
-})`
+const OverviewTimeline = styled.section`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
 `
 
-const TimelineTrigger = styled(PriCollapsible.Trigger).withConfig({
-	displayName: 'CompanyDetailTimelineTrigger',
-})`
+const TimelineTrigger = styled(PriCollapsible.Trigger)`
 	& > svg {
 		transition: transform 200ms ease;
 	}
@@ -2802,23 +2726,17 @@ const TimelineTrigger = styled(PriCollapsible.Trigger).withConfig({
 	}
 `
 
-const TimelinePanelInner = styled.div.withConfig({
-	displayName: 'CompanyDetailTimelinePanelInner',
-})`
+const TimelinePanelInner = styled.div`
 	padding: var(--space-sm) 0 0;
 `
 
-const TimelineToolbar = styled.div.withConfig({
-	displayName: 'CompanyDetailTimelineToolbar',
-})`
+const TimelineToolbar = styled.div`
 	display: flex;
 	justify-content: flex-end;
 	padding: 0 var(--space-md) var(--space-xs);
 `
 
-const SystemEventsToggle = styled.label.withConfig({
-	displayName: 'CompanyDetailSystemEventsToggle',
-})`
+const SystemEventsToggle = styled.label`
 	${stenciledTitle}
 	display: inline-flex;
 	align-items: center;
@@ -2829,17 +2747,13 @@ const SystemEventsToggle = styled.label.withConfig({
 	user-select: none;
 `
 
-const TimelineList = styled.div.withConfig({
-	displayName: 'CompanyDetailTimelineList',
-})`
+const TimelineList = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: 0;
 `
 
-const PagesList = styled.ul.withConfig({
-	displayName: 'CompanyDetailPagesList',
-})`
+const PagesList = styled.ul`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-sm);
@@ -2855,7 +2769,7 @@ const PagesList = styled.ul.withConfig({
 	}
 `
 
-const PageRow = styled.li.withConfig({ displayName: 'CompanyDetailPageRow' })`
+const PageRow = styled.li`
 	${agedPaperSurface}
 	display: flex;
 	align-items: center;
@@ -2864,9 +2778,7 @@ const PageRow = styled.li.withConfig({ displayName: 'CompanyDetailPageRow' })`
 	gap: var(--space-md);
 `
 
-const PageRowTitle = styled.span.withConfig({
-	displayName: 'CompanyDetailPageRowTitle',
-})`
+const PageRowTitle = styled.span`
 	& a {
 		color: var(--color-primary);
 		font-weight: var(--font-weight-medium);
@@ -2878,27 +2790,20 @@ const PageRowTitle = styled.span.withConfig({
 	}
 `
 
-const PageRowMeta = styled.div.withConfig({
-	displayName: 'CompanyDetailPageRowMeta',
-})`
+const PageRowMeta = styled.div`
 	display: flex;
 	align-items: center;
 	gap: var(--space-xs);
 `
 
-const PageLangBadge = styled.span.withConfig({
-	displayName: 'CompanyDetailPageLangBadge',
-})`
+const PageLangBadge = styled.span`
 	font-size: var(--typescale-label-small-size);
 	text-transform: uppercase;
 	letter-spacing: 0.06em;
 	color: var(--color-on-surface-variant);
 `
 
-const PageStatusBadge = styled.span.withConfig({
-	displayName: 'CompanyDetailPageStatusBadge',
-	shouldForwardProp: prop => prop !== '$published',
-})<{ $published: boolean }>`
+const PageStatusBadge = styled.span<{ $published: boolean }>`
 	font-size: var(--typescale-label-small-size);
 	text-transform: uppercase;
 	letter-spacing: 0.06em;

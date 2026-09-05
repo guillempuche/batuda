@@ -1,6 +1,6 @@
 import { Plural, Trans, useLingui } from '@lingui/react/macro'
 import { Pencil, Star, Trash2 } from 'lucide-react'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 import { DefaultBadge, InstructionIconButton } from './instruction-chrome'
 import {

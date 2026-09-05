@@ -1,7 +1,7 @@
 import { useLingui } from '@lingui/react/macro'
 import { Maximize2, Pencil } from 'lucide-react'
+import { styled } from 'next-yak'
 import { useCallback } from 'react'
-import styled from 'styled-components'
 
 import { ComposeWindow } from '#/components/emails/compose-window'
 import { type Draft, useComposeEmail } from '#/context/compose-email-context'
@@ -78,7 +78,7 @@ function pillLabel(draft: Draft, t: ReturnType<typeof useLingui>['t']): string {
 	return t`New message`
 }
 
-const DockLayer = styled.div.withConfig({ displayName: 'ComposeDock' })`
+const DockLayer = styled.div`
 	position: fixed;
 	right: var(--space-md);
 	bottom: 0;
@@ -98,9 +98,7 @@ const DockLayer = styled.div.withConfig({ displayName: 'ComposeDock' })`
 	}
 `
 
-const OpenStack = styled.div.withConfig({
-	displayName: 'ComposeDockOpenStack',
-})`
+const OpenStack = styled.div`
 	display: flex;
 	flex-direction: row-reverse;
 	align-items: flex-end;
@@ -122,9 +120,7 @@ const OpenStack = styled.div.withConfig({
 	}
 `
 
-const MinimizedTray = styled.div.withConfig({
-	displayName: 'ComposeDockMinimizedTray',
-})`
+const MinimizedTray = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-2xs);
@@ -139,9 +135,7 @@ const MinimizedTray = styled.div.withConfig({
 	}
 `
 
-const PillButton = styled.button.withConfig({
-	displayName: 'ComposeDockPill',
-})`
+const PillButton = styled.button`
 	${brushedMetalPlate}
 	${stenciledTitle}
 	display: inline-flex;
@@ -164,9 +158,7 @@ const PillButton = styled.button.withConfig({
 	}
 `
 
-const PillText = styled.span.withConfig({
-	displayName: 'ComposeDockPillText',
-})`
+const PillText = styled.span`
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;

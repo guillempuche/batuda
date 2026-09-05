@@ -4,8 +4,8 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { ArrowRight, ChevronsUpDown, Microscope, Search } from 'lucide-react'
+import { keyframes, styled } from 'next-yak'
 import { type ReactNode, useCallback, useMemo, useState } from 'react'
-import styled from 'styled-components'
 
 import { ATTENTION_RESEARCH_STATUSES } from '@batuda/domain'
 import { PriButton, PriInput, PriSelect, usePriToast } from '@batuda/ui/pri'
@@ -1147,7 +1147,7 @@ const ConfirmBatch = styled.div`
 	gap: var(--space-2xs);
 `
 
-// Styling `Link` directly with styled-components erases TanStack's typed
+// Styling `Link` directly erases TanStack's typed
 // `params` inference, so the chrome lives on a wrapper and the real Link
 // stays plain — keeping `params={{ id }}` type-checked against the route.
 const OpenRunChrome = styled.span`
@@ -1206,6 +1206,16 @@ const SkeletonList = styled.div`
 
 // A shimmering placeholder row that stands in for a queue item while the review
 // list loads, so the page shows its shape instead of a bare "Loading…" line.
+
+const shimmer = keyframes`
+	0% {
+		background-position: 100% 50%;
+	}
+	100% {
+		background-position: 0% 50%;
+	}
+`
+
 const SkeletonRow = styled.div`
 	height: 3.5rem;
 	border-radius: var(--shape-2xs);
@@ -1216,16 +1226,8 @@ const SkeletonRow = styled.div`
 		color-mix(in oklab, var(--color-on-surface) 6%, transparent) 63%
 	);
 	background-size: 400% 100%;
-	animation: shimmer 1.4s ease infinite;
+	animation: ${shimmer} 1.4s ease infinite;
 
-	@keyframes shimmer {
-		0% {
-			background-position: 100% 50%;
-		}
-		100% {
-			background-position: 0% 50%;
-		}
-	}
 
 	@media (prefers-reduced-motion: reduce) {
 		animation: none;

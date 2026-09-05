@@ -1,5 +1,6 @@
 import { useLingui } from '@lingui/react/macro'
 import { Eye, EyeOff } from 'lucide-react'
+import { styled } from 'next-yak'
 import {
 	type ComponentProps,
 	forwardRef,
@@ -7,7 +8,6 @@ import {
 	useRef,
 	useState,
 } from 'react'
-import styled from 'styled-components'
 
 import { PriInput } from '@batuda/ui/pri'
 
@@ -120,7 +120,7 @@ export const PriPasswordInput = forwardRef<InputElement, PriPasswordInputProps>(
 	},
 )
 
-const Wrapper = styled.div.withConfig({ displayName: 'PriPasswordInputWrap' })`
+const Wrapper = styled.div`
 	position: relative;
 	display: flex;
 	align-items: stretch;
@@ -132,9 +132,7 @@ const Wrapper = styled.div.withConfig({ displayName: 'PriPasswordInputWrap' })`
 	}
 `
 
-const ToggleButton = styled.button.withConfig({
-	displayName: 'PriPasswordToggle',
-})`
+const ToggleButton = styled.button`
 	position: absolute;
 	top: 50%;
 	right: var(--space-2xs);

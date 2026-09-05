@@ -1,11 +1,12 @@
+import { styled } from 'next-yak'
 import type { ComponentType, ReactNode } from 'react'
-import styled from 'styled-components'
 
 import {
 	agedPaperSurface,
 	brushedMetalBezel,
 	maskingTapeCorner,
 } from '#/lib/workshop-mixins'
+import { Heading } from './heading'
 
 /**
  * Aged-paper empty-state note. The outer card is taped to the workspace
@@ -39,14 +40,14 @@ export function EmptyState({
 					<Icon size={30} aria-hidden />
 				</Bezel>
 			)}
-			<Title as={`h${headingLevel}`}>{title}</Title>
+			<Title level={headingLevel}>{title}</Title>
 			{description && <Description>{description}</Description>}
 			{action && <Actions>{action}</Actions>}
 		</Wrapper>
 	)
 }
 
-const Wrapper = styled.div.withConfig({ displayName: 'EmptyState' })`
+const Wrapper = styled.div`
 	${agedPaperSurface}
 	position: relative;
 	display: flex;
@@ -61,11 +62,11 @@ const Wrapper = styled.div.withConfig({ displayName: 'EmptyState' })`
 	color: var(--color-on-surface);
 `
 
-const Tape = styled.span.withConfig({ displayName: 'EmptyStateTape' })`
+const Tape = styled.span`
 	${maskingTapeCorner}
 `
 
-const Bezel = styled.span.withConfig({ displayName: 'EmptyStateBezel' })`
+const Bezel = styled.span`
 	${brushedMetalBezel}
 	display: inline-flex;
 	align-items: center;
@@ -77,7 +78,7 @@ const Bezel = styled.span.withConfig({ displayName: 'EmptyStateBezel' })`
 	color: var(--color-on-surface);
 `
 
-const Title = styled.p.withConfig({ displayName: 'EmptyStateTitle' })`
+const Title = styled(Heading)`
 	margin: 0;
 	font-family: var(--font-display);
 	font-size: var(--typescale-title-medium-size);
@@ -89,9 +90,7 @@ const Title = styled.p.withConfig({ displayName: 'EmptyStateTitle' })`
 	text-shadow: var(--text-shadow-emboss);
 `
 
-const Description = styled.div.withConfig({
-	displayName: 'EmptyStateDescription',
-})`
+const Description = styled.div`
 	margin: 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
@@ -101,6 +100,6 @@ const Description = styled.div.withConfig({
 	font-style: italic;
 `
 
-const Actions = styled.div.withConfig({ displayName: 'EmptyStateActions' })`
+const Actions = styled.div`
 	margin-top: var(--space-xs);
 `

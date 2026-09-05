@@ -1,8 +1,8 @@
 import { useAtomRefresh, useAtomSet } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { AlertTriangle } from 'lucide-react'
+import { styled } from 'next-yak'
 import { useId, useState } from 'react'
-import styled from 'styled-components'
 
 import { normalizePaidActionTool } from '@batuda/research/application/paid-action-tool'
 import { searchedAndEmptyParts } from '@batuda/research/application/request-parts'

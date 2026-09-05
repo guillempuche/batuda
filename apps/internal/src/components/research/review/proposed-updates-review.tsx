@@ -2,8 +2,8 @@ import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { DateTime } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
+import { styled } from 'next-yak'
 import { useCallback, useMemo, useState } from 'react'
-import styled from 'styled-components'
 
 import { PriButton, usePriToast } from '@batuda/ui/pri'
 

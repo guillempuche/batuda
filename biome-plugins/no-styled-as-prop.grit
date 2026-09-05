@@ -1,0 +1,16 @@
+// next-yak ignores `as`: it still renders the original tag and then leaks
+// `as` to the DOM as a stray attribute. Nothing warns, so lint it.
+// biome.json limits this file to the folders that use styled-components.
+// One named field per node pattern — Biome 2.4.10 rejects two.
+JsxAttribute(name=$name) as $attr where {
+	$name <: `as`,
+	or {
+		$attr <: contains JsxString() where {
+			register_diagnostic(span=$attr, message="next-yak does not support `as`. Give the styled component the tag you want as its base, or add a second styled component for that tag.", severity="error")
+		},
+		$attr <: contains JsTemplateExpression() where {
+			register_diagnostic(span=$attr, message="next-yak does not support `as`, and this one picks the tag at runtime. Define one styled component per tag and choose between them in the JSX.", severity="error")
+		},
+		register_diagnostic(span=$attr, message="next-yak does not support `as` with a component target. Build the pairing instead — `const Foo = styled(Link)` — and render that here.", severity="error")
+	}
+}

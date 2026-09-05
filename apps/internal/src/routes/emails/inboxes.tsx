@@ -20,9 +20,9 @@ import {
 	Trash2,
 	X,
 } from 'lucide-react'
+import { css, styled } from 'next-yak'
 import type { ComponentType } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import styled, { css } from 'styled-components'
 
 import type { EmailBlocks } from '@batuda/email/schema'
 import {
@@ -1959,13 +1959,13 @@ function narrowInboxRows(rows: unknown): ReadonlyArray<InboxRow> {
 
 // ── Styles ───────────────────────────────────────────────────────
 
-const Page = styled.div.withConfig({ displayName: 'InboxesPage' })`
+const Page = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-lg);
 `
 
-const Intro = styled.div.withConfig({ displayName: 'InboxesIntro' })`
+const Intro = styled.div`
 	display: grid;
 	gap: var(--space-md);
 	align-items: end;
@@ -1975,7 +1975,7 @@ const Intro = styled.div.withConfig({ displayName: 'InboxesIntro' })`
 	}
 `
 
-const IntroText = styled.div.withConfig({ displayName: 'InboxesIntroText' })`
+const IntroText = styled.div`
 	${rulerUnderRule}
 	display: flex;
 	flex-direction: column;
@@ -1983,9 +1983,7 @@ const IntroText = styled.div.withConfig({ displayName: 'InboxesIntroText' })`
 	padding-bottom: var(--space-xs);
 `
 
-const IntroActions = styled.div.withConfig({
-	displayName: 'InboxesIntroActions',
-})`
+const IntroActions = styled.div`
 	display: flex;
 	gap: var(--space-xs);
 	flex-wrap: wrap;
@@ -1996,7 +1994,7 @@ const IntroActions = styled.div.withConfig({
 	}
 `
 
-const BackLink = styled.div.withConfig({ displayName: 'InboxesBackLink' })`
+const BackLink = styled.div`
 	> a {
 		display: inline-flex;
 		align-items: center;
@@ -2014,14 +2012,14 @@ const BackLink = styled.div.withConfig({ displayName: 'InboxesBackLink' })`
 	}
 `
 
-const Title = styled.h2.withConfig({ displayName: 'InboxesTitle' })`
+const Title = styled.h2`
 	${stenciledTitle}
 	font-size: var(--typescale-headline-large-size);
 	line-height: var(--typescale-headline-large-line);
 	margin: 0;
 `
 
-const Subtitle = styled.p.withConfig({ displayName: 'InboxesSubtitle' })`
+const Subtitle = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-large-size);
 	line-height: var(--typescale-body-large-line);
@@ -2030,7 +2028,7 @@ const Subtitle = styled.p.withConfig({ displayName: 'InboxesSubtitle' })`
 	margin: 0;
 `
 
-const InboxesTable = styled.div.withConfig({ displayName: 'InboxesTable' })`
+const InboxesTable = styled.div`
 	display: flex;
 	flex-direction: column;
 	border: 1px solid var(--color-ledger-line);
@@ -2059,9 +2057,7 @@ const gridTemplate = css`
 // On small screens the header row is hidden, so each value cell carries its
 // own column name as a caption above the value. Real text (not CSS generated
 // content) so a screen reader reads it as part of the cell.
-const MobileCaption = styled.span.withConfig({
-	displayName: 'InboxesMobileCaption',
-})`
+const MobileCaption = styled.span`
 	display: none;
 
 	@media (max-width: 767px) {
@@ -2075,7 +2071,7 @@ const MobileCaption = styled.span.withConfig({
 	}
 `
 
-const TableHead = styled.div.withConfig({ displayName: 'InboxesTableHead' })`
+const TableHead = styled.div`
 	${gridTemplate}
 	background: linear-gradient(
 		145deg,
@@ -2096,12 +2092,9 @@ const TableHead = styled.div.withConfig({ displayName: 'InboxesTableHead' })`
 	}
 `
 
-const HeadCell = styled.div.withConfig({ displayName: 'InboxesHeadCell' })``
+const HeadCell = styled.div``
 
-const TableRow = styled.div.withConfig({
-	displayName: 'InboxesTableRow',
-	shouldForwardProp: prop => prop !== '$inactive',
-})<{ $inactive: boolean }>`
+const TableRow = styled.div<{ $inactive: boolean }>`
 	${gridTemplate}
 	${agedPaperRow}
 	border-bottom: 1px solid var(--color-ledger-line);
@@ -2119,22 +2112,20 @@ const TableRow = styled.div.withConfig({
 	}
 `
 
-const CellEmail = styled.div.withConfig({ displayName: 'InboxesCellEmail' })`
+const CellEmail = styled.div`
 	display: flex;
 	flex-direction: column;
 	min-width: 0;
 `
 
-const EmailAddress = styled.span.withConfig({ displayName: 'InboxesEmail' })`
+const EmailAddress = styled.span`
 	font-family: var(--font-body);
 	font-weight: var(--font-weight-medium);
 	color: var(--color-on-surface);
 	overflow-wrap: anywhere;
 `
 
-const DisplayName = styled.span.withConfig({
-	displayName: 'InboxesDisplayName',
-})`
+const DisplayName = styled.span`
 	font-family: var(--font-body);
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface-variant);
@@ -2143,9 +2134,7 @@ const DisplayName = styled.span.withConfig({
 	white-space: nowrap;
 `
 
-const CellPurpose = styled.div.withConfig({
-	displayName: 'InboxesCellPurpose',
-})`
+const CellPurpose = styled.div`
 	display: flex;
 	flex-direction: column;
 	align-items: flex-start;
@@ -2153,14 +2142,14 @@ const CellPurpose = styled.div.withConfig({
 	min-width: 0;
 `
 
-const CellStatus = styled.div.withConfig({ displayName: 'InboxesCellStatus' })`
+const CellStatus = styled.div`
 	display: flex;
 	flex-direction: column;
 	align-items: flex-start;
 	gap: var(--space-3xs);
 `
 
-const EmailMeta = styled.div.withConfig({ displayName: 'InboxesEmailMeta' })`
+const EmailMeta = styled.div`
 	display: flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -2168,9 +2157,7 @@ const EmailMeta = styled.div.withConfig({ displayName: 'InboxesEmailMeta' })`
 	min-width: 0;
 `
 
-const ProviderName = styled.span.withConfig({
-	displayName: 'InboxesProviderName',
-})`
+const ProviderName = styled.span`
 	font-family: var(--font-body);
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface-variant);
@@ -2179,7 +2166,7 @@ const ProviderName = styled.span.withConfig({
 	white-space: nowrap;
 `
 
-const PrivacyTag = styled.span.withConfig({ displayName: 'InboxesPrivacyTag' })`
+const PrivacyTag = styled.span`
 	display: inline-flex;
 	padding: 1px var(--space-2xs);
 	border-radius: var(--shape-2xs);
@@ -2192,10 +2179,7 @@ const PrivacyTag = styled.span.withConfig({ displayName: 'InboxesPrivacyTag' })`
 	border: 1px solid color-mix(in oklab, var(--color-on-surface-variant) 35%, transparent);
 `
 
-const StatusBadge = styled.span.withConfig({
-	displayName: 'InboxesStatusBadge',
-	shouldForwardProp: prop => prop !== '$status',
-})<{ $status: StatusTone }>`
+const StatusBadge = styled.span<{ $status: StatusTone }>`
 	display: inline-flex;
 	align-items: center;
 	padding: 2px var(--space-2xs);
@@ -2232,9 +2216,7 @@ const StatusBadge = styled.span.withConfig({
 						`}
 `
 
-const PrimaryBanner = styled.div.withConfig({
-	displayName: 'InboxesPrimaryBanner',
-})`
+const PrimaryBanner = styled.div`
 	${agedPaperRow}
 	display: flex;
 	align-items: center;
@@ -2251,9 +2233,7 @@ const PrimaryBanner = styled.div.withConfig({
 	}
 `
 
-const PrimaryBannerText = styled.p.withConfig({
-	displayName: 'InboxesPrimaryBannerText',
-})`
+const PrimaryBannerText = styled.p`
 	margin: 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
@@ -2267,16 +2247,12 @@ const PrimaryBannerText = styled.p.withConfig({
 	}
 `
 
-const PrimaryBannerActions = styled.div.withConfig({
-	displayName: 'InboxesPrimaryBannerActions',
-})`
+const PrimaryBannerActions = styled.div`
 	display: flex;
 	gap: var(--space-xs);
 `
 
-const TransportGrid = styled.div.withConfig({
-	displayName: 'InboxFormTransportGrid',
-})`
+const TransportGrid = styled.div`
 	display: grid;
 	grid-template-columns: repeat(3, minmax(0, 1fr));
 	gap: var(--space-sm);
@@ -2286,7 +2262,7 @@ const TransportGrid = styled.div.withConfig({
 	}
 `
 
-const Hint = styled.p.withConfig({ displayName: 'InboxFormHint' })`
+const Hint = styled.p`
 	margin: 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-label-small-size);
@@ -2294,22 +2270,20 @@ const Hint = styled.p.withConfig({ displayName: 'InboxFormHint' })`
 	font-style: italic;
 `
 
-const PresetLink = styled.a.withConfig({ displayName: 'InboxFormPresetLink' })`
+const PresetLink = styled.a`
 	color: var(--color-primary);
 	font-style: normal;
 	text-decoration: underline;
 `
 
-const Warning = styled.p.withConfig({ displayName: 'InboxFormWarning' })`
+const Warning = styled.p`
 	margin: 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-error);
 `
 
-const AdvancedToggle = styled.button.withConfig({
-	displayName: 'InboxFormAdvancedToggle',
-})`
+const AdvancedToggle = styled.button`
 	align-self: flex-start;
 	background: none;
 	border: none;
@@ -2328,24 +2302,20 @@ const AdvancedToggle = styled.button.withConfig({
 	}
 `
 
-const AuthHint = styled.p.withConfig({ displayName: 'InboxesAuthHint' })`
+const AuthHint = styled.p`
 	margin: var(--space-2xs) 0 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface-variant);
 `
 
-const CellDefault = styled.div.withConfig({
-	displayName: 'InboxesCellDefault',
-})``
-const CellDate = styled.div.withConfig({ displayName: 'InboxesCellDate' })`
+const CellDefault = styled.div``
+const CellDate = styled.div`
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface-variant);
 `
-const CellActions = styled.div.withConfig({
-	displayName: 'InboxesCellActions',
-})`
+const CellActions = styled.div`
 	display: flex;
 	justify-content: flex-end;
 	gap: var(--space-3xs);
@@ -2358,9 +2328,7 @@ const CellActions = styled.div.withConfig({
 	}
 `
 
-const PrimaryLabel = styled.span.withConfig({
-	displayName: 'InboxesPrimaryLabel',
-})`
+const PrimaryLabel = styled.span`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-3xs);
@@ -2372,9 +2340,7 @@ const PrimaryLabel = styled.span.withConfig({
 	text-transform: uppercase;
 `
 
-const TechDetails = styled.details.withConfig({
-	displayName: 'InboxesTechDetails',
-})`
+const TechDetails = styled.details`
 	margin-top: var(--space-3xs);
 
 	> summary {
@@ -2396,7 +2362,7 @@ const TechDetails = styled.details.withConfig({
 
 // Marks the mailboxes that belong to everyone rather than to one person —
 // the one thing about a mailbox still worth saying at a glance.
-const TeamTag = styled.span.withConfig({ displayName: 'InboxesTeamTag' })`
+const TeamTag = styled.span`
 	display: inline-flex;
 	align-items: center;
 	padding: 2px var(--space-2xs);
@@ -2411,9 +2377,7 @@ const TeamTag = styled.span.withConfig({ displayName: 'InboxesTeamTag' })`
 	border: 1px dashed var(--color-outline);
 `
 
-const DescriptionText = styled.span.withConfig({
-	displayName: 'InboxesDescriptionText',
-})`
+const DescriptionText = styled.span`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface-variant);
@@ -2422,10 +2386,7 @@ const DescriptionText = styled.span.withConfig({
 	overflow-wrap: anywhere;
 `
 
-const IconToggle = styled.button.withConfig({
-	displayName: 'InboxesIconToggle',
-	shouldForwardProp: prop => prop !== '$active',
-})<{ $active: boolean }>`
+const IconToggle = styled.button<{ $active: boolean }>`
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -2470,9 +2431,7 @@ const PrimaryToggle = styled(IconToggle)`
 	text-transform: uppercase;
 `
 
-const IconAction = styled.button.withConfig({
-	displayName: 'InboxesIconAction',
-})`
+const IconAction = styled.button`
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -2509,9 +2468,7 @@ const IconAction = styled.button.withConfig({
 	}
 `
 
-const ActionLabel = styled.span.withConfig({
-	displayName: 'InboxesActionLabel',
-})`
+const ActionLabel = styled.span`
 	display: none;
 
 	@media (max-width: 767px) {
@@ -2524,12 +2481,12 @@ const ActionLabel = styled.span.withConfig({
 // Italic and the variant tone already read as de-emphasised. Fading it further
 // dropped the text under the contrast floor on paper, where most people read
 // it, so the tone carries it alone.
-const Muted = styled.span.withConfig({ displayName: 'InboxesMuted' })`
+const Muted = styled.span`
 	color: var(--color-on-surface-variant);
 	font-style: italic;
 `
 
-const EmptyHelp = styled.div.withConfig({ displayName: 'InboxesEmptyHelp' })`
+const EmptyHelp = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-sm);
@@ -2553,9 +2510,7 @@ const EmptyHelp = styled.div.withConfig({ displayName: 'InboxesEmptyHelp' })`
 	}
 `
 
-const DialogHeader = styled.div.withConfig({
-	displayName: 'InboxFormHeader',
-})`
+const DialogHeader = styled.div`
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -2563,9 +2518,7 @@ const DialogHeader = styled.div.withConfig({
 	margin-bottom: var(--space-md);
 `
 
-const CloseButton = styled.button.withConfig({
-	displayName: 'InboxFormClose',
-})`
+const CloseButton = styled.button`
 	${brushedMetalPlate}
 	display: inline-flex;
 	align-items: center;
@@ -2582,26 +2535,24 @@ const CloseButton = styled.button.withConfig({
 	}
 `
 
-const Form = styled.form.withConfig({ displayName: 'InboxForm' })`
+const Form = styled.form`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
 `
 
-const Field = styled.div.withConfig({ displayName: 'InboxFormField' })`
+const Field = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const Label = styled.label.withConfig({ displayName: 'InboxFormLabel' })`
+const Label = styled.label`
 	${stenciledTitle}
 	font-size: var(--typescale-label-small-size);
 `
 
-const CheckboxRow = styled.div.withConfig({
-	displayName: 'InboxFormCheckboxRow',
-})`
+const CheckboxRow = styled.div`
 	display: flex;
 	align-items: center;
 	gap: var(--space-xs);
@@ -2609,7 +2560,7 @@ const CheckboxRow = styled.div.withConfig({
 	font-size: var(--typescale-body-medium-size);
 `
 
-const ErrorText = styled.p.withConfig({ displayName: 'InboxFormError' })`
+const ErrorText = styled.p`
 	margin: 0;
 	padding: var(--space-2xs) var(--space-sm);
 	border-left: 3px solid var(--color-error);
@@ -2620,7 +2571,7 @@ const ErrorText = styled.p.withConfig({ displayName: 'InboxFormError' })`
 	font-style: italic;
 `
 
-const Footer = styled.div.withConfig({ displayName: 'InboxFormFooter' })`
+const Footer = styled.div`
 	${rulerUnderRule}
 	display: flex;
 	justify-content: flex-end;
@@ -2631,21 +2582,19 @@ const Footer = styled.div.withConfig({ displayName: 'InboxFormFooter' })`
 
 // ── Footer dialog styles ────────────────────────────────────────
 
-const FooterListView = styled.div.withConfig({
-	displayName: 'FooterListView',
-})`
+const FooterListView = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
 `
 
-const FooterTable = styled.div.withConfig({ displayName: 'FooterTable' })`
+const FooterTable = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const FooterItem = styled.div.withConfig({ displayName: 'FooterItem' })`
+const FooterItem = styled.div`
 	${agedPaperRow}
 	display: flex;
 	align-items: center;
@@ -2656,7 +2605,7 @@ const FooterItem = styled.div.withConfig({ displayName: 'FooterItem' })`
 	border-radius: var(--shape-2xs);
 `
 
-const FooterName = styled.div.withConfig({ displayName: 'FooterName' })`
+const FooterName = styled.div`
 	display: flex;
 	align-items: center;
 	gap: var(--space-xs);
@@ -2665,7 +2614,7 @@ const FooterName = styled.div.withConfig({ displayName: 'FooterName' })`
 	min-width: 0;
 `
 
-const DefaultTag = styled.span.withConfig({ displayName: 'FooterDefault' })`
+const DefaultTag = styled.span`
 	display: inline-flex;
 	padding: 1px var(--space-2xs);
 	border-radius: var(--shape-2xs);
@@ -2679,24 +2628,18 @@ const DefaultTag = styled.span.withConfig({ displayName: 'FooterDefault' })`
 		color-mix(in oklab, var(--color-primary) 45%, transparent);
 `
 
-const FooterActions = styled.div.withConfig({
-	displayName: 'FooterActions',
-})`
+const FooterActions = styled.div`
 	display: flex;
 	gap: var(--space-3xs);
 	flex: 0 0 auto;
 `
 
-const FooterDialogFooter = styled.div.withConfig({
-	displayName: 'FooterDialogFooter',
-})`
+const FooterDialogFooter = styled.div`
 	display: flex;
 	justify-content: flex-start;
 `
 
-const FooterEditorWrap = styled.div.withConfig({
-	displayName: 'FooterEditorWrap',
-})`
+const FooterEditorWrap = styled.div`
 	min-height: 120px;
 	border: 1px solid var(--color-ledger-line);
 	border-radius: var(--shape-2xs);

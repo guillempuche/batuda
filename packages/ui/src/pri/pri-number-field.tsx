@@ -1,5 +1,5 @@
 import { NumberField } from '@base-ui/react/number-field'
-import styled from 'styled-components'
+import { css, styled } from 'next-yak'
 
 /**
  * Workshop number field — ledger input flanked by tiny stamped-metal
@@ -13,9 +13,7 @@ import styled from 'styled-components'
  *     </PriNumberField.Group>
  *   </PriNumberField.Root>
  */
-const PriGroup = styled(NumberField.Group).withConfig({
-	displayName: 'PriNumberFieldGroup',
-})`
+const PriGroup = styled(NumberField.Group)`
 	display: inline-flex;
 	align-items: stretch;
 	border-bottom: 2px solid var(--color-outline);
@@ -27,9 +25,7 @@ const PriGroup = styled(NumberField.Group).withConfig({
 	}
 `
 
-const PriInput = styled(NumberField.Input).withConfig({
-	displayName: 'PriNumberFieldInput',
-})`
+const PriInput = styled(NumberField.Input)`
 	flex: 1;
 	min-width: 3rem;
 	padding: var(--space-xs) var(--space-sm);
@@ -49,7 +45,7 @@ const PriInput = styled(NumberField.Input).withConfig({
 	}
 `
 
-const stepperCss = `
+const stepperCss = css`
 	position: relative;
 	display: inline-flex;
 	align-items: center;
@@ -90,15 +86,11 @@ const stepperCss = `
 	}
 `
 
-const PriIncrement = styled(NumberField.Increment).withConfig({
-	displayName: 'PriNumberFieldIncrement',
-})`
+const PriIncrement = styled(NumberField.Increment)`
 	${stepperCss}
 `
 
-const PriDecrement = styled(NumberField.Decrement).withConfig({
-	displayName: 'PriNumberFieldDecrement',
-})`
+const PriDecrement = styled(NumberField.Decrement)`
 	${stepperCss}
 `
 

@@ -1,8 +1,8 @@
 import { useAtomSet } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { useNavigate } from '@tanstack/react-router'
+import { styled } from 'next-yak'
 import { useCallback, useState } from 'react'
-import styled from 'styled-components'
 
 import { PriButton, PriInput } from '@batuda/ui/pri'
 

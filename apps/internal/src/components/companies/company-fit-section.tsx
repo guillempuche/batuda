@@ -8,7 +8,7 @@ import {
 	TriangleAlert,
 	X,
 } from 'lucide-react'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 import { PriCollapsible } from '@batuda/ui/pri'
 
@@ -252,16 +252,12 @@ function hostOf(url: string): string {
 	}
 }
 
-const TriggerWrap = styled.div.withConfig({
-	displayName: 'CompanyFitTriggerWrap',
-})`
+const TriggerWrap = styled.div`
 	display: flex;
 	justify-content: flex-start;
 `
 
-const Verdict = styled.span.withConfig({
-	displayName: 'CompanyFitVerdict',
-})<{ $verdict: string }>`
+const Verdict = styled.span<{ $verdict: string }>`
 	${stenciledTitle}
 	padding: 0 var(--space-2xs);
 	border: 1px solid currentColor;
@@ -275,16 +271,14 @@ const Verdict = styled.span.withConfig({
 				: 'var(--color-on-surface-variant)'};
 `
 
-const Unjudged = styled.p.withConfig({ displayName: 'CompanyFitUnjudged' })`
+const Unjudged = styled.p`
 	margin: 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface-variant);
 `
 
-const Body = styled.div.withConfig({
-	displayName: 'CompanyFitBody',
-})`
+const Body = styled.div`
 	${agedPaperSurface}
 	display: flex;
 	flex-direction: column;
@@ -293,17 +287,13 @@ const Body = styled.div.withConfig({
 	margin-top: var(--space-sm);
 `
 
-const Group = styled.section.withConfig({
-	displayName: 'CompanyFitGroup',
-})`
+const Group = styled.section`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const GroupTitle = styled.h4.withConfig({
-	displayName: 'CompanyFitGroupTitle',
-})`
+const GroupTitle = styled.h4`
 	${stenciledTitle}
 	display: flex;
 	align-items: center;
@@ -314,9 +304,7 @@ const GroupTitle = styled.h4.withConfig({
 	color: var(--color-on-surface-variant);
 `
 
-const List = styled.ul.withConfig({
-	displayName: 'CompanyFitList',
-})`
+const List = styled.ul`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-xs);
@@ -325,17 +313,13 @@ const List = styled.ul.withConfig({
 	list-style: none;
 `
 
-const CheckRow = styled.li.withConfig({
-	displayName: 'CompanyFitCheckRow',
-})`
+const CheckRow = styled.li`
 	display: flex;
 	align-items: flex-start;
 	gap: var(--space-2xs);
 `
 
-const ResultIcon = styled.span.withConfig({
-	displayName: 'CompanyFitResultIcon',
-})<{ $result: string }>`
+const ResultIcon = styled.span<{ $result: string }>`
 	display: inline-flex;
 	flex-shrink: 0;
 	margin-top: 2px;
@@ -347,9 +331,7 @@ const ResultIcon = styled.span.withConfig({
 				: 'var(--color-on-surface-variant)'};
 `
 
-const CheckBody = styled.div.withConfig({
-	displayName: 'CompanyFitCheckBody',
-})`
+const CheckBody = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
@@ -357,27 +339,21 @@ const CheckBody = styled.div.withConfig({
 	flex: 1;
 `
 
-const ConflictRow = styled.li.withConfig({
-	displayName: 'CompanyFitConflictRow',
-})`
+const ConflictRow = styled.li`
 	display: flex;
 	flex-wrap: wrap;
 	align-items: baseline;
 	gap: var(--space-2xs);
 `
 
-const ProvenanceRow = styled.li.withConfig({
-	displayName: 'CompanyFitProvenanceRow',
-})`
+const ProvenanceRow = styled.li`
 	display: flex;
 	flex-wrap: wrap;
 	align-items: baseline;
 	gap: var(--space-2xs);
 `
 
-const Qualifier = styled.span.withConfig({
-	displayName: 'CompanyFitQualifier',
-})`
+const Qualifier = styled.span`
 	display: inline-flex;
 	align-items: baseline;
 	gap: var(--space-3xs);
@@ -386,38 +362,28 @@ const Qualifier = styled.span.withConfig({
 	white-space: nowrap;
 `
 
-const Criterion = styled.span.withConfig({
-	displayName: 'CompanyFitCriterion',
-})`
+const Criterion = styled.span`
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface);
 `
 
-const ConflictValue = styled.span.withConfig({
-	displayName: 'CompanyFitConflictValue',
-})`
+const ConflictValue = styled.span`
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface-variant);
 `
 
-const Quote = styled.span.withConfig({
-	displayName: 'CompanyFitQuote',
-})`
+const Quote = styled.span`
 	font-size: var(--typescale-label-small-size);
 	font-style: italic;
 	color: var(--color-on-surface-variant);
 `
 
-const SourceLink = styled.a.withConfig({
-	displayName: 'CompanyFitSourceLink',
-})`
+const SourceLink = styled.a`
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-primary);
 `
 
-const RunLinkWrap = styled.span.withConfig({
-	displayName: 'CompanyFitRunLinkWrap',
-})`
+const RunLinkWrap = styled.span`
 	& > a {
 		font-size: var(--typescale-label-small-size);
 		color: var(--color-primary);

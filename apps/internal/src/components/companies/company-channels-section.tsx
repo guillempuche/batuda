@@ -6,7 +6,7 @@ import {
 	Link2,
 	Send,
 } from 'lucide-react'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 import { PriCollapsible } from '@batuda/ui/pri'
 
@@ -148,16 +148,12 @@ export function CompanyChannelsSection({
 	)
 }
 
-const TriggerWrap = styled.div.withConfig({
-	displayName: 'CompanyChannelsTriggerWrap',
-})`
+const TriggerWrap = styled.div`
 	display: flex;
 	justify-content: flex-start;
 `
 
-const Count = styled.span.withConfig({
-	displayName: 'CompanyChannelsCount',
-})`
+const Count = styled.span`
 	${stenciledTitle}
 	padding: 0 var(--space-2xs);
 	border: 1px solid currentColor;
@@ -166,9 +162,7 @@ const Count = styled.span.withConfig({
 	color: var(--color-on-surface-variant);
 `
 
-const Body = styled.ul.withConfig({
-	displayName: 'CompanyChannelsBody',
-})`
+const Body = styled.ul`
 	${agedPaperSurface}
 	display: flex;
 	flex-direction: column;
@@ -181,9 +175,7 @@ const Body = styled.ul.withConfig({
 // The chips after the address wrap onto their own line in a narrow column
 // rather than squeezing it — an address broken mid-word is harder to read than
 // one that takes two lines.
-const Row = styled.li.withConfig({
-	displayName: 'CompanyChannelsRow',
-})`
+const Row = styled.li`
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
@@ -191,9 +183,7 @@ const Row = styled.li.withConfig({
 	color: var(--color-on-surface-variant);
 `
 
-const Address = styled.a.withConfig({
-	displayName: 'CompanyChannelsAddress',
-})`
+const Address = styled.a`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -212,9 +202,7 @@ const Address = styled.a.withConfig({
 	}
 `
 
-const Label = styled.span.withConfig({
-	displayName: 'CompanyChannelsLabel',
-})`
+const Label = styled.span`
 	padding: 0 var(--space-2xs);
 	border-radius: var(--shape-2xs);
 	background: var(--color-surface-container-high);
@@ -222,17 +210,13 @@ const Label = styled.span.withConfig({
 	font-size: var(--typescale-label-small-size);
 `
 
-const Primary = styled.span.withConfig({
-	displayName: 'CompanyChannelsPrimary',
-})`
+const Primary = styled.span`
 	${stenciledTitle}
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface-variant);
 `
 
-const Held = styled.span.withConfig({
-	displayName: 'CompanyChannelHeld',
-})`
+const Held = styled.span`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-3xs);
@@ -245,9 +229,7 @@ const Held = styled.span.withConfig({
 	white-space: nowrap;
 `
 
-const HeldNote = styled.div.withConfig({
-	displayName: 'CompanyChannelsHeldNote',
-})`
+const HeldNote = styled.div`
 	/* Stacked at every width: the panel sits in a narrow column, so even a wide
 	   window leaves the sentence wrapping to two words a line beside the
 	   button. */
@@ -264,9 +246,7 @@ const HeldNote = styled.div.withConfig({
 	line-height: var(--typescale-body-small-line);
 `
 
-const ClearButton = styled.button.withConfig({
-	displayName: 'CompanyClearSuppression',
-})`
+const ClearButton = styled.button`
 	flex: 0 0 auto;
 	padding: var(--space-3xs) var(--space-xs);
 	border: 1px solid var(--color-outline);
@@ -281,9 +261,7 @@ const ClearButton = styled.button.withConfig({
 	}
 `
 
-const Compose = styled.button.withConfig({
-	displayName: 'CompanyChannelsCompose',
-})`
+const Compose = styled.button`
 	display: inline-flex;
 	align-items: center;
 	padding: var(--space-2xs);

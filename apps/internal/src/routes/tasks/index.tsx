@@ -6,8 +6,8 @@ import { createFileRoute } from '@tanstack/react-router'
 import { DateTime, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { Clock, History, Plus } from 'lucide-react'
+import { styled } from 'next-yak'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import styled from 'styled-components'
 
 import type { Company } from '@batuda/domain'
 import { PriButton, PriDialog, PriInput } from '@batuda/ui/pri'
@@ -649,8 +649,7 @@ function TasksPage() {
 			</SrOnly>
 
 			<Layout>
-				<Rail
-					as='div'
+				<RailGroup
 					role='group'
 					aria-label={t`Filter tasks by shelf`}
 					aria-busy={!countsReady}
@@ -690,7 +689,7 @@ function TasksPage() {
 						<History size={12} aria-hidden />
 						<Trans>Recent changes</Trans>
 					</RailButton>
-				</Rail>
+				</RailGroup>
 
 				<Column>
 					<QuickAddForm
@@ -1207,13 +1206,13 @@ function atNineAm(daysFromNow: number): Date {
 
 // ── Styles ────────────────────────────────────────────────────────
 
-const Page = styled.div.withConfig({ displayName: 'TasksPage' })`
+const Page = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-xl);
 `
 
-const Intro = styled.div.withConfig({ displayName: 'TasksIntro' })`
+const Intro = styled.div`
 	display: grid;
 	grid-template-columns: 1fr;
 	gap: var(--space-lg);
@@ -1224,7 +1223,7 @@ const Intro = styled.div.withConfig({ displayName: 'TasksIntro' })`
 	}
 `
 
-const IntroText = styled.div.withConfig({ displayName: 'TasksIntroText' })`
+const IntroText = styled.div`
 	${rulerUnderRule}
 	display: flex;
 	flex-direction: column;
@@ -1232,14 +1231,14 @@ const IntroText = styled.div.withConfig({ displayName: 'TasksIntroText' })`
 	padding-bottom: var(--space-xs);
 `
 
-const Title = styled.h2.withConfig({ displayName: 'TasksTitle' })`
+const Title = styled.h2`
 	${stenciledTitle}
 	font-size: var(--typescale-headline-large-size);
 	line-height: var(--typescale-headline-large-line);
 	margin: 0;
 `
 
-const Subtitle = styled.p.withConfig({ displayName: 'TasksSubtitle' })`
+const Subtitle = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-large-size);
 	line-height: var(--typescale-body-large-line);
@@ -1248,13 +1247,13 @@ const Subtitle = styled.p.withConfig({ displayName: 'TasksSubtitle' })`
 	margin: 0;
 `
 
-const KpiRow = styled.div.withConfig({ displayName: 'TasksKpiRow' })`
+const KpiRow = styled.div`
 	display: flex;
 	gap: var(--space-sm);
 	flex-wrap: wrap;
 `
 
-const Layout = styled.div.withConfig({ displayName: 'TasksLayout' })`
+const Layout = styled.div`
 	display: grid;
 	grid-template-columns: 1fr;
 	gap: var(--space-lg);
@@ -1264,17 +1263,15 @@ const Layout = styled.div.withConfig({ displayName: 'TasksLayout' })`
 	}
 `
 
-const Rail = styled.nav.withConfig({ displayName: 'TasksRail' })`
+/* The rail wrapping the shelf buttons, which groups them rather than acting itself. */
+const RailGroup = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 	min-width: 0;
 `
 
-const RailButton = styled.button.withConfig({
-	displayName: 'TasksRailButton',
-	shouldForwardProp: prop => prop !== '$active',
-})<{ $active: boolean }>`
+const RailButton = styled.button<{ $active: boolean }>`
 	${agedPaperSurface}
 	display: flex;
 	align-items: center;
@@ -1303,13 +1300,13 @@ const RailButton = styled.button.withConfig({
 	}
 `
 
-const RailDivider = styled.hr.withConfig({ displayName: 'TasksRailDivider' })`
+const RailDivider = styled.hr`
 	border: none;
 	border-top: 1px solid color-mix(in srgb, var(--color-on-surface) 15%, transparent);
 	margin: var(--space-xs) 0;
 `
 
-const Count = styled.span.withConfig({ displayName: 'TasksRailCount' })`
+const Count = styled.span`
 	${brushedMetalPlate}
 	padding: var(--space-3xs) var(--space-xs);
 	font-size: var(--typescale-label-small-size);
@@ -1317,35 +1314,31 @@ const Count = styled.span.withConfig({ displayName: 'TasksRailCount' })`
 	border-radius: var(--shape-2xs);
 `
 
-const Column = styled.div.withConfig({ displayName: 'TasksColumn' })`
+const Column = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
 	min-width: 0;
 `
 
-const Stack = styled.div.withConfig({ displayName: 'TasksStack' })`
+const Stack = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: 0;
 `
 
-const QuickAddRow = styled.form.withConfig({ displayName: 'TasksQuickAddRow' })`
+const QuickAddRow = styled.form`
 	display: grid;
 	grid-template-columns: 1fr auto;
 	gap: var(--space-sm);
 	align-items: center;
 `
 
-const QuickAddInput = styled(PriInput).withConfig({
-	displayName: 'TasksQuickAddInput',
-})`
+const QuickAddInput = styled(PriInput)`
 	font-size: var(--typescale-body-medium-size);
 `
 
-const QuickAddButton = styled.button.withConfig({
-	displayName: 'TasksQuickAddButton',
-})`
+const QuickAddButton = styled.button`
 	${brushedMetalPlate}
 	display: inline-flex;
 	align-items: center;
@@ -1366,47 +1359,43 @@ const QuickAddButton = styled.button.withConfig({
 	}
 `
 
-const DetailMeta = styled.div.withConfig({ displayName: 'TasksDetailMeta' })`
+const DetailMeta = styled.div`
 	display: grid;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
 	gap: var(--space-sm);
 `
 
-const DetailField = styled.div.withConfig({ displayName: 'TasksDetailField' })`
+const DetailField = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
 `
 
-const DetailLabel = styled.span.withConfig({
-	displayName: 'TasksDetailLabel',
-})`
+const DetailLabel = styled.span`
 	${stenciledTitle}
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface-variant);
 `
 
-const DetailValue = styled.span.withConfig({
-	displayName: 'TasksDetailValue',
-})`
+const DetailValue = styled.span`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	color: var(--color-on-surface);
 `
 
-const ActionRow = styled.div.withConfig({ displayName: 'TasksActionRow' })`
+const ActionRow = styled.div`
 	display: flex;
 	gap: var(--space-sm);
 	flex-wrap: wrap;
 `
 
-const EventsHeader = styled.h3.withConfig({ displayName: 'TasksEventsHeader' })`
+const EventsHeader = styled.h3`
 	${stenciledTitle}
 	font-size: var(--typescale-title-small-size);
 	margin: 0;
 `
 
-const EventsList = styled.ol.withConfig({ displayName: 'TasksEventsList' })`
+const EventsList = styled.ol`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
@@ -1415,7 +1404,7 @@ const EventsList = styled.ol.withConfig({ displayName: 'TasksEventsList' })`
 	margin: 0;
 `
 
-const EventRow = styled.li.withConfig({ displayName: 'TasksEventRow' })`
+const EventRow = styled.li`
 	display: grid;
 	grid-template-columns: auto 1fr auto;
 	gap: var(--space-sm);
@@ -1425,7 +1414,7 @@ const EventRow = styled.li.withConfig({ displayName: 'TasksEventRow' })`
 	border-bottom: 1px solid color-mix(in srgb, var(--color-on-surface) 10%, transparent);
 `
 
-const EventActor = styled.span.withConfig({ displayName: 'TasksEventActor' })`
+const EventActor = styled.span`
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
 	font-weight: var(--font-weight-bold);
@@ -1434,9 +1423,7 @@ const EventActor = styled.span.withConfig({ displayName: 'TasksEventActor' })`
 	color: var(--color-on-surface-variant);
 `
 
-const EventSummary = styled.span.withConfig({
-	displayName: 'TasksEventSummary',
-})`
+const EventSummary = styled.span`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface);
@@ -1445,14 +1432,14 @@ const EventSummary = styled.span.withConfig({
 	white-space: nowrap;
 `
 
-const EventAt = styled.span.withConfig({ displayName: 'TasksEventAt' })`
+const EventAt = styled.span`
 	font-family: var(--font-body);
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface-variant);
 	font-style: italic;
 `
 
-const EmptyAudit = styled.p.withConfig({ displayName: 'TasksEmptyAudit' })`
+const EmptyAudit = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	font-style: italic;

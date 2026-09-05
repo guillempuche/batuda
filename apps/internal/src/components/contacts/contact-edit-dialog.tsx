@@ -1,8 +1,8 @@
 import { useAtomSet } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { X } from 'lucide-react'
+import { styled } from 'next-yak'
 import { type FormEvent, useEffect, useState } from 'react'
-import styled from 'styled-components'
 
 import { PriButton, PriDialog, PriInput, usePriToast } from '@batuda/ui/pri'
 

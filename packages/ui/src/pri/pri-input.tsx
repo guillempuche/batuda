@@ -1,14 +1,12 @@
 import { Input } from '@base-ui/react/input'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 /**
  * Aged-paper ledger input. No border-radius, cream fill, thick bottom rule
  * that darkens to terracotta on focus (drafting pencil on paper). Pairs with
  * PriField for label/error semantics.
  */
-export const PriInput = styled(Input).withConfig({
-	displayName: 'PriInput',
-})`
+export const PriInput = styled(Input)`
 	width: 100%;
 	padding: var(--space-xs) var(--space-sm);
 	background: var(--color-paper-aged);

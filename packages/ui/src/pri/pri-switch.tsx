@@ -1,5 +1,5 @@
 import { Switch } from '@base-ui/react/switch'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 /**
  * Workshop switch — a machined slot with a domed cap that slides along it.
@@ -18,9 +18,7 @@ import styled from 'styled-components'
  * Base UI gives the control no name of its own, so it has to sit inside a
  * label or be pointed at one.
  */
-const PriRoot = styled(Switch.Root).withConfig({
-	displayName: 'PriSwitchRoot',
-})`
+const PriRoot = styled(Switch.Root)`
 	position: relative;
 	display: inline-flex;
 	align-items: center;
@@ -73,9 +71,7 @@ const PriRoot = styled(Switch.Root).withConfig({
 	}
 `
 
-const PriThumb = styled(Switch.Thumb).withConfig({
-	displayName: 'PriSwitchThumb',
-})`
+const PriThumb = styled(Switch.Thumb)`
 	position: relative;
 	z-index: 1;
 	width: 1rem;

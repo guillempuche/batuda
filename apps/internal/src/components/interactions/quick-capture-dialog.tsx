@@ -5,9 +5,9 @@ import { useLingui as useLinguiCore } from '@lingui/react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { ChevronsUpDown, X } from 'lucide-react'
+import { styled } from 'next-yak'
 import type { FormEvent } from 'react'
 import { useEffect, useMemo, useState } from 'react'
-import styled from 'styled-components'
 
 import {
 	PriButton,
@@ -439,16 +439,14 @@ const typeLabels: Record<
 	note: msg`Note`,
 }
 
-const Header = styled.div.withConfig({ displayName: 'QuickCaptureHeader' })`
+const Header = styled.div`
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: var(--space-sm);
 `
 
-const CloseButton = styled.button.withConfig({
-	displayName: 'QuickCaptureClose',
-})`
+const CloseButton = styled.button`
 	${brushedMetalPlate}
 	display: inline-flex;
 	align-items: center;
@@ -473,9 +471,7 @@ const CloseButton = styled.button.withConfig({
 	}
 `
 
-const PrefillChip = styled.div.withConfig({
-	displayName: 'QuickCapturePrefillChip',
-})`
+const PrefillChip = styled.div`
 	${brushedMetalPlate}
 	display: inline-flex;
 	align-items: center;
@@ -493,9 +489,7 @@ const PrefillChip = styled.div.withConfig({
 	}
 `
 
-const PrefillLabel = styled.span.withConfig({
-	displayName: 'QuickCapturePrefillLabel',
-})`
+const PrefillLabel = styled.span`
 	font-size: var(--typescale-label-small-size);
 	font-weight: var(--font-weight-bold);
 	letter-spacing: 0.08em;
@@ -503,13 +497,13 @@ const PrefillLabel = styled.span.withConfig({
 	opacity: 0.75;
 `
 
-const Form = styled.form.withConfig({ displayName: 'QuickCaptureForm' })`
+const Form = styled.form`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
 `
 
-const Field = styled.div.withConfig({ displayName: 'QuickCaptureField' })`
+const Field = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
@@ -517,13 +511,13 @@ const Field = styled.div.withConfig({ displayName: 'QuickCaptureField' })`
 	min-width: 0;
 `
 
-const Row = styled.div.withConfig({ displayName: 'QuickCaptureRow' })`
+const Row = styled.div`
 	display: flex;
 	gap: var(--space-md);
 	flex-wrap: wrap;
 `
 
-const Label = styled.label.withConfig({ displayName: 'QuickCaptureLabel' })`
+const Label = styled.label`
 	${stenciledTitle}
 	font-size: var(--typescale-label-small-size);
 `
@@ -531,9 +525,7 @@ const Label = styled.label.withConfig({ displayName: 'QuickCaptureLabel' })`
 // Sized like the text fields beside it, and at the body size rather than
 // smaller: below 16px an iPhone zooms the page the moment the control is
 // tapped, which on a full-screen sheet is hard to get back from.
-const CompanyTrigger = styled(PriSelect.Trigger).withConfig({
-	displayName: 'QuickCaptureCompanyTrigger',
-})`
+const CompanyTrigger = styled(PriSelect.Trigger)`
 	justify-content: space-between;
 	width: 100%;
 	min-width: 0;
@@ -545,18 +537,14 @@ const CompanyTrigger = styled(PriSelect.Trigger).withConfig({
 	text-transform: none;
 `
 
-const CompanyValue = styled(PriSelect.Value).withConfig({
-	displayName: 'QuickCaptureCompanyValue',
-})`
+const CompanyValue = styled(PriSelect.Value)`
 	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 `
 
-const Textarea = styled.textarea.withConfig({
-	displayName: 'QuickCaptureTextarea',
-})`
+const Textarea = styled.textarea`
 	display: block;
 	width: 100%;
 	padding: var(--space-xs) var(--space-sm);
@@ -583,7 +571,7 @@ const Textarea = styled.textarea.withConfig({
 	}
 `
 
-const ErrorText = styled.p.withConfig({ displayName: 'QuickCaptureError' })`
+const ErrorText = styled.p`
 	margin: 0;
 	padding: var(--space-2xs) var(--space-sm);
 	border-left: 3px solid var(--color-error);
@@ -594,7 +582,7 @@ const ErrorText = styled.p.withConfig({ displayName: 'QuickCaptureError' })`
 	font-style: italic;
 `
 
-const Footer = styled.div.withConfig({ displayName: 'QuickCaptureFooter' })`
+const Footer = styled.div`
 	${rulerUnderRule}
 	display: flex;
 	justify-content: flex-end;

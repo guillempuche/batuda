@@ -7,8 +7,8 @@ import { Plural, Trans, useLingui } from '@lingui/react/macro'
 import { Link } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { ChevronsUpDown, X } from 'lucide-react'
+import { css, styled } from 'next-yak'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import styled, { css } from 'styled-components'
 
 import type { SchemaName } from '@batuda/research'
 import {
@@ -433,9 +433,9 @@ export function ResearchDialog({
 						</Field>
 
 						<Field>
-							<Label as='div' id='research-kind-label'>
+							<GroupLabel id='research-kind-label'>
 								<Trans>What kind of research?</Trans>
-							</Label>
+							</GroupLabel>
 							<SchemaGrid
 								aria-labelledby='research-kind-label'
 								value={schema}
@@ -467,9 +467,9 @@ export function ResearchDialog({
 
 						{isDiscovery ? (
 							<Field>
-								<Label as='div'>
+								<GroupLabel>
 									<Trans>Where to look (optional)</Trans>
-								</Label>
+								</GroupLabel>
 								<HelpText>
 									<Trans>
 										Steer a net-new search, or set a status/industry/country/tag
@@ -558,9 +558,9 @@ export function ResearchDialog({
 						) : null}
 
 						<Field>
-							<Label as='div'>
+							<GroupLabel>
 								<Trans>Instructions stack</Trans>
-							</Label>
+							</GroupLabel>
 							<HelpText>
 								<Trans>Pick a saved stack, or use your default.</Trans>
 							</HelpText>
@@ -582,9 +582,9 @@ export function ResearchDialog({
 						</Field>
 
 						<Field>
-							<Label as='div'>
+							<GroupLabel>
 								<Trans>Extra templates for this run</Trans>
-							</Label>
+							</GroupLabel>
 							{templateOptions.length > 0 ? (
 								<>
 									<HelpText>
@@ -831,12 +831,22 @@ const Field = styled.div`
 	gap: var(--space-2xs);
 `
 
-const Label = styled.label`
+const labelType = css`
 	${stenciledTitle}
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
 	color: var(--color-on-surface-variant);
+`
+
+const Label = styled.label`
+	${labelType}
+`
+
+/* Same wording, but naming a group of controls rather than one of them —
+ * a <label> that points at nothing is announced as an empty label. */
+const GroupLabel = styled.div`
+	${labelType}
 `
 
 // Columns follow the room there is: fields sit side by side wherever two fit at

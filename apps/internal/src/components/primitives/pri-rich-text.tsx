@@ -13,8 +13,8 @@ import {
 	Quote,
 	Strikethrough,
 } from 'lucide-react'
+import { styled } from 'next-yak'
 import { useState } from 'react'
-import styled from 'styled-components'
 
 import { PriToolbar } from '@batuda/ui/pri'
 

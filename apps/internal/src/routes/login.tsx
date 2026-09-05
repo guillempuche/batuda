@@ -7,8 +7,8 @@ import {
 	useNavigate,
 } from '@tanstack/react-router'
 import { Schema } from 'effect'
+import { css, styled } from 'next-yak'
 import { useActionState, useEffect, useMemo, useRef, useState } from 'react'
-import styled from 'styled-components'
 
 import { PriButton, PriInput } from '@batuda/ui/pri'
 
@@ -426,13 +426,11 @@ function LoginPage() {
 							? t`Sending…`
 							: t`Email me a sign-in link`}
 					</MagicLinkTrigger>
-					<MagicLinkTrigger
-						as={Link}
-						to='/forgot-password'
-						data-testid='login-forgot-password'
-					>
-						<Trans>Forgot password?</Trans>
-					</MagicLinkTrigger>
+					<MagicLinkChrome>
+						<Link to='/forgot-password' data-testid='login-forgot-password'>
+							<Trans>Forgot password?</Trans>
+						</Link>
+					</MagicLinkChrome>
 				</MagicLinkRow>
 				{magicLinkStatus.kind === 'error' ? (
 					<ErrorText role='alert' data-testid='login-magic-link-error'>
@@ -624,7 +622,7 @@ const absoluteUrl = (path: string, query?: Record<string, string>): string => {
 
 // --- styled components ------------------------------------------------------
 
-const Page = styled.div.withConfig({ displayName: 'LoginPage' })`
+const Page = styled.div`
 	min-height: 100dvh;
 	display: flex;
 	align-items: center;
@@ -640,7 +638,7 @@ const Page = styled.div.withConfig({ displayName: 'LoginPage' })`
 	background-size: 24px 24px;
 `
 
-const Card = styled.div.withConfig({ displayName: 'LoginCard' })`
+const Card = styled.div`
 	position: relative;
 	width: 100%;
 	max-width: 26rem;
@@ -685,7 +683,7 @@ const Card = styled.div.withConfig({ displayName: 'LoginCard' })`
 	}
 `
 
-const Brand = styled.h1.withConfig({ displayName: 'LoginBrand' })`
+const Brand = styled.h1`
 	${stenciledTitle}
 	font-size: var(--typescale-display-small-size);
 	line-height: var(--typescale-display-small-line);
@@ -694,7 +692,7 @@ const Brand = styled.h1.withConfig({ displayName: 'LoginBrand' })`
 	margin: 0;
 `
 
-const Subtitle = styled.p.withConfig({ displayName: 'LoginSubtitle' })`
+const Subtitle = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	line-height: var(--typescale-body-medium-line);
@@ -703,25 +701,25 @@ const Subtitle = styled.p.withConfig({ displayName: 'LoginSubtitle' })`
 	margin: 0;
 `
 
-const Form = styled.form.withConfig({ displayName: 'LoginForm' })`
+const Form = styled.form`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
 	margin-top: var(--space-sm);
 `
 
-const Field = styled.div.withConfig({ displayName: 'LoginField' })`
+const Field = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const Label = styled.label.withConfig({ displayName: 'LoginLabel' })`
+const Label = styled.label`
 	${stenciledTitle}
 	font-size: var(--typescale-label-small-size);
 `
 
-const ErrorText = styled.p.withConfig({ displayName: 'LoginError' })`
+const ErrorText = styled.p`
 	padding: var(--space-2xs) var(--space-sm);
 	border-left: 3px solid var(--color-error);
 	background: color-mix(in srgb, var(--color-error) 6%, transparent);
@@ -733,23 +731,17 @@ const ErrorText = styled.p.withConfig({ displayName: 'LoginError' })`
 	margin: 0;
 `
 
-const SubmitButton = styled(PriButton).withConfig({
-	displayName: 'LoginSubmit',
-})`
+const SubmitButton = styled(PriButton)`
 	margin-top: var(--space-xs);
 `
 
-const MagicLinkRow = styled.div.withConfig({
-	displayName: 'LoginMagicLinkRow',
-})`
+const MagicLinkRow = styled.div`
 	display: flex;
 	justify-content: center;
 	margin-top: calc(var(--space-xs) * -1);
 `
 
-const MagicLinkTrigger = styled.button.withConfig({
-	displayName: 'LoginMagicLinkTrigger',
-})`
+const magicLinkType = css`
 	background: none;
 	border: none;
 	padding: var(--space-2xs) var(--space-xs);
@@ -776,9 +768,25 @@ const MagicLinkTrigger = styled.button.withConfig({
 	}
 `
 
-const InboxHeading = styled.h2.withConfig({
-	displayName: 'LoginInboxHeading',
-})`
+const MagicLinkTrigger = styled.button`
+	${magicLinkType}
+`
+
+/* Reads the same, but goes somewhere rather than doing something.
+ *
+ * The styling sits on a wrapper with a plain <Link> inside, rather than on
+ * the Link itself: styling it directly erases TanStack's checking of `to`,
+ * so a wrong destination would become a dead click instead of something the
+ * compiler catches. */
+const MagicLinkChrome = styled.span`
+	display: inline-flex;
+
+	& > a {
+		${magicLinkType}
+	}
+`
+
+const InboxHeading = styled.h2`
 	${stenciledTitle}
 	font-size: var(--typescale-headline-small-size);
 	margin: 0;
@@ -787,25 +795,21 @@ const InboxHeading = styled.h2.withConfig({
 	}
 `
 
-const ButtonRow = styled.div.withConfig({ displayName: 'LoginInboxButtonRow' })`
+const ButtonRow = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-sm);
 	margin-top: var(--space-xs);
 `
 
-const SecondaryRow = styled.div.withConfig({
-	displayName: 'LoginInboxSecondaryRow',
-})`
+const SecondaryRow = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-md);
 	margin-top: var(--space-xs);
 `
 
-const SecondaryLink = styled.button.withConfig({
-	displayName: 'LoginInboxSecondaryLink',
-})`
+const SecondaryLink = styled.button`
 	background: none;
 	border: none;
 	padding: 0;
@@ -826,7 +830,7 @@ const SecondaryLink = styled.button.withConfig({
 	}
 `
 
-const Hint = styled.p.withConfig({ displayName: 'LoginHint' })`
+const Hint = styled.p`
 	${rulerUnderRule}
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);

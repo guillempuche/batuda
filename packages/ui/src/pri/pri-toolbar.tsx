@@ -1,5 +1,5 @@
 import { Toolbar } from '@base-ui/react/toolbar'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 /**
  * Workshop toolbar — brushed metal strip with screw dots at the corners
@@ -12,9 +12,7 @@ import styled from 'styled-components'
  *     <PriToolbar.Button>Sort</PriToolbar.Button>
  *   </PriToolbar.Root>
  */
-const PriRoot = styled(Toolbar.Root).withConfig({
-	displayName: 'PriToolbarRoot',
-})`
+const PriRoot = styled(Toolbar.Root)`
 	position: relative;
 	display: flex;
 	align-items: center;
@@ -46,9 +44,7 @@ const PriRoot = styled(Toolbar.Root).withConfig({
 	}
 `
 
-const PriButton = styled(Toolbar.Button).withConfig({
-	displayName: 'PriToolbarButton',
-})`
+const PriButton = styled(Toolbar.Button)`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -88,9 +84,7 @@ const PriButton = styled(Toolbar.Button).withConfig({
 	}
 `
 
-const PriSeparator = styled(Toolbar.Separator).withConfig({
-	displayName: 'PriToolbarSeparator',
-})`
+const PriSeparator = styled(Toolbar.Separator)`
 	width: 1px;
 	align-self: stretch;
 	margin: var(--space-2xs) var(--space-2xs);
@@ -101,9 +95,7 @@ const PriSeparator = styled(Toolbar.Separator).withConfig({
 	);
 `
 
-const PriInput = styled(Toolbar.Input).withConfig({
-	displayName: 'PriToolbarInput',
-})`
+const PriInput = styled(Toolbar.Input)`
 	padding: var(--space-2xs) var(--space-sm);
 	background: var(--color-paper-aged);
 	border: none;

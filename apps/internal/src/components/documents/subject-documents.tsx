@@ -1,6 +1,6 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Link } from '@tanstack/react-router'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 import type { DocumentSubjectTable } from '@batuda/domain'
 

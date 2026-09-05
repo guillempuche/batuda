@@ -1,5 +1,5 @@
 import { Menu } from '@base-ui/react/menu'
-import styled from 'styled-components'
+import { css, styled } from 'next-yak'
 
 /**
  * Workshop action menu — a brushed metal plate of actions opened from a button
@@ -21,9 +21,7 @@ import styled from 'styled-components'
  *   </PriMenu.Root>
  */
 
-const PriPopup = styled(Menu.Popup).withConfig({
-	displayName: 'PriMenuPopup',
-})`
+const PriPopup = styled(Menu.Popup)`
 	position: relative;
 	min-width: 12rem;
 	padding: var(--space-2xs);
@@ -64,7 +62,7 @@ const PriPopup = styled(Menu.Popup).withConfig({
 `
 
 // Shared row styling for every kind of menu item.
-const itemStyles = `
+const itemStyles = css`
 	display: flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -94,21 +92,15 @@ const itemStyles = `
 	}
 `
 
-const PriItem = styled(Menu.Item).withConfig({
-	displayName: 'PriMenuItem',
-})`
+const PriItem = styled(Menu.Item)`
 	${itemStyles}
 `
 
-const PriLinkItem = styled(Menu.LinkItem).withConfig({
-	displayName: 'PriMenuLinkItem',
-})`
+const PriLinkItem = styled(Menu.LinkItem)`
 	${itemStyles}
 `
 
-const PriCheckboxItem = styled(Menu.CheckboxItem).withConfig({
-	displayName: 'PriMenuCheckboxItem',
-})`
+const PriCheckboxItem = styled(Menu.CheckboxItem)`
 	${itemStyles}
 	position: relative;
 	/* Only the rows that are on carry a tick, so the room for one is kept on
@@ -116,9 +108,7 @@ const PriCheckboxItem = styled(Menu.CheckboxItem).withConfig({
 	padding-inline-start: calc(var(--space-sm) + 1rem + var(--space-2xs));
 `
 
-const PriCheckboxItemIndicator = styled(Menu.CheckboxItemIndicator).withConfig({
-	displayName: 'PriMenuCheckboxItemIndicator',
-})`
+const PriCheckboxItemIndicator = styled(Menu.CheckboxItemIndicator)`
 	/* Sits in the room the row keeps for it, outside the row's own layout, so
 	 * only the name decides how wide the menu opens. */
 	position: absolute;
@@ -132,9 +122,7 @@ const PriCheckboxItemIndicator = styled(Menu.CheckboxItemIndicator).withConfig({
 	color: var(--color-primary);
 `
 
-const PriGroupLabel = styled(Menu.GroupLabel).withConfig({
-	displayName: 'PriMenuGroupLabel',
-})`
+const PriGroupLabel = styled(Menu.GroupLabel)`
 	padding: var(--space-2xs) var(--space-sm);
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
@@ -143,9 +131,7 @@ const PriGroupLabel = styled(Menu.GroupLabel).withConfig({
 	color: var(--color-on-surface-variant);
 `
 
-const PriSeparator = styled(Menu.Separator).withConfig({
-	displayName: 'PriMenuSeparator',
-})`
+const PriSeparator = styled(Menu.Separator)`
 	height: 1px;
 	margin: var(--space-3xs) 0;
 	background: linear-gradient(

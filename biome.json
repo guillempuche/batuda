@@ -44,7 +44,18 @@
 				"useLiteralKeys": "off"
 			},
 			"style": {
-				"noNonNullAssertion": "warn"
+				"noNonNullAssertion": "warn",
+				"noRestrictedImports": {
+					"level": "error",
+					"options": {
+						"patterns": [
+							{
+								"group": ["styled-components", "styled-components/**"],
+								"message": "styled-components has been replaced by next-yak. Import `styled` / `css` from 'next-yak'."
+							}
+						]
+					}
+				}
 			},
 			"suspicious": {
 				"noConsole": {
@@ -137,6 +148,15 @@
 					}
 				}
 			}
+		}
+	],
+	"plugins": [
+		"./biome-plugins/no-styled-with-config.grit",
+		"./biome-plugins/no-css-var-name-interpolation.grit",
+		"./biome-plugins/no-untagged-css-block.grit",
+		{
+			"path": "./biome-plugins/no-styled-as-prop.grit",
+			"includes": ["**/apps/internal/src/**", "**/packages/ui/src/**"]
 		}
 	]
 }

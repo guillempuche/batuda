@@ -3,8 +3,8 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { ArrowLeft, Check, SlidersHorizontal } from 'lucide-react'
+import { styled } from 'next-yak'
 import { useEffect, useState } from 'react'
-import styled from 'styled-components'
 
 import { PriButton, PriCheckbox, PriInput, usePriToast } from '@batuda/ui/pri'
 

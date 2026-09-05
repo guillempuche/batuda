@@ -6,18 +6,41 @@ import { lingui } from '@lingui/vite-plugin'
 import tailwindcss from '@tailwindcss/vite'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import viteReact from '@vitejs/plugin-react-swc'
-import { defineConfig } from 'vite'
+import { viteYak } from 'next-yak/vite'
+import { defineConfig, type Plugin } from 'vite'
 
 const here = dirname(fileURLToPath(import.meta.url))
 
-/* Batuda uses `@vitejs/plugin-react-swc` so two SWC transforms can run at
- * compile time:
- * - `@lingui/swc-plugin` turns `<Trans>…</Trans>` (from `@lingui/react/macro`)
- *   into the runtime form with auto-generated message IDs.
- * - `@swc/plugin-styled-components` gives every `styled.*` call a stable
- *   `componentId` + `displayName`, so SSR class names match the emitted
- *   `<style data-styled>` rules (otherwise hashes drift and elements fall
- *   back to unstyled defaults). */
+/**
+ * Puts every generated stylesheet into a named cascade layer: `lib` for the
+ * shared components in `packages/ui`, `app` for this app's own.
+ *
+ * When the styling was assembled in the browser it was added in the order the
+ * components first rendered, and the app's own rules always landed after the
+ * shared ones — so when both set the same property with equal weight, the app
+ * won. Preparing the styles ahead of time replaces that with the order the
+ * bundler happens to write the files in, which is not a rule anyone chose.
+ * Naming the layers puts the same answer back and writes it down, so an
+ * override keeps working without anyone reaching for `!important`.
+ *
+ * The order itself is declared once, at the top of `src/styles.css`.
+ */
+function yakLayers(): Plugin {
+	return {
+		name: 'yak-cascade-layers',
+		enforce: 'pre',
+		transform: {
+			filter: { id: /^\0virtual:yak-css:/ },
+			handler(code, id) {
+				const layer = /node_modules|packages\/ui/.test(id) ? 'lib' : 'app'
+				return { code: `@layer ${layer} {\n${code}\n}\n`, map: null }
+			},
+		},
+	}
+}
+
+/* `@lingui/swc-plugin` turns `<Trans>…</Trans>` (from `@lingui/react/macro`)
+ * into the runtime form with auto-generated message IDs. */
 
 // Browser-side API requests are issued against the same origin as the
 // frontend so Better Auth's `Set-Cookie` lands on `batuda.localhost` (the
@@ -144,7 +167,7 @@ const config = defineConfig(({ command }) => {
 			],
 			dedupe: ['react', 'react-dom', '@base-ui/react', '@base-ui/utils'],
 			// Drop the default 'node' condition so tslib (and any other
-			// dual-pkg dep that styled-components pulls in) resolves to its
+			// dual-package dependency pulled in here) resolves to its
 			// ESM build. With 'node' first, Vite/Nitro picks the CJS entry
 			// and the interop wrapper exposes `__extends` only via a
 			// `.default` property — Nitro's prebuild then emits
@@ -155,11 +178,10 @@ const config = defineConfig(({ command }) => {
 			// `"development"` export key (e.g. `@batuda/ui`) resolve to
 			// their TS source in dev, not the pre-built `dist/`. Without
 			// it Vite picks `import` → `dist/index.mjs`, which tsdown ships
-			// without `@swc/plugin-styled-components` componentIds; the SSR
-			// pipeline's `noExternal` still re-runs the SWC plugin and adds
-			// IDs, while the client loads dist as-is. The classnames then
-			// diverge (`pri-input__PriInput-sc-{hash}-0` vs `PriInput-{hash}`)
-			// and React 19 bails hydration on every affected subtree —
+			// unbuilt. Class names are worked out from each file's path, so
+			// SSR reading the source while the browser reads `dist/` gives
+			// two different names for the same component, and React 19 bails
+			// hydration on every affected subtree —
 			// magic-link button onClick stops attaching, sign-in form
 			// submits get dropped, etc. Symmetric source load + symmetric
 			// transform fixes the mismatch at the root.
@@ -179,7 +201,7 @@ const config = defineConfig(({ command }) => {
 			// different React/tslib instance and SSR throws on hook calls
 			// or `__extends` is undefined.
 			noExternal: [
-				'styled-components',
+				'next-yak',
 				'@batuda/ui',
 				'@base-ui/react',
 				'@base-ui/utils',
@@ -190,20 +212,39 @@ const config = defineConfig(({ command }) => {
 			tailwindcss(),
 			cloudflare({ viteEnvironment: { name: 'ssr' } }),
 			tanstackStart(),
+			/* Turns `styled`/`css` templates into real CSS files at build time.
+			 * It has to see the original source, so it runs before the React
+			 * plugin — both ask to run early, and when two plugins both do,
+			 * the order in this array is what settles it.
+			 *
+			 * `basePath` is the repo root because `packages/ui` sits outside
+			 * this app's folder. The names of the generated CSS files are
+			 * worked out relative to this path, so pointing it at the app
+			 * instead would put the shared components' styles out of reach. */
+			/* Turns `styled`/`css` templates into real CSS files at build time.
+			 * It has to see the original source, so it runs before the React
+			 * plugin — both ask to run early, and when two plugins both do,
+			 * the order in this array is what settles it.
+			 *
+			 * `basePath` is the repo root because `packages/ui` sits outside
+			 * this app's folder. The names of the generated CSS files are
+			 * worked out relative to this path, so pointing it at the app
+			 * instead would put the shared components' styles out of reach.
+			 *
+			 * `minify` is on in development too, which is not the default.
+			 * Left off, the generated names are built from the file's name —
+			 * and a route file for a changing part of the address is called
+			 * `$slug.tsx`, so they come out as `--$slug_Badge__color_xxx`. A
+			 * `$` cannot appear in a CSS name, so the browser throws those
+			 * declarations away and the page quietly loses styling that is
+			 * perfectly fine once built for real. Shortening the names in
+			 * both places also means what you see while developing is what
+			 * ships. The cost is that class names in devtools read as
+			 * `.yuiqpR8d` rather than the component's name. */
+			viteYak({ basePath: resolve(here, '../..'), minify: true }),
+			yakLayers(),
 			viteReact({
-				plugins: [
-					['@lingui/swc-plugin', {}],
-					[
-						'@swc/plugin-styled-components',
-						{
-							displayName: true,
-							ssr: true,
-							fileName: true,
-							pure: false,
-							transpileTemplateLiterals: true,
-						},
-					],
-				],
+				plugins: [['@lingui/swc-plugin', {}]],
 			}),
 			lingui(),
 		],

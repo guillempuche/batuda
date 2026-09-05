@@ -8,7 +8,7 @@ import {
 	Users,
 	Wallet,
 } from 'lucide-react'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 import { authClient } from '#/lib/auth-client'
 import {
@@ -186,17 +186,13 @@ function OrganizationSettingsPage() {
 	)
 }
 
-const Page = styled.div.withConfig({
-	displayName: 'OrganizationSettingsPage',
-})`
+const Page = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-lg);
 `
 
-const Intro = styled.div.withConfig({
-	displayName: 'OrganizationSettingsIntro',
-})`
+const Intro = styled.div`
 	${rulerUnderRule}
 	display: flex;
 	flex-direction: column;
@@ -204,18 +200,14 @@ const Intro = styled.div.withConfig({
 	padding-bottom: var(--space-xs);
 `
 
-const Heading = styled.h2.withConfig({
-	displayName: 'OrganizationSettingsHeading',
-})`
+const Heading = styled.h2`
 	${stenciledTitle}
 	font-size: var(--typescale-headline-large-size);
 	line-height: var(--typescale-headline-large-line);
 	margin: 0;
 `
 
-const Subtitle = styled.p.withConfig({
-	displayName: 'OrganizationSettingsSubtitle',
-})`
+const Subtitle = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-large-size);
 	line-height: var(--typescale-body-large-line);
@@ -224,9 +216,7 @@ const Subtitle = styled.p.withConfig({
 	margin: 0;
 `
 
-const Card = styled.div.withConfig({
-	displayName: 'OrganizationSettingsCard',
-})`
+const Card = styled.div`
 	${brushedMetalPlate}
 	display: flex;
 	align-items: center;
@@ -235,9 +225,7 @@ const Card = styled.div.withConfig({
 	border-radius: var(--shape-2xs);
 `
 
-const IconPlate = styled.div.withConfig({
-	displayName: 'OrganizationSettingsIconPlate',
-})`
+const IconPlate = styled.div`
 	width: 56px;
 	height: 56px;
 	border-radius: var(--shape-2xs);
@@ -259,18 +247,14 @@ const IconPlate = styled.div.withConfig({
 	flex-shrink: 0;
 `
 
-const Info = styled.div.withConfig({
-	displayName: 'OrganizationSettingsInfo',
-})`
+const Info = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 	min-width: 0;
 `
 
-const Name = styled.p.withConfig({
-	displayName: 'OrganizationSettingsName',
-})`
+const Name = styled.p`
 	${stenciledTitle}
 	font-size: var(--typescale-title-large-size);
 	line-height: var(--typescale-title-large-line);
@@ -279,9 +263,7 @@ const Name = styled.p.withConfig({
 	text-overflow: ellipsis;
 `
 
-const MetaRow = styled.p.withConfig({
-	displayName: 'OrganizationSettingsMetaRow',
-})`
+const MetaRow = styled.p`
 	display: inline-flex;
 	align-items: baseline;
 	gap: var(--space-2xs);
@@ -292,24 +274,18 @@ const MetaRow = styled.p.withConfig({
 	color: var(--color-on-surface-variant);
 `
 
-const MetaLabel = styled.span.withConfig({
-	displayName: 'OrganizationSettingsMetaLabel',
-})`
+const MetaLabel = styled.span`
 	${stenciledTitle}
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
 `
 
-const SlugText = styled.span.withConfig({
-	displayName: 'OrganizationSettingsSlugText',
-})`
+const SlugText = styled.span`
 	font-family: var(--font-mono);
 `
 
-const NavRow = styled(Link).withConfig({
-	displayName: 'OrganizationSettingsNavRow',
-})`
+const NavRow = styled(Link)`
 	${brushedMetalPlate}
 	display: flex;
 	flex-direction: column;
@@ -332,25 +308,19 @@ const NavRow = styled(Link).withConfig({
 	}
 `
 
-const NavRowLabel = styled.span.withConfig({
-	displayName: 'OrganizationSettingsNavRowLabel',
-})`
+const NavRowLabel = styled.span`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
 `
 
-const NavRowTitle = styled.span.withConfig({
-	displayName: 'OrganizationSettingsNavRowTitle',
-})`
+const NavRowTitle = styled.span`
 	${stenciledTitle}
 	font-size: var(--typescale-title-medium-size);
 	line-height: var(--typescale-title-medium-line);
 `
 
-const NavRowDescription = styled.span.withConfig({
-	displayName: 'OrganizationSettingsNavRowDescription',
-})`
+const NavRowDescription = styled.span`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	line-height: var(--typescale-body-small-line);

@@ -1,6 +1,6 @@
 import { Tabs } from '@base-ui/react/tabs'
+import { styled } from 'next-yak'
 import type { ComponentProps } from 'react'
-import styled from 'styled-components'
 
 /**
  * Workshop tabs rendered as file-folder tabs. Each tab is an aged-paper
@@ -17,9 +17,7 @@ import styled from 'styled-components'
  *     <PriTabs.Panel value="profile">...</PriTabs.Panel>
  *   </PriTabs.Root>
  */
-const PriList = styled(Tabs.List).withConfig({
-	displayName: 'PriTabsList',
-})`
+const PriList = styled(Tabs.List)`
 	position: relative;
 	display: flex;
 	flex-wrap: nowrap;
@@ -53,9 +51,7 @@ const PriList = styled(Tabs.List).withConfig({
 	}
 `
 
-const PriTab = styled(Tabs.Tab).withConfig({
-	displayName: 'PriTabsTab',
-})`
+const PriTab = styled(Tabs.Tab)`
 	position: relative;
 	flex-shrink: 0;
 	scroll-snap-align: start;
@@ -107,9 +103,7 @@ const PriTab = styled(Tabs.Tab).withConfig({
 	}
 `
 
-const PriIndicator = styled(Tabs.Indicator).withConfig({
-	displayName: 'PriTabsIndicator',
-})`
+const PriIndicator = styled(Tabs.Indicator)`
 	position: absolute;
 	bottom: 0;
 	left: 0;

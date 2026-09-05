@@ -1,0 +1,20 @@
+// A block of CSS handed to an interpolation as a plain string is dropped —
+// next-yak compiles only what it can see is CSS, and an untagged literal
+// looks like any other string. Nothing warns: the component renders and the
+// rules are simply absent. Eight of these survived the migration and were
+// found only by comparing the built stylesheet against the source.
+//
+// `${p => p.$on && css`…`}` is the fix; the tag is the whole difference.
+JsTemplateExpression() as $template where {
+	or { $template <: contains `styled`, $template <: contains `css` },
+	$template <: contains bubble or {
+		JsStringLiteralExpression() as $lit where {
+			$lit <: r"(?s).*[a-z-]+\s*:\s*[^'\"]+;.*",
+			register_diagnostic(span=$lit, message="CSS handed over as a plain string: next-yak drops it and nothing warns, so these rules never reach the page. Tag it — css`…`.", severity="error")
+		},
+		JsTemplateExpression() as $inner where {
+			$inner <: r"(?s)`[^`]*[a-z-]+\s*:\s*[^`]+;[^`]*`",
+			register_diagnostic(span=$inner, message="CSS handed over as an untagged template: next-yak drops it and nothing warns, so these rules never reach the page. Tag it — css`…`.", severity="error")
+		}
+	}
+}

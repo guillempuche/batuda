@@ -2,7 +2,7 @@ import { useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { ArrowLeft } from 'lucide-react'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 import {
 	researchDetailAtom,

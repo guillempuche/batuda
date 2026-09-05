@@ -1,6 +1,6 @@
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
-import type { SpaceToken } from './tokens'
+import { SPACE, type SpaceToken } from './tokens'
 
 /**
  * Switcher — children share a row when the container is wider than
@@ -17,16 +17,13 @@ import type { SpaceToken } from './tokens'
  *
  * Reference: every-layout.dev/layouts/switcher
  */
-export const Switcher = styled.div.withConfig({
-	displayName: 'Switcher',
-	shouldForwardProp: prop => prop !== '$gap' && prop !== '$threshold',
-})<{
+export const Switcher = styled.div<{
 	$gap?: SpaceToken
 	$threshold?: string
 }>`
 	display: flex;
 	flex-wrap: wrap;
-	gap: var(--space-${p => p.$gap ?? 'md'});
+	gap: ${p => SPACE[p.$gap ?? 'md']};
 
 	& > * {
 		flex-grow: 1;

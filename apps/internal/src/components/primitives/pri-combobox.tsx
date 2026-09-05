@@ -1,5 +1,5 @@
 import { Autocomplete } from '@base-ui/react/autocomplete'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 /**
  * Workshop-styled text box that suggests what other people have already typed,
@@ -16,9 +16,7 @@ import styled from 'styled-components'
  * only place that needs it; it moves to the package when a second one does.
  */
 
-const PriInput = styled(Autocomplete.Input).withConfig({
-	displayName: 'PriComboboxInput',
-})`
+const PriInput = styled(Autocomplete.Input)`
 	width: 100%;
 	padding: var(--space-xs) var(--space-sm);
 	background: var(--color-paper-aged);
@@ -62,9 +60,7 @@ const PriInput = styled(Autocomplete.Input).withConfig({
 	}
 `
 
-const PriPopup = styled(Autocomplete.Popup).withConfig({
-	displayName: 'PriComboboxPopup',
-})`
+const PriPopup = styled(Autocomplete.Popup)`
 	position: relative;
 	/* Never narrower than the field it belongs to, or a suggestion reads as
 	 * belonging to something else on the page; never wider than the screen has
@@ -99,9 +95,7 @@ const PriPopup = styled(Autocomplete.Popup).withConfig({
 	}
 `
 
-const PriItem = styled(Autocomplete.Item).withConfig({
-	displayName: 'PriComboboxItem',
-})`
+const PriItem = styled(Autocomplete.Item)`
 	position: relative;
 	z-index: 1;
 	/* A plain block, not a row of parts: a suggestion is one piece of text, and
@@ -131,9 +125,7 @@ const PriItem = styled(Autocomplete.Item).withConfig({
 	}
 `
 
-const PriEmpty = styled(Autocomplete.Empty).withConfig({
-	displayName: 'PriComboboxEmpty',
-})`
+const PriEmpty = styled(Autocomplete.Empty)`
 	padding: var(--space-2xs) var(--space-sm);
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);

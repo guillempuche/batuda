@@ -2,8 +2,8 @@ import { useLingui } from '@lingui/react/macro'
 import { Link } from '@tanstack/react-router'
 import { MoreHorizontal } from 'lucide-react'
 import { motion } from 'motion/react'
+import { styled } from 'next-yak'
 import type { ComponentType, ReactNode } from 'react'
-import styled from 'styled-components'
 
 import { PriAvatar, PriContextMenu, PriMenu, usePriToast } from '@batuda/ui/pri'
 
@@ -155,7 +155,7 @@ export function CompanyCard({
 						aria-label={company.name}
 					/>
 				</CardLinkOverlay>
-				<ScrewDot $position='top-left' aria-hidden />
+				<ScrewDot data-position='top-left' aria-hidden />
 				<Header>
 					<Identity>
 						<Name>{company.name}</Name>
@@ -218,7 +218,7 @@ export function CompanyCard({
 	)
 }
 
-const Card = styled(motion.article).withConfig({ displayName: 'CompanyCard' })`
+const Card = styled(motion.article)`
 	${agedPaperSurface}
 	position: relative;
 	display: flex;
@@ -238,9 +238,7 @@ const Card = styled(motion.article).withConfig({ displayName: 'CompanyCard' })`
 	}
 `
 
-const CardLinkOverlay = styled.div.withConfig({
-	displayName: 'CompanyCardLinkOverlay',
-})`
+const CardLinkOverlay = styled.div`
 	position: absolute;
 	inset: 0;
 	z-index: 0;
@@ -258,7 +256,7 @@ const CardLinkOverlay = styled.div.withConfig({
 	}
 `
 
-const Header = styled.div.withConfig({ displayName: 'CompanyCardHeader' })`
+const Header = styled.div`
 	position: relative;
 	z-index: 1;
 	display: flex;
@@ -269,7 +267,7 @@ const Header = styled.div.withConfig({ displayName: 'CompanyCardHeader' })`
 	pointer-events: none;
 `
 
-const Corner = styled.div.withConfig({ displayName: 'CompanyCardCorner' })`
+const Corner = styled.div`
 	display: flex;
 	align-items: center;
 	gap: var(--space-3xs);
@@ -278,9 +276,7 @@ const Corner = styled.div.withConfig({ displayName: 'CompanyCardCorner' })`
 	pointer-events: auto;
 `
 
-const Unassigned = styled.span.withConfig({
-	displayName: 'CompanyCardUnassigned',
-})`
+const Unassigned = styled.span`
 	width: 1.5rem;
 	height: 1.5rem;
 	border-radius: 50%;
@@ -288,9 +284,7 @@ const Unassigned = styled.span.withConfig({
 	opacity: 0.6;
 `
 
-const ActionsTrigger = styled(PriMenu.Trigger).withConfig({
-	displayName: 'CompanyCardActionsTrigger',
-})`
+const ActionsTrigger = styled(PriMenu.Trigger)`
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -313,14 +307,14 @@ const ActionsTrigger = styled(PriMenu.Trigger).withConfig({
 	}
 `
 
-const Identity = styled.div.withConfig({ displayName: 'CompanyCardIdentity' })`
+const Identity = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
 	min-width: 0;
 `
 
-const Name = styled.h3.withConfig({ displayName: 'CompanyCardName' })`
+const Name = styled.h3`
 	margin: 0;
 	font-family: var(--font-display);
 	font-size: var(--typescale-title-medium-size);
@@ -334,7 +328,7 @@ const Name = styled.h3.withConfig({ displayName: 'CompanyCardName' })`
 	white-space: nowrap;
 `
 
-const Subtitle = styled.p.withConfig({ displayName: 'CompanyCardSubtitle' })`
+const Subtitle = styled.p`
 	margin: 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
@@ -346,7 +340,7 @@ const Subtitle = styled.p.withConfig({ displayName: 'CompanyCardSubtitle' })`
 	white-space: nowrap;
 `
 
-const Footer = styled.div.withConfig({ displayName: 'CompanyCardFooter' })`
+const Footer = styled.div`
 	position: relative;
 	z-index: 1;
 	display: flex;
@@ -356,9 +350,7 @@ const Footer = styled.div.withConfig({ displayName: 'CompanyCardFooter' })`
 	pointer-events: none;
 `
 
-const LastContact = styled.span.withConfig({
-	displayName: 'CompanyCardLastContact',
-})`
+const LastContact = styled.span`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-3xs);
@@ -368,9 +360,7 @@ const LastContact = styled.span.withConfig({
 	font-style: italic;
 `
 
-const LastContactLabel = styled.span.withConfig({
-	displayName: 'CompanyCardLastContactLabel',
-})`
+const LastContactLabel = styled.span`
 	font-family: var(--font-display);
 	font-weight: var(--font-weight-bold);
 	letter-spacing: 0.08em;

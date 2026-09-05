@@ -1,6 +1,6 @@
 import { Trans } from '@lingui/react/macro'
+import { styled } from 'next-yak'
 import type { ReactNode } from 'react'
-import styled from 'styled-components'
 
 import { PriButton, PriDialog } from '@batuda/ui/pri'
 

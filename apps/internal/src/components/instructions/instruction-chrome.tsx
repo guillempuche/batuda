@@ -1,4 +1,4 @@
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 // Small shared pieces reused across the instruction-template surfaces (the
 // templates list, the stack picker, the default-stack editor) so an owner tag

@@ -1,6 +1,7 @@
 import { useLingui } from '@lingui/react/macro'
 import { Bot, Check, ChevronRight, Pencil, Plus } from 'lucide-react'
 import { motion } from 'motion/react'
+import { css, styled } from 'next-yak'
 import {
 	type KeyboardEvent,
 	useCallback,
@@ -8,7 +9,6 @@ import {
 	useRef,
 	useState,
 } from 'react'
-import styled from 'styled-components'
 
 import { PriCheckbox, PriInput, PriPopover, PriTooltip } from '@batuda/ui/pri'
 
@@ -369,14 +369,14 @@ function SourceBadge({ source }: { source: TaskSourceLabel }) {
 
 // ── Styles ────────────────────────────────────────────────────────
 
-const Body = styled.div.withConfig({ displayName: 'TaskItemBody' })`
+const Body = styled.div`
 	min-width: 0;
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
 `
 
-const Meta = styled.span.withConfig({ displayName: 'TaskItemMeta' })`
+const Meta = styled.span`
 	display: inline-flex;
 	align-items: center;
 	font-family: var(--font-body);
@@ -385,10 +385,7 @@ const Meta = styled.span.withConfig({ displayName: 'TaskItemMeta' })`
 	font-style: italic;
 `
 
-const Row = styled(motion.div).withConfig({
-	displayName: 'TaskItemRow',
-	shouldForwardProp: prop => !prop.startsWith('$'),
-})<{ $overdue: boolean; $completed: boolean }>`
+const Row = styled(motion.div)<{ $overdue: boolean; $completed: boolean }>`
 	${agedPaperRow}
 	${ruledLedgerRow}
 	position: relative;
@@ -424,13 +421,13 @@ const Row = styled(motion.div).withConfig({
 
 	${p =>
 		p.$overdue &&
-		`
+		css`
 			border-left: 3px solid var(--color-error);
 			box-shadow: inset 4px 0 8px -4px color-mix(in srgb, var(--color-error) 60%, transparent);
 		`}
 `
 
-const Company = styled.span.withConfig({ displayName: 'TaskItemCompany' })`
+const Company = styled.span`
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-medium-size);
 	line-height: var(--typescale-label-medium-line);
@@ -443,10 +440,7 @@ const Company = styled.span.withConfig({ displayName: 'TaskItemCompany' })`
 	white-space: nowrap;
 `
 
-const Title = styled.span.withConfig({
-	displayName: 'TaskItemTitle',
-	shouldForwardProp: prop => prop !== '$completed',
-})<{ $completed: boolean }>`
+const Title = styled.span<{ $completed: boolean }>`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	line-height: var(--typescale-body-small-line);
@@ -457,10 +451,7 @@ const Title = styled.span.withConfig({
 	white-space: nowrap;
 `
 
-const TitleTrigger = styled.button.withConfig({
-	displayName: 'TaskItemTitleTrigger',
-	shouldForwardProp: prop => prop !== '$completed',
-})<{ $completed: boolean }>`
+const TitleTrigger = styled.button<{ $completed: boolean }>`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -484,7 +475,7 @@ const TitleTrigger = styled.button.withConfig({
 	}
 `
 
-const TitleText = styled.span.withConfig({ displayName: 'TaskItemTitleText' })`
+const TitleText = styled.span`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	line-height: var(--typescale-body-small-line);
@@ -494,9 +485,7 @@ const TitleText = styled.span.withConfig({ displayName: 'TaskItemTitleText' })`
 	white-space: nowrap;
 `
 
-const PencilMark = styled.span.withConfig({
-	displayName: 'TaskItemPencilMark',
-})`
+const PencilMark = styled.span`
 	flex-shrink: 0;
 	display: inline-flex;
 	align-items: center;
@@ -510,17 +499,13 @@ const PencilMark = styled.span.withConfig({
 	}
 `
 
-const InlineInput = styled(PriInput).withConfig({
-	displayName: 'TaskItemInlineInput',
-})`
+const InlineInput = styled(PriInput)`
 	font-size: var(--typescale-body-small-size);
 	line-height: var(--typescale-body-small-line);
 	padding: var(--space-3xs) var(--space-xs);
 `
 
-const DueTrigger = styled.button.withConfig({
-	displayName: 'TaskItemDueTrigger',
-})`
+const DueTrigger = styled.button`
 	background: transparent;
 	border: 1px dashed transparent;
 	border-radius: var(--shape-2xs);
@@ -544,14 +529,14 @@ const DueTrigger = styled.button.withConfig({
 	}
 `
 
-const DueForm = styled.div.withConfig({ displayName: 'TaskItemDueForm' })`
+const DueForm = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 	min-width: 10rem;
 `
 
-const DueLabel = styled.span.withConfig({ displayName: 'TaskItemDueLabel' })`
+const DueLabel = styled.span`
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.06em;
@@ -559,9 +544,7 @@ const DueLabel = styled.span.withConfig({ displayName: 'TaskItemDueLabel' })`
 	text-shadow: var(--text-shadow-emboss);
 `
 
-const DueDateInput = styled.input.withConfig({
-	displayName: 'TaskItemDueDateInput',
-})`
+const DueDateInput = styled.input`
 	padding: var(--space-2xs) var(--space-xs);
 	background: var(--color-paper-aged);
 	border: 1px solid var(--color-metal-edge);
@@ -576,7 +559,7 @@ const DueDateInput = styled.input.withConfig({
 	}
 `
 
-const ClearDue = styled.button.withConfig({ displayName: 'TaskItemClearDue' })`
+const ClearDue = styled.button`
 	${brushedMetalPlate}
 	padding: var(--space-3xs) var(--space-xs);
 	border-radius: var(--shape-2xs);
@@ -593,10 +576,7 @@ const ClearDue = styled.button.withConfig({ displayName: 'TaskItemClearDue' })`
 	}
 `
 
-const PriorityRivet = styled.span.withConfig({
-	displayName: 'TaskItemPriorityRivet',
-	shouldForwardProp: prop => prop !== '$priority',
-})<{ $priority: TaskPriorityLabel }>`
+const PriorityRivet = styled.span<{ $priority: TaskPriorityLabel }>`
 	display: inline-block;
 	width: 10px;
 	height: 10px;
@@ -621,10 +601,7 @@ const PriorityRivet = styled.span.withConfig({
 	opacity: ${p => (p.$priority === 'low' ? 0.55 : 1)};
 `
 
-const Badge = styled.span.withConfig({
-	displayName: 'TaskItemSourceBadge',
-	shouldForwardProp: prop => prop !== '$source',
-})<{ $source: TaskSourceLabel }>`
+const Badge = styled.span<{ $source: TaskSourceLabel }>`
 	${brushedMetalPlate}
 	display: inline-flex;
 	align-items: center;
@@ -642,7 +619,7 @@ const Badge = styled.span.withConfig({
 
 	${p =>
 		p.$source === 'agent' &&
-		`
+		css`
 			background: linear-gradient(
 				145deg,
 				color-mix(in srgb, var(--color-primary) 35%, var(--color-metal-light)) 0%,
@@ -652,9 +629,7 @@ const Badge = styled.span.withConfig({
 		`}
 `
 
-const DetailButton = styled.button.withConfig({
-	displayName: 'TaskItemDetailButton',
-})`
+const DetailButton = styled.button`
 	${brushedMetalPlate}
 	display: inline-flex;
 	align-items: center;
@@ -676,9 +651,7 @@ const DetailButton = styled.button.withConfig({
 	}
 `
 
-const LogButton = styled.button.withConfig({
-	displayName: 'TaskItemLogButton',
-})`
+const LogButton = styled.button`
 	${brushedMetalPlate}
 	display: inline-flex;
 	align-items: center;

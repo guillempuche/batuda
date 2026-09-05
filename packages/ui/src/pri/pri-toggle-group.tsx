@@ -1,6 +1,6 @@
 import { Toggle } from '@base-ui/react/toggle'
 import { ToggleGroup } from '@base-ui/react/toggle-group'
-import styled, { css } from 'styled-components'
+import { css, styled } from 'next-yak'
 
 /**
  * Workshop toggle group — stencil-outline buttons that flip to
@@ -64,17 +64,13 @@ const baseToggle = css`
 	}
 `
 
-const PriRoot = styled(ToggleGroup).withConfig({
-	displayName: 'PriToggleGroupRoot',
-})`
+const PriRoot = styled(ToggleGroup)`
 	display: inline-flex;
 	flex-wrap: wrap;
 	gap: var(--space-2xs);
 `
 
-const PriItem = styled(Toggle).withConfig({
-	displayName: 'PriToggleGroupItem',
-})`
+const PriItem = styled(Toggle)`
 	${baseToggle}
 `
 

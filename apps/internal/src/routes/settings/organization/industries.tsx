@@ -3,8 +3,8 @@ import { Plural, Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { ArrowLeft, Check, Merge, Trash2 } from 'lucide-react'
+import { styled } from 'next-yak'
 import { useState } from 'react'
-import styled from 'styled-components'
 
 import { PriButton, PriDialog, PriInput, usePriToast } from '@batuda/ui/pri'
 
@@ -397,13 +397,13 @@ function IndustriesPage() {
 	)
 }
 
-const Page = styled.div.withConfig({ displayName: 'IndustriesPage' })`
+const Page = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-lg);
 `
 
-const BackLink = styled(Link).withConfig({ displayName: 'IndustriesBackLink' })`
+const BackLink = styled(Link)`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -420,7 +420,7 @@ const BackLink = styled(Link).withConfig({ displayName: 'IndustriesBackLink' })`
 	}
 `
 
-const Intro = styled.div.withConfig({ displayName: 'IndustriesIntro' })`
+const Intro = styled.div`
 	${rulerUnderRule}
 	display: flex;
 	flex-direction: column;
@@ -428,14 +428,14 @@ const Intro = styled.div.withConfig({ displayName: 'IndustriesIntro' })`
 	padding-bottom: var(--space-xs);
 `
 
-const Heading = styled.h2.withConfig({ displayName: 'IndustriesHeading' })`
+const Heading = styled.h2`
 	${stenciledTitle}
 	font-size: var(--typescale-headline-large-size);
 	line-height: var(--typescale-headline-large-line);
 	margin: 0;
 `
 
-const Subtitle = styled.p.withConfig({ displayName: 'IndustriesSubtitle' })`
+const Subtitle = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-large-size);
 	line-height: var(--typescale-body-large-line);
@@ -444,7 +444,7 @@ const Subtitle = styled.p.withConfig({ displayName: 'IndustriesSubtitle' })`
 	margin: 0;
 `
 
-const Card = styled.div.withConfig({ displayName: 'IndustriesCard' })`
+const Card = styled.div`
 	${brushedMetalPlate}
 	display: flex;
 	flex-direction: column;
@@ -452,22 +452,19 @@ const Card = styled.div.withConfig({ displayName: 'IndustriesCard' })`
 	padding: var(--space-md);
 `
 
-const ReviewNote = styled.p.withConfig({ displayName: 'IndustriesReviewNote' })`
+const ReviewNote = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	color: var(--color-on-surface-variant);
 	margin: 0;
 `
 
-const Rows = styled.div.withConfig({ displayName: 'IndustriesRows' })`
+const Rows = styled.div`
 	display: flex;
 	flex-direction: column;
 `
 
-const Row = styled.div.withConfig({
-	displayName: 'IndustriesRow',
-	shouldForwardProp: prop => prop !== '$flagged',
-})<{ $flagged: boolean }>`
+const Row = styled.div<{ $flagged: boolean }>`
 	/* Stacked on a phone: a trade's name and the two things you can do to it do
 	 * not fit on one line there, and squeezing them together wraps the name into
 	 * the buttons. */
@@ -493,7 +490,7 @@ const Row = styled.div.withConfig({
 	}
 `
 
-const Names = styled.div.withConfig({ displayName: 'IndustriesNames' })`
+const Names = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
@@ -501,9 +498,7 @@ const Names = styled.div.withConfig({ displayName: 'IndustriesNames' })`
 	flex: 1;
 `
 
-const NameButton = styled.button.withConfig({
-	displayName: 'IndustriesNameButton',
-})`
+const NameButton = styled.button`
 	align-self: flex-start;
 	background: transparent;
 	border: 1px dashed transparent;
@@ -523,22 +518,20 @@ const NameButton = styled.button.withConfig({
 	}
 `
 
-const Usage = styled.span.withConfig({ displayName: 'IndustriesUsage' })`
+const Usage = styled.span`
 	font-family: var(--font-body);
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface-variant);
 `
 
-const Actions = styled.div.withConfig({ displayName: 'IndustriesActions' })`
+const Actions = styled.div`
 	display: flex;
 	align-items: center;
 	gap: var(--space-2xs);
 	flex-shrink: 0;
 `
 
-const DialogActions = styled.div.withConfig({
-	displayName: 'IndustriesDialogActions',
-})`
+const DialogActions = styled.div`
 	display: flex;
 	justify-content: flex-end;
 	gap: var(--space-2xs);

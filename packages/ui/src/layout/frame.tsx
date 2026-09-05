@@ -1,4 +1,4 @@
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 /**
  * Frame — fixed aspect-ratio container that crops oversized children.
@@ -11,10 +11,7 @@ import styled from 'styled-components'
  *
  * Reference: every-layout.dev/layouts/frame
  */
-export const Frame = styled.div.withConfig({
-	displayName: 'Frame',
-	shouldForwardProp: prop => prop !== '$ratio',
-})<{ $ratio?: string }>`
+export const Frame = styled.div<{ $ratio?: string }>`
 	aspect-ratio: ${p => p.$ratio ?? '16 / 9'};
 	display: flex;
 	overflow: hidden;

@@ -1,13 +1,11 @@
 import { PreviewCard } from '@base-ui/react/preview-card'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 /**
  * Workshop preview card — an aged-paper file card with a corner paperclip.
  * Used for rich hover previews (e.g. peek a company record from a link).
  */
-const PriPopup = styled(PreviewCard.Popup).withConfig({
-	displayName: 'PriPreviewCardPopup',
-})`
+const PriPopup = styled(PreviewCard.Popup)`
 	position: relative;
 	width: 22rem;
 	max-width: calc(100vw - var(--space-xl));
@@ -51,9 +49,7 @@ const PriPopup = styled(PreviewCard.Popup).withConfig({
 	}
 `
 
-const PriArrow = styled(PreviewCard.Arrow).withConfig({
-	displayName: 'PriPreviewCardArrow',
-})`
+const PriArrow = styled(PreviewCard.Arrow)`
 	width: 10px;
 	height: 10px;
 	background: var(--color-paper-aged);

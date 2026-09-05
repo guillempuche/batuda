@@ -1,5 +1,5 @@
 import { Avatar } from '@base-ui/react/avatar'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 /**
  * Workshop avatar — brushed metal bezel ring. When no image is available,
@@ -16,10 +16,7 @@ import styled from 'styled-components'
  *
  *   <PriAvatar.Root $size='1.25rem'>…</PriAvatar.Root>
  */
-const PriRoot = styled(Avatar.Root).withConfig({
-	displayName: 'PriAvatarRoot',
-	shouldForwardProp: prop => prop !== '$size',
-})<{ $size?: string }>`
+const PriRoot = styled(Avatar.Root)<{ $size?: string }>`
 	--pri-avatar-size: ${p => p.$size ?? '2.25rem'};
 
 	position: relative;
@@ -52,9 +49,7 @@ const PriRoot = styled(Avatar.Root).withConfig({
 	}
 `
 
-const PriImage = styled(Avatar.Image).withConfig({
-	displayName: 'PriAvatarImage',
-})`
+const PriImage = styled(Avatar.Image)`
 	width: 100%;
 	height: 100%;
 	border-radius: 50%;
@@ -63,9 +58,7 @@ const PriImage = styled(Avatar.Image).withConfig({
 	z-index: 1;
 `
 
-const PriFallback = styled(Avatar.Fallback).withConfig({
-	displayName: 'PriAvatarFallback',
-})`
+const PriFallback = styled(Avatar.Fallback)`
 	position: relative;
 	z-index: 1;
 	display: inline-flex;

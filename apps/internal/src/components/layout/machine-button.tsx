@@ -1,6 +1,6 @@
 import { motion } from 'motion/react'
+import { css, styled } from 'next-yak'
 import type { ComponentType } from 'react'
-import styled, { css } from 'styled-components'
 
 type IconComponent = ComponentType<{
 	size?: number | string
@@ -64,10 +64,7 @@ export function MachineButton({
 	)
 }
 
-const Wrapper = styled(motion.span).withConfig({
-	displayName: 'MachineButton',
-	shouldForwardProp: p => !p.startsWith('$'),
-})<{ $size: MachineButtonSize }>`
+const Wrapper = styled(motion.span)<{ $size: MachineButtonSize }>`
 	display: flex;
 	flex-direction: column;
 	align-items: center;
@@ -78,10 +75,7 @@ const Wrapper = styled(motion.span).withConfig({
 	will-change: transform;
 `
 
-const Housing = styled.span.withConfig({
-	displayName: 'MachineButtonHousing',
-	shouldForwardProp: p => !p.startsWith('$'),
-})<{ $size: MachineButtonSize; $active: boolean }>`
+const Housing = styled.span<{ $size: MachineButtonSize; $active: boolean }>`
 	width: ${p => SIZE[p.$size].housing}px;
 	height: ${p => SIZE[p.$size].housing}px;
 	border-radius: var(--shape-full);
@@ -136,10 +130,11 @@ const Housing = styled.span.withConfig({
 		`}
 `
 
-const Cap = styled(motion.span).withConfig({
-	displayName: 'MachineButtonCap',
-	shouldForwardProp: p => !p.startsWith('$'),
-})<{ $size: MachineButtonSize; $color: string; $active: boolean }>`
+const Cap = styled(motion.span)<{
+	$size: MachineButtonSize
+	$color: string
+	$active: boolean
+}>`
 	width: ${p => SIZE[p.$size].cap}px;
 	height: ${p => SIZE[p.$size].cap}px;
 	border-radius: var(--shape-full);
@@ -164,10 +159,7 @@ const Cap = styled(motion.span).withConfig({
 	transition: filter 240ms ease;
 `
 
-const Label = styled.span.withConfig({
-	displayName: 'MachineButtonLabel',
-	shouldForwardProp: p => !p.startsWith('$'),
-})<{ $size: MachineButtonSize; $active: boolean }>`
+const Label = styled.span<{ $size: MachineButtonSize; $active: boolean }>`
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
 	font-weight: var(--font-weight-bold);

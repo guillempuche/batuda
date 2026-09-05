@@ -8,8 +8,8 @@ import {
 	ShieldQuestion,
 	ShieldX,
 } from 'lucide-react'
+import { styled } from 'next-yak'
 import type { ComponentType } from 'react'
-import styled from 'styled-components'
 
 import { Badge } from './badge'
 import { verdictTone } from './proposal-logic'

@@ -215,7 +215,7 @@ Batuda web app — the multi-tenant SaaS CRM UI at `batuda.co`.
 TanStack Start SSR app deployed to Cloudflare Workers. Responsibilities:
 
 - Pipeline and company management UI
-- styled-components for co-located CSS with MD3 design tokens
+- next-yak for co-located CSS with MD3 design tokens, compiled to stylesheets at build time
 - Rich text editing via Tiptap (public prospect pages; planned for research docs)
 - Email composition via React Email v6 (`@react-email/editor`) — wraps Tiptap internally but the web app's email module never imports `@tiptap/*` directly; see `packages/email` and `docs/backend.md` § Email service
 - Interactive map view via react-map-gl + MapLibre (company clustering)
@@ -706,7 +706,7 @@ The only closed sets on a company are its pipeline stage, its priority and its s
 
 **Why Unikraft for server:** lightweight unikernel deployment, fast cold starts, matches the "lean infrastructure" philosophy of the project.
 
-**Why Unikraft for web:** same deployment model as the server (Dockerfile + Kraftfile), Node.js SSR enables runtime CSS-in-JS (styled-components), scales to zero. Both apps on one platform simplifies ops.
+**Why Unikraft for web:** same deployment model as the server (Dockerfile + Kraftfile), scales to zero. Both apps on one platform simplifies ops.
 
 **Why MCP over a custom SDK:** works with all major AI interfaces (Claude Code, Claude.ai, ChatGPT) without per-client integration work.
 

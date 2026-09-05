@@ -1,6 +1,6 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Plus, Radio } from 'lucide-react'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 import { PriButton } from '@batuda/ui/pri'
 
@@ -111,9 +111,7 @@ export function CadenceCard({
 	)
 }
 
-const Card = styled.section.withConfig({
-	displayName: 'CadenceCard',
-})`
+const Card = styled.section`
 	${agedPaperSurface}
 	container-type: inline-size;
 	display: flex;
@@ -122,16 +120,12 @@ const Card = styled.section.withConfig({
 	padding: var(--space-md);
 `
 
-const Header = styled.header.withConfig({
-	displayName: 'CadenceCardHeader',
-})`
+const Header = styled.header`
 	${rulerUnderRule}
 	padding-bottom: var(--space-2xs);
 `
 
-const Heading = styled.h3.withConfig({
-	displayName: 'CadenceCardHeading',
-})`
+const Heading = styled.h3`
 	${stenciledTitle}
 	display: inline-flex;
 	align-items: center;
@@ -141,9 +135,7 @@ const Heading = styled.h3.withConfig({
 	line-height: var(--typescale-title-medium-line);
 `
 
-const Grid = styled.dl.withConfig({
-	displayName: 'CadenceCardGrid',
-})`
+const Grid = styled.dl`
 	display: grid;
 	grid-template-columns: 1fr;
 	margin: 0;
@@ -154,9 +146,7 @@ const Grid = styled.dl.withConfig({
 	}
 `
 
-const Row = styled.div.withConfig({
-	displayName: 'CadenceCardRow',
-})`
+const Row = styled.div`
 	${ruledLedgerRow}
 	display: flex;
 	align-items: baseline;
@@ -178,9 +168,7 @@ const Row = styled.div.withConfig({
 	}
 `
 
-const Label = styled.dt.withConfig({
-	displayName: 'CadenceCardLabel',
-})`
+const Label = styled.dt`
 	${stenciledTitle}
 	margin: 0;
 	font-size: var(--typescale-label-small-size);
@@ -188,18 +176,14 @@ const Label = styled.dt.withConfig({
 	color: var(--color-on-surface-variant);
 `
 
-const EmptyState = styled.div.withConfig({
-	displayName: 'CadenceCardEmptyState',
-})`
+const EmptyState = styled.div`
 	display: flex;
 	flex-direction: column;
 	align-items: flex-start;
 	gap: var(--space-sm);
 `
 
-const EmptyText = styled.p.withConfig({
-	displayName: 'CadenceCardEmptyText',
-})`
+const EmptyText = styled.p`
 	margin: 0;
 	font-family: var(--font-body);
 	font-style: italic;

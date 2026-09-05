@@ -1,4 +1,4 @@
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 import { BlueprintSheet } from './blueprint-sheet'
 import { BottomNav } from './bottom-nav'
@@ -31,7 +31,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 	)
 }
 
-const Shell = styled.div.withConfig({ displayName: 'AppShell' })`
+const Shell = styled.div`
 	/* Create a root stacking context for all app chrome so the PriDialog
 	 * portal (appended to <body>, outside this subtree) can sit above
 	 * z-indexed app elements like TopBar and BottomNav — matches the
@@ -53,7 +53,7 @@ const Shell = styled.div.withConfig({ displayName: 'AppShell' })`
 	}
 `
 
-const Main = styled.main.withConfig({ displayName: 'AppShellMain' })`
+const Main = styled.main`
 	flex: 1;
 	min-width: 0;
 	display: flex;

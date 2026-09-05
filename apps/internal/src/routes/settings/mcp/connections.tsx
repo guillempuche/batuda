@@ -4,8 +4,8 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { ArrowLeft, Check, Plug, X } from 'lucide-react'
+import { styled } from 'next-yak'
 import { useMemo, useRef, useState } from 'react'
-import styled from 'styled-components'
 
 import { PriButton, PriCheckbox, PriDialog, usePriToast } from '@batuda/ui/pri'
 
@@ -1035,13 +1035,13 @@ function formatDate(iso: string): string {
 	})
 }
 
-const Page = styled.div.withConfig({ displayName: 'McpConnectionsPage' })`
+const Page = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-lg);
 `
 
-const BackLink = styled(Link).withConfig({ displayName: 'McpConnBackLink' })`
+const BackLink = styled(Link)`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -1056,7 +1056,7 @@ const BackLink = styled(Link).withConfig({ displayName: 'McpConnBackLink' })`
 	}
 `
 
-const Intro = styled.div.withConfig({ displayName: 'McpConnIntro' })`
+const Intro = styled.div`
 	${rulerUnderRule}
 	display: flex;
 	flex-direction: column;
@@ -1064,7 +1064,7 @@ const Intro = styled.div.withConfig({ displayName: 'McpConnIntro' })`
 	padding-bottom: var(--space-xs);
 `
 
-const Heading = styled.h2.withConfig({ displayName: 'McpConnHeading' })`
+const Heading = styled.h2`
 	${stenciledTitle}
 	display: inline-flex;
 	align-items: center;
@@ -1074,7 +1074,7 @@ const Heading = styled.h2.withConfig({ displayName: 'McpConnHeading' })`
 	margin: 0;
 `
 
-const Subtitle = styled.p.withConfig({ displayName: 'McpConnSubtitle' })`
+const Subtitle = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-large-size);
 	line-height: var(--typescale-body-large-line);
@@ -1083,7 +1083,7 @@ const Subtitle = styled.p.withConfig({ displayName: 'McpConnSubtitle' })`
 	margin: 0;
 `
 
-const ListSection = styled.section.withConfig({ displayName: 'McpConnList' })`
+const ListSection = styled.section`
 	${brushedMetalPlate}
 	display: flex;
 	flex-direction: column;
@@ -1092,16 +1092,14 @@ const ListSection = styled.section.withConfig({ displayName: 'McpConnList' })`
 	border-radius: var(--shape-2xs);
 `
 
-const SectionTitle = styled.h3.withConfig({
-	displayName: 'McpConnSectionTitle',
-})`
+const SectionTitle = styled.h3`
 	${stenciledTitle}
 	font-size: var(--typescale-title-medium-size);
 	line-height: var(--typescale-title-medium-line);
 	margin: 0;
 `
 
-const Empty = styled.p.withConfig({ displayName: 'McpConnEmpty' })`
+const Empty = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	font-style: italic;
@@ -1109,7 +1107,7 @@ const Empty = styled.p.withConfig({ displayName: 'McpConnEmpty' })`
 	margin: 0;
 `
 
-const ConnList = styled.ul.withConfig({ displayName: 'McpConnRows' })`
+const ConnList = styled.ul`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-sm);
@@ -1118,7 +1116,7 @@ const ConnList = styled.ul.withConfig({ displayName: 'McpConnRows' })`
 	list-style: none;
 `
 
-const ConnRow = styled.li.withConfig({ displayName: 'McpConnRow' })`
+const ConnRow = styled.li`
 	display: flex;
 	align-items: flex-start;
 	gap: var(--space-md);
@@ -1129,7 +1127,7 @@ const ConnRow = styled.li.withConfig({ displayName: 'McpConnRow' })`
 	border: 1px solid color-mix(in oklab, var(--color-on-surface) 10%, transparent);
 `
 
-const ConnInfo = styled.div.withConfig({ displayName: 'McpConnInfo' })`
+const ConnInfo = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
@@ -1137,22 +1135,20 @@ const ConnInfo = styled.div.withConfig({ displayName: 'McpConnInfo' })`
 	min-width: 12rem;
 `
 
-const ConnName = styled.span.withConfig({ displayName: 'McpConnName' })`
+const ConnName = styled.span`
 	${stenciledTitle}
 	font-size: var(--typescale-title-small-size);
 	overflow: hidden;
 	text-overflow: ellipsis;
 `
 
-const ConnMeta = styled.span.withConfig({ displayName: 'McpConnMeta' })`
+const ConnMeta = styled.span`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface-variant);
 `
 
-const OrgsForConnection = styled.div.withConfig({
-	displayName: 'McpConnOrgs',
-})`
+const OrgsForConnection = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
@@ -1160,7 +1156,7 @@ const OrgsForConnection = styled.div.withConfig({
 	min-width: 12rem;
 `
 
-const OrgsLabel = styled.span.withConfig({ displayName: 'McpConnOrgsLabel' })`
+const OrgsLabel = styled.span`
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.06em;
@@ -1168,13 +1164,13 @@ const OrgsLabel = styled.span.withConfig({ displayName: 'McpConnOrgsLabel' })`
 	color: var(--color-on-surface-variant);
 `
 
-const OrgChips = styled.div.withConfig({ displayName: 'McpConnOrgChips' })`
+const OrgChips = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-2xs);
 `
 
-const OrgChip = styled.span.withConfig({ displayName: 'McpConnOrgChip' })`
+const OrgChip = styled.span`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-3xs);
@@ -1187,13 +1183,11 @@ const OrgChip = styled.span.withConfig({ displayName: 'McpConnOrgChip' })`
 	font-size: var(--typescale-body-small-size);
 `
 
-const OrgChipName = styled.span.withConfig({
-	displayName: 'McpConnOrgChipName',
-})`
+const OrgChipName = styled.span`
 	font-weight: var(--typescale-label-medium-weight);
 `
 
-const UnboundTag = styled.span.withConfig({ displayName: 'McpConnUnbound' })`
+const UnboundTag = styled.span`
 	display: inline-flex;
 	align-items: center;
 	padding: var(--space-3xs) var(--space-2xs);
@@ -1208,9 +1202,7 @@ const UnboundTag = styled.span.withConfig({ displayName: 'McpConnUnbound' })`
 
 // ── The organization picker ──
 
-const PickerLabel = styled.span.withConfig({
-	displayName: 'McpConnPickerLabel',
-})`
+const PickerLabel = styled.span`
 	display: block;
 	font-family: var(--font-body);
 	font-size: var(--typescale-label-medium-size);
@@ -1219,51 +1211,45 @@ const PickerLabel = styled.span.withConfig({
 	margin-bottom: var(--space-2xs);
 `
 
-const PickerList = styled.div.withConfig({ displayName: 'McpConnPickerList' })`
+const PickerList = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const PickerRow = styled.div.withConfig({
-	displayName: 'McpConnPickerRow',
-})<{ $blocked?: boolean }>`
+const PickerRow = styled.div<{ $blocked?: boolean }>`
 	display: flex;
 	align-items: flex-start;
 	gap: var(--space-2xs);
 	opacity: ${p => (p.$blocked ? 0.6 : 1)};
 `
 
-const PickerText = styled.span.withConfig({ displayName: 'McpConnPickerText' })`
+const PickerText = styled.span`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
 `
 
-const PickerName = styled.span.withConfig({ displayName: 'McpConnPickerName' })`
+const PickerName = styled.span`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	color: var(--color-on-surface);
 `
 
-const PickerReason = styled.span.withConfig({
-	displayName: 'McpConnPickerReason',
-})`
+const PickerReason = styled.span`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface-variant);
 `
 
-const PickerEmpty = styled.p.withConfig({ displayName: 'McpConnPickerEmpty' })`
+const PickerEmpty = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	color: var(--color-on-surface-variant);
 	margin: 0;
 `
 
-const PickerWarning = styled.p.withConfig({
-	displayName: 'McpConnPickerWarning',
-})`
+const PickerWarning = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	line-height: var(--typescale-body-small-line);
@@ -1278,16 +1264,14 @@ const PickerWarning = styled.p.withConfig({
 
 // A section rather than a plain box, so its heading reads as part of the
 // organization's connections rather than a separate top-level list.
-const BlockedGroup = styled.section.withConfig({
-	displayName: 'McpConnBlockedGroup',
-})`
+const BlockedGroup = styled.section`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 	margin-top: var(--space-md);
 `
 
-const SectionLead = styled.p.withConfig({ displayName: 'McpConnSectionLead' })`
+const SectionLead = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	line-height: var(--typescale-body-medium-line);
@@ -1295,15 +1279,13 @@ const SectionLead = styled.p.withConfig({ displayName: 'McpConnSectionLead' })`
 	margin: 0;
 `
 
-const MemberName = styled.span.withConfig({ displayName: 'McpConnMemberName' })`
+const MemberName = styled.span`
 	display: block;
 	font-weight: var(--typescale-label-medium-weight);
 	color: var(--color-on-surface);
 `
 
-const ConfirmActions = styled.div.withConfig({
-	displayName: 'McpConnConfirmActions',
-})`
+const ConfirmActions = styled.div`
 	display: flex;
 	justify-content: flex-end;
 	gap: var(--space-sm);

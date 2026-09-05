@@ -1,7 +1,7 @@
 import { useLingui } from '@lingui/react/macro'
 import { Link, useRouterState } from '@tanstack/react-router'
+import { styled } from 'next-yak'
 import { useEffect, useState } from 'react'
-import styled from 'styled-components'
 
 import { PriPopover } from '@batuda/ui/pri'
 
@@ -83,9 +83,7 @@ export function NavGroupKnob({ group }: { readonly group: NavGroup }) {
 	)
 }
 
-const KnobButton = styled.button.withConfig({
-	displayName: 'NavGroupKnobButton',
-})`
+const KnobButton = styled.button`
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -101,7 +99,7 @@ const KnobButton = styled.button.withConfig({
 	}
 `
 
-const GroupList = styled.ul.withConfig({ displayName: 'NavGroupList' })`
+const GroupList = styled.ul`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
@@ -111,7 +109,7 @@ const GroupList = styled.ul.withConfig({ displayName: 'NavGroupList' })`
 	list-style: none;
 `
 
-const GroupLink = styled(Link).withConfig({ displayName: 'NavGroupLink' })`
+const GroupLink = styled(Link)`
 	display: flex;
 	align-items: center;
 	gap: var(--space-sm);
