@@ -13,7 +13,7 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#: src/routes/pages/index.tsx
+#: src/routes/_authed/pages/index.tsx
 msgid "—"
 msgstr "—"
 
@@ -37,12 +37,12 @@ msgid "\"{0}\" will be removed for good. This can't be undone."
 msgstr "S'eliminarà «{0}» per sempre. Això no es pot desfer."
 
 #. placeholder {0}: confirmStack?.name ?? ''
-#: src/routes/settings/organization/templates.tsx
+#: src/routes/_authed/settings/organization/templates.tsx
 msgid "\"{0}\" will be removed for the organization. The templates stay; only this grouping goes."
 msgstr "S'eliminarà «{0}» per a l'organització. Les plantilles es mantenen; només desapareix aquesta agrupació."
 
 #. placeholder {0}: confirmStack?.name ?? ''
-#: src/routes/settings/profile/templates.tsx
+#: src/routes/_authed/settings/profile/templates.tsx
 msgid "\"{0}\" will be removed. Your templates stay; only this grouping goes."
 msgstr "S'eliminarà «{0}». Les teves plantilles es mantenen; només desapareix aquesta agrupació."
 
@@ -51,8 +51,8 @@ msgid "\"{templateName}\" becomes theirs. It leaves your library, and only they 
 msgstr "\"{templateName}\" passarà a ser seva. Sortirà de la teva biblioteca i només ells la poden tornar."
 
 #: src/components/companies/conversations-tab.tsx
-#: src/routes/emails/$threadId.tsx
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/$threadId.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "(no subject)"
 msgstr "(sense assumpte)"
 
@@ -61,7 +61,7 @@ msgid "(no summary)"
 msgstr "(sense resum)"
 
 #. placeholder {0}: needsReview.length
-#: src/routes/settings/organization/industries.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
 msgid "{0, plural, one {# came from research and nobody has read it yet.} other {# came from research and nobody has read them yet.}}"
 msgstr "{0, plural, one {# ve de la recerca i encara ningú no l'ha llegit.} other {# venen de la recerca i encara ningú no les ha llegit.}}"
 
@@ -91,7 +91,7 @@ msgid "{0, plural, one {# step run} other {# steps run}}"
 msgstr "{0, plural, one {# pas fet} other {# passos fets}}"
 
 #. placeholder {0}: counts[shelf]
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "{0, plural, one {# task} other {# tasks}}"
 msgstr "{0, plural, one {# tasca} other {# tasques}}"
 
@@ -111,17 +111,17 @@ msgid "{0} attendees"
 msgstr "{0} assistents"
 
 #. placeholder {0}: b.calls
-#: src/routes/settings/organization/spend.tsx
+#: src/routes/_authed/settings/organization/spend.tsx
 msgid "{0} calls"
 msgstr "{0} crides"
 
 #. placeholder {0}: run.pendingUpdateCount
-#: src/routes/index.tsx
+#: src/routes/_authed/index.tsx
 msgid "{0} changes to review"
 msgstr "{0} canvis per revisar"
 
 #. placeholder {0}: industry.companyCount
-#: src/routes/settings/organization/industries.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
 msgid "{0} companies"
 msgstr "{0} empreses"
 
@@ -131,12 +131,12 @@ msgid "{0} is already on file. Edit that one instead."
 msgstr "{0} ja hi és. Edita aquella en comptes d’afegir-la."
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "{0} is now the address you send from"
 msgstr "{0} ara és l'adreça des d'on envies"
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "{0} is the address you send from"
 msgstr "{0} és l'adreça des d'on envies"
 
@@ -152,12 +152,12 @@ msgid "{0} messages"
 msgstr "{0} missatges"
 
 #. placeholder {0}: thread.messageCount
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "{0} msgs"
 msgstr "{0} missatges"
 
 #. placeholder {0}: selectedPreset.name
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "{0} no longer allows password sign-in for mail apps, so it can't be connected here yet — it needs an OAuth sign-in. Pick another provider or use Generic IMAP."
 msgstr "{0} ja no permet iniciar la sessió amb contrasenya a les aplicacions de correu, així que de moment no es pot connectar aquí: necessita un inici de sessió OAuth. Tria un altre proveïdor o fes servir IMAP genèric."
 
@@ -180,33 +180,33 @@ msgid "{0} selected"
 msgstr "{0} seleccionats"
 
 #. placeholder {0}: failedIds.length
-#: src/routes/emails/index.tsx
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "{0} thread could not be updated."
 msgstr "No s'han pogut actualitzar {0} fils."
 
 #. placeholder {0}: t(shelfCopy(selectedShelf).label)
 #. placeholder {1}: visibleTasks.length
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "{0}: showing {1} of {shelfTotal} tasks."
 msgstr "{0}: es mostren {1} de {shelfTotal} tasques."
 
-#: src/routes/settings/organization/members.tsx
+#: src/routes/_authed/settings/organization/members.tsx
 msgid "{addedEmail} is now a member. They've been emailed."
 msgstr "{addedEmail} ja és membre. Se li ha enviat un correu."
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "{confirmLabel}'s assistant stops reaching this organization on its next request. It keeps working in any other organization they belong to, and they can't undo this themselves."
 msgstr "L'assistent de {confirmLabel} deixarà d'accedir a aquesta organització a la següent petició. Continuarà funcionant a qualsevol altra organització de la qual formi part, i no ho podrà desfer pel seu compte."
 
-#: src/routes/companies/index.tsx
-#: src/routes/companies/index.tsx
-#: src/routes/companies/index.tsx
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "{count} companies"
 msgstr "{count} empreses"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "{count} people went with it"
 msgstr "S'hi han endut {count} persones"
 
@@ -222,7 +222,7 @@ msgstr "{entered} han entrat als registres, {leftover} encara et necessiten."
 msgid "{groupLabel} sections"
 msgstr "Seccions de {groupLabel}"
 
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "{name} is back"
 msgstr "{name} ha tornat"
 
@@ -234,35 +234,35 @@ msgstr "S'hi han afegit {peopleAdded} persones"
 msgid "{scoped} (default)"
 msgstr "{scoped} (per defecte)"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "{selectedCount} threads selected"
 msgstr "{selectedCount} fils seleccionats"
 
-#: src/routes/settings/organization/policy.tsx
+#: src/routes/_authed/settings/organization/policy.tsx
 msgid "{threshold}%"
 msgstr "{threshold}%"
 
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "{total} companies"
 msgstr "{total} empreses"
 
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "{total} companies with filters applied"
 msgstr "{total} empreses amb filtres aplicats"
 
-#: src/routes/documents/index.tsx
+#: src/routes/_authed/documents/index.tsx
 msgid "{total} documents"
 msgstr "{total} documents"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "{total} threads"
 msgstr "{total} fils"
 
-#: src/routes/settings/organization/members.tsx
+#: src/routes/_authed/settings/organization/members.tsx
 msgid "{trimmed} is already in this organization."
 msgstr "{trimmed} ja és en aquesta organització."
 
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "{who} wrote:"
 msgstr "{who} va escriure:"
 
@@ -270,11 +270,11 @@ msgstr "{who} va escriure:"
 msgid "+{remaining} more"
 msgstr "+{remaining} més"
 
-#: src/routes/settings/mcp/index.tsx
+#: src/routes/_authed/settings/mcp/index.tsx
 msgid "<0>ChatGPT:</0> Settings → Connectors → turn on Developer mode → add the URL above and choose OAuth. (Plus, Pro, Business, Enterprise, or Edu.)"
 msgstr "<0>ChatGPT:</0> Configuració → Connectors → activa el mode desenvolupador → afegeix l'URL de dalt i tria OAuth. (Plus, Pro, Business, Enterprise o Edu.)"
 
-#: src/routes/settings/mcp/index.tsx
+#: src/routes/_authed/settings/mcp/index.tsx
 msgid "<0>Claude.ai:</0> Settings → Connectors → Add custom connector → paste the URL above."
 msgstr "<0>Claude.ai:</0> Configuració → Connectors → Afegeix un connector personalitzat → enganxa l'URL de dalt."
 
@@ -282,16 +282,16 @@ msgstr "<0>Claude.ai:</0> Configuració → Connectors → Afegeix un connector 
 msgid "1 attendee"
 msgstr "1 assistent"
 
-#: src/routes/settings/organization/spend.tsx
+#: src/routes/_authed/settings/organization/spend.tsx
 msgid "1 call"
 msgstr "1 crida"
 
-#: src/routes/companies/index.tsx
-#: src/routes/settings/organization/industries.tsx
+#: src/routes/_authed/companies/index.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
 msgid "1 company"
 msgstr "1 empresa"
 
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "1 company with filters applied"
 msgstr "1 empresa amb els filtres aplicats"
 
@@ -299,7 +299,7 @@ msgstr "1 empresa amb els filtres aplicats"
 msgid "1 message"
 msgstr "1 missatge"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "1 msg"
 msgstr "1 missatge"
 
@@ -307,15 +307,15 @@ msgstr "1 missatge"
 msgid "1 person added"
 msgstr "S'hi ha afegit 1 persona"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "1 person went with it"
 msgstr "S'hi ha endut 1 persona"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "1 thread"
 msgstr "1 fil"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "1 thread selected"
 msgstr "1 fil seleccionat"
 
@@ -335,7 +335,7 @@ msgstr "90%+"
 msgid "A \"Re:\" on a message that answers nothing reads as a forged reply. Reply from the conversation, or drop the \"Re:\"."
 msgstr "Un \"Re:\" en un missatge que no respon res es llegeix com una resposta falsificada. Respon des de la conversa, o treu-li el \"Re:\"."
 
-#: src/routes/index.tsx
+#: src/routes/_authed/index.tsx
 msgid "A high-priority company that has gone quiet is listed once, under Needs attention."
 msgstr "Una empresa prioritària que ha quedat en silenci apareix un sol cop, a Necessita atenció."
 
@@ -347,7 +347,7 @@ msgstr "Una etiqueta curta. Si vols, comença-la amb un [tag] com ara [research]
 msgid "A stack with that name already exists."
 msgstr "Ja existeix una pila amb aquest nom."
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "A team member"
 msgstr "Algú de l'equip"
 
@@ -355,8 +355,8 @@ msgstr "Algú de l'equip"
 msgid "About"
 msgstr "Sobre l'empresa"
 
-#: src/routes/calendar/index.tsx
-#: src/routes/settings/organization/industries.tsx
+#: src/routes/_authed/calendar/index.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
 msgid "Accept"
 msgstr "Accepta"
 
@@ -378,7 +378,7 @@ msgid "acme.com"
 msgstr "acme.com"
 
 #. placeholder {0}: provider.length
-#: src/routes/settings/organization/spend.tsx
+#: src/routes/_authed/settings/organization/spend.tsx
 msgid "across {0} providers"
 msgstr "en {0} proveïdors"
 
@@ -386,9 +386,9 @@ msgstr "en {0} proveïdors"
 msgid "Across companies in stage"
 msgstr "A través d'empreses en l'etapa"
 
-#: src/routes/emails/inboxes.tsx
-#: src/routes/settings/mcp/connections.tsx
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Actions"
 msgstr "Accions"
 
@@ -401,8 +401,8 @@ msgstr "Accions per a {0}"
 msgid "Active client"
 msgstr "Client actiu"
 
-#: src/routes/index.tsx
-#: src/routes/index.tsx
+#: src/routes/_authed/index.tsx
+#: src/routes/_authed/index.tsx
 msgid "Active companies"
 msgstr "Empreses actives"
 
@@ -411,12 +411,12 @@ msgid "Active organization"
 msgstr "Organització activa"
 
 #. placeholder {0}: visibleTimeline.length
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Activity loaded: {0}"
 msgstr "Activitat carregada: {0}"
 
 #: src/components/contacts/manage-channels-dialog.tsx
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Add"
 msgstr "Afegeix"
 
@@ -443,7 +443,7 @@ msgstr "Afegeix {label}"
 msgid "Add a location on the Profile tab, then locate this company."
 msgstr "Afegeix una ubicació a la pestanya de perfil i després localitza aquesta empresa."
 
-#: src/routes/settings/organization/members.tsx
+#: src/routes/_authed/settings/organization/members.tsx
 msgid "Add a member"
 msgstr "Afegeix un membre"
 
@@ -455,7 +455,7 @@ msgstr "Posa un nom i les instruccions abans de desar."
 msgid "Add a template"
 msgstr "Afegeix una plantilla"
 
-#: src/routes/settings/organization/templates.tsx
+#: src/routes/_authed/settings/organization/templates.tsx
 msgid "Add an org template first."
 msgstr "Afegeix primer una plantilla de l'organització."
 
@@ -480,7 +480,7 @@ msgid "Add Cc / Bcc"
 msgstr "Afegeix Cc / Bcc"
 
 #: src/components/contacts/contact-edit-dialog.tsx
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Add contact"
 msgstr "Afegeix contacte"
 
@@ -493,8 +493,8 @@ msgstr "Afegeix document"
 msgid "Add line"
 msgstr "Afegeix línia"
 
-#: src/routes/settings/organization/members.tsx
-#: src/routes/settings/organization/members.tsx
+#: src/routes/_authed/settings/organization/members.tsx
+#: src/routes/_authed/settings/organization/members.tsx
 msgid "Add member"
 msgstr "Afegeix membre"
 
@@ -502,7 +502,7 @@ msgstr "Afegeix membre"
 msgid "Add task"
 msgstr "Afegeix tasca"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Add the first decision-maker to keep track of who to reach."
 msgstr "Afegeix el primer responsable de decisió per saber a qui adreçar-te."
 
@@ -510,8 +510,8 @@ msgstr "Afegeix el primer responsable de decisió per saber a qui adreçar-te."
 msgid "Add to the org default"
 msgstr "Amplia el valor per defecte de l'organització"
 
-#: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Added"
 msgstr "Afegit"
 
@@ -540,7 +540,7 @@ msgid "Added, but could not be marked verified, leaving out: {left}"
 msgstr "Afegit, però no s'ha pogut marcar com a verificat; s'ha deixat fora: {left}"
 
 #: src/components/research/findings/prospect-scan-view.tsx
-#: src/routes/settings/organization/members.tsx
+#: src/routes/_authed/settings/organization/members.tsx
 msgid "Adding…"
 msgstr "S'està afegint…"
 
@@ -550,34 +550,34 @@ msgstr "S'està afegint…"
 msgid "Address"
 msgstr "Adreça"
 
-#: src/routes/settings/organization/members.tsx
-#: src/routes/settings/organization/members.tsx
+#: src/routes/_authed/settings/organization/members.tsx
+#: src/routes/_authed/settings/organization/members.tsx
 msgid "Admin"
 msgstr "Admin"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Advanced settings (IMAP / SMTP)"
 msgstr "Configuració avançada (IMAP / SMTP)"
 
-#: src/routes/settings/mcp/index.tsx
+#: src/routes/_authed/settings/mcp/index.tsx
 msgid "After approving, manage which org each one acts in here."
 msgstr "Després d'aprovar-lo, gestiona aquí en quina organització actua cadascun."
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "AI assistants you've connected over MCP. Each works in the organizations you choose for it — usually one, since most assistants cannot say which they mean when there are several."
 msgstr "Assistents d'IA que has connectat per MCP. Cadascun treballa a les organitzacions que li triïs — normalment una, perquè la majoria d'assistents no poden dir a quina es refereixen quan n'hi ha diverses."
 
-#: src/routes/companies/index.tsx
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/companies/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "All"
 msgstr "Tots"
 
-#: src/routes/emails/index.tsx
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "All inboxes"
 msgstr "Totes les safates"
 
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "All industries"
 msgstr "Tots els sectors"
 
@@ -585,24 +585,24 @@ msgstr "Tots els sectors"
 msgid "All runs"
 msgstr "Totes les execucions"
 
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "All stages"
 msgstr "Totes les etapes"
 
-#: src/routes/pages/index.tsx
+#: src/routes/_authed/pages/index.tsx
 msgid "All statuses"
 msgstr "Tots els estats"
 
-#: src/routes/settings/organization/spend.tsx
+#: src/routes/_authed/settings/organization/spend.tsx
 msgid "All time"
 msgstr "Tot el temps"
 
-#: src/routes/index.tsx
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "All under control"
 msgstr "Tot sota control"
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "All your organizations"
 msgstr "Totes les teves organitzacions"
 
@@ -610,11 +610,11 @@ msgstr "Totes les teves organitzacions"
 msgid "Allow"
 msgstr "Permet"
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Allow again"
 msgstr "Torna-hi a permetre"
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Allow again — {memberLabel}'s {assistantLabel}"
 msgstr "Torna a permetre — {assistantLabel} de {memberLabel}"
 
@@ -648,11 +648,11 @@ msgstr "Una adreça no pot estar en blanc."
 msgid "An AI assistant wants to connect to your Batuda account over MCP and act on your behalf. Only approve assistants you trust."
 msgstr "Un assistent d'IA vol connectar-se al teu compte de Batuda per MCP i actuar en nom teu. Aprova només els assistents en qui confiïs."
 
-#: src/routes/settings/organization/templates.tsx
+#: src/routes/_authed/settings/organization/templates.tsx
 msgid "An org stack runs for every member who hasn't set their own. The one marked default applies to a run that names none. Only org templates can go in an org stack."
 msgstr "Una pila de l'organització s'aplica a tots els membres que no n'han definit una de pròpia. La marcada per defecte s'aplica quan una execució no n'anomena cap. En una pila de l'organització només hi poden anar plantilles de l'organització."
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "An owner removed this one. Ask them to allow it again."
 msgstr "Un propietari l’ha tret. Demana-li que hi torni a permetre l’accés."
 
@@ -660,11 +660,11 @@ msgstr "Un propietari l’ha tret. Demana-li que hi torni a permetre l’accés.
 msgid "and {hidden} more on the run"
 msgstr "i {hidden} més a l'execució"
 
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "Another company may be using its name now."
 msgstr "Pot ser que una altra empresa n'estigui fent servir el nom."
 
-#: src/routes/settings/organization/industries.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
 msgid "Another industry may already go by that name — merge them instead."
 msgstr "Pot ser que ja hi hagi una altra indústria amb aquest nom: fusiona-les."
 
@@ -672,7 +672,7 @@ msgstr "Pot ser que ja hi hagi una altra indústria amb aquest nom: fusiona-les.
 msgid "Any"
 msgstr "Qualsevol"
 
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Any agent using \"{confirmLabel}\" will stop working. This can't be undone."
 msgstr "Qualsevol agent que faci servir \"{confirmLabel}\" deixarà de funcionar. Això no es pot desfer."
 
@@ -680,21 +680,21 @@ msgstr "Qualsevol agent que faci servir \"{confirmLabel}\" deixarà de funcionar
 msgid "Any confidence"
 msgstr "Qualsevol confiança"
 
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "Any priority"
 msgstr "Qualsevol prioritat"
 
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "Anything"
 msgstr "Qualsevol"
 
-#: src/routes/settings/api-keys/index.tsx
-#: src/routes/settings/profile/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 msgid "API keys"
 msgstr "Claus d'API"
 
 #: src/components/profile/theme-select.tsx
-#: src/routes/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 msgid "Appearance"
 msgstr "Aparença"
 
@@ -762,18 +762,18 @@ msgstr "Aprova"
 msgid "Approve {0}"
 msgstr "Aprova {0}"
 
-#: src/routes/emails/$threadId.tsx
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/$threadId.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Archive"
 msgstr "Arxiva"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Archive thread"
 msgstr "Arxiva el fil"
 
 #: src/components/companies/conversations-tab.tsx
-#: src/routes/emails/$threadId.tsx
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/$threadId.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Archived"
 msgstr "Arxivat"
 
@@ -790,7 +790,7 @@ msgstr "Hi dona suport internament"
 msgid "as of"
 msgstr "a data de"
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Ask an owner or admin to allow yours back"
 msgstr "Demana a un propietari o administrador que torni a permetre el teu"
 
@@ -810,12 +810,12 @@ msgstr "Assigna"
 msgid "Assign to me"
 msgstr "Assigna-me'l"
 
-#: src/routes/settings/mcp/connections.tsx
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Assistant"
 msgstr "Assistent"
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Assistants this organization has stopped. Allowing one back lets it reach this organization again from its next request, and nothing else — it can never reach an organization its owner has not chosen."
 msgstr "Assistents que aquesta organització ha aturat. Si en tornes a permetre un, podrà accedir a aquesta organització a partir de la petició següent, i a res més: mai no podrà accedir a una organització que el seu propietari no hagi triat."
 
@@ -827,12 +827,12 @@ msgstr "Almenys un d'aquests resultats s'ha de llegir abans de fer-lo servir. Ob
 msgid "Attach"
 msgstr "Adjunta"
 
-#: src/routes/emails/$threadId.tsx
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "attachment"
 msgstr "adjunt"
 
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "Attention"
 msgstr "Atenció"
 
@@ -841,19 +841,19 @@ msgstr "Atenció"
 msgid "Attention needed"
 msgstr "Requereix atenció"
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Audit log"
 msgstr "Registre d'auditoria"
 
-#: src/routes/settings/organization/policy.tsx
+#: src/routes/_authed/settings/organization/policy.tsx
 msgid "Auto-apply"
 msgstr "Aplica automàticament"
 
-#: src/routes/settings/organization/policy.tsx
+#: src/routes/_authed/settings/organization/policy.tsx
 msgid "Auto-apply verified findings"
 msgstr "Aplica automàticament les conclusions verificades"
 
-#: src/routes/settings/organization/policy.tsx
+#: src/routes/_authed/settings/organization/policy.tsx
 msgid "Auto-approve paid calls under"
 msgstr "Aprova automàticament les crides de pagament per sota de"
 
@@ -861,27 +861,27 @@ msgstr "Aprova automàticament les crides de pagament per sota de"
 msgid "Back"
 msgstr "Enrere"
 
-#: src/routes/settings/profile/templates.tsx
+#: src/routes/_authed/settings/profile/templates.tsx
 msgid "Back to account"
 msgstr "Torna al compte"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Back to emails"
 msgstr "Torna als correus"
 
-#: src/routes/emails/$threadId.tsx
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "Back to inbox"
 msgstr "Torna a la safata"
 
-#: src/routes/settings/organization/members.tsx
-#: src/routes/settings/organization/policy.tsx
-#: src/routes/settings/organization/spend.tsx
-#: src/routes/settings/organization/templates.tsx
+#: src/routes/_authed/settings/organization/members.tsx
+#: src/routes/_authed/settings/organization/policy.tsx
+#: src/routes/_authed/settings/organization/spend.tsx
+#: src/routes/_authed/settings/organization/templates.tsx
 msgid "Back to organization"
 msgstr "Tornar a l'organització"
 
-#: src/routes/research/$id.tsx
+#: src/routes/_authed/research/$id.tsx
 msgid "Back to research"
 msgstr "Torna a la recerca"
 
@@ -889,9 +889,9 @@ msgstr "Torna a la recerca"
 msgid "Back to review queue"
 msgstr "Torna a la cua de revisió"
 
-#: src/routes/settings/api-keys/index.tsx
-#: src/routes/settings/mcp/connections.tsx
-#: src/routes/settings/mcp/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/index.tsx
 msgid "Back to settings"
 msgstr "Torna a la configuració"
 
@@ -925,15 +925,15 @@ msgstr "Batuda és només amb invitació. Demana accés a l'equip d'Engranatge."
 msgid "Bcc"
 msgstr "Bcc"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Belongs to another member"
 msgstr "És d'un altre membre"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Blocked"
 msgstr "Bloquejat"
 
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "Blocked by the provider. The body is shown for review only."
 msgstr "Bloquejat pel proveïdor. El cos es mostra només per revisar-lo."
 
@@ -949,7 +949,7 @@ msgstr "Tauler"
 msgid "Bold"
 msgstr "Negreta"
 
-#: src/routes/calendar/index.tsx
+#: src/routes/_authed/calendar/index.tsx
 msgid "Book a meeting from a company page or forward an invitation to your inbox to see it here."
 msgstr "Reserva una reunió des d'una pàgina d'empresa o reenvia una invitació a la teva safata per veure-la aquí."
 
@@ -958,8 +958,8 @@ msgid "bounced"
 msgstr "rebotat"
 
 #: src/components/companies/company-channels-section.tsx
-#: src/routes/companies/$slug.tsx
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/companies/$slug.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "Bounced"
 msgstr "Rebotat"
 
@@ -975,7 +975,7 @@ msgstr "Resum breu (opcional)"
 msgid "Bulk actions"
 msgstr "Accions massives"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Bulk thread actions"
 msgstr "Accions massives de fils"
 
@@ -983,35 +983,35 @@ msgstr "Accions massives de fils"
 msgid "Bullet list"
 msgstr "Llista de punts"
 
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "by {creatorName}"
 msgstr "per {creatorName}"
 
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "By last contact"
 msgstr "Per últim contacte"
 
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "By last update"
 msgstr "Per última actualització"
 
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "By name"
 msgstr "Per nom"
 
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "By priority"
 msgstr "Per prioritat"
 
-#: src/routes/settings/organization/spend.tsx
+#: src/routes/_authed/settings/organization/spend.tsx
 msgid "By provider"
 msgstr "Per proveïdor"
 
-#: src/routes/settings/organization/spend.tsx
+#: src/routes/_authed/settings/organization/spend.tsx
 msgid "By tool"
 msgstr "Per eina"
 
-#: src/routes/settings/organization/spend.tsx
+#: src/routes/_authed/settings/organization/spend.tsx
 msgid "By user"
 msgstr "Per usuari"
 
@@ -1022,7 +1022,7 @@ msgstr "Cadència"
 
 #: src/components/companies/conversations-tab.tsx
 #: src/components/layout/nav-items.ts
-#: src/routes/calendar/index.tsx
+#: src/routes/_authed/calendar/index.tsx
 msgid "Calendar"
 msgstr "Calendari"
 
@@ -1036,11 +1036,11 @@ msgstr "Trucada"
 msgid "Call notes"
 msgstr "Notes de trucada"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Call phone"
 msgstr "Truca al telèfon"
 
-#: src/routes/settings/organization/spend.tsx
+#: src/routes/_authed/settings/organization/spend.tsx
 msgid "Calls"
 msgstr "Crides"
 
@@ -1059,13 +1059,13 @@ msgstr "Crides"
 #: src/components/research/review/proposed-updates-review.tsx
 #: src/components/research/run-actions.tsx
 #: src/components/shared/delete-confirm.tsx
-#: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
-#: src/routes/settings/api-keys/index.tsx
-#: src/routes/settings/mcp/connections.tsx
-#: src/routes/settings/mcp/connections.tsx
-#: src/routes/settings/organization/industries.tsx
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Cancel"
 msgstr "Cancel·la"
 
@@ -1091,36 +1091,36 @@ msgid "Catch-all"
 msgstr "Genèric"
 
 #: src/components/emails/compose-form.tsx
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "Cc"
 msgstr "Cc"
 
-#: src/routes/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 msgid "Change my mind — set a password anyway"
 msgstr "Canvio d'opinió — vull posar contrasenya"
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Change organizations"
 msgstr "Canvia les organitzacions"
 
-#: src/routes/settings/profile/index.tsx
-#: src/routes/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 msgid "Change password"
 msgstr "Canvia la contrasenya"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Change password (re-probes the connection)"
 msgstr "Canvia la contrasenya (reprova la connexió)"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Change priority"
 msgstr "Canvia la prioritat"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Change status"
 msgstr "Canvia l'estat"
 
-#: src/routes/pages/$id.tsx
+#: src/routes/_authed/pages/$id.tsx
 msgid "Changes have been saved."
 msgstr "S'han desat els canvis."
 
@@ -1136,11 +1136,11 @@ msgstr "Canal"
 msgid "Channels — {contactName}"
 msgstr "Canals — {contactName}"
 
-#: src/routes/settings/mcp/index.tsx
+#: src/routes/_authed/settings/mcp/index.tsx
 msgid "Chat interfaces (OAuth)"
 msgstr "Interfícies de xat (OAuth)"
 
-#: src/routes/settings/mcp/index.tsx
+#: src/routes/_authed/settings/mcp/index.tsx
 msgid "ChatGPT and Claude.ai can't send a key, so they connect over OAuth. Add this server by URL, approve it, and it appears under your connections."
 msgstr "ChatGPT i Claude.ai no poden enviar una clau, així que es connecten amb OAuth. Afegeix aquest servidor per URL, aprova'l i apareixerà a les teves connexions."
 
@@ -1149,12 +1149,12 @@ msgstr "ChatGPT i Claude.ai no poden enviar una clau, així que es connecten amb
 msgid "Check your inbox"
 msgstr "Mira la safata d'entrada"
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Choose organizations"
 msgstr "Tria les organitzacions"
 
-#: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Choose primary inbox"
 msgstr "Tria la bústia principal"
 
@@ -1162,34 +1162,34 @@ msgstr "Tria la bústia principal"
 msgid "Choose someone in your organization"
 msgstr "Tria algú de la teva organització"
 
-#: src/routes/settings/mcp/index.tsx
+#: src/routes/_authed/settings/mcp/index.tsx
 msgid "Claude Desktop can't reach a remote server directly, so this bridges through <0>mcp-remote</0> (needs Node installed). Or add it as an OAuth connector instead."
 msgstr "Claude Desktop no es pot connectar directament a un servidor remot, així que això fa de pont amb <0>mcp-remote</0> (cal tenir Node instal·lat). O afegeix-lo com a connector OAuth."
 
 #: src/components/companies/pipeline-board.tsx
 #: src/components/shared/multi-select-filter.tsx
 #: src/components/shared/task-item.tsx
-#: src/routes/companies/$slug.tsx
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/companies/$slug.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Clear"
 msgstr "Neteja"
 
-#: src/routes/companies/index.tsx
-#: src/routes/companies/index.tsx
-#: src/routes/emails/index.tsx
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
+#: src/routes/_authed/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Clear filters"
 msgstr "Neteja els filtres"
 
-#: src/routes/settings/organization/templates.tsx
+#: src/routes/_authed/settings/organization/templates.tsx
 msgid "Clear the org default"
 msgstr "Esborra el valor per defecte de l'organització"
 
-#: src/routes/settings/organization/templates.tsx
+#: src/routes/_authed/settings/organization/templates.tsx
 msgid "Clear the org default?"
 msgstr "Vols esborrar el valor per defecte de l'organització?"
 
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "Clicked"
 msgstr "Clicat"
 
@@ -1208,14 +1208,14 @@ msgstr "Client"
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/components/research/research-dialog.tsx
 #: src/routes/__root.tsx
-#: src/routes/calendar/index.tsx
-#: src/routes/emails/$threadId.tsx
-#: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
-#: src/routes/emails/index.tsx
-#: src/routes/settings/organization/members.tsx
-#: src/routes/settings/organization/members.tsx
+#: src/routes/_authed/calendar/index.tsx
+#: src/routes/_authed/emails/$threadId.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/emails/index.tsx
+#: src/routes/_authed/settings/organization/members.tsx
+#: src/routes/_authed/settings/organization/members.tsx
 msgid "Close"
 msgstr "Tanca"
 
@@ -1223,14 +1223,14 @@ msgstr "Tanca"
 msgid "Close draft"
 msgstr "Tanca l'esborrany"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Close thread"
 msgstr "Tanca el fil"
 
 #: src/components/companies/conversations-tab.tsx
 #: src/components/shared/status-badge.tsx
-#: src/routes/emails/$threadId.tsx
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/$threadId.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Closed"
 msgstr "Tancat"
 
@@ -1242,7 +1242,7 @@ msgstr "Tancat — guanyat o perdut"
 msgid "Code"
 msgstr "Codi"
 
-#: src/routes/settings/mcp/index.tsx
+#: src/routes/_authed/settings/mcp/index.tsx
 msgid "Coding tools (API key)"
 msgstr "Eines de programació (clau API)"
 
@@ -1250,11 +1250,11 @@ msgstr "Eines de programació (clau API)"
 msgid "Cold lead — no contact yet"
 msgstr "Pista freda — encara sense contacte"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Collapse"
 msgstr "Plega"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Columns"
 msgstr "Columnes"
 
@@ -1268,24 +1268,24 @@ msgid "Comms"
 msgstr "Comunicació"
 
 #: src/components/layout/nav-items.ts
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "Companies"
 msgstr "Empreses"
 
-#: src/routes/index.tsx
+#: src/routes/_authed/index.tsx
 msgid "Companies marked hot with nothing scheduled at all. One that has also gone quiet is listed above instead, so it is only asked after once."
 msgstr "Empreses marcades com a prioritàries sense res programat. Si a més ha quedat en silenci, apareix a dalt, així només se li reclama un cop."
 
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/components/research/run-labels.ts
-#: src/routes/emails/$threadId.tsx
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "Company"
 msgstr "Empresa"
 
-#: src/routes/companies/$slug.tsx
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Company deleted"
 msgstr "Empresa suprimida"
 
@@ -1293,7 +1293,7 @@ msgstr "Empresa suprimida"
 msgid "Company enrichment"
 msgstr "Enriquiment d'empresa"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Company restored"
 msgstr "Empresa restaurada"
 
@@ -1315,17 +1315,17 @@ msgid "complained"
 msgstr "marcat com a brossa"
 
 #: src/components/companies/company-channels-section.tsx
-#: src/routes/companies/$slug.tsx
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/companies/$slug.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "Complained"
 msgstr "Marcat com a brossa"
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Complete"
 msgstr "Completa"
 
 #: src/components/companies/conversations-tab.tsx
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Compose"
 msgstr "Redacta"
 
@@ -1347,30 +1347,30 @@ msgstr "Confirma aplicar-ne {verifiedToApply}"
 msgid "Confirmed"
 msgstr "Confirmat"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Connect a mailbox to start"
 msgstr "Connecta una bústia per començar"
 
-#: src/routes/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 msgid "Connect AI tools"
 msgstr "Connecta eines d'IA"
 
-#: src/routes/settings/mcp/index.tsx
+#: src/routes/_authed/settings/mcp/index.tsx
 msgid "Connect AI tools over MCP"
 msgstr "Connecta eines d'IA amb MCP"
 
-#: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Connect an email"
 msgstr "Connecta un correu"
 
-#: src/routes/emails/inboxes.tsx
-#: src/routes/emails/index.tsx
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Connect mailbox"
 msgstr "Connecta una bústia"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Connect the email address you use with customers, so you can send and receive right here."
 msgstr "Connecta l'adreça de correu que fas servir amb els clients perquè puguis enviar i rebre des d'aquí."
 
@@ -1378,16 +1378,16 @@ msgstr "Connecta l'adreça de correu que fas servir amb els clients perquè pugu
 msgid "Connect to Batuda?"
 msgstr "Connectar a Batuda?"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Connect your email to get started"
 msgstr "Connecta el teu correu per començar"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Connected"
 msgstr "Connectada"
 
 #. placeholder {0}: formatDate(row.createdAt)
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Connected {0}"
 msgstr "Connectat {0}"
 
@@ -1395,20 +1395,20 @@ msgstr "Connectat {0}"
 msgid "Connecting…"
 msgstr "Connectant…"
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Connection allowed again"
 msgstr "Connexió permesa de nou"
 
-#: src/routes/settings/mcp/connections.tsx
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Connection revoked"
 msgstr "Connexió revocada"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Connection tested"
 msgstr "Connexió provada"
 
-#: src/routes/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 msgid "Connections"
 msgstr "Connexions"
 
@@ -1424,7 +1424,7 @@ msgstr "Descoberta de contactes"
 msgid "Contacted"
 msgstr "Contactat"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Contacted — set the next action (a follow-up date)."
 msgstr "Contactat — defineix la següent acció (una data de seguiment)."
 
@@ -1437,11 +1437,11 @@ msgid "Contacts found"
 msgstr "Contactes trobats"
 
 #. placeholder {0}: contacts.length
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Contacts loaded: {0}"
 msgstr "Contactes carregats: {0}"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Content"
 msgstr "Contingut"
 
@@ -1454,8 +1454,8 @@ msgstr "Contingut (Markdown)"
 msgid "Controls access"
 msgstr "Controla l'accés"
 
-#: src/routes/companies/$slug.tsx
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Conversations"
 msgstr "Converses"
 
@@ -1463,8 +1463,8 @@ msgstr "Converses"
 msgid "Coordinates saved from the geocoder."
 msgstr "Coordenades desades del geocodificador."
 
-#: src/routes/settings/api-keys/index.tsx
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Copied"
 msgstr "Copiada"
 
@@ -1473,7 +1473,7 @@ msgid "Copied {label}"
 msgstr "S'ha copiat {label}"
 
 #: src/components/instructions/template-dialog.tsx
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Copy"
 msgstr "Copia"
 
@@ -1481,7 +1481,7 @@ msgstr "Copia"
 msgid "Copy {label}"
 msgstr "Copia {label}"
 
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Copy failed"
 msgstr "No s'ha pogut copiar"
 
@@ -1489,7 +1489,7 @@ msgstr "No s'ha pogut copiar"
 msgid "Copy slug"
 msgstr "Copia el slug"
 
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Copy your key now"
 msgstr "Copia la teva clau ara"
 
@@ -1498,11 +1498,11 @@ msgid "Could be more than one person on file"
 msgstr "Podria ser més d'una persona de les que tens fitxades"
 
 #. placeholder {0}: industry.label
-#: src/routes/settings/organization/industries.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
 msgid "Could not accept {0}"
 msgstr "No s’ha pogut acceptar {0}"
 
-#: src/routes/settings/organization/members.tsx
+#: src/routes/_authed/settings/organization/members.tsx
 msgid "Could not add {trimmed}. Please try again."
 msgstr "No s'ha pogut afegir {trimmed}. Torna-ho a provar."
 
@@ -1514,7 +1514,7 @@ msgstr "No s'ha pogut afegir {value}"
 msgid "Could not add as a lead"
 msgstr "No s'ha pogut afegir com a oportunitat"
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Could not allow it again"
 msgstr "No s’ha pogut tornar a permetre"
 
@@ -1540,8 +1540,8 @@ msgstr "No s'ha pogut canviar {0}"
 msgid "Could not change owner"
 msgstr "No s'ha pogut canviar el responsable"
 
-#: src/routes/companies/$slug.tsx
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Could not clear suppression"
 msgstr "No s'''ha pogut esborrar la supressió"
 
@@ -1553,15 +1553,15 @@ msgstr "No s'ha pogut completar la connexió. Torna-ho a provar."
 msgid "Could not create the follow-up. Try again."
 msgstr "No s'ha pogut crear el seguiment. Torna-ho a provar."
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Could not create the inbox. Check transport or credentials."
 msgstr "No s'ha pogut crear la bústia. Revisa el transport o les credencials."
 
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Could not create the key. Please try again."
 msgstr "No s'ha pogut crear la clau. Torna-ho a provar."
 
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Could not delete the key. Please try again."
 msgstr "No s'ha pogut eliminar la clau. Torna-ho a provar."
 
@@ -1569,7 +1569,7 @@ msgstr "No s'ha pogut eliminar la clau. Torna-ho a provar."
 msgid "Could not delete the run"
 msgstr "No s'ha pogut eliminar l'execució"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Could not delete this company"
 msgstr "No s'ha pogut suprimir aquesta empresa"
 
@@ -1577,15 +1577,15 @@ msgstr "No s'ha pogut suprimir aquesta empresa"
 msgid "Could not load — retry"
 msgstr "No s'ha pogut carregar — torna-ho a provar"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Could not load activity"
 msgstr "No s'ha pogut carregar l'activitat"
 
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "Could not load companies"
 msgstr "No s'han pogut carregar les empreses"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Could not load contacts"
 msgstr "No s'han pogut carregar els contactes"
 
@@ -1597,7 +1597,7 @@ msgstr "No s'han pogut carregar els documents"
 msgid "Could not load emails"
 msgstr "No s'han pogut carregar els correus"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Could not load inboxes"
 msgstr "No s'han pogut carregar les safates"
 
@@ -1610,8 +1610,8 @@ msgstr "No s'han pogut carregar les reunions"
 msgid "Could not load more. The rows already here are still current."
 msgstr "No s'han pogut carregar més files. Les que ja hi ha continuen sent vàlides."
 
-#: src/routes/companies/$slug.tsx
-#: src/routes/pages/index.tsx
+#: src/routes/_authed/companies/$slug.tsx
+#: src/routes/_authed/pages/index.tsx
 msgid "Could not load pages"
 msgstr "No s'han pogut carregar les pàgines"
 
@@ -1619,11 +1619,11 @@ msgstr "No s'han pogut carregar les pàgines"
 msgid "Could not load proposals"
 msgstr "No s'han pogut carregar les propostes"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Could not load research"
 msgstr "No s'ha pogut carregar la recerca"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Could not load tasks"
 msgstr "No s'han pogut carregar les tasques"
 
@@ -1635,11 +1635,11 @@ msgstr "No s'ha pogut carregar el tauler"
 msgid "Could not load the companies. Close this and try again."
 msgstr "No s'han pogut carregar les empreses. Tanca això i torna-ho a provar."
 
-#: src/routes/settings/organization/industries.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
 msgid "Could not load the industries"
 msgstr "No s’han pogut carregar les indústries"
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Could not load the organization's connections."
 msgstr "No s'han pogut carregar les connexions de l'organització."
 
@@ -1647,19 +1647,19 @@ msgstr "No s'han pogut carregar les connexions de l'organització."
 msgid "Could not load the review queue."
 msgstr "No s'ha pogut carregar la cua de revisió."
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Could not load these tasks"
 msgstr "No s'han pogut carregar aquestes tasques"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Could not load this company"
 msgstr "No s'ha pogut carregar aquesta empresa"
 
-#: src/routes/documents/$id.tsx
+#: src/routes/_authed/documents/$id.tsx
 msgid "Could not load this document"
 msgstr "No s'ha pogut carregar aquest document"
 
-#: src/routes/pages/$id.tsx
+#: src/routes/_authed/pages/$id.tsx
 msgid "Could not load this page"
 msgstr "No s'ha pogut carregar aquesta pàgina"
 
@@ -1667,15 +1667,15 @@ msgstr "No s'ha pogut carregar aquesta pàgina"
 msgid "Could not load this run."
 msgstr "No s'ha pogut carregar aquesta execució."
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Could not load threads"
 msgstr "No s'han pogut carregar els fils"
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Could not load your connections."
 msgstr "No s'han pogut carregar les teves connexions."
 
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Could not load your keys."
 msgstr "No s'han pogut carregar les teves claus."
 
@@ -1692,7 +1692,7 @@ msgid "Could not log the interaction. Please try again."
 msgstr "No s'ha pogut registrar la interacció. Torna-ho a provar."
 
 #. placeholder {0}: from.label
-#: src/routes/settings/organization/industries.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
 msgid "Could not merge {0}"
 msgstr "No s’ha pogut fusionar {0}"
 
@@ -1700,26 +1700,26 @@ msgstr "No s’ha pogut fusionar {0}"
 msgid "Could not move the lead"
 msgstr "No s'ha pogut moure el lead"
 
-#: src/routes/pages/$id.tsx
+#: src/routes/_authed/pages/$id.tsx
 msgid "Could not publish the page. Please try again."
 msgstr "No s'ha pogut publicar la pàgina. Torna-ho a provar."
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Could not reach {0}."
 msgstr "No s'ha pogut arribar a {0}."
 
 #. placeholder {0}: industry.label
-#: src/routes/settings/organization/industries.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
 msgid "Could not remove {0}"
 msgstr "No s’ha pogut eliminar {0}"
 
-#: src/routes/settings/organization/members.tsx
+#: src/routes/_authed/settings/organization/members.tsx
 msgid "Could not remove {email}. Please try again."
 msgstr "No s'ha pogut eliminar {email}. Torna-ho a provar."
 
 #. placeholder {0}: industry.label
-#: src/routes/settings/organization/industries.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
 msgid "Could not rename {0}"
 msgstr "No s’ha pogut reanomenar {0}"
 
@@ -1728,21 +1728,21 @@ msgstr "No s’ha pogut reanomenar {0}"
 msgid "Could not resolve this proposal."
 msgstr "No s'ha pogut resoldre aquesta proposta."
 
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "Could not restore {name}"
 msgstr "No s'ha pogut restaurar {name}"
 
-#: src/routes/settings/mcp/connections.tsx
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Could not revoke"
 msgstr "No s'ha pogut revocar"
 
-#: src/routes/companies/$slug.tsx
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/companies/$slug.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Could not save"
 msgstr "No s'ha pogut desar"
 
-#: src/routes/settings/organization/policy.tsx
+#: src/routes/_authed/settings/organization/policy.tsx
 msgid "Could not save the budget."
 msgstr "No s'ha pogut desar el pressupost."
 
@@ -1754,11 +1754,11 @@ msgstr "No s'ha pogut desar el contacte"
 msgid "Could not save the document"
 msgstr "No s'ha pogut desar el document"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Could not save the inbox."
 msgstr "No s'ha pogut desar la safata."
 
-#: src/routes/pages/$id.tsx
+#: src/routes/_authed/pages/$id.tsx
 msgid "Could not save the page. Please try again."
 msgstr "No s'ha pogut desar la pàgina. Torna-ho a provar."
 
@@ -1775,11 +1775,11 @@ msgstr "No s'ha pogut desar la plantilla. Torna-ho a provar."
 msgid "Could not send the link. Try again in a few seconds."
 msgstr "No s'ha pogut enviar l'enllaç. Torna-ho a provar d'aquí uns segons."
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Could not set primary inbox"
 msgstr "No s'ha pogut establir la bústia principal"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Could not set the default inbox"
 msgstr "No s'ha pogut definir la bústia principal"
 
@@ -1812,7 +1812,7 @@ msgstr "No s'ha pogut actualitzar l'acció de pagament"
 msgid "Could not update this lookup."
 msgstr "No s'ha pogut actualitzar aquesta cerca."
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Could not update verification"
 msgstr "No s'ha pogut actualitzar la verificació"
 
@@ -1820,11 +1820,11 @@ msgstr "No s'ha pogut actualitzar la verificació"
 msgid "Couldn't check whether these addresses can receive email. Sending will still be stopped if one of them can't."
 msgstr "No s’ha pogut comprovar si aquestes adreces poden rebre correu. Si alguna no pot, l’enviament es continuarà aturant."
 
-#: src/routes/settings/organization/templates.tsx
+#: src/routes/_authed/settings/organization/templates.tsx
 msgid "Couldn't clear the default"
 msgstr "No s’ha pogut esborrar el valor per defecte"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Couldn't connect"
 msgstr "No s'ha pogut connectar"
 
@@ -1836,8 +1836,8 @@ msgstr "No s'ha pogut copiar"
 msgid "Couldn't copy the instructions"
 msgstr "No s'han pogut copiar les instruccions"
 
-#: src/routes/settings/organization/templates.tsx
-#: src/routes/settings/profile/templates.tsx
+#: src/routes/_authed/settings/organization/templates.tsx
+#: src/routes/_authed/settings/profile/templates.tsx
 msgid "Couldn't delete the stack. Please try again."
 msgstr "No s'ha pogut eliminar la pila. Torna-ho a provar."
 
@@ -1849,12 +1849,12 @@ msgstr "No s'ha pogut eliminar la plantilla. Torna-ho a provar."
 msgid "Couldn't hand it over"
 msgstr "No s’ha pogut traspassar"
 
-#: src/routes/settings/organization/templates.tsx
-#: src/routes/settings/organization/templates.tsx
+#: src/routes/_authed/settings/organization/templates.tsx
+#: src/routes/_authed/settings/organization/templates.tsx
 msgid "Couldn't load the org stacks."
 msgstr "No s'han pogut carregar les piles de l'organització."
 
-#: src/routes/settings/profile/templates.tsx
+#: src/routes/_authed/settings/profile/templates.tsx
 msgid "Couldn't load your stacks."
 msgstr "No s'han pogut carregar les teves piles."
 
@@ -1871,24 +1871,24 @@ msgstr "No s'ha pogut desar"
 msgid "Couldn't save the stack. Please try again."
 msgstr "No s'ha pogut desar la pila. Torna-ho a provar."
 
-#: src/routes/settings/organization/templates.tsx
-#: src/routes/settings/profile/templates.tsx
+#: src/routes/_authed/settings/organization/templates.tsx
+#: src/routes/_authed/settings/profile/templates.tsx
 msgid "Couldn't set the default"
 msgstr "No s'ha pogut definir per defecte"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Couldn't sign in"
 msgstr "No s'ha pogut iniciar la sessió"
 
-#: src/routes/settings/profile/templates.tsx
+#: src/routes/_authed/settings/profile/templates.tsx
 msgid "Couldn't switch"
 msgstr "No s'ha pogut canviar"
 
-#: src/routes/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 msgid "Couldn't update your preference. Try again."
 msgstr "No he pogut desar la teva preferència. Prova-ho de nou."
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "count loading"
 msgstr "carregant el recompte"
 
@@ -1903,7 +1903,7 @@ msgstr "país"
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/run-labels.ts
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "Country"
 msgstr "País"
 
@@ -1911,53 +1911,53 @@ msgstr "País"
 msgid "Country filter"
 msgstr "Filtre de país"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Create"
 msgstr "Crea"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Create a footer to append to outgoing emails from this inbox."
 msgstr "Crea un peu de pàgina per afegir als correus sortints d'aquesta bústia."
 
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Create a key"
 msgstr "Crea una clau"
 
-#: src/routes/pages/index.tsx
+#: src/routes/_authed/pages/index.tsx
 msgid "Create a prospect landing page from a company detail view or via the MCP tools."
 msgstr "Crea una pàgina d'aterratge per a un prospecte des del detall d'una empresa o amb les eines MCP."
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Create a prospect landing page to share with this company."
 msgstr "Crea una pàgina d'aterratge per a un prospecte per compartir amb aquesta empresa."
 
-#: src/routes/settings/profile/templates.tsx
+#: src/routes/_authed/settings/profile/templates.tsx
 msgid "Create a template above first, then group templates into a stack."
 msgstr "Crea primer una plantilla a dalt i després agrupa plantilles en una pila."
 
-#: src/routes/settings/mcp/index.tsx
+#: src/routes/_authed/settings/mcp/index.tsx
 msgid "Create an API key"
 msgstr "Crea una clau d'API"
 
-#: src/routes/settings/mcp/index.tsx
+#: src/routes/_authed/settings/mcp/index.tsx
 msgid "Create an API key, then paste the snippet for your tool — replacing <0>YOUR_API_KEY</0> with it. The key acts in this organization."
 msgstr "Crea una clau d'API i enganxa el fragment de la teva eina — substituint <0>YOUR_API_KEY</0> per la clau. La clau actua en aquesta organització."
 
-#: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Create an app password →"
 msgstr "Crea una contrasenya d'aplicació →"
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Create an app password for {0}, opens in a new tab"
 msgstr "Crea una contrasenya d'aplicació per a {0}, s'obre en una pestanya nova"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Create an app-specific password, opens in a new tab"
 msgstr "Crea una contrasenya d'aplicació, s'obre en una pestanya nova"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Create failed"
 msgstr "Error en crear"
 
@@ -1965,25 +1965,25 @@ msgstr "Error en crear"
 msgid "Create follow-up"
 msgstr "Crea el seguiment"
 
-#: src/routes/calendar/index.tsx
+#: src/routes/_authed/calendar/index.tsx
 msgid "Create follow-up task"
 msgstr "Crea una tasca de seguiment"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Create footer"
 msgstr "Crea peu de pàgina"
 
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Create key"
 msgstr "Crea la clau"
 
 #: src/components/research/proposal-outcome.tsx
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "Created"
 msgstr "Creada"
 
 #. placeholder {0}: formatDate(row.createdAt)
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Created {0}"
 msgstr "Creada el {0}"
 
@@ -1992,7 +1992,7 @@ msgid "Created by agent"
 msgstr "Creada per agent"
 
 #: src/components/companies/followup-dialog.tsx
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Creating…"
 msgstr "Creant…"
 
@@ -2004,11 +2004,11 @@ msgstr "Criteris"
 msgid "Currency"
 msgstr "Moneda"
 
-#: src/routes/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 msgid "Current password"
 msgstr "Contrasenya actual"
 
-#: src/routes/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 msgid "Current password is incorrect."
 msgstr "La contrasenya actual no és correcta."
 
@@ -2022,7 +2022,7 @@ msgstr "Eines actuals"
 msgid "currently"
 msgstr "actualment"
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Cut off this connection?"
 msgstr "Vols tallar aquesta connexió?"
 
@@ -2042,7 +2042,7 @@ msgstr "Data"
 msgid "Dead"
 msgstr "Descartat"
 
-#: src/routes/calendar/index.tsx
+#: src/routes/_authed/calendar/index.tsx
 msgid "Decline"
 msgstr "Rebutja"
 
@@ -2055,15 +2055,15 @@ msgid "default"
 msgstr "predeterminat"
 
 #: src/components/instructions/stack-list.tsx
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Default"
 msgstr "Per defecte"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Defaults to the email address."
 msgstr "Per defecte, l'adreça electrònica."
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Defaults to you when omitted."
 msgstr "Per defecte ets tu si s'omet."
 
@@ -2071,9 +2071,9 @@ msgstr "Per defecte ets tu si s'omet."
 #: src/components/instructions/template-library.tsx
 #: src/components/research/run-actions.tsx
 #: src/components/shared/delete-confirm.tsx
-#: src/routes/companies/$slug.tsx
-#: src/routes/emails/inboxes.tsx
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/companies/$slug.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Delete"
 msgstr "Elimina"
 
@@ -2082,16 +2082,16 @@ msgstr "Elimina"
 #. placeholder {0}: stack.name
 #: src/components/instructions/stack-list.tsx
 #: src/components/instructions/template-library.tsx
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Delete {0}"
 msgstr "Elimina {0}"
 
 #: src/components/instructions/template-library.tsx
-#: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
-#: src/routes/settings/api-keys/index.tsx
-#: src/routes/settings/organization/templates.tsx
-#: src/routes/settings/profile/templates.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/organization/templates.tsx
+#: src/routes/_authed/settings/profile/templates.tsx
 msgid "Delete failed"
 msgstr "Error en eliminar"
 
@@ -2100,31 +2100,31 @@ msgid "Delete for good"
 msgstr "Elimina-la definitivament"
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Delete inbox {0}? Stored messages stay; the connection stops."
 msgstr "Suprimir la bústia {0}? Els missatges desats es mantenen; la connexió s'atura."
 
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Delete key"
 msgstr "Elimina la clau"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Delete this company?"
 msgstr "Voleu suprimir aquesta empresa?"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Delete this footer? This cannot be undone."
 msgstr "Eliminar aquest peu de pàgina? Aquesta acció no es pot desfer."
 
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Delete this key?"
 msgstr "Vols eliminar aquesta clau?"
 
-#: src/routes/settings/organization/templates.tsx
+#: src/routes/_authed/settings/organization/templates.tsx
 msgid "Delete this org stack?"
 msgstr "Vols eliminar aquesta pila de l'organització?"
 
-#: src/routes/settings/profile/templates.tsx
+#: src/routes/_authed/settings/profile/templates.tsx
 msgid "Delete this stack?"
 msgstr "Vols eliminar aquesta pila?"
 
@@ -2133,18 +2133,18 @@ msgid "Delete this template?"
 msgstr "Vols eliminar aquesta plantilla?"
 
 #: src/components/research/run-labels.ts
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "Deleted"
 msgstr "Eliminada"
 
 #: src/components/research/run-actions.tsx
 #: src/components/shared/delete-confirm.tsx
-#: src/routes/settings/api-keys/index.tsx
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Deleting…"
 msgstr "Eliminant…"
 
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "Delivered"
 msgstr "Lliurat"
 
@@ -2160,7 +2160,7 @@ msgstr "Descripció"
 msgid "Direction"
 msgstr "Direcció"
 
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Disabled"
 msgstr "Desactivada"
 
@@ -2177,18 +2177,18 @@ msgstr "Vols descartar els canvis sense desar?"
 msgid "Discovery"
 msgstr "Descoberta"
 
-#: src/routes/settings/organization/members.tsx
+#: src/routes/_authed/settings/organization/members.tsx
 msgid "Dismiss"
 msgstr "Descarta"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Display name"
 msgstr "Nom a mostrar"
 
 #: src/components/companies/documents-panel.tsx
 #: src/components/companies/documents-panel.tsx
 #: src/components/shared/channel-icon.tsx
-#: src/routes/documents/$id.tsx
+#: src/routes/_authed/documents/$id.tsx
 msgid "Document"
 msgstr "Document"
 
@@ -2199,24 +2199,24 @@ msgstr "documents"
 
 #: src/components/documents/subject-documents.tsx
 #: src/components/layout/nav-items.ts
-#: src/routes/companies/$slug.tsx
-#: src/routes/documents/index.tsx
-#: src/routes/documents/index.tsx
+#: src/routes/_authed/companies/$slug.tsx
+#: src/routes/_authed/documents/index.tsx
+#: src/routes/_authed/documents/index.tsx
 msgid "Documents"
 msgstr "Documents"
 
 #: src/components/companies/conversations-tab.tsx
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Done"
 msgstr "Fet"
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Done 7d"
 msgstr "Fetes 7d"
 
 #: src/components/companies/proposals-panel.tsx
-#: src/routes/companies/$slug.tsx
-#: src/routes/pages/index.tsx
+#: src/routes/_authed/companies/$slug.tsx
+#: src/routes/_authed/pages/index.tsx
 msgid "Draft"
 msgstr "Esborrany"
 
@@ -2230,13 +2230,13 @@ msgstr "Arrossega {0}"
 msgid "Drag {0} to reorder"
 msgstr "Arrossega {0} per reordenar"
 
-#: src/routes/companies/board.tsx
+#: src/routes/_authed/companies/board.tsx
 msgid "Drag a lead across stages, or use its Move menu."
 msgstr "Arrossega un lead entre etapes, o fes servir el seu menú Mou."
 
 #: src/components/companies/next-action-card.tsx
 #: src/components/shared/task-item.tsx
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Due"
 msgstr "Venciment"
 
@@ -2260,7 +2260,7 @@ msgstr "p. ex. [research] Espanya prospecció d'hostaleria"
 msgid "e.g. Catalonia"
 msgstr "p. ex. Catalunya"
 
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "e.g. Claude Desktop"
 msgstr "p. ex. Claude Desktop"
 
@@ -2268,11 +2268,11 @@ msgstr "p. ex. Claude Desktop"
 msgid "e.g. Cold outreach"
 msgstr "p. ex. Contacte en fred"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "e.g. Company signature"
 msgstr "p. ex. Signatura de l'empresa"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "e.g. Customer enquiries"
 msgstr "p. ex. Consultes de clients"
 
@@ -2296,7 +2296,7 @@ msgstr "p. ex. fleques independents a Barcelona amb 5–20 treballadors"
 msgid "e.g. Marta Puig"
 msgstr "p. ex. Marta Puig"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "e.g. Sales — Acme"
 msgstr "p. ex. Vendes — Acme"
 
@@ -2311,8 +2311,8 @@ msgstr "p. ex. vip, càlid"
 #: src/components/companies/account-brief-section.tsx
 #: src/components/companies/documents-panel.tsx
 #: src/components/instructions/template-dialog.tsx
-#: src/routes/companies/$slug.tsx
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/companies/$slug.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Edit"
 msgstr "Edita"
 
@@ -2347,7 +2347,7 @@ msgstr "Edita el document"
 msgid "Edit due date"
 msgstr "Edita la data de venciment"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Edit inbox"
 msgstr "Edita la safata"
 
@@ -2355,7 +2355,7 @@ msgstr "Edita la safata"
 msgid "Edit proposal"
 msgstr "Edita la proposta"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Edit settings"
 msgstr "Edita la configuració"
 
@@ -2375,8 +2375,8 @@ msgstr "Edita la plantilla"
 msgid "Editing this template"
 msgstr "S’està editant aquesta plantilla"
 
-#: src/routes/pages/$id.tsx
-#: src/routes/pages/$id.tsx
+#: src/routes/_authed/pages/$id.tsx
+#: src/routes/_authed/pages/$id.tsx
 msgid "Editor"
 msgstr "Editor"
 
@@ -2388,15 +2388,15 @@ msgstr "Editor"
 #: src/components/research/findings/contact-discovery-view.tsx
 #: src/components/research/run-labels.ts
 #: src/components/shared/channel-icon.tsx
-#: src/routes/companies/$slug.tsx
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/companies/$slug.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/settings/organization/members.tsx
 #: src/routes/forgot-password.tsx
 #: src/routes/login.tsx
-#: src/routes/settings/organization/members.tsx
 msgid "Email"
 msgstr "Correu"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Email address"
 msgstr "Adreça electrònica"
 
@@ -2404,7 +2404,7 @@ msgstr "Adreça electrònica"
 msgid "Email drafts"
 msgstr "Esborranys de correu"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Email is dead-letter"
 msgstr "El correu electrònic és no entregable"
 
@@ -2416,16 +2416,16 @@ msgstr "Envia'm un enllaç per correu"
 msgid "Email or password is incorrect."
 msgstr "El correu o la contrasenya no són correctes."
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Email signature"
 msgstr "Signatura del correu"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Email via Batuda"
 msgstr "Correu via Batuda"
 
 #: src/components/layout/nav-items.ts
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Emails"
 msgstr "Correus"
 
@@ -2433,7 +2433,7 @@ msgstr "Correus"
 msgid "Emails are missing from this list. Everything else below is still accurate."
 msgstr "Falten els correus d'aquesta llista. La resta del que hi ha a sota continua sent correcte."
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Emails, calls, documents, and proposals will appear here as they happen."
 msgstr "Els emails, trucades, documents i propostes apareixeran aquí a mesura que passin."
 
@@ -2453,15 +2453,15 @@ msgstr "Enriquiment"
 msgid "Enter a valid email above first."
 msgstr "Primer escriu un correu vàlid a sobre."
 
-#: src/routes/settings/organization/members.tsx
+#: src/routes/_authed/settings/organization/members.tsx
 msgid "Enter an email address."
 msgstr "Introdueix una adreça electrònica."
 
-#: src/routes/settings/organization/policy.tsx
+#: src/routes/_authed/settings/organization/policy.tsx
 msgid "Enter valid amounts before saving."
 msgstr "Introdueix imports vàlids abans de desar."
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Enter your mail server settings below."
 msgstr "Introdueix la configuració del servidor de correu a sota."
 
@@ -2473,36 +2473,36 @@ msgstr "Error"
 msgid "Event"
 msgstr "Esdeveniment"
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Every assistant that can reach this organization's data right now. Names come from the assistant itself, so treat them as labels rather than proof."
 msgstr "Tots els assistents que ara mateix poden accedir a les dades d'aquesta organització. Els noms els diu el mateix assistent, així que tracta'ls com a etiquetes, no com a prova."
 
-#: src/routes/settings/organization/industries.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
 msgid "Every company on it moves to the industry you pick, and this one goes."
 msgstr "Totes les empreses que hi ha passen a la indústria que triïs, i aquesta desapareix."
 
-#: src/routes/documents/index.tsx
+#: src/routes/_authed/documents/index.tsx
 msgid "Every kind"
 msgstr "Tots els tipus"
 
 #. placeholder {0}: defaultStack.name
-#: src/routes/settings/organization/templates.tsx
+#: src/routes/_authed/settings/organization/templates.tsx
 msgid "Every member follows \"{0}\""
 msgstr "Tothom segueix \"{0}\""
 
-#: src/routes/settings/organization/templates.tsx
+#: src/routes/_authed/settings/organization/templates.tsx
 msgid "Every member who hasn't picked their own stack will run with no shared guidance until you set another default."
 msgstr "Qui no hagi triat la seva pila treballarà sense cap guia compartida fins que no en marquis una altra per defecte."
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Every open task has a due date assigned."
 msgstr "Totes les tasques obertes tenen data de venciment."
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Every task has a date"
 msgstr "Totes les tasques tenen data"
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Everyone's connections"
 msgstr "Connexions de tothom"
 
@@ -2510,17 +2510,17 @@ msgstr "Connexions de tothom"
 msgid "Exit full screen"
 msgstr "Surt de pantalla completa"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Expand"
 msgstr "Desplega"
 
 #: src/components/companies/proposals-panel.tsx
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Expired"
 msgstr "Caducada"
 
 #. placeholder {0}: formatDate(row.expiresAt)
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Expired {0}"
 msgstr "Caducada {0}"
 
@@ -2529,15 +2529,15 @@ msgid "Expires (optional)"
 msgstr "Caduca (opcional)"
 
 #. placeholder {0}: formatDate(row.expiresAt)
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Expires {0}"
 msgstr "Caduca el {0}"
 
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Expires in (days)"
 msgstr "Caduca d'aquí a (dies)"
 
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Expiry must be a number of days greater than zero."
 msgstr "La caducitat ha de ser un nombre de dies més gran que zero."
 
@@ -2566,12 +2566,12 @@ msgid "Fail"
 msgstr "No compleix"
 
 #: src/components/research/run-labels.ts
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "Failed"
 msgstr "Fallit"
 
-#: src/routes/companies/$slug.tsx
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Files"
 msgstr "Arxius"
 
@@ -2579,16 +2579,16 @@ msgstr "Arxius"
 msgid "Fill industry, size, location, contacts, competitors and proposed CRM updates for this company. Pick when you want every field on the company card answered."
 msgstr "Omple sector, mida, ubicació, contactes, competidors i actualitzacions de CRM proposades per a aquesta empresa. Tria-ho quan vulguis omplir tots els camps de la fitxa."
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Filter by inbox"
 msgstr "Filtra per safata"
 
-#: src/routes/companies/index.tsx
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/companies/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Filter by status"
 msgstr "Filtra per estat"
 
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "Filter companies"
 msgstr "Filtra empreses"
 
@@ -2596,11 +2596,11 @@ msgstr "Filtra empreses"
 msgid "Filter conversations"
 msgstr "Filtra les converses"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Filter emails"
 msgstr "Filtra correus"
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Filter tasks by shelf"
 msgstr "Filtra les tasques per prestatge"
 
@@ -2634,16 +2634,16 @@ msgstr "Primer contacte enviat"
 #: src/components/companies/company-fit-section.tsx
 #: src/components/companies/company-fit-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "Fit"
 msgstr "Encaix"
 
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "Flagged as spam by the provider. The body is shown for review only."
 msgstr "El proveïdor l'ha marcat com a brossa. El cos es mostra només per revisar-lo."
 
 #: src/components/companies/followup-dialog.tsx
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Follow up"
 msgstr "Fes seguiment"
 
@@ -2668,7 +2668,7 @@ msgid "Follow-up overdue by less than a day"
 msgstr "Seguiment endarrerit menys d’un dia"
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Footers — {0}"
 msgstr "Peus de pàgina — {0}"
 
@@ -2685,7 +2685,7 @@ msgstr "Has oblidat la contrasenya?"
 msgid "Former member"
 msgstr "Antic membre"
 
-#: src/routes/settings/organization/policy.tsx
+#: src/routes/_authed/settings/organization/policy.tsx
 msgid "Free research work allowed for one run."
 msgstr "Treball de recerca gratuït permès per a una execució."
 
@@ -2698,7 +2698,7 @@ msgid "Freeform"
 msgstr "Lliure"
 
 #: src/components/emails/compose-form.tsx
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "From"
 msgstr "De"
 
@@ -2735,11 +2735,11 @@ msgstr "Recollint proves."
 msgid "General"
 msgstr "General"
 
-#: src/routes/settings/mcp/index.tsx
+#: src/routes/_authed/settings/mcp/index.tsx
 msgid "Give an AI assistant access to this organization's CRM. Chat apps like ChatGPT and Claude.ai connect over OAuth; coding tools use an API key."
 msgstr "Dona a un assistent d'IA accés al CRM d'aquesta organització. Les aplicacions de xat com ChatGPT i Claude.ai es connecten amb OAuth; les eines de programació fan servir una clau API."
 
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Give the key a name so you can recognize it later."
 msgstr "Posa un nom a la clau perquè la puguis reconèixer més endavant."
 
@@ -2751,12 +2751,12 @@ msgstr "Ves a connexions"
 msgid "Go to sign in"
 msgstr "Ves a iniciar sessió"
 
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "Gone quiet"
 msgstr "En silenci"
 
 #. placeholder {0}: search.staleDays
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "Gone quiet · {0}+ days"
 msgstr "En silenci · {0}+ dies"
 
@@ -2785,11 +2785,11 @@ msgstr "Encapçalament 1"
 msgid "Heading 2"
 msgstr "Encapçalament 2"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Hide advanced settings"
 msgstr "Amaga la configuració avançada"
 
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "Hide Cc"
 msgstr "Amaga Cc"
 
@@ -2803,7 +2803,7 @@ msgstr "Alta"
 
 #: src/components/shared/priority-dot.tsx
 #: src/components/shared/task-item.tsx
-#: src/routes/index.tsx
+#: src/routes/_authed/index.tsx
 msgid "High priority"
 msgstr "Prioritat alta"
 
@@ -2845,11 +2845,11 @@ msgstr "He trobat pàgines que esmenten aquesta empresa, però cap no era del se
 msgid "I prefer passwordless"
 msgstr "Prefereixo sense contrasenya"
 
-#: src/routes/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 msgid "I prefer passwordless — don't ask me again"
 msgstr "Prefereixo sense contrasenya — no m'ho tornis a preguntar"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "I'll fill in the technical settings for you — you just add your email and password."
 msgstr "Jo ompliré la configuració tècnica per tu; tu només has d'afegir el correu i la contrasenya."
 
@@ -2861,56 +2861,56 @@ msgstr "Si <0>{submittedEmail}</0> està registrat, t'arribarà un enllaç per r
 msgid "If the chat opens empty, paste it."
 msgstr "Si el xat s'obre buit, enganxa-la."
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "If your account has two-factor authentication, use an app-specific password — not your normal login password."
 msgstr "Si el teu compte té verificació en dos passos, fes servir una contrasenya d'aplicació, no la contrasenya d'inici de sessió habitual."
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "IMAP host"
 msgstr "Servidor IMAP"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "IMAP port"
 msgstr "Port IMAP"
 
-#: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "IMAP security"
 msgstr "Seguretat IMAP"
 
 #: src/components/interactions/quick-capture-dialog.tsx
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Inbound"
 msgstr "Entrant"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Inbound and outbound emails will pin to this board once a thread exists."
 msgstr "Els correus entrants i sortints es fixaran en aquest tauler un cop existeixi un fil."
 
 #. placeholder {0}: msg.from
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "Inbound message from {0}"
 msgstr "Missatge entrant de {0}"
 
 #: src/components/emails/compose-form.tsx
-#: src/routes/emails/$threadId.tsx
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "Inbox"
 msgstr "Safata"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Inbox connected"
 msgstr "Bústia connectada"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Inbox removed"
 msgstr "Bústia eliminada"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Inbox updated"
 msgstr "Safata actualitzada"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Inboxes"
 msgstr "Bústies"
 
@@ -2919,8 +2919,8 @@ msgstr "Bústies"
 msgid "includes {0} on paid lookups"
 msgstr "inclou {0} en consultes de pagament"
 
-#: src/routes/settings/organization/index.tsx
-#: src/routes/settings/organization/industries.tsx
+#: src/routes/_authed/settings/organization/index.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
 msgid "Industries"
 msgstr "Indústries"
 
@@ -2928,7 +2928,7 @@ msgstr "Indústries"
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/findings/prospect-scan-view.tsx
 #: src/components/research/run-labels.ts
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "Industry"
 msgstr "Sector"
 
@@ -2936,11 +2936,11 @@ msgstr "Sector"
 msgid "Industry filter"
 msgstr "Filtre de sector"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Infomaniak needs a Mail app password created in your Mail service — not an account application password, and not your normal login password."
 msgstr "Infomaniak necessita una contrasenya d'aplicació de Mail creada al teu servei Mail; no la contrasenya d'aplicació del compte ni la contrasenya d'inici de sessió habitual."
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Infomaniak needs a Mail app password created in your Mail service — not an account application password."
 msgstr "Infomaniak necessita una contrasenya d'aplicació de Mail creada al teu servei Mail, no una contrasenya d'aplicació del compte."
 
@@ -2949,9 +2949,9 @@ msgstr "Infomaniak necessita una contrasenya d'aplicació de Mail creada al teu 
 msgid "Instagram"
 msgstr "Instagram"
 
-#: src/routes/settings/organization/index.tsx
-#: src/routes/settings/profile/index.tsx
-#: src/routes/settings/profile/templates.tsx
+#: src/routes/_authed/settings/organization/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/templates.tsx
 msgid "Instruction templates"
 msgstr "Plantilles d'instruccions"
 
@@ -2985,15 +2985,15 @@ msgstr "Interessat"
 msgid "Invalid"
 msgstr "No vàlid"
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "It can no longer reach this organization."
 msgstr "Ja no pot accedir a aquesta organització."
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "It can reach this organization from its next request."
 msgstr "Podrà accedir a aquesta organització a partir de la petició següent."
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "It comes off the lists and the pipeline, and its people go with it. Its history is kept, and you can put it back from the Deleted filter on the companies page."
 msgstr "Desapareix de les llistes i de l'embut, i les seves persones hi van amb ella. L'historial es conserva, i la podeu recuperar des del filtre Suprimides a la pàgina d'empreses."
 
@@ -3001,7 +3001,7 @@ msgstr "Desapareix de les llistes i de l'embut, i les seves persones hi van amb 
 msgid "It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it? Check spam."
 msgstr "Caduca en {MAGIC_LINK_EXPIRY_MINUTES} minuts. No el veus? Mira el correu brossa."
 
-#: src/routes/settings/organization/industries.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
 msgid "It is still on at least one company — merge it instead."
 msgstr "Encara és en almenys una empresa: fusiona-la."
 
@@ -3009,11 +3009,11 @@ msgstr "Encara és en almenys una empresa: fusiona-la."
 msgid "Italic"
 msgstr "Cursiva"
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Its owner has not chosen this organization"
 msgstr "El seu propietari no ha triat aquesta organització"
 
-#: src/routes/calendar/index.tsx
+#: src/routes/_authed/calendar/index.tsx
 msgid "Join video call"
 msgstr "Uneix-te a la videotrucada"
 
@@ -3022,7 +3022,7 @@ msgstr "Uneix-te a la videotrucada"
 msgid "Judges whether it works"
 msgstr "Valora si funciona"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Just a note to yourself — it changes nothing about how the mailbox works. Up to 200 characters."
 msgstr "Només és una nota per a tu: no canvia res del funcionament de la bústia. Fins a 200 caràcters."
 
@@ -3034,7 +3034,7 @@ msgstr "Continua editant"
 msgid "Keep it"
 msgstr "Conserva-la"
 
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Key deleted"
 msgstr "Clau eliminada"
 
@@ -3042,7 +3042,7 @@ msgstr "Clau eliminada"
 msgid "Key differentiators"
 msgstr "Diferenciadors clau"
 
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Keys let AI agents and MCP clients act on behalf of this organization."
 msgstr "Les claus permeten que els agents d'IA i els clients MCP actuïn en nom d'aquesta organització."
 
@@ -3051,27 +3051,27 @@ msgstr "Les claus permeten que els agents d'IA i els clients MCP actuïn en nom 
 msgid "Kind"
 msgstr "Tipus"
 
-#: src/routes/pages/index.tsx
+#: src/routes/_authed/pages/index.tsx
 msgid "Lang"
 msgstr "Idioma"
 
 #: src/components/profile/language-select.tsx
-#: src/routes/pages/$id.tsx
-#: src/routes/settings/organization/members.tsx
-#: src/routes/settings/profile/index.tsx
+#: src/routes/_authed/pages/$id.tsx
+#: src/routes/_authed/settings/organization/members.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 msgid "Language"
 msgstr "Idioma"
 
-#: src/routes/settings/organization/spend.tsx
+#: src/routes/_authed/settings/organization/spend.tsx
 msgid "Last 30 days"
 msgstr "Últims 30 dies"
 
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "Last activity"
 msgstr "Última activitat"
 
 #: src/components/companies/cadence-card.tsx
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Last call"
 msgstr "Última trucada"
 
@@ -3080,17 +3080,17 @@ msgid "Last changed"
 msgstr "Última modificació"
 
 #: src/components/shared/company-card.tsx
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Last contact"
 msgstr "Últim contacte"
 
 #: src/components/companies/cadence-card.tsx
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Last email"
 msgstr "Últim email"
 
 #: src/components/companies/cadence-card.tsx
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Last meet"
 msgstr "Última visita"
 
@@ -3098,21 +3098,21 @@ msgstr "Última visita"
 msgid "Last run with findings"
 msgstr "Última execució amb resultats"
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Last used"
 msgstr "Últim ús"
 
 #. placeholder {0}: formatDate(row.lastUsedAt)
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Last used {0}"
 msgstr "Utilitzada per última vegada {0}"
 
 #. placeholder {0}: formatDate(row.lastUsedAt)
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Last used {0} from {toolLabel}"
 msgstr "Utilitzada per última vegada {0} des de {toolLabel}"
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Later"
 msgstr "Més endavant"
 
@@ -3124,7 +3124,7 @@ msgstr "Latitud"
 msgid "Layered after the stack, in order."
 msgstr "S'apliquen després de la pila, en ordre."
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Lead assigned"
 msgstr "Oportunitat assignada"
 
@@ -3167,16 +3167,16 @@ msgstr "S'han aturat les actualitzacions en directe. Pot ser que l'execució enc
 msgid "Load more"
 msgstr "Carrega'n més"
 
-#: src/routes/companies/board.tsx
+#: src/routes/_authed/companies/board.tsx
 msgid "Loading board…"
 msgstr "S'està carregant el tauler…"
 
-#: src/routes/calendar/index.tsx
+#: src/routes/_authed/calendar/index.tsx
 msgid "Loading calendar…"
 msgstr "S'està carregant el calendari…"
 
 #: src/components/interactions/quick-capture-dialog.tsx
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "Loading companies…"
 msgstr "Carregant empreses…"
 
@@ -3188,7 +3188,7 @@ msgstr "Carregant l'execució…"
 msgid "Loading runs…"
 msgstr "S'estan carregant les execucions…"
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Loading tasks…"
 msgstr "S'estan carregant les tasques…"
 
@@ -3200,22 +3200,22 @@ msgstr "S'estan carregant els canvis pendents de revisió."
 msgid "Loading the review queue"
 msgstr "S'està carregant la cua de revisió"
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Loading your organizations…"
 msgstr "S’estan carregant les teves organitzacions…"
 
-#: src/routes/settings/organization/policy.tsx
+#: src/routes/_authed/settings/organization/policy.tsx
 msgid "Loading your research budget…"
 msgstr "Carregant el teu pressupost de recerca…"
 
 #: src/components/shared/loading-spinner.tsx
-#: src/routes/emails/inboxes.tsx
-#: src/routes/settings/api-keys/index.tsx
-#: src/routes/settings/mcp/connections.tsx
-#: src/routes/settings/mcp/connections.tsx
-#: src/routes/settings/organization/index.tsx
-#: src/routes/settings/organization/industries.tsx
-#: src/routes/settings/organization/members.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/organization/index.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
+#: src/routes/_authed/settings/organization/members.tsx
 msgid "Loading…"
 msgstr "Carregant…"
 
@@ -3236,7 +3236,7 @@ msgstr "Localitzant…"
 #: src/components/research/findings/prospect-scan-view.tsx
 #: src/components/research/research-dialog.tsx
 #: src/components/research/run-labels.ts
-#: src/routes/calendar/index.tsx
+#: src/routes/_authed/calendar/index.tsx
 msgid "Location"
 msgstr "Ubicació"
 
@@ -3255,7 +3255,7 @@ msgstr "Registra la primera interacció"
 
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/components/shared/company-card.tsx
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Log interaction"
 msgstr "Registra interacció"
 
@@ -3299,7 +3299,7 @@ msgid "Mail to these addresses is being held back. Letting mail through lifts al
 msgstr "El correu cap a aquestes adreces està aturat. Deixar-lo passar les allibera totes alhora, i qualsevol que torni a rebotar queda aturada de seguida."
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Make {0} the address you send from"
 msgstr "Fes que {0} sigui l'adreça des d'on envies"
 
@@ -3316,19 +3316,19 @@ msgstr "Fes que sigui la meva predeterminada"
 msgid "Make this the org default"
 msgstr "Fes que sigui la predeterminada de l'organització"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Manage channels"
 msgstr "Gestiona els canals"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Manage inboxes"
 msgstr "Gestiona les safates"
 
-#: src/routes/settings/organization/index.tsx
+#: src/routes/_authed/settings/organization/index.tsx
 msgid "Manage members"
 msgstr "Gestiona els membres"
 
-#: src/routes/settings/organization/index.tsx
+#: src/routes/_authed/settings/organization/index.tsx
 msgid "Manage org instruction templates"
 msgstr "Gestiona les plantilles d'instruccions de l'organització"
 
@@ -3354,7 +3354,7 @@ msgstr "Marca com a arriscat"
 msgid "Mark as undeliverable"
 msgstr "Marca com a no lliurable"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Mark as verified"
 msgstr "Marca com a verificada"
 
@@ -3362,17 +3362,17 @@ msgstr "Marca com a verificada"
 msgid "Mark contacted"
 msgstr "Marca com a contactat"
 
-#: src/routes/emails/index.tsx
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Mark read"
 msgstr "Marca com a llegit"
 
-#: src/routes/emails/$threadId.tsx
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/$threadId.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Mark unread"
 msgstr "Marca com a no llegit"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Marked as a verified lead"
 msgstr "Marcada com a oportunitat verificada"
 
@@ -3388,7 +3388,7 @@ msgstr "Segons el dispositiu"
 msgid "Maturity"
 msgstr "Maduresa"
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "MCP connections"
 msgstr "Connexions MCP"
 
@@ -3423,7 +3423,7 @@ msgstr "Preparació de reunió"
 msgid "Meeting scheduled"
 msgstr "Reunió programada"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Meeting stage — set the next action (agenda, follow-up)."
 msgstr "Etapa de reunió — defineix la següent acció (agenda, seguiment)."
 
@@ -3431,39 +3431,39 @@ msgstr "Etapa de reunió — defineix la següent acció (agenda, seguiment)."
 msgid "Meetings are missing from this list. Everything else below is still accurate."
 msgstr "Falten les reunions d'aquesta llista. La resta del que hi ha a sota continua sent correcte."
 
-#: src/routes/calendar/index.tsx
+#: src/routes/_authed/calendar/index.tsx
 msgid "Meetings from bookings, email invitations, and internal blocks."
 msgstr "Reunions des de reserves, invitacions per correu i blocs interns."
 
-#: src/routes/settings/mcp/connections.tsx
-#: src/routes/settings/mcp/connections.tsx
-#: src/routes/settings/organization/members.tsx
-#: src/routes/settings/organization/members.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/organization/members.tsx
+#: src/routes/_authed/settings/organization/members.tsx
 msgid "Member"
 msgstr "Membre"
 
-#: src/routes/settings/organization/index.tsx
-#: src/routes/settings/organization/members.tsx
+#: src/routes/_authed/settings/organization/index.tsx
+#: src/routes/_authed/settings/organization/members.tsx
 msgid "Members"
 msgstr "Membres"
 
-#: src/routes/settings/organization/industries.tsx
-#: src/routes/settings/organization/industries.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
 msgid "Merge"
 msgstr "Fusiona"
 
 #. placeholder {0}: mergeSource?.label ?? ''
-#: src/routes/settings/organization/industries.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
 msgid "Merge {0}"
 msgstr "Fusiona {0}"
 
 #. placeholder {0}: industry.label
-#: src/routes/settings/organization/industries.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
 msgid "Merge {0} into another"
 msgstr "Fusiona {0} amb una altra"
 
 #. placeholder {0}: from.label
-#: src/routes/settings/organization/industries.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
 msgid "Merged {0}"
 msgstr "S’ha fusionat {0}"
 
@@ -3475,11 +3475,11 @@ msgstr "Fusionat amb un existent"
 msgid "Message"
 msgstr "Missatge"
 
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "Messages"
 msgstr "Missatges"
 
-#: src/routes/pages/$id.tsx
+#: src/routes/_authed/pages/$id.tsx
 msgid "Meta"
 msgstr "Meta"
 
@@ -3497,15 +3497,15 @@ msgid "Minimize"
 msgstr "Minimitza"
 
 #: src/components/research/inbox/research-inbox.tsx
-#: src/routes/settings/organization/policy.tsx
+#: src/routes/_authed/settings/organization/policy.tsx
 msgid "Minimum confidence"
 msgstr "Confiança mínima"
 
-#: src/routes/settings/organization/policy.tsx
+#: src/routes/_authed/settings/organization/policy.tsx
 msgid "Minimum confidence to auto-apply"
 msgstr "Confiança mínima per aplicar automàticament"
 
-#: src/routes/settings/organization/policy.tsx
+#: src/routes/_authed/settings/organization/policy.tsx
 msgid "Monthly paid cap"
 msgstr "Límit mensual de pagament"
 
@@ -3518,7 +3518,7 @@ msgstr "Més accions"
 msgid "More actions for {0}"
 msgstr "Més accions per a {0}"
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Most assistants can only work in one organization per connection. With more than one ticked, this one will keep asking you to choose."
 msgstr "La majoria d’assistents només poden treballar en una organització per connexió. Amb més d’una marcada, aquest et continuarà demanant que en triïs una."
 
@@ -3526,7 +3526,7 @@ msgstr "La majoria d’assistents només poden treballar en una organització pe
 msgid "Most assistants can only work in one organization, so picking a single one here is usually what you want. You can change this later in Settings → MCP connections."
 msgstr "La majoria d’assistents només poden treballar en una organització, així que aquí normalment et convé triar-ne una de sola. Ho pots canviar més endavant a Configuració → Connexions MCP."
 
-#: src/routes/settings/organization/policy.tsx
+#: src/routes/_authed/settings/organization/policy.tsx
 msgid "Most this organization can spend on paid research each month, shared by everyone in it."
 msgstr "Màxim que aquesta organització pot gastar en recerca de pagament cada mes, compartit entre tothom."
 
@@ -3542,11 +3542,11 @@ msgstr "Mou a…"
 msgid "My default"
 msgstr "La meva predeterminada"
 
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "My leads"
 msgstr "Els meus leads"
 
-#: src/routes/settings/profile/templates.tsx
+#: src/routes/_authed/settings/profile/templates.tsx
 msgid "My stacks"
 msgstr "Les meves piles"
 
@@ -3555,8 +3555,8 @@ msgstr "Les meves piles"
 #: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/instructions/stack-editor.tsx
 #: src/components/instructions/template-dialog.tsx
-#: src/routes/emails/inboxes.tsx
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Name"
 msgstr "Nom"
 
@@ -3580,12 +3580,12 @@ msgstr "Filtra aquesta llista"
 msgid "Narrow this list…"
 msgstr "Filtra aquesta llista…"
 
-#: src/routes/index.tsx
-#: src/routes/index.tsx
+#: src/routes/_authed/index.tsx
+#: src/routes/_authed/index.tsx
 msgid "Needs action"
 msgstr "Necessita acció"
 
-#: src/routes/index.tsx
+#: src/routes/_authed/index.tsx
 msgid "Needs attention"
 msgstr "Necessita atenció"
 
@@ -3604,14 +3604,14 @@ msgstr "En negociació"
 #: src/components/companies/cadence-card.tsx
 #: src/components/companies/cadence-card.tsx
 #: src/components/companies/cadence-card.tsx
-#: src/routes/companies/$slug.tsx
-#: src/routes/companies/$slug.tsx
-#: src/routes/companies/$slug.tsx
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "never"
 msgstr "mai"
 
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Never"
 msgstr "Mai"
 
@@ -3619,12 +3619,12 @@ msgstr "Mai"
 msgid "Never contacted"
 msgstr "Mai contactada"
 
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Never expires"
 msgstr "No caduca mai"
 
-#: src/routes/settings/api-keys/index.tsx
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Never used"
 msgstr "Mai utilitzada"
 
@@ -3632,7 +3632,7 @@ msgstr "Mai utilitzada"
 msgid "New"
 msgstr "Nova"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "New client — set the next action (kick off onboarding)."
 msgstr "Client nou — defineix la següent acció (inicia l'onboarding)."
 
@@ -3641,11 +3641,11 @@ msgid "New follow-up"
 msgstr "Nou seguiment"
 
 #: src/components/instructions/template-dialog.tsx
-#: src/routes/settings/organization/templates.tsx
+#: src/routes/_authed/settings/organization/templates.tsx
 msgid "New org template"
 msgstr "Nova plantilla d'organització"
 
-#: src/routes/settings/organization/templates.tsx
+#: src/routes/_authed/settings/organization/templates.tsx
 msgid "New org template stack"
 msgstr "Nova pila de plantilles de l'organització"
 
@@ -3653,13 +3653,13 @@ msgstr "Nova pila de plantilles de l'organització"
 msgid "New owner"
 msgstr "Nou propietari"
 
+#: src/routes/_authed/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 #: src/routes/reset-password.tsx
-#: src/routes/settings/profile/index.tsx
-#: src/routes/settings/profile/index.tsx
 msgid "New password"
 msgstr "Contrasenya nova"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "New password or app-password"
 msgstr "Contrasenya nova o d'aplicació"
 
@@ -3669,16 +3669,16 @@ msgid "New proposal"
 msgstr "Nova proposta"
 
 #: src/components/instructions/stack-editor.tsx
-#: src/routes/settings/profile/templates.tsx
+#: src/routes/_authed/settings/profile/templates.tsx
 msgid "New stack"
 msgstr "Nova pila"
 
 #: src/components/instructions/template-dialog.tsx
-#: src/routes/settings/profile/templates.tsx
+#: src/routes/_authed/settings/profile/templates.tsx
 msgid "New template"
 msgstr "Nova plantilla"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Next"
 msgstr "Següent"
 
@@ -3701,15 +3701,15 @@ msgstr "Següent: {0}"
 msgid "No active organization"
 msgstr "Sense organització activa"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "No active organization on this session"
 msgstr "Cap organització activa en aquesta sessió"
 
-#: src/routes/settings/organization/index.tsx
+#: src/routes/_authed/settings/organization/index.tsx
 msgid "No active organization. Pick one from the switcher in the top bar."
 msgstr "Sense organització activa. Tria'n una al selector de la barra superior."
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "No activity yet"
 msgstr "Encara no hi ha activitat"
 
@@ -3717,11 +3717,11 @@ msgstr "Encara no hi ha activitat"
 msgid "No brief yet. Research writes one here, or you can start it yourself."
 msgstr "Encara no hi ha resum. La recerca n'escriu un aquí, o el pots començar tu."
 
-#: src/routes/calendar/index.tsx
+#: src/routes/_authed/calendar/index.tsx
 msgid "No calendar events yet"
 msgstr "Encara no hi ha esdeveniments al calendari"
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "No changes recorded yet."
 msgstr "Encara no hi ha canvis enregistrats."
 
@@ -3729,28 +3729,28 @@ msgstr "Encara no hi ha canvis enregistrats."
 msgid "No channels yet. Add the first reachable address below."
 msgstr "Encara no hi ha canals. Afegeix la primera adreça de contacte a sota."
 
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "No companies match the filters"
 msgstr "Cap empresa coincideix amb els filtres"
 
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "No companies yet"
 msgstr "Encara no hi ha empreses"
 
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "No company linked"
 msgstr "Cap empresa vinculada"
 
 #: src/components/layout/org-switcher.tsx
+#: src/routes/_authed/settings/organization/members.tsx
+#: src/routes/_authed/settings/organization/members.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 #: src/routes/login.tsx
 #: src/routes/oauth/consent.tsx
-#: src/routes/settings/organization/members.tsx
-#: src/routes/settings/organization/members.tsx
-#: src/routes/settings/profile/index.tsx
 msgid "No connection to the server. Try again in a few seconds."
 msgstr "Sense connexió al servidor. Torna-ho a provar d'aquí a uns segons."
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "No connections yet. Add this server in your AI assistant and authorize it, then it appears here."
 msgstr "Encara no hi ha connexions. Afegeix aquest servidor al teu assistent d'IA i autoritza'l; després apareixerà aquí."
 
@@ -3774,7 +3774,7 @@ msgstr "Sense contacte des de fa {weeks} setmanes"
 msgid "No contact yet."
 msgstr "Encara sense contacte."
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "No contacts yet"
 msgstr "Encara no hi ha contactes"
 
@@ -3788,11 +3788,11 @@ msgstr "Encara sense coordenades. Localitza aquesta empresa per situar-la al map
 
 #: src/components/shared/task-item.tsx
 #: src/components/shared/task-item.tsx
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "no date"
 msgstr "sense data"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "No description"
 msgstr "Sense descripció"
 
@@ -3804,7 +3804,7 @@ msgstr "Encara no hi ha documents."
 msgid "no due date"
 msgstr "sense data de venciment"
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "No due date"
 msgstr "Sense data"
 
@@ -3812,36 +3812,36 @@ msgstr "Sense data"
 msgid "No fit"
 msgstr "Sense encaix"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "No footers"
 msgstr "Sense peus de pàgina"
 
-#: src/routes/index.tsx
+#: src/routes/_authed/index.tsx
 msgid "No high-priority companies without a scheduled follow-up"
 msgstr "Cap empresa d'alta prioritat sense seguiment programat"
 
-#: src/routes/settings/organization/industries.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
 msgid "No industries yet. One appears here as soon as a company is given a trade."
 msgstr "Encara no hi ha indústries. N’apareixerà una tan bon punt donis un ofici a una empresa."
 
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "No keys yet. Create one above to connect an agent."
 msgstr "Encara no tens cap clau. Crea'n una a dalt per connectar un agent."
 
-#: src/routes/calendar/index.tsx
+#: src/routes/_authed/calendar/index.tsx
 msgid "no location"
 msgstr "sense ubicació"
 
-#: src/routes/emails/$threadId.tsx
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "No mailbox linked"
 msgstr "Cap bústia vinculada"
 
-#: src/routes/settings/organization/members.tsx
+#: src/routes/_authed/settings/organization/members.tsx
 msgid "No members yet."
 msgstr "Encara no hi ha membres."
 
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "No messages in this thread"
 msgstr "No hi ha missatges en aquest fil"
 
@@ -3849,40 +3849,40 @@ msgstr "No hi ha missatges en aquest fil"
 msgid "No open tasks."
 msgstr "Cap tasca oberta."
 
-#: src/routes/settings/organization/templates.tsx
+#: src/routes/_authed/settings/organization/templates.tsx
 msgid "No org stacks yet."
 msgstr "Encara no hi ha piles de l'organització."
 
-#: src/routes/settings/organization/templates.tsx
+#: src/routes/_authed/settings/organization/templates.tsx
 msgid "No org stacks yet. Create one to get started."
 msgstr "Encara no hi ha piles de l'organització. Crea'n una per començar."
 
-#: src/routes/settings/organization/templates.tsx
+#: src/routes/_authed/settings/organization/templates.tsx
 msgid "No org templates yet. Create one to get started."
 msgstr "Encara no hi ha plantilles de l'organització. Crea'n una per començar."
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "No organization selected"
 msgstr "Cap organització seleccionada"
 
-#: src/routes/index.tsx
+#: src/routes/_authed/index.tsx
 msgid "No overdue tasks, no pending follow-ups, no neglected companies."
 msgstr "Sense tasques endarrerides, sense seguiments pendents, sense empreses oblidades."
 
-#: src/routes/companies/$slug.tsx
-#: src/routes/pages/index.tsx
+#: src/routes/_authed/companies/$slug.tsx
+#: src/routes/_authed/pages/index.tsx
 msgid "No pages yet"
 msgstr "Encara no hi ha pàgines"
 
-#: src/routes/settings/organization/spend.tsx
+#: src/routes/_authed/settings/organization/spend.tsx
 msgid "No paid calls in this range."
 msgstr "No hi ha crides de pagament en aquest interval."
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "No pending tasks today. Time to prospect or take a walk."
 msgstr "Avui no hi ha tasques pendents. És hora de prospectar o de fer un tomb."
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "No primary inbox set."
 msgstr "No hi ha cap bústia principal."
 
@@ -3894,7 +3894,7 @@ msgstr "Encara sense productes vinculats"
 msgid "No proposals yet."
 msgstr "Encara no hi ha propostes."
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "No redirect URI"
 msgstr "Sense URI de redirecció"
 
@@ -3918,7 +3918,7 @@ msgstr "Encara sense recerca."
 msgid "No response"
 msgstr "Sense resposta"
 
-#: src/routes/settings/profile/templates.tsx
+#: src/routes/_authed/settings/profile/templates.tsx
 msgid "No stacks yet. Create one to group your templates."
 msgstr "Encara no hi ha piles. Crea'n una per agrupar les teves plantilles."
 
@@ -3931,23 +3931,23 @@ msgstr "No hi ha troballes estructurades."
 msgid "No tags yet"
 msgstr "Encara sense etiquetes"
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "No tasks are sleeping."
 msgstr "No hi ha cap tasca adormida."
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "No tasks completed in the last 7 days."
 msgstr "Cap tasca completada els darrers 7 dies."
 
-#: src/routes/index.tsx
+#: src/routes/_authed/index.tsx
 msgid "No tasks for today"
 msgstr "Cap tasca per a avui"
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "No tasks scheduled beyond this week."
 msgstr "No hi ha tasques programades més enllà d'aquesta setmana."
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "No tasks this week"
 msgstr "Cap tasca aquesta setmana"
 
@@ -3955,19 +3955,19 @@ msgstr "Cap tasca aquesta setmana"
 msgid "No templates added yet."
 msgstr "Encara no has afegit cap plantilla."
 
-#: src/routes/settings/profile/templates.tsx
+#: src/routes/_authed/settings/profile/templates.tsx
 msgid "No templates yet. Create one to start shaping your runs."
 msgstr "Encara no hi ha plantilles. Crea'n una per començar a guiar les teves recerques."
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "No threads match the filters"
 msgstr "Cap fil coincideix amb els filtres"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "No threads yet"
 msgstr "Encara no hi ha fils"
 
-#: src/routes/index.tsx
+#: src/routes/_authed/index.tsx
 msgid "No upcoming due dates"
 msgstr "Sense venciments propers"
 
@@ -4015,7 +4015,7 @@ msgstr "No interessat"
 msgid "Not known"
 msgstr "No se sap"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Not recorded"
 msgstr "No consta"
 
@@ -4023,11 +4023,11 @@ msgstr "No consta"
 msgid "Not seeing it? Check your spam folder. If you're sure the email is right and it never arrives, an admin can help."
 msgstr "No el veus? Mira la carpeta de correu brossa. Si estàs segur que el correu és correcte i no arriba mai, un administrador et pot ajudar."
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Not syncing"
 msgstr "No se sincronitza"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Not yours to set"
 msgstr "No la pots definir tu"
 
@@ -4039,15 +4039,15 @@ msgstr "Nota"
 msgid "Notes"
 msgstr "Notes"
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Nothing can reach this organization right now."
 msgstr "Ara mateix res no pot accedir a aquesta organització."
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Nothing changed yet."
 msgstr "Encara no ha canviat res."
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Nothing completed recently"
 msgstr "Res completat recentment"
 
@@ -4055,11 +4055,11 @@ msgstr "Res completat recentment"
 msgid "Nothing found on the web names this company."
 msgstr "No s'ha trobat res a la web que anomeni aquesta empresa."
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Nothing is connected to this organization yet."
 msgstr "Encara no hi ha res connectat a aquesta organització."
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Nothing later in the queue"
 msgstr "Res més endavant a la cua"
 
@@ -4071,15 +4071,15 @@ msgstr "Cap coincidència"
 msgid "nothing on file, would add"
 msgstr "no hi ha res, s'afegiria"
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Nothing overdue"
 msgstr "Res endarrerit"
 
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "Nothing planned"
 msgstr "Sense res programat"
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Nothing snoozed"
 msgstr "Res ajornat"
 
@@ -4099,11 +4099,11 @@ msgstr "Encara no hi ha res per previsualitzar."
 msgid "Nothing to review right now."
 msgstr "Ara mateix no hi ha res per revisar."
 
-#: src/routes/settings/organization/spend.tsx
+#: src/routes/_authed/settings/organization/spend.tsx
 msgid "Nothing to show in this range."
 msgstr "Res a mostrar en aquest interval."
 
-#: src/routes/documents/index.tsx
+#: src/routes/_authed/documents/index.tsx
 msgid "Nothing written down matches that."
 msgstr "No hi ha res escrit que hi coincideixi."
 
@@ -4120,11 +4120,11 @@ msgstr "Llista numerada"
 msgid "of {0} allowed"
 msgstr "de {0} permesos"
 
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "On {date}, {who} wrote:"
 msgstr "El {date}, {who} va escriure:"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Once it's connected, I can send and receive email for you right here — no switching tabs."
 msgstr "Un cop connectat, puc enviar i rebre correu per tu des d'aquí, sense canviar de pestanya."
 
@@ -4132,7 +4132,7 @@ msgstr "Un cop connectat, puc enviar i rebre correu per tu des d'aquí, sense ca
 msgid "Only an organization admin can change this stack."
 msgstr "Només un administrador de l'organització pot canviar aquesta pila."
 
-#: src/routes/settings/organization/members.tsx
+#: src/routes/_authed/settings/organization/members.tsx
 msgid "Only an owner or an admin can add members."
 msgstr "Només un propietari o un administrador pot afegir membres."
 
@@ -4140,7 +4140,7 @@ msgstr "Només un propietari o un administrador pot afegir membres."
 msgid "Only found named in a list of companies, with no website and no location of its own."
 msgstr "Només s'ha trobat anomenada en una llista d'empreses, sense web ni ubicació pròpies."
 
-#: src/routes/settings/organization/policy.tsx
+#: src/routes/_authed/settings/organization/policy.tsx
 msgid "Only machine-verified values apply on their own; free-text always waits for review."
 msgstr "Només els valors verificats per màquina s'apliquen sols; el text lliure sempre espera revisió."
 
@@ -4151,9 +4151,9 @@ msgstr "Només un lloc web anomena aquesta empresa, així que no hi havia res am
 #: src/components/companies/conversations-tab.tsx
 #: src/components/companies/conversations-tab.tsx
 #: src/components/research/inbox/research-inbox.tsx
-#: src/routes/emails/$threadId.tsx
-#: src/routes/emails/index.tsx
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/emails/$threadId.tsx
+#: src/routes/_authed/emails/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Open"
 msgstr "Obert"
 
@@ -4162,7 +4162,7 @@ msgstr "Obert"
 msgid "Open {0}"
 msgstr "Obre {0}"
 
-#: src/routes/calendar/index.tsx
+#: src/routes/_authed/calendar/index.tsx
 msgid "Open company"
 msgstr "Obre l'empresa"
 
@@ -4175,7 +4175,7 @@ msgid "Open in Cal.com"
 msgstr "Obre a Cal.com"
 
 #: src/components/companies/where-panel-client.client.tsx
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Open in Google Maps"
 msgstr "Obre a Google Maps"
 
@@ -4183,11 +4183,11 @@ msgstr "Obre a Google Maps"
 msgid "Open in new tab"
 msgstr "Obre en una pestanya nova"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Open Instagram"
 msgstr "Obre Instagram"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Open LinkedIn"
 msgstr "Obre LinkedIn"
 
@@ -4210,16 +4210,16 @@ msgid "Open task details"
 msgstr "Obre els detalls de la tasca"
 
 #: src/components/companies/open-tasks-card.tsx
-#: src/routes/index.tsx
-#: src/routes/index.tsx
+#: src/routes/_authed/index.tsx
+#: src/routes/_authed/index.tsx
 msgid "Open tasks"
 msgstr "Tasques obertes"
 
-#: src/routes/index.tsx
+#: src/routes/_authed/index.tsx
 msgid "Open tasks due in the next seven days, counted from tonight rather than to the end of the calendar week."
 msgstr "Tasques obertes que vencen els propers set dies, comptats des d’aquesta nit i no fins al final de la setmana natural."
 
-#: src/routes/index.tsx
+#: src/routes/_authed/index.tsx
 msgid "Open tasks due today, in your own timezone. Anything already past its due date is under Needs attention instead."
 msgstr "Tasques obertes que vencen avui, en el teu fus horari. Les que ja han passat la data són a Necessita atenció."
 
@@ -4227,12 +4227,12 @@ msgstr "Tasques obertes que vencen avui, en el teu fus horari. Les que ja han pa
 msgid "Open the map full screen"
 msgstr "Obre el mapa a pantalla completa"
 
-#: src/routes/settings/organization/index.tsx
+#: src/routes/_authed/settings/organization/index.tsx
 msgid "Open the org spend dashboard"
 msgstr "Obre el panell de despesa de l'organització"
 
 #: src/components/companies/documents-panel.tsx
-#: src/routes/documents/$id.tsx
+#: src/routes/_authed/documents/$id.tsx
 msgid "Open the page"
 msgstr "Obre la pàgina"
 
@@ -4240,20 +4240,20 @@ msgstr "Obre la pàgina"
 msgid "Open the run asking for this lookup"
 msgstr "Obre l'execució que demana aquesta cerca"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Open the setup guide, opens in a new tab"
 msgstr "Obre la guia de configuració, s'obre en una pestanya nova"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Open thread with no subject"
 msgstr "Obre la conversa sense assumpte"
 
 #. placeholder {0}: thread.subject
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Open thread: {0}"
 msgstr "Obre la conversa: {0}"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Open website"
 msgstr "Obre el lloc web"
 
@@ -4261,7 +4261,7 @@ msgstr "Obre el lloc web"
 msgid "Open-ended brief. Pick when the question does not fit a fixed shape — history, market trend, an opinion piece. No structured output."
 msgstr "Resum lliure. Tria-ho quan la pregunta no encaixa en una forma fixa — història, tendència de mercat, opinió. Sense sortida estructurada."
 
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "Opened"
 msgstr "Obert"
 
@@ -4283,16 +4283,16 @@ msgstr "Org"
 msgid "Org — {name}"
 msgstr "Organització — {name}"
 
-#: src/routes/settings/organization/templates.tsx
+#: src/routes/_authed/settings/organization/templates.tsx
 msgid "Org default cleared"
 msgstr "Valor per defecte de l'organització esborrat"
 
-#: src/routes/settings/organization/templates.tsx
+#: src/routes/_authed/settings/organization/templates.tsx
 msgid "Org instruction templates"
 msgstr "Plantilles d'instruccions de l'organització"
 
-#: src/routes/settings/organization/templates.tsx
-#: src/routes/settings/organization/templates.tsx
+#: src/routes/_authed/settings/organization/templates.tsx
+#: src/routes/_authed/settings/organization/templates.tsx
 msgid "Org stacks"
 msgstr "Piles de l'organització"
 
@@ -4300,25 +4300,25 @@ msgstr "Piles de l'organització"
 msgid "Org stacks can only use org templates."
 msgstr "Les piles de l'organització només poden fer servir plantilles de l'organització."
 
-#: src/routes/settings/organization/templates.tsx
+#: src/routes/_authed/settings/organization/templates.tsx
 msgid "Org templates"
 msgstr "Plantilles de l'organització"
 
-#: src/routes/settings/organization/index.tsx
-#: src/routes/settings/organization/industries.tsx
-#: src/routes/settings/organization/members.tsx
-#: src/routes/settings/profile/index.tsx
+#: src/routes/_authed/settings/organization/index.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
+#: src/routes/_authed/settings/organization/members.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 msgid "Organization"
 msgstr "Organització"
 
 #: src/components/layout/org-switcher.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 #: src/routes/oauth/consent.tsx
-#: src/routes/settings/mcp/connections.tsx
-#: src/routes/settings/mcp/connections.tsx
 msgid "Organizations"
 msgstr "Organitzacions"
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Organizations updated"
 msgstr "Organitzacions actualitzades"
 
@@ -4331,12 +4331,12 @@ msgid "Other"
 msgstr "Altres"
 
 #: src/components/interactions/quick-capture-dialog.tsx
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Outbound"
 msgstr "Sortint"
 
 #. placeholder {0}: msg.to.join(', ')
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "Outbound message to {0}"
 msgstr "Missatge sortint a {0}"
 
@@ -4357,11 +4357,11 @@ msgid "Outside the area searched:"
 msgstr "Fora de la zona cercada:"
 
 #: src/components/companies/next-action-card.tsx
-#: src/routes/companies/index.tsx
-#: src/routes/index.tsx
-#: src/routes/index.tsx
-#: src/routes/tasks/index.tsx
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/companies/index.tsx
+#: src/routes/_authed/index.tsx
+#: src/routes/_authed/index.tsx
+#: src/routes/_authed/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Overdue"
 msgstr "Endarrerit"
 
@@ -4369,8 +4369,8 @@ msgstr "Endarrerit"
 msgid "Overlap"
 msgstr "Solapament"
 
-#: src/routes/companies/$slug.tsx
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Overview"
 msgstr "Resum"
 
@@ -4380,44 +4380,44 @@ msgid "Owned by {0}"
 msgstr "El porta {0}"
 
 #: src/components/companies/company-owner-control.tsx
-#: src/routes/companies/index.tsx
-#: src/routes/settings/organization/members.tsx
+#: src/routes/_authed/companies/index.tsx
+#: src/routes/_authed/settings/organization/members.tsx
 msgid "Owner"
 msgstr "Propietari"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Owner and privacy hidden — a team mailbox has no owner and cannot be private"
 msgstr "S'amaguen el propietari i la privadesa: una bústia d'equip no té propietari i no pot ser privada"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Owner user ID"
 msgstr "ID d'usuari propietari"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Page {page} of {totalPages}"
 msgstr "Pàgina {page} de {totalPages}"
 
-#: src/routes/pages/$id.tsx
+#: src/routes/_authed/pages/$id.tsx
 msgid "Page published"
 msgstr "Pàgina publicada"
 
-#: src/routes/pages/$id.tsx
+#: src/routes/_authed/pages/$id.tsx
 msgid "Page saved"
 msgstr "Pàgina desada"
 
-#: src/routes/pages/$id.tsx
+#: src/routes/_authed/pages/$id.tsx
 msgid "Page title"
 msgstr "Títol de la pàgina"
 
 #: src/components/layout/nav-items.ts
-#: src/routes/companies/$slug.tsx
-#: src/routes/pages/$id.tsx
-#: src/routes/pages/index.tsx
+#: src/routes/_authed/companies/$slug.tsx
+#: src/routes/_authed/pages/$id.tsx
+#: src/routes/_authed/pages/index.tsx
 msgid "Pages"
 msgstr "Pàgines"
 
 #. placeholder {0}: companyPages.length
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Pages loaded: {0}"
 msgstr "Pàgines carregades: {0}"
 
@@ -4429,7 +4429,7 @@ msgstr "Acció de pagament aprovada"
 msgid "Paid action skipped"
 msgstr "Acció de pagament omesa"
 
-#: src/routes/settings/organization/policy.tsx
+#: src/routes/_authed/settings/organization/policy.tsx
 msgid "Paid calls at or below this run without asking."
 msgstr "Les crides de pagament iguals o inferiors a aquest import s'executen sense preguntar."
 
@@ -4437,15 +4437,15 @@ msgstr "Les crides de pagament iguals o inferiors a aquest import s'executen sen
 msgid "Paid lookups waiting for your OK"
 msgstr "Cerques de pagament que esperen el teu vistiplau"
 
-#: src/routes/settings/organization/policy.tsx
+#: src/routes/_authed/settings/organization/policy.tsx
 msgid "Paid provider calls allowed within one run."
 msgstr "Crides a proveïdors de pagament permeses en una execució."
 
-#: src/routes/settings/organization/index.tsx
+#: src/routes/_authed/settings/organization/index.tsx
 msgid "Paid research API calls billed to this org."
 msgstr "Crides d'API de recerca pagades carregades a aquesta organització."
 
-#: src/routes/settings/organization/spend.tsx
+#: src/routes/_authed/settings/organization/spend.tsx
 msgid "Paid research API calls billed to this organization."
 msgstr "Crides d'API de recerca pagades carregades a aquesta organització."
 
@@ -4469,7 +4469,7 @@ msgstr "Compleix"
 msgid "Password"
 msgstr "Contrasenya"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Password or app-password"
 msgstr "Contrasenya o contrasenya d'aplicació"
 
@@ -4477,21 +4477,21 @@ msgstr "Contrasenya o contrasenya d'aplicació"
 msgid "Password updated"
 msgstr "Contrasenya actualitzada"
 
-#: src/routes/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 msgid "Password updated."
 msgstr "Contrasenya actualitzada."
 
-#: src/routes/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 msgid "Passwordless sign-in only"
 msgstr "Només inici de sessió sense contrasenya"
 
+#: src/routes/_authed/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 #: src/routes/reset-password.tsx
-#: src/routes/settings/profile/index.tsx
-#: src/routes/settings/profile/index.tsx
 msgid "Passwords need at least {MIN_PASSWORD_LENGTH} characters."
 msgstr "La contrasenya ha de tenir com a mínim {MIN_PASSWORD_LENGTH} caràcters."
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Paste an app password — I'll show you where to get one"
 msgstr "Enganxa una contrasenya d'aplicació; jo et mostraré on aconseguir-ne una"
 
@@ -4504,8 +4504,8 @@ msgid "Pending review"
 msgstr "Pendent de revisió"
 
 #: src/components/research/findings/prospect-scan-view.tsx
-#: src/routes/companies/$slug.tsx
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "People"
 msgstr "Persones"
 
@@ -4513,25 +4513,25 @@ msgstr "Persones"
 msgid "People found"
 msgstr "Persones trobades"
 
-#: src/routes/settings/organization/members.tsx
+#: src/routes/_authed/settings/organization/members.tsx
 msgid "People with access to this workspace."
 msgstr "Persones amb accés a aquest espai de treball."
 
-#: src/routes/settings/organization/policy.tsx
+#: src/routes/_authed/settings/organization/policy.tsx
 msgid "Per-run budget"
 msgstr "Pressupost per execució"
 
-#: src/routes/settings/organization/policy.tsx
+#: src/routes/_authed/settings/organization/policy.tsx
 msgid "Per-run paid budget"
 msgstr "Pressupost de pagament per execució"
 
-#: src/routes/settings/organization/spend.tsx
+#: src/routes/_authed/settings/organization/spend.tsx
 msgid "Person"
 msgstr "Persona"
 
-#: src/routes/calendar/index.tsx
-#: src/routes/tasks/index.tsx
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/calendar/index.tsx
+#: src/routes/_authed/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Personal"
 msgstr "Personal"
 
@@ -4542,7 +4542,7 @@ msgstr "Personal"
 msgid "Phone"
 msgstr "Telèfon"
 
-#: src/routes/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 msgid "Pick a new password. Other signed-in devices will be signed out."
 msgstr "Tria una contrasenya nova. Els altres dispositius es desconnectaran."
 
@@ -4550,7 +4550,7 @@ msgstr "Tria una contrasenya nova. Els altres dispositius es desconnectaran."
 msgid "Pick a password you'll remember. Minimum 8 characters."
 msgstr "Tria una contrasenya que recordis. Mínim 8 caràcters."
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Pick a provider"
 msgstr "Tria un proveïdor"
 
@@ -4558,16 +4558,16 @@ msgstr "Tria un proveïdor"
 msgid "Pick a saved stack, or use your default."
 msgstr "Tria una pila desada o fes servir la teva predeterminada."
 
-#: src/routes/settings/organization/industries.tsx
-#: src/routes/settings/organization/industries.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
 msgid "Pick an industry"
 msgstr "Tria una indústria"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Pick an organization from the switcher in the header, or sign out and back in. After a recent dev DB reset, existing sessions can point at organization ids that the reset removed."
 msgstr "Tria una organització al selector de la barra superior, o tanca la sessió i torna a entrar. Després d'un reset recent de la base de dades de dev, les sessions existents poden apuntar a identificadors d'organització que el reset ha esborrat."
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Pick one to use as your default sender."
 msgstr "Tria'n una com a remitent per defecte."
 
@@ -4575,29 +4575,29 @@ msgstr "Tria'n una com a remitent per defecte."
 msgid "Pick somebody who is still a member."
 msgstr "Tria algú que encara en sigui membre."
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Pick your email provider"
 msgstr "Tria el teu proveïdor de correu"
 
 #: src/components/layout/nav-items.ts
 #: src/components/layout/nav-items.ts
-#: src/routes/index.tsx
+#: src/routes/_authed/index.tsx
 msgid "Pipeline"
 msgstr "Pipeline"
 
-#: src/routes/companies/board.tsx
+#: src/routes/_authed/companies/board.tsx
 msgid "Pipeline board"
 msgstr "Tauler del pipeline"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Plain"
 msgstr "Sense xifrar"
 
 #: src/components/instructions/template-library.tsx
-#: src/routes/settings/organization/templates.tsx
-#: src/routes/settings/organization/templates.tsx
-#: src/routes/settings/profile/templates.tsx
-#: src/routes/settings/profile/templates.tsx
+#: src/routes/_authed/settings/organization/templates.tsx
+#: src/routes/_authed/settings/organization/templates.tsx
+#: src/routes/_authed/settings/profile/templates.tsx
+#: src/routes/_authed/settings/profile/templates.tsx
 msgid "Please try again."
 msgstr "Torna-ho a provar."
 
@@ -4606,17 +4606,17 @@ msgstr "Torna-ho a provar."
 msgid "Possible fit"
 msgstr "Encaix possible"
 
-#: src/routes/calendar/index.tsx
+#: src/routes/_authed/calendar/index.tsx
 msgid "Preparing calendar view…"
 msgstr "S'està preparant la vista del calendari…"
 
 #: src/components/companies/account-brief-section.tsx
-#: src/routes/pages/$id.tsx
-#: src/routes/pages/index.tsx
+#: src/routes/_authed/pages/$id.tsx
+#: src/routes/_authed/pages/index.tsx
 msgid "Preview"
 msgstr "Vista prèvia"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Previous"
 msgstr "Anterior"
 
@@ -4628,15 +4628,15 @@ msgstr "Preu"
 msgid "primary"
 msgstr "principal"
 
-#: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Primary"
 msgstr "Principal"
 
-#: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Primary inbox set"
 msgstr "Bústia principal establerta"
 
@@ -4644,20 +4644,20 @@ msgstr "Bústia principal establerta"
 msgid "Primary navigation"
 msgstr "Navegació principal"
 
-#: src/routes/companies/index.tsx
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/companies/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Priority"
 msgstr "Prioritat"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Private"
 msgstr "Privada"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Private — hide threads from other members"
 msgstr "Privada — amaga els fils a la resta de membres"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Private inbox"
 msgstr "Bústia privada"
 
@@ -4669,7 +4669,7 @@ msgstr "Encaix de productes"
 msgid "Products that fit"
 msgstr "Productes que encaixen"
 
-#: src/routes/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 msgid "Profile"
 msgstr "Perfil"
 
@@ -4686,7 +4686,7 @@ msgstr "Proposta en revisió"
 msgid "Proposal requested"
 msgstr "Proposta sol·licitada"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Proposal stage — set the next action (send it, chase a decision)."
 msgstr "Etapa de proposta — defineix la següent acció (envia-la, persegueix una decisió)."
 
@@ -4694,7 +4694,7 @@ msgstr "Etapa de proposta — defineix la següent acció (envia-la, persegueix 
 msgid "proposals"
 msgstr "propostes"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Proposals"
 msgstr "Propostes"
 
@@ -4714,25 +4714,25 @@ msgstr "Escàner de prospectes"
 msgid "Prospects"
 msgstr "Prospectes"
 
-#: src/routes/pages/$id.tsx
+#: src/routes/_authed/pages/$id.tsx
 msgid "Public URL"
 msgstr "URL pública"
 
-#: src/routes/pages/$id.tsx
+#: src/routes/_authed/pages/$id.tsx
 msgid "Publish"
 msgstr "Publica"
 
-#: src/routes/pages/$id.tsx
+#: src/routes/_authed/pages/$id.tsx
 msgid "Publish failed"
 msgstr "Ha fallat la publicació"
 
-#: src/routes/companies/$slug.tsx
-#: src/routes/pages/index.tsx
-#: src/routes/pages/index.tsx
+#: src/routes/_authed/companies/$slug.tsx
+#: src/routes/_authed/pages/index.tsx
+#: src/routes/_authed/pages/index.tsx
 msgid "Published"
 msgstr "Publicada"
 
-#: src/routes/pages/$id.tsx
+#: src/routes/_authed/pages/$id.tsx
 msgid "Publishing…"
 msgstr "Publicant…"
 
@@ -4757,15 +4757,15 @@ msgid "Question copied"
 msgstr "Pregunta copiada"
 
 #: src/components/research/run-labels.ts
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "Queued"
 msgstr "En cua"
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Quick add task"
 msgstr "Afegeix tasca ràpidament"
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Quick add: \"Call Acme tomorrow #high\""
 msgstr "Afegeix ràpid: «Truca a Acme demà #high»"
 
@@ -4788,7 +4788,7 @@ msgstr "Reexecutant…"
 msgid "Read {0}"
 msgstr "Llegeix {0}"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Read state update failed"
 msgstr "Ha fallat l'actualització de l'estat de lectura"
 
@@ -4808,12 +4808,12 @@ msgstr "S’està llegint aquesta plantilla"
 msgid "Ready to apply"
 msgstr "A punt per aplicar"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Receive and send email from your own inbox inside Batuda."
 msgstr "Rep i envia correu des de la teva bústia dins de Batuda."
 
-#: src/routes/tasks/index.tsx
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Recent changes"
 msgstr "Canvis recents"
 
@@ -4825,7 +4825,7 @@ msgstr "Execucions recents"
 msgid "recently"
 msgstr "fa poc"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Recipient marked as spam"
 msgstr "El destinatari ha marcat el missatge com a brossa"
 
@@ -4847,7 +4847,7 @@ msgstr "Registres"
 msgid "Refresh"
 msgstr "Actualitza"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Refreshing inbox status…"
 msgstr "Actualitzant l'estat de la bústia…"
 
@@ -4877,9 +4877,9 @@ msgstr "S'està rebutjant…"
 msgid "Release owner"
 msgstr "Allibera el responsable"
 
-#: src/routes/emails/inboxes.tsx
-#: src/routes/settings/organization/industries.tsx
-#: src/routes/settings/organization/members.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
+#: src/routes/_authed/settings/organization/members.tsx
 msgid "Remove"
 msgstr "Elimina"
 
@@ -4893,7 +4893,7 @@ msgstr "Treu «{0}» de les piles que la fan servir abans d'eliminar-la."
 #. placeholder {0}: o.name
 #: src/components/emails/attachment-picker.tsx
 #: src/components/instructions/stack-picker.tsx
-#: src/routes/settings/organization/industries.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
 msgid "Remove {0}"
 msgstr "Elimina {0}"
 
@@ -4907,7 +4907,7 @@ msgstr "Elimina {0} {1}"
 msgid "Remove {chip}"
 msgstr "Elimina {chip}"
 
-#: src/routes/settings/organization/members.tsx
+#: src/routes/_authed/settings/organization/members.tsx
 msgid "Remove {email} from this organization?"
 msgstr "Vols eliminar {email} d'aquesta organització?"
 
@@ -4919,29 +4919,29 @@ msgstr "Elimina la línia"
 msgid "Remove this verdict"
 msgstr "Treu aquest veredicte"
 
-#: src/routes/settings/organization/members.tsx
+#: src/routes/_authed/settings/organization/members.tsx
 msgid "Removing…"
 msgstr "Eliminant…"
 
 #. placeholder {0}: industry.label
-#: src/routes/settings/organization/industries.tsx
-#: src/routes/settings/organization/industries.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
 msgid "Rename {0}"
 msgstr "Reanomena {0}"
 
-#: src/routes/emails/$threadId.tsx
-#: src/routes/emails/index.tsx
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/emails/$threadId.tsx
+#: src/routes/_authed/emails/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Reopen"
 msgstr "Reobre"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Reopen thread"
 msgstr "Reobre el fil"
 
+#: src/routes/_authed/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 #: src/routes/reset-password.tsx
-#: src/routes/settings/profile/index.tsx
-#: src/routes/settings/profile/index.tsx
 msgid "Repeat new password"
 msgstr "Repeteix la contrasenya nova"
 
@@ -4949,11 +4949,11 @@ msgstr "Repeteix la contrasenya nova"
 msgid "Replace the org default"
 msgstr "Substitueix el valor per defecte de l'organització"
 
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "Reply"
 msgstr "Respon"
 
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "Reply all"
 msgstr "Respon a tots"
 
@@ -4972,17 +4972,17 @@ msgstr "Demana un enllaç nou"
 msgid "Research"
 msgstr "Recerca"
 
-#: src/routes/settings/organization/index.tsx
-#: src/routes/settings/organization/policy.tsx
-#: src/routes/settings/organization/policy.tsx
+#: src/routes/_authed/settings/organization/index.tsx
+#: src/routes/_authed/settings/organization/policy.tsx
+#: src/routes/_authed/settings/organization/policy.tsx
 msgid "Research budget"
 msgstr "Pressupost de recerca"
 
-#: src/routes/settings/organization/policy.tsx
+#: src/routes/_authed/settings/organization/policy.tsx
 msgid "Research budget saved."
 msgstr "Pressupost de recerca desat."
 
-#: src/routes/index.tsx
+#: src/routes/_authed/index.tsx
 msgid "Research finished — needs a look"
 msgstr "Recerca acabada — cal revisar-la"
 
@@ -4990,7 +4990,7 @@ msgstr "Recerca acabada — cal revisar-la"
 msgid "Research has not weighed this company up yet. Run it to get a verdict and the reasons behind it."
 msgstr "La recerca encara no ha valorat aquesta empresa. Executa-la per obtenir un veredicte i els motius que hi ha al darrere."
 
-#: src/routes/research/$id.tsx
+#: src/routes/_authed/research/$id.tsx
 msgid "Research run"
 msgstr "Recerca"
 
@@ -5006,7 +5006,7 @@ msgstr "Torna a enviar en"
 msgid "Resend link"
 msgstr "Torna a enviar l'enllaç"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Reset"
 msgstr "Restableix"
 
@@ -5018,7 +5018,7 @@ msgstr "Els enllaços per restablir caduquen en 1 hora i només es poden fer ser
 msgid "Reset your password"
 msgstr "Restableix la contrasenya"
 
-#: src/routes/calendar/index.tsx
+#: src/routes/_authed/calendar/index.tsx
 msgid "Respond to the organizer"
 msgstr "Respon a l'organitzador"
 
@@ -5027,25 +5027,25 @@ msgstr "Respon a l'organitzador"
 msgid "Responded"
 msgstr "Respost"
 
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "Restore"
 msgstr "Restaura"
 
 #. placeholder {0}: company.name
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "Restore {0}"
 msgstr "Restaura {0}"
 
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "Restoring…"
 msgstr "S'està restaurant…"
 
 #. placeholder {0}: drafts.length
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Resume drafting ({0})"
 msgstr "Reprèn esborranys ({0})"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Resume drafting (1)"
 msgstr "Reprèn l'esborrany (1)"
 
@@ -5053,11 +5053,11 @@ msgstr "Reprèn l'esborrany (1)"
 msgid "Retry"
 msgstr "Torna-ho a provar"
 
-#: src/routes/settings/profile/templates.tsx
+#: src/routes/_authed/settings/profile/templates.tsx
 msgid "Reusable, standing guidance your agents follow — what you sell, who you target, tone, and which sources to trust."
 msgstr "Orientació reutilitzable i permanent que segueixen els teus agents: què vens, a qui t'adreces, el to i en quines fonts confiar."
 
-#: src/routes/settings/organization/index.tsx
+#: src/routes/_authed/settings/organization/index.tsx
 msgid "Review the industries on your companies"
 msgstr "Revisa les indústries de les teves empreses"
 
@@ -5065,13 +5065,13 @@ msgstr "Revisa les indústries de les teves empreses"
 msgid "Review what the research agent found and decide what enters the CRM."
 msgstr "Revisa què ha trobat l'agent de recerca i decideix què entra al CRM."
 
-#: src/routes/settings/mcp/connections.tsx
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Revoke"
 msgstr "Revoca"
 
 #. placeholder {0}: orgNameById.get(orgId) ?? orgId
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Revoke {0}"
 msgstr "Revoca {0}"
 
@@ -5084,7 +5084,7 @@ msgid "Risky and undeliverable record doubt about an address. Removing a verdict
 msgstr "Arriscada i no lliurable registren dubtes sobre una adreça. Treure un veredicte diu que ningú no ho ha comprovat, que és la veritat sobre un que es va escriure en comptes de comprovar-se. Només una comprovació pot tornar a confirmar una adreça."
 
 #: src/components/research/run-labels.ts
-#: src/routes/settings/organization/members.tsx
+#: src/routes/_authed/settings/organization/members.tsx
 msgid "Role"
 msgstr "Rol"
 
@@ -5146,19 +5146,19 @@ msgstr "Context comercial"
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/instructions/template-dialog.tsx
-#: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
-#: src/routes/pages/$id.tsx
-#: src/routes/settings/mcp/connections.tsx
-#: src/routes/settings/organization/industries.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/pages/$id.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
 msgid "Save"
 msgstr "Desa"
 
-#: src/routes/settings/organization/policy.tsx
+#: src/routes/_authed/settings/organization/policy.tsx
 msgid "Save budget"
 msgstr "Desa el pressupost"
 
-#: src/routes/pages/$id.tsx
+#: src/routes/_authed/pages/$id.tsx
 msgid "Save failed"
 msgstr "Ha fallat el desament"
 
@@ -5166,7 +5166,7 @@ msgstr "Ha fallat el desament"
 msgid "Save new password"
 msgstr "Desa la nova contrasenya"
 
-#: src/routes/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 msgid "Save password"
 msgstr "Desa la contrasenya"
 
@@ -5192,29 +5192,29 @@ msgstr "Desada, però no s'ha marcat com a predeterminada"
 #: src/components/emails/compose-form.tsx
 #: src/components/instructions/stack-editor.tsx
 #: src/components/instructions/template-dialog.tsx
-#: src/routes/emails/inboxes.tsx
-#: src/routes/pages/$id.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/pages/$id.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/organization/policy.tsx
+#: src/routes/_authed/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 #: src/routes/reset-password.tsx
-#: src/routes/settings/mcp/connections.tsx
-#: src/routes/settings/organization/policy.tsx
-#: src/routes/settings/profile/index.tsx
-#: src/routes/settings/profile/index.tsx
 msgid "Saving…"
 msgstr "Desant…"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Schedule a call via Cal.com"
 msgstr "Programa una trucada amb Cal.com"
 
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "Search by name, industry, or location…"
 msgstr "Cerca per nom, sector o ubicació…"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Search by subject…"
 msgstr "Cerca per assumpte…"
 
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "Search companies"
 msgstr "Cerca empreses"
 
@@ -5226,11 +5226,11 @@ msgstr "Cerca nom o consulta"
 msgid "Search the review queue"
 msgstr "Cerca a la cua de revisió"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Search threads"
 msgstr "Cerca fils"
 
-#: src/routes/documents/index.tsx
+#: src/routes/_authed/documents/index.tsx
 msgid "Search titles and text"
 msgstr "Cerca en títols i text"
 
@@ -5238,7 +5238,7 @@ msgstr "Cerca en títols i text"
 msgid "Searching and reasoning"
 msgstr "Cercant i raonant"
 
-#: src/routes/settings/organization/index.tsx
+#: src/routes/_authed/settings/organization/index.tsx
 msgid "See who can access this workspace, and add or remove people."
 msgstr "Mira qui té accés a aquest espai i afegeix-hi o treu-ne persones."
 
@@ -5247,8 +5247,8 @@ msgstr "Mira qui té accés a aquest espai i afegeix-hi o treu-ne persones."
 msgid "Select {0}"
 msgstr "Selecciona {0}"
 
-#: src/routes/emails/index.tsx
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Select all threads on this page"
 msgstr "Selecciona tots els fils d'aquesta pàgina"
 
@@ -5260,7 +5260,7 @@ msgstr "Selecciona almenys una organització abans d'autoritzar."
 msgid "Select inbox…"
 msgstr "Tria una safata…"
 
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Select the key and copy it manually."
 msgstr "Selecciona la clau i copia-la manualment."
 
@@ -5269,7 +5269,7 @@ msgid "Select the text and copy it manually."
 msgstr "Selecciona el text i copia'l manualment."
 
 #. placeholder {0}: row.original.subject ?? '(no subject)'
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Select thread {0}"
 msgstr "Selecciona el fil {0}"
 
@@ -5281,7 +5281,7 @@ msgstr "Envia"
 msgid "Send blocked: these recipients cannot receive email"
 msgstr "Enviament bloquejat: aquests destinataris no poden rebre correu"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Send email"
 msgstr "Envia correu"
 
@@ -5305,16 +5305,16 @@ msgid "Sending…"
 msgstr "Enviant…"
 
 #. placeholder {0}: row.redirectHost
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Sends you to {0}"
 msgstr "T'envia a {0}"
 
 #: src/components/companies/proposals-panel.tsx
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "Sent"
 msgstr "Enviat"
 
-#: src/routes/settings/mcp/index.tsx
+#: src/routes/_authed/settings/mcp/index.tsx
 msgid "server URL"
 msgstr "l'URL del servidor"
 
@@ -5322,7 +5322,7 @@ msgstr "l'URL del servidor"
 msgid "Set a new password"
 msgstr "Posa una contrasenya nova"
 
-#: src/routes/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 msgid "Set a password"
 msgstr "Posa una contrasenya"
 
@@ -5330,7 +5330,7 @@ msgstr "Posa una contrasenya"
 msgid "Set a password so you don't have to check your email next time."
 msgstr "Posa una contrasenya per no haver de mirar el correu la pròxima vegada."
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Set as default"
 msgstr "Estableix com a predeterminat"
 
@@ -5338,7 +5338,7 @@ msgstr "Estableix com a predeterminat"
 msgid "Set password"
 msgstr "Posa contrasenya"
 
-#: src/routes/settings/organization/index.tsx
+#: src/routes/_authed/settings/organization/index.tsx
 msgid "Set research budgets and auto-apply"
 msgstr "Configura els pressupostos de recerca i l'aplicació automàtica"
 
@@ -5348,15 +5348,15 @@ msgstr "Configura <0>plantilles d'instruccions</0> reutilitzables per guiar cada
 
 #: src/components/layout/nav-items.ts
 #: src/components/layout/nav-items.ts
-#: src/routes/pages/$id.tsx
-#: src/routes/settings/api-keys/index.tsx
-#: src/routes/settings/mcp/connections.tsx
-#: src/routes/settings/mcp/index.tsx
-#: src/routes/settings/profile/index.tsx
+#: src/routes/_authed/pages/$id.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 msgid "Settings"
 msgstr "Configuració"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Setup guide →"
 msgstr "Guia de configuració →"
 
@@ -5364,11 +5364,11 @@ msgstr "Guia de configuració →"
 msgid "Shaped by"
 msgstr "Modelat per"
 
-#: src/routes/settings/organization/index.tsx
+#: src/routes/_authed/settings/organization/index.tsx
 msgid "Shared guidance and the org research default."
 msgstr "Orientació compartida i la recerca per defecte de l'organització."
 
-#: src/routes/settings/organization/templates.tsx
+#: src/routes/_authed/settings/organization/templates.tsx
 msgid "Shared guidance every member's agents can use, plus the organization's stacks."
 msgstr "Orientació compartida que poden fer servir els agents de tots els membres, més les piles de l'organització."
 
@@ -5376,26 +5376,26 @@ msgstr "Orientació compartida que poden fer servir els agents de tots els membr
 msgid "Shared with everyone in your organization — their agents follow it on every run."
 msgstr "Compartida amb tothom de la teva organització: els seus agents la segueixen a cada execució."
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Shared with the team"
 msgstr "Compartida amb l'equip"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Shared with the whole team — no single owner"
 msgstr "Compartida amb tot l'equip: sense cap propietari"
 
-#: src/routes/index.tsx
-#: src/routes/index.tsx
-#: src/routes/index.tsx
+#: src/routes/_authed/index.tsx
+#: src/routes/_authed/index.tsx
+#: src/routes/_authed/index.tsx
 msgid "Show all"
 msgstr "Mostra-ho tot"
 
-#: src/routes/index.tsx
+#: src/routes/_authed/index.tsx
 msgid "Show all quiet companies"
 msgstr "Mostra totes les empreses en silenci"
 
 #. placeholder {0}: msg.cc.length
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "Show Cc ({0})"
 msgstr "Mostra Cc ({0})"
 
@@ -5413,7 +5413,7 @@ msgstr "Mostra més"
 msgid "Show password"
 msgstr "Mostra la contrasenya"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Show system events"
 msgstr "Mostra esdeveniments del sistema"
 
@@ -5427,7 +5427,7 @@ msgstr "Es mostren {0} de {attentionTotal}. Obre totes les execucions per veure 
 msgid "Showing {0} of {totalPending}. Narrow the filters to reach the rest."
 msgstr "Es mostren {0} de {totalPending}. Afina els filtres per arribar a la resta."
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Showing {firstRow}–{lastRow} of {total}"
 msgstr "Mostrant {firstRow}–{lastRow} de {total}"
 
@@ -5459,11 +5459,11 @@ msgstr "Inicia sessió per continuar"
 msgid "Sign in with your new password. Other devices will need to sign in again too."
 msgstr "Inicia sessió amb la contrasenya nova. Els altres dispositius també hauran de tornar a iniciar sessió."
 
-#: src/routes/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 msgid "Sign out"
 msgstr "Tanca sessió"
 
-#: src/routes/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 msgid "Sign-out failed. Please try again."
 msgstr "No s'ha pogut tancar la sessió. Torna-ho a provar."
 
@@ -5471,7 +5471,7 @@ msgstr "No s'ha pogut tancar la sessió. Torna-ho a provar."
 msgid "Signing in…"
 msgstr "Iniciant sessió…"
 
-#: src/routes/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 msgid "Signing out…"
 msgstr "Tancant sessió…"
 
@@ -5491,34 +5491,34 @@ msgstr "Omet"
 msgid "Skip {0}"
 msgstr "Omet {0}"
 
-#: src/routes/pages/$id.tsx
-#: src/routes/pages/index.tsx
-#: src/routes/settings/organization/index.tsx
+#: src/routes/_authed/pages/$id.tsx
+#: src/routes/_authed/pages/index.tsx
+#: src/routes/_authed/settings/organization/index.tsx
 msgid "Slug"
 msgstr "Slug"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "SMTP host"
 msgstr "Servidor SMTP"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "SMTP port"
 msgstr "Port SMTP"
 
-#: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "SMTP security"
 msgstr "Seguretat SMTP"
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Snooze 1d"
 msgstr "Posposa 1d"
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Snoozed"
 msgstr "Ajornades"
 
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "someone"
 msgstr "algú"
 
@@ -5526,7 +5526,7 @@ msgstr "algú"
 msgid "Someone had already decided this one."
 msgstr "Algú ja havia decidit aquesta."
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Someone since removed"
 msgstr "Algú que ja no hi és"
 
@@ -5538,17 +5538,17 @@ msgstr "Alguna cosa ha anat malament en executar aquesta recerca."
 msgid "Something went wrong. Start the connection again from your assistant."
 msgstr "Alguna cosa ha anat malament. Torna a iniciar la connexió des del teu assistent."
 
+#: src/routes/_authed/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 #: src/routes/reset-password.tsx
-#: src/routes/settings/mcp/connections.tsx
-#: src/routes/settings/mcp/connections.tsx
-#: src/routes/settings/mcp/connections.tsx
-#: src/routes/settings/mcp/connections.tsx
-#: src/routes/settings/profile/index.tsx
-#: src/routes/settings/profile/index.tsx
 msgid "Something went wrong. Try again."
 msgstr "Alguna cosa ha fallat. Prova-ho de nou."
 
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "Sort"
 msgstr "Ordena"
 
@@ -5557,8 +5557,8 @@ msgstr "Ordena"
 msgid "source"
 msgstr "font"
 
-#: src/routes/calendar/index.tsx
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/calendar/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Source"
 msgstr "Origen"
 
@@ -5579,7 +5579,7 @@ msgstr "Les fonts no coincideixen"
 msgid "Sources language"
 msgstr "Idioma de les fonts"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Spam"
 msgstr "Brossa"
 
@@ -5587,22 +5587,22 @@ msgstr "Brossa"
 msgid "Spanish"
 msgstr "Castellà"
 
-#: src/routes/settings/organization/index.tsx
-#: src/routes/settings/organization/spend.tsx
-#: src/routes/settings/organization/spend.tsx
-#: src/routes/settings/organization/spend.tsx
+#: src/routes/_authed/settings/organization/index.tsx
+#: src/routes/_authed/settings/organization/spend.tsx
+#: src/routes/_authed/settings/organization/spend.tsx
+#: src/routes/_authed/settings/organization/spend.tsx
 msgid "Spend"
 msgstr "Despesa"
 
-#: src/routes/settings/organization/policy.tsx
+#: src/routes/_authed/settings/organization/policy.tsx
 msgid "Spend ceilings"
 msgstr "Límits de despesa"
 
-#: src/routes/settings/organization/index.tsx
+#: src/routes/_authed/settings/organization/index.tsx
 msgid "Spend ceilings and the confidence needed to auto-apply findings."
 msgstr "Límits de despesa i la confiança necessària per aplicar automàticament les conclusions."
 
-#: src/routes/settings/organization/policy.tsx
+#: src/routes/_authed/settings/organization/policy.tsx
 msgid "Spend ceilings for research and how confident a finding must be to apply on its own."
 msgstr "Límits de despesa per a la recerca i quina confiança ha de tenir una conclusió per aplicar-se sola."
 
@@ -5610,8 +5610,8 @@ msgstr "Límits de despesa per a la recerca i quina confiança ha de tenir una c
 msgid "Spent"
 msgstr "Gastat"
 
-#: src/routes/settings/organization/templates.tsx
-#: src/routes/settings/profile/templates.tsx
+#: src/routes/_authed/settings/organization/templates.tsx
+#: src/routes/_authed/settings/profile/templates.tsx
 msgid "Stack deleted"
 msgstr "Pila eliminada"
 
@@ -5620,7 +5620,7 @@ msgstr "Pila eliminada"
 msgid "Stack saved"
 msgstr "Pila desada"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Stage changed"
 msgstr "Etapa canviada"
 
@@ -5640,7 +5640,7 @@ msgstr "Orientació permanent que el teu agent de recerca segueix en cada recerc
 msgid "Start"
 msgstr "Inicia"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Start sending and receiving"
 msgstr "Comença a enviar i rebre"
 
@@ -5657,21 +5657,21 @@ msgstr "Iniciant l'execució…"
 msgid "Starting…"
 msgstr "Iniciant…"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "STARTTLS"
 msgstr "STARTTLS"
 
 #: src/components/companies/proposals-panel.tsx
 #: src/components/companies/proposals-panel.tsx
-#: src/routes/calendar/index.tsx
-#: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
-#: src/routes/pages/index.tsx
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/calendar/index.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/pages/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Status"
 msgstr "Estat"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Status update failed"
 msgstr "Ha fallat l'actualització d'estat"
 
@@ -5689,15 +5689,15 @@ msgstr "Pas {0} de 3"
 msgid "Still in use"
 msgstr "Encara s'utilitza"
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Stopped by"
 msgstr "Aturat per"
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Stopped here"
 msgstr "Aturats aquí"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Stored encrypted with AES-256-GCM."
 msgstr "Es desa xifrada amb AES-256-GCM."
 
@@ -5746,7 +5746,7 @@ msgstr "Sistema"
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/run-labels.ts
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "Tags"
 msgstr "Etiquetes"
 
@@ -5773,11 +5773,11 @@ msgid "Task title"
 msgstr "Títol de la tasca"
 
 #: src/components/layout/nav-items.ts
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Tasks"
 msgstr "Tasques"
 
-#: src/routes/index.tsx
+#: src/routes/_authed/index.tsx
 msgid "Tasks past their due date, companies whose follow-up date has passed, companies mid-deal with no contact in two weeks, and finished research nobody has decided on. Each company is listed once, under its most urgent reason. Closed and dead companies are left out."
 msgstr "Tasques amb la data passada, empreses amb el seguiment vençut, empreses amb una venda en curs sense contacte des de fa dues setmanes, i recerques acabades que ningú ha resolt. Cada empresa apareix un sol cop, pel motiu més urgent. Les tancades i les descartades queden fora."
 
@@ -5786,11 +5786,11 @@ msgstr "Tasques amb la data passada, empreses amb el seguiment vençut, empreses
 msgid "Tax ID"
 msgstr "NIF"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Technical details"
 msgstr "Detalls tècnics"
 
-#: src/routes/pages/$id.tsx
+#: src/routes/_authed/pages/$id.tsx
 msgid "Template"
 msgstr "Plantilla"
 
@@ -5802,7 +5802,7 @@ msgstr "Plantilla eliminada"
 msgid "Template handed over"
 msgstr "Plantilla traspassada"
 
-#: src/routes/settings/profile/templates.tsx
+#: src/routes/_authed/settings/profile/templates.tsx
 msgid "Templates"
 msgstr "Plantilles"
 
@@ -5811,23 +5811,23 @@ msgid "tentative"
 msgstr "provisional"
 
 #: src/components/companies/conversations-tab.tsx
-#: src/routes/calendar/index.tsx
+#: src/routes/_authed/calendar/index.tsx
 msgid "Tentative"
 msgstr "Provisional"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Test & connect"
 msgstr "Prova i connecta"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Test connection"
 msgstr "Prova la connexió"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Test failed"
 msgstr "Prova fallida"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Testing connection…"
 msgstr "Provant la connexió…"
 
@@ -5843,7 +5843,7 @@ msgstr "Aquesta sol·licitud de connexió ha caducat. Torna a iniciar-la des del
 msgid "That does not look like a website. Try the company's domain, like acme.com."
 msgstr "Això no sembla un lloc web. Prova el domini de l'empresa, com ara acme.com."
 
-#: src/routes/settings/organization/members.tsx
+#: src/routes/_authed/settings/organization/members.tsx
 msgid "That email address can't be used."
 msgstr "Aquesta adreça electrònica no es pot fer servir."
 
@@ -5863,15 +5863,15 @@ msgstr "Aquesta cerca no està disponible, així que només es pot ometre."
 msgid "That set of instructions is no longer available. Pick another and try again."
 msgstr "Aquest conjunt d'instruccions ja no està disponible. Tria'n un altre i torna-ho a provar."
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "The 20 most recently edited tasks on this shelf. Click one to reopen it."
 msgstr "Les 20 tasques editades més recentment d'aquest prestatge. Fes clic en una per reobrir-la."
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "The activity for this company could not be fetched. Check that the session is valid, then try again."
 msgstr "No s'ha pogut recuperar l'activitat d'aquesta empresa. Comprova que la sessió sigui vàlida i torna-ho a provar."
 
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "The API key can no longer be used."
 msgstr "La clau d'API ja no es pot fer servir."
 
@@ -5881,8 +5881,8 @@ msgstr "No s'ha pogut carregar el tauler. Comprova que la sessió sigui vàlida 
 
 #: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/contacts/manage-channels-dialog.tsx
-#: src/routes/companies/$slug.tsx
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "The change didn't go through. Try again."
 msgstr "El canvi no s'ha completat. Torna-ho a provar."
 
@@ -5894,7 +5894,7 @@ msgstr "No s'han pogut aplicar els canvis."
 msgid "The check could not run, so this company was never looked into."
 msgstr "La comprovació no es va poder executar, així que aquesta empresa no es va arribar a mirar."
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "The company could not be fetched. Check that the session is valid, then try again."
 msgstr "No s'ha pogut carregar l'empresa. Comprova que la sessió sigui vàlida i torna-ho a provar."
 
@@ -5902,11 +5902,11 @@ msgstr "No s'ha pogut carregar l'empresa. Comprova que la sessió sigui vàlida 
 msgid "The company this research was pinned to isn't here any more, so I stopped rather than research the wrong one."
 msgstr "L'empresa a què estava lligada aquesta recerca ja no hi és, així que m'he aturat en comptes d'investigar-ne una altra."
 
-#: src/routes/pages/$id.tsx
+#: src/routes/_authed/pages/$id.tsx
 msgid "The content arrived in a form the editor cannot read, so there is nothing to edit. Go back to the list and open the page again; report it if it keeps happening."
 msgstr "El contingut ha arribat en un format que l'editor no pot llegir, així que no hi ha res per editar. Torna a la llista i obre la pàgina de nou; informa-ho si continua passant."
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "The details arrived in a form this page cannot read, so there is nothing to show. Go back to the list and open the company again; report it if it keeps happening."
 msgstr "Les dades han arribat en un format que aquesta pàgina no pot llegir, així que no hi ha res per mostrar. Torna a la llista i obre l'empresa de nou; informa-ho si continua passant."
 
@@ -5922,24 +5922,24 @@ msgstr "Les proves situen aquesta empresa fora de la zona que demanava la cerca.
 msgid "The geocoder did not return a match. Try editing the location field."
 msgstr "El geocodificador no ha trobat cap coincidència. Prova d'editar el camp d'ubicació."
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "The inboxes could not be fetched. Check that the session is valid, then try again."
 msgstr "No s'han pogut carregar les safates. Comprova que la sessió sigui vàlida i torna-ho a provar."
 
-#: src/routes/calendar/index.tsx
+#: src/routes/_authed/calendar/index.tsx
 msgid "The invitation gave no time zone, so this time may be wrong. Confirm it with the organizer."
 msgstr "La invitació no indicava cap fus horari, així que aquesta hora pot ser incorrecta. Confirma-la amb qui organitza."
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "The ledger is clean."
 msgstr "El llibre de comptes està net."
 
-#: src/routes/companies/index.tsx
-#: src/routes/pages/index.tsx
+#: src/routes/_authed/companies/index.tsx
+#: src/routes/_authed/pages/index.tsx
 msgid "The list could not be fetched. Check that the session is valid, then try again."
 msgstr "No s'ha pogut carregar la llista. Comprova que la sessió sigui vàlida i torna-ho a provar."
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "The list could not be fetched. Check the connection, then try again."
 msgstr "No s'ha pogut obtenir la llista. Comprova la connexió i torna-ho a provar."
 
@@ -5947,7 +5947,7 @@ msgstr "No s'ha pogut obtenir la llista. Comprova la connexió i torna-ho a prov
 msgid "The list of changes could not be loaded."
 msgstr "No s'ha pogut carregar la llista de canvis."
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "The mailbox is ready."
 msgstr "La bústia està a punt."
 
@@ -5955,15 +5955,15 @@ msgstr "La bústia està a punt."
 msgid "The name matched too many companies to tell them apart."
 msgstr "El nom coincidia amb massa empreses per distingir-les."
 
-#: src/routes/pages/$id.tsx
+#: src/routes/_authed/pages/$id.tsx
 msgid "The page could not be fetched. Check that the session is valid, then try again."
 msgstr "No s'ha pogut carregar la pàgina. Comprova que la sessió sigui vàlida i torna-ho a provar."
 
-#: src/routes/pages/$id.tsx
+#: src/routes/_authed/pages/$id.tsx
 msgid "The page is now live."
 msgstr "La pàgina ja està publicada."
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "The pages for this company could not be fetched. Check that the session is valid, then try again."
 msgstr "No s'han pogut recuperar les pàgines d'aquesta empresa. Comprova que la sessió sigui vàlida i torna-ho a provar."
 
@@ -5971,7 +5971,7 @@ msgstr "No s'han pogut recuperar les pàgines d'aquesta empresa. Comprova que la
 msgid "The pages I found were about a different company, so I didn't save anything."
 msgstr "Les pàgines que he trobat eren d'una altra empresa, així que no he desat res."
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "The people at this company could not be fetched. Check that the session is valid, then try again."
 msgstr "No s'han pogut recuperar les persones d'aquesta empresa. Comprova que la sessió sigui vàlida i torna-ho a provar."
 
@@ -5984,7 +5984,7 @@ msgstr "No s'han pogut recuperar les propostes d'aquesta empresa. Comprova que l
 msgid "The receiving server said: {0}"
 msgstr "El servidor que el rep ha dit: {0}"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "The research runs for this company could not be fetched. Check that the session is valid, then try again."
 msgstr "No s'han pogut recuperar les recerques d'aquesta empresa. Comprova que la sessió sigui vàlida i torna-ho a provar."
 
@@ -6016,19 +6016,19 @@ msgstr "La cerca es va quedar sense temps abans d'arribar a aquesta empresa."
 msgid "The search spent its checking allowance before it reached this company."
 msgstr "La cerca va exhaurir el pressupost de comprovació abans d'arribar a aquesta empresa."
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "The tasks for this company could not be fetched. Check that the session is valid, then try again."
 msgstr "No s'han pogut recuperar les tasques d'aquesta empresa. Comprova que la sessió sigui vàlida i torna-ho a provar."
 
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "The thread exists but the provider returned no messages."
 msgstr "El fil existeix però el proveïdor no ha retornat cap missatge."
 
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "The thread may have been archived upstream or the link is stale."
 msgstr "Potser el fil s'ha arxivat al proveïdor o l'enllaç és obsolet."
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "The threads could not be fetched. Check that the session is valid, then try again."
 msgstr "No s'han pogut carregar les converses. Comprova que la sessió sigui vàlida i torna-ho a provar."
 
@@ -6036,19 +6036,19 @@ msgstr "No s'han pogut carregar les converses. Comprova que la sessió sigui và
 msgid "The token expired or was already used. Request a fresh link."
 msgstr "El token ha caducat o ja s'ha fet servir. Demana un enllaç nou."
 
-#: src/routes/settings/organization/index.tsx
+#: src/routes/_authed/settings/organization/index.tsx
 msgid "The trades your companies are in — check the ones research suggested, and merge any duplicates."
 msgstr "Els oficis de les teves empreses: comprova els que ha proposat la recerca i fusiona’n els duplicats."
 
-#: src/routes/settings/organization/industries.tsx
+#: src/routes/_authed/settings/organization/industries.tsx
 msgid "The trades your companies are in. Each one is written the first time somebody uses it, however they spell it — this is where the list gets tidied."
 msgstr "Els oficis de les teves empreses. Cadascun s’escriu el primer cop que algú l’utilitza, tal com l’escrigui: aquí és on s’endreça la llista."
 
-#: src/routes/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 msgid "The two new password fields don't match."
 msgstr "Les dues contrasenyes noves no coincideixen."
 
-#: src/routes/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 msgid "The two password fields don't match."
 msgstr "Les dues contrasenyes no coincideixen."
 
@@ -6056,19 +6056,19 @@ msgstr "Les dues contrasenyes no coincideixen."
 msgid "The two passwords don't match."
 msgstr "Les dues contrasenyes no coincideixen."
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "The week is clear — good time to plan."
 msgstr "La setmana és lliure: bon moment per planificar."
 
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "The workshop ledger — tear off one strip at a time."
 msgstr "El llibre del taller — arrenca-n'hi una tira cada vegada."
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "The workshop rejected the change. Try again."
 msgstr "El taller ha rebutjat el canvi. Torna-ho a provar."
 
-#: src/routes/settings/organization/index.tsx
+#: src/routes/_authed/settings/organization/index.tsx
 msgid "The workspace your CRM data lives in."
 msgstr "L'espai de treball on viuen les dades del CRM."
 
@@ -6085,7 +6085,7 @@ msgstr "Encara no hi ha ningú més a la teva organització a qui traspassar-la.
 msgid "These cost money, so nothing runs until you say so. About {0} in total."
 msgstr "Costen diners, així que no es fa res fins que ho diguis. Uns {0} en total."
 
-#: src/routes/settings/organization/members.tsx
+#: src/routes/_authed/settings/organization/members.tsx
 msgid "They join straight away and get an email telling them so. It carries no password and no link to sign in with."
 msgstr "S'hi afegeix immediatament i rep un correu que l'hi comunica. No conté cap contrasenya ni cap enllaç per iniciar la sessió."
 
@@ -6093,32 +6093,32 @@ msgstr "S'hi afegeix immediatament i rep un correu que l'hi comunica. No conté 
 msgid "They replied — keep the thread warm"
 msgstr "Ha respost — manté el fil calent"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "They responded — set the next action to keep it warm."
 msgstr "Han respost — defineix la següent acció per mantenir-ho actiu."
 
-#: src/routes/settings/organization/members.tsx
+#: src/routes/_authed/settings/organization/members.tsx
 msgid "They sign in at the sign-in page with this address and ask for their own link, so nothing sent here can expire."
 msgstr "La persona inicia la sessió a la pàgina d'inici de sessió amb aquesta adreça i demana el seu propi enllaç, de manera que res del que s'enviï des d'aquí no pot caducar."
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "This assistant can no longer reach this organization."
 msgstr "Aquest assistent ja no pot accedir a aquesta organització."
 
 #. placeholder {0}: tickedOrgIds.length
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "This assistant is authorized for {0} organizations."
 msgstr "Aquest assistent està autoritzat a {0} organitzacions."
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "This assistant now works in one organization."
 msgstr "Aquest assistent ara treballa en una sola organització."
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "This assistant works in the organizations you tick here."
 msgstr "Aquest assistent treballa a les organitzacions que marquis aquí."
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "This company can't be displayed"
 msgstr "Aquesta empresa no es pot mostrar"
 
@@ -6130,7 +6130,7 @@ msgstr "No s'ha pogut llegir el nom d'aquesta empresa, així que res no ha compr
 msgid "This document is a web page. It opens in a new tab."
 msgstr "Aquest document és una pàgina web. S'obre en una pestanya nova."
 
-#: src/routes/documents/$id.tsx
+#: src/routes/_authed/documents/$id.tsx
 msgid "This document is a web page. It opens in a tab of its own, exactly as it was saved."
 msgstr "Aquest document és una pàgina web. S'obre en una pestanya pròpia, tal com es va desar."
 
@@ -6138,7 +6138,7 @@ msgstr "Aquest document és una pàgina web. S'obre en una pestanya pròpia, tal
 msgid "This is not the same as having none. Try again to see what is scheduled."
 msgstr "Això no vol dir que no n'hi hagi cap. Torna-ho a provar per veure què hi ha programat."
 
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "This is the only time the full key is shown. Store it somewhere safe — I can't show it again."
 msgstr "Aquest és l'únic moment en què es mostra la clau sencera. Desa-la en un lloc segur — no te la puc tornar a mostrar."
 
@@ -6159,7 +6159,7 @@ msgstr "Aquest tipus de recerca ja no està disponible, així que no es pot torn
 msgid "This link is no longer valid"
 msgstr "Aquest enllaç ja no és vàlid"
 
-#: src/routes/settings/organization/spend.tsx
+#: src/routes/_authed/settings/organization/spend.tsx
 msgid "This month"
 msgstr "Aquest mes"
 
@@ -6171,7 +6171,7 @@ msgstr "Aquesta és de la teva organització. El que desis aquí la canvia per a
 msgid "This overrides the site I auto-detected and re-runs the research locked onto the company at that domain."
 msgstr "Això substitueix el lloc que he detectat automàticament i torna a executar la recerca fixada en l'empresa d'aquest domini."
 
-#: src/routes/pages/$id.tsx
+#: src/routes/_authed/pages/$id.tsx
 msgid "This page can't be displayed"
 msgstr "Aquesta pàgina no es pot mostrar"
 
@@ -6209,37 +6209,37 @@ msgstr "Aquesta plantilla és buida, així que no aporta res a cap execució. Om
 msgid "This tool isn't available, so it can only be skipped."
 msgstr "Aquesta eina no està disponible, així que només es pot ometre."
 
-#: src/routes/index.tsx
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "This week"
 msgstr "Aquesta setmana"
 
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "Thread actions"
 msgstr "Accions del fil"
 
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "Thread metadata"
 msgstr "Metadades del fil"
 
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "Thread not found"
 msgstr "Fil no trobat"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Thread pages"
 msgstr "Pàgines de fils"
 
-#: src/routes/settings/organization/spend.tsx
+#: src/routes/_authed/settings/organization/spend.tsx
 msgid "Time range"
 msgstr "Interval de temps"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Timeline"
 msgstr "Cronologia"
 
 #: src/components/companies/proposals-panel.tsx
-#: src/routes/pages/index.tsx
+#: src/routes/_authed/pages/index.tsx
 msgid "Title"
 msgstr "Títol"
 
@@ -6247,12 +6247,12 @@ msgstr "Títol"
 msgid "Title (optional)"
 msgstr "Títol (opcional)"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "TLS"
 msgstr "TLS"
 
 #: src/components/emails/compose-form.tsx
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "To"
 msgstr "Per a"
 
@@ -6260,8 +6260,8 @@ msgstr "Per a"
 msgid "To review"
 msgstr "Per revisar"
 
-#: src/routes/index.tsx
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "Today"
 msgstr "Avui"
 
@@ -6269,7 +6269,7 @@ msgstr "Avui"
 msgid "Too many attempts. Try again in a minute."
 msgstr "Massa intents. Torna-ho a provar d'aquí un minut."
 
-#: src/routes/settings/organization/spend.tsx
+#: src/routes/_authed/settings/organization/spend.tsx
 msgid "Tool"
 msgstr "Eina"
 
@@ -6285,14 +6285,14 @@ msgstr "Total competidors"
 msgid "Try again"
 msgstr "Torna-ho a provar"
 
-#: src/routes/companies/index.tsx
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/companies/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Try different criteria or clear the filters."
 msgstr "Prova amb criteris diferents o neteja els filtres."
 
-#: src/routes/companies/$slug.tsx
-#: src/routes/companies/$slug.tsx
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Trying again…"
 msgstr "S'està tornant a provar…"
 
@@ -6315,7 +6315,7 @@ msgid "Unassign"
 msgstr "Desassigna"
 
 #: src/components/companies/company-owner-control.tsx
-#: src/routes/companies/index.tsx
+#: src/routes/_authed/companies/index.tsx
 msgid "Unassigned"
 msgstr "Sense assignar"
 
@@ -6338,30 +6338,30 @@ msgstr "Preu unitari"
 #: src/components/companies/conversations-tab.tsx
 #: src/components/companies/research-summary-card.tsx
 #: src/components/companies/upcoming-meetings-card.tsx
-#: src/routes/tasks/index.tsx
+#: src/routes/_authed/tasks/index.tsx
 msgid "unknown"
 msgstr "desconegut"
 
 #: src/components/research/findings/company-enrichment-view.tsx
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Unknown"
 msgstr "Desconegut"
 
-#: src/routes/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 msgid "Unknown user"
 msgstr "Usuari desconegut"
 
-#: src/routes/emails/$threadId.tsx
+#: src/routes/_authed/emails/$threadId.tsx
 msgid "Unlinked"
 msgstr "Sense enllaçar"
 
-#: src/routes/settings/mcp/connections.tsx
-#: src/routes/settings/mcp/connections.tsx
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Unnamed client"
 msgstr "Client sense nom"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Unread"
 msgstr "No llegit"
 
@@ -6369,15 +6369,15 @@ msgstr "No llegit"
 msgid "Unsaved changes"
 msgstr "Canvis sense desar"
 
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Untitled"
 msgstr "Sense títol"
 
-#: src/routes/documents/$id.tsx
+#: src/routes/_authed/documents/$id.tsx
 msgid "Untitled document"
 msgstr "Document sense títol"
 
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Untitled key"
 msgstr "Clau sense títol"
 
@@ -6397,8 +6397,8 @@ msgstr "Reunions properes"
 msgid "Update"
 msgstr "Actualitza"
 
-#: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Update failed"
 msgstr "Ha fallat l'actualització"
 
@@ -6415,7 +6415,7 @@ msgid "Uploading…"
 msgstr "Pujant…"
 
 #. placeholder {0}: primarySuggestions[0]?.email ?? ''
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Use {0} as primary"
 msgstr "Fes servir {0} com a principal"
 
@@ -6425,7 +6425,7 @@ msgstr "Fes servir {0} com a principal"
 msgid "Use {0} as the main {1}"
 msgstr "Fes servir {0} com a {1} principal"
 
-#: src/routes/settings/mcp/index.tsx
+#: src/routes/_authed/settings/mcp/index.tsx
 msgid "Use <0>httpUrl</0>, not <1>url</1> — plain <2>url</2> selects the old SSE transport."
 msgstr "Usa <0>httpUrl</0>, no <1>url</1> — <2>url</2> sol selecciona el transport SSE antic."
 
@@ -6433,7 +6433,7 @@ msgstr "Usa <0>httpUrl</0>, no <1>url</1> — <2>url</2> sol selecciona el trans
 msgid "Use a different email"
 msgstr "Fes servir un altre correu"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Use as default footer"
 msgstr "Utilitza com a peu de pàgina predeterminat"
 
@@ -6441,15 +6441,15 @@ msgstr "Utilitza com a peu de pàgina predeterminat"
 msgid "Use password instead"
 msgstr "Fes servir contrasenya"
 
-#: src/routes/settings/profile/templates.tsx
+#: src/routes/_authed/settings/profile/templates.tsx
 msgid "Use the org default instead"
 msgstr "Fes servir la predeterminada de l'organització"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Use your email provider's app-specific password — not your normal login password."
 msgstr "Fes servir la contrasenya d'aplicació del teu proveïdor de correu, no la contrasenya d'inici de sessió habitual."
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Username"
 msgstr "Nom d'usuari"
 
@@ -6458,7 +6458,7 @@ msgstr "Nom d'usuari"
 msgid "Uses it day to day"
 msgstr "L'utilitza cada dia"
 
-#: src/routes/settings/profile/templates.tsx
+#: src/routes/_authed/settings/profile/templates.tsx
 msgid "Using the org default"
 msgstr "S'utilitza el valor per defecte de l'organització"
 
@@ -6466,7 +6466,7 @@ msgstr "S'utilitza el valor per defecte de l'organització"
 msgid "Verifiable only"
 msgstr "Només verificables"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Verification cleared"
 msgstr "Verificació esborrada"
 
@@ -6474,11 +6474,11 @@ msgstr "Verificació esborrada"
 msgid "Verified emails and grounded values — safe to apply in one click."
 msgstr "Correus verificats i valors fonamentats — segurs per aplicar amb un clic."
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Verified lead"
 msgstr "Oportunitat verificada"
 
-#: src/routes/companies/$slug.tsx
+#: src/routes/_authed/companies/$slug.tsx
 msgid "Verified lead — click to clear"
 msgstr "Oportunitat verificada — clica per esborrar"
 
@@ -6490,8 +6490,8 @@ msgstr "Veure el fil"
 msgid "Viewed"
 msgstr "Vista"
 
-#: src/routes/pages/$id.tsx
-#: src/routes/pages/index.tsx
+#: src/routes/_authed/pages/$id.tsx
+#: src/routes/_authed/pages/index.tsx
 msgid "Views"
 msgstr "Visites"
 
@@ -6542,8 +6542,8 @@ msgstr "Lloc web"
 msgid "Websites name this company, but none of them could be established as its own."
 msgstr "Hi ha llocs web que anomenen aquesta empresa, però no s'ha pogut establir que cap sigui el seu."
 
-#: src/routes/emails/index.tsx
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "What"
 msgstr "Què"
 
@@ -6563,8 +6563,8 @@ msgstr "Què ha passat?"
 msgid "What is this about?"
 msgstr "De què tracta?"
 
-#: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "What it's for"
 msgstr "Per a què serveix"
 
@@ -6584,7 +6584,7 @@ msgstr "El que ha costat aquesta execució fins ara"
 msgid "What to follow up on"
 msgstr "Sobre què fer seguiment"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "What's this mailbox for?"
 msgstr "Per a què serveix aquesta bústia?"
 
@@ -6593,9 +6593,9 @@ msgstr "Per a què serveix aquesta bústia?"
 msgid "WhatsApp"
 msgstr "WhatsApp"
 
-#: src/routes/calendar/index.tsx
-#: src/routes/emails/index.tsx
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/calendar/index.tsx
+#: src/routes/_authed/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "When"
 msgstr "Quan"
 
@@ -6611,13 +6611,13 @@ msgstr "D'on ve cada dada"
 msgid "Where to look (optional)"
 msgstr "On cercar (opcional)"
 
-#: src/routes/emails/index.tsx
-#: src/routes/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Who"
 msgstr "Qui"
 
-#: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Who's your email provider?"
 msgstr "Quin és el teu proveïdor de correu?"
 
@@ -6629,7 +6629,7 @@ msgstr "Sense assumpte, arriba com a \"(sense assumpte)\" i és probable que es 
 msgid "Working…"
 msgstr "S'està fent…"
 
-#: src/routes/index.tsx
+#: src/routes/_authed/index.tsx
 msgid "Workshop floor — live counters on the bench."
 msgstr "Planta del taller — comptadors en viu al banc."
 
@@ -6645,7 +6645,7 @@ msgstr "Escriu"
 msgid "Write a brief"
 msgstr "Escriu un resum"
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Write footer…"
 msgstr "Escriu el peu de pàgina…"
 
@@ -6674,12 +6674,12 @@ msgstr "Empresa equivocada? Introdueix el seu lloc web oficial"
 msgid "X"
 msgstr "X"
 
-#: src/routes/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 msgid "You currently sign in from email links. Add a password to skip checking your email next time."
 msgstr "Ara mateix entres des d'enllaços al correu. Afegeix una contrasenya per no haver de mirar el correu la pròxima vegada."
 
-#: src/routes/settings/organization/policy.tsx
-#: src/routes/settings/organization/spend.tsx
+#: src/routes/_authed/settings/organization/policy.tsx
+#: src/routes/_authed/settings/organization/spend.tsx
 msgid "You don't have permission to see this page."
 msgstr "No tens permís per veure aquesta pàgina."
 
@@ -6691,23 +6691,23 @@ msgstr "Has entrat des d'un enllaç al teu correu."
 msgid "You have no mailbox to send from. Connect one under Emails → your email connections, or ask an admin to set up one shared with the team."
 msgstr "No tens cap bústia des d'on enviar. Connecta'n una a Correus → les teves connexions de correu, o demana a un administrador que en configuri una de compartida amb l'equip."
 
-#: src/routes/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
 msgid "You removed this one. Tick it to restore it."
 msgstr "L’has tret tu. Marca-la per tornar-la a activar."
 
-#: src/routes/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 msgid "You sign in from email links. I won't bring it up again."
 msgstr "Entres des d'enllaços al correu. No t'ho tornaré a esmentar."
 
-#: src/routes/settings/profile/templates.tsx
+#: src/routes/_authed/settings/profile/templates.tsx
 msgid "You're following one of your own stacks."
 msgstr "Estàs seguint una de les teves piles."
 
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "you@example.com"
 msgstr "tu@exemple.com"
 
-#: src/routes/settings/profile/index.tsx
+#: src/routes/_authed/settings/profile/index.tsx
 msgid "Your Batuda workbench identity."
 msgstr "La teva identitat al banc de Batuda."
 
@@ -6715,13 +6715,13 @@ msgstr "La teva identitat al banc de Batuda."
 msgid "Your choice of organization could not be saved, so this was stopped rather than give the assistant more access than you picked. Try again."
 msgstr "No s’ha pogut desar la teva tria d’organització, així que s’ha aturat en comptes de donar a l’assistent més accés del que has triat. Torna-ho a provar."
 
-#: src/routes/settings/mcp/connections.tsx
-#: src/routes/settings/mcp/index.tsx
+#: src/routes/_authed/settings/mcp/connections.tsx
+#: src/routes/_authed/settings/mcp/index.tsx
 msgid "Your connections"
 msgstr "Les teves connexions"
 
-#: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
+#: src/routes/_authed/emails/inboxes.tsx
 msgid "Your email connections"
 msgstr "Les teves connexions de correu"
 
@@ -6729,7 +6729,7 @@ msgstr "Les teves connexions de correu"
 msgid "Your email isn't verified yet. Use the magic link instead."
 msgstr "El correu encara no està verificat. Fes servir l'enllaç de sessió."
 
-#: src/routes/settings/api-keys/index.tsx
+#: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Your keys"
 msgstr "Les teves claus"
 
@@ -6737,10 +6737,10 @@ msgstr "Les teves claus"
 msgid "Your organization has no default yet."
 msgstr "La teva organització encara no té cap valor per defecte."
 
-#: src/routes/settings/profile/templates.tsx
+#: src/routes/_authed/settings/profile/templates.tsx
 msgid "Your organization has no default yet. Make a stack your default to steer every run."
 msgstr "La teva organització encara no té cap predeterminada. Marca una pila com a predeterminada per guiar totes les execucions."
 
-#: src/routes/settings/organization/members.tsx
+#: src/routes/_authed/settings/organization/members.tsx
 msgid "Your session has expired. Sign in again to continue."
 msgstr "La teva sessió ha caducat. Torna a iniciar la sessió per continuar."

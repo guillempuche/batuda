@@ -9,6 +9,7 @@ import { PriButton, PriCheckbox } from '@batuda/ui/pri'
 
 import { apiBaseUrl } from '#/lib/api-base'
 import { authClient } from '#/lib/auth-client'
+import { redirectToLogin } from '#/lib/session-check'
 import { agedPaperSurface, stenciledTitle } from '#/lib/workshop-mixins'
 
 /**
@@ -32,6 +33,11 @@ import { agedPaperSurface, stenciledTitle } from '#/lib/workshop-mixins'
  */
 
 export const Route = createFileRoute('/oauth/consent')({
+	// Signed in, but outside the app's chrome: the assistant is handed access
+	// to an account, so the person granting it has to be in one.
+	beforeLoad: ({ context, location }) => {
+		if (!context.signedIn) throw redirectToLogin(location.href)
+	},
 	validateSearch: (
 		search: Record<string, unknown>,
 	): { readonly client_id: string; readonly scope: string } => ({

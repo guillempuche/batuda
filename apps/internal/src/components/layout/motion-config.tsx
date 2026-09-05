@@ -7,8 +7,9 @@ import { MotionConfig } from 'motion/react'
  *   - `reducedMotion='user'` so the whole app respects the OS preference
  *     without any extra wiring in individual components.
  *
- * Mounted at the outermost level in `__root.tsx` alongside `<LayoutGroup>`
- * so both apply to every descendant `motion` component.
+ * Mounted by the `_authed` layout route alongside `<LayoutGroup>`, so both
+ * apply to every `motion` component a signed-in page renders. The sign-in
+ * pages and the OAuth consent screen sit outside it and animate nothing.
  */
 export function BatudaMotionConfig({
 	children,

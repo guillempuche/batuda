@@ -699,13 +699,17 @@ TanStack Start uses file-based routing under `src/routes/`. The top level, at th
 
 ```
 src/routes/
-├── __root.tsx              # Root layout: nav, page wrapper
-├── index.tsx               # / — Pipeline dashboard
+├── __root.tsx              # Document, providers, head, session check
+├── _authed/
+│   ├── route.tsx           # Signed-in chrome: sidebar, top bar, Quick Capture, compose dock
+│   ├── index.tsx           # / — Pipeline dashboard
+│   ├── calendar/           # companies/, documents/, emails/, pages/,
+│   └── …                   # profile/, research/, settings/, tasks/
 ├── login.tsx               # plus forgot-password / reset-password
-├── calendar/               # companies/, documents/, emails/, oauth/,
-├── pages/                  # profile/, research/, settings/, tasks/
-└── …
+└── oauth/consent.tsx       # signed in, but without the chrome
 ```
+
+`_authed` is a pathless layout route (the underscore keeps it out of the URL), TanStack's own shape for [authenticated routes](https://tanstack.com/router/latest/docs/framework/react/guide/authenticated-routes). The root route asks the API for the session once per request and hands a yes/no down as `signedIn` in the route context; the layout and the consent screen turn a "no" into a redirect to `/login` via `redirectToLogin` in `src/lib/session-check.ts`. The chrome lives in the layout rather than the root because the root route cannot be code-split, so anything imported there ships on the sign-in page too.
 
 ### Data fetching — `BatudaApiAtom`
 

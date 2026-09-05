@@ -12,36 +12,38 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as TasksIndexRouteImport } from './routes/tasks/index'
-import { Route as SettingsIndexRouteImport } from './routes/settings/index'
-import { Route as ResearchIndexRouteImport } from './routes/research/index'
-import { Route as ProfileIndexRouteImport } from './routes/profile/index'
-import { Route as PagesIndexRouteImport } from './routes/pages/index'
-import { Route as EmailsIndexRouteImport } from './routes/emails/index'
-import { Route as DocumentsIndexRouteImport } from './routes/documents/index'
-import { Route as CompaniesIndexRouteImport } from './routes/companies/index'
-import { Route as CalendarIndexRouteImport } from './routes/calendar/index'
-import { Route as ResearchRunsRouteImport } from './routes/research/runs'
-import { Route as ResearchIdRouteImport } from './routes/research/$id'
-import { Route as PagesIdRouteImport } from './routes/pages/$id'
+import { Route as AuthedRouteRouteImport } from './routes/_authed/route'
+import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
 import { Route as OauthConsentRouteImport } from './routes/oauth/consent'
-import { Route as EmailsInboxesRouteImport } from './routes/emails/inboxes'
-import { Route as EmailsThreadIdRouteImport } from './routes/emails/$threadId'
-import { Route as DocumentsIdRouteImport } from './routes/documents/$id'
-import { Route as CompaniesBoardRouteImport } from './routes/companies/board'
-import { Route as CompaniesSlugRouteImport } from './routes/companies/$slug'
-import { Route as SettingsProfileIndexRouteImport } from './routes/settings/profile/index'
-import { Route as SettingsOrganizationIndexRouteImport } from './routes/settings/organization/index'
-import { Route as SettingsMcpIndexRouteImport } from './routes/settings/mcp/index'
-import { Route as SettingsApiKeysIndexRouteImport } from './routes/settings/api-keys/index'
-import { Route as SettingsProfileTemplatesRouteImport } from './routes/settings/profile/templates'
-import { Route as SettingsOrganizationTemplatesRouteImport } from './routes/settings/organization/templates'
-import { Route as SettingsOrganizationSpendRouteImport } from './routes/settings/organization/spend'
-import { Route as SettingsOrganizationPolicyRouteImport } from './routes/settings/organization/policy'
-import { Route as SettingsOrganizationMembersRouteImport } from './routes/settings/organization/members'
-import { Route as SettingsOrganizationIndustriesRouteImport } from './routes/settings/organization/industries'
-import { Route as SettingsMcpConnectionsRouteImport } from './routes/settings/mcp/connections'
+import { Route as AuthedSplatRouteImport } from './routes/_authed/$'
+import { Route as AuthedTasksIndexRouteImport } from './routes/_authed/tasks/index'
+import { Route as AuthedSettingsIndexRouteImport } from './routes/_authed/settings/index'
+import { Route as AuthedResearchIndexRouteImport } from './routes/_authed/research/index'
+import { Route as AuthedProfileIndexRouteImport } from './routes/_authed/profile/index'
+import { Route as AuthedPagesIndexRouteImport } from './routes/_authed/pages/index'
+import { Route as AuthedEmailsIndexRouteImport } from './routes/_authed/emails/index'
+import { Route as AuthedDocumentsIndexRouteImport } from './routes/_authed/documents/index'
+import { Route as AuthedCompaniesIndexRouteImport } from './routes/_authed/companies/index'
+import { Route as AuthedCalendarIndexRouteImport } from './routes/_authed/calendar/index'
+import { Route as AuthedResearchRunsRouteImport } from './routes/_authed/research/runs'
+import { Route as AuthedResearchIdRouteImport } from './routes/_authed/research/$id'
+import { Route as AuthedPagesIdRouteImport } from './routes/_authed/pages/$id'
+import { Route as AuthedEmailsInboxesRouteImport } from './routes/_authed/emails/inboxes'
+import { Route as AuthedEmailsThreadIdRouteImport } from './routes/_authed/emails/$threadId'
+import { Route as AuthedDocumentsIdRouteImport } from './routes/_authed/documents/$id'
+import { Route as AuthedCompaniesBoardRouteImport } from './routes/_authed/companies/board'
+import { Route as AuthedCompaniesSlugRouteImport } from './routes/_authed/companies/$slug'
+import { Route as AuthedSettingsProfileIndexRouteImport } from './routes/_authed/settings/profile/index'
+import { Route as AuthedSettingsOrganizationIndexRouteImport } from './routes/_authed/settings/organization/index'
+import { Route as AuthedSettingsMcpIndexRouteImport } from './routes/_authed/settings/mcp/index'
+import { Route as AuthedSettingsApiKeysIndexRouteImport } from './routes/_authed/settings/api-keys/index'
+import { Route as AuthedSettingsProfileTemplatesRouteImport } from './routes/_authed/settings/profile/templates'
+import { Route as AuthedSettingsOrganizationTemplatesRouteImport } from './routes/_authed/settings/organization/templates'
+import { Route as AuthedSettingsOrganizationSpendRouteImport } from './routes/_authed/settings/organization/spend'
+import { Route as AuthedSettingsOrganizationPolicyRouteImport } from './routes/_authed/settings/organization/policy'
+import { Route as AuthedSettingsOrganizationMembersRouteImport } from './routes/_authed/settings/organization/members'
+import { Route as AuthedSettingsOrganizationIndustriesRouteImport } from './routes/_authed/settings/organization/industries'
+import { Route as AuthedSettingsMcpConnectionsRouteImport } from './routes/_authed/settings/mcp/connections'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -58,269 +60,285 @@ const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
   path: '/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
+const AuthedRouteRoute = AuthedRouteRouteImport.update({
+  id: '/_authed',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthedIndexRoute = AuthedIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TasksIndexRoute = TasksIndexRouteImport.update({
-  id: '/tasks/',
-  path: '/tasks/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SettingsIndexRoute = SettingsIndexRouteImport.update({
-  id: '/settings/',
-  path: '/settings/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResearchIndexRoute = ResearchIndexRouteImport.update({
-  id: '/research/',
-  path: '/research/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProfileIndexRoute = ProfileIndexRouteImport.update({
-  id: '/profile/',
-  path: '/profile/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PagesIndexRoute = PagesIndexRouteImport.update({
-  id: '/pages/',
-  path: '/pages/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const EmailsIndexRoute = EmailsIndexRouteImport.update({
-  id: '/emails/',
-  path: '/emails/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DocumentsIndexRoute = DocumentsIndexRouteImport.update({
-  id: '/documents/',
-  path: '/documents/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CompaniesIndexRoute = CompaniesIndexRouteImport.update({
-  id: '/companies/',
-  path: '/companies/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CalendarIndexRoute = CalendarIndexRouteImport.update({
-  id: '/calendar/',
-  path: '/calendar/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResearchRunsRoute = ResearchRunsRouteImport.update({
-  id: '/research/runs',
-  path: '/research/runs',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResearchIdRoute = ResearchIdRouteImport.update({
-  id: '/research/$id',
-  path: '/research/$id',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PagesIdRoute = PagesIdRouteImport.update({
-  id: '/pages/$id',
-  path: '/pages/$id',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthedRouteRoute,
 } as any)
 const OauthConsentRoute = OauthConsentRouteImport.update({
   id: '/oauth/consent',
   path: '/oauth/consent',
   getParentRoute: () => rootRouteImport,
 } as any)
-const EmailsInboxesRoute = EmailsInboxesRouteImport.update({
+const AuthedSplatRoute = AuthedSplatRouteImport.update({
+  id: '/$',
+  path: '/$',
+  getParentRoute: () => AuthedRouteRoute,
+} as any)
+const AuthedTasksIndexRoute = AuthedTasksIndexRouteImport.update({
+  id: '/tasks/',
+  path: '/tasks/',
+  getParentRoute: () => AuthedRouteRoute,
+} as any)
+const AuthedSettingsIndexRoute = AuthedSettingsIndexRouteImport.update({
+  id: '/settings/',
+  path: '/settings/',
+  getParentRoute: () => AuthedRouteRoute,
+} as any)
+const AuthedResearchIndexRoute = AuthedResearchIndexRouteImport.update({
+  id: '/research/',
+  path: '/research/',
+  getParentRoute: () => AuthedRouteRoute,
+} as any)
+const AuthedProfileIndexRoute = AuthedProfileIndexRouteImport.update({
+  id: '/profile/',
+  path: '/profile/',
+  getParentRoute: () => AuthedRouteRoute,
+} as any)
+const AuthedPagesIndexRoute = AuthedPagesIndexRouteImport.update({
+  id: '/pages/',
+  path: '/pages/',
+  getParentRoute: () => AuthedRouteRoute,
+} as any)
+const AuthedEmailsIndexRoute = AuthedEmailsIndexRouteImport.update({
+  id: '/emails/',
+  path: '/emails/',
+  getParentRoute: () => AuthedRouteRoute,
+} as any)
+const AuthedDocumentsIndexRoute = AuthedDocumentsIndexRouteImport.update({
+  id: '/documents/',
+  path: '/documents/',
+  getParentRoute: () => AuthedRouteRoute,
+} as any)
+const AuthedCompaniesIndexRoute = AuthedCompaniesIndexRouteImport.update({
+  id: '/companies/',
+  path: '/companies/',
+  getParentRoute: () => AuthedRouteRoute,
+} as any)
+const AuthedCalendarIndexRoute = AuthedCalendarIndexRouteImport.update({
+  id: '/calendar/',
+  path: '/calendar/',
+  getParentRoute: () => AuthedRouteRoute,
+} as any)
+const AuthedResearchRunsRoute = AuthedResearchRunsRouteImport.update({
+  id: '/research/runs',
+  path: '/research/runs',
+  getParentRoute: () => AuthedRouteRoute,
+} as any)
+const AuthedResearchIdRoute = AuthedResearchIdRouteImport.update({
+  id: '/research/$id',
+  path: '/research/$id',
+  getParentRoute: () => AuthedRouteRoute,
+} as any)
+const AuthedPagesIdRoute = AuthedPagesIdRouteImport.update({
+  id: '/pages/$id',
+  path: '/pages/$id',
+  getParentRoute: () => AuthedRouteRoute,
+} as any)
+const AuthedEmailsInboxesRoute = AuthedEmailsInboxesRouteImport.update({
   id: '/emails/inboxes',
   path: '/emails/inboxes',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthedRouteRoute,
 } as any)
-const EmailsThreadIdRoute = EmailsThreadIdRouteImport.update({
+const AuthedEmailsThreadIdRoute = AuthedEmailsThreadIdRouteImport.update({
   id: '/emails/$threadId',
   path: '/emails/$threadId',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthedRouteRoute,
 } as any)
-const DocumentsIdRoute = DocumentsIdRouteImport.update({
+const AuthedDocumentsIdRoute = AuthedDocumentsIdRouteImport.update({
   id: '/documents/$id',
   path: '/documents/$id',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthedRouteRoute,
 } as any)
-const CompaniesBoardRoute = CompaniesBoardRouteImport.update({
+const AuthedCompaniesBoardRoute = AuthedCompaniesBoardRouteImport.update({
   id: '/companies/board',
   path: '/companies/board',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthedRouteRoute,
 } as any)
-const CompaniesSlugRoute = CompaniesSlugRouteImport.update({
+const AuthedCompaniesSlugRoute = AuthedCompaniesSlugRouteImport.update({
   id: '/companies/$slug',
   path: '/companies/$slug',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthedRouteRoute,
 } as any)
-const SettingsProfileIndexRoute = SettingsProfileIndexRouteImport.update({
-  id: '/settings/profile/',
-  path: '/settings/profile/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SettingsOrganizationIndexRoute =
-  SettingsOrganizationIndexRouteImport.update({
+const AuthedSettingsProfileIndexRoute =
+  AuthedSettingsProfileIndexRouteImport.update({
+    id: '/settings/profile/',
+    path: '/settings/profile/',
+    getParentRoute: () => AuthedRouteRoute,
+  } as any)
+const AuthedSettingsOrganizationIndexRoute =
+  AuthedSettingsOrganizationIndexRouteImport.update({
     id: '/settings/organization/',
     path: '/settings/organization/',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthedRouteRoute,
   } as any)
-const SettingsMcpIndexRoute = SettingsMcpIndexRouteImport.update({
+const AuthedSettingsMcpIndexRoute = AuthedSettingsMcpIndexRouteImport.update({
   id: '/settings/mcp/',
   path: '/settings/mcp/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthedRouteRoute,
 } as any)
-const SettingsApiKeysIndexRoute = SettingsApiKeysIndexRouteImport.update({
-  id: '/settings/api-keys/',
-  path: '/settings/api-keys/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SettingsProfileTemplatesRoute =
-  SettingsProfileTemplatesRouteImport.update({
+const AuthedSettingsApiKeysIndexRoute =
+  AuthedSettingsApiKeysIndexRouteImport.update({
+    id: '/settings/api-keys/',
+    path: '/settings/api-keys/',
+    getParentRoute: () => AuthedRouteRoute,
+  } as any)
+const AuthedSettingsProfileTemplatesRoute =
+  AuthedSettingsProfileTemplatesRouteImport.update({
     id: '/settings/profile/templates',
     path: '/settings/profile/templates',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthedRouteRoute,
   } as any)
-const SettingsOrganizationTemplatesRoute =
-  SettingsOrganizationTemplatesRouteImport.update({
+const AuthedSettingsOrganizationTemplatesRoute =
+  AuthedSettingsOrganizationTemplatesRouteImport.update({
     id: '/settings/organization/templates',
     path: '/settings/organization/templates',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthedRouteRoute,
   } as any)
-const SettingsOrganizationSpendRoute =
-  SettingsOrganizationSpendRouteImport.update({
+const AuthedSettingsOrganizationSpendRoute =
+  AuthedSettingsOrganizationSpendRouteImport.update({
     id: '/settings/organization/spend',
     path: '/settings/organization/spend',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthedRouteRoute,
   } as any)
-const SettingsOrganizationPolicyRoute =
-  SettingsOrganizationPolicyRouteImport.update({
+const AuthedSettingsOrganizationPolicyRoute =
+  AuthedSettingsOrganizationPolicyRouteImport.update({
     id: '/settings/organization/policy',
     path: '/settings/organization/policy',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthedRouteRoute,
   } as any)
-const SettingsOrganizationMembersRoute =
-  SettingsOrganizationMembersRouteImport.update({
+const AuthedSettingsOrganizationMembersRoute =
+  AuthedSettingsOrganizationMembersRouteImport.update({
     id: '/settings/organization/members',
     path: '/settings/organization/members',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthedRouteRoute,
   } as any)
-const SettingsOrganizationIndustriesRoute =
-  SettingsOrganizationIndustriesRouteImport.update({
+const AuthedSettingsOrganizationIndustriesRoute =
+  AuthedSettingsOrganizationIndustriesRouteImport.update({
     id: '/settings/organization/industries',
     path: '/settings/organization/industries',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthedRouteRoute,
   } as any)
-const SettingsMcpConnectionsRoute = SettingsMcpConnectionsRouteImport.update({
-  id: '/settings/mcp/connections',
-  path: '/settings/mcp/connections',
-  getParentRoute: () => rootRouteImport,
-} as any)
+const AuthedSettingsMcpConnectionsRoute =
+  AuthedSettingsMcpConnectionsRouteImport.update({
+    id: '/settings/mcp/connections',
+    path: '/settings/mcp/connections',
+    getParentRoute: () => AuthedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof AuthedIndexRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
-  '/companies/$slug': typeof CompaniesSlugRoute
-  '/companies/board': typeof CompaniesBoardRoute
-  '/documents/$id': typeof DocumentsIdRoute
-  '/emails/$threadId': typeof EmailsThreadIdRoute
-  '/emails/inboxes': typeof EmailsInboxesRoute
+  '/$': typeof AuthedSplatRoute
   '/oauth/consent': typeof OauthConsentRoute
-  '/pages/$id': typeof PagesIdRoute
-  '/research/$id': typeof ResearchIdRoute
-  '/research/runs': typeof ResearchRunsRoute
-  '/calendar/': typeof CalendarIndexRoute
-  '/companies/': typeof CompaniesIndexRoute
-  '/documents/': typeof DocumentsIndexRoute
-  '/emails/': typeof EmailsIndexRoute
-  '/pages/': typeof PagesIndexRoute
-  '/profile/': typeof ProfileIndexRoute
-  '/research/': typeof ResearchIndexRoute
-  '/settings/': typeof SettingsIndexRoute
-  '/tasks/': typeof TasksIndexRoute
-  '/settings/mcp/connections': typeof SettingsMcpConnectionsRoute
-  '/settings/organization/industries': typeof SettingsOrganizationIndustriesRoute
-  '/settings/organization/members': typeof SettingsOrganizationMembersRoute
-  '/settings/organization/policy': typeof SettingsOrganizationPolicyRoute
-  '/settings/organization/spend': typeof SettingsOrganizationSpendRoute
-  '/settings/organization/templates': typeof SettingsOrganizationTemplatesRoute
-  '/settings/profile/templates': typeof SettingsProfileTemplatesRoute
-  '/settings/api-keys/': typeof SettingsApiKeysIndexRoute
-  '/settings/mcp/': typeof SettingsMcpIndexRoute
-  '/settings/organization/': typeof SettingsOrganizationIndexRoute
-  '/settings/profile/': typeof SettingsProfileIndexRoute
+  '/companies/$slug': typeof AuthedCompaniesSlugRoute
+  '/companies/board': typeof AuthedCompaniesBoardRoute
+  '/documents/$id': typeof AuthedDocumentsIdRoute
+  '/emails/$threadId': typeof AuthedEmailsThreadIdRoute
+  '/emails/inboxes': typeof AuthedEmailsInboxesRoute
+  '/pages/$id': typeof AuthedPagesIdRoute
+  '/research/$id': typeof AuthedResearchIdRoute
+  '/research/runs': typeof AuthedResearchRunsRoute
+  '/calendar/': typeof AuthedCalendarIndexRoute
+  '/companies/': typeof AuthedCompaniesIndexRoute
+  '/documents/': typeof AuthedDocumentsIndexRoute
+  '/emails/': typeof AuthedEmailsIndexRoute
+  '/pages/': typeof AuthedPagesIndexRoute
+  '/profile/': typeof AuthedProfileIndexRoute
+  '/research/': typeof AuthedResearchIndexRoute
+  '/settings/': typeof AuthedSettingsIndexRoute
+  '/tasks/': typeof AuthedTasksIndexRoute
+  '/settings/mcp/connections': typeof AuthedSettingsMcpConnectionsRoute
+  '/settings/organization/industries': typeof AuthedSettingsOrganizationIndustriesRoute
+  '/settings/organization/members': typeof AuthedSettingsOrganizationMembersRoute
+  '/settings/organization/policy': typeof AuthedSettingsOrganizationPolicyRoute
+  '/settings/organization/spend': typeof AuthedSettingsOrganizationSpendRoute
+  '/settings/organization/templates': typeof AuthedSettingsOrganizationTemplatesRoute
+  '/settings/profile/templates': typeof AuthedSettingsProfileTemplatesRoute
+  '/settings/api-keys/': typeof AuthedSettingsApiKeysIndexRoute
+  '/settings/mcp/': typeof AuthedSettingsMcpIndexRoute
+  '/settings/organization/': typeof AuthedSettingsOrganizationIndexRoute
+  '/settings/profile/': typeof AuthedSettingsProfileIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
-  '/companies/$slug': typeof CompaniesSlugRoute
-  '/companies/board': typeof CompaniesBoardRoute
-  '/documents/$id': typeof DocumentsIdRoute
-  '/emails/$threadId': typeof EmailsThreadIdRoute
-  '/emails/inboxes': typeof EmailsInboxesRoute
+  '/$': typeof AuthedSplatRoute
   '/oauth/consent': typeof OauthConsentRoute
-  '/pages/$id': typeof PagesIdRoute
-  '/research/$id': typeof ResearchIdRoute
-  '/research/runs': typeof ResearchRunsRoute
-  '/calendar': typeof CalendarIndexRoute
-  '/companies': typeof CompaniesIndexRoute
-  '/documents': typeof DocumentsIndexRoute
-  '/emails': typeof EmailsIndexRoute
-  '/pages': typeof PagesIndexRoute
-  '/profile': typeof ProfileIndexRoute
-  '/research': typeof ResearchIndexRoute
-  '/settings': typeof SettingsIndexRoute
-  '/tasks': typeof TasksIndexRoute
-  '/settings/mcp/connections': typeof SettingsMcpConnectionsRoute
-  '/settings/organization/industries': typeof SettingsOrganizationIndustriesRoute
-  '/settings/organization/members': typeof SettingsOrganizationMembersRoute
-  '/settings/organization/policy': typeof SettingsOrganizationPolicyRoute
-  '/settings/organization/spend': typeof SettingsOrganizationSpendRoute
-  '/settings/organization/templates': typeof SettingsOrganizationTemplatesRoute
-  '/settings/profile/templates': typeof SettingsProfileTemplatesRoute
-  '/settings/api-keys': typeof SettingsApiKeysIndexRoute
-  '/settings/mcp': typeof SettingsMcpIndexRoute
-  '/settings/organization': typeof SettingsOrganizationIndexRoute
-  '/settings/profile': typeof SettingsProfileIndexRoute
+  '/': typeof AuthedIndexRoute
+  '/companies/$slug': typeof AuthedCompaniesSlugRoute
+  '/companies/board': typeof AuthedCompaniesBoardRoute
+  '/documents/$id': typeof AuthedDocumentsIdRoute
+  '/emails/$threadId': typeof AuthedEmailsThreadIdRoute
+  '/emails/inboxes': typeof AuthedEmailsInboxesRoute
+  '/pages/$id': typeof AuthedPagesIdRoute
+  '/research/$id': typeof AuthedResearchIdRoute
+  '/research/runs': typeof AuthedResearchRunsRoute
+  '/calendar': typeof AuthedCalendarIndexRoute
+  '/companies': typeof AuthedCompaniesIndexRoute
+  '/documents': typeof AuthedDocumentsIndexRoute
+  '/emails': typeof AuthedEmailsIndexRoute
+  '/pages': typeof AuthedPagesIndexRoute
+  '/profile': typeof AuthedProfileIndexRoute
+  '/research': typeof AuthedResearchIndexRoute
+  '/settings': typeof AuthedSettingsIndexRoute
+  '/tasks': typeof AuthedTasksIndexRoute
+  '/settings/mcp/connections': typeof AuthedSettingsMcpConnectionsRoute
+  '/settings/organization/industries': typeof AuthedSettingsOrganizationIndustriesRoute
+  '/settings/organization/members': typeof AuthedSettingsOrganizationMembersRoute
+  '/settings/organization/policy': typeof AuthedSettingsOrganizationPolicyRoute
+  '/settings/organization/spend': typeof AuthedSettingsOrganizationSpendRoute
+  '/settings/organization/templates': typeof AuthedSettingsOrganizationTemplatesRoute
+  '/settings/profile/templates': typeof AuthedSettingsProfileTemplatesRoute
+  '/settings/api-keys': typeof AuthedSettingsApiKeysIndexRoute
+  '/settings/mcp': typeof AuthedSettingsMcpIndexRoute
+  '/settings/organization': typeof AuthedSettingsOrganizationIndexRoute
+  '/settings/profile': typeof AuthedSettingsProfileIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/_authed': typeof AuthedRouteRouteWithChildren
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
-  '/companies/$slug': typeof CompaniesSlugRoute
-  '/companies/board': typeof CompaniesBoardRoute
-  '/documents/$id': typeof DocumentsIdRoute
-  '/emails/$threadId': typeof EmailsThreadIdRoute
-  '/emails/inboxes': typeof EmailsInboxesRoute
+  '/_authed/$': typeof AuthedSplatRoute
   '/oauth/consent': typeof OauthConsentRoute
-  '/pages/$id': typeof PagesIdRoute
-  '/research/$id': typeof ResearchIdRoute
-  '/research/runs': typeof ResearchRunsRoute
-  '/calendar/': typeof CalendarIndexRoute
-  '/companies/': typeof CompaniesIndexRoute
-  '/documents/': typeof DocumentsIndexRoute
-  '/emails/': typeof EmailsIndexRoute
-  '/pages/': typeof PagesIndexRoute
-  '/profile/': typeof ProfileIndexRoute
-  '/research/': typeof ResearchIndexRoute
-  '/settings/': typeof SettingsIndexRoute
-  '/tasks/': typeof TasksIndexRoute
-  '/settings/mcp/connections': typeof SettingsMcpConnectionsRoute
-  '/settings/organization/industries': typeof SettingsOrganizationIndustriesRoute
-  '/settings/organization/members': typeof SettingsOrganizationMembersRoute
-  '/settings/organization/policy': typeof SettingsOrganizationPolicyRoute
-  '/settings/organization/spend': typeof SettingsOrganizationSpendRoute
-  '/settings/organization/templates': typeof SettingsOrganizationTemplatesRoute
-  '/settings/profile/templates': typeof SettingsProfileTemplatesRoute
-  '/settings/api-keys/': typeof SettingsApiKeysIndexRoute
-  '/settings/mcp/': typeof SettingsMcpIndexRoute
-  '/settings/organization/': typeof SettingsOrganizationIndexRoute
-  '/settings/profile/': typeof SettingsProfileIndexRoute
+  '/_authed/': typeof AuthedIndexRoute
+  '/_authed/companies/$slug': typeof AuthedCompaniesSlugRoute
+  '/_authed/companies/board': typeof AuthedCompaniesBoardRoute
+  '/_authed/documents/$id': typeof AuthedDocumentsIdRoute
+  '/_authed/emails/$threadId': typeof AuthedEmailsThreadIdRoute
+  '/_authed/emails/inboxes': typeof AuthedEmailsInboxesRoute
+  '/_authed/pages/$id': typeof AuthedPagesIdRoute
+  '/_authed/research/$id': typeof AuthedResearchIdRoute
+  '/_authed/research/runs': typeof AuthedResearchRunsRoute
+  '/_authed/calendar/': typeof AuthedCalendarIndexRoute
+  '/_authed/companies/': typeof AuthedCompaniesIndexRoute
+  '/_authed/documents/': typeof AuthedDocumentsIndexRoute
+  '/_authed/emails/': typeof AuthedEmailsIndexRoute
+  '/_authed/pages/': typeof AuthedPagesIndexRoute
+  '/_authed/profile/': typeof AuthedProfileIndexRoute
+  '/_authed/research/': typeof AuthedResearchIndexRoute
+  '/_authed/settings/': typeof AuthedSettingsIndexRoute
+  '/_authed/tasks/': typeof AuthedTasksIndexRoute
+  '/_authed/settings/mcp/connections': typeof AuthedSettingsMcpConnectionsRoute
+  '/_authed/settings/organization/industries': typeof AuthedSettingsOrganizationIndustriesRoute
+  '/_authed/settings/organization/members': typeof AuthedSettingsOrganizationMembersRoute
+  '/_authed/settings/organization/policy': typeof AuthedSettingsOrganizationPolicyRoute
+  '/_authed/settings/organization/spend': typeof AuthedSettingsOrganizationSpendRoute
+  '/_authed/settings/organization/templates': typeof AuthedSettingsOrganizationTemplatesRoute
+  '/_authed/settings/profile/templates': typeof AuthedSettingsProfileTemplatesRoute
+  '/_authed/settings/api-keys/': typeof AuthedSettingsApiKeysIndexRoute
+  '/_authed/settings/mcp/': typeof AuthedSettingsMcpIndexRoute
+  '/_authed/settings/organization/': typeof AuthedSettingsOrganizationIndexRoute
+  '/_authed/settings/profile/': typeof AuthedSettingsProfileIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -329,12 +347,13 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/reset-password'
+    | '/$'
+    | '/oauth/consent'
     | '/companies/$slug'
     | '/companies/board'
     | '/documents/$id'
     | '/emails/$threadId'
     | '/emails/inboxes'
-    | '/oauth/consent'
     | '/pages/$id'
     | '/research/$id'
     | '/research/runs'
@@ -360,16 +379,17 @@ export interface FileRouteTypes {
     | '/settings/profile/'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/'
     | '/forgot-password'
     | '/login'
     | '/reset-password'
+    | '/$'
+    | '/oauth/consent'
+    | '/'
     | '/companies/$slug'
     | '/companies/board'
     | '/documents/$id'
     | '/emails/$threadId'
     | '/emails/inboxes'
-    | '/oauth/consent'
     | '/pages/$id'
     | '/research/$id'
     | '/research/runs'
@@ -395,75 +415,49 @@ export interface FileRouteTypes {
     | '/settings/profile'
   id:
     | '__root__'
-    | '/'
+    | '/_authed'
     | '/forgot-password'
     | '/login'
     | '/reset-password'
-    | '/companies/$slug'
-    | '/companies/board'
-    | '/documents/$id'
-    | '/emails/$threadId'
-    | '/emails/inboxes'
+    | '/_authed/$'
     | '/oauth/consent'
-    | '/pages/$id'
-    | '/research/$id'
-    | '/research/runs'
-    | '/calendar/'
-    | '/companies/'
-    | '/documents/'
-    | '/emails/'
-    | '/pages/'
-    | '/profile/'
-    | '/research/'
-    | '/settings/'
-    | '/tasks/'
-    | '/settings/mcp/connections'
-    | '/settings/organization/industries'
-    | '/settings/organization/members'
-    | '/settings/organization/policy'
-    | '/settings/organization/spend'
-    | '/settings/organization/templates'
-    | '/settings/profile/templates'
-    | '/settings/api-keys/'
-    | '/settings/mcp/'
-    | '/settings/organization/'
-    | '/settings/profile/'
+    | '/_authed/'
+    | '/_authed/companies/$slug'
+    | '/_authed/companies/board'
+    | '/_authed/documents/$id'
+    | '/_authed/emails/$threadId'
+    | '/_authed/emails/inboxes'
+    | '/_authed/pages/$id'
+    | '/_authed/research/$id'
+    | '/_authed/research/runs'
+    | '/_authed/calendar/'
+    | '/_authed/companies/'
+    | '/_authed/documents/'
+    | '/_authed/emails/'
+    | '/_authed/pages/'
+    | '/_authed/profile/'
+    | '/_authed/research/'
+    | '/_authed/settings/'
+    | '/_authed/tasks/'
+    | '/_authed/settings/mcp/connections'
+    | '/_authed/settings/organization/industries'
+    | '/_authed/settings/organization/members'
+    | '/_authed/settings/organization/policy'
+    | '/_authed/settings/organization/spend'
+    | '/_authed/settings/organization/templates'
+    | '/_authed/settings/profile/templates'
+    | '/_authed/settings/api-keys/'
+    | '/_authed/settings/mcp/'
+    | '/_authed/settings/organization/'
+    | '/_authed/settings/profile/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  AuthedRouteRoute: typeof AuthedRouteRouteWithChildren
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
-  CompaniesSlugRoute: typeof CompaniesSlugRoute
-  CompaniesBoardRoute: typeof CompaniesBoardRoute
-  DocumentsIdRoute: typeof DocumentsIdRoute
-  EmailsThreadIdRoute: typeof EmailsThreadIdRoute
-  EmailsInboxesRoute: typeof EmailsInboxesRoute
   OauthConsentRoute: typeof OauthConsentRoute
-  PagesIdRoute: typeof PagesIdRoute
-  ResearchIdRoute: typeof ResearchIdRoute
-  ResearchRunsRoute: typeof ResearchRunsRoute
-  CalendarIndexRoute: typeof CalendarIndexRoute
-  CompaniesIndexRoute: typeof CompaniesIndexRoute
-  DocumentsIndexRoute: typeof DocumentsIndexRoute
-  EmailsIndexRoute: typeof EmailsIndexRoute
-  PagesIndexRoute: typeof PagesIndexRoute
-  ProfileIndexRoute: typeof ProfileIndexRoute
-  ResearchIndexRoute: typeof ResearchIndexRoute
-  SettingsIndexRoute: typeof SettingsIndexRoute
-  TasksIndexRoute: typeof TasksIndexRoute
-  SettingsMcpConnectionsRoute: typeof SettingsMcpConnectionsRoute
-  SettingsOrganizationIndustriesRoute: typeof SettingsOrganizationIndustriesRoute
-  SettingsOrganizationMembersRoute: typeof SettingsOrganizationMembersRoute
-  SettingsOrganizationPolicyRoute: typeof SettingsOrganizationPolicyRoute
-  SettingsOrganizationSpendRoute: typeof SettingsOrganizationSpendRoute
-  SettingsOrganizationTemplatesRoute: typeof SettingsOrganizationTemplatesRoute
-  SettingsProfileTemplatesRoute: typeof SettingsProfileTemplatesRoute
-  SettingsApiKeysIndexRoute: typeof SettingsApiKeysIndexRoute
-  SettingsMcpIndexRoute: typeof SettingsMcpIndexRoute
-  SettingsOrganizationIndexRoute: typeof SettingsOrganizationIndexRoute
-  SettingsProfileIndexRoute: typeof SettingsProfileIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -489,96 +483,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
+    '/_authed': {
+      id: '/_authed'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authed/': {
+      id: '/_authed/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/tasks/': {
-      id: '/tasks/'
-      path: '/tasks'
-      fullPath: '/tasks/'
-      preLoaderRoute: typeof TasksIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings/': {
-      id: '/settings/'
-      path: '/settings'
-      fullPath: '/settings/'
-      preLoaderRoute: typeof SettingsIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/research/': {
-      id: '/research/'
-      path: '/research'
-      fullPath: '/research/'
-      preLoaderRoute: typeof ResearchIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/profile/': {
-      id: '/profile/'
-      path: '/profile'
-      fullPath: '/profile/'
-      preLoaderRoute: typeof ProfileIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/pages/': {
-      id: '/pages/'
-      path: '/pages'
-      fullPath: '/pages/'
-      preLoaderRoute: typeof PagesIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/emails/': {
-      id: '/emails/'
-      path: '/emails'
-      fullPath: '/emails/'
-      preLoaderRoute: typeof EmailsIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/documents/': {
-      id: '/documents/'
-      path: '/documents'
-      fullPath: '/documents/'
-      preLoaderRoute: typeof DocumentsIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/companies/': {
-      id: '/companies/'
-      path: '/companies'
-      fullPath: '/companies/'
-      preLoaderRoute: typeof CompaniesIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/calendar/': {
-      id: '/calendar/'
-      path: '/calendar'
-      fullPath: '/calendar/'
-      preLoaderRoute: typeof CalendarIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/research/runs': {
-      id: '/research/runs'
-      path: '/research/runs'
-      fullPath: '/research/runs'
-      preLoaderRoute: typeof ResearchRunsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/research/$id': {
-      id: '/research/$id'
-      path: '/research/$id'
-      fullPath: '/research/$id'
-      preLoaderRoute: typeof ResearchIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/pages/$id': {
-      id: '/pages/$id'
-      path: '/pages/$id'
-      fullPath: '/pages/$id'
-      preLoaderRoute: typeof PagesIdRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthedIndexRouteImport
+      parentRoute: typeof AuthedRouteRoute
     }
     '/oauth/consent': {
       id: '/oauth/consent'
@@ -587,155 +504,291 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OauthConsentRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/emails/inboxes': {
-      id: '/emails/inboxes'
+    '/_authed/$': {
+      id: '/_authed/$'
+      path: '/$'
+      fullPath: '/$'
+      preLoaderRoute: typeof AuthedSplatRouteImport
+      parentRoute: typeof AuthedRouteRoute
+    }
+    '/_authed/tasks/': {
+      id: '/_authed/tasks/'
+      path: '/tasks'
+      fullPath: '/tasks/'
+      preLoaderRoute: typeof AuthedTasksIndexRouteImport
+      parentRoute: typeof AuthedRouteRoute
+    }
+    '/_authed/settings/': {
+      id: '/_authed/settings/'
+      path: '/settings'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof AuthedSettingsIndexRouteImport
+      parentRoute: typeof AuthedRouteRoute
+    }
+    '/_authed/research/': {
+      id: '/_authed/research/'
+      path: '/research'
+      fullPath: '/research/'
+      preLoaderRoute: typeof AuthedResearchIndexRouteImport
+      parentRoute: typeof AuthedRouteRoute
+    }
+    '/_authed/profile/': {
+      id: '/_authed/profile/'
+      path: '/profile'
+      fullPath: '/profile/'
+      preLoaderRoute: typeof AuthedProfileIndexRouteImport
+      parentRoute: typeof AuthedRouteRoute
+    }
+    '/_authed/pages/': {
+      id: '/_authed/pages/'
+      path: '/pages'
+      fullPath: '/pages/'
+      preLoaderRoute: typeof AuthedPagesIndexRouteImport
+      parentRoute: typeof AuthedRouteRoute
+    }
+    '/_authed/emails/': {
+      id: '/_authed/emails/'
+      path: '/emails'
+      fullPath: '/emails/'
+      preLoaderRoute: typeof AuthedEmailsIndexRouteImport
+      parentRoute: typeof AuthedRouteRoute
+    }
+    '/_authed/documents/': {
+      id: '/_authed/documents/'
+      path: '/documents'
+      fullPath: '/documents/'
+      preLoaderRoute: typeof AuthedDocumentsIndexRouteImport
+      parentRoute: typeof AuthedRouteRoute
+    }
+    '/_authed/companies/': {
+      id: '/_authed/companies/'
+      path: '/companies'
+      fullPath: '/companies/'
+      preLoaderRoute: typeof AuthedCompaniesIndexRouteImport
+      parentRoute: typeof AuthedRouteRoute
+    }
+    '/_authed/calendar/': {
+      id: '/_authed/calendar/'
+      path: '/calendar'
+      fullPath: '/calendar/'
+      preLoaderRoute: typeof AuthedCalendarIndexRouteImport
+      parentRoute: typeof AuthedRouteRoute
+    }
+    '/_authed/research/runs': {
+      id: '/_authed/research/runs'
+      path: '/research/runs'
+      fullPath: '/research/runs'
+      preLoaderRoute: typeof AuthedResearchRunsRouteImport
+      parentRoute: typeof AuthedRouteRoute
+    }
+    '/_authed/research/$id': {
+      id: '/_authed/research/$id'
+      path: '/research/$id'
+      fullPath: '/research/$id'
+      preLoaderRoute: typeof AuthedResearchIdRouteImport
+      parentRoute: typeof AuthedRouteRoute
+    }
+    '/_authed/pages/$id': {
+      id: '/_authed/pages/$id'
+      path: '/pages/$id'
+      fullPath: '/pages/$id'
+      preLoaderRoute: typeof AuthedPagesIdRouteImport
+      parentRoute: typeof AuthedRouteRoute
+    }
+    '/_authed/emails/inboxes': {
+      id: '/_authed/emails/inboxes'
       path: '/emails/inboxes'
       fullPath: '/emails/inboxes'
-      preLoaderRoute: typeof EmailsInboxesRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthedEmailsInboxesRouteImport
+      parentRoute: typeof AuthedRouteRoute
     }
-    '/emails/$threadId': {
-      id: '/emails/$threadId'
+    '/_authed/emails/$threadId': {
+      id: '/_authed/emails/$threadId'
       path: '/emails/$threadId'
       fullPath: '/emails/$threadId'
-      preLoaderRoute: typeof EmailsThreadIdRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthedEmailsThreadIdRouteImport
+      parentRoute: typeof AuthedRouteRoute
     }
-    '/documents/$id': {
-      id: '/documents/$id'
+    '/_authed/documents/$id': {
+      id: '/_authed/documents/$id'
       path: '/documents/$id'
       fullPath: '/documents/$id'
-      preLoaderRoute: typeof DocumentsIdRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthedDocumentsIdRouteImport
+      parentRoute: typeof AuthedRouteRoute
     }
-    '/companies/board': {
-      id: '/companies/board'
+    '/_authed/companies/board': {
+      id: '/_authed/companies/board'
       path: '/companies/board'
       fullPath: '/companies/board'
-      preLoaderRoute: typeof CompaniesBoardRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthedCompaniesBoardRouteImport
+      parentRoute: typeof AuthedRouteRoute
     }
-    '/companies/$slug': {
-      id: '/companies/$slug'
+    '/_authed/companies/$slug': {
+      id: '/_authed/companies/$slug'
       path: '/companies/$slug'
       fullPath: '/companies/$slug'
-      preLoaderRoute: typeof CompaniesSlugRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthedCompaniesSlugRouteImport
+      parentRoute: typeof AuthedRouteRoute
     }
-    '/settings/profile/': {
-      id: '/settings/profile/'
+    '/_authed/settings/profile/': {
+      id: '/_authed/settings/profile/'
       path: '/settings/profile'
       fullPath: '/settings/profile/'
-      preLoaderRoute: typeof SettingsProfileIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthedSettingsProfileIndexRouteImport
+      parentRoute: typeof AuthedRouteRoute
     }
-    '/settings/organization/': {
-      id: '/settings/organization/'
+    '/_authed/settings/organization/': {
+      id: '/_authed/settings/organization/'
       path: '/settings/organization'
       fullPath: '/settings/organization/'
-      preLoaderRoute: typeof SettingsOrganizationIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthedSettingsOrganizationIndexRouteImport
+      parentRoute: typeof AuthedRouteRoute
     }
-    '/settings/mcp/': {
-      id: '/settings/mcp/'
+    '/_authed/settings/mcp/': {
+      id: '/_authed/settings/mcp/'
       path: '/settings/mcp'
       fullPath: '/settings/mcp/'
-      preLoaderRoute: typeof SettingsMcpIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthedSettingsMcpIndexRouteImport
+      parentRoute: typeof AuthedRouteRoute
     }
-    '/settings/api-keys/': {
-      id: '/settings/api-keys/'
+    '/_authed/settings/api-keys/': {
+      id: '/_authed/settings/api-keys/'
       path: '/settings/api-keys'
       fullPath: '/settings/api-keys/'
-      preLoaderRoute: typeof SettingsApiKeysIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthedSettingsApiKeysIndexRouteImport
+      parentRoute: typeof AuthedRouteRoute
     }
-    '/settings/profile/templates': {
-      id: '/settings/profile/templates'
+    '/_authed/settings/profile/templates': {
+      id: '/_authed/settings/profile/templates'
       path: '/settings/profile/templates'
       fullPath: '/settings/profile/templates'
-      preLoaderRoute: typeof SettingsProfileTemplatesRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthedSettingsProfileTemplatesRouteImport
+      parentRoute: typeof AuthedRouteRoute
     }
-    '/settings/organization/templates': {
-      id: '/settings/organization/templates'
+    '/_authed/settings/organization/templates': {
+      id: '/_authed/settings/organization/templates'
       path: '/settings/organization/templates'
       fullPath: '/settings/organization/templates'
-      preLoaderRoute: typeof SettingsOrganizationTemplatesRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthedSettingsOrganizationTemplatesRouteImport
+      parentRoute: typeof AuthedRouteRoute
     }
-    '/settings/organization/spend': {
-      id: '/settings/organization/spend'
+    '/_authed/settings/organization/spend': {
+      id: '/_authed/settings/organization/spend'
       path: '/settings/organization/spend'
       fullPath: '/settings/organization/spend'
-      preLoaderRoute: typeof SettingsOrganizationSpendRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthedSettingsOrganizationSpendRouteImport
+      parentRoute: typeof AuthedRouteRoute
     }
-    '/settings/organization/policy': {
-      id: '/settings/organization/policy'
+    '/_authed/settings/organization/policy': {
+      id: '/_authed/settings/organization/policy'
       path: '/settings/organization/policy'
       fullPath: '/settings/organization/policy'
-      preLoaderRoute: typeof SettingsOrganizationPolicyRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthedSettingsOrganizationPolicyRouteImport
+      parentRoute: typeof AuthedRouteRoute
     }
-    '/settings/organization/members': {
-      id: '/settings/organization/members'
+    '/_authed/settings/organization/members': {
+      id: '/_authed/settings/organization/members'
       path: '/settings/organization/members'
       fullPath: '/settings/organization/members'
-      preLoaderRoute: typeof SettingsOrganizationMembersRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthedSettingsOrganizationMembersRouteImport
+      parentRoute: typeof AuthedRouteRoute
     }
-    '/settings/organization/industries': {
-      id: '/settings/organization/industries'
+    '/_authed/settings/organization/industries': {
+      id: '/_authed/settings/organization/industries'
       path: '/settings/organization/industries'
       fullPath: '/settings/organization/industries'
-      preLoaderRoute: typeof SettingsOrganizationIndustriesRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthedSettingsOrganizationIndustriesRouteImport
+      parentRoute: typeof AuthedRouteRoute
     }
-    '/settings/mcp/connections': {
-      id: '/settings/mcp/connections'
+    '/_authed/settings/mcp/connections': {
+      id: '/_authed/settings/mcp/connections'
       path: '/settings/mcp/connections'
       fullPath: '/settings/mcp/connections'
-      preLoaderRoute: typeof SettingsMcpConnectionsRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthedSettingsMcpConnectionsRouteImport
+      parentRoute: typeof AuthedRouteRoute
     }
   }
 }
 
+interface AuthedRouteRouteChildren {
+  AuthedSplatRoute: typeof AuthedSplatRoute
+  AuthedIndexRoute: typeof AuthedIndexRoute
+  AuthedCompaniesSlugRoute: typeof AuthedCompaniesSlugRoute
+  AuthedCompaniesBoardRoute: typeof AuthedCompaniesBoardRoute
+  AuthedDocumentsIdRoute: typeof AuthedDocumentsIdRoute
+  AuthedEmailsThreadIdRoute: typeof AuthedEmailsThreadIdRoute
+  AuthedEmailsInboxesRoute: typeof AuthedEmailsInboxesRoute
+  AuthedPagesIdRoute: typeof AuthedPagesIdRoute
+  AuthedResearchIdRoute: typeof AuthedResearchIdRoute
+  AuthedResearchRunsRoute: typeof AuthedResearchRunsRoute
+  AuthedCalendarIndexRoute: typeof AuthedCalendarIndexRoute
+  AuthedCompaniesIndexRoute: typeof AuthedCompaniesIndexRoute
+  AuthedDocumentsIndexRoute: typeof AuthedDocumentsIndexRoute
+  AuthedEmailsIndexRoute: typeof AuthedEmailsIndexRoute
+  AuthedPagesIndexRoute: typeof AuthedPagesIndexRoute
+  AuthedProfileIndexRoute: typeof AuthedProfileIndexRoute
+  AuthedResearchIndexRoute: typeof AuthedResearchIndexRoute
+  AuthedSettingsIndexRoute: typeof AuthedSettingsIndexRoute
+  AuthedTasksIndexRoute: typeof AuthedTasksIndexRoute
+  AuthedSettingsMcpConnectionsRoute: typeof AuthedSettingsMcpConnectionsRoute
+  AuthedSettingsOrganizationIndustriesRoute: typeof AuthedSettingsOrganizationIndustriesRoute
+  AuthedSettingsOrganizationMembersRoute: typeof AuthedSettingsOrganizationMembersRoute
+  AuthedSettingsOrganizationPolicyRoute: typeof AuthedSettingsOrganizationPolicyRoute
+  AuthedSettingsOrganizationSpendRoute: typeof AuthedSettingsOrganizationSpendRoute
+  AuthedSettingsOrganizationTemplatesRoute: typeof AuthedSettingsOrganizationTemplatesRoute
+  AuthedSettingsProfileTemplatesRoute: typeof AuthedSettingsProfileTemplatesRoute
+  AuthedSettingsApiKeysIndexRoute: typeof AuthedSettingsApiKeysIndexRoute
+  AuthedSettingsMcpIndexRoute: typeof AuthedSettingsMcpIndexRoute
+  AuthedSettingsOrganizationIndexRoute: typeof AuthedSettingsOrganizationIndexRoute
+  AuthedSettingsProfileIndexRoute: typeof AuthedSettingsProfileIndexRoute
+}
+
+const AuthedRouteRouteChildren: AuthedRouteRouteChildren = {
+  AuthedSplatRoute: AuthedSplatRoute,
+  AuthedIndexRoute: AuthedIndexRoute,
+  AuthedCompaniesSlugRoute: AuthedCompaniesSlugRoute,
+  AuthedCompaniesBoardRoute: AuthedCompaniesBoardRoute,
+  AuthedDocumentsIdRoute: AuthedDocumentsIdRoute,
+  AuthedEmailsThreadIdRoute: AuthedEmailsThreadIdRoute,
+  AuthedEmailsInboxesRoute: AuthedEmailsInboxesRoute,
+  AuthedPagesIdRoute: AuthedPagesIdRoute,
+  AuthedResearchIdRoute: AuthedResearchIdRoute,
+  AuthedResearchRunsRoute: AuthedResearchRunsRoute,
+  AuthedCalendarIndexRoute: AuthedCalendarIndexRoute,
+  AuthedCompaniesIndexRoute: AuthedCompaniesIndexRoute,
+  AuthedDocumentsIndexRoute: AuthedDocumentsIndexRoute,
+  AuthedEmailsIndexRoute: AuthedEmailsIndexRoute,
+  AuthedPagesIndexRoute: AuthedPagesIndexRoute,
+  AuthedProfileIndexRoute: AuthedProfileIndexRoute,
+  AuthedResearchIndexRoute: AuthedResearchIndexRoute,
+  AuthedSettingsIndexRoute: AuthedSettingsIndexRoute,
+  AuthedTasksIndexRoute: AuthedTasksIndexRoute,
+  AuthedSettingsMcpConnectionsRoute: AuthedSettingsMcpConnectionsRoute,
+  AuthedSettingsOrganizationIndustriesRoute:
+    AuthedSettingsOrganizationIndustriesRoute,
+  AuthedSettingsOrganizationMembersRoute:
+    AuthedSettingsOrganizationMembersRoute,
+  AuthedSettingsOrganizationPolicyRoute: AuthedSettingsOrganizationPolicyRoute,
+  AuthedSettingsOrganizationSpendRoute: AuthedSettingsOrganizationSpendRoute,
+  AuthedSettingsOrganizationTemplatesRoute:
+    AuthedSettingsOrganizationTemplatesRoute,
+  AuthedSettingsProfileTemplatesRoute: AuthedSettingsProfileTemplatesRoute,
+  AuthedSettingsApiKeysIndexRoute: AuthedSettingsApiKeysIndexRoute,
+  AuthedSettingsMcpIndexRoute: AuthedSettingsMcpIndexRoute,
+  AuthedSettingsOrganizationIndexRoute: AuthedSettingsOrganizationIndexRoute,
+  AuthedSettingsProfileIndexRoute: AuthedSettingsProfileIndexRoute,
+}
+
+const AuthedRouteRouteWithChildren = AuthedRouteRoute._addFileChildren(
+  AuthedRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  AuthedRouteRoute: AuthedRouteRouteWithChildren,
   ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
   ResetPasswordRoute: ResetPasswordRoute,
-  CompaniesSlugRoute: CompaniesSlugRoute,
-  CompaniesBoardRoute: CompaniesBoardRoute,
-  DocumentsIdRoute: DocumentsIdRoute,
-  EmailsThreadIdRoute: EmailsThreadIdRoute,
-  EmailsInboxesRoute: EmailsInboxesRoute,
   OauthConsentRoute: OauthConsentRoute,
-  PagesIdRoute: PagesIdRoute,
-  ResearchIdRoute: ResearchIdRoute,
-  ResearchRunsRoute: ResearchRunsRoute,
-  CalendarIndexRoute: CalendarIndexRoute,
-  CompaniesIndexRoute: CompaniesIndexRoute,
-  DocumentsIndexRoute: DocumentsIndexRoute,
-  EmailsIndexRoute: EmailsIndexRoute,
-  PagesIndexRoute: PagesIndexRoute,
-  ProfileIndexRoute: ProfileIndexRoute,
-  ResearchIndexRoute: ResearchIndexRoute,
-  SettingsIndexRoute: SettingsIndexRoute,
-  TasksIndexRoute: TasksIndexRoute,
-  SettingsMcpConnectionsRoute: SettingsMcpConnectionsRoute,
-  SettingsOrganizationIndustriesRoute: SettingsOrganizationIndustriesRoute,
-  SettingsOrganizationMembersRoute: SettingsOrganizationMembersRoute,
-  SettingsOrganizationPolicyRoute: SettingsOrganizationPolicyRoute,
-  SettingsOrganizationSpendRoute: SettingsOrganizationSpendRoute,
-  SettingsOrganizationTemplatesRoute: SettingsOrganizationTemplatesRoute,
-  SettingsProfileTemplatesRoute: SettingsProfileTemplatesRoute,
-  SettingsApiKeysIndexRoute: SettingsApiKeysIndexRoute,
-  SettingsMcpIndexRoute: SettingsMcpIndexRoute,
-  SettingsOrganizationIndexRoute: SettingsOrganizationIndexRoute,
-  SettingsProfileIndexRoute: SettingsProfileIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

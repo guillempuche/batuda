@@ -1,0 +1,552 @@
+import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
+import { Trans, useLingui } from '@lingui/react/macro'
+import {
+	createFileRoute,
+	Link,
+	notFound,
+	stripSearchParams,
+} from '@tanstack/react-router'
+import { EditorContent, useEditor } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import { DateTime, Schema } from 'effect'
+import { AsyncResult } from 'effect/unstable/reactivity'
+import { ArrowLeft, Eye, Globe, Save } from 'lucide-react'
+import { styled } from 'next-yak'
+import { useCallback, useMemo, useState } from 'react'
+
+import type { Page as PageModel } from '@batuda/domain'
+import type { TiptapDocument } from '@batuda/ui/blocks'
+import { allBlockExtensions } from '@batuda/ui/blocks'
+import { PriButton, PriTabs, usePriToast } from '@batuda/ui/pri'
+
+import { pageAtomFor } from '#/atoms/pages-atoms'
+import { useSetDocumentTitle } from '#/components/layout/top-bar-title'
+import { ErrorState } from '#/components/shared/error-state'
+import { LoadingSpinner } from '#/components/shared/loading-spinner'
+import { dehydrateAtom } from '#/lib/atom-hydration'
+import { BatudaApiAtom } from '#/lib/batuda-api-atom'
+import { validateSearchWith } from '#/lib/search-schema'
+import { getServerCookieHeader } from '#/lib/server-cookie'
+import { useTabSearchParam } from '#/lib/tab-search'
+import {
+	agedPaperSurface,
+	brushedMetalBezel,
+	brushedMetalPlate,
+	stenciledTitle,
+} from '#/lib/workshop-mixins'
+
+type PageDetail = {
+	readonly id: string
+	readonly slug: string
+	readonly lang: string
+	readonly title: string
+	readonly status: string
+	readonly template: string | null
+	readonly content: TiptapDocument
+	readonly meta: Record<string, unknown> | null
+	readonly publishedAt: string | null
+	readonly viewCount: number
+}
+
+async function loadPageOnServer(id: string): Promise<PageModel> {
+	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
+		import('effect'),
+		import('#/lib/batuda-api-server'),
+		getServerCookieHeader(),
+	])
+	const program = Effect.gen(function* () {
+		const client = yield* makeBatudaApiServer(cookie ?? undefined)
+		return yield* client.pages.get({ params: { id } })
+	})
+	return Effect.runPromise(program)
+}
+
+const PAGE_TABS = ['editor', 'meta'] as const
+type PageTab = (typeof PAGE_TABS)[number]
+
+const validateSearch = validateSearchWith({
+	tab: Schema.Literals(PAGE_TABS),
+})
+
+export const Route = createFileRoute('/_authed/pages/$id')({
+	validateSearch,
+	// Strip the default tab from the URL so `useTabSearchParam` can write
+	// `tab: next` unconditionally without leaving `?tab=editor` behind.
+	search: { middlewares: [stripSearchParams({ tab: 'editor' })] },
+	loader: async ({ params: { id } }) => {
+		if (!import.meta.env.SSR) {
+			return { dehydrated: [] as const, id, title: null as string | null }
+		}
+		try {
+			const page = await loadPageOnServer(id)
+			const title = extractPageTitle(page)
+			return {
+				dehydrated: [
+					dehydrateAtom(pageAtomFor(id), AsyncResult.success(page)),
+				] as const,
+				id,
+				title,
+			}
+		} catch (error) {
+			if (isNotFoundError(error)) throw notFound()
+			console.warn('[PageEditorLoader] falling back:', error)
+			return { dehydrated: [] as const, id, title: null as string | null }
+		}
+	},
+	head: ({ loaderData }) => {
+		const title = loaderData?.title ?? 'Page'
+		return { meta: [{ title: `${title} — Batuda` }] }
+	},
+	component: PageEditorPage,
+})
+
+function extractPageTitle(raw: unknown): string | null {
+	if (!raw || typeof raw !== 'object') return null
+	const title = (raw as Record<string, unknown>)['title']
+	return typeof title === 'string' && title.length > 0 ? title : null
+}
+
+function isNotFoundError(error: unknown): boolean {
+	if (!error || typeof error !== 'object') return false
+	return (error as Record<string, unknown>)['_tag'] === 'NotFound'
+}
+
+function PageEditorPage() {
+	const { t } = useLingui()
+	const { id } = Route.useParams()
+	const atom = useMemo(() => pageAtomFor(id), [id])
+	const result = useAtomValue(atom)
+	const refreshPage = useAtomRefresh(atom)
+
+	const page = useMemo<PageDetail | null>(
+		() => (AsyncResult.isSuccess(result) ? narrowPage(result.value) : null),
+		[result],
+	)
+
+	if (AsyncResult.isInitial(result)) {
+		return (
+			<Page>
+				<LoadingSpinner />
+			</Page>
+		)
+	}
+
+	if (AsyncResult.isFailure(result)) {
+		return (
+			<Page>
+				<ErrorState
+					data-testid='page-error'
+					headingLevel={1}
+					title={t`Could not load this page`}
+					description={t`The page could not be fetched. Check that the session is valid, then try again.`}
+					onRetry={refreshPage}
+				/>
+			</Page>
+		)
+	}
+
+	// The request succeeded but the page came back in a shape we don't
+	// recognise, so asking again would only return the same thing.
+	if (page === null) {
+		return (
+			<Page>
+				<ErrorState
+					data-testid='page-shape-error'
+					headingLevel={1}
+					title={t`This page can't be displayed`}
+					description={t`The content arrived in a form the editor cannot read, so there is nothing to edit. Go back to the list and open the page again; report it if it keeps happening.`}
+				/>
+			</Page>
+		)
+	}
+
+	return <EditorBody page={page} />
+}
+
+function EditorBody({ page }: { page: PageDetail }) {
+	const { t } = useLingui()
+	const toastManager = usePriToast()
+	const [tab, setTab] = useTabSearchParam<PageTab>(PAGE_TABS, 'editor')
+
+	// Mirror the page title (and active tab when not the default) into
+	// the top bar + browser tab, replacing the static "Pages" label.
+	const tabLabel: Record<PageTab, string> = {
+		editor: t`Editor`,
+		meta: t`Meta`,
+	}
+	useSetDocumentTitle(
+		tab === 'editor' ? page.title : `${page.title} · ${tabLabel[tab]}`,
+	)
+	const refreshPage = useAtomRefresh(
+		useMemo(() => pageAtomFor(page.id), [page.id]),
+	)
+
+	const updatePage = useAtomSet(BatudaApiAtom.mutation('pages', 'update'), {
+		mode: 'promiseExit',
+	})
+	const publishPage = useAtomSet(BatudaApiAtom.mutation('pages', 'publish'), {
+		mode: 'promiseExit',
+	})
+
+	const [title, setTitle] = useState(page.title)
+	const [saving, setSaving] = useState(false)
+	const [publishing, setPublishing] = useState(false)
+
+	const editor = useEditor({
+		extensions: [...allBlockExtensions, StarterKit],
+		content: page.content as Record<string, unknown>,
+		immediatelyRender: false,
+	})
+
+	const handleSave = useCallback(async () => {
+		if (!editor) return
+		setSaving(true)
+		const content = editor.getJSON()
+		const exit = await updatePage({
+			params: { id: page.id },
+			payload: { title, content },
+		} as never)
+		if (exit._tag === 'Success') {
+			toastManager.add({
+				title: t`Page saved`,
+				description: t`Changes have been saved.`,
+				type: 'success',
+			})
+			refreshPage()
+		} else {
+			toastManager.add({
+				title: t`Save failed`,
+				description: t`Could not save the page. Please try again.`,
+				type: 'error',
+			})
+			console.error('[batuda] pages.update failed', exit.cause)
+		}
+		setSaving(false)
+	}, [editor, page.id, title, updatePage, toastManager, t, refreshPage])
+
+	const handlePublish = useCallback(async () => {
+		setPublishing(true)
+		const exit = await publishPage({
+			params: { id: page.id },
+		} as never)
+		if (exit._tag === 'Success') {
+			toastManager.add({
+				title: t`Page published`,
+				description: t`The page is now live.`,
+				type: 'success',
+			})
+			refreshPage()
+		} else {
+			toastManager.add({
+				title: t`Publish failed`,
+				description: t`Could not publish the page. Please try again.`,
+				type: 'error',
+			})
+			console.error('[batuda] pages.publish failed', exit.cause)
+		}
+		setPublishing(false)
+	}, [page.id, publishPage, toastManager, t, refreshPage])
+
+	const publicUrl = `https://engranatge.localhost/${page.lang}/${page.slug}`
+
+	return (
+		<Page>
+			<Header>
+				<BackLink to='/pages' data-testid='page-editor-back'>
+					<ArrowLeft size={16} aria-hidden />
+					<Trans>Pages</Trans>
+				</BackLink>
+				<HeaderMain>
+					<TitleInput
+						data-testid='page-editor-title-input'
+						value={title}
+						onChange={e => setTitle(e.target.value)}
+						placeholder={t`Page title`}
+					/>
+					<HeaderMeta>
+						<MetaTag>{page.lang}</MetaTag>
+						<MetaTag>{page.status}</MetaTag>
+						{page.status === 'published' && (
+							<PreviewLink
+								data-testid='page-editor-preview'
+								href={publicUrl}
+								target='_blank'
+								rel='noopener noreferrer'
+							>
+								<Globe size={14} aria-hidden />
+								<Trans>Preview</Trans>
+							</PreviewLink>
+						)}
+					</HeaderMeta>
+				</HeaderMain>
+				<Actions>
+					<PriButton
+						type='button'
+						$variant='outlined'
+						onClick={handleSave}
+						disabled={saving}
+						data-testid='page-editor-save'
+					>
+						<Save size={16} aria-hidden />
+						{saving ? t`Saving…` : t`Save`}
+					</PriButton>
+					{page.status !== 'published' && (
+						<PriButton
+							type='button'
+							$variant='filled'
+							onClick={handlePublish}
+							disabled={publishing}
+							data-testid='page-editor-publish'
+						>
+							<Eye size={16} aria-hidden />
+							{publishing ? t`Publishing…` : t`Publish`}
+						</PriButton>
+					)}
+				</Actions>
+			</Header>
+
+			<PriTabs.Root value={tab} onValueChange={v => setTab(v as PageTab)}>
+				<PriTabs.List>
+					<PriTabs.Tab value='editor' data-testid='page-editor-tab-editor'>
+						<Trans>Editor</Trans>
+					</PriTabs.Tab>
+					<PriTabs.Tab value='meta' data-testid='page-editor-tab-meta'>
+						<Trans>Settings</Trans>
+					</PriTabs.Tab>
+					<PriTabs.Indicator />
+				</PriTabs.List>
+
+				<PriTabs.Panel value='editor'>
+					<EditorWrap>
+						{editor ? <EditorContent editor={editor} /> : <LoadingSpinner />}
+					</EditorWrap>
+				</PriTabs.Panel>
+
+				<PriTabs.Panel value='meta'>
+					<MetaPanel>
+						<MetaField>
+							<MetaLabel>
+								<Trans>Slug</Trans>
+							</MetaLabel>
+							<MetaValue>{page.slug}</MetaValue>
+						</MetaField>
+						<MetaField>
+							<MetaLabel>
+								<Trans>Language</Trans>
+							</MetaLabel>
+							<MetaValue>{page.lang}</MetaValue>
+						</MetaField>
+						<MetaField>
+							<MetaLabel>
+								<Trans>Template</Trans>
+							</MetaLabel>
+							<MetaValue>{page.template ?? '—'}</MetaValue>
+						</MetaField>
+						<MetaField>
+							<MetaLabel>
+								<Trans>Views</Trans>
+							</MetaLabel>
+							<MetaValue>{page.viewCount}</MetaValue>
+						</MetaField>
+						{page.status === 'published' && (
+							<MetaField>
+								<MetaLabel>
+									<Trans>Public URL</Trans>
+								</MetaLabel>
+								<PreviewLink
+									href={publicUrl}
+									target='_blank'
+									rel='noopener noreferrer'
+								>
+									{publicUrl}
+								</PreviewLink>
+							</MetaField>
+						)}
+					</MetaPanel>
+				</PriTabs.Panel>
+			</PriTabs.Root>
+		</Page>
+	)
+}
+
+function narrowPage(raw: unknown): PageDetail | null {
+	if (!raw || typeof raw !== 'object') return null
+	const r = raw as Record<string, unknown>
+	if (typeof r['id'] !== 'string') return null
+	if (typeof r['slug'] !== 'string') return null
+	if (typeof r['title'] !== 'string') return null
+	// Typed date fields (publishedAt) decode to DateTime.Utc on the wire;
+	// convert those back to an ISO string while leaving plain string fields
+	// untouched.
+	const str = (key: string) => {
+		const v = r[key]
+		if (typeof v === 'string') return v
+		if (DateTime.isDateTime(v)) return DateTime.formatIso(v)
+		return null
+	}
+	return {
+		id: r['id'],
+		slug: r['slug'],
+		lang: typeof r['lang'] === 'string' ? r['lang'] : 'en',
+		title: r['title'],
+		status: typeof r['status'] === 'string' ? r['status'] : 'draft',
+		template: str('template'),
+		content: (r['content'] as TiptapDocument) ?? {
+			type: 'doc' as const,
+			content: [],
+		},
+		meta:
+			r['meta'] && typeof r['meta'] === 'object'
+				? (r['meta'] as Record<string, unknown>)
+				: null,
+		publishedAt: str('publishedAt'),
+		viewCount: typeof r['viewCount'] === 'number' ? r['viewCount'] : 0,
+	}
+}
+
+const Page = styled.div`
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-lg);
+`
+
+const Header = styled.header`
+	${brushedMetalPlate}
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-sm);
+	padding: var(--space-md) var(--space-lg);
+	box-shadow: var(--elevation-workshop-md);
+`
+
+const BackLink = styled(Link)`
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2xs);
+	font-size: var(--typescale-label-large-size);
+	color: var(--color-on-surface-variant);
+	text-decoration: none;
+
+	&:hover {
+		color: var(--color-primary);
+	}
+`
+
+const HeaderMain = styled.div`
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-md);
+`
+
+const TitleInput = styled.input`
+	${stenciledTitle}
+	font-size: var(--typescale-headline-medium-size);
+	line-height: var(--typescale-headline-medium-line);
+	letter-spacing: 0.04em;
+	border: none;
+	background: transparent;
+	color: var(--color-on-surface);
+	flex: 1 1 300px;
+	min-width: 0;
+	padding: var(--space-2xs) 0;
+
+	&:focus {
+		outline: none;
+		border-bottom: 2px solid var(--color-primary);
+	}
+`
+
+const HeaderMeta = styled.div`
+	display: flex;
+	align-items: center;
+	gap: var(--space-sm);
+`
+
+const MetaTag = styled.span`
+	${brushedMetalBezel}
+	font-size: var(--typescale-label-medium-size);
+	padding: var(--space-3xs) var(--space-sm);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+`
+
+const Actions = styled.div`
+	display: flex;
+	align-items: center;
+	gap: var(--space-sm);
+	justify-content: flex-end;
+`
+
+const PreviewLink = styled.a`
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2xs);
+	font-size: var(--typescale-label-large-size);
+	color: var(--color-primary);
+	text-decoration: none;
+
+	&:hover {
+		text-decoration: underline;
+	}
+`
+
+const EditorWrap = styled.div`
+	${agedPaperSurface}
+	padding: var(--space-lg);
+	min-height: 400px;
+
+	.tiptap {
+		outline: none;
+		min-height: 300px;
+		font-family: var(--font-body);
+		font-size: var(--typescale-body-large-size);
+		line-height: var(--typescale-body-large-line);
+		color: var(--color-on-surface);
+	}
+
+	.tiptap [data-type] {
+		padding: var(--space-md);
+		margin: var(--space-sm) 0;
+		border: 1px dashed var(--color-outline);
+		border-radius: 8px;
+		background: color-mix(in oklab, var(--color-surface) 90%, transparent);
+	}
+
+	.tiptap [data-type]::before {
+		content: attr(data-type);
+		display: block;
+		font-size: var(--typescale-label-small-size);
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--color-on-surface-variant);
+		margin-bottom: var(--space-xs);
+	}
+`
+
+const MetaPanel = styled.div`
+	${agedPaperSurface}
+	padding: var(--space-lg);
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-md);
+`
+
+const MetaField = styled.div`
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2xs);
+`
+
+const MetaLabel = styled.span`
+	font-size: var(--typescale-label-large-size);
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--color-on-surface-variant);
+`
+
+const MetaValue = styled.span`
+	font-size: var(--typescale-body-large-size);
+	color: var(--color-on-surface);
+`

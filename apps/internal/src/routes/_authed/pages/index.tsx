@@ -1,0 +1,386 @@
+import { Trans, useLingui } from '@lingui/react/macro'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { DateTime, Schema } from 'effect'
+import { AsyncResult } from 'effect/unstable/reactivity'
+import { ChevronsUpDown, ExternalLink } from 'lucide-react'
+import { styled } from 'next-yak'
+import { useEffect, useMemo, useState } from 'react'
+
+import type { PageSummary } from '@batuda/controllers'
+import { PriSelect } from '@batuda/ui/pri'
+
+import {
+	canonicalKey,
+	PAGES_FIRST_PAGE,
+	PAGES_PAGE_SIZE,
+	type PagesSearch,
+	pagesSearchAtom,
+} from '#/atoms/pages-atoms'
+import { EmptyState } from '#/components/shared/empty-state'
+import { ErrorState } from '#/components/shared/error-state'
+import { InfiniteListFooter } from '#/components/shared/infinite-list-footer'
+import { LoadingSpinner } from '#/components/shared/loading-spinner'
+import { RelativeDate } from '#/components/shared/relative-date'
+import { useInfiniteList } from '#/hooks/use-infinite-list'
+import { dehydrateAtom } from '#/lib/atom-hydration'
+import { listPageQuery } from '#/lib/list-page'
+import type { PaginatedList } from '#/lib/paginated-list'
+import { validateSearchWith } from '#/lib/search-schema'
+import { getServerCookieHeader } from '#/lib/server-cookie'
+import {
+	agedPaperSurface,
+	brushedMetalPlate,
+	ruledLedgerRow,
+	stenciledTitle,
+} from '#/lib/workshop-mixins'
+
+type PageRow = {
+	readonly id: string
+	readonly slug: string
+	readonly lang: string
+	readonly title: string
+	readonly status: string
+	readonly template: string | null
+	readonly viewCount: number
+	readonly publishedAt: string | null
+	readonly companyId: string | null
+}
+
+const validateSearch = validateSearchWith({
+	companyId: Schema.NonEmptyString,
+	status: Schema.NonEmptyString,
+	lang: Schema.NonEmptyString,
+})
+
+async function loadPagesOnServer(
+	search: PagesSearch,
+): Promise<{ pages: PaginatedList<(typeof PageSummary)['Type']> }> {
+	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
+		import('effect'),
+		import('#/lib/batuda-api-server'),
+		getServerCookieHeader(),
+	])
+	const program = Effect.gen(function* () {
+		const client = yield* makeBatudaApiServer(cookie ?? undefined)
+		// Matches `pagesSearchAtom` exactly, so the browser reuses this answer
+		// instead of asking again.
+		return yield* client.pages.list({
+			query: { ...search, ...listPageQuery(PAGES_FIRST_PAGE) },
+		})
+	})
+	const pages = await Effect.runPromise(program)
+	return { pages }
+}
+
+export const Route = createFileRoute('/_authed/pages/')({
+	validateSearch,
+	loaderDeps: ({ search }) => ({ search }),
+	loader: async ({ deps: { search } }) => {
+		if (!import.meta.env.SSR) {
+			return { dehydrated: [] as const }
+		}
+		try {
+			const { pages } = await loadPagesOnServer(search)
+			return {
+				dehydrated: [
+					dehydrateAtom(
+						pagesSearchAtom(search, PAGES_FIRST_PAGE),
+						AsyncResult.success(pages),
+					),
+				] as const,
+			}
+		} catch (error) {
+			console.warn('[PagesLoader] falling back to empty hydration:', error)
+			return { dehydrated: [] as const }
+		}
+	},
+	head: () => ({ meta: [{ title: 'Pages — Batuda' }] }),
+	component: PagesListPage,
+})
+
+function PagesListPage() {
+	const { t } = useLingui()
+	const search = Route.useSearch()
+	const navigate = useNavigate({ from: Route.fullPath })
+
+	const list = useInfiniteList({
+		resetKey: `pages:${canonicalKey(search)}`,
+		pageSize: PAGES_PAGE_SIZE,
+		count: 'exact',
+		atomFor: page => pagesSearchAtom(search, page),
+	})
+	const refreshPages = list.refresh
+
+	const pages = useMemo<ReadonlyArray<PageRow>>(
+		() => narrowPages(list.items),
+		[list.items],
+	)
+	const isLoading = list.isLoadingFirstPage
+	const isFailure = list.isError
+
+	const [statusFilter, setStatusFilter] = useState(search.status ?? '')
+	const statusItems = useMemo(
+		() => [
+			{ value: '', label: t`All statuses` },
+			{ value: 'draft', label: t`Draft` },
+			{ value: 'published', label: t`Published` },
+		],
+		[t],
+	)
+
+	// Keeps the dropdown in step with the address bar, since going back or
+	// forward in the browser changes the status in the URL but not the
+	// dropdown's own state.
+	useEffect(() => {
+		setStatusFilter(search.status ?? '')
+	}, [search.status])
+
+	return (
+		<Page>
+			<Header>
+				<Title>
+					<Trans>Pages</Trans>
+				</Title>
+				<HeaderActions>
+					<PriSelect.Root
+						items={statusItems}
+						value={statusFilter}
+						onValueChange={next => {
+							const picked = statusItems.find(item => item.value === next)
+							if (!picked) return
+							const nextStatus = picked.value
+							setStatusFilter(nextStatus)
+							if (nextStatus) {
+								void navigate({ search: { ...search, status: nextStatus } })
+							} else {
+								// Drop `status` entirely rather than setting it to '' —
+								// `exactOptionalPropertyTypes` rejects `undefined` here
+								// and an empty string would show up in the URL.
+								const { status: _, ...rest } = search
+								void navigate({ search: rest })
+							}
+						}}
+					>
+						<StatusFilterTrigger data-testid='pages-status-filter'>
+							<PriSelect.Value />
+							<PriSelect.Icon>
+								<ChevronsUpDown size={12} aria-hidden />
+							</PriSelect.Icon>
+						</StatusFilterTrigger>
+						<PriSelect.Options
+							items={statusItems}
+							optionTestId={value => `pages-status-filter-${value || 'all'}`}
+						/>
+					</PriSelect.Root>
+				</HeaderActions>
+			</Header>
+
+			{isLoading ? (
+				<LoadingSpinner />
+			) : isFailure ? (
+				<ErrorState
+					data-testid='pages-error'
+					title={t`Could not load pages`}
+					description={t`The list could not be fetched. Check that the session is valid, then try again.`}
+					onRetry={refreshPages}
+				/>
+			) : pages.length === 0 ? (
+				<EmptyState
+					title={t`No pages yet`}
+					description={t`Create a prospect landing page from a company detail view or via the MCP tools.`}
+				/>
+			) : (
+				<Table>
+					<thead>
+						<tr>
+							<Th>{t`Title`}</Th>
+							<Th>{t`Slug`}</Th>
+							<Th>{t`Lang`}</Th>
+							<Th>{t`Status`}</Th>
+							<Th>{t`Views`}</Th>
+							<Th>{t`Published`}</Th>
+							<Th />
+						</tr>
+					</thead>
+					<tbody>
+						{pages.map(page => (
+							<Row key={page.id} data-testid={`page-row-${page.slug}`}>
+								<Td>
+									<PageTitleCell>
+										<Link to='/pages/$id' params={{ id: page.id }}>
+											{page.title}
+										</Link>
+									</PageTitleCell>
+								</Td>
+								<TdMono>{page.slug}</TdMono>
+								<Td>{page.lang}</Td>
+								<Td>
+									<StatusDot $published={page.status === 'published'} />
+									{page.status}
+								</Td>
+								<Td>{page.viewCount}</Td>
+								<Td>
+									<RelativeDate value={page.publishedAt} fallback={t`—`} />
+								</Td>
+								<Td>
+									{page.status === 'published' && (
+										<PreviewLink
+											data-testid={`page-row-preview-${page.slug}`}
+											href={`https://engranatge.localhost/${page.lang}/${page.slug}`}
+											target='_blank'
+											rel='noopener noreferrer'
+											aria-label={t`Preview`}
+										>
+											<ExternalLink size={14} aria-hidden />
+										</PreviewLink>
+									)}
+								</Td>
+							</Row>
+						))}
+					</tbody>
+				</Table>
+			)}
+
+			<InfiniteListFooter list={list} testId='pages' />
+		</Page>
+	)
+}
+
+// Typed date fields decode to DateTime.Utc on the wire; fall back to their
+// string form for anything already an ISO string.
+function dateToIsoOrNull(value: unknown): string | null {
+	if (typeof value === 'string') return value
+	if (DateTime.isDateTime(value)) return DateTime.formatIso(value)
+	return null
+}
+
+function narrowPages(rows: ReadonlyArray<unknown>): ReadonlyArray<PageRow> {
+	const out: Array<PageRow> = []
+	for (const row of rows) {
+		if (!row || typeof row !== 'object') continue
+		const r = row as Record<string, unknown>
+		if (typeof r['id'] !== 'string') continue
+		if (typeof r['slug'] !== 'string') continue
+		if (typeof r['title'] !== 'string') continue
+		out.push({
+			id: r['id'],
+			slug: r['slug'],
+			lang: typeof r['lang'] === 'string' ? r['lang'] : 'en',
+			title: r['title'],
+			status: typeof r['status'] === 'string' ? r['status'] : 'draft',
+			template: typeof r['template'] === 'string' ? r['template'] : null,
+			viewCount: typeof r['viewCount'] === 'number' ? r['viewCount'] : 0,
+			publishedAt: dateToIsoOrNull(r['publishedAt']),
+			companyId: typeof r['companyId'] === 'string' ? r['companyId'] : null,
+		})
+	}
+	return out
+}
+
+const Page = styled.div`
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-lg);
+`
+
+const Header = styled.header`
+	${brushedMetalPlate}
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: var(--space-md) var(--space-lg);
+	gap: var(--space-md);
+`
+
+const Title = styled.h2`
+	${stenciledTitle}
+	font-size: var(--typescale-headline-medium-size);
+	line-height: var(--typescale-headline-medium-line);
+	letter-spacing: 0.06em;
+	margin: 0;
+`
+
+const HeaderActions = styled.div`
+	display: flex;
+	align-items: center;
+	gap: var(--space-sm);
+`
+
+// Kept at the body size rather than smaller: below 16px an iPhone zooms the
+// page the moment the control is tapped.
+const StatusFilterTrigger = styled(PriSelect.Trigger)`
+	gap: var(--space-2xs);
+	padding: var(--space-xs) var(--space-sm);
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-large-size);
+	font-weight: var(--font-weight-regular);
+	letter-spacing: var(--typescale-body-large-tracking);
+	text-transform: none;
+`
+
+const Table = styled.table`
+	${agedPaperSurface}
+	width: 100%;
+	border-collapse: collapse;
+`
+
+const Th = styled.th`
+	text-align: left;
+	padding: var(--space-sm) var(--space-md);
+	font-size: var(--typescale-label-large-size);
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--color-on-surface-variant);
+	border-bottom: 2px solid var(--color-outline);
+`
+
+const Row = styled.tr`
+	${ruledLedgerRow}
+`
+
+const Td = styled.td`
+	padding: var(--space-sm) var(--space-md);
+	font-size: var(--typescale-body-medium-size);
+	color: var(--color-on-surface);
+	vertical-align: middle;
+`
+
+const TdMono = styled(Td)`
+	font-family: var(--font-mono, monospace);
+	font-size: var(--typescale-body-small-size);
+	color: var(--color-on-surface-variant);
+`
+
+const PageTitleCell = styled.span`
+	& a {
+		color: var(--color-primary);
+		text-decoration: none;
+		font-weight: var(--font-weight-medium);
+	}
+
+	& a:hover {
+		text-decoration: underline;
+	}
+`
+
+const StatusDot = styled.span<{ $published: boolean }>`
+	display: inline-block;
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	margin-right: var(--space-xs);
+	background: ${p =>
+		p.$published
+			? 'var(--color-status-client)'
+			: 'var(--color-status-prospect)'};
+`
+
+const PreviewLink = styled.a`
+	display: inline-flex;
+	align-items: center;
+	color: var(--color-on-surface-variant);
+
+	&:hover {
+		color: var(--color-primary);
+	}
+`
