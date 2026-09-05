@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-09-05 (internal-v2026.9.5)
+
+### Features
+
+* stream a research run's progress and spend as they happen ([e036a3b](https://github.com/guillempuche/batuda/commit/e036a3bb9ad31c205f6b94956f52e4739e505f0f))
+
+### Bug Fixes
+
+* **research:** keep a run's record of its own work when it fails ([3292a49](https://github.com/guillempuche/batuda/commit/3292a49c1f39b4df77165ad2bb95eb60384d3baa)), closes [#614](https://github.com/guillempuche/batuda/issues/614)
+* **research:** stop the harness inventing retries and losing real ones ([3bf0243](https://github.com/guillempuche/batuda/commit/3bf02434f814000cdb6ba46a739b49fa16913c2d))
+* say when adding a company the run could not vouch for ([71a2e1f](https://github.com/guillempuche/batuda/commit/71a2e1f145c0c527a815f2d16d4a2a97be8226db)), closes [#615](https://github.com/guillempuche/batuda/issues/615)
+
+### Documentation
+
+* **research:** stop pointing examples at a withdrawn model ([d655afb](https://github.com/guillempuche/batuda/commit/d655afb5f26ad048fafd517dc996d51fc23eb17d))
+
 ## 2026-09-04 (internal-v2026.9.4)
 
 ### Features
