@@ -45,6 +45,9 @@ export type QuickCapturePrefill = {
  */
 export type QuickCaptureContextValue = {
 	readonly isOpen: boolean
+	/** Counts up on every open, so a form keyed on it starts blank even when the
+	 * dialog is reopened before its closing animation has finished. */
+	readonly session: number
 	readonly prefill: QuickCapturePrefill | null
 	readonly open: (prefill?: QuickCapturePrefill | undefined) => void
 	readonly close: () => void
@@ -71,17 +74,20 @@ export function QuickCaptureProvider({
 	children: React.ReactNode
 }) {
 	const [isOpen, setIsOpen] = useState(false)
+	const [session, setSession] = useState(0)
 	const [prefill, setPrefill] = useState<QuickCapturePrefill | null>(null)
 
 	const open = useCallback((nextPrefill?: QuickCapturePrefill | undefined) => {
 		setPrefill(nextPrefill ?? null)
+		setSession(current => current + 1)
 		setIsOpen(true)
 	}, [])
 
 	const close = useCallback(() => {
 		setIsOpen(false)
 		// Keep prefill around for a render so close animations don't flash.
-		// The dialog component resets its form on next `isOpen` transition.
+		// The dialog builds a fresh form each time it opens, so there is nothing
+		// left to reset here.
 	}, [])
 
 	// Global Shift+I keyboard shortcut. Skipped while the user is typing
@@ -111,8 +117,8 @@ export function QuickCaptureProvider({
 	}, [isOpen, open])
 
 	const value = useMemo<QuickCaptureContextValue>(
-		() => ({ isOpen, prefill, open, close }),
-		[isOpen, prefill, open, close],
+		() => ({ isOpen, session, prefill, open, close }),
+		[isOpen, session, prefill, open, close],
 	)
 
 	return (

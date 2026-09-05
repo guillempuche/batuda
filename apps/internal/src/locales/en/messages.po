@@ -1607,6 +1607,10 @@ msgstr "Could not load tasks"
 msgid "Could not load the board"
 msgstr "Could not load the board"
 
+#: src/components/interactions/quick-capture-dialog.tsx
+msgid "Could not load the companies. Close this and try again."
+msgstr "Could not load the companies. Close this and try again."
+
 #: src/routes/settings/organization/industries.tsx
 msgid "Could not load the industries"
 msgstr "Could not load the industries"
@@ -3143,6 +3147,7 @@ msgstr "Loading board…"
 msgid "Loading calendar…"
 msgstr "Loading calendar…"
 
+#: src/components/interactions/quick-capture-dialog.tsx
 #: src/routes/companies/index.tsx
 msgid "Loading companies…"
 msgstr "Loading companies…"
