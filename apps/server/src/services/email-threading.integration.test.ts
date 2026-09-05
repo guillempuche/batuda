@@ -71,6 +71,35 @@ const runExit = <A, E>(
 const sqlOnly = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
 	Effect.runPromise(effect.pipe(Effect.provide(PgLive)))
 
+// A conversation's own id is a uuid; the provider's Message-ID is an address.
+// Telling them apart is the whole point of the assertions that use this.
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+// Reads back every line an effect writes. Annotations sit on the fiber rather
+// than on the log options, so they are read the way the built-in formatters
+// read them.
+const captureLines = () => {
+	const lines: Array<{
+		level: string
+		message: string
+		annotations: Record<string, unknown>
+	}> = []
+	const layer = Logger.layer([
+		Logger.make(options => {
+			lines.push({
+				level: String(options.logLevel),
+				message: String(options.message),
+				annotations: options.fiber.getRef(
+					References.CurrentLogAnnotations,
+				) as Record<string, unknown>,
+			})
+		}),
+	]).pipe(
+		Layer.provideMerge(Layer.succeed(References.MinimumLogLevel, 'Debug')),
+	)
+	return { lines, layer }
+}
+
 // Why the send was turned away, so a test that expects a refusal can't be
 // satisfied by some unrelated failure earlier in the call. A refusal carries a
 // tag of its own and names its reason; anything else answers with neither.
@@ -1155,24 +1184,7 @@ describe('the record a send that never got through leaves', () => {
 			messages: [{ messageId: ROOT_ID, subject: 'your pallet pools' }],
 		})
 
-		const lines: Array<{
-			level: string
-			message: string
-			annotations: Record<string, unknown>
-		}> = []
-		const capture = Logger.layer([
-			Logger.make(options => {
-				lines.push({
-					level: String(options.logLevel),
-					message: String(options.message),
-					annotations: options.fiber.getRef(
-						References.CurrentLogAnnotations,
-					) as Record<string, unknown>,
-				})
-			}),
-		]).pipe(
-			Layer.provideMerge(Layer.succeed(References.MinimumLogLevel, 'Debug')),
-		)
+		const { lines, layer: capture } = captureLines()
 
 		// WHEN the send is attempted
 		const exit = await failingSend.runPromiseExit(
@@ -1250,22 +1262,7 @@ describe('the record a failed clean-up leaves', () => {
 			messages: [{ messageId: ROOT_ID, subject: 'your pallet pools' }],
 		})
 
-		const lines: Array<{
-			level: string
-			annotations: Record<string, unknown>
-		}> = []
-		const capture = Logger.layer([
-			Logger.make(options => {
-				lines.push({
-					level: String(options.logLevel),
-					annotations: options.fiber.getRef(
-						References.CurrentLogAnnotations,
-					) as Record<string, unknown>,
-				})
-			}),
-		]).pipe(
-			Layer.provideMerge(Layer.succeed(References.MinimumLogLevel, 'Debug')),
-		)
+		const { lines, layer: capture } = captureLines()
 
 		// WHEN it is sent
 		const exit = await failingPurge.runPromiseExit(
@@ -1300,22 +1297,7 @@ describe('the record a refused send leaves', () => {
 	// went through does. Without it, "how often are we refusing sends, and
 	// over what" cannot be answered at all.
 	const runCapturingLogs = async (effect: Parameters<typeof runExit>[0]) => {
-		const lines: Array<{
-			level: string
-			annotations: Record<string, unknown>
-		}> = []
-		const capture = Logger.layer([
-			Logger.make(options => {
-				lines.push({
-					level: String(options.logLevel),
-					annotations: options.fiber.getRef(
-						References.CurrentLogAnnotations,
-					) as Record<string, unknown>,
-				})
-			}),
-		]).pipe(
-			Layer.provideMerge(Layer.succeed(References.MinimumLogLevel, 'Debug')),
-		)
+		const { lines, layer: capture } = captureLines()
 		await runtime.runPromiseExit(
 			scopedAsOrg(asOrg, effect).pipe(Effect.provide(capture)) as Effect.Effect<
 				unknown,
@@ -1488,6 +1470,98 @@ describe('a draft answering a conversation in another mailbox', () => {
 			// conversation belonging to another
 			expect(lastOutbound).not.toBeNull()
 			expect(lastOutbound?.inReplyTo).toBeUndefined()
+		})
+	})
+})
+
+describe('the record a send that went through leaves', () => {
+	// The line has to join back to the CRM, and the provider's Message-ID cannot:
+	// it joins to nothing we hold, and it is an address, so naming a conversation
+	// by it files a tenant's mail domain into telemetry.
+
+	// Takes the id as a uuid or not at all: handed 'null' or 'undefined', the
+	// comparison below raises a Postgres type error, which reads as broken test
+	// plumbing rather than as the regression it would actually be.
+	const linkExists = (id: unknown) => {
+		if (typeof id !== 'string' || !UUID.test(id)) return Promise.resolve(0)
+		return sqlOnly(
+			Effect.gen(function* () {
+				const sql = yield* SqlClient.SqlClient
+				const rows = yield* sql<{ n: number }>`
+					SELECT count(*)::int AS n FROM email_thread_links
+					WHERE id = ${id}
+				`
+				return rows[0]!.n
+			}),
+		)
+	}
+
+	describe('when the send opens a new conversation', () => {
+		it('should name that conversation by its own id, and the mailbox it left from', async () => {
+			// GIVEN a first message to a company
+			const { lines, layer } = captureLines()
+
+			// WHEN it is sent
+			await run(
+				Effect.gen(function* () {
+					const svc = yield* EmailService
+					return yield* svc.send(
+						inboxId,
+						'client@example.com',
+						'your pallet pools',
+						body,
+						companyId,
+						undefined,
+						{ actor: null },
+					)
+				}).pipe(Effect.provide(layer)),
+			)
+
+			// THEN the line names the conversation row this send created, so the
+			// send can be joined to the thread, the company and the tenant
+			const sent = lines.find(l => l.annotations['event'] === 'email.sent')
+			expect(sent).toBeDefined()
+			expect(await linkExists(sent?.annotations['threadId'])).toBe(1)
+
+			// AND it names the mailbox it went out from, which is what ties a send
+			// to the inbox whose credentials carried it
+			expect(sent?.annotations['inboxId']).toBe(inboxId)
+
+			// AND it names the tenant, which reaches the line from the org scope
+			// the send runs in rather than from the line itself
+			expect(sent?.annotations['org.id']).toBe(ORG)
+
+			// AND nothing on it carries a mail domain: a Message-ID is an address,
+			// and addresses must never reach telemetry
+			expect(String(sent?.annotations['threadId'])).not.toContain('@')
+		})
+	})
+
+	describe('when the send answers an existing conversation', () => {
+		it('should name the conversation it joined, not the message that opened it', async () => {
+			// GIVEN a conversation already on file
+			const threadId = await seedThread({
+				linkSubject: 'your pallet pools',
+				messages: [{ messageId: ROOT_ID, subject: 'your pallet pools' }],
+			})
+			const { lines, layer } = captureLines()
+
+			// WHEN a reply goes out on it
+			await run(
+				Effect.gen(function* () {
+					const svc = yield* EmailService
+					return yield* svc.reply(threadId, body, { actor: null })
+				}).pipe(Effect.provide(layer)),
+			)
+
+			// THEN the line names that same conversation and its mailbox
+			const replied = lines.find(
+				l => l.annotations['event'] === 'email.replied',
+			)
+			expect(replied).toBeDefined()
+			expect(replied?.annotations['threadId']).toBe(threadId)
+			expect(replied?.annotations['inboxId']).toBe(inboxId)
+			expect(replied?.annotations['org.id']).toBe(ORG)
 		})
 	})
 })

@@ -271,7 +271,9 @@ const McpAuthMiddleware = HttpRouter.middleware(
 					// is registered ahead of this one and has already opened the record.
 					recordFacts({
 						'mcp.auth_method': authMethod,
-						'mcp.org_id': org.id,
+						// Named here as well as in `enterOrgScope`, because a call that
+						// dies between the two still resolved to a tenant.
+						'org.id': org.id,
 						'mcp.principal_is_agent': principal.isAgent,
 					}).pipe(
 						Effect.andThen(

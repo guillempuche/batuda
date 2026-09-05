@@ -1139,15 +1139,22 @@ export class EmailService extends Context.Service<EmailService>()(
 								),
 							),
 						)
-					yield* transport
-						.appendToSent(creds, sent.raw)
-						.pipe(
-							Effect.catchCause(cause =>
-								Effect.logWarning(
-									`appendToSent failed inbox=${inbox.id} (provider may auto-copy)`,
-								).pipe(Effect.andThen(Effect.logError(cause))),
+					yield* transport.appendToSent(creds, sent.raw).pipe(
+						Effect.catchCause(cause =>
+							Effect.logWarning(
+								'Filing a copy in the Sent folder failed (the provider may file it itself)',
+							).pipe(
+								// The failing call was handed the whole message, so an
+								// unbounded cause could carry the customer's own words
+								// into the logs.
+								Effect.andThen(Effect.logError(boundedCause(cause))),
+								Effect.annotateLogs({
+									event: 'email.sent_append_failed',
+									inboxId: inbox.id,
+								}),
 							),
-						)
+						),
+					)
 					return { messageId, rawRef: key }
 				})
 
@@ -1187,7 +1194,7 @@ export class EmailService extends Context.Service<EmailService>()(
 				Effect.gen(function* () {
 					const currentOrg = yield* CurrentOrg
 
-					yield* sql.withTransaction(
+					return yield* sql.withTransaction(
 						Effect.gen(function* () {
 							let externalThreadId: string
 							let inReplyTo: string | null
@@ -1317,6 +1324,11 @@ export class EmailService extends Context.Service<EmailService>()(
 									Effect.provideService(TimelineActivityService, timeline),
 								)
 							}
+
+							// Handed back so the send's line can name the conversation by
+							// our own id: the provider's Message-ID joins to nothing we
+							// hold and carries the mailbox's domain.
+							return threadLinkId
 						}),
 					)
 				})
@@ -1415,7 +1427,7 @@ export class EmailService extends Context.Service<EmailService>()(
 							threadId: dispatched.messageId,
 						}
 
-						yield* recordOutbound({
+						const threadLinkId = yield* recordOutbound({
 							result,
 							inbox,
 							companyId,
@@ -1455,7 +1467,8 @@ export class EmailService extends Context.Service<EmailService>()(
 							Effect.annotateLogs({
 								event: 'email.sent',
 								companyId,
-								threadId: result.threadId,
+								inboxId: inbox.id,
+								threadId: threadLinkId,
 							}),
 						)
 
@@ -1700,6 +1713,7 @@ export class EmailService extends Context.Service<EmailService>()(
 						yield* Effect.logInfo('Email reply sent').pipe(
 							Effect.annotateLogs({
 								event: 'email.replied',
+								inboxId: inbox.id,
 								threadId,
 							}),
 						)
@@ -3439,7 +3453,9 @@ export class EmailService extends Context.Service<EmailService>()(
 								: dispatched.messageId,
 						}
 
-						yield* recordOutbound({
+						// The conversation the message landed in: the same one for a
+						// reply, a fresh one when this send opened it.
+						threadLinkId = yield* recordOutbound({
 							result,
 							inbox,
 							companyId: ctx.companyId,
@@ -3489,7 +3505,8 @@ export class EmailService extends Context.Service<EmailService>()(
 							Effect.annotateLogs({
 								event: 'email.draft_sent',
 								draftId,
-								threadId: result.threadId,
+								inboxId: inbox.id,
+								threadId: threadLinkId,
 							}),
 						)
 

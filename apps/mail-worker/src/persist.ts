@@ -373,6 +373,8 @@ export const persistMessage = (args: {
 			yield* Effect.logInfo('Email received').pipe(
 				Effect.annotateLogs({
 					event: 'email.received',
+					// No request to inherit the tenant from here, so the line names it.
+					'org.id': args.organizationId,
 					inboxId: args.inboxId,
 					folder: args.folder,
 					companyId,

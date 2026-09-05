@@ -90,13 +90,13 @@ describe('redactingTracer', () => {
 
 			// WHEN they are recorded
 			span.attribute('tool', 'manage_email_inbox')
-			span.attribute('mcp.org_id', 'org_123')
+			span.attribute('org.id', 'org_123')
 			span.attribute('mcp.auth_method', 'api_key')
 
 			// THEN every one survives — scrubbing everything would leave nothing to
 			// debug from, so only the catch-all argument bag is emptied
 			expect(recorded.get('tool')).toBe('manage_email_inbox')
-			expect(recorded.get('mcp.org_id')).toBe('org_123')
+			expect(recorded.get('org.id')).toBe('org_123')
 			expect(recorded.get('mcp.auth_method')).toBe('api_key')
 		})
 	})

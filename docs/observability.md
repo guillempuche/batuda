@@ -32,9 +32,17 @@ So the rule is: when work learns something, it puts that fact on the work's reco
 | `event`             | Dot-notation name, so records filter by kind      |
 | `http.path_pattern` | The route, with ids collapsed — never the raw URL |
 | `org.id`            | Which tenant, once resolved                       |
-| `service`           | Which process emitted it                          |
+| `service.name`      | Which process emitted it                          |
 
-Timestamps and trace ids are added by the framework.
+Timestamps and trace ids are added by the framework, and `service.name` comes from the process's own resource rather than from a line — so it is the exported column, not something a caller writes.
+The `otlp.*` lines are the exception: they never reach the backend, so they spell it `service` on the console themselves.
+
+`org.id` comes from `enterOrgScope`, which every transport passes through when it settles who the work is for — HTTP, MCP, the cal.com webhook.
+It rides two ways on purpose: onto the request's record, which lands on the closing line, and as a log annotation, which reaches every line written *inside* the scope.
+The record alone is not enough, because it is only read when the work ends: a business event written halfway through a request would name no tenant.
+Two places say it a second time on purpose, and neither is redundant.
+The MCP transport records it before entering the scope, because a call can fail on the way there — reading its body, or writing down which client it came from — and a request that got as far as resolving a tenant should say which one.
+The mail worker has no request and no scope at all, so `email.received` names the tenant itself.
 
 ### Event names
 
@@ -50,12 +58,21 @@ Timestamps and trace ids are added by the framework.
 | `company.status_changed`       | Pipeline status transition                                 |
 | `interaction.logged`           | Interaction recorded                                       |
 | `document.created`             | Research/notes document added                              |
-| `email.sent`                   | Outbound email                                             |
+| `email.sent`                   | Outbound email starting a conversation                     |
+| `email.replied`                | Outbound email answering one                               |
+| `email.draft_sent`             | A saved draft went out                                     |
 | `email.received`               | Inbound reply                                              |
 | `email.failed`                 | Email delivery failed                                      |
+| `email.refused`                | A message was turned away before it was sent, and why      |
+| `email.sent_copy_failed`       | The message went out; keeping our own copy did not         |
+| `email.sent_append_failed`     | The message went out; filing it in Sent did not            |
+| `email.staging_purge_failed`   | Attachments outlived the message they went with            |
 | `inbox.created`                | A mailbox was connected                                    |
 | `inbox.probed`                 | A mailbox check that did not pass (a clean one is `debug`) |
 | `inbox.probe_unrecorded`       | A mailbox was checked but the answer could not be stored   |
+| `inbox.probe_started`          | The recurring mailbox check began, and how often it runs   |
+| `inbox.probe_round_failed`     | A whole round of checks failed — the poller, not a mailbox |
+| `mail_worker.heartbeat`        | The mail worker is still running, repeated on a timer      |
 | `webhook.fired`                | Webhook fan-out triggered                                  |
 | `webhook.failed`               | Webhook delivery failed                                    |
 | `page.published`               | Sales page made public                                     |
@@ -77,6 +94,16 @@ A request leaves exactly one of `http.request`, `http.server_error`, `http.defec
 A refused MCP tool call is the case that makes the rule concrete: the refusal travels as a JSON-RPC error inside a perfectly successful HTTP response, so the request's own line reads `http.status: 200` and a tool that turned the caller away is indistinguishable from one that answered. So the tool's name and how the call went ride on that same record as `mcp.tool` and `mcp.tool.outcome` (`ok` / `refused` / `failed`) rather than on a line of their own — recorded once, where every tool call already funnels through `apps/server/src/mcp/safe-toolkit.ts`. A refusal is the tool answering and a fault is nobody's intention, which is why the two are told apart rather than counted together. This matters more here than elsewhere because an MCP client shows a refusal as a silent retry rather than a visible error, so the record is the only place it surfaces at all.
 
 A request also leaves exactly **one span**, not two. The platform opens that span itself, so the server passes no tracer of its own when it starts serving; passing one as well used to open a second span per request, and every count taken from the traces read double until 2026-08-18. A trace older than that carries the twins.
+
+### What the mail lines carry
+
+An email line names the conversation by `threadId` — the `email_thread_links` row, our own id — and the mailbox it went out from by `inboxId`.
+Never the provider's Message-ID: it joins to nothing we hold, and it is an address, so naming the conversation by it filed a tenant's mail domain into telemetry on every send.
+
+A mailbox check carries `inbox.probe.outcome` (`connected`, `auth_failed`, `connect_failed`) and, when it did not pass, `inbox.probe.reason` — one of `invalid_credentials`, `timeout`, `dns`, `tls`, `unreachable`, `unknown`.
+It also carries `imap.host` and `imap.port`, which name the provider without naming anybody.
+What the mail server itself said never travels: those words are about somebody's account, so they stay on the mailbox row where its owner can read them.
+A check that passed is only the poller saying it is still polling, so it is written at `debug` and production keeps none of them.
 
 ### Levels
 
@@ -121,8 +148,9 @@ Routes whose URL itself carries a secret are exempt from tracing entirely rather
 | ------------------------ | --------------------------------------------------------------------- | -------------------------- |
 | **Pipeline Progression** | `company.status_changed`                                              | Core business flow         |
 | **Interaction Logging**  | `interaction.logged`, `task.created`                                  | Drives daily work          |
-| **Email Outbound**       | `email.sent`, `email.failed`                                          | Primary outreach channel   |
+| **Email Outbound**       | `email.sent`, `email.replied`, `email.draft_sent`, `email.failed`     | Primary outreach channel   |
 | **Email Inbound**        | `email.received`, `interaction.logged`                                | Reply tracking             |
+| **Mailbox Health**       | `inbox.created`, `inbox.probed`                                       | A dead mailbox stops both  |
 | **Webhook Fan-out**      | `webhook.fired`, `webhook.failed`                                     | Integration reliability    |
 | **Page Publishing**      | `page.published`, `page.viewed`                                       | Sales page effectiveness   |
 | **MCP Tool Calls**       | `mcp.auth.rejected`; the tool and its outcome on the request's record | Agent workflow reliability |
@@ -166,13 +194,18 @@ As a solo operation there is no on-call rotation or war room. Two questions matt
 
 **Start with few, high-signal alerts.** Alert fatigue is worse than no alerts.
 
-| Alert                | Condition                                  | Severity |
-| -------------------- | ------------------------------------------ | -------- |
-| **API Down**         | Health check fails for > 2 min             | Critical |
-| **Telemetry Silent** | No spans from any prod dataset over 15 min | Critical |
-| **High Error Rate**  | > 10% API 5xx responses in 15 min          | High     |
-| **Email Failures**   | > 5 consecutive email send failures        | High     |
-| **Webhook Failures** | > 20% webhook 5xx responses in 15 min      | High     |
+| Alert                | Condition                                     | Severity |
+| -------------------- | --------------------------------------------- | -------- |
+| **API Down**         | Health check fails for > 2 min                | Critical |
+| **Telemetry Silent** | No spans from any prod dataset over 15 min    | Critical |
+| **High Error Rate**  | > 10% API 5xx responses in 15 min             | High     |
+| **Email Failures**   | > 5 consecutive email send failures           | High     |
+| **Mailbox Refused**  | The same mailbox fails its check for > 30 min | High     |
+| **Webhook Failures** | > 20% webhook 5xx responses in 15 min         | High     |
+
+Mailbox Refused is the one that says a tenant is cut off rather than that a request went wrong.
+A mailbox whose credentials stop working stops that tenant's mail in both directions, and it is silent by construction: nobody is waiting on the check, so the only place it surfaces is `inbox.probed`.
+It is held to one mailbox failing repeatedly rather than to a count across all of them, because a provider having a bad minute and a password that has actually been revoked look identical in a single check.
 
 **Telemetry Silent is the one alert that cannot be raised from inside.** Every other row above is a question asked of the records, so it needs the records to be arriving. This one has to be evaluated by the vendor, environment-wide, so it still fires when the services are stopped or cut off and cannot report for themselves — the gap that let the 2026-08-31 outage run seven hours unnoticed while `/health` answered 200 throughout. Note the consequence: once it fires it stays fired until export is restored, so it cannot warn about a second outage in the meantime.
 
@@ -327,6 +360,8 @@ Pointers, not copies — read the files for detail.
 | Export health: per-signal outcomes, the watchdog, the report  | `packages/observability/src/export-health.ts`      |
 | Per-request record, route sanitizing, catch-all error logging | `apps/server/src/lib/observability-middleware.ts`  |
 | Logger set and level                                          | `apps/server/src/lib/logger.ts`                    |
+| Tenant on every line inside a request                         | `apps/server/src/middleware/org.ts`                |
+| Mailbox checks and the lines they leave                       | `apps/server/src/services/inbox-health-probe.ts`   |
 | Tracing exemptions for secret-carrying routes                 | `apps/server/src/main.ts`                          |
 | Spend counters                                                | `packages/research/src/application/usage-meter.ts` |
 

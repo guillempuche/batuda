@@ -68,6 +68,10 @@ export const detachFromTransaction =
  * member behind it manages nothing, so leaving it out grants no authority
  * rather than borrowing someone else's.
  */
+// One spelling of the tenant, so the record and the log lines can never end up
+// disagreeing about which one it was.
+const tenantFact = (orgId: string) => ({ 'org.id': orgId })
+
 export const enterOrgScope =
 	(
 		// Passed in (not pulled from context) so the wrapped effect's R stays
@@ -81,18 +85,29 @@ export const enterOrgScope =
 		},
 	) =>
 	<A, E, R>(effect: Effect.Effect<A, E, R>) =>
-		sql
-			.withTransaction(
-				Effect.gen(function* () {
-					yield* sql`SET LOCAL ROLE app_user`
-					yield* sql`SELECT set_config('app.current_org_id', ${scope.org.id}, true)`
-					if (scope.userId !== undefined)
-						yield* sql`SELECT set_config('app.current_user_id', ${scope.userId}, true)`
-					return yield* Effect.provideService(effect, CurrentOrg, {
-						...scope.org,
-						role: scope.role ?? null,
-					})
-				}),
+		// Which tenant this is, said once for every transport that enters a scope
+		// here. The record is only read when the work ends, so the annotation is
+		// what names the tenant on lines written midway through.
+		recordFacts(tenantFact(scope.org.id))
+			.pipe(
+				Effect.andThen(
+					sql.withTransaction(
+						Effect.gen(function* () {
+							yield* sql`SET LOCAL ROLE app_user`
+							yield* sql`SELECT set_config('app.current_org_id', ${scope.org.id}, true)`
+							if (scope.userId !== undefined)
+								yield* sql`SELECT set_config('app.current_user_id', ${scope.userId}, true)`
+							return yield* Effect.provideService(
+								Effect.annotateLogs(effect, tenantFact(scope.org.id)),
+								CurrentOrg,
+								{
+									...scope.org,
+									role: scope.role ?? null,
+								},
+							)
+						}),
+					),
+				),
 			)
 			// Die only on SqlError: the role/GUC prologue and the commit are
 			// infrastructure, so they must not surface to callers. The wrapped
@@ -247,12 +262,6 @@ export const OrgMiddlewareLive = Layer.effect(
 						message: `Active organization ${activeOrgId} not found`,
 					})
 				}
-
-				// Put the resolved org on the request's span and row so errors and
-				// traces can be filtered to one tenant. ObservabilityMiddleware runs
-				// before this and already set request id + route on the same span,
-				// and opened the row this joins.
-				yield* recordFacts({ 'org.id': row.id })
 
 				// Enter the org scope (role + both GUCs + CurrentOrg) for the
 				// rest of the request via the shared combinator, keeping the

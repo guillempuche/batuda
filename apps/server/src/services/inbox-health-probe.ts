@@ -148,8 +148,12 @@ export class InboxHealthProbe extends Context.Service<InboxHealthProbe>()(
 					// A check that passed is only the poller saying it is still
 					// polling; one that did not is for the mailbox owner to fix.
 					yield* state === 'connected'
-						? Effect.logDebug('inbox.probed').pipe(Effect.annotateLogs(facts))
-						: Effect.logWarning('inbox.probed').pipe(Effect.annotateLogs(facts))
+						? Effect.logDebug('Mailbox check passed').pipe(
+								Effect.annotateLogs(facts),
+							)
+						: Effect.logWarning('Mailbox check did not pass').pipe(
+								Effect.annotateLogs(facts),
+							)
 				}).pipe(
 					// One mailbox whose answer cannot be written down must not cost the
 					// others their turn. A lost permission or a key that fails to
@@ -157,7 +161,7 @@ export class InboxHealthProbe extends Context.Service<InboxHealthProbe>()(
 					// it goes down as an error. Shutting down skips this entirely: a
 					// fiber stopped from outside unwinds without running it.
 					Effect.catchCause(cause =>
-						Effect.logError('inbox.probe_unrecorded').pipe(
+						Effect.logError('Storing a mailbox check failed').pipe(
 							Effect.annotateLogs({
 								event: 'inbox.probe_unrecorded',
 								inboxId: inbox.id,
@@ -185,10 +189,20 @@ export class InboxHealthProbe extends Context.Service<InboxHealthProbe>()(
 	static readonly daemonLayer = Layer.effectDiscard(
 		Effect.gen(function* () {
 			const probe = yield* InboxHealthProbe
-			yield* Effect.logInfo(`inbox health probe: every ${probe.intervalSec}s`)
+			yield* Effect.logInfo('Mailbox checks started').pipe(
+				Effect.annotateLogs({
+					event: 'inbox.probe_started',
+					'inbox.probe.interval_sec': probe.intervalSec,
+				}),
+			)
 			yield* probe.tick.pipe(
 				Effect.catchCause(cause =>
-					Effect.logError('inbox health probe tick failed', cause),
+					// A whole round failing is the poller itself broken, not one
+					// mailbox, so it gets a name of its own.
+					Effect.logError('A round of mailbox checks failed').pipe(
+						Effect.andThen(Effect.logError(boundedCause(cause))),
+						Effect.annotateLogs({ event: 'inbox.probe_round_failed' }),
+					),
 				),
 				Effect.repeat(Schedule.spaced(`${probe.intervalSec} seconds`)),
 				Effect.forkScoped,
