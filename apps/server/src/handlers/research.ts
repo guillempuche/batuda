@@ -12,16 +12,13 @@ import {
 	SessionContext,
 	UnknownStack,
 } from '@batuda/controllers'
-import { isTerminalResearchStatus } from '@batuda/domain'
 import { resolveInstructions, resolveStackRef } from '@batuda/instructions'
 import { type CreateResearchInput, ResearchService } from '@batuda/research'
-import {
-	countFoundRows,
-	countPendingProposals,
-} from '@batuda/research/application/schemas'
+import { foundRowsField } from '@batuda/research/application/schemas'
 import { TimelineActivityService } from '@batuda/timeline'
 
 import { ResearchDefaults } from '../lib/research-defaults'
+import { goneFrame, liveFrame, toolFromEvent } from '../lib/research-live-frame'
 import { detachFromTransaction, resolveSystemOrg } from '../middleware/org'
 import { CompanyService } from '../services/companies'
 import { Geocoder } from '../services/geocoder'
@@ -57,101 +54,6 @@ const LIVE_CONNECTION_LIFETIME = '2 minutes'
 // reading is a database round trip. Waiting for the burst to settle turns a
 // tool call's pair of events — and a whole round's worth — into a single read.
 const LIVE_FRAME_SETTLE = '400 millis'
-
-/**
- * What the run last reached for, as its events report it. A call names the tool;
- * its result means nothing is running just then, so the name is taken back
- * rather than left standing over the phases that follow it.
- */
-const toolFromEvent = (
-	event: unknown,
-): { readonly tool: string | null } | null => {
-	const e = event as { type?: unknown; data?: unknown }
-	if (e.type === 'tool.result') return { tool: null }
-	if (e.type !== 'tool.called') return null
-	const tool = (e.data as { tool?: unknown } | null)?.tool
-	return typeof tool === 'string' ? { tool } : null
-}
-
-/**
- * Which phase a run's event says it is working on. The row cannot answer this:
- * it records the phases a run has *finished*, so reading it there names the one
- * before — a run gathering evidence reads as not started, and one writing the
- * brief reads as still extracting.
- */
-const phaseFromEvent = (event: unknown): number | null => {
-	const phase = (
-		(event as { data?: unknown }).data as { phase?: unknown } | null
-	)?.phase
-	return typeof phase === 'number' ? phase : null
-}
-
-// A number off a run row, or a stand-in when the column has nothing in it yet.
-// The run's own columns are typed, but `get` hands back the row widened by the
-// aggregates it selects alongside them, so each is read back on its own.
-const numberAt = (row: Record<string, unknown>, key: string): number =>
-	typeof row[key] === 'number' ? row[key] : 0
-
-const nullableNumberAt = (
-	row: Record<string, unknown>,
-	key: string,
-): number | null => (typeof row[key] === 'number' ? row[key] : null)
-
-/** Whether a run has written down what it found yet. */
-const hasFindings = (findings: unknown): boolean =>
-	findings !== null &&
-	typeof findings === 'object' &&
-	Object.keys(findings as object).length > 0
-
-/**
- * One frame of the live stream: the whole of where a run is, read off its row.
- *
- * Whole rather than a difference from the last frame, so a watcher that joins
- * partway through a run — or misses a frame — still shows the truth.
- *
- * `activeTool` and `phase` come from the run's own events, because the row does
- * not carry either while the run is working. A watcher that joined late has
- * missed the events that said so, which is why both can be null on a run that
- * is plainly busy — better than the row's answer, which is confidently wrong.
- */
-const liveFrame = (
-	run: unknown,
-	live: { readonly activeTool: string | null; readonly phase: number | null },
-) => {
-	const row = run as Record<string, unknown>
-	const status = typeof row['status'] === 'string' ? row['status'] : 'queued'
-	const findings = row['findings'] ?? null
-	const schemaName =
-		typeof row['schemaName'] === 'string' ? row['schemaName'] : null
-	// Nothing has been written down yet, so there is no count to give. Zero would
-	// be an answer — "it looked and found none" — and this is the other thing.
-	const counted = hasFindings(findings)
-	return {
-		status,
-		phase: live.phase,
-		activeTool: live.activeTool,
-		sourceCount: Array.isArray(row['sources']) ? row['sources'].length : null,
-		progressSteps: nullableNumberAt(row, 'progressSteps'),
-		costCents: numberAt(row, 'costCents'),
-		paidCostCents: numberAt(row, 'paidCostCents'),
-		budgetCents: numberAt(row, 'budgetCents'),
-		paidBudgetCents: numberAt(row, 'paidBudgetCents'),
-		foundCount: counted ? countFoundRows(schemaName, findings) : null,
-		pendingProposalCount: counted ? countPendingProposals(findings) : null,
-		done: isTerminalResearchStatus(status),
-	}
-}
-
-/**
- * The last thing a watcher is told about a run that has gone from under them —
- * soft-deleted, or no longer theirs to read. Marked finished so the page stops
- * waiting and asks the run for itself, which is what says it is gone.
- */
-const goneFrame = (frame: ReturnType<typeof liveFrame>) => ({
-	...frame,
-	status: 'deleted',
-	done: true,
-})
 
 // Same raw-Date handling for the waiting paid lookups.
 const PendingPaidActionRow = Schema.Struct({
@@ -311,36 +213,23 @@ export const ResearchLive = HttpApiBuilder.group(
 				)
 				.handle('live', _ =>
 					Effect.gen(function* () {
-						const run = yield* svc.get(_.params.id)
-						if (!run)
+						// Which organization is watching, and which list this kind of run
+						// fills with what it finds. Both are settled once: the reader was
+						// checked when they asked, and a run's schema never changes.
+						const currentOrg = yield* CurrentOrg
+						const { userId } = yield* SessionContext
+						const schemaName = yield* svc.runSchemaName(_.params.id)
+						if (schemaName === undefined)
 							return yield* new NotFound({
 								entity: 'research',
 								id: _.params.id,
 							})
+						const foundField = foundRowsField(schemaName)
 
-						// What the run is doing right now, as opposed to what it has
-						// finished. Only its events carry either, so both start empty and a
-						// watcher who joined late waits for the next one rather than being
-						// told the row's answer, which names the phase before.
-						const working = yield* Ref.make<{
-							readonly activeTool: string | null
-							readonly phase: number | null
-						}>({ activeTool: null, phase: null })
-
-						const opening = liveFrame(run, {
-							activeTool: null,
-							phase: null,
-						})
-						// Already over: say where it ended and close. Holding the
-						// connection open would leave the page waiting on a run that will
-						// never send anything again.
-						if (opening.done) return Stream.make(opening)
-
-						// Which organization is watching, taken while this handler still
-						// has it. Every later read needs it back (see `nextFrame`), and by
-						// then there is no request left to ask.
-						const currentOrg = yield* CurrentOrg
-						const { userId } = yield* SessionContext
+						// What the run last reached for. Held here because the row does not
+						// keep it; it is only ever said once, in the event announcing the
+						// call, and taken back when that call returns.
+						const activeTool = yield* Ref.make<string | null>(null)
 
 						// Reading the run again happens after this handler has returned:
 						// the frames are sent as the body streams, and the transaction that
@@ -355,16 +244,44 @@ export const ResearchLive = HttpApiBuilder.group(
 						// not a hiccup, and is told apart from a read that simply failed:
 						// without the distinction a deleted run left the connection open
 						// forever, re-reading a row it would never see again.
-						const nextFrame = Effect.gen(function* () {
-							const row = yield* svc
-								.get(_.params.id)
-								.pipe(
-									resolveSystemOrg(sql, currentOrg.id, { userId }),
-									detachFromTransaction(sql),
-								)
-							if (row === null) return goneFrame(opening)
-							return liveFrame(row, yield* Ref.get(working))
-						}).pipe(
+						// `reenter` is the whole difference between the opening read and
+						// every later one. The opening happens inside the request, which
+						// holds the reader's organization already; re-entering there would
+						// look it up a second time and read from outside the transaction it
+						// belongs to.
+						const readRow = (reenter: boolean) => {
+							const read = svc.liveSnapshot(_.params.id, foundField)
+							return reenter
+								? read.pipe(
+										resolveSystemOrg(sql, currentOrg.id, { userId }),
+										detachFromTransaction(sql),
+									)
+								: read
+						}
+
+						const readFrame = Effect.gen(function* () {
+							const row = yield* readRow(true)
+							return row === null
+								? null
+								: liveFrame(row, yield* Ref.get(activeTool))
+						})
+
+						const openingRow = yield* readRow(false)
+						const opening =
+							openingRow === null ? null : liveFrame(openingRow, null)
+						// Gone between the two reads, or over already: either way there is
+						// nothing left to watch, so say so once and close. Holding the
+						// connection open would leave the page waiting on a run that will
+						// never send anything again.
+						if (opening === null)
+							return yield* new NotFound({
+								entity: 'research',
+								id: _.params.id,
+							})
+						if (opening.done) return Stream.make(opening)
+
+						const nextFrame = readFrame.pipe(
+							Effect.map(frame => frame ?? goneFrame(opening)),
 							// A read that fails mid-run must not tear down a watcher's page;
 							// the next beat tries again.
 							Effect.catchCause(() => Effect.succeed(null)),
@@ -379,26 +296,21 @@ export const ResearchLive = HttpApiBuilder.group(
 						// has already said everything that beat would; dropping it saves
 						// a second read of the same row a moment later.
 						const beat = Stream.drop(Stream.tick(LIVE_FRAME_BEAT), 1)
-						// An event's payload goes no further than what the run is doing —
-						// the tool it reached for and the phase it is in, neither of which
-						// the row keeps. Everything else is read off the row afterwards, so
-						// each event becomes a bare nudge of the same shape the beat has.
+						// An event's payload goes no further than the tool it may name —
+						// the one thing the row does not keep. Everything else is read off
+						// the row afterwards, so each event becomes a bare nudge of the
+						// same shape the beat has.
 						const asks =
 							events === null
 								? beat
 								: Stream.merge(
 										beat,
-										Stream.mapEffect(events, event =>
-											Ref.update(working, held => {
-												const tool = toolFromEvent(event)
-												const phase = phaseFromEvent(event)
-												return {
-													activeTool:
-														tool === null ? held.activeTool : tool.tool,
-													phase: phase ?? held.phase,
-												}
-											}),
-										),
+										Stream.mapEffect(events, event => {
+											const named = toolFromEvent(event)
+											return named === null
+												? Effect.void
+												: Ref.set(activeTool, named.tool)
+										}),
 									)
 
 						return Stream.make(opening).pipe(
