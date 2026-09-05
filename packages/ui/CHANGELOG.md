@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-09-05 (ui-v2026.9.5)
+
+### Refactoring
+
+* compile every styled template at build time ([a13e660](https://github.com/guillempuche/batuda/commit/a13e660217c06326eb302f142d55858627e65bc1))
+
 ## 2026-08-30 (ui-v2026.8.30-1)
 
 ### Features
