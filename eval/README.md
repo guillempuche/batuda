@@ -358,23 +358,36 @@ Two figures for what a rule catches — `networkDropped` and `placeRefused` — 
 
 A rule that answers `drop` on a `serves_not_in` row is deleting a real company, and is counted that way. Anything short of `drop` on a `network` row is a miss, because there is no company there to keep.
 
-### Handing it the shipped rule
+### Running it
 
-`dropNetworkRows` takes a findings tree and returns the rows it kept, not a verdict per id, so a runner has to bridge the two. Group the corpus by run first — each row carries the places its own request named, and a rule handed rows from two scans would read hosts across lists that never met:
-
-```ts
-const judge: FarmJudge = all => {
-	const verdicts = new Map<string, FarmVerdict>()
-	for (const group of byRun(all)) {
-		const findings = { prospects: group.map(asProspect) }
-		const gone = new Set(
-			dropNetworkRows(findings, 'prospects', group[0].askedAbout).dropped
-				.map(row => row.name),
-		)
-		for (const row of group) verdicts.set(row.id, gone.has(row.name) ? 'drop' : 'keep')
-	}
-	return verdicts
-}
+```bash
+pnpm cli research farm-replay
 ```
 
-That join is by name, and a name is not unique — the shipped template carries "Estructures Vallès" twice under different ids, and a real corpus repeats more. Where two rows of one run share a name they take the same verdict, which is right for the fold's purpose and wrong if you need them apart; give such rows distinct names in the corpus, or diff the kept list positionally instead.
+It reads `eval/farm-replay.json` (a relative `--corpus` is read from the repo root) and grades the rule that ships, out of the same file the pipeline runs — so a number printed here is a number about production rather than about a copy of the rule that drifted. It fetches nothing and calls no model.
+
+Against the shared template it prints:
+
+```
+10 rows over 7 runs
+operator rows taken off: 3/4
+real companies deleted: 0
+per-town landing pages, place refused: 0/2
+```
+
+Three of the four, not four: the fourth cites a finance profile and nothing of the operator's own, so no rule reading hosts can reach it. `0/2` is honest too — nothing yet refuses the place on a per-town landing page.
+
+### Handing it a rule of your own
+
+`dropNetworkRows` takes a findings tree and answers with the rows it KEPT, not a verdict per id, so a runner has to bridge the two. That bridge is `networkGuardJudge` in `eval-farm-replay.ts` — tested, and what the command above runs, so the numbers you get are the numbers the rule gives:
+
+```ts
+const score = scoreFarmReplay(
+	rows,
+	networkGuardJudge({ drop: dropNetworkRows, placesOf: placesNamed }),
+)
+```
+
+Two things it does that are easy to get wrong on your own. It asks the check **one run at a time** — a rule reads addresses across a whole list, and rows from two scans handed over together would be read against each other in a list no scan ever produced. And it diffs **by id, never by name**: a run repeats a company name across rows far more often than it repeats an id, and joined by name two rows take each other's verdict.
+
+For a rule of your own, write a `FarmJudge` — handed the whole list, answering by id. A rule that really does read one row at a time is lifted with `rowByRow` and loses nothing. A row your answer leaves out is kept, so a rule that reaches no conclusion is never read as reaching one.

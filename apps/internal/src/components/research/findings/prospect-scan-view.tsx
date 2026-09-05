@@ -1,4 +1,6 @@
 import { useAtomSet } from '@effect/atom-react'
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { useNavigate } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
@@ -7,6 +9,7 @@ import styled from 'styled-components'
 
 import { companySlugFromName } from '@batuda/domain'
 import { prospectHoldBack } from '@batuda/research/application/prospect-hold-back'
+import type { CandidateReason } from '@batuda/research/application/row-marks'
 import { PriButton, usePriToast } from '@batuda/ui/pri'
 
 import { SafeLink } from '#/components/research/safe-link'
@@ -28,7 +31,6 @@ import {
 	Section,
 	Sections,
 	SectionTitle,
-	sourcedText,
 } from './shared'
 
 /**
@@ -45,7 +47,7 @@ import {
 
 type ProspectEntry = {
 	readonly name: string
-	readonly website?: unknown
+	readonly website?: string
 	// A company with no site of its own often has one of these and nothing else,
 	// so they travel with the lead rather than staying in a finding nobody opens
 	// again.
@@ -56,9 +58,7 @@ type ProspectEntry = {
 	readonly tax_id?: string
 	readonly industry?: string
 	readonly countries?: ReadonlyArray<string>
-	// Paired with the page it was read on, like the website above. Runs stored
-	// before it was paired hold a bare string, so both shapes are read.
-	readonly location?: unknown
+	readonly location?: string
 	readonly why_relevant: string
 	readonly unconfirmed_reason?: string
 	// Doubt the run did not put into words but the engine established on its own, so
@@ -72,6 +72,10 @@ type ProspectEntry = {
 	// Why the run placed this company outside the area that was asked for. Its own
 	// field, because a mark is a word and the reason is the run's own sentence.
 	readonly outside_place_reason?: string
+	// What the existence check found missing, in its own word. Read the same way
+	// as the place reason next to it, and for the same reason: a word here, the
+	// sentence written where the reader is.
+	readonly existence_reason?: string
 	readonly citations?: ReadonlyArray<Citation>
 }
 
@@ -96,7 +100,7 @@ export function ProspectScanView({
 					<List>
 						{prospects.map(p => (
 							<ProspectRow
-								key={`${p.name}|${p.tax_id ?? sourcedText(p.website) ?? ''}`}
+								key={`${p.name}|${p.tax_id ?? p.website ?? ''}`}
 								prospect={p}
 							/>
 						))}
@@ -109,6 +113,36 @@ export function ProspectScanView({
 	)
 }
 
+/**
+ * Why the run could not stand behind this company, in the reader's language.
+ *
+ * The run states a word, never a sentence, and the difference between the words
+ * is the thing a reader most needs: the first three are findings about the
+ * company, and the last three are facts about the run that stopped short of it.
+ * Collapsing those into one sentence would tell somebody the search looked and
+ * found nothing when it never looked at all.
+ */
+const MISSING_SENTENCE: Record<CandidateReason, MessageDescriptor> = {
+	no_sources: msg`Nothing found on the web names this company.`,
+	one_website: msg`Only one website names this company, so there was nothing to check it against.`,
+	no_own_site: msg`Websites name this company, but none of them could be established as its own.`,
+	budget_exhausted: msg`The search spent its checking allowance before it reached this company.`,
+	deadline_reached: msg`The search ran out of time before it reached this company.`,
+	checker_unavailable: msg`The check could not run, so this company was never looked into.`,
+}
+
+/**
+ * The sentence for a doubt the run put no word to — a row found only in lists of
+ * companies, or one carrying a word this build does not know.
+ *
+ * The list-of-companies sentence is itself a finding, so it is said only when
+ * that is what happened; anything else gets the sentence that claims nothing.
+ */
+const unwordedDoubt = (nameOnly: boolean): MessageDescriptor =>
+	nameOnly
+		? msg`Only found named in a list of companies, with no website and no location of its own.`
+		: msg`The search could not establish that this is a real, trading company.`
+
 // One company in the list. It is its own component so the reason it could not be
 // confirmed can carry an id, which the row's button points at — a reader moving
 // button to button otherwise meets a column of identical "Add as lead" controls
@@ -117,17 +151,20 @@ export function ProspectScanView({
 function ProspectRow({ prospect }: { readonly prospect: ProspectEntry }) {
 	const doubtId = useId()
 	const placeId = useId()
-	const { t } = useLingui()
+	const { t, i18n } = useLingui()
 	// What the run held back about this company. The same answer gates the
 	// vouching step below, so it is read from one place rather than two.
-	const { couldNotConfirm, outsidePlace, holdsBack, spokenReason } =
-		prospectHoldBack(prospect)
+	const {
+		couldNotConfirm,
+		outsidePlace,
+		holdsBack,
+		spokenReason,
+		missing,
+		nameOnly,
+	} = prospectHoldBack(prospect)
 	const outsideReason = prospect.outside_place_reason?.trim()
-	// The address on its own: a scan reports it paired with the page it was read
-	// on, so the value here is not the string a link needs. The place is reported
-	// the same way, and read the same way.
-	const site = sourcedText(prospect.website)
-	const place = sourcedText(prospect.location)
+	const site = prospect.website
+	const place = prospect.location
 
 	return (
 		<ListItem>
@@ -143,7 +180,9 @@ function ProspectRow({ prospect }: { readonly prospect: ProspectEntry }) {
 						<Trans>Outside the area searched</Trans>
 					</CandidatePill>
 				) : null}
-				{site !== undefined ? <SafeLink href={site}>{site}</SafeLink> : null}
+				{site !== undefined && site !== '' ? (
+					<SafeLink href={site}>{site}</SafeLink>
+				) : null}
 			</RowHead>
 			<Reason>{prospect.why_relevant}</Reason>
 			{couldNotConfirm ? (
@@ -155,7 +194,10 @@ function ProspectRow({ prospect }: { readonly prospect: ProspectEntry }) {
 					    is said here rather than stored, and reads in the reader's
 					    language. */}
 					{spokenReason ??
-						t`Only found named in a list of companies, with no website and no location of its own.`}
+						i18n._(
+							(missing === undefined ? undefined : MISSING_SENTENCE[missing]) ??
+								unwordedDoubt(nameOnly),
+						)}
 				</Reason>
 			) : null}
 			{/* Said separately from the doubt above, and never in its words: a company
@@ -304,15 +346,8 @@ function AddAsLeadButton({
 				// A company row holds one country, and a scan may have named several. The
 				// first is the one it is registered in, which is what the row means.
 				...(prospect.countries?.[0] ? { country: prospect.countries[0] } : {}),
-				// The place goes onto the company record and from there onto a map, so
-				// it is read off the pairing rather than written across whole — an
-				// object put here would reach the CRM as one.
-				...(sourcedText(prospect.location)
-					? { location: sourcedText(prospect.location) }
-					: {}),
-				...(sourcedText(prospect.website)
-					? { website: sourcedText(prospect.website) }
-					: {}),
+				...(prospect.location ? { location: prospect.location } : {}),
+				...(prospect.website ? { website: prospect.website } : {}),
 				...(usableProfiles.length > 0
 					? { socialProfiles: usableProfiles }
 					: {}),

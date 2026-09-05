@@ -173,6 +173,11 @@ const ORGANISATION_KIND_MARKER =
 // thing it is are never answered with each other's script.
 const PLACE_JUDGE_MARKER =
 	'You are checking a list of companies a search returned for a request confined to one area.'
+// And one only the field critic carries. Without an answer here it reads the
+// stub's generic `{}` as an answer holding no verdicts and the run dies, where a
+// real model's reply is decoded against the schema first and a malformed one
+// fails open with an empty list.
+const CRITIC_MARKER = 'For each field, return exactly one verdict:'
 
 // How many splitting prompts the stub recognised. A case that expects parts asserts
 // on this, so rewording the splitting prompt fails as "the stub never saw the
@@ -205,6 +210,23 @@ const extractLlm: LanguageModel.Service = {
 			// the case's own verdict, keyed back to the ids the prompt itself hands
 			// out — reading them off the prompt rather than counting rows, so a case
 			// fails as "the judge answered nobody" if that numbering ever changes.
+			// Every field it is shown is supported, so the critic changes nothing and
+			// a case asserting on a field is asserting on the guards that produced
+			// it. A case wanting the critic to bite scripts it in its own scenario.
+			if (
+				typeof options.prompt === 'string' &&
+				options.prompt.includes(CRITIC_MARKER)
+			) {
+				const ids = [...options.prompt.matchAll(/^- id=(\S+) /gm)].map(
+					match => match[1],
+				)
+				return {
+					usage,
+					value: {
+						verdicts: ids.map(id => ({ id, verdict: 'supported' as const })),
+					},
+				}
+			}
 			if (
 				typeof options.prompt === 'string' &&
 				options.prompt.includes(PLACE_JUDGE_MARKER)
@@ -388,6 +410,12 @@ const runScan = async (args: {
 	citationsSeen: number | undefined
 	citationsKept: number | undefined
 	prospects: ReadonlyArray<string>
+	prospectRows: ReadonlyArray<Record<string, unknown>>
+	// The same rows as a reader is handed them, which is not the same shape as
+	// the rows above: those come straight off the column, and these have been
+	// through the step that settles every field on the way out.
+	readerRows: ReadonlyArray<Record<string, unknown>>
+	existence: { confirmed?: number; candidates?: number } | undefined
 }> => {
 	scenario = args.scenario
 	firedEvents = []
@@ -444,6 +472,19 @@ const runScan = async (args: {
 				FROM research_runs WHERE id = ${created.id}::uuid
 			`
 			const findings = row?.findings
+			// Read back through the service the API and the assistant both call,
+			// rather than off the column, so what is asserted below is what a reader
+			// actually gets.
+			const asRead = yield* enterOrgScope(sql, { org: ctx.org, userId })(
+				svc.get(created.id),
+			).pipe(Effect.orDie)
+			const readerRows = (
+				(asRead as { findings?: { prospects?: ReadonlyArray<unknown> } } | null)
+					?.findings?.prospects ?? []
+			).filter(
+				(prospect): prospect is Record<string, unknown> =>
+					prospect !== null && typeof prospect === 'object',
+			)
 			const quality =
 				findings !== null && typeof findings === 'object'
 					? (
@@ -454,6 +495,7 @@ const runScan = async (args: {
 									citations_seen?: number
 									citations_kept?: number
 									place?: StoredPlace
+									existence?: { confirmed?: number; candidates?: number }
 								}
 							}
 						).quality
@@ -481,6 +523,20 @@ const runScan = async (args: {
 				).flatMap(prospect =>
 					typeof prospect.name === 'string' ? [prospect.name] : [],
 				),
+				// The rows themselves, for a check about what a guard wrote ON a row
+				// rather than about which rows survived.
+				prospectRows: (
+					(
+						findings as {
+							prospects?: ReadonlyArray<Record<string, unknown>>
+						} | null
+					)?.prospects ?? []
+				).filter(
+					(prospect): prospect is Record<string, unknown> =>
+						prospect !== null && typeof prospect === 'object',
+				),
+				existence: quality?.existence,
+				readerRows,
 			}
 		}),
 	)
@@ -675,6 +731,108 @@ describe('what a discovery scan reports about itself', () => {
 			//   an assistant are handed the same list.
 			expect(result.prospects).toContain('Cablestyl Fabricació de Cables')
 			expect(result.prospects).not.toContain('VKS Estampacions Metalúrgiques')
+		}, 60_000)
+	})
+
+	describe('when a reader asks for a scan the run stored', () => {
+		it('should hand every field back one way, with the pages beside them', async () => {
+			// GIVEN a scan whose row carries fields the run paired with the page it
+			//   read them on — a website and a registration number — beside a plain
+			//   one
+			const result = await runScan({
+				schemaName: 'prospect_scan_v1',
+				query: 'Fabricantes de maquinaria industrial en Terrassa (Barcelona)',
+				scenario: {
+					place: 'Terrassa (Barcelona)',
+					placeVerdict: 'inside',
+					evidence:
+						'Maquinaria Solsona SL, Terrassa. NIF B61234567. www.maquinariasolsona.example',
+					findings: [
+						{
+							prospects: [
+								{
+									name: 'Maquinària Solsona',
+									why_relevant: 'Fabricant de maquinària industrial a mida',
+									website: {
+										value: 'https://www.maquinariasolsona.example',
+										source_id: SEED_URL,
+										quote: 'www.maquinariasolsona.example',
+										confidence: 1,
+									},
+									tax_id: {
+										value: 'B61234567',
+										source_id: SEED_URL,
+										quote: 'NIF B61234567',
+										confidence: 1,
+									},
+									citations: [{ source_id: SEED_URL, confidence: 1 }],
+								},
+							],
+						},
+					],
+				},
+			})
+
+			// THEN the reader gets the value under the field's own name, and the
+			//   page it was read on under the same name in an evidence map. Before
+			//   this, most fields were bare and a handful were wrappers, with which
+			//   handful depending on when the run happened — so every reader had to
+			//   know the difference, and one that guessed wrong read nothing at all
+			//   without failing.
+			const [row] = result.readerRows
+			expect(row?.['website']).toBe('https://www.maquinariasolsona.example')
+			expect(row?.['tax_id']).toBe('B61234567')
+			expect(row?.['evidence']).toMatchObject({
+				website: { source_id: SEED_URL },
+				tax_id: { source_id: SEED_URL },
+			})
+			// AND what the run stored is untouched, because that is the shape the
+			//   per-field checks grade
+			const [stored] = result.prospectRows
+			expect(stored?.['website']).toMatchObject({
+				value: 'https://www.maquinariasolsona.example',
+			})
+		}, 60_000)
+	})
+
+	describe('when a scan cannot establish that a company is real', () => {
+		it('should mark the row and say what was missing', async () => {
+			// GIVEN a list holding one company named by a single page and nothing
+			//   else — no site of its own, and no second website to check it against
+			const result = await runScan({
+				schemaName: 'prospect_scan_v1',
+				query: 'Talleres de mecanizado industrial en Sabadell (Barcelona)',
+				scenario: {
+					place: 'Sabadell (Barcelona)',
+					placeVerdict: 'inside',
+					evidence: 'A list of industrial machining workshops.',
+					findings: [
+						{
+							prospects: [
+								{
+									name: 'Mecanitzats Puigcerdà',
+									why_relevant: 'Mecanitzat de precisió per a automoció',
+									citations: [{ source_id: SEED_URL, confidence: 1 }],
+								},
+							],
+						},
+					],
+				},
+			})
+
+			// THEN the doubt reaches the stored row as a mark with the check's own
+			//   word beside it, and the count of websites that named the company.
+			//   Before the fold this went to a field of its own that only the run
+			//   read, so the row a reader was handed looked exactly like one the
+			//   run could stand behind.
+			const [row] = result.prospectRows
+			expect(row?.['marks']).toContain('existence_unconfirmed')
+			expect(typeof row?.['existence_reason']).toBe('string')
+			expect(typeof row?.['websites_seen']).toBe('number')
+			// AND the run's own tally agrees with the row, because both are read
+			//   through the one reader rather than counted twice
+			expect(result.existence?.candidates).toBe(1)
+			expect(result.existence?.confirmed).toBe(0)
 		}, 60_000)
 	})
 

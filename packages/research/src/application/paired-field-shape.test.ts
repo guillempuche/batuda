@@ -35,6 +35,27 @@ describe('settlePairedFields', () => {
 			expect(wrapped).toBe(1)
 		})
 
+		it('should pair the registration number and the trade too', () => {
+			// GIVEN a row whose tax id and trade came back as plain text, which is
+			// how a model writes them unless the schema asks otherwise
+			const { findings } = settle(
+				scanWith({
+					name: 'ACME',
+					tax_id: 'B12345678',
+					industry: 'metalworking',
+				}),
+			)
+
+			// THEN both are paired like the fields beside them. Left out of the list
+			// while the schema declares them paired, they would reach storage as a
+			// string on one run and an object on the next — the very mixture this
+			// settling exists to end.
+			expect(rowsOf(findings)[0]?.['tax_id']).toEqual({ value: 'B12345678' })
+			expect(rowsOf(findings)[0]?.['industry']).toEqual({
+				value: 'metalworking',
+			})
+		})
+
 		it('should pair a figure written as a bare number too', () => {
 			// GIVEN a headcount that reached the row as the number alone
 			const { findings } = settle(

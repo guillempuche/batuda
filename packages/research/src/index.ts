@@ -50,6 +50,7 @@ export {
 	type FarmRow,
 	type FarmRowParseResult,
 	type FarmVerdict,
+	networkGuardJudge,
 	parseFarmCorpus,
 	parseFarmRow,
 	rowByRow,

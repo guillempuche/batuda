@@ -43,20 +43,43 @@ export type Citation = {
 }
 
 /**
- * A field the run paired with the page it read it on, read back as plain text.
+ * Which page one value was read on, as a reader is handed it.
  *
- * Runs stored before a field started carrying its source hold the bare value, and
- * those rows are never rewritten — so both shapes arrive here forever, and a run
- * from last year has to render the same as one from today. A field a guard emptied
- * reads as absent rather than as an empty string.
+ * A run pairs some values with the page they came from. What reaches here is the
+ * value under the field's own name and the page under the same name in a map
+ * beside it, so a screen reads every field the same way and asks for the page
+ * only where it wants to show one.
  */
-export const sourcedText = (field: unknown): string | undefined => {
-	if (typeof field === 'string') return field
-	if (field !== null && typeof field === 'object') {
-		const inner = (field as { value?: unknown }).value
-		if (typeof inner === 'string') return inner
-	}
-	return undefined
+export type FieldEvidence = {
+	readonly source_id?: string
+	readonly quote?: string
+	readonly confidence?: number
+	readonly as_of?: string
+}
+
+/** The pages behind a row's fields, keyed by the field each belongs to. */
+export type EvidenceMap = Readonly<Record<string, FieldEvidence>>
+
+/**
+ * The citation to show under one field, or none.
+ *
+ * None is the ordinary answer, not a fault: a value the run could not tie to a
+ * page is stored with no page named, because inventing one would turn a missing
+ * citation into a false one.
+ */
+export const evidenceCitations = (
+	evidence: EvidenceMap | undefined,
+	field: string,
+): ReadonlyArray<Citation> => {
+	const page = evidence?.[field]
+	if (page?.source_id === undefined) return []
+	return [
+		{
+			source_id: page.source_id,
+			...(page.quote !== undefined ? { quote: page.quote } : {}),
+			...(page.confidence !== undefined ? { confidence: page.confidence } : {}),
+		},
+	]
 }
 
 export type ProposedUpdate = {

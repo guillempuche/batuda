@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
 	type FarmRow,
+	networkGuardJudge,
 	parseFarmCorpus,
 	parseFarmRow,
 	rowByRow,
@@ -410,6 +411,162 @@ describe('scoreFarmReplay', () => {
 			expect(score.networkTotal).toBe(0)
 			expect(score.placeTotal).toBe(0)
 			expect(score.companiesDeleted).toEqual([])
+		})
+	})
+})
+
+describe('networkGuardJudge', () => {
+	// The shape a row takes on the way into the check, so a case here reads as the
+	// list a scan produced rather than as plumbing.
+	const row = (
+		over: Partial<FarmRow> & Pick<FarmRow, 'id' | 'name'>,
+	): FarmRow => ({
+		askedAbout: ['Ripollet', 'Barcelona'],
+		website: null,
+		statedPlace: null,
+		addresses: [],
+		label: 'ok',
+		...over,
+	})
+
+	describe('when the check takes a row off the list', () => {
+		it('should answer drop for it and keep for the rest', () => {
+			// GIVEN a check that removes whichever row rests on a caught address
+			const judge = networkGuardJudge({
+				drop: findings => ({
+					findings: {
+						prospects: (
+							findings as {
+								prospects: ReadonlyArray<{ id: string; citations: unknown }>
+							}
+						).prospects.filter(p => p.id !== 'r2'),
+					},
+				}),
+				placesOf: place => [place],
+			})
+
+			// WHEN two rows of one run are judged
+			const verdicts = judge([
+				row({ id: 'r1', name: 'Keep Me' }),
+				row({ id: 'r2', name: 'Take Me Off' }),
+			])
+
+			// THEN the answer is read off which rows SURVIVED, because the check
+			//   reports what it kept rather than a verdict per row
+			expect(verdicts.get('r1')).toBe('keep')
+			expect(verdicts.get('r2')).toBe('drop')
+		})
+	})
+
+	describe('when two rows of one run share a name', () => {
+		it('should judge them apart', () => {
+			// GIVEN a run holding the same company name twice, one of which goes
+			const judge = networkGuardJudge({
+				drop: findings => ({
+					findings: {
+						prospects: (
+							findings as { prospects: ReadonlyArray<{ id: string }> }
+						).prospects.filter(p => p.id !== 'r2'),
+					},
+				}),
+				placesOf: place => [place],
+			})
+
+			const verdicts = judge([
+				row({ id: 'r1', name: 'Talleres Vallès' }),
+				row({ id: 'r2', name: 'Talleres Vallès' }),
+			])
+
+			// THEN each keeps its own answer. Joined by name they would take each
+			//   other's, and a run repeats a name far more often than an id.
+			expect(verdicts.get('r1')).toBe('keep')
+			expect(verdicts.get('r2')).toBe('drop')
+		})
+	})
+
+	describe('when the corpus holds rows from more than one run', () => {
+		it('should put each run to the check on its own', () => {
+			// GIVEN rows from two scans that asked about different towns
+			const listsSeen: Array<ReadonlyArray<string>> = []
+			const judge = networkGuardJudge({
+				drop: (findings, _listField, places) => {
+					listsSeen.push(places)
+					return { findings }
+				},
+				placesOf: place => [place],
+			})
+
+			judge([
+				row({ id: 'r1', name: 'A', askedAbout: ['Ripollet'] }),
+				row({ id: 'r2', name: 'B', askedAbout: ['Rubí'] }),
+			])
+
+			// THEN the check is asked twice, each time about one run's places. Handed
+			//   both lists at once it would read addresses across scans that never
+			//   met, in a list no scan ever produced.
+			expect(listsSeen).toEqual([['Ripollet'], ['Rubí']])
+		})
+	})
+
+	describe('when a row states a website', () => {
+		it('should hand it over among the addresses the row rests on', () => {
+			// GIVEN a row whose only address is its own site
+			let seen: unknown = null
+			const judge = networkGuardJudge({
+				drop: findings => {
+					seen = findings
+					return { findings }
+				},
+				placesOf: place => [place],
+			})
+
+			judge([
+				row({
+					id: 'r1',
+					name: 'Acme',
+					website: 'https://acme.example',
+					addresses: ['https://acme.example'],
+				}),
+			])
+
+			// THEN the check sees it as the row's website AND among its citations —
+			//   a rule that forgot the website is an address too would otherwise pass
+			//   the row for want of anything to read
+			expect(seen).toEqual({
+				prospects: [
+					{
+						id: 'r1',
+						name: 'Acme',
+						website: 'https://acme.example',
+						citations: [{ source_id: 'https://acme.example' }],
+					},
+				],
+			})
+		})
+	})
+
+	describe('when a row states no website', () => {
+		it('should leave the field out rather than send an empty one', () => {
+			// GIVEN a row citing a page but naming no site of its own
+			const seen: Array<{ prospects: ReadonlyArray<Record<string, unknown>> }> =
+				[]
+			const judge = networkGuardJudge({
+				drop: findings => {
+					seen.push(
+						findings as { prospects: ReadonlyArray<Record<string, unknown>> },
+					)
+					return { findings }
+				},
+				placesOf: place => [place],
+			})
+
+			judge([
+				row({ id: 'r1', name: 'Acme', addresses: ['https://list.example'] }),
+			])
+
+			// THEN the key is absent. Sent as null or empty it would read as an
+			//   address, and every check that screens one would have to know better.
+			expect(seen[0]?.prospects[0]).not.toHaveProperty('website')
 		})
 	})
 })

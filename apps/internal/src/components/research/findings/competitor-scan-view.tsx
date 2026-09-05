@@ -18,7 +18,6 @@ import {
 	Section,
 	Sections,
 	SectionTitle,
-	sourcedText,
 	Tag,
 	TagList,
 } from './shared'
@@ -31,7 +30,7 @@ import {
 
 type CompetitorEntry = {
 	readonly name: string
-	readonly website?: unknown
+	readonly website?: string
 	readonly description?: string
 	readonly strengths?: ReadonlyArray<string>
 	readonly weaknesses?: ReadonlyArray<string>
@@ -51,12 +50,14 @@ type CompetitorScanFindings = CommonFindings & {
 	readonly market_summary?: MarketSummary
 }
 
-// A competitor's address, whether the run paired it with its source or, on an
-// older run, stored it bare.
-const CompetitorSite = ({ website }: { readonly website?: unknown }) => {
-	const site = sourcedText(website)
-	return site === undefined ? null : <SafeLink href={site}>{site}</SafeLink>
-}
+const CompetitorSite = ({
+	website,
+}: {
+	readonly website?: string | undefined
+}) =>
+	website === undefined || website === '' ? null : (
+		<SafeLink href={website}>{website}</SafeLink>
+	)
 
 export function CompetitorScanView({
 	findings,

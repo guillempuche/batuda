@@ -106,6 +106,7 @@ import {
 	verificationQuery,
 } from './existence-verdict'
 import { contactFill, enrichmentFill } from './extraction-fill'
+import { runForReaders } from './findings-for-readers'
 import {
 	FirmographicsRescueSchema,
 	firmographicsRescuePrompt,
@@ -124,6 +125,7 @@ import {
 } from './generic-emails'
 import { type GuardLink, runGuardChain } from './guard-chain'
 import {
+	isPlainObject,
 	readTextValue,
 	citedSourceIds as rowCitedSourceIds,
 } from './guard-shapes'
@@ -182,6 +184,7 @@ import {
 	readKindsOfCompany,
 	readRequestParts,
 	readRequestPlace,
+	readRequestPlaces,
 	requestPartsDirective,
 	requestPartsPrompt,
 	searchedAndEmptyParts,
@@ -1632,7 +1635,7 @@ export const buildBriefPrompt = (args: {
 		args.existence === undefined || args.existence.candidates === 0
 			? []
 			: [
-					`Each company carries an \`existence\` field saying whether the run could establish it is real: \`confirmed\` means two independent websites name it and one is established as the company's own; \`candidate\` means it could not be established, and \`reason\` says what was missing. ${args.existence.confirmed} of them are confirmed and ${args.existence.candidates} are candidates. Say so near the top, in ${args.language}, and wherever you name companies make clear which are which. Never present a candidate as an established company. A candidate is not a company the run judged not to exist — it is one it could not confirm either way, and \`budget_exhausted\`, \`deadline_reached\` or \`checker_unavailable\` mean the run never got to check it at all.`,
+					`A company the run could not establish as real carries \`existence_unconfirmed\` in its \`marks\`, with \`existence_reason\` saying what was missing; a company without that mark is one the run stopped doubting, because two independent websites named it and one is established as its own. ${args.existence.candidates} of the ${args.existence.candidates + args.existence.confirmed} carry the mark. Say so near the top, in ${args.language}, and wherever you name companies make clear which are which. Never present a marked company as an established one. The mark is not the run judging that a company does not exist — it is the run unable to settle it either way, and \`budget_exhausted\`, \`deadline_reached\` or \`checker_unavailable\` mean it never got to check at all.`,
 				]
 	return [
 		`Write a concise human-readable research brief in ${args.language}, summarizing ONLY the material below.`,
@@ -2732,6 +2735,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// that. It stays out of the searching, where a place read wrongly
 					// would spend the run's money somewhere nobody asked about.
 					let areaAsked = hintPlace?.trim() ?? ''
+					// Every place the request named, which the one area above cannot hold: a
+					// request naming three towns is answered with the province containing
+					// them, and a check that works by telling two places apart has nothing to
+					// tell apart. Filled from the same reading of the request, and empty
+					// until it runs.
+					let placesAsked: ReadonlyArray<string> = []
 					const hintCountryCode = (
 						context?.hints as { country?: string } | undefined
 					)?.country
@@ -4273,7 +4282,17 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											const check = dropNetworkRows(
 												findings,
 												discoveryResultField(schemaName),
-												placesNamed(areaAsked),
+												// Both readings together. Every place added makes the
+												// check stricter as well as wider: a word belonging to
+												// a place stops counting toward a domain spelling a
+												// company, which is the condition standing between
+												// this and deleting a real one.
+												[
+													...new Set([
+														...placesNamed(areaAsked),
+														...placesAsked.flatMap(placesNamed),
+													]),
+												],
 											)
 											if (check.dropped.length > 0) {
 												yield* Effect.logInfo('research.network.dropped').pipe(
@@ -4889,6 +4908,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										parts: readRequestParts(response.value),
 										kinds: readKindsOfCompany(response.value),
 										place: readRequestPlace(response.value),
+										places: readRequestPlaces(response.value),
 									})),
 									Effect.catchCause(cause =>
 										Cause.hasInterruptsOnly(cause)
@@ -4905,6 +4925,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														parts: [] as ReadonlyArray<RequestPart>,
 														kinds: [] as ReadonlyArray<string>,
 														place: '',
+														places: [] as ReadonlyArray<string>,
 													}),
 												),
 									),
@@ -4923,6 +4944,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									}),
 								)
 							}
+							// Kept whatever the caller's hint said, rather than only when the
+							// hint was empty. The hint is the area the run is held to and the
+							// list is the request's own words; a request naming several towns
+							// inside the hinted province names places the hint never held, and
+							// they are the pair the reading below needs.
+							placesAsked = split.places
 							// Both answer the one question every reading asks of a word — does
 							// it identify anybody — so both go into one vocabulary. They are
 							// handed over apart because only the request's own wordings are
@@ -7940,13 +7967,25 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							readonly links: ReadonlyArray<unknown>
 							readonly children: ReadonlyArray<unknown>
 						}
-						return {
+						// Every field written one way on the way out, for the two
+						// surfaces that read a run: a person's screen and an assistant.
+						// Both used to meet a mixture — most fields bare, a handful
+						// paired with the page they were read on, and which handful
+						// depending on when the run happened — and each had to know the
+						// difference or quietly read nothing. What the pipeline stores
+						// is untouched, because that is the shape the per-field checks
+						// grade.
+						return runForReaders({
 							...decoded,
 							errorMessage: extras.errorMessage,
 							sources: extras.sources,
 							links: extras.links,
-							children: extras.children,
-						}
+							// A group's children carry findings of their own, and a reader
+							// meets them in the same answer, so they are settled too.
+							children: extras.children.map(child =>
+								isPlainObject(child) ? runForReaders(child) : child,
+							),
+						})
 					}),
 
 				/** List research runs with filters. */

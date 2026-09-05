@@ -27,8 +27,28 @@ export const ProspectScanV1Schema = Schema.Struct({
 			// on Facebook belongs to whoever opened the account, and a reader sent
 			// there instead of to the company's own site has been misled.
 			social_profiles: Schema.optionalKey(Schema.Array(SocialProfile)),
-			tax_id: Schema.optionalKey(Schema.String),
-			industry: Schema.optionalKey(Schema.String),
+			// Both paired with the page they were read on, like the website, the
+			// headcount and the place. Written bare they were out of every check's
+			// reach — the per-field guard only grades a value that names its source
+			// — so a registration number the model assembled and a trade it inferred
+			// from the request rather than from the company both travelled the whole
+			// way to a reader with nothing behind them.
+			tax_id: Schema.optionalKey(
+				Sourced(
+					Schema.String.annotate({
+						description:
+							'The number the company is registered or taxed under, copied exactly as printed — a Spanish NIF/CIF, a UK company number, an EU VAT number. Take it only from a page that states it for THIS company (its own legal notice or imprint, or an official register); never assemble or infer one.',
+					}),
+				),
+			),
+			industry: Schema.optionalKey(
+				Sourced(
+					Schema.String.annotate({
+						description:
+							"What the company actually does, in the words its own pages use. Take it from the company's own site where there is one, not from the request: a trade copied back off the request says only that the search asked for it.",
+					}),
+				),
+			),
 			countries: Schema.optionalKey(
 				Schema.Array(
 					Schema.String.annotate({

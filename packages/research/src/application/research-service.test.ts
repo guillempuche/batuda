@@ -2080,14 +2080,14 @@ describe('buildBriefPrompt — telling confirmed companies from candidates', () 
 			// GIVEN a list that split into some confirmed and some not
 			const prompt = brief({ confirmed: 4, candidates: 18 })
 
-			// THEN the writer is given both counts and told to keep them apart —
-			// without this it reads a list of twenty-two and writes about
-			// twenty-two companies, presenting what the run could not confirm as
-			// though it had
-			expect(prompt).toContain('4 of them are confirmed')
-			expect(prompt).toContain('18 are candidates')
+			// THEN the writer is given the count and the whole it is out of, and
+			// told to keep the two apart — without this it reads a list of
+			// twenty-two and writes about twenty-two companies, presenting what the
+			// run could not confirm as though it had
+			expect(prompt).toContain('18 of the 22 carry the mark')
+			expect(prompt).toContain('existence_unconfirmed')
 			expect(prompt).toContain(
-				'Never present a candidate as an established company',
+				'Never present a marked company as an established one',
 			)
 		})
 
@@ -2095,10 +2095,10 @@ describe('buildBriefPrompt — telling confirmed companies from candidates', () 
 			// GIVEN the same split
 			const prompt = brief({ confirmed: 1, candidates: 2 })
 
-			// THEN the writer is told what a candidate is NOT, because "could not
+			// THEN the writer is told what the mark is NOT, because "could not
 			// confirm" read as "found not to exist" is the opposite error and just
 			// as wrong
-			expect(prompt).toContain('could not confirm either way')
+			expect(prompt).toContain('unable to settle it either way')
 			expect(prompt).toContain('budget_exhausted')
 		})
 	})

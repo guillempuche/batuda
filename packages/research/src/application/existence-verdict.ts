@@ -95,37 +95,24 @@ import {
 } from './entity-guard'
 import { citedSourceIds, isPlainObject, readTextValue } from './guard-shapes'
 import { ownSiteVerdict } from './own-site'
+import {
+	type CandidateReason,
+	EXISTENCE_REASON_FIELD,
+	EXISTENCE_UNCONFIRMED,
+	isCandidateReason,
+	MARKS_FIELD,
+	WEBSITES_SEEN_FIELD,
+} from './row-marks'
 import type { RunWords } from './run-words'
 import { hostOf, isBareWebAddress } from './source-key'
 
+// The reason words live with the other marks, where the web app can read them
+// without pulling this file's imports into the browser. Handed on from here so
+// no caller has to know that.
+export type { CandidateReason }
+
 /** Where the row's existence stands. There is no third value. */
 export type ExistenceVerdict = 'confirmed' | 'candidate'
-
-/**
- * Why a company is only a candidate.
- *
- * The first three are things the evidence said. The last three are things about
- * the run, and are kept apart from the others on purpose: none of them is a
- * finding about the company, and a reader who cannot tell them apart from one
- * will read a run that stopped early as a run that looked and found nothing.
- *
- * Money and time are named separately for the same reason they are separate
- * from the evidence: they are different things to have run out of, and only one
- * of them is fixed by paying more.
- */
-export type CandidateReason =
-	/** Nothing usable named the company at all. */
-	| 'no_sources'
-	/** Only one website named it, however many pages of it were read. */
-	| 'one_website'
-	/** Two or more websites named it, none established as the company's own. */
-	| 'no_own_site'
-	/** The run ran out of its verification allowance before reaching this row. */
-	| 'budget_exhausted'
-	/** The run ran out of time before reaching this row. */
-	| 'deadline_reached'
-	/** The check could not run — a search provider that was down or errored. */
-	| 'checker_unavailable'
 
 /** What was decided about one company, and what it rests on. */
 export interface RowExistence {
@@ -136,7 +123,14 @@ export interface RowExistence {
 	readonly websites: number
 }
 
-/** The field a verdict is written to, so one spelling is read and written. */
+/**
+ * The field an older stored run carries its verdict on.
+ *
+ * Such a run keeps the object it was written with, and nothing migrates stored
+ * findings — so this is still read here, in the one place that reads existence
+ * at all, and nowhere else. That is the whole point of both readings living
+ * behind `rowExistence`: no caller anywhere has to know there are two shapes.
+ */
 const EXISTENCE_KEY = 'existence'
 
 // One source address, read once. `host` is the address as met and `site` the
@@ -306,31 +300,89 @@ export const existenceOf = (args: {
  * in that reads as confirmed without a verdict actually saying so.
  */
 export const rowExistence = (row: Record<string, unknown>): RowExistence => {
-	const held = row[EXISTENCE_KEY]
-	const stored = isPlainObject(held) ? held : {}
-	const websitesHeld = stored['websites']
-	const websites = typeof websitesHeld === 'number' ? websitesHeld : 0
-	if (stored['verdict'] === 'confirmed')
-		return { verdict: 'confirmed', websites }
-	const reason = stored['reason']
-	return {
-		verdict: 'candidate',
-		...(typeof reason === 'string'
-			? { reason: reason as CandidateReason }
-			: {}),
-		websites,
+	const marks = row[MARKS_FIELD]
+	const doubted = Array.isArray(marks) && marks.includes(EXISTENCE_UNCONFIRMED)
+	if (doubted) {
+		const reason = row[EXISTENCE_REASON_FIELD]
+		const seen = row[WEBSITES_SEEN_FIELD]
+		return {
+			verdict: 'candidate',
+			...(isCandidateReason(reason) ? { reason } : {}),
+			websites: typeof seen === 'number' ? seen : 0,
+		}
 	}
+
+	// A run stored under the older shape, where the verdict was an object on the
+	// row. Read after the mark, so a row carrying both — written as an object and
+	// judged again since — is read as the mark rather than the object.
+	const held = row[EXISTENCE_KEY]
+	if (isPlainObject(held)) {
+		const websitesHeld = held['websites']
+		const websites = typeof websitesHeld === 'number' ? websitesHeld : 0
+		if (held['verdict'] === 'confirmed')
+			return { verdict: 'confirmed', websites }
+		const reason = held['reason']
+		return {
+			verdict: 'candidate',
+			...(isCandidateReason(reason) ? { reason } : {}),
+			websites,
+		}
+	}
+
+	// The count without a doubt: a row the check reached and stopped doubting.
+	const seen = row[WEBSITES_SEEN_FIELD]
+	if (typeof seen === 'number') return { verdict: 'confirmed', websites: seen }
+
+	// Carrying none of it. A row nobody judged is not a row the run stands
+	// behind, which is the whole of "two states, never three".
+	return { verdict: 'candidate', websites: 0 }
 }
 
 /** Whether a row is one the run stands behind. */
 export const isConfirmedRow = (row: Record<string, unknown>): boolean =>
 	rowExistence(row).verdict === 'confirmed'
 
-/** A row with its verdict written on. */
+/**
+ * A row with its verdict written on.
+ *
+ * Only a doubt is written. A row the run stopped doubting carries no mark, no
+ * reason and no count — and any of the three left over from an earlier pass is
+ * taken off, so a row that was a candidate and is one no longer does not keep
+ * wearing the badge.
+ */
 export const withExistence = (
 	row: Record<string, unknown>,
 	existence: RowExistence,
-): Record<string, unknown> => ({ ...row, [EXISTENCE_KEY]: existence })
+): Record<string, unknown> => {
+	const otherMarks = Array.isArray(row[MARKS_FIELD])
+		? (row[MARKS_FIELD] as ReadonlyArray<unknown>).filter(
+				(mark): mark is string =>
+					typeof mark === 'string' && mark !== EXISTENCE_UNCONFIRMED,
+			)
+		: []
+	const {
+		[EXISTENCE_KEY]: _wasStoredAsAnObject,
+		[EXISTENCE_REASON_FIELD]: _reason,
+		[WEBSITES_SEEN_FIELD]: _seen,
+		[MARKS_FIELD]: _marks,
+		...rest
+	} = row
+	if (existence.verdict === 'confirmed') {
+		return {
+			...rest,
+			...(otherMarks.length === 0 ? {} : { [MARKS_FIELD]: otherMarks }),
+			[WEBSITES_SEEN_FIELD]: existence.websites,
+		}
+	}
+	return {
+		...rest,
+		[MARKS_FIELD]: [...otherMarks, EXISTENCE_UNCONFIRMED],
+		...(existence.reason === undefined
+			? {}
+			: { [EXISTENCE_REASON_FIELD]: existence.reason }),
+		[WEBSITES_SEEN_FIELD]: existence.websites,
+	}
+}
 
 /**
  * A web search that goes looking for a second website naming this company.

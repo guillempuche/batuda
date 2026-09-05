@@ -39,8 +39,6 @@ export const CompanyEnrichmentV1Schema = Schema.Struct({
 			),
 		),
 		// The company's registration number, sourced like every other field here.
-		// The prospect scan reads one too, but as a plain string with no page behind
-		// it, so nothing can be written from that — this is the graded version.
 		tax_id: Schema.optionalKey(
 			Sourced(
 				Schema.String.annotate({

@@ -4018,6 +4018,10 @@ msgstr "Encara no ha canviat res."
 msgid "Nothing completed recently"
 msgstr "Res completat recentment"
 
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Nothing found on the web names this company."
+msgstr "No s'ha trobat res a la web que anomeni aquesta empresa."
+
 #: src/routes/settings/mcp/connections.tsx
 msgid "Nothing is connected to this organization yet."
 msgstr "Encara no hi ha res connectat a aquesta organització."
@@ -4106,6 +4110,10 @@ msgstr "Només s'ha trobat anomenada en una llista d'empreses, sense web ni ubic
 #: src/routes/settings/organization/policy.tsx
 msgid "Only machine-verified values apply on their own; free-text always waits for review."
 msgstr "Només els valors verificats per màquina s'apliquen sols; el text lliure sempre espera revisió."
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Only one website names this company, so there was nothing to check it against."
+msgstr "Només un lloc web anomena aquesta empresa, així que no hi havia res amb què contrastar-la."
 
 #: src/components/companies/conversations-tab.tsx
 #: src/components/companies/conversations-tab.tsx
@@ -5848,6 +5856,10 @@ msgstr "El canvi no s'ha completat. Torna-ho a provar."
 msgid "The changes could not be applied."
 msgstr "No s'han pogut aplicar els canvis."
 
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "The check could not run, so this company was never looked into."
+msgstr "La comprovació no es va poder executar, així que aquesta empresa no es va arribar a mirar."
+
 #: src/routes/companies/$slug.tsx
 msgid "The company could not be fetched. Check that the session is valid, then try again."
 msgstr "No s'ha pogut carregar l'empresa. Comprova que la sessió sigui vàlida i torna-ho a provar."
@@ -5954,9 +5966,21 @@ msgstr "L'execució ha acabat sense actualitzacions proposades ni accions de pag
 msgid "The search came back with no company for:"
 msgstr "La cerca no ha trobat cap empresa per a:"
 
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "The search could not establish that this is a real, trading company."
+msgstr "La cerca no ha pogut establir que aquesta sigui una empresa real i en actiu."
+
 #: src/components/research/findings/shared.tsx
 msgid "The search did not look for:"
 msgstr "La cerca no ha buscat:"
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "The search ran out of time before it reached this company."
+msgstr "La cerca es va quedar sense temps abans d'arribar a aquesta empresa."
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "The search spent its checking allowance before it reached this company."
+msgstr "La cerca va exhaurir el pressupost de comprovació abans d'arribar a aquesta empresa."
 
 #: src/routes/companies/$slug.tsx
 msgid "The tasks for this company could not be fetched. Check that the session is valid, then try again."
@@ -6475,6 +6499,10 @@ msgstr "Punts febles"
 #: src/components/research/run-labels.ts
 msgid "Website"
 msgstr "Lloc web"
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Websites name this company, but none of them could be established as its own."
+msgstr "Hi ha llocs web que anomenen aquesta empresa, però no s'ha pogut establir que cap sigui el seu."
 
 #: src/routes/emails/index.tsx
 #: src/routes/emails/index.tsx
