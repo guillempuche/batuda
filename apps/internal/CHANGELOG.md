@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-09-05 (internal-v2026.9.5-1)
+
+### Bug Fixes
+
+* make a pasted mailbox password work, and limit the check ([22edc58](https://github.com/guillempuche/batuda/commit/22edc589da06e2f7bbb816e10cef7ffe2d73c879))
+
 ## 2026-09-05 (internal-v2026.9.5)
 
 ### Features
