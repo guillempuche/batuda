@@ -323,13 +323,10 @@ export class MailTransport extends Context.Service<MailTransport>()(
 										),
 								})
 								yield* Effect.promise(() => imap.logout()).pipe(
-									Effect.catchCause(() => Effect.void),
+									Effect.ignoreCause,
 								)
 							}),
-						imap =>
-							Effect.sync(() => imap.close()).pipe(
-								Effect.catchCause(() => Effect.void),
-							),
+						imap => Effect.sync(() => imap.close()).pipe(Effect.ignoreCause),
 					)
 
 					yield* Effect.acquireUseRelease(
@@ -339,10 +336,7 @@ export class MailTransport extends Context.Service<MailTransport>()(
 								try: () => smtp.verify(),
 								catch: err => classifySmtpError(err, creds.inboxId),
 							}),
-						smtp =>
-							Effect.sync(() => smtp.close()).pipe(
-								Effect.catchCause(() => Effect.void),
-							),
+						smtp => Effect.sync(() => smtp.close()).pipe(Effect.ignoreCause),
 					)
 				}).pipe(
 					Effect.timeoutOrElse({
@@ -467,13 +461,10 @@ export class MailTransport extends Context.Service<MailTransport>()(
 									classifyImapError(realImapFailure(imap, err), creds.inboxId),
 							})
 							yield* Effect.promise(() => imap.logout()).pipe(
-								Effect.catchCause(() => Effect.void),
+								Effect.ignoreCause,
 							)
 						}),
-					imap =>
-						Effect.sync(() => imap.close()).pipe(
-							Effect.catchCause(() => Effect.void),
-						),
+					imap => Effect.sync(() => imap.close()).pipe(Effect.ignoreCause),
 				)
 
 			return { probe, send, appendToSent } as const

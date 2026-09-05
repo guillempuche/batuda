@@ -116,11 +116,13 @@ export class InboxHealthProbe extends Context.Service<InboxHealthProbe>()(
 						password,
 					}
 
-					const result = yield* Effect.exit(transport.probe(creds))
-					const { state, detail, reason } =
-						result._tag === 'Success'
-							? ({ state: 'connected', detail: null, reason: null } as const)
-							: failureFacts(result.cause)
+					const { state, detail, reason } = yield* transport.probe(creds).pipe(
+						Effect.matchCause({
+							onSuccess: () =>
+								({ state: 'connected', detail: null, reason: null }) as const,
+							onFailure: failureFacts,
+						}),
+					)
 
 					yield* inServiceTransaction(sql`
 						UPDATE inboxes
