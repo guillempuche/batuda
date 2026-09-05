@@ -4,23 +4,14 @@ import {
 	createRootRoute,
 	HeadContent,
 	Outlet,
-	redirect,
 	ScriptOnce,
 	Scripts,
-	useLocation,
 	useMatches,
 } from '@tanstack/react-router'
-import { LayoutGroup } from 'motion/react'
-import { useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 
 import { PriToast } from '@batuda/ui/pri'
 
-import { ComposeDock } from '#/components/emails/compose-dock'
-import { QuickCaptureDialog } from '#/components/interactions/quick-capture-dialog'
-import { AppShell } from '#/components/layout/app-shell'
-import { BatudaMotionConfig } from '#/components/layout/motion-config'
-import { ComposeEmailProvider } from '#/context/compose-email-context'
-import { QuickCaptureProvider } from '#/context/quick-capture-context'
 import barlowCondensedMedium from '#/fonts/barlow/barlow-condensed-latin-500-normal.woff2?url'
 import barlowCondensedBold from '#/fonts/barlow/barlow-condensed-latin-700-normal.woff2?url'
 import barlowRegular from '#/fonts/barlow/barlow-latin-400-normal.woff2?url'
@@ -32,7 +23,7 @@ import { LangProvider } from '#/i18n/lang-provider'
 import { translatedHead } from '#/i18n/lingui'
 import type { DehydratedAtomValue } from '#/lib/atom-hydration'
 import { getServerCookieHeader } from '#/lib/server-cookie'
-import { fetchSession } from '#/lib/session-check'
+import { fetchSession, hasSessionCookie } from '#/lib/session-check'
 import { readThemeCookieFromHeader } from '#/theme/cookie'
 import {
 	defaultTheme,
@@ -77,18 +68,18 @@ const fontPreloadLinks = [
 }))
 
 /**
- * Session gate for the whole app. Runs on SSR (initial HTML render)
- * and on client navigations. If there's no session and the user isn't
- * already on `/login`, throw a redirect carrying the full current URL
- * as `returnTo` so the login page can send them back after signing in.
+ * Session check for the whole app. Runs on SSR (initial HTML render) and on
+ * client navigations, and hands the answer down as `signedIn` in the route
+ * context. The `_authed` layout route and the OAuth consent screen turn a
+ * "no" into a redirect to `/login` carrying the page that was asked for.
  *
  * Public sign-up is disabled on the server (see
  * `docs/backend.md#invite-only-signup`), so the only way into the app
- * is a pre-provisioned account — this gate is what keeps the rest of
+ * is a pre-provisioned account — that redirect is what keeps the rest of
  * the routes unreachable to anonymous visitors.
  */
 export const Route = createRootRoute({
-	beforeLoad: async ({ location }) => {
+	beforeLoad: async () => {
 		let cookieHeader: string | null | undefined
 		if (import.meta.env.SSR) {
 			cookieHeader = await getServerCookieHeader()
@@ -112,31 +103,25 @@ export const Route = createRootRoute({
 		const theme: ThemeCode =
 			themePreference === 'system' ? defaultTheme : themePreference
 
-		const isPublicPath =
-			location.pathname === '/login' ||
-			location.pathname === '/forgot-password' ||
-			location.pathname === '/reset-password'
-
-		// Sign-in pages have no session to read a language from, so they keep
-		// the cookie-or-default path.
-		if (isPublicPath)
-			return { lang: chosenLang ?? defaultLang, themePreference, theme }
-
-		const user = await fetchSession(cookieHeader ?? undefined)
-		if (!user) {
-			throw redirect({
-				to: '/login',
-				search: { returnTo: location.href },
-			})
-		}
+		// A visit without a session cookie cannot be signed in, so the sign-in
+		// pages skip the round trip to the API. The browser hides that cookie
+		// from scripts, so only the server can make that call; a client
+		// navigation always asks.
+		const user =
+			import.meta.env.SSR && !hasSessionCookie(cookieHeader)
+				? null
+				: await fetchSession(cookieHeader ?? undefined)
 		// Falls back to the account's language so someone an admin just added
 		// lands in their own language on the very first page, before they have
 		// touched any setting. Route context is serialized across SSR, so only
-		// the plain language code crosses — never the session itself.
+		// the plain language code and a yes/no cross — never the session
+		// itself. The routes that need a signed-in person read `signedIn` in
+		// their own `beforeLoad`; the sign-in pages are reachable either way.
 		return {
-			lang: chosenLang ?? user.locale ?? defaultLang,
+			lang: chosenLang ?? user?.locale ?? defaultLang,
 			themePreference,
 			theme,
+			signedIn: user !== null,
 		}
 	},
 	loader: ({ context }) => ({
@@ -202,7 +187,6 @@ function RootComponent() {
 	// data. Routes without loaders (or without a `dehydrated` field) contribute
 	// nothing. Order matches the route hierarchy top-down.
 	const matches = useMatches()
-	const location = useLocation()
 	const { lang, themePreference, theme } = Route.useLoaderData()
 	const collected = matches.flatMap(m => {
 		const data = m.loaderData as
@@ -222,56 +206,19 @@ function RootComponent() {
 	// biome-ignore lint/correctness/useExhaustiveDependencies: the signature is the identity of `collected`; depending on the array itself would defeat the point.
 	const dehydrated = useMemo(() => collected, [signature])
 
-	// The sign-in pages render standalone — no sidebar, no top bar, no Quick
-	// Capture dialog — because they run before there is an account or an
-	// active org for that chrome to describe. Everything else runs inside the
-	// full authenticated shell.
-	const isAuthChrome =
-		location.pathname === '/login' ||
-		location.pathname === '/forgot-password' ||
-		location.pathname === '/reset-password' ||
-		// The OAuth consent screen runs mid-flow (authed, but handing access to
-		// an MCP client) — render it focused, without the org-aware chrome.
-		location.pathname === '/oauth/consent'
-
-	// Tell any stale `/login` tab (left on the "Check your inbox" panel
-	// after a cross-tab magic-link verify) to navigate off. Listener lives
-	// in login.tsx; firing on every authed-shell mount covers all sign-in
-	// paths uniformly.
-	useEffect(() => {
-		if (isAuthChrome) return
-		if (typeof BroadcastChannel === 'undefined') return
-		const channel = new BroadcastChannel('batuda-auth')
-		channel.postMessage({ kind: 'signed-in' })
-		channel.close()
-	}, [isAuthChrome])
-
+	// Only what every page needs sits here. The signed-in chrome (sidebar, top
+	// bar, Quick Capture, compose dock) is the `_authed` layout route's, so the
+	// sign-in pages never download it.
 	return (
 		<RootDocument lang={lang} theme={theme} preference={themePreference}>
 			<ThemeProvider initialPreference={themePreference} initialTheme={theme}>
 				<LangProvider initialLang={lang}>
 					<RegistryProvider>
 						<HydrationBoundary state={dehydrated}>
-							<BatudaMotionConfig>
-								<LayoutGroup>
-									<PriToast.Provider>
-										{isAuthChrome ? (
-											<Outlet />
-										) : (
-											<QuickCaptureProvider>
-												<ComposeEmailProvider>
-													<AppShell>
-														<Outlet />
-													</AppShell>
-													<QuickCaptureDialog />
-													<ComposeDock />
-												</ComposeEmailProvider>
-											</QuickCaptureProvider>
-										)}
-										<ToastChrome />
-									</PriToast.Provider>
-								</LayoutGroup>
-							</BatudaMotionConfig>
+							<PriToast.Provider>
+								<Outlet />
+								<ToastChrome />
+							</PriToast.Provider>
 						</HydrationBoundary>
 					</RegistryProvider>
 				</LangProvider>

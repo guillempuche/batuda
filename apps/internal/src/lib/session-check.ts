@@ -1,9 +1,12 @@
+import { redirect } from '@tanstack/react-router'
+
 import { isLangCode, type LangCode } from '@batuda/domain'
 
 import { apiBaseUrl } from './api-base'
 
 /**
- * Session gate used by the root route's `beforeLoad`.
+ * Session check used by the root route's `beforeLoad`; the routes that need
+ * a signed-in person turn its answer into `redirectToLogin` below.
  *
  * Calls Better-Auth's `/auth/get-session` and returns the user (or
  * `null`). Base URL resolution lives in `api-base.ts`; on SSR the
@@ -30,6 +33,21 @@ function filterAuthCookies(header: string): string {
 			return AUTH_COOKIE_PATTERN.test(name)
 		})
 		.join('; ')
+}
+
+// Better Auth's session cookie, with the prefix it adds on https. The theme
+// and language cookies share the `batuda.` prefix but say nothing about a
+// session, so they must not count.
+const SESSION_COOKIE_PATTERN = /(?:^|;\s*)(?:__Secure-)?batuda\.session_token=/
+
+/**
+ * Whether a request's `Cookie` header carries a session cookie at all. A
+ * request without one cannot be signed in, so the server can skip asking the
+ * API. Only meaningful on the server: the browser hides this cookie from
+ * scripts, so `document.cookie` never shows it even when it is set.
+ */
+export function hasSessionCookie(cookieHeader: string | null | undefined) {
+	return cookieHeader ? SESSION_COOKIE_PATTERN.test(cookieHeader) : false
 }
 
 export type SessionUser = {
@@ -95,4 +113,13 @@ export async function fetchSession(
 		}
 		return null
 	}
+}
+
+/**
+ * The trip to the sign-in page for someone who is not signed in, carrying the
+ * page they asked for so it can send them back afterwards. Thrown from a
+ * route's `beforeLoad`.
+ */
+export function redirectToLogin(returnTo: string) {
+	return redirect({ to: '/login', search: { returnTo } })
 }

@@ -16,8 +16,6 @@ import { PriPasswordInput } from '#/components/primitives/pri-password-input'
 import { apiBaseUrl } from '#/lib/api-base'
 import { normalizeEmail } from '#/lib/forms'
 import { validateSearchWith } from '#/lib/search-schema'
-import { getServerCookieHeader } from '#/lib/server-cookie'
-import { fetchSession } from '#/lib/session-check'
 import { rulerUnderRule, stenciledTitle } from '#/lib/workshop-mixins'
 
 /**
@@ -52,8 +50,8 @@ function pendingOAuthQuery(): string {
 const AUTH_CHANNEL = 'batuda-auth'
 
 /**
- * Standalone route: `__root.tsx` skips the authenticated AppShell for
- * `/login` so this renders on a bare body. No "Create account" link
+ * Standalone route: it sits outside the `_authed` layout that carries the
+ * app's chrome, so this renders on a bare body. No "Create account" link
  * because public sign-up is disabled server-side (see
  * docs/backend.md#invite-only-signup).
  */
@@ -117,13 +115,10 @@ export const Route = createFileRoute('/login')({
 	 * on SSR (cookie from the incoming request headers) and on client
 	 * navigations (browser attaches cookie via fetch credentials).
 	 */
-	beforeLoad: async ({ search }) => {
-		let cookieHeader: string | undefined
-		if (import.meta.env.SSR) {
-			cookieHeader = (await getServerCookieHeader()) ?? undefined
-		}
-		const user = await fetchSession(cookieHeader)
-		if (user) {
+	beforeLoad: ({ context, search }) => {
+		// The root route has already asked the API once for this request; asking
+		// again here would double the wait before the form appears.
+		if (context.signedIn) {
 			throw redirect({ href: safeReturnTo(search.returnTo) })
 		}
 	},
