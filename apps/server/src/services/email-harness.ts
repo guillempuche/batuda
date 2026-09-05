@@ -110,6 +110,7 @@ export const emailDependencies = (options?: HarnessOptions) =>
 							new GrantConnectFailed({
 								inboxId: 'harness-inbox',
 								detail: options.sendFailure,
+								reason: 'unknown',
 							}),
 						),
 			appendToSent: () => Effect.void,

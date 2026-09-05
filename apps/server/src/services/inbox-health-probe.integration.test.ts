@@ -96,11 +96,7 @@ describe('InboxHealthProbe', () => {
 	const readGrant = (id: string) =>
 		Effect.gen(function* () {
 			const sql = yield* SqlClient.SqlClient
-			const rows = yield* sql<{
-				grantStatus: string
-				grantLastError: string | null
-				grantLastSeenAt: Date | null
-			}>`
+			const rows = yield* sql<GrantRow>`
 				SELECT grant_status AS "grantStatus",
 				       grant_last_error AS "grantLastError",
 				       grant_last_seen_at AS "grantLastSeenAt"
@@ -174,7 +170,11 @@ describe('InboxHealthProbe', () => {
 					Effect.provide(
 						provideTestLayers(creds =>
 							Effect.fail(
-								new GrantAuthFailed({ inboxId: creds.inboxId, detail }),
+								new GrantAuthFailed({
+									inboxId: creds.inboxId,
+									detail,
+									reason: 'invalid_credentials',
+								}),
 							),
 						),
 					),
@@ -208,7 +208,11 @@ describe('InboxHealthProbe', () => {
 					Effect.provide(
 						provideTestLayers(creds =>
 							Effect.fail(
-								new GrantConnectFailed({ inboxId: creds.inboxId, detail }),
+								new GrantConnectFailed({
+									inboxId: creds.inboxId,
+									detail,
+									reason: 'unreachable',
+								}),
 							),
 						),
 					),
@@ -275,7 +279,7 @@ describe('InboxHealthProbe', () => {
 
 	describe('over multiple iterations', () => {
 		it('should transition a recovered inbox from auth_failed to connected', async () => {
-			// GIVEN the inbox is on auth_failed (set by an earlier tick)
+			// GIVEN the inbox is on auth_failed, as an earlier tick would leave it
 			await Effect.runPromise(
 				Effect.gen(function* () {
 					const sql = yield* SqlClient.SqlClient

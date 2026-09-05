@@ -5,7 +5,7 @@ process.env['DATABASE_URL'] ??=
 
 import { randomUUID } from 'node:crypto'
 
-import { Effect, Layer } from 'effect'
+import { Cause, Effect, Exit, Layer } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
@@ -184,7 +184,11 @@ describe('EmailService.updateInbox re-probe', () => {
 					Effect.provide(
 						serviceLayer(creds =>
 							Effect.fail(
-								new GrantAuthFailed({ inboxId: creds.inboxId, detail }),
+								new GrantAuthFailed({
+									inboxId: creds.inboxId,
+									detail,
+									reason: 'invalid_credentials',
+								}),
 							),
 						),
 					),
@@ -436,6 +440,137 @@ describe('EmailService.updateInbox re-probe — real credential round-trip', () 
 		})
 	})
 
+	describe('when a mailbox is connected with whitespace around its details', () => {
+		it('should offer the mail server what was meant, not what was pasted', async () => {
+			// GIVEN details pasted from a provider's page, each carrying a space
+			// or a newline
+			const created = `created-${randomUUID()}@test.local`
+			await Effect.runPromise(
+				Effect.gen(function* () {
+					const svc = yield* EmailService
+					yield* svc.createInbox({
+						email: ` ${created} `,
+						username: `  ${created}\n`,
+						password: ' pasted-app-pw\n',
+						imapHost: ' imap.test.local\n',
+						imapPort: 993,
+						imapSecurity: 'tls',
+						smtpHost: ' smtp.test.local ',
+						smtpPort: 587,
+						smtpSecurity: 'starttls',
+					})
+				}).pipe(
+					Effect.provide(realServiceLayer),
+					Effect.provide(orgContext),
+					Effect.provide(sessionContext),
+					Effect.orDie,
+				),
+			)
+
+			// THEN every one of them reaches the mail server tidied. A hostname
+			// with a newline fails to resolve and reads on screen as correct.
+			expect(probeCalls).toHaveLength(1)
+			expect(probeCalls[0]?.username).toBe(created)
+			expect(probeCalls[0]?.password).toBe('pasted-app-pw')
+			expect(probeCalls[0]?.imapHost).toBe('imap.test.local')
+			expect(probeCalls[0]?.smtpHost).toBe('smtp.test.local')
+
+			await Effect.runPromise(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					yield* sql`DELETE FROM inboxes WHERE email = ${created}`
+				}).pipe(Effect.provide(PgLive)) as Effect.Effect<void, never, never>,
+			)
+		})
+
+		it('should refuse a password that is only blank space', async () => {
+			// GIVEN a password box holding a single space
+			// WHEN the mailbox is connected
+			const exit = await Effect.runPromise(
+				Effect.exit(
+					Effect.gen(function* () {
+						const svc = yield* EmailService
+						yield* svc.createInbox({
+							email: `blank-${randomUUID()}@test.local`,
+							username: 'someone@test.local',
+							password: '   ',
+							imapHost: 'imap.test.local',
+							imapPort: 993,
+							imapSecurity: 'tls',
+							smtpHost: 'smtp.test.local',
+							smtpPort: 587,
+							smtpSecurity: 'starttls',
+						})
+					}).pipe(
+						Effect.provide(realServiceLayer),
+						Effect.provide(orgContext),
+						Effect.provide(sessionContext),
+					),
+				),
+			)
+
+			// THEN it is turned away rather than stored, since stored it could
+			// only ever be refused, and no mail server is troubled with it
+			expect(exit._tag).toBe('Failure')
+			expect(probeCalls).toHaveLength(0)
+		})
+	})
+
+	describe('when a blank password rides along with a handover', () => {
+		it('should refuse before anything is written', async () => {
+			// GIVEN an admin handing the mailbox to somebody who is not a member
+			// of the organization, and a password box holding only blank space
+			const adminContext = Layer.succeed(CurrentOrg, {
+				id: TEST_ORG,
+				role: 'admin',
+			} as never)
+
+			// WHEN the mailbox is saved
+			const exit = await Effect.runPromise(
+				Effect.exit(
+					Effect.gen(function* () {
+						const svc = yield* EmailService
+						yield* svc.updateInbox(inboxId, {
+							ownerUserId: 'not-a-member-of-this-org',
+							password: '   ',
+						})
+					}).pipe(
+						Effect.provide(serviceLayer(() => Effect.void)),
+						Effect.provide(adminContext),
+						Effect.provide(sessionContext),
+					),
+				),
+			)
+
+			// THEN it is turned away for the password, and the handover never ran.
+			// The other way round it would have moved the mailbox first, and a
+			// refusal does not always undo what came before it
+			expect(exit._tag).toBe('Failure')
+			const failure = Exit.isFailure(exit)
+				? [...exit.cause.reasons].find(reason => Cause.isFailReason(reason))
+				: undefined
+			expect(
+				(failure as { error?: { _tag?: string; message?: string } } | undefined)
+					?.error?._tag,
+			).toBe('BadRequest')
+
+			const after = await Effect.runPromise(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					const rows = yield* sql<{ ownerUserId: string | null }>`
+						SELECT owner_user_id AS "ownerUserId" FROM inboxes WHERE id = ${inboxId}
+					`
+					return rows[0]?.ownerUserId
+				}).pipe(Effect.provide(PgLive)) as Effect.Effect<
+					string | null | undefined,
+					never,
+					never
+				>,
+			)
+			expect(after).toBe(TEST_USER)
+		})
+	})
+
 	describe('when only the transport changes', () => {
 		it('should probe with the decrypted stored password and the new host', async () => {
 			// [email.ts:1912 — transport change triggers reprobe with the decrypted stored password]
@@ -460,6 +595,56 @@ describe('EmailService.updateInbox re-probe — real credential round-trip', () 
 			expect(probeCalls).toHaveLength(1)
 			expect(probeCalls[0]?.password).toBe(ORIGINAL_PW)
 			expect(probeCalls[0]?.imapHost).toBe('imap.rotated.example')
+		})
+	})
+
+	describe('when the password arrives with blank space around it', () => {
+		it('should probe with the password trimmed', async () => {
+			// GIVEN a password copied from a provider's page, carrying a leading
+			// space and a trailing newline
+			// WHEN it is saved
+			await Effect.runPromise(
+				Effect.gen(function* () {
+					const svc = yield* EmailService
+					yield* svc.updateInbox(inboxId, {
+						password: ' pasted-app-pw\n',
+					})
+				}).pipe(
+					Effect.provide(realServiceLayer),
+					Effect.provide(orgContext),
+					Effect.provide(sessionContext),
+					Effect.orDie,
+				),
+			)
+
+			// THEN the mail server is offered the password itself, not the
+			// whitespace that came with it — which it would reject as wrong
+			expect(probeCalls).toHaveLength(1)
+			expect(probeCalls[0]?.password).toBe('pasted-app-pw')
+		})
+	})
+
+	describe('when the login name arrives with blank space around it', () => {
+		it('should probe with the login name trimmed', async () => {
+			// GIVEN a login name typed with a trailing space
+			// WHEN it is saved
+			await Effect.runPromise(
+				Effect.gen(function* () {
+					const svc = yield* EmailService
+					yield* svc.updateInbox(inboxId, {
+						username: '  someone@test.local ',
+					})
+				}).pipe(
+					Effect.provide(realServiceLayer),
+					Effect.provide(orgContext),
+					Effect.provide(sessionContext),
+					Effect.orDie,
+				),
+			)
+
+			// THEN the stored login name is the one the server will recognise
+			expect(probeCalls).toHaveLength(1)
+			expect(probeCalls[0]?.username).toBe('someone@test.local')
 		})
 	})
 })

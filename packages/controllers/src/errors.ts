@@ -103,16 +103,39 @@ export class InboxInactive extends Schema.TaggedErrorClass<InboxInactive>()(
 	{ inboxId: Schema.String },
 ) {}
 
+/**
+ * Why a probe did not go through, as a fixed set rather than the words the
+ * mail server used. Safe to count and to write down anywhere, since it carries
+ * nothing the server said about the account — `detail` keeps those words.
+ */
+export const GrantFailureReason = Schema.Literals([
+	'invalid_credentials',
+	'timeout',
+	'dns',
+	'tls',
+	'unreachable',
+	'unknown',
+])
+export type GrantFailureReason = typeof GrantFailureReason.Type
+
 /** IMAP/SMTP probe rejected the credentials. Returned as 409. */
 export class GrantAuthFailed extends Schema.TaggedErrorClass<GrantAuthFailed>()(
 	'GrantAuthFailed',
-	{ inboxId: Schema.String, detail: Schema.NullOr(Schema.String) },
+	{
+		inboxId: Schema.String,
+		detail: Schema.NullOr(Schema.String),
+		reason: GrantFailureReason,
+	},
 ) {}
 
 /** IMAP/SMTP probe could not reach the server. Returned as 409. */
 export class GrantConnectFailed extends Schema.TaggedErrorClass<GrantConnectFailed>()(
 	'GrantConnectFailed',
-	{ inboxId: Schema.String, detail: Schema.NullOr(Schema.String) },
+	{
+		inboxId: Schema.String,
+		detail: Schema.NullOr(Schema.String),
+		reason: GrantFailureReason,
+	},
 ) {}
 
 /** Inbox grant is in a non-`connected` state. Returned as 409. */
