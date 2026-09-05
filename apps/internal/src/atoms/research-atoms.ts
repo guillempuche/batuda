@@ -31,7 +31,14 @@ export function researchListPage(page: ListPage): {
 
 const listCache = new Map<string, ReturnType<typeof makeListAtom>>()
 
-function makeListAtom(params: ResearchListParams) {
+/**
+ * The wire form of a list request. Shared with route loaders so the server
+ * asks the exact question the atom will look for; the field names differ from
+ * the params (snake case on the wire), which is easy to get wrong by hand.
+ */
+export function researchListQuery(
+	params: ResearchListParams,
+): Record<string, string | number> {
 	const query: Record<string, string | number> = {}
 	if (params.subjectTable !== undefined) {
 		query['subject_table'] = params.subjectTable
@@ -43,8 +50,12 @@ function makeListAtom(params: ResearchListParams) {
 	if (params.limit !== undefined) query['limit'] = params.limit
 	if (params.offset !== undefined) query['offset'] = params.offset
 	if (params.count !== undefined) query['count'] = params.count
+	return query
+}
+
+function makeListAtom(params: ResearchListParams) {
 	const atom = BatudaApiAtom.query('research', 'list', {
-		query,
+		query: researchListQuery(params),
 		serializationKey: `research:list:${listKey(params)}`,
 	})
 	// Only the first slice is held, so returning to the runs screen paints at
@@ -269,21 +280,31 @@ export type PendingPaidAction = {
 	readonly subjectName: string | null
 }
 
-let pendingPaidActionsAtomCache:
-	| ReturnType<typeof makePendingPaidActionsAtom>
-	| undefined
-
-function makePendingPaidActionsAtom(limit: number) {
+/** Paid lookups waiting for a decision, across runs. Asking twice with the same
+ * limit returns the same atom: the query is remembered by its request. */
+export function pendingPaidActionsAtom(limit: number) {
 	return BatudaApiAtom.query('research', 'listPendingPaidActions', {
 		query: { limit },
 		serializationKey: `research:pending-paid-actions:${limit}`,
 	})
 }
 
-export function pendingPaidActionsAtom(limit: number) {
-	pendingPaidActionsAtomCache ??= makePendingPaidActionsAtom(limit)
-	return pendingPaidActionsAtomCache
-}
+/** The question the inbox's spend tile asks, shared with the route loader so
+ * the server fetches exactly what the browser will look for. */
+export const RESEARCH_MONTHLY_SPEND_QUERY = {
+	range: 'month',
+	groupBy: 'provider',
+} as const
+
+/** This month's research spend by provider, for the inbox's spend tile. */
+export const researchMonthlySpendAtom = BatudaApiAtom.query(
+	'research',
+	'spend',
+	{
+		query: RESEARCH_MONTHLY_SPEND_QUERY,
+		serializationKey: 'research:spend:month:provider',
+	},
+)
 
 // How long a watcher waits between attempts to pick a dropped stream back up,
 // at the most, and how many attempts it makes before letting the page say the

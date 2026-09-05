@@ -108,14 +108,9 @@ export const Route = createFileRoute('/')({
 			// loading state.
 			return { dehydrated: [] as const }
 		}
+		let data: Awaited<ReturnType<typeof loadPipelineDataOnServer>>
 		try {
-			const { nextSteps, pipeline } = await loadPipelineDataOnServer()
-			return {
-				dehydrated: [
-					dehydrateAtom(nextStepsAtom, AsyncResult.success(nextSteps)),
-					dehydrateAtom(pipelineAtom, AsyncResult.success(pipeline)),
-				] as const,
-			}
+			data = await loadPipelineDataOnServer()
 		} catch (error) {
 			// Expected in unauthenticated contexts (401 from SessionMiddleware) or
 			// when the API is down. Fall back to empty hydration — the atoms land in
@@ -124,6 +119,15 @@ export const Route = createFileRoute('/')({
 			// server.log for the underlying cause.
 			console.warn('[PipelineLoader] falling back to empty hydration:', error)
 			return { dehydrated: [] as const }
+		}
+		// Deliberately outside the catch above: handing the data over can only
+		// fail through a programming mistake (an atom with no serialization key),
+		// and that has to surface as a broken page rather than a quiet refetch.
+		return {
+			dehydrated: [
+				dehydrateAtom(nextStepsAtom, AsyncResult.success(data.nextSteps)),
+				dehydrateAtom(pipelineAtom, AsyncResult.success(data.pipeline)),
+			] as const,
 		}
 	},
 	head: () => ({ meta: [{ title: 'Pipeline — Batuda' }] }),

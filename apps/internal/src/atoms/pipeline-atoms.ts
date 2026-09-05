@@ -1,18 +1,12 @@
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 
 /**
- * Shared atom instances for Pipeline + Tasks pages.
+ * Shared atom instances for the Pipeline and Tasks pages.
  *
- * These are module-level constants so that the Route loader (SSR) and
- * the React component (client) reference the *same* atom identity. The
- * loader produces `[atom, AsyncResult.success(data)]` pairs; the root
- * `<RegistryProvider>` passes them as `initialValues` which seeds the
- * registry before first render, so `useAtomValue` returns `Success`
- * on first paint instead of `Initial`.
- *
- * The plan calls out that the Tasks page reuses `openTasksAtom` —
- * navigating Dashboard → Tasks reuses the cached atom value without a
- * refetch.
+ * Each carries a serialization key, so a route loader can fetch its value on
+ * the server and hand it to the browser, where the first render already has
+ * it. The Tasks page reads the same `openTasksAtom` as the dashboard, so
+ * moving between the two reuses the value instead of asking again.
  */
 
 /**
@@ -54,7 +48,11 @@ export const openTasksAtom = BatudaApiAtom.query('tasks', 'list', {
  * attention counters (overdue tasks, companies without a next action). Replaces
  * the dashboard's client-side `countByStatus` and drives the board column totals.
  */
-export const pipelineAtom = BatudaApiAtom.query('pipeline', 'get', {})
+export const pipelineAtom = BatudaApiAtom.query('pipeline', 'get', {
+	// Without a key the atom cannot be handed from the server to the browser at
+	// all: the handover throws instead of pre-filling the page.
+	serializationKey: 'pipeline:get',
+})
 
 /**
  * How many rows of each attention list the dashboard shows. The lists are meant
