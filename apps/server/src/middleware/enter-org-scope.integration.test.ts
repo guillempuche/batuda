@@ -5,7 +5,7 @@ process.env['DATABASE_URL'] ??=
 
 import { randomUUID } from 'node:crypto'
 
-import { Effect } from 'effect'
+import { Effect, Layer, Logger, References } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -72,6 +72,25 @@ const countVisiblePolicies: Effect.Effect<number, never, SqlClient.SqlClient> =
 		`.pipe(Effect.orDie)
 		return rows[0]?.n ?? 0
 	})
+
+// Reads back the annotations on every line an effect writes; they sit on the
+// fiber, not on the log options.
+const captureLines = () => {
+	const lines: Array<Record<string, unknown>> = []
+	const layer = Logger.layer([
+		Logger.make(options => {
+			lines.push({
+				...(options.fiber.getRef(References.CurrentLogAnnotations) as Record<
+					string,
+					unknown
+				>),
+			})
+		}),
+	]).pipe(
+		Layer.provideMerge(Layer.succeed(References.MinimumLogLevel, 'Debug')),
+	)
+	return { lines, layer }
+}
 
 const ctx = {} as { org: Org }
 const seededUsers: string[] = []
@@ -157,6 +176,34 @@ describe('enterOrgScope', () => {
 			expect(result.role).toBe('app_user')
 			expect(result.orgGuc).toBe(ctx.org.id)
 			expect(result.userGuc).toBeNull()
+		})
+	})
+
+	describe('when work inside the scope writes a line of its own', () => {
+		it('should name the tenant on that line, not only on the closing record', async () => {
+			// GIVEN a business event logged from inside the scope
+			// WHEN enterOrgScope wraps it
+			// THEN the line itself carries org.id — the request's record is only
+			//      read when the work ends, so it cannot name the tenant on a line
+			//      written halfway through
+			const { lines, layer } = captureLines()
+			await Effect.runPromise(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					yield* enterOrgScope(sql, { org: ctx.org })(
+						Effect.logInfo('Inbox created').pipe(
+							Effect.annotateLogs({ event: 'inbox.created' }),
+						),
+					)
+				}).pipe(Effect.provide(PgLive), Effect.provide(layer)) as Effect.Effect<
+					void,
+					never,
+					never
+				>,
+			)
+
+			const created = lines.find(line => line['event'] === 'inbox.created')
+			expect(created?.['org.id']).toBe(ctx.org.id)
 		})
 	})
 
