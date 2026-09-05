@@ -144,7 +144,12 @@ export function vitalsFromRun(run: {
 		Object.keys(run.findings as object).length > 0
 	return {
 		status: run.status,
-		phase: run.phase,
+		// The column counts the phases a run has finished, so the one it is working
+		// on is the next — the same reading the server's frame takes.
+		phase:
+			isTerminalResearchStatus(run.status) || run.phase === null
+				? null
+				: Math.min(run.phase + 1, 3),
 		// Never recorded on the row — see the run's live handler.
 		activeTool: null,
 		sourceCount: run.sourceCount,
