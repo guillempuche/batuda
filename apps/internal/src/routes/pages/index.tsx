@@ -3,8 +3,8 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { DateTime, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { ChevronsUpDown, ExternalLink } from 'lucide-react'
+import { styled } from 'next-yak'
 import { useEffect, useMemo, useState } from 'react'
-import styled from 'styled-components'
 
 import type { PageSummary } from '@batuda/controllers'
 import { PriSelect } from '@batuda/ui/pri'
@@ -277,13 +277,13 @@ function narrowPages(rows: ReadonlyArray<unknown>): ReadonlyArray<PageRow> {
 	return out
 }
 
-const Page = styled.div.withConfig({ displayName: 'PagesListPage' })`
+const Page = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-lg);
 `
 
-const Header = styled.header.withConfig({ displayName: 'PagesListHeader' })`
+const Header = styled.header`
 	${brushedMetalPlate}
 	display: flex;
 	align-items: center;
@@ -292,7 +292,7 @@ const Header = styled.header.withConfig({ displayName: 'PagesListHeader' })`
 	gap: var(--space-md);
 `
 
-const Title = styled.h2.withConfig({ displayName: 'PagesListTitle' })`
+const Title = styled.h2`
 	${stenciledTitle}
 	font-size: var(--typescale-headline-medium-size);
 	line-height: var(--typescale-headline-medium-line);
@@ -300,9 +300,7 @@ const Title = styled.h2.withConfig({ displayName: 'PagesListTitle' })`
 	margin: 0;
 `
 
-const HeaderActions = styled.div.withConfig({
-	displayName: 'PagesListHeaderActions',
-})`
+const HeaderActions = styled.div`
 	display: flex;
 	align-items: center;
 	gap: var(--space-sm);
@@ -310,9 +308,7 @@ const HeaderActions = styled.div.withConfig({
 
 // Kept at the body size rather than smaller: below 16px an iPhone zooms the
 // page the moment the control is tapped.
-const StatusFilterTrigger = styled(PriSelect.Trigger).withConfig({
-	displayName: 'PagesListStatusFilterTrigger',
-})`
+const StatusFilterTrigger = styled(PriSelect.Trigger)`
 	gap: var(--space-2xs);
 	padding: var(--space-xs) var(--space-sm);
 	font-family: var(--font-body);
@@ -322,13 +318,13 @@ const StatusFilterTrigger = styled(PriSelect.Trigger).withConfig({
 	text-transform: none;
 `
 
-const Table = styled.table.withConfig({ displayName: 'PagesListTable' })`
+const Table = styled.table`
 	${agedPaperSurface}
 	width: 100%;
 	border-collapse: collapse;
 `
 
-const Th = styled.th.withConfig({ displayName: 'PagesListTh' })`
+const Th = styled.th`
 	text-align: left;
 	padding: var(--space-sm) var(--space-md);
 	font-size: var(--typescale-label-large-size);
@@ -338,26 +334,24 @@ const Th = styled.th.withConfig({ displayName: 'PagesListTh' })`
 	border-bottom: 2px solid var(--color-outline);
 `
 
-const Row = styled.tr.withConfig({ displayName: 'PagesListRow' })`
+const Row = styled.tr`
 	${ruledLedgerRow}
 `
 
-const Td = styled.td.withConfig({ displayName: 'PagesListTd' })`
+const Td = styled.td`
 	padding: var(--space-sm) var(--space-md);
 	font-size: var(--typescale-body-medium-size);
 	color: var(--color-on-surface);
 	vertical-align: middle;
 `
 
-const TdMono = styled(Td).withConfig({ displayName: 'PagesListTdMono' })`
+const TdMono = styled(Td)`
 	font-family: var(--font-mono, monospace);
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface-variant);
 `
 
-const PageTitleCell = styled.span.withConfig({
-	displayName: 'PagesListPageTitleCell',
-})`
+const PageTitleCell = styled.span`
 	& a {
 		color: var(--color-primary);
 		text-decoration: none;
@@ -369,10 +363,7 @@ const PageTitleCell = styled.span.withConfig({
 	}
 `
 
-const StatusDot = styled.span.withConfig({
-	displayName: 'PagesListStatusDot',
-	shouldForwardProp: prop => prop !== '$published',
-})<{ $published: boolean }>`
+const StatusDot = styled.span<{ $published: boolean }>`
 	display: inline-block;
 	width: 8px;
 	height: 8px;
@@ -384,9 +375,7 @@ const StatusDot = styled.span.withConfig({
 			: 'var(--color-status-prospect)'};
 `
 
-const PreviewLink = styled.a.withConfig({
-	displayName: 'PagesListPreviewLink',
-})`
+const PreviewLink = styled.a`
 	display: inline-flex;
 	align-items: center;
 	color: var(--color-on-surface-variant);

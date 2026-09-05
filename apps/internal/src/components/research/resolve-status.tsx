@@ -1,6 +1,6 @@
 import { Trans, useLingui } from '@lingui/react/macro'
+import { styled } from 'next-yak'
 import { useEffect, useRef } from 'react'
-import styled from 'styled-components'
 
 import type { ResolveDecision } from '#/hooks/use-proposal-resolution'
 
@@ -65,14 +65,14 @@ export function ResolveStatus({
 }
 
 /** An amount, aligned so figures in a column line up. */
-export const Money = styled.span.withConfig({ displayName: 'Money' })`
+export const Money = styled.span`
 	font-family: var(--font-mono);
 	font-size: var(--typescale-body-small-size);
 	font-variant-numeric: tabular-nums;
 	color: var(--color-on-surface-variant);
 `
 
-const Wrap = styled.div.withConfig({ displayName: 'ResolveStatusWrap' })`
+const Wrap = styled.div`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -86,14 +86,14 @@ const Wrap = styled.div.withConfig({ displayName: 'ResolveStatusWrap' })`
 	}
 `
 
-const Label = styled.span.withConfig({ displayName: 'ResolveStatusLabel' })`
+const Label = styled.span`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	font-style: italic;
 	color: var(--color-on-surface-variant);
 `
 
-const UndoButton = styled.button.withConfig({ displayName: 'UndoButton' })`
+const UndoButton = styled.button`
 	/* Small text made this under the 24px a pointer needs, and it is the only
 	   thing that stops a change being written. */
 	min-height: 1.5rem;

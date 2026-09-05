@@ -1,5 +1,5 @@
 import { Button } from '@base-ui/react/button'
-import styled, { css } from 'styled-components'
+import { css, styled } from 'next-yak'
 
 /**
  * Workshop button primitive. Four variants:
@@ -16,7 +16,7 @@ import styled, { css } from 'styled-components'
  */
 export type PriButtonVariant = 'filled' | 'outlined' | 'text' | 'destructive'
 
-const filled = css`
+export const priButtonFilled = css`
 	background: linear-gradient(
 		145deg,
 		var(--color-metal-light) 0%,
@@ -55,7 +55,7 @@ const filled = css`
 	}
 `
 
-const outlined = css`
+export const priButtonOutlined = css`
 	background: transparent;
 	color: var(--color-on-surface);
 	border: 2px dashed var(--color-outline);
@@ -74,7 +74,7 @@ const outlined = css`
 	}
 `
 
-const destructive = css`
+export const priButtonDestructive = css`
 	background: var(--color-error);
 	color: var(--color-on-error);
 	border-color: color-mix(in oklab, var(--color-error) 65%, black);
@@ -92,7 +92,7 @@ const destructive = css`
 	}
 `
 
-const text = css`
+export const priButtonText = css`
 	background: transparent;
 	color: var(--color-primary);
 	border-color: transparent;
@@ -112,10 +112,14 @@ const text = css`
 	}
 `
 
-export const PriButton = styled(Button).withConfig({
-	displayName: 'PriButton',
-	shouldForwardProp: prop => prop !== '$variant',
-})<{ $variant?: PriButtonVariant }>`
+/**
+ * The button's look without the button. Base UI's Button insists on native
+ * button semantics — it sets `type="button"` and a tab index on whatever it
+ * renders — so something that navigates cannot borrow PriButton itself
+ * without becoming an anchor that claims to be a button. Put these on a
+ * wrapper around a plain link instead.
+ */
+export const priButtonBase = css`
 	position: relative;
 	display: inline-flex;
 	align-items: center;
@@ -161,16 +165,21 @@ export const PriButton = styled(Button).withConfig({
 		transform: translateY(1px);
 	}
 
+`
+
+export const PriButton = styled(Button)<{ $variant?: PriButtonVariant }>`
+	${priButtonBase}
+
 	${p => {
 		switch (p.$variant) {
 			case 'outlined':
-				return outlined
+				return priButtonOutlined
 			case 'text':
-				return text
+				return priButtonText
 			case 'destructive':
-				return destructive
+				return priButtonDestructive
 			default:
-				return filled
+				return priButtonFilled
 		}
 	}}
 `

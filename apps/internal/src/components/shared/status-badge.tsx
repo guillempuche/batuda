@@ -1,7 +1,7 @@
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { useLingui } from '@lingui/react'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 import { COMPANY_STATUSES } from '@batuda/domain'
 import { PriTooltip } from '@batuda/ui/pri'
@@ -89,10 +89,7 @@ export function StatusBadge({
 	)
 }
 
-const Tag = styled.span.withConfig({
-	displayName: 'StatusBadgeTag',
-	shouldForwardProp: prop => prop !== '$status' && prop !== '$size',
-})<{ $status: CompanyStatus; $size: 'sm' | 'lg' }>`
+const Tag = styled.span<{ $status: CompanyStatus; $size: 'sm' | 'lg' }>`
 	${brushedMetalPlate}
 	${stenciledTitle}
 	display: inline-flex;

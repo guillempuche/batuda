@@ -3,8 +3,8 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { DateTime } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { Calendar, ExternalLink } from 'lucide-react'
+import { styled } from 'next-yak'
 import { useMemo } from 'react'
-import styled from 'styled-components'
 
 import { calendarEventsByCompanyAtom } from '#/atoms/calendar-atoms'
 import { ErrorState } from '#/components/shared/error-state'
@@ -287,9 +287,7 @@ function narrowEvents(rows: ReadonlyArray<unknown>): ReadonlyArray<EventRow> {
 	return out
 }
 
-const Panel = styled.section.withConfig({
-	displayName: 'UpcomingMeetingsCardPanel',
-})`
+const Panel = styled.section`
 	${brushedMetalPlate}
 	display: flex;
 	flex-direction: column;
@@ -298,16 +296,12 @@ const Panel = styled.section.withConfig({
 	border-radius: var(--shape-2xs);
 `
 
-const Header = styled.header.withConfig({
-	displayName: 'UpcomingMeetingsCardHeader',
-})`
+const Header = styled.header`
 	${rulerUnderRule}
 	padding-bottom: var(--space-2xs);
 `
 
-const Heading = styled.h3.withConfig({
-	displayName: 'UpcomingMeetingsCardHeading',
-})`
+const Heading = styled.h3`
 	${stenciledTitle}
 	display: inline-flex;
 	align-items: center;
@@ -317,9 +311,7 @@ const Heading = styled.h3.withConfig({
 	margin: 0;
 `
 
-const List = styled.ul.withConfig({
-	displayName: 'UpcomingMeetingsCardList',
-})`
+const List = styled.ul`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
@@ -328,9 +320,7 @@ const List = styled.ul.withConfig({
 	list-style: none;
 `
 
-const Row = styled.li.withConfig({
-	displayName: 'UpcomingMeetingsCardRow',
-})`
+const Row = styled.li`
 	display: flex;
 	align-items: flex-start;
 	justify-content: space-between;
@@ -343,18 +333,14 @@ const Row = styled.li.withConfig({
 	}
 `
 
-const RowMain = styled.div.withConfig({
-	displayName: 'UpcomingMeetingsCardRowMain',
-})`
+const RowMain = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
 	min-width: 0;
 `
 
-const Title = styled.span.withConfig({
-	displayName: 'UpcomingMeetingsCardTitle',
-})`
+const Title = styled.span`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	color: var(--color-on-surface);
@@ -363,9 +349,7 @@ const Title = styled.span.withConfig({
 	white-space: nowrap;
 `
 
-const Meta = styled.span.withConfig({
-	displayName: 'UpcomingMeetingsCardMeta',
-})`
+const Meta = styled.span`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -374,21 +358,15 @@ const Meta = styled.span.withConfig({
 	color: var(--color-on-surface-variant);
 `
 
-const Dot = styled.span.withConfig({
-	displayName: 'UpcomingMeetingsCardDot',
-})`
+const Dot = styled.span`
 	color: var(--color-on-surface-variant);
 `
 
-const AttendeeCount = styled.span.withConfig({
-	displayName: 'UpcomingMeetingsCardAttendeeCount',
-})`
+const AttendeeCount = styled.span`
 	font-variant-numeric: tabular-nums;
 `
 
-const Attendees = styled.ul.withConfig({
-	displayName: 'UpcomingMeetingsCardAttendees',
-})`
+const Attendees = styled.ul`
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-2xs);
@@ -401,9 +379,7 @@ const Attendees = styled.ul.withConfig({
 
 // An attendee we hold no contact for is dashed rather than solid: it reads as
 // provisional, and it is the cue to look them up before the meeting.
-const Attendee = styled.li.withConfig({
-	displayName: 'UpcomingMeetingsCardAttendee',
-})<{ readonly $known: boolean }>`
+const Attendee = styled.li<{ readonly $known: boolean }>`
 	display: inline-flex;
 	align-items: baseline;
 	gap: var(--space-3xs);
@@ -415,18 +391,14 @@ const Attendee = styled.li.withConfig({
 		p.$known ? 'var(--color-on-surface)' : 'var(--color-on-surface-variant)'};
 `
 
-const AttendeeNote = styled.span.withConfig({
-	displayName: 'UpcomingMeetingsCardAttendeeNote',
-})`
+const AttendeeNote = styled.span`
 	font-size: 0.85em;
 	color: var(--color-on-surface-variant);
 `
 
 // Invitation descriptions run long and often repeat the joining details, so only
 // the first few lines show rather than pushing the next meeting off the card.
-const Agenda = styled.p.withConfig({
-	displayName: 'UpcomingMeetingsCardAgenda',
-})`
+const Agenda = styled.p`
 	margin: 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
@@ -439,9 +411,7 @@ const Agenda = styled.p.withConfig({
 	-webkit-line-clamp: 3;
 `
 
-const OpenLink = styled.a.withConfig({
-	displayName: 'UpcomingMeetingsCardOpenLink',
-})`
+const OpenLink = styled.a`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-3xs);
@@ -457,9 +427,7 @@ const OpenLink = styled.a.withConfig({
 	}
 `
 
-const Empty = styled.p.withConfig({
-	displayName: 'UpcomingMeetingsCardEmpty',
-})`
+const Empty = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	font-style: italic;

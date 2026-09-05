@@ -1,15 +1,13 @@
 import { Dialog } from '@base-ui/react/dialog'
+import { styled } from 'next-yak'
 import { type ComponentProps, type RefObject, useEffect, useRef } from 'react'
-import styled from 'styled-components'
 
 /**
  * Workshop dialog — clipboard work order: aged cream paper + cross-hatch
  * desk bg, tape strips top corners, brushed-metal binder clip top-center.
  * Backdrop is warm graphite.
  */
-const PriBackdrop = styled(Dialog.Backdrop).withConfig({
-	displayName: 'PriDialogBackdrop',
-})`
+const PriBackdrop = styled(Dialog.Backdrop)`
 	position: fixed;
 	inset: 0;
 	background: var(--color-scrim);
@@ -22,9 +20,7 @@ const PriBackdrop = styled(Dialog.Backdrop).withConfig({
 	}
 `
 
-const StyledPopup = styled(Dialog.Popup).withConfig({
-	displayName: 'PriDialogPopup',
-})`
+const StyledPopup = styled(Dialog.Popup)`
 	position: fixed;
 	top: 50%;
 	left: 50%;
@@ -206,9 +202,7 @@ const StyledPopup = styled(Dialog.Popup).withConfig({
 	}
 `
 
-const PriTitle = styled(Dialog.Title).withConfig({
-	displayName: 'PriDialogTitle',
-})`
+const PriTitle = styled(Dialog.Title)`
 	font-family: var(--font-display);
 	font-size: var(--typescale-title-large-size);
 	line-height: var(--typescale-title-large-line);
@@ -220,9 +214,7 @@ const PriTitle = styled(Dialog.Title).withConfig({
 	text-shadow: var(--text-shadow-emboss);
 `
 
-const PriDescription = styled(Dialog.Description).withConfig({
-	displayName: 'PriDialogDescription',
-})`
+const PriDescription = styled(Dialog.Description)`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	line-height: var(--typescale-body-medium-line);

@@ -1,4 +1,5 @@
 import { motion, useScroll, useTransform } from 'motion/react'
+import { css, styled } from 'next-yak'
 import {
 	createContext,
 	type RefObject,
@@ -6,7 +7,6 @@ import {
 	useMemo,
 	useRef,
 } from 'react'
-import styled from 'styled-components'
 
 import { PriScrollArea } from '@batuda/ui/pri'
 
@@ -107,7 +107,7 @@ export function BlueprintSheet({ children }: { children: React.ReactNode }) {
 	)
 }
 
-const Wrapper = styled.div.withConfig({ displayName: 'BlueprintSheet' })`
+const Wrapper = styled.div`
 	display: flex;
 	flex-direction: column;
 	flex: 1;
@@ -247,7 +247,7 @@ const Tape = styled.span<{ $right?: boolean }>`
 	display: block;
 	position: absolute;
 	top: ${p => (p.$right ? '-5px' : '-4px')};
-	${p => (p.$right ? 'right: 20px;' : 'left: 16px;')}
+	${p => (p.$right ? css`right: 20px;` : css`left: 16px;`)}
 	width: ${p => (p.$right ? '54px' : '48px')};
 	height: ${p => (p.$right ? '17px' : '18px')};
 	background: linear-gradient(
@@ -265,7 +265,7 @@ const Tape = styled.span<{ $right?: boolean }>`
 	z-index: 5;
 
 	@media (min-width: 768px) {
-		${p => (p.$right ? 'right: 24px;' : 'left: 24px;')}
+		${p => (p.$right ? css`right: 24px;` : css`left: 24px;`)}
 		width: 64px;
 		height: 24px;
 	}

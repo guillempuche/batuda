@@ -1,6 +1,6 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { ChevronRight } from 'lucide-react'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 import { COMPANY_SIZE_RANGES } from '@batuda/domain'
 import { PriCollapsible } from '@batuda/ui/pri'
@@ -169,14 +169,12 @@ export function AboutSection({
 	)
 }
 
-const TriggerWrap = styled.div.withConfig({
-	displayName: 'AboutTriggerWrap',
-})`
+const TriggerWrap = styled.div`
 	display: flex;
 	justify-content: flex-start;
 `
 
-const Body = styled.div.withConfig({ displayName: 'AboutSectionBody' })`
+const Body = styled.div`
 	${agedPaperSurface}
 	display: flex;
 	flex-direction: column;
@@ -191,7 +189,7 @@ const Body = styled.div.withConfig({ displayName: 'AboutSectionBody' })`
 	container-type: inline-size;
 `
 
-const Count = styled.span.withConfig({ displayName: 'AboutSectionCount' })`
+const Count = styled.span`
 	padding: 0 var(--space-2xs);
 	border: 1px solid currentColor;
 	border-radius: var(--shape-2xs);
@@ -200,17 +198,13 @@ const Count = styled.span.withConfig({ displayName: 'AboutSectionCount' })`
 	opacity: 0.8;
 `
 
-const Group = styled.section.withConfig({
-	displayName: 'AboutGroup',
-})`
+const Group = styled.section`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-sm);
 `
 
-const GroupTitle = styled.h4.withConfig({
-	displayName: 'AboutGroupTitle',
-})`
+const GroupTitle = styled.h4`
 	${stenciledTitle}
 	margin: 0;
 	font-size: var(--typescale-label-medium-size);
@@ -218,9 +212,7 @@ const GroupTitle = styled.h4.withConfig({
 	color: var(--color-on-surface-variant);
 `
 
-const Grid = styled.div.withConfig({
-	displayName: 'AboutGrid',
-})`
+const Grid = styled.div`
 	display: grid;
 	grid-template-columns: 1fr;
 	gap: var(--space-sm);

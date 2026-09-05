@@ -1,4 +1,4 @@
-import styled from 'styled-components'
+import { css, styled } from 'next-yak'
 
 /**
  * Batuda-internal table primitive. Compound export: `PriTable = { Root, Head,
@@ -19,10 +19,7 @@ import styled from 'styled-components'
 // override drops the role a browser would otherwise infer from the tag, and the
 // chain has to be unbroken — a table owns rowgroups, a rowgroup owns rows, a row
 // owns cells — or a screen reader stops treating any of it as a table.
-const Root = styled.table.attrs({ role: 'table' }).withConfig({
-	displayName: 'PriTable.Root',
-	shouldForwardProp: prop => !prop.startsWith('$'),
-})<{ $dense?: boolean }>`
+const Root = styled.table.attrs({ role: 'table' })<{ $dense?: boolean }>`
 	width: 100%;
 	border-collapse: separate;
 	border-spacing: 0;
@@ -32,9 +29,7 @@ const Root = styled.table.attrs({ role: 'table' }).withConfig({
 	display: block;
 `
 
-const Head = styled.thead.attrs({ role: 'rowgroup' }).withConfig({
-	displayName: 'PriTable.Head',
-})`
+const Head = styled.thead.attrs({ role: 'rowgroup' })`
 	display: block;
 	position: sticky;
 	top: 0;
@@ -54,16 +49,12 @@ const Head = styled.thead.attrs({ role: 'rowgroup' }).withConfig({
 	}
 `
 
-const Body = styled.tbody.attrs({ role: 'rowgroup' }).withConfig({
-	displayName: 'PriTable.Body',
-})`
+const Body = styled.tbody.attrs({ role: 'rowgroup' })`
 	display: block;
 	position: relative;
 `
 
-const Row = styled.tr.attrs({ role: 'row' }).withConfig({
-	displayName: 'PriTable.Row',
-})`
+const Row = styled.tr.attrs({ role: 'row' })`
 	display: flex;
 	align-items: stretch;
 	width: 100%;
@@ -106,10 +97,7 @@ const Row = styled.tr.attrs({ role: 'row' }).withConfig({
 const flexFor = (intent?: 'fixed' | 'grow' | 'shrink') =>
 	intent === 'grow' ? '1 1 0' : intent === 'shrink' ? '0 1 auto' : '0 0 auto'
 
-const ColumnHeader = styled.th.attrs({ role: 'columnheader' }).withConfig({
-	displayName: 'PriTable.ColumnHeader',
-	shouldForwardProp: prop => !prop.startsWith('$'),
-})<{
+const ColumnHeader = styled.th.attrs({ role: 'columnheader' })<{
 	$align?: 'left' | 'right' | 'center'
 	$flex?: 'fixed' | 'grow' | 'shrink'
 }>`
@@ -130,10 +118,7 @@ const ColumnHeader = styled.th.attrs({ role: 'columnheader' }).withConfig({
 	user-select: none;
 `
 
-const Cell = styled.td.attrs({ role: 'cell' }).withConfig({
-	displayName: 'PriTable.Cell',
-	shouldForwardProp: prop => !prop.startsWith('$'),
-})<{
+const Cell = styled.td.attrs({ role: 'cell' })<{
 	$align?: 'left' | 'right' | 'center'
 	$numeric?: boolean
 	$flex?: 'fixed' | 'grow' | 'shrink'
@@ -146,7 +131,7 @@ const Cell = styled.td.attrs({ role: 'cell' }).withConfig({
 	overflow: hidden;
 	text-overflow: ellipsis;
 	text-align: ${p => p.$align ?? 'left'};
-	${p => (p.$numeric ? 'font-variant-numeric: tabular-nums;' : '')}
+	${p => p.$numeric && css`font-variant-numeric: tabular-nums;`}
 
 	@media (max-width: 1024px) {
 		display: block;
@@ -157,10 +142,7 @@ const Cell = styled.td.attrs({ role: 'cell' }).withConfig({
 	}
 `
 
-const Resizer = styled.div.withConfig({
-	displayName: 'PriTable.Resizer',
-	shouldForwardProp: prop => !prop.startsWith('$'),
-})<{ $isResizing?: boolean }>`
+const Resizer = styled.div<{ $isResizing?: boolean }>`
 	position: absolute;
 	right: 0;
 	top: 25%;

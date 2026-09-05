@@ -2,7 +2,7 @@ import { useLingui } from '@lingui/react/macro'
 import { Cog } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
 import { Typewriter } from 'motion-plus/react'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 /**
  * Workshop-flavored busy indicator. A `Cog` icon spins in primary
@@ -46,7 +46,7 @@ export function LoadingSpinner({
 
 const sizeMap = { sm: 16, md: 28, lg: 40 } as const
 
-const Wrapper = styled.div.withConfig({ displayName: 'LoadingSpinnerWrapper' })`
+const Wrapper = styled.div`
 	display: inline-flex;
 	flex-direction: column;
 	align-items: center;
@@ -54,7 +54,7 @@ const Wrapper = styled.div.withConfig({ displayName: 'LoadingSpinnerWrapper' })`
 	gap: var(--space-xs);
 `
 
-const Label = styled.span.withConfig({ displayName: 'LoadingSpinnerLabel' })`
+const Label = styled.span`
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
 	line-height: var(--typescale-label-small-line);

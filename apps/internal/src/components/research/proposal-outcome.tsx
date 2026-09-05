@@ -8,8 +8,8 @@ import {
 	GitMerge,
 	Minus,
 } from 'lucide-react'
+import { styled } from 'next-yak'
 import type { ComponentType } from 'react'
-import styled from 'styled-components'
 
 import { Badge } from './badge'
 import { outcomeTone, type ProposalOutcome, type Tone } from './proposal-logic'

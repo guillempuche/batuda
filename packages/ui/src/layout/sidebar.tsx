@@ -1,6 +1,6 @@
-import styled, { css } from 'styled-components'
+import { css, styled } from 'next-yak'
 
-import type { SpaceToken } from './tokens'
+import { SPACE, type SpaceToken } from './tokens'
 
 type SidebarSide = 'left' | 'right'
 
@@ -21,14 +21,7 @@ type SidebarSide = 'left' | 'right'
  *
  * Reference: every-layout.dev/layouts/sidebar
  */
-export const Sidebar = styled.div.withConfig({
-	displayName: 'Sidebar',
-	shouldForwardProp: prop =>
-		prop !== '$gap' &&
-		prop !== '$side' &&
-		prop !== '$sideWidth' &&
-		prop !== '$contentMin',
-})<{
+export const Sidebar = styled.div<{
 	$gap?: SpaceToken
 	$side?: SidebarSide
 	$sideWidth?: string
@@ -36,7 +29,7 @@ export const Sidebar = styled.div.withConfig({
 }>`
 	display: flex;
 	flex-wrap: wrap;
-	gap: var(--space-${p => p.$gap ?? 'md'});
+	gap: ${p => SPACE[p.$gap ?? 'md']};
 
 	/* The side keeps its width as a preference, not a floor. Once the two
 	 * columns wrap onto one, its basis is wider than the line it landed on, and

@@ -1,7 +1,7 @@
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 import type { ResearchRunLive } from '@batuda/controllers'
 import { isTerminalResearchStatus } from '@batuda/domain'
@@ -159,9 +159,7 @@ export function vitalsFromRun(run: {
 	}
 }
 
-const Wrap = styled.div.withConfig({
-	shouldForwardProp: prop => prop !== '$live',
-})<{ $live: boolean }>`
+const Wrap = styled.div<{ $live: boolean }>`
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
 	gap: var(--space-2xs);

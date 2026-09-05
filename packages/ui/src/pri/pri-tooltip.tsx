@@ -1,5 +1,5 @@
 import { Tooltip } from '@base-ui/react/tooltip'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 /**
  * Workshop tooltip — a stamped metal tag with a micro-rotation and an
@@ -17,9 +17,7 @@ import styled from 'styled-components'
  *     </PriTooltip.Root>
  *   </PriTooltip.Provider>
  */
-const PriPopup = styled(Tooltip.Popup).withConfig({
-	displayName: 'PriTooltipPopup',
-})`
+const PriPopup = styled(Tooltip.Popup)`
 	position: relative;
 	padding: 0.375rem 0.625rem;
 	background: linear-gradient(
@@ -62,9 +60,7 @@ const PriPopup = styled(Tooltip.Popup).withConfig({
 	}
 `
 
-const PriArrow = styled(Tooltip.Arrow).withConfig({
-	displayName: 'PriTooltipArrow',
-})`
+const PriArrow = styled(Tooltip.Arrow)`
 	width: 8px;
 	height: 8px;
 	background: var(--color-metal);

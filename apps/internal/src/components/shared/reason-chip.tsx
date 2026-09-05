@@ -1,5 +1,5 @@
 import { useLingui } from '@lingui/react/macro'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 /**
  * Why this row is on this list.
@@ -71,10 +71,7 @@ function daysBetween(iso: string, now: number): number | null {
 	return Math.max(0, Math.floor((now - then) / 86_400_000))
 }
 
-const Chip = styled.span.withConfig({
-	displayName: 'ReasonChip',
-	shouldForwardProp: prop => prop !== '$reason',
-})<{ $reason: AttentionReason }>`
+const Chip = styled.span<{ $reason: AttentionReason }>`
 	display: inline-flex;
 	align-items: center;
 	align-self: flex-start;

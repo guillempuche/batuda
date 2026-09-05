@@ -2,9 +2,9 @@ import { useAtomRefresh, useAtomSet } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { icon } from 'leaflet'
 import { Crosshair, ExternalLink, MapPin, Maximize2 } from 'lucide-react'
+import { css, styled } from 'next-yak'
 import { useEffect, useState } from 'react'
 import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet'
-import styled from 'styled-components'
 
 import { PriButton, PriDialog, usePriToast } from '@batuda/ui/pri'
 
@@ -98,8 +98,7 @@ export function WherePanel({
 						</ExternalLinkButton>
 					) : null}
 					{googleHref ? (
-						<ExternalLinkButton
-							as='a'
+						<ExternalLinkAnchor
 							href={googleHref}
 							target='_blank'
 							rel='noopener noreferrer'
@@ -107,7 +106,7 @@ export function WherePanel({
 						>
 							<ExternalLink size={14} aria-hidden />
 							<Trans>Open in Google Maps</Trans>
-						</ExternalLinkButton>
+						</ExternalLinkAnchor>
 					) : null}
 				</HeaderActions>
 			</Header>
@@ -296,24 +295,20 @@ function LeafletMap({
 	)
 }
 
-const Wrap = styled.section.withConfig({ displayName: 'WherePanel' })`
+const Wrap = styled.section`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
 `
 
-const Header = styled.header.withConfig({
-	displayName: 'WherePanelClientHeader',
-})`
+const Header = styled.header`
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: var(--space-md);
 `
 
-const Title = styled.h3.withConfig({
-	displayName: 'WherePanelClientTitle',
-})`
+const Title = styled.h3`
 	${stenciledTitle};
 	display: inline-flex;
 	align-items: center;
@@ -322,18 +317,14 @@ const Title = styled.h3.withConfig({
 	margin: 0;
 `
 
-const HeaderActions = styled.div.withConfig({
-	displayName: 'WherePanelHeaderActions',
-})`
+const HeaderActions = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
 	gap: var(--space-2xs);
 `
 
-const ExternalLinkButton = styled.button.withConfig({
-	displayName: 'WherePanelClientExternalLinkButton',
-})`
+const externalControl = css`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-xs);
@@ -353,9 +344,16 @@ const ExternalLinkButton = styled.button.withConfig({
 	}
 `
 
-const MapFrame = styled.div.withConfig({
-	shouldForwardProp: prop => prop !== '$compact',
-})<{ $compact: boolean }>`
+const ExternalLinkButton = styled.button`
+	${externalControl}
+`
+
+/* Same control, but one that navigates — so it is an anchor, not a button. */
+const ExternalLinkAnchor = styled.a`
+	${externalControl}
+`
+
+const MapFrame = styled.div<{ $compact: boolean }>`
 	${brushedMetalPlate};
 	width: 100%;
 	height: ${p => (p.$compact ? '180px' : '320px')};
@@ -394,16 +392,12 @@ const MapFrame = styled.div.withConfig({
 
 /* A dialog holding a map wants the window, not the width a form reads best at,
  * which is what the shared popup is sized for. */
-const MapPopup = styled(PriDialog.Popup).withConfig({
-	displayName: 'WherePanelMapPopup',
-})`
+const MapPopup = styled(PriDialog.Popup)`
 	width: min(90vw, 80rem);
 	max-width: min(90vw, 80rem);
 `
 
-const FullMapFrame = styled.div.withConfig({
-	displayName: 'WherePanelFullMapFrame',
-})`
+const FullMapFrame = styled.div`
 	${brushedMetalPlate};
 	width: 100%;
 	/* Tall enough to be worth opening, and it gives way on a short window
@@ -422,9 +416,7 @@ const FullMapFrame = styled.div.withConfig({
 	}
 `
 
-const EmptyFrame = styled.div.withConfig({
-	displayName: 'WherePanelClientEmptyFrame',
-})`
+const EmptyFrame = styled.div`
 	${agedPaperSurface};
 	display: flex;
 	flex-direction: column;
@@ -434,24 +426,18 @@ const EmptyFrame = styled.div.withConfig({
 	border-radius: var(--shape-md);
 `
 
-const EmptyCopy = styled.div.withConfig({
-	displayName: 'WherePanelClientEmptyCopy',
-})`
+const EmptyCopy = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const EmptyLocation = styled.span.withConfig({
-	displayName: 'WherePanelClientEmptyLocation',
-})`
+const EmptyLocation = styled.span`
 	color: var(--color-on-surface);
 	font-weight: var(--font-weight-medium);
 `
 
-const EmptyHint = styled.span.withConfig({
-	displayName: 'WherePanelClientEmptyHint',
-})`
+const EmptyHint = styled.span`
 	color: var(--color-on-surface-variant);
 	font-size: var(--typescale-body-small-size);
 `

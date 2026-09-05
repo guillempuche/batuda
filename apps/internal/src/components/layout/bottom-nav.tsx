@@ -1,5 +1,5 @@
 import { useLingui } from '@lingui/react/macro'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 import { MachineButton } from './machine-button'
 import { NavGroupKnob } from './nav-group-knob'
@@ -54,7 +54,7 @@ export function BottomNav() {
 	)
 }
 
-const Bar = styled.nav.withConfig({ displayName: 'BottomNavBar' })`
+const Bar = styled.nav`
 	position: fixed;
 	left: 0;
 	right: 0;

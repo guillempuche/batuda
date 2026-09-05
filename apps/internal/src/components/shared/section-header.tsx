@@ -1,6 +1,6 @@
 import { Info } from 'lucide-react'
+import { styled } from 'next-yak'
 import type { ReactNode } from 'react'
-import styled from 'styled-components'
 
 import { PriTooltip } from '@batuda/ui/pri'
 
@@ -55,9 +55,7 @@ export function SectionHeader({
 	)
 }
 
-const HelpButton = styled.button.withConfig({
-	displayName: 'SectionHeaderHelp',
-})`
+const HelpButton = styled.button`
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -78,7 +76,7 @@ const HelpButton = styled.button.withConfig({
 	}
 `
 
-const Wrapper = styled.div.withConfig({ displayName: 'SectionHeader' })`
+const Wrapper = styled.div`
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -94,23 +92,21 @@ const Wrapper = styled.div.withConfig({ displayName: 'SectionHeader' })`
 	background-size: 100% 1px;
 `
 
-const TitleRow = styled.div.withConfig({
-	displayName: 'SectionHeaderTitleRow',
-})`
+const TitleRow = styled.div`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-sm);
 	min-width: 0;
 `
 
-const Heading = styled.h3.withConfig({ displayName: 'SectionHeaderTitle' })`
+const Heading = styled.h3`
 	${stenciledTitle}
 	margin: 0;
 	font-size: var(--typescale-title-medium-size);
 	line-height: var(--typescale-title-medium-line);
 `
 
-const Count = styled.span.withConfig({ displayName: 'SectionHeaderCount' })`
+const Count = styled.span`
 	${brushedMetalPlate}
 	display: inline-flex;
 	align-items: center;
@@ -126,7 +122,7 @@ const Count = styled.span.withConfig({ displayName: 'SectionHeaderCount' })`
 	text-shadow: var(--text-shadow-emboss);
 `
 
-const Actions = styled.div.withConfig({ displayName: 'SectionHeaderActions' })`
+const Actions = styled.div`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-xs);

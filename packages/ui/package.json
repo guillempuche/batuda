@@ -46,16 +46,16 @@
 	},
 	"peerDependencies": {
 		"@base-ui/react": "^1.6.0",
+		"next-yak": "^9.9.0",
 		"react": "^19",
 		"react-dom": "^19",
-		"styled-components": "^6.3.12",
 		"tailwindcss": ">=4"
 	},
 	"devDependencies": {
 		"@base-ui/react": "1.6.0",
 		"@types/react": "19.2.17",
+		"next-yak": "9.9.0",
 		"publint": "^0.3.24",
-		"styled-components": "6.3.12",
 		"tailwindcss": ">=4",
 		"tsdown": "^0.22.7",
 		"tsx": "^4.20.3",
@@ -72,7 +72,7 @@
 		"@base-ui/react": {
 			"optional": true
 		},
-		"styled-components": {
+		"next-yak": {
 			"optional": true
 		}
 	},

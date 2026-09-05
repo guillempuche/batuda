@@ -1,7 +1,7 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Check, ChevronsUpDown, Search } from 'lucide-react'
+import { styled } from 'next-yak'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import styled from 'styled-components'
 
 import { PriCheckbox, PriInput, PriPopover } from '@batuda/ui/pri'
 
@@ -237,9 +237,7 @@ export function MultiSelectFilter({
 
 // Shaped after PriSelect's trigger so the filter bar reads as one row of
 // controls rather than a dropdown next to something else.
-const Trigger = styled(PriPopover.Trigger).withConfig({
-	displayName: 'MultiSelectFilterTrigger',
-})`
+const Trigger = styled(PriPopover.Trigger)`
 	position: relative;
 	display: inline-flex;
 	align-items: center;
@@ -285,9 +283,7 @@ const TriggerLabel = styled.span`
 `
 
 // The chosen value, standing where the control's name would be.
-const TriggerValue = styled.span.withConfig({
-	displayName: 'MultiSelectFilterTriggerValue',
-})`
+const TriggerValue = styled.span`
 	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;

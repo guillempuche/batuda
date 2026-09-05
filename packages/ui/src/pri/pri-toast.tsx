@@ -1,5 +1,5 @@
 import { Toast } from '@base-ui/react/toast'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 /**
  * Workshop toast — clipboard note: aged paper card with a masking tape
@@ -10,9 +10,7 @@ import styled from 'styled-components'
  * viewport alone draws an empty frame, so a toast raised into it is never seen.
  * Fire toasts via `usePriToast()`.
  */
-const PriViewport = styled(Toast.Viewport).withConfig({
-	displayName: 'PriToastViewport',
-})`
+const PriViewport = styled(Toast.Viewport)`
 	position: fixed;
 	bottom: var(--space-lg);
 	right: var(--space-lg);
@@ -24,9 +22,7 @@ const PriViewport = styled(Toast.Viewport).withConfig({
 	pointer-events: none;
 `
 
-const PriRoot = styled(Toast.Root).withConfig({
-	displayName: 'PriToastRoot',
-})`
+const PriRoot = styled(Toast.Root)`
 	position: relative;
 	pointer-events: auto;
 	padding: var(--space-sm) var(--space-md);
@@ -85,9 +81,7 @@ const PriRoot = styled(Toast.Root).withConfig({
 	}
 `
 
-const PriTitle = styled(Toast.Title).withConfig({
-	displayName: 'PriToastTitle',
-})`
+const PriTitle = styled(Toast.Title)`
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-large-size);
 	font-weight: var(--font-weight-bold);
@@ -97,9 +91,7 @@ const PriTitle = styled(Toast.Title).withConfig({
 	margin: 0;
 `
 
-const PriDescription = styled(Toast.Description).withConfig({
-	displayName: 'PriToastDescription',
-})`
+const PriDescription = styled(Toast.Description)`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	line-height: var(--typescale-body-small-line);
@@ -108,9 +100,7 @@ const PriDescription = styled(Toast.Description).withConfig({
 	margin: 0;
 `
 
-const PriClose = styled(Toast.Close).withConfig({
-	displayName: 'PriToastClose',
-})`
+const PriClose = styled(Toast.Close)`
 	position: absolute;
 	top: 4px;
 	right: 6px;

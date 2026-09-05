@@ -1,5 +1,5 @@
 import { useLingui } from '@lingui/react/macro'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 /**
  * Relative date formatter, in the reader's own language.
@@ -80,7 +80,7 @@ function formatRelative(date: Date, locale: string): string {
 	return rtf.format(Math.round(diffSec / year), 'year')
 }
 
-const Time = styled.time.withConfig({ displayName: 'RelativeDateTime' })`
+const Time = styled.time`
 	font-family: var(--font-body);
 	font-size: var(--typescale-label-medium-size);
 	line-height: var(--typescale-label-medium-line);
@@ -88,7 +88,7 @@ const Time = styled.time.withConfig({ displayName: 'RelativeDateTime' })`
 	color: var(--color-on-surface-variant);
 `
 
-const Muted = styled.span.withConfig({ displayName: 'RelativeDateMuted' })`
+const Muted = styled.span`
 	font-family: var(--font-body);
 	font-size: var(--typescale-label-medium-size);
 	color: var(--color-on-surface-variant);

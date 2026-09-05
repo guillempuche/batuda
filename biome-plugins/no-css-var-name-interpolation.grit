@@ -1,0 +1,16 @@
+// A chunk that stops part-way through `var(--name` means the interpolation is
+// building the variable NAME. yak can only swap in a whole value, so it emits
+// `var(--space-var(--Stack__gap_xxx))` — invalid CSS that lightningcss rejects.
+// Node patterns carry no named fields here: Biome 2.4.10 only exposes some.
+JsTemplateExpression() as $template where {
+	or {
+		$template <: contains `styled`,
+		$template <: contains `css`,
+		$template <: contains `createGlobalStyle`,
+		$template <: contains `keyframes`
+	},
+	$template <: contains bubble JsTemplateChunkElement() as $chunk where {
+		$chunk <: r"(?s).*var\(\s*--[A-Za-z0-9_-]*",
+		register_diagnostic(span=$chunk, message="This interpolation builds a CSS variable name, not a value. next-yak substitutes whole values only, so the output is invalid CSS. Move the whole `var(...)` inside the interpolation instead.", severity="error")
+	}
+}

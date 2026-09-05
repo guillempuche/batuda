@@ -4,8 +4,8 @@ import { useLingui } from '@lingui/react'
 import { useLingui as useLinguiMacro } from '@lingui/react/macro'
 import { useNavigate } from '@tanstack/react-router'
 import { ExternalLink } from 'lucide-react'
+import { styled } from 'next-yak'
 import { useState } from 'react'
-import styled from 'styled-components'
 
 import { agedPaperRow, brushedMetalBezel } from '#/lib/workshop-mixins'
 import { ChannelIcon, channelLabelFor } from './channel-icon'
@@ -101,7 +101,7 @@ export function TimelineEntry({ entry }: { entry: TimelineEntryData }) {
 	)
 }
 
-const Row = styled.button.withConfig({ displayName: 'TimelineEntry' })`
+const Row = styled.button`
 	${agedPaperRow}
 	display: grid;
 	grid-template-columns: auto 1fr;
@@ -124,7 +124,7 @@ const Row = styled.button.withConfig({ displayName: 'TimelineEntry' })`
 	}
 `
 
-const IconBezel = styled.span.withConfig({ displayName: 'TimelineEntryIcon' })`
+const IconBezel = styled.span`
 	${brushedMetalBezel}
 	display: inline-flex;
 	align-items: center;
@@ -136,14 +136,14 @@ const IconBezel = styled.span.withConfig({ displayName: 'TimelineEntryIcon' })`
 	color: var(--color-on-surface);
 `
 
-const Body = styled.div.withConfig({ displayName: 'TimelineEntryBody' })`
+const Body = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 	min-width: 0;
 `
 
-const Title = styled.div.withConfig({ displayName: 'TimelineEntryTitle' })`
+const Title = styled.div`
 	display: flex;
 	align-items: baseline;
 	justify-content: space-between;
@@ -163,7 +163,7 @@ const Title = styled.div.withConfig({ displayName: 'TimelineEntryTitle' })`
 	}
 `
 
-const DateSpan = styled.span.withConfig({ displayName: 'TimelineEntryDate' })`
+const DateSpan = styled.span`
 	flex-shrink: 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-label-small-size);
@@ -174,7 +174,7 @@ const DateSpan = styled.span.withConfig({ displayName: 'TimelineEntryDate' })`
 	font-style: italic;
 `
 
-const Summary = styled.p.withConfig({ displayName: 'TimelineEntrySummary' })`
+const Summary = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	line-height: var(--typescale-body-medium-line);
@@ -183,7 +183,7 @@ const Summary = styled.p.withConfig({ displayName: 'TimelineEntrySummary' })`
 	margin: 0;
 `
 
-const Meta = styled.p.withConfig({ displayName: 'TimelineEntryMeta' })`
+const Meta = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	line-height: var(--typescale-body-small-line);
@@ -191,9 +191,7 @@ const Meta = styled.p.withConfig({ displayName: 'TimelineEntryMeta' })`
 	margin: 0;
 `
 
-const ThreadLink = styled.button.withConfig({
-	displayName: 'TimelineEntryThreadLink',
-})`
+const ThreadLink = styled.button`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-3xs);
@@ -215,9 +213,7 @@ const ThreadLink = styled.button.withConfig({
 	}
 `
 
-const ToggleHint = styled.span.withConfig({
-	displayName: 'TimelineEntryToggleHint',
-})`
+const ToggleHint = styled.span`
 	margin-top: var(--space-3xs);
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);

@@ -1,4 +1,4 @@
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 /**
  * Links to addresses that came out of a research run.

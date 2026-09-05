@@ -1,14 +1,12 @@
 import { Select } from '@base-ui/react/select'
+import { styled } from 'next-yak'
 import type { ComponentProps } from 'react'
-import styled from 'styled-components'
 
 /**
  * Workshop-styled wrapper around Base UI's Select.
  */
 
-const PriTrigger = styled(Select.Trigger).withConfig({
-	displayName: 'PriSelectTrigger',
-})`
+const PriTrigger = styled(Select.Trigger)`
 	position: relative;
 	display: inline-flex;
 	align-items: center;
@@ -64,9 +62,7 @@ const PriTrigger = styled(Select.Trigger).withConfig({
 	}
 `
 
-const PriPopup = styled(Select.Popup).withConfig({
-	displayName: 'PriSelectPopup',
-})`
+const PriPopup = styled(Select.Popup)`
 	position: relative;
 	/* Never narrower than the selector, or the options read as belonging to
 	 * something else; never wider than the screen has room for, or the longest
@@ -133,9 +129,7 @@ const PriPopup = styled(Select.Popup).withConfig({
 	}
 `
 
-const PriItem = styled(Select.Item).withConfig({
-	displayName: 'PriSelectItem',
-})`
+const PriItem = styled(Select.Item)`
 	position: relative;
 	z-index: 1;
 	display: flex;
@@ -166,9 +160,7 @@ const PriItem = styled(Select.Item).withConfig({
 	}
 `
 
-const PriItemIndicator = styled(Select.ItemIndicator).withConfig({
-	displayName: 'PriSelectItemIndicator',
-})`
+const PriItemIndicator = styled(Select.ItemIndicator)`
 	/* Sits in the room the row keeps for it, outside the row's own layout, so
 	 * only the name decides how wide the list opens. */
 	position: absolute;
@@ -187,18 +179,14 @@ const PriItemIndicator = styled(Select.ItemIndicator).withConfig({
 // long list runs off the bottom of the screen with its last items out of reach.
 // Capping the list rather than the frame keeps the frame's corners where they
 // are while the items scroll.
-const PriList = styled(Select.List).withConfig({
-	displayName: 'PriSelectList',
-})`
+const PriList = styled(Select.List)`
 	display: block;
 	max-height: min(20rem, var(--available-height));
 	overflow-y: auto;
 	overscroll-behavior: contain;
 `
 
-const PriItemText = styled(Select.ItemText).withConfig({
-	displayName: 'PriSelectItemText',
-})`
+const PriItemText = styled(Select.ItemText)`
 	/* Once the list has grown as wide as it may, a name too long for it trails
 	 * off; the zero minimum is what lets it shrink inside the row at all. */
 	min-width: 0;
@@ -206,9 +194,7 @@ const PriItemText = styled(Select.ItemText).withConfig({
 	text-overflow: ellipsis;
 `
 
-const PriGroupLabel = styled(Select.GroupLabel).withConfig({
-	displayName: 'PriSelectGroupLabel',
-})`
+const PriGroupLabel = styled(Select.GroupLabel)`
 	padding: var(--space-3xs) var(--space-sm);
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
@@ -220,9 +206,7 @@ const PriGroupLabel = styled(Select.GroupLabel).withConfig({
 	border-bottom: 1px solid color-mix(in srgb, var(--color-on-surface) 18%, transparent);
 `
 
-const PriSeparator = styled(Select.Separator).withConfig({
-	displayName: 'PriSelectSeparator',
-})`
+const PriSeparator = styled(Select.Separator)`
 	height: 1px;
 	margin: var(--space-3xs) 0;
 	background: linear-gradient(
@@ -235,9 +219,7 @@ const PriSeparator = styled(Select.Separator).withConfig({
 `
 
 // Hidden until Base UI sets `data-visible`; consumer slots in the icon.
-const PriScrollUpArrow = styled(Select.ScrollUpArrow).withConfig({
-	displayName: 'PriSelectScrollUpArrow',
-})`
+const PriScrollUpArrow = styled(Select.ScrollUpArrow)`
 	position: absolute;
 	top: 0;
 	left: 0;
@@ -262,9 +244,7 @@ const PriScrollUpArrow = styled(Select.ScrollUpArrow).withConfig({
 	}
 `
 
-const PriScrollDownArrow = styled(Select.ScrollDownArrow).withConfig({
-	displayName: 'PriSelectScrollDownArrow',
-})`
+const PriScrollDownArrow = styled(Select.ScrollDownArrow)`
 	position: absolute;
 	bottom: 0;
 	left: 0;

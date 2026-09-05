@@ -16,8 +16,8 @@ import { useLingui } from '@lingui/react/macro'
 import { Link } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { Check, GripVertical, MoveRight } from 'lucide-react'
+import { styled } from 'next-yak'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import styled from 'styled-components'
 
 import { PriButton, PriCheckbox, PriMenu, usePriToast } from '@batuda/ui/pri'
 
@@ -551,13 +551,13 @@ function StagePicker({
 
 // ── Styles ─────────────────────────────────────────────────────
 
-const Wrap = styled.div.withConfig({ displayName: 'PipelineBoardWrap' })`
+const Wrap = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-sm);
 `
 
-const BulkBar = styled.div.withConfig({ displayName: 'PipelineBoardBulkBar' })`
+const BulkBar = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
@@ -568,9 +568,7 @@ const BulkBar = styled.div.withConfig({ displayName: 'PipelineBoardBulkBar' })`
 	color: var(--color-on-primary);
 `
 
-const BulkCount = styled.span.withConfig({
-	displayName: 'PipelineBoardBulkCount',
-})`
+const BulkCount = styled.span`
 	font-family: var(--font-display);
 	font-weight: var(--font-weight-bold);
 	letter-spacing: 0.06em;
@@ -578,7 +576,7 @@ const BulkCount = styled.span.withConfig({
 	font-size: var(--typescale-label-small-size);
 `
 
-const Columns = styled.div.withConfig({ displayName: 'PipelineBoardColumns' })`
+const Columns = styled.div`
 	display: flex;
 	gap: var(--space-sm);
 	overflow-x: auto;
@@ -586,10 +584,7 @@ const Columns = styled.div.withConfig({ displayName: 'PipelineBoardColumns' })`
 	scroll-snap-type: x proximity;
 `
 
-const Column = styled.div.withConfig({
-	displayName: 'PipelineBoardColumn',
-	shouldForwardProp: prop => prop !== '$over',
-})<{ $over: boolean }>`
+const Column = styled.div<{ $over: boolean }>`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
@@ -611,9 +606,7 @@ const Column = styled.div.withConfig({
 	transition: background 140ms ease;
 `
 
-const ColumnHeader = styled.div.withConfig({
-	displayName: 'PipelineBoardColumnHeader',
-})`
+const ColumnHeader = styled.div`
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -621,9 +614,7 @@ const ColumnHeader = styled.div.withConfig({
 	padding: var(--space-2xs);
 `
 
-const ColumnCount = styled.span.withConfig({
-	displayName: 'PipelineBoardColumnCount',
-})`
+const ColumnCount = styled.span`
 	font-family: var(--font-display);
 	font-size: var(--typescale-title-small-size);
 	font-weight: var(--font-weight-bold);
@@ -631,17 +622,13 @@ const ColumnCount = styled.span.withConfig({
 	text-shadow: var(--text-shadow-emboss);
 `
 
-const ColumnBody = styled.div.withConfig({
-	displayName: 'PipelineBoardColumnBody',
-})`
+const ColumnBody = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const ColumnEmpty = styled.p.withConfig({
-	displayName: 'PipelineBoardColumnEmpty',
-})`
+const ColumnEmpty = styled.p`
 	margin: 0;
 	padding: var(--space-sm);
 	text-align: center;
@@ -651,9 +638,7 @@ const ColumnEmpty = styled.p.withConfig({
 	color: var(--color-on-surface-variant);
 `
 
-const ColumnFailed = styled.button.withConfig({
-	displayName: 'PipelineBoardColumnFailed',
-})`
+const ColumnFailed = styled.button`
 	margin: 0;
 	padding: var(--space-sm);
 	width: 100%;
@@ -672,10 +657,7 @@ const ColumnFailed = styled.button.withConfig({
 	}
 `
 
-const CardShell = styled.div.withConfig({
-	displayName: 'PipelineBoardCard',
-	shouldForwardProp: prop => prop !== '$selected' && prop !== '$dragging',
-})<{ $selected: boolean; $dragging: boolean }>`
+const CardShell = styled.div<{ $selected: boolean; $dragging: boolean }>`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
@@ -688,15 +670,13 @@ const CardShell = styled.div.withConfig({
 	box-shadow: var(--shadow-paper-card);
 `
 
-const CardTop = styled.div.withConfig({ displayName: 'PipelineBoardCardTop' })`
+const CardTop = styled.div`
 	display: flex;
 	align-items: center;
 	gap: var(--space-2xs);
 `
 
-const CardNameArea = styled.div.withConfig({
-	displayName: 'PipelineBoardCardNameArea',
-})`
+const CardNameArea = styled.div`
 	flex: 1 1 auto;
 	min-width: 0;
 
@@ -719,9 +699,7 @@ const CardNameArea = styled.div.withConfig({
 	}
 `
 
-const DragName = styled.span.withConfig({
-	displayName: 'PipelineBoardDragName',
-})`
+const DragName = styled.span`
 	flex: 1 1 auto;
 	min-width: 0;
 	font-family: var(--font-display);
@@ -735,27 +713,21 @@ const DragName = styled.span.withConfig({
 	white-space: nowrap;
 `
 
-const CardIndustry = styled.span.withConfig({
-	displayName: 'PipelineBoardCardIndustry',
-})`
+const CardIndustry = styled.span`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	font-style: italic;
 	color: var(--color-on-surface-variant);
 `
 
-const CardBottom = styled.div.withConfig({
-	displayName: 'PipelineBoardCardBottom',
-})`
+const CardBottom = styled.div`
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: var(--space-2xs);
 `
 
-const DragHandle = styled.button.withConfig({
-	displayName: 'PipelineBoardDragHandle',
-})`
+const DragHandle = styled.button`
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -773,9 +745,7 @@ const DragHandle = styled.button.withConfig({
 	}
 `
 
-const MoveTrigger = styled(PriButton).withConfig({
-	displayName: 'PipelineBoardMoveTrigger',
-})`
+const MoveTrigger = styled(PriButton)`
 	gap: var(--space-3xs);
 	padding: var(--space-3xs) var(--space-2xs);
 	font-size: var(--typescale-label-small-size);

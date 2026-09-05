@@ -1,5 +1,5 @@
 import { Field } from '@base-ui/react/field'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 /**
  * Workshop field — stenciled uppercase label, italic description,
@@ -12,18 +12,14 @@ import styled from 'styled-components'
  *     <PriField.Error />
  *   </PriField.Root>
  */
-const PriRoot = styled(Field.Root).withConfig({
-	displayName: 'PriFieldRoot',
-})`
+const PriRoot = styled(Field.Root)`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 	min-width: 0;
 `
 
-const PriLabel = styled(Field.Label).withConfig({
-	displayName: 'PriFieldLabel',
-})`
+const PriLabel = styled(Field.Label)`
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
 	font-weight: var(--font-weight-bold);
@@ -32,9 +28,7 @@ const PriLabel = styled(Field.Label).withConfig({
 	color: var(--color-on-surface-variant);
 `
 
-const PriDescription = styled(Field.Description).withConfig({
-	displayName: 'PriFieldDescription',
-})`
+const PriDescription = styled(Field.Description)`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	line-height: var(--typescale-body-small-line);
@@ -42,9 +36,7 @@ const PriDescription = styled(Field.Description).withConfig({
 	font-style: italic;
 `
 
-const PriError = styled(Field.Error).withConfig({
-	displayName: 'PriFieldError',
-})`
+const PriError = styled(Field.Error)`
 	font-family: var(--font-body);
 	font-size: var(--typescale-label-medium-size);
 	line-height: var(--typescale-label-medium-line);

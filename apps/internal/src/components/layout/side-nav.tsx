@@ -1,7 +1,7 @@
 import { useLingui } from '@lingui/react/macro'
 import { Link } from '@tanstack/react-router'
 import { Cog } from 'lucide-react'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 import { MachineButton } from './machine-button'
 import { navItems } from './nav-items'
@@ -52,7 +52,7 @@ export function SideNav() {
 	)
 }
 
-const Aside = styled.aside.withConfig({ displayName: 'SideNavAside' })`
+const Aside = styled.aside`
 	display: none;
 
 	@media (min-width: 1024px) {
@@ -82,7 +82,7 @@ const Aside = styled.aside.withConfig({ displayName: 'SideNavAside' })`
 	}
 `
 
-const LogoPlate = styled(Link).withConfig({ displayName: 'SideNavLogoPlate' })`
+const LogoPlate = styled(Link)`
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -112,7 +112,7 @@ const LogoPlate = styled(Link).withConfig({ displayName: 'SideNavLogoPlate' })`
 	}
 `
 
-const NavList = styled.ul.withConfig({ displayName: 'SideNavList' })`
+const NavList = styled.ul`
 	list-style: none;
 	display: flex;
 	flex-direction: column;
@@ -137,7 +137,7 @@ const NavList = styled.ul.withConfig({ displayName: 'SideNavList' })`
 	}
 `
 
-const NavItem = styled.li.withConfig({ displayName: 'SideNavItem' })`
+const NavItem = styled.li`
 	a {
 		display: inline-flex;
 		border-radius: var(--shape-full);

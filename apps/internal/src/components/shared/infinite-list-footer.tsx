@@ -1,6 +1,6 @@
 import { useLingui } from '@lingui/react/macro'
+import { styled } from 'next-yak'
 import { useEffect, useRef } from 'react'
-import styled from 'styled-components'
 
 import { PriButton } from '@batuda/ui/pri'
 

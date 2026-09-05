@@ -1,10 +1,11 @@
 import { Trans } from '@lingui/react/macro'
+import { styled } from 'next-yak'
 import { type ReactNode, useId } from 'react'
-import styled from 'styled-components'
 
 import { PriButton } from '@batuda/ui/pri'
 
 import { agedPaperSurface } from '#/lib/workshop-mixins'
+import { Heading } from './heading'
 
 /**
  * Tells the reader something broke while loading, so a failed fetch is never
@@ -68,7 +69,7 @@ export function ErrorState({
 	return (
 		<CardWrapper role='group' aria-labelledby={titleId} data-testid={testId}>
 			<CardText role='status'>
-				<CardTitle as={`h${headingLevel}`} id={titleId}>
+				<CardTitle level={headingLevel} id={titleId}>
 					{title}
 				</CardTitle>
 				{description && <CardDescription>{description}</CardDescription>}
@@ -78,7 +79,7 @@ export function ErrorState({
 	)
 }
 
-const CardWrapper = styled.div.withConfig({ displayName: 'ErrorState' })`
+const CardWrapper = styled.div`
 	${agedPaperSurface}
 	display: flex;
 	flex-direction: column;
@@ -93,14 +94,14 @@ const CardWrapper = styled.div.withConfig({ displayName: 'ErrorState' })`
 	color: var(--color-on-surface);
 `
 
-const CardText = styled.div.withConfig({ displayName: 'ErrorStateText' })`
+const CardText = styled.div`
 	display: flex;
 	flex-direction: column;
 	align-items: center;
 	gap: var(--space-sm);
 `
 
-const CardTitle = styled.p.withConfig({ displayName: 'ErrorStateTitle' })`
+const CardTitle = styled(Heading)`
 	margin: 0;
 	font-family: var(--font-display);
 	font-size: var(--typescale-title-medium-size);
@@ -111,9 +112,7 @@ const CardTitle = styled.p.withConfig({ displayName: 'ErrorStateTitle' })`
 	color: var(--color-error);
 `
 
-const CardDescription = styled.div.withConfig({
-	displayName: 'ErrorStateDescription',
-})`
+const CardDescription = styled.div`
 	margin: 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
@@ -122,16 +121,14 @@ const CardDescription = styled.div.withConfig({
 	max-width: 28rem;
 `
 
-const CardActions = styled.div.withConfig({ displayName: 'ErrorStateActions' })`
+const CardActions = styled.div`
 	display: flex;
 	align-items: center;
 	gap: var(--space-sm);
 	margin-top: var(--space-2xs);
 `
 
-const InlineWrapper = styled.div.withConfig({
-	displayName: 'ErrorStateInline',
-})`
+const InlineWrapper = styled.div`
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -142,26 +139,20 @@ const InlineWrapper = styled.div.withConfig({
 	background: var(--color-error-container);
 `
 
-const InlineText = styled.div.withConfig({
-	displayName: 'ErrorStateInlineText',
-})`
+const InlineText = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
 `
 
-const InlineTitle = styled.p.withConfig({
-	displayName: 'ErrorStateInlineTitle',
-})`
+const InlineTitle = styled.p`
 	margin: 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-error-container);
 `
 
-const InlineDescription = styled.div.withConfig({
-	displayName: 'ErrorStateInlineDescription',
-})`
+const InlineDescription = styled.div`
 	margin: 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
@@ -169,9 +160,7 @@ const InlineDescription = styled.div.withConfig({
 	opacity: 0.85;
 `
 
-const InlineActions = styled.div.withConfig({
-	displayName: 'ErrorStateInlineActions',
-})`
+const InlineActions = styled.div`
 	display: flex;
 	align-items: center;
 	gap: var(--space-2xs);

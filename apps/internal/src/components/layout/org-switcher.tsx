@@ -1,7 +1,7 @@
 import { useLingui } from '@lingui/react/macro'
 import { Building2, Check, ChevronsUpDown } from 'lucide-react'
+import { styled } from 'next-yak'
 import { useState } from 'react'
-import styled from 'styled-components'
 
 import { PriPopover } from '@batuda/ui/pri'
 
@@ -133,9 +133,7 @@ export function OrgSwitcher() {
 	)
 }
 
-const TriggerButton = styled.button.withConfig({
-	displayName: 'OrgSwitcherTrigger',
-})`
+const TriggerButton = styled.button`
 	${brushedMetalPlate}
 	display: inline-flex;
 	align-items: center;
@@ -162,9 +160,7 @@ const TriggerButton = styled.button.withConfig({
 	}
 `
 
-const ReadOnlyChip = styled.div.withConfig({
-	displayName: 'OrgSwitcherChip',
-})`
+const ReadOnlyChip = styled.div`
 	${brushedMetalPlate}
 	display: inline-flex;
 	align-items: center;
@@ -175,9 +171,7 @@ const ReadOnlyChip = styled.div.withConfig({
 	color: var(--color-on-surface);
 `
 
-const ActiveLabel = styled.span.withConfig({
-	displayName: 'OrgSwitcherActiveLabel',
-})`
+const ActiveLabel = styled.span`
 	${stenciledTitle}
 	font-size: var(--typescale-label-medium-size);
 	line-height: var(--typescale-label-medium-line);
@@ -196,9 +190,7 @@ const ActiveLabel = styled.span.withConfig({
 	}
 `
 
-const MenuList = styled.ul.withConfig({
-	displayName: 'OrgSwitcherMenuList',
-})`
+const MenuList = styled.ul`
 	display: flex;
 	flex-direction: column;
 	min-width: 14rem;
@@ -207,9 +199,7 @@ const MenuList = styled.ul.withConfig({
 	list-style: none;
 `
 
-const MenuItem = styled.button.withConfig({
-	displayName: 'OrgSwitcherMenuItem',
-})`
+const MenuItem = styled.button`
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -245,17 +235,13 @@ const MenuItem = styled.button.withConfig({
 	}
 `
 
-const MenuItemLabel = styled.span.withConfig({
-	displayName: 'OrgSwitcherMenuItemLabel',
-})`
+const MenuItemLabel = styled.span`
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 `
 
-const ErrorText = styled.p.withConfig({
-	displayName: 'OrgSwitcherError',
-})`
+const ErrorText = styled.p`
 	margin: var(--space-2xs) var(--space-sm) 0;
 	padding: var(--space-2xs) 0 0;
 	border-top: 1px solid color-mix(in srgb, var(--color-error) 30%, transparent);

@@ -1,6 +1,6 @@
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
-import type { SpaceToken } from './tokens'
+import { SPACE, type SpaceToken } from './tokens'
 
 type ClusterAlign = 'start' | 'center' | 'end' | 'baseline' | 'stretch'
 type ClusterJustify =
@@ -22,11 +22,7 @@ type ClusterJustify =
  *
  * Reference: every-layout.dev/layouts/cluster
  */
-export const Cluster = styled.div.withConfig({
-	displayName: 'Cluster',
-	shouldForwardProp: prop =>
-		prop !== '$gap' && prop !== '$align' && prop !== '$justify',
-})<{
+export const Cluster = styled.div<{
 	$gap?: SpaceToken
 	$align?: ClusterAlign
 	$justify?: ClusterJustify
@@ -35,5 +31,5 @@ export const Cluster = styled.div.withConfig({
 	flex-wrap: wrap;
 	align-items: ${p => p.$align ?? 'center'};
 	justify-content: ${p => p.$justify ?? 'flex-start'};
-	gap: var(--space-${p => p.$gap ?? 'sm'});
+	gap: ${p => SPACE[p.$gap ?? 'sm']};
 `

@@ -9,8 +9,8 @@ import {
 	Trash2,
 	X,
 } from 'lucide-react'
+import { styled } from 'next-yak'
 import { useEffect, useState } from 'react'
-import styled from 'styled-components'
 
 import { CHANNEL_KINDS } from '@batuda/domain'
 import {
@@ -797,9 +797,7 @@ const AddForm = styled.form`
 	align-items: end;
 `
 
-const KindTrigger = styled(PriSelect.Trigger).withConfig({
-	displayName: 'ChannelKindTrigger',
-})`
+const KindTrigger = styled(PriSelect.Trigger)`
 	gap: var(--space-3xs);
 	padding: var(--space-2xs) var(--space-xs);
 	font-size: var(--typescale-body-small-size);

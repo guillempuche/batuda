@@ -1,4 +1,4 @@
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 import type { Tone } from './proposal-logic'
 
@@ -24,10 +24,7 @@ const TONE_ACCENT: Record<Tone, string> = {
  * way the badge beside it does. */
 export const toneColor = (tone: Tone): string => TONE_ACCENT[tone]
 
-export const Badge = styled.span.withConfig({
-	displayName: 'ResearchBadge',
-	shouldForwardProp: prop => prop !== '$tone',
-})<{ $tone: Tone }>`
+export const Badge = styled.span<{ $tone: Tone }>`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-3xs);

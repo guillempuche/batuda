@@ -18,7 +18,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { useLingui } from '@lingui/react/macro'
 import { ClientOnly } from '@tanstack/react-router'
 import { Eye, GripVertical, Plus, X } from 'lucide-react'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 import { brushedMetalPlate } from '#/lib/workshop-mixins'
 import { InstructionIconButton, OwnerBadge } from './instruction-chrome'

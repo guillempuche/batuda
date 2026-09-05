@@ -18,8 +18,8 @@ import {
 	Paperclip,
 	Reply,
 } from 'lucide-react'
+import { css, styled } from 'next-yak'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import styled, { css } from 'styled-components'
 
 import { withReplyPrefix } from '@batuda/email/subject'
 import { PriButton } from '@batuda/ui/pri'
@@ -896,15 +896,13 @@ function prefixSubject(subject: string): string {
 
 // ── Styled components ─────────────────────────────────────────────
 
-const Page = styled.div.withConfig({ displayName: 'EmailsThreadDetailPage' })`
+const Page = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-lg);
 `
 
-const HeaderPlate = styled.header.withConfig({
-	displayName: 'ThreadHeaderPlate',
-})`
+const HeaderPlate = styled.header`
 	${brushedMetalPlate}
 	${rulerUnderRule}
 	display: flex;
@@ -913,14 +911,14 @@ const HeaderPlate = styled.header.withConfig({
 	padding: var(--space-md);
 `
 
-const BackRow = styled.div.withConfig({ displayName: 'ThreadHeaderBackRow' })`
+const BackRow = styled.div`
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: var(--space-sm);
 `
 
-const BackLink = styled(Link).withConfig({ displayName: 'ThreadBackLink' })`
+const BackLink = styled(Link)`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -940,7 +938,7 @@ const BackLink = styled(Link).withConfig({ displayName: 'ThreadBackLink' })`
 	}
 `
 
-const Title = styled.h2.withConfig({ displayName: 'ThreadTitle' })`
+const Title = styled.h2`
 	${stenciledTitle}
 	font-size: var(--typescale-headline-large-size);
 	line-height: var(--typescale-headline-large-line);
@@ -948,35 +946,33 @@ const Title = styled.h2.withConfig({ displayName: 'ThreadTitle' })`
 	word-break: break-word;
 `
 
-const Actions = styled.div.withConfig({ displayName: 'ThreadActions' })`
+const Actions = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-2xs);
 	align-items: center;
 `
 
-const statusTone = (status: ThreadStatus) => {
-	if (status === 'open')
-		return css`
-			background: color-mix(in oklab, var(--color-primary) 14%, transparent);
-			color: var(--color-primary);
-			border-color: color-mix(in oklab, var(--color-primary) 40%, transparent);
-		`
-	if (status === 'closed')
-		return css`
-			background: transparent;
-			color: var(--color-on-surface-variant);
-			border-color: var(--color-outline);
-		`
-	return css`
-		background: transparent;
-		color: var(--color-on-surface-variant);
-		border-style: dashed;
-		border-color: var(--color-outline);
-	`
-}
+const statusOpen = css`
+	background: color-mix(in oklab, var(--color-primary) 14%, transparent);
+	color: var(--color-primary);
+	border-color: color-mix(in oklab, var(--color-primary) 40%, transparent);
+`
 
-const StatusChip = styled.span.withConfig({ displayName: 'ThreadStatusChip' })<{
+const statusClosed = css`
+	background: transparent;
+	color: var(--color-on-surface-variant);
+	border-color: var(--color-outline);
+`
+
+const statusOther = css`
+	background: transparent;
+	color: var(--color-on-surface-variant);
+	border-style: dashed;
+	border-color: var(--color-outline);
+`
+
+const StatusChip = styled.span<{
 	readonly $status: ThreadStatus
 }>`
 	display: inline-flex;
@@ -988,10 +984,14 @@ const StatusChip = styled.span.withConfig({ displayName: 'ThreadStatusChip' })<{
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.08em;
 	text-transform: uppercase;
-	${({ $status }) => statusTone($status)}
+	${({ $status }) => {
+		if ($status === 'open') return statusOpen
+		if ($status === 'closed') return statusClosed
+		return statusOther
+	}}
 `
 
-const Layout = styled.div.withConfig({ displayName: 'ThreadLayout' })`
+const Layout = styled.div`
 	display: grid;
 	grid-template-columns: 1fr;
 	gap: var(--space-lg);
@@ -1001,16 +1001,14 @@ const Layout = styled.div.withConfig({ displayName: 'ThreadLayout' })`
 	}
 `
 
-const Main = styled.div.withConfig({ displayName: 'ThreadMain' })`
+const Main = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
 	min-width: 0;
 `
 
-const MetaStripMobile = styled.div.withConfig({
-	displayName: 'ThreadMetaStripMobile',
-})`
+const MetaStripMobile = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-sm);
@@ -1023,13 +1021,13 @@ const MetaStripMobile = styled.div.withConfig({
 	}
 `
 
-const MetaItem = styled.div.withConfig({ displayName: 'ThreadMetaItem' })`
+const MetaItem = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
 `
 
-const MetaLabel = styled.span.withConfig({ displayName: 'ThreadMetaLabel' })`
+const MetaLabel = styled.span`
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.08em;
@@ -1037,16 +1035,12 @@ const MetaLabel = styled.span.withConfig({ displayName: 'ThreadMetaLabel' })`
 	color: var(--color-on-surface-variant);
 `
 
-const MetaValueMuted = styled.span.withConfig({
-	displayName: 'ThreadMetaValueMuted',
-})`
+const MetaValueMuted = styled.span`
 	color: var(--color-on-surface-variant);
 	font-size: var(--typescale-body-medium-size);
 `
 
-const CompanyLinkWrap = styled.div.withConfig({
-	displayName: 'ThreadCompanyLink',
-})`
+const CompanyLinkWrap = styled.div`
 	> a {
 		color: var(--color-primary);
 		text-decoration: none;
@@ -1060,7 +1054,7 @@ const CompanyLinkWrap = styled.div.withConfig({
 /* The tint sits under text a shade darker than itself — matching them leaves
  * too little contrast to read at label size. One tone for every mailbox: what
  * a mailbox is for is its own words now, which no colour could stand in for. */
-const InboxBadge = styled.span.withConfig({ displayName: 'ThreadInboxBadge' })`
+const InboxBadge = styled.span`
 	display: inline-flex;
 	align-items: center;
 	padding: var(--space-3xs) var(--space-xs);
@@ -1071,7 +1065,7 @@ const InboxBadge = styled.span.withConfig({ displayName: 'ThreadInboxBadge' })`
 	color: var(--color-primary);
 `
 
-const SideRail = styled.aside.withConfig({ displayName: 'ThreadSideRail' })`
+const SideRail = styled.aside`
 	${brushedMetalBezel}
 	display: none;
 	flex-direction: column;
@@ -1086,13 +1080,13 @@ const SideRail = styled.aside.withConfig({ displayName: 'ThreadSideRail' })`
 	}
 `
 
-const SideSection = styled.div.withConfig({ displayName: 'ThreadSideSection' })`
+const SideSection = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
 `
 
-const SideLabel = styled.span.withConfig({ displayName: 'ThreadSideLabel' })`
+const SideLabel = styled.span`
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.08em;
@@ -1100,27 +1094,23 @@ const SideLabel = styled.span.withConfig({ displayName: 'ThreadSideLabel' })`
 	color: var(--color-on-surface-variant);
 `
 
-const SideValue = styled.span.withConfig({ displayName: 'ThreadSideValue' })`
+const SideValue = styled.span`
 	font-size: var(--typescale-body-medium-size);
 	color: var(--color-on-surface);
 `
 
-const SideValueMuted = styled.span.withConfig({
-	displayName: 'ThreadSideValueMuted',
-})`
+const SideValueMuted = styled.span`
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface-variant);
 `
 
-const Timeline = styled.div.withConfig({ displayName: 'ThreadTimeline' })`
+const Timeline = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
 `
 
-const MessageCard = styled.article.withConfig({
-	displayName: 'ThreadMessageCard',
-})<{
+const MessageCard = styled.article<{
 	readonly $direction: Direction
 	readonly $muted: boolean
 }>`
@@ -1142,18 +1132,14 @@ const MessageCard = styled.article.withConfig({
 			: null}
 `
 
-const MessageHeader = styled.header.withConfig({
-	displayName: 'ThreadMessageHeader',
-})`
+const MessageHeader = styled.header`
 	display: grid;
 	grid-template-columns: auto 1fr auto;
 	align-items: start;
 	gap: var(--space-sm);
 `
 
-const DirectionBadge = styled.span.withConfig({
-	displayName: 'ThreadDirectionBadge',
-})<{
+const DirectionBadge = styled.span<{
 	readonly $direction: Direction
 }>`
 	display: inline-flex;
@@ -1172,16 +1158,14 @@ const DirectionBadge = styled.span.withConfig({
 			: 'var(--color-primary)'};
 `
 
-const MessageAddresses = styled.div.withConfig({
-	displayName: 'ThreadMessageAddresses',
-})`
+const MessageAddresses = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
 	min-width: 0;
 `
 
-const AddressLine = styled.div.withConfig({ displayName: 'ThreadAddressLine' })`
+const AddressLine = styled.div`
 	display: flex;
 	gap: var(--space-xs);
 	font-size: var(--typescale-body-small-size);
@@ -1189,9 +1173,7 @@ const AddressLine = styled.div.withConfig({ displayName: 'ThreadAddressLine' })`
 	min-width: 0;
 `
 
-const AddressRole = styled.span.withConfig({
-	displayName: 'ThreadAddressRole',
-})`
+const AddressRole = styled.span`
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.08em;
@@ -1200,16 +1182,14 @@ const AddressRole = styled.span.withConfig({
 	flex: 0 0 48px;
 `
 
-const AddressValue = styled.span.withConfig({
-	displayName: 'ThreadAddressValue',
-})`
+const AddressValue = styled.span`
 	color: var(--color-on-surface);
 	word-break: break-word;
 	flex: 1 1 auto;
 	min-width: 0;
 `
 
-const CcToggle = styled.button.withConfig({ displayName: 'ThreadCcToggle' })`
+const CcToggle = styled.button`
 	align-self: flex-start;
 	display: inline-flex;
 	align-items: center;
@@ -1229,48 +1209,38 @@ const CcToggle = styled.button.withConfig({ displayName: 'ThreadCcToggle' })`
 	}
 `
 
-const MessageMeta = styled.div.withConfig({ displayName: 'ThreadMessageMeta' })`
+const MessageMeta = styled.div`
 	display: flex;
 	flex-direction: column;
 	align-items: flex-end;
 	gap: var(--space-3xs);
 `
 
-const MessageTime = styled.span.withConfig({
-	displayName: 'ThreadMessageTime',
-})`
+const MessageTime = styled.span`
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface-variant);
 	white-space: nowrap;
 `
 
-const deliveryTone = (tone: 'ok' | 'warn' | 'error') => {
-	if (tone === 'ok')
-		return css`
-			color: var(--color-primary);
-			border-color: color-mix(in oklab, var(--color-primary) 40%, transparent);
-			background: color-mix(in oklab, var(--color-primary) 8%, transparent);
-		`
-	if (tone === 'warn')
-		return css`
-			color: var(--color-on-surface-variant);
-			border-color: var(--color-outline);
-			background: transparent;
-		`
-	return css`
-		color: var(--color-error);
-		border-color: color-mix(
-			in oklab,
-			var(--color-error) 40%,
-			transparent
-		);
-		background: color-mix(in oklab, var(--color-error) 8%, transparent);
-	`
-}
+const deliveryOk = css`
+	color: var(--color-primary);
+	border-color: color-mix(in oklab, var(--color-primary) 40%, transparent);
+	background: color-mix(in oklab, var(--color-primary) 8%, transparent);
+`
 
-const DeliveryTag = styled.span.withConfig({
-	displayName: 'ThreadDeliveryTag',
-})<{
+const deliveryWarn = css`
+	color: var(--color-on-surface-variant);
+	border-color: var(--color-outline);
+	background: transparent;
+`
+
+const deliveryError = css`
+	color: var(--color-error);
+	border-color: color-mix(in oklab, var(--color-error) 40%, transparent);
+	background: color-mix(in oklab, var(--color-error) 8%, transparent);
+`
+
+const DeliveryTag = styled.span<{
 	readonly $tone: 'ok' | 'warn' | 'error'
 }>`
 	display: inline-flex;
@@ -1282,12 +1252,14 @@ const DeliveryTag = styled.span.withConfig({
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
-	${({ $tone }) => deliveryTone($tone)}
+	${({ $tone }) => {
+		if ($tone === 'ok') return deliveryOk
+		if ($tone === 'warn') return deliveryWarn
+		return deliveryError
+	}}
 `
 
-const SuspiciousBanner = styled.div.withConfig({
-	displayName: 'ThreadSuspiciousBanner',
-})`
+const SuspiciousBanner = styled.div`
 	display: flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -1299,10 +1271,7 @@ const SuspiciousBanner = styled.div.withConfig({
 	font-size: var(--typescale-body-small-size);
 `
 
-const MessageBody = styled.div.withConfig({
-	displayName: 'ThreadMessageBody',
-	shouldForwardProp: prop => prop !== '$rich',
-})<{ $rich?: boolean }>`
+const MessageBody = styled.div<{ $rich?: boolean }>`
 	white-space: ${p => (p.$rich ? 'normal' : 'pre-wrap')};
 	word-break: break-word;
 	font-size: var(--typescale-body-medium-size);
@@ -1316,7 +1285,7 @@ const MessageBody = styled.div.withConfig({
 	 * whatever the page is doing, and reads as a printout of the message. */
 	${p =>
 		p.$rich
-			? `
+			? css`
 		background: var(--color-sheet);
 		color: var(--color-on-sheet);
 		color-scheme: light;
@@ -1440,9 +1409,7 @@ const MessageBody = styled.div.withConfig({
 			: ''}
 `
 
-const AttachmentList = styled.div.withConfig({
-	displayName: 'ThreadAttachmentList',
-})`
+const AttachmentList = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-2xs);
@@ -1450,9 +1417,7 @@ const AttachmentList = styled.div.withConfig({
 	border-top: 1px dashed var(--color-outline);
 `
 
-const AttachmentChip = styled.a.withConfig({
-	displayName: 'ThreadAttachmentChip',
-})`
+const AttachmentChip = styled.a`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -1471,9 +1436,7 @@ const AttachmentChip = styled.a.withConfig({
 	}
 `
 
-const AttachmentName = styled.span.withConfig({
-	displayName: 'ThreadAttachmentName',
-})`
+const AttachmentName = styled.span`
 	font-family: var(--font-mono, ui-monospace, monospace);
 	max-width: 220px;
 	overflow: hidden;
@@ -1481,8 +1444,6 @@ const AttachmentName = styled.span.withConfig({
 	white-space: nowrap;
 `
 
-const AttachmentSize = styled.span.withConfig({
-	displayName: 'ThreadAttachmentSize',
-})`
+const AttachmentSize = styled.span`
 	color: var(--color-on-surface-variant);
 `

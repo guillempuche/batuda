@@ -1,7 +1,7 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { ChevronRight, Eye, NotebookPen, Pencil } from 'lucide-react'
+import { css, styled } from 'next-yak'
 import { useState } from 'react'
-import styled from 'styled-components'
 
 import { PriButton, PriCollapsible, PriTextarea } from '@batuda/ui/pri'
 
@@ -195,14 +195,12 @@ export function AccountBriefSection({
 // document — about a screenful of prose.
 const LONG_BRIEF_CHARS = 700
 
-const TriggerWrap = styled.div.withConfig({
-	displayName: 'AccountBriefTriggerWrap',
-})`
+const TriggerWrap = styled.div`
 	display: flex;
 	justify-content: flex-start;
 `
 
-const Body = styled.div.withConfig({ displayName: 'AccountBriefBody' })`
+const Body = styled.div`
 	${agedPaperSurface}
 	display: flex;
 	flex-direction: column;
@@ -211,10 +209,7 @@ const Body = styled.div.withConfig({ displayName: 'AccountBriefBody' })`
 	margin-top: var(--space-sm);
 `
 
-const Rendered = styled.div.withConfig({
-	displayName: 'AccountBriefRendered',
-	shouldForwardProp: prop => prop !== '$folded',
-})<{ $folded: boolean }>`
+const Rendered = styled.div<{ $folded: boolean }>`
 	font-size: var(--typescale-body-medium-size);
 	color: var(--color-on-surface);
 	/* Prose, so it is held to a line length that can be read rather than to
@@ -223,20 +218,20 @@ const Rendered = styled.div.withConfig({
 
 	${p =>
 		p.$folded &&
-		`
+		css`
 			max-height: 22rem;
 			overflow: hidden;
 			mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
 		`}
 `
 
-const Empty = styled.p.withConfig({ displayName: 'AccountBriefEmpty' })`
+const Empty = styled.p`
 	margin: 0;
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface-variant);
 `
 
-const Preview = styled.div.withConfig({ displayName: 'AccountBriefPreview' })`
+const Preview = styled.div`
 	${agedPaperSurface}
 	max-width: 68ch;
 	min-height: 12rem;
@@ -246,17 +241,12 @@ const Preview = styled.div.withConfig({ displayName: 'AccountBriefPreview' })`
 	color: var(--color-on-surface);
 `
 
-const EditorToolbar = styled.div.withConfig({
-	displayName: 'AccountBriefEditorToolbar',
-})`
+const EditorToolbar = styled.div`
 	display: flex;
 	gap: var(--space-3xs);
 `
 
-const ModeToggle = styled.button.withConfig({
-	displayName: 'AccountBriefModeToggle',
-	shouldForwardProp: prop => prop !== '$active',
-})<{ $active: boolean }>`
+const ModeToggle = styled.button<{ $active: boolean }>`
 	${stenciledTitle}
 	display: inline-flex;
 	align-items: center;
@@ -278,9 +268,7 @@ const ModeToggle = styled.button.withConfig({
 	}
 `
 
-const FoldToggle = styled.button.withConfig({
-	displayName: 'AccountBriefFoldToggle',
-})`
+const FoldToggle = styled.button`
 	${stenciledTitle}
 	align-self: flex-start;
 	min-block-size: 2.75rem;
@@ -301,7 +289,7 @@ const FoldToggle = styled.button.withConfig({
 	}
 `
 
-const Footer = styled.div.withConfig({ displayName: 'AccountBriefFooter' })`
+const Footer = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
@@ -309,7 +297,7 @@ const Footer = styled.div.withConfig({ displayName: 'AccountBriefFooter' })`
 	gap: var(--space-sm);
 `
 
-const Actions = styled.div.withConfig({ displayName: 'AccountBriefActions' })`
+const Actions = styled.div`
 	display: flex;
 	justify-content: flex-end;
 	gap: var(--space-sm);

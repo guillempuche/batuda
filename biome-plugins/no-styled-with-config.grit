@@ -1,0 +1,6 @@
+// next-yak's styled objects have no `.withConfig()` method, so a call the
+// codemod missed throws the moment the module is loaded, not at build time.
+`$receiver.withConfig($options)` as $call where {
+	$receiver <: contains `styled`,
+	register_diagnostic(span=$call, message="Remove `.withConfig()` — next-yak has no such method, so this throws as soon as the file is loaded. Drop `displayName` (yak derives it from the variable name) and turn `shouldForwardProp` into a transient `$prop`.", severity="error")
+}

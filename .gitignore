@@ -70,3 +70,7 @@ coverage/
 # `.example` templates are shared.
 eval/*.json
 !eval/*.example.json
+
+# Build
+# SWC wasm-plugin cache, written by next-yak during the build
+.swc/

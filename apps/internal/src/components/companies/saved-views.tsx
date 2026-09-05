@@ -1,7 +1,7 @@
 import { useLingui } from '@lingui/react/macro'
 import { Bookmark, BookmarkPlus, X } from 'lucide-react'
+import { styled } from 'next-yak'
 import { useCallback, useEffect, useState } from 'react'
-import styled from 'styled-components'
 
 import {
 	type CompaniesSearch,
@@ -133,17 +133,14 @@ function writeViews(views: ReadonlyArray<SavedView>): void {
 	}
 }
 
-const Wrap = styled.div.withConfig({ displayName: 'SavedViewsWrap' })`
+const Wrap = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
 	gap: var(--space-2xs);
 `
 
-const Chip = styled.div.withConfig({
-	displayName: 'SavedViewsChip',
-	shouldForwardProp: prop => prop !== '$active',
-})<{ $active: boolean }>`
+const Chip = styled.div<{ $active: boolean }>`
 	display: inline-flex;
 	align-items: center;
 	border: 1px dashed
@@ -157,9 +154,7 @@ const Chip = styled.div.withConfig({
 		p.$active ? 'var(--color-primary)' : 'var(--color-on-surface-variant)'};
 `
 
-const ChipButton = styled.button.withConfig({
-	displayName: 'SavedViewsChipButton',
-})`
+const ChipButton = styled.button`
 	${stenciledTitle}
 	display: inline-flex;
 	align-items: center;
@@ -178,7 +173,7 @@ const ChipButton = styled.button.withConfig({
 	}
 `
 
-const Remove = styled.button.withConfig({ displayName: 'SavedViewsRemove' })`
+const Remove = styled.button`
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;

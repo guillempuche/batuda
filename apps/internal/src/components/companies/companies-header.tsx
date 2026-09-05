@@ -1,6 +1,6 @@
 import { useLingui } from '@lingui/react/macro'
 import { Columns3, LayoutGrid } from 'lucide-react'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 import { rulerUnderRule, stenciledTitle } from '#/lib/workshop-mixins'
 
@@ -58,15 +58,13 @@ export function CompaniesHeader({
 	)
 }
 
-const Intro = styled.div.withConfig({ displayName: 'CompaniesHeaderIntro' })`
+const Intro = styled.div`
 	display: grid;
 	gap: var(--space-md);
 	align-items: end;
 `
 
-const TitleRow = styled.div.withConfig({
-	displayName: 'CompaniesHeaderTitleRow',
-})`
+const TitleRow = styled.div`
 	${rulerUnderRule}
 	display: flex;
 	flex-wrap: wrap;
@@ -76,25 +74,21 @@ const TitleRow = styled.div.withConfig({
 	padding-bottom: var(--space-sm);
 `
 
-const TitleBlock = styled.div.withConfig({
-	displayName: 'CompaniesHeaderTitleBlock',
-})`
+const TitleBlock = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 	min-width: 0;
 `
 
-const Title = styled.h2.withConfig({ displayName: 'CompaniesHeaderTitle' })`
+const Title = styled.h2`
 	${stenciledTitle}
 	margin: 0;
 	font-size: var(--typescale-headline-large-size);
 	line-height: var(--typescale-headline-large-line);
 `
 
-const Subtitle = styled.p.withConfig({
-	displayName: 'CompaniesHeaderSubtitle',
-})`
+const Subtitle = styled.p`
 	margin: 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-large-size);
@@ -104,9 +98,7 @@ const Subtitle = styled.p.withConfig({
 	font-style: italic;
 `
 
-const ViewToggle = styled.div.withConfig({
-	displayName: 'CompaniesHeaderViewToggle',
-})`
+const ViewToggle = styled.div`
 	display: inline-flex;
 	align-items: stretch;
 	border: 2px solid var(--color-outline);
@@ -115,10 +107,7 @@ const ViewToggle = styled.div.withConfig({
 	flex-shrink: 0;
 `
 
-const ViewLink = styled.a.withConfig({
-	displayName: 'CompaniesHeaderViewLink',
-	shouldForwardProp: prop => prop !== '$active',
-})<{ $active?: boolean }>`
+const ViewLink = styled.a<{ $active?: boolean }>`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);

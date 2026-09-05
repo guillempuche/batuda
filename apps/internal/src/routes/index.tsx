@@ -4,8 +4,8 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { DateTime } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { motion } from 'motion/react'
+import { styled } from 'next-yak'
 import { useCallback, useMemo } from 'react'
-import styled from 'styled-components'
 
 import {
 	ATTENTION_PREVIEW,
@@ -704,13 +704,13 @@ function toAttentionTasks(result: unknown): ReadonlyArray<AttentionTask> {
 	return out
 }
 
-const Page = styled.div.withConfig({ displayName: 'PipelinePage' })`
+const Page = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-xl);
 `
 
-const Intro = styled.div.withConfig({ displayName: 'PipelineIntro' })`
+const Intro = styled.div`
 	${rulerUnderRule}
 	display: flex;
 	flex-direction: column;
@@ -718,14 +718,14 @@ const Intro = styled.div.withConfig({ displayName: 'PipelineIntro' })`
 	padding-bottom: var(--space-sm);
 `
 
-const Title = styled.h2.withConfig({ displayName: 'PipelineTitle' })`
+const Title = styled.h2`
 	${stenciledTitle}
 	margin: 0;
 	font-size: var(--typescale-headline-large-size);
 	line-height: var(--typescale-headline-large-line);
 `
 
-const Subtitle = styled.p.withConfig({ displayName: 'PipelineSubtitle' })`
+const Subtitle = styled.p`
 	margin: 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-large-size);
@@ -740,7 +740,7 @@ const Subtitle = styled.p.withConfig({ displayName: 'PipelineSubtitle' })`
  * stranded on a row of its own at every width, and a single column stacked them
  * into more than a phone screen of counters before any work appeared.
  */
-const KpiRow = styled.div.withConfig({ displayName: 'PipelineKpiRow' })`
+const KpiRow = styled.div`
 	display: grid;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
 	gap: var(--space-sm);
@@ -750,9 +750,7 @@ const KpiRow = styled.div.withConfig({ displayName: 'PipelineKpiRow' })`
 	}
 `
 
-const StatusStrip = styled.div.withConfig({
-	displayName: 'PipelineStatusStrip',
-})`
+const StatusStrip = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-sm);
@@ -766,9 +764,7 @@ const StatusStrip = styled.div.withConfig({
  * `search`, which is what turns a wrong destination into a compile error
  * instead of a dead click.
  */
-const StatusChip = styled.div.withConfig({
-	displayName: 'PipelineStatusChip',
-})`
+const StatusChip = styled.div`
 	position: relative;
 	display: inline-flex;
 	align-items: center;
@@ -802,7 +798,7 @@ const StatusChip = styled.div.withConfig({
  * The way out of a section that shows only its first few rows. Without it the
  * heading states a total the reader has no way of reaching.
  */
-const ShowAll = styled.span.withConfig({ displayName: 'PipelineShowAll' })`
+const ShowAll = styled.span`
 	> a {
 		font-family: var(--font-display);
 		font-size: var(--typescale-label-small-size);
@@ -827,7 +823,7 @@ const ShowAll = styled.span.withConfig({ displayName: 'PipelineShowAll' })`
 `
 
 /** Wraps a counter plate so the whole plate is the target, not just its digits. */
-const KpiLink = styled.div.withConfig({ displayName: 'PipelineKpiLink' })`
+const KpiLink = styled.div`
 	position: relative;
 	border-radius: var(--shape-2xs);
 
@@ -849,9 +845,7 @@ const KpiLink = styled.div.withConfig({ displayName: 'PipelineKpiLink' })`
 	}
 `
 
-const StatusCount = styled.span.withConfig({
-	displayName: 'PipelineStatusCount',
-})`
+const StatusCount = styled.span`
 	font-family: var(--font-display);
 	font-size: var(--typescale-title-small-size);
 	font-weight: var(--font-weight-bold);
@@ -859,24 +853,20 @@ const StatusCount = styled.span.withConfig({
 	text-shadow: var(--text-shadow-emboss);
 `
 
-const Section = styled(motion.section).withConfig({
-	displayName: 'PipelineSection',
-})`
+const Section = styled(motion.section)`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-sm);
 `
 
-const Stack = styled.div.withConfig({ displayName: 'PipelineStack' })`
+const Stack = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-sm);
 `
 
 /** A company card with the reason it earned its place sitting above it. */
-const AttentionRow = styled.div.withConfig({
-	displayName: 'PipelineAttentionRow',
-})`
+const AttentionRow = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
@@ -887,9 +877,7 @@ const AttentionRow = styled.div.withConfig({
  * whoever asked for it has usually moved on — this row is how a run that landed
  * unattended gets noticed at all.
  */
-const ResearchRow = styled.div.withConfig({
-	displayName: 'PipelineResearchRow',
-})`
+const ResearchRow = styled.div`
 	${agedPaperRow}
 	position: relative;
 	display: flex;
@@ -910,9 +898,7 @@ const ResearchRow = styled.div.withConfig({
 // Stretched-link overlay so the whole row navigates. A `styled(Link)` would
 // take the row's styling but lose the router's typing of `params`, which is
 // what makes a wrong route id a compile error rather than a dead link.
-const ResearchLinkOverlay = styled.div.withConfig({
-	displayName: 'PipelineResearchLinkOverlay',
-})`
+const ResearchLinkOverlay = styled.div`
 	position: absolute;
 	inset: 0;
 	z-index: 0;
@@ -930,9 +916,7 @@ const ResearchLinkOverlay = styled.div.withConfig({
 	}
 `
 
-const ResearchSubject = styled.span.withConfig({
-	displayName: 'PipelineResearchSubject',
-})`
+const ResearchSubject = styled.span`
 	position: relative;
 	z-index: 1;
 	pointer-events: none;
@@ -948,9 +932,7 @@ const ResearchSubject = styled.span.withConfig({
 	white-space: nowrap;
 `
 
-const ResearchNote = styled.span.withConfig({
-	displayName: 'PipelineResearchNote',
-})`
+const ResearchNote = styled.span`
 	position: relative;
 	z-index: 1;
 	pointer-events: none;
@@ -961,7 +943,7 @@ const ResearchNote = styled.span.withConfig({
 
 // Splits at the same width the card grid does, so a tablet stops stacking these
 // full-width and pushing everything below them off the screen.
-const TwoColumn = styled.div.withConfig({ displayName: 'PipelineTwoColumn' })`
+const TwoColumn = styled.div`
 	display: grid;
 	grid-template-columns: minmax(0, 1fr);
 	gap: var(--space-lg);
@@ -971,9 +953,7 @@ const TwoColumn = styled.div.withConfig({ displayName: 'PipelineTwoColumn' })`
 	}
 `
 
-const CompanyGrid = styled.div.withConfig({
-	displayName: 'PipelineCompanyGrid',
-})`
+const CompanyGrid = styled.div`
 	display: grid;
 	/* Two at most, matching the companies list, which caps there on purpose: a
 	 * single card already fills a desktop column comfortably. */

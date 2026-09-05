@@ -1,5 +1,5 @@
 import { ContextMenu } from '@base-ui/react/context-menu'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 /**
  * Workshop context menu — a brushed metal plate that pops up on right-click.
@@ -19,9 +19,7 @@ import styled from 'styled-components'
  *     </PriContextMenu.Portal>
  *   </PriContextMenu.Root>
  */
-const PriPopup = styled(ContextMenu.Popup).withConfig({
-	displayName: 'PriContextMenuPopup',
-})`
+const PriPopup = styled(ContextMenu.Popup)`
 	position: relative;
 	min-width: 12rem;
 	padding: var(--space-2xs);
@@ -61,9 +59,7 @@ const PriPopup = styled(ContextMenu.Popup).withConfig({
 	}
 `
 
-const PriItem = styled(ContextMenu.Item).withConfig({
-	displayName: 'PriContextMenuItem',
-})`
+const PriItem = styled(ContextMenu.Item)`
 	display: flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -91,9 +87,7 @@ const PriItem = styled(ContextMenu.Item).withConfig({
 	}
 `
 
-const PriGroupLabel = styled(ContextMenu.GroupLabel).withConfig({
-	displayName: 'PriContextMenuGroupLabel',
-})`
+const PriGroupLabel = styled(ContextMenu.GroupLabel)`
 	padding: var(--space-2xs) var(--space-sm);
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);

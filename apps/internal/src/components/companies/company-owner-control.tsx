@@ -1,8 +1,8 @@
 import { useAtomSet } from '@effect/atom-react'
 import { useLingui } from '@lingui/react/macro'
 import { Check, ChevronsUpDown, UserCircle2 } from 'lucide-react'
+import { styled } from 'next-yak'
 import { useCallback } from 'react'
-import styled from 'styled-components'
 
 import { PriAvatar, PriSelect, usePriToast } from '@batuda/ui/pri'
 
@@ -116,9 +116,7 @@ export function CompanyOwnerControl({
 	)
 }
 
-const OwnerTrigger = styled(PriSelect.Trigger).withConfig({
-	displayName: 'CompanyOwnerTrigger',
-})`
+const OwnerTrigger = styled(PriSelect.Trigger)`
 	gap: var(--space-3xs);
 	padding: var(--space-3xs) var(--space-2xs);
 	font-size: var(--typescale-label-small-size);
@@ -126,7 +124,7 @@ const OwnerTrigger = styled(PriSelect.Trigger).withConfig({
 	letter-spacing: 0;
 `
 
-const OwnerName = styled.span.withConfig({ displayName: 'CompanyOwnerName' })`
+const OwnerName = styled.span`
 	max-width: 8rem;
 	overflow: hidden;
 	text-overflow: ellipsis;

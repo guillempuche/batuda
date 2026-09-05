@@ -1,5 +1,13 @@
 export { PriAvatar } from './pri-avatar'
-export { PriButton, type PriButtonVariant } from './pri-button'
+export {
+	PriButton,
+	type PriButtonVariant,
+	priButtonBase,
+	priButtonDestructive,
+	priButtonFilled,
+	priButtonOutlined,
+	priButtonText,
+} from './pri-button'
 export { PriCheckbox } from './pri-checkbox'
 export { PriCollapsible } from './pri-collapsible'
 export { PriContextMenu } from './pri-context-menu'

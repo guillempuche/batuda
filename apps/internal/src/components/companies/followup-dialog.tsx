@@ -2,8 +2,8 @@ import { useAtomSet } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { DateTime } from 'effect'
 import { X } from 'lucide-react'
+import { styled } from 'next-yak'
 import { type FormEvent, useEffect, useState } from 'react'
-import styled from 'styled-components'
 
 import { PriButton, PriDialog, PriInput } from '@batuda/ui/pri'
 
@@ -147,25 +147,19 @@ export function FollowupDialog({
 	)
 }
 
-const Header = styled.div.withConfig({
-	displayName: 'FollowupDialogHeader',
-})`
+const Header = styled.div`
 	display: flex;
 	align-items: flex-start;
 	justify-content: space-between;
 	gap: var(--space-sm);
 `
 
-const Heading = styled.span.withConfig({
-	displayName: 'FollowupDialogHeading',
-})`
+const Heading = styled.span`
 	${stenciledTitle}
 	font-size: var(--typescale-title-large-size);
 `
 
-const CloseButton = styled.button.withConfig({
-	displayName: 'FollowupDialogCloseButton',
-})`
+const CloseButton = styled.button`
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -179,26 +173,20 @@ const CloseButton = styled.button.withConfig({
 	cursor: pointer;
 `
 
-const Form = styled.form.withConfig({
-	displayName: 'FollowupDialogForm',
-})`
+const Form = styled.form`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
 	margin-top: var(--space-sm);
 `
 
-const Field = styled.div.withConfig({
-	displayName: 'FollowupDialogField',
-})`
+const Field = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const Label = styled.label.withConfig({
-	displayName: 'FollowupDialogLabel',
-})`
+const Label = styled.label`
 	${stenciledTitle}
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.06em;
@@ -206,18 +194,14 @@ const Label = styled.label.withConfig({
 	color: var(--color-on-surface-variant);
 `
 
-const ErrorText = styled.p.withConfig({
-	displayName: 'FollowupDialogErrorText',
-})`
+const ErrorText = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-error);
 	margin: 0;
 `
 
-const Footer = styled.div.withConfig({
-	displayName: 'FollowupDialogFooter',
-})`
+const Footer = styled.div`
 	display: flex;
 	gap: var(--space-sm);
 	justify-content: flex-end;

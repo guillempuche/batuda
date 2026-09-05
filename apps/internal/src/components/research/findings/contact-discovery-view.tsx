@@ -1,5 +1,5 @@
 import { Trans } from '@lingui/react/macro'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 import { useBuyingRoleLabel } from '#/components/contacts/buying-role-label'
 import { displayValue } from '#/components/research/field-diff'

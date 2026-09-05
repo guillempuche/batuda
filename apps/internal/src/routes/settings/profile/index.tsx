@@ -15,8 +15,8 @@ import {
 	ScrollText,
 	UserCircle2,
 } from 'lucide-react'
+import { styled } from 'next-yak'
 import { useActionState, useRef, useState } from 'react'
-import styled from 'styled-components'
 
 import { PriButton } from '@batuda/ui/pri'
 
@@ -544,13 +544,13 @@ function ChangePasswordCard() {
 	)
 }
 
-const Page = styled.div.withConfig({ displayName: 'ProfilePage' })`
+const Page = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-lg);
 `
 
-const Intro = styled.div.withConfig({ displayName: 'ProfileIntro' })`
+const Intro = styled.div`
 	${rulerUnderRule}
 	display: flex;
 	flex-direction: column;
@@ -558,14 +558,14 @@ const Intro = styled.div.withConfig({ displayName: 'ProfileIntro' })`
 	padding-bottom: var(--space-xs);
 `
 
-const Heading = styled.h2.withConfig({ displayName: 'ProfileHeading' })`
+const Heading = styled.h2`
 	${stenciledTitle}
 	font-size: var(--typescale-headline-large-size);
 	line-height: var(--typescale-headline-large-line);
 	margin: 0;
 `
 
-const Subtitle = styled.p.withConfig({ displayName: 'ProfileSubtitle' })`
+const Subtitle = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-large-size);
 	line-height: var(--typescale-body-large-line);
@@ -574,17 +574,13 @@ const Subtitle = styled.p.withConfig({ displayName: 'ProfileSubtitle' })`
 	margin: 0;
 `
 
-const SettingsNav = styled.nav.withConfig({
-	displayName: 'ProfileSettingsNav',
-})`
+const SettingsNav = styled.nav`
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-sm);
 `
 
-const NavRow = styled(Link).withConfig({
-	displayName: 'ProfileSettingsNavRow',
-})`
+const NavRow = styled(Link)`
 	${brushedMetalPlate}
 	display: inline-flex;
 	align-items: center;
@@ -609,7 +605,7 @@ const NavRow = styled(Link).withConfig({
 	}
 `
 
-const Card = styled.div.withConfig({ displayName: 'ProfileCard' })`
+const Card = styled.div`
 	${brushedMetalPlate}
 	display: flex;
 	align-items: center;
@@ -618,9 +614,7 @@ const Card = styled.div.withConfig({ displayName: 'ProfileCard' })`
 	border-radius: var(--shape-2xs);
 `
 
-const AvatarPlate = styled.div.withConfig({
-	displayName: 'ProfileAvatarPlate',
-})`
+const AvatarPlate = styled.div`
 	width: 64px;
 	height: 64px;
 	border-radius: var(--shape-full);
@@ -642,7 +636,7 @@ const AvatarPlate = styled.div.withConfig({
 	flex-shrink: 0;
 `
 
-const Initial = styled.span.withConfig({ displayName: 'ProfileInitial' })`
+const Initial = styled.span`
 	${stenciledTitle}
 	font-size: var(--typescale-headline-small-size);
 	line-height: 1;
@@ -650,14 +644,14 @@ const Initial = styled.span.withConfig({ displayName: 'ProfileInitial' })`
 	text-shadow: 0 1px 2px var(--shadow-color-deep);
 `
 
-const Info = styled.div.withConfig({ displayName: 'ProfileInfo' })`
+const Info = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 	min-width: 0;
 `
 
-const DisplayName = styled.p.withConfig({ displayName: 'ProfileDisplayName' })`
+const DisplayName = styled.p`
 	${stenciledTitle}
 	font-size: var(--typescale-title-large-size);
 	line-height: var(--typescale-title-large-line);
@@ -666,7 +660,7 @@ const DisplayName = styled.p.withConfig({ displayName: 'ProfileDisplayName' })`
 	text-overflow: ellipsis;
 `
 
-const MetaRow = styled.p.withConfig({ displayName: 'ProfileMetaRow' })`
+const MetaRow = styled.p`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -678,23 +672,19 @@ const MetaRow = styled.p.withConfig({ displayName: 'ProfileMetaRow' })`
 	min-width: 0;
 `
 
-const IdText = styled.span.withConfig({ displayName: 'ProfileIdText' })`
+const IdText = styled.span`
 	font-family: var(--font-mono);
 	font-size: var(--typescale-body-small-size);
 	overflow: hidden;
 	text-overflow: ellipsis;
 `
 
-const SignOutForm = styled.form.withConfig({
-	displayName: 'ProfileSignOutForm',
-})`
+const SignOutForm = styled.form`
 	display: flex;
 	gap: var(--space-sm);
 `
 
-const LanguageRow = styled.div.withConfig({
-	displayName: 'ProfileLanguageRow',
-})`
+const LanguageRow = styled.div`
 	${brushedMetalPlate}
 	display: flex;
 	align-items: center;
@@ -704,18 +694,14 @@ const LanguageRow = styled.div.withConfig({
 	border-radius: var(--shape-2xs);
 `
 
-const LanguageRowLabel = styled.span.withConfig({
-	displayName: 'ProfileLanguageRowLabel',
-})`
+const LanguageRowLabel = styled.span`
 	${stenciledTitle}
 	font-size: var(--typescale-label-large-size);
 	line-height: var(--typescale-label-large-line);
 	letter-spacing: 0.08em;
 `
 
-const SecurityCard = styled.section.withConfig({
-	displayName: 'ProfileSecurityCard',
-})`
+const SecurityCard = styled.section`
 	${brushedMetalPlate}
 	display: flex;
 	flex-direction: column;
@@ -724,18 +710,14 @@ const SecurityCard = styled.section.withConfig({
 	border-radius: var(--shape-2xs);
 `
 
-const SecurityCardHeading = styled.h3.withConfig({
-	displayName: 'ProfileSecurityHeading',
-})`
+const SecurityCardHeading = styled.h3`
 	${stenciledTitle}
 	font-size: var(--typescale-title-medium-size);
 	line-height: var(--typescale-title-medium-line);
 	margin: 0;
 `
 
-const SecurityCardBody = styled.p.withConfig({
-	displayName: 'ProfileSecurityBody',
-})`
+const SecurityCardBody = styled.p`
 	margin: 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
@@ -743,39 +725,33 @@ const SecurityCardBody = styled.p.withConfig({
 	color: var(--color-on-surface-variant);
 `
 
-const PasswordForm = styled.form.withConfig({
-	displayName: 'ProfilePasswordForm',
-})`
+const PasswordForm = styled.form`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-sm);
 `
 
-const FieldRow = styled.div.withConfig({ displayName: 'ProfileFieldRow' })`
+const FieldRow = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const FieldLabel = styled.label.withConfig({
-	displayName: 'ProfileFieldLabel',
-})`
+const FieldLabel = styled.label`
 	font-family: var(--font-body);
 	font-size: var(--typescale-label-medium-size);
 	line-height: var(--typescale-label-medium-line);
 	color: var(--color-on-surface-variant);
 `
 
-const ActionsRow = styled.div.withConfig({ displayName: 'ProfileActionsRow' })`
+const ActionsRow = styled.div`
 	display: flex;
 	align-items: center;
 	gap: var(--space-md);
 	flex-wrap: wrap;
 `
 
-const TextButton = styled.button.withConfig({
-	displayName: 'ProfileTextButton',
-})`
+const TextButton = styled.button`
 	background: none;
 	border: none;
 	padding: 0;
@@ -795,7 +771,7 @@ const TextButton = styled.button.withConfig({
 	}
 `
 
-const StatusText = styled.p.withConfig({ displayName: 'ProfileStatusText' })`
+const StatusText = styled.p`
 	margin: 0;
 	padding: var(--space-2xs) var(--space-sm);
 	border-left: 3px solid var(--color-error);
@@ -806,7 +782,7 @@ const StatusText = styled.p.withConfig({ displayName: 'ProfileStatusText' })`
 	font-style: italic;
 `
 
-const SuccessText = styled.p.withConfig({ displayName: 'ProfileSuccessText' })`
+const SuccessText = styled.p`
 	margin: 0;
 	padding: var(--space-2xs) var(--space-sm);
 	border-left: 3px solid var(--color-primary);
@@ -816,7 +792,7 @@ const SuccessText = styled.p.withConfig({ displayName: 'ProfileSuccessText' })`
 	font-size: var(--typescale-body-small-size);
 `
 
-const ErrorText = styled.p.withConfig({ displayName: 'ProfileError' })`
+const ErrorText = styled.p`
 	margin: 0;
 	padding: var(--space-2xs) var(--space-sm);
 	border-left: 3px solid var(--color-error);

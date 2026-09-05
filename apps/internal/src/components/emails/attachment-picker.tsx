@@ -1,7 +1,7 @@
 import { useLingui } from '@lingui/react/macro'
 import { AlertTriangle, Loader2, Paperclip, X } from 'lucide-react'
+import { keyframes, styled } from 'next-yak'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
-import styled from 'styled-components'
 
 import {
 	discardAttachment,
@@ -222,15 +222,13 @@ export function AttachmentPicker({
 	)
 }
 
-const Wrapper = styled.div.withConfig({ displayName: 'AttachmentPicker' })`
+const Wrapper = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const PickerButton = styled.button.withConfig({
-	displayName: 'AttachmentPickerButton',
-})`
+const PickerButton = styled.button`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -257,18 +255,13 @@ const PickerButton = styled.button.withConfig({
 	}
 `
 
-const ChipList = styled.div.withConfig({
-	displayName: 'AttachmentPickerChipList',
-})`
+const ChipList = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-2xs);
 `
 
-const Chip = styled.div.withConfig({
-	displayName: 'AttachmentPickerChip',
-	shouldForwardProp: prop => prop !== '$state',
-})<{ $state?: 'uploading' | 'error' }>`
+const Chip = styled.div<{ $state?: 'uploading' | 'error' }>`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -284,33 +277,25 @@ const Chip = styled.div.withConfig({
 	max-width: 220px;
 `
 
-const ChipText = styled.div.withConfig({
-	displayName: 'AttachmentPickerChipText',
-})`
+const ChipText = styled.div`
 	display: flex;
 	flex-direction: column;
 	min-width: 0;
 `
 
-const ChipName = styled.span.withConfig({
-	displayName: 'AttachmentPickerChipName',
-})`
+const ChipName = styled.span`
 	font-size: var(--typescale-body-small-size);
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 `
 
-const ChipSize = styled.span.withConfig({
-	displayName: 'AttachmentPickerChipSize',
-})`
+const ChipSize = styled.span`
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface-variant);
 `
 
-const ChipRemove = styled.button.withConfig({
-	displayName: 'AttachmentPickerChipRemove',
-})`
+const ChipRemove = styled.button`
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -328,15 +313,16 @@ const ChipRemove = styled.button.withConfig({
 	}
 `
 
-const Spinner = styled(Loader2)`
-	animation: spin 1s linear infinite;
-
-	@keyframes spin {
-		from {
-			transform: rotate(0deg);
-		}
-		to {
-			transform: rotate(360deg);
-		}
+const spin = keyframes`
+	from {
+		transform: rotate(0deg);
 	}
+	to {
+		transform: rotate(360deg);
+	}
+`
+
+const Spinner = styled(Loader2)`
+	animation: ${spin} 1s linear infinite;
+
 `

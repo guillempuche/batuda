@@ -1,6 +1,6 @@
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
-import type { SpaceToken } from './tokens'
+import { SPACE, type SpaceToken } from './tokens'
 
 /**
  * Vertical stack — a flex column with consistent gap between children.
@@ -14,11 +14,8 @@ import type { SpaceToken } from './tokens'
  *
  * Reference: every-layout.dev/layouts/stack
  */
-export const Stack = styled.div.withConfig({
-	displayName: 'Stack',
-	shouldForwardProp: prop => prop !== '$gap',
-})<{ $gap?: SpaceToken }>`
+export const Stack = styled.div<{ $gap?: SpaceToken }>`
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-${p => p.$gap ?? 'md'});
+	gap: ${p => SPACE[p.$gap ?? 'md']};
 `

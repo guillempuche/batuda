@@ -1,5 +1,5 @@
 import { Popover } from '@base-ui/react/popover'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 /**
  * Workshop popover — brushed metal plate with four screw dots and a small
@@ -14,9 +14,7 @@ import styled from 'styled-components'
  *     </PriPopover.Portal>
  *   </PriPopover.Root>
  */
-const PriPopup = styled(Popover.Popup).withConfig({
-	displayName: 'PriPopoverPopup',
-})`
+const PriPopup = styled(Popover.Popup)`
 	position: relative;
 	min-width: 12rem;
 	padding: var(--space-sm) var(--space-md);
@@ -76,9 +74,7 @@ const PriPopup = styled(Popover.Popup).withConfig({
 	}
 `
 
-const PriArrow = styled(Popover.Arrow).withConfig({
-	displayName: 'PriPopoverArrow',
-})`
+const PriArrow = styled(Popover.Arrow)`
 	width: 10px;
 	height: 10px;
 	background: var(--color-metal);
@@ -88,9 +84,7 @@ const PriArrow = styled(Popover.Arrow).withConfig({
 	transform: rotate(45deg);
 `
 
-const PriTitle = styled(Popover.Title).withConfig({
-	displayName: 'PriPopoverTitle',
-})`
+const PriTitle = styled(Popover.Title)`
 	font-family: var(--font-display);
 	font-size: var(--typescale-title-small-size);
 	font-weight: var(--font-weight-bold);
@@ -100,9 +94,7 @@ const PriTitle = styled(Popover.Title).withConfig({
 	margin: 0 0 var(--space-2xs);
 `
 
-const PriDescription = styled(Popover.Description).withConfig({
-	displayName: 'PriPopoverDescription',
-})`
+const PriDescription = styled(Popover.Description)`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface-variant);

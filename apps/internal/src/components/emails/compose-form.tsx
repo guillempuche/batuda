@@ -2,8 +2,8 @@ import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { useLingui } from '@lingui/react/macro'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { AlertTriangle, Plus, Send, X } from 'lucide-react'
+import { css, styled } from 'next-yak'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import styled from 'styled-components'
 
 import type { EmailBlocks } from '@batuda/email/schema'
 import { PriButton, PriInput, PriSelect } from '@batuda/ui/pri'
@@ -490,7 +490,7 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 			    written down rather than left to be assumed. */}
 			{isReply && sendingFrom !== null ? (
 				<Field>
-					<FieldLabel as='span'>{t`From`}</FieldLabel>
+					<FieldCaption>{t`From`}</FieldCaption>
 					<ReplyFromValue>{sendingFrom}</ReplyFromValue>
 				</Field>
 			) : null}
@@ -764,7 +764,7 @@ function narrowInboxes(raw: unknown): ReadonlyArray<InboxOption> {
 
 // ── Styled components ─────────────────────────────────────────────
 
-const Form = styled.form.withConfig({ displayName: 'ComposeForm' })`
+const Form = styled.form`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-sm);
@@ -776,16 +776,14 @@ const Form = styled.form.withConfig({ displayName: 'ComposeForm' })`
 	overflow-y: auto;
 `
 
-const Field = styled.div.withConfig({ displayName: 'ComposeField' })`
+const Field = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
 	min-width: 0;
 `
 
-const FieldLabel = styled.label.withConfig({
-	displayName: 'ComposeFieldLabel',
-})`
+const fieldLabelType = css`
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.08em;
@@ -793,17 +791,22 @@ const FieldLabel = styled.label.withConfig({
 	color: var(--color-on-surface-variant);
 `
 
-const ReplyFromValue = styled.span.withConfig({
-	displayName: 'ComposeReplyFromValue',
-})`
+const FieldLabel = styled.label`
+	${fieldLabelType}
+`
+
+/* The From row shows the address rather than letting it be edited, so its caption labels nothing. */
+const FieldCaption = styled.span`
+	${fieldLabelType}
+`
+
+const ReplyFromValue = styled.span`
 	font-family: var(--font-mono, ui-monospace, monospace);
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface);
 `
 
-const CcBccToggle = styled.button.withConfig({
-	displayName: 'ComposeCcBccToggle',
-})`
+const CcBccToggle = styled.button`
 	align-self: flex-start;
 	display: inline-flex;
 	align-items: center;
@@ -823,7 +826,7 @@ const CcBccToggle = styled.button.withConfig({
 	}
 `
 
-const BodyField = styled.div.withConfig({ displayName: 'ComposeBodyField' })`
+const BodyField = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
@@ -831,7 +834,7 @@ const BodyField = styled.div.withConfig({ displayName: 'ComposeBodyField' })`
 	min-height: 160px;
 `
 
-const BodyLabel = styled.div.withConfig({ displayName: 'ComposeBodyLabel' })`
+const BodyLabel = styled.div`
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.08em;
@@ -839,7 +842,7 @@ const BodyLabel = styled.div.withConfig({ displayName: 'ComposeBodyLabel' })`
 	color: var(--color-on-surface-variant);
 `
 
-const Footer = styled.div.withConfig({ displayName: 'ComposeFooter' })`
+const Footer = styled.div`
 	/* Pinned to the bottom of the scrolling form so Send/Discard stay reachable
 	   even with the on-screen keyboard shrinking the sheet. margin-top pushes it
 	   down when the content is short; the opaque paper hides fields scrolling
@@ -856,9 +859,7 @@ const Footer = styled.div.withConfig({ displayName: 'ComposeFooter' })`
 	border-top: 1px dashed var(--color-outline);
 `
 
-const SavingIndicator = styled.span.withConfig({
-	displayName: 'ComposeSaving',
-})`
+const SavingIndicator = styled.span`
 	margin-left: auto;
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
@@ -868,9 +869,7 @@ const SavingIndicator = styled.span.withConfig({
 	opacity: 0.7;
 `
 
-const SuppressionBanner = styled.div.withConfig({
-	displayName: 'ComposeSuppressionBanner',
-})`
+const SuppressionBanner = styled.div`
 	display: flex;
 	align-items: flex-start;
 	gap: var(--space-2xs);
@@ -888,9 +887,7 @@ const SuppressionBanner = styled.div.withConfig({
 	}
 `
 
-const SuppressionList = styled.ul.withConfig({
-	displayName: 'ComposeSuppressionList',
-})`
+const SuppressionList = styled.ul`
 	margin: 0;
 	padding: 0;
 	list-style: none;
@@ -899,9 +896,7 @@ const SuppressionList = styled.ul.withConfig({
 	gap: var(--space-3xs);
 `
 
-const SuppressionTitle = styled.div.withConfig({
-	displayName: 'ComposeSuppressionTitle',
-})`
+const SuppressionTitle = styled.div`
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.06em;
@@ -909,9 +904,7 @@ const SuppressionTitle = styled.div.withConfig({
 	margin-bottom: var(--space-3xs);
 `
 
-const CheckUnavailable = styled.p.withConfig({
-	displayName: 'ComposeCheckUnavailable',
-})`
+const CheckUnavailable = styled.p`
 	margin: 0;
 	padding: var(--space-2xs) var(--space-sm);
 	border: 1px dashed var(--color-outline-variant);
@@ -921,9 +914,7 @@ const CheckUnavailable = styled.p.withConfig({
 	line-height: var(--typescale-body-small-line);
 `
 
-const ErrorBanner = styled.div.withConfig({
-	displayName: 'ComposeErrorBanner',
-})`
+const ErrorBanner = styled.div`
 	display: flex;
 	align-items: center;
 	gap: var(--space-2xs);

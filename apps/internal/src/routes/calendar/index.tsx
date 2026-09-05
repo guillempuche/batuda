@@ -4,8 +4,8 @@ import { createFileRoute } from '@tanstack/react-router'
 import { DateTime } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { CalendarPlus, Check, CircleHelp, X } from 'lucide-react'
+import { styled } from 'next-yak'
 import { lazy, Suspense, useCallback, useMemo } from 'react'
-import styled from 'styled-components'
 
 import { PriButton, PriDialog } from '@batuda/ui/pri'
 
@@ -476,7 +476,7 @@ function toCompanyLookup(raw: unknown): CompanyLookup | null {
 
 // ── Styled ─────────────────────────────────────────────────────────
 
-const Page = styled.div.withConfig({ displayName: 'CalendarPage' })`
+const Page = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
@@ -484,28 +484,26 @@ const Page = styled.div.withConfig({ displayName: 'CalendarPage' })`
 	min-height: 100dvh;
 `
 
-const Header = styled.header.withConfig({ displayName: 'CalendarHeader' })`
+const Header = styled.header`
 	${brushedMetalPlate}
 	padding: var(--space-sm) var(--space-md);
 	border-radius: var(--shape-md);
 `
 
-const HeaderTitle = styled.h1.withConfig({
-	displayName: 'CalendarHeaderTitle',
-})`
+const HeaderTitle = styled.h1`
 	${stenciledTitle}
 	font-size: var(--typescale-title-large-size);
 	color: var(--color-on-surface);
 	margin: 0;
 `
 
-const HeaderSub = styled.p.withConfig({ displayName: 'CalendarHeaderSub' })`
+const HeaderSub = styled.p`
 	margin: var(--space-3xs) 0 0;
 	color: var(--color-on-surface-variant);
 	font-size: var(--typescale-body-small-size);
 `
 
-const GridFrame = styled.div.withConfig({ displayName: 'CalendarGridFrame' })`
+const GridFrame = styled.div`
 	${agedPaperSurface}
 	border-radius: var(--shape-md);
 	padding: var(--space-sm);
@@ -517,7 +515,7 @@ const GridFrame = styled.div.withConfig({ displayName: 'CalendarGridFrame' })`
 	}
 `
 
-const DetailMeta = styled.dl.withConfig({ displayName: 'CalendarDetailMeta' })`
+const DetailMeta = styled.dl`
 	display: grid;
 	grid-template-columns: 1fr;
 	gap: var(--space-sm);
@@ -528,53 +526,45 @@ const DetailMeta = styled.dl.withConfig({ displayName: 'CalendarDetailMeta' })`
 	}
 `
 
-const DetailField = styled.div.withConfig({
-	displayName: 'CalendarDetailField',
-})`
+const DetailField = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
 `
 
-const DetailLabel = styled.dt.withConfig({
-	displayName: 'CalendarDetailLabel',
-})`
+const DetailLabel = styled.dt`
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface-variant);
 	text-transform: uppercase;
 	letter-spacing: 0.08em;
 `
 
-const DetailValue = styled.dd.withConfig({
-	displayName: 'CalendarDetailValue',
-})`
+const DetailValue = styled.dd`
 	margin: 0;
 	color: var(--color-on-surface);
 	font-size: var(--typescale-body-medium-size);
 `
 
-const AssumedTime = styled.p.withConfig({
-	displayName: 'CalendarAssumedTime',
-})`
+const AssumedTime = styled.p`
 	margin: var(--space-2xs) 0 0;
 	font-size: var(--typescale-label-small-size);
 	line-height: var(--typescale-label-small-line);
 	color: var(--color-error);
 `
 
-const VideoLink = styled.a.withConfig({ displayName: 'CalendarVideoLink' })`
+const VideoLink = styled.a`
 	color: var(--color-primary);
 	text-decoration: underline;
 `
 
-const ActionRow = styled.div.withConfig({ displayName: 'CalendarActionRow' })`
+const ActionRow = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-2xs);
 	margin-top: var(--space-md);
 `
 
-const RsvpRow = styled.div.withConfig({ displayName: 'CalendarRsvpRow' })`
+const RsvpRow = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
@@ -583,14 +573,12 @@ const RsvpRow = styled.div.withConfig({ displayName: 'CalendarRsvpRow' })`
 	border-top: 1px dashed var(--color-outline-variant);
 `
 
-const RsvpHint = styled.span.withConfig({ displayName: 'CalendarRsvpHint' })`
+const RsvpHint = styled.span`
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface-variant);
 `
 
-const RsvpButtons = styled.div.withConfig({
-	displayName: 'CalendarRsvpButtons',
-})`
+const RsvpButtons = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-2xs);

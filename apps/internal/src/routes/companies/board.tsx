@@ -1,7 +1,7 @@
 import { useLingui } from '@lingui/react/macro'
 import { ClientOnly, createFileRoute } from '@tanstack/react-router'
 import { Schema } from 'effect'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 import { CommaList } from '@batuda/controllers'
 import {
@@ -74,7 +74,7 @@ function BoardPage() {
 
 // Full-bleed on purpose: the pipeline is a horizontal kanban whose columns
 // need the whole sheet width, so this view is not capped like the list.
-const Page = styled.div.withConfig({ displayName: 'BoardPage' })`
+const Page = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-lg);

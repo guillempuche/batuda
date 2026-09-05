@@ -1,7 +1,7 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { ArrowLeft, Plug } from 'lucide-react'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 import { PriCopyButton } from '#/components/primitives/pri-copy-button'
 import { apiBaseUrl } from '#/lib/api-base'
@@ -228,13 +228,13 @@ function McpSetupPage() {
 	)
 }
 
-const Page = styled.div.withConfig({ displayName: 'McpSetupPage' })`
+const Page = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-lg);
 `
 
-const BackLink = styled(Link).withConfig({ displayName: 'McpSetupBackLink' })`
+const BackLink = styled(Link)`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -255,7 +255,7 @@ const BackLink = styled(Link).withConfig({ displayName: 'McpSetupBackLink' })`
 	}
 `
 
-const Intro = styled.div.withConfig({ displayName: 'McpSetupIntro' })`
+const Intro = styled.div`
 	${rulerUnderRule}
 	display: flex;
 	flex-direction: column;
@@ -263,7 +263,7 @@ const Intro = styled.div.withConfig({ displayName: 'McpSetupIntro' })`
 	padding-bottom: var(--space-xs);
 `
 
-const Heading = styled.h2.withConfig({ displayName: 'McpSetupHeading' })`
+const Heading = styled.h2`
 	${stenciledTitle}
 	display: inline-flex;
 	align-items: center;
@@ -273,7 +273,7 @@ const Heading = styled.h2.withConfig({ displayName: 'McpSetupHeading' })`
 	margin: 0;
 `
 
-const Subtitle = styled.p.withConfig({ displayName: 'McpSetupSubtitle' })`
+const Subtitle = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-large-size);
 	line-height: var(--typescale-body-large-line);
@@ -282,7 +282,7 @@ const Subtitle = styled.p.withConfig({ displayName: 'McpSetupSubtitle' })`
 	margin: 0;
 `
 
-const Section = styled.section.withConfig({ displayName: 'McpSetupSection' })`
+const Section = styled.section`
 	${brushedMetalPlate}
 	display: flex;
 	flex-direction: column;
@@ -291,16 +291,14 @@ const Section = styled.section.withConfig({ displayName: 'McpSetupSection' })`
 	border-radius: var(--shape-2xs);
 `
 
-const SectionTitle = styled.h3.withConfig({
-	displayName: 'McpSetupSectionTitle',
-})`
+const SectionTitle = styled.h3`
 	${stenciledTitle}
 	font-size: var(--typescale-title-medium-size);
 	line-height: var(--typescale-title-medium-line);
 	margin: 0;
 `
 
-const SectionLead = styled.p.withConfig({ displayName: 'McpSetupLead' })`
+const SectionLead = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	line-height: var(--typescale-body-medium-line);
@@ -319,13 +317,13 @@ const SectionLead = styled.p.withConfig({ displayName: 'McpSetupLead' })`
 	}
 `
 
-const ClientBlock = styled.div.withConfig({ displayName: 'McpSetupClient' })`
+const ClientBlock = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const BlockHead = styled.div.withConfig({ displayName: 'McpSetupBlockHead' })`
+const BlockHead = styled.div`
 	display: flex;
 	align-items: baseline;
 	justify-content: space-between;
@@ -333,24 +331,22 @@ const BlockHead = styled.div.withConfig({ displayName: 'McpSetupBlockHead' })`
 	flex-wrap: wrap;
 `
 
-const ClientName = styled.span.withConfig({
-	displayName: 'McpSetupClientName',
-})`
+const ClientName = styled.span`
 	${stenciledTitle}
 	font-size: var(--typescale-title-small-size);
 `
 
-const Where = styled.code.withConfig({ displayName: 'McpSetupWhere' })`
+const Where = styled.code`
 	font-family: var(--font-mono);
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface-variant);
 `
 
-const CodeWrap = styled.div.withConfig({ displayName: 'McpSetupCodeWrap' })`
+const CodeWrap = styled.div`
 	position: relative;
 `
 
-const Pre = styled.pre.withConfig({ displayName: 'McpSetupPre' })`
+const Pre = styled.pre`
 	margin: 0;
 	padding: var(--space-sm);
 	padding-right: var(--space-xl);
@@ -366,9 +362,7 @@ const Pre = styled.pre.withConfig({ displayName: 'McpSetupPre' })`
 `
 
 // The shared PriCopyButton positioned into the code block's corner.
-const CopyBtn = styled(PriCopyButton).withConfig({
-	displayName: 'McpSetupCopy',
-})`
+const CopyBtn = styled(PriCopyButton)`
 	position: absolute;
 	top: var(--space-2xs);
 	right: var(--space-2xs);
@@ -379,11 +373,11 @@ const CopyBtn = styled(PriCopyButton).withConfig({
 	background: var(--color-surface);
 `
 
-const UrlRow = styled.div.withConfig({ displayName: 'McpSetupUrlRow' })`
+const UrlRow = styled.div`
 	position: relative;
 `
 
-const Steps = styled.ul.withConfig({ displayName: 'McpSetupSteps' })`
+const Steps = styled.ul`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-xs);
@@ -395,11 +389,11 @@ const Steps = styled.ul.withConfig({ displayName: 'McpSetupSteps' })`
 	color: var(--color-on-surface);
 `
 
-const Strong = styled.strong.withConfig({ displayName: 'McpSetupStrong' })`
+const Strong = styled.strong`
 	font-weight: 700;
 `
 
-const Mono = styled.code.withConfig({ displayName: 'McpSetupMono' })`
+const Mono = styled.code`
 	font-family: var(--font-mono);
 	font-size: 0.92em;
 	padding: 0 var(--space-3xs);
@@ -407,7 +401,7 @@ const Mono = styled.code.withConfig({ displayName: 'McpSetupMono' })`
 	background: color-mix(in oklab, var(--color-on-surface) 8%, transparent);
 `
 
-const Note = styled.p.withConfig({ displayName: 'McpSetupNote' })`
+const Note = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	line-height: var(--typescale-body-small-line);

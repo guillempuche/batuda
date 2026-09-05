@@ -1,6 +1,6 @@
 import { Trans } from '@lingui/react/macro'
+import { styled } from 'next-yak'
 import type { ReactNode } from 'react'
-import styled from 'styled-components'
 
 import { type Agent, agents } from '@batuda/instructions/domain'
 import { PriToggleGroup } from '@batuda/ui/pri'

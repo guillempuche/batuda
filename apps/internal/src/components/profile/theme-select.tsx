@@ -1,6 +1,6 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Check, ChevronsUpDown, SunMoon } from 'lucide-react'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 import { PriSelect } from '@batuda/ui/pri'
 

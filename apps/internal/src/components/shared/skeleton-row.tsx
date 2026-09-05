@@ -1,4 +1,4 @@
-import styled, { css, keyframes } from 'styled-components'
+import { css, keyframes, styled } from 'next-yak'
 
 import { agedPaperRow, ruledLedgerRow } from '#/lib/workshop-mixins'
 
@@ -35,9 +35,7 @@ const shimmer = keyframes`
 	100% { background-position: 200% 0; }
 `
 
-const SkeletonList = styled.div.withConfig({
-	displayName: 'SkeletonRowsList',
-})`
+const SkeletonList = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: 0;
@@ -59,9 +57,7 @@ const shimmerBg = css`
 	}
 `
 
-const SkeletonBar = styled.div.withConfig({
-	displayName: 'SkeletonRowsBar',
-})`
+const SkeletonBar = styled.div`
 	${agedPaperRow}
 	${ruledLedgerRow}
 	${shimmerBg}

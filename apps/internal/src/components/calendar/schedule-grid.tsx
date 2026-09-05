@@ -15,8 +15,8 @@ import { createEventModalPlugin } from '@schedule-x/event-modal'
 import { createEventsServicePlugin } from '@schedule-x/events-service'
 import { ScheduleXCalendar, useCalendarApp } from '@schedule-x/react'
 import { createResizePlugin } from '@schedule-x/resize'
+import { styled } from 'next-yak'
 import { useMemo } from 'react'
-import styled from 'styled-components'
 
 /**
  * Schedule-X wrapper. Rendered inside a `React.lazy()` boundary from
@@ -188,7 +188,7 @@ function toZonedDateTime(iso: string): Temporal.ZonedDateTime {
 	return Temporal.Instant.from(iso).toZonedDateTimeISO(tz)
 }
 
-const Frame = styled.div.withConfig({ displayName: 'ScheduleGridFrame' })`
+const Frame = styled.div`
 	/*
 	 * Schedule-X reads its palette from CSS custom properties prefixed
 	 * with --sx-. Overriding them inside the wrapper keeps the workshop

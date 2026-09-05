@@ -6,8 +6,8 @@ import { Link } from '@tanstack/react-router'
 import { Option } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { RefreshCw } from 'lucide-react'
+import { styled } from 'next-yak'
 import { type ComponentType, useEffect, useRef } from 'react'
-import styled from 'styled-components'
 
 import { isActiveResearchStatus } from '@batuda/domain'
 import type { SchemaName } from '@batuda/research'
@@ -608,9 +608,7 @@ const ProvenanceLabel = styled.span`
 	text-transform: uppercase;
 `
 
-const StatusText = styled.span.withConfig({
-	shouldForwardProp: prop => prop !== '$tone',
-})<{ $tone: Tone }>`
+const StatusText = styled.span<{ $tone: Tone }>`
 	font-family: var(--font-display);
 	letter-spacing: 0.06em;
 	text-transform: uppercase;

@@ -4,8 +4,8 @@ import { Link } from '@tanstack/react-router'
 import { DateTime } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { Mail } from 'lucide-react'
+import { styled } from 'next-yak'
 import { useMemo, useState } from 'react'
-import styled from 'styled-components'
 
 import { PriButton } from '@batuda/ui/pri'
 
@@ -366,9 +366,7 @@ function narrowCalendar(
 	return out
 }
 
-const Wrap = styled.div.withConfig({
-	displayName: 'ConversationsTabWrap',
-})`
+const Wrap = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
@@ -376,9 +374,7 @@ const Wrap = styled.div.withConfig({
 	${agedPaperSurface}
 `
 
-const Toolbar = styled.header.withConfig({
-	displayName: 'ConversationsTabToolbar',
-})`
+const Toolbar = styled.header`
 	${rulerUnderRule}
 	display: flex;
 	flex-wrap: wrap;
@@ -388,17 +384,13 @@ const Toolbar = styled.header.withConfig({
 	padding-bottom: var(--space-2xs);
 `
 
-const Chips = styled.div.withConfig({
-	displayName: 'ConversationsTabChips',
-})`
+const Chips = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-2xs);
 `
 
-const Chip = styled.button.withConfig({
-	shouldForwardProp: prop => prop !== '$active',
-})<{ $active: boolean }>`
+const Chip = styled.button<{ $active: boolean }>`
 	${stenciledTitle}
 	display: inline-flex;
 	align-items: center;
@@ -425,9 +417,7 @@ const Chip = styled.button.withConfig({
 	}
 `
 
-const List = styled.ul.withConfig({
-	displayName: 'ConversationsTabList',
-})`
+const List = styled.ul`
 	display: flex;
 	flex-direction: column;
 	gap: 0;
@@ -436,9 +426,7 @@ const List = styled.ul.withConfig({
 	list-style: none;
 `
 
-const Row = styled.li.withConfig({
-	displayName: 'ConversationsTabRow',
-})`
+const Row = styled.li`
 	${ruledLedgerRow}
 	display: flex;
 	align-items: center;
@@ -474,27 +462,21 @@ const Row = styled.li.withConfig({
 	}
 `
 
-const RowMain = styled.div.withConfig({
-	displayName: 'ConversationsTabRowMain',
-})`
+const RowMain = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
 	min-width: 0;
 `
 
-const RowKind = styled.span.withConfig({
-	displayName: 'ConversationsTabRowKind',
-})`
+const RowKind = styled.span`
 	${stenciledTitle}
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.08em;
 	color: var(--color-on-surface-variant);
 `
 
-const RowTitle = styled.span.withConfig({
-	displayName: 'ConversationsTabRowTitle',
-})`
+const RowTitle = styled.span`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	color: var(--color-on-surface);
@@ -504,17 +486,13 @@ const RowTitle = styled.span.withConfig({
 	min-width: 0;
 `
 
-const RowSubtitle = styled.span.withConfig({
-	displayName: 'ConversationsTabRowSubtitle',
-})`
+const RowSubtitle = styled.span`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface-variant);
 `
 
-const RowMeta = styled.span.withConfig({
-	displayName: 'ConversationsTabRowMeta',
-})`
+const RowMeta = styled.span`
 	${stenciledTitle}
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.06em;
@@ -522,9 +500,7 @@ const RowMeta = styled.span.withConfig({
 	flex-shrink: 0;
 `
 
-const Empty = styled.p.withConfig({
-	displayName: 'ConversationsTabEmpty',
-})`
+const Empty = styled.p`
 	margin: 0;
 	font-family: var(--font-body);
 	font-style: italic;

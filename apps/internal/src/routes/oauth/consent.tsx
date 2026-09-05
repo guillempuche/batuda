@@ -2,8 +2,8 @@ import { CheckboxGroup } from '@base-ui/react/checkbox-group'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { KeyRound } from 'lucide-react'
+import { styled } from 'next-yak'
 import { useEffect, useRef, useState } from 'react'
-import styled from 'styled-components'
 
 import { PriButton, PriCheckbox } from '@batuda/ui/pri'
 
@@ -282,7 +282,7 @@ function ConsentPage() {
 	)
 }
 
-const Page = styled.div.withConfig({ displayName: 'ConsentPage' })`
+const Page = styled.div`
 	min-height: 100dvh;
 	display: flex;
 	align-items: center;
@@ -290,7 +290,7 @@ const Page = styled.div.withConfig({ displayName: 'ConsentPage' })`
 	padding: var(--space-lg);
 `
 
-const Card = styled.div.withConfig({ displayName: 'ConsentCard' })`
+const Card = styled.div`
 	${agedPaperSurface}
 	position: relative;
 	display: flex;
@@ -303,7 +303,7 @@ const Card = styled.div.withConfig({ displayName: 'ConsentCard' })`
 	color: var(--color-on-surface);
 `
 
-const Bezel = styled.span.withConfig({ displayName: 'ConsentBezel' })`
+const Bezel = styled.span`
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -314,14 +314,14 @@ const Bezel = styled.span.withConfig({ displayName: 'ConsentBezel' })`
 	color: var(--color-primary);
 `
 
-const Title = styled.h1.withConfig({ displayName: 'ConsentTitle' })`
+const Title = styled.h1`
 	${stenciledTitle}
 	font-size: var(--typescale-headline-small-size);
 	line-height: var(--typescale-headline-small-line);
 	margin: 0;
 `
 
-const Body = styled.p.withConfig({ displayName: 'ConsentBody' })`
+const Body = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	line-height: var(--typescale-body-medium-line);
@@ -329,15 +329,13 @@ const Body = styled.p.withConfig({ displayName: 'ConsentBody' })`
 	margin: 0;
 `
 
-const Client = styled.div.withConfig({ displayName: 'ConsentClient' })`
+const Client = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
 `
 
-const ClientLabel = styled.span.withConfig({
-	displayName: 'ConsentClientLabel',
-})`
+const ClientLabel = styled.span`
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.06em;
@@ -345,20 +343,20 @@ const ClientLabel = styled.span.withConfig({
 	color: var(--color-on-surface-variant);
 `
 
-const ClientId = styled.code.withConfig({ displayName: 'ConsentClientId' })`
+const ClientId = styled.code`
 	font-family: var(--font-mono);
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface);
 	word-break: break-all;
 `
 
-const Scopes = styled.div.withConfig({ displayName: 'ConsentScopes' })`
+const Scopes = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const ScopeList = styled.ul.withConfig({ displayName: 'ConsentScopeList' })`
+const ScopeList = styled.ul`
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-2xs);
@@ -367,7 +365,7 @@ const ScopeList = styled.ul.withConfig({ displayName: 'ConsentScopeList' })`
 	list-style: none;
 `
 
-const ScopeItem = styled.li.withConfig({ displayName: 'ConsentScopeItem' })`
+const ScopeItem = styled.li`
 	font-family: var(--font-mono);
 	font-size: var(--typescale-label-small-size);
 	padding: var(--space-3xs) var(--space-2xs);
@@ -376,19 +374,19 @@ const ScopeItem = styled.li.withConfig({ displayName: 'ConsentScopeItem' })`
 	color: var(--color-on-surface);
 `
 
-const OrgSection = styled.div.withConfig({ displayName: 'ConsentOrgSection' })`
+const OrgSection = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const OrgList = styled.div.withConfig({ displayName: 'ConsentOrgList' })`
+const OrgList = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const OrgRow = styled.label.withConfig({ displayName: 'ConsentOrgRow' })`
+const OrgRow = styled.label`
 	display: flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -398,11 +396,11 @@ const OrgRow = styled.label.withConfig({ displayName: 'ConsentOrgRow' })`
 	cursor: pointer;
 `
 
-const OrgName = styled.span.withConfig({ displayName: 'ConsentOrgName' })`
+const OrgName = styled.span`
 	font-family: var(--font-body);
 `
 
-const OrgHint = styled.p.withConfig({ displayName: 'ConsentOrgHint' })`
+const OrgHint = styled.p`
 	margin: 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
@@ -410,7 +408,7 @@ const OrgHint = styled.p.withConfig({ displayName: 'ConsentOrgHint' })`
 	color: var(--color-on-surface-variant);
 `
 
-const ErrorText = styled.p.withConfig({ displayName: 'ConsentError' })`
+const ErrorText = styled.p`
 	margin: 0;
 	padding: var(--space-2xs) var(--space-sm);
 	border-left: 3px solid var(--color-error);
@@ -421,7 +419,7 @@ const ErrorText = styled.p.withConfig({ displayName: 'ConsentError' })`
 	font-style: italic;
 `
 
-const Actions = styled.div.withConfig({ displayName: 'ConsentActions' })`
+const Actions = styled.div`
 	display: flex;
 	justify-content: flex-end;
 	gap: var(--space-sm);

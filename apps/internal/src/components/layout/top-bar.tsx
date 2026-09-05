@@ -3,7 +3,7 @@ import { Trans } from '@lingui/react/macro'
 import { useRouterState } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import { motion } from 'motion/react'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 import { PriButton } from '@batuda/ui/pri'
 
@@ -36,8 +36,8 @@ export function TopBar() {
 
 	return (
 		<Bar>
-			<ScrewDot $position='top-left' aria-hidden />
-			<ScrewDot $position='top-right' aria-hidden />
+			<ScrewDot data-position='top-left' aria-hidden />
+			<ScrewDot data-position='top-right' aria-hidden />
 			<Title>{title}</Title>
 			<Actions>
 				<OrgSwitcher />
@@ -73,7 +73,7 @@ function deriveTitleDescriptor(pathname: string) {
 	return longest?.label ?? null
 }
 
-const Bar = styled.header.withConfig({ displayName: 'TopBar' })`
+const Bar = styled.header`
 	${brushedMetalPlate}
 	z-index: 5;
 	display: flex;
@@ -91,7 +91,7 @@ const Bar = styled.header.withConfig({ displayName: 'TopBar' })`
 	}
 `
 
-const Title = styled.h1.withConfig({ displayName: 'TopBarTitle' })`
+const Title = styled.h1`
 	${stenciledTitle}
 	font-size: var(--typescale-title-medium-size);
 	line-height: var(--typescale-title-medium-line);
@@ -114,7 +114,7 @@ const Title = styled.h1.withConfig({ displayName: 'TopBarTitle' })`
 	}
 `
 
-const Actions = styled.div.withConfig({ displayName: 'TopBarActions' })`
+const Actions = styled.div`
 	display: flex;
 	flex-shrink: 0;
 	align-items: center;

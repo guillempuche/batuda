@@ -1,5 +1,6 @@
 import { useLingui } from '@lingui/react/macro'
 import { Check, ChevronsUpDown, Pencil, X } from 'lucide-react'
+import { styled } from 'next-yak'
 import {
 	type KeyboardEvent,
 	type ReactNode,
@@ -8,7 +9,6 @@ import {
 	useRef,
 	useState,
 } from 'react'
-import styled from 'styled-components'
 
 import { PriInput, PriSelect } from '@batuda/ui/pri'
 
@@ -494,7 +494,7 @@ export function EditableChips({
 
 // ── Styles ────────────────────────────────────────────────────────
 
-const Field = styled.div.withConfig({ displayName: 'EditableFieldShell' })`
+const Field = styled.div`
 	${agedPaperSurface}
 	display: flex;
 	flex-direction: column;
@@ -503,18 +503,13 @@ const Field = styled.div.withConfig({ displayName: 'EditableFieldShell' })`
 	border-bottom-width: 2px;
 `
 
-const FieldLabel = styled.span.withConfig({
-	displayName: 'EditableFieldLabel',
-})`
+const FieldLabel = styled.span`
 	${stenciledTitle}
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface-variant);
 `
 
-const ReadTrigger = styled.button.withConfig({
-	displayName: 'EditableFieldReadTrigger',
-	shouldForwardProp: prop => prop !== '$multiline',
-})<{ $multiline: boolean }>`
+const ReadTrigger = styled.button<{ $multiline: boolean }>`
 	position: relative;
 	display: flex;
 	align-items: ${p => (p.$multiline ? 'flex-start' : 'center')};
@@ -541,7 +536,7 @@ const ReadTrigger = styled.button.withConfig({
 	}
 `
 
-const Value = styled.span.withConfig({ displayName: 'EditableFieldValue' })`
+const Value = styled.span`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	line-height: var(--typescale-body-medium-line);
@@ -549,9 +544,7 @@ const Value = styled.span.withConfig({ displayName: 'EditableFieldValue' })`
 	overflow-wrap: anywhere;
 `
 
-const ValueMultiline = styled.span.withConfig({
-	displayName: 'EditableFieldValueMultiline',
-})`
+const ValueMultiline = styled.span`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	line-height: var(--typescale-body-medium-line);
@@ -560,7 +553,7 @@ const ValueMultiline = styled.span.withConfig({
 	overflow-wrap: anywhere;
 `
 
-const Empty = styled.span.withConfig({ displayName: 'EditableFieldEmpty' })`
+const Empty = styled.span`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	font-style: italic;
@@ -568,9 +561,7 @@ const Empty = styled.span.withConfig({ displayName: 'EditableFieldEmpty' })`
 	opacity: 0.55;
 `
 
-const PencilMark = styled.span.withConfig({
-	displayName: 'EditableFieldPencilMark',
-})`
+const PencilMark = styled.span`
 	flex-shrink: 0;
 	display: inline-flex;
 	align-items: center;
@@ -584,9 +575,7 @@ const PencilMark = styled.span.withConfig({
 	}
 `
 
-const TextArea = styled.textarea.withConfig({
-	displayName: 'EditableFieldTextArea',
-})`
+const TextArea = styled.textarea`
 	width: 100%;
 	padding: var(--space-xs) var(--space-sm);
 	background: var(--color-paper-aged);
@@ -621,9 +610,7 @@ const TextArea = styled.textarea.withConfig({
 	}
 `
 
-const SelectTrigger = styled(PriSelect.Trigger).withConfig({
-	displayName: 'EditableSelectTrigger',
-})`
+const SelectTrigger = styled(PriSelect.Trigger)`
 	justify-content: space-between;
 	width: 100%;
 	background: transparent;
@@ -651,20 +638,18 @@ const SelectTrigger = styled(PriSelect.Trigger).withConfig({
 	}
 `
 
-const ComboboxShell = styled.div.withConfig({
-	displayName: 'EditableComboboxShell',
-})`
+const ComboboxShell = styled.div`
 	display: contents;
 `
 
-const ChipRow = styled.div.withConfig({ displayName: 'EditableChipsRow' })`
+const ChipRow = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-2xs);
 	min-height: calc(var(--typescale-body-medium-size) * 1.4);
 `
 
-const Chip = styled.span.withConfig({ displayName: 'EditableChip' })`
+const Chip = styled.span`
 	${brushedMetalPlate}
 	${stenciledTitle}
 	display: inline-flex;
@@ -675,9 +660,7 @@ const Chip = styled.span.withConfig({ displayName: 'EditableChip' })`
 	line-height: var(--typescale-label-small-line);
 `
 
-const ChipRemove = styled.button.withConfig({
-	displayName: 'EditableChipRemove',
-})`
+const ChipRemove = styled.button`
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;

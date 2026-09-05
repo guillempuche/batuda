@@ -1,6 +1,6 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Link2 } from 'lucide-react'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 import { safeHref } from '#/components/research/safe-link'
 

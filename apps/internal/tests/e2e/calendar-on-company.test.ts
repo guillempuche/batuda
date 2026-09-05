@@ -161,7 +161,7 @@ test.describe('calendar on company page', () => {
 				await expect(cancelledRow).toContainText(/cancelled/i)
 
 				// AND the cancelled row is visually de-emphasised (line-through
-				// title). The styled-components selector targets the title span;
+				// title). The generated class selector targets the title span;
 				// CSS is inline so we read the computed style.
 				const titleStyle = await cancelledRow
 					.locator('span')

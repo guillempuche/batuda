@@ -3,7 +3,7 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, notFound } from '@tanstack/react-router'
 import { DateTime } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 import { documentAtomFor } from '#/atoms/documents-atoms'
 import { DOCUMENT_KIND_LABELS } from '#/components/documents/document-kinds'

@@ -2,8 +2,8 @@ import { useAtomRefresh, useAtomSet } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { useNavigate } from '@tanstack/react-router'
 import { RefreshCw, Trash2, XCircle } from 'lucide-react'
+import { styled } from 'next-yak'
 import { useState } from 'react'
-import styled from 'styled-components'
 
 import { isActiveResearchStatus } from '@batuda/domain'
 // Straight from the schemas file rather than the package entry point: that entry

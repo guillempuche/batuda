@@ -1,5 +1,5 @@
 import { Collapsible } from '@base-ui/react/collapsible'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 /**
  * Workshop collapsible — the trigger looks like a strip of masking tape
@@ -10,9 +10,7 @@ import styled from 'styled-components'
  *     <PriCollapsible.Panel>…</PriCollapsible.Panel>
  *   </PriCollapsible.Root>
  */
-const PriTrigger = styled(Collapsible.Trigger).withConfig({
-	displayName: 'PriCollapsibleTrigger',
-})`
+const PriTrigger = styled(Collapsible.Trigger)`
 	position: relative;
 	display: inline-flex;
 	align-items: center;
@@ -71,13 +69,9 @@ const PriTrigger = styled(Collapsible.Trigger).withConfig({
 // It rests on Tailwind's reset sparing `hidden='until-found'` from
 // `display: none`. If that exception ever goes, a folded section stays
 // invisible for good rather than merely unfindable.
-const PriPanel = styled(Collapsible.Panel)
-	.attrs<{
-		readonly hiddenUntilFound?: boolean
-	}>(props => ({ hiddenUntilFound: props.hiddenUntilFound ?? true }))
-	.withConfig({
-		displayName: 'PriCollapsiblePanel',
-	})`
+const PriPanel = styled(Collapsible.Panel).attrs<{
+	readonly hiddenUntilFound?: boolean
+}>(props => ({ hiddenUntilFound: props.hiddenUntilFound ?? true }))`
 	overflow: hidden;
 	transition: height 260ms cubic-bezier(0.22, 1.2, 0.4, 1);
 

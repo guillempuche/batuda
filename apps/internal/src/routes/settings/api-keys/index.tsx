@@ -3,9 +3,9 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { ArrowLeft, Copy, KeyRound, Trash2 } from 'lucide-react'
+import { styled } from 'next-yak'
 import type { FormEvent } from 'react'
 import { useMemo, useState } from 'react'
-import styled from 'styled-components'
 
 import {
 	PriButton,
@@ -570,13 +570,13 @@ function formatDate(iso: string): string {
 	})
 }
 
-const Page = styled.div.withConfig({ displayName: 'ApiKeysPage' })`
+const Page = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-lg);
 `
 
-const BackLink = styled(Link).withConfig({ displayName: 'ApiKeysBackLink' })`
+const BackLink = styled(Link)`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -591,7 +591,7 @@ const BackLink = styled(Link).withConfig({ displayName: 'ApiKeysBackLink' })`
 	}
 `
 
-const Intro = styled.div.withConfig({ displayName: 'ApiKeysIntro' })`
+const Intro = styled.div`
 	${rulerUnderRule}
 	display: flex;
 	flex-direction: column;
@@ -599,7 +599,7 @@ const Intro = styled.div.withConfig({ displayName: 'ApiKeysIntro' })`
 	padding-bottom: var(--space-xs);
 `
 
-const Heading = styled.h2.withConfig({ displayName: 'ApiKeysHeading' })`
+const Heading = styled.h2`
 	${stenciledTitle}
 	display: inline-flex;
 	align-items: center;
@@ -609,7 +609,7 @@ const Heading = styled.h2.withConfig({ displayName: 'ApiKeysHeading' })`
 	margin: 0;
 `
 
-const Subtitle = styled.p.withConfig({ displayName: 'ApiKeysSubtitle' })`
+const Subtitle = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-large-size);
 	line-height: var(--typescale-body-large-line);
@@ -618,9 +618,7 @@ const Subtitle = styled.p.withConfig({ displayName: 'ApiKeysSubtitle' })`
 	margin: 0;
 `
 
-const CreateCard = styled.section.withConfig({
-	displayName: 'ApiKeysCreateCard',
-})`
+const CreateCard = styled.section`
 	${brushedMetalPlate}
 	display: flex;
 	flex-direction: column;
@@ -629,22 +627,20 @@ const CreateCard = styled.section.withConfig({
 	border-radius: var(--shape-2xs);
 `
 
-const SectionTitle = styled.h3.withConfig({
-	displayName: 'ApiKeysSectionTitle',
-})`
+const SectionTitle = styled.h3`
 	${stenciledTitle}
 	font-size: var(--typescale-title-medium-size);
 	line-height: var(--typescale-title-medium-line);
 	margin: 0;
 `
 
-const CreateForm = styled.form.withConfig({ displayName: 'ApiKeysCreateForm' })`
+const CreateForm = styled.form`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
 `
 
-const FieldRow = styled.div.withConfig({ displayName: 'ApiKeysFieldRow' })`
+const FieldRow = styled.div`
 	display: flex;
 	gap: var(--space-md);
 	flex-wrap: wrap;
@@ -654,12 +650,12 @@ const FieldRow = styled.div.withConfig({ displayName: 'ApiKeysFieldRow' })`
 	}
 `
 
-const Actions = styled.div.withConfig({ displayName: 'ApiKeysActions' })`
+const Actions = styled.div`
 	display: flex;
 	justify-content: flex-end;
 `
 
-const FormError = styled.p.withConfig({ displayName: 'ApiKeysFormError' })`
+const FormError = styled.p`
 	margin: 0;
 	padding: var(--space-2xs) var(--space-sm);
 	border-left: 3px solid var(--color-error);
@@ -670,7 +666,7 @@ const FormError = styled.p.withConfig({ displayName: 'ApiKeysFormError' })`
 	font-style: italic;
 `
 
-const ListSection = styled.section.withConfig({ displayName: 'ApiKeysList' })`
+const ListSection = styled.section`
 	${brushedMetalPlate}
 	display: flex;
 	flex-direction: column;
@@ -679,7 +675,7 @@ const ListSection = styled.section.withConfig({ displayName: 'ApiKeysList' })`
 	border-radius: var(--shape-2xs);
 `
 
-const Empty = styled.p.withConfig({ displayName: 'ApiKeysEmpty' })`
+const Empty = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	font-style: italic;
@@ -687,7 +683,7 @@ const Empty = styled.p.withConfig({ displayName: 'ApiKeysEmpty' })`
 	margin: 0;
 `
 
-const KeyList = styled.ul.withConfig({ displayName: 'ApiKeysKeyList' })`
+const KeyList = styled.ul`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-sm);
@@ -696,7 +692,7 @@ const KeyList = styled.ul.withConfig({ displayName: 'ApiKeysKeyList' })`
 	list-style: none;
 `
 
-const KeyRow = styled.li.withConfig({ displayName: 'ApiKeysKeyRow' })`
+const KeyRow = styled.li`
 	display: flex;
 	align-items: center;
 	gap: var(--space-md);
@@ -706,7 +702,7 @@ const KeyRow = styled.li.withConfig({ displayName: 'ApiKeysKeyRow' })`
 	border: 1px solid color-mix(in oklab, var(--color-on-surface) 10%, transparent);
 `
 
-const KeyInfo = styled.div.withConfig({ displayName: 'ApiKeysKeyInfo' })`
+const KeyInfo = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
@@ -714,14 +710,14 @@ const KeyInfo = styled.div.withConfig({ displayName: 'ApiKeysKeyInfo' })`
 	min-width: 0;
 `
 
-const KeyName = styled.span.withConfig({ displayName: 'ApiKeysKeyName' })`
+const KeyName = styled.span`
 	${stenciledTitle}
 	font-size: var(--typescale-title-small-size);
 	overflow: hidden;
 	text-overflow: ellipsis;
 `
 
-const KeyMeta = styled.div.withConfig({ displayName: 'ApiKeysKeyMeta' })`
+const KeyMeta = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
@@ -731,21 +727,17 @@ const KeyMeta = styled.div.withConfig({ displayName: 'ApiKeysKeyMeta' })`
 	color: var(--color-on-surface-variant);
 `
 
-const MaskedPrefix = styled.code.withConfig({
-	displayName: 'ApiKeysMaskedPrefix',
-})`
+const MaskedPrefix = styled.code`
 	font-family: var(--font-mono);
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface);
 `
 
-const MetaItem = styled.span.withConfig({ displayName: 'ApiKeysMetaItem' })`
+const MetaItem = styled.span`
 	white-space: nowrap;
 `
 
-const DisabledTag = styled.span.withConfig({
-	displayName: 'ApiKeysDisabledTag',
-})`
+const DisabledTag = styled.span`
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.06em;
@@ -753,14 +745,14 @@ const DisabledTag = styled.span.withConfig({
 	color: var(--color-error);
 `
 
-const SecretBox = styled.div.withConfig({ displayName: 'ApiKeysSecretBox' })`
+const SecretBox = styled.div`
 	display: flex;
 	align-items: stretch;
 	gap: var(--space-sm);
 	flex-wrap: wrap;
 `
 
-const SrOnly = styled.span.withConfig({ displayName: 'ApiKeysSrOnly' })`
+const SrOnly = styled.span`
 	position: absolute;
 	width: 1px;
 	height: 1px;
@@ -772,9 +764,7 @@ const SrOnly = styled.span.withConfig({ displayName: 'ApiKeysSrOnly' })`
 	border: 0;
 `
 
-const SecretValue = styled.code.withConfig({
-	displayName: 'ApiKeysSecretValue',
-})`
+const SecretValue = styled.code`
 	flex: 1 1 16rem;
 	min-width: 0;
 	padding: var(--space-xs) var(--space-sm);
@@ -787,16 +777,12 @@ const SecretValue = styled.code.withConfig({
 	word-break: break-all;
 `
 
-const RevealActions = styled.div.withConfig({
-	displayName: 'ApiKeysRevealActions',
-})`
+const RevealActions = styled.div`
 	display: flex;
 	justify-content: flex-end;
 `
 
-const ConfirmActions = styled.div.withConfig({
-	displayName: 'ApiKeysConfirmActions',
-})`
+const ConfirmActions = styled.div`
 	display: flex;
 	justify-content: flex-end;
 	gap: var(--space-sm);

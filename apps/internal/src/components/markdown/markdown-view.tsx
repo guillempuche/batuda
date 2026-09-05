@@ -1,5 +1,5 @@
+import { styled } from 'next-yak'
 import { Streamdown } from 'streamdown'
-import styled from 'styled-components'
 
 // A heading someone writes inside stored prose belongs under the title of the
 // page or dialog around it, never above it, so every level renders a step lower
@@ -31,7 +31,7 @@ export function MarkdownView({ source }: { readonly source: string }) {
 	)
 }
 
-const Wrapper = styled.div.withConfig({ displayName: 'MarkdownView' })`
+const Wrapper = styled.div`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	line-height: var(--typescale-body-medium-line);

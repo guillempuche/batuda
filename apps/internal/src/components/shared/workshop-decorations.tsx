@@ -1,4 +1,4 @@
-import styled, { css } from 'styled-components'
+import { styled } from 'next-yak'
 
 /**
  * Screw/rivet dot — a tiny metal bead pinned to a surface corner or an
@@ -7,35 +7,20 @@ import styled, { css } from 'styled-components'
  *
  * Prefer the `$position` preset (`top-left`, `top-right`, `bottom-left`,
  * `bottom-right`) over inline `style={}` — it keeps placement in CSS and
- * avoids the render-time style object that defeats styled-components
+ * avoids the render-time style object that defeats
  * class memoization.
  */
 
-type ScrewPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+export type ScrewPosition =
+	| 'top-left'
+	| 'top-right'
+	| 'bottom-left'
+	| 'bottom-right'
 
-const POSITION_OFFSETS: Record<ScrewPosition, ReturnType<typeof css>> = {
-	'top-left': css`
-		top: 8px;
-		left: 8px;
-	`,
-	'top-right': css`
-		top: 8px;
-		right: 8px;
-	`,
-	'bottom-left': css`
-		bottom: 8px;
-		left: 8px;
-	`,
-	'bottom-right': css`
-		bottom: 8px;
-		right: 8px;
-	`,
-}
-
-export const ScrewDot = styled.span.withConfig({
-	displayName: 'ScrewDot',
-	shouldForwardProp: prop => !prop.startsWith('$'),
-})<{ $position?: ScrewPosition; $size?: number }>`
+export const ScrewDot = styled.span<{
+	'data-position'?: ScrewPosition
+	$size?: number
+}>`
 	position: absolute;
 	width: ${p => p.$size ?? 6}px;
 	height: ${p => p.$size ?? 6}px;
@@ -49,5 +34,22 @@ export const ScrewDot = styled.span.withConfig({
 	pointer-events: none;
 	z-index: 2;
 
-	${p => (p.$position ? POSITION_OFFSETS[p.$position] : '')}
+	/* Which corner it sits in is one of four, so each is its own rule rather
+	 * than a value worked out as the page runs. */
+	&[data-position='top-left'] {
+		top: 8px;
+		left: 8px;
+	}
+	&[data-position='top-right'] {
+		top: 8px;
+		right: 8px;
+	}
+	&[data-position='bottom-left'] {
+		bottom: 8px;
+		left: 8px;
+	}
+	&[data-position='bottom-right'] {
+		bottom: 8px;
+		right: 8px;
+	}
 `

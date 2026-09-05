@@ -12,8 +12,8 @@ Deployed at `batuda.co`. Tenant marketing sites live in their own repos (e.g. th
 - **TanStack Start** — SSR framework (file-based routing, server functions)
 - **TanStack Router** — type-safe client routing
 - **Tailwind CSS v4** — in the build pipeline for its `@theme` breakpoint declarations; utility classes are not used in app code
-- **styled-components** — CSS-in-JS, the styling tool for both visuals and layout (transient props, runtime interpolation)
-- **BaseUI** — headless, accessible components (styled with styled-components)
+- **next-yak** — the styling tool for both visuals and layout. Same `styled`/`css` templates as styled-components, but turned into real CSS files while the app is built rather than assembled as the page runs
+- **BaseUI** — headless, accessible components (styled with next-yak)
 - **Motion + Motion Plus** — animations (`motion/react` for layout/transitions, `motion-plus/react` for premium components)
 - **react-leaflet + Leaflet** — interactive map showing a company's location
 - **Tiptap** — rich text editor for instruction templates, pages, and the email composer
@@ -41,7 +41,9 @@ Same `moduleResolution: bundler` as the server — no `.js` in imports, `import 
 - `tanstackStart()` from `@tanstack/react-start/plugin/vite` — SSR framework
 - `cloudflare()` from `@cloudflare/vite-plugin` — builds and serves the app on Workers. Dev-only `/auth/*`, `/v1/*`, `/openapi.json` and `/docs` proxy rules live in Vite's `server.proxy`, mirroring the forwarding that `src/worker.ts` performs in production so dev parity holds.
 - `tailwindcss()` from `@tailwindcss/vite` — Tailwind v4 Vite plugin
-- `viteReact()` with `@swc/plugin-styled-components` (stable `componentId` for SSR ↔ CSR matching) and `@lingui/swc-plugin` (compiles macros)
+- `viteYak({ basePath })` before the React plugin — both ask to run early, so array order decides. `basePath` is the repo root because `packages/ui` sits outside the app folder and the generated stylesheet names are worked out from it
+- `yakLayers()` after it, wrapping each generated stylesheet in `@layer lib` or `@layer app` (see [Cascade layers](#cascade-layers))
+- `viteReact()` with `@lingui/swc-plugin` (compiles macros)
 - `lingui()` plugin for catalog handling
 
 `@batuda/ui` workspace dual export — load-bearing for hydration:
@@ -61,10 +63,12 @@ so they bought nothing. Tailwind's `@import` resolver does not consult
 
 `'development'` must appear in BOTH `resolve.conditions` and
 `ssr.resolve.conditions` so SSR and client load the same build. Otherwise
-`noExternal: ['@batuda/ui']` re-runs the SWC styled-components plugin on
-`dist/` for SSR (adding componentIds), while the client loads `dist/`
-as-is (no IDs). Mismatched classnames → React 19 bails hydration and
-`onClick` handlers silently never attach. See the comment block at
+class names are worked out from each file's path, so the server reading
+`packages/ui/src` while the browser reads `dist/` produces two different
+names for the same component. Mismatched classnames → React 19 bails
+hydration and `onClick` handlers silently never attach. `next-yak` itself
+must also be in `ssr.noExternal`, or its runtime is loaded outside Vite's
+graph and picks up a second React — every hook then throws on the server. See the comment block at
 `apps/internal/vite.config.ts:120-138`.
 
 Deployed to Cloudflare Workers via `@cloudflare/vite-plugin` + `wrangler` (config in `apps/internal/wrangler.jsonc`, Worker entry in `src/worker.ts`). Build output in `dist/`.
@@ -76,7 +80,7 @@ Deployed to Cloudflare Workers via `@cloudflare/vite-plugin` + `wrangler` (confi
 **Note:** Tokens are defined in `packages/ui/src/tokens.css` and imported by `apps/internal` via the workspace link; tenant marketing repos consume the same tokens via the published `@batuda/ui` npm package. The values below document the full token set.
 
 All spacing, typography, and color values come from CSS custom properties defined in
-`packages/ui/src/tokens.css`. Never hardcode values — use `var(--token)` in styled-components.
+`packages/ui/src/tokens.css`. Never hardcode values — use `var(--token)` in the component's styles.
 
 ### Typography — MD3 type scale
 
@@ -163,7 +167,7 @@ All spacing, typography, and color values come from CSS custom properties define
 
 ### Tailwind setup
 
-Tailwind v4 is in the build pipeline, but **no app code uses Tailwind utility classes** — `className` appears twice in the whole of `apps/internal/src` and `packages/ui/src`, once to forward a class so `styled()` can target a primitive and once for `sr-only`. What it is there for is the `@theme` block below, which declares the canonical breakpoints that `tokens.css` refers to. Styling is done with styled-components (see [Styling conventions](#styling-conventions--styled-components)).
+Tailwind v4 is in the build pipeline, but **no app code uses Tailwind utility classes** — `className` appears twice in the whole of `apps/internal/src` and `packages/ui/src`, once to forward a class so `styled()` can target a primitive and once for `sr-only`. What it is there for is the `@theme` block below, which declares the canonical breakpoints that `tokens.css` refers to. Styling is done with next-yak (see [Styling conventions](#styling-conventions)).
 
 ```css
 /* packages/ui/src/tailwind.css */
@@ -184,7 +188,7 @@ Each app imports this file as its CSS entry point:
 @import '@batuda/ui/tailwind.css';
 ```
 
-Adding Tailwind utility classes to a component would make that file the only one of its kind in the codebase, so reach for styled-components instead.
+Adding Tailwind utility classes to a component would make that file the only one of its kind in the codebase, so write the styles alongside the component instead.
 
 ### Color tokens — Mediterranean industrial
 
@@ -227,7 +231,7 @@ brushed-metal plates, aged-paper surfaces, masking-tape strips, stenciled
 labels. The system and rationale live in
 [`docs/brand-visual.md`](brand-visual.md) §Workshop Visual Language.
 
-Reusable CSS fragments are exposed as `styled-components` `css` mixins from
+Reusable CSS fragments are exposed as `css` mixins from
 `apps/internal/src/lib/workshop-mixins.ts`:
 
 | Mixin               | Used for                                                              |
@@ -342,7 +346,7 @@ Adding a primitive needs no build change — `packages/ui/tsdown.config.ts` glob
 
 #### What a consumer has to install
 
-`@base-ui/react` and `styled-components` are **peer** dependencies, not bundled ones. Both keep state in React context — Base UI's hooks and styled-components' stylesheet registry — so two copies in one tree produce "Invalid hook call" inside a `Select.Root`, or styles that render server-side and vanish on hydration. A peer makes the consumer's copy the only copy. The declared ranges track what this package is built against rather than the oldest version that happens to work, so a consumer behind on either has to catch up. Both are optional, because `@batuda/ui/blocks` needs neither.
+`@base-ui/react` and `next-yak` are **peer** dependencies, not bundled ones. Base UI keeps state in React context, so two copies in one tree produce "Invalid hook call" inside a `Select.Root`; a peer makes the consumer's copy the only copy. `next-yak` is a peer for a different reason — this package ships templates that the *consumer's* build turns into CSS, so the consumer needs the plugin and needs it to agree with what these files were written against. A consumer must therefore run `viteYak` with `basePath` at its own repo root, list `@batuda/ui` and `next-yak` in `ssr.noExternal`, and exclude `@batuda/ui` from dependency pre-bundling so the plugin gets to see it. The declared ranges track what this package is built against rather than the oldest version that happens to work, so a consumer behind on either has to catch up. Both are optional, because `@batuda/ui/blocks` needs neither.
 
 `effect` and `@tiptap/core` are still ordinary dependencies, so `blocks` carries its own. That is a deliberate trade and it has a sharp edge: `blocks` exports `TiptapDocument` and `BlockNode` as `Schema` instances, and a consumer that composes one into its own `Schema.Struct` is mixing two copies of `effect`. When the versions differ the inferred type silently collapses to `{}` and every field access on it fails to compile — it does not error at the import, it errors pages away in whatever consumed the type. A consumer of `blocks` should pin the same `effect` version this package does.
 
@@ -392,14 +396,14 @@ will block on missing strings).
 
 ## BaseUI components
 
-BaseUI provides headless, accessible components. Style them with styled-components using MD3 tokens — layout included, the same as anywhere else.
+BaseUI provides headless, accessible components. Style them with next-yak using MD3 tokens — layout included, the same as anywhere else.
 
 ### Usage pattern
 
 ```tsx
 // packages/ui/src/pri/pri-button.tsx
 import { Button } from '@base-ui/react/button'
-import styled, { css } from 'styled-components'
+import { css, styled } from 'next-yak'
 
 const variants = {
   filled: css`
@@ -483,7 +487,7 @@ pnpm --filter internal add motion motion-plus
 
 ```tsx
 import { motion, AnimatePresence } from 'motion/react'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 const AnimatedCard = styled(motion.div)`
   background: var(--color-surface);
@@ -548,13 +552,13 @@ import { AnimateNumber, Typewriter, Carousel, Ticker, ScrambleText } from 'motio
 </ScrambleText>
 ```
 
-### Motion + styled-components
+### Motion + next-yak
 
-Motion wraps any element including styled-components:
+Motion wraps any element including styled ones:
 
 ```tsx
 import { motion } from 'motion/react'
-import styled from 'styled-components'
+import { styled } from 'next-yak'
 
 // Option 1: motion() wrapper
 const AnimatedBadge = styled(motion.span)<{ $status: string }>`
@@ -669,7 +673,7 @@ Attribution to OpenStreetMap contributors is required and is rendered by the `Ti
 
 ## Breakpoints
 
-Mobile-first. The canonical breakpoints are declared once in `@theme` (md: 768px, lg: 1024px) and referenced from `tokens.css`. Use `@media` in styled-components:
+Mobile-first. The canonical breakpoints are declared once in `@theme` (md: 768px, lg: 1024px) and referenced from `tokens.css`. Use `@media` in the component's styles:
 
 ```tsx
 const PipelineGrid = styled.div`
@@ -739,79 +743,94 @@ All `.tsx` and `.ts` files are covered by the root `biome.json`. Run `pnpm check
 
 ---
 
-## Styling conventions — styled-components
+## Styling conventions
 
-**styled-components** is the styling tool, for visual properties *and* layout alike — colors, typography, spacing, shape and elevation all use MD3 tokens via `var()`, and flex/grid/positioning live in the same styled component. Responsive changes use `@media`. Tailwind is installed but unused in component code (see [Tailwind setup](#tailwind-setup)).
+**next-yak** is the styling tool, for visual properties *and* layout alike — colors, typography, spacing, shape and elevation all use MD3 tokens via `var()`, and flex/grid/positioning live in the same styled component. Responsive changes use `@media`. Tailwind is installed but unused in component code (see [Tailwind setup](#tailwind-setup)).
 
 ### When to use what
 
-| Scenario                                                          | Use                                        |
-| ----------------------------------------------------------------- | ------------------------------------------ |
-| Visual properties (colors, typography, spacing, borders, shadows) | styled-components with `var(--token)`      |
-| Data-driven dynamic values (e.g. `--color-status-${status}`)      | styled-components with `$` transient props |
-| Layout structure (flex, grid, columns)                            | styled-components                          |
-| Responsive layout changes                                         | `@media` in styled-components              |
-| Animation targets                                                 | styled-components or Motion `style` prop   |
+| Scenario                                                          | Use                                               |
+| ----------------------------------------------------------------- | ------------------------------------------------- |
+| Visual properties (colors, typography, spacing, borders, shadows) | `styled` with `var(--token)`                      |
+| A value from a **closed set** (status, tone, variant, size)       | `data-*` attribute + static `&[data-…]` selectors |
+| A value that is **genuinely per-instance** (a measured width)     | one custom property, set from `style`             |
+| Layout structure (flex, grid, columns)                            | `styled`                                          |
+| Responsive layout changes                                         | `@media` in the component's styles                |
+| Animation targets                                                 | `styled` or Motion `style` prop                   |
 
-### Examples
+### Data-driven values
 
-**styled-components for visual styling (default):**
+**Never build a token name out of a prop.** `var(--color-status-${p => p.$status})`
+compiles to `var(--color-status-var(--Tag__background_x7f))`, which is not a property
+name. The production build fails on it; **dev has no minifier and ships it silently.**
 
-```tsx
-import styled from 'styled-components'
-
-const Card = styled.div`
-  background: var(--color-surface);
-  border-radius: var(--shape-md);
-  padding: var(--space-sm);
-  box-shadow: var(--elevation-1);
-`
-
-const Title = styled.h2`
-  font-size: var(--typescale-title-medium-size);
-  font-weight: var(--typescale-title-medium-weight);
-  color: var(--color-on-surface);
-`
-
-function CompanyCard({ company }: { company: Company }) {
-  return (
-    <Card>
-      <Title>{company.name}</Title>
-    </Card>
-  )
-}
-```
-
-**styled-components for layout too:**
+Prefer a data attribute. Every arm is a real rule in the stylesheet, nothing is
+computed as the page runs, and you can see it in devtools:
 
 ```tsx
-// Grid layout and card visuals both live in styled-components
-const CompanyGrid = styled.div`
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--space-sm);
+const Tag = styled.span<{ 'data-status'?: CompanyStatus }>`
+  border-left: 4px solid var(--color-status-prospect);
 
-  @media (min-width: 768px) {
-    grid-template-columns: repeat(2, 1fr);
-  }
-`
-
-const CardHead = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  &[data-status='client'] { border-left-color: var(--color-status-client); }
+  &[data-status='dead']   { border-left-color: var(--color-status-dead); }
 `
 ```
+
+When the set is large enough that spelling out every arm is worse than one variable,
+resolve the whole `var()` through a lookup in an ordinary `.ts` module — the map
+returns the complete token reference, never a fragment of its name. That is what
+`packages/ui/src/layout/tokens.ts` does for `$gap`.
+
+### Where a function may appear in a template
+
+**In value position, anything goes.** `flex: ${p => flexFor(p.$flex)}` becomes a
+custom property and works.
+
+**In block position, the compiler has to see the `css` block itself.** These emit
+their CSS:
+
+```tsx
+${sharedMixin}                                   // an identifier
+${p => (p.$on ? mixinA : mixinB)}                // a ternary over identifiers
+${p => { switch (p.$variant) { case 'filled': return filled; … } }}
+```
+
+These emit **nothing at all, with no error**:
+
+```tsx
+${p => toneFor(p.$tone)}                         // reached through a call
+${p => OFFSETS[p.$position]}                     // reached through a lookup
+${p => (p.$right ? 'right: 20px;' : 'left: 0;')} // a declaration as a string
+```
+
+If you need arms, write them where they are used or make them a data attribute.
+
+### Cascade layers
+
+`src/styles.css` declares the order once, weakest to strongest:
+
+```css
+@layer reset, theme, base, components, utilities, lib, app;
+```
+
+`theme`/`base`/`components`/`utilities` are Tailwind's own. `lib` holds `@batuda/ui`,
+`app` holds this app — so an app component overriding a shared primitive wins without
+`!important`. A small Vite plugin puts each generated stylesheet in the right layer.
+
+**Anything left outside a layer beats everything inside one**, which is why the reset
+and the page frame sit in `@layer reset` rather than at the top level.
 
 ### Rules
 
 1. **Tokens always.** Use `var(--token)` — never hardcode hex, px, or font values.
-2. **styled-components for visuals.** Colors, typography, spacing, borders, shadows — all via styled-components with tokens.
-3. **styled-components for layout.** Grid, flex, positioning and visibility too, with `@media` for responsive changes. Tailwind classes are not used anywhere in app code.
-4. **Co-locate styles.** Styled components live in the same `.tsx` file as the React component.
-5. **Transient props.** Use `$` prefix for styling-only props in styled-components.
-6. **No `!important`.** Fix specificity properly.
-7. **SSR.** styled-components handles SSR via `ServerStyleSheet`.
+2. **Styles live with the component**, visuals and layout alike, with `@media` for responsive changes. Tailwind classes are not used in app code; Tailwind supplies the token layer and the reset only.
+3. **Co-locate.** Styled components live in the same `.tsx` file as the React component. The `css` prop is not used.
+4. **Closed sets become data attributes.** Reach for a runtime value only when the value is genuinely per-instance.
+5. **Transient props are a correctness rule, not a preference.** Every prop the styles read must be `$`-prefixed. A conditional style reading a prop the DOM also needs makes the compiler wrap the element in a function, and inside `<Trans>` that turns a translatable `<0>word</0>` into an untranslatable `{0}` — silently, with a message id the catalogue does not contain.
+6. **No `!important`.** Put the override in the right layer instead.
+7. **Never interpolate inside a quoted CSS string.** `content: '${…}'` loses its quotes and renders nothing. Use two classes.
+8. **The tag a component renders is fixed.** There is no `as` prop — declare a second component off a shared `css` mixin, or take the tag as a typed prop the way `components/shared/heading.tsx` does.
+9. **SSR.** Styles are extracted to stylesheets at build time. There is no `ServerStyleSheet` and no runtime style tag.
 
 ---
 

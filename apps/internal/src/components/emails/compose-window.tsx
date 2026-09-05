@@ -1,7 +1,7 @@
 import { useLingui } from '@lingui/react/macro'
 import { Maximize2, Minimize2, Minus, X } from 'lucide-react'
+import { css, styled } from 'next-yak'
 import { useCallback } from 'react'
-import styled, { css } from 'styled-components'
 
 import { ComposeForm } from '#/components/emails/compose-form'
 import { type Draft, useComposeEmail } from '#/context/compose-email-context'
@@ -111,10 +111,7 @@ function previewFor(draft: Draft): string | null {
 	return to
 }
 
-const Shell = styled.div.withConfig({
-	displayName: 'ComposeWindowShell',
-	shouldForwardProp: prop => prop !== '$fullscreen',
-})<{ $fullscreen: boolean }>`
+const Shell = styled.div<{ $fullscreen: boolean }>`
 	${agedPaperSurface}
 	display: flex;
 	flex-direction: column;
@@ -150,9 +147,7 @@ const Shell = styled.div.withConfig({
 				`}
 `
 
-const Header = styled.header.withConfig({
-	displayName: 'ComposeWindowHeader',
-})`
+const Header = styled.header`
 	${brushedMetalPlate}
 	position: relative;
 	display: flex;
@@ -163,9 +158,7 @@ const Header = styled.header.withConfig({
 	flex: 0 0 auto;
 `
 
-const TapeCorner = styled.span.withConfig({
-	displayName: 'ComposeWindowTape',
-})`
+const TapeCorner = styled.span`
 	${maskingTapeCorner}
 	top: -10px;
 	left: 20px;
@@ -173,9 +166,7 @@ const TapeCorner = styled.span.withConfig({
 	height: 18px;
 `
 
-const HeaderTitle = styled.div.withConfig({
-	displayName: 'ComposeWindowHeaderTitle',
-})`
+const HeaderTitle = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
@@ -183,9 +174,7 @@ const HeaderTitle = styled.div.withConfig({
 	flex: 1 1 auto;
 `
 
-const TitleText = styled.span.withConfig({
-	displayName: 'ComposeWindowTitleText',
-})`
+const TitleText = styled.span`
 	${stenciledTitle}
 	font-size: var(--typescale-label-medium-size);
 	letter-spacing: 0.1em;
@@ -194,9 +183,7 @@ const TitleText = styled.span.withConfig({
 	text-overflow: ellipsis;
 `
 
-const Preview = styled.span.withConfig({
-	displayName: 'ComposeWindowPreview',
-})`
+const Preview = styled.span`
 	font-family: var(--font-body);
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface-variant);
@@ -205,17 +192,13 @@ const Preview = styled.span.withConfig({
 	text-overflow: ellipsis;
 `
 
-const HeaderActions = styled.div.withConfig({
-	displayName: 'ComposeWindowActions',
-})`
+const HeaderActions = styled.div`
 	display: inline-flex;
 	gap: var(--space-3xs);
 	flex: 0 0 auto;
 `
 
-const ChromeButton = styled.button.withConfig({
-	displayName: 'ComposeWindowChromeButton',
-})`
+const ChromeButton = styled.button`
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -242,17 +225,13 @@ const ChromeButton = styled.button.withConfig({
 	}
 `
 
-const DesktopChromeButton = styled(ChromeButton).withConfig({
-	displayName: 'ComposeWindowDesktopChromeButton',
-})`
+const DesktopChromeButton = styled(ChromeButton)`
 	@media (max-width: 767px) {
 		display: none;
 	}
 `
 
-const Body = styled.div.withConfig({
-	displayName: 'ComposeWindowBody',
-})`
+const Body = styled.div`
 	display: flex;
 	flex-direction: column;
 	flex: 1 1 auto;

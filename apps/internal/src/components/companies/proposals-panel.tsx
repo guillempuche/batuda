@@ -4,8 +4,8 @@ import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { DateTime, Schema } from 'effect'
 import { Check, ChevronsUpDown, FileSignature, Plus, X } from 'lucide-react'
+import { styled } from 'next-yak'
 import { type FormEvent, useMemo, useRef, useState } from 'react'
-import styled from 'styled-components'
 
 import {
 	PriButton,
@@ -568,17 +568,13 @@ function ProposalDialog({
 	)
 }
 
-const Head = styled.div.withConfig({
-	displayName: 'ProposalsPanelHead',
-})`
+const Head = styled.div`
 	display: flex;
 	justify-content: flex-end;
 	margin-bottom: var(--space-sm);
 `
 
-const Empty = styled.p.withConfig({
-	displayName: 'ProposalsPanelEmpty',
-})`
+const Empty = styled.p`
 	display: flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -589,17 +585,13 @@ const Empty = styled.p.withConfig({
 	margin: 0;
 `
 
-const List = styled.div.withConfig({
-	displayName: 'ProposalsPanelList',
-})`
+const List = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const Row = styled.button.withConfig({
-	displayName: 'ProposalsPanelRow',
-})`
+const Row = styled.button`
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -616,26 +608,20 @@ const Row = styled.button.withConfig({
 	}
 `
 
-const RowMain = styled.span.withConfig({
-	displayName: 'ProposalsPanelRowMain',
-})`
+const RowMain = styled.span`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
 	min-width: 0;
 `
 
-const RowTitle = styled.span.withConfig({
-	displayName: 'ProposalsPanelRowTitle',
-})`
+const RowTitle = styled.span`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	color: var(--color-on-surface);
 `
 
-const RowMeta = styled.span.withConfig({
-	displayName: 'ProposalsPanelRowMeta',
-})`
+const RowMeta = styled.span`
 	display: inline-flex;
 	gap: var(--space-2xs);
 	align-items: center;
@@ -643,42 +629,32 @@ const RowMeta = styled.span.withConfig({
 	color: var(--color-on-surface-variant);
 `
 
-const StatusTag = styled.span.withConfig({
-	displayName: 'ProposalsPanelStatusTag',
-})`
+const StatusTag = styled.span`
 	font-family: var(--font-display);
 	letter-spacing: 0.04em;
 	text-transform: uppercase;
 	color: var(--color-primary);
 `
 
-const RowTotal = styled.span.withConfig({
-	displayName: 'ProposalsPanelRowTotal',
-})`
+const RowTotal = styled.span`
 	font-family: var(--font-display);
 	color: var(--color-on-surface);
 	white-space: nowrap;
 `
 
-const DialogHead = styled.div.withConfig({
-	displayName: 'ProposalsPanelDialogHead',
-})`
+const DialogHead = styled.div`
 	display: flex;
 	align-items: flex-start;
 	justify-content: space-between;
 	gap: var(--space-sm);
 `
 
-const Heading = styled.span.withConfig({
-	displayName: 'ProposalsPanelHeading',
-})`
+const Heading = styled.span`
 	${stenciledTitle}
 	font-size: var(--typescale-title-large-size);
 `
 
-const CloseButton = styled.button.withConfig({
-	displayName: 'ProposalsPanelCloseButton',
-})`
+const CloseButton = styled.button`
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -692,53 +668,39 @@ const CloseButton = styled.button.withConfig({
 	cursor: pointer;
 `
 
-const Form = styled.form.withConfig({
-	displayName: 'ProposalsPanelForm',
-})`
+const Form = styled.form`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
 	margin-top: var(--space-sm);
 `
 
-const Lines = styled.div.withConfig({
-	displayName: 'ProposalsPanelLines',
-})`
+const Lines = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const LineRow = styled.div.withConfig({
-	displayName: 'ProposalsPanelLineRow',
-})`
+const LineRow = styled.div`
 	display: grid;
 	grid-template-columns: 1fr 4rem 6rem auto;
 	gap: var(--space-2xs);
 	align-items: center;
 `
 
-const QtyInput = styled(PriInput).withConfig({
-	displayName: 'ProposalsPanelQtyInput',
-})`
+const QtyInput = styled(PriInput)`
 	text-align: right;
 `
 
-const PriceInput = styled(PriInput).withConfig({
-	displayName: 'ProposalsPanelPriceInput',
-})`
+const PriceInput = styled(PriInput)`
 	text-align: right;
 `
 
-const CurrencyInput = styled(PriInput).withConfig({
-	displayName: 'ProposalsPanelCurrencyInput',
-})`
+const CurrencyInput = styled(PriInput)`
 	max-width: 6rem;
 `
 
-const RemoveLine = styled.button.withConfig({
-	displayName: 'ProposalsPanelRemoveLine',
-})`
+const RemoveLine = styled.button`
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -753,9 +715,7 @@ const RemoveLine = styled.button.withConfig({
 	}
 `
 
-const AddLine = styled.button.withConfig({
-	displayName: 'ProposalsPanelAddLine',
-})`
+const AddLine = styled.button`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-3xs);
@@ -773,9 +733,7 @@ const AddLine = styled.button.withConfig({
 	}
 `
 
-const TotalRow = styled.div.withConfig({
-	displayName: 'ProposalsPanelTotalRow',
-})`
+const TotalRow = styled.div`
 	display: flex;
 	justify-content: space-between;
 	align-items: baseline;
@@ -788,25 +746,19 @@ const TotalRow = styled.div.withConfig({
 	color: var(--color-on-surface-variant);
 `
 
-const TotalValue = styled.span.withConfig({
-	displayName: 'ProposalsPanelTotalValue',
-})`
+const TotalValue = styled.span`
 	font-size: var(--typescale-title-medium-size);
 	color: var(--color-on-surface);
 	text-transform: none;
 `
 
-const Field = styled.div.withConfig({
-	displayName: 'ProposalsPanelField',
-})`
+const Field = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const Label = styled.label.withConfig({
-	displayName: 'ProposalsPanelLabel',
-})`
+const Label = styled.label`
 	${stenciledTitle}
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.06em;
@@ -814,9 +766,7 @@ const Label = styled.label.withConfig({
 	color: var(--color-on-surface-variant);
 `
 
-const Footer = styled.div.withConfig({
-	displayName: 'ProposalsPanelFooter',
-})`
+const Footer = styled.div`
 	display: flex;
 	gap: var(--space-sm);
 	justify-content: flex-end;

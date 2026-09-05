@@ -11,8 +11,8 @@ import StarterKit from '@tiptap/starter-kit'
 import { DateTime, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { ArrowLeft, Eye, Globe, Save } from 'lucide-react'
+import { styled } from 'next-yak'
 import { useCallback, useMemo, useState } from 'react'
-import styled from 'styled-components'
 
 import type { Page as PageModel } from '@batuda/domain'
 import type { TiptapDocument } from '@batuda/ui/blocks'
@@ -404,13 +404,13 @@ function narrowPage(raw: unknown): PageDetail | null {
 	}
 }
 
-const Page = styled.div.withConfig({ displayName: 'PageEditorPage' })`
+const Page = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-lg);
 `
 
-const Header = styled.header.withConfig({ displayName: 'PageEditorHeader' })`
+const Header = styled.header`
 	${brushedMetalPlate}
 	display: flex;
 	flex-direction: column;
@@ -419,7 +419,7 @@ const Header = styled.header.withConfig({ displayName: 'PageEditorHeader' })`
 	box-shadow: var(--elevation-workshop-md);
 `
 
-const BackLink = styled(Link).withConfig({ displayName: 'PageEditorBackLink' })`
+const BackLink = styled(Link)`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -432,9 +432,7 @@ const BackLink = styled(Link).withConfig({ displayName: 'PageEditorBackLink' })`
 	}
 `
 
-const HeaderMain = styled.div.withConfig({
-	displayName: 'PageEditorHeaderMain',
-})`
+const HeaderMain = styled.div`
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
@@ -442,9 +440,7 @@ const HeaderMain = styled.div.withConfig({
 	gap: var(--space-md);
 `
 
-const TitleInput = styled.input.withConfig({
-	displayName: 'PageEditorTitleInput',
-})`
+const TitleInput = styled.input`
 	${stenciledTitle}
 	font-size: var(--typescale-headline-medium-size);
 	line-height: var(--typescale-headline-medium-line);
@@ -462,15 +458,13 @@ const TitleInput = styled.input.withConfig({
 	}
 `
 
-const HeaderMeta = styled.div.withConfig({
-	displayName: 'PageEditorHeaderMeta',
-})`
+const HeaderMeta = styled.div`
 	display: flex;
 	align-items: center;
 	gap: var(--space-sm);
 `
 
-const MetaTag = styled.span.withConfig({ displayName: 'PageEditorMetaTag' })`
+const MetaTag = styled.span`
 	${brushedMetalBezel}
 	font-size: var(--typescale-label-medium-size);
 	padding: var(--space-3xs) var(--space-sm);
@@ -478,16 +472,14 @@ const MetaTag = styled.span.withConfig({ displayName: 'PageEditorMetaTag' })`
 	letter-spacing: 0.06em;
 `
 
-const Actions = styled.div.withConfig({ displayName: 'PageEditorActions' })`
+const Actions = styled.div`
 	display: flex;
 	align-items: center;
 	gap: var(--space-sm);
 	justify-content: flex-end;
 `
 
-const PreviewLink = styled.a.withConfig({
-	displayName: 'PageEditorPreviewLink',
-})`
+const PreviewLink = styled.a`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -500,9 +492,7 @@ const PreviewLink = styled.a.withConfig({
 	}
 `
 
-const EditorWrap = styled.div.withConfig({
-	displayName: 'PageEditorEditorWrap',
-})`
+const EditorWrap = styled.div`
 	${agedPaperSurface}
 	padding: var(--space-lg);
 	min-height: 400px;
@@ -535,9 +525,7 @@ const EditorWrap = styled.div.withConfig({
 	}
 `
 
-const MetaPanel = styled.div.withConfig({
-	displayName: 'PageEditorMetaPanel',
-})`
+const MetaPanel = styled.div`
 	${agedPaperSurface}
 	padding: var(--space-lg);
 	display: flex;
@@ -545,26 +533,20 @@ const MetaPanel = styled.div.withConfig({
 	gap: var(--space-md);
 `
 
-const MetaField = styled.div.withConfig({
-	displayName: 'PageEditorMetaField',
-})`
+const MetaField = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const MetaLabel = styled.span.withConfig({
-	displayName: 'PageEditorMetaLabel',
-})`
+const MetaLabel = styled.span`
 	font-size: var(--typescale-label-large-size);
 	text-transform: uppercase;
 	letter-spacing: 0.08em;
 	color: var(--color-on-surface-variant);
 `
 
-const MetaValue = styled.span.withConfig({
-	displayName: 'PageEditorMetaValue',
-})`
+const MetaValue = styled.span`
 	font-size: var(--typescale-body-large-size);
 	color: var(--color-on-surface);
 `
