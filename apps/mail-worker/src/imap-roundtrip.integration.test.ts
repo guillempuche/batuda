@@ -14,10 +14,12 @@
 //
 // What it does: SMTP-inject a message → connect ImapFlow as the seeded
 // admin@taller.cat → open INBOX → call `fetchAndIngestNewerThan` against the
-// same SqlClient layer the worker uses → assert that an `email_messages` row
-// with the test subject lands. The IMAP + SMTP connections are real wire
-// interactions; the only thing we mock is the `Effect.never` outer loop in
-// `runInboxSession` so the test terminates.
+// same SqlClient layer the worker uses → assert what lands: the message row,
+// one touchpoint per message no matter how many people are copied in, and —
+// when a message will not store — that the folder waits on it rather than
+// reading past it. The IMAP + SMTP connections are real wire interactions;
+// the only thing we mock is the `Effect.never` outer loop in `runInboxSession`
+// so the test terminates.
 
 process.env['DATABASE_URL'] ??=
 	'postgresql://batuda:batuda@localhost:5433/batuda'
@@ -26,7 +28,7 @@ process.env['DATABASE_URL'] ??=
 const MAIL_CATCHER_REST = 'http://localhost:8025'
 
 import { PgClient } from '@effect/sql-pg'
-import { Config, Effect, Redacted } from 'effect'
+import { Config, Effect, Layer, Redacted } from 'effect'
 import { ImapFlow } from 'imapflow'
 import nodemailer from 'nodemailer'
 import pg from 'pg'
@@ -83,6 +85,7 @@ const runWith = <A, E>(eff: Effect.Effect<A, E, never>) =>
 const smtpInject = async (msg: {
 	to: string
 	from: string
+	cc?: string
 	subject: string
 	text: string
 }) => {
@@ -304,6 +307,185 @@ describe.skipIf(!mailServerAnswers)(
 						[subject, orgId],
 					)
 					expect(rows.rows[0]!.count).toBe('1')
+				} finally {
+					await client.logout().catch(() => undefined)
+				}
+			})
+		})
+
+		describe('when a known contact writes in with colleagues copied', () => {
+			it('should file one touchpoint for the message, not one per person', async () => {
+				// Read the addresses out of the seed rather than naming them, so
+				// the test still means the same thing when the seed data changes.
+				const people = await pool.query<{
+					address: string
+					companyId: string
+				}>(
+					`SELECT lower(ch.address) AS address,
+					        min(c.company_id::text) AS "companyId"
+					 FROM channels ch
+					 JOIN contacts c
+					   ON c.id = ch.subject_id AND ch.subject_table = 'contacts'
+					 WHERE ch.channel = 'email'
+					   AND ch.organization_id = $1
+					   AND c.deleted_at IS NULL
+					   AND c.company_id IS NOT NULL
+					 GROUP BY lower(ch.address)
+					 -- One contact each: an address shared by two of them is
+					 -- ambiguous, and the matcher declines to pick a winner.
+					 HAVING count(DISTINCT c.id) = 1
+					 ORDER BY 1
+					 LIMIT 3`,
+					[orgId],
+				)
+				expect(people.rows.length).toBe(3)
+				const [sender, ...copied] = people.rows
+
+				const subject = `roundtrip-cc ${Date.now()}`
+				await clearCatcher()
+
+				const countInteractions = async () =>
+					(
+						await pool.query<{ n: number }>(
+							`SELECT count(*)::int AS n FROM interactions WHERE organization_id = $1`,
+							[orgId],
+						)
+					).rows[0]?.n ?? 0
+
+				const interactionsBefore = await countInteractions()
+
+				// GIVEN mail from someone we know, with two more people we know
+				// copied in
+				await smtpInject({
+					to: 'admin@taller.cat',
+					from: sender!.address,
+					cc: copied.map(p => p.address).join(', '),
+					subject,
+					text: 'three people we know are on this message',
+				})
+
+				const client = await openImap()
+				try {
+					const opened = await client.mailboxOpen('INBOX')
+
+					// WHEN one tick reads the folder
+					await runWith(
+						fetchAndIngestNewerThan({
+							client,
+							organizationId: orgId,
+							inboxId,
+							folder: 'INBOX',
+							direction: 'inbound',
+							uidvalidity: Number(opened.uidValidity),
+							sinceUid: 0,
+							stuckUid: null,
+							attempts: 0,
+						}).pipe(
+							Effect.provide(RawMessageStorage.layer),
+							Effect.provide(WorkerEnvVars.layer),
+							Effect.provide(ParticipantMatcher.layer),
+							Effect.provide(TimelineActivityService.layer),
+							Effect.provide(PgLive),
+						),
+					)
+
+					// THEN the message is filed against the sender's company
+					const stored = await pool.query<{ id: string; companyId: string }>(
+						`SELECT id, company_id AS "companyId" FROM email_messages
+						 WHERE organization_id = $1 AND subject = $2`,
+						[orgId, subject],
+					)
+					expect(stored.rows.length).toBe(1)
+					expect(stored.rows[0]?.companyId).toBe(sender!.companyId)
+
+					// AND it counts once — what is recorded is the message, not each
+					// person on it.
+					const history = await pool.query<{ n: number }>(
+						`SELECT count(*)::int AS n FROM timeline_activity
+						 WHERE organization_id = $1 AND entity_id = $2`,
+						[orgId, stored.rows[0]!.id],
+					)
+					expect(history.rows[0]?.n).toBe(1)
+					expect((await countInteractions()) - interactionsBefore).toBe(1)
+				} finally {
+					await client.logout().catch(() => undefined)
+				}
+			})
+		})
+
+		describe('when one of the messages cannot be taken in', () => {
+			it('should stop there rather than reading past it', async () => {
+				const badSubject = `roundtrip-bad ${Date.now()}`
+				const nextSubject = `roundtrip-next ${Date.now()}`
+
+				await clearCatcher()
+
+				// GIVEN two messages waiting, the first of which cannot be
+				// stored — what a short object-store outage looks like
+				await smtpInject({
+					to: 'admin@taller.cat',
+					from: 'roundtrip-sender@example.com',
+					subject: badSubject,
+					text: 'this one will not store',
+				})
+				await smtpInject({
+					to: 'admin@taller.cat',
+					from: 'roundtrip-sender@example.com',
+					subject: nextSubject,
+					text: 'this one is behind it',
+				})
+
+				// Refuses exactly the first message and stores the rest, so one
+				// message fails rather than the whole pass.
+				const refusingStorage = Layer.succeed(RawMessageStorage, {
+					putRaw: (_key: string, body: Uint8Array) =>
+						new TextDecoder().decode(body).includes(badSubject)
+							? Effect.fail(new Error('object store refused the bytes'))
+							: Effect.void,
+					putAttachment: () => Effect.void,
+				} as never)
+
+				const client = await openImap()
+				try {
+					const opened = await client.mailboxOpen('INBOX')
+					const uidvalidity = Number(opened.uidValidity)
+
+					// WHEN one tick reads the folder
+					const progress = await runWith(
+						fetchAndIngestNewerThan({
+							client,
+							organizationId: orgId,
+							inboxId,
+							folder: 'INBOX',
+							direction: 'inbound',
+							uidvalidity,
+							sinceUid: 0,
+							stuckUid: null,
+							attempts: 0,
+						}).pipe(
+							Effect.provide(refusingStorage),
+							Effect.provide(WorkerEnvVars.layer),
+							Effect.provide(ParticipantMatcher.layer),
+							Effect.provide(TimelineActivityService.layer),
+							Effect.provide(PgLive),
+						),
+					)
+
+					// THEN the folder is left waiting on the message it could not
+					// take in, so the next tick starts from it again
+					expect(progress.lastUid).toBe(0)
+					expect(progress.stuckUid).not.toBeNull()
+					expect(progress.attempts).toBe(1)
+
+					// AND neither message is on file: the first because it failed,
+					// the one behind it because the folder is read in order rather
+					// than around the gap
+					const stored = await pool.query<{ subject: string }>(
+						`SELECT subject FROM email_messages
+						 WHERE organization_id = $1 AND subject = ANY($2)`,
+						[orgId, [badSubject, nextSubject]],
+					)
+					expect(stored.rows).toEqual([])
 				} finally {
 					await client.logout().catch(() => undefined)
 				}
