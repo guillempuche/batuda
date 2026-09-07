@@ -55,6 +55,7 @@ export {
 	parseFarmRow,
 	rowByRow,
 	scoreFarmReplay,
+	townPageJudge,
 } from './application/eval-farm-replay'
 export {
 	type GoldenParseResult,
@@ -185,6 +186,10 @@ export {
 	researchToolkitLayer,
 	researchToolkitWireFormat,
 } from './application/tools'
+export {
+	placeReadOffATownPage,
+	type TownPageReading,
+} from './application/town-page-guard'
 export {
 	makeUsageMeter,
 	UsageMeter,

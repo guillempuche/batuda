@@ -79,6 +79,14 @@ export interface FarmRow {
 	 * which is the same silent miss this file exists to catch.
 	 */
 	readonly addresses: ReadonlyArray<string>
+	/**
+	 * The page the row's PLACE was read on, which a scan row states beside the
+	 * place itself. Kept apart from `addresses` because the question it answers is
+	 * not "does this row rest on that host" but "did this very place come off that
+	 * page" — and a rule handed the whole list cannot tell one from the other.
+	 * Null where the row stated no place, or stated one written without its source.
+	 */
+	readonly placeSource: string | null
 	readonly label: FarmLabel
 }
 
@@ -225,6 +233,10 @@ export const parseFarmRow = (raw: unknown): FarmRowParseResult => {
 	if (!statedPlace.ok) {
 		return { ok: false, error: `${id}: statedPlace must be a string` }
 	}
+	const placeSource = readTextOrNull(row['placeSource'])
+	if (!placeSource.ok) {
+		return { ok: false, error: `${id}: placeSource must be a string` }
+	}
 
 	return {
 		ok: true,
@@ -235,6 +247,7 @@ export const parseFarmRow = (raw: unknown): FarmRowParseResult => {
 			website: website.value,
 			statedPlace: statedPlace.value,
 			addresses: addresses.value,
+			placeSource: placeSource.value,
 			label,
 		},
 	}
@@ -389,3 +402,44 @@ export const networkGuardJudge =
 		}
 		return verdicts
 	}
+
+/**
+ * The shipped town-page check, as a rule this can grade.
+ *
+ * It lives here for the reason the operator bridge above does: a bridge written at
+ * the call site is a bridge nothing tests, and this one decides every number
+ * anybody quotes about the rule.
+ *
+ * The bridging is small but not nothing. The check reads a scan row, so a corpus
+ * row has to be written back into that shape — and the place has to go back
+ * PAIRED with the page it was read on, because reading that pairing is the whole
+ * rule. A corpus row whose place names no source is handed one with none, which is
+ * how the check comes to say the honest "cannot grade this".
+ */
+export const townPageJudge =
+	(check: {
+		readonly reads: (row: Record<string, unknown>) => unknown
+	}): FarmJudge =>
+	rows =>
+		new Map(
+			rows.map(row => [
+				row.id,
+				check.reads({
+					name: row.name,
+					...(row.website === null ? {} : { website: row.website }),
+					...(row.statedPlace === null
+						? {}
+						: {
+								location: {
+									value: row.statedPlace,
+									confidence: null,
+									...(row.placeSource === null
+										? {}
+										: { source_id: row.placeSource }),
+								},
+							}),
+				}) === null
+					? ('keep' as const)
+					: ('refuse_place' as const),
+			]),
+		)

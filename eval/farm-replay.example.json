@@ -9,6 +9,7 @@
 			"https://www.vkestampacionsmetalurgiquesbarcelona.example",
 			"https://www.vkestampacionsmetalurgiquesbarcelona.example/sant-quirze-del-valles"
 		],
+		"placeSource": "https://www.vkestampacionsmetalurgiquesbarcelona.example/sant-quirze-del-valles",
 		"label": "network"
 	},
 	{
@@ -20,6 +21,7 @@
 		"addresses": [
 			"https://www.vkestampacionsmetalurgiquesbarcelona.example/cerdanyola-del-valles"
 		],
+		"placeSource": "https://www.vkestampacionsmetalurgiquesbarcelona.example/cerdanyola-del-valles",
 		"label": "network"
 	},
 	{
@@ -32,6 +34,7 @@
 			"https://www.vkanoditzatstecnicsbarcelona.example",
 			"https://www.vkanoditzatstecnicsbarcelona.example/vacarisses"
 		],
+		"placeSource": "https://www.vkanoditzatstecnicsbarcelona.example/vacarisses",
 		"label": "network"
 	},
 	{
@@ -41,6 +44,7 @@
 		"website": null,
 		"statedPlace": null,
 		"addresses": ["https://finance-profiles.example"],
+		"placeSource": null,
 		"label": "network"
 	},
 	{
@@ -53,6 +57,7 @@
 			"https://estructuresvalles.example",
 			"https://estructuresvalles.example/estructures-metalliques-castellar-del-valles/"
 		],
+		"placeSource": "https://estructuresvalles.example/estructures-metalliques-castellar-del-valles/",
 		"label": "serves_not_in"
 	},
 	{
@@ -65,6 +70,7 @@
 			"https://estructuresvalles.example",
 			"https://estructuresvalles.example/estructures-metalliques-barbera-del-valles/"
 		],
+		"placeSource": "https://estructuresvalles.example/estructures-metalliques-barbera-del-valles/",
 		"label": "serves_not_in"
 	},
 	{
@@ -74,6 +80,7 @@
 		"website": "https://carinsa.example",
 		"statedPlace": "Sant Quirze del Vallès, Barcelona",
 		"addresses": ["https://carinsa.example"],
+		"placeSource": "https://carinsa.example",
 		"label": "ok"
 	},
 	{
@@ -86,17 +93,19 @@
 			"https://caldereria-sentmenat.example",
 			"https://caldereria-sentmenat.example/"
 		],
+		"placeSource": "https://caldereria-sentmenat.example/caldereria-sentmenat-taller",
 		"label": "ok"
 	},
 	{
 		"id": "example-ordinary-on-a-directory-path",
 		"askedAbout": ["Castellar del Vallès", "Barcelona"],
 		"name": "Delinox Solutions",
-		"website": null,
+		"website": "https://delinox-solutions.example",
 		"statedPlace": "Castellar del Vallès",
 		"addresses": [
 			"https://a-directory.example/castellar-del-valles/fabricante/delinox-solutions"
 		],
+		"placeSource": "https://a-directory.example/castellar-del-valles/fabricante/delinox-solutions",
 		"label": "ok"
 	},
 	{
@@ -106,6 +115,7 @@
 		"website": null,
 		"statedPlace": null,
 		"addresses": [],
+		"placeSource": null,
 		"label": "ok"
 	}
 ]

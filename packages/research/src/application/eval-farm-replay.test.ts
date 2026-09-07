@@ -7,7 +7,9 @@ import {
 	parseFarmRow,
 	rowByRow,
 	scoreFarmReplay,
+	townPageJudge,
 } from './eval-farm-replay'
+import { placeReadOffATownPage } from './town-page-guard'
 
 const row = (over: Partial<FarmRow>): FarmRow => ({
 	id: 'r1',
@@ -16,6 +18,7 @@ const row = (over: Partial<FarmRow>): FarmRow => ({
 	website: 'https://acme.example',
 	statedPlace: 'Sant Quirze del Vallès, Barcelona',
 	addresses: ['https://acme.example'],
+	placeSource: null,
 	label: 'ok',
 	...over,
 })
@@ -425,6 +428,7 @@ describe('networkGuardJudge', () => {
 		website: null,
 		statedPlace: null,
 		addresses: [],
+		placeSource: null,
 		label: 'ok',
 		...over,
 	})
@@ -567,6 +571,98 @@ describe('networkGuardJudge', () => {
 			// THEN the key is absent. Sent as null or empty it would read as an
 			//   address, and every check that screens one would have to know better.
 			expect(seen[0]?.prospects[0]).not.toHaveProperty('website')
+		})
+	})
+})
+
+describe('townPageJudge', () => {
+	const row = (
+		over: Partial<FarmRow> & Pick<FarmRow, 'id' | 'name'>,
+	): FarmRow => ({
+		askedAbout: ['Barberà del Vallès', 'Barcelona'],
+		website: 'https://montvalles.com/',
+		statedPlace: 'Barberà del Vallès, Barcelona',
+		addresses: [],
+		placeSource:
+			'https://montvalles.com/estructuras-metalicas-barbera-del-valles/',
+		label: 'serves_not_in',
+		...over,
+	})
+
+	const judge = townPageJudge({ reads: placeReadOffATownPage })
+
+	describe("when a row's place rests on the firm's own page about that town", () => {
+		it('should answer refuse_place, keeping the company on the list', () => {
+			// GIVEN one such row beside an ordinary one
+			const rows = [
+				row({ id: 'a', name: 'Montvalles' }),
+				row({
+					id: 'b',
+					name: 'Metalser SL',
+					website: 'https://metalser.example',
+					statedPlace: 'Barberà del Vallès',
+					placeSource: 'https://metalser.example/contacte',
+					label: 'ok',
+				}),
+			]
+
+			// WHEN the shipped rule is asked
+			const answer = judge(rows)
+
+			// THEN only the town page is refused, and nothing is dropped
+			expect(answer.get('a')).toBe('refuse_place')
+			expect(answer.get('b')).toBe('keep')
+			expect([...answer.values()]).not.toContain('drop')
+		})
+	})
+
+	describe('when a corpus row states a place with no source', () => {
+		it('should keep it, since the rule is handed nothing to grade', () => {
+			// GIVEN a place written without the page it was read on — the shape a
+			// run stored before the field was paired with its source
+			const answer = judge([
+				row({ id: 'a', name: 'ST Empresas', placeSource: null }),
+			])
+
+			// WHEN asked — THEN the honest answer is that this cannot be graded
+			expect(answer.get('a')).toBe('keep')
+		})
+	})
+
+	describe('when a corpus row states no place at all', () => {
+		it('should keep it, since there is no place to refuse', () => {
+			// GIVEN a row whose location never came back
+			const answer = judge([
+				row({ id: 'a', name: 'Stemp', statedPlace: null, placeSource: null }),
+			])
+
+			// WHEN asked — THEN nothing is refused
+			expect(answer.get('a')).toBe('keep')
+		})
+	})
+
+	describe('when the score reads its answers', () => {
+		it('should count a caught row and leave the real companies whole', () => {
+			// GIVEN one town-page row and one ordinary row
+			const rows = [
+				row({ id: 'a', name: 'Montvalles' }),
+				row({
+					id: 'b',
+					name: 'Metalser SL',
+					website: 'https://metalser.example',
+					placeSource: 'https://metalser.example/contacte',
+					label: 'ok',
+				}),
+			]
+
+			// WHEN scored
+			const score = scoreFarmReplay(rows, judge)
+
+			// THEN the catch is counted, and neither cost is paid
+			expect(score.placeRefused).toBe(1)
+			expect(score.placeTotal).toBe(1)
+			expect(score.companiesDeleted).toEqual([])
+			expect(score.placesRefusedInError).toEqual([])
 		})
 	})
 })
