@@ -286,6 +286,88 @@ describe('markRowsOutsidePlace', () => {
 		})
 	})
 
+	describe("when a place was read off the firm's own page about that town", () => {
+		it('should take the place off and keep the company, with no judge involved', async () => {
+			// GIVEN a firm that writes one landing page per town it travels to, and
+			// whose place was read off the page for the town this run asked about
+			const findings = scan([
+				prospect('Montvalles', {
+					website: 'https://montvalles.com/',
+					location: {
+						value: 'Barberà del Vallès, Barcelona',
+						source_id:
+							'https://montvalles.com/estructuras-metalicas-barbera-del-valles/',
+						confidence: null,
+					},
+				}),
+			])
+			const judge = vi.fn(silent)
+
+			// WHEN run — THEN the company stays on the list, the place it could not
+			// support is gone, and the row is named so somebody can go and look
+			const result = await run(
+				markRowsOutsidePlace(findings, 'prospects', 'Barcelona', judge),
+			)
+			expect(namesOf(result.findings)).toEqual(['Montvalles'])
+			expect(rowsOf(result.findings)[0]?.['location']).toBeUndefined()
+			expect(result.refusedTownPages).toEqual([
+				{
+					name: 'Montvalles',
+					page: 'montvalles.com/estructuras-metalicas-barbera-del-valles',
+				},
+			])
+			// AND it is counted apart from a value that was never a place at all
+			expect(result.locationsDropped).toBe(0)
+		})
+
+		it('should run even when the request named no area to hold rows to', async () => {
+			// GIVEN the same row, on a run that confined itself to nowhere. The gate
+			// below returns early here, and this one must not: the place is
+			// unsupported whatever was asked for
+			const findings = scan([
+				prospect('Montvalles', {
+					website: 'https://montvalles.com/',
+					location: {
+						value: 'Barberà del Vallès, Barcelona',
+						source_id:
+							'https://montvalles.com/estructuras-metalicas-barbera-del-valles/',
+						confidence: null,
+					},
+				}),
+			])
+
+			// WHEN run with no place — THEN the place still comes off
+			const result = await run(
+				markRowsOutsidePlace(findings, 'prospects', '', silent),
+			)
+			expect(rowsOf(result.findings)[0]?.['location']).toBeUndefined()
+			expect(result.refusedTownPages).toHaveLength(1)
+		})
+
+		it('should leave a place a directory filed under that town alone', async () => {
+			// GIVEN a place read off a business directory's page for the town, which
+			// is a directory stating where a company is rather than a firm naming
+			// somewhere it travels to
+			const findings = scan([
+				prospect('Fadiplast S.L.', {
+					website: 'https://fadiplast.example',
+					location: {
+						value: 'Montcada i Reixac, Barcelona',
+						source_id: 'https://empresite.example/montcada-reixac-barcelona',
+						confidence: null,
+					},
+				}),
+			])
+
+			// WHEN run — THEN nothing is refused
+			const result = await run(
+				markRowsOutsidePlace(findings, 'prospects', 'Barcelona', silent),
+			)
+			expect(rowsOf(result.findings)[0]?.['location']).toBeDefined()
+			expect(result.refusedTownPages).toEqual([])
+		})
+	})
+
 	describe('when an earlier pass already placed a company', () => {
 		it('should stand by an inside even after the row gains evidence', async () => {
 			// GIVEN a company placed inside on an earlier pass, met again with a
