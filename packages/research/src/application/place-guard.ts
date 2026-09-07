@@ -9,7 +9,7 @@
  * different question — what kind of organisation this is, whether its name can be
  * read, whether it exists at all — and none asks where it is.
  *
- * ## Three answers this gives without asking anybody
+ * ## Four answers this gives without asking anybody
  *
  * The cheap cases are cheap, and they run first so the model is only asked what
  * the model is needed for:
@@ -20,6 +20,10 @@
  *    key is removed. That rule now runs over the field a pass earlier as well,
  *    since the location names the page it was read on; this is what still answers
  *    for a value stored before that, which keeps the shape it was written in.
+ *  - **The page it was read on does not establish it.** A firm writing one landing
+ *    page per town it travels to gets that town recorded as where it is. The
+ *    company is real and stays; the place comes off. See `town-page-guard.ts`,
+ *    which also says why the area comparison below can never answer this one.
  *  - **Nothing was asked.** A run given no place has nothing to hold a row to, so
  *    no row is marked and the count says the check did not run rather than
  *    finding nothing.
@@ -73,6 +77,7 @@ import {
 } from './row-marks'
 import { valueIsRightKind } from './scalar-field-guard'
 import { canonicalizeUrl, hostOf } from './source-key'
+import { placeReadOffATownPage } from './town-page-guard'
 
 /** How much of the judge's reason travels with the row. */
 const REASON_CHARS = 200
@@ -281,6 +286,19 @@ export interface MarkedOutsidePlace {
 	readonly reason: string
 }
 
+/**
+ * One place refused for resting on a page about a town the firm travels to.
+ *
+ * Named rather than counted, the way the operator check next door names what it
+ * takes off: a count says a rule touched two percent of a list, a name says whose
+ * place went and lets somebody open the page and disagree.
+ */
+export interface RefusedTownPagePlace {
+	readonly name: string
+	/** The page that filed it under that town, host and path, so a reader can look. */
+	readonly page: string
+}
+
 export interface PlaceGuardResult {
 	readonly findings: unknown
 	/** Rows marked as outside the area asked for. */
@@ -294,6 +312,12 @@ export interface PlaceGuardResult {
 	readonly cleared: number
 	/** Locations removed for naming a service area rather than a place. */
 	readonly locationsDropped: number
+	/**
+	 * Places removed for resting on a page the firm filed under that very town.
+	 * Counted apart from the line above because the two are different faults: one
+	 * is a value that was never a place, this is a place nothing established.
+	 */
+	readonly refusedTownPages: ReadonlyArray<RefusedTownPagePlace>
 	/** Rows put to the judge, as the scale the marks read against. */
 	readonly asked: number
 	/**
@@ -349,6 +373,7 @@ export const markRowsOutsidePlace = <E, R>(
 			marked: [],
 			cleared: 0,
 			locationsDropped: 0,
+			refusedTownPages: [],
 			asked: 0,
 			ruled: 0,
 			unclear: 0,
@@ -364,6 +389,7 @@ export const markRowsOutsidePlace = <E, R>(
 		// rather than about the area, and a run that named no area still must not
 		// ship a list of towns in the field that says where a company is.
 		let locationsDropped = 0
+		const refusedTownPages: Array<RefusedTownPagePlace> = []
 		const cleaned = list.map(row => {
 			if (!isPlainObject(row)) return row
 			const stated = readTextValue(row['location'])
@@ -372,20 +398,45 @@ export const markRowsOutsidePlace = <E, R>(
 			// that reaches here written bare — findings stored before the field was
 			// paired keep the shape they were written in, and nothing migrates them.
 			if (stated === null) return row
-			if (valueIsRightKind('location', stated)) return row
-			locationsDropped++
 			// Removed rather than emptied, so the row reads as one that never named a
 			// place — the same as any other field a guard takes away.
-			const { location: _taken, ...rest } = row
-			return rest
+			const withoutPlace = () => {
+				const { location: _taken, ...rest } = row
+				return rest
+			}
+			if (!valueIsRightKind('location', stated)) {
+				locationsDropped++
+				return withoutPlace()
+			}
+			// ── Gate 1b: a place the page it was read on does not establish ──
+			// A firm that writes one landing page per town it travels to has its
+			// place read off a page about a town it merely serves. Same field, same
+			// pass, and the same reason as above: this is about the row's own
+			// honesty, so it runs whether or not the run named an area — and it has
+			// to, because a request naming several towns is held to the province
+			// they sit in, which such a row is genuinely inside.
+			const reading = placeReadOffATownPage(row)
+			if (reading === null) return row
+			refusedTownPages.push({
+				name: judgedRowText(row, 'name'),
+				page: `${reading.host}/${reading.filedAs}`,
+			})
+			return withoutPlace()
 		})
 		const afterGateOne =
-			locationsDropped === 0 ? findings : { ...findings, [listField]: cleaned }
+			locationsDropped === 0 && refusedTownPages.length === 0
+				? findings
+				: { ...findings, [listField]: cleaned }
 
 		// ── Gate 2: nothing was asked ──
 		const area = place.trim()
 		if (area === '')
-			return { ...nothing, findings: afterGateOne, locationsDropped }
+			return {
+				...nothing,
+				findings: afterGateOne,
+				locationsDropped,
+				refusedTownPages,
+			}
 
 		// Identity rather than position ties a verdict to a row, because the walk
 		// that writes the marks reads the list again.
@@ -418,7 +469,12 @@ export const markRowsOutsidePlace = <E, R>(
 			row.citedPages.length > 0
 		const judgeable = rows.filter(saysSomething)
 		if (judgeable.length === 0)
-			return { ...nothing, findings: afterGateOne, locationsDropped }
+			return {
+				...nothing,
+				findings: afterGateOne,
+				locationsDropped,
+				refusedTownPages,
+			}
 
 		// The answer this run already holds, where it still speaks for the row. An
 		// "inside" stands whatever a later pass adds; anything else speaks only for
@@ -556,12 +612,16 @@ export const markRowsOutsidePlace = <E, R>(
 
 		return {
 			findings:
-				marked.length === 0 && cleared === 0 && locationsDropped === 0
+				marked.length === 0 &&
+				cleared === 0 &&
+				locationsDropped === 0 &&
+				refusedTownPages.length === 0
 					? findings
 					: { ...findings, [listField]: withMarks },
 			marked,
 			cleared,
 			locationsDropped,
+			refusedTownPages,
 			asked: judgeable.length,
 			ruled,
 			unclear,

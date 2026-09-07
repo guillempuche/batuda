@@ -4449,6 +4449,24 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													}),
 												)
 											}
+											// Named, not merely counted: a place taken off a real company is
+											// something somebody may want to open the page and disagree with,
+											// and a bare number gives them nothing to open.
+											for (const row of check.refusedTownPages.slice(
+												0,
+												MAX_LOGGED_FIELD_DROPS,
+											)) {
+												yield* Effect.logInfo(
+													'research.place.read_off_town_page',
+												).pipe(
+													Effect.annotateLogs({
+														event: 'research.place.read_off_town_page',
+														research_id: researchId,
+														name: row.name,
+														page: row.page,
+													}),
+												)
+											}
 											for (const row of check.marked.slice(
 												0,
 												MAX_LOGGED_FIELD_DROPS,
@@ -4501,6 +4519,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													'research.place.outside': check.marked.length,
 													'research.place.location_not_a_place':
 														check.locationsDropped,
+													// Apart from the line above: that one is a value that was never a
+													// place, this is a place no page established.
+													'research.place.read_off_town_page':
+														check.refusedTownPages.length,
 												},
 											}
 										}),
