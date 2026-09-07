@@ -350,6 +350,12 @@ Copy `farm-replay.example.json` to your own `farm-replay.json` and fill it with 
 
 To build a corpus, dump the runs you want (`get_research`, or a query against the runs table) and take each prospect's `name`, its unwrapped `website` and `location`, and the towns the request asked about. `addresses` is every address the row rests on **with the website among them** — the website itself, plus every `source_id` the row cites. One list, not two, so a rule cannot pass a row by forgetting that the website is an address as well.
 
+`placeSource` is separate from all of them: it is the page the row's PLACE was read on, `location.source_id` as the row states it. It is kept apart because the question it answers is not "does this row rest on that host" but "did this very place come off that page", and a rule handed the address list cannot tell one from the other. Leave it `null` where the row stated no place, or stated one written without its source — a run stored before that field was paired with its page keeps the shape it was written in.
+
+**`askedAbout` is a set, not an ordered pair, and nothing in it says which place is the province.** A measurement that reads the last entry as the province gets `Montcada i Reixac (Ripollet)` and `Sant Quirze del Vallès (Sabadell)` — areas that are not places, and a check asked about one of those answers a question nobody meant. If what you are grading needs the area a run was actually held to, read it off the run, and remember the splitter answers a request naming several towns with the widest place containing them all: for most of these that is the province, not any town.
+
+**A corpus is cheaper to rebuild than it looks.** `get_research` dumps are what it is built from, and those survive wherever the tool wrote them — so a corpus lost with its worktree is usually a replay away rather than a re-scan. Pass `include: ['sources']` and the response is large enough to land in a file, which is the affordable way to pull twenty-odd runs.
+
 The `.example` file uses `.example` domains throughout. A corpus names real businesses, and calling a named firm a farm in a shared file is a claim about that firm, so keep yours out of git — `.gitignore` covers `eval/*.json` and spares the `.example` templates.
 
 ### Reading the score
@@ -366,16 +372,22 @@ pnpm cli research farm-replay
 
 It reads `eval/farm-replay.json` (a relative `--corpus` is read from the repo root) and grades the rule that ships, out of the same file the pipeline runs — so a number printed here is a number about production rather than about a copy of the rule that drifted. It fetches nothing and calls no model.
 
-Against the shared template it prints:
+The two rules are graded apart, because they answer the two defects that wear the same address shape. Against the shared template it prints:
 
 ```
 10 rows over 7 runs
+
 operator rows taken off: 3/4
-real companies deleted: 0
-per-town landing pages, place refused: 0/2
+  real companies deleted: 0
+
+per-town landing pages, place refused: 2/2
+  real companies deleted: 0
+  places refused in error: 0
 ```
 
-Three of the four, not four: the fourth cites a finance profile and nothing of the operator's own, so no rule reading hosts can reach it. `0/2` is honest too — nothing yet refuses the place on a per-town landing page.
+Three of the four, not four: the fourth cites a finance profile and nothing of the operator's own, so no rule reading hosts can reach it.
+
+Over twenty-two production scans — 364 rows — the same command reads 9/14 operator rows and 8/13 town pages, with no real company deleted and no ordinary place refused. The five town pages it misses are named in `town-page-guard.ts`, along with why each is out of reach.
 
 ### Handing it a rule of your own
 
@@ -389,5 +401,11 @@ const score = scoreFarmReplay(
 ```
 
 Two things it does that are easy to get wrong on your own. It asks the check **one run at a time** — a rule reads addresses across a whole list, and rows from two scans handed over together would be read against each other in a list no scan ever produced. And it diffs **by id, never by name**: a run repeats a company name across rows far more often than it repeats an id, and joined by name two rows take each other's verdict.
+
+The town-page check is bridged the same way, by `townPageJudge`. That one is smaller — the rule reads one row — but it has its own trap: the place has to go back into the row **paired with the page it was read on**, because reading that pairing is the whole rule. Hand it a bare place and every row comes back `keep`, which looks exactly like a rule that catches nothing:
+
+```ts
+const score = scoreFarmReplay(rows, townPageJudge({ reads: placeReadOffATownPage }))
+```
 
 For a rule of your own, write a `FarmJudge` — handed the whole list, answering by id. A rule that really does read one row at a time is lifted with `rowByRow` and loses nothing. A row your answer leaves out is kept, so a rule that reaches no conclusion is never read as reaching one.

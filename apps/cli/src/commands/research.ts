@@ -33,6 +33,7 @@ import {
 	ExtractLanguageModel,
 	evalSpanAttributes,
 	evalSummaryAttributes,
+	type FarmReplayScore,
 	type FramingOutcome,
 	type GoldenExpectation,
 	judgeOrganisationKinds,
@@ -52,6 +53,7 @@ import {
 	parseContactGoldenSet,
 	parseFarmCorpus,
 	parseGoldenSet,
+	placeReadOffATownPage,
 	placesNamed,
 	probeModelCapabilities,
 	probeReachability,
@@ -69,6 +71,7 @@ import {
 	scoreContactRun,
 	scoreFarmReplay,
 	scoreRun,
+	townPageJudge,
 	UsageMeter,
 } from '@batuda/research'
 
@@ -1457,30 +1460,49 @@ export const researchFarmReplay = (input: { readonly corpus: string }) =>
 			return
 		}
 
-		const score = scoreFarmReplay(
+		// Two rules, graded apart. They answer the two defects that wear the same
+		// address shape, and one number over both would let a rule that simply
+		// dropped everything look good at exactly the thing this exists to catch.
+		const network = scoreFarmReplay(
 			rows,
 			networkGuardJudge({ drop: dropNetworkRows, placesOf: placesNamed }),
 		)
+		const townPages = scoreFarmReplay(
+			rows,
+			townPageJudge({ reads: placeReadOffATownPage }),
+		)
 		const runs = new Set(rows.map(row => JSON.stringify(row.askedAbout))).size
 
-		yield* Console.log(`${score.rows} rows over ${runs} runs`)
-		yield* Console.log(
-			`operator rows taken off: ${score.networkDropped}/${score.networkTotal}`,
-		)
 		// Printed even at zero, and by name. A count says a rule is a few percent
 		// wrong; a name says which company somebody paid to find would have gone,
 		// and that is the number this exists to protect.
+		const costOf = (score: FarmReplayScore) =>
+			Effect.gen(function* () {
+				yield* Console.log(
+					`  real companies deleted: ${score.companiesDeleted.length}`,
+				)
+				for (const name of score.companiesDeleted) {
+					yield* Console.log(`    deleted: ${name}`)
+				}
+			})
+
+		yield* Console.log(`${network.rows} rows over ${runs} runs`)
+		yield* Console.log('')
 		yield* Console.log(
-			`real companies deleted: ${score.companiesDeleted.length}`,
+			`operator rows taken off: ${network.networkDropped}/${network.networkTotal}`,
 		)
-		for (const name of score.companiesDeleted) {
-			yield* Console.log(`  deleted: ${name}`)
+		yield* costOf(network)
+		yield* Console.log('')
+		yield* Console.log(
+			`per-town landing pages, place refused: ${townPages.placeRefused}/${townPages.placeTotal}`,
+		)
+		yield* costOf(townPages)
+		// The cheaper cost, and only this rule can pay it: an ordinary company left
+		// wearing a doubt about its place that it did not earn.
+		yield* Console.log(
+			`  places refused in error: ${townPages.placesRefusedInError.length}`,
+		)
+		for (const name of townPages.placesRefusedInError) {
+			yield* Console.log(`    refused: ${name}`)
 		}
-		// Always nothing out of however many, because this rule only ever drops a
-		// row or leaves it. It is printed all the same: those rows are a real defect
-		// wearing the same address shape, and a line reading zero is how somebody
-		// finds out nothing yet answers them.
-		yield* Console.log(
-			`per-town landing pages, place refused: ${score.placeRefused}/${score.placeTotal}`,
-		)
 	})
