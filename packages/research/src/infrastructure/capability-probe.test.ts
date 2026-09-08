@@ -1,12 +1,81 @@
+import { Effect, Redacted } from 'effect'
+import {
+	HttpClient,
+	type HttpClientError,
+	type HttpClientRequest,
+	HttpClientResponse,
+} from 'effect/unstable/http'
 import { describe, expect, it } from 'vitest'
 
 import {
 	classifyJsonSchemaResponse,
 	classifyToolChoiceResponse,
 	jsonSchemaProbeBody,
+	probeModelCapabilities,
 	toolChoiceProbeBody,
 	verdictForStatus,
 } from './capability-probe'
+
+// The body groq returns when the model called the tool but filled its arguments
+// in wrongly — copied from a real run, because the exact wording is what tells
+// this apart from a vendor saying the model cannot call tools at all.
+const TOOL_CALL_DID_NOT_VALIDATE = JSON.stringify({
+	error: {
+		message:
+			"Tool call validation failed: parameters for tool web_search did not match schema: errors: [missing properties: 'limit', additionalProperties 'topn' not allowed]",
+		type: 'invalid_request_error',
+		code: 'tool_use_failed',
+	},
+})
+
+const CALLED_A_TOOL = JSON.stringify({
+	choices: [
+		{ message: { tool_calls: [{ function: { name: 'web_search' } }] } },
+	],
+})
+
+const RETURNED_JSON = JSON.stringify({
+	choices: [{ message: { content: '{"title":"a","year":1}' } }],
+})
+
+/**
+ * A client that answers with the given replies in order, counting how many times
+ * it was asked. The last reply repeats once the script runs out, so a test only
+ * has to write the answers it cares about.
+ */
+const scriptedClient = (
+	replies: ReadonlyArray<{ status: number; body: string }>,
+	asked: { count: number },
+): HttpClient.HttpClient =>
+	HttpClient.makeWith<
+		HttpClientError.HttpClientError,
+		never,
+		HttpClientError.HttpClientError,
+		never
+	>(
+		effect =>
+			Effect.flatMap(effect, (request: HttpClientRequest.HttpClientRequest) => {
+				const reply = replies[asked.count] ?? replies[replies.length - 1]!
+				asked.count += 1
+				return Effect.succeed(
+					HttpClientResponse.fromWeb(
+						request,
+						new Response(reply.body, { status: reply.status }),
+					),
+				)
+			}),
+		Effect.succeed,
+	)
+
+const probeWith = (client: HttpClient.HttpClient) =>
+	Effect.runPromise(
+		probeModelCapabilities({
+			baseUrl: 'https://api.example.test/v1',
+			apiKey: Redacted.make('test-key'),
+			model: 'openai/gpt-oss-120b',
+			tools: [{ type: 'function', function: { name: 'web_search' } }],
+		}).pipe(Effect.provideService(HttpClient.HttpClient, client)),
+	)
 
 describe('classifyToolChoiceResponse', () => {
 	describe('when the model emitted a tool call', () => {
@@ -172,6 +241,17 @@ describe('probe request bodies', () => {
 				expect(verdict).toBe('unknown')
 			})
 
+			it('should not blame the model when a tool call did not validate', () => {
+				// GIVEN a refusal about the arguments this one answer chose — the
+				// model did call the tool, it just filled it in wrongly, and the
+				// next answer may well be right
+				const verdict = verdictForStatus(400, TOOL_CALL_DID_NOT_VALIDATE)
+
+				// WHEN classified — THEN it is held back for a person, because
+				// nothing here says the model cannot do the work
+				expect(verdict).toBe('unknown')
+			})
+
 			it('should blame the model when it is no longer served', () => {
 				// GIVEN a model the vendor has retired
 				// WHEN classified — THEN it counts against the model: gone is as good a
@@ -225,6 +305,93 @@ describe('probe request bodies', () => {
 			}
 			expect(responseFormat.type).toBe('json_schema')
 			expect(responseFormat.json_schema.strict).toBe(true)
+		})
+	})
+})
+
+describe('probeModelCapabilities', () => {
+	describe('when one answer fails and the next one works', () => {
+		it('should report the capability as met', async () => {
+			// GIVEN a model whose first tool call did not validate and whose
+			// second one did — the same model answering twice, differently
+			const asked = { count: 0 }
+			const client = scriptedClient(
+				[
+					{ status: 400, body: TOOL_CALL_DID_NOT_VALIDATE },
+					{ status: 200, body: CALLED_A_TOOL },
+					{ status: 200, body: RETURNED_JSON },
+				],
+				asked,
+			)
+
+			// WHEN probed
+			const result = await probeWith(client)
+
+			// THEN the model is not blamed for the answer that went wrong
+			expect(result.toolChoice.ok).toBe(true)
+			expect(result.passed).toBe(true)
+		})
+	})
+
+	describe('when every answer fails the same way', () => {
+		it('should report the failure and say how many times it asked', async () => {
+			// GIVEN a model that never produces a usable tool call
+			const asked = { count: 0 }
+			const client = scriptedClient(
+				[{ status: 400, body: TOOL_CALL_DID_NOT_VALIDATE }],
+				asked,
+			)
+
+			// WHEN probed
+			const result = await probeWith(client)
+
+			// THEN it is reported as failed, and the report says how hard we tried
+			// so a reader can weigh it
+			expect(result.toolChoice.ok).toBe(false)
+			expect(result.toolChoice.detail).toContain('3 attempts')
+
+			// AND it is still held back rather than counted against the model,
+			// because the refusal never said the model cannot do the work
+			expect(result.toolChoice.verdict).toBe('unknown')
+		})
+	})
+
+	describe('when the vendor never gives a usable answer', () => {
+		it('should ask once rather than spending the run on a slow vendor', async () => {
+			// GIVEN the vendor's own side failing, which says nothing about the
+			// model and is the slowest kind of answer to come back
+			const asked = { count: 0 }
+			const client = scriptedClient(
+				[{ status: 503, body: '{"error":"upstream unavailable"}' }],
+				asked,
+			)
+
+			// WHEN probed
+			const result = await probeWith(client)
+
+			// THEN each of the two capabilities was asked exactly once. Asking
+			// again would multiply the slowest case by three, and the scheduled
+			// check has a fixed slot of time to finish in.
+			expect(asked.count).toBe(2)
+			expect(result.toolChoice.verdict).toBe('transport')
+		})
+	})
+
+	describe('when the key is refused', () => {
+		it('should take that at its word rather than asking again', async () => {
+			// GIVEN a vendor rejecting the key, which no amount of retrying fixes
+			const asked = { count: 0 }
+			const client = scriptedClient(
+				[{ status: 401, body: '{"error":"invalid api key"}' }],
+				asked,
+			)
+
+			// WHEN probed
+			const result = await probeWith(client)
+
+			// THEN each of the two capabilities was asked exactly once
+			expect(asked.count).toBe(2)
+			expect(result.toolChoice.verdict).toBe('auth')
 		})
 	})
 })
