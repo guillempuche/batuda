@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-09-08 (internal-v2026.9.8)
+
+### Bug Fixes
+
+* **internal:** read the phase the same way the live frame does ([8c6e66e](https://github.com/guillempuche/batuda/commit/8c6e66e228c774791cc68d5f667a9d82209759a9))
+* say who every mail line is about, and name every one of them ([e297af8](https://github.com/guillempuche/batuda/commit/e297af8a81b44936942a8e80097e6740040feb3e))
+
+### CI/CD
+
+* **release:** ui v2026.9.5 ([46d0165](https://github.com/guillempuche/batuda/commit/46d0165ab1f2500b790c021510ddb0e7692cb4f6))
+
 ## 2026-09-05 (internal-v2026.9.5-2)
 
 ### Features
