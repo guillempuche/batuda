@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-09-08 (server-v2026.9.8)
+
+### Features
+
+* **research:** drop scan rows that are one operator, not companies ([cdecc86](https://github.com/guillempuche/batuda/commit/cdecc862f4bdd902038ba78cae6d38b05453a7c0))
+* **research:** give every field on a scan row one shape ([fdf90dd](https://github.com/guillempuche/batuda/commit/fdf90ddd89b06d8f2abcc09b5145f8cbe64e13d0))
+
+### Bug Fixes
+
+* say who every mail line is about, and name every one of them ([e297af8](https://github.com/guillempuche/batuda/commit/e297af8a81b44936942a8e80097e6740040feb3e))
+
+### Refactoring
+
+* compile every styled template at build time ([a13e660](https://github.com/guillempuche/batuda/commit/a13e660217c06326eb302f142d55858627e65bc1))
+
+### CI/CD
+
+* **release:** ui v2026.9.5 ([46d0165](https://github.com/guillempuche/batuda/commit/46d0165ab1f2500b790c021510ddb0e7692cb4f6))
+
 ## 2026-09-05 (server-v2026.9.5-1)
 
 ### Bug Fixes
