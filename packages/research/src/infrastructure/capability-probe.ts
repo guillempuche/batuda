@@ -88,9 +88,12 @@ const fail = (
  *
  * A 404 is the model being gone, which is as good a reason to stop trusting it
  * as a refusal. A 401 or 403 is about the key. A 429 is about how fast we asked.
- * Anything from the vendor's own side says nothing at all. A plain 400 usually
- * is the model declining the request, but not always — a model that needs terms
- * accepted answers exactly the same way — so the body decides.
+ * Anything from the vendor's own side says nothing at all.
+ *
+ * A 400 only counts against the model when the vendor says so in as many words:
+ * it can just as easily be terms waiting to be accepted, or one answer whose tool
+ * arguments came out wrong while the next one would have been fine. A refusal
+ * nobody can read is held back for a person rather than blamed on the model.
  */
 export const verdictForStatus = (
 	status: number,
@@ -106,9 +109,7 @@ export const verdictForStatus = (
 			lower.includes('does not support') ||
 			lower.includes('not supported') ||
 			lower.includes('unsupported')
-		if (aboutTheModel) return 'capability'
-		if (lower.includes('terms') || lower.includes('quota')) return 'unknown'
-		return 'capability'
+		return aboutTheModel ? 'capability' : 'unknown'
 	}
 	return 'unknown'
 }
@@ -268,6 +269,50 @@ const runCheck = (
 	)
 
 /**
+ * How many times one capability is asked for before a failure is believed.
+ *
+ * The same request can come back a good answer one time and a bad one the next,
+ * so concluding from a single bad answer reads a model that mostly works as one
+ * that never does — which is how a working spare gets reported as broken. Only a
+ * model that fails every time has said something that still holds tomorrow.
+ */
+const MAX_ATTEMPTS = 3
+
+/**
+ * One capability check, asked again while a failure could still be luck.
+ *
+ * Only what the model itself said is worth asking twice. A rejected key or a rate
+ * limit is not the model choosing badly, and will answer the same way however
+ * often we ask.
+ */
+const runCheckUntilSettled = (
+	client: HttpClient.HttpClient,
+	url: string,
+	apiKey: Redacted.Redacted<string>,
+	body: Record<string, unknown>,
+	classify: (json: unknown) => ProbeCheck,
+): Effect.Effect<ProbeCheck> =>
+	Effect.gen(function* () {
+		let attemptsMade = 1
+		let check = yield* runCheck(client, url, apiKey, body, classify)
+		while (
+			!check.ok &&
+			attemptsMade < MAX_ATTEMPTS &&
+			// Only the model's own answers are asked again: asking a slow or broken
+			// vendor three times over runs the check out of the time it is given.
+			(check.verdict === 'capability' || check.verdict === 'unknown')
+		) {
+			attemptsMade += 1
+			check = yield* runCheck(client, url, apiKey, body, classify)
+		}
+		// Say how hard we tried, so a reader can weigh the verdict rather than
+		// take it on trust.
+		return check.ok || attemptsMade === 1
+			? check
+			: { ...check, detail: `${check.detail} (${attemptsMade} attempts)` }
+	})
+
+/**
  * Probe one model's two required capabilities against an OpenAI-compatible endpoint.
  * Requires an `HttpClient`; never fails — each capability is reported as a check.
  */
@@ -280,14 +325,14 @@ export const probeModelCapabilities = (input: {
 	Effect.gen(function* () {
 		const client = yield* HttpClient.HttpClient
 		const url = `${input.baseUrl.replace(/\/$/, '')}/chat/completions`
-		const toolChoice = yield* runCheck(
+		const toolChoice = yield* runCheckUntilSettled(
 			client,
 			url,
 			input.apiKey,
 			toolChoiceProbeBody(input.model, input.tools),
 			classifyToolChoiceResponse,
 		)
-		const jsonSchema = yield* runCheck(
+		const jsonSchema = yield* runCheckUntilSettled(
 			client,
 			url,
 			input.apiKey,
