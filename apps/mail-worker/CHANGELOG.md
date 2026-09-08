@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-09-08 (mail-worker-v2026.9.8)
+
+### Bug Fixes
+
+* **cicd:** let the IMAP tests find the mail server themselves ([c8dc65b](https://github.com/guillempuche/batuda/commit/c8dc65b8a256d7959732f0d9732c59177733c0d9))
+* say who every mail line is about, and name every one of them ([e297af8](https://github.com/guillempuche/batuda/commit/e297af8a81b44936942a8e80097e6740040feb3e))
+
+### Tests
+
+* **mail-worker:** cover mail that will not load, and what it counts as ([e5fd550](https://github.com/guillempuche/batuda/commit/e5fd5507eda8d74593ff55777ee326cd2e63d736))
+
 ## 2026-09-05 (mail-worker-v2026.9.5)
 
 ### Bug Fixes
