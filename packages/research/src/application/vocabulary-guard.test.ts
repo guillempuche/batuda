@@ -163,6 +163,25 @@ describe('mapCountry', () => {
 			expect(mapCountry('')).toBeNull()
 		})
 	})
+
+	describe('when the value names a country and then says something about it', () => {
+		it('should read the country and ignore the aside', () => {
+			// GIVEN the shapes real scans have written, where the country is stated
+			// plainly and the bracket only says how far the company reaches
+			expect(mapCountry('Spain (global)')).toBe('ES')
+			expect(mapCountry('United States (global)')).toBe('US')
+		})
+
+		it('should leave a country the run was unsure of alone', () => {
+			// GIVEN a value where the question mark is the run saying it does not
+			// know which country this is
+			const hedged = 'Portugal? (uncertain – site uses .br domain)'
+
+			// WHEN folded — THEN it stays as written, because answering "PT" would
+			// state as fact something the run explicitly did not settle
+			expect(mapCountry(hedged)).toBe(hedged)
+		})
+	})
 })
 
 describe('constrainVocabulary', () => {
@@ -417,6 +436,73 @@ describe('a country named in its own writing', () => {
 			// THEN it survives as written. Refusing what cannot be mapped would throw
 			// away real countries simply for being absent from a hand-written list
 			expect(mapCountry('Freedonia')).toBe('Freedonia')
+		})
+	})
+})
+
+describe('constrainVocabulary on a scan row', () => {
+	const prospects = (countries: unknown) => ({
+		prospects: [{ name: 'Acme', countries }],
+	})
+	const countriesOf = (result: { findings: unknown }): unknown =>
+		(
+			(result.findings as { prospects: ReadonlyArray<Record<string, unknown>> })
+				.prospects[0] as Record<string, unknown>
+		)['countries']
+
+	describe('when a scan names its countries in words', () => {
+		it('should fold every one of them to a code', () => {
+			// GIVEN the spellings real scans have written into the list
+			const result = constrainVocabulary(
+				prospects(['Spain', 'España', 'Portugal', 'United States']),
+			)
+
+			// WHEN folded — THEN each is a code, and the two spellings of Spain
+			// become one entry rather than the same country listed twice
+			expect(countriesOf(result)).toEqual(['ES', 'PT', 'US'])
+			expect(result.mapped).toBe(4)
+		})
+
+		it('should leave a list already written as codes alone', () => {
+			// GIVEN a list the model wrote correctly
+			const result = constrainVocabulary(prospects(['ES', 'FR']))
+
+			// WHEN folded — THEN nothing is rewritten and nothing is counted
+			expect(countriesOf(result)).toEqual(['ES', 'FR'])
+			expect(result.mapped).toBe(0)
+		})
+	})
+
+	describe('when the list holds junk beside a real country', () => {
+		it('should drop the junk and keep the country', () => {
+			// GIVEN a list where the model filled one slot with a placeholder
+			const result = constrainVocabulary(
+				prospects(['Spain', 'N/A', 'https://acme.example']),
+			)
+
+			// WHEN folded — THEN the country survives and the two placeholders go
+			expect(countriesOf(result)).toEqual(['ES'])
+			expect(result.blanked).toBe(2)
+		})
+
+		it('should drop the field when nothing in it was usable', () => {
+			// GIVEN a list of nothing but placeholders
+			const result = constrainVocabulary(prospects(['N/A', '']))
+
+			// WHEN folded — THEN the key is gone rather than left as an empty list,
+			// which would read as a run that looked and found no country
+			expect(countriesOf(result)).toBeUndefined()
+		})
+	})
+
+	describe('when the list is not a list of countries at all', () => {
+		it('should leave a shape it cannot read where it is', () => {
+			// GIVEN an entry that is not a value this mapper understands
+			const result = constrainVocabulary(prospects([{ odd: 'shape' }, 'Spain']))
+
+			// WHEN folded — THEN the country is folded and the odd entry survives,
+			// because one unreadable entry is not a reason to lose the list
+			expect(countriesOf(result)).toEqual([{ odd: 'shape' }, 'ES'])
 		})
 	})
 })
