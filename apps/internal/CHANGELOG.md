@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-09-09 (internal-v2026.9.9)
+
+### Features
+
+* grade the town-page rule on rows real scans returned ([d101c99](https://github.com/guillempuche/batuda/commit/d101c993fcf363564a4868da790dc21c3852c590))
+
+### Bug Fixes
+
+* **research:** stop a town page deciding where a firm is ([8adcaa0](https://github.com/guillempuche/batuda/commit/8adcaa091158084e005469c8254d6cf4b4965f10))
+* **research:** stop condemning a model on one bad answer ([6600879](https://github.com/guillempuche/batuda/commit/6600879e91abe1e738137e73b5c84d189497a096))
+
 ## 2026-09-08 (internal-v2026.9.8)
 
 ### Bug Fixes
