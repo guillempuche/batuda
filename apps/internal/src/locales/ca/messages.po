@@ -512,8 +512,16 @@ msgid "Added as a verified lead"
 msgstr "Afegit com a oportunitat verificada"
 
 #: src/components/research/findings/prospect-scan-view.tsx
+msgid "Added as a verified lead, without its {left}"
+msgstr "Afegit com a oportunitat verificada, sense el seu {left}"
+
+#: src/components/research/findings/prospect-scan-view.tsx
 msgid "Added as an unverified lead"
 msgstr "Afegit com a oportunitat sense verificar"
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Added as an unverified lead, without its {left}"
+msgstr "Afegit com a oportunitat sense verificar, sense el seu {left}"
 
 #: src/components/research/findings/prospect-scan-view.tsx
 msgid "Added, but could not be marked verified"
@@ -1871,6 +1879,10 @@ msgstr "carregant el recompte"
 #: src/components/research/findings/prospect-scan-view.tsx
 msgid "Countries"
 msgstr "Països"
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "country"
+msgstr "país"
 
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
@@ -6499,6 +6511,10 @@ msgstr "Encaix feble"
 #: src/components/research/findings/competitor-scan-view.tsx
 msgid "Weaknesses"
 msgstr "Punts febles"
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "website"
+msgstr "lloc web"
 
 #: src/components/contacts/channel-kind-label.tsx
 #: src/components/research/run-labels.ts

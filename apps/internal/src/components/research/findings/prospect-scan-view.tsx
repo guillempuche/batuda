@@ -15,6 +15,10 @@ import { PriButton, usePriToast } from '@batuda/ui/pri'
 import { SafeLink } from '#/components/research/safe-link'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import {
+	buildLeadPayload,
+	type DroppedLeadField,
+} from './prospect-lead-payload'
+import {
 	type Citation,
 	CitationList,
 	type CommonFindings,
@@ -326,33 +330,20 @@ function AddAsLeadButton({
 	)
 	const [busy, setBusy] = useState(false)
 
-	// Only the pages that say both what platform they are and where. These come out
-	// of a model's answer, and one blank entry would otherwise make the whole
-	// request invalid — losing the lead over a footnote, with nothing on screen to
-	// say which row was at fault.
-	const usableProfiles = (prospect.social_profiles ?? [])
-		.filter(p => p.kind.trim() !== '' && p.value.trim() !== '')
-		.map(p => ({ kind: p.kind.trim(), value: p.value.trim() }))
+	// What each field the CRM could not store is called, in words a person reads.
+	// The builder answers with the field, not the sentence, so it can stay clear
+	// of the translation macros the way the other logic beside these components
+	// does.
+	const droppedLabel: Record<DroppedLeadField, MessageDescriptor> = {
+		country: msg`country`,
+		website: msg`website`,
+	}
 
 	const add = async () => {
 		setBusy(true)
 		const slug = toSlug(prospect.name)
-		const exit = await createCompany({
-			payload: {
-				name: prospect.name,
-				slug,
-				status: 'prospect',
-				...(prospect.industry ? { industry: prospect.industry } : {}),
-				// A company row holds one country, and a scan may have named several. The
-				// first is the one it is registered in, which is what the row means.
-				...(prospect.countries?.[0] ? { country: prospect.countries[0] } : {}),
-				...(prospect.location ? { location: prospect.location } : {}),
-				...(prospect.website ? { website: prospect.website } : {}),
-				...(usableProfiles.length > 0
-					? { socialProfiles: usableProfiles }
-					: {}),
-			},
-		})
+		const { payload, dropped } = buildLeadPayload(prospect, slug)
+		const exit = await createCompany({ payload })
 		if (exit._tag !== 'Success') {
 			setBusy(false)
 			toast.add({ title: t`Could not add as a lead`, type: 'error' })
@@ -376,10 +367,22 @@ function AddAsLeadButton({
 		// A wanted vouch that did not land is its own outcome: the company is on
 		// file, and 'unverified' would read as the run's doing rather than as
 		// something to try again.
+		// What the run said but the CRM could not hold. Named on the way past
+		// rather than left to be noticed: the lead is on file either way, and a
+		// company that quietly arrived without its country reads as a company that
+		// never had one.
+		const left = dropped.map(field => t(droppedLabel[field])).join(', ')
 		if (vouchWanted && !verified) {
 			toast.add({
 				title: t`Added, but could not be marked verified`,
 				type: 'error',
+			})
+		} else if (left !== '') {
+			toast.add({
+				title: verified
+					? t`Added as a verified lead, without its ${left}`
+					: t`Added as an unverified lead, without its ${left}`,
+				type: 'success',
 			})
 		} else {
 			toast.add({
