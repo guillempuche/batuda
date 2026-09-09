@@ -45,6 +45,10 @@
 		"./application/schemas": {
 			"types": "./src/application/schemas/index.ts",
 			"import": "./src/application/schemas/index.ts"
+		},
+		"./application/vocabulary-guard": {
+			"types": "./src/application/vocabulary-guard.ts",
+			"import": "./src/application/vocabulary-guard.ts"
 		}
 	},
 	"scripts": {
