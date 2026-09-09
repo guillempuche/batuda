@@ -67,12 +67,18 @@ const SearchResponse = Schema.Struct({
 const statusRecoverable = (status: number): boolean =>
 	status === 429 || status >= 500
 
+// Only 402 (no credit) means the same answer awaits every later lookup this run
+// makes, which is what the budget needs to hear. 401 is a dead key: terminal
+// too, but not an allowance running out.
+const isQuotaExhausted = (status: number): boolean => status === 402
+
 const failStatus = (status: number) =>
 	Effect.fail(
 		new ProviderError({
 			provider: 'librebor',
 			message: `registry lookup failed: HTTP ${status}`,
 			recoverable: statusRecoverable(status),
+			quotaExhausted: isQuotaExhausted(status),
 		}),
 	)
 

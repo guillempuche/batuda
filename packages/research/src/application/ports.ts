@@ -34,6 +34,12 @@ export class ResearchRunContext extends Context.Service<
 		// company, and that alone turns the re-anchoring off.
 		readonly entityTargets?: EntityTargets | null | undefined
 		readonly entityName?: string | undefined
+		// What kind of run this is, so a handler that spends money can refuse a run
+		// that is not allowed to. The tools a scan may call are already narrowed
+		// where the request is built, but that narrowing is the provider honouring
+		// what it was sent, and a paid call is the wrong place to find out that one
+		// did not.
+		readonly schemaName?: string | undefined
 	}
 >()('research/ResearchRunContext') {}
 
@@ -277,14 +283,21 @@ export class ResearchEventSink extends Context.Service<
 // ── Budget ──
 
 /**
- * What came of paying for a vendor call: the answer that was bought, or word
- * that this run already paid for the same call and holds the answer somewhere
- * — never a bare value, so a caller cannot spend twice by mistaking the second
- * for the first.
+ * What came of paying for a vendor call: the answer that was bought, word that
+ * this run already paid for the same call and holds the answer somewhere, or
+ * word that the vendor's own allowance is spent — never a bare value, so a
+ * caller cannot spend twice by mistaking one for another.
  */
 export type PaidCall<A> =
 	| { readonly _tag: 'bought'; readonly value: A }
 	| { readonly _tag: 'already_charged' }
+	/**
+	 * This vendor already told the run its paid allowance is spent, so nothing
+	 * was charged and nothing was called. An outcome rather than a failure: the
+	 * caller carries on with what it can do without that vendor, exactly as it
+	 * would for a vendor that had nothing to say.
+	 */
+	| { readonly _tag: 'vendor_refused'; readonly provider: string }
 
 export interface BudgetService {
 	readonly chargeCheap: (
@@ -311,6 +324,11 @@ export interface BudgetService {
 	 * answer it never got. A call that fails hands the run's own allowance back;
 	 * a repeat of one already paid for in this run comes back as
 	 * `already_charged` and the vendor is not called again.
+	 *
+	 * Once a vendor has said its allowance is spent, every later call to that
+	 * same vendor in this run comes back as `vendor_refused` without charging.
+	 * A register with no credit answers every lookup the same way, and paying
+	 * the flat price each time buys a run nothing but a smaller allowance.
 	 *
 	 * The call is passed as a function, not as a ready-made effect, so nothing
 	 * of it is built until the money is actually set aside.

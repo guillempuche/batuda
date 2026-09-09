@@ -20,6 +20,7 @@
 import { Cause, Effect, Schema } from 'effect'
 import {
 	AiError,
+	type LanguageModel,
 	OpenAiStructuredOutput,
 	Tool,
 	Toolkit,
@@ -31,9 +32,12 @@ import {
 	approvalRequiredResult,
 	BudgetExceeded,
 	noRegistryResult,
+	paidToolBarredResult,
+	registryUnavailableResult,
 } from '../domain/errors'
 import { ScrapedPage } from '../domain/types'
 import { ContactDiscovery } from './contact-discovery'
+import { isDiscoveryScan } from './discovery-scan'
 import {
 	Budget,
 	RegistryRouter,
@@ -170,12 +174,46 @@ export const researchToolkit = Toolkit.make(
 	DiscoverContactsTool,
 )
 
+/** Every tool name the toolkit above holds, for anything that names a subset. */
+type ResearchToolName =
+	(typeof researchToolkit.tools)[keyof typeof researchToolkit.tools]['name']
+
+// What a discovery scan may reach for. The two paid tools are left out because a
+// scan is asked for a list of companies, while buying a register record or a set
+// of contacts is work about ONE of them — the register seeding step already
+// refuses to do it for a scan, and leaving the tools on the wire lets the model
+// do by hand what that step declines to do for it. A scan that wants either says
+// so under `pending_paid_actions` and a person decides.
+const SCAN_TOOLS: ReadonlyArray<ResearchToolName> = [
+	'web_search',
+	'scrape_page',
+]
+
+/**
+ * Which tools this round may call, and whether it must call one.
+ *
+ * Round one is forced either way: a model that answers from memory leaves no
+ * sources behind and fails the grounding gate on a company that is perfectly
+ * real. Later rounds are free to reflect instead.
+ */
+export const agentToolChoice = (
+	schemaName: string,
+	round: number,
+): LanguageModel.ToolChoice<ResearchToolName> => {
+	const mode = round === 1 ? ('required' as const) : ('auto' as const)
+	return isDiscoveryScan(schemaName) ? { mode, oneOf: SCAN_TOOLS } : mode
+}
+
 /**
  * The tool list written out exactly as it is sent to a provider.
  *
  * A provider can accept a simple made-up tool and still reject these over a
  * detail of how one argument is described, so anything asking "would you accept
  * our tools?" has to ask with the real ones.
+ *
+ * Every tool, including the two a scan is not offered: a scan narrows what the
+ * model may CALL, while this asks whether a provider will accept the definitions
+ * at all, and only the widest set answers that for every run.
  */
 export const researchToolkitWireFormat = (): ReadonlyArray<
 	Record<string, unknown>
@@ -305,7 +343,16 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 			country: hintCountry,
 			entityTargets,
 			entityName,
+			schemaName,
 		} = yield* ResearchRunContext
+
+		// A scan is not offered the paid tools, and this is where that is true
+		// rather than merely asked for: the narrowing sent with the request is the
+		// provider being told what to allow, and a paid call is the wrong place to
+		// discover that one did not listen. Costs nothing when the narrowing works,
+		// which is every time it does.
+		const paidToolBarred =
+			schemaName !== undefined && isDiscoveryScan(schemaName)
 
 		// Each tool below reports a failure in three steps, in this order: log an
 		// unexpected one, turn an expected stop into the sentence the model should
@@ -474,6 +521,7 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 
 			registry_lookup: params =>
 				Effect.gen(function* () {
+					if (paidToolBarred) return paidToolBarredResult('registry_lookup')
 					const country = params.country.toUpperCase()
 					// Find out whether there is a register to ask before paying to ask
 					// it. Charging first meant a country Batuda has no register for
@@ -497,11 +545,16 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 					)
 					// The register charges per lookup, so a repeat of one this run
 					// already bought would be paid for twice for the same answer.
-					return outcome._tag === 'already_charged'
-						? alreadyLookedUpResult(
-								`${params.tax_id ?? params.query ?? ''} (${country})`,
-							)
-						: outcome.value
+					if (outcome._tag === 'already_charged')
+						return alreadyLookedUpResult(
+							`${params.tax_id ?? params.query ?? ''} (${country})`,
+						)
+					// Told as a result rather than a failure, and named as OUR shortfall:
+					// a model handed a bare error about a register tends to read it as
+					// something about the company it asked after.
+					if (outcome._tag === 'vendor_refused')
+						return registryUnavailableResult(country)
+					return outcome.value
 				}).pipe(
 					// A registry-less country is a routing answer, not a failure:
 					// hand it back as data so the model can switch to discover_contacts.
@@ -532,25 +585,24 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 			// Reuses this run's id + budget so paid enrichment/verification lands on
 			// the run and its cap applies — no separate anchor run or allowance.
 			discover_contacts: params =>
-				contactDiscovery
-					.discover({
+				Effect.gen(function* () {
+					if (paidToolBarred) return paidToolBarredResult('discover_contacts')
+					return yield* contactDiscovery.discover({
 						companyName: params.company_name,
 						domain: params.domain,
 						country: params.country ?? undefined,
 						runContext: { researchId, budget },
 					})
-					.pipe(
-						Effect.catchCause(cause =>
-							mapToolError('discover_contacts')(cause),
-						),
-						Effect.withSpan('research.tool.discover_contacts', {
-							attributes: {
-								'research.tool': 'discover_contacts',
-								'research.run_id': researchId,
-								domain: params.domain,
-							},
-						}),
-					),
+				}).pipe(
+					Effect.catchCause(cause => mapToolError('discover_contacts')(cause)),
+					Effect.withSpan('research.tool.discover_contacts', {
+						attributes: {
+							'research.tool': 'discover_contacts',
+							'research.run_id': researchId,
+							domain: params.domain,
+						},
+					}),
+				),
 		})
 	}),
 )

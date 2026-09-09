@@ -28,6 +28,7 @@ import {
 	SearchProvider,
 } from './ports'
 import {
+	agentToolChoice,
 	isUnsupportedScrapeUrl,
 	RegistryLookupTool,
 	researchToolkit,
@@ -1078,6 +1079,88 @@ describe('stripPlaceholderSiteFilters', () => {
 	})
 })
 
+describe('agentToolChoice', () => {
+	// The tools that charge the organisation. Listed once so a new paid tool
+	// only has to be added here to be held to the same test.
+	const paidTools = ['registry_lookup', 'discover_contacts']
+	const oneOfFor = (schema: string, round: number): ReadonlyArray<string> => {
+		const choice = agentToolChoice(schema, round)
+		// Only a scan gets the object form; anything else names no list at all.
+		return typeof choice === 'object' && 'oneOf' in choice ? choice.oneOf : []
+	}
+
+	describe('when the run is a discovery scan', () => {
+		it('should offer the free tools only, for either kind of scan', () => {
+			// GIVEN both schemas that are discovery scans
+			// WHEN each is asked what a later round may call
+			// THEN both get searching and reading, and nothing that spends
+			expect(oneOfFor('prospect_scan_v1', 2)).toEqual([
+				'web_search',
+				'scrape_page',
+			])
+			expect(oneOfFor('competitor_scan_v1', 2)).toEqual([
+				'web_search',
+				'scrape_page',
+			])
+		})
+
+		it('should keep every paid tool out of reach', () => {
+			// GIVEN a scan on its first and a later round
+			// WHEN the offered lists are read
+			// THEN neither carries a tool that charges the organisation
+			for (const round of [1, 2]) {
+				for (const paid of paidTools) {
+					expect(oneOfFor('prospect_scan_v1', round)).not.toContain(paid)
+				}
+			}
+		})
+
+		it('should still force a tool call on the first round', () => {
+			// GIVEN the first round of a scan, where answering from memory would
+			// leave no sources behind
+			const first = agentToolChoice('prospect_scan_v1', 1)
+			const later = agentToolChoice('prospect_scan_v1', 2)
+
+			// WHEN the mode is read — THEN round one must call something and a
+			// later round may reflect instead
+			expect(first).toEqual({
+				mode: 'required',
+				oneOf: ['web_search', 'scrape_page'],
+			})
+			expect(later).toEqual({
+				mode: 'auto',
+				oneOf: ['web_search', 'scrape_page'],
+			})
+		})
+	})
+
+	describe('when the run is about one named company', () => {
+		it('should leave the whole toolkit reachable', () => {
+			// GIVEN the two schemas whose whole job is a single company
+			// WHEN each is asked what it may call
+			// THEN no list is named at all, so every tool stays on the wire
+			expect(agentToolChoice('company_enrichment_v1', 2)).toBe('auto')
+			expect(agentToolChoice('contact_discovery_v1', 2)).toBe('auto')
+		})
+
+		it('should still force a tool call on the first round', () => {
+			// GIVEN the first round of an enrichment run
+			// WHEN the choice is read — THEN it is the bare forcing, unchanged
+			expect(agentToolChoice('company_enrichment_v1', 1)).toBe('required')
+		})
+	})
+
+	describe('when the schema is one nothing recognises', () => {
+		it('should leave the whole toolkit reachable rather than guess', () => {
+			// GIVEN a schema name that is not a discovery scan
+			// WHEN the choice is read — THEN it falls through to the unrestricted
+			// form, because narrowing a run nobody classified would silently take
+			// tools away from it
+			expect(agentToolChoice('freeform_v1', 2)).toBe('auto')
+		})
+	})
+})
+
 describe('researchToolkitWireFormat', () => {
 	describe('when serialising the toolkit for a provider', () => {
 		it('should carry every research tool in the shape sent to a provider', () => {
@@ -1638,6 +1721,163 @@ describe('a run that spends its budget', () => {
 				level: 'Error',
 				message: 'research.tool.failed',
 			})
+		})
+	})
+})
+
+describe('the paid tools when the run is a discovery scan', () => {
+	// The handlers reached directly, so the answer is the handler's own and not
+	// the provider's narrowing — which is the whole point of the check.
+	const handleOnScan = async (
+		tool: 'registry_lookup' | 'discover_contacts',
+		params: Record<string, unknown>,
+	) => {
+		let vendorCalled = false
+		const ports = Layer.mergeAll(
+			StubSearchProvider,
+			StubScrapeProvider,
+			Layer.succeed(RegistryRouter)(
+				RegistryRouter.of({
+					lookup: () => {
+						vendorCalled = true
+						return Effect.succeed(
+							new RegistryRecord({
+								legalName: 'Acme SL',
+								sourceUrl: 'https://registry.example/acme',
+								units: 1,
+							}),
+						)
+					},
+				}),
+			),
+		)
+		const infra = Layer.mergeAll(
+			stubBudget,
+			Layer.succeed(ResearchRunContext)({
+				researchId: 'test-run',
+				schemaName: 'prospect_scan_v1',
+			}),
+			Layer.succeed(ContactDiscovery)({
+				discover: () => {
+					vendorCalled = true
+					return Effect.succeed({
+						status: 'no_reliable_contact' as const,
+						researchId: 'test-run',
+					})
+				},
+			}),
+		)
+		const results: unknown[] = []
+		await Effect.runPromise(
+			Effect.gen(function* () {
+				const toolkit = yield* researchToolkit
+				const stream = yield* toolkit.handle(tool, params as never)
+				yield* Stream.runForEach(stream, part =>
+					Effect.sync(() => results.push(part)),
+				)
+			}).pipe(
+				Effect.provide(
+					researchToolkitLayer.pipe(
+						Layer.provide(Layer.mergeAll(ports, infra)),
+					),
+				),
+			),
+		)
+		return { vendorCalled, results }
+	}
+
+	describe('when a scan calls the register anyway', () => {
+		it('should refuse without reaching the vendor', async () => {
+			// GIVEN a scan whose model asked for a registry lookup regardless of
+			// what it was offered — a provider that ignores the narrowing, say
+			const { vendorCalled, results } = await handleOnScan('registry_lookup', {
+				country: 'ES',
+				query: 'Acme SL',
+				tax_id: null,
+			})
+
+			// THEN nothing was bought, and the model is told where the request
+			// belongs instead of being handed a bare refusal
+			expect(vendorCalled).toBe(false)
+			expect(JSON.stringify(results)).toContain('pending_paid_actions')
+		})
+	})
+
+	describe('when a scan calls contact discovery anyway', () => {
+		it('should refuse without reaching the vendor', async () => {
+			// GIVEN the same, for the other tool that spends
+			const { vendorCalled, results } = await handleOnScan(
+				'discover_contacts',
+				{
+					company_name: 'Acme SL',
+					domain: 'acme.example',
+					country: 'ES',
+				},
+			)
+
+			// THEN the same answer: nothing bought, and a route to take instead
+			expect(vendorCalled).toBe(false)
+			expect(JSON.stringify(results)).toContain('pending_paid_actions')
+		})
+	})
+
+	describe('when the run is not a scan', () => {
+		it('should let the register through', async () => {
+			// GIVEN an enrichment run, which is what the register is for
+			let vendorCalled = false
+			const ports = Layer.mergeAll(
+				StubSearchProvider,
+				StubScrapeProvider,
+				Layer.succeed(RegistryRouter)(
+					RegistryRouter.of({
+						lookup: () => {
+							vendorCalled = true
+							return Effect.succeed(
+								new RegistryRecord({
+									legalName: 'Acme SL',
+									sourceUrl: 'https://registry.example/acme',
+									units: 1,
+								}),
+							)
+						},
+					}),
+				),
+			)
+			const infra = Layer.mergeAll(
+				stubBudget,
+				Layer.succeed(ResearchRunContext)({
+					researchId: 'test-run',
+					schemaName: 'company_enrichment_v1',
+				}),
+				Layer.succeed(ContactDiscovery)({
+					discover: () =>
+						Effect.succeed({
+							status: 'no_reliable_contact' as const,
+							researchId: 'test-run',
+						}),
+				}),
+			)
+			await Effect.runPromise(
+				Effect.gen(function* () {
+					const toolkit = yield* researchToolkit
+					const stream = yield* toolkit.handle('registry_lookup', {
+						country: 'ES',
+						query: 'Acme SL',
+						tax_id: null,
+					})
+					yield* Stream.runDrain(stream)
+				}).pipe(
+					Effect.provide(
+						researchToolkitLayer.pipe(
+							Layer.provide(Layer.mergeAll(ports, infra)),
+						),
+					),
+				),
+			)
+
+			// THEN the lookup happens, because barring it everywhere would be a
+			// different change from barring it on a list
+			expect(vendorCalled).toBe(true)
 		})
 	})
 })

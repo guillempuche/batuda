@@ -300,6 +300,36 @@ describe('makeLibreborRegistry', () => {
 		expect(log.count).toBe(1)
 	})
 
+	it('should say a 402 is the paid allowance running out, not a bad answer', async () => {
+		// GIVEN the register refuses because the account has no credit left
+		const { exit, log } = runLookup(
+			{ country: 'ES', taxId: 'A46103834' },
+			() => ({
+				status: 402,
+				body: { error: { code: 'PAYMENT_REQUIRED' } },
+			}),
+		)
+
+		// THEN it fails fast and says why, so the budget can stop asking a register
+		// that will answer every later lookup the same way
+		const resolved = await exit
+		expect(errorOf(resolved)?.recoverable).toBe(false)
+		expect(errorOf(resolved)?.quotaExhausted).toBe(true)
+		expect(log.count).toBe(1)
+	})
+
+	it('should not read a bad credential as an allowance running out', async () => {
+		// GIVEN a dead key rather than an empty account
+		const { exit } = runLookup({ country: 'ES', taxId: 'A46103834' }, () => ({
+			status: 401,
+			body: { error: { code: 'UNAUTHORIZED' } },
+		}))
+
+		// THEN the flag stays off — it means an allowance running out, which a
+		// dead key is not
+		expect(errorOf(await exit)?.quotaExhausted).toBe(false)
+	})
+
 	it('should treat 404 (company not found) as non-recoverable', async () => {
 		// GIVEN the company is not in the registry
 		const { exit } = runLookup({ country: 'ES', taxId: 'A00000000' }, () => ({
