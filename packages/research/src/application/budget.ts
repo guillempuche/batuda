@@ -409,6 +409,9 @@ export const makeBudgetLayer = (config: BudgetConfig) =>
 							return { _tag: 'bought' as const, value }
 						}),
 
+				vendorsRefused: () =>
+					Effect.map(Ref.get(refusedRef), seen => [...seen].sort()),
+
 				snapshot: () =>
 					Effect.gen(function* () {
 						const cheap = yield* Ref.get(cheapRef)

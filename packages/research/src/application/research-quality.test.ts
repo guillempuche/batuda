@@ -29,6 +29,7 @@ const scanInput = {
 	coverageLastMissing: [],
 	existence: null,
 	place: null,
+	vendorsUnavailable: [],
 } as const
 
 describe('computeRunQuality', () => {
@@ -105,6 +106,7 @@ describe('computeRunQuality', () => {
 			coverageLastMissing: [],
 			existence: null,
 			place: null,
+			vendorsUnavailable: [],
 		} as const
 
 		it('should not flag a strong, well-grounded run', () => {
@@ -198,6 +200,7 @@ describe('computeRunQuality', () => {
 			coverageLastMissing: [],
 			existence: null,
 			place: null,
+			vendorsUnavailable: [],
 		} as const
 
 		it('should flag a scan vetted against a single source', () => {
@@ -309,6 +312,7 @@ describe('computeRunQuality', () => {
 			coverageLastMissing: [],
 			existence: null,
 			place: null,
+			vendorsUnavailable: [],
 		} as const
 
 		it('should flag a well-sourced scan that still found only a handful', () => {
@@ -365,6 +369,7 @@ describe('computeRunQuality', () => {
 				coverageLastMissing: [],
 				existence: null,
 				place: null,
+				vendorsUnavailable: [],
 			})
 			// THEN the thin-list signal stays quiet — a missing list is "does not
 			// apply", not "found nothing"
@@ -397,6 +402,7 @@ describe('computeRunQuality', () => {
 			coverageLastMissing: [],
 			existence: null,
 			place: null,
+			vendorsUnavailable: [],
 		} as const
 
 		it('should flag a long list that answered one of the trades asked about', () => {
@@ -531,6 +537,7 @@ describe('computeRunQuality', () => {
 			coverageLastMissing: [],
 			existence: null,
 			place: null,
+			vendorsUnavailable: [],
 		} as const
 
 		it('should flag a run whose citations were all rejected', () => {
@@ -599,6 +606,7 @@ describe('computeRunQuality', () => {
 				coverageLastMissing: [],
 				existence: null,
 				place: null,
+				vendorsUnavailable: [],
 			}).low_confidence
 
 		it('should flag one that never clearly reached that company', () => {
@@ -640,6 +648,7 @@ describe('computeRunQuality', () => {
 				coverageLastMissing: [],
 				existence: null,
 				place: null,
+				vendorsUnavailable: [],
 			})
 			// THEN the count still stands: 'absent' is a verdict on what the evidence
 			// showed, not the run having no company to be about
@@ -670,6 +679,7 @@ describe('computeRunQuality', () => {
 			coverageLastMissing: [],
 			existence: null,
 			place: null,
+			vendorsUnavailable: [],
 		} as const
 
 		it('should leave out the profile numbers a brief never fills', () => {
@@ -745,6 +755,7 @@ describe('computeRunQuality', () => {
 			coverageLastMissing: [],
 			existence: null,
 			place: null,
+			vendorsUnavailable: [],
 		} as const
 
 		it('should report each phase of rounds as its own number', () => {
@@ -785,6 +796,7 @@ describe('computeRunQuality', () => {
 				coverageLastMissing: [],
 				existence: null,
 				place: null,
+				vendorsUnavailable: [],
 			})
 			// THEN zero is reported rather than left out: a run that went back for
 			// nothing is a run that needed nothing, which is worth knowing
@@ -848,6 +860,7 @@ describe('computeRunQuality — how the list split', () => {
 		coverageStopped: null,
 		coverageLastMissing: [],
 		place: null,
+		vendorsUnavailable: [],
 	} as const
 
 	describe('when a scan verified its list', () => {
@@ -857,6 +870,7 @@ describe('computeRunQuality — how the list split', () => {
 				...scan,
 				existence: { confirmed: 4, candidates: 8 },
 				place: null,
+				vendorsUnavailable: [],
 			})
 
 			// THEN a reader can see what the run stands behind without opening it
@@ -869,6 +883,7 @@ describe('computeRunQuality — how the list split', () => {
 				...scan,
 				existence: { confirmed: 0, candidates: 12 },
 				place: null,
+				vendorsUnavailable: [],
 			})
 
 			// THEN the run is reported, not flagged. What to do about a list of
@@ -917,6 +932,7 @@ describe('computeRunQuality — when the run could not read its own subject', ()
 		coverageLastMissing: [],
 		existence: null,
 		place: null,
+		vendorsUnavailable: [],
 	} as const
 
 	describe('when the subject name yielded no key', () => {
@@ -1264,6 +1280,37 @@ describe('computeRunQuality — how the list stands against the place asked for'
 
 			// THEN the signal has nothing to say about it
 			expect(quality.low_confidence).toBe(false)
+		})
+	})
+})
+
+describe('computeRunQuality when a paid source turned the run away', () => {
+	describe('when a vendor refused for want of credit', () => {
+		it('should name it, so a gap on our side is not read as one in the world', () => {
+			// GIVEN a search the national register would not answer, because our own
+			// allowance with it is spent
+			const quality = computeRunQuality({
+				...scanInput,
+				notCompanies: [],
+				vendorsUnavailable: ['registry'],
+			})
+
+			// WHEN the run writes down how it went
+			// THEN the refusal is on the record. Nothing else on a finished run says
+			// the register was shut, and a reader who cannot see that concludes the
+			// companies are not on it.
+			expect(quality.vendors_unavailable).toEqual(['registry'])
+		})
+	})
+
+	describe('when every vendor answered', () => {
+		it('should say nothing at all', () => {
+			// GIVEN a run where nothing refused — including one that asked nobody
+			const quality = computeRunQuality({ ...scanInput, notCompanies: [] })
+
+			// WHEN written down — THEN the field is absent rather than empty, so its
+			// presence alone is the signal and it can be counted off finished runs
+			expect(quality.vendors_unavailable).toBeUndefined()
 		})
 	})
 })

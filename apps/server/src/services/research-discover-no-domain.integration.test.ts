@@ -112,6 +112,7 @@ const budget: BudgetService = {
 			charges.push(`${provider}:${idempotencyKey}`)
 			return { _tag: 'bought' as const, value: yield* Effect.suspend(call) }
 		}),
+	vendorsRefused: () => Effect.succeed([]),
 	snapshot: () => Effect.succeed({} as never),
 }
 

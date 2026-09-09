@@ -350,6 +350,13 @@ export interface BudgetService {
 		R
 	>
 	readonly snapshot: () => Effect.Effect<BudgetSnapshot>
+	/**
+	 * The vendors that refused this run for want of credit, so the finished run
+	 * can say which of its gaps are ours rather than the company's. Kept apart
+	 * from the money snapshot because it is not a sum: a run that stopped asking
+	 * a vendor spent nothing more on it, and the figure alone cannot say why.
+	 */
+	readonly vendorsRefused: () => Effect.Effect<ReadonlyArray<string>>
 }
 
 export class Budget extends Context.Service<Budget, BudgetService>()(
