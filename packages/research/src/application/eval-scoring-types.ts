@@ -474,6 +474,24 @@ export interface RunScore {
 	 * nothing to score at all.
 	 */
 	readonly marketWentUnanswered: boolean
+	/**
+	 * The same fact about any row, market or not: the run came back with nothing
+	 * to score.
+	 *
+	 * The figure above says it for market rows, because it is read beside the
+	 * other market ones. This one is read beside the pass, where a run that died
+	 * is otherwise indistinguishable from a run that worked and found nothing —
+	 * both land in `empty`, and only one of them says anything about quality.
+	 */
+	readonly wentUnanswered: boolean
+	/**
+	 * Why the run stopped looking, for any row rather than only a market one.
+	 *
+	 * Carried up so a pass can say how many of its runs a vendor cut short. That
+	 * is the difference between a pass that measured worse and a pass that was
+	 * measured through an outage.
+	 */
+	readonly searchingStopped: SearchStopped | null
 	/** What the list got right, present only for a row that asked for a market. */
 	readonly market?: MarketScore
 }
@@ -612,6 +630,24 @@ export interface EvalSummary {
 	 * killed mid-search.
 	 */
 	readonly scansThatNeverAnswered: number | null
+	/**
+	 * How much of the pass never answered at all, and how much of it a vendor cut
+	 * short — across every run, not only the market ones. Cut short means a vendor
+	 * turned the run away; a run that ran out of time or money hit a limit of our
+	 * own and is not counted here.
+	 *
+	 * Every rate above is taken over the runs that came back. When a model vendor
+	 * has a bad hour, a pass finishes with fewer of those and reports its rates
+	 * over what survived, which reads exactly like research having got worse. It
+	 * is not the same thing, and nothing else here tells them apart: a run that
+	 * died and a run that worked and found nothing both land in `emptyRate`.
+	 *
+	 * Counted rather than shared, for the same reason as the scan figures above —
+	 * a share cannot say whether it rests on forty runs or on four. Nought is the
+	 * healthy reading for both.
+	 */
+	readonly runsThatNeverAnswered: number
+	readonly runsStoppedByProvider: number
 	readonly duplicateRate: number | null
 	/**
 	 * The share of rows that may repeat a company, read loosely enough to see the

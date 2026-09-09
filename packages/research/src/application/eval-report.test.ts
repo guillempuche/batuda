@@ -14,6 +14,8 @@ const score = (over: Partial<RunScore>): RunScore => ({
 	grounded: true,
 	groundable: true,
 	marketWentUnanswered: false,
+	wentUnanswered: false,
+	searchingStopped: null,
 	wrongCompany: false,
 	wrongCompanyAutoApplicable: false,
 	lowConfidence: false,
@@ -185,6 +187,8 @@ describe('evalSummaryAttributes', () => {
 				scansReportingCoverage: null,
 				scansSayingWhyTheyStopped: null,
 				scansThatNeverAnswered: null,
+				runsThatNeverAnswered: 0,
+				runsStoppedByProvider: 0,
 				scansCutOff: null,
 				partsThoughtAnswered: null,
 				duplicateRate: null,
@@ -240,6 +244,8 @@ describe('evalSummaryAttributes', () => {
 				scansReportingCoverage: null,
 				scansSayingWhyTheyStopped: null,
 				scansThatNeverAnswered: null,
+				runsThatNeverAnswered: 0,
+				runsStoppedByProvider: 0,
 				scansCutOff: null,
 				partsThoughtAnswered: null,
 				duplicateRate: null,
@@ -514,6 +520,8 @@ describe('reporting a pass that held market requests', () => {
 			scansReportingCoverage: null,
 			scansSayingWhyTheyStopped: null,
 			scansThatNeverAnswered: null,
+			runsThatNeverAnswered: 0,
+			runsStoppedByProvider: 0,
 			scansCutOff: null,
 			partsThoughtAnswered: null,
 			duplicateRate: null,
@@ -543,6 +551,30 @@ describe('reporting a pass that held market requests', () => {
 			expect('eval.grounding_accuracy' in attrs).toBe(false)
 		})
 
+		it('should always say how much of the pass was lost, nought included', () => {
+			// GIVEN a clean pass, where nothing was lost
+			const attrs = evalSummaryAttributes(
+				summary({ runsThatNeverAnswered: 0, runsStoppedByProvider: 0 }),
+			)
+
+			// WHEN charted — THEN both still appear. Nought is the reading that says
+			// the rates beside them were taken over the whole pass, so leaving it out
+			// would make a clean pass and an unmeasured one look the same.
+			expect(attrs['eval.runs_that_never_answered']).toBe(0)
+			expect(attrs['eval.runs_stopped_by_provider']).toBe(0)
+		})
+
+		it('should carry what a degraded pass lost', () => {
+			// GIVEN a pass where a vendor killed three runs and cut two more short
+			const attrs = evalSummaryAttributes(
+				summary({ runsThatNeverAnswered: 3, runsStoppedByProvider: 2 }),
+			)
+
+			// WHEN charted — THEN both counts ride along with the rates
+			expect(attrs['eval.runs_that_never_answered']).toBe(3)
+			expect(attrs['eval.runs_stopped_by_provider']).toBe(2)
+		})
+
 		it('should carry each market rate that has a reading', () => {
 			// GIVEN a market pass with figures
 			const attrs = evalSummaryAttributes(
@@ -558,6 +590,8 @@ describe('reporting a pass that held market requests', () => {
 					scansReportingCoverage: null,
 					scansSayingWhyTheyStopped: null,
 					scansThatNeverAnswered: null,
+					runsThatNeverAnswered: 0,
+					runsStoppedByProvider: 0,
 					scansCutOff: null,
 					partsThoughtAnswered: null,
 					duplicateRate: 0.16,
