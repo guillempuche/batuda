@@ -364,14 +364,14 @@ function AddAsLeadButton({
 					payload: { verified: true },
 				})
 			)._tag === 'Success'
-		// A wanted vouch that did not land is its own outcome: the company is on
-		// file, and 'unverified' would read as the run's doing rather than as
-		// something to try again.
-		// What the run said but the CRM could not hold. Named on the way past
-		// rather than left to be noticed: the lead is on file either way, and a
+		// What the run said but the CRM could not hold, named on the way past: a
 		// company that quietly arrived without its country reads as a company that
 		// never had one.
 		const left = dropped.map(field => t(droppedLabel[field])).join(', ')
+		// A wanted vouch that did not land is its own outcome: the company is on
+		// file, and 'unverified' would read as the run's doing rather than as
+		// something to try again. It comes first because it is the one thing here
+		// worth trying again, and a dropped field is not.
 		if (vouchWanted && !verified) {
 			toast.add({
 				title: t`Added, but could not be marked verified`,

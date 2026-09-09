@@ -495,6 +495,30 @@ describe('constrainVocabulary on a scan row', () => {
 		})
 	})
 
+	describe('when a field is named after something every object already has', () => {
+		it('should leave it alone rather than treat a built-in as a rule', () => {
+			// GIVEN a row carrying keys that every JavaScript object answers to, which
+			// a plain lookup finds on the prototype and mistakes for a mapping rule.
+			// `toString` used to come back rewritten as "[object Undefined]".
+			const result = constrainVocabulary({
+				prospects: [{ constructor: 'x', toString: 'y', countries: ['Spain'] }],
+			})
+
+			// WHEN folded — THEN both survive as written, and the real field beside
+			// them is still folded
+			expect(result.findings).toEqual({
+				prospects: [{ constructor: 'x', toString: 'y', countries: ['ES'] }],
+			})
+		})
+
+		it('should not read a country name off the prototype either', () => {
+			// GIVEN a country whose name matches a built-in. Looked up plainly this
+			// answered with a function, which then travelled on as the country.
+			expect(mapCountry('constructor')).toBe('constructor')
+			expect(mapCountry('valueOf')).toBe('valueOf')
+		})
+	})
+
 	describe('when the list is not a list of countries at all', () => {
 		it('should leave a shape it cannot read where it is', () => {
 			// GIVEN an entry that is not a value this mapper understands

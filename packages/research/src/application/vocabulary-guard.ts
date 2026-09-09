@@ -230,9 +230,19 @@ export const mapCountry = (raw: string): string | null => {
 	const n = normalize(raw)
 	if (isHardJunk(n)) return null
 	if (/^[a-z]{2}$/.test(n)) return n.toUpperCase()
-	const iso = COUNTRY_NAME_TO_ALPHA2[n] ?? COUNTRY_NAME_TO_ALPHA2[named(n)]
+	const iso = alpha2For(n) ?? alpha2For(named(n))
 	return iso ?? raw
 }
+
+// Every one of these tables is looked up by words a model wrote, and a plain
+// object answers for the whole prototype chain as well as its own entries — so
+// "constructor" comes back as a function and "toString" as a method, which the
+// walk below would then call and store. Own entries only, always.
+const own = <T>(table: Record<string, T>, key: string): T | undefined =>
+	Object.hasOwn(table, key) ? table[key] : undefined
+
+const alpha2For = (key: string): string | undefined =>
+	own(COUNTRY_NAME_TO_ALPHA2, key)
 
 // The country out of a value that names one and then says something about it —
 // "Spain (global)". The aside is about how far the company reaches, and the
@@ -380,7 +390,7 @@ export const constrainVocabulary = (findings: unknown): VocabularyResult => {
 		if (value === null || typeof value !== 'object') return value
 		const out: Record<string, unknown> = {}
 		for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
-			const listMapper = LIST_MAPPERS[key]
+			const listMapper = own(LIST_MAPPERS, key)
 			if (listMapper && Array.isArray(v)) {
 				const kept: unknown[] = []
 				const seen = new Set<string>()
@@ -412,7 +422,7 @@ export const constrainVocabulary = (findings: unknown): VocabularyResult => {
 				if (kept.length > 0) out[key] = kept
 				continue
 			}
-			const mapper = MAPPERS[key]
+			const mapper = own(MAPPERS, key)
 			const raw = mapper ? rawOf(v) : null
 			if (mapper && raw !== null) {
 				const code = mapper(raw)
