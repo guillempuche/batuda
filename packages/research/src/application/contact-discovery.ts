@@ -170,6 +170,13 @@ export const runEnrichmentChain = (
 				alreadyPaid = true
 				continue
 			}
+			// This vendor ran dry earlier in the run, so nothing was called and
+			// nothing charged. The same shortfall as the refusal caught above,
+			// without paying to be told again.
+			if (outcome._tag === 'vendor_refused') {
+				quotaExhausted = true
+				continue
+			}
 			collected.push(...outcome.value.people)
 			if (chain.mode === 'fallback' && collected.length > 0) break
 		}
@@ -584,15 +591,15 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 										}),
 									),
 							)
-							// Already paid for on an earlier attempt at this run, which is
-							// what a resume after a deploy looks like. The register is not
-							// asked again — it bills per call, and this run's record of
-							// what it spent deliberately will not count the same key twice,
-							// so a second call would be money nothing recorded. The cost is
-							// that the paid finders below are reached instead, which is
-							// dearer than the register would have been.
-							const record =
-								looked._tag === 'already_charged' ? null : looked.value
+							// Only a lookup this run actually bought carries directors.
+							// Already paid for on an earlier attempt — what a resume after a
+							// deploy looks like — the register is not asked again: it bills
+							// per call, and this run's record of what it spent deliberately
+							// will not count the same key twice, so a second call would be
+							// money nothing recorded. Out of credit, it has nothing left to
+							// answer with. Either way the paid finders below are reached
+							// instead, which is dearer than the register would have been.
+							const record = looked._tag === 'bought' ? looked.value : null
 							people = (record?.directors ?? []).map(d => {
 								const { firstName, lastName } = splitPersonName(
 									d.name,
@@ -660,6 +667,15 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 								)(() => verifier.verify({ email }))
 								if (checked._tag === 'already_charged') {
 									yield* Ref.set(verifierAlreadyPaid, true)
+									return {
+										verdict: 'unknown' as VerificationVerdict,
+										confidence: undefined as number | undefined,
+									}
+								}
+								// The verifier ran dry earlier in this run, and the refusal that
+								// ran it dry already recorded why below. Unchecked, then — not
+								// checked and found wanting.
+								if (checked._tag === 'vendor_refused') {
 									return {
 										verdict: 'unknown' as VerificationVerdict,
 										confidence: undefined as number | undefined,

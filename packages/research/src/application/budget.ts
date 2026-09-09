@@ -1,4 +1,4 @@
-import { Effect, Exit, Layer, Ref } from 'effect'
+import { Cause, Effect, Exit, Layer, Option, Ref } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import {
@@ -8,6 +8,28 @@ import {
 } from '../domain/errors'
 import type { BudgetSnapshot, ResolvedPolicy } from '../domain/types'
 import { Budget } from './ports'
+
+/**
+ * Whether a failed vendor call failed because the account's paid allowance is
+ * spent, rather than because the vendor had nothing to say.
+ *
+ * Read off the value rather than with `instanceof`, so an error crossing a
+ * package boundary is still recognised. A vendor that does not set the flag
+ * never trips the refusal, which is the safe way round: the run keeps paying.
+ */
+const isQuotaRefusal = (error: unknown): boolean =>
+	typeof error === 'object' &&
+	error !== null &&
+	'_tag' in error &&
+	error._tag === 'ProviderError' &&
+	'quotaExhausted' in error &&
+	error.quotaExhausted === true
+
+/** The same question of a whole cause: did this call fail for want of credit? */
+const causeIsQuotaRefusal = <E>(cause: Cause.Cause<E>): boolean => {
+	const error = Cause.findErrorOption(cause)
+	return Option.isSome(error) && isQuotaRefusal(error.value)
+}
 
 // ── Monthly paid spend: check-and-debit serialized per organization ──
 
@@ -185,6 +207,13 @@ export const makeBudgetLayer = (config: BudgetConfig) =>
 				spent: 0,
 				remaining: config.policy.paidBudgetCents,
 			})
+			// Vendors that have told this run their paid allowance is spent. A
+			// register with no credit refuses every lookup identically, so the
+			// second call buys exactly what the first did — nothing — and the run
+			// pays the flat price again to be told so. Remembered per run rather
+			// than globally: an allowance topped up between two runs should be
+			// found by the next one rather than waited out.
+			const refusedRef = yield* Ref.make<ReadonlySet<string>>(new Set())
 
 			// Give this run back the room it set aside for a call that did not
 			// happen. This is the run's own allowance — how much more work it may
@@ -346,6 +375,10 @@ export const makeBudgetLayer = (config: BudgetConfig) =>
 					) =>
 					<A, E, R>(vendorCall: () => Effect.Effect<A, E, R>) =>
 						Effect.gen(function* () {
+							// A vendor that already ran dry is not asked again — the answer
+							// would be the same and the price would not.
+							if ((yield* Ref.get(refusedRef)).has(provider))
+								return { _tag: 'vendor_refused' as const, provider }
 							const charged = yield* chargePaidImpl(
 								provider,
 								cents,
@@ -359,7 +392,18 @@ export const makeBudgetLayer = (config: BudgetConfig) =>
 								Effect.onExit(exit =>
 									Exit.isSuccess(exit)
 										? Effect.void
-										: releaseRunAllowance(cents),
+										: Effect.andThen(
+												// A refusal is remembered, so the next call to
+												// this vendor is turned away rather than charged
+												// a second time.
+												causeIsQuotaRefusal(exit.cause)
+													? Ref.update(
+															refusedRef,
+															seen => new Set([...seen, provider]),
+														)
+													: Effect.void,
+												releaseRunAllowance(cents),
+											),
 								),
 							)
 							return { _tag: 'bought' as const, value }

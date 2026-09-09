@@ -112,6 +112,30 @@ export const noRegistryResult = (country: string) => ({
 })
 
 /**
+ * A tool that spends money, reached by a run that may not spend it. A scan is
+ * handed a list of companies to work through, so buying a record about one of
+ * them is work for a run about that one company — which a person starts, from
+ * what the scan proposes.
+ */
+export const paidToolBarredResult = (tool: string) => ({
+	status: 'not_available_here' as const,
+	tool,
+	message: `${tool} is not available on a list-of-companies search, because it spends money on one company at a time. Record it under pending_paid_actions with the company it is for, and a person decides whether to run it.`,
+})
+
+/**
+ * The register exists but our account has no credit left to ask it, so no lookup
+ * in this run will be answered. Kept apart from `no_registry`, which says the
+ * country has no register at all: this one is a fact about us, and a run that
+ * confuses the two reports a gap in our billing as a gap in the record.
+ */
+export const registryUnavailableResult = (country: string) => ({
+	status: 'registry_unavailable' as const,
+	country,
+	message: `The ${country} business registry cannot be reached this run — our paid allowance for it is spent, which is about us and not about the company. Do not look it up again; carry on with the open web, and say plainly that the register went unchecked rather than that the company is not on it.`,
+})
+
+/**
  * The scrape provider flatly refuses this site — Firecrawl answers a page fetch
  * with "we do not support this site" (LinkedIn and other people directories).
  * A routing outcome, not a failure: the page can never be fetched no matter the

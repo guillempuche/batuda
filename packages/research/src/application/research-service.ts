@@ -223,6 +223,7 @@ import {
 	SEARCH_COST_CENTS,
 } from './tool-costs'
 import {
+	agentToolChoice,
 	isUnsupportedScrapeUrl,
 	researchToolkit,
 	researchToolkitLayer,
@@ -435,9 +436,17 @@ export const isValidUuid = (id: string): boolean =>
 const MAX_GROUNDING_RETRIES = 1
 
 // Appended after such a premature finish: push the model to reach the company's
-// own site (or its registry) rather than answering from look-alike pages.
-const GROUNDING_RETRY_INSTRUCTION =
-	'You have not yet confirmed this is the right company from its own website. Before giving a final answer, use web_search to find the official website (try the company name together with its city or country), then scrape_page that site — or look up the company in the official registry. Do not answer from the pages you already have if none of them is its own official site.'
+// own site (or its registry) rather than answering from look-alike pages. The
+// register is named only where the run may actually reach it — an anchored scan
+// meets the same "not confirmed yet" test as an enrichment run, but its agent is
+// handed a shorter tool list, so pointing it at the register sends it after
+// something that is not on the wire.
+const groundingRetryInstruction = (schemaName: string): string =>
+	`You have not yet confirmed this is the right company from its own website. Before giving a final answer, use web_search to find the official website (try the company name together with its city or country), then scrape_page that site${
+		isDiscoveryScan(schemaName)
+			? ''
+			: ' — or look up the company in the official registry'
+	}. Do not answer from the pages you already have if none of them is its own official site.`
 
 // When an enrichment run finishes without having gathered any employee-count
 // signal, it gets this many nudges to search for the headcount before ending — the
@@ -1288,7 +1297,11 @@ export const buildResearchSystemPrompt = (args: {
 		'The employee headcount is rarely on a company\'s own homepage. If the site does not state it, search for it (the company name with "number of employees", or its LinkedIn / ZoomInfo profile) before finishing — do not conclude the size is unknown without having searched.',
 		"The company's own site rarely tells the whole story. Vary your searches across the open web — recent news and trade press (roughly the last 12 months), industry blogs, magazines, and event or conference pages — for funding, leadership changes, tooling, and growth signals the site omits.",
 		'For a citation to a page you scraped, set source_id to the exact URL you scraped with scrape_page. Never invent an identifier — a made-up source is dropped.',
-		'Name the people who run the company — each with the exact title they are given — and treat that as part of the job, not an extra. They are listed on a team, leadership, management or "equipo" page, almost never on the homepage, so open one when the site has it. When reading the pages turns up nobody with a title, discover_contacts is the tool that finds them.',
+		`Name the people who run the company — each with the exact title they are given — and treat that as part of the job, not an extra. They are listed on a team, leadership, management or "equipo" page, almost never on the homepage, so open one when the site has it. ${
+			isDiscoveryScan(args.schemaName)
+				? 'When reading the pages turns up nobody with a title, the tools that would buy you names are not yours to call on a list of companies: add a `pending_paid_actions` entry naming discover_contacts and the company, and a person decides whether to spend it.'
+				: 'When reading the pages turns up nobody with a title, discover_contacts is the tool that finds them.'
+		}`,
 		'A search result quotes only the one sentence of a page that matched your query. When a page looks like it holds more than that sentence, open it with scrape_page rather than settling for the snippet.',
 		'For discovery or prospecting queries, prefer authoritative sources — business directories, industry association member lists, and sector registries — over social media, forums, or glossary pages. Treat such a page as somewhere to find candidates, not as the answer: a "top N" or "largest" ranking lists the biggest firms in a sector, which is the opposite of what most prospecting asks for. Carry every qualifier in the request — size, place, and niche — into each search, and check each candidate against all of them before returning it; leave out one that fails any, however prominently a directory listed it.',
 		...(isDiscoveryScan(args.schemaName) ? [DISCOVERY_PLAN_DIRECTIVE] : []),
@@ -5430,7 +5443,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										query: registryQuery,
 									}),
 								)
-								if (looked._tag === 'already_charged') return
+								// Nothing to seed: either this run already bought the same
+								// lookup, or the register has no credit left to answer it.
+								// The run carries on with what the web tells it, exactly as it
+								// does when the register does not list the company.
+								if (looked._tag !== 'bought') return
 								const record = looked.value
 								const hash = urlHashForScrape(record.sourceUrl)
 								// A record read from a national register sits in `sources`
@@ -5519,11 +5536,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										const response = yield* agentLlm.generateText({
 											prompt,
 											toolkit,
-											// Force a tool on the first round so the model can't
-											// answer from memory without gathering evidence (which
-											// would leave zero sources and fail the grounding gate
-											// on a legitimate company); reflect freely after.
-											toolChoice: round === 1 ? 'required' : 'auto',
+											// A scan is offered a shorter list than the toolkit
+											// holds, and round one must call a tool either way —
+											// the helper says why.
+											toolChoice: agentToolChoice(schemaName, round),
 										})
 										prompt = Prompt.concat(
 											prompt,
@@ -5722,7 +5738,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											groundingRetries++
 											prompt = Prompt.concat(
 												prompt,
-												Prompt.make(GROUNDING_RETRY_INSTRUCTION),
+												Prompt.make(groundingRetryInstruction(schemaName)),
 											)
 											return true
 										}
@@ -5995,6 +6011,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								place: hints?.place,
 								entityTargets,
 								entityName,
+								schemaName,
 							}),
 						),
 						Effect.withSpan('research.phase1', {

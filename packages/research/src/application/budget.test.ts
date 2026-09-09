@@ -356,6 +356,115 @@ describe('paying for a vendor call that then fails', () => {
 		})
 	})
 
+	describe('when a vendor says its paid allowance is spent', () => {
+		// A refusal for want of credit, which is what a register with no money on
+		// the account answers every lookup with.
+		const outOfCredit = Effect.fail(
+			new ProviderError({
+				provider: 'librebor',
+				message: 'registry lookup failed: HTTP 402',
+				recoverable: false,
+				quotaExhausted: true,
+			}),
+		)
+
+		it('should turn the next call to that vendor away without charging', async () => {
+			// GIVEN a run whose first registry lookup was refused for want of credit
+			const [outcome, left] = await withBudget(budget =>
+				Effect.gen(function* () {
+					yield* budget
+						.withPaidCharge(
+							'registry',
+							29,
+							'registry_lookup',
+							'k1',
+						)(() => outOfCredit)
+						.pipe(Effect.ignore)
+
+					// WHEN a second, different lookup goes to the same vendor
+					const second = yield* budget.withPaidCharge(
+						'registry',
+						29,
+						'registry_lookup',
+						'k2',
+					)(() => outOfCredit)
+					const snapshot = yield* budget.snapshot()
+					return [second, snapshot.paidRemaining] as const
+				}),
+			)
+
+			// THEN it is told the vendor refused rather than charged again, and the
+			// run's allowance is whole
+			expect(outcome).toEqual({ _tag: 'vendor_refused', provider: 'registry' })
+			expect(left).toBe(100)
+		})
+
+		it('should still let a different vendor be paid', async () => {
+			// GIVEN the same refused register
+			const outcome = await withBudget(budget =>
+				Effect.gen(function* () {
+					yield* budget
+						.withPaidCharge(
+							'registry',
+							29,
+							'registry_lookup',
+							'k1',
+						)(() => outOfCredit)
+						.pipe(Effect.ignore)
+
+					// WHEN another vendor is asked for something
+					return yield* budget.withPaidCharge(
+						'hunter-verify',
+						1,
+						'discover_contacts',
+						'k2',
+					)(() => Effect.succeed('checked'))
+				}),
+			)
+
+			// THEN one vendor running dry does not shut the others off
+			expect(outcome).toEqual({ _tag: 'bought', value: 'checked' })
+		})
+	})
+
+	describe('when a vendor fails for a reason other than credit', () => {
+		it('should keep asking it, since the next call may well answer', async () => {
+			// GIVEN a vendor that failed once with a plain upstream error
+			const outcome = await withBudget(budget =>
+				Effect.gen(function* () {
+					yield* budget
+						.withPaidCharge(
+							'hunter',
+							20,
+							'discover_contacts',
+							'k1',
+						)(() =>
+							Effect.fail(
+								new ProviderError({
+									provider: 'hunter',
+									message: 'upstream 503',
+									recoverable: true,
+								}),
+							),
+						)
+						.pipe(Effect.ignore)
+
+					// WHEN it is asked again
+					return yield* budget.withPaidCharge(
+						'hunter',
+						20,
+						'discover_contacts',
+						'k2',
+					)(() => Effect.succeed('people'))
+				}),
+			)
+
+			// THEN the call goes through — a vendor that was merely down is not a
+			// vendor that has run out of money
+			expect(outcome).toEqual({ _tag: 'bought', value: 'people' })
+		})
+	})
+
 	describe('when the vendor call succeeds', () => {
 		it('should keep the money spent and hand back what was bought', async () => {
 			// GIVEN the same run
