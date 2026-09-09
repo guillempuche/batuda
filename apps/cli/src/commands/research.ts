@@ -606,10 +606,30 @@ const count = (value: number | null): string =>
 const decimal = (value: number | null): string =>
 	value === null ? 'n/a' : value.toFixed(1)
 
+/**
+ * What the pass lost, printed directly under the run count and above the rates it
+ * qualifies.
+ *
+ * Silent when nothing was lost, so its presence is the warning. Every rate below
+ * is taken over the runs that came back, and a pass measured through a model
+ * vendor having a bad hour reports worse rates over fewer runs — which reads
+ * exactly like research having got worse. These two lines are what tell the
+ * reader which of the two they are looking at.
+ */
+const formatRunsLost = (summary: EvalSummary): ReadonlyArray<string> => [
+	...(summary.runsThatNeverAnswered > 0
+		? [`  never answered:       ${summary.runsThatNeverAnswered}`]
+		: []),
+	...(summary.runsStoppedByProvider > 0
+		? [`  cut short by vendor:  ${summary.runsStoppedByProvider}`]
+		: []),
+]
+
 const formatSummary = (summary: EvalSummary): string =>
 	[
 		'',
 		`Runs:                   ${summary.runs}`,
+		...formatRunsLost(summary),
 		`Grounding accuracy:     ${pct(summary.groundingAccuracy)}`,
 		`Field precision:        ${pct(summary.fieldPrecision)}`,
 		`Field recall:           ${pct(summary.fieldRecall)}`,

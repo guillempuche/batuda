@@ -1459,6 +1459,8 @@ describe('summarizeScores', () => {
 		grounded: true,
 		groundable: true,
 		marketWentUnanswered: false,
+		wentUnanswered: false,
+		searchingStopped: null,
 		wrongCompany: false,
 		wrongCompanyAutoApplicable: false,
 		lowConfidence: false,
@@ -1499,6 +1501,8 @@ describe('summarizeScores', () => {
 				scansReportingCoverage: null,
 				scansSayingWhyTheyStopped: null,
 				scansThatNeverAnswered: null,
+				runsThatNeverAnswered: 0,
+				runsStoppedByProvider: 0,
 				scansCutOff: null,
 				partsThoughtAnswered: null,
 				duplicateRate: null,
@@ -1550,6 +1554,55 @@ describe('summarizeScores', () => {
 			expect(summary.profileFieldsTotal).toBe(6)
 			expect(summary.contactsNamedPerRun).toBe(2)
 			expect(summary.contactsTitledPerRun).toBe(1.5)
+		})
+	})
+
+	describe('when some runs never came back with anything', () => {
+		it('should count them, so the rates are not read as the whole pass', () => {
+			// GIVEN a pass of four runs, two of which never answered — the shape a
+			// pass takes when a model vendor has a bad hour
+			const summary = summarizeScores([
+				score({}),
+				score({}),
+				score({ wentUnanswered: true, empty: true }),
+				score({ wentUnanswered: true, empty: true }),
+			])
+
+			// WHEN summarized — THEN how much of the pass was lost is reported
+			expect(summary.runsThatNeverAnswered).toBe(2)
+
+			// AND the run count still covers every row that was asked for, so the
+			// two read together as "half of these answered"
+			expect(summary.runs).toBe(4)
+		})
+	})
+
+	describe('when a vendor cut a run short but it still answered', () => {
+		it('should count it apart from the runs that never answered', () => {
+			// GIVEN one run stopped early because a vendor refused, and one that
+			// stopped of its own accord
+			const summary = summarizeScores([
+				score({ searchingStopped: 'provider_refused' }),
+				score({ searchingStopped: 'finished_looking' }),
+			])
+
+			// WHEN summarized — THEN only the refused one counts
+			expect(summary.runsStoppedByProvider).toBe(1)
+
+			// AND it is not counted as never having answered, because it did
+			expect(summary.runsThatNeverAnswered).toBe(0)
+		})
+	})
+
+	describe('when every run answered', () => {
+		it('should report nothing lost rather than leaving it unsaid', () => {
+			// GIVEN a clean pass
+			const summary = summarizeScores([score({}), score({})])
+
+			// WHEN summarized — THEN both counts read nought, which is what says the
+			// rates were taken over the whole pass
+			expect(summary.runsThatNeverAnswered).toBe(0)
+			expect(summary.runsStoppedByProvider).toBe(0)
 		})
 	})
 
@@ -1759,6 +1812,8 @@ describe('summarizing a pass that held market requests', () => {
 		grounded: true,
 		groundable: true,
 		marketWentUnanswered: false,
+		wentUnanswered: false,
+		searchingStopped: null,
 		wrongCompany: false,
 		wrongCompanyAutoApplicable: false,
 		lowConfidence: false,
@@ -2439,6 +2494,37 @@ describe('scoring a run that answered with a list of companies', () => {
 			// the wrong-company measure, so the shape returning the most companies
 			// could never be measured at all
 			expect(score.empty).toBe(false)
+		})
+	})
+
+	describe('when a company run died before it answered', () => {
+		it('should say it never answered, not merely that it found nothing', () => {
+			// GIVEN a company row — not a market one — whose run failed
+			const score = scoreRun(acme, outcome({ status: 'failed' }))
+
+			// WHEN scored — THEN it is marked as never having answered, which is
+			// what separates a vendor outage from research that found nothing
+			expect(score.wentUnanswered).toBe(true)
+
+			// AND the market-only figure stays silent, because no market was asked
+			// for and it speaks only for the ones that were
+			expect(score.marketWentUnanswered).toBe(false)
+		})
+	})
+
+	describe('when a company run was cut short by a vendor', () => {
+		it('should carry that up, not only for market rows', () => {
+			// GIVEN a company run that answered but stopped early because a vendor
+			// refused
+			const score = scoreRun(
+				acme,
+				outcome({ status: 'succeeded', searchingStopped: 'provider_refused' }),
+			)
+
+			// WHEN scored — THEN the reason is carried, so a pass can say how many
+			// of its runs a vendor cut short
+			expect(score.searchingStopped).toBe('provider_refused')
+			expect(score.wentUnanswered).toBe(false)
 		})
 	})
 
