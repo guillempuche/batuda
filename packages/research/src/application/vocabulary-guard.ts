@@ -230,9 +230,20 @@ export const mapCountry = (raw: string): string | null => {
 	const n = normalize(raw)
 	if (isHardJunk(n)) return null
 	if (/^[a-z]{2}$/.test(n)) return n.toUpperCase()
-	const iso = COUNTRY_NAME_TO_ALPHA2[n]
+	const iso = COUNTRY_NAME_TO_ALPHA2[n] ?? COUNTRY_NAME_TO_ALPHA2[named(n)]
 	return iso ?? raw
 }
+
+// The country out of a value that names one and then says something about it —
+// "Spain (global)". The aside is about how far the company reaches, and the
+// country in front of it was stated plainly, so losing the whole value over the
+// bracket would throw away a fact the run really did establish.
+//
+// A question mark is the exception, and the reason this is not a plain strip: it
+// is the run saying it does not know which country, and reading a code out of
+// that would turn a doubt into a fact nobody checked.
+const named = (n: string): string =>
+	n.includes('?') ? n : n.replace(/\([^)]*\)/g, '').trim()
 
 // The words a model reaches for when naming somebody's part in a purchase, and
 // the part each one means. Written as fragments so "Economic Buyer", "the
@@ -324,6 +335,16 @@ const MAPPERS: Record<string, (raw: string) => string | null> = {
 	buyingRole: mapBuyingRole,
 }
 
+// Fields holding a list of values rather than one. A scan names every country a
+// company has a place in, and each entry answers the same question the single
+// `country` above does, so it is folded to a code the same way. Kept in its own
+// table because the walk has to read a list where the others read a string, and
+// a mapper that guessed which it had would fold a two-letter country name to a
+// code letter by letter.
+const LIST_MAPPERS: Record<string, (raw: string) => string | null> = {
+	countries: mapCountry,
+}
+
 export interface VocabularyResult {
 	readonly findings: unknown
 	/** Values rewritten to a different code. */
@@ -359,6 +380,38 @@ export const constrainVocabulary = (findings: unknown): VocabularyResult => {
 		if (value === null || typeof value !== 'object') return value
 		const out: Record<string, unknown> = {}
 		for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
+			const listMapper = LIST_MAPPERS[key]
+			if (listMapper && Array.isArray(v)) {
+				const kept: unknown[] = []
+				const seen = new Set<string>()
+				for (const entry of v) {
+					const raw = rawOf(entry)
+					// A shape this mapper cannot read is passed along untouched. Not
+					// every entry has to be a value it understands, and losing the list
+					// over one would cost more than the folding is worth.
+					if (raw === null) {
+						kept.push(walk(entry))
+						continue
+					}
+					const code = listMapper(raw)
+					if (code === null) {
+						blanked++
+						continue
+					}
+					if (code !== raw) mapped++
+					// The same country twice says nothing the once did not, and two
+					// spellings of it — "Spain" beside "ES" — is exactly what folding
+					// them produces.
+					if (seen.has(code)) continue
+					seen.add(code)
+					kept.push(withValue(entry, code))
+				}
+				// A list emptied of everything usable is dropped whole: an empty list
+				// reads as a run that looked and found no country, which is not what
+				// happened.
+				if (kept.length > 0) out[key] = kept
+				continue
+			}
 			const mapper = MAPPERS[key]
 			const raw = mapper ? rawOf(v) : null
 			if (mapper && raw !== null) {
