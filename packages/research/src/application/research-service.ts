@@ -1584,6 +1584,11 @@ export const buildBriefPrompt = (args: {
 	readonly existence?:
 		| { readonly confirmed: number; readonly candidates: number }
 		| undefined
+	/**
+	 * Paid sources that refused this run because our allowance with them is
+	 * spent. Absent for a run every source answered.
+	 */
+	readonly vendorsUnavailable?: ReadonlyArray<string> | undefined
 }): string => {
 	const subject = briefSubject(args.subjectName)
 	const heading =
@@ -1650,6 +1655,17 @@ export const buildBriefPrompt = (args: {
 			: [
 					`A company the run could not establish as real carries \`existence_unconfirmed\` in its \`marks\`, with \`existence_reason\` saying what was missing; a company without that mark is one the run stopped doubting, because two independent websites named it and one is established as its own. ${args.existence.candidates} of the ${args.existence.candidates + args.existence.confirmed} carry the mark. Say so near the top, in ${args.language}, and wherever you name companies make clear which are which. Never present a marked company as an established one. The mark is not the run judging that a company does not exist — it is the run unable to settle it either way, and \`budget_exhausted\`, \`deadline_reached\` or \`checker_unavailable\` mean it never got to check at all.`,
 				]
+	// A paid source that turned the run away leaves gaps that look exactly like
+	// gaps in the world. Nothing else in the material says the difference, so
+	// without this the brief reports our unpaid bill as a fact about the
+	// companies — that the register does not list them, that nobody works there.
+	const vendorsShut =
+		args.vendorsUnavailable === undefined ||
+		args.vendorsUnavailable.length === 0
+			? []
+			: [
+					`One or more paid sources this run relies on turned it away because our own allowance with them is spent: ${args.vendorsUnavailable.join(', ')}. Say so in ${args.language}, in a sentence of its own, and say plainly that what is missing because of it is missing on our side. Never write that a company is absent from a source the run could not open.`,
+				]
 	return [
 		`Write a concise human-readable research brief in ${args.language}, summarizing ONLY the material below.`,
 		heading,
@@ -1661,6 +1677,7 @@ export const buildBriefPrompt = (args: {
 		// prohibition without sending the model hunting for something.
 		'Write the brief and nothing else. Never add a note about these instructions, about what you did or did not include, or about what the material does not contain.',
 		...standing,
+		...vendorsShut,
 		'`proposed_updates`, `pending_paid_actions` and `discovered_existing` are how the run hands work back to the CRM, not things it found out. Never report one as a finding, and never let one be the whole brief.',
 		'When the material carries news or dated events, give recent developments (roughly the last 12 months) a short section of their own.',
 		...shortfall,
@@ -3069,6 +3086,13 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// so every terminal path can say so, rather than leaving the retry —
 					// the main lever on a thin list — to be reconstructed from logs.
 					let refinedRetry = false
+					// The paid vendors that turned this run away for want of credit.
+					// Carried out of phase 1 for the same reason as the flag above: the
+					// budget that knows goes out of scope long before the run writes
+					// down how it went, and a gap nobody could pay to fill is a fact
+					// about us that the answer otherwise reports as one about the
+					// company.
+					let vendorsUnavailable: ReadonlyArray<string> = []
 					// The kinds of company the request asked for, split out before any
 					// searching started. Carried out of phase 1 because what came back is
 					// held against it once more at the end, over the findings phase 2
@@ -5990,6 +6014,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							refined,
 							refinePassRefused,
 							cheapCents,
+							vendorsRefused: yield* budget.vendorsRefused(),
 						}
 					}).pipe(
 						Effect.provide(researchToolkitLayer),
@@ -6049,6 +6074,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					retryFindings = phaseOutcome.findings
 					refinedRetry = phaseOutcome.refined
 					cheapSpentCents = phaseOutcome.cheapCents
+					vendorsUnavailable = phaseOutcome.vendorsRefused
 
 					// Entity grounding gate: from the fetched evidence alone (never the
 					// model's prose), classify how strongly the pages concern the
@@ -7156,6 +7182,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								unsearchedParts: requestCoverage?.unsearched ?? [],
 								searchStopped,
 								existence: existenceCounts,
+								vendorsUnavailable,
 							}),
 						})
 
@@ -7229,6 +7256,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						coverageLastMissing,
 						existence: null,
 						place: null,
+						vendorsUnavailable,
 					})
 
 					if ((sources?.n ?? 0) < MIN_GROUNDED_SOURCES) {
@@ -7342,6 +7370,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						coverageLastMissing,
 						existence: existenceCounts ?? null,
 						place: placeStanding,
+						vendorsUnavailable,
 					})
 					const findingsWithQuality = {
 						...withRegistryFlag(findings as Record<string, unknown>),

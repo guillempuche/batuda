@@ -52,6 +52,7 @@ const stubBudget = Layer.succeed(Budget)(
 				_tag: 'bought' as const,
 				value,
 			})),
+		vendorsRefused: () => Effect.succeed([]),
 		snapshot: () =>
 			Effect.succeed({
 				cheapBudget: 1000,
@@ -1241,6 +1242,7 @@ describe('what a tool call charges the run', () => {
 						_tag: 'bought' as const,
 						value,
 					})),
+				vendorsRefused: () => Effect.succeed([]),
 				snapshot: () =>
 					Effect.succeed({
 						cheapBudget: 1000,
@@ -1319,6 +1321,7 @@ describe('looking the same company up twice in one run', () => {
 				// Already paid for in this run, so the vendor is never called.
 				withPaidCharge: () => () =>
 					Effect.succeed({ _tag: 'already_charged' as const }),
+				vendorsRefused: () => Effect.succeed([]),
 				snapshot: () =>
 					Effect.succeed({
 						cheapBudget: 1000,
@@ -1405,6 +1408,7 @@ describe('looking up a country Batuda has no register for', () => {
 							value: yield* Effect.suspend(call),
 						}
 					}),
+				vendorsRefused: () => Effect.succeed([]),
 				snapshot: () =>
 					Effect.succeed({
 						cheapBudget: 1000,
@@ -1502,6 +1506,7 @@ describe('a run that spends its budget', () => {
 							remaining,
 						}),
 					),
+				vendorsRefused: () => Effect.succeed([]),
 				snapshot: () =>
 					Effect.succeed({
 						cheapBudget: 1000,
@@ -1647,6 +1652,7 @@ describe('a run that spends its budget', () => {
 						Effect.fail(
 							new MonthlyCapExceeded({ capCents: 5000, spentCents: 5000 }),
 						),
+					vendorsRefused: () => Effect.succeed([]),
 					snapshot: () =>
 						Effect.succeed({
 							cheapBudget: 1000,

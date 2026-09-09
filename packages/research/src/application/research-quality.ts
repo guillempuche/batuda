@@ -91,6 +91,12 @@ export interface RunQualityInput {
 	 * out. Empty for a run that removed nothing, and for every run that is not a
 	 * scan.
 	 */
+	/**
+	 * Paid vendors that refused this run because our allowance with them is
+	 * spent. Empty for a run where every vendor answered, and for one that asked
+	 * none.
+	 */
+	readonly vendorsUnavailable: ReadonlyArray<string>
 	readonly notCompanies: ReadonlyArray<DroppedOrganisation>
 	/** Citations the run offered for its findings. */
 	readonly citationsSeen: number
@@ -299,6 +305,17 @@ export interface RunQuality {
 	 * signal, and how often it happens can be counted off finished runs.
 	 */
 	readonly subject_unreadable?: true
+	/**
+	 * The paid vendors that turned this run away because our own allowance with
+	 * them is spent — the national register, the contact finders.
+	 *
+	 * Present only when one did, because its presence is the whole signal. What a
+	 * run could not buy it also could not report, and a thin answer then reads as
+	 * a fact about the company rather than about us: nothing else on a finished
+	 * run says the register was shut, so a reader is left to conclude the company
+	 * is not on it.
+	 */
+	readonly vendors_unavailable?: ReadonlyArray<string>
 	/** True when the result is thin enough that an automation should not act on it unreviewed. */
 	readonly low_confidence: boolean
 }
@@ -401,6 +418,9 @@ export const computeRunQuality = (input: RunQualityInput): RunQuality => {
 		...(input.existence !== null ? { existence: input.existence } : {}),
 		...(input.place !== null ? { place: input.place } : {}),
 		...(subjectWentUnchecked ? { subject_unreadable: true as const } : {}),
+		...(input.vendorsUnavailable.length > 0
+			? { vendors_unavailable: input.vendorsUnavailable }
+			: {}),
 		low_confidence: lowConfidence,
 	}
 }
