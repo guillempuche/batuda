@@ -486,6 +486,35 @@ describe('paid-action follow-up', () => {
 		})
 	})
 
+	describe('when a discover_contacts action says the company has no website', () => {
+		it('should run it, because that is a statement and not a gap', async () => {
+			// GIVEN an action whose domain is written as an explicit null — what a
+			// search records for a company with no site of its own, which is the
+			// kind it turns up most
+			const user = `u-nulldom-${randomUUID()}`
+			const before = discoverCalls.length
+			const origin = await seedOrigin(user, [
+				{
+					id: 'pa1',
+					status: 'pending',
+					tool: 'discover_contacts',
+					args: { company_name: 'Acme', domain: null },
+				},
+			])
+
+			// WHEN it is approved and the follow-up runs
+			const result = await approve(origin, 'pa1', user)
+			const followupId =
+				result.status === 'approved' ? result.followup_run_id : ''
+
+			// THEN it runs. Refusing it would dead-end the approval the moment
+			// somebody gave it — discovery takes a null domain on purpose and
+			// answers with names off the register rather than guessed addresses.
+			expect(await pollRun(followupId)).toBe('succeeded')
+			expect(discoverCalls.length).toBe(before + 1)
+		})
+	})
+
 	describe('when a discover_contacts action carries no company at all', () => {
 		it('should backfill it from the origin run single company subject', async () => {
 			// GIVEN a run about one company and a gate whose args are empty
