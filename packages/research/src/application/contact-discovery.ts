@@ -137,11 +137,15 @@ export const runEnrichmentChain = (
 	// which case the vendor is not called again — the answer would be bought a
 	// second time for real money that this run's record deliberately will not
 	// count twice.
+	// The vendor's own failure is left in the error channel rather than swallowed
+	// inside the call, so the budget sees it: that is what tells a vendor which
+	// ran out of credit apart from one that simply found nobody, and it is what
+	// stops the next company in the same run paying to be refused again.
 	buy: (
 		label: string,
-	) => <A>(
-		call: () => Effect.Effect<A>,
-	) => Effect.Effect<PaidCall<A>, PaidRail>,
+	) => <A, E>(
+		call: () => Effect.Effect<A, E>,
+	) => Effect.Effect<PaidCall<A>, PaidRail | E>,
 ): Effect.Effect<EnrichmentChainOutcome, PaidRail> =>
 	Effect.gen(function* () {
 		const collected: SourcePerson[] = []
@@ -153,17 +157,24 @@ export const runEnrichmentChain = (
 			// resumed after a deploy — is not called again, and the shortfall is
 			// reported instead.
 			const outcome = yield* buy(attempt.label)(() =>
-				attempt.findPeople(input).pipe(
-					// A vendor that could not answer is remembered, not just swallowed.
-					// "Nobody works here" and "we are out of credit" produce the same
-					// empty list, and only one of them is an answer about the company.
-					Effect.catchTag('ProviderError', error =>
-						Effect.sync(() => {
-							if (error.quotaExhausted === true) quotaExhausted = true
-							else vendorFailed = true
-							return new EnrichmentResult({ people: [], units: 0 })
-						}),
-					),
+				attempt.findPeople(input),
+			).pipe(
+				// A vendor that could not answer is remembered, not just swallowed.
+				// "Nobody works here" and "we are out of credit" produce the same empty
+				// list, and only one of them is an answer about the company.
+				//
+				// Caught out here rather than around the call itself: inside, the
+				// failure never reaches the budget, so a vendor with no credit left is
+				// paid again for every company that follows.
+				Effect.catchTag('ProviderError', error =>
+					Effect.sync(() => {
+						if (error.quotaExhausted === true) quotaExhausted = true
+						else vendorFailed = true
+						return {
+							_tag: 'bought' as const,
+							value: new EnrichmentResult({ people: [], units: 0 }),
+						}
+					}),
 				),
 			)
 			if (outcome._tag === 'already_charged') {
@@ -571,26 +582,32 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 							// agent's own registry_lookup tool. Left uncharged, a discovery
 							// spent real money that neither the run's budget nor the
 							// month's total ever saw.
-							const looked = yield* budget.withPaidCharge(
-								'registry',
-								REGISTRY_LOOKUP_COST_CENTS,
-								'discover_contacts',
-								`${researchId}:registry:${countryWithRegistry}:${input.companyName}`,
-							)(() =>
-								registry
-									.lookup({
+							const looked = yield* budget
+								.withPaidCharge(
+									'registry',
+									REGISTRY_LOOKUP_COST_CENTS,
+									'discover_contacts',
+									`${researchId}:registry:${countryWithRegistry}:${input.companyName}`,
+								)(() =>
+									registry.lookup({
 										country: countryWithRegistry,
 										query: input.companyName,
-									})
-									.pipe(
-										// Registry is best-effort here; any miss (provider failure
-										// or a country with no registry) falls through to enrichment.
-										Effect.catchTags({
-											ProviderError: () => Effect.succeed(null),
-											NoRegistry: () => Effect.succeed(null),
-										}),
-									),
-							)
+									}),
+								)
+								.pipe(
+									// Registry is best-effort here; any miss (provider failure or a
+									// country with no registry) falls through to enrichment.
+									//
+									// Caught out here rather than around the lookup: inside, the
+									// failure never reaches the budget, so a register with no credit
+									// is paid again for every company in the same run.
+									Effect.catchTags({
+										ProviderError: () =>
+											Effect.succeed({ _tag: 'bought' as const, value: null }),
+										NoRegistry: () =>
+											Effect.succeed({ _tag: 'bought' as const, value: null }),
+									}),
+								)
 							// Only a lookup this run actually bought carries directors.
 							// Already paid for on an earlier attempt — what a resume after a
 							// deploy looks like — the register is not asked again: it bills

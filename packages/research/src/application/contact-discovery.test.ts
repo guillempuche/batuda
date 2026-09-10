@@ -502,7 +502,7 @@ const anInput = { domain: 'acme.example' }
 const recordCharge =
 	(charged: string[]) =>
 	(label: string) =>
-	<A>(call: () => Effect.Effect<A>) =>
+	<A, E>(call: () => Effect.Effect<A, E>) =>
 		Effect.gen(function* () {
 			charged.push(label)
 			return { _tag: 'bought' as const, value: yield* Effect.suspend(call) }
@@ -718,6 +718,93 @@ describe('runEnrichmentChain', () => {
 			// the charge is taken before the paid call
 			expect(Exit.isFailure(exit)).toBe(true)
 			expect(calls).toEqual([])
+		})
+	})
+})
+
+describe('runEnrichmentChain and the budget it buys through', () => {
+	// A charge whose vendor call is allowed to fail, recording which labels the
+	// failure actually reached. The real budget uses that failure to remember a
+	// vendor with no credit left; a stand-in that swallows it inside the call
+	// would let this pass while production quietly paid twice.
+	const chargeSeeingFailures =
+		(sawFailure: string[]) =>
+		(label: string) =>
+		<A, E>(call: () => Effect.Effect<A, E>) =>
+			Effect.suspend(call).pipe(
+				Effect.tapError(() => Effect.sync(() => sawFailure.push(label))),
+				Effect.map(value => ({ _tag: 'bought' as const, value })),
+			)
+
+	describe('when a vendor refuses because its allowance is spent', () => {
+		it('should let the failure reach the budget rather than swallow it', async () => {
+			// GIVEN a vendor out of credit, and a budget watching for that failure
+			const sawFailure: string[] = []
+			const outcome = await Effect.runPromise(
+				runEnrichmentChain(
+					{
+						mode: 'fallback',
+						attempts: [
+							{
+								label: 'hunter',
+								findPeople: () =>
+									Effect.fail(
+										new ProviderError({
+											provider: 'hunter',
+											message: 'HTTP 429',
+											recoverable: false,
+											quotaExhausted: true,
+										}),
+									),
+							},
+						],
+					},
+					anInput,
+					chargeSeeingFailures(sawFailure),
+				),
+			)
+
+			// THEN the budget saw it — which is what lets it stop paying that vendor
+			// for the rest of the run — and the chain still reports the shortfall
+			// rather than failing the whole discovery
+			expect(sawFailure).toEqual(['hunter'])
+			expect(outcome.quotaExhausted).toBe(true)
+			expect(outcome.people).toEqual([])
+		})
+	})
+
+	describe('when the budget turns a vendor away it already knows is dry', () => {
+		it('should count it as the same shortfall, without calling the vendor', async () => {
+			// GIVEN a budget answering that this vendor already ran dry this run
+			let called = false
+			const outcome = await Effect.runPromise(
+				runEnrichmentChain(
+					{
+						mode: 'fallback',
+						attempts: [
+							{
+								label: 'hunter',
+								findPeople: () => {
+									called = true
+									return Effect.succeed(
+										new EnrichmentResult({ people: [], units: 0 }),
+									)
+								},
+							},
+						],
+					},
+					anInput,
+					() => () =>
+						Effect.succeed({
+							_tag: 'vendor_refused' as const,
+							provider: 'hunter-enrich',
+						}),
+				),
+			)
+
+			// THEN nothing was asked, and the missing people are reported as ours
+			expect(called).toBe(false)
+			expect(outcome.quotaExhausted).toBe(true)
 		})
 	})
 })
