@@ -4894,14 +4894,20 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// points at the guards, a low value everywhere at the model.
 							if (isEnrichmentRun) {
 								const keptFill = enrichmentFill(result)
-								const keptContacts = contactFill(result)
 								yield* Effect.annotateCurrentSpan({
 									'research.enrichment.filled_kept': keptFill.filled,
 									'research.enrichment.missing_kept': keptFill.missing.length,
-									'research.contacts.named_kept': keptContacts.named,
-									'research.contacts.titled_kept': keptContacts.titled,
 								})
 							}
+							// People, counted for whichever shape the run is. A search
+							// files them on each company rather than on the run, and
+							// reporting only the second shape left a search that named two
+							// hundred and one that named none reading exactly alike.
+							const keptContacts = contactFill(result)
+							yield* Effect.annotateCurrentSpan({
+								'research.contacts.named_kept': keptContacts.named,
+								'research.contacts.titled_kept': keptContacts.titled,
+							})
 							return {
 								findings: result as unknown,
 								entityFieldsDropped,
