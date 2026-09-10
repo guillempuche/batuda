@@ -130,6 +130,27 @@ describe('runAgentResearchLoop', () => {
 		})
 	})
 
+	describe('when both budgets are set and the chars run out first', () => {
+		it('should halt on chars even though the provider reported usage', async () => {
+			// GIVEN rounds reporting real usage, well inside a 1000-token budget that
+			// therefore cannot fire, each adding 100 chars against a 150-char one
+			const result = await Effect.runPromise(
+				runAgentResearchLoop({
+					maxSteps: 100,
+					maxPromptChars: 150,
+					maxPromptTokens: 1000,
+					runRound: scriptedRounds([toolRound(1), toolRound(2), toolRound(3)]),
+					budgetSnapshot: Effect.succeed(snapshot(100, 100)),
+				}),
+			)
+
+			// THEN the char budget ends it at round 2, so it is not something that
+			// stands aside once the provider says what the prompt really occupies
+			expect(result.stopReason).toBe('context_full')
+			expect(result.rounds).toBe(2)
+		})
+	})
+
 	describe('when the model finishes but the target is not yet grounded', () => {
 		it('should run another round when the continue hook asks to keep going', async () => {
 			// GIVEN the model finishes each round, and the grounding hook asks to
@@ -267,9 +288,9 @@ describe('runAgentResearchLoop — token budget', () => {
 	})
 
 	describe('when usage is absent but a char budget is set', () => {
-		it('should still halt on the char backstop', async () => {
+		it('should still halt on the char budget', async () => {
 			// GIVEN 0-token rounds that each add 100 prompt chars, a 100-token budget
-			// and a 150-char backstop
+			// and a 150-char one
 			const charRound: LoopRound = {
 				...toolRound(1),
 				inputTokens: 0,

@@ -317,10 +317,14 @@ const boundedToolResult = (value: unknown, maxChars = 4000): string => {
 // success with fabricated findings.
 const MIN_GROUNDED_SOURCES = 1
 
-// Provider-independent backstop for the reflect-loop depth: a rough character
-// budget on the accumulated prompt (which re-sends every round's tool results),
-// used when the model provider omits token usage so the token budget below can't
-// fire. Scrapes are capped per page but many of them still add up.
+// Character ceiling on how deep the reflect loop may go. Each round's tool
+// results stay in the prompt for every round after it, so summing what each
+// round adds tracks how large the prompt has grown. Checked before the token
+// budget and never conditional on the provider reporting usage: it is live on
+// every run, not a fallback for when usage is missing. At roughly four
+// characters to the token it lands near the 24k tokens that budget runs at in
+// production, so raising either of the two on its own barely moves where a
+// search stops. Scrapes are capped per page but many still add up.
 const MAX_LOOP_PROMPT_CHARS = 90000
 
 // How much full fetched-page text phase-2 extraction may read on top of the
@@ -1951,8 +1955,13 @@ export class ResearchService extends Context.Service<ResearchService>()(
 			// search, so it is required with no default — like the concurrency cap.
 			const maxAgentSteps = yield* Config.int('RESEARCH_MAX_AGENT_STEPS')
 			// How many prompt tokens the reflect loop may reach before it stops
-			// searching, so a bigger-context model can look further. Required with no
-			// default — set per the chosen agent model's context window.
+			// searching. Required with no default — sized to the smallest context
+			// window that has to hold the transcript afterwards, which today is the
+			// extract tier's model and not the agent model that runs the loop;
+			// MAX_EXTRACTION_PAGE_CHARS above carries the arithmetic. It bounds one
+			// pass, so a run that searches again stacks a further pass's transcript on
+			// top of it. Raising this without raising MAX_LOOP_PROMPT_CHARS too leaves
+			// the search stopping in the same place.
 			const maxLoopPromptTokens = yield* Config.int(
 				'RESEARCH_MAX_LOOP_PROMPT_TOKENS',
 			)
