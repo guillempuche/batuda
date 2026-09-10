@@ -205,6 +205,75 @@ describe('normalizeVendorReply', () => {
 		})
 	})
 
+	describe('when a choice says it called no tool by sending null', () => {
+		it('should drop the field rather than put an empty array in its place', () => {
+			// GIVEN a reply whose one choice says it called no tool by sending an
+			// explicit null, which is what some of the configured models send where
+			// the library expects an array
+			const body = replyBody({
+				choices: [
+					{
+						index: 0,
+						finish_reason: 'stop',
+						message: { role: 'assistant', content: 'hi', tool_calls: null },
+					},
+				],
+			})
+
+			// WHEN the reply is normalized
+			const normalized = normalizeVendorReply(body)
+			const choices = parseBody(normalized?.body ?? '')[
+				'choices'
+			] as ReadonlyArray<{ message: Record<string, unknown> }>
+
+			// THEN the field is gone rather than replaced with an empty array —
+			// absent is already how the library reads "called no tool"
+			expect(normalized?.repaired).toContain('tool_calls')
+			expect(choices[0]?.message).not.toHaveProperty('tool_calls')
+		})
+	})
+
+	describe('when a choice sends tool_calls the library already accepts', () => {
+		it('should leave a real tool call untouched', () => {
+			// GIVEN a choice that genuinely called a tool
+			const call = {
+				id: 'c1',
+				type: 'function',
+				function: { name: 'web_search', arguments: '{}' },
+			}
+			const body = replyBody({
+				choices: [
+					{
+						index: 0,
+						finish_reason: 'tool_calls',
+						message: { role: 'assistant', content: null, tool_calls: [call] },
+					},
+				],
+			})
+
+			// THEN nothing is repaired, since an array is the shape the library
+			// already accepts
+			expect(normalizeVendorReply(body)).toBeUndefined()
+		})
+
+		it('should leave an empty array alone rather than drop it too', () => {
+			// GIVEN a choice that said it called no tool the way the library
+			// already understands
+			const body = replyBody({
+				choices: [
+					{
+						index: 0,
+						finish_reason: 'stop',
+						message: { role: 'assistant', content: 'hi', tool_calls: [] },
+					},
+				],
+			})
+
+			// THEN the field stays, because only a null is what decode refuses
+			expect(normalizeVendorReply(body)).toBeUndefined()
+		})
+	})
+
 	describe('when the vendor omits created', () => {
 		it('should fill it with the time the reply arrived', () => {
 			// GIVEN a reply that never carried a created timestamp
@@ -526,11 +595,12 @@ describe('normalizeVendorReply', () => {
 		})
 
 		it('should name every field when several were missing', () => {
-			// GIVEN a reply short its service_tier, created, index and usage total
+			// GIVEN a reply short its service_tier, created, index, tool_calls and
+			// usage total
 			const body = replyBody({
 				service_tier: null,
 				created: undefined,
-				choices: [{ message: { content: 'hi there' } }],
+				choices: [{ message: { content: 'hi there', tool_calls: null } }],
 				usage: { prompt_tokens: 10, completion_tokens: 4 },
 			})
 
@@ -539,6 +609,7 @@ describe('normalizeVendorReply', () => {
 				'service_tier',
 				'created',
 				'index',
+				'tool_calls',
 				'usage',
 			])
 		})
