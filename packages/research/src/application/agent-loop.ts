@@ -63,15 +63,22 @@ export const canAffordAnotherRound = (snapshot: BudgetSnapshot): boolean =>
 
 export interface RunAgentResearchLoopParams<E, R> {
 	readonly maxSteps: number
-	/** Character budget for the accumulated prompt; stops the loop before the
-	 * agent model's context window overflows. Omitted = unbounded. */
+	/**
+	 * Character budget for the accumulated prompt, summed over what each round
+	 * adds. Checked before the token budget below, and never conditional on the
+	 * provider reporting usage — it is live on every run, not a fallback for when
+	 * usage is missing, so it can be the cap that ends the loop even where a token
+	 * budget is set too. Omitted = unbounded.
+	 */
 	readonly maxPromptChars?: number | undefined
 	/**
 	 * Token budget compared against the LATEST round's inputTokens — the
 	 * provider-reported occupancy of the whole current prompt, so it is NOT
-	 * accumulated like promptChars. This is the primary depth stop; the char cap
-	 * is the provider-independent backstop for when usage is unavailable (then
-	 * inputTokens is 0 and this never fires). Omitted = no token stop.
+	 * accumulated like promptChars. It counts the real prompt instead of
+	 * estimating it, but it is checked second, and a provider that omits usage
+	 * leaves inputTokens at 0 so it never fires at all. Both caps stop with the
+	 * same reason, so which of the two ended a loop is not visible afterwards.
+	 * Omitted = no token stop.
 	 */
 	readonly maxPromptTokens?: number | undefined
 	readonly runRound: (round: number) => Effect.Effect<LoopRound, E, R>
@@ -118,9 +125,8 @@ export const runAgentResearchLoop = <E, R>(
 
 			// The stop conditions are independent: the model finishing (unless the
 			// grounding-retry hook asks for one more round), the step cap, the prompt
-			// outgrowing the context window (a token budget on the latest round's
-			// occupancy, with the char cap as a provider-independent backstop), and
-			// the budget each end the loop on their own.
+			// outgrowing the context window (the char budget or the token budget,
+			// whichever is met first), and the budget each end the loop on their own.
 
 			// The hook below can send a finished model back out, and a ceiling met on
 			// a round the model had already finished stopped the hook's errand rather
