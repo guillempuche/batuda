@@ -4491,6 +4491,7 @@ msgstr "Pending paid actions"
 msgid "Pending review"
 msgstr "Pending review"
 
+#: src/components/research/findings/prospect-scan-view.tsx
 #: src/routes/companies/$slug.tsx
 #: src/routes/companies/$slug.tsx
 msgid "People"
