@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+
 import { Effect, Layer, Logger, Schema, Stream } from 'effect'
 import { describe, expect, it } from 'vitest'
 
@@ -1158,6 +1160,33 @@ describe('agentToolChoice', () => {
 			// form, because narrowing a run nobody classified would silently take
 			// tools away from it
 			expect(agentToolChoice('freeform_v1', 2)).toBe('auto')
+		})
+	})
+})
+
+describe('the tool choice the agent loop actually sends', () => {
+	// The helper being right is half of it. This reads the real call site's
+	// source and asserts it passes the helper rather than a hand-written choice —
+	// reverting that one line otherwise breaks nothing anywhere in the suite,
+	// which is exactly how the narrowing would be lost.
+	const callSite = readFileSync(
+		new URL('./research-service.ts', import.meta.url),
+		'utf8',
+	)
+
+	describe('when the loop asks the model for a round', () => {
+		it('should hand it the choice this module decides, not one of its own', () => {
+			// GIVEN the generateText call the reflect loop makes
+			const call = callSite.slice(
+				callSite.indexOf('agentLlm.generateText({'),
+				callSite.indexOf('agentLlm.generateText({') + 600,
+			)
+
+			// WHEN its toolChoice is read
+			// THEN it defers to the helper. A literal 'required'/'auto' here is the
+			// narrowing silently gone for every discovery scan.
+			expect(call).toContain('toolChoice: agentToolChoice(schemaName, round)')
+			expect(call).not.toMatch(/toolChoice:\s*round === 1/)
 		})
 	})
 })

@@ -512,20 +512,24 @@ msgid "Added as a verified lead"
 msgstr "Added as a verified lead"
 
 #: src/components/research/findings/prospect-scan-view.tsx
-msgid "Added as a verified lead, without its {left}"
-msgstr "Added as a verified lead, without its {left}"
+msgid "Added as a verified lead, leaving out: {left}"
+msgstr "Added as a verified lead, leaving out: {left}"
 
 #: src/components/research/findings/prospect-scan-view.tsx
 msgid "Added as an unverified lead"
 msgstr "Added as an unverified lead"
 
 #: src/components/research/findings/prospect-scan-view.tsx
-msgid "Added as an unverified lead, without its {left}"
-msgstr "Added as an unverified lead, without its {left}"
+msgid "Added as an unverified lead, leaving out: {left}"
+msgstr "Added as an unverified lead, leaving out: {left}"
 
 #: src/components/research/findings/prospect-scan-view.tsx
 msgid "Added, but could not be marked verified"
 msgstr "Added, but could not be marked verified"
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Added, but could not be marked verified, leaving out: {left}"
+msgstr "Added, but could not be marked verified, leaving out: {left}"
 
 #: src/components/research/findings/prospect-scan-view.tsx
 #: src/routes/settings/organization/members.tsx

@@ -1564,6 +1564,16 @@ const briefSubject = (name: string | undefined): string =>
  * a machine-readable block would still leave them unable to tell a market with no
  * lift installers from a search that stopped before it looked for any.
  */
+// A paid source in words a person reads. The budget keys these by the slug it
+// charges under — `hunter-verify`, `fullenrich-enrich` — which names our billing
+// arrangement rather than anything the reader of a brief could place.
+const vendorInWords = (slug: string): string => {
+	if (slug === 'registry') return 'the national business register'
+	if (slug.endsWith('-enrich')) return 'the contact finder'
+	if (slug.endsWith('-verify')) return 'the email address checker'
+	return 'a paid source'
+}
+
 export const buildBriefPrompt = (args: {
 	readonly schemaName: string
 	readonly language: string
@@ -1663,12 +1673,14 @@ export const buildBriefPrompt = (args: {
 	// gaps in the world. Nothing else in the material says the difference, so
 	// without this the brief reports our unpaid bill as a fact about the
 	// companies — that the register does not list them, that nobody works there.
+	const shutInWords = [
+		...new Set((args.vendorsUnavailable ?? []).map(vendorInWords)),
+	]
 	const vendorsShut =
-		args.vendorsUnavailable === undefined ||
-		args.vendorsUnavailable.length === 0
+		shutInWords.length === 0
 			? []
 			: [
-					`One or more paid sources this run relies on turned it away because our own allowance with them is spent: ${args.vendorsUnavailable.join(', ')}. Say so in ${args.language}, in a sentence of its own, and say plainly that what is missing because of it is missing on our side. Never write that a company is absent from a source the run could not open.`,
+					`One or more paid sources this run relies on turned it away because our own allowance with them is spent: ${shutInWords.join(', ')}. Say so in ${args.language}, in a sentence of its own, and say plainly that what is missing because of it is missing on our side. Never write that a company is absent from a source the run could not open.`,
 				]
 	return [
 		`Write a concise human-readable research brief in ${args.language}, summarizing ONLY the material below.`,
@@ -2393,9 +2405,16 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							typeof args.domain === 'string' ? args.domain : undefined
 						const country =
 							typeof args.country === 'string' ? args.country : undefined
-						if (!companyName || !domain)
+						// The name is the only thing this cannot do without. A company
+						// with no website of its own is exactly what discover_contacts
+						// takes `domain: null` for — it comes back with names and titles
+						// off the register instead of guessed addresses — and a search
+						// that hands work back for approval finds those constantly, so
+						// refusing them here would dead-end the approval the moment
+						// somebody gave it.
+						if (!companyName)
 							return yield* finishFailed(
-								'discover_contacts requires company_name and domain',
+								'discover_contacts requires company_name',
 							)
 
 						// Reuse this follow-up's id + budget so the enrichment/verify spend
@@ -2405,7 +2424,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							const budget = yield* Budget
 							return yield* contactDiscovery.discover({
 								companyName,
-								domain,
+								domain: domain ?? null,
 								country,
 								runContext: { researchId, budget },
 							})

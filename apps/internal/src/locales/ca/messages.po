@@ -512,20 +512,24 @@ msgid "Added as a verified lead"
 msgstr "Afegit com a oportunitat verificada"
 
 #: src/components/research/findings/prospect-scan-view.tsx
-msgid "Added as a verified lead, without its {left}"
-msgstr "Afegit com a oportunitat verificada, sense el seu {left}"
+msgid "Added as a verified lead, leaving out: {left}"
+msgstr "Afegit com a oportunitat verificada; s'ha deixat fora: {left}"
 
 #: src/components/research/findings/prospect-scan-view.tsx
 msgid "Added as an unverified lead"
 msgstr "Afegit com a oportunitat sense verificar"
 
 #: src/components/research/findings/prospect-scan-view.tsx
-msgid "Added as an unverified lead, without its {left}"
-msgstr "Afegit com a oportunitat sense verificar, sense el seu {left}"
+msgid "Added as an unverified lead, leaving out: {left}"
+msgstr "Afegit com a oportunitat sense verificar; s'ha deixat fora: {left}"
 
 #: src/components/research/findings/prospect-scan-view.tsx
 msgid "Added, but could not be marked verified"
 msgstr "Afegit, però no s'ha pogut marcar com a verificat"
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Added, but could not be marked verified, leaving out: {left}"
+msgstr "Afegit, però no s'ha pogut marcar com a verificat; s'ha deixat fora: {left}"
 
 #: src/components/research/findings/prospect-scan-view.tsx
 #: src/routes/settings/organization/members.tsx

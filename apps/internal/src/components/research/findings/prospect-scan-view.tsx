@@ -373,15 +373,23 @@ function AddAsLeadButton({
 		// something to try again. It comes first because it is the one thing here
 		// worth trying again, and a dropped field is not.
 		if (vouchWanted && !verified) {
+			// The dropped fields are named here too. A lead that lost both its
+			// country and its vouch would otherwise only hear about the vouch, which
+			// is the one case this message exists for.
 			toast.add({
-				title: t`Added, but could not be marked verified`,
+				title:
+					left === ''
+						? t`Added, but could not be marked verified`
+						: t`Added, but could not be marked verified, leaving out: ${left}`,
 				type: 'error',
 			})
 		} else if (left !== '') {
+			// Written as a list rather than "without its X", which reads as one
+			// thing and has to agree with it in languages that give words a gender.
 			toast.add({
 				title: verified
-					? t`Added as a verified lead, without its ${left}`
-					: t`Added as an unverified lead, without its ${left}`,
+					? t`Added as a verified lead, leaving out: ${left}`
+					: t`Added as an unverified lead, leaving out: ${left}`,
 				type: 'success',
 			})
 		} else {

@@ -1,4 +1,4 @@
-import { Cause, Effect, Exit, Layer, Option, Ref } from 'effect'
+import { Cause, Effect, Exit, Layer, Ref } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import {
@@ -25,11 +25,18 @@ const isQuotaRefusal = (error: unknown): boolean =>
 	'quotaExhausted' in error &&
 	error.quotaExhausted === true
 
-/** The same question of a whole cause: did this call fail for want of credit? */
-const causeIsQuotaRefusal = <E>(cause: Cause.Cause<E>): boolean => {
-	const error = Cause.findErrorOption(cause)
-	return Option.isSome(error) && isQuotaRefusal(error.value)
-}
+/**
+ * The same question of a whole cause: did this call fail for want of credit?
+ *
+ * Every failure in it is read, not just the first. A call that cascades across
+ * two vendors keeps both, and the one that ran out of credit is as likely to be
+ * the earlier as the later — reading only the first would leave the vendor
+ * unremembered and every later lookup paying again.
+ */
+const causeIsQuotaRefusal = <E>(cause: Cause.Cause<E>): boolean =>
+	cause.reasons.some(
+		reason => Cause.isFailReason(reason) && isQuotaRefusal(reason.error),
+	)
 
 // ── Monthly paid spend: check-and-debit serialized per organization ──
 
