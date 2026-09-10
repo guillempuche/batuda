@@ -98,6 +98,35 @@ export interface RawContact {
 const citationsArray = (c: RawContact): ReadonlyArray<unknown> =>
 	Array.isArray(c.citations) ? c.citations : []
 
+// The same page quoted twice is one citation. A person met in three gap rounds
+// otherwise arrives carrying the same line three times, which reads to whoever
+// opens the finding as three sources agreeing.
+const joinCitations = (
+	a: ReadonlyArray<unknown>,
+	b: ReadonlyArray<unknown>,
+): ReadonlyArray<unknown> => {
+	const seen = new Set<string>()
+	const out: unknown[] = []
+	for (const citation of [...a, ...b]) {
+		const key = JSON.stringify(citation)
+		if (seen.has(key)) continue
+		seen.add(key)
+		out.push(citation)
+	}
+	return out
+}
+
+// Only the details one of the two actually carried. Writing every key whether or
+// not it holds anything puts `role: undefined` on a row whose schema has no room
+// for it — and on a scan row, no room for `email` or `phone` at all.
+const addDetail = (
+	into: Record<string, unknown>,
+	key: string,
+	value: unknown,
+): void => {
+	if (value !== undefined) into[key] = value
+}
+
 export interface ContactsMergeResult {
 	readonly contacts: ReadonlyArray<RawContact>
 	/** People left out because they came with no name to key on. */
@@ -140,13 +169,15 @@ export const mergeContacts = (
 			order.push(key)
 			return
 		}
-		byKey.set(key, {
-			name: existing.name,
-			role: existing.role ?? c.role,
-			email: existing.email ?? c.email,
-			phone: existing.phone ?? c.phone,
-			citations: [...citationsArray(existing), ...citationsArray(c)],
-		})
+		const joined: Record<string, unknown> = { name: existing.name }
+		addDetail(joined, 'role', existing.role ?? c.role)
+		addDetail(joined, 'email', existing.email ?? c.email)
+		addDetail(joined, 'phone', existing.phone ?? c.phone)
+		joined['citations'] = joinCitations(
+			citationsArray(existing),
+			citationsArray(c),
+		)
+		byKey.set(key, joined as RawContact)
 	}
 
 	for (const c of broad) absorb(c)

@@ -3861,40 +3861,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										}),
 								},
 								{
-									// Contact entity binding: drop a person whose quotes name only a
-									// different company (a client testimonial or a competitor's exec
-									// quoted on the target's own page), so the richer extraction
-									// can't present someone else's leader as this company's contact.
-									name: 'contact-entity',
-									run: findings =>
-										Effect.gen(function* () {
-											// Passes every person through when there are no keys: with
-											// nothing to hold a quote against, one naming another
-											// company cannot be told from one naming this company.
-											// Two shapes, two checks. A run about one company holds its
-											// people against that company; a search returning many holds
-											// each row's people against that row.
-											const check = isDiscoveryScan(schemaName)
-												? bindScanContactsToRows(
-														findings,
-														discoveryResultField(schemaName),
-													)
-												: bindContactsToEntity(findings, entityTargets)
-											if (check.dropped > 0) {
-												yield* Effect.logWarning(
-													'research.contacts.wrong_entity',
-												).pipe(
-													Effect.annotateLogs({
-														event: 'research.contacts.wrong_entity',
-														research_id: researchId,
-														dropped: check.dropped,
-													}),
-												)
-											}
-											return { findings: check.findings }
-										}),
-								},
-								{
 									// Scalar grounding: hold each per-field value to "grounded or
 									// absent". The citation guard has just removed fabricated
 									// sources, so a scalar left without one is dropped here rather
@@ -4013,6 +3979,48 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														check.namedNobodyInParticular,
 												},
 											}
+										}),
+								},
+								{
+									// Contact entity binding: drop a person whose quotes name only a
+									// different company (a client testimonial or a competitor's exec
+									// quoted on the target's own page), so the richer extraction
+									// can't present someone else's leader as this company's contact.
+									//
+									// After the websites check above, because a search's rows are held
+									// against the address each one gave: a row still carrying somebody
+									// else's site would take that owner's staff as its own, and the
+									// check above is what takes such an address away. After the
+									// citation check too, so a person left with no source to their
+									// name has already lost it by the time this asks.
+									name: 'contact-entity',
+									run: findings =>
+										Effect.gen(function* () {
+											// Passes every person through when there are no keys: with
+											// nothing to hold a quote against, one naming another
+											// company cannot be told from one naming this company.
+											// Two shapes, two checks. A run about one company holds its
+											// people against that company; a search returning many holds
+											// each row's people against that row.
+											const check = isDiscoveryScan(schemaName)
+												? bindScanContactsToRows(
+														findings,
+														discoveryResultField(schemaName),
+													)
+												: bindContactsToEntity(findings, entityTargets)
+											if (check.dropped > 0 || check.droppedUncited > 0) {
+												yield* Effect.logWarning(
+													'research.contacts.wrong_entity',
+												).pipe(
+													Effect.annotateLogs({
+														event: 'research.contacts.wrong_entity',
+														research_id: researchId,
+														dropped: check.dropped,
+														dropped_uncited: check.droppedUncited,
+													}),
+												)
+											}
+											return { findings: check.findings }
 										}),
 								},
 								{

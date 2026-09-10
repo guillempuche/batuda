@@ -19,10 +19,13 @@
 
 import {
 	classifyEntityMatch,
-	DISTINCTIVE_NAME_LENGTH,
+	distinctiveWords,
+	domainHost,
 	type EntityTargets,
-	nameCoreTokens,
+	hostLabel,
+	labelSpellsOneOf,
 } from './entity-guard'
+import { isValueWrapper, unwrapValue } from './guard-shapes'
 
 // A proper name (one to five capitalised words) directly followed by a company
 // marker — the shape of "<Company> Inc" / "Caraway Logistics". The markers include
@@ -30,8 +33,44 @@ import {
 const ORG_PHRASE =
 	/\b([A-Z][A-Za-z0-9&.'’-]*(?:\s+[A-Z][A-Za-z0-9&.'’-]*){0,4})\s+(Inc|LLC|Corp|Corporation|Ltd|Co|Company|Group|Holdings|Logistics|Transport|Transportation|Freight|Shipping|Solutions|Technologies|Systems|Industries|Services|Partners|GmbH|S\.?A|S\.?L|Srl|BV|AG|Pty|PLC)\b\.?/g
 
+// The markers that are as often the back half of a job title as the back half of
+// a company: "Director of Client Services", "Head of Technical Solutions", "VP
+// Business Systems". Every other marker in the pattern above names a company
+// wherever it turns up, and is read as written.
+const ALSO_TITLE_WORDS = new Set([
+	'Services',
+	'Solutions',
+	'Systems',
+	'Technologies',
+	'Partners',
+	'Industries',
+])
+
+// Words that put a person AT an organisation, so what follows one is an employer
+// and not the rest of what they are called.
+const WORKS_AT = /(?:\bat|\bfrom|\bwith)\s+$/i
+
+/**
+ * The companies a quote names.
+ *
+ * Every phrase counts but one shape: a marker that doubles as half a job title,
+ * with nothing before it placing anybody at a company. Counting those too read
+ * "Director of Client Services" as a firm called Client Services and threw a
+ * real employee off her own company's row.
+ *
+ * Deliberately no wider than that. Asking every phrase for a word that places
+ * somebody first lost the commonest shapes there are — "Mark Riskowitz, VP of
+ * Operations, Caraway Logistics" and "Caraway Logistics promotes Andrew Smith",
+ * where the employer just follows a comma or opens the sentence.
+ */
 const orgPhrasesIn = (text: string): ReadonlyArray<string> =>
-	[...text.matchAll(ORG_PHRASE)].map(m => `${m[1]} ${m[2]}`)
+	[...text.matchAll(ORG_PHRASE)]
+		.filter(
+			m =>
+				!ALSO_TITLE_WORDS.has((m[2] ?? '').replace(/\.$/, '')) ||
+				WORKS_AT.test(text.slice(0, m.index)),
+		)
+		.map(m => `${m[1]} ${m[2]}`)
 
 // Every quote a contact carries: its per-field sources (role/email/phone) and its
 // own citation list. These are what tie — or fail to tie — the person to the target.
@@ -66,6 +105,8 @@ export interface ContactEntityResult {
 	readonly findings: unknown
 	/** Contacts dropped because their evidence named only a different company. */
 	readonly dropped: number
+	/** Contacts dropped because nothing was left saying where they were read. */
+	readonly droppedUncited: number
 }
 
 /**
@@ -82,10 +123,11 @@ export const bindContactsToEntity = (
 		typeof findings !== 'object' ||
 		Array.isArray(findings)
 	) {
-		return { findings, dropped: 0 }
+		return { findings, dropped: 0, droppedUncited: 0 }
 	}
 	const contacts = (findings as { contacts?: unknown }).contacts
-	if (!Array.isArray(contacts)) return { findings, dropped: 0 }
+	if (!Array.isArray(contacts))
+		return { findings, dropped: 0, droppedUncited: 0 }
 
 	let dropped = 0
 	const kept = contacts.filter(contact => {
@@ -104,16 +146,36 @@ export const bindContactsToEntity = (
 	return {
 		findings: { ...(findings as object), contacts: kept },
 		dropped,
+		// Never any here: a run about one company has a step of its own for a
+		// person with no source to their name, and it runs later in the chain.
+		droppedUncited: 0,
 	}
 }
 
-// The words in a company's name that could tell it from another one — its own
-// words, with the trade and the legal form taken off, and anything too short to
-// carry a name on its own.
+// The words in a company's name that could tell it from another one, read with
+// the shared `distinctiveWords`, which takes off the legal form AND the trade:
+// keeping the trade word let "Transportes Ribera" answer to a quote about
+// "Transportes Gomez", and in a market where most firms are Transportes-something
+// that is nearly every row.
 const distinctiveWordsOf = (name: string): ReadonlySet<string> =>
-	new Set(
-		nameCoreTokens(name).filter(word => word.length >= DISTINCTIVE_NAME_LENGTH),
-	)
+	new Set(distinctiveWords(name))
+
+// The word a row's own web address is registered under — "egein" for
+// https://egein.com. A row's people are quoted on that site under whatever the
+// company calls itself day to day, which is often not the name the row was
+// listed under: "Especialidades Geotecnicas e Ingenieria SL" shares no word with
+// "EGEIN Group", and only egein.com says they are the same firm.
+const siteLabelOf = (row: Record<string, unknown>): string => {
+	const website = row['website']
+	const address = isValueWrapper(website)
+		? unwrapValue(website)
+		: typeof website === 'string'
+			? website
+			: undefined
+	if (typeof address !== 'string') return ''
+	const host = domainHost(address)
+	return host === undefined ? '' : hostLabel(host)
+}
 
 /**
  * The same check for a search that returns many companies, each carrying the
@@ -138,12 +200,13 @@ export const bindScanContactsToRows = (
 		typeof findings !== 'object' ||
 		Array.isArray(findings)
 	) {
-		return { findings, dropped: 0 }
+		return { findings, dropped: 0, droppedUncited: 0 }
 	}
 	const rows = (findings as Record<string, unknown>)[listField]
-	if (!Array.isArray(rows)) return { findings, dropped: 0 }
+	if (!Array.isArray(rows)) return { findings, dropped: 0, droppedUncited: 0 }
 
 	let dropped = 0
+	let droppedUncited = 0
 	const keptRows = rows.map(row => {
 		if (row === null || typeof row !== 'object') return row
 		const record = row as Record<string, unknown>
@@ -152,12 +215,26 @@ export const bindScanContactsToRows = (
 		const own = distinctiveWordsOf(
 			typeof record['name'] === 'string' ? record['name'] : '',
 		)
-		// A name with nothing distinctive in it would answer to any quote, so the
-		// check is skipped rather than run on a word that cannot decide anything.
-		if (own.size === 0) return row
+		const siteLabel = siteLabelOf(record)
+		// A row with neither a name of its own nor an address cannot say whose
+		// staff anybody is — every quote would answer to it. Only that comparison
+		// is skipped, though: whether a person came with any evidence at all is
+		// not a question about the row, so it is still asked below.
+		const canDecide = own.size > 0 || siteLabel !== ''
 
 		const keptContacts = contacts.filter(contact => {
 			if (contact === null || typeof contact !== 'object') return true
+			// Nothing says where this person was read. Either the model named a
+			// page the run never fetched — the citation guard, which runs before
+			// this, will have just taken it away — or it named none at all. A run
+			// about one company refuses such a person; a search returning fifty
+			// has fifty times the reason to.
+			const citations = (contact as Record<string, unknown>)['citations']
+			if (!Array.isArray(citations) || citations.length === 0) {
+				droppedUncited++
+				return false
+			}
+			if (!canDecide) return true
 			const orgs = orgPhrasesIn(
 				contactQuotes(contact as Record<string, unknown>),
 			)
@@ -166,10 +243,21 @@ export const bindScanContactsToRows = (
 			if (orgs.length === 0) return true
 			// One word in common is enough, and prefix matching is not: a page says
 			// "Sentmenat Group" where the row reads "Calderería Sentmenat SL", and
-			// neither spells the other from its first letter.
-			const namesThisRow = orgs.some(org =>
-				[...distinctiveWordsOf(org)].some(word => own.has(word)),
-			)
+			// neither spells the other from its first letter. Failing that, the
+			// row's own address answers for it, which is how a company listed under
+			// its legal name keeps the staff its trading name is quoted with.
+			const namesThisRow = orgs.some(org => {
+				const words = [...distinctiveWordsOf(org)]
+				// The quote names a company of nothing but its trade — "Transportes
+				// y Logistica SL". That reads the same for this row as for any
+				// other in the list, so it decides nothing, and a row whose own
+				// name is the same shape would otherwise throw out its own staff.
+				if (words.length === 0) return true
+				return (
+					words.some(word => own.has(word)) ||
+					(siteLabel !== '' && labelSpellsOneOf(siteLabel, words))
+				)
+			})
 			if (!namesThisRow) dropped++
 			return namesThisRow
 		})
@@ -178,7 +266,11 @@ export const bindScanContactsToRows = (
 			: { ...record, contacts: keptContacts }
 	})
 
-	return dropped === 0
-		? { findings, dropped: 0 }
-		: { findings: { ...(findings as object), [listField]: keptRows }, dropped }
+	return dropped === 0 && droppedUncited === 0
+		? { findings, dropped: 0, droppedUncited: 0 }
+		: {
+				findings: { ...(findings as object), [listField]: keptRows },
+				dropped,
+				droppedUncited,
+			}
 }

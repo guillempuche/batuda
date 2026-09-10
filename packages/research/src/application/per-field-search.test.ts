@@ -1675,6 +1675,76 @@ describe('the people on a company a wider read met again', () => {
 		})
 	})
 
+	describe('when the row already holds an entry the model left nameless', () => {
+		it('should still take a person the later read names', () => {
+			// GIVEN a row holding one real person and one the model emitted without a
+			// name. The merge drops the nameless one, so the list comes back the same
+			// length with a different person in it — and counting by length reads that
+			// as nothing gained.
+			const merged = mergePerFieldSearch(
+				{
+					prospects: [
+						row('Vidal', [
+							person('Anna Serra'),
+							{ name: undefined, citations: [] },
+						]),
+					],
+				},
+				{ prospects: [row('Vidal', [person('Jordi Roca')])] },
+				'prospect_scan_v1',
+				noRunWords,
+			)
+
+			// WHEN folded — THEN the new person is on the row and the round says so
+			expect(peopleOn(merged.findings).map(p => p.name)).toContain('Jordi Roca')
+			expect(merged.contactsChanged).toBe(true)
+		})
+	})
+
+	describe('when the later read puts a title on somebody already named', () => {
+		it('should keep the title rather than call the round empty', () => {
+			// GIVEN a homepage that named the director and a team page, read a round
+			// later, that finally says what he does
+			const merged = mergePerFieldSearch(
+				{ prospects: [row('Vidal', [person('David Garrido')])] },
+				{
+					prospects: [
+						row('Vidal', [{ ...person('David Garrido'), role: 'CEO' }]),
+					],
+				},
+				'prospect_scan_v1',
+				noRunWords,
+			)
+
+			// WHEN folded — THEN the title is on the row, even though nobody is new
+			expect(peopleOn(merged.findings)).toHaveLength(1)
+			expect((peopleOn(merged.findings)[0] as { role?: string }).role).toBe(
+				'CEO',
+			)
+			expect(merged.contactsChanged).toBe(true)
+		})
+	})
+
+	describe('when the later read carries a blank title', () => {
+		it('should report nothing gained rather than buy another round', () => {
+			// GIVEN a read that returns the same person with a role of blank spaces
+			const merged = mergePerFieldSearch(
+				{ prospects: [row('Vidal', [person('David Garrido')])] },
+				{
+					prospects: [
+						row('Vidal', [{ ...person('David Garrido'), role: '   ' }]),
+					],
+				},
+				'prospect_scan_v1',
+				noRunWords,
+			)
+
+			// WHEN folded — THEN nothing counts as gained: a title of blank spaces
+			// differs from no title by the letter of a comparison and nothing else
+			expect(merged.contactsChanged).toBe(false)
+		})
+	})
+
 	describe('when the later read names only people already on the row', () => {
 		it('should report nothing gained', () => {
 			// GIVEN the same person read twice
