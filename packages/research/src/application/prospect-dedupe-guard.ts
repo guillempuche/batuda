@@ -93,6 +93,7 @@
  * survivor evidence gathered about somebody else.
  */
 
+import { mergeContacts, type RawContact } from './contacts-rescue'
 import {
 	collapse,
 	DISTINCTIVE_NAME_LENGTH,
@@ -572,6 +573,20 @@ const foldInto = (
 		if (value === undefined || value === null) continue
 		if (field === 'citations') {
 			merged['citations'] = mergeCitations(kept['citations'], value)
+			continue
+		}
+		// The people on both rows are the same company's people. Kept the way the
+		// citations above are: two spellings of one firm are usually two pages of
+		// it, and each names whoever it happened to list — so filling only where
+		// the surviving row was empty would throw away everyone on the second page
+		// of a company that already named one director.
+		if (field === 'contacts' && Array.isArray(value)) {
+			merged['contacts'] = mergeContacts(
+				Array.isArray(kept['contacts'])
+					? (kept['contacts'] as ReadonlyArray<RawContact>)
+					: [],
+				value as ReadonlyArray<RawContact>,
+			).contacts
 			continue
 		}
 		if (field === 'location' && alsoElsewhere) {

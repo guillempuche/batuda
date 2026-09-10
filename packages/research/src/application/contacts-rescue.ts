@@ -87,7 +87,7 @@ export const contactsRescuePrompt = (
 // the markets this actually runs in.
 export const normalizeContactName = (name: string): string => foldLabel(name)
 
-interface RawContact {
+export interface RawContact {
 	readonly name?: unknown
 	readonly role?: unknown
 	readonly email?: unknown

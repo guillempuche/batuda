@@ -20,7 +20,7 @@
  * any other.
  */
 
-import { mergeContacts } from './contacts-rescue'
+import { mergeContacts, type RawContact } from './contacts-rescue'
 import { discoveryResultField, isDiscoveryScan } from './discovery-scan'
 import { enrichmentFill } from './extraction-fill'
 import { isPlainObject, isValueWrapper, unwrapValue } from './guard-shapes'
@@ -74,6 +74,29 @@ export const scanRowFields = (schemaName: string): ReadonlyArray<string> =>
 // round that meets one has found the only way anybody has of reaching a company
 // with no site of its own, and a field left off this list is one whose value is
 // thrown away even when a round does turn it up.
+/**
+ * The people on a row after a wider read, or nothing when it found none the row
+ * did not already hold.
+ *
+ * Joined rather than filled in: every other fact on a row is one value, so a row
+ * that has it is answered. A row's people are a list that is never finished, and
+ * a company naming one director on its homepage and three more on a team page
+ * would otherwise keep only whichever page was read first.
+ */
+const unionRowContacts = (
+	held: unknown,
+	found: unknown,
+): { contacts: ReadonlyArray<unknown>; gained: number } | undefined => {
+	if (!Array.isArray(found) || found.length === 0) return undefined
+	const before = Array.isArray(held) ? held : []
+	const merged = mergeContacts(
+		before as ReadonlyArray<RawContact>,
+		found as ReadonlyArray<RawContact>,
+	)
+	const gained = merged.contacts.length - before.length
+	return gained > 0 ? { contacts: merged.contacts, gained } : undefined
+}
+
 const SCAN_ROW_FOLD_FIELDS_BY_SCHEMA: Record<string, ReadonlyArray<string>> = {
 	prospect_scan_v1: [
 		'website',
@@ -451,6 +474,7 @@ const mergeScanRows = (
 		}
 	}
 	let filled = 0
+	let gainedPeople = 0
 	const merged = known.map(row => {
 		const match = discoveryRowIdentityKeys(row, ownSiteHosts)
 			.map(key => foundByKey.get(key))
@@ -464,8 +488,16 @@ const mergeScanRows = (
 				filledHere++
 			}
 		}
+		// People are joined, not filled in. A row already naming one person reads
+		// as answered to every other field's test, so treating them the same way
+		// would let a company with a single name on file never gain a second.
+		const people = unionRowContacts(row['contacts'], match['contacts'])
+		if (people !== undefined) {
+			next['contacts'] = people.contacts
+			gainedPeople += people.gained
+		}
 		filled += filledHere
-		return filledHere === 0 ? row : next
+		return filledHere === 0 && people === undefined ? row : next
 	})
 	// Grows as companies are taken, so one re-extraction naming the same new
 	// company twice appends it once. A duplicate would not only read badly — the
@@ -495,11 +527,11 @@ const mergeScanRows = (
 		for (const key of keys) taken.add(key)
 		return true
 	})
-	if (filled === 0 && additions.length === 0) {
+	if (filled === 0 && gainedPeople === 0 && additions.length === 0) {
 		return {
 			findings,
 			filled: 0,
-			contactsChanged: false,
+			contactsChanged: gainedPeople > 0,
 			added: 0,
 			folded: joinedOnSite,
 		}
@@ -541,7 +573,7 @@ const mergeScanRows = (
 	return {
 		findings: settled.findings,
 		filled,
-		contactsChanged: false,
+		contactsChanged: gainedPeople > 0,
 		added:
 			before === undefined || after === undefined
 				? additions.length

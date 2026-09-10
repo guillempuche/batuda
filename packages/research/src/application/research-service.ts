@@ -1491,12 +1491,17 @@ export const buildExtractionPrompt = (args: {
 		"Read ALL of the evidence to the end — every fetched page and every search result in the transcript — and report every fact it states; the evidence routinely states far more than a first pass returns. Report the industry, employee-count band, location, country, and the company's own operational software wherever the evidence states them — including on a third-party page rather than the company's own site.",
 		'',
 	]
-	// The breadth ask, addressed to whichever list this run's answer actually is.
-	// A scan is asked for companies and has no people list to fill; saying both
-	// would push it to invent one.
+	// The breadth ask, addressed to whichever list this run's answer actually is —
+	// and, either way, the ask for the people in it. A scan's people hang off each
+	// company rather than off the run, so it is told where they go; without that
+	// it reads the ask as a second list to fill and invents one.
 	if (args.discoveryScan) {
 		lines.push(DISCOVERY_BREADTH_DIRECTIVE, '')
 		lines.push(DISCOVERY_ORGANISATION_KIND_DIRECTIVE, '')
+		lines.push(
+			"Where the evidence names somebody as a company's own leader or employee — a titled person on its team page, a quoted founder, a signed author — put them in THAT company's `contacts`, with the exact job title the evidence gives them and the page you read them on. Under the company they work for, never the one listed beside them, and never in a list of their own. A company whose pages name its staff and comes back with an empty `contacts` is an incomplete row.",
+			'',
+		)
 		if (args.marksUnconfirmed) lines.push(DISCOVERY_UNCONFIRMED_DIRECTIVE, '')
 	} else {
 		lines.push(

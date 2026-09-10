@@ -1636,3 +1636,58 @@ describe('roundChangedNothing', () => {
 		})
 	})
 })
+
+describe('the people on a company a wider read met again', () => {
+	const person = (name: string) => ({ name, citations: [] })
+	const row = (name: string, contacts: ReadonlyArray<unknown>) => ({
+		name,
+		website: { value: `https://${name.toLowerCase()}.example`, source_id: 'x' },
+		contacts,
+	})
+	const peopleOn = (findings: unknown): ReadonlyArray<{ name: string }> =>
+		(
+			(findings as { prospects: ReadonlyArray<Record<string, unknown>> })
+				.prospects[0] as Record<string, unknown>
+		)['contacts'] as ReadonlyArray<{ name: string }>
+
+	describe('when the later read names somebody the row did not have', () => {
+		it('should join them rather than leave the row as it was', () => {
+			// GIVEN a company already naming one director, met again on a page that
+			// names two more. Every other fact is one value, so a row that has one
+			// is answered — people are a list that is never finished.
+			const merged = mergePerFieldSearch(
+				{ prospects: [row('Vidal', [person('Anna Serra')])] },
+				{
+					prospects: [row('Vidal', [person('Jordi Roca'), person('Pau Mas')])],
+				},
+				'prospect_scan_v1',
+				noRunWords,
+			)
+
+			// WHEN folded — THEN the row holds all three, and the round reports that
+			// it gained people so the loop does not read it as having done nothing
+			expect(
+				peopleOn(merged.findings)
+					.map(p => p.name)
+					.sort(),
+			).toEqual(['Anna Serra', 'Jordi Roca', 'Pau Mas'])
+			expect(merged.contactsChanged).toBe(true)
+		})
+	})
+
+	describe('when the later read names only people already on the row', () => {
+		it('should report nothing gained', () => {
+			// GIVEN the same person read twice
+			const merged = mergePerFieldSearch(
+				{ prospects: [row('Vidal', [person('Anna Serra')])] },
+				{ prospects: [row('Vidal', [person('Anna Serra')])] },
+				'prospect_scan_v1',
+				noRunWords,
+			)
+
+			// WHEN folded — THEN the round is honest about having added nobody
+			expect(merged.contactsChanged).toBe(false)
+			expect(peopleOn(merged.findings)).toHaveLength(1)
+		})
+	})
+})
