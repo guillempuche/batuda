@@ -120,7 +120,7 @@ export const noRegistryResult = (country: string) => ({
 export const paidToolBarredResult = (tool: string) => ({
 	status: 'not_available_here' as const,
 	tool,
-	message: `${tool} is not available on a list-of-companies search, because it spends money on one company at a time. Record it under pending_paid_actions with the company it is for, and a person decides whether to run it.`,
+	message: `${tool} is not available on a list-of-companies search, because it spends money on one company at a time. Record it under pending_paid_actions with the company it is for — and for discover_contacts, its web domain, written as null when the company has no website — and a person decides whether to run it.`,
 })
 
 /**

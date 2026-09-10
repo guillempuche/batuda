@@ -2401,20 +2401,24 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							typeof args.company_name === 'string'
 								? args.company_name
 								: undefined
-						const domain =
-							typeof args.domain === 'string' ? args.domain : undefined
+						// A domain nobody wrote is not the same as one written as "there
+						// is none". An absent key is ambiguous — whoever proposed the
+						// action may simply have left it out — and guessing addresses off
+						// a bare name is the one thing this must never do, so it fails
+						// closed below. An explicit null is a statement: this company has
+						// no website, which discover_contacts takes on purpose, and
+						// answers with names and titles off the register instead of
+						// guessed addresses.
+						const domainArg = 'domain' in args ? args.domain : undefined
+						const domainStated =
+							(typeof domainArg === 'string' && domainArg !== '') ||
+							domainArg === null
+						const domain = typeof domainArg === 'string' ? domainArg : null
 						const country =
 							typeof args.country === 'string' ? args.country : undefined
-						// The name is the only thing this cannot do without. A company
-						// with no website of its own is exactly what discover_contacts
-						// takes `domain: null` for — it comes back with names and titles
-						// off the register instead of guessed addresses — and a search
-						// that hands work back for approval finds those constantly, so
-						// refusing them here would dead-end the approval the moment
-						// somebody gave it.
-						if (!companyName)
+						if (!companyName || !domainStated)
 							return yield* finishFailed(
-								'discover_contacts requires company_name',
+								'discover_contacts requires company_name, and a domain — write it as null when the company has no website',
 							)
 
 						// Reuse this follow-up's id + budget so the enrichment/verify spend
@@ -2424,7 +2428,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							const budget = yield* Budget
 							return yield* contactDiscovery.discover({
 								companyName,
-								domain: domain ?? null,
+								domain,
 								country,
 								runContext: { researchId, budget },
 							})
