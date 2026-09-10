@@ -3,10 +3,12 @@
  *
  * `@effect/ai-openai-compat` describes a reply more strictly than the vendors
  * behave: `created` and every choice's `index` are required integers, a usage
- * block must carry all three token counters, and `service_tier` is typed as
+ * block must carry all three token counters, `service_tier` is typed as
  * "absent or a string" — never null, which the custom endpoint serving Qwen
- * sends. A reply that is fine in practice is then rejected before any findings
- * are produced, and the run pays a retry against the next configured slot.
+ * sends — and a choice's `tool_calls` the same way: absent or an array, never
+ * the null some models send to say they called no tool. A reply that is fine in
+ * practice is then rejected before any findings are produced, and the run pays a
+ * retry against the next configured slot.
  *
  * The fix lives on the HTTP boundary Batuda already supplies to the client, not
  * in the dependency: `tolerateVendorReplyShape` wraps the `HttpClient` so the
@@ -66,6 +68,25 @@ const repairServiceTier = (
 	// the "absent or a string" shape the library expects.
 	delete reply['service_tier']
 	return 'service_tier'
+}
+
+const repairToolCalls = (
+	choices: ReadonlyArray<unknown>,
+): string | undefined => {
+	let touched = false
+	for (const choice of choices) {
+		if (!isRecord(choice)) continue
+		const message = choice['message']
+		if (!isRecord(message)) continue
+		if (message['tool_calls'] !== null) continue
+		// Dropping the field, rather than putting an empty array in its place, is
+		// what makes the body satisfy the "absent or an array" shape the library
+		// expects — and absent is already how it reads "called no tool", so this
+		// adds nothing the vendor did not say.
+		delete message['tool_calls']
+		touched = true
+	}
+	return touched ? 'tool_calls' : undefined
 }
 
 const repairCreated = (reply: Record<string, unknown>): string | undefined => {
@@ -195,6 +216,7 @@ export const normalizeVendorReply = (
 		repairServiceTier(parsed),
 		repairCreated(parsed),
 		repairChoiceIndexes(choices),
+		repairToolCalls(choices),
 		repairUsage(parsed),
 	].filter((field): field is string => field !== undefined)
 	if (repaired.length === 0) return undefined
