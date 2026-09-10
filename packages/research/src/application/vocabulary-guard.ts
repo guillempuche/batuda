@@ -226,11 +226,17 @@ const COUNTRY_NAME_TO_ALPHA2: Record<string, string> = {
 // map a known country name, and leave anything else untouched (never dropping a real
 // value we simply don't have a code for). Hard junk — a URL, an email, a placeholder —
 // is blanked like the other fields.
+// A value that names a country and then adds something in brackets is left
+// alone. It is tempting to read the country off the front — "Spain (global)"
+// plainly means ES — but the bracket is just as often the part that says WHICH
+// country: "Korea (North)" is not KR, "China (Taiwan)" is not CN, and
+// "Ireland (Northern)" is not IE. Reading past it turns three of those into a
+// confident wrong answer, which is worse than the handful of rows it rescues.
 export const mapCountry = (raw: string): string | null => {
 	const n = normalize(raw)
 	if (isHardJunk(n)) return null
 	if (/^[a-z]{2}$/.test(n)) return n.toUpperCase()
-	const iso = alpha2For(n) ?? alpha2For(named(n))
+	const iso = alpha2For(n)
 	return iso ?? raw
 }
 
@@ -243,17 +249,6 @@ const own = <T>(table: Record<string, T>, key: string): T | undefined =>
 
 const alpha2For = (key: string): string | undefined =>
 	own(COUNTRY_NAME_TO_ALPHA2, key)
-
-// The country out of a value that names one and then says something about it —
-// "Spain (global)". The aside is about how far the company reaches, and the
-// country in front of it was stated plainly, so losing the whole value over the
-// bracket would throw away a fact the run really did establish.
-//
-// A question mark is the exception, and the reason this is not a plain strip: it
-// is the run saying it does not know which country, and reading a code out of
-// that would turn a doubt into a fact nobody checked.
-const named = (n: string): string =>
-	n.includes('?') ? n : n.replace(/\([^)]*\)/g, '').trim()
 
 // The words a model reaches for when naming somebody's part in a purchase, and
 // the part each one means. Written as fragments so "Economic Buyer", "the
@@ -396,11 +391,13 @@ export const constrainVocabulary = (findings: unknown): VocabularyResult => {
 				const seen = new Set<string>()
 				for (const entry of v) {
 					const raw = rawOf(entry)
-					// A shape this mapper cannot read is passed along untouched. Not
-					// every entry has to be a value it understands, and losing the list
-					// over one would cost more than the folding is worth.
+					// An entry that is not a value at all — a number, a null, an object
+					// where a country name belongs — is dropped rather than carried
+					// along. Keeping it would leave a list that reads as countries and
+					// holds something else, which every later reader would take at face
+					// value.
 					if (raw === null) {
-						kept.push(walk(entry))
+						blanked++
 						continue
 					}
 					const code = listMapper(raw)

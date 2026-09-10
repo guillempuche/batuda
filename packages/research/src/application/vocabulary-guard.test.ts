@@ -164,12 +164,16 @@ describe('mapCountry', () => {
 		})
 	})
 
-	describe('when the value names a country and then says something about it', () => {
-		it('should read the country and ignore the aside', () => {
-			// GIVEN the shapes real scans have written, where the country is stated
-			// plainly and the bracket only says how far the company reaches
-			expect(mapCountry('Spain (global)')).toBe('ES')
-			expect(mapCountry('United States (global)')).toBe('US')
+	describe('when the value names a country and then qualifies it', () => {
+		it('should leave it alone rather than read past the bracket', () => {
+			// GIVEN values where the bracket is what says WHICH country. Reading the
+			// name off the front answers confidently and wrongly.
+			expect(mapCountry('Korea (North)')).toBe('Korea (North)')
+			expect(mapCountry('China (Taiwan)')).toBe('China (Taiwan)')
+			expect(mapCountry('Ireland (Northern)')).toBe('Ireland (Northern)')
+			// AND one where reading past it would have been right — kept as written
+			// all the same, because nothing here can tell the two kinds apart
+			expect(mapCountry('Spain (global)')).toBe('Spain (global)')
 		})
 
 		it('should leave a country the run was unsure of alone', () => {
@@ -519,14 +523,19 @@ describe('constrainVocabulary on a scan row', () => {
 		})
 	})
 
-	describe('when the list is not a list of countries at all', () => {
-		it('should leave a shape it cannot read where it is', () => {
-			// GIVEN an entry that is not a value this mapper understands
-			const result = constrainVocabulary(prospects([{ odd: 'shape' }, 'Spain']))
+	describe('when the list holds something that is not a country at all', () => {
+		it('should drop it rather than leave it looking like one', () => {
+			// GIVEN entries that are not values this mapper can read — an object
+			// where a name belongs, a number, a null
+			const result = constrainVocabulary(
+				prospects([{ odd: 'shape' }, 'Spain', 5, null]),
+			)
 
-			// WHEN folded — THEN the country is folded and the odd entry survives,
-			// because one unreadable entry is not a reason to lose the list
-			expect(countriesOf(result)).toEqual([{ odd: 'shape' }, 'ES'])
+			// WHEN folded — THEN only the country survives. Carrying the rest along
+			// would leave a list that reads as countries and holds something else,
+			// which every later reader would take at face value.
+			expect(countriesOf(result)).toEqual(['ES'])
+			expect(result.blanked).toBe(3)
 		})
 	})
 })
