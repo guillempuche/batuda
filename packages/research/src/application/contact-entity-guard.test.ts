@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { bindContactsToEntity } from './contact-entity-guard'
+import {
+	bindContactsToEntity,
+	bindScanContactsToRows,
+} from './contact-entity-guard'
 import { deriveEntityTargets } from './entity-guard'
 
 // The run is researching Circle Logistics; targets carry its name-core + domain.
@@ -137,6 +140,94 @@ describe('bindContactsToEntity', () => {
 
 			// THEN untouched
 			expect(contactsOf(result.findings)).toHaveLength(1)
+			expect(result.dropped).toBe(0)
+		})
+	})
+})
+
+describe('bindScanContactsToRows', () => {
+	const row = (name: string, contacts: ReadonlyArray<unknown>) => ({
+		name,
+		contacts,
+	})
+	const person = (name: string, quote: string) => ({
+		name,
+		citations: [{ quote, source_id: 'https://example.com', confidence: 90 }],
+	})
+	const contactsOn = (findings: unknown, at: number): unknown =>
+		(
+			(findings as { prospects: ReadonlyArray<Record<string, unknown>> })
+				.prospects[at] as Record<string, unknown>
+		)['contacts']
+
+	describe('when a person on one row is evidenced by another company', () => {
+		it('should drop them from that row and leave the rest alone', () => {
+			// GIVEN two companies, where the second row carries a director whose only
+			// quote names the first — the quiet mistake of filing somebody under the
+			// company listed above them
+			const findings = {
+				prospects: [
+					row('Calderería Sentmenat SL', [
+						person('Marta Puig', 'Marta Puig, Gerent at Sentmenat Group'),
+					]),
+					row('Talleres Vidal SL', [
+						person('Jordi Roca', 'Jordi Roca, Director at Sentmenat Group'),
+					]),
+				],
+			}
+
+			// WHEN each row's people are held against that row
+			const result = bindScanContactsToRows(findings, 'prospects')
+
+			// THEN the misfiled one goes and the rightly-filed one stays
+			expect(result.dropped).toBe(1)
+			expect(contactsOn(result.findings, 1)).toEqual([])
+			expect(
+				(contactsOn(result.findings, 0) as ReadonlyArray<{ name: string }>)[0]
+					?.name,
+			).toBe('Marta Puig')
+		})
+	})
+
+	describe('when the evidence names no company at all', () => {
+		it('should keep the person', () => {
+			// GIVEN a quote that reads the same for a real member of staff as for a
+			// stranger
+			const findings = {
+				prospects: [
+					row('Talleres Vidal SL', [
+						person('Anna Serra', 'Anna Serra, Gerent'),
+					]),
+				],
+			}
+
+			// WHEN checked — THEN they stay: losing real people is the worse mistake
+			expect(bindScanContactsToRows(findings, 'prospects').dropped).toBe(0)
+		})
+	})
+
+	describe('when the row name is too plain to decide anything', () => {
+		it('should keep everyone rather than half-check them', () => {
+			// GIVEN a company whose name has nothing distinctive to hold a quote
+			// against
+			const findings = {
+				prospects: [row('SL', [person('Pau Mas', 'Pau Mas at Other Group')])],
+			}
+
+			// WHEN checked — THEN nobody is dropped, because a name that answers to
+			// every quote cannot decide this one
+			expect(bindScanContactsToRows(findings, 'prospects').dropped).toBe(0)
+		})
+	})
+
+	describe('when the run is not a scan shape', () => {
+		it('should leave the findings untouched', () => {
+			// GIVEN no list field, which is what a run about one company passes
+			const findings = { contacts: [person('X', 'X at Y Group')] }
+
+			// WHEN checked — THEN it is the same object back, not a rebuilt copy
+			const result = bindScanContactsToRows(findings, undefined)
+			expect(result.findings).toBe(findings)
 			expect(result.dropped).toBe(0)
 		})
 	})

@@ -43,7 +43,10 @@ import {
 	validateFindingCitations,
 } from './citation-guard'
 import { ContactDiscovery } from './contact-discovery'
-import { bindContactsToEntity } from './contact-entity-guard'
+import {
+	bindContactsToEntity,
+	bindScanContactsToRows,
+} from './contact-entity-guard'
 import {
 	ContactsRescueSchema,
 	contactsRescuePrompt,
@@ -1299,7 +1302,7 @@ export const buildResearchSystemPrompt = (args: {
 		'For a citation to a page you scraped, set source_id to the exact URL you scraped with scrape_page. Never invent an identifier — a made-up source is dropped.',
 		`Name the people who run the company — each with the exact title they are given — and treat that as part of the job, not an extra. They are listed on a team, leadership, management or "equipo" page, almost never on the homepage, so open one when the site has it. ${
 			isDiscoveryScan(args.schemaName)
-				? 'When reading the pages turns up nobody with a title, the tools that would buy you names are not yours to call on a list of companies: add a `pending_paid_actions` entry naming discover_contacts and the company, and a person decides whether to spend it.'
+				? "Put each one in that company's own `contacts`, with the page you read them on — a list of companies is worth far more with somebody to ask for on each. When reading the pages turns up nobody, the tools that would buy you names are not yours to call on a list of companies: add a `pending_paid_actions` entry naming discover_contacts and the company, and a person decides whether to spend it."
 				: 'When reading the pages turns up nobody with a title, discover_contacts is the tool that finds them.'
 		}`,
 		'A search result quotes only the one sentence of a page that matched your query. When a page looks like it holds more than that sentence, open it with scrape_page rather than settling for the snippet.',
@@ -3863,10 +3866,15 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											// Passes every person through when there are no keys: with
 											// nothing to hold a quote against, one naming another
 											// company cannot be told from one naming this company.
-											const check = bindContactsToEntity(
-												findings,
-												entityTargets,
-											)
+											// Two shapes, two checks. A run about one company holds its
+											// people against that company; a search returning many holds
+											// each row's people against that row.
+											const check = isDiscoveryScan(schemaName)
+												? bindScanContactsToRows(
+														findings,
+														discoveryResultField(schemaName),
+													)
+												: bindContactsToEntity(findings, entityTargets)
 											if (check.dropped > 0) {
 												yield* Effect.logWarning(
 													'research.contacts.wrong_entity',

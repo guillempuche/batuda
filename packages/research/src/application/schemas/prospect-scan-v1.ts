@@ -104,6 +104,36 @@ export const ProspectScanV1Schema = Schema.Struct({
 						'Only about whether this is a real, trading company: fill it when the evidence names the company but does not establish that it exists and trades, saying in a few words what is missing. Never drop a company for want of that — list it with this instead. A field you could not confirm is not a reason to fill this: leave that field out and this one too.',
 				}),
 			),
+			// The people a search could name from pages it already read, so a list of
+			// companies arrives with somebody to ask for rather than a name and a
+			// phone number nobody answers.
+			//
+			// Deliberately thinner than the shape a contact-discovery run fills. It
+			// holds what a page states — who they are and what they are called — and
+			// no way of reaching them: an address is either published, in which case
+			// the company's own email already carries it, or it is guessed and
+			// checked, which costs money per person and is work a person approves for
+			// one company rather than a search doing it for fifty.
+			contacts: Schema.optionalKey(
+				Schema.Array(
+					Schema.Struct({
+						name: Schema.String.annotate({
+							description:
+								'The person as the page names them, in full. Not a job title on its own, and not a department.',
+						}),
+						role: Schema.optionalKey(
+							Schema.String.annotate({
+								description:
+									'Their title exactly as the page gives it, in its own language — "Gerent", "Responsable de producció". Leave it out rather than translating or inventing one.',
+							}),
+						),
+						citations: Schema.Array(Citation),
+					}),
+				).annotate({
+					description:
+						'Only people this company\'s own pages name — a team, leadership, management or "equipo" page. Never a person read off a directory listing about the company, and never somebody carried over from another company on the list.',
+				}),
+			),
 			citations: Schema.Array(Citation),
 		}),
 	),
