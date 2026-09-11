@@ -18,7 +18,7 @@
  */
 
 import { aboutPageCandidates } from './about-pages'
-import { domainHost } from './entity-guard'
+import { distinctiveWords, domainHost } from './entity-guard'
 import { isValueWrapper, unwrapValue } from './guard-shapes'
 
 export interface TeamPageTarget {
@@ -76,14 +76,13 @@ export const teamPagesForRows = (args: {
 		// Team and about pages only. This sweep exists to find the people, and a
 		// contact page names a switchboard — buying one to look for staff spends
 		// the fetch and comes back with nobody.
-		const candidate = aboutPageCandidates(args.addresses, host, 4, 1).find(
-			url => !args.alreadyTried(url),
-		)
+		const name = typeof record['name'] === 'string' ? record['name'] : ''
+		const candidate = aboutPageCandidates(args.addresses, host, 4, {
+			weakestBand: 1,
+			ownWords: distinctiveWords(name),
+		}).find(url => !args.alreadyTried(url))
 		if (candidate === undefined) continue
-		picked.push({
-			name: typeof record['name'] === 'string' ? record['name'] : host,
-			url: candidate,
-		})
+		picked.push({ name: name === '' ? host : name, url: candidate })
 	}
 	return picked
 }

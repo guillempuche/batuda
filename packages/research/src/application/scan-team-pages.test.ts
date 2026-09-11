@@ -178,6 +178,70 @@ describe('teamPagesForRows', () => {
 		})
 	})
 
+	describe('when a company named its about page after itself', () => {
+		it('should find it, where no list of words in any language could', () => {
+			// GIVEN the real ER Enginy site, whose about page is "/ca/er-enginy" —
+			// a shape a small firm uses often and no keyword list can catch
+			const picked = teamPagesForRows({
+				findings: {
+					prospects: [
+						{
+							name: 'ER Enginy',
+							website: { value: 'https://www.erenginy.com', source_id: 'x' },
+							contacts: [],
+						},
+					],
+				},
+				listField: 'prospects',
+				addresses: [
+					'https://www.erenginy.com/ca/serveis',
+					'https://www.erenginy.com/ca/er-enginy',
+					'https://www.erenginy.com/ca/contacte',
+				],
+				alreadyTried: never,
+				max: 3,
+			})
+
+			// THEN that page, not the contact form the run used to settle for
+			expect(picked).toEqual([
+				{ name: 'ER Enginy', url: 'https://www.erenginy.com/ca/er-enginy' },
+			])
+		})
+	})
+
+	describe('when a company simply has no page about itself', () => {
+		it('should buy nothing at all', () => {
+			// GIVEN the real Bellmas site: services, project references and news,
+			// and nothing that talks about the firm or names its staff
+			const picked = teamPagesForRows({
+				findings: {
+					prospects: [
+						{
+							name: 'Bellmas Enginyers Associats S.L.',
+							website: {
+								value: 'https://www.bellmasenginyers.cat',
+								source_id: 'x',
+							},
+							contacts: [],
+						},
+					],
+				},
+				listField: 'prospects',
+				addresses: [
+					'https://www.bellmasenginyers.cat/ca/actualitat-i-noticies/nota-aclaridora-sobre-l-aplicacio',
+					'https://www.bellmasenginyers.cat/es/referencias/edificios-de-viviendas/conjunto-residencial-56-viviendas-en-calonge',
+					'https://www.bellmasenginyers.cat/es/ingenieria-industrial-civil-servicios',
+				],
+				alreadyTried: never,
+				max: 3,
+			})
+
+			// THEN nothing: a project of the company's own sitting on the same site
+			// is not the company talking about itself
+			expect(picked).toEqual([])
+		})
+	})
+
 	describe('when the run is not a search', () => {
 		it('should return nothing', () => {
 			expect(
