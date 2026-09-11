@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-09-11 (internal-v2026.9.11)
+
+### Features
+
+* **research:** make a run say when a paid source turned it away ([7277417](https://github.com/guillempuche/batuda/commit/7277417ff69139d8ab1defdd72cbb2170e82222b))
+* return the people a company search reads off its pages ([54822ca](https://github.com/guillempuche/batuda/commit/54822cacf743c9e710f78c04ecc4a96f759859e0))
+
+### Bug Fixes
+
+* **internal:** keep a lead when one of its fields cannot be stored ([ca5777b](https://github.com/guillempuche/batuda/commit/ca5777b4c2b4d227f35dc4299e8718ffac5d14e1))
+* **research:** accept a reply that says it called no tool with null ([bc6efa6](https://github.com/guillempuche/batuda/commit/bc6efa6331a066bbe47b501c599018d419e73c58))
+* **research:** fold a search's countries to the codes its schema asks for ([28a9a04](https://github.com/guillempuche/batuda/commit/28a9a0485a32603adcacfcefc047dd0fb9970502))
+* **research:** keep a company search away from the paid tools ([1271733](https://github.com/guillempuche/batuda/commit/1271733c3bd7c943498dc4157049c0e052fc677e))
+* **research:** let a refused vendor reach the budget that must remember it ([8852508](https://github.com/guillempuche/batuda/commit/8852508c093a40cab388d4076a40fb8d89aa4f57))
+* **research:** stop a field named after a built-in being rewritten ([a692e73](https://github.com/guillempuche/batuda/commit/a692e730cb36f810be9519b8e64c3d3cd3b76dfe))
+* **research:** stop reading a country off the front of a qualified name ([b2dee8f](https://github.com/guillempuche/batuda/commit/b2dee8ff389b21017a1e91003306d51260c2a63f))
+* **research:** tell an approved discovery apart from one missing its domain ([ace075c](https://github.com/guillempuche/batuda/commit/ace075ccf47ca532e17258b786056fc662e535b7))
+
+### Documentation
+
+* **research:** make the prompt-budget comments say what the code does ([1aaf85b](https://github.com/guillempuche/batuda/commit/1aaf85bf32d329b125a64773af6ffc1591cc1a81)), closes [#632](https://github.com/guillempuche/batuda/issues/632)
+
 ## 2026-09-09 (internal-v2026.9.9)
 
 ### Features
