@@ -77,7 +77,7 @@ export function ContactEditDialog({
 							...(trimmedRole ? { role: trimmedRole } : {}),
 							buyingRole: buyingRole === '' ? null : buyingRole,
 						},
-					} as never)
+					})
 				: await updateContact({
 						params: { id: contact.id },
 						payload: {
@@ -85,7 +85,7 @@ export function ContactEditDialog({
 							role: trimmedRole,
 							buyingRole: buyingRole === '' ? null : buyingRole,
 						},
-					} as never)
+					})
 		setBusy(false)
 		if (exit._tag === 'Success') {
 			onSaved()
