@@ -19,13 +19,14 @@
 
 import {
 	classifyEntityMatch,
-	distinctiveWords,
+	deriveEntityTargets,
 	domainHost,
 	type EntityTargets,
-	hostLabel,
-	labelSpellsOneOf,
+	namesNobodyInParticular,
 } from './entity-guard'
 import { isValueWrapper, unwrapValue } from './guard-shapes'
+import { isInCorpus } from './scalar-field-guard'
+import { isFirstPartyHost } from './source-tier-guard'
 
 // A proper name (one to five capitalised words) directly followed by a company
 // marker — the shape of "<Company> Inc" / "Caraway Logistics". The markers include
@@ -107,6 +108,10 @@ export interface ContactEntityResult {
 	readonly dropped: number
 	/** Contacts dropped because nothing was left saying where they were read. */
 	readonly droppedUncited: number
+	/** Contacts dropped because only a directory about the company named them. */
+	readonly droppedOffSite: number
+	/** Titles removed because the pages the run read never say them. */
+	readonly droppedTitles: number
 }
 
 /**
@@ -123,11 +128,23 @@ export const bindContactsToEntity = (
 		typeof findings !== 'object' ||
 		Array.isArray(findings)
 	) {
-		return { findings, dropped: 0, droppedUncited: 0 }
+		return {
+			findings,
+			dropped: 0,
+			droppedUncited: 0,
+			droppedOffSite: 0,
+			droppedTitles: 0,
+		}
 	}
 	const contacts = (findings as { contacts?: unknown }).contacts
 	if (!Array.isArray(contacts))
-		return { findings, dropped: 0, droppedUncited: 0 }
+		return {
+			findings,
+			dropped: 0,
+			droppedUncited: 0,
+			droppedOffSite: 0,
+			droppedTitles: 0,
+		}
 
 	let dropped = 0
 	const kept = contacts.filter(contact => {
@@ -146,35 +163,42 @@ export const bindContactsToEntity = (
 	return {
 		findings: { ...(findings as object), contacts: kept },
 		dropped,
-		// Never any here: a run about one company has a step of its own for a
-		// person with no source to their name, and it runs later in the chain.
+		// Never any here: a run about one company has steps of its own for a person
+		// with no source to their name and for a title nothing supports, and they
+		// run later in the chain.
 		droppedUncited: 0,
+		droppedOffSite: 0,
+		droppedTitles: 0,
 	}
 }
 
-// The words in a company's name that could tell it from another one, read with
-// the shared `distinctiveWords`, which takes off the legal form AND the trade:
-// keeping the trade word let "Transportes Ribera" answer to a quote about
-// "Transportes Gomez", and in a market where most firms are Transportes-something
-// that is nearly every row.
-const distinctiveWordsOf = (name: string): ReadonlySet<string> =>
-	new Set(distinctiveWords(name))
-
-// The word a row's own web address is registered under — "egein" for
-// https://egein.com. A row's people are quoted on that site under whatever the
-// company calls itself day to day, which is often not the name the row was
-// listed under: "Especialidades Geotecnicas e Ingenieria SL" shares no word with
-// "EGEIN Group", and only egein.com says they are the same firm.
-const siteLabelOf = (row: Record<string, unknown>): string => {
+/**
+ * A row read as the thing a guard checks against — the same shape a run about one
+ * company builds for its subject, from the only two things a row knows about
+ * itself: what it is called and the address it gave.
+ *
+ * This is what lets a search reuse the checks written for a single company rather
+ * than keep a second copy of each. Null when the row says nothing distinctive
+ * enough to tell it from any other company on the list.
+ */
+const rowTargets = (row: Record<string, unknown>): EntityTargets | null => {
 	const website = row['website']
 	const address = isValueWrapper(website)
 		? unwrapValue(website)
 		: typeof website === 'string'
 			? website
 			: undefined
-	if (typeof address !== 'string') return ''
-	const host = domainHost(address)
-	return host === undefined ? '' : hostLabel(host)
+	return deriveEntityTargets({
+		schemaName: 'company_enrichment_v1',
+		query: '',
+		subjects: [
+			{
+				table: 'companies',
+				name: typeof row['name'] === 'string' ? row['name'] : undefined,
+				website: typeof address === 'string' ? address : undefined,
+			},
+		],
+	}).targets
 }
 
 /**
@@ -193,84 +217,141 @@ const siteLabelOf = (row: Record<string, unknown>): string => {
 export const bindScanContactsToRows = (
 	findings: unknown,
 	listField: string | undefined,
+	corpus = '',
 ): ContactEntityResult => {
+	const nothingToDo = {
+		findings,
+		dropped: 0,
+		droppedUncited: 0,
+		droppedOffSite: 0,
+		droppedTitles: 0,
+	}
 	if (
 		listField === undefined ||
 		findings === null ||
 		typeof findings !== 'object' ||
 		Array.isArray(findings)
 	) {
-		return { findings, dropped: 0, droppedUncited: 0 }
+		return nothingToDo
 	}
 	const rows = (findings as Record<string, unknown>)[listField]
-	if (!Array.isArray(rows)) return { findings, dropped: 0, droppedUncited: 0 }
+	if (!Array.isArray(rows)) return nothingToDo
+	const lowerCorpus = corpus.toLowerCase()
 
 	let dropped = 0
 	let droppedUncited = 0
+	let droppedOffSite = 0
+	let droppedTitles = 0
 	const keptRows = rows.map(row => {
 		if (row === null || typeof row !== 'object') return row
 		const record = row as Record<string, unknown>
 		const contacts = record['contacts']
 		if (!Array.isArray(contacts)) return row
-		const own = distinctiveWordsOf(
-			typeof record['name'] === 'string' ? record['name'] : '',
-		)
-		const siteLabel = siteLabelOf(record)
 		// A row with neither a name of its own nor an address cannot say whose
 		// staff anybody is — every quote would answer to it. Only that comparison
 		// is skipped, though: whether a person came with any evidence at all is
 		// not a question about the row, so it is still asked below.
-		const canDecide = own.size > 0 || siteLabel !== ''
+		const targets = rowTargets(record)
 
-		const keptContacts = contacts.filter(contact => {
-			if (contact === null || typeof contact !== 'object') return true
+		const keptContacts: unknown[] = []
+		for (const contact of contacts) {
+			if (contact === null || typeof contact !== 'object') {
+				keptContacts.push(contact)
+				continue
+			}
+			const held = contact as Record<string, unknown>
 			// Nothing says where this person was read. Either the model named a
 			// page the run never fetched — the citation guard, which runs before
 			// this, will have just taken it away — or it named none at all. A run
 			// about one company refuses such a person; a search returning fifty
 			// has fifty times the reason to.
-			const citations = (contact as Record<string, unknown>)['citations']
+			const citations = held['citations']
 			if (!Array.isArray(citations) || citations.length === 0) {
 				droppedUncited++
-				return false
+				continue
 			}
-			if (!canDecide) return true
-			const orgs = orgPhrasesIn(
-				contactQuotes(contact as Record<string, unknown>),
-			)
+			if (targets === null) {
+				keptContacts.push(contact)
+				continue
+			}
+			// Only the company's own pages may name its people. A directory about
+			// the company is not the company saying so: its rosters are scraped,
+			// years old, and list people who left — and a search reaching fifty
+			// firms will meet far more directories than team pages. Asked only of
+			// a row that gave an address, because without one there is nothing to
+			// tell a company's own site from a page about it.
+			if (targets.domains.length > 0) {
+				const hosts = citations.flatMap(citation => {
+					const id = (citation as Record<string, unknown>)['source_id']
+					const host = typeof id === 'string' ? domainHost(id) : undefined
+					return host === undefined ? [] : [host]
+				})
+				if (
+					hosts.length > 0 &&
+					!hosts.some(host => isFirstPartyHost(host, targets.domains))
+				) {
+					droppedOffSite++
+					continue
+				}
+			}
+			const orgs = orgPhrasesIn(contactQuotes(held))
 			// No company named in the evidence reads the same for a real member of
 			// staff as for a stranger, and losing real people is the worse mistake.
-			if (orgs.length === 0) return true
-			// One word in common is enough, and prefix matching is not: a page says
-			// "Sentmenat Group" where the row reads "Calderería Sentmenat SL", and
-			// neither spells the other from its first letter. Failing that, the
-			// row's own address answers for it, which is how a company listed under
-			// its legal name keeps the staff its trading name is quoted with.
-			const namesThisRow = orgs.some(org => {
-				const words = [...distinctiveWordsOf(org)]
-				// The quote names a company of nothing but its trade — "Transportes
-				// y Logistica SL". That reads the same for this row as for any
-				// other in the list, so it decides nothing, and a row whose own
-				// name is the same shape would otherwise throw out its own staff.
-				if (words.length === 0) return true
-				return (
-					words.some(word => own.has(word)) ||
-					(siteLabel !== '' && labelSpellsOneOf(siteLabel, words))
-				)
-			})
-			if (!namesThisRow) dropped++
-			return namesThisRow
-		})
-		return keptContacts.length === contacts.length
+			//
+			// A phrase of nothing but the trade — "Logistica SL" — names no company
+			// in particular either, so it cannot be evidence that this person
+			// belongs to a different one. Dropped from the reckoning rather than
+			// read as a stranger, which would take the gerente off a haulier named
+			// after what it does.
+			const named = orgs.filter(org => !namesNobodyInParticular(org))
+			// Any reading but "names nobody this row could be" keeps the person. A
+			// page saying "Sentmenat Group" where the row reads "Calderería
+			// Sentmenat SL" names one word of it and no more, which is as much as a
+			// company gets called in passing — and the row's own address answers
+			// for it too, which is how a company listed under its legal name keeps
+			// the staff its trading name is quoted with.
+			if (
+				named.length > 0 &&
+				!named.some(org => classifyEntityMatch(targets, org) !== 'absent')
+			) {
+				dropped++
+				continue
+			}
+			// The title is kept only if a page the run read actually says it. Asked
+			// because a model handed a person with no stated title writes one and
+			// says so in the same breath — "Director/a (the page does not give the
+			// exact title)" reached a real row — and a made-up title is worse than
+			// none: it is what somebody opens a call with.
+			const role = held['role']
+			if (
+				lowerCorpus !== '' &&
+				typeof role === 'string' &&
+				role.trim() !== '' &&
+				!isInCorpus(role, lowerCorpus)
+			) {
+				droppedTitles++
+				const { role: _removed, ...withoutRole } = held
+				keptContacts.push(withoutRole)
+				continue
+			}
+			keptContacts.push(contact)
+		}
+		return keptContacts.length === contacts.length &&
+			keptContacts.every((kept, i) => kept === contacts[i])
 			? row
 			: { ...record, contacts: keptContacts }
 	})
 
-	return dropped === 0 && droppedUncited === 0
-		? { findings, dropped: 0, droppedUncited: 0 }
+	return dropped === 0 &&
+		droppedUncited === 0 &&
+		droppedOffSite === 0 &&
+		droppedTitles === 0
+		? nothingToDo
 		: {
 				findings: { ...(findings as object), [listField]: keptRows },
 				dropped,
 				droppedUncited,
+				droppedOffSite,
+				droppedTitles,
 			}
 }

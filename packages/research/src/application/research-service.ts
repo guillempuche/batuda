@@ -4006,9 +4006,15 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												? bindScanContactsToRows(
 														findings,
 														discoveryResultField(schemaName),
+														evidenceCorpus,
 													)
 												: bindContactsToEntity(findings, entityTargets)
-											if (check.dropped > 0 || check.droppedUncited > 0) {
+											if (
+												check.dropped > 0 ||
+												check.droppedUncited > 0 ||
+												check.droppedOffSite > 0 ||
+												check.droppedTitles > 0
+											) {
 												yield* Effect.logWarning(
 													'research.contacts.wrong_entity',
 												).pipe(
@@ -4017,6 +4023,8 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														research_id: researchId,
 														dropped: check.dropped,
 														dropped_uncited: check.droppedUncited,
+														dropped_off_site: check.droppedOffSite,
+														dropped_titles: check.droppedTitles,
 													}),
 												)
 											}
