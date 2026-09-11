@@ -18,6 +18,13 @@ import { pathOf } from './source-key'
 // carries: people first (leaders and their titles), then the about/location pages,
 // then a contact page as a last resort. Spans several languages so a non-English site
 // is still covered.
+//
+// Matched as substrings, so a word that is the front of another covers both:
+// 'equip' catches the Catalan /equip and the Spanish /equipo and the French
+// /equipe at once. It is listed rather than left to 'equipo' because the shorter
+// spelling is the one a Catalan site uses — egein.com/ca/equip lists forty-two
+// people with their titles, and without it that page fell to the about band and
+// lost to a contact form.
 const TEAM_HINTS = [
 	'team',
 	'leadership',
@@ -26,8 +33,7 @@ const TEAM_HINTS = [
 	'staff',
 	'directors',
 	'board',
-	'equipo',
-	'equipe',
+	'equip',
 	'leaders',
 ]
 const ABOUT_HINTS = [
@@ -53,6 +59,13 @@ const CONTACT_HINTS = ['contact', 'contacto', 'contacte', 'kontakt', 'contatti']
 const NON_PAGE_SEGMENTS = new Set([
 	'blog',
 	'news',
+	'actualitat',
+	'actualidad',
+	'noticies',
+	'noticias',
+	'portfolio',
+	'projectes',
+	'proyectos',
 	'article',
 	'articles',
 	'post',
@@ -63,10 +76,18 @@ const NON_PAGE_SEGMENTS = new Set([
 	'media',
 ])
 
+// Whether any word of a segment is one of these. Split rather than compared whole,
+// because a section is written as a phrase as often as a word — "actualitat-i-
+// noticies" is the news, and matching the segment exactly let a press release
+// through as a page that would name the staff, then spent a fetch on it.
+const segmentNames = (segment: string, words: ReadonlySet<string>): boolean =>
+	segment.split(/[^a-z0-9]+/).some(word => word !== '' && words.has(word))
+
 // Which band a path falls in, or 3 (not a candidate) when no hint matches or it sits
-// under a blog/news section.
+// in a section that only ever talks about other things.
 const bandOf = (path: string): number => {
-	if (path.split('/').some(segment => NON_PAGE_SEGMENTS.has(segment))) return 3
+	if (path.split('/').some(segment => segmentNames(segment, NON_PAGE_SEGMENTS)))
+		return 3
 	if (TEAM_HINTS.some(hint => path.includes(hint))) return 0
 	if (ABOUT_HINTS.some(hint => path.includes(hint))) return 1
 	if (CONTACT_HINTS.some(hint => path.includes(hint))) return 2
@@ -82,6 +103,14 @@ export const aboutPageCandidates = (
 	links: ReadonlyArray<string>,
 	host: string,
 	max: number,
+	/**
+	 * The weakest kind of page worth taking: 0 a team page, 1 an about page, 2 a
+	 * contact page. A caller filling in a company's location takes all three,
+	 * because an address is on a contact page as often as anywhere. A caller after
+	 * the company's PEOPLE stops at 1 — a contact form names a switchboard, and
+	 * fetching one to look for staff spends the money and returns nobody.
+	 */
+	weakestBand = 2,
 ): ReadonlyArray<string> => {
 	const seen = new Set<string>()
 	const ranked: Array<{ url: string; band: number }> = []
@@ -94,7 +123,7 @@ export const aboutPageCandidates = (
 		// null on an unparseable URL, and '/' for a bare host.)
 		if (path === null || path === '/') continue
 		const band = bandOf(path)
-		if (band === 3) continue
+		if (band > weakestBand) continue
 		// Drop the fragment so "/team" and "/team#ceo" aren't both fetched.
 		const url = link.split('#')[0] ?? link
 		if (seen.has(url)) continue

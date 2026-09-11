@@ -197,6 +197,7 @@ import { computeRunQuality, type PlaceStanding } from './research-quality'
 import { type RunWords, runWordsOf } from './run-words'
 import { guardScalarFields } from './scalar-field-guard'
 import { guardScanEvidence } from './scan-evidence-guard'
+import { teamPagesForRows } from './scan-team-pages'
 import {
 	type FreeformSchema,
 	isSchemaName,
@@ -6449,12 +6450,43 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							),
 						)
 
-						// Grounded and fully fetched — nothing left to close.
-						if (unbought.length === 0 && citedWaiting.length === 0) break
+						// One page per company that came back with nobody, chosen from
+						// links the run genuinely saw. A run about a single company has
+						// swept its own site for these all along; a search never could,
+						// because that sweep hangs off the one company the run is about.
+						// Bought after the cited pages and before the searches, out of
+						// the same purse — a round with nothing left simply buys none.
+						const teamPages = teamPagesForRows({
+							findings,
+							listField: discoveryResultField(schemaName),
+							addresses: [...gatheredAddresses],
+							alreadyTried: url => {
+								const hash = urlHashForScrape(url)
+								return openedHashes.has(hash) || citedAttempted.has(hash)
+							},
+							max: Math.floor(
+								(spendable - citedToFetch.length * SCRAPE_COST_CENTS) /
+									SCRAPE_COST_CENTS,
+							),
+						})
+						// Grounded and fully fetched — nothing left to close. A page that
+						// would name a company's people counts as something left: a list
+						// whose rows are otherwise complete is exactly the one that would
+						// otherwise stop here with nobody to ask for on any of them.
+						if (
+							unbought.length === 0 &&
+							citedWaiting.length === 0 &&
+							teamPages.length === 0
+						)
+							break
 						// Something left to buy and nothing to buy it with. Said out loud:
 						// a run stopped for want of money leaves the same silence as one
 						// that closed every gap, and only the first is worth acting on.
-						if (perFieldTargets.length === 0 && citedToFetch.length === 0) {
+						if (
+							perFieldTargets.length === 0 &&
+							citedToFetch.length === 0 &&
+							teamPages.length === 0
+						) {
 							yield* Effect.logInfo('research.gap_rounds.stopped').pipe(
 								Effect.annotateLogs({
 									event: 'research.gap_rounds.stopped',
@@ -6558,6 +6590,61 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														event: 'research.gap_rounds.cited_scrape_skipped',
 														research_id: researchId,
 														url: citedUrl,
+														cause: Cause.pretty(cause),
+													}),
+												),
+									),
+								),
+							{ concurrency: GAP_ROUND_CONCURRENCY },
+						)
+						yield* Effect.forEach(
+							teamPages,
+							target =>
+								Effect.gen(function* () {
+									citedAttempted.add(urlHashForScrape(target.url))
+									if (isUnsupportedScrapeUrl(target.url)) return
+									const page = yield* gapScrape.scrape({
+										url: target.url,
+										formats: ['markdown'],
+									})
+									gapSpentCents += SCRAPE_COST_CENTS
+									if (
+										page.markdown === undefined ||
+										page.markdown.trim().length === 0
+									)
+										return
+									gatheredAddresses.add(page.url)
+									for (const linked of linkedAddresses(page.markdown)) {
+										gatheredAddresses.add(linked)
+									}
+									const pageHash = urlHashForScrape(page.url)
+									roundHashes.push(pageHash)
+									scrapeCorpus.push({
+										urlHash: pageHash,
+										text: page.markdown,
+										host: domainHost(page.resolvedUrl ?? page.url),
+										kind: 'page',
+									})
+									yield* Effect.logInfo('research.gap_rounds.team_page').pipe(
+										Effect.annotateLogs({
+											event: 'research.gap_rounds.team_page',
+											research_id: researchId,
+											round: gapRound,
+											company: target.name,
+											url: target.url,
+										}),
+									)
+								}).pipe(
+									Effect.catchCause(cause =>
+										Cause.hasInterruptsOnly(cause)
+											? Effect.failCause(cause)
+											: Effect.logInfo(
+													'research.gap_rounds.team_page_skipped',
+												).pipe(
+													Effect.annotateLogs({
+														event: 'research.gap_rounds.team_page_skipped',
+														research_id: researchId,
+														url: target.url,
 														cause: Cause.pretty(cause),
 													}),
 												),
