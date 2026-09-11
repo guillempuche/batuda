@@ -40,7 +40,11 @@ const CreateContactInput = Schema.Struct({
 	siteId: Schema.optional(Schema.String),
 	name: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
 	role: Schema.optional(Schema.String),
-	buyingRole: Schema.optional(Schema.String),
+	// Null is one of the answers, not a value gone missing: "nobody has said what
+	// part this person plays in a purchase" is the usual state, so a caller saying
+	// so outright is taken rather than turned away — and on an update it is the
+	// only way to take a part back off once it has been named.
+	buyingRole: Schema.optional(Schema.NullOr(Schema.String)),
 	metadata: Schema.optional(Schema.Unknown),
 	channels: Schema.optional(Schema.Array(ChannelInput)),
 })
@@ -49,7 +53,7 @@ const UpdateContactInput = Schema.Struct({
 	siteId: Schema.optional(Schema.NullOr(Schema.String)),
 	name: Schema.optional(Schema.String),
 	role: Schema.optional(Schema.String),
-	buyingRole: Schema.optional(Schema.String),
+	buyingRole: Schema.optional(Schema.NullOr(Schema.String)),
 	metadata: Schema.optional(Schema.Unknown),
 	channels: Schema.optional(Schema.Array(ChannelInput)),
 })
