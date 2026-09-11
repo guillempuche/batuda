@@ -30,6 +30,7 @@ const outcome = (over: Partial<RunOutcome>): RunOutcome => ({
 	removed: [],
 	searchingStopped: null,
 	reportedCoverage: null,
+	people: { named: 0, titled: 0 },
 	...over,
 })
 
@@ -1526,20 +1527,12 @@ describe('summarizeScores', () => {
 			// GIVEN two runs, one that came back full and one nearly empty
 			const summary = summarizeScores([
 				score({
-					profile: {
-						fieldsTotal: 6,
-						fieldsFilled: 6,
-						contactsNamed: 4,
-						contactsTitled: 3,
-					},
+					profile: { fieldsTotal: 6, fieldsFilled: 6 },
+					people: { named: 4, titled: 3 },
 				}),
 				score({
-					profile: {
-						fieldsTotal: 6,
-						fieldsFilled: 2,
-						contactsNamed: 0,
-						contactsTitled: 0,
-					},
+					profile: { fieldsTotal: 6, fieldsFilled: 2 },
+					people: { named: 0, titled: 0 },
 				}),
 			])
 

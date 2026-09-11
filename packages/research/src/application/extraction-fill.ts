@@ -73,7 +73,7 @@ export const hasTitle = (contact: unknown): boolean => {
 // top, and a search returning many hangs each company's people off its own row.
 // Reading only the first reported nothing for every scan ever run, so a search
 // that named two hundred people and one that named none read the same.
-const contactsOf = (findings: unknown): ReadonlyArray<unknown> => {
+export const contactsOf = (findings: unknown): ReadonlyArray<unknown> => {
 	if (findings === null || typeof findings !== 'object') return []
 	const record = findings as Record<string, unknown>
 	const top = Array.isArray(record['contacts']) ? record['contacts'] : []

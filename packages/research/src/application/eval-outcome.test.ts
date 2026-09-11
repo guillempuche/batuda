@@ -18,6 +18,35 @@ describe('outcomeFromRun', () => {
 		})
 	})
 
+	describe('when a search filed its people under each company it found', () => {
+		it('should count them, where reading only the top level found none', () => {
+			// GIVEN a company search whose people hang off the rows, which is the
+			// only place a search ever puts them
+			const outcome = outcomeFromRun({
+				status: 'succeeded',
+				schemaName: 'prospect_scan_v1',
+				findings: {
+					prospects: [
+						{
+							name: 'Egein',
+							contacts: [
+								{ name: 'David Garrido', role: 'CEO' },
+								{ name: 'Mariona Garrido' },
+							],
+						},
+						{ name: 'Talleres Vidal SL', contacts: [] },
+					],
+				},
+				fetchedUrls: [],
+			})
+
+			// THEN both are counted and the titled one is told apart — a search that
+			// named two hundred people and one that named none read alike before
+			expect(outcome.people.named).toBe(2)
+			expect(outcome.people.titled).toBe(1)
+		})
+	})
+
 	describe('when a scan removed organisations from its list', () => {
 		it('should read them back off the finished run', () => {
 			// GIVEN a stored run in the shape the pipeline actually writes: the
