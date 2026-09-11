@@ -147,6 +147,30 @@ describe('contactFill', () => {
 		})
 	})
 
+	describe("when the people hang off a search's rows", () => {
+		it('should count them, with a plainly-written title counted as a title', () => {
+			// GIVEN a company search, where each row carries the people its own pages
+			// named and the title is written plainly rather than paired with a page
+			const result = contactFill({
+				prospects: [
+					{
+						name: 'EGEIN',
+						contacts: [
+							{ name: 'David Garrido', role: 'CEO - Enginyer Industrial' },
+							{ name: 'Mariona Garrido', role: 'CFO' },
+						],
+					},
+					{ name: 'Talleres Vidal SL', contacts: [{ name: 'Anna Serra' }] },
+				],
+			})
+
+			// THEN all three count, and the two with a title are told apart —
+			// reading only the top level reported nothing for every scan ever run
+			expect(result.named).toBe(3)
+			expect(result.titled).toBe(2)
+		})
+	})
+
 	describe('when there are no contacts', () => {
 		it('should count zero rather than throwing', () => {
 			// GIVEN findings with no contacts array

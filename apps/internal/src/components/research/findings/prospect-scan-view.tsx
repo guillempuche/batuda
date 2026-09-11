@@ -40,7 +40,7 @@ import {
 /**
  * Renders a `prospect_scan_v1` research finding. Each prospect carries
  * a `why_relevant` rationale + optional industry/countries/location/tax_id +
- * citations.
+ * the people its pages named + citations.
  *
  * A prospect the run could not confirm as a real trading company still belongs on
  * the list — the small firms a scan is really for are the ones with the thinnest
@@ -64,6 +64,13 @@ type ProspectEntry = {
 	readonly countries?: ReadonlyArray<string>
 	readonly location?: string
 	readonly why_relevant: string
+	// The people the company's own pages name. A list of firms is worth far more
+	// with somebody to ask for on each, so they travel on the row rather than
+	// waiting for a second run about one company.
+	readonly contacts?: ReadonlyArray<{
+		readonly name: string
+		readonly role?: string
+	}>
 	readonly unconfirmed_reason?: string
 	// Doubt the run did not put into words but the engine established on its own, so
 	// the wording belongs here rather than in the finding.
@@ -248,6 +255,22 @@ function ProspectRow({ prospect }: { readonly prospect: ProspectEntry }) {
 							<Trans>Tax ID</Trans>
 						</FieldKey>
 						<FieldValue>{prospect.tax_id}</FieldValue>
+					</FieldRow>
+				) : null}
+				{prospect.contacts !== undefined && prospect.contacts.length > 0 ? (
+					<FieldRow>
+						<FieldKey>
+							<Trans>People</Trans>
+						</FieldKey>
+						<FieldValue data-testid='prospect-contacts'>
+							{prospect.contacts
+								.map(person =>
+									person.role === undefined
+										? person.name
+										: `${person.name} — ${person.role}`,
+								)
+								.join(', ')}
+						</FieldValue>
 					</FieldRow>
 				) : null}
 			</FieldsTable>

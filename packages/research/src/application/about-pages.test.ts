@@ -95,3 +95,53 @@ describe('aboutPageCandidates', () => {
 		})
 	})
 })
+
+describe('the pages a live search actually offered', () => {
+	describe('when a section only ever talks about other things', () => {
+		it('should refuse it, however much its words look like an about page', () => {
+			// GIVEN the four pages a real Girona scan picked before this: a press
+			// release whose title happens to say "sobre", and a portfolio entry
+			// whose title happens to say "management"
+			const picked = aboutPageCandidates(
+				[
+					'https://www.bellmasenginyers.cat/ca/actualitat-i-noticies/nota-aclaridora-sobre-l-aplicacio-de-la-instruccio/',
+					'https://www.bellmasenginyers.cat/ca/equip',
+				],
+				'bellmasenginyers.cat',
+				4,
+			)
+
+			// THEN only the team page, and the press release is left alone
+			expect(picked).toEqual(['https://www.bellmasenginyers.cat/ca/equip'])
+		})
+
+		it('should refuse a portfolio entry that names a discipline', () => {
+			// GIVEN a project page whose slug carries "management"
+			const picked = aboutPageCandidates(
+				[
+					'https://enigest.com/ca/portfolio/project-management-i-direccio-dobra/',
+				],
+				'enigest.com',
+				4,
+			)
+
+			// THEN nothing: a portfolio entry names the work, never the staff
+			expect(picked).toEqual([])
+		})
+	})
+
+	describe('when a Catalan site spells its team page the short way', () => {
+		it('should rank it above the contact form', () => {
+			// GIVEN the real EGEIN site, whose roster lives at /ca/equip and which
+			// also carries a contact page
+			const picked = aboutPageCandidates(
+				['https://egein.com/ca/contacte', 'https://egein.com/ca/equip'],
+				'egein.com',
+				4,
+			)
+
+			// THEN the forty-two people come first
+			expect(picked[0]).toBe('https://egein.com/ca/equip')
+		})
+	})
+})

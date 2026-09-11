@@ -154,14 +154,26 @@ export interface GoldenExpectation {
  * the same as one that returns a full picture — the opposite of what a rich
  * profile is worth.
  */
+/**
+ * The people a run named, whatever shape it answered in.
+ *
+ * Kept apart from `profile` because the two answer different questions: how full a
+ * profile came back applies only to a run asked for one, while a search names
+ * people too — they just hang off each company it found rather than off the run.
+ * Counting them inside the profile block reported every search as having found
+ * nobody, however many it named.
+ */
+export interface PeopleNamed {
+	/** People kept after the guards, whether or not a title came with them. */
+	readonly named: number
+	/** How many of those carry a title. */
+	readonly titled: number
+}
+
 export interface ProfileFullness {
 	/** Profile fields the shape asks for, and how many carry a real value. */
 	readonly fieldsTotal: number
 	readonly fieldsFilled: number
-	/** People named, whether or not a title came with them. */
-	readonly contactsNamed: number
-	/** Of those, how many carry a title — the ones worth writing to. */
-	readonly contactsTitled: number
 }
 
 /**
@@ -260,6 +272,8 @@ export interface RunOutcome {
 	readonly registryConfirmed?: boolean
 	/** How full the profile came back, across the whole output shape. */
 	readonly profile?: ProfileFullness
+	/** The people it named, counted for a search as well as a profile. */
+	readonly people: PeopleNamed
 }
 
 // What one run was billed, and what it consumed getting there — read back from
@@ -460,6 +474,8 @@ export interface RunScore {
 	readonly country?: string
 	/** How full the profile came back, independent of the golden answers. */
 	readonly profile?: ProfileFullness
+	/** The people it named, independent of the shape it answered in. */
+	readonly people?: PeopleNamed
 	/**
 	 * Whether this row asked for a market and the run came back with nothing to
 	 * score at all — it failed, or it was cancelled, so it carries no `market`

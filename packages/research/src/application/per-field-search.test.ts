@@ -1636,3 +1636,128 @@ describe('roundChangedNothing', () => {
 		})
 	})
 })
+
+describe('the people on a company a wider read met again', () => {
+	const person = (name: string) => ({ name, citations: [] })
+	const row = (name: string, contacts: ReadonlyArray<unknown>) => ({
+		name,
+		website: { value: `https://${name.toLowerCase()}.example`, source_id: 'x' },
+		contacts,
+	})
+	const peopleOn = (findings: unknown): ReadonlyArray<{ name: string }> =>
+		(
+			(findings as { prospects: ReadonlyArray<Record<string, unknown>> })
+				.prospects[0] as Record<string, unknown>
+		)['contacts'] as ReadonlyArray<{ name: string }>
+
+	describe('when the later read names somebody the row did not have', () => {
+		it('should join them rather than leave the row as it was', () => {
+			// GIVEN a company already naming one director, met again on a page that
+			// names two more. Every other fact is one value, so a row that has one
+			// is answered — people are a list that is never finished.
+			const merged = mergePerFieldSearch(
+				{ prospects: [row('Vidal', [person('Anna Serra')])] },
+				{
+					prospects: [row('Vidal', [person('Jordi Roca'), person('Pau Mas')])],
+				},
+				'prospect_scan_v1',
+				noRunWords,
+			)
+
+			// WHEN folded — THEN the row holds all three, and the round reports that
+			// it gained people so the loop does not read it as having done nothing
+			expect(
+				peopleOn(merged.findings)
+					.map(p => p.name)
+					.sort(),
+			).toEqual(['Anna Serra', 'Jordi Roca', 'Pau Mas'])
+			expect(merged.contactsChanged).toBe(true)
+		})
+	})
+
+	describe('when the row already holds an entry the model left nameless', () => {
+		it('should still take a person the later read names', () => {
+			// GIVEN a row holding one real person and one the model emitted without a
+			// name. The merge drops the nameless one, so the list comes back the same
+			// length with a different person in it — and counting by length reads that
+			// as nothing gained.
+			const merged = mergePerFieldSearch(
+				{
+					prospects: [
+						row('Vidal', [
+							person('Anna Serra'),
+							{ name: undefined, citations: [] },
+						]),
+					],
+				},
+				{ prospects: [row('Vidal', [person('Jordi Roca')])] },
+				'prospect_scan_v1',
+				noRunWords,
+			)
+
+			// WHEN folded — THEN the new person is on the row and the round says so
+			expect(peopleOn(merged.findings).map(p => p.name)).toContain('Jordi Roca')
+			expect(merged.contactsChanged).toBe(true)
+		})
+	})
+
+	describe('when the later read puts a title on somebody already named', () => {
+		it('should keep the title rather than call the round empty', () => {
+			// GIVEN a homepage that named the director and a team page, read a round
+			// later, that finally says what he does
+			const merged = mergePerFieldSearch(
+				{ prospects: [row('Vidal', [person('David Garrido')])] },
+				{
+					prospects: [
+						row('Vidal', [{ ...person('David Garrido'), role: 'CEO' }]),
+					],
+				},
+				'prospect_scan_v1',
+				noRunWords,
+			)
+
+			// WHEN folded — THEN the title is on the row, even though nobody is new
+			expect(peopleOn(merged.findings)).toHaveLength(1)
+			expect((peopleOn(merged.findings)[0] as { role?: string }).role).toBe(
+				'CEO',
+			)
+			expect(merged.contactsChanged).toBe(true)
+		})
+	})
+
+	describe('when the later read carries a blank title', () => {
+		it('should report nothing gained rather than buy another round', () => {
+			// GIVEN a read that returns the same person with a role of blank spaces
+			const merged = mergePerFieldSearch(
+				{ prospects: [row('Vidal', [person('David Garrido')])] },
+				{
+					prospects: [
+						row('Vidal', [{ ...person('David Garrido'), role: '   ' }]),
+					],
+				},
+				'prospect_scan_v1',
+				noRunWords,
+			)
+
+			// WHEN folded — THEN nothing counts as gained: a title of blank spaces
+			// differs from no title by the letter of a comparison and nothing else
+			expect(merged.contactsChanged).toBe(false)
+		})
+	})
+
+	describe('when the later read names only people already on the row', () => {
+		it('should report nothing gained', () => {
+			// GIVEN the same person read twice
+			const merged = mergePerFieldSearch(
+				{ prospects: [row('Vidal', [person('Anna Serra')])] },
+				{ prospects: [row('Vidal', [person('Anna Serra')])] },
+				'prospect_scan_v1',
+				noRunWords,
+			)
+
+			// WHEN folded — THEN the round is honest about having added nobody
+			expect(merged.contactsChanged).toBe(false)
+			expect(peopleOn(merged.findings)).toHaveLength(1)
+		})
+	})
+})

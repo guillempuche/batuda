@@ -333,6 +333,7 @@ export const scoreRun = (
 		contactsExpected: expectedContacts.length,
 		contactsFound,
 		...(outcome.profile !== undefined ? { profile: outcome.profile } : {}),
+		people: outcome.people,
 		...(outcome.usage !== undefined ? { usage: outcome.usage } : {}),
 		...(market !== undefined ? { market } : {}),
 		...(expected.bucket !== undefined ? { bucket: expected.bucket } : {}),
@@ -397,6 +398,7 @@ export const summarizeScores = (
 	let lowConfidence = 0
 	let empty = 0
 	let runsWithProfile = 0
+	let runsWithPeople = 0
 	let profileFieldsTotal = 0
 	let totalFieldsFilled = 0
 	let totalContactsNamed = 0
@@ -467,6 +469,11 @@ export const summarizeScores = (
 		}
 		if (score.lowConfidence) lowConfidence++
 		if (score.empty) empty++
+		if (score.people !== undefined) {
+			runsWithPeople++
+			totalContactsNamed += score.people.named
+			totalContactsTitled += score.people.titled
+		}
 		if (score.profile !== undefined) {
 			runsWithProfile++
 			// Every run is measured against the same profile shape, so this is the
@@ -474,8 +481,6 @@ export const summarizeScores = (
 			// something to add up.
 			profileFieldsTotal = score.profile.fieldsTotal
 			totalFieldsFilled += score.profile.fieldsFilled
-			totalContactsNamed += score.profile.contactsNamed
-			totalContactsTitled += score.profile.contactsTitled
 		}
 		if (score.marketWentUnanswered) scansThatNeverAnswered++
 		if (score.market !== undefined) {
@@ -600,9 +605,9 @@ export const summarizeScores = (
 			runsWithProfile === 0 ? null : totalFieldsFilled / runsWithProfile,
 		profileFieldsTotal: runsWithProfile === 0 ? null : profileFieldsTotal,
 		contactsNamedPerRun:
-			runsWithProfile === 0 ? null : totalContactsNamed / runsWithProfile,
+			runsWithPeople === 0 ? null : totalContactsNamed / runsWithPeople,
 		contactsTitledPerRun:
-			runsWithProfile === 0 ? null : totalContactsTitled / runsWithProfile,
+			runsWithPeople === 0 ? null : totalContactsTitled / runsWithPeople,
 		costPerRun: runsWithUsage === 0 ? null : totalCostCents / runsWithUsage,
 		costPerGroundedRun:
 			groundedRunsWithUsage === 0

@@ -24,7 +24,7 @@ import {
 	type TerminalStatus,
 } from './eval-scoring'
 import { isConfirmedRow } from './existence-verdict'
-import { contactFill, enrichmentFill } from './extraction-fill'
+import { contactFill, contactsOf, enrichmentFill } from './extraction-fill'
 import { unwrapValue } from './guard-shapes'
 import { isSearchStopped, type SearchStopped } from './search-stopped'
 import { hostOf } from './source-key'
@@ -135,20 +135,14 @@ export const outcomeFromRun = (input: {
 	// title it found or null — so the scorer can measure how many known contacts
 	// came back with a title.
 	const contacts: Array<{ name: string; role: string | null }> = []
-	const rawContacts =
-		findings !== null && typeof findings === 'object'
-			? (findings as { contacts?: unknown }).contacts
-			: undefined
-	if (Array.isArray(rawContacts)) {
-		for (const contact of rawContacts) {
-			if (contact === null || typeof contact !== 'object') continue
-			const name = (contact as { name?: unknown }).name
-			if (typeof name !== 'string' || name.trim() === '') continue
-			contacts.push({
-				name,
-				role: readFieldValue((contact as { role?: unknown }).role),
-			})
-		}
+	for (const contact of contactsOf(findings)) {
+		if (contact === null || typeof contact !== 'object') continue
+		const name = (contact as { name?: unknown }).name
+		if (typeof name !== 'string' || name.trim() === '') continue
+		contacts.push({
+			name,
+			role: readFieldValue((contact as { role?: unknown }).role),
+		})
 	}
 
 	const reachedDomains: string[] = []
@@ -242,14 +236,17 @@ export const outcomeFromRun = (input: {
 		// the shape the run answered in, not whether the findings happen to carry a
 		// profile: a run that was asked and came back with nothing has no block either,
 		// and dropping it would lift the average by hiding the worst runs.
+		// Counted for every shape, by the same reader the run's own telemetry uses.
+		// A search files its people under each company it found rather than under
+		// the run, and a counter that knew only the second shape reported every
+		// search as having named nobody.
+		people: { named: people.named, titled: people.titled },
 		...(isScan
 			? {}
 			: {
 					profile: {
 						fieldsTotal: profileFill.total,
 						fieldsFilled: profileFill.filled,
-						contactsNamed: people.named,
-						contactsTitled: people.titled,
 					},
 				}),
 		...(input.usage !== undefined ? { usage: input.usage } : {}),

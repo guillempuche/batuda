@@ -20,7 +20,11 @@
  * any other.
  */
 
-import { mergeContacts } from './contacts-rescue'
+import {
+	mergeContacts,
+	normalizeContactName,
+	type RawContact,
+} from './contacts-rescue'
 import { discoveryResultField, isDiscoveryScan } from './discovery-scan'
 import { enrichmentFill } from './extraction-fill'
 import { isPlainObject, isValueWrapper, unwrapValue } from './guard-shapes'
@@ -68,12 +72,80 @@ const SCAN_ROW_FIELDS_BY_SCHEMA: Record<string, ReadonlyArray<string>> = {
 export const scanRowFields = (schemaName: string): ReadonlyArray<string> =>
 	SCAN_ROW_FIELDS_BY_SCHEMA[schemaName] ?? []
 
+// What a later read can add to somebody a row already names.
+const DETAILS = ['role', 'email', 'phone'] as const
+
+// A detail is only a detail when it says something. A role of blank spaces
+// differs from nothing at all by the letter of a comparison and by nothing else,
+// and reading it as a gain writes it onto the row and buys another round.
+const detailKey = (value: unknown): string =>
+	typeof value === 'string' && value.trim() === ''
+		? 'null'
+		: JSON.stringify(value ?? null)
+
+const sameDetail = (
+	was: Record<string, unknown>,
+	now: RawContact,
+	key: string,
+): boolean =>
+	detailKey(was[key]) === detailKey((now as Record<string, unknown>)[key])
+
 // What a wider read is allowed to fill in on a company the list already holds.
 // Everything worth going out and searching for, plus what a run turns up without
 // being asked: a company's pages on the platforms are never searched for, but a
 // round that meets one has found the only way anybody has of reaching a company
 // with no site of its own, and a field left off this list is one whose value is
 // thrown away even when a round does turn it up.
+/**
+ * The people on a row after a wider read, or nothing when it found none the row
+ * did not already hold.
+ *
+ * Joined rather than filled in: every other fact on a row is one value, so a row
+ * that has it is answered. A row's people are a list that is never finished, and
+ * a company naming one director on its homepage and three more on a team page
+ * would otherwise keep only whichever page was read first.
+ */
+const unionRowContacts = (
+	held: unknown,
+	found: unknown,
+): ReadonlyArray<unknown> | undefined => {
+	if (!Array.isArray(found) || found.length === 0) return undefined
+	const before = Array.isArray(held) ? held : []
+	const merged = mergeContacts(
+		before as ReadonlyArray<RawContact>,
+		found as ReadonlyArray<RawContact>,
+	)
+	// Counted by who is new, never by how much longer the list got. The merge
+	// drops an entry the model left nameless, so a row holding one of those
+	// alongside one real person comes back the same length with a different
+	// person in it — and a length test reads that as nothing gained and throws
+	// the new one away.
+	const heldByName = new Map(
+		before.flatMap(person =>
+			isPlainObject(person) && typeof person['name'] === 'string'
+				? ([[normalizeContactName(person['name']), person]] as const)
+				: [],
+		),
+	)
+	const gained = merged.contacts.filter(
+		person =>
+			typeof person.name === 'string' &&
+			!heldByName.has(normalizeContactName(person.name)),
+	).length
+	// A title put on somebody already named is worth the write too. The round
+	// that finally opens the team page usually finds the same director the
+	// homepage named, now with the job he does under him, and counting people
+	// alone hands that back unchanged.
+	const detailed = merged.contacts.some(person => {
+		if (typeof person.name !== 'string') return false
+		const was = heldByName.get(normalizeContactName(person.name))
+		return (
+			was !== undefined && !DETAILS.every(key => sameDetail(was, person, key))
+		)
+	})
+	return gained > 0 || detailed ? merged.contacts : undefined
+}
+
 const SCAN_ROW_FOLD_FIELDS_BY_SCHEMA: Record<string, ReadonlyArray<string>> = {
 	prospect_scan_v1: [
 		'website',
@@ -451,6 +523,7 @@ const mergeScanRows = (
 		}
 	}
 	let filled = 0
+	let peopleBettered = false
 	const merged = known.map(row => {
 		const match = discoveryRowIdentityKeys(row, ownSiteHosts)
 			.map(key => foundByKey.get(key))
@@ -464,8 +537,19 @@ const mergeScanRows = (
 				filledHere++
 			}
 		}
+		// People are joined, not filled in. A row already naming one person reads
+		// as answered to every other field's test, so treating them the same way
+		// would let a company with a single name on file never gain a second.
+		const people = unionRowContacts(row['contacts'], match['contacts'])
+		// A round can better a row without adding anybody to it — the team page
+		// that finally says what the director the homepage named actually does —
+		// so this says the row moved, not how many people it gained.
+		if (people !== undefined) {
+			next['contacts'] = people
+			peopleBettered = true
+		}
 		filled += filledHere
-		return filledHere === 0 ? row : next
+		return filledHere === 0 && people === undefined ? row : next
 	})
 	// Grows as companies are taken, so one re-extraction naming the same new
 	// company twice appends it once. A duplicate would not only read badly — the
@@ -495,7 +579,7 @@ const mergeScanRows = (
 		for (const key of keys) taken.add(key)
 		return true
 	})
-	if (filled === 0 && additions.length === 0) {
+	if (filled === 0 && !peopleBettered && additions.length === 0) {
 		return {
 			findings,
 			filled: 0,
@@ -541,7 +625,7 @@ const mergeScanRows = (
 	return {
 		findings: settled.findings,
 		filled,
-		contactsChanged: false,
+		contactsChanged: peopleBettered,
 		added:
 			before === undefined || after === undefined
 				? additions.length

@@ -4491,6 +4491,7 @@ msgstr "Accions de pagament pendents"
 msgid "Pending review"
 msgstr "Pendent de revisió"
 
+#: src/components/research/findings/prospect-scan-view.tsx
 #: src/routes/companies/$slug.tsx
 #: src/routes/companies/$slug.tsx
 msgid "People"

@@ -60,15 +60,35 @@ export const enrichmentFill = (findings: unknown): EnrichmentFill => {
 export const hasTitle = (contact: unknown): boolean => {
 	if (contact === null || typeof contact !== 'object') return false
 	const role = (contact as { role?: unknown }).role
+	// A scan writes the title plainly; a run about one company pairs it with the
+	// page it was read on. Reading only the paired shape counted every titled
+	// person a search found as untitled.
+	if (typeof role === 'string') return role.trim() !== ''
 	if (role === null || typeof role !== 'object') return false
 	const value = (role as { value?: unknown }).value
 	return typeof value === 'string' && value.trim() !== ''
 }
 
-const contactsOf = (findings: unknown): ReadonlyArray<unknown> => {
+// Both places a pass can leave people: a run about one company files them at the
+// top, and a search returning many hangs each company's people off its own row.
+// Reading only the first reported nothing for every scan ever run, so a search
+// that named two hundred people and one that named none read the same.
+export const contactsOf = (findings: unknown): ReadonlyArray<unknown> => {
 	if (findings === null || typeof findings !== 'object') return []
-	const contacts = (findings as { contacts?: unknown }).contacts
-	return Array.isArray(contacts) ? contacts : []
+	const record = findings as Record<string, unknown>
+	const top = Array.isArray(record['contacts']) ? record['contacts'] : []
+	const onRows = Object.values(record).flatMap(value =>
+		Array.isArray(value)
+			? value.flatMap(row =>
+					row !== null &&
+					typeof row === 'object' &&
+					Array.isArray((row as Record<string, unknown>)['contacts'])
+						? ((row as Record<string, unknown>)['contacts'] as unknown[])
+						: [],
+				)
+			: [],
+	)
+	return [...top, ...onRows]
 }
 
 const isNamed = (contact: unknown): boolean =>

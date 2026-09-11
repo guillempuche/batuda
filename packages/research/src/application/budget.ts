@@ -235,6 +235,32 @@ export const makeBudgetLayer = (config: BudgetConfig) =>
 					remaining: s.remaining + cents,
 				}))
 
+			// Take a charge back off the bill without taking the row away. The row
+			// records that the call was attempted, which is worth keeping — a
+			// breakdown that showed nothing at all could not tell a run that never
+			// tried from one turned away every time. Only the money goes.
+			const voidPaidCharge = (idempotencyKey: string) =>
+				sql`
+					UPDATE research_paid_spend
+					SET amount_cents = 0
+					WHERE organization_id = ${config.organizationId}
+					  AND idempotency_key = ${idempotencyKey}
+				`.pipe(
+					Effect.asVoid,
+					// Never let bookkeeping sink the run: the call already failed, and
+					// the caller is about to degrade on that. A charge left standing is
+					// reported rather than raised.
+					Effect.catchCause(cause =>
+						Effect.logWarning('budget.void_failed').pipe(
+							Effect.annotateLogs({
+								event: 'budget.void_failed',
+								idempotency_key: idempotencyKey,
+								cause: String(cause),
+							}),
+						),
+					),
+				)
+
 			// Named rather than written straight into the service object, so
 			// withPaidCharge below can pay through exactly the same path instead of
 			// keeping a second copy of the rules.
@@ -402,11 +428,20 @@ export const makeBudgetLayer = (config: BudgetConfig) =>
 										: Effect.andThen(
 												// A refusal is remembered, so the next call to
 												// this vendor is turned away rather than charged
-												// a second time.
+												// a second time — and the money is taken back off
+												// the bill, which a failure on the way home is not.
+												// A vendor that says outright it will not do the
+												// work has not billed for it, so a charge left
+												// standing is money the run never spent: it eats
+												// the month's allowance and reads in the breakdown
+												// as a lookup that happened.
 												causeIsQuotaRefusal(exit.cause)
-													? Ref.update(
-															refusedRef,
-															seen => new Set([...seen, provider]),
+													? Effect.andThen(
+															Ref.update(
+																refusedRef,
+																seen => new Set([...seen, provider]),
+															),
+															voidPaidCharge(idempotencyKey),
 														)
 													: Effect.void,
 												releaseRunAllowance(cents),

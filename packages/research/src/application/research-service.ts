@@ -43,7 +43,10 @@ import {
 	validateFindingCitations,
 } from './citation-guard'
 import { ContactDiscovery } from './contact-discovery'
-import { bindContactsToEntity } from './contact-entity-guard'
+import {
+	bindContactsToEntity,
+	bindScanContactsToRows,
+} from './contact-entity-guard'
 import {
 	ContactsRescueSchema,
 	contactsRescuePrompt,
@@ -194,6 +197,7 @@ import { computeRunQuality, type PlaceStanding } from './research-quality'
 import { type RunWords, runWordsOf } from './run-words'
 import { guardScalarFields } from './scalar-field-guard'
 import { guardScanEvidence } from './scan-evidence-guard'
+import { teamPagesForRows } from './scan-team-pages'
 import {
 	type FreeformSchema,
 	isSchemaName,
@@ -1299,7 +1303,7 @@ export const buildResearchSystemPrompt = (args: {
 		'For a citation to a page you scraped, set source_id to the exact URL you scraped with scrape_page. Never invent an identifier — a made-up source is dropped.',
 		`Name the people who run the company — each with the exact title they are given — and treat that as part of the job, not an extra. They are listed on a team, leadership, management or "equipo" page, almost never on the homepage, so open one when the site has it. ${
 			isDiscoveryScan(args.schemaName)
-				? 'When reading the pages turns up nobody with a title, the tools that would buy you names are not yours to call on a list of companies: add a `pending_paid_actions` entry naming discover_contacts and the company, and a person decides whether to spend it.'
+				? "Put each one in that company's own `contacts`, with the page you read them on — a list of companies is worth far more with somebody to ask for on each. When reading the pages turns up nobody, the tools that would buy you names are not yours to call on a list of companies: add a `pending_paid_actions` entry naming discover_contacts and the company, and a person decides whether to spend it."
 				: 'When reading the pages turns up nobody with a title, discover_contacts is the tool that finds them.'
 		}`,
 		'A search result quotes only the one sentence of a page that matched your query. When a page looks like it holds more than that sentence, open it with scrape_page rather than settling for the snippet.',
@@ -1488,12 +1492,17 @@ export const buildExtractionPrompt = (args: {
 		"Read ALL of the evidence to the end — every fetched page and every search result in the transcript — and report every fact it states; the evidence routinely states far more than a first pass returns. Report the industry, employee-count band, location, country, and the company's own operational software wherever the evidence states them — including on a third-party page rather than the company's own site.",
 		'',
 	]
-	// The breadth ask, addressed to whichever list this run's answer actually is.
-	// A scan is asked for companies and has no people list to fill; saying both
-	// would push it to invent one.
+	// The breadth ask, addressed to whichever list this run's answer actually is —
+	// and, either way, the ask for the people in it. A scan's people hang off each
+	// company rather than off the run, so it is told where they go; without that
+	// it reads the ask as a second list to fill and invents one.
 	if (args.discoveryScan) {
 		lines.push(DISCOVERY_BREADTH_DIRECTIVE, '')
 		lines.push(DISCOVERY_ORGANISATION_KIND_DIRECTIVE, '')
+		lines.push(
+			"Where the evidence names somebody as a company's own leader or employee — a titled person on its team page, a quoted founder, a signed author — put them in THAT company's `contacts`, with the exact job title the evidence gives them and the page you read them on. Under the company they work for, never the one listed beside them, and never in a list of their own. A company whose pages name its staff and comes back with an empty `contacts` is an incomplete row.",
+			'',
+		)
 		if (args.marksUnconfirmed) lines.push(DISCOVERY_UNCONFIRMED_DIRECTIVE, '')
 	} else {
 		lines.push(
@@ -3853,35 +3862,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										}),
 								},
 								{
-									// Contact entity binding: drop a person whose quotes name only a
-									// different company (a client testimonial or a competitor's exec
-									// quoted on the target's own page), so the richer extraction
-									// can't present someone else's leader as this company's contact.
-									name: 'contact-entity',
-									run: findings =>
-										Effect.gen(function* () {
-											// Passes every person through when there are no keys: with
-											// nothing to hold a quote against, one naming another
-											// company cannot be told from one naming this company.
-											const check = bindContactsToEntity(
-												findings,
-												entityTargets,
-											)
-											if (check.dropped > 0) {
-												yield* Effect.logWarning(
-													'research.contacts.wrong_entity',
-												).pipe(
-													Effect.annotateLogs({
-														event: 'research.contacts.wrong_entity',
-														research_id: researchId,
-														dropped: check.dropped,
-													}),
-												)
-											}
-											return { findings: check.findings }
-										}),
-								},
-								{
 									// Scalar grounding: hold each per-field value to "grounded or
 									// absent". The citation guard has just removed fabricated
 									// sources, so a scalar left without one is dropped here rather
@@ -4000,6 +3980,56 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														check.namedNobodyInParticular,
 												},
 											}
+										}),
+								},
+								{
+									// Contact entity binding: drop a person whose quotes name only a
+									// different company (a client testimonial or a competitor's exec
+									// quoted on the target's own page), so the richer extraction
+									// can't present someone else's leader as this company's contact.
+									//
+									// After the websites check above, because a search's rows are held
+									// against the address each one gave: a row still carrying somebody
+									// else's site would take that owner's staff as its own, and the
+									// check above is what takes such an address away. After the
+									// citation check too, so a person left with no source to their
+									// name has already lost it by the time this asks.
+									name: 'contact-entity',
+									run: findings =>
+										Effect.gen(function* () {
+											// Passes every person through when there are no keys: with
+											// nothing to hold a quote against, one naming another
+											// company cannot be told from one naming this company.
+											// Two shapes, two checks. A run about one company holds its
+											// people against that company; a search returning many holds
+											// each row's people against that row.
+											const check = isDiscoveryScan(schemaName)
+												? bindScanContactsToRows(
+														findings,
+														discoveryResultField(schemaName),
+														evidenceCorpus,
+													)
+												: bindContactsToEntity(findings, entityTargets)
+											if (
+												check.dropped > 0 ||
+												check.droppedUncited > 0 ||
+												check.droppedOffSite > 0 ||
+												check.droppedTitles > 0
+											) {
+												yield* Effect.logWarning(
+													'research.contacts.wrong_entity',
+												).pipe(
+													Effect.annotateLogs({
+														event: 'research.contacts.wrong_entity',
+														research_id: researchId,
+														dropped: check.dropped,
+														dropped_uncited: check.droppedUncited,
+														dropped_off_site: check.droppedOffSite,
+														dropped_titles: check.droppedTitles,
+													}),
+												)
+											}
+											return { findings: check.findings }
 										}),
 								},
 								{
@@ -4873,14 +4903,20 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// points at the guards, a low value everywhere at the model.
 							if (isEnrichmentRun) {
 								const keptFill = enrichmentFill(result)
-								const keptContacts = contactFill(result)
 								yield* Effect.annotateCurrentSpan({
 									'research.enrichment.filled_kept': keptFill.filled,
 									'research.enrichment.missing_kept': keptFill.missing.length,
-									'research.contacts.named_kept': keptContacts.named,
-									'research.contacts.titled_kept': keptContacts.titled,
 								})
 							}
+							// People, counted for whichever shape the run is. A search
+							// files them on each company rather than on the run, and
+							// reporting only the second shape left a search that named two
+							// hundred and one that named none reading exactly alike.
+							const keptContacts = contactFill(result)
+							yield* Effect.annotateCurrentSpan({
+								'research.contacts.named_kept': keptContacts.named,
+								'research.contacts.titled_kept': keptContacts.titled,
+							})
 							return {
 								findings: result as unknown,
 								entityFieldsDropped,
@@ -6414,12 +6450,43 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							),
 						)
 
-						// Grounded and fully fetched — nothing left to close.
-						if (unbought.length === 0 && citedWaiting.length === 0) break
+						// One page per company that came back with nobody, chosen from
+						// links the run genuinely saw. A run about a single company has
+						// swept its own site for these all along; a search never could,
+						// because that sweep hangs off the one company the run is about.
+						// Bought after the cited pages and before the searches, out of
+						// the same purse — a round with nothing left simply buys none.
+						const teamPages = teamPagesForRows({
+							findings,
+							listField: discoveryResultField(schemaName),
+							addresses: [...gatheredAddresses],
+							alreadyTried: url => {
+								const hash = urlHashForScrape(url)
+								return openedHashes.has(hash) || citedAttempted.has(hash)
+							},
+							max: Math.floor(
+								(spendable - citedToFetch.length * SCRAPE_COST_CENTS) /
+									SCRAPE_COST_CENTS,
+							),
+						})
+						// Grounded and fully fetched — nothing left to close. A page that
+						// would name a company's people counts as something left: a list
+						// whose rows are otherwise complete is exactly the one that would
+						// otherwise stop here with nobody to ask for on any of them.
+						if (
+							unbought.length === 0 &&
+							citedWaiting.length === 0 &&
+							teamPages.length === 0
+						)
+							break
 						// Something left to buy and nothing to buy it with. Said out loud:
 						// a run stopped for want of money leaves the same silence as one
 						// that closed every gap, and only the first is worth acting on.
-						if (perFieldTargets.length === 0 && citedToFetch.length === 0) {
+						if (
+							perFieldTargets.length === 0 &&
+							citedToFetch.length === 0 &&
+							teamPages.length === 0
+						) {
 							yield* Effect.logInfo('research.gap_rounds.stopped').pipe(
 								Effect.annotateLogs({
 									event: 'research.gap_rounds.stopped',
@@ -6523,6 +6590,61 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														event: 'research.gap_rounds.cited_scrape_skipped',
 														research_id: researchId,
 														url: citedUrl,
+														cause: Cause.pretty(cause),
+													}),
+												),
+									),
+								),
+							{ concurrency: GAP_ROUND_CONCURRENCY },
+						)
+						yield* Effect.forEach(
+							teamPages,
+							target =>
+								Effect.gen(function* () {
+									citedAttempted.add(urlHashForScrape(target.url))
+									if (isUnsupportedScrapeUrl(target.url)) return
+									const page = yield* gapScrape.scrape({
+										url: target.url,
+										formats: ['markdown'],
+									})
+									gapSpentCents += SCRAPE_COST_CENTS
+									if (
+										page.markdown === undefined ||
+										page.markdown.trim().length === 0
+									)
+										return
+									gatheredAddresses.add(page.url)
+									for (const linked of linkedAddresses(page.markdown)) {
+										gatheredAddresses.add(linked)
+									}
+									const pageHash = urlHashForScrape(page.url)
+									roundHashes.push(pageHash)
+									scrapeCorpus.push({
+										urlHash: pageHash,
+										text: page.markdown,
+										host: domainHost(page.resolvedUrl ?? page.url),
+										kind: 'page',
+									})
+									yield* Effect.logInfo('research.gap_rounds.team_page').pipe(
+										Effect.annotateLogs({
+											event: 'research.gap_rounds.team_page',
+											research_id: researchId,
+											round: gapRound,
+											company: target.name,
+											url: target.url,
+										}),
+									)
+								}).pipe(
+									Effect.catchCause(cause =>
+										Cause.hasInterruptsOnly(cause)
+											? Effect.failCause(cause)
+											: Effect.logInfo(
+													'research.gap_rounds.team_page_skipped',
+												).pipe(
+													Effect.annotateLogs({
+														event: 'research.gap_rounds.team_page_skipped',
+														research_id: researchId,
+														url: target.url,
 														cause: Cause.pretty(cause),
 													}),
 												),

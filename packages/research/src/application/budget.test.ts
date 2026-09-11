@@ -322,6 +322,129 @@ describe('what a company may spend on paid calls in a month', () => {
 	})
 })
 
+// Every statement the budget issued, so a test can ask what it wrote rather than
+// what it returned. The ledger is the only place a refused charge shows up.
+const withRecordedSql = <A, E>(
+	body: (budget: Budget['Service']) => Effect.Effect<A, E, never>,
+): Promise<{
+	readonly result: A
+	readonly statements: ReadonlyArray<string>
+}> => {
+	const statements: string[] = []
+	const fakeSql = ((strings: ReadonlyArray<string>) => {
+		const text = strings.join(' ')
+		statements.push(text)
+		if (text.includes('organization_research_policy')) return Effect.succeed([])
+		if (text.includes('SUM(amount_cents)'))
+			return Effect.succeed([{ spent: 0 }])
+		if (text.includes('pg_advisory_xact_lock')) return Effect.succeed([])
+		return Effect.succeed([{ id: 'spend-1' }])
+	}) as unknown as SqlClient.SqlClient
+	Object.assign(fakeSql, {
+		withTransaction: <T, E2, R>(effect: Effect.Effect<T, E2, R>) => effect,
+	})
+	const layer = makeBudgetLayer({
+		organizationId: 'org-1',
+		userId: 'user-1',
+		researchId: 'run-1',
+		policy: new ResolvedPolicy({ ...POLICY }),
+		defaultCapCents: 2000,
+		systemCeiling: 10_000,
+	}).pipe(Layer.provide(Layer.succeed(SqlClient.SqlClient)(fakeSql)))
+	return Effect.runPromise(
+		Effect.gen(function* () {
+			const budget = yield* Budget
+			const result = yield* body(budget)
+			return { result, statements }
+		}).pipe(Effect.provide(layer), Effect.orDie),
+	)
+}
+
+const voidedCharges = (statements: ReadonlyArray<string>): number =>
+	statements.filter(
+		text =>
+			text.includes('UPDATE research_paid_spend') &&
+			text.includes('amount_cents = 0'),
+	).length
+
+describe('a vendor that refuses the work outright', () => {
+	const outOfCredit = Effect.fail(
+		new ProviderError({
+			provider: 'librebor',
+			message: 'registry lookup failed: HTTP 402',
+			recoverable: false,
+			quotaExhausted: true,
+		}),
+	)
+
+	describe('when it says it has no credit left', () => {
+		it('should take the charge back off the bill', async () => {
+			// GIVEN a register lookup the vendor turns away for want of credit
+			const { statements } = await withRecordedSql(budget =>
+				budget
+					.withPaidCharge(
+						'registry',
+						29,
+						'registry_lookup',
+						'k1',
+					)(() => outOfCredit)
+					.pipe(Effect.ignore),
+			)
+
+			// THEN the money is taken off: a vendor that refused the work never
+			// billed for it, and a charge left standing eats the month's allowance
+			// and reads in the breakdown as a lookup that happened
+			expect(voidedCharges(statements)).toBe(1)
+		})
+	})
+
+	describe('when the call fails on the way home instead', () => {
+		it('should leave the charge standing', async () => {
+			// GIVEN a call that reached the vendor and then broke
+			const { statements } = await withRecordedSql(budget =>
+				budget
+					.withPaidCharge(
+						'registry',
+						29,
+						'registry_lookup',
+						'k1',
+					)(() =>
+						Effect.fail(
+							new ProviderError({
+								provider: 'librebor',
+								message: 'socket hang up',
+								recoverable: true,
+							}),
+						),
+					)
+					.pipe(Effect.ignore),
+			)
+
+			// THEN nothing is taken back: the vendor may well have billed for a
+			// call that failed on the way back, and guessing otherwise invents a
+			// refund the vendor never gave
+			expect(voidedCharges(statements)).toBe(0)
+		})
+	})
+
+	describe('when the call succeeds', () => {
+		it('should leave the charge standing', async () => {
+			// GIVEN a lookup that worked
+			const { statements } = await withRecordedSql(budget =>
+				budget.withPaidCharge(
+					'registry',
+					29,
+					'registry_lookup',
+					'k1',
+				)(() => Effect.succeed('a record')),
+			)
+
+			// THEN the run is billed for it, as it should be
+			expect(voidedCharges(statements)).toBe(0)
+		})
+	})
+})
+
 describe('paying for a vendor call that then fails', () => {
 	describe('when the vendor call fails after the money was set aside', () => {
 		it('should give the run its allowance back', async () => {
