@@ -946,6 +946,7 @@ const fireWebhooks = (event: string, payload: unknown) =>
 Events fired:
 
 - `company.created`
+- `company.already_on_file` (a company offered a second time is answered with the one already here, so `company.created` does not fire for it)
 - `company.status_changed` (include `from` and `to` in payload)
 - `interaction.logged`
 - `email.sent`

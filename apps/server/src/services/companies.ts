@@ -12,6 +12,7 @@ import {
 	Company,
 	type CompanySort,
 	Contact,
+	foldLabel,
 	Interaction,
 	normalizeCountry,
 } from '@batuda/domain'
@@ -507,35 +508,232 @@ export class CompanyService extends Context.Service<CompanyService>()(
 						return yield* Schema.decodeUnknownEffect(Company)(company)
 					}),
 
-				create: (data: Record<string, unknown>) =>
+				/**
+				 * Take a company on, with the people a search read off its pages.
+				 *
+				 * Finds it rather than making a second one when it is already here.
+				 * Sending the same company twice is an ordinary thing to do — a
+				 * person working down a list of fifty loses their place — so two
+				 * identities are checked: the web address the company is filed
+				 * under, which catches the same name arriving again, and the number
+				 * it is registered under, which catches the same firm arriving under
+				 * a different trading name.
+				 *
+				 * The people land on whichever company answered, new or already
+				 * here, and anyone it already has is left alone. Their part in a
+				 * purchase is not set: a search reads a job title off a page and has
+				 * no way of knowing who holds the budget.
+				 */
+				createWithContacts: (args: {
+					readonly company: Record<string, unknown>
+					readonly contacts: ReadonlyArray<{
+						readonly name: string
+						readonly role?: string | undefined
+					}>
+				}) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
-						const split = splitCompanyChannelFields(data)
-						// The trade a caller named becomes an entry in the organisation's
-						// own list, so its name and the entry it points at are written
-						// together and can never disagree.
-						const columns = withIndustry(
-							split.columns,
-							yield* industryForWrite(
-								sql,
-								currentOrg.id,
-								split.columns['industry'],
-							),
-						)
-						const rows =
-							yield* sql`INSERT INTO companies ${sql.insert({ ...columns, organizationId: currentOrg.id })} RETURNING *`
-						const row = rows[0]
-						if (row !== undefined && split.channels.length > 0) {
-							yield* writeChannels(
-								sql,
-								currentOrg.id,
-								{ table: 'companies', id: String(row['id']) },
-								split.channels,
+						const slug =
+							typeof args.company['slug'] === 'string'
+								? args.company['slug']
+								: ''
+						const taxId =
+							typeof args.company['taxId'] === 'string'
+								? normalizeTaxId(args.company['taxId'])
+								: ''
+
+						// Live rows only, on both identities. A company that was deleted
+						// has given its identity back, so re-adding it has to land rather
+						// than answer with something nobody can open.
+						//
+						// The number is asked first and alone, because it is the surer of
+						// the two: a firm is written down differently every time it is
+						// found, and its registration is not.
+						const byNumber =
+							taxId === ''
+								? []
+								: yield* sql`
+										SELECT * FROM companies
+										WHERE organization_id = ${currentOrg.id}
+											AND deleted_at IS NULL
+											AND tax_id IS NOT NULL
+											AND upper(regexp_replace(tax_id, '[^A-Za-z0-9]', '', 'g'))
+												= ${taxId}
+										LIMIT 1
+									`
+
+						// Then the web address the company is filed under — but a company
+						// that contradicts on what it IS does not answer to it. Two
+						// unrelated firms reduce to one address more often than it
+						// sounds: the fold drops accents and cuts a long name short, so
+						// a Talleres Garcia in Girona and another in Sevilla are one
+						// address. Taking that as proof would file this company's people
+						// under somebody else while saying "already here".
+						const sharingAddress =
+							byNumber.length > 0
+								? []
+								: yield* sql`
+										SELECT * FROM companies
+										WHERE organization_id = ${currentOrg.id}
+											AND deleted_at IS NULL
+											AND slug = ${slug}
+										LIMIT 1
+									`
+
+						// Compared here rather than in the query, so a place is folded the
+						// same way names are folded everywhere else.
+						const disagreesOn = (held: unknown, offered: unknown): boolean => {
+							// Silence is not a disagreement, and neither is a shorter way
+							// of saying the same place: "Girona" inside "Girona, Catalunya"
+							// is one place, not two.
+							if (typeof held !== 'string' || held.trim() === '') return false
+							if (typeof offered !== 'string' || offered.trim() === '')
+								return false
+							const foldedHeld = foldLabel(held)
+							const foldedOffered = foldLabel(offered)
+							return (
+								foldedHeld !== '' &&
+								foldedOffered !== '' &&
+								!foldedHeld.includes(foldedOffered) &&
+								!foldedOffered.includes(foldedHeld)
 							)
 						}
-						return yield* Schema.decodeUnknownEffect(Schema.Array(Company))(
-							rows,
+
+						const holder = sharingAddress[0]
+						const heldByAnotherFirm =
+							holder !== undefined &&
+							(disagreesOn(holder['location'], args.company['location']) ||
+								(taxId !== '' &&
+									typeof holder['taxId'] === 'string' &&
+									normalizeTaxId(holder['taxId']) !== taxId))
+						const byAddress = heldByAnotherFirm ? [] : sharingAddress
+						const onFile = byNumber.length > 0 ? byNumber : byAddress
+
+						let row = onFile[0]
+						let created = false
+						if (row === undefined) {
+							const split = splitCompanyChannelFields(args.company)
+							const columns = withIndustry(
+								split.columns,
+								yield* industryForWrite(
+									sql,
+									currentOrg.id,
+									split.columns['industry'],
+								),
+							)
+
+							// A different firm already answers to this address, so this one
+							// takes an address of its own rather than being folded into it.
+							// Only ever reached on a real clash, which is why the address
+							// is the plain one the rest of the time.
+							//
+							// Told apart by whatever made it a different firm — its place,
+							// or failing that its number. Both stay the same from one
+							// offer to the next, so this company answers to one address
+							// ever after; something picked at random would hand it a new
+							// one every time and file it again on every click.
+							const toldApartBy =
+								foldLabel(
+									typeof args.company['location'] === 'string'
+										? args.company['location']
+										: '',
+								).replace(/\s+/g, '-') || taxId.toLowerCase()
+							const filedUnder =
+								heldByAnotherFirm && toldApartBy !== ''
+									? `${slug}-${toldApartBy}`.slice(0, 60)
+									: slug
+
+							// Nothing was here a moment ago, so a conflict now means
+							// another request filed the same company in between. That is
+							// the same answer as finding it in the first place — it is
+							// here — and saying so beats failing the click on a race the
+							// person cannot see or do anything about.
+							const inserted = yield* sql`
+								INSERT INTO companies ${sql.insert({ ...columns, slug: filedUnder, organizationId: currentOrg.id })}
+								ON CONFLICT (organization_id, slug) WHERE deleted_at IS NULL
+								DO NOTHING
+								RETURNING *
+							`
+							row = inserted[0]
+							created = row !== undefined
+
+							if (row === undefined) {
+								// Another request filed it between the look and the write.
+								const raced = yield* sql`
+									SELECT * FROM companies
+									WHERE organization_id = ${currentOrg.id}
+										AND deleted_at IS NULL
+										AND slug = ${filedUnder}
+									LIMIT 1
+								`
+								row = raced[0]
+							}
+
+							if (row !== undefined && created && split.channels.length > 0) {
+								yield* writeChannels(
+									sql,
+									currentOrg.id,
+									{ table: 'companies', id: String(row['id']) },
+									split.channels,
+								)
+							}
+						}
+
+						if (row === undefined)
+							return yield* Effect.die(
+								new Error('company insert returned no row'),
+							)
+
+						const companyId = String(row['id'])
+
+						// A company already here, now offered with the number it is
+						// registered under, and nothing on file. Written down, because it
+						// is what recognises this firm the next time it arrives under a
+						// name that gives a different address — which is the duplicate
+						// this whole step exists to stop.
+						if (
+							!created &&
+							taxId !== '' &&
+							(row['taxId'] === null || row['taxId'] === undefined)
+						) {
+							yield* sql`
+								UPDATE companies
+								SET tax_id = ${String(args.company['taxId'])}, updated_at = now()
+								WHERE id = ${companyId} AND organization_id = ${currentOrg.id}
+							`
+						}
+
+						const held = yield* sql`
+							SELECT name FROM contacts
+							WHERE organization_id = ${currentOrg.id}
+								AND company_id = ${companyId}
+								AND deleted_at IS NULL
+						`
+						// Folded before comparing, so the same person written with an
+						// accent one time and without it the next is one person.
+						const heldNames = new Set(
+							held.map(person => foldLabel(String(person['name']))),
 						)
+
+						let contactsAdded = 0
+						for (const person of args.contacts) {
+							const key = foldLabel(person.name)
+							if (key === '' || heldNames.has(key)) continue
+							heldNames.add(key)
+							yield* sql`INSERT INTO contacts ${sql.insert({
+								organizationId: currentOrg.id,
+								companyId,
+								name: person.name,
+								role: person.role ?? null,
+							})}`
+							contactsAdded++
+						}
+
+						return {
+							company: yield* Schema.decodeUnknownEffect(Company)(row),
+							created,
+							contactsAdded,
+						}
 					}),
 
 				// Take a company out of view without losing it. Its people go with

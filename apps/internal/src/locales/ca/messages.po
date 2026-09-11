@@ -226,6 +226,10 @@ msgstr "Seccions de {groupLabel}"
 msgid "{name} is back"
 msgstr "{name} ha tornat"
 
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "{peopleAdded} people added"
+msgstr "S'hi han afegit {peopleAdded} persones"
+
 #: src/components/research/research-dialog.tsx
 msgid "{scoped} (default)"
 msgstr "{scoped} (per defecte)"
@@ -298,6 +302,10 @@ msgstr "1 missatge"
 #: src/routes/emails/index.tsx
 msgid "1 msg"
 msgstr "1 missatge"
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "1 person added"
+msgstr "S'hi ha afegit 1 persona"
 
 #: src/routes/companies/$slug.tsx
 msgid "1 person went with it"
@@ -618,6 +626,10 @@ msgstr "ja hi diu {0}"
 #: src/components/research/findings/shared.tsx
 msgid "Already in CRM"
 msgstr "Ja al CRM"
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Already on file"
+msgstr "Ja hi és"
 
 #: src/components/research/proposal-outcome.tsx
 msgid "Already resolved"

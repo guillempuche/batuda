@@ -48,44 +48,45 @@ The mail worker has no request and no scope at all, so `email.received` names th
 
 `{domain}.{action}[.{result}]` — so a filter on one prefix gets a whole area.
 
-| Event                          | Description                                                |
-| ------------------------------ | ---------------------------------------------------------- |
-| `http.request`                 | A request completed                                        |
-| `http.server_error`            | A request ended 5xx                                        |
-| `http.defect`                  | A request died without producing a response                |
-| `http.not_found`               | A request asked for a route that does not exist            |
-| `company.created`              | New company added to CRM                                   |
-| `company.status_changed`       | Pipeline status transition                                 |
-| `interaction.logged`           | Interaction recorded                                       |
-| `document.created`             | Research/notes document added                              |
-| `email.sent`                   | Outbound email starting a conversation                     |
-| `email.replied`                | Outbound email answering one                               |
-| `email.draft_sent`             | A saved draft went out                                     |
-| `email.received`               | Inbound reply                                              |
-| `email.failed`                 | Email delivery failed                                      |
-| `email.refused`                | A message was turned away before it was sent, and why      |
-| `email.sent_copy_failed`       | The message went out; keeping our own copy did not         |
-| `email.sent_append_failed`     | The message went out; filing it in Sent did not            |
-| `email.staging_purge_failed`   | Attachments outlived the message they went with            |
-| `inbox.created`                | A mailbox was connected                                    |
-| `inbox.probed`                 | A mailbox check that did not pass (a clean one is `debug`) |
-| `inbox.probe_unrecorded`       | A mailbox was checked but the answer could not be stored   |
-| `inbox.probe_started`          | The recurring mailbox check began, and how often it runs   |
-| `inbox.probe_round_failed`     | A whole round of checks failed — the poller, not a mailbox |
-| `mail_worker.heartbeat`        | The mail worker is still running, repeated on a timer      |
-| `webhook.fired`                | Webhook fan-out triggered                                  |
-| `webhook.failed`               | Webhook delivery failed                                    |
-| `page.published`               | Sales page made public                                     |
-| `page.viewed`                  | Prospect viewed a sales page                               |
-| `task.created`                 | CRM task raised                                            |
-| `research.run`                 | A research run finished, with what it spent                |
-| `mcp.auth.rejected`            | An MCP call was refused, and why                           |
-| `mcp.protocol_version.refused` | A call named a protocol revision this server does not know |
-| `otlp.export.failing`          | This process has stopped being able to export, and why     |
-| `otlp.export.recovered`        | Exporting works again                                      |
-| `otlp.export.health`           | Whether this process is exporting, repeated on a timer     |
-| `otlp.clock.skewed`            | This process and the backend disagree about the time       |
-| `otlp.clock.agreed`            | This process and the backend agree again                   |
+| Event                          | Description                                                 |
+| ------------------------------ | ----------------------------------------------------------- |
+| `http.request`                 | A request completed                                         |
+| `http.server_error`            | A request ended 5xx                                         |
+| `http.defect`                  | A request died without producing a response                 |
+| `http.not_found`               | A request asked for a route that does not exist             |
+| `company.created`              | New company added to CRM                                    |
+| `company.already_on_file`      | A company offered again, answered with the one already here |
+| `company.status_changed`       | Pipeline status transition                                  |
+| `interaction.logged`           | Interaction recorded                                        |
+| `document.created`             | Research/notes document added                               |
+| `email.sent`                   | Outbound email starting a conversation                      |
+| `email.replied`                | Outbound email answering one                                |
+| `email.draft_sent`             | A saved draft went out                                      |
+| `email.received`               | Inbound reply                                               |
+| `email.failed`                 | Email delivery failed                                       |
+| `email.refused`                | A message was turned away before it was sent, and why       |
+| `email.sent_copy_failed`       | The message went out; keeping our own copy did not          |
+| `email.sent_append_failed`     | The message went out; filing it in Sent did not             |
+| `email.staging_purge_failed`   | Attachments outlived the message they went with             |
+| `inbox.created`                | A mailbox was connected                                     |
+| `inbox.probed`                 | A mailbox check that did not pass (a clean one is `debug`)  |
+| `inbox.probe_unrecorded`       | A mailbox was checked but the answer could not be stored    |
+| `inbox.probe_started`          | The recurring mailbox check began, and how often it runs    |
+| `inbox.probe_round_failed`     | A whole round of checks failed — the poller, not a mailbox  |
+| `mail_worker.heartbeat`        | The mail worker is still running, repeated on a timer       |
+| `webhook.fired`                | Webhook fan-out triggered                                   |
+| `webhook.failed`               | Webhook delivery failed                                     |
+| `page.published`               | Sales page made public                                      |
+| `page.viewed`                  | Prospect viewed a sales page                                |
+| `task.created`                 | CRM task raised                                             |
+| `research.run`                 | A research run finished, with what it spent                 |
+| `mcp.auth.rejected`            | An MCP call was refused, and why                            |
+| `mcp.protocol_version.refused` | A call named a protocol revision this server does not know  |
+| `otlp.export.failing`          | This process has stopped being able to export, and why      |
+| `otlp.export.recovered`        | Exporting works again                                       |
+| `otlp.export.health`           | Whether this process is exporting, repeated on a timer      |
+| `otlp.clock.skewed`            | This process and the backend disagree about the time        |
+| `otlp.clock.agreed`            | This process and the backend agree again                    |
 
 The `otlp.*` lines are the exception to one record per unit of work: they report on the reporting itself, so they belong to the process rather than to any piece of work it did. See [When export itself fails](#when-export-itself-fails).
 

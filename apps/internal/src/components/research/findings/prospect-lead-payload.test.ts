@@ -155,3 +155,80 @@ describe('buildLeadPayload', () => {
 		})
 	})
 })
+
+describe("the people a search read off the company's own pages", () => {
+	describe('when the run named some', () => {
+		it('should carry them across with their job titles', () => {
+			// GIVEN a prospect whose own team page named two people
+			const { payload } = buildLeadPayload(
+				{
+					name: 'Egein',
+					contacts: [
+						{ name: 'David Garrido', role: 'CEO - Enginyer Industrial' },
+						{ name: 'Mariona Garrido' },
+					],
+				},
+				'egein',
+			)
+
+			// THEN both travel with the company, the untitled one without a title
+			// invented for her
+			expect(payload.contacts).toEqual([
+				{ name: 'David Garrido', role: 'CEO - Enginyer Industrial' },
+				{ name: 'Mariona Garrido' },
+			])
+		})
+	})
+
+	describe('when an entry has a title but nobody to hang it on', () => {
+		it('should leave it out', () => {
+			// GIVEN a blank name beside a real one
+			const { payload } = buildLeadPayload(
+				{
+					name: 'Egein',
+					contacts: [{ name: '  ', role: 'Gerent' }, { name: 'David Garrido' }],
+				},
+				'egein',
+			)
+
+			// THEN only the person who can be asked for is carried: a contact with
+			// no name is one nobody can be asked for
+			expect(payload.contacts).toEqual([{ name: 'David Garrido' }])
+		})
+	})
+
+	describe('when the run named nobody', () => {
+		it('should leave the field off entirely', () => {
+			// GIVEN a company with no people on its pages
+			const { payload } = buildLeadPayload({ name: 'Egein' }, 'egein')
+
+			// THEN nothing is sent rather than an empty list
+			expect(payload.contacts).toBeUndefined()
+		})
+	})
+})
+
+describe('the number a company is registered under', () => {
+	describe('when the run read one', () => {
+		it('should carry it, since it is what recognises the firm again', () => {
+			// GIVEN a prospect whose registration number the run found
+			const { payload } = buildLeadPayload(
+				{ name: 'Egein', tax_id: 'B17234567' },
+				'egein',
+			)
+
+			// THEN it travels: the name and the web address both change, the
+			// registration does not
+			expect(payload.taxId).toBe('B17234567')
+		})
+	})
+
+	describe('when the run read none', () => {
+		it('should leave it off', () => {
+			expect(
+				buildLeadPayload({ name: 'Egein', tax_id: '  ' }, 'egein').payload
+					.taxId,
+			).toBeUndefined()
+		})
+	})
+})

@@ -39,24 +39,32 @@ export const CompaniesLive = HttpApiBuilder.group(
 						),
 					),
 				)
-				.handle('create', _ =>
-					svc.create(_.payload).pipe(
-						Effect.flatMap(r =>
-							r[0] === undefined
-								? Effect.die(new Error('company insert returned no row'))
-								: Effect.succeed(r[0]),
-						),
-						Effect.tap(c =>
-							Effect.logInfo('Company created').pipe(
-								Effect.annotateLogs({
-									event: 'company.created',
-									slug: c.slug,
-								}),
+				.handle('create', _ => {
+					const { contacts, ...company } = _.payload
+					return svc
+						.createWithContacts({
+							company,
+							contacts: contacts ?? [],
+						})
+						.pipe(
+							Effect.tap(result =>
+								Effect.logInfo(
+									result.created
+										? 'Company created'
+										: 'Company already on file',
+								).pipe(
+									Effect.annotateLogs({
+										event: result.created
+											? 'company.created'
+											: 'company.already_on_file',
+										slug: result.company.slug,
+										contacts_added: result.contactsAdded,
+									}),
+								),
 							),
-						),
-						Effect.orDie,
-					),
-				)
+							Effect.orDie,
+						)
+				})
 				.handle('update', _ =>
 					Effect.gen(function* () {
 						// Capture the stage before the write so a change can be recorded

@@ -372,13 +372,38 @@ function AddAsLeadButton({
 			toast.add({ title: t`Could not add as a lead`, type: 'error' })
 			return
 		}
-		const row = exit.value as Record<string, unknown>
-		const id = typeof row['id'] === 'string' ? row['id'] : null
-		const newSlug = typeof row['slug'] === 'string' ? row['slug'] : slug
+		const { company, created, contactsAdded: peopleAdded } = exit.value
+		const id = company.id
+		const alreadyOnFile = !created
+		// Said under the headline rather than folded into it: the headline is about
+		// the company, and a count of people crammed into every branch of it would
+		// have to agree with each one separately.
+		const peopleNote =
+			peopleAdded === 0
+				? {}
+				: {
+						description:
+							peopleAdded === 1
+								? t`1 person added`
+								: t`${peopleAdded} people added`,
+					}
+		// Already here, so nothing is vouched for and nothing is reported as
+		// dropped: this click wrote no fields, and naming what it did not carry
+		// would read as a loss that just happened.
+		if (alreadyOnFile) {
+			setBusy(false)
+			toast.add({
+				title: t`Already on file`,
+				type: 'success',
+				...peopleNote,
+			})
+			void navigate({ to: '/companies/$slug', params: { slug: company.slug } })
+			return
+		}
 		// What the company ended up as, not what this click meant it to be: the
 		// vouching step is a second call that can fail on its own, and a message
 		// read off the intent would say verified when it is not.
-		const vouchWanted = id !== null && !heldBack
+		const vouchWanted = !heldBack
 		const verified =
 			vouchWanted &&
 			(
@@ -405,6 +430,7 @@ function AddAsLeadButton({
 						? t`Added, but could not be marked verified`
 						: t`Added, but could not be marked verified, leaving out: ${left}`,
 				type: 'error',
+				...peopleNote,
 			})
 		} else if (left !== '') {
 			// Written as a list rather than "without its X", which reads as one
@@ -414,6 +440,7 @@ function AddAsLeadButton({
 					? t`Added as a verified lead, leaving out: ${left}`
 					: t`Added as an unverified lead, leaving out: ${left}`,
 				type: 'success',
+				...peopleNote,
 			})
 		} else {
 			toast.add({
@@ -421,9 +448,10 @@ function AddAsLeadButton({
 					? t`Added as a verified lead`
 					: t`Added as an unverified lead`,
 				type: 'success',
+				...peopleNote,
 			})
 		}
-		void navigate({ to: '/companies/$slug', params: { slug: newSlug } })
+		void navigate({ to: '/companies/$slug', params: { slug: company.slug } })
 	}
 
 	return (
@@ -461,13 +489,16 @@ function AddAsLeadButton({
 	)
 }
 
-// A web address for a prospect, with a short random suffix so two prospects of the
-// same name (or an existing company) don't collide.
+// A web address for a prospect, read off its name and nothing else.
+//
+// No random suffix, so the same prospect gives the same address every time.
+// Colliding with a company already on file is the point — it is how the same firm
+// is recognised — and the answer then says the company is already here and takes
+// the person to it.
 //
 // The name is read by the shared rule rather than here, because reading it here got
 // it wrong both ways: "Calderería Sentmenat" came out "caldereri-a-sentmenat", and
 // "北京科技有限公司" came out "lead-x7f2q" with the company's own name nowhere in it.
 function toSlug(name: string): string {
-	const suffix = Math.random().toString(36).slice(2, 7)
-	return `${companySlugFromName(name)}-${suffix}`
+	return companySlugFromName(name)
 }
