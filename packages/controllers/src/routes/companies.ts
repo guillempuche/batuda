@@ -78,6 +78,11 @@ const CompanySuppressionCleared = Schema.Struct({
 	channels: Schema.Array(Schema.Unknown),
 })
 
+const LeadContactInput = Schema.Struct({
+	name: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
+	role: Schema.optional(Schema.String),
+})
+
 // What a caller may write. The shapes come from the domain so the browser and
 // the agent tools turn away the same values — and they sit here rather than on
 // `Company`, which has to keep reading rows written before any of this existed.
@@ -117,6 +122,34 @@ export const CreateCompanyInput = Schema.Struct({
 	geocodedAt: Schema.optional(Schema.DateTimeUtc),
 	geocodeSource: Schema.optional(Schema.String),
 	metadata: Schema.optional(Schema.Unknown),
+	// The number the company is registered or taxed under. Carried because it is
+	// the only thing that recognises the same firm arriving under a different
+	// trading name — the name and the web address both change, the registration
+	// does not.
+	taxId: Schema.optional(Schema.String),
+	// The people a company search read off the company's own pages, taken on with
+	// it so a list of firms arrives with somebody to ask for. A job title only: a
+	// search has no way of knowing who holds the budget, so the part a person
+	// plays in a purchase is left unsaid rather than guessed.
+	contacts: Schema.optional(Schema.Array(LeadContactInput)),
+})
+
+/**
+ * What comes back from taking a company on.
+ *
+ * More than the company row, because two things the caller cannot work out for
+ * itself decide what it says next: whether this call put the company on file or
+ * found one already there, and how many of the people it sent were new. Sending
+ * the same prospect twice is a normal thing to do — a person scrolling a list of
+ * fifty loses their place — and it should land on the company, not make a second
+ * one.
+ */
+export const CreateCompanyResult = Schema.Struct({
+	company: Company.json,
+	/** False when the company was already on file and this call found it. */
+	created: Schema.Boolean,
+	/** People written. Anyone the company already had is not counted again. */
+	contactsAdded: Schema.Number,
 })
 
 // Every field a person can empty from the company page is nullable here. The page
@@ -285,7 +318,7 @@ export const CompaniesGroup = HttpApiGroup.make('companies')
 	.add(
 		HttpApiEndpoint.post('create', '/companies', {
 			payload: CreateCompanyInput,
-			success: Company.json,
+			success: CreateCompanyResult,
 		}),
 	)
 	.add(

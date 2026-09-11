@@ -32,6 +32,10 @@ export interface ProspectLeadSource {
 	readonly social_profiles?:
 		| ReadonlyArray<{ readonly kind: string; readonly value: string }>
 		| undefined
+	readonly tax_id?: string | undefined
+	readonly contacts?:
+		| ReadonlyArray<{ readonly name: string; readonly role?: string }>
+		| undefined
 }
 
 export interface LeadPayload {
@@ -46,6 +50,11 @@ export interface LeadPayload {
 		readonly socialProfiles?: ReadonlyArray<{
 			readonly kind: string
 			readonly value: string
+		}>
+		readonly taxId?: string
+		readonly contacts?: ReadonlyArray<{
+			readonly name: string
+			readonly role?: string
 		}>
 	}
 	/** Empty when everything the run said could be carried across. */
@@ -76,9 +85,8 @@ const usableProfiles = (source: ProspectLeadSource) =>
 		.map(p => ({ kind: p.kind.trim(), value: p.value.trim() }))
 
 /**
- * The slug is passed in rather than built here because it carries a random
- * suffix, and a function that answers differently each time cannot be tested by
- * asking it twice.
+ * The web address is passed in rather than built here, so the caller decides
+ * what a company is filed under and this stays a plain reading of the row.
  */
 export const buildLeadPayload = (
 	source: ProspectLeadSource,
@@ -101,6 +109,15 @@ export const buildLeadPayload = (
 		dropped.push('website')
 
 	const profiles = usableProfiles(source)
+	const taxId = source.tax_id?.trim()
+	// Only people with a name to file them under. A row carrying a title and
+	// nobody to hang it on would become a contact nobody can be asked for.
+	const people = (source.contacts ?? []).flatMap(person => {
+		const name = person.name?.trim() ?? ''
+		if (name === '') return []
+		const role = person.role?.trim()
+		return [role ? { name, role } : { name }]
+	})
 
 	return {
 		payload: {
@@ -112,6 +129,8 @@ export const buildLeadPayload = (
 			...(source.location ? { location: source.location } : {}),
 			...(storableWebsite ? { website: storableWebsite } : {}),
 			...(profiles.length > 0 ? { socialProfiles: profiles } : {}),
+			...(taxId ? { taxId } : {}),
+			...(people.length > 0 ? { contacts: people } : {}),
 		},
 		dropped,
 	}

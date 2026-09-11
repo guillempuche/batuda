@@ -226,6 +226,10 @@ msgstr "{groupLabel} sections"
 msgid "{name} is back"
 msgstr "{name} is back"
 
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "{peopleAdded} people added"
+msgstr "{peopleAdded} people added"
+
 #: src/components/research/research-dialog.tsx
 msgid "{scoped} (default)"
 msgstr "{scoped} (default)"
@@ -298,6 +302,10 @@ msgstr "1 message"
 #: src/routes/emails/index.tsx
 msgid "1 msg"
 msgstr "1 msg"
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "1 person added"
+msgstr "1 person added"
 
 #: src/routes/companies/$slug.tsx
 msgid "1 person went with it"
@@ -618,6 +626,10 @@ msgstr "already {0}"
 #: src/components/research/findings/shared.tsx
 msgid "Already in CRM"
 msgstr "Already in CRM"
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Already on file"
+msgstr "Already on file"
 
 #: src/components/research/proposal-outcome.tsx
 msgid "Already resolved"

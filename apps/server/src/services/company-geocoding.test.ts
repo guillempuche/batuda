@@ -35,8 +35,8 @@ const companyServiceWith = (
 		softDelete: () => Effect.die(unused),
 		restore: () => Effect.die(unused),
 		findBySlug: () => Effect.die(unused),
-		create: () => Effect.die(unused),
 		createMany: () => Effect.die(unused),
+		createWithContacts: () => Effect.die(unused),
 		getWithRelations: () => Effect.die(unused),
 	})
 
