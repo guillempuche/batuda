@@ -107,6 +107,24 @@ describe('CompanyService.createWithContacts', () => {
 			)
 			expect(roles.rows.every(person => person.buying_role === null)).toBe(true)
 		})
+
+		it('should store a blank job title as no job title', async () => {
+			// GIVEN a person whose title the caller sent as an empty box rather
+			// than leaving the field out
+			const slug = `blanc-${randomUUID().slice(0, 8)}`
+			const result = await takeOn({ name: 'Blanc', slug }, [
+				{ name: 'Joan Blanc', role: '' },
+				{ name: 'Pau Espai', role: '   ' },
+			])
+			createdIds.push(result.company.id)
+
+			// THEN both read as having no title. A blank one passes every check
+			// for having a title, so it would be quoted back at somebody on a call
+			expect(await peopleOn(result.company.id)).toStrictEqual([
+				{ name: 'Joan Blanc', role: null },
+				{ name: 'Pau Espai', role: null },
+			])
+		})
 	})
 
 	describe('when the same prospect is added a second time', () => {

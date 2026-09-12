@@ -80,7 +80,7 @@ const CompanySuppressionCleared = Schema.Struct({
 
 const LeadContactInput = Schema.Struct({
 	name: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
-	role: Schema.optional(Schema.String),
+	role: Schema.optional(Schema.NullOr(Schema.String)),
 })
 
 // What a caller may write. The shapes come from the domain so the browser and
