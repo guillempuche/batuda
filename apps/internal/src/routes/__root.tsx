@@ -8,7 +8,7 @@ import {
 	Scripts,
 	useMatches,
 } from '@tanstack/react-router'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 
 import { PriToast } from '@batuda/ui/pri'
 
@@ -22,7 +22,9 @@ import { defaultLang, htmlLang, type LangCode } from '#/i18n/index'
 import { LangProvider } from '#/i18n/lang-provider'
 import { translatedHead } from '#/i18n/lingui'
 import type { DehydratedAtomValue } from '#/lib/atom-hydration'
+import { ServerIdentityProvider } from '#/lib/identity'
 import { getServerCookieHeader } from '#/lib/server-cookie'
+import { fetchServerOrganizations } from '#/lib/server-identity'
 import { fetchSession, hasSessionCookie } from '#/lib/session-check'
 import { readThemeCookieFromHeader } from '#/theme/cookie'
 import {
@@ -113,22 +115,43 @@ export const Route = createRootRoute({
 				: await fetchSession(cookieHeader ?? undefined)
 		// Falls back to the account's language so someone an admin just added
 		// lands in their own language on the very first page, before they have
-		// touched any setting. Route context is serialized across SSR, so only
-		// the plain language code and a yes/no cross — never the session
-		// itself. The routes that need a signed-in person read `signedIn` in
-		// their own `beforeLoad`; the sign-in pages are reachable either way.
+		// touched any setting. Route context is serialized across SSR, so what
+		// crosses is the plain language code, a yes/no, and the person's id,
+		// name and email — never the session itself. The routes that need a
+		// signed-in person read `signedIn` in their own `beforeLoad`; the sign-in
+		// pages are reachable either way.
 		return {
 			lang: chosenLang ?? user?.locale ?? defaultLang,
 			themePreference,
 			theme,
 			signedIn: user !== null,
+			person:
+				user === null
+					? null
+					: { id: user.id, email: user.email, name: user.name },
 		}
 	},
-	loader: ({ context }) => ({
-		lang: context.lang,
-		themePreference: context.themePreference,
-		theme: context.theme,
-	}),
+	// On the server, the organisation the person is in is read here rather than
+	// in `beforeLoad`, so the pages' own loaders run alongside it instead of
+	// waiting for it. The browser's store takes over once it has asked for the
+	// same; a page the browser renders for itself gets no handover.
+	loader: async ({ context }) => {
+		const identity =
+			import.meta.env.SSR && context.person !== null
+				? {
+						person: context.person,
+						...(await fetchServerOrganizations(
+							(await getServerCookieHeader()) ?? '',
+						)),
+					}
+				: undefined
+		return {
+			lang: context.lang,
+			themePreference: context.themePreference,
+			theme: context.theme,
+			identity,
+		}
+	},
 	head: ({ loaderData }) => {
 		const lang: LangCode = loaderData?.lang ?? defaultLang
 		const { title, description } = translatedHead[lang]
@@ -187,7 +210,12 @@ function RootComponent() {
 	// data. Routes without loaders (or without a `dehydrated` field) contribute
 	// nothing. Order matches the route hierarchy top-down.
 	const matches = useMatches()
-	const { lang, themePreference, theme } = Route.useLoaderData()
+	const loaderData = Route.useLoaderData()
+	const { lang, themePreference, theme } = loaderData
+	// The server's answer arrives with the first page and is kept for the
+	// visit: a later navigation is rendered by the browser, whose store is live
+	// by then, and the handover only ever stands in until that store answers.
+	const [identity] = useState(loaderData.identity)
 	const collected = matches.flatMap(m => {
 		const data = m.loaderData as
 			| { dehydrated?: ReadonlyArray<DehydratedAtomValue> }
@@ -215,10 +243,12 @@ function RootComponent() {
 				<LangProvider initialLang={lang}>
 					<RegistryProvider>
 						<HydrationBoundary state={dehydrated}>
-							<PriToast.Provider>
-								<Outlet />
-								<ToastChrome />
-							</PriToast.Provider>
+							<ServerIdentityProvider value={identity}>
+								<PriToast.Provider>
+									<Outlet />
+									<ToastChrome />
+								</PriToast.Provider>
+							</ServerIdentityProvider>
 						</HydrationBoundary>
 					</RegistryProvider>
 				</LangProvider>

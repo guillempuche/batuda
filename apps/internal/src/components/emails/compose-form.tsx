@@ -22,7 +22,7 @@ import { AttachmentPicker } from '#/components/emails/attachment-picker'
 import { EmailEditor } from '#/components/emails/email-editor'
 import { SrOnly } from '#/components/shared/sr-only'
 import { type Draft, useComposeEmail } from '#/context/compose-email-context'
-import { authClient } from '#/lib/auth-client'
+import { useHydratedSession } from '#/lib/auth-client'
 import type { StagedAttachment } from '#/lib/email-attachments'
 import {
 	badRequestMessage,
@@ -77,7 +77,7 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 		threadAtomFor(draft.threadId ?? '__unused__'),
 	)
 
-	const meUserId = authClient.useSession().data?.user?.id
+	const meUserId = useHydratedSession().data?.user?.id
 	const inboxes = useMemo<ReadonlyArray<InboxOption>>(
 		() =>
 			AsyncResult.isSuccess(inboxesResult)

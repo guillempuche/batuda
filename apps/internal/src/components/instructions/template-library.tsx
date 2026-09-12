@@ -18,7 +18,7 @@ import {
 } from '#/atoms/instruction-atoms'
 import { DeleteConfirm } from '#/components/shared/delete-confirm'
 import { ErrorState } from '#/components/shared/error-state'
-import { authClient } from '#/lib/auth-client'
+import { useHydratedActiveOrganization } from '#/lib/auth-client'
 import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
 import { useDlg } from '#/lib/use-dlg'
 import { useReadParam } from '#/lib/use-read-param'
@@ -91,7 +91,7 @@ export function TemplateLibrary({
 }) {
 	const { t } = useLingui()
 	const toast = usePriToast()
-	const activeOrg = authClient.useActiveOrganization()
+	const activeOrg = useHydratedActiveOrganization()
 	const deleteTemplate = useAtomSet(deleteTemplateAtom, { mode: 'promiseExit' })
 	const transferTemplate = useAtomSet(transferTemplateAtom, {
 		mode: 'promiseExit',

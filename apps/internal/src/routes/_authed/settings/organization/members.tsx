@@ -20,7 +20,12 @@ import { PriButton, PriInput, PriSelect } from '@batuda/ui/pri'
 import { langSelectItems } from '#/i18n/lang-labels'
 import { useLang } from '#/i18n/lang-provider'
 import { apiBaseUrl } from '#/lib/api-base'
-import { authClient } from '#/lib/auth-client'
+import {
+	authClient,
+	useHydratedActiveMember,
+	useHydratedActiveOrganization,
+} from '#/lib/auth-client'
+import { isOrgAdmin } from '#/lib/identity'
 import {
 	brushedMetalPlate,
 	rulerUnderRule,
@@ -59,12 +64,12 @@ export const Route = createFileRoute('/_authed/settings/organization/members')({
 
 function MembersPage() {
 	const { t } = useLingui()
-	// `useActiveOrganization` returns the full org payload and is signal-backed,
-	// so it auto-refetches when the active-org cookie changes or any
-	// /organization/* call lands. Saves a separate list-members fetch on every
-	// page load.
-	const active = authClient.useActiveOrganization()
-	const activeMember = authClient.useActiveMember()
+	// `useHydratedActiveOrganization` returns the full org payload and is
+	// signal-backed, so it auto-refetches when the active-org cookie changes or
+	// any /organization/* call lands. Saves a separate list-members fetch on
+	// every page load.
+	const active = useHydratedActiveOrganization()
+	const activeMember = useHydratedActiveMember()
 	const activeLang = useLang()
 
 	const [removingId, setRemovingId] = useState<string | null>(null)
@@ -83,7 +88,7 @@ function MembersPage() {
 	const members = (active.data?.members ?? []) as ReadonlyArray<OrgMember>
 
 	const myRole = activeMember.data?.role ?? null
-	const canManage = myRole === 'owner' || myRole === 'admin'
+	const canManage = isOrgAdmin(myRole)
 
 	// Inline so Lingui's macro extractor sees each `t` call.
 	const roleLabels: Record<string, string> = {

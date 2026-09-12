@@ -44,7 +44,7 @@ import type { StackOption } from '#/components/instructions/stack-picker'
 import { TemplateLibrary } from '#/components/instructions/template-library'
 import { DeleteConfirm } from '#/components/shared/delete-confirm'
 import { ErrorState } from '#/components/shared/error-state'
-import { authClient } from '#/lib/auth-client'
+import { useHydratedSession } from '#/lib/auth-client'
 import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
 import { validateSearchWith } from '#/lib/search-schema'
 import { useDlg } from '#/lib/use-dlg'
@@ -75,7 +75,7 @@ export const Route = createFileRoute('/_authed/settings/profile/templates')({
 function TemplatesPage() {
 	const { t } = useLingui()
 	const toast = usePriToast()
-	const session = authClient.useSession()
+	const session = useHydratedSession()
 	const myUserId = session.data?.user?.id ?? null
 
 	// Instructions are per surface; this picks which surface's stacks the section

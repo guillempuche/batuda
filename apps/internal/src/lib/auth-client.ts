@@ -1,7 +1,9 @@
 import { magicLinkClient, organizationClient } from 'better-auth/client/plugins'
 import { createAuthClient } from 'better-auth/react'
+import { useContext } from 'react'
 
 import { apiBaseUrl } from './api-base'
+import { ServerIdentityContext, serverFirst } from './identity'
 import { useHydrated } from './use-hydrated'
 
 // Browser-side Better Auth client. Plugins mirror the server's plugin tuple
@@ -24,44 +26,69 @@ import { useHydrated } from './use-hydrated'
 // atoms never hydrate (the org switcher renders "No active
 // organization" forever).
 const base = apiBaseUrl()
-
-export const authClient = createAuthClient({
+const client = createAuthClient({
 	baseURL: base || undefined,
 	basePath: '/auth',
 	plugins: [organizationClient(), magicLinkClient()],
 })
 
-/*
- * The store behind these hooks lives in the browser only, so the server always
- * renders its "nothing known yet" branch. The browser's copy can already hold
- * the answer by the time React matches the server's HTML, and rendering it at
- * that moment makes React throw the subtree away and rebuild it. These wrappers
- * hold the answer back until hydration is over, so the first browser render
- * matches the server and the real data lands one render later. Read the stores
- * through them, never through `authClient.use…` directly.
- */
+// The store's own hooks stay inside this file: read them through the
+// `useHydrated…` hooks below, which know what the server drew. Everything
+// else (sign-in, sign-out, switching organisation, the mutations) is the
+// client as it is.
+const {
+	useSession,
+	useActiveOrganization,
+	useListOrganizations,
+	useActiveMember,
+	...authClientWithoutStoreHooks
+} = client
+export const authClient = authClientWithoutStoreHooks
 
-function withheldUntilHydrated<T extends { data: unknown }>(
-	result: T,
-	hydrated: boolean,
-): Omit<T, 'data'> & { readonly data: T['data'] | undefined } {
-	return hydrated ? result : { ...result, data: undefined }
-}
-
-/** The signed-in person's session, once the browser is allowed to know it. */
+/** The signed-in person's session. */
 export function useHydratedSession() {
-	return withheldUntilHydrated(authClient.useSession(), useHydrated())
-}
-
-/** The active organisation with its members, once the browser may know it. */
-export function useHydratedActiveOrganization() {
-	return withheldUntilHydrated(
-		authClient.useActiveOrganization(),
+	const server = useContext(ServerIdentityContext)
+	const person = server?.person
+	return serverFirst(
+		useSession(),
+		person === undefined ? undefined : person && { user: person },
 		useHydrated(),
 	)
 }
 
-/** Every organisation the person belongs to, once the browser may know it. */
+/** The active organisation with its members. */
+export function useHydratedActiveOrganization() {
+	const server = useContext(ServerIdentityContext)
+	return serverFirst(
+		useActiveOrganization(),
+		server?.activeOrganization,
+		useHydrated(),
+	)
+}
+
+/** Every organisation the person belongs to. */
 export function useHydratedListOrganizations() {
-	return withheldUntilHydrated(authClient.useListOrganizations(), useHydrated())
+	const server = useContext(ServerIdentityContext)
+	return serverFirst(
+		useListOrganizations(),
+		server?.organizations,
+		useHydrated(),
+	)
+}
+
+/** The person's own membership of the active organisation, role included. */
+export function useHydratedActiveMember() {
+	const server = useContext(ServerIdentityContext)
+	// The server hands the organisation over with its members, so the person's
+	// own row is read off it rather than asked for separately.
+	const organization = server?.activeOrganization
+	const member =
+		organization === undefined || server?.person == null
+			? undefined
+			: organization === null
+				? null
+				: (organization.members.find(
+						member => member.userId === server.person?.id,
+					) ?? null)
+	return serverFirst(useActiveMember(), member, useHydrated())
 }

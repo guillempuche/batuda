@@ -6,8 +6,12 @@ import { ArrowLeft, Wallet } from 'lucide-react'
 import { styled } from 'next-yak'
 import { type ReactNode, useMemo, useState } from 'react'
 
-import { authClient } from '#/lib/auth-client'
+import {
+	useHydratedActiveMember,
+	useHydratedActiveOrganization,
+} from '#/lib/auth-client'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
+import { isOrgAdmin } from '#/lib/identity'
 import {
 	brushedMetalPlate,
 	rulerUnderRule,
@@ -42,10 +46,10 @@ export const Route = createFileRoute('/_authed/settings/organization/spend')({
 
 function SpendPage() {
 	const { t } = useLingui()
-	const activeMember = authClient.useActiveMember()
-	const activeOrg = authClient.useActiveOrganization()
+	const activeMember = useHydratedActiveMember()
+	const activeOrg = useHydratedActiveOrganization()
 	const myRole = activeMember.data?.role ?? null
-	const canSeeSpend = myRole === 'owner' || myRole === 'admin'
+	const canSeeSpend = isOrgAdmin(myRole)
 
 	const [range, setRange] = useState<Range>('month')
 

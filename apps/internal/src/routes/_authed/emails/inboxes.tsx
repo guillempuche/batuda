@@ -60,11 +60,12 @@ import { ErrorState } from '#/components/shared/error-state'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { SkeletonRows } from '#/components/shared/skeleton-row'
 import { SrOnly } from '#/components/shared/sr-only'
-import { dehydrateAtom } from '#/lib/atom-hydration'
-import { authClient } from '#/lib/auth-client'
+import { dehydrateAtom, handOverFromServer } from '#/lib/atom-hydration'
+import { useHydratedActiveMember, useHydratedSession } from '#/lib/auth-client'
+import type { BatudaApiServerClient } from '#/lib/batuda-api-server'
 import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
+import { isOrgAdmin } from '#/lib/identity'
 import { validateSearchWith } from '#/lib/search-schema'
-import { getServerCookieHeader } from '#/lib/server-cookie'
 import {
 	agedPaperRow,
 	brushedMetalPlate,
@@ -116,17 +117,8 @@ type ProviderPreset = {
 // Return type is inferred from the typed API client so the dehydrated atom
 // value matches the listInboxes atom's success schema; `narrowInboxRows`
 // still treats it as unknown.
-async function loadInboxesOnServer() {
-	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
-		import('effect'),
-		import('#/lib/batuda-api-server'),
-		getServerCookieHeader(),
-	])
-	const program = Effect.gen(function* () {
-		const client = yield* makeBatudaApiServer(cookie ?? undefined)
-		return yield* client.email.listInboxes({ query: { active: 'true' } })
-	})
-	return Effect.runPromise(program)
+function loadInboxesOnServer(client: BatudaApiServerClient) {
+	return client.email.listInboxes({ query: { active: 'true' } })
 }
 
 // Which dialog is open lives in the `?dlg=` URL param so dialogs are
@@ -143,20 +135,17 @@ const decodeInboxDlg = Schema.decodeUnknownOption(inboxDlgSchema)
 
 export const Route = createFileRoute('/_authed/emails/inboxes')({
 	validateSearch: validateSearchWith({ dlg: inboxDlgSchema }),
-	loader: async () => {
-		if (!import.meta.env.SSR) return { dehydrated: [] as const }
-		try {
-			const inboxes = await loadInboxesOnServer()
-			return {
+	loader: () =>
+		handOverFromServer({
+			label: 'InboxesLoader',
+			empty: { dehydrated: [] },
+			fetch: loadInboxesOnServer,
+			handOver: inboxes => ({
 				dehydrated: [
 					dehydrateAtom(inboxesListAtom, AsyncResult.success(inboxes)),
-				] as const,
-			}
-		} catch (error) {
-			console.warn('[InboxesLoader] falling back to empty hydration:', error)
-			return { dehydrated: [] as const }
-		}
-	},
+				],
+			}),
+		}),
 	head: () => ({ meta: [{ title: 'Inboxes — Batuda' }] }),
 	component: InboxesPage,
 })
@@ -798,21 +787,21 @@ function DialogPending({ onClose }: { readonly onClose: () => void }) {
 // Whoever runs the organization looks after everyone's mailboxes; everyone
 // else only their own.
 function useCanManageOthers(): boolean {
-	const role = authClient.useActiveMember().data?.role ?? null
-	return role === 'owner' || role === 'admin'
+	const role = useHydratedActiveMember().data?.role ?? null
+	return isOrgAdmin(role)
 }
 
 // The signed-in member, so the list can tell their own mailboxes from the
 // team's and from colleagues'.
 function useMeUserId(): string | undefined {
-	return authClient.useSession().data?.user?.id
+	return useHydratedSession().data?.user?.id
 }
 
 // Until we know who is asking every mailbox looks like somebody else's, so
 // the rows would fill in after paint — moving what a person can tab to.
 function useIdentityPending(): boolean {
-	const member = authClient.useActiveMember()
-	const session = authClient.useSession()
+	const member = useHydratedActiveMember()
+	const session = useHydratedSession()
 	return member.isPending === true || session.isPending === true
 }
 

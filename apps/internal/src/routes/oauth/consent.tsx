@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react'
 import { PriButton, PriCheckbox } from '@batuda/ui/pri'
 
 import { apiBaseUrl } from '#/lib/api-base'
-import { authClient } from '#/lib/auth-client'
+import { useHydratedListOrganizations } from '#/lib/auth-client'
 import { redirectToLogin } from '#/lib/session-check'
 import { agedPaperSurface, stenciledTitle } from '#/lib/workshop-mixins'
 
@@ -55,7 +55,7 @@ function ConsentPage() {
 	const [submitting, setSubmitting] = useState<'allow' | 'deny' | null>(null)
 	const [error, setError] = useState<string | null>(null)
 
-	const orgs = authClient.useListOrganizations()
+	const orgs = useHydratedListOrganizations()
 	const memberships = orgs.data ?? []
 	const isMultiOrg = memberships.length > 1
 	// The selected org ids, managed by BaseUI's CheckboxGroup. Pre-check all
