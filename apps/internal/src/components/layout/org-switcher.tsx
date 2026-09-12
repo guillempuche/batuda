@@ -5,7 +5,11 @@ import { useState } from 'react'
 
 import { PriPopover } from '@batuda/ui/pri'
 
-import { authClient } from '#/lib/auth-client'
+import {
+	authClient,
+	useHydratedActiveOrganization,
+	useHydratedListOrganizations,
+} from '#/lib/auth-client'
 import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
 
 /**
@@ -27,8 +31,8 @@ export function OrgSwitcher() {
 	const [pending, setPending] = useState(false)
 	const [error, setError] = useState<string | null>(null)
 
-	const list = authClient.useListOrganizations()
-	const active = authClient.useActiveOrganization()
+	const list = useHydratedListOrganizations()
+	const active = useHydratedActiveOrganization()
 
 	const memberships = list.data ?? []
 	const activeOrg = active.data

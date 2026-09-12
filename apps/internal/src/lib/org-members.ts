@@ -1,6 +1,9 @@
 import { useMemo } from 'react'
 
-import { authClient } from './auth-client'
+import {
+	useHydratedActiveOrganization,
+	useHydratedSession,
+} from './auth-client'
 
 export type OrgMemberInfo = {
 	readonly userId: string
@@ -24,8 +27,8 @@ export function useOrgMembers(): {
 	) => OrgMemberInfo | undefined
 	readonly meUserId: string | undefined
 } {
-	const active = authClient.useActiveOrganization()
-	const session = authClient.useSession()
+	const active = useHydratedActiveOrganization()
+	const session = useHydratedSession()
 
 	const rawMembers = active.data?.members
 	const meUserId = session.data?.user?.id
