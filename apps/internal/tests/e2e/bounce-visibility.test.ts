@@ -18,7 +18,7 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 // renders the resulting state correctly.
 //
 // Selectors verified against:
-//   apps/internal/src/routes/companies/$slug.tsx (suppression banner +
+//   apps/internal/src/routes/_authed/companies/$slug.tsx (suppression banner +
 //   badge + clear action; testids: contact-suppression-{badge,banner,clear}-{id})
 //   apps/internal/src/components/companies/company-channels-section.tsx
 //   (held-back badge + clear action; testids: company-channel-held-{id},

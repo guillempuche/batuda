@@ -20,7 +20,7 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 //     (company-open-tasks-card)
 //   apps/internal/src/components/companies/research-summary-card.tsx
 //     (company-research-summary-card)
-//   apps/internal/src/routes/companies/$slug.tsx
+//   apps/internal/src/routes/_authed/companies/$slug.tsx
 //     (company-overview-timeline; tab key='profile' label='Overview')
 //   apps/internal/src/components/companies/about-section.tsx
 //     (company-about-trigger, company-about-panel)

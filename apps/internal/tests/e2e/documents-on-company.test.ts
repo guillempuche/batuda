@@ -20,7 +20,7 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 //     (company-add-document, document-row-{id}, document-edit-{id},
 //      document-dialog, document-view, document-title, document-type,
 //      document-content, document-save)
-//   apps/internal/src/routes/companies/$slug.tsx (?tab=files)
+//   apps/internal/src/routes/_authed/companies/$slug.tsx (?tab=files)
 //
 // Auth: runs in the `authed` project and inherits Alice's session cookie from
 // the `setup` project's storageState.

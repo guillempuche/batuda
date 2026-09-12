@@ -24,7 +24,7 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 // Selectors verified against:
 //   apps/internal/src/components/layout/org-switcher.tsx
 //     (org-switcher, org-switcher-option-{slug}, active-org-name)
-//   apps/internal/src/routes/index.tsx
+//   apps/internal/src/routes/_authed/index.tsx
 //     (company-card-{slug})
 //   apps/internal/src/routes/login.tsx
 //     (login-form, login-email, login-password, login-submit)

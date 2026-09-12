@@ -14,7 +14,7 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 // ("Vendor quote — final") is the multi-attachment variant.
 //
 // Selectors verified against:
-//   apps/internal/src/routes/emails/$threadId.tsx
+//   apps/internal/src/routes/_authed/emails/$threadId.tsx
 //     (attachment-chip, data-attachment-id)
 
 const psql = (sqlText: string): string =>

@@ -15,7 +15,7 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 // for "did the reply land with the right In-Reply-To/References".
 //
 // Selectors verified against:
-//   apps/internal/src/routes/emails/$threadId.tsx
+//   apps/internal/src/routes/_authed/emails/$threadId.tsx
 //     (thread-reply, thread-reply-all)
 //   apps/internal/src/components/emails/compose-form.tsx
 //     (compose-{form,to,subject,send})

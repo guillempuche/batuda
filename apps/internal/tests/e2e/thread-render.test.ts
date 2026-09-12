@@ -13,7 +13,7 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 //   3. The Cc disclosure toggle reveals/hides the Cc line.
 //
 // Selectors verified against:
-//   apps/internal/src/routes/emails/$threadId.tsx
+//   apps/internal/src/routes/_authed/emails/$threadId.tsx
 //     (thread-message-card, thread-cc-toggle)
 
 const psql = (sqlText: string): string =>

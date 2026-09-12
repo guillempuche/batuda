@@ -6,9 +6,9 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 // from Better Auth's useActiveOrganization atom, which is signal-backed
 // and refetches when setActive flips the cookie. Selectors verified
 // against:
-//   apps/internal/src/routes/settings/organization/index.tsx
+//   apps/internal/src/routes/_authed/settings/organization/index.tsx
 //     (settings-org-card, settings-org-name, settings-org-members-link)
-//   apps/internal/src/routes/settings/organization/members.tsx
+//   apps/internal/src/routes/_authed/settings/organization/members.tsx
 //     (member-row-{userId}, member-role-{userId})
 
 // Reset Alice's session to Taller before every test — a sibling file

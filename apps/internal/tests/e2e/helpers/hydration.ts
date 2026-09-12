@@ -35,3 +35,28 @@ export async function waitForInteractive(
 		expect(attached, `${testId} should be interactive`).toBe(true)
 	}).toPass({ timeout: 30_000 })
 }
+
+/**
+ * Waits until React has taken over the page at all, then returns.
+ *
+ * Same signal as `waitForInteractive`, read off any link or button rather than
+ * one named control, for checks about the page as a whole. A page where no
+ * element carries React's key is still the server's HTML. Polled generously:
+ * the dev server compiles a route the first time it is asked for, and on a
+ * heavy page that lands well after the load event.
+ */
+export async function waitForHydrated(page: Page): Promise<void> {
+	await expect
+		.poll(
+			() =>
+				page.evaluate(() =>
+					Array.from(
+						document.querySelectorAll('a, button, [data-testid]'),
+					).some(element =>
+						Object.keys(element).some(key => key.startsWith('__react')),
+					),
+				),
+			{ message: 'the page never hydrated', timeout: 90_000 },
+		)
+		.toBe(true)
+}

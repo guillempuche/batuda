@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 // Hard-reload + cross-tab durability of Better Auth's session cookie.
 // The original regression these cases pin: a hard reload at the
-// frontend origin runs SSR `beforeLoad` (apps/internal/src/routes/__root.tsx:55-83)
+// frontend origin runs SSR `beforeLoad` (apps/internal/src/routes/__root.tsx)
 // which forwards the incoming Cookie header to /auth/get-session
 // (session-check.ts:39-71). If the auth cookie isn't on the frontend
 // origin's cookie jar, SSR sees no cookie and bounces to /login —
@@ -13,7 +13,7 @@ import { expect, test } from '@playwright/test'
 //   apps/internal/src/routes/login.tsx (login-form, beforeLoad redirect
 //     when an authenticated user visits /login)
 //   apps/internal/src/components/layout/org-switcher.tsx (active-org-name)
-//   apps/internal/src/routes/companies/$slug.tsx (company name in <Name>)
+//   apps/internal/src/routes/_authed/companies/$slug.tsx (company name in <Name>)
 //
 // Auth: runs in the `authed` Playwright project so Alice's cookies are
 // injected from `setup`'s storageState.
@@ -36,7 +36,7 @@ test.describe('session persistence', () => {
 			// THEN the URL stays / (SSR beforeLoad accepted the cookie and
 			// did not redirect), login-form is absent, and the active-org
 			// indicator hydrates back to the same value
-			// [__root.tsx:55-83 — SSR beforeLoad with valid cookie]
+			// [__root.tsx — SSR beforeLoad with valid cookie]
 			// [build-better-auth-config.ts:30-41 — cookie-domain derivation]
 			await expect(page).toHaveURL(/\/$/)
 			await expect(page.getByTestId('login-form')).toHaveCount(0)
@@ -61,7 +61,7 @@ test.describe('session persistence', () => {
 			// THEN the URL stays on the same deep route, login-form is
 			// absent, and the company header re-renders — proving the SSR
 			// session check + the company loader both saw the cookie
-			// [__root.tsx:55-83 — SSR beforeLoad on a non-root URL]
+			// [__root.tsx — SSR beforeLoad on a non-root URL]
 			await expect(page).toHaveURL(/\/companies\/cal-pep-fonda/)
 			await expect(page.getByTestId('login-form')).toHaveCount(0)
 			await expect(page.locator('body')).toContainText('Cal Pep Fonda')
