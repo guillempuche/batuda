@@ -16,9 +16,10 @@ export type OrgMemberInfo = {
  * Auth's active-organization signal. Powers the owner name/initials on leads, the
  * owner picker, and the "my leads" filter.
  *
- * The signal is client-only, so `data` is undefined during SSR / first paint —
- * callers then get an empty directory and `undefined` lookups, which the UI
- * renders as a neutral placeholder rather than flashing wrong names.
+ * The server hands the active organisation over with the page, so the names
+ * are there on the first frame. When it could not, callers get an empty
+ * directory and `undefined` lookups, which the UI renders as a neutral
+ * placeholder rather than flashing wrong names.
  */
 export function useOrgMembers(): {
 	readonly members: ReadonlyArray<OrgMemberInfo>

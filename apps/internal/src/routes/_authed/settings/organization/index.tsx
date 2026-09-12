@@ -10,7 +10,11 @@ import {
 } from 'lucide-react'
 import { styled } from 'next-yak'
 
-import { authClient } from '#/lib/auth-client'
+import {
+	useHydratedActiveMember,
+	useHydratedActiveOrganization,
+} from '#/lib/auth-client'
+import { isOrgAdmin } from '#/lib/identity'
 import {
 	brushedMetalPlate,
 	rulerUnderRule,
@@ -36,11 +40,11 @@ export const Route = createFileRoute('/_authed/settings/organization/')({
 
 function OrganizationSettingsPage() {
 	const { t } = useLingui()
-	const active = authClient.useActiveOrganization()
-	const activeMember = authClient.useActiveMember()
+	const active = useHydratedActiveOrganization()
+	const activeMember = useHydratedActiveMember()
 	const org = active.data
 	const myRole = activeMember.data?.role ?? null
-	const canInvite = myRole === 'owner' || myRole === 'admin'
+	const canInvite = isOrgAdmin(myRole)
 
 	return (
 		<Page>

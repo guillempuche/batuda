@@ -12,8 +12,14 @@ import { PriButton, PriCheckbox, PriDialog, usePriToast } from '@batuda/ui/pri'
 import { PriTable } from '#/components/primitives/pri-table'
 import { ErrorState } from '#/components/shared/error-state'
 import { SrOnly } from '#/components/shared/sr-only'
-import { authClient } from '#/lib/auth-client'
+import {
+	useHydratedActiveMember,
+	useHydratedActiveOrganization,
+	useHydratedListOrganizations,
+	useHydratedSession,
+} from '#/lib/auth-client'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
+import { isOrgAdmin } from '#/lib/identity'
 import {
 	brushedMetalPlate,
 	rulerUnderRule,
@@ -126,7 +132,7 @@ function ConnectionsPage() {
 		},
 	)
 
-	const orgs = authClient.useListOrganizations()
+	const orgs = useHydratedListOrganizations()
 	const orgNameById = useMemo(() => {
 		const map = new Map<string, string>()
 		for (const o of orgs.data ?? []) map.set(o.id, o.name)
@@ -136,14 +142,14 @@ function ConnectionsPage() {
 	// Cutting a connection off is recorded against the organization you are
 	// currently working in, so only that organization's chip offers it. The
 	// others are shown for context — switch organization to manage them.
-	const activeOrg = authClient.useActiveOrganization()
+	const activeOrg = useHydratedActiveOrganization()
 	const activeOrgId = activeOrg.data?.id ?? null
 
 	// Only owners and admins get the organization-wide view. Hiding it is a
 	// courtesy; the server refuses the call for anyone else regardless.
-	const activeMember = authClient.useActiveMember()
+	const activeMember = useHydratedActiveMember()
 	const myRole = activeMember.data?.role ?? null
-	const canManage = myRole === 'owner' || myRole === 'admin'
+	const canManage = isOrgAdmin(myRole)
 
 	// The connection currently being revoked, so its button can disable until
 	// the call finishes and a second click can't race it.
@@ -572,7 +578,7 @@ function OrgConnectionsSection() {
 	// Whose connections these are matters here: nobody may put back a removal
 	// aimed at them by somebody else, so their own rows get an explanation
 	// rather than a button that is always refused.
-	const session = authClient.useSession()
+	const session = useHydratedSession()
 	const myUserId = session.data?.user?.id ?? null
 
 	// Where the keyboard lands after a row moves between the two tables.

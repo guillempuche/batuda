@@ -12,7 +12,8 @@ import {
 	researchPolicyAtom,
 	updateResearchPolicyAtom,
 } from '#/atoms/research-atoms'
-import { authClient } from '#/lib/auth-client'
+import { useHydratedActiveMember } from '#/lib/auth-client'
+import { isOrgAdmin } from '#/lib/identity'
 import { centsToEuros, eurosToCents, narrowPolicy } from '#/lib/research-policy'
 import {
 	brushedMetalPlate,
@@ -30,9 +31,9 @@ const DEFAULT_THRESHOLD = 70
 function ResearchPolicyPage() {
 	const { t } = useLingui()
 	const toast = usePriToast()
-	const activeMember = authClient.useActiveMember()
+	const activeMember = useHydratedActiveMember()
 	const myRole = activeMember.data?.role ?? null
-	const canManage = myRole === 'owner' || myRole === 'admin'
+	const canManage = isOrgAdmin(myRole)
 
 	const policyResult = useAtomValue(researchPolicyAtom)
 	const refreshPolicy = useAtomRefresh(researchPolicyAtom)

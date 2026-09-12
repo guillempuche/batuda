@@ -78,7 +78,12 @@ test.describe('layout stability', () => {
 				})
 			})
 
-			for (const route of ['/', '/companies', '/research']) {
+			for (const route of [
+				'/',
+				'/companies',
+				'/research',
+				'/settings/organization/members',
+			]) {
 				test.describe(`when Alice opens ${route}`, () => {
 					test('should settle without the page moving', async ({
 						context,
@@ -166,6 +171,14 @@ test.describe('data painted on the server', () => {
 			await expect(
 				dashboard.getByRole('link', { name: /open tasks/i }),
 			).toBeVisible()
+
+			// AND the top bar already names the organisation: the server reads who
+			// is signed in and hands it over with the page, so nothing waits on the
+			// browser to find out.
+			await expect(page.getByTestId('active-org-name')).not.toHaveText(
+				/no active organi[sz]ation/i,
+			)
+			await expect(page.getByTestId('active-org-name')).not.toBeEmpty()
 		})
 	})
 

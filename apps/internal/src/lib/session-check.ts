@@ -23,7 +23,8 @@ import { apiBaseUrl } from './api-base'
 
 const AUTH_COOKIE_PATTERN = /^(?:__Secure-|__Host-)?batuda[._-]/
 
-function filterAuthCookies(header: string): string {
+/** Only the app's own auth cookies, so nothing else leaves the SSR runtime. */
+export function filterAuthCookies(header: string): string {
 	return header
 		.split(';')
 		.map(s => s.trim())

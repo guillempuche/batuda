@@ -42,8 +42,9 @@ import type { StackOption } from '#/components/instructions/stack-picker'
 import { TemplateLibrary } from '#/components/instructions/template-library'
 import { DeleteConfirm } from '#/components/shared/delete-confirm'
 import { ErrorState } from '#/components/shared/error-state'
-import { authClient } from '#/lib/auth-client'
+import { useHydratedActiveMember, useHydratedSession } from '#/lib/auth-client'
 import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
+import { isOrgAdmin } from '#/lib/identity'
 import { validateSearchWith } from '#/lib/search-schema'
 import { useDlg } from '#/lib/use-dlg'
 import { useReadParam } from '#/lib/use-read-param'
@@ -72,11 +73,11 @@ export const Route = createFileRoute(
 })
 
 function OrgTemplatesPage() {
-	const activeMember = authClient.useActiveMember()
-	const session = authClient.useSession()
+	const activeMember = useHydratedActiveMember()
+	const session = useHydratedSession()
 	const myUserId = session.data?.user?.id ?? null
 	const role = activeMember.data?.role ?? null
-	const isAdmin = role === 'owner' || role === 'admin'
+	const isAdmin = isOrgAdmin(role)
 
 	const templatesResult = useAtomValue(instructionTemplatesAtom)
 	const refreshTemplates = useAtomRefresh(instructionTemplatesAtom)
