@@ -236,14 +236,36 @@ const companyInputFields = {
 		description:
 			'Anything else worth keeping on this company, as a JSON object of your own shape. Searchable later through search_companies with metadata_key + metadata_value. Your own view of whether a company is worth selling to belongs here, by convention as `fitVerdict`: the separate fit_verdict field is what a research run concluded and nothing but a run writes it, so a judgement of your own has nowhere else to live.',
 	}),
+	contacts: Schema.optionalKey(
+		Schema.Array(
+			Schema.Struct({
+				name: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
+				role: Schema.optionalKey(Schema.NullOr(Schema.String)),
+			}),
+		),
+	).annotate({
+		description:
+			'The people this company names on its own pages, each as { name, role } — role being the job title as the page gives it, kept word for word, though a blank one is stored as no title at all. Use it for the people a discovery scan read off a company\'s site: they become contacts on the company in the same call, so a shortlist arrives with somebody to ask for instead of a switchboard number — except where the company is skipped on its web address alone, when they are dropped and the tool description says why. There is deliberately no field here for the part somebody plays in a purchase: a page gives a job title and nothing about who holds the budget, so that is for a person to add later with update_contact. Offer the same person twice, or somebody the company already has, and they are written once — accents are folded, so "Mercè Solà" and "Merce Sola" are one person.',
+	}),
 }
 const CompanyInput = Schema.Struct(companyInputFields)
 
 // Written from the vocabularies rather than typed out beside them. The typed-out
 // version drifted: it offered three statuses the app has never had and a priority
 // range twice the real one, and assistants followed it into rows that show up in
-// no board column. Now the sentence cannot say anything the schema would refuse.
-export const CREATE_COMPANIES_DESCRIPTION = `Create one or more companies in a single call — pass \`companies\` as an array (a single element to create just one, the whole shortlist to load a batch). Slug: leave it out and it is worked out from the name — supply one only to choose a particular web address. It must be plain lowercase a-z, digits and single hyphens, so an accented or non-Latin name cannot be written into one directly. Status: ${COMPANY_STATUSES.join('|')} (default: prospect). ownerId assigns the colleague who will work the company — pass a user id from list_members, or leave it out to create it unowned. It only lands on companies actually created: a skipped duplicate keeps the owner it already had, so re-sending a list is never a way to hand companies over. Use update_company for that. Priority: ${COMPANY_PRIORITIES[0]} (highest) to ${COMPANY_PRIORITIES[COMPANY_PRIORITIES.length - 1]} (lowest, default: 2). Pass taxId whenever you know it: a company is skipped if its slug already exists OR its registration number already does, so the number catches the same firm arriving under a different trading name. Runs in one transaction; a skip is not an error, so re-running an overlapping list is safe. Returns { created, skipped, created_needs_review }. Read the split this way: created and created_needs_review were both WRITTEN; only skipped was not. \`skipped\` gives each left-out slug plus matched_on — "slug" or "tax_id" when that identity was already on file before this call, "slug_in_request" or "tax_id_in_request" when the same company appeared twice in the list you just sent (a mistake in the list, not a company already in the CRM). \`created_needs_review\` gives companies that DID land but resemble another one: matches_slug and matches_name name the lookalike, matches says whether it is "on_file" (already in the CRM) or "in_request" (another entry in this same call), and matched_on says whether they share a web address or just a similar name — a website match reports confidence 100, which only means the host was identical, never that the row was rejected. Check those before treating them as separate companies. A company taken from a discovery scan's prospect list is a candidate, not a fact. Four things on that row say the run held it back, and they are separate: \`unconfirmed_reason\` is the run's own words on why it could not establish the company is real, \`${NAME_ONLY_EVIDENCE_FIELD}\` of "${NAME_ONLY_EVIDENCE}" means every page citing it was a list of many companies and it has neither a site nor a place of its own, \`${MARKS_FIELD}\` containing "${EXISTENCE_UNCONFIRMED}" means the run could not establish the company is real and trading, with what was missing in \`${EXISTENCE_REASON_FIELD}\`, and \`${MARKS_FIELD}\` containing "${OUTSIDE_REQUESTED_PLACE}" means the evidence puts it somewhere other than the area that was asked about. Any of the four: say so to the person before creating it, and never record it as verified on this run's word alone.`
+// no board column. The sentence cannot say anything the schema would refuse.
+export const CREATE_COMPANIES_DESCRIPTION = `Create one or more companies in a single call — pass \`companies\` as an array (a single element to create just one, the whole shortlist to load a batch). Slug: leave it out and it is worked out from the name — supply one only to choose a particular web address. It must be plain lowercase a-z, digits and single hyphens, so an accented or non-Latin name cannot be written into one directly. Status: ${COMPANY_STATUSES.join('|')} (default: prospect). ownerId assigns the colleague who will work the company — pass a user id from list_members, or leave it out to create it unowned. It only lands on companies actually created: a skipped duplicate keeps the owner it already had, so re-sending a list is never a way to hand companies over. Use update_company for that. Priority: ${COMPANY_PRIORITIES[0]} (highest) to ${COMPANY_PRIORITIES[COMPANY_PRIORITIES.length - 1]} (lowest, default: 2). Pass taxId whenever you know it: a company is skipped if its slug already exists OR its registration number already does, so the number catches the same firm arriving under a different trading name. Pass \`contacts\` inside a company's own object, not beside the list, to take its people on in the same call. Runs in one transaction; a skip is not an error, so re-running an overlapping list is safe. Returns { created, contacts_added, skipped, created_needs_review }. Read the split this way: created and created_needs_review were both WRITTEN; only skipped was not — though a skipped company's people may still have landed on it. contacts_added counts the people written across the whole call. \`skipped\` gives each left-out slug plus matched_on — "slug" or "tax_id" when that identity was already on file before this call, "slug_in_request" or "tax_id_in_request" when the same company appeared twice in the list you just sent (a mistake in the list, not a company already in the CRM) — and \`company\`, the one it matched: its id, web address, name, place and registration number. Act on it through company.id, never through the slug beside it, because that slug is the one YOU sent and on a tax_id match it may not be the web address the company is filed under. People offered with a skipped company land on it where its registration number matched — tax_id or tax_id_in_request, one firm written down twice, so they are its people. Where only the web address matched — slug or slug_in_request — nothing is written, those people included: a web address is folded from the name, so two unrelated firms reduce to one often enough that adding people there would file them under somebody else and report it as done. Read the company it matched: if it is the same firm, use create_contact for the people; if it is not, this company was never created, so send it again under a web address of its own. \`created_needs_review\` gives companies that DID land but resemble another one: matches_slug and matches_name name the lookalike, matches says whether it is "on_file" (already in the CRM) or "in_request" (another entry in this same call), and matched_on says whether they share a web address or just a similar name — a website match reports confidence 100, which only means the host was identical, never that the row was rejected. Check those before treating them as separate companies. A company taken from a discovery scan's prospect list is a candidate, not a fact. Four things on that row say the run held it back, and they are separate: \`unconfirmed_reason\` is the run's own words on why it could not establish the company is real, \`${NAME_ONLY_EVIDENCE_FIELD}\` of "${NAME_ONLY_EVIDENCE}" means every page citing it was a list of many companies and it has neither a site nor a place of its own, \`${MARKS_FIELD}\` containing "${EXISTENCE_UNCONFIRMED}" means the run could not establish the company is real and trading, with what was missing in \`${EXISTENCE_REASON_FIELD}\`, and \`${MARKS_FIELD}\` containing "${OUTSIDE_REQUESTED_PLACE}" means the evidence puts it somewhere other than the area that was asked about. Any of the four: say so to the person before creating it, and never record it as verified on this run's word alone.`
+
+// Enough of the company that matched to act on it and to judge whether it is the
+// same firm. Not the whole record: a re-sent list of fifty would come back as
+// fifty full account briefs.
+const CompanyMatched = Schema.Struct({
+	id: Schema.String,
+	slug: Schema.String,
+	name: Schema.String,
+	location: Schema.NullOr(Schema.String),
+	taxId: Schema.NullOr(Schema.String),
+})
 
 // What the service calls a skip, in the words the tool answers with.
 const SKIPPED_BECAUSE = {
@@ -260,8 +282,14 @@ const CreateCompanies = Tool.make('create_companies', {
 	}),
 	success: Schema.Struct({
 		created: Schema.Array(Company.json),
+		// People written, across the whole call. Anyone a company already had is
+		// not counted again.
+		contacts_added: Schema.Number,
 		// Not written, because something with this identity was there already —
-		// either on file before this call, or earlier in this same request.
+		// either on file before this call, or earlier in this same request. The
+		// company that matched comes back with it, because the slug beside it is the
+		// one the caller sent: on a number match that is not the address the company
+		// is filed under, so it is no use for going to look.
 		skipped: Schema.Array(
 			Schema.Struct({
 				slug: Schema.String,
@@ -271,6 +299,7 @@ const CreateCompanies = Tool.make('create_companies', {
 					'slug_in_request',
 					'tax_id_in_request',
 				]),
+				company: CompanyMatched,
 			}),
 		),
 		// Written, and worth a second look: every company named here landed, and
@@ -640,12 +669,28 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 							website: c.website,
 						})),
 					)
-					const batch = yield* service.createMany(companies)
+					// The people are held beside the company, not among its fields: the
+					// write builds its column list from the keys it is handed, so a
+					// `contacts` left in there becomes a column the table does not have.
+					const batch = yield* service.createMany(
+						companies.map(({ contacts, ...company }) => ({
+							company,
+							contacts: contacts ?? [],
+						})),
+					)
 					return {
 						created: batch.created,
+						contacts_added: batch.contactsAdded,
 						skipped: batch.skipped.map(skip => ({
 							slug: skip.slug,
 							matched_on: SKIPPED_BECAUSE[skip.matchedOn],
+							company: {
+								id: skip.company.id,
+								slug: skip.company.slug,
+								name: skip.company.name,
+								location: skip.company.location,
+								taxId: skip.company.taxId,
+							},
 						})),
 						created_needs_review: needsReview,
 					}

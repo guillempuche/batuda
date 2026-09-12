@@ -40,7 +40,9 @@ const createMany = (items: ReadonlyArray<Record<string, unknown>>) =>
 		Effect.gen(function* () {
 			const sql = yield* SqlClient.SqlClient
 			const service = yield* CompanyService
-			return yield* enterOrgScope(sql, { org })(service.createMany(items))
+			return yield* enterOrgScope(sql, { org })(
+				service.createMany(items.map(company => ({ company, contacts: [] }))),
+			)
 		}).pipe(Effect.orDie),
 	)
 
@@ -97,9 +99,14 @@ describe('CompanyService.createMany deduping on the registration number', () => 
 			// AND the second is reported as a repeat inside this very call, by its
 			// number rather than its slug — which is the whole point: its slug was new,
 			// and it was never on file before this call either
-			expect(batch.skipped).toStrictEqual([
-				{ slug: `acme-logistics-${suffix}`, matchedOn: 'taxIdInRequest' },
-			])
+			expect(batch.skipped).toHaveLength(1)
+			expect(batch.skipped[0]?.slug).toBe(`acme-logistics-${suffix}`)
+			expect(batch.skipped[0]?.matchedOn).toBe('taxIdInRequest')
+
+			// AND it hands back the company it matched — the one this same call wrote
+			// a moment earlier. The slug reported is the one that was sent, which here
+			// is not the address that company is filed under
+			expect(batch.skipped[0]?.company.slug).toBe(`acme-${suffix}`)
 		})
 	})
 
@@ -116,9 +123,10 @@ describe('CompanyService.createMany deduping on the registration number', () => 
 			// THEN one landed, and the other is reported as the caller having sent the
 			// same slug twice rather than as a company already in the CRM
 			expect(batch.created).toHaveLength(1)
-			expect(batch.skipped).toStrictEqual([
-				{ slug: `dup-${suffix}`, matchedOn: 'slugInRequest' },
-			])
+			expect(batch.skipped).toHaveLength(1)
+			expect(batch.skipped[0]?.slug).toBe(`dup-${suffix}`)
+			expect(batch.skipped[0]?.matchedOn).toBe('slugInRequest')
+			expect(batch.skipped[0]?.company.name).toBe('Dup One')
 		})
 	})
 
@@ -181,9 +189,15 @@ describe('CompanyService.createMany telling a company already on file from one s
 			// THEN nothing new landed, and the report says the number was on file
 			// rather than sent twice — the caller's list was fine
 			expect(second.created).toHaveLength(0)
-			expect(second.skipped).toStrictEqual([
-				{ slug: `prior-trading-${suffix}`, matchedOn: 'taxId' },
-			])
+			expect(second.skipped).toHaveLength(1)
+			expect(second.skipped[0]?.slug).toBe(`prior-trading-${suffix}`)
+			expect(second.skipped[0]?.matchedOn).toBe('taxId')
+
+			// AND the company on file comes back with it. This is the case where the
+			// slug reported cannot be looked up: the firm is filed under the name it
+			// first arrived as, so only the company itself leads anywhere
+			expect(second.skipped[0]?.company.slug).toBe(`prior-${suffix}`)
+			expect(second.skipped[0]?.company.id).toBe(first.created[0]?.id)
 		})
 	})
 
@@ -203,9 +217,10 @@ describe('CompanyService.createMany telling a company already on file from one s
 
 			// THEN the slug is reported as one the CRM already held
 			expect(second.created).toHaveLength(0)
-			expect(second.skipped).toStrictEqual([
-				{ slug: `held-${suffix}`, matchedOn: 'slug' },
-			])
+			expect(second.skipped).toHaveLength(1)
+			expect(second.skipped[0]?.slug).toBe(`held-${suffix}`)
+			expect(second.skipped[0]?.matchedOn).toBe('slug')
+			expect(second.skipped[0]?.company.name).toBe('Held One')
 		})
 	})
 })

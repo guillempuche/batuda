@@ -14,6 +14,7 @@ import {
 	Contact,
 	foldLabel,
 	Interaction,
+	jobTitleOrNothing,
 	normalizeCountry,
 } from '@batuda/domain'
 
@@ -103,6 +104,58 @@ export interface CompanyFilters {
  */
 export const normalizeTaxId = (taxId: string): string =>
 	taxId.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
+
+/**
+ * A person a company search read off the company's own pages: who they are, and
+ * what the page called them. No way of reaching them — an email is either
+ * published, in which case it is already on the company's own channels, or
+ * it is guessed and checked, which costs money for each person.
+ */
+export interface LeadPerson {
+	readonly name: string
+	readonly role?: string | null | undefined
+}
+
+/**
+ * Write the people offered with a company onto it, and say how many were new.
+ *
+ * Anyone the company already has is left alone: the same person is found again
+ * every time the company is, and a name written with an accent one time and
+ * without it the next is one person, not two. Their part in a purchase is not
+ * set — a page gives a job title and nothing about who holds the budget.
+ */
+const writeContacts = (
+	sql: SqlClient.SqlClient,
+	organizationId: string,
+	companyId: string,
+	people: ReadonlyArray<LeadPerson>,
+) =>
+	Effect.gen(function* () {
+		if (people.length === 0) return 0
+		const held = yield* sql`
+			SELECT name FROM contacts
+			WHERE organization_id = ${organizationId}
+				AND company_id = ${companyId}
+				AND deleted_at IS NULL
+		`
+		const heldNames = new Set(
+			held.map(person => foldLabel(String(person['name']))),
+		)
+		let added = 0
+		for (const person of people) {
+			const key = foldLabel(person.name)
+			if (key === '' || heldNames.has(key)) continue
+			heldNames.add(key)
+			yield* sql`INSERT INTO contacts ${sql.insert({
+				organizationId,
+				companyId,
+				name: person.name,
+				role: jobTitleOrNothing(person.role),
+			})}`
+			added++
+		}
+		return added
+	})
 
 /** A filter that offers a menu of its values, each with how many it would find. */
 export type CompanyFacetKey = 'country' | 'industry' | 'tags' | 'fitVerdict'
@@ -519,17 +572,11 @@ export class CompanyService extends Context.Service<CompanyService>()(
 				 * it is registered under, which catches the same firm arriving under
 				 * a different trading name.
 				 *
-				 * The people land on whichever company answered, new or already
-				 * here, and anyone it already has is left alone. Their part in a
-				 * purchase is not set: a search reads a job title off a page and has
-				 * no way of knowing who holds the budget.
+				 * The people land on whichever company answered, new or already here.
 				 */
 				createWithContacts: (args: {
 					readonly company: Record<string, unknown>
-					readonly contacts: ReadonlyArray<{
-						readonly name: string
-						readonly role?: string | undefined
-					}>
+					readonly contacts: ReadonlyArray<LeadPerson>
 				}) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
@@ -703,31 +750,12 @@ export class CompanyService extends Context.Service<CompanyService>()(
 							`
 						}
 
-						const held = yield* sql`
-							SELECT name FROM contacts
-							WHERE organization_id = ${currentOrg.id}
-								AND company_id = ${companyId}
-								AND deleted_at IS NULL
-						`
-						// Folded before comparing, so the same person written with an
-						// accent one time and without it the next is one person.
-						const heldNames = new Set(
-							held.map(person => foldLabel(String(person['name']))),
+						const contactsAdded = yield* writeContacts(
+							sql,
+							currentOrg.id,
+							companyId,
+							args.contacts,
 						)
-
-						let contactsAdded = 0
-						for (const person of args.contacts) {
-							const key = foldLabel(person.name)
-							if (key === '' || heldNames.has(key)) continue
-							heldNames.add(key)
-							yield* sql`INSERT INTO contacts ${sql.insert({
-								organizationId: currentOrg.id,
-								companyId,
-								name: person.name,
-								role: person.role ?? null,
-							})}`
-							contactsAdded++
-						}
 
 						return {
 							company: yield* Schema.decodeUnknownEffect(Company)(row),
@@ -864,10 +892,20 @@ export class CompanyService extends Context.Service<CompanyService>()(
 				// The lookup runs inside the same transaction as the inserts, so a number
 				// repeated twice within one batch is caught on the second one too.
 				//
-				// Both keys are reported back by what matched, so a caller told a company
-				// was left out can tell "you already have this slug" from "you already
-				// have this company under another name" without guessing.
-				createMany: (items: ReadonlyArray<Record<string, unknown>>) =>
+				// Both keys are reported back by what matched, and with the company that
+				// matched, so a caller told a company was left out can tell "you already
+				// have this slug" from "you already have this company under another name"
+				// without guessing — and is holding the company rather than a name to go
+				// and look up.
+				//
+				// The people offered with a company land on it where the same firm is
+				// established: this call created it, or its registration number matched.
+				createMany: (
+					items: ReadonlyArray<{
+						readonly company: Record<string, unknown>
+						readonly contacts: ReadonlyArray<LeadPerson>
+					}>,
+				) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
 						// Checked before anything lands: the batch is one transaction, so
@@ -875,7 +913,7 @@ export class CompanyService extends Context.Service<CompanyService>()(
 						// most of the list and leaving the caller to work out which.
 						yield* requireOrgMembers(
 							sql,
-							items.map(item => item['ownerId']),
+							items.map(item => item.company['ownerId']),
 						)
 						const inserted: Array<unknown> = []
 						const skipped: Array<{
@@ -885,31 +923,52 @@ export class CompanyService extends Context.Service<CompanyService>()(
 								| 'taxId'
 								| 'slugInRequest'
 								| 'taxIdInRequest'
+							readonly company: Schema.Schema.Type<typeof Company>
 						}> = []
-						// What this very call has written so far. Without it a repeat inside
-						// one request reads exactly like a company that had been on file for
-						// a year: the slug conflict and the tax-id lookup below both find the
-						// row this same call inserted a moment earlier, and the caller is told
-						// it already existed.
-						const slugsWritten = new Set<string>()
-						const taxIdsWritten = new Set<string>()
-						for (const data of items) {
-							const slug = typeof data['slug'] === 'string' ? data['slug'] : ''
+						let contactsAdded = 0
+						// What this very call has written so far, and the row it wrote.
+						// Without it a repeat inside one request reads exactly like a company
+						// that had been on file for a year: the slug conflict and the tax-id
+						// lookup below both find the row this same call inserted a moment
+						// earlier, and the caller is told it already existed.
+						const slugsWritten = new Map<string, unknown>()
+						const taxIdsWritten = new Map<string, unknown>()
+						// Bound once: the org id and the company id sit side by side in the call
+						// below, and swapping them files people under the wrong company silently.
+						const addPeople = (
+							companyId: string,
+							people: ReadonlyArray<LeadPerson>,
+						) => writeContacts(sql, currentOrg.id, companyId, people)
+						for (const item of items) {
+							const companyFields = item.company
+							const slug =
+								typeof companyFields['slug'] === 'string'
+									? companyFields['slug']
+									: ''
 							const taxId =
-								typeof data['taxId'] === 'string' ? data['taxId'] : null
+								typeof companyFields['taxId'] === 'string'
+									? companyFields['taxId']
+									: null
 							const normalizedTaxId =
 								taxId === null ? '' : normalizeTaxId(taxId)
-							if (slugsWritten.has(slug)) {
-								skipped.push({ slug, matchedOn: 'slugInRequest' })
-								continue
-							}
+							// The number is asked first and alone, because it is the surer of the
+							// two: a firm is written down differently every time it is found, and
+							// its registration is not. Checking the web address first would call
+							// one firm sent twice a repeat and drop the second entry's people on
+							// the strength of a folded name.
 							if (normalizedTaxId !== '') {
-								if (taxIdsWritten.has(normalizedTaxId)) {
-									skipped.push({ slug, matchedOn: 'taxIdInRequest' })
+								const sameNumberInBatch = taxIdsWritten.get(normalizedTaxId)
+								if (sameNumberInBatch !== undefined) {
+									const company =
+										yield* Schema.decodeUnknownEffect(Company)(
+											sameNumberInBatch,
+										)
+									contactsAdded += yield* addPeople(company.id, item.contacts)
+									skipped.push({ slug, matchedOn: 'taxIdInRequest', company })
 									continue
 								}
-								const existing = yield* sql`
-									SELECT id FROM companies
+								const sameNumberOnFile = yield* sql`
+									SELECT * FROM companies
 									WHERE organization_id = ${currentOrg.id}
 										-- Live rows only, matching the slug half: a company that
 										-- was deleted has given its identity back, so re-adding it
@@ -921,12 +980,29 @@ export class CompanyService extends Context.Service<CompanyService>()(
 											= ${normalizedTaxId}
 									LIMIT 1
 								`
-								if (existing.length > 0) {
-									skipped.push({ slug, matchedOn: 'taxId' })
+								const registered = sameNumberOnFile[0]
+								if (registered !== undefined) {
+									const company =
+										yield* Schema.decodeUnknownEffect(Company)(registered)
+									contactsAdded += yield* addPeople(company.id, item.contacts)
+									skipped.push({ slug, matchedOn: 'taxId', company })
 									continue
 								}
 							}
-							const split = splitCompanyChannelFields(data)
+							const sameSlugInBatch = slugsWritten.get(slug)
+							if (sameSlugInBatch !== undefined) {
+								// The people offered with it are dropped on purpose: a web address
+								// is folded from the name, so these two entries can be two firms,
+								// and filing one's people under the other is worse than losing them.
+								skipped.push({
+									slug,
+									matchedOn: 'slugInRequest',
+									company:
+										yield* Schema.decodeUnknownEffect(Company)(sameSlugInBatch),
+								})
+								continue
+							}
+							const split = splitCompanyChannelFields(companyFields)
 							// The trade a caller named becomes an entry in the organisation's
 							// own list, so its name and the entry it points at are written
 							// together and can never disagree.
@@ -948,8 +1024,35 @@ export class CompanyService extends Context.Service<CompanyService>()(
 								RETURNING *
 							`
 							const row = rows[0]
-							if (row === undefined) skipped.push({ slug, matchedOn: 'slug' })
-							else {
+							if (row === undefined) {
+								// DO NOTHING says nothing about what is already there, so the
+								// company holding this address is asked for by name. Inside this
+								// transaction the conflict proves a live row has the slug, so
+								// finding none would mean the arbiter and this condition have
+								// drifted apart.
+								const sameSlugOnFile = yield* sql`
+									SELECT * FROM companies
+									WHERE organization_id = ${currentOrg.id}
+										AND deleted_at IS NULL
+										AND slug = ${slug}
+									LIMIT 1
+								`
+								const holder = sameSlugOnFile[0]
+								if (holder === undefined)
+									return yield* Effect.die(
+										new Error(
+											`company insert conflicted on "${slug}" with no live row holding it`,
+										),
+									)
+								// The people offered with it are dropped on purpose, for the same
+								// reason: a web address is folded from the name, so the company
+								// holding it can be a different firm entirely.
+								skipped.push({
+									slug,
+									matchedOn: 'slug',
+									company: yield* Schema.decodeUnknownEffect(Company)(holder),
+								})
+							} else {
 								if (split.channels.length > 0) {
 									yield* writeChannels(
 										sql,
@@ -958,15 +1061,20 @@ export class CompanyService extends Context.Service<CompanyService>()(
 										split.channels,
 									)
 								}
-								slugsWritten.add(slug)
-								if (normalizedTaxId !== '') taxIdsWritten.add(normalizedTaxId)
+								slugsWritten.set(slug, row)
+								if (normalizedTaxId !== '')
+									taxIdsWritten.set(normalizedTaxId, row)
+								contactsAdded += yield* addPeople(
+									String(row['id']),
+									item.contacts,
+								)
 								inserted.push(row)
 							}
 						}
 						const created = yield* Schema.decodeUnknownEffect(
 							Schema.Array(Company),
 						)(inserted)
-						return { created, skipped }
+						return { created, skipped, contactsAdded }
 					}).pipe(sql.withTransaction),
 
 				update: (id: string, data: Record<string, unknown>) =>
