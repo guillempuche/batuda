@@ -4,7 +4,7 @@ import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { BatudaApi, CurrentOrg, NotFound } from '@batuda/controllers'
-import { Contact, ContactChannel } from '@batuda/domain'
+import { Contact, ContactChannel, jobTitleOrNothing } from '@batuda/domain'
 
 import {
 	pageOf,
@@ -118,6 +118,7 @@ export const ContactsLive = HttpApiBuilder.group(
 						)
 						const rows = yield* sql`INSERT INTO contacts ${sql.insert({
 							...fields,
+							role: jobTitleOrNothing(fields.role),
 							siteId: ownedSite ?? null,
 							organizationId: currentOrg.id,
 						})} RETURNING *`
@@ -167,8 +168,14 @@ export const ContactsLive = HttpApiBuilder.group(
 						// phone number does not wipe where that person works.
 						const siteChange =
 							ownedSite === undefined ? {} : { siteId: ownedSite }
+						// A blank box is a caller taking the title off; no field at all is a
+						// caller not mentioning it.
+						const roleChange =
+							fields.role === undefined
+								? {}
+								: { role: jobTitleOrNothing(fields.role) }
 						const rows = yield* sql`
-							UPDATE contacts SET ${sql.update({ ...fields, ...siteChange, updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) })}
+							UPDATE contacts SET ${sql.update({ ...fields, ...roleChange, ...siteChange, updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) })}
 							WHERE id = ${_.params.id} RETURNING *
 						`
 						if (channels && channels.length > 0)

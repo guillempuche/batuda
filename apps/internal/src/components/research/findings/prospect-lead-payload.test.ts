@@ -180,6 +180,30 @@ describe("the people a search read off the company's own pages", () => {
 		})
 	})
 
+	describe('when a title is blank or only spaces', () => {
+		it('should leave the title off rather than carry a blank one', () => {
+			// GIVEN two people the run named, one with an empty title and one whose
+			// title is nothing but spacing
+			const { payload } = buildLeadPayload(
+				{
+					name: 'Egein',
+					contacts: [
+						{ name: 'David Garrido', role: '' },
+						{ name: 'Mariona Garrido', role: '   ' },
+					],
+				},
+				'egein',
+			)
+
+			// THEN both travel with no title at all. A blank title passes every
+			// check for having one, and would be read back as a finding
+			expect(payload.contacts).toEqual([
+				{ name: 'David Garrido' },
+				{ name: 'Mariona Garrido' },
+			])
+		})
+	})
+
 	describe('when an entry has a title but nobody to hang it on', () => {
 		it('should leave it out', () => {
 			// GIVEN a blank name beside a real one

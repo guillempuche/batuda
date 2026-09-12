@@ -11,6 +11,7 @@ import {
 	CompanyTag,
 	channelAddressIsValid,
 	isVerificationVerdict,
+	jobTitleOrNothing,
 	MAPS_ADDRESS_PATTERN,
 } from '@batuda/domain'
 import {
@@ -222,7 +223,8 @@ const resolveFieldSources = (
 /**
  * Keep only the proposal fields that map to a writable column on the target
  * table, normalizing snake_case keys to the camelCase the SQL client expects,
- * and collect the page each kept value was cited to.
+ * settling a blank job title as no job title, and collecting the page each kept
+ * value was cited to.
  */
 export const allowlistFields = (
 	table: 'companies' | 'contacts',
@@ -238,7 +240,13 @@ export const allowlistFields = (
 		const camel = snakeToCamel(key)
 		if (!allowed.has(camel)) continue
 		const read = readSourced(value)
-		out[camel] = read.value
+		// A job title read as blank is one nobody gave. Settled here rather than at
+		// the write, because a proposal reaches the row through two statements — an
+		// insert for a person the run found and an update for one already on file.
+		out[camel] =
+			camel === 'role' && typeof read.value === 'string'
+				? jobTitleOrNothing(read.value)
+				: read.value
 		if (read.citation !== undefined) citations[camel] = read.citation
 	}
 	return { fields: out, citations }

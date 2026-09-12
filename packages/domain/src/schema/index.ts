@@ -67,7 +67,7 @@ export {
 	ContactChannelId,
 	EmailStatus,
 } from './contact-channels'
-export { Contact, ContactId } from './contacts'
+export { Contact, ContactId, jobTitleOrNothing } from './contacts'
 export {
 	DOCUMENT_FORMATS,
 	DOCUMENT_TYPES,

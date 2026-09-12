@@ -74,7 +74,7 @@ export function ContactEditDialog({
 						payload: {
 							companyId,
 							name: trimmedName,
-							...(trimmedRole ? { role: trimmedRole } : {}),
+							role: trimmedRole === '' ? null : trimmedRole,
 							buyingRole: buyingRole === '' ? null : buyingRole,
 						},
 					})
@@ -82,7 +82,7 @@ export function ContactEditDialog({
 						params: { id: contact.id },
 						payload: {
 							name: trimmedName,
-							role: trimmedRole,
+							role: trimmedRole === '' ? null : trimmedRole,
 							buyingRole: buyingRole === '' ? null : buyingRole,
 						},
 					})
