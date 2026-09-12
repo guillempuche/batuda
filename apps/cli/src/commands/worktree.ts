@@ -414,11 +414,16 @@ const dropDatabase = (db: string) =>
 		),
 	)
 
-// The minio/mc image's entrypoint is `mc` itself, so override it with a shell
-// (as the storage-init sidecar does) to set the alias then run one command,
-// reaching the shared MinIO over the compose network.
+// The same image and release the storage-init sidecar uses, from the registry
+// MinIO publishes to — kept in step with docker/docker-compose.yml so a worktree
+// and the shared stack never speak to MinIO through two different clients.
+const MC_IMAGE = 'quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z'
+
+// The mc image's entrypoint is `mc` itself, so override it with a shell (as the
+// storage-init sidecar does) to set the alias then run one command, reaching the
+// shared MinIO over the compose network.
 const mcScript = (command: string) =>
-	`docker run --rm --network ${STORAGE_NETWORK} --entrypoint /bin/sh minio/mc:latest -c "mc alias set local http://storage:9000 batuda batuda-secret >/dev/null 2>&1 && ${command}"`
+	`docker run --rm --network ${STORAGE_NETWORK} --entrypoint /bin/sh ${MC_IMAGE} -c "mc alias set local http://storage:9000 batuda batuda-secret >/dev/null 2>&1 && ${command}"`
 
 const mc = (command: string) => dockerFail(exec(mcScript(command)))
 const mcCapture = (command: string) => execSilent(mcScript(command))
