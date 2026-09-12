@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-09-12 (internal-v2026.9.12-2)
+
+### Bug Fixes
+
+* **internal:** draw who is signed in from the server's first frame ([5e3a25f](https://github.com/guillempuche/batuda/commit/5e3a25f016659620aad9731585dcc8ec38573aad))
+
+### Refactoring
+
+* **internal:** fetch ahead of the page through one loader helper ([922313e](https://github.com/guillempuche/batuda/commit/922313e9f3504cd0e007986e9dd6a25e1c88505d))
+
 ## 2026-09-12 (internal-v2026.9.12-1)
 
 ### Features
