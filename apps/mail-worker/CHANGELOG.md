@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-09-12 (mail-worker-v2026.9.12-1)
+
+### Bug Fixes
+
+* name every mail failure and say whose mailbox it was ([391dec6](https://github.com/guillempuche/batuda/commit/391dec63e6a07e42efa94d773476128cb57c7bcd))
+
 ## 2026-09-12 (mail-worker-v2026.9.12)
 
 ### Bug Fixes
