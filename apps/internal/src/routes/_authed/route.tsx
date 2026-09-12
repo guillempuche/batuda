@@ -10,8 +10,8 @@ import { AppShell } from '#/components/layout/app-shell'
 import { BatudaMotionConfig } from '#/components/layout/motion-config'
 import { ComposeEmailProvider } from '#/context/compose-email-context'
 import { QuickCaptureProvider } from '#/context/quick-capture-context'
-import { dehydrateAtom } from '#/lib/atom-hydration'
-import { getServerCookieHeader } from '#/lib/server-cookie'
+import { dehydrateAtom, handOverFromServer } from '#/lib/atom-hydration'
+import type { BatudaApiServerClient } from '#/lib/batuda-api-server'
 import { redirectToLogin } from '#/lib/session-check'
 
 /**
@@ -36,43 +36,24 @@ export const Route = createFileRoute('/_authed')({
 	// browser with the page. Fetched here rather than in each page's loader
 	// because whichever page renders a card needs them, and in the browser the
 	// atom fetches for itself on a later navigation.
-	loader: async () => {
-		if (!import.meta.env.SSR) return { dehydrated: [] as const }
-		let industries: Awaited<ReturnType<typeof loadIndustriesOnServer>>
-		try {
-			industries = await loadIndustriesOnServer()
-		} catch (error) {
-			console.warn(
-				'[AuthedLayoutLoader] falling back to empty hydration:',
-				error,
-			)
-			return { dehydrated: [] as const }
-		}
-		// Outside the catch on purpose: the handover only fails through a
-		// programming mistake (an atom with no serialization key), which has to
-		// break the page rather than quietly turn into a refetch.
-		return {
-			dehydrated: [
-				dehydrateAtom(companyIndustriesAtom, AsyncResult.success(industries)),
-			] as const,
-		}
-	},
+	loader: () =>
+		handOverFromServer({
+			label: 'AuthedLayoutLoader',
+			empty: { dehydrated: [] },
+			fetch: loadIndustriesOnServer,
+			handOver: industries => ({
+				dehydrated: [
+					dehydrateAtom(companyIndustriesAtom, AsyncResult.success(industries)),
+				],
+			}),
+		}),
 	component: AuthedLayout,
 })
 
-async function loadIndustriesOnServer() {
-	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
-		import('effect'),
-		import('#/lib/batuda-api-server'),
-		getServerCookieHeader(),
-	])
-	const program = Effect.gen(function* () {
-		const client = yield* makeBatudaApiServer(cookie ?? undefined)
-		// Has to match `companyIndustriesAtom` exactly: the browser picks up what
-		// the server fetched by the shape of the question.
-		return yield* client.companyIndustries.list()
-	})
-	return Effect.runPromise(program)
+function loadIndustriesOnServer(client: BatudaApiServerClient) {
+	// Has to match `companyIndustriesAtom` exactly: the browser picks up what
+	// the server fetched by the shape of the question.
+	return client.companyIndustries.list()
 }
 
 function AuthedLayout() {

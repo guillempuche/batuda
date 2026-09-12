@@ -3,13 +3,12 @@ import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Plural, Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute } from '@tanstack/react-router'
-import { DateTime, Schema } from 'effect'
+import { DateTime, Effect, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { Clock, History, Plus } from 'lucide-react'
 import { styled } from 'next-yak'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import type { Company } from '@batuda/domain'
 import { PriButton, PriDialog, PriInput } from '@batuda/ui/pri'
 
 import { companiesListAtom } from '#/atoms/pipeline-atoms'
@@ -43,12 +42,11 @@ import {
 } from '#/components/shared/task-item'
 import { useQuickCapture } from '#/context/quick-capture-context'
 import { useInfiniteList } from '#/hooks/use-infinite-list'
-import { dehydrateAtom } from '#/lib/atom-hydration'
+import { dehydrateAtom, handOverFromServer } from '#/lib/atom-hydration'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
+import type { BatudaApiServerClient } from '#/lib/batuda-api-server'
 import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
-import type { PaginatedList } from '#/lib/paginated-list'
 import { validateSearchWith } from '#/lib/search-schema'
-import { getServerCookieHeader } from '#/lib/server-cookie'
 import { useDlg } from '#/lib/use-dlg'
 import {
 	agedPaperSurface,
@@ -179,21 +177,14 @@ const completeTaskAtom = BatudaApiAtom.mutation('tasks', 'complete')
  * depends on where the reader is in the world, and the server has no way to
  * know that, so the shelves are left for the browser to ask for.
  */
-async function loadCompaniesOnServer(): Promise<PaginatedList<Company>> {
-	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
-		import('effect'),
-		import('#/lib/batuda-api-server'),
-		getServerCookieHeader(),
-	])
-	const program = Effect.gen(function* () {
-		const client = yield* makeBatudaApiServer(cookie ?? undefined)
+function loadCompaniesOnServer(client: BatudaApiServerClient) {
+	return Effect.gen(function* () {
 		// Matches `companiesListAtom` exactly, so the browser reuses this answer
 		// instead of asking again.
 		return yield* client.companies.list({
 			query: { limit: 500, count: 'exact' },
 		})
 	})
-	return Effect.runPromise(program)
 }
 
 // The open task and the recent-changes list live in `?dlg=`, so a task can be
@@ -214,22 +205,17 @@ export const Route = createFileRoute('/_authed/tasks/')({
 		// matching one; without this every link landed on Today whatever it said.
 		shelf: Schema.Literals(TASK_SHELVES),
 	}),
-	loader: async () => {
-		if (!import.meta.env.SSR) {
-			return { dehydrated: [] as const }
-		}
-		try {
-			const companies = await loadCompaniesOnServer()
-			return {
+	loader: () =>
+		handOverFromServer({
+			label: 'TasksLoader',
+			empty: { dehydrated: [] },
+			fetch: loadCompaniesOnServer,
+			handOver: companies => ({
 				dehydrated: [
 					dehydrateAtom(companiesListAtom, AsyncResult.success(companies)),
-				] as const,
-			}
-		} catch (error) {
-			console.warn('[TasksLoader] falling back to empty hydration:', error)
-			return { dehydrated: [] as const }
-		}
-	},
+				],
+			}),
+		}),
 	head: () => ({ meta: [{ title: 'Tasks — Batuda' }] }),
 	component: TasksPage,
 })

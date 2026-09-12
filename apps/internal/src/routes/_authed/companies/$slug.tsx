@@ -5,11 +5,10 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import {
 	createFileRoute,
 	Link,
-	notFound,
 	stripSearchParams,
 	useNavigate,
 } from '@tanstack/react-router'
-import { DateTime, Schema } from 'effect'
+import { DateTime, Effect, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import {
 	AlertTriangle,
@@ -135,15 +134,19 @@ import { ScrewDot } from '#/components/shared/workshop-decorations'
 import { useComposeEmail } from '#/context/compose-email-context'
 import { useQuickCapture } from '#/context/quick-capture-context'
 import { useCompanyIndustries } from '#/hooks/use-company-industries'
-import { dehydrateAtom } from '#/lib/atom-hydration'
+import {
+	dehydrateAtom,
+	handOverFromServer,
+	isNotFoundError,
+} from '#/lib/atom-hydration'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
+import type { BatudaApiServerClient } from '#/lib/batuda-api-server'
 import { documentsDlgMembers, proposalsDlgMembers } from '#/lib/company-dlg'
 import { languageName } from '#/lib/country-name'
 import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
 import { useOrgMembers } from '#/lib/org-members'
 import type { PaginatedList } from '#/lib/paginated-list'
 import { validateSearchWith } from '#/lib/search-schema'
-import { getServerCookieHeader } from '#/lib/server-cookie'
 import { useTabSearchParam } from '#/lib/tab-search'
 import { useDlg } from '#/lib/use-dlg'
 import {
@@ -258,22 +261,12 @@ type DetailPayload = {
 }
 
 /**
- * Server-only: fetch the company row plus its contacts and tasks in
- * parallel. Dynamically imports the server client so Vite excludes it from
- * the client bundle; forwards the Better-Auth cookie via
- * `getRequestHeader('cookie')`.
- *
- * The relations go through a single `Effect.all` so they share one
- * Better-Auth session roundtrip but still run in parallel on the server.
+ * The company row plus its contacts and tasks. The relations go through a
+ * single `Effect.all` so they share one Better-Auth session roundtrip but
+ * still run in parallel.
  */
-async function loadDetailOnServer(slug: string): Promise<DetailPayload> {
-	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
-		import('effect'),
-		import('#/lib/batuda-api-server'),
-		getServerCookieHeader(),
-	])
-	const program = Effect.gen(function* () {
-		const client = yield* makeBatudaApiServer(cookie ?? undefined)
+function loadDetailOnServer(client: BatudaApiServerClient, slug: string) {
+	return Effect.gen(function* () {
 		const company = yield* client.companies.get({ params: { slug } })
 		const companyId = extractCompanyId(company)
 		if (companyId === null) {
@@ -302,7 +295,6 @@ async function loadDetailOnServer(slug: string): Promise<DetailPayload> {
 		)
 		return { company, contacts, tasks } as DetailPayload
 	})
-	return Effect.runPromise(program)
 }
 
 function extractCompanyId(raw: unknown): string | null {
@@ -348,62 +340,39 @@ export const Route = createFileRoute('/_authed/companies/$slug')({
 	// Strip the default tab from the URL so `useTabSearchParam` can write
 	// `tab: next` unconditionally without leaving `?tab=overview` behind.
 	search: { middlewares: [stripSearchParams({ tab: 'overview' })] },
-	loader: async ({ params: { slug } }) => {
-		if (!import.meta.env.SSR) {
-			// Client-side navigation: let the atoms refetch directly via
-			// `BatudaApiAtom`. First render flashes the loading state while
-			// the request is in flight — that's acceptable for parameterized
-			// routes per the plan (Phase 5b.4.e option 1).
-			return { dehydrated: [] as const, slug, name: null as string | null }
-		}
-		try {
-			const payload = await loadDetailOnServer(slug)
-			const companyId = extractCompanyId(payload.company)
-			const name = extractCompanyName(payload.company)
-			// Can't hydrate the relation atoms without a companyId. Fall back
-			// to hydrating only the company atom; the relations will fetch
-			// client-side after hydration.
-			if (companyId === null) {
+	loader: ({ params: { slug } }) =>
+		handOverFromServer({
+			label: 'CompanyDetailLoader',
+			empty: { dehydrated: [], slug, name: null },
+			fetch: client => loadDetailOnServer(client, slug),
+			notFoundWhen: isNotFoundError,
+			handOver: payload => {
+				const companyId = extractCompanyId(payload.company)
+				const name = extractCompanyName(payload.company)
+				const company = dehydrateAtom(
+					companyAtomFor(slug),
+					AsyncResult.success(payload.company),
+				)
+				// Without a company id the relations cannot be handed over; the
+				// browser fetches them after hydration.
+				if (companyId === null) return { dehydrated: [company], slug, name }
 				return {
 					dehydrated: [
+						company,
 						dehydrateAtom(
-							companyAtomFor(slug),
-							AsyncResult.success(payload.company),
+							contactsAtomFor(companyId),
+							AsyncResult.success(payload.contacts),
 						),
-					] as const,
+						dehydrateAtom(
+							companyTasksAtomFor(companyId),
+							AsyncResult.success(payload.tasks),
+						),
+					],
 					slug,
 					name,
 				}
-			}
-			return {
-				dehydrated: [
-					dehydrateAtom(
-						companyAtomFor(slug),
-						AsyncResult.success(payload.company),
-					),
-					dehydrateAtom(
-						contactsAtomFor(companyId),
-						AsyncResult.success(payload.contacts),
-					),
-					dehydrateAtom(
-						companyTasksAtomFor(companyId),
-						AsyncResult.success(payload.tasks),
-					),
-				] as const,
-				slug,
-				name,
-			}
-		} catch (error) {
-			// 404 from the server → propagate as a TanStack Router notFound.
-			// Anything else (auth failure, network) falls back to empty
-			// hydration and the component renders an error state.
-			if (isNotFoundError(error)) {
-				throw notFound()
-			}
-			console.warn('[CompanyDetailLoader] falling back:', error)
-			return { dehydrated: [] as const, slug, name: null as string | null }
-		}
-	},
+			},
+		}),
 	// `head()` runs on the server with the loader's return value, so the
 	// initial HTML response carries the right `<title>` for SSR + crawlers.
 	// The component layer (useSetDocumentTitle) overrides afterwards when
@@ -415,12 +384,6 @@ export const Route = createFileRoute('/_authed/companies/$slug')({
 	},
 	component: CompanyDetailPage,
 })
-
-function isNotFoundError(error: unknown): boolean {
-	if (!error || typeof error !== 'object') return false
-	const tag = (error as Record<string, unknown>)['_tag']
-	return tag === 'NotFound'
-}
 
 function CompanyDetailPage() {
 	const { t } = useLingui()

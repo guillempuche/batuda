@@ -3,7 +3,6 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import {
 	createFileRoute,
 	Link,
-	notFound,
 	stripSearchParams,
 } from '@tanstack/react-router'
 import { EditorContent, useEditor } from '@tiptap/react'
@@ -14,7 +13,6 @@ import { ArrowLeft, Eye, Globe, Save } from 'lucide-react'
 import { styled } from 'next-yak'
 import { useCallback, useMemo, useState } from 'react'
 
-import type { Page as PageModel } from '@batuda/domain'
 import type { TiptapDocument } from '@batuda/ui/blocks'
 import { allBlockExtensions } from '@batuda/ui/blocks'
 import { PriButton, PriTabs, usePriToast } from '@batuda/ui/pri'
@@ -23,10 +21,14 @@ import { pageAtomFor } from '#/atoms/pages-atoms'
 import { useSetDocumentTitle } from '#/components/layout/top-bar-title'
 import { ErrorState } from '#/components/shared/error-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
-import { dehydrateAtom } from '#/lib/atom-hydration'
+import {
+	dehydrateAtom,
+	handOverFromServer,
+	isNotFoundError,
+} from '#/lib/atom-hydration'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
+import type { BatudaApiServerClient } from '#/lib/batuda-api-server'
 import { validateSearchWith } from '#/lib/search-schema'
-import { getServerCookieHeader } from '#/lib/server-cookie'
 import { useTabSearchParam } from '#/lib/tab-search'
 import {
 	agedPaperSurface,
@@ -48,17 +50,8 @@ type PageDetail = {
 	readonly viewCount: number
 }
 
-async function loadPageOnServer(id: string): Promise<PageModel> {
-	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
-		import('effect'),
-		import('#/lib/batuda-api-server'),
-		getServerCookieHeader(),
-	])
-	const program = Effect.gen(function* () {
-		const client = yield* makeBatudaApiServer(cookie ?? undefined)
-		return yield* client.pages.get({ params: { id } })
-	})
-	return Effect.runPromise(program)
+function loadPageOnServer(client: BatudaApiServerClient, id: string) {
+	return client.pages.get({ params: { id } })
 }
 
 const PAGE_TABS = ['editor', 'meta'] as const
@@ -73,26 +66,18 @@ export const Route = createFileRoute('/_authed/pages/$id')({
 	// Strip the default tab from the URL so `useTabSearchParam` can write
 	// `tab: next` unconditionally without leaving `?tab=editor` behind.
 	search: { middlewares: [stripSearchParams({ tab: 'editor' })] },
-	loader: async ({ params: { id } }) => {
-		if (!import.meta.env.SSR) {
-			return { dehydrated: [] as const, id, title: null as string | null }
-		}
-		try {
-			const page = await loadPageOnServer(id)
-			const title = extractPageTitle(page)
-			return {
-				dehydrated: [
-					dehydrateAtom(pageAtomFor(id), AsyncResult.success(page)),
-				] as const,
+	loader: ({ params: { id } }) =>
+		handOverFromServer({
+			label: 'PageEditorLoader',
+			empty: { dehydrated: [], id, title: null },
+			fetch: client => loadPageOnServer(client, id),
+			notFoundWhen: isNotFoundError,
+			handOver: page => ({
+				dehydrated: [dehydrateAtom(pageAtomFor(id), AsyncResult.success(page))],
 				id,
-				title,
-			}
-		} catch (error) {
-			if (isNotFoundError(error)) throw notFound()
-			console.warn('[PageEditorLoader] falling back:', error)
-			return { dehydrated: [] as const, id, title: null as string | null }
-		}
-	},
+				title: extractPageTitle(page),
+			}),
+		}),
 	head: ({ loaderData }) => {
 		const title = loaderData?.title ?? 'Page'
 		return { meta: [{ title: `${title} — Batuda` }] }
@@ -104,11 +89,6 @@ function extractPageTitle(raw: unknown): string | null {
 	if (!raw || typeof raw !== 'object') return null
 	const title = (raw as Record<string, unknown>)['title']
 	return typeof title === 'string' && title.length > 0 ? title : null
-}
-
-function isNotFoundError(error: unknown): boolean {
-	if (!error || typeof error !== 'object') return false
-	return (error as Record<string, unknown>)['_tag'] === 'NotFound'
 }
 
 function PageEditorPage() {

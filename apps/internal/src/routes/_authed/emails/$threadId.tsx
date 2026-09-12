@@ -37,10 +37,10 @@ import { EmptyState } from '#/components/shared/empty-state'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { SkeletonRows } from '#/components/shared/skeleton-row'
 import { useComposeEmail } from '#/context/compose-email-context'
-import { dehydrateAtom } from '#/lib/atom-hydration'
+import { dehydrateAtom, handOverFromServer } from '#/lib/atom-hydration'
+import type { BatudaApiServerClient } from '#/lib/batuda-api-server'
 import { downloadUrlFor } from '#/lib/email-attachments'
 import { sanitizeEmailHtml } from '#/lib/sanitize-email'
-import { getServerCookieHeader } from '#/lib/server-cookie'
 import {
 	agedPaperSurface,
 	brushedMetalBezel,
@@ -120,47 +120,24 @@ type CompanyLookup = {
 // Return type is inferred from the typed API client so the dehydrated atom
 // value matches the getThread atom's success schema; `narrowDetail` still
 // treats it as unknown.
-async function loadThreadOnServer(threadId: string) {
-	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
-		import('effect'),
-		import('#/lib/batuda-api-server'),
-		getServerCookieHeader(),
-	])
-	const program = Effect.gen(function* () {
-		const client = yield* makeBatudaApiServer(cookie ?? undefined)
-		return yield* client.email.getThread({ params: { threadId } })
-	})
-	return Effect.runPromise(program)
+function loadThreadOnServer(client: BatudaApiServerClient, threadId: string) {
+	return client.email.getThread({ params: { threadId } })
 }
 
 export const Route = createFileRoute('/_authed/emails/$threadId')({
-	loader: async ({ params: { threadId } }) => {
-		if (!import.meta.env.SSR) {
-			return {
-				dehydrated: [] as const,
-				threadId,
-				subject: null as string | null,
-			}
-		}
-		try {
-			const raw = await loadThreadOnServer(threadId)
-			const subject = extractThreadSubject(raw)
-			return {
+	loader: ({ params: { threadId } }) =>
+		handOverFromServer({
+			label: 'ThreadDetailLoader',
+			empty: { dehydrated: [], threadId, subject: null },
+			fetch: client => loadThreadOnServer(client, threadId),
+			handOver: raw => ({
 				dehydrated: [
 					dehydrateAtom(threadAtomFor(threadId), AsyncResult.success(raw)),
-				] as const,
+				],
 				threadId,
-				subject,
-			}
-		} catch (error) {
-			console.warn('[ThreadDetailLoader] falling back to client fetch:', error)
-			return {
-				dehydrated: [] as const,
-				threadId,
-				subject: null as string | null,
-			}
-		}
-	},
+				subject: extractThreadSubject(raw),
+			}),
+		}),
 	head: ({ loaderData }) => {
 		const subject = loaderData?.subject?.trim() || 'Email thread'
 		return { meta: [{ title: `${subject} — Batuda` }] }

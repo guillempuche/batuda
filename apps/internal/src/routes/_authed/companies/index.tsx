@@ -1,7 +1,7 @@
 import { useAtomRefresh, useAtomSet } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { DateTime, Schema } from 'effect'
+import { DateTime, Effect, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { ChevronsUpDown, Search, X } from 'lucide-react'
 import { LayoutGroup, motion } from 'motion/react'
@@ -49,11 +49,11 @@ import {
 import { useQuickCapture } from '#/context/quick-capture-context'
 import { useCompanyFilterOptions } from '#/hooks/use-company-filter-options'
 import { useInfiniteList } from '#/hooks/use-infinite-list'
-import { dehydrateAtom } from '#/lib/atom-hydration'
+import { dehydrateAtom, handOverFromServer } from '#/lib/atom-hydration'
+import type { BatudaApiServerClient } from '#/lib/batuda-api-server'
 import { companiesSearchToQuery } from '#/lib/companies-search-params'
 import { useOrgMembers } from '#/lib/org-members'
 import { validateSearchWith } from '#/lib/search-schema'
-import { getServerCookieHeader } from '#/lib/server-cookie'
 import { brushedMetalPlate } from '#/lib/workshop-mixins'
 
 /**
@@ -114,20 +114,11 @@ const validateSearch = validateSearchWith({
 	deleted: Schema.Literals(['only']),
 })
 
-/**
- * Server-only load: forwards the incoming Better-Auth cookie and runs
- * the typed HttpApi call. Same pattern the dashboard uses — dynamically
- * imports the server module so Vite tree-shakes it out of the client
- * bundle.
- */
-async function loadCompaniesOnServer(search: CompaniesSearch) {
-	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
-		import('effect'),
-		import('#/lib/batuda-api-server'),
-		getServerCookieHeader(),
-	])
-	const program = Effect.gen(function* () {
-		const client = yield* makeBatudaApiServer(cookie ?? undefined)
+function loadCompaniesOnServer(
+	client: BatudaApiServerClient,
+	search: CompaniesSearch,
+) {
+	return Effect.gen(function* () {
 		// Asked for side by side, each allowed to come back empty-handed on its
 		// own: the counts fill the filter menus and the list fills the page, so
 		// losing one is no reason to give up the other, and asking in turn would
@@ -157,24 +148,19 @@ async function loadCompaniesOnServer(search: CompaniesSearch) {
 			{ concurrency: 2 },
 		)
 	})
-	return await Effect.runPromise(program)
 }
 
 export const Route = createFileRoute('/_authed/companies/')({
 	validateSearch,
 	loaderDeps: ({ search }) => ({ search }),
-	loader: async ({ deps: { search } }) => {
-		if (!import.meta.env.SSR) {
-			// Client-side navigation: let the atom refetch via `BatudaApiAtom`
-			// using the browser session cookie. Empty dehydration leaves the
-			// registry alone and the component renders the loading state.
-			return { dehydrated: [] as const }
-		}
-		try {
-			const { companies, facets } = await loadCompaniesOnServer(search)
-			// Whichever arrived is handed over. The other is left for the browser to
-			// ask for again, rather than costing the page the half that did arrive.
-			return {
+	loader: ({ deps: { search } }) =>
+		handOverFromServer({
+			label: 'CompaniesLoader',
+			empty: { dehydrated: [] },
+			fetch: client => loadCompaniesOnServer(client, search),
+			handOver: ({ companies, facets }) => ({
+				// Whichever arrived is handed over. The other is left for the browser
+				// to ask for again, rather than costing the page the half that did.
 				dehydrated: [
 					...(companies === undefined
 						? []
@@ -193,12 +179,8 @@ export const Route = createFileRoute('/_authed/companies/')({
 								),
 							]),
 				],
-			}
-		} catch (error) {
-			console.warn('[CompaniesLoader] falling back to empty hydration:', error)
-			return { dehydrated: [] as const }
-		}
-	},
+			}),
+		}),
 	head: () => ({ meta: [{ title: 'Companies — Batuda' }] }),
 	component: CompaniesListPage,
 })

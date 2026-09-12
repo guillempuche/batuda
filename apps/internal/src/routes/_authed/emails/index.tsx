@@ -16,7 +16,7 @@ import {
 	useReactTable,
 	type VisibilityState,
 } from '@tanstack/react-table'
-import { Cause, DateTime, Option, Schema } from 'effect'
+import { Cause, DateTime, Effect, Option, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import {
 	AlertTriangle,
@@ -77,10 +77,10 @@ import { ErrorState } from '#/components/shared/error-state'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { SkeletonRows } from '#/components/shared/skeleton-row'
 import { useComposeEmail } from '#/context/compose-email-context'
-import { dehydrateAtom } from '#/lib/atom-hydration'
+import { dehydrateAtom, handOverFromServer } from '#/lib/atom-hydration'
+import type { BatudaApiServerClient } from '#/lib/batuda-api-server'
 import type { PaginatedList } from '#/lib/paginated-list'
 import { validateSearchWith } from '#/lib/search-schema'
-import { getServerCookieHeader } from '#/lib/server-cookie'
 import {
 	brushedMetalPlate,
 	rulerUnderRule,
@@ -173,12 +173,10 @@ function toWireSearch(
 // Return type is inferred from the typed API client so the dehydrated atom
 // values line up with the atoms' success schemas. The runtime `narrow*`
 // guards below still treat the payload as unknown.
-async function loadThreadsOnServer(wire: EmailsSearch) {
-	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
-		import('effect'),
-		import('#/lib/batuda-api-server'),
-		getServerCookieHeader(),
-	])
+function loadThreadsOnServer(
+	client: BatudaApiServerClient,
+	wire: EmailsSearch,
+) {
 	const queryForServer: Record<string, string | number> = {}
 	if (wire.inboxId !== undefined) queryForServer['inboxId'] = wire.inboxId
 	if (wire.companyId !== undefined) queryForServer['companyId'] = wire.companyId
@@ -187,8 +185,7 @@ async function loadThreadsOnServer(wire: EmailsSearch) {
 	if (wire.limit !== undefined) queryForServer['limit'] = wire.limit
 	if (wire.offset !== undefined) queryForServer['offset'] = wire.offset
 	if (wire.count !== undefined) queryForServer['count'] = wire.count
-	const program = Effect.gen(function* () {
-		const client = yield* makeBatudaApiServer(cookie ?? undefined)
+	return Effect.gen(function* () {
 		const [envelope, inboxes] = yield* Effect.all(
 			[
 				client.email.listThreads({ query: queryForServer }),
@@ -200,29 +197,24 @@ async function loadThreadsOnServer(wire: EmailsSearch) {
 		)
 		return { envelope, inboxes }
 	})
-	return Effect.runPromise(program)
 }
 
 export const Route = createFileRoute('/_authed/emails/')({
 	validateSearch,
 	loaderDeps: ({ search }) => ({ search }),
-	loader: async ({ deps: { search } }) => {
-		if (!import.meta.env.SSR) {
-			return { dehydrated: [] as const }
-		}
-		try {
-			const wire = toWireSearch(search)
-			const { envelope, inboxes } = await loadThreadsOnServer(wire)
-			return {
+	loader: ({ deps: { search } }) => {
+		const wire = toWireSearch(search)
+		return handOverFromServer({
+			label: 'EmailsLoader',
+			empty: { dehydrated: [] },
+			fetch: client => loadThreadsOnServer(client, wire),
+			handOver: ({ envelope, inboxes }) => ({
 				dehydrated: [
 					dehydrateAtom(emailsSearchAtom(wire), AsyncResult.success(envelope)),
 					dehydrateAtom(inboxesListAtom, AsyncResult.success(inboxes)),
-				] as const,
-			}
-		} catch (error) {
-			console.warn('[EmailsLoader] falling back to empty hydration:', error)
-			return { dehydrated: [] as const }
-		}
+				],
+			}),
+		})
 	},
 	head: () => ({ meta: [{ title: 'Emails — Batuda' }] }),
 	component: EmailsIndexPage,
