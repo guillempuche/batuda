@@ -86,8 +86,16 @@ Every document is filed against a CRM record — `subject_table` (`companies`, `
 
 When researching a new company:
 
-1. `create_companies(...)` with known fields
+1. `create_companies(...)` with known fields, and `contacts: [{ name, role }]` for anybody the company names on its own pages — they become contacts on it in the same call, so there is no round trip per person
 2. `create_document({ subject_table: "companies", subject_id: <id>, type: "research", content: <scraped + structured markdown> })`
+
+A company already on file comes back under `skipped`, with the company itself
+beside the reason. Act on `company.id`: the slug in that entry is the one that was
+sent, and on a `tax_id` match it is not the address the company is filed under.
+People sent with a skipped company land on it where its registration number
+matched — `tax_id` or `tax_id_in_request`, the same firm written down twice. Where
+only the web address matched — `slug` or `slug_in_request` — nothing is written,
+since a slug is folded from the name and two unrelated firms can reduce to one.
 
 A company's standing summary is `companies.account_brief`, not a document.
 
