@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-09-12 (internal-v2026.9.12)
+
+### Features
+
+* bring a prospect's people across when it becomes a lead ([34298f4](https://github.com/guillempuche/batuda/commit/34298f494be482f9fcb79c939d8e9bf503f4d834))
+* let the agent tools take a company's people on with it ([b2180e9](https://github.com/guillempuche/batuda/commit/b2180e9e4686651c65f41ee92a3168dfcc7fce49))
+
+### Bug Fixes
+
+* let a contact be saved without naming a part in a purchase ([d0297dc](https://github.com/guillempuche/batuda/commit/d0297dce41d4cf8fb2c5292389895844ae8ad349))
+* store a missing job title one way instead of two ([92ca4bd](https://github.com/guillempuche/batuda/commit/92ca4bdfb7b61048bac2436024ef765f1a573bba))
+
 ## 2026-09-11 (internal-v2026.9.11)
 
 ### Features
