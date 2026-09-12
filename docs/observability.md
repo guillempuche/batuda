@@ -42,7 +42,7 @@ It rides two ways on purpose: onto the request's record, which lands on the clos
 The record alone is not enough, because it is only read when the work ends: a business event written halfway through a request would name no tenant.
 Two places say it a second time on purpose, and neither is redundant.
 The MCP transport records it before entering the scope, because a call can fail on the way there — reading its body, or writing down which client it came from — and a request that got as far as resolving a tenant should say which one.
-The mail worker has no request and no scope at all, so `email.received` names the tenant itself.
+The mail worker has no request and no scope at all, so every line it writes names the tenant itself — `email.received`, and both ways a sync pass can fail.
 
 ### Event names
 
@@ -68,10 +68,13 @@ The mail worker has no request and no scope at all, so `email.received` names th
 | `email.sent_copy_failed`       | The message went out; keeping our own copy did not          |
 | `email.sent_append_failed`     | The message went out; filing it in Sent did not             |
 | `email.staging_purge_failed`   | Attachments outlived the message they went with             |
+| `email.folder_read_failed`     | A folder would not open, so nothing new was read from it    |
+| `email.idle_wait_failed`       | Waiting for the mail server to report a change failed       |
 | `inbox.created`                | A mailbox was connected                                     |
 | `inbox.probed`                 | A mailbox check that did not pass (a clean one is `debug`)  |
 | `inbox.probe_unrecorded`       | A mailbox was checked but the answer could not be stored    |
 | `inbox.probe_started`          | The recurring mailbox check began, and how often it runs    |
+| `inbox.probe_round`            | A round of checks finished, and how many passed             |
 | `inbox.probe_round_failed`     | A whole round of checks failed — the poller, not a mailbox  |
 | `mail_worker.heartbeat`        | The mail worker is still running, repeated on a timer       |
 | `webhook.fired`                | Webhook fan-out triggered                                   |
@@ -105,6 +108,11 @@ A mailbox check carries `inbox.probe.outcome` (`connected`, `auth_failed`, `conn
 It also carries `imap.host` and `imap.port`, which name the provider without naming anybody.
 What the mail server itself said never travels: those words are about somebody's account, so they stay on the mailbox row where its owner can read them.
 A check that passed is only the poller saying it is still polling, so it is written at `debug` and production keeps none of them.
+So every round also writes one `inbox.probe_round` line at `info`, carrying `inbox.probe.checked`, `inbox.probe.passed` and `inbox.probe.failed`.
+Without it a poller that has stopped and a poller with nothing to report look the same from outside — no line either way — and on 2026-09-12 that absence was read as the poller being dead when nothing showed it either way.
+
+A failure in the worker names the folder it was about, because the two folders fail for different reasons: `INBOX` not opening stops mail coming in, and `Sent` not opening only stops our own copies being matched up.
+`email.idle_wait_failed` used to go down as a bare stack with no event name at all, which no query could group, count or alert on.
 
 ### Levels
 
@@ -151,7 +159,8 @@ Routes whose URL itself carries a secret are exempt from tracing entirely rather
 | **Interaction Logging**  | `interaction.logged`, `task.created`                                  | Drives daily work          |
 | **Email Outbound**       | `email.sent`, `email.replied`, `email.draft_sent`, `email.failed`     | Primary outreach channel   |
 | **Email Inbound**        | `email.received`, `interaction.logged`                                | Reply tracking             |
-| **Mailbox Health**       | `inbox.created`, `inbox.probed`                                       | A dead mailbox stops both  |
+| **Mailbox Health**       | `inbox.created`, `inbox.probed`, `inbox.probe_round`                  | A dead mailbox stops both  |
+| **Mail Sync**            | `email.folder_read_failed`, `email.idle_wait_failed`                  | Mail silently stops here   |
 | **Webhook Fan-out**      | `webhook.fired`, `webhook.failed`                                     | Integration reliability    |
 | **Page Publishing**      | `page.published`, `page.viewed`                                       | Sales page effectiveness   |
 | **MCP Tool Calls**       | `mcp.auth.rejected`; the tool and its outcome on the request's record | Agent workflow reliability |
@@ -202,11 +211,18 @@ As a solo operation there is no on-call rotation or war room. Two questions matt
 | **High Error Rate**  | > 10% API 5xx responses in 15 min             | High     |
 | **Email Failures**   | > 5 consecutive email send failures           | High     |
 | **Mailbox Refused**  | The same mailbox fails its check for > 30 min | High     |
+| **Mail Not Syncing** | One mailbox fails to read a folder for > 1 h  | High     |
+| **Checks Stopped**   | No `inbox.probe_round` line over 45 min       | High     |
 | **Webhook Failures** | > 20% webhook 5xx responses in 15 min         | High     |
 
 Mailbox Refused is the one that says a tenant is cut off rather than that a request went wrong.
 A mailbox whose credentials stop working stops that tenant's mail in both directions, and it is silent by construction: nobody is waiting on the check, so the only place it surfaces is `inbox.probed`.
 It is held to one mailbox failing repeatedly rather than to a count across all of them, because a provider having a bad minute and a password that has actually been revoked look identical in a single check.
+
+Mail Not Syncing catches the other way a tenant goes quiet: the credentials are accepted, the check passes, and the folders still will not open, so no mail moves.
+Checks Stopped is what makes the silence of a passing check safe to rely on, since a round that never runs writes nothing and a round that finds nothing wrong now writes one line.
+
+**When counting these, filter on `meta.signal_type`.** A business event inside a request leaves both a log record and a span, by design — so a count that does not pick one reads exactly double, and a threshold written that way means half what it says.
 
 **Telemetry Silent is the one alert that cannot be raised from inside.** Every other row above is a question asked of the records, so it needs the records to be arriving. This one has to be evaluated by the vendor, environment-wide, so it still fires when the services are stopped or cut off and cannot report for themselves — the gap that let the 2026-08-31 outage run seven hours unnoticed while `/health` answered 200 throughout. Note the consequence: once it fires it stays fired until export is restored, so it cannot warn about a second outage in the meantime.
 
