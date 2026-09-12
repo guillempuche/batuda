@@ -6,7 +6,6 @@ import { ChevronsUpDown, ExternalLink } from 'lucide-react'
 import { styled } from 'next-yak'
 import { useEffect, useMemo, useState } from 'react'
 
-import type { PageSummary } from '@batuda/controllers'
 import { PriSelect } from '@batuda/ui/pri'
 
 import {
@@ -22,11 +21,10 @@ import { InfiniteListFooter } from '#/components/shared/infinite-list-footer'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { useInfiniteList } from '#/hooks/use-infinite-list'
-import { dehydrateAtom } from '#/lib/atom-hydration'
+import { dehydrateAtom, handOverFromServer } from '#/lib/atom-hydration'
+import type { BatudaApiServerClient } from '#/lib/batuda-api-server'
 import { listPageQuery } from '#/lib/list-page'
-import type { PaginatedList } from '#/lib/paginated-list'
 import { validateSearchWith } from '#/lib/search-schema'
-import { getServerCookieHeader } from '#/lib/server-cookie'
 import {
 	agedPaperSurface,
 	brushedMetalPlate,
@@ -52,48 +50,31 @@ const validateSearch = validateSearchWith({
 	lang: Schema.NonEmptyString,
 })
 
-async function loadPagesOnServer(
-	search: PagesSearch,
-): Promise<{ pages: PaginatedList<(typeof PageSummary)['Type']> }> {
-	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
-		import('effect'),
-		import('#/lib/batuda-api-server'),
-		getServerCookieHeader(),
-	])
-	const program = Effect.gen(function* () {
-		const client = yield* makeBatudaApiServer(cookie ?? undefined)
-		// Matches `pagesSearchAtom` exactly, so the browser reuses this answer
-		// instead of asking again.
-		return yield* client.pages.list({
-			query: { ...search, ...listPageQuery(PAGES_FIRST_PAGE) },
-		})
+function loadPagesOnServer(client: BatudaApiServerClient, search: PagesSearch) {
+	// Matches `pagesSearchAtom` exactly, so the browser reuses this answer
+	// instead of asking again.
+	return client.pages.list({
+		query: { ...search, ...listPageQuery(PAGES_FIRST_PAGE) },
 	})
-	const pages = await Effect.runPromise(program)
-	return { pages }
 }
 
 export const Route = createFileRoute('/_authed/pages/')({
 	validateSearch,
 	loaderDeps: ({ search }) => ({ search }),
-	loader: async ({ deps: { search } }) => {
-		if (!import.meta.env.SSR) {
-			return { dehydrated: [] as const }
-		}
-		try {
-			const { pages } = await loadPagesOnServer(search)
-			return {
+	loader: ({ deps: { search } }) =>
+		handOverFromServer({
+			label: 'PagesLoader',
+			empty: { dehydrated: [] },
+			fetch: client => loadPagesOnServer(client, search),
+			handOver: pages => ({
 				dehydrated: [
 					dehydrateAtom(
 						pagesSearchAtom(search, PAGES_FIRST_PAGE),
 						AsyncResult.success(pages),
 					),
-				] as const,
-			}
-		} catch (error) {
-			console.warn('[PagesLoader] falling back to empty hydration:', error)
-			return { dehydrated: [] as const }
-		}
-	},
+				],
+			}),
+		}),
 	head: () => ({ meta: [{ title: 'Pages — Batuda' }] }),
 	component: PagesListPage,
 })

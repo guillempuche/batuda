@@ -1,6 +1,6 @@
 import { useAtomRefresh, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { createFileRoute, notFound } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { DateTime } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { styled } from 'next-yak'
@@ -12,9 +12,13 @@ import { MarkdownView } from '#/components/markdown/markdown-view'
 import { ErrorState } from '#/components/shared/error-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { RelativeDate } from '#/components/shared/relative-date'
-import { dehydrateAtom } from '#/lib/atom-hydration'
+import {
+	dehydrateAtom,
+	handOverFromServer,
+	isNotFoundError,
+} from '#/lib/atom-hydration'
+import type { BatudaApiServerClient } from '#/lib/batuda-api-server'
 import { documentOpenUrl } from '#/lib/document-links'
-import { getServerCookieHeader } from '#/lib/server-cookie'
 import { stenciledTitle } from '#/lib/workshop-mixins'
 
 /**
@@ -25,17 +29,8 @@ import { stenciledTitle } from '#/lib/workshop-mixins'
  * inside a popup on the company page works, but nothing about that popup can be
  * shared with anybody.
  */
-async function loadDocumentOnServer(id: string) {
-	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
-		import('effect'),
-		import('#/lib/batuda-api-server'),
-		getServerCookieHeader(),
-	])
-	const program = Effect.gen(function* () {
-		const client = yield* makeBatudaApiServer(cookie ?? undefined)
-		return yield* client.documents.get({ params: { id } })
-	})
-	return Effect.runPromise(program)
+function loadDocumentOnServer(client: BatudaApiServerClient, id: string) {
+	return client.documents.get({ params: { id } })
 }
 
 // A kind the app does not know is shown as it is stored rather than blank.
@@ -44,29 +39,19 @@ function kindLabel(i18n: { _: (d: never) => string }, value: string): string {
 	return found ? i18n._(found.label as never) : value
 }
 
-function isNotFoundError(error: unknown): boolean {
-	if (!error || typeof error !== 'object') return false
-	return (error as Record<string, unknown>)['_tag'] === 'NotFound'
-}
-
 export const Route = createFileRoute('/_authed/documents/$id')({
-	loader: async ({ params: { id } }) => {
-		if (!import.meta.env.SSR) {
-			return { dehydrated: [] as const }
-		}
-		try {
-			const document = await loadDocumentOnServer(id)
-			return {
+	loader: ({ params: { id } }) =>
+		handOverFromServer({
+			label: 'DocumentLoader',
+			empty: { dehydrated: [] },
+			fetch: client => loadDocumentOnServer(client, id),
+			notFoundWhen: isNotFoundError,
+			handOver: document => ({
 				dehydrated: [
 					dehydrateAtom(documentAtomFor(id), AsyncResult.success(document)),
-				] as const,
-			}
-		} catch (error) {
-			if (isNotFoundError(error)) throw notFound()
-			console.warn('[DocumentLoader] falling back to empty hydration:', error)
-			return { dehydrated: [] as const }
-		}
-	},
+				],
+			}),
+		}),
 	head: () => ({ meta: [{ title: 'Document — Batuda' }] }),
 	component: DocumentPage,
 })

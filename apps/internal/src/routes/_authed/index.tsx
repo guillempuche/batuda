@@ -1,7 +1,7 @@
 import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { DateTime } from 'effect'
+import { DateTime, Effect } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { motion } from 'motion/react'
 import { styled } from 'next-yak'
@@ -30,10 +30,10 @@ import {
 } from '#/components/shared/status-badge'
 import { TaskItem } from '#/components/shared/task-item'
 import { useQuickCapture } from '#/context/quick-capture-context'
-import { dehydrateAtom } from '#/lib/atom-hydration'
+import { dehydrateAtom, handOverFromServer } from '#/lib/atom-hydration'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
+import type { BatudaApiServerClient } from '#/lib/batuda-api-server'
 import { countActiveCompanies } from '#/lib/pipeline-counts'
-import { getServerCookieHeader } from '#/lib/server-cookie'
 import {
 	agedPaperRow,
 	rulerUnderRule,
@@ -68,22 +68,12 @@ type AttentionTask = {
 }
 
 /**
- * Server-only pipeline fetch. Dynamically imports the server client so Vite
- * excludes it from the client bundle, and reads the incoming request cookie via
- * `getRequestHeader` to forward the Better-Auth session on to the API server.
- *
  * Only the two lists that do not depend on the reader's clock are fetched here.
  * The task shelves need the edges of the reader's own day, which the browser
  * knows and the server does not, so those load on arrival.
  */
-async function loadPipelineDataOnServer() {
-	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
-		import('effect'),
-		import('#/lib/batuda-api-server'),
-		getServerCookieHeader(),
-	])
-	const program = Effect.gen(function* () {
-		const client = yield* makeBatudaApiServer(cookie ?? undefined)
+function loadPipelineDataOnServer(client: BatudaApiServerClient) {
+	return Effect.gen(function* () {
 		const [nextSteps, pipeline] = yield* Effect.all(
 			[
 				// These two have to match `nextStepsAtom` and `pipelineAtom` exactly:
@@ -96,40 +86,21 @@ async function loadPipelineDataOnServer() {
 		)
 		return { nextSteps, pipeline }
 	})
-	return Effect.runPromise(program)
 }
 
 export const Route = createFileRoute('/_authed/')({
-	loader: async () => {
-		if (!import.meta.env.SSR) {
-			// Client-side navigation: let the atoms refetch directly via
-			// `BatudaApiAtom` using the browser's session cookie. Returning an empty
-			// dehydration leaves the registry alone and the component renders the
-			// loading state.
-			return { dehydrated: [] as const }
-		}
-		let data: Awaited<ReturnType<typeof loadPipelineDataOnServer>>
-		try {
-			data = await loadPipelineDataOnServer()
-		} catch (error) {
-			// Expected in unauthenticated contexts (401 from SessionMiddleware) or
-			// when the API is down. Fall back to empty hydration — the atoms land in
-			// `Initial`, the component renders the loading state, and the
-			// client-side fetch (with browser cookies) gets a second chance. See
-			// server.log for the underlying cause.
-			console.warn('[PipelineLoader] falling back to empty hydration:', error)
-			return { dehydrated: [] as const }
-		}
-		// Deliberately outside the catch above: handing the data over can only
-		// fail through a programming mistake (an atom with no serialization key),
-		// and that has to surface as a broken page rather than a quiet refetch.
-		return {
-			dehydrated: [
-				dehydrateAtom(nextStepsAtom, AsyncResult.success(data.nextSteps)),
-				dehydrateAtom(pipelineAtom, AsyncResult.success(data.pipeline)),
-			] as const,
-		}
-	},
+	loader: () =>
+		handOverFromServer({
+			label: 'PipelineLoader',
+			empty: { dehydrated: [] },
+			fetch: loadPipelineDataOnServer,
+			handOver: ({ nextSteps, pipeline }) => ({
+				dehydrated: [
+					dehydrateAtom(nextStepsAtom, AsyncResult.success(nextSteps)),
+					dehydrateAtom(pipelineAtom, AsyncResult.success(pipeline)),
+				],
+			}),
+		}),
 	head: () => ({ meta: [{ title: 'Pipeline — Batuda' }] }),
 	component: PipelinePage,
 })

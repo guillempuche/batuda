@@ -1,7 +1,7 @@
 import { useAtomSet, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute } from '@tanstack/react-router'
-import { DateTime } from 'effect'
+import { DateTime, Effect } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { CalendarPlus, Check, CircleHelp, X } from 'lucide-react'
 import { styled } from 'next-yak'
@@ -15,10 +15,10 @@ import { createTaskAtom } from '#/atoms/tasks-atoms'
 import { SubjectDocuments } from '#/components/documents/subject-documents'
 import { EmptyState } from '#/components/shared/empty-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
-import { dehydrateAtom } from '#/lib/atom-hydration'
+import { dehydrateAtom, handOverFromServer } from '#/lib/atom-hydration'
+import type { BatudaApiServerClient } from '#/lib/batuda-api-server'
 import { dlgWithId } from '#/lib/dlg-search'
 import { validateSearchWith } from '#/lib/search-schema'
-import { getServerCookieHeader } from '#/lib/server-cookie'
 import { useDlg } from '#/lib/use-dlg'
 import {
 	agedPaperSurface,
@@ -61,14 +61,8 @@ const ScheduleGrid = lazy(() => import('#/components/calendar/schedule-grid'))
 
 // The shape is taken from the API client rather than written out here, so a
 // change to what the endpoint returns can't leave a stale copy behind.
-async function loadCalendarOnServer() {
-	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
-		import('effect'),
-		import('#/lib/batuda-api-server'),
-		getServerCookieHeader(),
-	])
-	const program = Effect.gen(function* () {
-		const client = yield* makeBatudaApiServer(cookie ?? undefined)
+function loadCalendarOnServer(client: BatudaApiServerClient) {
+	return Effect.gen(function* () {
 		const [events, companies] = yield* Effect.all(
 			[
 				client.calendar.listEvents({ query: { limit: 500 } }),
@@ -80,7 +74,6 @@ async function loadCalendarOnServer() {
 		)
 		return { events, companies }
 	})
-	return Effect.runPromise(program)
 }
 
 // The open event lives in `?dlg=`, so a meeting can be linked to directly and
@@ -89,23 +82,18 @@ const calendarDlgSchema = dlgWithId('event')
 
 export const Route = createFileRoute('/_authed/calendar/')({
 	validateSearch: validateSearchWith({ dlg: calendarDlgSchema }),
-	loader: async () => {
-		if (!import.meta.env.SSR) {
-			return { dehydrated: [] as const }
-		}
-		try {
-			const { events, companies } = await loadCalendarOnServer()
-			return {
+	loader: () =>
+		handOverFromServer({
+			label: 'CalendarLoader',
+			empty: { dehydrated: [] },
+			fetch: loadCalendarOnServer,
+			handOver: ({ events, companies }) => ({
 				dehydrated: [
 					dehydrateAtom(calendarEventsAtom, AsyncResult.success(events)),
 					dehydrateAtom(companiesListAtom, AsyncResult.success(companies)),
-				] as const,
-			}
-		} catch (error) {
-			console.warn('[CalendarLoader] falling back to empty hydration:', error)
-			return { dehydrated: [] as const }
-		}
-	},
+				],
+			}),
+		}),
 	head: () => ({ meta: [{ title: 'Calendar — Batuda' }] }),
 	component: CalendarPage,
 })

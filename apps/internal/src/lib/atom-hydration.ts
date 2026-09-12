@@ -28,7 +28,11 @@
  *   - First paint still has data, so there's no loading flash.
  */
 
+import { notFound } from '@tanstack/react-router'
+import type { Effect } from 'effect'
 import { Atom } from 'effect/unstable/reactivity'
+
+import type { BatudaApiServerClient } from './batuda-api-server'
 
 /**
  * Serializable dehydrated atom value. Shape matches
@@ -73,4 +77,53 @@ export function dehydrateAtom<A>(
 		value: meta.encode(value),
 		dehydratedAt: Date.now(),
 	}
+}
+
+/** What a loader returns: the snapshots for the page, plus anything else it names. */
+export type HandedOver = {
+	readonly dehydrated: ReadonlyArray<DehydratedAtomValue>
+}
+
+/** Whether an API failure says the record does not exist. */
+export function isNotFoundError(error: unknown): boolean {
+	if (!error || typeof error !== 'object') return false
+	return (error as Record<string, unknown>)['_tag'] === 'NotFound'
+}
+
+/**
+ * The shape every loader that fetches ahead of the page follows, written
+ * once. In the browser it returns `empty` straight away: loaders only fetch on
+ * the server, the atoms fetch for themselves on a later navigation. On the
+ * server it runs `fetch` against the API as the visitor whose page this is,
+ * and a fetch that fails is logged under `label` and degrades to `empty`, so
+ * the page still renders and asks the API itself.
+ *
+ * `handOver` runs outside that safety net on purpose: it only fails through a
+ * programming mistake, an atom with no serialization key, and that has to
+ * break the page rather than quietly turn into a refetch on every visit.
+ *
+ * `notFoundWhen` lets a page give up instead of degrading: a record that does
+ * not exist becomes a "not found" page, not an empty one that fetches again.
+ *
+ * The API client is imported here, inside the server-only branch, so the
+ * browser bundle never carries it; a route file names only its type.
+ */
+export async function handOverFromServer<A, E, R extends HandedOver>(options: {
+	readonly label: string
+	readonly empty: NoInfer<R>
+	readonly fetch: (client: BatudaApiServerClient) => Effect.Effect<A, E>
+	readonly handOver: (data: A) => R
+	readonly notFoundWhen?: (error: unknown) => boolean
+}): Promise<R> {
+	if (!import.meta.env.SSR) return options.empty
+	let data: A
+	try {
+		const { withServerApi } = await import('./batuda-api-server')
+		data = await withServerApi(options.fetch)
+	} catch (error) {
+		if (options.notFoundWhen?.(error)) throw notFound()
+		console.warn(`[${options.label}] falling back to empty hydration:`, error)
+		return options.empty
+	}
+	return options.handOver(data)
 }
