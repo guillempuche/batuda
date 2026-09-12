@@ -10,9 +10,9 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 // spend and re-fetches when the range toggle changes.
 //
 // Selectors verified against:
-//   apps/internal/src/routes/settings/organization/index.tsx
+//   apps/internal/src/routes/_authed/settings/organization/index.tsx
 //     (settings-org-spend-link)
-//   apps/internal/src/routes/settings/organization/spend.tsx
+//   apps/internal/src/routes/_authed/settings/organization/spend.tsx
 //     (settings-spend-{total,by-provider,by-user,by-tool,
 //      range-month,range-30d,range-all})
 

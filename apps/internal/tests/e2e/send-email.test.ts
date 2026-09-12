@@ -14,7 +14,7 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 // Selectors verified against:
 //   apps/internal/src/components/emails/compose-form.tsx (compose-{form,to,
 //   subject,send})
-//   apps/internal/src/routes/emails/index.tsx (emails-compose)
+//   apps/internal/src/routes/_authed/emails/index.tsx (emails-compose)
 
 const SUPPRESSED_EMAIL = 'pep@calpepfonda.cat'
 const SUPPRESSED_REASON = '550 5.1.1 mailbox not found (e2e fixture)'

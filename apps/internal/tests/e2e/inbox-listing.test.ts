@@ -12,7 +12,7 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 // selected, and vice versa.
 //
 // Selectors verified against:
-//   apps/internal/src/routes/emails/index.tsx
+//   apps/internal/src/routes/_authed/emails/index.tsx
 //     (thread-row-{id}, emails-thread-total, inbox-filter-trigger,
 //      inbox-filter-option, data-inbox-email)
 

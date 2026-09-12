@@ -25,7 +25,7 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 // rather than trusting the template.
 //
 // Selectors verified against:
-//   apps/internal/src/routes/settings/organization/members.tsx
+//   apps/internal/src/routes/_authed/settings/organization/members.tsx
 //
 // Auth: Alice's session comes from `auth.setup`'s storageState. The
 // member-view persona uses a fresh context so we never reuse Alice's cookie.

@@ -12,7 +12,7 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 // components defer to C2.
 //
 // Selectors verified against:
-//   apps/internal/src/routes/companies/$slug.tsx (research-tab,
+//   apps/internal/src/routes/_authed/companies/$slug.tsx (research-tab,
 //     research-run-new)
 //   apps/internal/src/components/research/run-list.tsx
 //     (research-run-list, research-run-row-{id})

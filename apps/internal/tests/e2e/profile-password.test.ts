@@ -24,7 +24,7 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 //      confirmed state with an undo affordance.
 //
 // Selectors and branches verified against:
-//   apps/internal/src/routes/profile/index.tsx
+//   apps/internal/src/routes/_authed/profile/index.tsx
 //   apps/server/src/plugins/set-password-route.ts
 //   apps/internal/src/lib/security-state.ts
 

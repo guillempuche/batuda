@@ -19,7 +19,7 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 //   apps/internal/src/components/companies/calendar-tab.tsx
 //     (company-calendar-tab-list, company-calendar-tab-empty,
 //     company-calendar-event-{id})
-//   apps/internal/src/routes/companies/$slug.tsx (company-calendar-tab,
+//   apps/internal/src/routes/_authed/companies/$slug.tsx (company-calendar-tab,
 //     ?tab=calendar)
 
 const COMPANY_SLUG = 'cal-pep-fonda'

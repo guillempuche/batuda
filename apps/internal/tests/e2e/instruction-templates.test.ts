@@ -11,7 +11,7 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 // rather than sharing `?dlg=` with the editors, so it can open over a
 // half-written stack without discarding it.
 // Selectors verified against:
-//   apps/internal/src/routes/settings/profile/templates.tsx
+//   apps/internal/src/routes/_authed/settings/profile/templates.tsx
 //     (new-stack)
 //   apps/internal/src/components/instructions/template-library.tsx
 //     (template-row, template-view-{id}, org-template-row,

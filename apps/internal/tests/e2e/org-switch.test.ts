@@ -8,7 +8,7 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 // verified against:
 //   apps/internal/src/components/layout/org-switcher.tsx
 //     (org-switcher, org-switcher-option-{slug}, active-org-name)
-//   apps/internal/src/routes/index.tsx
+//   apps/internal/src/routes/_authed/index.tsx
 //     (company-card-{slug})
 //
 // Auth: this test runs in the `authed` project — Alice (taller owner +

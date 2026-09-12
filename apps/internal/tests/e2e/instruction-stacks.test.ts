@@ -8,9 +8,9 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 // The organization's default is admin-only, and unsetting it leaves every
 // member who hasn't picked their own running with no shared guidance.
 // Selectors verified against:
-//   apps/internal/src/routes/settings/profile/templates.tsx
+//   apps/internal/src/routes/_authed/settings/profile/templates.tsx
 //     (new-stack, inherit-banner, use-org-default)
-//   apps/internal/src/routes/settings/organization/templates.tsx
+//   apps/internal/src/routes/_authed/settings/organization/templates.tsx
 //     (org-default-banner, clear-org-default, org-default-clear-confirm)
 //   apps/internal/src/components/instructions/stack-list.tsx (stack-row)
 //   apps/internal/src/components/instructions/stack-editor.tsx

@@ -17,7 +17,7 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 //
 // Selectors verified against:
 //   apps/internal/src/components/contacts/manage-channels-dialog.tsx
-//   apps/internal/src/routes/companies/$slug.tsx (contact-channels-{id})
+//   apps/internal/src/routes/_authed/companies/$slug.tsx (contact-channels-{id})
 
 const COMPANY_SLUG = 'cal-pep-fonda'
 const SEEDED_EMAIL = 'pep@calpepfonda.cat'
