@@ -8,6 +8,7 @@ import {
 import {
 	ATTENTION_FILTERS,
 	Company,
+	CompanyAttributesInput,
 	CompanyCountry,
 	CompanyEmail,
 	CompanyGoogleMapsUrl,
@@ -28,7 +29,7 @@ import {
 	Interaction,
 } from '@batuda/domain'
 
-import { BadRequest, NotFound } from '../errors'
+import { AttributeRejected, BadRequest, NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 import { PaginatedList, pageQuery } from '../pagination'
@@ -114,7 +115,6 @@ export const CreateCompanyInput = Schema.Struct({
 	productsFit: Schema.optional(Schema.Array(Schema.String)),
 	tags: Schema.optional(Schema.Array(CompanyTag)),
 	painPoints: Schema.optional(Schema.String),
-	currentTools: Schema.optional(Schema.String),
 	nextAction: Schema.optional(Schema.String),
 	nextActionAt: Schema.optional(Schema.DateTimeUtc),
 	latitude: Schema.optional(CompanyLatitude),
@@ -122,6 +122,13 @@ export const CreateCompanyInput = Schema.Struct({
 	geocodedAt: Schema.optional(Schema.DateTimeUtc),
 	geocodeSource: Schema.optional(Schema.String),
 	metadata: Schema.optional(Schema.Unknown),
+	// Values under the keys the organisation declared, checked against each
+	// key's kind; a key nobody declared is refused with its name. A value may
+	// come with the page and quote it was read from, and `researchId` names the
+	// run that read them — when that run fetched the page, the value is recorded
+	// as research's, else as the caller's.
+	attributes: Schema.optional(CompanyAttributesInput),
+	researchId: Schema.optional(Schema.String),
 	// The number the company is registered or taxed under. Carried because it is
 	// the only thing that recognises the same firm arriving under a different
 	// trading name — the name and the web address both change, the registration
@@ -187,7 +194,6 @@ export const UpdateCompanyInput = Schema.Struct({
 	productsFit: Schema.optional(Schema.NullOr(Schema.Array(Schema.String))),
 	tags: Schema.optional(Schema.NullOr(Schema.Array(CompanyTag))),
 	painPoints: Schema.optional(Schema.NullOr(Schema.String)),
-	currentTools: Schema.optional(Schema.NullOr(Schema.String)),
 	nextAction: Schema.optional(Schema.NullOr(Schema.String)),
 	nextActionAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
 	latitude: Schema.optional(Schema.NullOr(CompanyLatitude)),
@@ -195,6 +201,10 @@ export const UpdateCompanyInput = Schema.Struct({
 	geocodedAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
 	geocodeSource: Schema.optional(Schema.NullOr(Schema.String)),
 	metadata: Schema.optional(Schema.Unknown),
+	// Merged into what the company holds: keys not named stay, a null removes
+	// its key. The rest reads as on create.
+	attributes: Schema.optional(CompanyAttributesInput),
+	researchId: Schema.optional(Schema.String),
 })
 
 /**
@@ -236,6 +246,13 @@ const companyFilterQuery = {
 	// notes, none of which could be searched for before.
 	metadataKey: Schema.optional(Schema.String),
 	metadataValue: Schema.optional(Schema.String),
+	// One declared attribute, held to a value the way its kind allows: the key,
+	// the operator (eq, in, contains, gte, lte — which ones depends on the kind)
+	// and the value, all three or none. For `in`, the value is the choices
+	// separated by commas. A key nobody declared matches nothing.
+	attributeKey: Schema.optional(Schema.String),
+	attributeOp: Schema.optional(Schema.String),
+	attributeValue: Schema.optional(Schema.String),
 	query: Schema.optional(Schema.String),
 	// Which companies to look at. Omitted means the live ones; 'only' is
 	// how somebody finds a deleted company again in order to restore it,
@@ -297,6 +314,9 @@ export const CompaniesGroup = HttpApiGroup.make('companies')
 				...pageQuery,
 			},
 			success: PaginatedList(Company.json),
+			// An attribute filter that does not fit its kind is the caller's to
+			// fix, so it answers with the reason rather than a server fault.
+			error: AttributeRejected.pipe(HttpApiSchema.status(400)),
 		}),
 	)
 	.add(
@@ -306,6 +326,7 @@ export const CompaniesGroup = HttpApiGroup.make('companies')
 		HttpApiEndpoint.get('facets', '/company-facets', {
 			query: companyFilterQuery,
 			success: CompanyFacets,
+			error: AttributeRejected.pipe(HttpApiSchema.status(400)),
 		}),
 	)
 	.add(
@@ -319,6 +340,7 @@ export const CompaniesGroup = HttpApiGroup.make('companies')
 		HttpApiEndpoint.post('create', '/companies', {
 			payload: CreateCompanyInput,
 			success: CreateCompanyResult,
+			error: AttributeRejected.pipe(HttpApiSchema.status(400)),
 		}),
 	)
 	.add(
@@ -327,6 +349,7 @@ export const CompaniesGroup = HttpApiGroup.make('companies')
 			payload: UpdateCompanyInput,
 			// null when the id doesn't exist.
 			success: Schema.NullOr(Company.json),
+			error: AttributeRejected.pipe(HttpApiSchema.status(400)),
 		}),
 	)
 	.add(

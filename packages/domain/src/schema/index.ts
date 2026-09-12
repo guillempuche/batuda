@@ -1,6 +1,30 @@
 export { DbNumber, DbNumberOrNull } from './_common'
 export { ApiKey, ApiKeyId } from './api-keys'
 export {
+	ATTRIBUTE_DESCRIPTION_MAX,
+	ATTRIBUTE_ENUM_VALUE_MAX,
+	ATTRIBUTE_KEY_PATTERN,
+	ATTRIBUTE_KINDS,
+	ATTRIBUTE_LABEL_MAX,
+	ATTRIBUTE_OPS,
+	ATTRIBUTE_QUOTE_MAX,
+	ATTRIBUTE_RESERVED_KEYS,
+	ATTRIBUTE_SOURCE_MAX,
+	ATTRIBUTE_TEXT_MAX,
+	ATTRIBUTE_UNIT_MAX,
+	ATTRIBUTES_PER_STACK_MAX,
+	AttributeKind,
+	AttributeOp,
+	AttributeValue,
+	AttributeValueEntry,
+	AttributeValueInput,
+	CompanyAttributesInput,
+	coerceAttributeValue,
+	isCalendarDay,
+	OPS_FOR_KIND,
+	ResearchAttributeDeclaration,
+} from './attributes'
+export {
 	BUYING_ROLES,
 	BuyingRole,
 	decidesPurchase,
@@ -110,6 +134,7 @@ export {
 	isSucceededResearchStatus,
 	isTerminalResearchEvent,
 	isTerminalResearchStatus,
+	RESEARCH_QUERY_MAX_CHARS,
 	ResearchRun,
 	ResearchRunId,
 	SUCCEEDED_RESEARCH_STATUSES,

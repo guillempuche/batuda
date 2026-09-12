@@ -106,7 +106,7 @@ export {
 // The one way to read a field that may carry the page it was read on. Exported
 // because a caller outside this package reading such a field bare gets null and
 // no complaint — the failure this whole shape has caused before.
-export { readTextValue } from './application/guard-shapes'
+export { isPlainObject, readTextValue } from './application/guard-shapes'
 export {
 	type DroppedNetworkRow,
 	dropNetworkRows,

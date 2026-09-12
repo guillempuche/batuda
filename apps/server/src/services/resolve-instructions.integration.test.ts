@@ -395,6 +395,7 @@ describe('resolveInstructions (live RLS)', () => {
 							templateIds: [stackTplA],
 							composition: 'replace',
 							isDefault: false,
+							researchFillsAttributes: false,
 						}),
 					)
 				}),
@@ -422,6 +423,7 @@ describe('resolveInstructions (live RLS)', () => {
 							templateIds: [stackTplA],
 							composition: 'replace',
 							isDefault: false,
+							researchFillsAttributes: false,
 						}),
 					)
 				}),
@@ -450,6 +452,7 @@ describe('resolveInstructions (live RLS)', () => {
 							templateIds: [stackTplA],
 							composition: 'replace',
 							isDefault: false,
+							researchFillsAttributes: false,
 						}),
 					)
 				}),
@@ -498,6 +501,7 @@ describe('resolveInstructions (live RLS)', () => {
 					templateIds: [orgTemplate],
 					composition: 'replace',
 					isDefault: false,
+					researchFillsAttributes: false,
 				}),
 			)
 			expect(first.ok).toBe(true)
@@ -512,6 +516,7 @@ describe('resolveInstructions (live RLS)', () => {
 					templateIds: [orgTemplate],
 					composition: 'replace',
 					isDefault: false,
+					researchFillsAttributes: false,
 				}),
 			)
 			// THEN it is rejected as a duplicate name
@@ -531,6 +536,7 @@ describe('resolveInstructions (live RLS)', () => {
 					templateIds: [orgTemplate],
 					composition: 'replace',
 					isDefault: true,
+					researchFillsAttributes: false,
 				}),
 			)
 			const b = await asUser(
@@ -543,6 +549,7 @@ describe('resolveInstructions (live RLS)', () => {
 					templateIds: [orgTemplate],
 					composition: 'replace',
 					isDefault: false,
+					researchFillsAttributes: false,
 				}),
 			)
 			if (!a.ok || !b.ok) throw new Error('stack create failed')
@@ -566,6 +573,7 @@ describe('resolveInstructions (live RLS)', () => {
 					templateIds: [orgTemplate],
 					composition: 'replace',
 					isDefault: true,
+					researchFillsAttributes: false,
 				}),
 			)
 			// WHEN the default is cleared

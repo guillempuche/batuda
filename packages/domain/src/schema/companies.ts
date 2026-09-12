@@ -249,7 +249,13 @@ export class Company extends Model.Class<Company>('Company')({
 	productsFit: Schema.NullOr(Schema.Array(Schema.String)),
 	tags: Schema.NullOr(Schema.Array(Schema.String)),
 	painPoints: Schema.NullOr(Schema.String),
-	currentTools: Schema.NullOr(Schema.String),
+	// The facts the organisation declared it wants on every company, keyed by the
+	// attribute's key: `{ site_count: { value: 4, set_by: 'client' } }`. Every
+	// write merges into what is there, so the column is never replaced whole. Read
+	// loosely here — the doors that write it check each value against its declared
+	// kind (`schema/attributes.ts`), and a row written before a key was retired
+	// still has to be readable.
+	attributes: Schema.Record(Schema.String, Schema.Unknown),
 
 	// What research found out about this company, and where it came from.
 	//
@@ -275,10 +281,10 @@ export class Company extends Model.Class<Company>('Company')({
 	// findings are applied, and no tool a person or an assistant can call sets
 	// them. That is deliberate — the field answers "what did the run conclude",
 	// and letting anything else write it would leave nobody able to tell a run's
-	// reading from somebody's disagreement with it. A view of your own about
-	// whether a company is worth selling to belongs under `metadata`, by
-	// convention as `fitVerdict` there, which search_companies can filter on with
-	// its metadata_key / metadata_value pair.
+	// reading from somebody's disagreement with it. A judgement of your own about
+	// a company is an attribute the campaign's stack declares — a choice such as
+	// "fit: strong | possible | no" — which search_companies filters by its
+	// declared kind.
 	//
 	// The fit checks and conflicts are kept word for word as the research run
 	// wrote them, so their inner names are the ones the research schema defines.
@@ -334,7 +340,8 @@ export class Company extends Model.Class<Company>('Company')({
 	geocodedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
 	geocodeSource: Schema.NullOr(Schema.String),
 
-	// Catch-all for evolving data
+	// Anything with no declared home. A fact the organisation records on every
+	// company belongs in `attributes` under a declared key instead.
 	metadata: Schema.NullOr(Schema.Unknown),
 
 	createdAt: Model.DateTimeInsertFromDate,

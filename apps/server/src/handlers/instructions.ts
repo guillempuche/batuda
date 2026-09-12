@@ -92,6 +92,7 @@ export const InstructionsLive = HttpApiBuilder.group(
 								templateIds: _.payload.template_ids,
 								composition: _.payload.composition,
 								isDefault: _.payload.is_default ?? false,
+								researchFillsAttributes: _.payload.research_fills_attributes,
 							})
 						}),
 					)
@@ -108,6 +109,7 @@ export const InstructionsLive = HttpApiBuilder.group(
 								name: _.payload.name,
 								templateIds: _.payload.template_ids,
 								composition: _.payload.composition,
+								researchFillsAttributes: _.payload.research_fills_attributes,
 							})
 						}),
 					)
@@ -157,10 +159,60 @@ export const InstructionsLive = HttpApiBuilder.group(
 							)
 							return {
 								source: active.source,
+								stack_id: active.stackId,
 								template_names: active.templateNames,
 								segments: active.segments,
+								// The org stack whose attributes a run fills, and what it
+								// declares — empty until that stack's switch is on.
+								attribute_stack_id: active.attributeStackId,
+								attributes: active.attributes,
 								defaults,
 							}
+						}),
+					)
+					.handle('listAttributes', _ =>
+						Effect.gen(function* () {
+							const raw = _.query.agent
+							if (raw !== undefined && parseAgent(raw) === null)
+								return { error: 'unknown_agent' }
+							const items = yield* svc.listAttributes({
+								stackId: _.query.stackId,
+								agent: raw === undefined ? undefined : (raw as Agent),
+							})
+							return { items }
+						}),
+					)
+					.handle('createAttribute', _ =>
+						Effect.gen(function* () {
+							const { userId } = yield* SessionContext
+							return yield* svc.createAttribute(userId, {
+								stackId: _.payload.stack_id,
+								key: _.payload.key,
+								label: _.payload.label,
+								kind: _.payload.kind,
+								enumValues: _.payload.enum_values ?? null,
+								unit: _.payload.unit ?? null,
+								description: _.payload.description ?? null,
+							})
+						}),
+					)
+					.handle('updateAttribute', _ =>
+						Effect.gen(function* () {
+							const { userId } = yield* SessionContext
+							return yield* svc.updateAttribute(userId, _.params.id, {
+								label: _.payload.label,
+								kind: _.payload.kind,
+								enumValues: _.payload.enum_values,
+								unit: _.payload.unit,
+								description: _.payload.description,
+								isActive: _.payload.is_active,
+							})
+						}),
+					)
+					.handle('deleteAttribute', _ =>
+						Effect.gen(function* () {
+							const { userId } = yield* SessionContext
+							return yield* svc.deleteAttribute(userId, _.params.id)
 						}),
 					)
 			)

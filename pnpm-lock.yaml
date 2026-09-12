@@ -675,6 +675,9 @@ importers:
 
   packages/instructions:
     dependencies:
+      '@batuda/domain':
+        specifier: workspace:*
+        version: link:../domain
       effect:
         specifier: 4.0.0-beta.102
         version: 4.0.0-beta.102

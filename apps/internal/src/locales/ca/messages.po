@@ -2012,7 +2012,6 @@ msgstr "Contrasenya actual"
 msgid "Current password is incorrect."
 msgstr "La contrasenya actual no és correcta."
 
-#: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/run-labels.ts
 msgid "Current tools"

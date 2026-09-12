@@ -195,6 +195,37 @@ export class ConfirmRequired extends Schema.TaggedErrorClass<ConfirmRequired>()(
 ) {}
 
 /**
+ * A company write or a company list asked for an attribute in a way it cannot
+ * be used: a value under a key the organisation never declared, a value that
+ * does not read as the key's kind, a research run that is not this
+ * organisation's, or a filter that arrived half-given or whose operator or
+ * value does not fit the kind. `key` is the attribute at fault, null when the
+ * reason names none.
+ *
+ * It carries the reason rather than a sentence, so the side facing the reader
+ * writes the wording and telemetry can count the reasons apart, as
+ * `EmailNotSendable` does. Returned as 400.
+ */
+export const attributeRejectedReasons = [
+	'undeclared_key',
+	'wrong_kind',
+	'unknown_run',
+	'filter_incomplete',
+	'unknown_operator',
+	'operator_not_for_kind',
+	'value_not_for_kind',
+] as const
+export type AttributeRejectedReason = (typeof attributeRejectedReasons)[number]
+
+export class AttributeRejected extends Schema.TaggedErrorClass<AttributeRejected>()(
+	'AttributeRejected',
+	{
+		reason: Schema.Literals(attributeRejectedReasons),
+		key: Schema.NullOr(Schema.String),
+	},
+) {}
+
+/**
  * A run asked for a saved set of instructions that cannot be used — deleted, or
  * belonging to someone else. Starting the run anyway would silently apply
  * different instructions than the caller asked for, so it is refused outright.
