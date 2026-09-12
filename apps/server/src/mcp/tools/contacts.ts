@@ -11,6 +11,7 @@ import {
 	Contact,
 	ContactChannel,
 	HandSetVerificationVerdict,
+	jobTitleOrNothing,
 } from '@batuda/domain'
 
 import {
@@ -78,7 +79,9 @@ const CreateContact = Tool.make('create_contact', {
 				'The branch this person works at, when the company has more than one and it is known which. Leave it out for someone who works for the company at large or moves between its branches — most people, and guessing here is worse than saying nothing.',
 		}),
 		name: Schema.String,
-		role: Schema.optionalKey(Schema.String),
+		// Null as well as absent: a caller that knows there is no job title says so
+		// the same way here as on update, and the same way the web app does.
+		role: Schema.optionalKey(Schema.NullOr(Schema.String)),
 		channels: Schema.optionalKey(Schema.Array(ChannelInput)),
 	}),
 	success: ContactWithChannels,
@@ -98,7 +101,10 @@ const UpdateContact = Tool.make('update_contact', {
 				'The branch this person works at, when the company has more than one and it is known which. Leave it out for someone who works for the company at large or moves between its branches — most people, and guessing here is worse than saying nothing. Pass null to clear a branch somebody no longer works at; leaving it out changes nothing.',
 		}),
 		name: Schema.optionalKey(Schema.String),
-		role: Schema.optionalKey(Schema.String),
+		role: Schema.optionalKey(Schema.NullOr(Schema.String)).annotate({
+			description:
+				"This person's job title, as they or their company give it. Pass null to take off a title that turned out to be wrong or is no longer theirs; leaving it out changes nothing.",
+		}),
 		channels: Schema.optionalKey(Schema.Array(ChannelInput)),
 		clear_email_suppression: Schema.optionalKey(Schema.Boolean),
 	}),
@@ -218,6 +224,7 @@ export const ContactHandlersLive = ContactTools.toLayer(
 						companyId: company_id,
 						siteId: siteId ?? null,
 						...fields,
+						role: jobTitleOrNothing(fields.role),
 					})} RETURNING *`
 					const contact = rows[0] as { id: string }
 					if (channels && channels.length > 0) {
@@ -274,6 +281,11 @@ export const ContactHandlersLive = ContactTools.toLayer(
 						// Only when named: leaving it out means "don't touch", which is
 						// what a caller changing only a phone number expects.
 						...(siteId === undefined ? {} : { siteId }),
+						// Named and left blank is a title taken off, which is not the same
+						// as saying nothing about it.
+						...(fields.role === undefined
+							? {}
+							: { role: jobTitleOrNothing(fields.role) }),
 						updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 					})} WHERE id = ${id} RETURNING *`
 					if (clear_email_suppression)

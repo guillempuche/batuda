@@ -49,3 +49,18 @@ export class Contact extends Model.Class<Contact>('Contact')({
 	createdAt: Model.DateTimeInsertFromDate,
 	updatedAt: Model.DateTimeUpdateFromDate,
 }) {}
+
+/**
+ * The job title a person was given, or nothing — never blank.
+ *
+ * A form whose box was cleared sends an empty string, a caller with nothing to
+ * put there leaves the field out, and both mean the same thing. Kept as two
+ * different values they stop being one thing: a reader then has to know a title
+ * can be absent in two ways, one of which answers yes to "is there a title".
+ */
+export const jobTitleOrNothing = (
+	role: string | null | undefined,
+): string | null => {
+	const given = role?.trim() ?? ''
+	return given === '' ? null : given
+}

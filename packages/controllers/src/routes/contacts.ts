@@ -39,7 +39,9 @@ const CreateContactInput = Schema.Struct({
 	// The branch this person works at, when the company has more than one.
 	siteId: Schema.optional(Schema.String),
 	name: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
-	role: Schema.optional(Schema.String),
+	// Null is taken because a caller has to be able to say a person has no job
+	// title — on an update it is the only way to take one back off.
+	role: Schema.optional(Schema.NullOr(Schema.String)),
 	// Null is one of the answers, not a value gone missing: "nobody has said what
 	// part this person plays in a purchase" is the usual state, so a caller saying
 	// so outright is taken rather than turned away — and on an update it is the
@@ -52,7 +54,7 @@ const CreateContactInput = Schema.Struct({
 const UpdateContactInput = Schema.Struct({
 	siteId: Schema.optional(Schema.NullOr(Schema.String)),
 	name: Schema.optional(Schema.String),
-	role: Schema.optional(Schema.String),
+	role: Schema.optional(Schema.NullOr(Schema.String)),
 	buyingRole: Schema.optional(Schema.NullOr(Schema.String)),
 	metadata: Schema.optional(Schema.Unknown),
 	channels: Schema.optional(Schema.Array(ChannelInput)),
