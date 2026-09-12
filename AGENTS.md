@@ -290,8 +290,8 @@ RESEARCH_API_KEY_SEARCH_2=fc_...           # slot 1 key
 ### Schema changes
 
 1. Edit `packages/domain/src/schema/<table>.ts`
-2. Run `pnpm db:generate` to create migration
-3. Run `pnpm db:migrate` to apply
+2. Write the migration by hand as the next numbered file in `apps/server/src/db/migrations/` (idempotent statements; a destructive one carries the expand-contract marker `pnpm check-migrations` looks for)
+3. Run `pnpm db:migrate` to apply (`pnpm cli worktree up` inside a worktree)
 4. Update affected MCP tools and routes
 
 ### Build & lint
