@@ -271,13 +271,13 @@ Batuda has three bounded contexts. Each owns its own domain errors and types; de
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**Dependency direction.** `packages/auth`, `packages/domain`, and `packages/research` have no dependency between them. All are consumed by the apps; the apps do not consume each other. Each context's domain errors stay within the context — if the server needs to map them to HTTP-surface errors, that mapping lives at the edge in `apps/server`, not in the packages.
+**Dependency direction.** `packages/domain` is the shared vocabulary: `packages/research` and `packages/instructions` both read it (the attribute shapes a research run is asked to fill are declared there once, so the two never disagree about them), and `packages/research` also reads `packages/observability`; `packages/auth` stands alone, and `packages/controllers` is the edge that reads the bounded contexts to describe their routes. The contexts never read each other. All are consumed by the apps; the apps do not consume each other. Each context's domain errors stay within the context — if the server needs to map them to HTTP-surface errors, that mapping lives at the edge in `apps/server`, not in the packages.
 
 **Why a shared `buildBetterAuthConfig`.** The CLI and server both instantiate `betterAuth(...)` — the CLI because it mints users/keys out-of-band, the server because it serves `/auth/*`. If the plugin list or field set drifts between the two, the apiKey plugin's verification path breaks at runtime (keys minted in one process fail to validate in the other). Keeping the builder in one place makes that drift impossible.
 
 **Why the CLI omits `magicLink()`.** The magic-link sender depends on the server's `EmailProvider` service (local inbox catcher in dev, real SMTP via the requesting org's primary inbox in prod). The CLI doesn't run that service, so it injects its own `MagicLinkSender` port implementation when it needs to issue a link (see `pnpm cli auth invite`). The builder takes `plugins` as a parameter precisely so each caller supplies the plugin list it can back.
 
-**Why research is a separate bounded context.** Research has its own domain model (providers, budgets, quotas, schemas), its own error hierarchy (`ProviderError`, `BudgetExceeded`, `QuotaExhausted`), and its own infrastructure concerns (external API keys, LLM inference, cost tracking). It reads CRM data (companies, contacts) but never writes directly — proposed changes go through the `propose_update` tool, reviewed by the outer AI or user before applying. This separation means research provider implementations, pricing models, and LLM providers can evolve independently of the CRM schema.
+**Why research is a separate bounded context.** Research has its own domain model (providers, budgets, schemas), its own error hierarchy (`ProviderError`, `BudgetExceeded`, `QuotaExhausted` when a vendor says its own allowance is spent), and its own infrastructure concerns (external API keys, LLM inference, cost tracking). It reads CRM data (companies, contacts) but never writes directly — proposed changes go through the `propose_update` tool, reviewed by the outer AI or user before applying. This separation means research provider implementations, pricing models, and LLM providers can evolve independently of the CRM schema.
 
 **Provider selection pattern.** Each research capability (search, scrape, enrich, verify, registry, report) plus LLM inference is configured by an env var (`RESEARCH_PROVIDER_*`) that picks the implementation at boot time. The pattern is `Layer.unwrap(Config.schema(...) → switch → return Layer)` — same as `EmailProviderLive`. Stubs provide zero-cost deterministic data for local dev. Real providers (Brave, Firecrawl, libreBORME, Companies House, Hunter) declare their dependencies (`HttpClient`, `Config`) in the R type, satisfied at the composition root.
 
@@ -369,7 +369,7 @@ Most Batuda intelligence is external — the MCP client does the reasoning and g
 Every external capability is a role, not a vendor. Each is a port selected at boot by a `RESEARCH_PROVIDER_*` env var, with a comma-list fallback chain and a zero-cost stub for local dev. The roles:
 
 - **search** — web search (e.g. Firecrawl, Brave)
-- **scrape** — fetch a page as markdown, or as structured JSON against a schema (Firecrawl)
+- **scrape** — fetch a page as markdown, or as its HTML, its links, or a screenshot (Firecrawl)
 - **enrich** — decision-maker name + email discovery for a company (Hunter)
 - **verify** — email deliverability, with a free DNS MX pre-gate in front of it (Hunter)
 - **registry** — company identity + officers, routed by country (libreBORME for Spain, Companies House for the UK)
@@ -387,9 +387,9 @@ One entry point, three shapes of request:
 
 ### The run flow
 
-A run is dispatched, not run inline. `start_research` commits a run row as `queued` inside the request transaction and returns immediately; a consumer daemon drains the queue and runs each as a fiber on its own connection. The fiber has three phases: a tool-calling loop (search, read, registry, CRM lookup — accumulating findings, recording every page it reaches and archiving the ones it opens), a structured-output pass that validates the findings against the run's schema, and a brief pass that renders a human-readable markdown summary. Tool calls stream to the web app over SSE as they happen, and the fiber writes a count of the rounds it has got through to the run row as it goes, so any client — an MCP caller included — can read live progress without a stream; findings, sources, and the tool log persist at the end.
+A run is dispatched, not run inline. `start_research` commits a run row as `queued` inside the request transaction and returns immediately; a consumer daemon drains the queue and runs each as a fiber on its own connection. The fiber has three phases: a tool-calling loop (search, read, registry, contact discovery — accumulating findings, recording every page it reaches and archiving the ones it opens), a structured-output pass that validates the findings against the run's schema, and a brief pass that renders a human-readable markdown summary. Tool calls stream to the web app over SSE as they happen, and the fiber writes a count of the rounds it has got through to the run row as it goes, so any client — an MCP caller included — can read live progress without a stream; findings, sources, and the tool log persist at the end.
 
-The first phase starts from the target's own site where there is one: the run maps that domain and reads its own pages before anything a search engine offers, because a company is the best source on itself. The second phase does not settle for what the first pass happened to find — fields still empty afterwards earn further rounds of targeted search and scraping, each round re-running the guards, until the fields fill or the run's budget or deadline stops it.
+When the run is about one company and that company has a site, the first phase starts there: the run maps that domain and reads its own pages before anything a search engine offers, because a company is the best source on itself. A discovery scan has no such company to start from. The second phase does not settle for what the first pass happened to find — fields still empty afterwards earn further rounds of targeted search and scraping, each round re-running the guards, until the fields fill or the run's budget or deadline stops it.
 
 A run says how far it got rather than reporting a flat success. `succeeded` means the findings are grounded and confident; `succeeded_low_confidence` means real findings came back but thin enough to want a person's eye, and the web app surfaces those for review; `no_reliable_data` is the honest answer when nothing could be grounded, which is preferred to shipping a confident guess; `failed` and `cancelled` cover a run that broke or was stopped.
 
@@ -401,16 +401,21 @@ At a glance:
   start_research  →  run row 'queued'  →  consumer daemon  →  fiber (own connection)
 
   Phase 1 · agent reflect-loop
-      web_search · scrape_page · registry_lookup · crm_lookup
-      site discovery: map the target's own domain and read its own pages first
+      web_search · scrape_page · registry_lookup · discover_contacts
+      site discovery (runs about one company): map its own domain and read
+          its own pages first
       accumulate findings, record each page reached, archive the ones opened
 
   Phase 2 · structured extraction
       validate the findings against the run's schema
-      guard chain — a list of named links, run in the order they are written:
-          citations · contact entity · scalars · websites · value provenance
-          fit evidence · vocabulary · applicability · discovered-existing
-          prospect criteria · field-support critic · per-source entity · source tier
+      guard chain — named links, run in the order they are written; a link
+          prunes what it cannot stand behind and the run carries on:
+          organisation kind · citations · scalars · websites · contact entity
+          value provenance · fit evidence · vocabulary · applicability
+          discovered-existing · scan evidence · prospect criteria
+          prospect dedupe · network · place · unconfirmed mark
+          name-only evidence · field-support critic · entity sources
+          source tier · paired fields
       gap rounds: fields still empty earn another targeted search and scrape,
           until the run's budget or its deadline says stop
 
@@ -437,6 +442,14 @@ This paragraph is the whole rule. The code beside each writer says only what tha
 
 Auto-apply is narrower than a person's reach. Whoever starts a run can set a confidence threshold above which its proposals apply without review — the setting is that person's, not the organisation's. It only ever runs for a fully succeeded run, and never for a value whose confidence was capped for coming from a third party rather than the company itself — an outside estimate always waits for a human. It is narrower in what it may write, too: it writes the values, where each came from, and the freshness stamp, but never the run's own words about the company — neither its fit judgement nor its brief. Those are a model's opinion, and they wait for somebody to read them.
 
+### Attributes
+
+What an organisation wants to know about every company differs by campaign: one sells to freight brokers and counts loads per day, another to machine shops and counts quotes per week. Nothing in the code names such a fact. Instead an admin declares them on an org-owned research stack — one stack per campaign — as **attributes**: a key the value is filed under, a label people read, and a kind (text, number, a choice from declared words, yes/no, a date) that decides how a value is checked and which filters make sense for it. At most eight are active per stack, and a key declared on two stacks has to read the same way on both, so a reader that merges by key never meets two meanings of one name.
+
+Values live in one merged JSON column on the company, `attributes`, keyed by attribute key. Every write merges into what is there — keys not named stay, a null removes one — and every value records who set it: a person or an assistant through the ordinary company tools, or a research run. A run's value carries the page it was read from, the quote, the date it was true as of and the run's id, and never overwrites a value a person set by hand. The rules about a value — the kinds, the key shape, the caps — are written once in `packages/domain` and read by the HTTP routes, the assistant's tools and the apply path alike; the database keeps a unique index as a race guard and a lookup index, as the [backend guide](backend.md#where-a-rule-about-a-value-lives) says.
+
+A run fills a stack's attributes only when that stack's `research_fills_attributes` switch is on, and the attributes always come from the organisation's stack in play — the named stack when the organisation owns it, else the org default — so a member's personal stack changes the prompt but never which facts the campaign records. A run's values land on its company only by a person's hand, only when the run was about that one company, and never over a value a person set. A key's kind, unit and choice words stay as declared while any company holds a value under it: a value read one way must go on being read that way. A company list can be narrowed by one attribute at a time, compared the way its kind allows: a number as a number, a date as a date, a choice by its word.
+
 ### Contact discovery
 
 Turning a company into ranked, verified decision-maker contacts is its own flow, shared by the `discover_contacts` tool and the in-loop path. It is registry-first where a national registry exists — those officers are free and authoritative — and falls back to the paid enrichment provider elsewhere. For each person it takes the vendor's email or generates ordered pattern guesses (`first.last`, `flast`, …), gates every candidate through the free MX check, and verifies deliverability. A guessed address is asserted only when the verifier positively confirms it; a vendor-provided address is kept unless it verifies as undeliverable. Contacts come back ranked — decision-makers first, then by deliverability verdict — and the flow never writes CRM rows; the caller decides what to keep.
@@ -445,12 +458,12 @@ Turning a company into ranked, verified decision-maker contacts is its own flow,
 
 Two independent layers gate every external call, and the agent experiences both only as tool errors — it never reads a policy.
 
-- **Provider quota** (hard limit) — does the user have units left with this provider? A `QuotaExhausted` tells the agent to try an alternative provider.
+- **Vendor allowance** (hard limit) — a vendor that says its own allowance is spent answers with a `QuotaExhausted`, which tells the agent to try an alternative provider. Batuda keeps no allowance table of its own.
 - **Resource budget** (volume governor) — notional per-run and per-month cents, so one run cannot burn a disproportionate share even of prepaid credits. A `BudgetExceeded` tells the agent to finish with what it has.
 
-The rules the loop follows: climb cost tiers only when a cheaper one cannot answer (cheap web search and scrape before a paid per-company report); never exceed the paid budget without proposing the paid action for human approval; and the monthly cap is the only rail a user cannot override per-run, enforced exactly under a per-user advisory lock so concurrent fan-out fibers cannot overshoot it.
+The rules the loop follows: climb cost tiers only when a cheaper one cannot answer (cheap web search and scrape before a paid per-company report); never exceed the paid budget without proposing the paid action for human approval; and the monthly cap is the one rail nobody can override per-run — it is the organisation's, enforced exactly under a per-organisation advisory lock so concurrent fan-out fibers cannot overshoot it. (The auto-apply threshold, by contrast, is each person's own; see below.)
 
-Three safety invariants hold regardless of budget: the agent never mutates a CRM row (it proposes; a human applies, under optimistic concurrency), every claim in the findings must carry a citation that resolves to a page the run actually reached (an uncited claim fails the run) — a page it opened is archived, while one it only saw named in a search result is recorded and citable without a stored copy, and paid calls are metered idempotently so a retried fiber is never double-charged.
+Three safety invariants hold regardless of budget: the agent never mutates a CRM row (it proposes; a human applies, under optimistic concurrency); a claim reaches the findings only with a citation that resolves to a page the run actually reached — the citations guard drops any that does not and the run carries on with what is left, so an uncited claim costs the claim, never the run — where a page it opened is archived, while one it only saw named in a search result is recorded and citable without a stored copy; and paid calls are metered idempotently so a retried fiber is never double-charged.
 
 ### Surfaces
 
@@ -458,7 +471,7 @@ The same loop is reached three ways. External agents call the MCP tools (`start_
 
 ### Data model
 
-Research owns a small set of tables, created together in the `research` migration: `research_runs` (one row per run — leaf, group, or follow-up — with findings, brief, cost, and tool log), `sources` and `research_run_sources` (globally-deduped sources linked to runs with a stable citation ref — a row records either a page the run opened and stored, or one it only saw named in a search result, which carries no stored copy), `research_links` (polymorphic run ↔ company/contact links carrying applied-change provenance), `research_paid_spend` (an idempotent audit row per paid call), and the policy and quota tables (`user_research_policy`, `provider_quotas`, `provider_usage`). Companies and contacts are soft-deleted so a research link never dangles, and carry a version column so a proposed update cannot silently overwrite a human edit made mid-run. An hourly sweep prunes run transcripts and, once nothing points at them any more, the stored pages and the records of pages a run only saw — while keeping every applied contact's provenance trail.
+Research owns a small set of tables, created together in the `research` migration: `research_runs` (one row per run — leaf, group, or follow-up — with findings, brief, cost, and tool log, plus the attribute declarations the run was asked to fill), `sources` and `research_run_sources` (globally-deduped sources linked to runs with a stable citation ref — a row records either a page the run opened and stored, or one it only saw named in a search result, which carries no stored copy), `research_links` (polymorphic run ↔ company/contact links carrying applied-change provenance), `research_paid_spend` (an idempotent audit row per paid call), `user_research_policy` (each person's budget and auto-apply threshold), and, added later, `research_attributes` (the facts an organisation declares on a research stack for runs to fill — see [Attributes](#attributes) above). Companies and contacts are soft-deleted so a research link never dangles, and carry a version column so a proposed update cannot silently overwrite a human edit made mid-run. An hourly sweep prunes run transcripts and, once nothing points at them any more, the stored pages and the records of pages a run only saw — while keeping every applied contact's provenance trail.
 
 ### Quality — the eval harness
 
@@ -611,6 +624,8 @@ products            — service/product catalog
 proposals           — quotes sent to companies
 documents           — long-form markdown (research, meeting notes)
 pages               — public prospect sales pages (Tiptap JSON, multilingual)
+                      (companies.attributes holds the per-organisation facts
+                      declared in research_attributes; see the research tables)
 webhook_endpoints   — outgoing webhook configuration
 call_recordings     — audio metadata per call (transcript columns nullable, populated in a later phase)
 ```
@@ -627,9 +642,10 @@ research_run_sources — many-to-many: runs ↔ sources (with local_ref citation
 research_links      — polymorphic: runs ↔ companies/contacts (input or finding);
                       citations (jsonb) carries the applied row's provenance trail
 research_paid_spend — audit log: every paid API call with idempotency_key
-user_research_policy — per-user budget/quota preferences + auto_apply_min_confidence
-provider_quotas     — per-user per-provider quota config (monthly plan or pay-per-call)
-provider_usage      — consumption counter per provider per billing period
+user_research_policy — per-user budget preferences + auto_apply_min_confidence
+research_attributes — the facts an organisation declares on an org research
+                      stack for runs to fill: key, label, kind, choice words,
+                      unit, description, is_active; at most 8 active per stack
 ```
 
 **Retention.** A scheduled sweep (`ResearchRetention`, in `ServicesLive`) runs hourly and clears out what research leaves behind, in four passes: expired cache rows (their TTL only gates reads); the `research_text` + `tool_log` transcript of runs older than `RESEARCH_RETENTION_DAYS` (default 90); stored page text that no surviving run fetches and no applied contact cites, along with the `sources` row that pointed at it; and the records of pages a run only saw named, which never had stored text, once nothing points at those either. The last two are kept apart deliberately — pages merely seen outnumber stored ones by roughly ten to one, so sharing a batch would leave the stored copies, the ones that cost money to keep, queued behind them. The run rows, `research_run_sources` and `research_links.citations` stay, so a contact's provenance trail survives the prune (see [§Research](#research)).
@@ -701,6 +717,7 @@ pages: UNIQUE(slug, lang) — each language version is a separate row
 Catalan/Spanish appears only in seed/mock data (the repo owner's nationality).
 A company's trade is whatever the organisation calls it: the first person to type one creates it in that organisation's own list (`company_industries`), and everyone else is offered it while typing. Nothing in the code names a trade, so an organisation selling to boat builders or to funeral directors is as well served as one selling to restaurants.
 The only closed sets on a company are its pipeline stage, its priority and its size band (`COMPANY_STATUSES`, `COMPANY_PRIORITIES`, `COMPANY_SIZE_RANGES` in `packages/domain/src/schema/companies.ts`), each of which means something only next to the others. Country is an ISO code, and location is free text.
+Every other fact a campaign wants on a company is an attribute the organisation declares itself (see [Attributes](#attributes)): the code names the kinds a value can have, never the facts. `metadata` stays for whatever has no declared home.
 
 **Why NeonDB over SQLite:** analytics queries, JSONB for evolving metadata, email/calendar integrations planned. Postgres is the right foundation.
 
