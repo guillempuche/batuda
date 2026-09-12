@@ -201,6 +201,36 @@ const CURRENT_TOOLS = [
 	'Cap eina',
 ] as const
 
+const byPerson = (value: string | number | boolean) => ({
+	value,
+	set_by: 'client',
+})
+
+// The taller org declares tools, sites, online bookings and a fit reading on
+// its default research stack; about half the companies carry each.
+export const tallerAttributes = (
+	rng: () => number,
+): Record<string, unknown> => ({
+	...(chance(rng, 0.6)
+		? { current_tools: byPerson(pick(rng, CURRENT_TOOLS)) }
+		: {}),
+	...(chance(rng, 0.5)
+		? { site_count: byPerson(1 + Math.floor(rng() * 4)) }
+		: {}),
+	...(chance(rng, 0.4)
+		? { takes_online_bookings: byPerson(chance(rng, 0.5)) }
+		: {}),
+	...(chance(rng, 0.3)
+		? { fit: byPerson(pick(rng, ['strong', 'possible', 'no'] as const)) }
+		: {}),
+})
+
+// The restaurant org declares one fact: whether a supplier or partner caters.
+export const restaurantAttributes = (
+	rng: () => number,
+): Record<string, unknown> =>
+	chance(rng, 0.5) ? { catering: byPerson(chance(rng, 0.5)) } : {}
+
 const NEXT_ACTIONS = [
 	'Trucar per confirmar interès',
 	'Enviar pressupost',
@@ -219,13 +249,11 @@ const briefFor = (
 	town: string,
 	trade: string,
 	pain: string | null,
-	tools: string | null,
 ): string => {
 	const short = [
 		`**${name}** — ${trade.toLowerCase()} a ${town}.`,
 		'',
 		pain ? `El que els fa mal: ${pain}` : 'Encara no sabem què els fa mal.',
-		tools ? `Ara mateix treballen amb ${tools}.` : '',
 	]
 		.filter(Boolean)
 		.join('\n')
@@ -238,9 +266,6 @@ const briefFor = (
 		'## Per què ens interessa',
 		'',
 		pain ? `- ${pain}` : '- Encara per confirmar què els fa mal.',
-		tools
-			? `- Ara mateix treballen amb **${tools}**.`
-			: '- Sense eines pròpies.',
 		'- Han preguntat pel preu dues vegades sense que els hi oferíssim.',
 		'',
 		'## Riscos',
@@ -283,7 +308,9 @@ export type GeneratedCompany = {
 	readonly productsFit: string[]
 	readonly tags: string[]
 	readonly painPoints: string | null
-	readonly currentTools: string | null
+	// The facts the organisation declared it records on every company, keyed
+	// by attribute key, each stamped as written by a person.
+	readonly attributes: Record<string, unknown>
 	// The running notes on the account, in markdown. Null on a company nobody
 	// has looked into yet.
 	readonly accountBrief: string | null
@@ -309,6 +336,8 @@ export const generateCompanies = (options: {
 	readonly productSlugs: ReadonlyArray<string>
 	/** Distinguishes slugs between orgs so the two demo orgs never collide. */
 	readonly slugPrefix?: string
+	/** The attribute values a company gets, drawn from the org's own keys. */
+	readonly attributes: (rng: () => number) => Record<string, unknown>
 }): GeneratedCompany[] => {
 	const rng = mulberry32(options.seed)
 	const used = new Set<string>()
@@ -342,7 +371,6 @@ export const generateCompanies = (options: {
 
 		const status = pickStatus(rng)
 		const painPoints = chance(rng, 0.75) ? pick(rng, PAIN_POINTS) : null
-		const currentTools = chance(rng, 0.6) ? pick(rng, CURRENT_TOOLS) : null
 		// A prospect nobody has worked yet has nothing written about it, so the
 		// empty state stays reachable; past that, most accounts have notes.
 		const hasBrief = status === 'prospect' ? chance(rng, 0.3) : chance(rng, 0.8)
@@ -375,16 +403,9 @@ export const generateCompanies = (options: {
 			),
 			tags: [trade.industry, town.name.toLowerCase()],
 			painPoints,
-			currentTools,
+			attributes: options.attributes(rng),
 			accountBrief: hasBrief
-				? briefFor(
-						rng,
-						name,
-						town.name,
-						trade.industry,
-						painPoints,
-						currentTools,
-					)
+				? briefFor(rng, name, town.name, trade.industry, painPoints)
 				: null,
 			fitVerdict: scored
 				? pick(rng, ['strong_fit', 'possible_fit', 'no_fit'])

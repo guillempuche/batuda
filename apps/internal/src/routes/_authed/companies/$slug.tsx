@@ -187,7 +187,6 @@ type CompanyDetail = {
 	readonly linkedin: string | null
 	readonly googleMapsUrl: string | null
 	readonly painPoints: string | null
-	readonly currentTools: string | null
 	readonly nextAction: string | null
 	readonly nextActionAt: string | null
 	readonly lastContactedAt: string | null
@@ -1880,7 +1879,6 @@ function narrowCompany(raw: unknown): CompanyDetail | null {
 		linkedin: channel('linkedin'),
 		googleMapsUrl: str('googleMapsUrl'),
 		painPoints: str('painPoints'),
-		currentTools: str('currentTools'),
 		nextAction: str('nextAction'),
 		nextActionAt: str('nextActionAt'),
 		lastContactedAt: str('lastContactedAt'),

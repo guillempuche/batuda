@@ -5,7 +5,7 @@ import {
 	HttpApiSchema,
 } from 'effect/unstable/httpapi'
 
-import { ResearchSubjectTable } from '@batuda/domain'
+import { RESEARCH_QUERY_MAX_CHARS, ResearchSubjectTable } from '@batuda/domain'
 // Straight from the schemas file rather than the package entry point: that entry
 // point also reaches the research service and the providers it talks to, and this
 // spec is what the browser builds its API client from.
@@ -98,7 +98,12 @@ export const ContextInput = Schema.Struct({
 // Exported for the test next door, which pins schema_name to the closed set —
 // widening it back to a bare string is what let a doomed run be created.
 export const CreateResearchInput = Schema.Struct({
-	query: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
+	query: Schema.String.pipe(
+		Schema.check(
+			Schema.isMinLength(1),
+			Schema.isMaxLength(RESEARCH_QUERY_MAX_CHARS),
+		),
+	),
 	mode: Schema.optional(Schema.String),
 	context: Schema.optional(ContextInput),
 	// The closed set, not a bare string: an unknown name is refused as a bad

@@ -1,7 +1,10 @@
 import { Effect, Schema } from 'effect'
 import type { SqlError } from 'effect/unstable/sql'
 
-import { isTerminalResearchStatus } from '@batuda/domain'
+import {
+	isTerminalResearchStatus,
+	RESEARCH_QUERY_MAX_CHARS,
+} from '@batuda/domain'
 import { SchemaNameSchema } from '@batuda/research'
 
 // A UUID-shaped identifier, validated at the MCP parameter boundary. Rejecting
@@ -38,11 +41,11 @@ export const SchemaNameParam = SchemaNameSchema.annotate({
 })
 
 // A research query: present and length-bounded. Stops empty prompts from
-// creating junk runs and caps oversized input that would otherwise waste spend
-// once real providers are wired in.
+// creating junk runs, and holds the request to the one cap every door shares,
+// so a request this tool accepts is never cut when the prompt quotes it back.
 export const ResearchQuery = Schema.String.check(
 	Schema.isMinLength(1),
-	Schema.isMaxLength(8000),
+	Schema.isMaxLength(RESEARCH_QUERY_MAX_CHARS),
 )
 
 // How long a caller is willing to wait, in whole seconds and at least one. A

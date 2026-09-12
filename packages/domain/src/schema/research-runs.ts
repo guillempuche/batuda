@@ -3,6 +3,11 @@ import { Model } from 'effect/unstable/schema'
 
 export const ResearchRunId = Schema.String.pipe(Schema.brand('ResearchRunId'))
 
+// How long a request may be, in characters. The same bound wherever a request
+// is taken in or quoted back to the model, so a request accepted at one point
+// is never cut at another.
+export const RESEARCH_QUERY_MAX_CHARS = 8000
+
 // A single research run: one query the engine investigates, from queued to a
 // terminal status, with its budget, spend, findings, and the instruction set
 // that shaped it. A group run fans work out to child runs; a leaf run does the

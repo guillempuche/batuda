@@ -1,5 +1,7 @@
 import { Schema } from 'effect'
 
+import type { AttributeKind } from '@batuda/domain'
+
 // The code-defined set of AI agents that compose instruction templates into
 // their prompt. Research and email today; chat/outreach later. Kept as a string
 // set (not a DB enum) so adding an agent is a code change, never a migration —
@@ -33,7 +35,9 @@ export type StackComposition = 'replace' | 'extend'
 // A named, ordered stack of templates for one agent, owned by the org
 // (`ownerUserId` null) or a member. `name` is unique within its scope+agent;
 // `isDefault` marks the one stack that applies when a run names none — at most
-// one per scope+agent.
+// one per scope+agent. `researchFillsAttributes` lets a research run fill the
+// attributes declared on the stack; it is off until an admin turns it on, so
+// declaring an attribute never changes what a run does by itself.
 export interface InstructionStack {
 	readonly id: string
 	readonly organizationId: string
@@ -42,6 +46,30 @@ export interface InstructionStack {
 	readonly name: string
 	readonly isDefault: boolean
 	readonly composition: StackComposition
+	readonly researchFillsAttributes: boolean
+}
+
+// One fact an organisation wants recorded on every company a stack is used
+// for — declared on an org-owned research stack, since a stack stands for one
+// campaign. The key is what a value is filed under on the company; the label
+// is what people see; the kind decides how a value is checked and filtered.
+// Retiring one (`isActive` false) stops new writes and hides it from prompts
+// without touching the values companies already carry.
+export interface ResearchAttribute {
+	readonly id: string
+	readonly organizationId: string
+	readonly stackId: string
+	readonly stackName: string
+	readonly key: string
+	readonly label: string
+	readonly kind: AttributeKind
+	readonly enumValues: ReadonlyArray<string> | null
+	readonly unit: string | null
+	readonly description: string | null
+	readonly isActive: boolean
+	readonly createdBy: string
+	readonly createdAt: string
+	readonly updatedAt: string
 }
 
 // One ordered reference inside a stack. `position` is the add-order; the

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { fingerprintTemplates } from './fingerprint'
+import { fingerprintAttributes, fingerprintTemplates } from './fingerprint'
 
 describe('fingerprintTemplates', () => {
 	describe('when the same templates resolve in the same order', () => {
@@ -84,6 +84,75 @@ describe('fingerprintTemplates', () => {
 			])
 			// THEN they fingerprint differently
 			expect(a).not.toBe(b)
+		})
+	})
+})
+
+describe('fingerprintAttributes', () => {
+	const sites = {
+		key: 'site_count',
+		label: 'Sites',
+		kind: 'number' as const,
+		enumValues: null,
+		unit: 'sites',
+		description: 'How many premises.',
+	}
+	const fit = {
+		key: 'fit',
+		label: 'Fit',
+		kind: 'enum' as const,
+		enumValues: ['strong', 'no'],
+		unit: null,
+		description: null,
+	}
+
+	describe('when the same declarations arrive in a different order', () => {
+		it('should produce the same fingerprint without touching the given array', () => {
+			// GIVEN the two declarations both ways round
+			const given = [fit, sites]
+			// THEN the digest is the same and the array is as it was
+			expect(fingerprintAttributes([sites, fit])).toBe(
+				fingerprintAttributes(given),
+			)
+			expect(given).toEqual([fit, sites])
+		})
+	})
+
+	describe('when something that reaches a prompt changes', () => {
+		it('should change for a label, description, unit, kind, key or word-order change, and for a declaration added', () => {
+			// GIVEN one declaration edited in each field in turn
+			const base = fingerprintAttributes([sites, fit])
+			const edits = [
+				[{ ...sites, label: 'Premises' }, fit],
+				[{ ...sites, description: 'Changed.' }, fit],
+				[{ ...sites, unit: 'towns' }, fit],
+				[{ ...sites, kind: 'text' as const }, fit],
+				[{ ...sites, key: 'sites' }, fit],
+				[sites, { ...fit, enumValues: ['no', 'strong'] }],
+				[sites],
+			]
+			// THEN every edit reads as a different set
+			const digests = new Set(edits.map(fingerprintAttributes))
+			expect(digests.size).toBe(edits.length)
+			expect(digests.has(base)).toBe(false)
+		})
+
+		it('should keep a line break in a label from forging a second entry', () => {
+			// GIVEN one label carrying the separator a second entry would use
+			const forged = fingerprintAttributes([
+				{ ...sites, label: 'Sites"]\n["Fit' },
+			])
+			// THEN it is not the digest of two entries
+			expect(forged).not.toBe(fingerprintAttributes([sites, fit]))
+		})
+	})
+
+	describe('when there are no declarations', () => {
+		it('should return a fixed digest, the same as an empty template list', () => {
+			// GIVEN nothing declared
+			// THEN the digest is stable and shared with the empty template case
+			expect(fingerprintAttributes([])).toMatch(/^[0-9a-f]{64}$/)
+			expect(fingerprintAttributes([])).toBe(fingerprintTemplates([]))
 		})
 	})
 })

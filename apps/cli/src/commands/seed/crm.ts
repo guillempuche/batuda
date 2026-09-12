@@ -6,7 +6,12 @@ import {
 	MINIMAL_COMPANY_SLUGS,
 	PRODUCTS,
 } from './fixtures'
-import { generateCompanies, generateContacts } from './generate'
+import {
+	generateCompanies,
+	generateContacts,
+	restaurantAttributes,
+	tallerAttributes,
+} from './generate'
 import {
 	normalizeRows,
 	SEED_REFERENCE,
@@ -132,12 +137,19 @@ export const seedCompanies = (
 						seed: TALLER_SEED,
 						reference,
 						productSlugs,
+						attributes: tallerAttributes,
 					})
 				: []
+		// Every row carries the attributes column: the batch insert aligns the
+		// rows' keys and would write null where a fixture names none.
 		const companies = assignOwners(
 			[...handWritten, ...generated],
 			[alice, alice, carol, bea],
-		).map(c => ({ ...c, id: seedCompanyId(c.slug) }))
+		).map(c => ({
+			...c,
+			id: seedCompanyId(c.slug),
+			attributes: 'attributes' in c ? c.attributes : {},
+		}))
 
 		yield* Effect.logInfo(`Seeding companies (${preset})...`)
 		// A company's website and mailbox are no longer columns on its row, so the
@@ -180,7 +192,7 @@ export const seedCompanies = (
 				productsFit: ['gestio-reserves'],
 				tags: ['gastro', 'garraf'],
 				painPoints: null,
-				currentTools: null,
+				attributes: { catering: { value: true, set_by: 'client' } },
 				nextAction: null,
 				latitude: null,
 				longitude: null,
@@ -197,6 +209,7 @@ export const seedCompanies = (
 							reference,
 							productSlugs,
 							slugPrefix: 'rst',
+							attributes: restaurantAttributes,
 						})
 					: []
 			const restaurantRows = assignOwners(

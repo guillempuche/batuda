@@ -4,27 +4,36 @@ import { SqlClient } from 'effect/unstable/sql'
 
 import {
 	type Agent,
+	type AttributeWriteResult,
+	type CreateAttributeInput,
 	clearDefaultStack,
+	createAttribute,
 	createStack,
 	createTemplate,
 	decideTemplateEdit,
+	deleteAttribute,
 	deleteStack,
 	deleteTemplate,
 	getDefaultStacks,
 	getStack,
 	getTemplate,
 	type InstructionTemplate,
+	listAttributes,
 	listStacks,
 	listTemplates,
+	type ResearchAttribute,
 	type StackComposition,
 	type StackSummary,
 	type StackWriteResult,
 	setDefaultStack,
 	templateInUse,
 	transferTemplateToUser,
+	type UpdateAttributeFields,
+	updateAttribute,
 	updateStack,
 	updateTemplateFields,
 } from '@batuda/instructions'
+import { recordFacts } from '@batuda/observability'
 
 // Orchestration for instruction-template management shared by the HTTP and MCP
 // surfaces. It captures `sql` once, applies the admin gate on the
@@ -79,6 +88,35 @@ export type StackOutcome =
 			readonly outcome: 'personal_in_org_stack'
 			readonly offending: ReadonlyArray<string>
 	  }
+
+// An attribute declaration write. The gates add 'forbidden' and 'not_found';
+// every other refusal is the package's own reason, passed through as a code the
+// transports word.
+export type AttributeOutcome =
+	| { readonly outcome: 'created'; readonly attribute: ResearchAttribute }
+	| { readonly outcome: 'updated'; readonly attribute: ResearchAttribute }
+	| { readonly outcome: 'deleted' }
+	| { readonly outcome: 'forbidden' }
+	| { readonly outcome: 'not_found' }
+	| {
+			readonly outcome: Extract<AttributeWriteResult, { ok: false }>['reason']
+	  }
+
+const toAttributeOutcome = (
+	result: AttributeWriteResult,
+	success: 'created' | 'updated',
+): AttributeOutcome =>
+	result.ok
+		? { outcome: success, attribute: result.attribute }
+		: { outcome: result.reason }
+
+// A declaration write answers with a code in a successful body, so the code
+// rides on the request's record too — that is the only place a refused
+// declaration is told apart from one that landed.
+const recordOutcome = (outcome: AttributeOutcome) =>
+	recordFacts({ 'attribute.declare.outcome': outcome.outcome }).pipe(
+		Effect.as(outcome),
+	)
 
 // Map a package write result to the service outcome. The success tag differs by
 // action ('created' vs 'updated'); the failure reasons pass straight through.
@@ -239,6 +277,7 @@ export class InstructionsService extends Context.Service<InstructionsService>()(
 						readonly templateIds: ReadonlyArray<string>
 						readonly composition?: StackComposition | undefined
 						readonly isDefault: boolean
+						readonly researchFillsAttributes?: boolean | undefined
 					},
 				): Effect.Effect<StackOutcome, never, SqlClient.SqlClient> =>
 					Effect.gen(function* () {
@@ -256,6 +295,13 @@ export class InstructionsService extends Context.Service<InstructionsService>()(
 									? 'replace'
 									: (input.composition ?? 'replace'),
 							isDefault: input.isDefault,
+							// Attributes are read off the org's research stack whatever a
+							// member's own stack says, so the switch means something there
+							// only.
+							researchFillsAttributes:
+								input.scope === 'org' &&
+								input.agent === 'research' &&
+								(input.researchFillsAttributes ?? false),
 						})
 						return toStackOutcome(result, 'created')
 					}).pipe(redactSql),
@@ -269,6 +315,7 @@ export class InstructionsService extends Context.Service<InstructionsService>()(
 						readonly name?: string | undefined
 						readonly templateIds?: ReadonlyArray<string> | undefined
 						readonly composition?: StackComposition | undefined
+						readonly researchFillsAttributes?: boolean | undefined
 					},
 				): Effect.Effect<StackOutcome, never, SqlClient.SqlClient> =>
 					Effect.gen(function* () {
@@ -282,6 +329,12 @@ export class InstructionsService extends Context.Service<InstructionsService>()(
 							// An org stack is the base every extend layers on, so it can
 							// only ever replace — ignore a composition aimed at one.
 							composition: isOrgOwned ? 'replace' : fields.composition,
+							// The switch is the org research stack's alone, for the reason
+							// on create.
+							researchFillsAttributes:
+								isOrgOwned && existing.agent === 'research'
+									? fields.researchFillsAttributes
+									: undefined,
 						})
 						return result === 'not_found'
 							? { outcome: 'not_found' as const }
@@ -330,6 +383,53 @@ export class InstructionsService extends Context.Service<InstructionsService>()(
 						)
 						return { outcome: result }
 					}).pipe(redactSql),
+
+				// ── Attributes ──
+				// Declared on org-owned research stacks, so every write is admin-only;
+				// any member may read them, since the values sit on companies everyone
+				// works with.
+				listAttributes: (filter: {
+					readonly stackId?: string | undefined
+					readonly agent?: Agent | undefined
+				}) => listAttributes(filter).pipe(redactSql),
+
+				createAttribute: (
+					userId: string,
+					input: Omit<CreateAttributeInput, 'createdBy'>,
+				): Effect.Effect<AttributeOutcome, never, SqlClient.SqlClient> =>
+					Effect.gen(function* () {
+						if (!(yield* isAdmin(userId)))
+							return { outcome: 'forbidden' as const }
+						const result = yield* createAttribute({
+							...input,
+							createdBy: userId,
+						})
+						return toAttributeOutcome(result, 'created')
+					}).pipe(Effect.flatMap(recordOutcome), redactSql),
+
+				updateAttribute: (
+					userId: string,
+					id: string,
+					fields: UpdateAttributeFields,
+				): Effect.Effect<AttributeOutcome, never, SqlClient.SqlClient> =>
+					Effect.gen(function* () {
+						if (!(yield* isAdmin(userId)))
+							return { outcome: 'forbidden' as const }
+						const result = yield* updateAttribute(id, fields)
+						return result === 'not_found'
+							? { outcome: 'not_found' as const }
+							: toAttributeOutcome(result, 'updated')
+					}).pipe(Effect.flatMap(recordOutcome), redactSql),
+
+				deleteAttribute: (
+					userId: string,
+					id: string,
+				): Effect.Effect<AttributeOutcome, never, SqlClient.SqlClient> =>
+					Effect.gen(function* () {
+						if (!(yield* isAdmin(userId)))
+							return { outcome: 'forbidden' as const }
+						return { outcome: yield* deleteAttribute(id) }
+					}).pipe(Effect.flatMap(recordOutcome), redactSql),
 			}
 		}),
 	},
