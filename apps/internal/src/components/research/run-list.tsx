@@ -5,14 +5,13 @@ import { styled } from 'next-yak'
 
 import { PriButton } from '@batuda/ui/pri'
 
-import { researchListAtom, researchListPage } from '#/atoms/research-atoms'
+import { RUN_LIST_PAGE_SIZE, researchRunsAtom } from '#/atoms/research-atoms'
 import { ErrorState } from '#/components/shared/error-state'
 import { InfiniteListFooter } from '#/components/shared/infinite-list-footer'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { useInfiniteList } from '#/hooks/use-infinite-list'
-import { dlgNoId } from '#/lib/dlg-search'
 import { formatMoneyCents } from '#/lib/format-money'
-import { firstPage, type ListPage } from '#/lib/list-page'
+import { researchDlgSchema } from '#/lib/research-dlg'
 import { useDlg } from '#/lib/use-dlg'
 import { stenciledTitle } from '#/lib/workshop-mixins'
 import { Badge } from './badge'
@@ -20,26 +19,10 @@ import { ResearchDialog } from './research-dialog'
 import { statusLabel, statusTone } from './run-labels'
 import { narrowResearch } from './run-shapes'
 
-/** How many runs the screen reads at a time, and each "load more" adds. */
-export const RUN_LIST_PAGE_SIZE = 100
-
-/** The slice both the route loader and the screen ask for first. */
-export const RUN_LIST_FIRST_PAGE = firstPage(RUN_LIST_PAGE_SIZE, 'none')
-
-/** The all-runs list atom, shared by the route loader (to hydrate) and page. */
-export function researchRunsAtom(page: ListPage = RUN_LIST_FIRST_PAGE) {
-	return researchListAtom(researchListPage(page))
-}
-
-// The "Find companies" dialog lives in `?dlg=discovery` so it is deep-linkable
-// and Back closes it, matching the review-queue inbox. The route validates this
-// schema; a value outside it decodes to nothing and the dialog stays closed.
-export const researchRunsDlgSchema = dlgNoId('discovery')
-
 export function ResearchRuns() {
 	const { t, i18n } = useLingui()
 	const navigate = useNavigate()
-	const { dlg, open, close } = useDlg(researchRunsDlgSchema)
+	const { dlg, open, close } = useDlg(researchDlgSchema)
 	const dialogOpen = dlg !== undefined
 	const list = useInfiniteList({
 		resetKey: 'research-runs',

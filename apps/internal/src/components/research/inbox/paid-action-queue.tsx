@@ -14,12 +14,10 @@ import {
 	pendingPaidActionsAtom,
 	skipPaidActionAtom,
 } from '#/atoms/research-atoms'
+import { PAID_ACTION_LIMIT } from '#/atoms/research-inbox-atoms'
 import { humanizeFieldKey } from '#/components/research/field-diff'
 import { formatMoneyCents } from '#/lib/format-money'
 import { agedPaperSurface, stenciledTitle } from '#/lib/workshop-mixins'
-
-/** How many waiting lookups the queue shows at once. */
-export const PAID_ACTION_LIMIT = 50
 
 /**
  * Paid lookups that a run stopped short of paying for. Each one is real money

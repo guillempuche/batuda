@@ -1,14 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
 
-import {
-	ResearchRuns,
-	RUN_LIST_FIRST_PAGE,
-	researchRunsAtom,
-	researchRunsDlgSchema,
-} from '#/components/research/run-list'
+import { RUN_LIST_FIRST_PAGE, researchRunsAtom } from '#/atoms/research-atoms'
+import { ResearchRuns } from '#/components/research/run-list'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { listPageQuery } from '#/lib/list-page'
+import { researchDlgSchema } from '#/lib/research-dlg'
 import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 
@@ -34,27 +31,31 @@ async function loadRunsOnServer() {
 }
 
 export const Route = createFileRoute('/_authed/research/runs')({
-	validateSearch: validateSearchWith({ dlg: researchRunsDlgSchema }),
+	validateSearch: validateSearchWith({ dlg: researchDlgSchema }),
 	loader: async () => {
 		if (!import.meta.env.SSR) {
 			return { dehydrated: [] as const }
 		}
+		let runs: Awaited<ReturnType<typeof loadRunsOnServer>>
 		try {
-			const runs = await loadRunsOnServer()
-			return {
-				dehydrated: [
-					dehydrateAtom(
-						researchRunsAtom(RUN_LIST_FIRST_PAGE),
-						AsyncResult.success(runs),
-					),
-				] as const,
-			}
+			runs = await loadRunsOnServer()
 		} catch (error) {
 			console.warn(
 				'[ResearchRunsLoader] falling back to empty hydration:',
 				error,
 			)
 			return { dehydrated: [] as const }
+		}
+		// Outside the catch on purpose: the handover only fails through a
+		// programming mistake (an atom with no serialization key), which has to
+		// break the page rather than quietly turn into a refetch.
+		return {
+			dehydrated: [
+				dehydrateAtom(
+					researchRunsAtom(RUN_LIST_FIRST_PAGE),
+					AsyncResult.success(runs),
+				),
+			] as const,
 		}
 	},
 	head: () => ({ meta: [{ title: 'Research runs — Batuda' }] }),

@@ -29,19 +29,11 @@ import { InfiniteListFooter } from '#/components/shared/infinite-list-footer'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { useInfiniteList } from '#/hooks/use-infinite-list'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
-import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
+import { documentsDlgMembers } from '#/lib/company-dlg'
 import { documentOpenUrl } from '#/lib/document-links'
 import { useDlg } from '#/lib/use-dlg'
 import { stenciledTitle } from '#/lib/workshop-mixins'
 
-// Prefixed because the company page this panel sits on carries one `?dlg=` for
-// all of its dialogs: two kinds sharing a name would leave the second
-// unreachable.
-export const documentsDlgMembers = [
-	dlgWithId('doc-view'),
-	dlgWithId('doc-edit'),
-	dlgNoId('doc-add'),
-] as const
 const documentsDlgSchema = Schema.Union(documentsDlgMembers)
 
 type DocRow = {

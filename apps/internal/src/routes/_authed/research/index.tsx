@@ -7,7 +7,6 @@ import {
 	researchListQuery,
 	researchMonthlySpendAtom,
 } from '#/atoms/research-atoms'
-import { PAID_ACTION_LIMIT } from '#/components/research/inbox/paid-action-queue'
 import {
 	INBOX_ATTENTION_RUNS_PARAMS,
 	INBOX_FIRST_PAGE,
@@ -15,11 +14,12 @@ import {
 	inboxAttentionRunsAtom,
 	inboxPendingProposalsAtom,
 	inboxRunCountAtom,
-	ResearchInbox,
-	researchDlgSchema,
-} from '#/components/research/inbox/research-inbox'
+	PAID_ACTION_LIMIT,
+} from '#/atoms/research-inbox-atoms'
+import { ResearchInbox } from '#/components/research/inbox/research-inbox'
 import { type DehydratedAtomValue, dehydrateAtom } from '#/lib/atom-hydration'
 import { listPageQuery } from '#/lib/list-page'
+import { researchDlgSchema } from '#/lib/research-dlg'
 import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 
