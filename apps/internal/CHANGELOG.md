@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-09-12 (internal-v2026.9.12-1)
+
+### Features
+
+* **internal:** name the stylesheet and fonts in a Link header ([ff566e9](https://github.com/guillempuche/batuda/commit/ff566e963eaf08e1c4f72484cd75c1d11017b66e))
+
+### Bug Fixes
+
+* **internal:** draw the same first frame on the server and in the browser ([43bd850](https://github.com/guillempuche/batuda/commit/43bd8503ae9cfd86f2db4eb5e197401d3215f1dd))
+
+### Refactoring
+
+* **internal:** keep loader-side atoms out of component files ([6b103ad](https://github.com/guillempuche/batuda/commit/6b103ad012a0f8f11973ed2204ad30ec66df3f44))
+* **internal:** move the signed-in chrome into a layout route ([b0bc5a1](https://github.com/guillempuche/batuda/commit/b0bc5a1dc8efb9957ec9241e03df507a7ff75027))
+
+### Tests
+
+* **internal:** guard paint stability, server-painted data and self-hosted fonts ([55d7cd3](https://github.com/guillempuche/batuda/commit/55d7cd3074a2dca980644a52f96a6d8c9f9ab992))
+
 ## 2026-09-12 (internal-v2026.9.12)
 
 ### Features
