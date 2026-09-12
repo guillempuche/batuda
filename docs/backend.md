@@ -410,6 +410,12 @@ Two things belong in the database instead, and only these. A **unique index** is
 
 Nothing else. No generated column, no trigger, no expression that decides something the application also decides — a rule written twice is a rule that will disagree with itself, and the copy in SQL is the one nobody reads. Where a migration genuinely has to fold a whole existing table, pin the two against each other with a test (`company-industries-fold.integration.test.ts` is the example) and say in the migration that the application's version is the one that wins.
 
+The attribute rules are the worked example: `packages/domain/src/schema/attributes.ts` names the kinds, the key shape and the caps, `packages/instructions/src/attributes.ts` turns them into the checks every door runs (`validateDeclaration`, `validateAttributeWrite`, `validateAttributeFilter`), and `research_attributes` carries one unique index over `(organization_id, stack_id, key)` as its race guard, plus a lookup index. The rules that count and compare across the whole organisation — eight active per stack, one shape per key — run in code under an advisory lock per organisation (`pg_advisory_xact_lock`), which is what a race guard looks like when the thing two writers fight over is a count rather than a row.
+
+### Merged JSON columns
+
+`companies.attributes` and `companies.field_provenance` are maps the application only ever merges into: `attributes || $patch::jsonb - $removed::text[]`, never `attributes = $whole`. A write that replaced the column whole would drop every key the caller did not happen to send, and the callers are many — the browser sends one edited field, an assistant sends what it was told, a run's apply sends what it found. `company-attributes.ts` builds the merge fragment once (`attributeWriteFragments`) and the two writes that touch the map — the company service's update and the research apply's `occUpdate` — both take it from there, as the identity `attributes = attributes` when the write named none. The stored-row schema reads the map loosely (`Record<string, unknown>`) because a row written before a key was retired still has to decode; the input schemas are strict.
+
 ### When a tool cannot find the thing it was asked for
 
 A read answers with nothing: `success: Schema.NullOr(...)`. An action says what it could not find: `dieNotFound(entity, id)`.
