@@ -70,7 +70,7 @@ docker exec batuda-db psql -U batuda -d postgres \
 # ${db#batuda_} is <slug> and this can never target the main checkout's batuda_it.
 docker exec batuda-db psql -U batuda -d postgres \
 	-c "DROP DATABASE IF EXISTS batuda_it__${db#batuda_} WITH (FORCE)" >/dev/null 2>&1 || true
-docker run --rm --network batuda_default --entrypoint /bin/sh minio/mc:latest \
+docker run --rm --network batuda_default --entrypoint /bin/sh quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z \
 	-c "mc alias set local http://storage:9000 batuda batuda-secret >/dev/null 2>&1 && mc rb --force local/${bucket}" \
 	>/dev/null 2>&1 || true
 exit 0
