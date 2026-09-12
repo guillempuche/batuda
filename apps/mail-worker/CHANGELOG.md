@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-09-12 (mail-worker-v2026.9.12)
+
+### Bug Fixes
+
+* store a missing job title one way instead of two ([92ca4bd](https://github.com/guillempuche/batuda/commit/92ca4bdfb7b61048bac2436024ef765f1a573bba))
+
 ## 2026-09-08 (mail-worker-v2026.9.8)
 
 ### Bug Fixes
