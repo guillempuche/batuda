@@ -22,18 +22,11 @@ import { InfiniteListFooter } from '#/components/shared/infinite-list-footer'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { useInfiniteList } from '#/hooks/use-infinite-list'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
-import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
+import { proposalsDlgMembers } from '#/lib/company-dlg'
 import { formatMoneyCents } from '#/lib/format-money'
 import { useDlg } from '#/lib/use-dlg'
 import { stenciledTitle } from '#/lib/workshop-mixins'
 
-// Prefixed because the company page this panel sits on carries one `?dlg=` for
-// all of its dialogs. Only the id travels in the URL — a proposal holds nested
-// line items, which have no business in a query string.
-export const proposalsDlgMembers = [
-	dlgWithId('proposal-edit'),
-	dlgNoId('proposal-new'),
-] as const
 const proposalsDlgSchema = Schema.Union(proposalsDlgMembers)
 
 type ProposalRow = {

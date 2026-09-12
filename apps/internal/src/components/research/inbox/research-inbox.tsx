@@ -7,16 +7,19 @@ import { ArrowRight, ChevronsUpDown, Microscope, Search } from 'lucide-react'
 import { keyframes, styled } from 'next-yak'
 import { type ReactNode, useCallback, useMemo, useState } from 'react'
 
-import { ATTENTION_RESEARCH_STATUSES } from '@batuda/domain'
 import { PriButton, PriInput, PriSelect, usePriToast } from '@batuda/ui/pri'
 
 import {
 	type PendingProposal,
-	pendingProposalsAtom,
-	researchListAtom,
 	researchMonthlySpendAtom,
 	resolveProposalsBatchAtom,
 } from '#/atoms/research-atoms'
+import {
+	INBOX_FIRST_PAGE,
+	inboxAttentionRunsAtom,
+	inboxPendingProposalsAtom,
+	inboxRunCountAtom,
+} from '#/atoms/research-inbox-atoms'
 import { Badge } from '#/components/research/badge'
 import {
 	fieldChanges,
@@ -48,9 +51,8 @@ import {
 	type ResolveOutcome,
 	useProposalResolution,
 } from '#/hooks/use-proposal-resolution'
-import { dlgNoId } from '#/lib/dlg-search'
 import { formatMoneyCents } from '#/lib/format-money'
-import { firstPage, type ListPage } from '#/lib/list-page'
+import { researchDlgSchema } from '#/lib/research-dlg'
 import { useDlg } from '#/lib/use-dlg'
 import {
 	agedPaperSurface,
@@ -58,49 +60,6 @@ import {
 	rulerUnderRule,
 	stenciledTitle,
 } from '#/lib/workshop-mixins'
-
-/** How many waiting proposals the queue reads at a time. */
-export const INBOX_PROPOSAL_LIMIT = 100
-
-/** The slice both the loader and the screen ask for first. */
-export const INBOX_FIRST_PAGE = firstPage(INBOX_PROPOSAL_LIMIT, 'exact')
-
-/** The single atom the inbox reads (and the loader hydrates) for its queue. */
-export function inboxPendingProposalsAtom(page: ListPage = INBOX_FIRST_PAGE) {
-	// Counted on purpose: the inbox states how many are waiting and how many it
-	// could not fit on screen, and neither is knowable from the rows alone.
-	return pendingProposalsAtom({
-		limit: page.limit,
-		offset: page.offset,
-		count: page.count,
-	})
-}
-
-// Asked for by name rather than sifted out of the newest runs here: sifting
-// locally can only ever find the ones that happened to be fetched, so the tile
-// counted a slice of the truth and called it the total.
-const ATTENTION_STATUS_FILTER = ATTENTION_RESEARCH_STATUSES.join(',')
-
-/** What the attention feed asks for: the runs still waiting on a reader. */
-export const INBOX_ATTENTION_RUNS_PARAMS = {
-	status: ATTENTION_STATUS_FILTER,
-	limit: INBOX_PROPOSAL_LIMIT,
-	count: 'exact',
-} as const
-
-/** What the "runs" tile asks for: one row, but the exact total alongside it. */
-export const INBOX_RUN_COUNT_PARAMS = { limit: 1, count: 'exact' } as const
-
-/** The single atom for the attention feed, so a value fetched ahead of the
- * page is the one the screen reads. */
-export function inboxAttentionRunsAtom() {
-	return researchListAtom(INBOX_ATTENTION_RUNS_PARAMS)
-}
-
-/** The single atom behind the "runs" tile, shared for the same reason. */
-export function inboxRunCountAtom() {
-	return researchListAtom(INBOX_RUN_COUNT_PARAMS)
-}
 
 function rowKey(p: PendingProposal): string {
 	return `${p.researchId}::${p.proposedUpdateId ?? ''}`
@@ -119,12 +78,6 @@ function tierOf(p: PendingProposal) {
 		machineCheckable: p.machineCheckable,
 	})
 }
-
-// Whether the "Find companies" dialog is open lives in the `?dlg=discovery`
-// URL param — like the other dialogs in the app — so it is deep-linkable and
-// the back button closes it. The route validates this schema; a value outside
-// it decodes to nothing and the dialog stays closed.
-export const researchDlgSchema = dlgNoId('discovery')
 
 // Boolean adapter over the shared `?dlg=` helper: this route owns a single,
 // id-less dialog, so its open/closed state collapses to a boolean.
@@ -167,10 +120,7 @@ export function ResearchInbox() {
 	// invisible and the queue could read as empty while work was waiting.
 	const proposalsAtom = useMemo(
 		() =>
-			pendingProposalsAtom({
-				limit: INBOX_FIRST_PAGE.limit,
-				offset: INBOX_FIRST_PAGE.offset,
-				count: INBOX_FIRST_PAGE.count,
+			inboxPendingProposalsAtom(INBOX_FIRST_PAGE, {
 				...(minConfidence > 0 ? { minConfidence } : {}),
 				...(machineOnly ? { machineCheckable: true } : {}),
 			}),

@@ -79,17 +79,11 @@ import {
 	companyConversationsCalendarAtom,
 	countCompanyConversationMeetings,
 } from '#/components/companies/conversations-tab'
-import {
-	DocumentsPanel,
-	documentsDlgMembers,
-} from '#/components/companies/documents-panel'
+import { DocumentsPanel } from '#/components/companies/documents-panel'
 import { FollowupDialog } from '#/components/companies/followup-dialog'
 import { NextActionCard } from '#/components/companies/next-action-card'
 import { OpenTasksCard } from '#/components/companies/open-tasks-card'
-import {
-	ProposalsPanel,
-	proposalsDlgMembers,
-} from '#/components/companies/proposals-panel'
+import { ProposalsPanel } from '#/components/companies/proposals-panel'
 import { ResearchSummaryCard } from '#/components/companies/research-summary-card'
 import { UpcomingMeetingsCard } from '#/components/companies/upcoming-meetings-card'
 import { WherePanel } from '#/components/companies/where-panel'
@@ -143,6 +137,7 @@ import { useQuickCapture } from '#/context/quick-capture-context'
 import { useCompanyIndustries } from '#/hooks/use-company-industries'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
+import { documentsDlgMembers, proposalsDlgMembers } from '#/lib/company-dlg'
 import { languageName } from '#/lib/country-name'
 import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
 import { useOrgMembers } from '#/lib/org-members'

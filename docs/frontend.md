@@ -739,6 +739,8 @@ A mutation run with `mode: 'promiseExit'` fails with a cause rather than the err
 
 Auth is the exception: it goes through `authClient` (Better Auth). `createServerFn` is used in exactly one place, `src/lib/server-cookie.ts`, for cookie access during SSR — not for reaching the API.
 
+**What a loader imports ships to every page.** TanStack keeps route loaders, `validateSearch` and `head` in the main bundle on purpose (splitting them would make the browser fetch a chunk and only then run the loader), so whatever those import is downloaded by every visitor, sign-in page included. Atoms, page sizes and dialog search schemas that a loader needs therefore live in `src/atoms/*` and `src/lib/*` — never in a component file, which would drag the whole screen, its dependencies and its stylesheets along. `src/atoms/research-inbox-atoms.ts`, `src/lib/research-dlg.ts` and `src/lib/company-dlg.ts` exist for exactly this reason. The cost of getting it wrong is large: one loader reaching into the research inbox's file pulled that screen, the research dialog and the company panels, with their stylesheets, onto the sign-in page.
+
 ---
 
 ## Code quality — Biome

@@ -418,3 +418,14 @@ export const updateResearchPolicyAtom = BatudaApiAtom.mutation(
 	'research',
 	'updatePolicy',
 )
+
+/** How many runs the all-runs screen reads at a time, and each "load more" adds. */
+export const RUN_LIST_PAGE_SIZE = 100
+
+/** The slice both the route loader and the all-runs screen ask for first. */
+export const RUN_LIST_FIRST_PAGE = firstPage(RUN_LIST_PAGE_SIZE, 'none')
+
+/** The all-runs list atom, shared by the route loader (to hydrate) and page. */
+export function researchRunsAtom(page: ListPage = RUN_LIST_FIRST_PAGE) {
+	return researchListAtom(researchListPage(page))
+}
