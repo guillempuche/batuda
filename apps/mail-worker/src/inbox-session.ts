@@ -1,4 +1,4 @@
-import { Effect, Result, Schedule } from 'effect'
+import { type Cause, Effect, Result, Schedule } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 import { ImapFlow } from 'imapflow'
 
@@ -32,6 +32,45 @@ export const onImapClientError =
 			}),
 		)
 	}
+
+// What the two failures of a sync pass leave in the logs. Both name the
+// tenant: this worker serves every mailbox we hold and has no request to
+// take one from, so a line that skips it cannot be traced to a customer.
+// Exported for the same reason as `onImapClientError` — so a test can read
+// back what somebody filtering these lines has to work with.
+export const folderReadFailed = (args: {
+	readonly inbox: Pick<ClaimedInbox, 'id' | 'organizationId'>
+	readonly folder: string
+	readonly cause: Cause.Cause<unknown>
+}) =>
+	Effect.logWarning('Reading a folder failed').pipe(
+		Effect.andThen(Effect.logError(boundedCause(args.cause))),
+		Effect.annotateLogs({
+			event: 'email.folder_read_failed',
+			'org.id': args.inbox.organizationId,
+			inboxId: args.inbox.id,
+			folder: args.folder,
+		}),
+	)
+
+// A pass spends nearly all of its time waiting for the mail server to say
+// something changed, so a failure here is the difference between mail
+// arriving late and not arriving at all. It used to go down as a bare stack
+// with no name, which no query could group, count or alert on.
+export const idleWaitFailed = (args: {
+	readonly inbox: Pick<ClaimedInbox, 'id' | 'organizationId'>
+	readonly folder: string
+	readonly cause: Cause.Cause<unknown>
+}) =>
+	Effect.logWarning('Waiting for mailbox changes failed').pipe(
+		Effect.andThen(Effect.logError(boundedCause(args.cause))),
+		Effect.annotateLogs({
+			event: 'email.idle_wait_failed',
+			'org.id': args.inbox.organizationId,
+			inboxId: args.inbox.id,
+			folder: args.folder,
+		}),
+	)
 
 // Folders we monitor per inbox, and what finding a message in one means.
 // Gmail's "All Mail" duplicates everything (covered by IMAP \All
@@ -333,6 +372,10 @@ export const runInboxSession = (claimed: ClaimedInbox) =>
 
 		yield* Effect.gen(function* () {
 			while (true) {
+				// Whether anything in this pass failed to read. A mailbox whose
+				// folders would not open is not one we have just seen, so saying
+				// so would wipe the error that explains why no mail is arriving.
+				let readFailed = false
 				for (const folder of folders) {
 					yield* syncOneFolderTick({
 						client,
@@ -343,18 +386,21 @@ export const runInboxSession = (claimed: ClaimedInbox) =>
 						progress,
 					}).pipe(
 						Effect.catchCause(cause =>
-							Effect.logWarning('Reading a folder failed').pipe(
-								Effect.andThen(Effect.logError(boundedCause(cause))),
-								Effect.annotateLogs({
-									event: 'email.folder_read_failed',
-									inboxId: claimed.id,
-									folder: folder.path,
-								}),
+							folderReadFailed({
+								inbox: claimed,
+								folder: folder.path,
+								cause,
+							}).pipe(
+								Effect.andThen(
+									Effect.sync(() => {
+										readFailed = true
+									}),
+								),
 							),
 						),
 					)
 				}
-				yield* markHealthy(claimed.id)
+				if (!readFailed) yield* markHealthy(claimed.id)
 
 				// Hold IMAP IDLE so the server can push `exists`/`expunge` mid-IDLE.
 				// imapflow surfaces those as events rather than resolving idle(), so
@@ -370,7 +416,13 @@ export const runInboxSession = (claimed: ClaimedInbox) =>
 							`mailboxOpen(${folderToWaitOn.path}) failed: ${String(err)}`,
 						),
 				}).pipe(
-					Effect.catchCause(cause => Effect.logError(boundedCause(cause))),
+					Effect.catchCause(cause =>
+						idleWaitFailed({
+							inbox: claimed,
+							folder: folderToWaitOn.path,
+							cause,
+						}),
+					),
 				)
 				yield* Effect.sync(() => {
 					void client.idle().catch(() => {})

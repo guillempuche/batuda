@@ -5,7 +5,7 @@ process.env['DATABASE_URL'] ??=
 	'postgresql://batuda:batuda@localhost:5433/batuda'
 process.env['EMAIL_HEALTH_PROBE_INTERVAL_SEC'] ??= '900'
 
-import { Effect, Layer } from 'effect'
+import { Effect, Layer, Logger, References } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -58,6 +58,31 @@ const provideTestLayers = (
 		Layer.provide([stubCrypto, stubTransport(probeImpl)]),
 		Layer.provide(PgLive),
 	)
+
+// Reads back every line an effect writes. Annotations sit on the fiber rather
+// than on the log options, so they are read the way the built-in formatters
+// read them.
+const captureLines = () => {
+	const lines: Array<{
+		level: string
+		message: string
+		annotations: Record<string, unknown>
+	}> = []
+	const layer = Logger.layer([
+		Logger.make(options => {
+			lines.push({
+				level: String(options.logLevel),
+				message: String(options.message),
+				annotations: options.fiber.getRef(
+					References.CurrentLogAnnotations,
+				) as Record<string, unknown>,
+			})
+		}),
+	]).pipe(
+		Layer.provideMerge(Layer.succeed(References.MinimumLogLevel, 'Debug')),
+	)
+	return { lines, layer }
+}
 
 describe('InboxHealthProbe', () => {
 	let inboxId: string
@@ -307,6 +332,76 @@ describe('InboxHealthProbe', () => {
 			)
 			expect(grant?.grantStatus).toBe('connected')
 			expect(grant?.grantLastError).toBeNull()
+		})
+	})
+	// A round that finds nothing wrong writes only Debug lines per mailbox,
+	// and production keeps Debug out. Without a line of its own, a stopped
+	// poller and a healthy one are told apart by nothing at all.
+	describe('the line a whole round leaves behind', () => {
+		const roundLine = (
+			lines: ReadonlyArray<{ annotations: Record<string, unknown> }>,
+		) => lines.find(line => line.annotations['event'] === 'inbox.probe_round')
+
+		it('should report a passing round at info, counting the mailboxes it checked', async () => {
+			// GIVEN the seeded inbox is active AND the probe will succeed
+			const { lines, layer: capture } = captureLines()
+
+			// WHEN the probe walks a round
+			await Effect.runPromise(
+				Effect.gen(function* () {
+					const probe = yield* InboxHealthProbe
+					yield* probe.tick
+				}).pipe(
+					Effect.provide(provideTestLayers(() => Effect.void)),
+					Effect.provide(capture),
+				) as Effect.Effect<void, never, never>,
+			)
+
+			// THEN one info line should account for every mailbox in the round
+			const round = roundLine(lines)
+			expect(round).toBeDefined()
+			const checked = round?.annotations['inbox.probe.checked'] as number
+			expect(checked).toBeGreaterThanOrEqual(1)
+			expect(round?.annotations['inbox.probe.passed']).toBe(checked)
+			expect(round?.annotations['inbox.probe.failed']).toBe(0)
+			expect(
+				lines.find(line => line.annotations['event'] === 'inbox.probe_round')
+					?.level,
+			).toBe('Info')
+		})
+
+		it('should count a mailbox that did not pass against the round', async () => {
+			// GIVEN a probe that is turned away by the mail server
+			const { lines, layer: capture } = captureLines()
+
+			// WHEN the probe walks a round
+			await Effect.runPromise(
+				Effect.gen(function* () {
+					const probe = yield* InboxHealthProbe
+					yield* probe.tick
+				}).pipe(
+					Effect.provide(
+						provideTestLayers(creds =>
+							Effect.fail(
+								new GrantAuthFailed({
+									inboxId: creds.inboxId,
+									reason: 'invalid_credentials',
+									detail: 'turned away',
+								}),
+							),
+						),
+					),
+					Effect.provide(capture),
+				) as Effect.Effect<void, never, never>,
+			)
+
+			// THEN the round should own up to the failure rather than counting it as a pass
+			const round = roundLine(lines)
+			expect(round?.annotations['inbox.probe.failed']).toBeGreaterThanOrEqual(1)
+			expect(round?.annotations['inbox.probe.checked']).toBe(
+				(round?.annotations['inbox.probe.passed'] as number) +
+					(round?.annotations['inbox.probe.failed'] as number),
+			)
 		})
 	})
 })

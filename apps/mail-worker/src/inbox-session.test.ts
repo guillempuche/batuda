@@ -1,8 +1,14 @@
 import { EventEmitter } from 'node:events'
 
+import { Cause, Effect, Layer, Logger, References } from 'effect'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { onImapClientError, resolveTrackedFolders } from './inbox-session.js'
+import {
+	folderReadFailed,
+	idleWaitFailed,
+	onImapClientError,
+	resolveTrackedFolders,
+} from './inbox-session.js'
 
 // Spy on console.warn so the handler's single JSON line is captured, not printed.
 const captureWarn = () =>
@@ -210,6 +216,126 @@ describe('resolveTrackedFolders', () => {
 			expect(resolveTrackedFolders(boxes)).toEqual([
 				{ path: 'INBOX', direction: 'inbound' },
 			])
+		})
+	})
+})
+
+// Reads back every line an effect writes. Annotations sit on the fiber rather
+// than on the log options, so they are read the way the built-in formatters
+// read them.
+const captureLines = () => {
+	const lines: Array<{
+		level: string
+		message: string
+		annotations: Record<string, unknown>
+	}> = []
+	const layer = Logger.layer([
+		Logger.make(options => {
+			lines.push({
+				level: String(options.logLevel),
+				message: String(options.message),
+				annotations: options.fiber.getRef(
+					References.CurrentLogAnnotations,
+				) as Record<string, unknown>,
+			})
+		}),
+	]).pipe(
+		Layer.provideMerge(Layer.succeed(References.MinimumLogLevel, 'Debug')),
+	)
+	return { lines, layer }
+}
+
+const readLines = async (effect: Effect.Effect<void>) => {
+	const { lines, layer } = captureLines()
+	await Effect.runPromise(effect.pipe(Effect.provide(layer)))
+	return lines
+}
+
+const inbox = { id: 'inbox-1', organizationId: 'org-1' } as const
+
+describe('the lines a sync pass leaves when the mail server will not cooperate', () => {
+	describe('when a folder cannot be read', () => {
+		it('should name the event and say which tenant and folder it was about', async () => {
+			// GIVEN a folder read that failed
+			// WHEN the failure is written down
+			const lines = await readLines(
+				folderReadFailed({
+					inbox,
+					folder: 'INBOX',
+					cause: Cause.fail(new Error('Connection not available')),
+				}),
+			)
+
+			// THEN every line it writes should carry the name and the tenant
+			expect(lines.length).toBeGreaterThan(0)
+			for (const line of lines) {
+				expect(line.annotations['event']).toBe('email.folder_read_failed')
+				expect(line.annotations['org.id']).toBe('org-1')
+				expect(line.annotations['inboxId']).toBe('inbox-1')
+				expect(line.annotations['folder']).toBe('INBOX')
+			}
+		})
+
+		it('should keep the reason out of the message and in a bounded cause', async () => {
+			// GIVEN a failure whose cause names the underlying problem
+			// WHEN the failure is written down
+			const lines = await readLines(
+				folderReadFailed({
+					inbox,
+					folder: 'Sent',
+					cause: Cause.fail(new Error('Connection not available')),
+				}),
+			)
+
+			// THEN one line should read as a sentence and another carry the cause
+			expect(lines[0]?.message).toBe('Reading a folder failed')
+			expect(
+				lines.some(line => line.message.includes('Connection not available')),
+			).toBe(true)
+		})
+	})
+
+	describe('when waiting for the mail server to report a change fails', () => {
+		it('should get a name of its own rather than a bare stack', async () => {
+			// GIVEN the wait failed
+			// WHEN the failure is written down
+			const lines = await readLines(
+				idleWaitFailed({
+					inbox,
+					folder: 'INBOX',
+					cause: Cause.fail(new Error('Connection not available')),
+				}),
+			)
+
+			// THEN it should be filterable by name, tenant and folder
+			expect(lines.length).toBeGreaterThan(0)
+			for (const line of lines) {
+				expect(line.annotations['event']).toBe('email.idle_wait_failed')
+				expect(line.annotations['org.id']).toBe('org-1')
+				expect(line.annotations['inboxId']).toBe('inbox-1')
+				expect(line.annotations['folder']).toBe('INBOX')
+			}
+			expect(lines[0]?.message).toBe('Waiting for mailbox changes failed')
+		})
+
+		it('should not be mistaken for a folder read failure', async () => {
+			// GIVEN both failures happen in the same pass
+			// WHEN each is written down
+			const waitLines = await readLines(
+				idleWaitFailed({
+					inbox,
+					folder: 'INBOX',
+					cause: Cause.fail(new Error('boom')),
+				}),
+			)
+
+			// THEN the wait failure should not answer to the folder-read name,
+			// so a count of one is not silently the other
+			expect(
+				waitLines.every(
+					line => line.annotations['event'] !== 'email.folder_read_failed',
+				),
+			).toBe(true)
 		})
 	})
 })

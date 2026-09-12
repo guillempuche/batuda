@@ -154,6 +154,8 @@ export class InboxHealthProbe extends Context.Service<InboxHealthProbe>()(
 						: Effect.logWarning('Mailbox check did not pass').pipe(
 								Effect.annotateLogs(facts),
 							)
+					// Handed back so the round can say how it went as a whole.
+					return state
 				}).pipe(
 					// One mailbox whose answer cannot be written down must not cost the
 					// others their turn. A lost permission or a key that fails to
@@ -167,13 +169,34 @@ export class InboxHealthProbe extends Context.Service<InboxHealthProbe>()(
 								inboxId: inbox.id,
 								cause: boundedCause(cause),
 							}),
+							// A check we could not write down is not a check that
+							// passed, so the round counts it against itself.
+							Effect.andThen(Effect.succeed('unrecorded' as const)),
 						),
 					),
 				)
 
 			const tick = Effect.gen(function* () {
 				const rows = yield* activeInboxes
-				yield* Effect.forEach(rows, probeOne, { concurrency: 4 })
+				const outcomes = yield* Effect.forEach(rows, probeOne, {
+					concurrency: 4,
+				})
+				// The one line a round that found nothing wrong still writes.
+				// Production keeps Debug out of the logs, so without this a
+				// poller that has stopped and a poller with good news look the
+				// same from outside: no line either way.
+				yield* Effect.logInfo('Mailbox checks ran').pipe(
+					Effect.annotateLogs({
+						event: 'inbox.probe_round',
+						'inbox.probe.checked': outcomes.length,
+						'inbox.probe.passed': outcomes.filter(
+							outcome => outcome === 'connected',
+						).length,
+						'inbox.probe.failed': outcomes.filter(
+							outcome => outcome !== 'connected',
+						).length,
+					}),
+				)
 			})
 
 			return { tick, intervalSec } as const
