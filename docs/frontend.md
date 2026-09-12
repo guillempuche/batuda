@@ -735,6 +735,8 @@ const update = useAtomSet(updateTemplateAtom, { mode: 'promiseExit' })
 
 A query resolves to an `AsyncResult` — narrow it with `AsyncResult.isSuccess` / `isFailure`. `useAtomRefresh` keeps serving the **previous** value while the new one is in flight, so a component that must show what was just written should read the mutation's own reply rather than waiting on the refreshed list.
 
+A value a loader handed over from the server works the same way: the atom mounts already holding it (so the first render shows data, not a spinner), and then asks the API once more, marking the held value `waiting` until the fresh one lands. That second request is the framework's stale-while-revalidate, not a missed handover — `makeEffect` in `effect/unstable/reactivity` always runs the effect and only decides what to show meanwhile. A missed handover looks different: the server renders the spinner, and the page stays on it until the browser has fetched everything itself. `tests/e2e/web-vitals.test.ts` guards that case by fetching the dashboard without JavaScript and by slowing the browser's own requests down.
+
 A mutation run with `mode: 'promiseExit'` fails with a cause rather than the error itself, and the client buries the decoded error inside it — so without digging, every failure looks alike and a screen can only say "try again". `taggedFailure(cause, tag)` in `src/lib/tagged-failure.ts` pulls a named one back out, and `badRequestMessage(cause)` gets straight to the sentence the server wrote for the reader.
 
 Auth is the exception: it goes through `authClient` (Better Auth). `createServerFn` is used in exactly one place, `src/lib/server-cookie.ts`, for cookie access during SSR — not for reaching the API.

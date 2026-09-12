@@ -22,6 +22,12 @@ export type CompanyIndustry = {
 	readonly companyCount: number
 }
 
+// The key is what lets the signed-in layout fetch this on the server and hand
+// it to the browser, so the first paint already names each trade. Without it
+// the server spells a trade out from its stored form ("Restauracio") while the
+// browser shows the real name, and React throws the card away and rebuilds it.
 export const companyIndustriesAtom = Atom.keepAlive(
-	BatudaApiAtom.query('companyIndustries', 'list', {}),
+	BatudaApiAtom.query('companyIndustries', 'list', {
+		serializationKey: 'companyIndustries:list',
+	}),
 )
