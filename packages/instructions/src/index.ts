@@ -4,14 +4,50 @@
 // lives with the app's migrations, not here; this package owns the logic.
 
 export type {
+	AttributeFilter,
+	AttributeFilterCheck,
+	AttributeWriteCheck,
+	AttributeWritePlan,
+	AttributeWriteResult,
+	CheckedValue,
+	CleanDeclaration,
+	CreateAttributeInput,
+	DeclarationCheck,
+	DeclarationContext,
+	DeclarationInput,
+	DeclarationRefusal,
+	DeclaredAttribute,
+	DeclaredShape,
+	FilterRefusal,
+	UpdateAttributeFields,
+	WriteRefusal,
+} from './attributes'
+export {
+	createAttribute,
+	declaredByKey,
+	deleteAttribute,
+	getAttribute,
+	listActiveAttributes,
+	listAttributes,
+	readStackAttributesForRun,
+	sameShape,
+	toDeclaration,
+	updateAttribute,
+	validateAttributeFilter,
+	validateAttributeWrite,
+	validateDeclaration,
+	validateKey,
+} from './attributes'
+export type {
 	Agent,
 	InstructionStack,
 	InstructionTemplate,
+	ResearchAttribute,
 	StackComposition,
 	StackItem,
 } from './domain'
 export { AgentSchema, agents } from './domain'
-export { fingerprintTemplates } from './fingerprint'
+export { fingerprintAttributes, fingerprintTemplates } from './fingerprint'
 export type {
 	CreateStackInput,
 	CreateTemplateInput,
@@ -55,10 +91,10 @@ export {
 	assembleSegments,
 	classifyInstructionRefs,
 	classifyStackRef,
-	isUuidRef,
 	personalTemplatesInOrgStack,
 	pickStackSource,
 	resolveInstructionRefs,
 	resolveInstructions,
 	resolveStackRef,
 } from './resolver'
+export { isUuidRef } from './uuid'

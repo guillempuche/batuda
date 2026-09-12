@@ -2012,7 +2012,6 @@ msgstr "Current password"
 msgid "Current password is incorrect."
 msgstr "Current password is incorrect."
 
-#: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/run-labels.ts
 msgid "Current tools"

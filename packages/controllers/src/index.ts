@@ -1,5 +1,8 @@
 export { BatudaApi } from './api'
 export {
+	AttributeRejected,
+	type AttributeRejectedReason,
+	attributeRejectedReasons,
 	BadRequest,
 	ConfirmRequired,
 	Conflict,

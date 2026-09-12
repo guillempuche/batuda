@@ -18,6 +18,19 @@ import {
 import { recordStageChange } from '../services/company-stage-change'
 import { Geocoder } from '../services/geocoder'
 
+// A refused attribute value or filter is the caller's to fix and keeps its
+// own answer, mapped to 400 by the route; anything else is a server fault.
+const keepAttributeRejected = <A, E extends { readonly _tag: string }, R>(
+	self: Effect.Effect<A, E, R>,
+): Effect.Effect<A, Extract<E, { readonly _tag: 'AttributeRejected' }>, R> =>
+	self.pipe(
+		Effect.catch(e =>
+			e._tag === 'AttributeRejected'
+				? Effect.fail(e as Extract<E, { readonly _tag: 'AttributeRejected' }>)
+				: Effect.die(e),
+		),
+	)
+
 export const CompaniesLive = HttpApiBuilder.group(
 	BatudaApi,
 	'companies',
@@ -28,8 +41,8 @@ export const CompaniesLive = HttpApiBuilder.group(
 			const timeline = yield* TimelineActivityService
 			const sql = yield* SqlClient.SqlClient
 			return handlers
-				.handle('list', _ => svc.search(_.query).pipe(Effect.orDie))
-				.handle('facets', _ => svc.facets(_.query).pipe(Effect.orDie))
+				.handle('list', _ => svc.search(_.query).pipe(keepAttributeRejected))
+				.handle('facets', _ => svc.facets(_.query).pipe(keepAttributeRejected))
 				.handle('get', _ =>
 					svc.getWithRelations(_.params.slug).pipe(
 						// Keep NotFound (mapped to 404 by the route's declared error
@@ -40,6 +53,9 @@ export const CompaniesLive = HttpApiBuilder.group(
 					),
 				)
 				.handle('create', _ => {
+					// The people ride beside the company rather than among its fields;
+					// the attribute values and the run they came from stay in the bag,
+					// which the service lifts out itself.
 					const { contacts, ...company } = _.payload
 					return svc
 						.createWithContacts({
@@ -62,7 +78,7 @@ export const CompaniesLive = HttpApiBuilder.group(
 									}),
 								),
 							),
-							Effect.orDie,
+							keepAttributeRejected,
 						)
 				})
 				.handle('update', _ =>
@@ -105,7 +121,7 @@ export const CompaniesLive = HttpApiBuilder.group(
 							actorUserId: session.userId,
 						})
 						return result
-					}).pipe(Effect.orDie),
+					}).pipe(keepAttributeRejected),
 				)
 				.handle('geocode', _ =>
 					geocodeCompany(_.params.id).pipe(

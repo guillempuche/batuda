@@ -1,10 +1,10 @@
 import { Effect } from 'effect'
-import type { SqlError } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
 import type { Agent, InstructionTemplate } from './domain'
 import { classifyStackTemplates } from './management-logic'
 import type { StackComposition } from './resolver'
+import { type Eff, isUniqueViolation } from './sql'
 
 // SQL-only management operations for instruction templates and default stacks.
 // They run as the request-scoped role, so RLS already limits what
@@ -12,8 +12,6 @@ import type { StackComposition } from './resolver'
 // admin gate on org-owned writes, fork-on-edit) are composed by the app layer
 // on top of these primitives. Every operation requires SqlClient and fails only
 // with SqlError, like the resolver.
-
-type Eff<A> = Effect.Effect<A, SqlError.SqlError, SqlClient.SqlClient>
 
 // ── Templates ──────────────────────────────────────────────────────────────
 
@@ -174,6 +172,7 @@ export interface StackSummary {
 	readonly name: string
 	readonly isDefault: boolean
 	readonly composition: StackComposition
+	readonly researchFillsAttributes: boolean
 	readonly templateIds: ReadonlyArray<string>
 }
 
@@ -185,6 +184,7 @@ interface StackRow {
 	readonly name: string
 	readonly isDefault: boolean
 	readonly composition: StackComposition
+	readonly researchFillsAttributes: boolean
 }
 
 const loadStackItemIds = (
@@ -210,6 +210,7 @@ const withItems = (
 	name: row.name,
 	isDefault: row.isDefault,
 	composition: row.composition,
+	researchFillsAttributes: row.researchFillsAttributes,
 	templateIds,
 })
 
@@ -246,14 +247,7 @@ const loadItemsByStack = (
 				},
 			)
 
-const STACK_COLUMNS = `id, organization_id, owner_user_id, agent, name, is_default, composition`
-
-// A stack whose name (or default flag) collides with an existing one for the
-// same scope+agent raises a unique violation; the SqlError carries a structured
-// `reason` tagged UniqueViolation, which maps to a clean `duplicate_name` rather
-// than a redacted fault.
-const isUniqueViolation = (err: SqlError.SqlError): boolean =>
-	err.reason._tag === 'UniqueViolation'
+const STACK_COLUMNS = `id, organization_id, owner_user_id, agent, name, is_default, composition, research_fills_attributes`
 
 // Every stack readable by the actor (RLS: org stacks + their own), optionally
 // filtered to one agent. Ordered so defaults surface first, then by name.
@@ -404,6 +398,8 @@ export interface CreateStackInput {
 	// 'extend' layers the items on the live org default; org stacks pass 'replace'.
 	readonly composition: StackComposition
 	readonly isDefault: boolean
+	// Whether a research run fills the attributes declared on this stack.
+	readonly researchFillsAttributes: boolean
 }
 
 export const createStack = (input: CreateStackInput): Eff<StackWriteResult> =>
@@ -425,10 +421,11 @@ export const createStack = (input: CreateStackInput): Eff<StackWriteResult> =>
 			)
 		const created = yield* sql<StackRow>`
 			INSERT INTO instruction_stacks
-				(organization_id, owner_user_id, agent, name, is_default, composition)
+				(organization_id, owner_user_id, agent, name, is_default, composition, research_fills_attributes)
 			VALUES (
 				${input.organizationId}, ${input.ownerUserId}, ${input.agent},
-				${input.name}, ${input.isDefault}, ${input.composition}
+				${input.name}, ${input.isDefault}, ${input.composition},
+				${input.researchFillsAttributes}
 			)
 			RETURNING ${sql.unsafe(STACK_COLUMNS)}
 		`
@@ -454,6 +451,7 @@ export const updateStack = (
 		readonly name?: string | undefined
 		readonly templateIds?: ReadonlyArray<string> | undefined
 		readonly composition?: StackComposition | undefined
+		readonly researchFillsAttributes?: boolean | undefined
 	},
 ): Eff<StackWriteResult | 'not_found'> =>
 	Effect.gen(function* () {
@@ -479,6 +477,7 @@ export const updateStack = (
 			UPDATE instruction_stacks
 			SET name = COALESCE(${fields.name ?? null}, name),
 				composition = COALESCE(${fields.composition ?? null}, composition),
+				research_fills_attributes = COALESCE(${fields.researchFillsAttributes ?? null}, research_fills_attributes),
 				updated_at = now()
 			WHERE id = ${id}
 		`

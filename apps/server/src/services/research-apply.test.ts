@@ -34,13 +34,13 @@ describe('allowlistFields', () => {
 			// GIVEN a model that sent snake_case field names
 			const { fields: kept } = allowlistFields('companies', {
 				size_range: '51-200',
-				current_tools: 'a spreadsheet',
+				google_maps_url: 'https://maps.google.com/?cid=1',
 			})
 
 			// THEN they map to the camelCase column keys
 			expect(kept).toEqual({
 				sizeRange: '51-200',
-				currentTools: 'a spreadsheet',
+				googleMapsUrl: 'https://maps.google.com/?cid=1',
 			})
 		})
 	})

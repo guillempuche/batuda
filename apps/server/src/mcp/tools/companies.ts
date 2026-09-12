@@ -3,15 +3,19 @@ import { Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
 import {
+	type AttributeRejected,
 	CompanyDetail,
 	CurrentOrg,
 	STALE_DAYS_BOUNDS,
 } from '@batuda/controllers'
 import {
+	ATTRIBUTE_QUOTE_MAX,
 	AttentionFilter,
+	AttributeOp,
 	COMPANY_PRIORITIES,
 	COMPANY_STATUSES,
 	Company,
+	CompanyAttributesInput,
 	CompanyCountry,
 	CompanyEmail,
 	CompanyGoogleMapsUrl,
@@ -69,7 +73,13 @@ import { Geocoder } from '../../services/geocoder'
 import { CurrentUser } from '../current-user'
 import { ToolMessage } from '../tool-message'
 import { CompanyIdOrSlugParam, CompanyIdParam } from './_ids'
+import { Uuid } from './_research-shared'
 import { McpPageLimit, McpPageOffset, PageResult, toPage } from './_result'
+
+// How a value of each kind is written, said once for every place that has to
+// say it.
+const HOW_A_VALUE_READS =
+	'a number as digits, a date as YYYY-MM-DD, yes/no as true or false, a choice by one of its declared words'
 
 const REQUEST_DEPENDENCIES = [CurrentOrg, CurrentUser]
 
@@ -103,7 +113,7 @@ export const CompanyFilterOptions = Schema.Struct({
 
 const SearchCompanies = Tool.make('search_companies', {
 	description:
-		'Filter companies by status, country (ISO 3166-1 alpha-2, e.g. US/ES/DE), industry, priority, owner, search query, what needs attention, the research fit verdict, a fit criterion the company passed, tags, one thing written under `metadata`, or a geographic bounding box. `status`, `country`, `owner` and `fit_verdict` each take a list and match ANY of the values in it, while different filters narrow one another — so status ["contacted","responded"] with country ["ES"] is those two stages in Spain. `tags` reads the other way round: every tag named has to be on the company, so a second tag narrows the list. `owner` takes user ids from list_members and/or the word "none" for companies nobody has taken; pass both to ask for yours plus the unclaimed. `attention` is what needs doing, in the same words the daily lists use: "overdue" missed its follow-up date, "stale" is mid-chase and unheard from for `stale_days` (default 14), "no-next-action" has nothing written down at all — a deleted company counts as none of these, so `attention` with `deleted: "only"` finds nothing at all, and with `deleted: "include"` simply leaves the deleted ones out. `fit_verdict` is what a research run concluded (strong_fit / possible_fit / weak_fit / no_fit), which nothing but a run writes, so a view of your own lives under `metadata` and is found with the pair below — a fit criterion is matched loosely against the criterion text. One thing under `metadata` is given as `metadata_key` plus `metadata_value`. The box is any subset of min_lat/max_lat/min_lng/max_lng (decimal degrees); each bound is applied independently and only matches companies with stored coordinates. `sort` picks the order: priority (the default), name, recent_contact, recent_update. Returns summaries (including latitude/longitude) — call get_company for full details. Set `include_filter_options` to be told which countries, trades, tags and fit verdicts are worth asking for, rather than guessing a value and getting nothing back. Each count is how many companies carry that value under the OTHER filters in force — for `status`, `country` and `fit_verdict` that is what adding it would bring in, not the size of the list you would end up with, since a second value there widens. For `tags` it is both, because every tag named has to be on the company, so a tag already chosen just reports the whole current list. `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true.',
+		'Filter companies by status, country (ISO 3166-1 alpha-2, e.g. US/ES/DE), industry, priority, owner, search query, what needs attention, the research fit verdict, a fit criterion the company passed, tags, one declared attribute, one thing written under `metadata`, or a geographic bounding box. `status`, `country`, `owner` and `fit_verdict` each take a list and match ANY of the values in it, while different filters narrow one another — so status ["contacted","responded"] with country ["ES"] is those two stages in Spain. `tags` reads the other way round: every tag named has to be on the company, so a second tag narrows the list. `owner` takes user ids from list_members and/or the word "none" for companies nobody has taken; pass both to ask for yours plus the unclaimed. `attention` is what needs doing, in the same words the daily lists use: "overdue" missed its follow-up date, "stale" is mid-chase and unheard from for `stale_days` (default 14), "no-next-action" has nothing written down at all — a deleted company counts as none of these, so `attention` with `deleted: "only"` finds nothing at all, and with `deleted: "include"` simply leaves the deleted ones out. `fit_verdict` is what a research run concluded (strong_fit / possible_fit / weak_fit / no_fit), which nothing but a run writes; a judgement of your own is an attribute the organisation declares — a fit criterion is matched loosely against the criterion text. A declared attribute is given as `attribute_key` + `attribute_op` + `attribute_value` together: the operator has to fit the kind (text: eq, in, contains; a choice: eq, in; yes/no: eq; a number or a date: eq, gte, lte), `in` takes the choices separated by commas, and a key nobody declared finds nothing. manage_instructions list_attributes says what is declared. One thing under `metadata` is given as `metadata_key` plus `metadata_value`. The box is any subset of min_lat/max_lat/min_lng/max_lng (decimal degrees); each bound is applied independently and only matches companies with stored coordinates. `sort` picks the order: priority (the default), name, recent_contact, recent_update. Returns summaries (including latitude/longitude) — call get_company for full details. Set `include_filter_options` to be told which countries, trades, tags and fit verdicts are worth asking for, rather than guessing a value and getting nothing back. Each count is how many companies carry that value under the OTHER filters in force — for `status`, `country` and `fit_verdict` that is what adding it would bring in, not the size of the list you would end up with, since a second value there widens. For `tags` it is both, because every tag named has to be on the company, so a tag already chosen just reports the whole current list. `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true.',
 	parameters: Schema.Struct({
 		// The same closed word lists the write tools below use. A stage the model
 		// invented used to come back as an empty list, which reads as "you have
@@ -138,9 +148,20 @@ const SearchCompanies = Tool.make('search_companies', {
 			description:
 				'Tags the company must carry — every one of them, not any of them. Tags are free text set when the company was written, so ask for one you know was used rather than guessing.',
 		}),
+		attribute_key: Schema.optionalKey(Schema.String).annotate({
+			description:
+				'The key of a declared attribute (manage_instructions list_attributes). Goes with attribute_op and attribute_value: give all three or none.',
+		}),
+		attribute_op: Schema.optionalKey(AttributeOp).annotate({
+			description:
+				'How the value is held: eq (exactly), in (one of several, comma-separated), contains (text only), gte / lte (numbers and dates only, at least / at most).',
+		}),
+		attribute_value: Schema.optionalKey(Schema.String).annotate({
+			description: `What the attribute is held to, as text: ${HOW_A_VALUE_READS}.`,
+		}),
 		metadata_key: Schema.optionalKey(Schema.String).annotate({
 			description:
-				"Name of one thing written under the company's `metadata`, to be matched together with `metadata_value`. Neither half filters on its own.",
+				"Name of one thing written under the company's `metadata` — the free-form bag for what has no declared home — to be matched together with `metadata_value`. Neither half filters on its own. A fact the organisation records on every company is an attribute instead; filter those with attribute_key.",
 		}),
 		metadata_value: Schema.optionalKey(Schema.String).annotate({
 			description:
@@ -187,6 +208,9 @@ const GetCompany = Tool.make('get_company', {
 	.annotate(Tool.Destructive, false)
 	.annotate(Tool.OpenWorld, false)
 
+// Written once for both company writes, so the two tools describe one shape.
+const ATTRIBUTES_INPUT_DESCRIPTION = `Values for the attributes this organisation declared (manage_instructions list_attributes), keyed by attribute key: \`{ "site_count": 4, "fit": "strong" }\`. Each value is the bare value — text, or ${HOW_A_VALUE_READS} — or \`{ value, source_id, quote, as_of }\` when you know the page it was read from (a quote is kept to ${ATTRIBUTE_QUOTE_MAX} characters); null removes the key. A key nobody declared, or a value that does not read as the key's kind, refuses the whole write and names the key. Values merge into what the company already holds. When a value was read during a research run, pass the run's id as research_id beside the list and give the value in the wrapped form with the page it was read on as source_id: a value whose page that run fetched is recorded as the run's, with the page, the run and the date; any other is recorded as yours.`
+
 // The fields a new company carries — one array element of a create_companies call.
 const companyInputFields = {
 	name: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
@@ -223,7 +247,6 @@ const companyInputFields = {
 	productsFit: Schema.optionalKey(Schema.Array(Schema.String)),
 	tags: Schema.optionalKey(Schema.Array(CompanyTag)),
 	painPoints: Schema.optionalKey(Schema.String),
-	currentTools: Schema.optionalKey(Schema.String),
 	nextAction: Schema.optionalKey(Schema.String),
 	nextActionAt: Schema.optionalKey(Schema.String),
 	// Finite, not a plain number: a plain number also admits NaN, which reaches
@@ -232,9 +255,12 @@ const companyInputFields = {
 	longitude: Schema.optionalKey(CompanyLongitude),
 	geocodedAt: Schema.optionalKey(Schema.String),
 	geocodeSource: Schema.optionalKey(Schema.String),
+	attributes: Schema.optionalKey(CompanyAttributesInput).annotate({
+		description: ATTRIBUTES_INPUT_DESCRIPTION,
+	}),
 	metadata: Schema.optional(Schema.Unknown).annotate({
 		description:
-			'Anything else worth keeping on this company, as a JSON object of your own shape. Searchable later through search_companies with metadata_key + metadata_value. Your own view of whether a company is worth selling to belongs here, by convention as `fitVerdict`: the separate fit_verdict field is what a research run concluded and nothing but a run writes it, so a judgement of your own has nowhere else to live.',
+			'Anything with no declared home, as a JSON object of your own shape; searchable later through search_companies with metadata_key + metadata_value. A fact the organisation records on every company — a judgement of your own about the fit, a count, a yes/no — belongs in `attributes` under a key an admin has declared (manage_instructions list_attributes); until one is declared, it lives here.',
 	}),
 	contacts: Schema.optionalKey(
 		Schema.Array(
@@ -254,7 +280,7 @@ const CompanyInput = Schema.Struct(companyInputFields)
 // version drifted: it offered three statuses the app has never had and a priority
 // range twice the real one, and assistants followed it into rows that show up in
 // no board column. The sentence cannot say anything the schema would refuse.
-export const CREATE_COMPANIES_DESCRIPTION = `Create one or more companies in a single call — pass \`companies\` as an array (a single element to create just one, the whole shortlist to load a batch). Slug: leave it out and it is worked out from the name — supply one only to choose a particular web address. It must be plain lowercase a-z, digits and single hyphens, so an accented or non-Latin name cannot be written into one directly. Status: ${COMPANY_STATUSES.join('|')} (default: prospect). ownerId assigns the colleague who will work the company — pass a user id from list_members, or leave it out to create it unowned. It only lands on companies actually created: a skipped duplicate keeps the owner it already had, so re-sending a list is never a way to hand companies over. Use update_company for that. Priority: ${COMPANY_PRIORITIES[0]} (highest) to ${COMPANY_PRIORITIES[COMPANY_PRIORITIES.length - 1]} (lowest, default: 2). Pass taxId whenever you know it: a company is skipped if its slug already exists OR its registration number already does, so the number catches the same firm arriving under a different trading name. Pass \`contacts\` inside a company's own object, not beside the list, to take its people on in the same call. Runs in one transaction; a skip is not an error, so re-running an overlapping list is safe. Returns { created, contacts_added, skipped, created_needs_review }. Read the split this way: created and created_needs_review were both WRITTEN; only skipped was not — though a skipped company's people may still have landed on it. contacts_added counts the people written across the whole call. \`skipped\` gives each left-out slug plus matched_on — "slug" or "tax_id" when that identity was already on file before this call, "slug_in_request" or "tax_id_in_request" when the same company appeared twice in the list you just sent (a mistake in the list, not a company already in the CRM) — and \`company\`, the one it matched: its id, web address, name, place and registration number. Act on it through company.id, never through the slug beside it, because that slug is the one YOU sent and on a tax_id match it may not be the web address the company is filed under. People offered with a skipped company land on it where its registration number matched — tax_id or tax_id_in_request, one firm written down twice, so they are its people. Where only the web address matched — slug or slug_in_request — nothing is written, those people included: a web address is folded from the name, so two unrelated firms reduce to one often enough that adding people there would file them under somebody else and report it as done. Read the company it matched: if it is the same firm, use create_contact for the people; if it is not, this company was never created, so send it again under a web address of its own. \`created_needs_review\` gives companies that DID land but resemble another one: matches_slug and matches_name name the lookalike, matches says whether it is "on_file" (already in the CRM) or "in_request" (another entry in this same call), and matched_on says whether they share a web address or just a similar name — a website match reports confidence 100, which only means the host was identical, never that the row was rejected. Check those before treating them as separate companies. A company taken from a discovery scan's prospect list is a candidate, not a fact. Four things on that row say the run held it back, and they are separate: \`unconfirmed_reason\` is the run's own words on why it could not establish the company is real, \`${NAME_ONLY_EVIDENCE_FIELD}\` of "${NAME_ONLY_EVIDENCE}" means every page citing it was a list of many companies and it has neither a site nor a place of its own, \`${MARKS_FIELD}\` containing "${EXISTENCE_UNCONFIRMED}" means the run could not establish the company is real and trading, with what was missing in \`${EXISTENCE_REASON_FIELD}\`, and \`${MARKS_FIELD}\` containing "${OUTSIDE_REQUESTED_PLACE}" means the evidence puts it somewhere other than the area that was asked about. Any of the four: say so to the person before creating it, and never record it as verified on this run's word alone.`
+export const CREATE_COMPANIES_DESCRIPTION = `Create one or more companies in a single call — pass \`companies\` as an array (a single element to create just one, the whole shortlist to load a batch). Slug: leave it out and it is worked out from the name — supply one only to choose a particular web address. It must be plain lowercase a-z, digits and single hyphens, so an accented or non-Latin name cannot be written into one directly. Status: ${COMPANY_STATUSES.join('|')} (default: prospect). ownerId assigns the colleague who will work the company — pass a user id from list_members, or leave it out to create it unowned. It only lands on companies actually created: a skipped duplicate keeps the owner it already had, so re-sending a list is never a way to hand companies over. Use update_company for that. Priority: ${COMPANY_PRIORITIES[0]} (highest) to ${COMPANY_PRIORITIES[COMPANY_PRIORITIES.length - 1]} (lowest, default: 2). Pass taxId whenever you know it: a company is skipped if its slug already exists OR its registration number already does, so the number catches the same firm arriving under a different trading name. Pass \`contacts\` inside a company's own object, not beside the list, to take its people on in the same call. Pass \`attributes\` the same way for the facts this organisation declared on every company, with the run's id as \`research_id\` beside the list when they were read during a research run. They land only on companies this call creates: a skipped company keeps what it holds, so send its values with update_company. Runs in one transaction; a skip is not an error, so re-running an overlapping list is safe. Returns { created, contacts_added, skipped, created_needs_review }. Read the split this way: created and created_needs_review were both WRITTEN; only skipped was not — though a skipped company's people may still have landed on it. contacts_added counts the people written across the whole call. \`skipped\` gives each left-out slug plus matched_on — "slug" or "tax_id" when that identity was already on file before this call, "slug_in_request" or "tax_id_in_request" when the same company appeared twice in the list you just sent (a mistake in the list, not a company already in the CRM) — and \`company\`, the one it matched: its id, web address, name, place and registration number. Act on it through company.id, never through the slug beside it, because that slug is the one YOU sent and on a tax_id match it may not be the web address the company is filed under. People offered with a skipped company land on it where its registration number matched — tax_id or tax_id_in_request, one firm written down twice, so they are its people. Where only the web address matched — slug or slug_in_request — nothing is written, those people included: a web address is folded from the name, so two unrelated firms reduce to one often enough that adding people there would file them under somebody else and report it as done. Read the company it matched: if it is the same firm, use create_contact for the people; if it is not, this company was never created, so send it again under a web address of its own. \`created_needs_review\` gives companies that DID land but resemble another one: matches_slug and matches_name name the lookalike, matches says whether it is "on_file" (already in the CRM) or "in_request" (another entry in this same call), and matched_on says whether they share a web address or just a similar name — a website match reports confidence 100, which only means the host was identical, never that the row was rejected. Check those before treating them as separate companies. A company taken from a discovery scan's prospect list is a candidate, not a fact. Four things on that row say the run held it back, and they are separate: \`unconfirmed_reason\` is the run's own words on why it could not establish the company is real, \`${NAME_ONLY_EVIDENCE_FIELD}\` of "${NAME_ONLY_EVIDENCE}" means every page citing it was a list of many companies and it has neither a site nor a place of its own, \`${MARKS_FIELD}\` containing "${EXISTENCE_UNCONFIRMED}" means the run could not establish the company is real and trading, with what was missing in \`${EXISTENCE_REASON_FIELD}\`, and \`${MARKS_FIELD}\` containing "${OUTSIDE_REQUESTED_PLACE}" means the evidence puts it somewhere other than the area that was asked about. Any of the four: say so to the person before creating it, and never record it as verified on this run's word alone.`
 
 // Enough of the company that matched to act on it and to judge whether it is the
 // same firm. Not the whole record: a re-sent list of fifty would come back as
@@ -279,6 +305,10 @@ const CreateCompanies = Tool.make('create_companies', {
 	description: CREATE_COMPANIES_DESCRIPTION,
 	parameters: Schema.Struct({
 		companies: Schema.Array(CompanyInput),
+		research_id: Schema.optionalKey(Uuid).annotate({
+			description:
+				'The research run whose findings these companies and their attribute values come from, when they do. Lets a value be recorded as read by that run rather than written by you.',
+		}),
 	}),
 	success: Schema.Struct({
 		created: Schema.Array(Company.json),
@@ -359,13 +389,19 @@ const UpdateCompany = Tool.make('update_company', {
 		productsFit: Schema.optionalKey(Schema.Array(Schema.String)),
 		tags: Schema.optionalKey(Schema.Array(CompanyTag)),
 		painPoints: Schema.optionalKey(Schema.String),
-		currentTools: Schema.optionalKey(Schema.String),
 		nextAction: Schema.optionalKey(Schema.String),
 		nextActionAt: Schema.optionalKey(Schema.String),
 		latitude: Schema.optionalKey(CompanyLatitude),
 		longitude: Schema.optionalKey(CompanyLongitude),
 		geocodedAt: Schema.optionalKey(Schema.String),
 		geocodeSource: Schema.optionalKey(Schema.String),
+		attributes: Schema.optionalKey(CompanyAttributesInput).annotate({
+			description: ATTRIBUTES_INPUT_DESCRIPTION,
+		}),
+		research_id: Schema.optionalKey(Uuid).annotate({
+			description:
+				'The research run the attribute values come from, when they do — see `attributes`.',
+		}),
 		accountBrief: Schema.optionalKey(
 			Schema.String.annotate({
 				description:
@@ -374,7 +410,7 @@ const UpdateCompany = Tool.make('update_company', {
 		),
 		metadata: Schema.optional(Schema.Unknown).annotate({
 			description:
-				'Anything else worth keeping on this company, as a JSON object of your own shape. Searchable later through search_companies with metadata_key + metadata_value. Your own view of whether a company is worth selling to belongs here, by convention as `fitVerdict`: the separate fit_verdict field is what a research run concluded and nothing but a run writes it, so a judgement of your own has nowhere else to live.',
+				'Anything with no declared home, as a JSON object of your own shape; searchable later through search_companies with metadata_key + metadata_value. A fact the organisation records on every company belongs in `attributes` under a key an admin has declared (manage_instructions list_attributes); until one is declared, it lives here.',
 		}),
 	}),
 	success: Schema.NullOr(Company.json),
@@ -576,6 +612,29 @@ export const CompanyTools = Toolkit.make(
 	ListIndustries,
 )
 
+// The words for a refused attribute value or filter. The server carries only
+// the reason; this is the one place the assistant's tools put it into a
+// sentence it can act on.
+const attributeRejectedMessage = (e: AttributeRejected): string => {
+	const key = e.key === null ? 'the attribute' : `"${e.key}"`
+	switch (e.reason) {
+		case 'undeclared_key':
+			return `No attribute ${key} is declared for this organisation. manage_instructions list_attributes says which keys exist; send null under a key to remove its value.`
+		case 'wrong_kind':
+			return `The value for ${key} does not read as its declared kind: ${HOW_A_VALUE_READS}.`
+		case 'unknown_run':
+			return 'research_id names no research run of this organisation.'
+		case 'filter_incomplete':
+			return 'attribute_key, attribute_op and attribute_value go together: give all three or none.'
+		case 'unknown_operator':
+			return 'attribute_op must be one of eq, in, contains, gte, lte.'
+		case 'operator_not_for_kind':
+			return `That operator does not fit the kind of ${key}: text takes eq, in, contains; a choice eq, in; yes/no eq; a number or a date eq, gte, lte.`
+		case 'value_not_for_kind':
+			return `attribute_value does not read as the kind of ${key}: ${HOW_A_VALUE_READS}.`
+	}
+}
+
 export const CompanyHandlersLive = CompanyTools.toLayer(
 	Effect.gen(function* () {
 		const service = yield* CompanyService
@@ -602,6 +661,9 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 						tags: params.tags,
 						metadataKey: params.metadata_key,
 						metadataValue: params.metadata_value,
+						attributeKey: params.attribute_key,
+						attributeOp: params.attribute_op,
+						attributeValue: params.attribute_value,
 						query: params.query,
 						deleted: params.deleted,
 						minLat: params.min_lat,
@@ -639,7 +701,12 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 							})),
 						},
 					}
-				}).pipe(Effect.orDie),
+				}).pipe(
+					Effect.catchTag('AttributeRejected', e =>
+						Effect.die(new ToolMessage(attributeRejectedMessage(e))),
+					),
+					Effect.orDie,
+				),
 			get_company: ({ id_or_slug }) =>
 				service.getWithRelations(id_or_slug).pipe(
 					Effect.catchTag('NotFound', () => service.findById(id_or_slug)),
@@ -672,9 +739,11 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 					// The people are held beside the company, not among its fields: the
 					// write builds its column list from the keys it is handed, so a
 					// `contacts` left in there becomes a column the table does not have.
+					// The run the values came from rides on every company: the write
+					// decides per value whether that run really read it.
 					const batch = yield* service.createMany(
 						companies.map(({ contacts, ...company }) => ({
-							company,
+							company: { ...company, researchId: params.research_id },
 							contacts: contacts ?? [],
 						})),
 					)
@@ -698,9 +767,17 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 					Effect.catchTag('BadRequest', e =>
 						Effect.die(new ToolMessage(e.message)),
 					),
+					Effect.catchTag('AttributeRejected', e =>
+						Effect.die(new ToolMessage(attributeRejectedMessage(e))),
+					),
 					Effect.orDie,
 				),
-			update_company: ({ id, clear_email_suppression, ...fields }) =>
+			update_company: ({
+				id,
+				clear_email_suppression,
+				research_id,
+				...fields
+			}) =>
 				Effect.gen(function* () {
 					// Capture the stage before the write so an agent-driven change
 					// is recorded on the timeline too (actor unknown → null).
@@ -713,7 +790,10 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 									),
 									Effect.catch(() => Effect.succeed(null)),
 								)
-					const result = yield* updateCompanyRegeocoding(id, fields).pipe(
+					const result = yield* updateCompanyRegeocoding(id, {
+						...fields,
+						researchId: research_id,
+					}).pipe(
 						Effect.provideService(CompanyService, service),
 						Effect.provideService(Geocoder, geocoder),
 						Effect.provideService(SqlClient.SqlClient, sql),
@@ -742,6 +822,9 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 				}).pipe(
 					Effect.catchTag('BadRequest', e =>
 						Effect.die(new ToolMessage(e.message)),
+					),
+					Effect.catchTag('AttributeRejected', e =>
+						Effect.die(new ToolMessage(attributeRejectedMessage(e))),
 					),
 					Effect.orDie,
 				),

@@ -16,7 +16,6 @@ export const SNAPSHOT_COMPANY_FIELDS = [
 	'industry',
 	'sizeRange',
 	'location',
-	'currentTools',
 	'productsFit',
 	'tags',
 ] as const

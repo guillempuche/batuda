@@ -3,7 +3,12 @@ import { Effect } from 'effect'
 
 import { fingerprintTemplates } from '@batuda/instructions'
 
-import { normalizeRows, type SeedCtx, withSeedIds } from './shared'
+import {
+	normalizeRows,
+	type SeedCtx,
+	seedCompanyId,
+	withSeedIds,
+} from './shared'
 
 // Standing instruction templates + per-agent default stacks for local dev.
 // owner_user_id NULL = org-owned (every member reads and manages it); a set
@@ -164,7 +169,8 @@ export const seedInstructions = ({
 		// Each scope+agent has one default stack (is_default), plus a couple of
 		// named non-default stacks so the multiple-stacks feature is exercisable:
 		// an org research variant for the Spanish hospitality market, and the org's
-		// default email stack.
+		// default email stack. Only the taller org's default research stack lets
+		// runs fill its declared attributes, so both states are on show.
 		const stackRows = [
 			{
 				organizationId: tallerOrgId,
@@ -173,6 +179,7 @@ export const seedInstructions = ({
 				name: 'default',
 				isDefault: true,
 				composition: 'replace',
+				researchFillsAttributes: true,
 			},
 			{
 				organizationId: tallerOrgId,
@@ -181,6 +188,7 @@ export const seedInstructions = ({
 				name: 'hospitality-es',
 				isDefault: false,
 				composition: 'replace',
+				researchFillsAttributes: false,
 			},
 			{
 				organizationId: tallerOrgId,
@@ -189,6 +197,7 @@ export const seedInstructions = ({
 				name: 'default',
 				isDefault: true,
 				composition: 'replace',
+				researchFillsAttributes: false,
 			},
 			{
 				organizationId: tallerOrgId,
@@ -197,6 +206,7 @@ export const seedInstructions = ({
 				name: 'default',
 				isDefault: true,
 				composition: 'replace',
+				researchFillsAttributes: false,
 			},
 			...(carol
 				? [
@@ -207,6 +217,7 @@ export const seedInstructions = ({
 							name: 'default',
 							isDefault: true,
 							composition: 'extend',
+							researchFillsAttributes: false,
 						},
 					]
 				: []),
@@ -219,6 +230,7 @@ export const seedInstructions = ({
 							name: 'default',
 							isDefault: true,
 							composition: 'replace',
+							researchFillsAttributes: false,
 						},
 					]
 				: []),
@@ -434,4 +446,33 @@ export const linkRunProvenance = (
 		yield* Effect.logInfo(
 			`  linked instruction provenance on ${Math.min(runs.length, 3)} research runs`,
 		)
+
+		// One attribute value set by a run rather than a person, on the company
+		// the first run was about, so the trail a research value carries — the
+		// page, the quote, the date, the run — renders with real data locally.
+		const first = runs[0]
+		if (!first) return
+		const entry = {
+			takes_online_bookings: {
+				value: false,
+				source_url: 'https://calpepfonda.cat',
+				quote: 'Reserves: truqueu-nos al 938 123 456',
+				as_of: '2026-06-01',
+				research_id: first.id,
+				set_by: 'research',
+			},
+		}
+		const provenance = {
+			'attributes.takes_online_bookings': {
+				sourceUrl: 'https://calpepfonda.cat',
+				runId: first.id,
+				asOf: '2026-06-01',
+			},
+		}
+		yield* sql`
+			UPDATE companies
+			SET attributes = attributes || ${JSON.stringify(entry)}::jsonb,
+				field_provenance = COALESCE(field_provenance, '{}'::jsonb) || ${JSON.stringify(provenance)}::jsonb
+			WHERE id = ${seedCompanyId('cal-pep-fonda')} AND organization_id = ${tallerOrgId}
+		`
 	})

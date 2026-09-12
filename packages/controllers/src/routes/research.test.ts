@@ -219,4 +219,19 @@ describe('CreateResearchInput', () => {
 			expect(exit._tag).toBe('Failure')
 		})
 	})
+
+	describe('when the request is at the shared length cap', () => {
+		it('should accept eight thousand characters and refuse one more', () => {
+			// GIVEN a request exactly at the cap, and one over it
+			// WHEN decoded
+			// THEN the first passes and the second is refused — the same bound the
+			// assistant's tool and the prompt hold the request to
+			expect(
+				decodeExit(CreateResearchInput, { query: 'q'.repeat(8000) })._tag,
+			).toBe('Success')
+			expect(
+				decodeExit(CreateResearchInput, { query: 'q'.repeat(8001) })._tag,
+			).toBe('Failure')
+		})
+	})
 })

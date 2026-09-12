@@ -42,6 +42,9 @@ const CreateStackInput = Schema.Struct({
 	// default; absent/'replace' uses the stack alone. Ignored for org stacks.
 	composition: Schema.optional(Composition),
 	is_default: Schema.optional(Schema.Boolean),
+	// Org research stacks only: whether a run fills the attributes declared on
+	// the stack. Off until an admin turns it on.
+	research_fills_attributes: Schema.optional(Schema.Boolean),
 })
 
 const UpdateStackInput = Schema.Struct({
@@ -50,6 +53,31 @@ const UpdateStackInput = Schema.Struct({
 	),
 	template_ids: Schema.optional(Schema.Array(Schema.String)),
 	composition: Schema.optional(Composition),
+	research_fills_attributes: Schema.optional(Schema.Boolean),
+})
+
+// A fact the organisation records on every company a stack is used for. The
+// rules — key shape, kinds, caps, the eight-per-stack limit — are checked in
+// code, and a refusal comes back as an `{ outcome }` code like a stack write.
+const CreateAttributeInput = Schema.Struct({
+	stack_id: Schema.String,
+	key: Schema.String,
+	label: Schema.String,
+	kind: Schema.String,
+	enum_values: Schema.optional(Schema.NullOr(Schema.Array(Schema.String))),
+	unit: Schema.optional(Schema.NullOr(Schema.String)),
+	description: Schema.optional(Schema.NullOr(Schema.String)),
+})
+
+// The key never changes once created; an explicit null clears the choice
+// words, the unit or the description.
+const UpdateAttributeInput = Schema.Struct({
+	label: Schema.optional(Schema.String),
+	kind: Schema.optional(Schema.String),
+	enum_values: Schema.optional(Schema.NullOr(Schema.Array(Schema.String))),
+	unit: Schema.optional(Schema.NullOr(Schema.String)),
+	description: Schema.optional(Schema.NullOr(Schema.String)),
+	is_active: Schema.optional(Schema.Boolean),
 })
 
 // ── Route group ──
@@ -150,6 +178,34 @@ export const InstructionsGroup = HttpApiGroup.make('instructions')
 			'/instructions/agents/:agent/resolution',
 			{ params: { agent: Schema.String }, success: Schema.Unknown },
 		),
+	)
+	.add(
+		HttpApiEndpoint.get('listAttributes', '/instructions/attributes', {
+			query: {
+				stackId: Schema.optional(Schema.String),
+				agent: Schema.optional(Schema.String),
+			},
+			success: Schema.Unknown,
+		}),
+	)
+	.add(
+		HttpApiEndpoint.post('createAttribute', '/instructions/attributes', {
+			payload: CreateAttributeInput,
+			success: Schema.Unknown,
+		}),
+	)
+	.add(
+		HttpApiEndpoint.patch('updateAttribute', '/instructions/attributes/:id', {
+			params: { id: Schema.String },
+			payload: UpdateAttributeInput,
+			success: Schema.Unknown,
+		}),
+	)
+	.add(
+		HttpApiEndpoint.delete('deleteAttribute', '/instructions/attributes/:id', {
+			params: { id: Schema.String },
+			success: Schema.Unknown,
+		}),
 	)
 	.middleware(SessionMiddleware)
 	.middleware(OrgMiddleware)

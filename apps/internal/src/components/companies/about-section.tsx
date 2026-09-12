@@ -24,7 +24,7 @@ const SIZE_OPTIONS = [
 
 // What the trigger's count is out of — the fields below, with tags and products
 // counting as one apiece however many are on them.
-const TOTAL_ABOUT_FIELDS = 8
+const TOTAL_ABOUT_FIELDS = 7
 
 export type AboutCompany = {
 	readonly industry: string | null
@@ -32,7 +32,6 @@ export type AboutCompany = {
 	readonly location: string | null
 	readonly sizeRange: string | null
 	readonly painPoints: string | null
-	readonly currentTools: string | null
 	readonly tags: ReadonlyArray<string>
 	readonly productsFit: ReadonlyArray<string>
 }
@@ -45,7 +44,7 @@ export type AboutCompany = {
  * subsections:
  *
  *   - Sales context (industry, country, location, size)
- *   - Discovery (pain points, current tools)
+ *   - Discovery (pain points)
  *   - Tags & fit (tags, products fit)
  *
  * Priority and next action live in the header / NextActionCard, so they
@@ -68,7 +67,6 @@ export function AboutSection({
 		company.location,
 		company.sizeRange,
 		company.painPoints,
-		company.currentTools,
 		company.tags.length > 0 ? 'tags' : null,
 		company.productsFit.length > 0 ? 'fit' : null,
 	].filter(v => v !== null && v !== '').length
@@ -135,11 +133,6 @@ export function AboutSection({
 								value={company.painPoints}
 								onSave={next => onSave('painPoints', next)}
 								multiline
-							/>
-							<EditableField
-								label={t`Current tools`}
-								value={company.currentTools}
-								onSave={next => onSave('currentTools', next)}
 							/>
 						</Grid>
 					</Group>

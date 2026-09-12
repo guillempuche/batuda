@@ -17,6 +17,7 @@ import {
 	jobTitleOrNothing,
 	normalizeCountry,
 } from '@batuda/domain'
+import type { AttributeFilter } from '@batuda/instructions'
 
 import { textAnywhere } from '../lib/search-text'
 import {
@@ -33,6 +34,17 @@ import {
 	writeChannels,
 } from './channels'
 import { type AttentionFilter, attentionCondition } from './company-attention'
+import {
+	type AttributeMerge,
+	type AttributeWriteContext,
+	attributeCondition,
+	attributeMergeFor,
+	attributeWriteFragments,
+	readAttributeMerge,
+	readAttributeWriteContext,
+	resolveAttributeFilter,
+	splitCompanyAttributes,
+} from './company-attributes'
 import {
 	findIndustryByName,
 	type Industry,
@@ -64,6 +76,13 @@ export interface CompanyFilters {
 	// which is not a question anybody has asked for.
 	readonly metadataKey?: string | undefined
 	readonly metadataValue?: string | undefined
+	// One declared attribute, compared the way its kind allows: `site_count`
+	// `gte` `3`, `fit` `in` `strong,possible`. All three or none; the key names
+	// the attribute, the operator says how, the value is what it is held to. A
+	// key nobody declared matches nothing rather than failing.
+	readonly attributeKey?: string | undefined
+	readonly attributeOp?: string | undefined
+	readonly attributeValue?: string | undefined
 	// Owner ids to match, and/or the literal 'none' for the companies nobody has
 	// taken. Both together is a real question — what I am working, plus what is
 	// going spare.
@@ -210,6 +229,9 @@ const companyConditions = (
 	// built for one request and all but one of them keep the trade filter, so
 	// without this each would ask the database for the same trade again.
 	trade?: Industry | undefined,
+	// The attribute filter, already checked against the declarations, for the
+	// same reason.
+	attribute?: AttributeFilter | undefined,
 ) =>
 	Effect.gen(function* () {
 		const lifted =
@@ -279,6 +301,8 @@ const companyConditions = (
 			conditions.push(
 				sql`metadata->>${filters.metadataKey} = ${filters.metadataValue}`,
 			)
+		if (attribute !== undefined)
+			conditions.push(attributeCondition(sql, attribute))
 		if (filters.attention)
 			conditions.push(
 				attentionCondition(sql, filters.attention, filters.staleDays),
@@ -327,6 +351,20 @@ const companyConditions = (
 		return conditions
 	})
 
+// The attribute columns a new row starts with. A merge on a row that does not
+// exist yet is just the values themselves.
+const attributeInsertColumns = (
+	merge: AttributeMerge | undefined,
+): Record<string, unknown> =>
+	merge === undefined
+		? {}
+		: {
+				attributes: merge.entries,
+				...(Object.keys(merge.provenance).length > 0
+					? { fieldProvenance: merge.provenance }
+					: {}),
+			}
+
 export class CompanyService extends Context.Service<CompanyService>()(
 	'CompanyService',
 	{
@@ -337,10 +375,18 @@ export class CompanyService extends Context.Service<CompanyService>()(
 				search: (filters: CompanyFilters) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
+						const attribute = yield* resolveAttributeFilter(
+							sql,
+							currentOrg.id,
+							filters,
+						)
 						const conditions = yield* companyConditions(
 							sql,
 							currentOrg.id,
 							filters,
+							undefined,
+							undefined,
+							attribute,
 						)
 
 						// Whitelisted sort key → a fixed ORDER BY fragment; never
@@ -404,6 +450,11 @@ export class CompanyService extends Context.Service<CompanyService>()(
 						const trade = filters.industry
 							? yield* findIndustryByName(sql, currentOrg.id, filters.industry)
 							: undefined
+						const attribute = yield* resolveAttributeFilter(
+							sql,
+							currentOrg.id,
+							filters,
+						)
 						const [countryMatches, industryMatches, tagMatches, fitMatches] =
 							yield* Effect.all(
 								[
@@ -413,6 +464,7 @@ export class CompanyService extends Context.Service<CompanyService>()(
 										filters,
 										'country',
 										trade,
+										attribute,
 									),
 									companyConditions(
 										sql,
@@ -420,14 +472,23 @@ export class CompanyService extends Context.Service<CompanyService>()(
 										filters,
 										'industry',
 										trade,
+										attribute,
 									),
-									companyConditions(sql, currentOrg.id, filters, 'tags', trade),
+									companyConditions(
+										sql,
+										currentOrg.id,
+										filters,
+										'tags',
+										trade,
+										attribute,
+									),
 									companyConditions(
 										sql,
 										currentOrg.id,
 										filters,
 										'fitVerdict',
 										trade,
+										attribute,
 									),
 								],
 								{ concurrency: 'unbounded' },
@@ -584,6 +645,13 @@ export class CompanyService extends Context.Service<CompanyService>()(
 							typeof args.company['slug'] === 'string'
 								? args.company['slug']
 								: ''
+						// The attribute values are checked before the company is looked
+						// for, so a value under a key nobody declared is refused the same
+						// way whether the company turns out to be new or already on file.
+						// They land only on a row this call creates: a company already
+						// here keeps what it holds.
+						const lifted = splitCompanyAttributes(args.company)
+						const merge = yield* readAttributeMerge(sql, currentOrg.id, lifted)
 						const taxId =
 							typeof args.company['taxId'] === 'string'
 								? normalizeTaxId(args.company['taxId'])
@@ -659,7 +727,7 @@ export class CompanyService extends Context.Service<CompanyService>()(
 						let row = onFile[0]
 						let created = false
 						if (row === undefined) {
-							const split = splitCompanyChannelFields(args.company)
+							const split = splitCompanyChannelFields(lifted.columns)
 							const columns = withIndustry(
 								split.columns,
 								yield* industryForWrite(
@@ -696,7 +764,12 @@ export class CompanyService extends Context.Service<CompanyService>()(
 							// here — and saying so beats failing the click on a race the
 							// person cannot see or do anything about.
 							const inserted = yield* sql`
-								INSERT INTO companies ${sql.insert({ ...columns, slug: filedUnder, organizationId: currentOrg.id })}
+								INSERT INTO companies ${sql.insert({
+									...columns,
+									...attributeInsertColumns(merge),
+									slug: filedUnder,
+									organizationId: currentOrg.id,
+								})}
 								ON CONFLICT (organization_id, slug) WHERE deleted_at IS NULL
 								DO NOTHING
 								RETURNING *
@@ -933,14 +1006,45 @@ export class CompanyService extends Context.Service<CompanyService>()(
 						// earlier, and the caller is told it already existed.
 						const slugsWritten = new Map<string, unknown>()
 						const taxIdsWritten = new Map<string, unknown>()
+						// Every company's attribute values are checked before any row is
+						// written: one value under an undeclared key refuses the whole
+						// batch, so the caller never has to work out which half landed.
+						// The declarations and the named run's pages are read once per
+						// run named, not once per company, and not at all when no
+						// company in the batch carries values.
+						const lifted = items.map(item =>
+							splitCompanyAttributes(item.company),
+						)
+						const contexts = new Map<
+							string | undefined,
+							AttributeWriteContext
+						>()
+						const merges: Array<AttributeMerge | undefined> = []
+						for (const write of lifted) {
+							if (write.attributes === undefined) {
+								merges.push(undefined)
+								continue
+							}
+							let context = contexts.get(write.researchId)
+							if (context === undefined) {
+								context = yield* readAttributeWriteContext(
+									sql,
+									currentOrg.id,
+									write.researchId,
+								)
+								contexts.set(write.researchId, context)
+							}
+							merges.push(yield* attributeMergeFor(context, write.attributes))
+						}
 						// Bound once: the org id and the company id sit side by side in the call
 						// below, and swapping them files people under the wrong company silently.
 						const addPeople = (
 							companyId: string,
 							people: ReadonlyArray<LeadPerson>,
 						) => writeContacts(sql, currentOrg.id, companyId, people)
-						for (const item of items) {
-							const companyFields = item.company
+						for (const [position, item] of items.entries()) {
+							const companyFields = lifted[position]?.columns ?? {}
+							const merge = merges[position]
 							const slug =
 								typeof companyFields['slug'] === 'string'
 									? companyFields['slug']
@@ -1015,7 +1119,11 @@ export class CompanyService extends Context.Service<CompanyService>()(
 								),
 							)
 							const rows = yield* sql`
-								INSERT INTO companies ${sql.insert({ ...columns, organizationId: currentOrg.id })}
+								INSERT INTO companies ${sql.insert({
+									...columns,
+									...attributeInsertColumns(merge),
+									organizationId: currentOrg.id,
+								})}
 								-- The predicate is repeated because the unique index only covers
 								-- live rows: without it Postgres has no arbiter for this clause
 								-- and refuses the statement outright.
@@ -1094,10 +1202,8 @@ export class CompanyService extends Context.Service<CompanyService>()(
 						`
 						if (live.length === 0)
 							return yield* new NotFound({ entity: 'company', id })
-						// Bumping the version on every edit is what lets a research apply notice
-						// that somebody changed the row while the run was thinking, so its findings
-						// can never quietly overwrite a person's edit.
-						const split = splitCompanyChannelFields(data)
+						const lifted = splitCompanyAttributes(data)
+						const split = splitCompanyChannelFields(lifted.columns)
 						// The trade a caller named becomes an entry in the organisation's
 						// own list, so its name and the entry it points at are written
 						// together and can never disagree.
@@ -1109,6 +1215,10 @@ export class CompanyService extends Context.Service<CompanyService>()(
 								split.columns['industry'],
 							),
 						)
+						// Refused before the addresses land, for the same reason as the
+						// liveness check above.
+						const merge = yield* readAttributeMerge(sql, currentOrg.id, lifted)
+						const written = attributeWriteFragments(sql, merge)
 						if (split.channels.length > 0) {
 							yield* writeChannels(
 								sql,
@@ -1120,8 +1230,17 @@ export class CompanyService extends Context.Service<CompanyService>()(
 						// Nothing edits a company that was taken out of view: the change
 						// would be invisible, and the next person to restore it would
 						// find edits nobody remembers making.
+						// Attribute values merge into what is there and the record of where
+						// each came from moves with them: a person's edit drops the note a
+						// run left, since the value is theirs now, whatever page they say
+						// they read it on.
+						// The version bump is how a research apply notices a person edited
+						// the row while the run was thinking, so it never quietly overwrites
+						// them.
 						const rows = yield* sql`
 							UPDATE companies SET ${sql.update({ ...columns, updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) })},
+								attributes = ${written.attributes},
+								field_provenance = ${written.fieldProvenance},
 								version = version + 1
 							WHERE id = ${id}
 								AND organization_id = ${currentOrg.id}

@@ -3,6 +3,7 @@ import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
 import {
+	type AttributeValueEntry,
 	BUYING_ROLES,
 	COMPANY_PRIORITIES,
 	COMPANY_SIZE_RANGES,
@@ -14,12 +15,8 @@ import {
 	jobTitleOrNothing,
 	MAPS_ADDRESS_PATTERN,
 } from '@batuda/domain'
-import {
-	canonicalizeUrl,
-	isWebAddress,
-	sourceIdFor,
-	urlHashForScrape,
-} from '@batuda/research'
+import { declaredByKey, listActiveAttributes } from '@batuda/instructions'
+import { recordFacts } from '@batuda/observability'
 
 export {
 	type ProvenanceEntry,
@@ -37,7 +34,19 @@ import {
 	splitCompanyChannelFields,
 	writeChannels,
 } from './channels'
+import {
+	attributeProvenanceKey,
+	attributeWriteFragments,
+	researchAttributeCitations,
+	researchAttributeEntries,
+	researchAttributePatch,
+} from './company-attributes'
 import { forkCompanyRegeocode } from './company-geocoding'
+import {
+	type FieldCitation,
+	type FieldSource,
+	resolveFieldSources,
+} from './research-page-sources'
 
 /**
  * Apply (or reject) a research-proposed CRM update — the one place a research
@@ -74,7 +83,6 @@ export const COMPANY_FIELDS = new Set([
 	'googleMapsUrl',
 	'productsFit',
 	'tags',
-	'currentTools',
 ])
 
 // Reachable addresses (email/phone/whatsapp/linkedin/instagram) live on
@@ -84,26 +92,6 @@ export const CONTACT_FIELDS = new Set(['name', 'role', 'buyingRole'])
 
 const snakeToCamel = (s: string) =>
 	s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
-
-// What the run cited for one value: which page it read the value on, how sure it
-// was, and the date the value was true as of. The page is named by the run's own
-// id for it, which only means something inside that run.
-export type FieldCitation = {
-	readonly sourceId: string
-	readonly confidence?: number
-	readonly asOf?: string
-}
-
-// Where one applied value came from, as the company row keeps it: the page's own
-// address rather than the run's private id for it, plus the run that read it.
-// Stored beside the value it explains, so a reader can ask "where did this come
-// from?" of any single fact on the row.
-export type FieldSource = {
-	readonly sourceUrl: string
-	readonly runId: string
-	readonly confidence?: number
-	readonly asOf?: string
-}
 
 // A field value the model may have wrapped as { value, source_id, … } — the
 // per-field provenance shape enrichment findings use. CRM columns hold plain
@@ -138,87 +126,6 @@ const readSourced = (
 		},
 	}
 }
-
-/**
- * Swap each cited page for the page's real address, and stamp the run that cited
- * it. A run names a page either by its address — which is what the model is asked
- * for, and all it is ever shown — or by the id we hold that page under, which is
- * what our own harvested values carry. Both are read.
- *
- * Only pages THIS run fetched count: a citation naming a page the run never
- * opened is dropped, because a stored note about where a fact came from has to
- * point somewhere a reader can open.
- */
-const resolveFieldSources = (
-	sql: SqlClient.SqlClient,
-	runId: string,
-	citations: Record<string, FieldCitation>,
-) =>
-	Effect.gen(function* () {
-		const entries = Object.entries(citations)
-		if (entries.length === 0) return {} as Record<string, FieldSource>
-		// The run's own pages, matched here rather than in the query: one page gets
-		// written a dozen ways — a trailing slash, a capital in the host, a
-		// fragment — and tidying both sides down to one spelling is not something
-		// the database can do for us. A run holds tens of pages, so reading them all
-		// costs less than a lookup per citation.
-		//
-		// The page store is shared by every organisation, so it is the run's own link
-		// rows that hold this to pages this run really fetched. Take that join away
-		// and an address a run merely mentioned would resolve against somebody else's
-		// page.
-		const rows = yield* sql<{ id: string; url: string; localRef: string }>`
-			SELECT s.id, s.url, rs.local_ref AS "localRef"
-			FROM research_run_sources rs
-			JOIN sources s ON s.id = rs.source_id
-			WHERE rs.research_id = ${runId}
-			ORDER BY s.id
-		`
-		// Every way one of this run's pages can be named, each pointing at the one
-		// address on file. What gets stored is always that address, never the text
-		// the run happened to write down. Two pages can tidy down to the same name
-		// and the first of them wins, so the rows are read in a fixed order — the
-		// same citation then always resolves to the same page.
-		const urlByName = new Map<string, string>()
-		for (const row of rows) {
-			// A page with no address on file cannot be pointed at, so it never becomes
-			// a way of naming one. Left in, it would answer a lookup with an empty
-			// string — which is a found value as far as the search below is concerned,
-			// and would store a note leading nowhere.
-			if (row.url === '') continue
-			for (const name of [
-				row.id,
-				canonicalizeUrl(row.url),
-				canonicalizeUrl(row.localRef),
-			])
-				if (!urlByName.has(name)) urlByName.set(name, row.url)
-		}
-		const out: Record<string, FieldSource> = {}
-		for (const [field, cited] of entries) {
-			// Exactly as written first, so an id we minted is never put through
-			// address-tidying it was never meant for. Then the tidied address. Then
-			// the id that address itself maps to, which is what still finds the page
-			// when a fetch was redirected off-site and the row kept where it landed.
-			// That last one only makes sense for an address: asked of an id it would
-			// hash the id itself, which names no page anybody holds.
-			const sourceUrl =
-				urlByName.get(cited.sourceId) ??
-				urlByName.get(canonicalizeUrl(cited.sourceId)) ??
-				(isWebAddress(cited.sourceId)
-					? urlByName.get(sourceIdFor(urlHashForScrape(cited.sourceId)))
-					: undefined)
-			if (sourceUrl === undefined) continue
-			out[field] = {
-				sourceUrl,
-				runId,
-				...(cited.confidence !== undefined
-					? { confidence: cited.confidence }
-					: {}),
-				...(cited.asOf !== undefined ? { asOf: cited.asOf } : {}),
-			}
-		}
-		return out
-	})
 
 /**
  * Keep only the proposal fields that map to a writable column on the target
@@ -533,6 +440,13 @@ export type CompanyEnrichment = {
 	/** The run's brief, in markdown, already carrying its own dated heading. */
 	readonly brief?: string | null
 	/**
+	 * The attribute values the run found for this company, keyed by attribute
+	 * key and already stamped as the run's, merged into what the row holds.
+	 * Checked before they get here: only declared keys, only values whose page
+	 * the run fetched, and never a key a person set by hand.
+	 */
+	readonly attributes?: Readonly<Record<string, AttributeValueEntry>>
+	/**
 	 * True whenever a person set this apply going — one at a time or as a batch.
 	 * Only the server acting on its own leaves it out, and then the run's opinion
 	 * above and its written brief stay as they are: both are a model's words, and
@@ -630,6 +544,22 @@ export const occUpdate = (
 	// write — so writing it here would take their notes with nothing said.
 	const written = writesRunOpinion ? (enrichment?.brief ?? null) : null
 	const brief = written !== null && written.trim() !== '' ? written : null
+	// The campaign's own facts, by the same rule as the opinion: a run adds them
+	// to what the row holds, but only with a person watching. The same merge
+	// every other company write uses; nothing is removed here.
+	const attributes = attributeWriteFragments(
+		sql,
+		writesRunOpinion &&
+			enrichment?.attributes !== undefined &&
+			Object.keys(enrichment.attributes).length > 0
+			? {
+					entries: enrichment.attributes,
+					removed: [],
+					provenance: {},
+					provenanceCleared: [],
+				}
+			: undefined,
+	).attributes
 	return sql<{ version: number }>`
 		UPDATE companies
 		SET ${setFields}
@@ -637,6 +567,7 @@ export const occUpdate = (
 				WHEN ${provenance}::jsonb IS NULL THEN field_provenance
 				ELSE COALESCE(field_provenance, '{}'::jsonb) || ${provenance}::jsonb
 			END,
+			attributes = ${attributes},
 			last_enriched_at = CASE
 				WHEN ${isRunTarget}::boolean THEN now()
 				ELSE last_enriched_at
@@ -885,6 +816,7 @@ export const resolveResearchProposedUpdate = (
 				verdict?: unknown
 				fit_checks?: unknown
 				conflicts?: unknown
+				attributes?: unknown
 			} | null
 			context: { subjects?: Array<{ table?: string; id?: string }> } | null
 			country: string | null
@@ -1096,10 +1028,92 @@ export const resolveResearchProposedUpdate = (
 		const badValue = checkFieldValues(validated.table, fields)
 		if (badValue !== null)
 			return { outcome: 'invalid', reason: badValue } satisfies ResolveOutcome
+
+		// The run's own judgement and brief belong only to the company the run was
+		// about — a competitor it merely mentioned gets its values and their sources,
+		// nothing more.
+		const isRunTarget =
+			validated.table === 'companies' &&
+			targetCompanyIds.has(validated.subjectId)
+		// So do the attribute values it found — the campaign's own facts about
+		// that company — checked against what the organisation declares today,
+		// since a key may have been retired while the proposal waited. Like the
+		// brief, they land only by a person's hand, and only when the run was
+		// about one company: the values are the run's, not any one proposal's,
+		// so a run pinned to several companies could not say whose they are.
+		const attributePatch =
+			isRunTarget &&
+			targetCompanyIds.size === 1 &&
+			options.origin !== 'unattended'
+				? researchAttributePatch(
+						declaredByKey(
+							yield* listActiveAttributes(org.id).pipe(
+								Effect.provideService(SqlClient.SqlClient, sql),
+							),
+						),
+						findings?.attributes,
+					)
+				: { values: {}, dropped: [] }
 		const sources = yield* resolveFieldSources(sql, runId, {
 			...channelCitations,
 			...fieldCitations,
+			...researchAttributeCitations(attributePatch),
 		})
+		// A key a person set by hand keeps their value, so the row's current
+		// values are read first. A subject id that is not a UUID fails here the
+		// way it fails the update below, and is reported the same way there.
+		const storedRows =
+			Object.keys(attributePatch.values).length === 0
+				? []
+				: yield* sql<{ attributes: unknown }>`
+						SELECT attributes FROM companies
+						WHERE id = ${validated.subjectId} AND organization_id = ${org.id}
+						LIMIT 1
+					`.pipe(
+						Effect.catchTag('SqlError', e =>
+							pgErrorCode(e) === '22P02' ? Effect.succeed([]) : Effect.fail(e),
+						),
+					)
+		const landing = researchAttributeEntries(
+			attributePatch,
+			sources,
+			runId,
+			storedRows[0]?.attributes,
+		)
+		const attributeEntries = landing.entries
+		const landedAttributes = new Set(
+			Object.keys(attributeEntries).map(attributeProvenanceKey),
+		)
+		// What became of the run's attribute values rides on the request's
+		// record: how many landed, how many a person's own value held back, how
+		// many were dropped and why, as codes. A value whose cited page the run
+		// never fetched is a drop, not a hold. Written only once the outcome is
+		// known, so a change refused for being out of date never claims values.
+		const dropped = [
+			...attributePatch.dropped.map(entry => entry.reason),
+			...landing.unfetched.map(() => 'unfetched' as const),
+		]
+		const noteAttributeFacts =
+			Object.keys(attributePatch.values).length > 0 || dropped.length > 0
+				? recordFacts({
+						'research.apply.attributes_landed': landedAttributes.size,
+						'research.apply.attributes_held': landing.held.length,
+						'research.apply.attributes_dropped': dropped.length,
+						'research.apply.attributes_dropped_reasons': [
+							...new Set(dropped),
+						].join(','),
+					})
+				: Effect.void
+		// The other facts keep their note of where they came from; an attribute
+		// keeps its only where the value landed, so the row never points at a page
+		// for a fact it does not hold.
+		const provenance = Object.fromEntries(
+			Object.entries(sources).filter(
+				([name]) =>
+					!name.startsWith(attributeProvenanceKey('')) ||
+					landedAttributes.has(name),
+			),
+		)
 
 		// Persist the run's country onto its own target company as the run's
 		// findings are applied. `country` is not an allowlisted proposal field —
@@ -1110,18 +1124,18 @@ export const resolveResearchProposedUpdate = (
 			targetCompanyIds.has(validated.subjectId)
 		)
 			fields['country'] = run.country
-		if (Object.keys(fields).length === 0 && proposedChannels.length === 0)
+		if (
+			Object.keys(fields).length === 0 &&
+			proposedChannels.length === 0 &&
+			Object.keys(attributeEntries).length === 0
+		) {
+			yield* noteAttributeFacts
 			return { outcome: 'no_applicable_fields' } satisfies ResolveOutcome
+		}
 
 		// A subject_id that isn't a UUID trips text parsing (22P02) in the WHERE
 		// clause; that is a bad proposal (the model can invent an id), not a server
 		// error, so report it as invalid the way the create branch does.
-		// The run's own judgement and brief belong only to the company the run was
-		// about — a competitor it merely mentioned gets its values and their sources,
-		// nothing more.
-		const isRunTarget =
-			validated.table === 'companies' &&
-			targetCompanyIds.has(validated.subjectId)
 		const updatedRows = yield* occUpdate(
 			sql,
 			validated.table,
@@ -1131,7 +1145,7 @@ export const resolveResearchProposedUpdate = (
 			fields,
 			validated.table === 'companies'
 				? {
-						provenance: sources,
+						provenance,
 						isRunTarget,
 						fitVerdict:
 							typeof findings?.verdict === 'string' ? findings.verdict : null,
@@ -1139,8 +1153,9 @@ export const resolveResearchProposedUpdate = (
 						fitConflicts: findings?.conflicts ?? null,
 						brief: run.briefMd,
 						attended: options.origin !== 'unattended',
+						attributes: attributeEntries,
 					}
-				: { provenance: sources },
+				: { provenance },
 		).pipe(
 			Effect.catchTag('SqlError', e => {
 				const code = pgErrorCode(e)
@@ -1156,6 +1171,7 @@ export const resolveResearchProposedUpdate = (
 			} satisfies ResolveOutcome
 		if (updatedRows.length === 0)
 			return { outcome: 'conflict' } satisfies ResolveOutcome
+		yield* noteAttributeFacts
 
 		// Only now that the row's version proved unchanged. Written earlier, an
 		// address would land even when the change was refused for being out of
@@ -1184,7 +1200,7 @@ export const resolveResearchProposedUpdate = (
 			validated.subjectId,
 			validated.table === 'companies' ? validated.subjectId : null,
 			validated.table === 'contacts' ? validated.subjectId : null,
-			Object.keys(fields),
+			[...Object.keys(fields), ...landedAttributes],
 		)
 
 		// Applying a new location makes the stored coordinates stale; refresh them

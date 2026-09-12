@@ -2,8 +2,12 @@ import { Effect } from 'effect'
 import type { SqlError } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
+import type { ResearchAttributeDeclaration } from '@batuda/domain'
+
+import { readStackAttributesForRun } from './attributes'
 import type { Agent, StackComposition } from './domain'
-import { fingerprintTemplates } from './fingerprint'
+import { fingerprintAttributes, fingerprintTemplates } from './fingerprint'
+import { isUuidRef } from './uuid'
 
 // Re-exported so callers that only import from the resolver still see it.
 export type { StackComposition } from './domain'
@@ -80,11 +84,6 @@ export const personalTemplatesInOrgStack = (
 // that matches more than one template (e.g. a personal and an org template share
 // a name) is ambiguous — its candidates come back with their scope so the AI can
 // re-ask with the exact id instead of silently running the wrong one.
-
-const UUID_RE =
-	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-export const isUuidRef = (ref: string): boolean => UUID_RE.test(ref)
 
 export interface InstructionCandidate {
 	readonly id: string
@@ -166,6 +165,16 @@ export interface ResolvedInstructions {
 	readonly templateIds: ReadonlyArray<string>
 	readonly templateNames: ReadonlyArray<string>
 	readonly source: StackSource
+	// The stack the templates came from; null when only override templates or
+	// nothing applied.
+	readonly stackId: string | null
+	// The org stack whose declared attributes a run fills — the named stack
+	// when the org owns it, else the org default. A member's personal stack
+	// changes the prompt, never which attributes the campaign records.
+	readonly attributeStackId: string | null
+	// Empty unless that stack has research filling switched on.
+	readonly attributes: ReadonlyArray<ResearchAttributeDeclaration>
+	readonly attributeFingerprint: string
 }
 
 // SqlClient.transformResultNames camelCases result keys, so a snake_case column
@@ -176,6 +185,7 @@ interface StackRow {
 	readonly id: string
 	readonly ownerUserId: string | null
 	readonly composition: StackComposition
+	readonly researchFillsAttributes: boolean
 }
 
 interface TemplateRow {
@@ -221,6 +231,24 @@ const readOrgDefaultItemIds = (
 		rows => rows.map(row => row.templateId),
 	)
 
+// The org's default stack for an agent, if it has one.
+const readOrgDefaultStack = (
+	sql: SqlClient.SqlClient,
+	organizationId: string,
+	agent: Agent,
+): Effect.Effect<StackRow | undefined, SqlError.SqlError> =>
+	Effect.map(
+		sql<StackRow>`
+			SELECT id, owner_user_id, composition, research_fills_attributes
+			FROM instruction_stacks
+			WHERE organization_id = ${organizationId}
+				AND agent = ${agent}
+				AND owner_user_id IS NULL
+				AND is_default
+		`,
+		rows => rows[0],
+	)
+
 // Resolve the effective instruction prompt for one agent run. Must run inside
 // the request transaction: it reads through RLS, so the org/user GUCs have to
 // be set. (A caller's run fiber may be forked outside the tx — which is exactly
@@ -239,6 +267,8 @@ export const resolveInstructions = (
 
 		let source: StackSource
 		let orderedIds: ReadonlyArray<string>
+		let chosenStack: StackRow | undefined
+		let attributeStack: StackRow | undefined
 
 		if (stackId !== undefined) {
 			// A run named a specific stack. Read it (RLS may hide it, leaving an
@@ -247,7 +277,7 @@ export const resolveInstructions = (
 			// ad-hoc override templates append after the stack, all deduped.
 			source = 'stack'
 			const rows = yield* sql<StackRow>`
-				SELECT id, owner_user_id, composition
+				SELECT id, owner_user_id, composition, research_fills_attributes
 				FROM instruction_stacks WHERE id = ${stackId}
 			`
 			const stack = rows[0]
@@ -257,13 +287,23 @@ export const resolveInstructions = (
 					: []
 			const stackIds = stack ? yield* readStackTemplateIds(sql, stack.id) : []
 			orderedIds = dedupeKeepFirst([...baseIds, ...stackIds, ...override])
+			chosenStack = stack
+			attributeStack =
+				stack && stack.ownerUserId === null
+					? stack
+					: yield* readOrgDefaultStack(sql, args.organizationId, args.agent)
 		} else if (override.length > 0) {
 			source = 'override'
 			orderedIds = dedupeKeepFirst(override)
+			attributeStack = yield* readOrgDefaultStack(
+				sql,
+				args.organizationId,
+				args.agent,
+			)
 		} else {
 			// Default resolution: the actor's own default stack, else the org's.
 			const stacks = yield* sql<StackRow>`
-				SELECT id, owner_user_id, composition
+				SELECT id, owner_user_id, composition, research_fills_attributes
 				FROM instruction_stacks
 				WHERE organization_id = ${args.organizationId}
 					AND agent = ${args.agent}
@@ -278,8 +318,9 @@ export const resolveInstructions = (
 				hasUserStack: userStack !== undefined,
 				hasOrgStack: orgStack !== undefined,
 			})
-			const chosenStack =
+			chosenStack =
 				source === 'user' ? userStack : source === 'org' ? orgStack : undefined
+			attributeStack = orgStack
 			// An "extend" user default resolves to the live org default followed by
 			// the user's own additions (deduped, org keeping its position).
 			const isExtend = source === 'user' && userStack?.composition === 'extend'
@@ -295,6 +336,19 @@ export const resolveInstructions = (
 					: []
 		}
 
+		// Only a research run fills attributes, so no other agent pays the read.
+		const attributes =
+			args.agent === 'research' &&
+			attributeStack?.researchFillsAttributes === true
+				? yield* readStackAttributesForRun(sql, attributeStack.id)
+				: []
+		const attributeFields = {
+			stackId: chosenStack?.id ?? null,
+			attributeStackId: attributeStack?.id ?? null,
+			attributes,
+			attributeFingerprint: fingerprintAttributes(attributes),
+		}
+
 		if (orderedIds.length === 0) {
 			return {
 				segments: [],
@@ -302,6 +356,7 @@ export const resolveInstructions = (
 				templateIds: [],
 				templateNames: [],
 				source,
+				...attributeFields,
 			}
 		}
 
@@ -326,6 +381,7 @@ export const resolveInstructions = (
 			templateIds: ordered.map(row => row.id),
 			templateNames: ordered.map(row => row.name),
 			source,
+			...attributeFields,
 		}
 	})
 

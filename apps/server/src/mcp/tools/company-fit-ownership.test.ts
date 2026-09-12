@@ -86,21 +86,22 @@ describe('who may write a company fit verdict', () => {
 				expect(Array.from(accepted)).not.toContain(field)
 		})
 
-		it('should accept metadata, which is where a view of your own goes', () => {
+		it('should accept attributes, which is where a view of your own goes', () => {
 			// GIVEN the same parameters
-			// THEN metadata is offered, so the rule above leaves somewhere to put
-			// a judgement rather than simply refusing one
-			expect(Array.from(acceptedFieldNames(toolName))).toContain('metadata')
+			// THEN the declared attributes are offered, so the rule above leaves
+			// somewhere typed to put a judgement rather than simply refusing one
+			expect(Array.from(acceptedFieldNames(toolName))).toContain('attributes')
 		})
 
 		it('should tell a caller where its own verdict goes', () => {
 			// GIVEN the description a client actually receives for metadata
 			const described = fieldDescription(toolName, 'metadata')
 
-			// THEN it names the convention, because a caller that cannot find
-			// fit_verdict among these parameters is otherwise left to invent a place
-			// for its own judgement — which is how a second field came to exist
-			expect(described).toContain('fitVerdict')
+			// THEN it points at the declared attributes, because a caller that
+			// cannot find fit_verdict among these parameters is otherwise left to
+			// invent a place for its own judgement — which is how a second field
+			// came to exist
+			expect(described).toContain('attributes')
 			expect(described).toContain('metadata_key')
 		})
 	})
@@ -108,14 +109,15 @@ describe('who may write a company fit verdict', () => {
 	describe('the search_companies tool', () => {
 		it('should still filter on the verdict a run reached', () => {
 			// GIVEN the search parameters
-			// AND the metadata pair added for a view of your own
+			// AND the attribute triple added for a view of your own
 			const accepted = acceptedFieldNames('search_companies')
 
 			// THEN both routes are searchable: the run's verdict as its own filter,
-			// and yours through the metadata pair
+			// and yours through a declared attribute
 			expect(Array.from(accepted)).toContain('fit_verdict')
-			expect(Array.from(accepted)).toContain('metadata_key')
-			expect(Array.from(accepted)).toContain('metadata_value')
+			expect(Array.from(accepted)).toContain('attribute_key')
+			expect(Array.from(accepted)).toContain('attribute_op')
+			expect(Array.from(accepted)).toContain('attribute_value')
 		})
 	})
 })

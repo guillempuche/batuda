@@ -14,6 +14,7 @@ export const ENTITY_NAMES = [
 	'companies',
 	'templates',
 	'stacks',
+	'attributes',
 	'inboxes',
 	'tasks',
 	'pages',
@@ -99,7 +100,8 @@ export const dataInspect = (entity: Option.Option<EntityName>, json: boolean) =>
 					col('Name', 18, 'name'),
 					col('Default', 8, 'isDefault'),
 					col('Composition', 12, 'composition'),
-					col('Items', 0, 'items'),
+					col('Items', 6, 'items'),
+					col('Fills attrs', 0, 'fillsAttributes'),
 				],
 				rows: () => sql<Row>`
 					SELECT o.slug AS org,
@@ -107,9 +109,31 @@ export const dataInspect = (entity: Option.Option<EntityName>, json: boolean) =>
 						s.agent, s.name,
 						CASE WHEN s.is_default THEN 'yes' ELSE '' END AS "isDefault",
 						s.composition,
-						(SELECT count(*) FROM instruction_stack_items i WHERE i.stack_id = s.id) AS items
+						(SELECT count(*) FROM instruction_stack_items i WHERE i.stack_id = s.id) AS items,
+						CASE WHEN s.research_fills_attributes THEN 'yes' ELSE '' END AS "fillsAttributes"
 					FROM instruction_stacks s JOIN organization o ON o.id = s.organization_id
 					ORDER BY o.slug, scope, s.agent, s.is_default DESC, s.name`,
+			},
+			// The facts each org declared on its research stacks. Id first because
+			// update_attribute and delete_attribute address a declaration by it.
+			attributes: {
+				columns: [
+					col('Org', 12, 'org'),
+					col('Stack', 16, 'stack'),
+					col('Id', 38, 'id'),
+					col('Key', 24, 'key'),
+					col('Kind', 8, 'kind'),
+					col('Active', 7, 'active'),
+					col('Label', 0, 'label'),
+				],
+				rows: () => sql<Row>`
+					SELECT o.slug AS org, s.name AS stack, a.id, a.key, a.kind,
+						CASE WHEN a.is_active THEN 'yes' ELSE 'no' END AS active,
+						a.label
+					FROM research_attributes a
+					JOIN instruction_stacks s ON s.id = a.stack_id
+					JOIN organization o ON o.id = a.organization_id
+					ORDER BY o.slug, s.name, a.created_at, a.key`,
 			},
 			inboxes: {
 				columns: [

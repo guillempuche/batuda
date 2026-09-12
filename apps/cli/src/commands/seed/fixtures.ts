@@ -145,7 +145,12 @@ export const COMPANIES = [
 		productsFit: ['web-starter', 'gestio-reserves'],
 		tags: ['gastro', 'garraf'],
 		painPoints: 'Reserves per telèfon, perden clients els caps de setmana.',
-		currentTools: 'Llibreta + WhatsApp',
+		attributes: {
+			current_tools: { value: 'Llibreta + WhatsApp', set_by: 'client' },
+			site_count: { value: 1, set_by: 'client' },
+			takes_online_bookings: { value: false, set_by: 'client' },
+			fit: { value: 'strong', set_by: 'client' },
+		},
 		// Short brief — the page shows it whole.
 		accountBrief: [
 			'**Cal Pep Fonda** — fonda de tota la vida a Vilanova, 12 taules.',
@@ -187,7 +192,12 @@ export const COMPANIES = [
 		productsFit: ['automatitzacions'],
 		tags: ['indústria', 'facturació'],
 		painPoints: 'Factures manuals amb Excel, errors freqüents al tancar mes.',
-		currentTools: 'Excel + Contaplus',
+		attributes: {
+			current_tools: { value: 'Excel + Contaplus', set_by: 'client' },
+			site_count: { value: 2, set_by: 'client' },
+			fit: { value: 'strong', set_by: 'client' },
+			founded_on: { value: '1998-03-12', set_by: 'client' },
+		},
 		// Long brief — long enough that the page has to fold it.
 		accountBrief: [
 			'## Qui són',
@@ -241,7 +251,10 @@ export const COMPANIES = [
 		productsFit: ['ecommerce-local', 'web-starter'],
 		tags: ['fashion', 'barcelona'],
 		painPoints: 'Want to sell online but unsure where to start.',
-		currentTools: 'Instagram direct',
+		attributes: {
+			current_tools: { value: 'Instagram direct', set_by: 'client' },
+			takes_online_bookings: { value: false, set_by: 'client' },
+		},
 		nextAction: 'Schedule ecommerce demo',
 		latitude: 41.3874,
 		longitude: 2.1686,
@@ -263,7 +276,6 @@ export const COMPANIES = [
 		productsFit: ['automatitzacions', 'web-starter'],
 		tags: ['reformes', 'vallès'],
 		painPoints: 'Web desactualitzada, no surten a Google.',
-		currentTools: 'Pàgina estàtica antiga',
 	},
 	{
 		slug: 'forn-de-pa-queralt',
@@ -279,6 +291,11 @@ export const COMPANIES = [
 		instagram: '@fornqueralt',
 		productsFit: ['web-starter', 'social-media-pack'],
 		tags: ['obrador', 'berguedà'],
+		attributes: {
+			current_tools: { value: 'Pàgina estàtica antiga', set_by: 'client' },
+			site_count: { value: 3, set_by: 'client' },
+			fit: { value: 'possible', set_by: 'client' },
+		},
 	},
 	{
 		slug: 'coastal-freight',
@@ -295,7 +312,11 @@ export const COMPANIES = [
 		productsFit: ['automatitzacions'],
 		tags: ['logistics', 'maresme'],
 		painPoints: 'Paper-based delivery notes, hard to trace shipments.',
-		currentTools: 'Paper + fax',
+		attributes: {
+			current_tools: { value: 'Paper + fax', set_by: 'client' },
+			site_count: { value: 4, set_by: 'client' },
+			fit: { value: 'no', set_by: 'client' },
+		},
 		nextAction: 'Follow-up call',
 		latitude: 41.5388,
 		longitude: 2.4449,
@@ -318,7 +339,11 @@ export const COMPANIES = [
 		productsFit: ['gestio-reserves', 'web-starter'],
 		tags: ['turisme', 'ribagorça'],
 		painPoints: 'Booking cobra comissions altes, volen canal directe.',
-		currentTools: 'Booking + llibreta',
+		attributes: {
+			current_tools: { value: 'Booking + llibreta', set_by: 'client' },
+			takes_online_bookings: { value: true, set_by: 'client' },
+			covers: { value: 40, set_by: 'client' },
+		},
 		nextAction: 'Demo sistema de reserves',
 	},
 	{
@@ -336,7 +361,10 @@ export const COMPANIES = [
 		productsFit: ['automatitzacions', 'ecommerce-local'],
 		tags: ['agroalimentari', 'ribera'],
 		painPoints: 'Pedidos por teléfono, hojas de ruta manuales.',
-		currentTools: 'WhatsApp + Excel',
+		attributes: {
+			current_tools: { value: 'WhatsApp + Excel', set_by: 'client' },
+			site_count: { value: 1, set_by: 'client' },
+		},
 	},
 	{
 		slug: 'park-stone-design',
@@ -385,7 +413,10 @@ export const COMPANIES = [
 		productsFit: ['automatitzacions', 'web-starter'],
 		tags: ['tancaments', 'garraf'],
 		painPoints: 'Gestió de projectes amb fulls de càlcul compartits.',
-		currentTools: 'Google Sheets + WhatsApp',
+		attributes: {
+			current_tools: { value: 'Google Sheets + WhatsApp', set_by: 'client' },
+			founded_on: { value: '2011-09-01', set_by: 'client' },
+		},
 		nextAction: 'Tancar contracte anual',
 		nextActionAt: new Date('2026-03-01'),
 		lastContactedAt: new Date('2026-03-28'),

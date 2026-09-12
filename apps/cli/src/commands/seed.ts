@@ -1,6 +1,7 @@
 import { Effect } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
+import { seedAttributes } from './seed/attributes'
 import { seedCalendar } from './seed/calendar'
 import {
 	seedCompanies,
@@ -110,6 +111,7 @@ export const seed = (preset: Preset) =>
 				const seededInboxes = yield* seedInboxes(ctx)
 				yield* seedDemoEmails(sql, seededInboxes)
 				const instructionTemplateIds = yield* seedInstructions(ctx)
+				yield* seedAttributes(ctx)
 				yield* seedMcpOAuth(ctx)
 
 				if (preset === 'full') {
@@ -149,6 +151,7 @@ export const seed = (preset: Preset) =>
 				const counts = {
 					products: insertedProducts.length,
 					instructionTemplates: instructionTemplateIds.size,
+					attributes: yield* tally('research_attributes'),
 					companies: insertedCompanies.length,
 					contacts: insertedContacts.length,
 					interactions: insertedInteractions.length,
