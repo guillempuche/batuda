@@ -1,10 +1,12 @@
-import { readFile, writeFile } from 'node:fs/promises'
-import { isAbsolute, resolve } from 'node:path'
+import { execFileSync } from 'node:child_process'
+import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { isAbsolute, join, resolve } from 'node:path'
 
 import {
 	Config,
 	ConfigProvider,
 	Console,
+	DateTime,
 	Effect,
 	Layer,
 	Option,
@@ -17,6 +19,7 @@ import { isTerminalResearchStatus } from '@batuda/domain'
 import { makeOtlpObservability } from '@batuda/observability'
 import {
 	BlobStorage,
+	baselineReportName,
 	buildContactEvalReport,
 	buildEvalReport,
 	ContactDiscovery,
@@ -29,6 +32,7 @@ import {
 	contactEvalSpanAttributes,
 	contactEvalSummaryAttributes,
 	dropNetworkRows,
+	type EvalReport,
 	type EvalSummary,
 	ExtractLanguageModel,
 	evalSpanAttributes,
@@ -36,6 +40,7 @@ import {
 	type FarmReplayScore,
 	type FramingOutcome,
 	type GoldenExpectation,
+	goldenStem,
 	judgeOrganisationKinds,
 	type KindCandidate,
 	type MarketExpectation,
@@ -45,6 +50,7 @@ import {
 	makeResearchProvidersLive,
 	makeUsageMeter,
 	networkGuardJudge,
+	newestReportName,
 	OrganisationKindVerdictsSchema,
 	organisationKindPrompt,
 	outcomeFromContactRun,
@@ -71,12 +77,15 @@ import {
 	scoreContactRun,
 	scoreFarmReplay,
 	scoreRun,
+	stripReportForBaseline,
 	townPageJudge,
 	UsageMeter,
 } from '@batuda/research'
 
 import { SqlLive } from '../db'
 import { requireLocalDatabase } from '../lib/confirm-cloud'
+import { requireDatabasePin } from '../lib/database-pin'
+import { makeGuardFacts, meanFactsPerRun } from '../lib/guard-facts'
 import {
 	NOTHING_TO_REACH,
 	settingWillNotRead,
@@ -387,6 +396,8 @@ const driveOne = (
 	golden: GoldenExpectation,
 	schemaName: string,
 	language: string | undefined,
+	// What this run's own guards counted, once it has one to be looked up by.
+	guardFactsFor: (runId: string) => Record<string, number> | undefined,
 ) =>
 	Effect.gen(function* () {
 		// Narrow the free-text flag to a supported language, dropping anything else.
@@ -459,7 +470,9 @@ const driveOne = (
 						[],
 						askExtractTierForKinds,
 					)
-		return scoreRun(golden, outcome, kinds, removedKinds)
+		const score = scoreRun(golden, outcome, kinds, removedKinds)
+		const facts = guardFactsFor(runId)
+		return facts === undefined ? score : { ...score, facts }
 	})
 
 /**
@@ -475,10 +488,15 @@ const estimatedPassCents = (
 ): Effect.Effect<number | null> =>
 	Option.isNone(priceFrom)
 		? Effect.succeed(null)
-		: Effect.tryPromise({
-				try: () => readFile(fromRepoRoot(priceFrom.value), 'utf8'),
-				catch: error => new Error(String(error)),
-			}).pipe(
+		: reportToPriceFrom(priceFrom.value).pipe(
+				Effect.flatMap(path =>
+					path === null
+						? Effect.fail(new Error('no report to price from'))
+						: Effect.tryPromise({
+								try: () => readFile(path, 'utf8'),
+								catch: error => new Error(String(error)),
+							}),
+				),
 				Effect.map(raw => {
 					const parsed: unknown = JSON.parse(raw)
 					const costPerRun =
@@ -497,6 +515,102 @@ const estimatedPassCents = (
 				// that spends nothing — it only means there is no price to quote.
 				Effect.catchCause(() => Effect.succeed(null)),
 			)
+
+// The commit the pass was taken on, so a figure can be traced back to the code
+// that produced it. A checkout that cannot answer still files its pass.
+const shortSha = Effect.sync((): string | null => {
+	try {
+		return (
+			execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
+				cwd: REPO_ROOT,
+				encoding: 'utf8',
+			}).trim() || null
+		)
+	} catch {
+		return null
+	}
+})
+
+/**
+ * File the pass under the golden set it measured, dated and tied to its commit,
+ * so a later pass can be read against it and the free pre-flight can price a
+ * pass from what one really cost.
+ *
+ * The filed copy is committed, so it holds no part of what a run found — only
+ * how it did. Everything a run read off a company's pages is stripped first.
+ */
+const fileBaseline = (report: EvalReport, goldenPath: string) =>
+	Effect.gen(function* () {
+		const sha = yield* shortSha
+		const now = DateTime.formatIso(DateTime.nowUnsafe())
+		const folder = fromRepoRoot(join('eval/reports', goldenStem(goldenPath)))
+		const path = join(folder, baselineReportName(now, sha))
+		yield* Effect.tryPromise({
+			try: async () => {
+				await mkdir(folder, { recursive: true })
+				await writeFile(
+					path,
+					JSON.stringify(stripReportForBaseline(report), null, 2),
+				)
+			},
+			catch: error => new Error(`cannot file the baseline: ${String(error)}`),
+		})
+		yield* Console.log(`Baseline filed at ${path}`)
+	})
+
+/**
+ * Which report file a `--price-from` points at: the file itself, or the newest
+ * report in a baselines folder such as `eval/reports/golden`. A folder is what a
+ * caller has to hand — the file inside it is named after the day and the commit
+ * it was taken on, which nobody wants to type.
+ */
+const reportToPriceFrom = (path: string): Effect.Effect<string | null> =>
+	Effect.tryPromise({
+		try: async () => {
+			const full = fromRepoRoot(path)
+			if (!(await stat(full)).isDirectory()) return full
+			const newest = newestReportName(await readdir(full))
+			return newest === null ? null : join(full, newest)
+		},
+		catch: error => new Error(String(error)),
+	}).pipe(Effect.catchCause(() => Effect.succeed(null)))
+
+// Switched off for a pass that measures quality: a company register or a paid
+// enrichment vendor answers with people and numbers the change under test had no
+// part in finding, and it does not answer every time, so two passes differ for a
+// reason that is not the change. `none` is a deliberate setting, not a stub, so a
+// pass with these off is still a pass of live research.
+const REGISTRIES = [
+	'RESEARCH_PROVIDER_REGISTRY_ES',
+	'RESEARCH_PROVIDER_REGISTRY_GB',
+] as const
+
+// The tiers a profile pass has no business reaching, and which the dev
+// environment holds no key for anyway. Contact discovery is not among the passes
+// that switch these off: the enrichment tier is the thing it measures.
+const QUALITY_PASS_OFF = [
+	...REGISTRIES,
+	'RESEARCH_PROVIDER_ENRICH',
+	'RESEARCH_PROVIDER_MAP',
+	'RESEARCH_PROVIDER_VERIFY',
+] as const
+
+/**
+ * Those settings as a top-priority source of `none`, laid over the environment.
+ *
+ * Not written into `process.env`: the settings are read through a provider that
+ * takes the environment as it stood when the pipeline's layers were built, which
+ * is before this command's handler gets to run — a write here is simply not
+ * seen, and the pass dies for want of a setting instead.
+ */
+const qualityOverrides = (
+	quality: boolean,
+	names: ReadonlyArray<string>,
+): Record<string, string> =>
+	quality ? Object.fromEntries(names.map(name => [name, 'none'])) : {}
+
+const sayQualityOff = (names: ReadonlyArray<string>) =>
+	Console.log(`Quality pass: ${names.join(', ')} switched off (set to none).`)
 
 /**
  * Puts a market list's rows to the extract tier, which is the cheap one and enough
@@ -631,6 +745,20 @@ const formatSummary = (summary: EvalSummary): string =>
 		`Tokens per run:         ${count(summary.tokensPerRun)}`,
 		`Credits per run:        ${count(summary.creditsPerRun)}`,
 		...formatAnsweringModels(summary),
+	].join('\n')
+
+// What the guards took out, as the mean per run of every count the runs reported.
+// A change to a guard moves these long before it moves a rate, so a pass read on
+// the rates alone files such a change as "nothing happened". Nothing is named
+// here: whatever the runs reported is what prints, so a guard added later shows
+// up on its own.
+const formatGuardDrops = (
+	drops: ReadonlyArray<{ readonly key: string; readonly mean: number }>,
+): string =>
+	[
+		'',
+		'── Guard drops (mean per run) ──',
+		...drops.map(drop => `${drop.key.padEnd(48)} ${decimal(drop.mean)}`),
 	].join('\n')
 
 // What a pass of market requests got right. Silent for a pass of company profiles,
@@ -807,9 +935,21 @@ export const researchEval = (opts: {
 	readonly byBucket: boolean
 	readonly dryRun: boolean
 	readonly priceFrom: Option.Option<string>
+	readonly quality: boolean
+	readonly baseline: boolean
+	readonly databaseFromEnv: boolean
 }) =>
 	Effect.gen(function* () {
+		// Laid over every setting this command reads, so what it turns off is off
+		// while the pipeline is built rather than only while it runs.
+		const offForQuality = qualityOverrides(opts.quality, QUALITY_PASS_OFF)
+		const qualitySettings = ConfigProvider.layerAdd(
+			ConfigProvider.fromEnv({ env: offForQuality }),
+			{ asPrimary: true },
+		)
+		if (opts.quality) yield* sayQualityOff(QUALITY_PASS_OFF)
 		yield* requireLocalDatabase('research eval')
+		yield* requireDatabasePin('research eval', opts.databaseFromEnv)
 		// A profile pass reads pages the agent finds and the extract tier reads. The
 		// writer tier only phrases the human brief, which nothing here scores, and the
 		// company registers are asked to be off for a comparison — so neither is
@@ -823,6 +963,9 @@ export const researchEval = (opts: {
 			tiers: ['agent', 'extract'],
 			capabilities: ['search', 'scrape'],
 		}).pipe(
+			// Judged on the values the pass will really use, not on the ones a
+			// quality pass is about to replace.
+			Effect.provide(qualitySettings),
 			Effect.as<string | null>(null),
 			Effect.catchTag('StubbedProvidersRefused', error =>
 				opts.dryRun ? Effect.succeed(error.message) : Effect.fail(error),
@@ -859,7 +1002,7 @@ export const researchEval = (opts: {
 			if (routingRefusal !== null) {
 				yield* Console.log(`Would not run: ${routingRefusal}`)
 			}
-			yield* reportReachability
+			yield* reportReachability.pipe(Effect.provide(qualitySettings))
 			const runsTotal = golden.length * opts.runs
 			const price = yield* estimatedPassCents(opts.priceFrom, runsTotal)
 			yield* Console.log(
@@ -875,9 +1018,12 @@ export const researchEval = (opts: {
 		// the first round's answer, and averaging it with itself steadies nothing. So
 		// a pass asking for repeats goes past the caches, and pays for every round.
 		const repeating = opts.runs > 1
-		const cacheSettings = ConfigProvider.layerAdd(
+		const runSettings = ConfigProvider.layerAdd(
 			ConfigProvider.fromEnv({
-				env: repeating ? { RESEARCH_CACHE_BYPASS: 'true' } : {},
+				env: {
+					...offForQuality,
+					...(repeating ? { RESEARCH_CACHE_BYPASS: 'true' } : {}),
+				},
 			}),
 			{ asPrimary: true },
 		)
@@ -909,6 +1055,11 @@ export const researchEval = (opts: {
 		// catches exactly those calls: a run's own model calls use the run's meter.
 		const judgeMeter = yield* makeUsageMeter
 
+		// Reads the guards' own log lines as the runs write them, keyed by the run
+		// they name — the counts ride a record each run opens inside itself, which
+		// one handed in from here never reaches.
+		const guardFacts = makeGuardFacts()
+
 		const scores = yield* Effect.gen(function* () {
 			const defaults = yield* systemDefaults
 			// A round is one pass over every company. Repeats are rounds rather than a
@@ -926,6 +1077,7 @@ export const researchEval = (opts: {
 							company,
 							opts.schemaName,
 							Option.getOrUndefined(opts.language),
+							guardFacts.forRun,
 						).pipe(
 							Effect.tap(score =>
 								Effect.annotateCurrentSpan(evalSpanAttributes(score)),
@@ -947,8 +1099,11 @@ export const researchEval = (opts: {
 			return perRound.flat()
 		}).pipe(
 			Effect.provide(researchLive),
-			Effect.provide(cacheSettings),
+			Effect.provide(runSettings),
 			Effect.provideService(UsageMeter, judgeMeter),
+			// Outermost, so the capturing logger is in place while the pipeline's
+			// own layers are built and the fibers they start inherit it.
+			Effect.provide(guardFacts.layer),
 		)
 		const judgeSpend = yield* judgeMeter.snapshot()
 
@@ -963,6 +1118,10 @@ export const researchEval = (opts: {
 
 		const report = buildEvalReport(scores)
 		yield* Console.log(formatSummary(report.summary))
+		const guardDrops = meanFactsPerRun(scores)
+		if (guardDrops.length > 0) {
+			yield* Console.log(formatGuardDrops(guardDrops))
+		}
 		// Printed apart from the cost per run above, which counts only what the runs
 		// themselves were billed. Asking a model what kind of organisation each row of
 		// a market list is happens after a run has finished, so folding it into that
@@ -1000,6 +1159,9 @@ export const researchEval = (opts: {
 					),
 				),
 		})
+		if (opts.baseline) {
+			yield* fileBaseline(report, opts.goldenPath)
+		}
 	}).pipe(
 		// One span per eval run plus this batch span, exported to the monitoring
 		// board when OTEL_EXPORTER_OTLP_ENDPOINT is set; a no-op native tracer
@@ -1273,15 +1435,26 @@ export const researchEvalContacts = (opts: {
 	readonly enrich: Option.Option<string>
 	readonly enrichMode: Option.Option<string>
 	readonly out: Option.Option<string>
+	readonly quality: boolean
+	readonly databaseFromEnv: boolean
 }) =>
 	Effect.gen(function* () {
+		// First of all, before any setting is read: what this turns off has to be
+		// off while the pipeline is built, not merely while it runs.
+		// Only the registers: this command measures the enrichment tier, so
+		// switching that off would measure nothing at all.
+		if (opts.quality) yield* sayQualityOff(REGISTRIES)
 		yield* requireLocalDatabase('research eval-contacts')
+		yield* requireDatabasePin('research eval-contacts', opts.databaseFromEnv)
 		// The --enrich / --enrich-mode flags need to reach the settings the
 		// enrichment step reads. Those settings are captured from the environment
 		// once, before this handler runs, so writing to process.env now would be
 		// ignored. Instead the flag values become a top-priority settings source
 		// that wins over the existing one, which still supplies everything else.
-		const enrichOverrides: Record<string, string> = {}
+		const enrichOverrides: Record<string, string> = qualityOverrides(
+			opts.quality,
+			REGISTRIES,
+		)
 		if (Option.isSome(opts.enrich)) {
 			enrichOverrides['RESEARCH_PROVIDER_ENRICH'] = opts.enrich.value
 		}

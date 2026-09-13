@@ -44,6 +44,13 @@ import type {
 import type { AuthEnv } from './build-better-auth-config'
 import { buildBetterAuthConfig } from './build-better-auth-config'
 
+// What a key minted here may do, matching the figures the server stamps on the
+// keys it mints (`API_KEY_RATE_LIMIT_MAX` / `_WINDOW_SECONDS` as shipped): 600
+// requests a minute. A key that carries no figures of its own gets Better Auth's
+// ten a day instead, which a single MCP turn spends before it has finished.
+const KEY_RATE_LIMIT_MAX = 600
+const KEY_RATE_LIMIT_WINDOW_MS = 60_000
+
 export interface MagicLinkCallbackInput {
 	readonly email: string
 	readonly url: string
@@ -466,6 +473,24 @@ export const makeBetterAuthAdapter = (
 										prefix: input.prefix,
 										...(input.expiresIn !== undefined
 											? { expiresIn: input.expiresIn }
+											: {}),
+										// The creator defaults to the user the key was issued
+										// for, which is the id looked up just above.
+										...(input.metadata !== undefined
+											? {
+													metadata: {
+														organizationId: input.metadata.organizationId,
+														createdByUserId:
+															input.metadata.createdByUserId ?? owner.id,
+													},
+													// Stamped rather than inherit Better Auth's
+													// 10-requests-a-day default, which one MCP turn
+													// spends on its own. The same figures the server
+													// stamps on the keys it mints.
+													rateLimitEnabled: true,
+													rateLimitMax: KEY_RATE_LIMIT_MAX,
+													rateLimitTimeWindow: KEY_RATE_LIMIT_WINDOW_MS,
+												}
 											: {}),
 									},
 								}),

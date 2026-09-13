@@ -432,6 +432,21 @@ export interface RunScore {
 	/** What this run cost, carried through so a pass can be totalled and compared. */
 	readonly usage?: RunUsage
 	/**
+	 * Every number the run logged under a `research.` line, keyed
+	 * `<line>.<field>` and summed over the run — how many citations were kept of
+	 * those returned, how many websites were blanked, how many fields a guard
+	 * dropped. A change to a guard moves these long before it moves a rate, so
+	 * reading only the rates files such a change as "nothing happened".
+	 *
+	 * Left off a run that logged nothing of the sort, and left off the run's own
+	 * closing line, whose cost and tokens are already in `usage`. Nothing else is
+	 * named anywhere, so a guard line added later arrives with no change here.
+	 *
+	 * A guard that only writes its counts as a span attribute is not in here at
+	 * all: an absent line means it was not logged, not that it did not fire.
+	 */
+	readonly facts?: Readonly<Record<string, number>>
+	/**
 	 * Field by field, for the fields the golden row states an answer for. The rates
 	 * are computed from the same comparisons, so this adds no judgement of its own —
 	 * it only keeps the reasons the counts threw away.

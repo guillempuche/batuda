@@ -14,6 +14,13 @@ export type EnvTarget = 'local' | 'cloud'
 
 let resolvedTarget: EnvTarget = 'local'
 
+// Which database each side named, kept apart because the merge below cannot tell
+// them apart afterwards: the caller's value wins, so by then process.env holds
+// one answer and no record of the other. A measuring pass is the one thing that
+// has to know they disagreed.
+let callerDatabaseUrl: string | undefined
+let fileDatabaseUrl: string | undefined
+
 const stripEnvFlag = (argv: string[]): EnvTarget => {
 	let target: EnvTarget = 'local'
 	for (let i = argv.length - 1; i >= 2; i--) {
@@ -127,8 +134,17 @@ export const loadEnv = (): EnvTarget => {
 		}
 	}
 
-	for (const file of baselineFiles)
-		if (existsSync(file)) mergeIntoEnv(dotenvParse(readFileSync(file)))
+	callerDatabaseUrl = callerProvided.has('DATABASE_URL')
+		? process.env['DATABASE_URL']
+		: undefined
+
+	for (const file of baselineFiles) {
+		if (!existsSync(file)) continue
+		const settings = dotenvParse(readFileSync(file))
+		const fromFile = settings['DATABASE_URL']
+		if (fromFile !== undefined && fromFile !== '') fileDatabaseUrl = fromFile
+		mergeIntoEnv(settings)
+	}
 
 	if (target === 'cloud') mergeIntoEnv(readCloudConfig())
 
@@ -137,3 +153,13 @@ export const loadEnv = (): EnvTarget => {
 }
 
 export const getTarget = (): EnvTarget => resolvedTarget
+
+/**
+ * The two connection strings `loadEnv` saw: the one the caller had already
+ * exported, and the one the `.env` files beside this checkout name. Either may
+ * be absent. Both are raw, so anything printing one has to strip its password.
+ */
+export const getDatabaseUrls = (): {
+	readonly caller: string | undefined
+	readonly file: string | undefined
+} => ({ caller: callerDatabaseUrl, file: fileDatabaseUrl })
