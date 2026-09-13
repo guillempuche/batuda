@@ -1,4 +1,5 @@
 import { Schema } from 'effect'
+import { Tool } from 'effect/unstable/ai'
 import { describe, expect, it } from 'vitest'
 
 import { discoveryResultField } from '../discovery-scan'
@@ -9,6 +10,7 @@ import {
 	resolveSchema,
 	SchemaNameSchema,
 	schemaFieldNames,
+	schemaFillsAttributes,
 	schemaNameFor,
 	schemaNames,
 	schemaRegistry,
@@ -38,6 +40,9 @@ describe('schemaFieldNames', () => {
 			// is nothing inside a verdict to go and find
 			expect(names).toContain('verdict')
 			expect(names).toContain('verdict_rationale')
+			// AND the attribute values are left out: the prompt asks for them in a
+			// block of their own that names each key
+			expect(names.some(name => name.startsWith('attributes'))).toBe(false)
 		})
 	})
 
@@ -80,6 +85,46 @@ describe('schemaFieldNames', () => {
 	describe('when the schema is not one we know', () => {
 		it('should return nothing rather than fail a run', () => {
 			expect(schemaFieldNames('made_up_v9')).toEqual([])
+		})
+	})
+})
+
+describe('schemaFillsAttributes', () => {
+	// Whether a shape, anywhere inside it, has a field called `attributes`.
+	const hasAttributesField = (node: unknown): boolean => {
+		if (typeof node !== 'object' || node === null) return false
+		const record = node as Record<string, unknown>
+		const properties = record['properties']
+		if (typeof properties === 'object' && properties !== null) {
+			if ('attributes' in properties) return true
+			if (Object.values(properties).some(hasAttributesField)) return true
+		}
+		for (const key of ['items', 'additionalProperties']) {
+			if (hasAttributesField(record[key])) return true
+		}
+		for (const key of ['anyOf', 'oneOf', 'allOf']) {
+			const members = record[key]
+			if (Array.isArray(members) && members.some(hasAttributesField))
+				return true
+		}
+		const defs = record['$defs']
+		return (
+			typeof defs === 'object' &&
+			defs !== null &&
+			Object.values(defs).some(hasAttributesField)
+		)
+	}
+
+	describe('for every kind of run', () => {
+		it('should say yes exactly when the schema has somewhere to put the values', () => {
+			// GIVEN each schema as the model is shown it
+			for (const [name, schema] of Object.entries(schemaRegistry)) {
+				const shape = Tool.getJsonSchemaFromSchema(schema)
+				// THEN the table agrees with the shape
+				expect(schemaFillsAttributes(name)).toBe(hasAttributesField(shape))
+			}
+			// AND a name this build does not know fills nothing
+			expect(schemaFillsAttributes('made_up_v9')).toBe(false)
 		})
 	})
 })

@@ -21,7 +21,13 @@
  * page beside it. The two are not in tension — a check needs the pair, and a
  * reader wants the value — but a field the schema pairs belongs in the list
  * below as well, or in neither.
+ *
+ * A run's attribute values are settled the same way, wherever they sit: on each
+ * company a scan found, and beside the profile of the one company a run was
+ * about. Every value under `attributes` is one the schema pairs.
  */
+
+import { ATTRIBUTES_FIELD } from './attribute-bag'
 
 /**
  * The fields each kind of scan declares as a value paired with its page.
@@ -50,6 +56,30 @@ const isBareValue = (value: unknown): value is string | number =>
 	(typeof value === 'string' && value.trim() !== '') ||
 	(typeof value === 'number' && Number.isFinite(value))
 
+// The attribute map with every bare value paired, and how many had to be.
+const settleAttributes = (
+	holder: Record<string, unknown>,
+): { readonly holder: Record<string, unknown>; readonly wrapped: number } => {
+	const map = holder[ATTRIBUTES_FIELD]
+	if (!isPlainObject(map)) return { holder, wrapped: 0 }
+	let wrapped = 0
+	const settled: Array<[string, unknown]> = []
+	for (const [key, value] of Object.entries(map)) {
+		// A declared yes/no reaches a row as a bare true or false, which no schema
+		// field does, so it is paired here as well.
+		if (isBareValue(value) || typeof value === 'boolean') {
+			settled.push([key, { value }])
+			wrapped++
+		} else settled.push([key, value])
+	}
+	return wrapped === 0
+		? { holder, wrapped: 0 }
+		: {
+				holder: { ...holder, [ATTRIBUTES_FIELD]: Object.fromEntries(settled) },
+				wrapped,
+			}
+}
+
 export interface PairedFieldResult {
 	readonly findings: unknown
 	/** How many fields had to be put back into the paired shape. */
@@ -67,10 +97,13 @@ export const settlePairedFields = (
 	schemaName: string,
 	listField: string | undefined,
 ): PairedFieldResult => {
-	const fields = PAIRED_FIELDS_BY_SCHEMA[schemaName]
-	if (fields === undefined || listField === undefined)
-		return { findings, wrapped: 0 }
 	if (!isPlainObject(findings)) return { findings, wrapped: 0 }
+	const fields = PAIRED_FIELDS_BY_SCHEMA[schemaName]
+	if (fields === undefined || listField === undefined) {
+		// A run about one company holds its attribute map beside its profile.
+		const profile = settleAttributes(findings)
+		return { findings: profile.holder, wrapped: profile.wrapped }
+	}
 	const rows = findings[listField]
 	if (!Array.isArray(rows)) return { findings, wrapped: 0 }
 
@@ -86,7 +119,12 @@ export const settlePairedFields = (
 			changed = true
 			wrapped++
 		}
-		return changed ? next : row
+		const attributes = settleAttributes(next)
+		if (attributes.wrapped > 0) {
+			changed = true
+			wrapped += attributes.wrapped
+		}
+		return changed ? attributes.holder : row
 	})
 
 	return wrapped === 0

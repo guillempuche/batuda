@@ -95,11 +95,14 @@ export const schemaNameFor = (request: {
 
 // Fields every schema carries that are not something to go and find out: they
 // are how a run hands work back to the CRM, and the prompt covers them where it
-// explains that work.
+// explains that work. The attribute values are something to find out, but the
+// prompt asks for them in a block of their own, naming each key, so listing the
+// field here would only repeat the ask without the keys.
 const PLUMBING_FIELDS = new Set([
 	'proposed_updates',
 	'pending_paid_actions',
 	'discovered_existing',
+	'attributes',
 ])
 
 /**
@@ -184,6 +187,23 @@ const NON_SCAN_FOUND_FIELD = {
 	competitor_scan_v1: null,
 	prospect_scan_v1: null,
 } satisfies Record<SchemaName, string | null>
+
+// The kinds of run whose answer has a place for the attribute values an
+// organisation declared: a company profile beside its other blocks, a prospect
+// scan on each company it found. A competitor scan, a hunt for people and a
+// brief have none, so a run of those kinds is asked for no attributes whatever
+// its stack declares. The test next door holds this table to the schemas.
+const FILLS_ATTRIBUTES = {
+	freeform: false,
+	company_enrichment_v1: true,
+	contact_discovery_v1: false,
+	competitor_scan_v1: false,
+	prospect_scan_v1: true,
+} satisfies Record<SchemaName, boolean>
+
+/** Whether a run of this kind has somewhere to put the attribute values. */
+export const schemaFillsAttributes = (schemaName: string): boolean =>
+	isSchemaName(schemaName) && FILLS_ATTRIBUTES[schemaName]
 
 /**
  * Which list a kind of run fills with what it went looking for, or null for a

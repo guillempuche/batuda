@@ -19,8 +19,22 @@ export class ProviderError extends Schema.TaggedErrorClass<ProviderError>()(
 		 * bill to pay, the other is an answer.
 		 */
 		quotaExhausted: Schema.optional(Schema.Boolean),
+		/**
+		 * The shape of the failure before it was folded into this error: the
+		 * provider client's own reason, or ResponseCutOff for a structured reply
+		 * that ended before its JSON closed.
+		 */
+		reason: Schema.optional(Schema.String),
 	},
 ) {}
+
+/** The `reason` a ProviderError carries when a structured reply ended before its JSON closed. */
+export const RESPONSE_CUT_OFF = 'ResponseCutOff'
+
+// A reply the model never finished. Asking again gets the same reply cut at the
+// same place, so a caller shortens what it asks for instead of retrying.
+export const isResponseCutOff = (err: unknown): err is ProviderError =>
+	err instanceof ProviderError && err.reason === RESPONSE_CUT_OFF
 
 /** Per-run resource budget (cheap or paid tier) exceeded. */
 export class BudgetExceeded extends Schema.TaggedErrorClass<BudgetExceeded>()(

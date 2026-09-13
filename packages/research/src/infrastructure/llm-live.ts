@@ -26,6 +26,7 @@
  *   RESEARCH_LLM_<TIER>_API_KEY_2=…                      (slot 1 via keyForSlot)
  *   RESEARCH_LLM_<TIER>_BASE_URL=…                       (custom vendor only)
  *   RESEARCH_LLM_<TIER>_TIMEOUT_SEC=90                   (per-call; default 90)
+ *   RESEARCH_LLM_<TIER>_MAX_OUTPUT_TOKENS=8192           (the most one reply may write; required)
  */
 
 import { OpenAiClient, OpenAiLanguageModel } from '@effect/ai-openai-compat'
@@ -81,6 +82,8 @@ export interface ConfiguredSlot {
 	readonly vendor: string
 	readonly model: string
 	readonly baseUrl: string
+	/** The most tokens one reply may write. */
+	readonly maxOutputTokens: number
 	/** The variable holding this slot's key — named, never read here. */
 	readonly apiKeyEnv: string
 }
@@ -146,6 +149,7 @@ const slotsForVendors = (
 		// precisely because it was never going to need one.
 		if (vendors[0] === 'stub') return []
 		const model = yield* Config.string(`${envPrefix}_MODEL`)
+		const maxOutputTokens = yield* Config.int(`${envPrefix}_MAX_OUTPUT_TOKENS`)
 		return yield* Effect.forEach(vendors, (vendor, i) =>
 			Effect.gen(function* () {
 				if (vendor === 'stub') return []
@@ -166,6 +170,7 @@ const slotsForVendors = (
 						vendor,
 						model: slotModel,
 						baseUrl,
+						maxOutputTokens,
 						apiKeyEnv: keyForSlot(`${envPrefix}_API_KEY`, i),
 					} satisfies ConfiguredSlot,
 				]
@@ -254,6 +259,7 @@ const buildSlot = (
 	model: string,
 	timeout: Duration.Input,
 	tier: LlmTier,
+	maxOutputTokens: number,
 ) =>
 	Effect.gen(function* () {
 		if (vendor === 'stub') return stubLanguageModelService
@@ -264,7 +270,10 @@ const buildSlot = (
 			vendor === 'custom'
 				? yield* Config.string(keyForSlot(`${envPrefix}_BASE_URL`, slot))
 				: LLM_BASE_URLS[vendor]
-		const service = yield* OpenAiLanguageModel.make({ model }).pipe(
+		const service = yield* OpenAiLanguageModel.make({
+			model,
+			config: { max_output_tokens: maxOutputTokens },
+		}).pipe(
 			Effect.provide(
 				OpenAiClient.layer({
 					apiKey,
@@ -303,6 +312,12 @@ const buildTierLayer = <Self>(
 			}
 
 			const model = yield* Config.string(`${envPrefix}_MODEL`)
+			// The most one reply may write. Left to the vendor, a long extraction
+			// runs on until the vendor cuts it mid-JSON at a length nobody chose;
+			// set here, the cut is known and the caller can ask for less.
+			const maxOutputTokens = yield* Config.int(
+				`${envPrefix}_MAX_OUTPUT_TOKENS`,
+			)
 			const timeoutSeconds = yield* Config.int(`${envPrefix}_TIMEOUT_SEC`).pipe(
 				Config.withDefault(DEFAULT_TIMEOUT_SEC[tier]),
 			)
@@ -326,6 +341,7 @@ const buildTierLayer = <Self>(
 						slotModel,
 						timeout,
 						tier,
+						maxOutputTokens,
 					)
 					const rate = yield* slotRate(vendor, envPrefix, i)
 					return { service, model: slotModel, rate, vendor }

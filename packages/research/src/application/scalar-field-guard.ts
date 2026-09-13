@@ -69,17 +69,18 @@ const SCHEMA_WORDS = new Set([
 	'hq',
 ])
 
-// Fields whose value is meant to read straight off the page (a city name, a tool's
-// name), so it should actually appear in the evidence. Coded or paraphrased fields
-// (industry, size band, the ISO country code) are deliberately excluded — their
-// value is a category, not a span, so a text-overlap test would wrongly reject
-// them. A proposed CRM change keys the same fields in camelCase, so the value guard
-// can hold those to the page too.
-export const PAGE_LITERAL_FIELDS = new Set([
-	'location',
-	'current_tools',
-	'currentTools',
-])
+// Fields whose value is meant to read straight off the page (a city name, a job
+// title), so it should actually appear in the evidence. Coded or paraphrased
+// fields (industry, size band, the ISO country code) are deliberately excluded —
+// their value is a category, not a span, so a text-overlap test would wrongly
+// reject them. The value guard holds a proposed CRM change to the page by the
+// same list.
+export const PAGE_LITERAL_FIELDS = new Set(['location', 'role'])
+
+// Fields a model writes from memory when the page says nothing — a headcount, a
+// job title — so a value that arrives with no quote behind it is dropped rather
+// than kept on trust. Every other field may still stand on its source alone.
+export const QUOTE_REQUIRED_FIELDS = new Set(['employee_estimate', 'role'])
 
 // Ways of reaching a person, which the value guard already matches against the
 // evidence address-for-address and digit-for-digit — far more precisely than the
@@ -98,7 +99,9 @@ const COMPANY_PROFILE_KEY = 'enrichment'
 
 // Subtrees that are not scalar fields: the block-level citation arrays and the
 // freeform proposed-update JSON, whose contents could otherwise look like a field.
-const SKIP_KEYS = new Set(['citations', 'proposed_updates'])
+// The attribute map is skipped too: its values are graded once, by the guard
+// that knows each one's kind.
+const SKIP_KEYS = new Set(['citations', 'proposed_updates', 'attributes'])
 
 // A quote counts as real when at least this share of its distinctive words appear
 // in the gathered evidence. Set low so a lightly paraphrased real quote survives
@@ -167,8 +170,20 @@ const runsOf = (token: string): ReadonlyArray<string> => {
 // Japanese or Thai, and nothing was then given the benefit of the doubt — so an
 // invented Chinese address was applied as evidence-backed without a single one of
 // its characters being looked for.
-const salientTokens = (value: string): ReadonlyArray<string> =>
-	normalize(value)
+//
+// A short run of capitals is a word of its own — CEO, CFO, HR — and the one part
+// of a job title a model most readily writes from memory. Asked for only when the
+// text is a title: in a place or a company name the same shape is a state code
+// or a legal form ("Chicago, IL", "Acme SL"), which a page rarely repeats.
+const ACRONYM_RE = /(?<![\p{L}\p{N}])[A-Z]{2,3}(?![\p{L}\p{N}])/gu
+const acronymsOf = (value: string): ReadonlyArray<string> =>
+	[...value.matchAll(ACRONYM_RE)].map(match => match[0].toLowerCase())
+
+const salientTokens = (
+	value: string,
+	withAcronyms = false,
+): ReadonlyArray<string> => [
+	...normalize(value)
 		.split(/[^\p{L}\p{N}]+/u)
 		.flatMap(token =>
 			writtenWithoutWordSpaces(token)
@@ -176,9 +191,20 @@ const salientTokens = (value: string): ReadonlyArray<string> =>
 				: token.length >= SALIENT_MIN_CHARS || /^\d{2,}$/.test(token)
 					? [token]
 					: [],
-		)
+		),
+	...(withAcronyms ? acronymsOf(value) : []),
+]
 
-const isPlaceholderValue = (value: string, key: string): boolean => {
+// An acronym is looked for as a whole word: "ceo" inside "oceans" says nothing.
+// A longer token is looked for anywhere, so a stem still finds its longer form.
+const hasToken = (text: string, token: string): boolean =>
+	/^[a-z]{2,3}$/.test(token)
+		? new RegExp(`(?<![\\p{L}\\p{N}])${token}(?![\\p{L}\\p{N}])`, 'u').test(
+				text,
+			)
+		: text.includes(token)
+
+export const isPlaceholderValue = (value: string, key: string): boolean => {
 	const n = normalize(value)
 	if (PLACEHOLDER_VALUES.has(n)) return true
 	if (SCHEMA_WORDS.has(n)) return true
@@ -254,26 +280,100 @@ export const valueIsRightKind = (key: string, value: string): boolean => {
 	return rule === undefined || rule(value)
 }
 
-// The quote backs the value when it contains it outright or shares one of its
-// distinctive words. A value with no distinctive words (all short) can't be judged
-// this way, so it is given the benefit of the doubt.
-const quoteSupportsValue = (quote: string, value: string): boolean => {
+// How much of a title's word has to match for the rest to be a different ending
+// of the same word: "Directora" is found in "director general", "Gerent" in
+// "gerente". Titles alone get this, since a place name is not inflected.
+const ROLE_STEM_CHARS = 5
+
+// The quote backs the value when it contains it outright, shares one of its
+// distinctive words, or — read strictly — shares the stem of one. A value with
+// nothing distinctive in it can't be judged this way and is given the benefit of
+// the doubt. Read strictly, an acronym is distinctive too, so "CEO" has to be in
+// the quote: that is how a job title or a declared text value is read, since
+// those are what a model writes from memory.
+export const quoteSupportsValue = (
+	quote: string,
+	value: string,
+	strict = false,
+): boolean => {
 	const nq = normalize(quote)
 	const nv = normalize(value)
 	if (nv.length > 0 && nq.includes(nv)) return true
-	const tokens = salientTokens(value)
+	const tokens = salientTokens(value, strict)
 	if (tokens.length === 0) return true
-	return tokens.some(token => nq.includes(token))
+	if (tokens.some(token => hasToken(nq, token))) return true
+	if (!strict) return false
+	const quoteWords = nq.split(/[^\p{L}\p{N}]+/u)
+	return tokens.some(
+		token =>
+			token.length >= ROLE_STEM_CHARS &&
+			quoteWords.some(word => word.startsWith(token.slice(0, ROLE_STEM_CHARS))),
+	)
 }
+
+// The numbers a text states, read the ways a page writes one: a bare run of
+// digits; digits grouped in threes by a dot, a comma, an apostrophe or a space
+// ("1.200", "1 000"); a decimal with one or two digits after a dot or a comma
+// ("12.5", "12,5", "1.234,56"). Two runs a space apart that are not thousand
+// groups are two numbers ("fundada en 1990 45 empleados").
+const NUMBER_TOKEN = /\d+(?:[.,'\s]\d+)*/g
+const SEPARATOR = /[.,'\s]/
+
+const numbersStatedIn = (text: string): ReadonlyArray<number> => {
+	const stated: number[] = []
+	for (const token of text.match(NUMBER_TOKEN) ?? []) {
+		const parts = token.split(SEPARATOR)
+		const separators = token.match(/[.,'\s]/g) ?? []
+		// Digits with nothing between them spell the number they are.
+		if (separators.length === 0) {
+			stated.push(Number(token))
+			continue
+		}
+		const groupedInThrees = parts.slice(1).every(part => part.length === 3)
+		// A space or an apostrophe only ever groups thousands, so runs that are not
+		// groups of three are separate numbers rather than one long one.
+		if (separators.every(separator => /[\s']/.test(separator))) {
+			if (groupedInThrees) stated.push(Number(parts.join('')))
+			else stated.push(...parts.map(Number))
+			continue
+		}
+		// A dot or a comma can group thousands or mark the decimal, so both readings
+		// are tried: threes all the way, then a one- or two-digit tail after a mark
+		// the earlier groups did not use.
+		if (groupedInThrees) stated.push(Number(parts.join('')))
+		const last = parts[parts.length - 1] ?? ''
+		const lastSeparator = separators[separators.length - 1]
+		const groupsBeforeLast = parts.slice(1, -1).every(part => part.length === 3)
+		if (
+			last.length <= 2 &&
+			groupsBeforeLast &&
+			separators.slice(0, -1).every(separator => separator !== lastSeparator)
+		)
+			stated.push(Number(`${parts.slice(0, -1).join('')}.${last}`))
+	}
+	return stated
+}
+
+// A number is stated by the quote only when the quote writes that very number:
+// 5 is not read into "1950", 120 is not read into "30 years, 4 sites", and 12
+// is not read into "12.5 million".
+export const quoteStatesNumber = (quote: string, value: number): boolean =>
+	numbersStatedIn(quote).includes(Math.abs(value))
 
 // Most of a text's distinctive words appear somewhere in the gathered evidence, so
 // it was copied from a real page rather than invented. Used both for a field's
-// supporting quote and for a value that is meant to read off the page.
-export const isInCorpus = (text: string, lowerCorpus: string): boolean => {
-	const tokens = salientTokens(text)
+// supporting quote and for a value that is meant to read off the page. A job
+// title asks for its acronyms too, since "CEO" is the whole of what a model may
+// have made up.
+export const isInCorpus = (
+	text: string,
+	lowerCorpus: string,
+	options?: { readonly acronyms?: boolean },
+): boolean => {
+	const tokens = salientTokens(text, options?.acronyms === true)
 	if (tokens.length === 0) return true
 	const corpus = accentFreeCorpus(lowerCorpus)
-	const present = tokens.filter(token => corpus.includes(token)).length
+	const present = tokens.filter(token => hasToken(corpus, token)).length
 	return present / tokens.length >= QUOTE_PRESENCE_THRESHOLD
 }
 
@@ -283,6 +383,7 @@ export type FieldDropReason =
 	| 'wrong_kind'
 	| 'ungrounded'
 	| 'unsupported'
+	| 'unquoted'
 
 /**
  * One dropped scalar, recorded so a run can show exactly which field it nulled and
@@ -307,6 +408,8 @@ export interface ScalarFieldGuardResult {
 	readonly droppedUngrounded: number
 	/** Fields dropped because the quote did not support or was absent from evidence. */
 	readonly droppedUnsupported: number
+	/** Fields dropped because a value only credible with its words arrived without a quote. */
+	readonly droppedUnquoted: number
 	/** Each drop with its field, reason, value, and source — for the grounding trace. */
 	readonly drops: ReadonlyArray<FieldDrop>
 }
@@ -333,7 +436,7 @@ export const guardScalarFields = (
 	const lowerCorpus = corpus.toLowerCase()
 	const drops: FieldDrop[] = []
 	// Record a drop and return null (the walk replaces the field with null). The
-	// four per-reason counts below are read back off this list, so they can never
+	// per-reason counts below are read back off this list, so they can never
 	// drift from what was actually dropped.
 	const drop = (
 		field: string,
@@ -369,14 +472,22 @@ export const guardScalarFields = (
 				source_id?: unknown
 				quote?: unknown
 			}
-			// Only text scalars are judged here; a non-string value is left as-is.
-			if (typeof wrapper.value !== 'string') return value
-			if (isPlaceholderValue(wrapper.value, key)) {
-				return drop(key, 'placeholder', wrapper.value, wrapper.source_id)
-			}
-			// Not a placeholder, but still the wrong kind of thing for its field.
-			if (!valueIsRightKind(key, wrapper.value)) {
-				return drop(key, 'wrong_kind', wrapper.value, wrapper.source_id)
+			const raw = wrapper.value
+			// Text and numbers are judged here; anything else is left as-is.
+			if (
+				typeof raw !== 'string' &&
+				!(typeof raw === 'number' && Number.isFinite(raw))
+			)
+				return value
+			const text = typeof raw === 'string' ? raw : String(raw)
+			if (typeof raw === 'string') {
+				if (isPlaceholderValue(raw, key)) {
+					return drop(key, 'placeholder', raw, wrapper.source_id)
+				}
+				// Not a placeholder, but still the wrong kind of thing for its field.
+				if (!valueIsRightKind(key, raw)) {
+					return drop(key, 'wrong_kind', raw, wrapper.source_id)
+				}
 			}
 			// An unsourced fact is treated as absent: the citation guard has already
 			// stripped every fabricated source_id, so a field with none left never
@@ -385,19 +496,29 @@ export const guardScalarFields = (
 				typeof wrapper.source_id !== 'string' ||
 				wrapper.source_id.trim() === ''
 			) {
-				return drop(key, 'ungrounded', wrapper.value, null)
+				return drop(key, 'ungrounded', text, null)
 			}
 			const quote =
 				typeof wrapper.quote === 'string' ? wrapper.quote.trim() : ''
+			// A headcount or a title with no words behind it is what a model writes
+			// from memory, so it is not kept on trust.
+			if (quote === '' && QUOTE_REQUIRED_FIELDS.has(key)) {
+				return drop(key, 'unquoted', text, wrapper.source_id)
+			}
 			if (quote !== '') {
 				if (corpus !== '' && !isInCorpus(quote, lowerCorpus)) {
-					return drop(key, 'unsupported', wrapper.value, wrapper.source_id)
+					return drop(key, 'unsupported', text, wrapper.source_id)
+				}
+				// A number has to be the number the quote states, digit for digit.
+				if (typeof raw === 'number' && !quoteStatesNumber(quote, raw)) {
+					return drop(key, 'unsupported', text, wrapper.source_id)
 				}
 				if (
+					typeof raw === 'string' &&
 					PAGE_LITERAL_FIELDS.has(key) &&
-					!quoteSupportsValue(quote, wrapper.value)
+					!quoteSupportsValue(quote, raw, key === 'role')
 				) {
-					return drop(key, 'unsupported', wrapper.value, wrapper.source_id)
+					return drop(key, 'unsupported', text, wrapper.source_id)
 				}
 			}
 			return value
@@ -421,6 +542,7 @@ export const guardScalarFields = (
 		droppedWrongKind: countReason('wrong_kind'),
 		droppedUngrounded: countReason('ungrounded'),
 		droppedUnsupported: countReason('unsupported'),
+		droppedUnquoted: countReason('unquoted'),
 		drops,
 	}
 }

@@ -20,8 +20,11 @@
  *   - An `llm.retry` log written ONLY when another attempt is really about to be
  *     made — not for a failure the gate above refuses, and not on the final
  *     exhausted attempt.
- *   - AiError → `ProviderError { provider, message, recoverable }` at the exit,
- *     so the fallback cascade can pattern-match on the tagged error.
+ *   - AiError → `ProviderError { provider, message, recoverable, reason }` at
+ *     the exit, so the fallback cascade can pattern-match on the tagged error.
+ *   - A structured reply that ended before its JSON closed is neither retried
+ *     nor handed to the next slot: asking again cuts the same reply at the same
+ *     place. It carries `reason: ResponseCutOff` so the caller can ask for less.
  *   - Before that mapping erases it, the failure's real shape (timeout vs the
  *     provider's HTTP status / reason) is written to the `llm.call` span and an
  *     error log, so a generic "<provider> request failed" stays diagnosable.
@@ -31,8 +34,9 @@
  *
  * `withFallbackLanguageModel` folds N hardened slots into a single caller
  * that tries each slot in order. On `ProviderError` from slot i (regardless
- * of `recoverable`), the cascade invokes slot i+1. The outer-most `ProviderError`
- * escapes when every slot exhausts its retries.
+ * of `recoverable`, a reply cut off mid-answer excepted), the cascade invokes
+ * slot i+1. The outer-most `ProviderError` escapes when every slot exhausts its
+ * retries.
  *
  * `streamText` is passed through unwrapped. Mid-stream retries require a
  * replay buffer on the caller side — deferred until we actually stream LLM
@@ -44,7 +48,7 @@ import { Cause, Duration, Effect, Schedule, Semaphore } from 'effect'
 import type { LanguageModel } from 'effect/unstable/ai'
 import { AiError } from 'effect/unstable/ai'
 
-import { ProviderError } from '../domain/errors'
+import { ProviderError, RESPONSE_CUT_OFF } from '../domain/errors'
 import { reclassifyRejectedToolCall } from './_tool-call-rejection'
 
 const DEFAULT_TIMEOUT: Duration.Input = '60 seconds'
@@ -85,6 +89,30 @@ interface FailureInfo {
 	readonly message: string
 }
 
+const parsesAsJson = (text: string): boolean => {
+	try {
+		JSON.parse(text)
+		return true
+	} catch {
+		return false
+	}
+}
+
+// A structured reply the model never finished: it began as JSON and ends before
+// the JSON closes, so nothing in it can be decoded. Told apart from a reply that
+// parsed and merely failed to fit the schema, and from one that was never JSON
+// at all — a fenced block, a refusal, an empty body — which a second try or the
+// next vendor may well fix.
+const isCutOffReply = (err: unknown): boolean => {
+	if (
+		!(err instanceof AiError.AiError) ||
+		err.reason._tag !== 'StructuredOutputError'
+	)
+		return false
+	const text = err.reason.responseText.trimStart()
+	return (text.startsWith('{') || text.startsWith('[')) && !parsesAsJson(text)
+}
+
 // Read the true shape of a failure before it collapses into a ProviderError
 // (only provider + message + recoverable). `Effect.timeout` raises a bare
 // TimeoutError with no message, and a provider blip can arrive as an AiError
@@ -105,7 +133,7 @@ const describeFailure = (
 		const status = httpStatusOf(err)
 		return {
 			kind: 'provider',
-			reason: err.reason._tag,
+			reason: isCutOffReply(err) ? RESPONSE_CUT_OFF : err.reason._tag,
 			...(status !== undefined ? { status } : {}),
 			message: err.message,
 		}
@@ -125,10 +153,16 @@ const toProviderError = (
 	// `describeFailure` always yields a non-empty message; a ProviderError built
 	// with an empty message rejects its own construction and throws a second,
 	// contentless error over the real one — so the non-empty invariant matters.
-	const message = describeFailure(provider, err, timeout).message
-	return err instanceof AiError.AiError
-		? new ProviderError({ provider, message, recoverable: err.isRetryable })
-		: new ProviderError({ provider, message, recoverable: true })
+	const info = describeFailure(provider, err, timeout)
+	return new ProviderError({
+		provider,
+		message: info.message,
+		recoverable:
+			err instanceof AiError.AiError
+				? err.isRetryable && !isCutOffReply(err)
+				: true,
+		...(info.reason !== undefined ? { reason: info.reason } : {}),
+	})
 }
 
 // Emit the failure's real shape onto the `llm.call` span and a log line before
@@ -165,7 +199,7 @@ const reportFailure = (
 }
 
 const isRetryableFailure = (err: unknown): boolean =>
-	err instanceof AiError.AiError && err.isRetryable
+	err instanceof AiError.AiError && err.isRetryable && !isCutOffReply(err)
 
 const rateLimitRetryAfter = (err: unknown): Duration.Duration | undefined => {
 	if (!(err instanceof AiError.AiError)) return undefined
@@ -279,6 +313,34 @@ const harden =
 		return semaphore ? semaphore.withPermits(1)(wrapped) : wrapped
 	}
 
+// The reason the model stopped, written on the span. A reply the vendor cut at
+// the ceiling is logged as well: nothing else says the ceiling was hit until
+// the JSON it broke fails to parse.
+const noteFinishReason = (
+	response: unknown,
+	provider: string,
+	tier: string | undefined,
+): Effect.Effect<void> => {
+	const reason =
+		typeof response === 'object' && response !== null
+			? (response as { finishReason?: unknown }).finishReason
+			: undefined
+	if (typeof reason !== 'string') return Effect.void
+	return Effect.annotateCurrentSpan({ 'llm.finish_reason': reason }).pipe(
+		Effect.andThen(
+			reason === 'length'
+				? Effect.logWarning('llm.output_truncated').pipe(
+						Effect.annotateLogs({
+							event: 'llm.output_truncated',
+							provider,
+							...(tier !== undefined ? { tier } : {}),
+						}),
+					)
+				: Effect.void,
+		),
+	)
+}
+
 /**
  * Wrap a single-tier LanguageModel with timeout + retry + error mapping.
  * The result still conforms to `LanguageModel.Service`, but its failure
@@ -313,6 +375,7 @@ export const hardenLanguageModel = (
 				AiError.AiError
 			>,
 		).pipe(
+			Effect.tap(response => noteFinishReason(response, provider, tier)),
 			Effect.withSpan('llm.call', {
 				attributes: { ...spanAttributes, 'llm.method': 'generateText' },
 			}),
@@ -324,6 +387,7 @@ export const hardenLanguageModel = (
 				AiError.AiError
 			>,
 		).pipe(
+			Effect.tap(response => noteFinishReason(response, provider, tier)),
 			Effect.withSpan('llm.call', {
 				attributes: { ...spanAttributes, 'llm.method': 'generateObject' },
 			}),
@@ -359,15 +423,20 @@ export const withFallbackLanguageModel = (
 			(acc, svc) =>
 				acc.pipe(
 					Effect.catchTag('ProviderError', err =>
-						Effect.gen(function* () {
-							yield* Effect.logInfo('llm.fallback').pipe(
-								Effect.annotateLogs({
-									event: 'llm.fell_back',
-									from_provider: err.provider,
+						// A reply the model never finished is not handed on: the next slot
+						// would write the same reply and cut it at the same place. The
+						// caller shortens what it asks for instead.
+						err.reason === RESPONSE_CUT_OFF
+							? Effect.fail(err)
+							: Effect.gen(function* () {
+									yield* Effect.logInfo('llm.fallback').pipe(
+										Effect.annotateLogs({
+											event: 'llm.fell_back',
+											from_provider: err.provider,
+										}),
+									)
+									return yield* invoke(svc)
 								}),
-							)
-							return yield* invoke(svc)
-						}),
 					),
 				),
 			invoke(head),

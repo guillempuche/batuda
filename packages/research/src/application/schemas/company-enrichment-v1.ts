@@ -1,6 +1,7 @@
 import { Schema } from 'effect'
 
 import {
+	AttributeEntries,
 	Citation,
 	DiscoveredExisting,
 	PendingPaidAction,
@@ -13,14 +14,6 @@ export const CompanyEnrichmentV1Schema = Schema.Struct({
 	enrichment: Schema.Struct({
 		industry: Schema.optionalKey(Sourced(Schema.String)),
 		size_range: Schema.optionalKey(Sourced(Schema.String)),
-		current_tools: Schema.optionalKey(
-			Sourced(
-				Schema.String.annotate({
-					description:
-						"The company's own business or operations software (e.g. TMS, ERP, CRM, WMS, load boards). Exclude generic website infrastructure that appears on any site — reCAPTCHA, analytics, CDNs, cookie/consent banners.",
-				}),
-			),
-		),
 		tags: Schema.optionalKey(
 			Schema.Array(
 				Schema.String.annotate({
@@ -80,6 +73,8 @@ export const CompanyEnrichmentV1Schema = Schema.Struct({
 		// for not being a website.
 		social_profiles: Schema.optionalKey(Schema.Array(SocialProfile)),
 	}),
+	// The facts the organisation declared for this run, one entry each.
+	attributes: AttributeEntries,
 	// The fit judgement the run reaches. It was previously written only into the
 	// human brief and lost from the structured output, so a consumer reading
 	// `findings` couldn't tell a qualified prospect from a disqualified one.

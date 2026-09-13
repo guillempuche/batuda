@@ -38,6 +38,7 @@ const AGENT_ON_GROQ = {
 	RESEARCH_LLM_WRITER_PROVIDERS: 'stub',
 	RESEARCH_LLM_AGENT_PROVIDERS: 'groq',
 	RESEARCH_LLM_AGENT_MODEL: 'openai/gpt-oss-120b',
+	RESEARCH_LLM_AGENT_MAX_OUTPUT_TOKENS: '8192',
 }
 
 describe('the models a tier is pointed at', () => {
@@ -140,6 +141,63 @@ describe('the models a tier is pointed at', () => {
 			// it swaps the whole tier for canned answers on the first choice alone and
 			// never reaches the second
 			expect(slots).toEqual([])
+		})
+	})
+})
+
+describe('the most a reply may write', () => {
+	describe('when a tier on a real vendor names no ceiling', () => {
+		it('should refuse to read the tier, naming the setting', async () => {
+			// GIVEN the agent tier on a vendor with every setting but the ceiling
+			const { RESEARCH_LLM_AGENT_MAX_OUTPUT_TOKENS: _unset, ...env } =
+				AGENT_ON_GROQ
+
+			// WHEN read — THEN the missing setting is named, since a reply with no
+			// ceiling runs until the vendor cuts it at a length nobody chose
+			expect(reasonOf(await read(env))).toContain(
+				'RESEARCH_LLM_AGENT_MAX_OUTPUT_TOKENS',
+			)
+		})
+
+		it('should refuse a ceiling that is not a whole number', async () => {
+			// GIVEN a ceiling written as words
+			const exit = await read({
+				...AGENT_ON_GROQ,
+				RESEARCH_LLM_AGENT_MAX_OUTPUT_TOKENS: 'eight thousand',
+			})
+
+			// THEN the setting is named rather than silently ignored
+			expect(reasonOf(exit)).toContain('RESEARCH_LLM_AGENT_MAX_OUTPUT_TOKENS')
+		})
+	})
+
+	describe('when a tier names a ceiling', () => {
+		it('should carry it on every slot of the tier', async () => {
+			// GIVEN a tier with a first and a second choice
+			const slots = slotsOf(
+				await read({
+					...AGENT_ON_GROQ,
+					RESEARCH_LLM_AGENT_PROVIDERS: 'groq,groq',
+				}),
+			)
+
+			// THEN both slots write no more than the tier's ceiling
+			expect(slots.map(slot => slot.maxOutputTokens)).toEqual([8192, 8192])
+		})
+	})
+
+	describe('when a tier runs on the stub', () => {
+		it('should ask for no ceiling, since the stub writes nothing', async () => {
+			// GIVEN every tier stubbed and no ceiling anywhere
+			const exit = await read({
+				RESEARCH_LLM_AGENT_PROVIDERS: 'stub',
+				RESEARCH_LLM_EXTRACT_PROVIDERS: 'stub',
+				RESEARCH_LLM_WRITER_PROVIDERS: 'stub',
+			})
+
+			// THEN the read goes through with nothing to list
+			expect(Exit.isSuccess(exit)).toBe(true)
+			if (Exit.isSuccess(exit)) expect(exit.value).toEqual([])
 		})
 	})
 })

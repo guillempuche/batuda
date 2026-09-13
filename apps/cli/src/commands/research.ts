@@ -1106,6 +1106,8 @@ const FRAMING_A: ResolvedInstructions = {
 	fingerprint: 'eval-invariance-a',
 	templateIds: [],
 	templateNames: ['eval-invariance-a'],
+	attributes: [],
+	attributeFingerprint: '',
 }
 const FRAMING_B: ResolvedInstructions = {
 	segments: [
@@ -1114,6 +1116,8 @@ const FRAMING_B: ResolvedInstructions = {
 	fingerprint: 'eval-invariance-b',
 	templateIds: [],
 	templateNames: ['eval-invariance-b'],
+	attributes: [],
+	attributeFingerprint: '',
 }
 
 // One framed run, adapted to the shape the comparator reads: scorable fields,

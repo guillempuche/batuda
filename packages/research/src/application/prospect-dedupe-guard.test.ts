@@ -29,6 +29,34 @@ const citedPagesOf = (findings: unknown): Array<unknown> => {
 }
 
 describe('dedupeDiscoveryRows', () => {
+	describe('when two rows of one company each carry attributes', () => {
+		it('should keep both sets, the surviving row winning where they overlap', () => {
+			// GIVEN the same company twice, each page stating different facts
+			const findings = scan([
+				{
+					name: 'Acme Serveis SL',
+					why_relevant: 'x',
+					attributes: { site_count: { value: 3 } },
+				},
+				{
+					name: 'ACME SERVEIS',
+					why_relevant: 'y',
+					attributes: { site_count: { value: 9 }, fit: { value: 'strong' } },
+				},
+			])
+
+			// WHEN folded
+			const result = dedupeDiscoveryRows(findings, 'prospects', noRunWords)
+
+			// THEN one row holds the first reading of the shared key and the other's extra
+			expect(rowsOf(result.findings)).toHaveLength(1)
+			expect(rowsOf(result.findings)[0]?.['attributes']).toEqual({
+				site_count: { value: 3 },
+				fit: { value: 'strong' },
+			})
+		})
+	})
+
 	describe('when two rows are the same company under different spellings', () => {
 		it('should fold a row that only differs by its legal form', () => {
 			// GIVEN one company met twice, once with the form on the end
