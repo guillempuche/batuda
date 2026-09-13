@@ -12,20 +12,28 @@ The pipeline is what changes; the companies are what stay still. A benchmark for
 
 **The answers are rates, not pass or fail.** A pass does not come back "passed"; it comes back as shares — how much of what was known came back, and how much of what came back was right. A share moves in small steps, which is what lets it show a drift that a yes/no would round away, and equally what makes any single pass unreadable on its own; see [Reading a change that targets under-filling](#reading-a-change-that-targets-under-filling).
 
-**Nothing is staged, so a pass is billable, slow, and noisy.** A real company either publishes that mailbox or it does not, which is what makes these numbers mean something outside this folder — and also what makes a pass cost ~$10–15 and a few hours, fail for reasons that have nothing to do with the change (a rate-limited provider, a site that blocked the scraper that morning), and differ from itself when run twice. Cost and noise are behind most of the rules in this file: why you validate one row before the billable pass, why a reading is three passes rather than one, why the registries go off for a comparison.
+**Nothing is staged, so a pass is billable, slow, and noisy.** A real company either publishes that mailbox or it does not, which is what makes these numbers mean something outside this folder — and also what makes a pass cost real money and hours, fail for reasons that have nothing to do with the change (a rate-limited provider, a site that blocked the scraper that morning), and differ from itself when run twice. On today's two-slot cascade one row is about 3¢ and about a minute, so the shipped ~20-row set at `--runs 3` is 60 runs: roughly $2 and an hour at concurrency 1, and a before/after is two of those. A market row is the expensive kind — one whole-market run takes 20–32 minutes by itself. Cost and noise are behind most of the rules in this file: why the free pre-flight comes before the billable pass, why a reading is three runs rather than one, why the registries go off for a comparison.
 
 ## Run it
 
 ```bash
+# The normal way: the wrapper carries the committed routing in, pins the local database,
+# resolves the org/user, runs the free pre-flight first, and defaults to --runs 3.
+scripts/research-eval.sh --env dev --golden eval/golden.json
+
+# A set of whole-market requests instead: a scan schema, and a golden file of market rows.
+# The wrapper raises RESEARCH_RUN_DEADLINE_SEC with that schema — it defaults to 20 minutes,
+# and a market search runs longer.
+scripts/research-eval.sh --env dev --golden eval/golden-markets.json --schema prospect_scan_v1
+
 # Which candidate models support the two features the tiers need (tool-calling + strict JSON schema)?
 pnpm cli research probe --api-key <nebius-key>
+```
 
-# Score the golden set. Needs the research env configured (LLM + provider keys, DATABASE_URL) and an org/user to run as.
+The wrapper calls `pnpm cli research eval` and nothing else, so every flag below is still the CLI's own; reach for the command directly when you need a shape the wrapper does not pass through.
+
+```bash
 pnpm cli research eval --org <org-id> --user <user-id> --golden eval/golden.json --out report.json
-
-# Score a set of whole-market requests instead. Same command, a scan schema, and a golden file of market rows.
-# RESEARCH_RUN_DEADLINE_SEC must be raised: it defaults to 20 minutes, and a market search runs longer.
-RESEARCH_RUN_DEADLINE_SEC=2400 pnpm cli research eval --org <org-id> --user <user-id> --schema prospect_scan_v1 --golden eval/golden-markets.json --out markets.json
 ```
 
 `eval` prints the metrics — grounding accuracy, field precision, field recall, titled-contact recall, profile fullness, wrong-company rate, needs-review rate, empty rate — and writes a full per-run report with `--out`. A pass of whole-market requests is graded on a different set of numbers; see [Market rows](#market-rows-grading-a-search-for-a-whole-market).
@@ -64,7 +72,17 @@ A change meant to fix a near-empty profile or titleless contacts is judged by th
 
 A single run is noise, so always take three — `--runs 3`. That runs the whole set three times over, one round after another, and every round asks the providers again instead of reading the round before it, so the three answers are three readings rather than one answer counted three times. It costs about three times a single pass, which is the price of the noise going away; a pass that asks for one run is unchanged and still reads whatever an earlier pass left behind.
 
-Clearing the caches by hand (`DELETE FROM search_cache; DELETE FROM llm_cache;`) is no longer part of the recipe, and would not have been enough on its own: a copy of each answer also sits in the running process's own memory, and the pages a run opened are kept in `sources` rather than in either of those tables.
+So a before/after is one pass on each side, not three passes on each side. Clearing the caches by hand is not part of the recipe and never could have been enough: a copy of each answer also sits in the running process's own memory, and the pages a run opened are kept in `sources` rather than in any cache table.
+
+**Keep the before side.** `--baseline` writes the report to `eval/reports/<golden-stem>/<YYYY-MM-DD>-<HHMM>-<short-sha>.json` as well as to `--out`, and prints the path — so the pass is filed under the golden set it measured, timed, and tied to the commit it was taken on; a second pass on the same commit gets its own name rather than landing on the first. A later `--price-from` accepts that folder and reads the newest report in it, which is how the free pre-flight prices a pass from what one really cost rather than from a guess. Take the baseline on the base branch's worktree, before the change exists.
+
+**A change to a guard shows up in the drops before it shows up in a rate.** Each run's report carries `runs[].facts` and the pass prints a **Guard drops** section over them, as the mean per run.
+
+What lands there is every number a run logs under a `research.` line, keyed `<line>.<field>` — nothing is named in the eval's code, so a guard line added on the pipeline branch flows through once merged with no change here. The run's own closing line (`research.run`) is the one exception, left out because its cost and token counts are already in `usage`.
+
+On this branch a one-company pass captured: `research.citations.dropped.total` / `.kept`, `research.contacts.rescued.before` / `.after`, `research.source_tier.capped.capped`, `research.vocabulary.normalized.mapped` / `.blanked`, and `research.websites.own_site.established` / `.unknown` / `.named_nobody_in_particular`. Lines that only write when they have something to report join them on the runs where they fire — among them `research.fields.ungrounded` (`dropped_placeholder`, `dropped_wrong_kind`, `dropped_ungrounded`, `dropped_unsupported`), `research.websites.blanked` (the `blanked_*` counts and `rescued_social_profile`), `research.contacts.wrong_entity`, `research.values.unsupported`, `research.fit.unsupported`, `research.proposals.unappliable` and the `research.prospects.*` lines.
+
+**An absent line means "not logged", not "did not fire".** A guard whose counts only reach a span attribute never appears here, however hard it worked; the monitoring board is where those are read.
 
 Whether a recovery pass earned its cost — as opposed to the up-front extraction prompt carrying the whole lift — is read from the monitoring board, not the printed table. Each run's `research.phase2` span carries the profile's fill at three stages: `research.enrichment.filled_broad` (fields the model returned on its own), `research.enrichment.filled_rescued` (after the focused recovery passes), and `research.enrichment.filled_kept` (what survived the guards), against `research.enrichment.fields_total`. A `filled_broad` near zero means the model answered almost nothing, which only the extraction prompt can move — a recovery pass cannot recover what was never there. A rise from `filled_broad` to `filled_rescued` is the recovery passes earning their spend; a drop from `filled_rescued` to `filled_kept` is the guards removing what a pass recovered. Charting the three across a prompt or trigger change shows which stage a number actually moved at, so a flat overall result is not mistaken for "nothing worked" when a pass recovered fields a guard then dropped.
 
@@ -74,41 +92,32 @@ The rest of Batuda runs on **stub providers with no secrets** — a fork can clo
 
 **Forking or contributing** — put your own keys in `.env` and switch the providers on. `.env.example` documents every variable (see its commented "real providers" block): set `RESEARCH_LLM_<TIER>_PROVIDERS=custom` with `_BASE_URL` + `_MODEL` + `_API_KEY`, plus `RESEARCH_PROVIDER_SCRAPE=firecrawl` (`RESEARCH_API_KEY_SCRAPE`), a search provider, and `RESEARCH_PROVIDER_REGISTRY_ES=librebor` for Spanish companies. The rest of the app keeps working on stubs.
 
-**Maintainers (Infisical)** — keys live in Infisical, so run through it. Put **only API-key secrets** in the environment you run with — never `DATABASE_URL` or `STORAGE_*`. Those are per-worktree local and must come from the worktree's own `.env`: the CLI's loader treats anything Infisical injects as authoritative and lets it outrank every file it reads (`apps/cli/src/lib/load-env.ts`), so a `DATABASE_URL` in Infisical would clobber the worktree's isolated database. Always name the environment explicitly with `--env=`; `.infisical.json` sets `defaultEnvironment` to `dev`, but relying on that default means one edit to a shared file silently repoints every unqualified run. With infra kept out of the Infisical env, a worktree run composes cleanly:
+**Maintainers (Infisical)** — keys live in Infisical, so run through it. Put **only API-key secrets** in the environment you run with — never `DATABASE_URL` or `STORAGE_*`. Those are per-worktree local and must come from the worktree's own `.env`: the CLI's loader treats anything Infisical injects as authoritative and lets it outrank every file it reads (`apps/cli/src/lib/load-env.ts`), so a `DATABASE_URL` in Infisical clobbers the worktree's isolated database. Always name the environment explicitly with `--env=`; `.infisical.json` sets `defaultEnvironment` to `dev`, but relying on that default means one edit to a shared file silently repoints every unqualified run.
 
-```bash
-infisical run --env=<dev-env> -- pnpm cli research eval --org <org-id> --user <user-id> --golden eval/golden.json --out report.json
-```
+**Which environment, which database.** Two questions, two answers. The **database** is always the worktree's own, under every environment: `scripts/research-eval.sh` pins it from the worktree's `.env` and the CLI refuses a pass whose process `DATABASE_URL` differs from that file (overridable with `--database-from-env`, which is almost always the wrong answer). The cleanest fix is upstream — take `DATABASE_URL` and `STORAGE_*` out of the Infisical dev environment altogether, which is what the rule above already asks for. The **environment** chooses only the keys: `--env dev` for every comparison pass, whose missing `ENRICH` / `MAP` / `VERIFY` keys are exactly why `--quality` switches those tiers off, and `--env prod --production` only for the one registries-on pass that stands in for production — which spends the production allowances and is still pinned to the local database.
 
-If an environment already carries a `DATABASE_URL`, pin it back to local with a leading `env DATABASE_URL="postgresql://batuda:batuda@localhost:5433/<local-db>"` before `pnpm`.
-
-**Routing, not just keys.** The keys alone don't run anything — the pipeline also needs the *routing*: `RESEARCH_LLM_<TIER>_PROVIDERS` + `_MODEL` for each of the three tiers, and the `RESEARCH_PROVIDER_SEARCH` / `_SCRAPE` / `_REGISTRY_GB` selectors. If those are missing from the run environment every provider silently falls back to `stub` and the eval reports a 100% empty rate over canned data — the keys being present is not enough. Unlike `DATABASE_URL`/`STORAGE_*`, this routing is **not secret** and is the *same* across worktrees, so it belongs in the Infisical env right next to the keys (never pass a key inline on the command; a provider name or model id is fine to pass inline, a key is not). Named vendors (`groq`, `fireworks`, `nebius`) carry their own endpoint, so a tier needs only its `PROVIDERS` name + `MODEL`; only a `custom` vendor also needs `_BASE_URL`.
+**Routing, not just keys.** The keys alone don't run anything — the pipeline also needs the *routing*: `RESEARCH_LLM_<TIER>_PROVIDERS` + `_MODEL` for each of the three tiers, and the `RESEARCH_PROVIDER_SEARCH` / `_SCRAPE` / `_REGISTRY_GB` selectors. If those are missing from the run environment every provider silently falls back to `stub` and the eval reports a 100% empty rate over canned data — the keys being present is not enough. Unlike the keys, the routing is **not secret**: it is committed in `apps/server/config.production.json`, it is not in Infisical, and a run has to carry it in explicitly. `scripts/research-eval.sh` reads every `RESEARCH_*` setting bar the keys out of that file and hands them to the run as separate arguments, which is the same trick `.github/workflows/model_capability.yml` uses to probe the models: committed routing plus injected keys. Named vendors (`groq`, `fireworks`, `nebius`) carry their own endpoint, so a tier needs only its `PROVIDERS` name + `MODEL`; only a `custom` vendor also needs `_BASE_URL`.
 
 **Match prod's cascade when you measure.** Run each tier as the two-slot `custom,<fallback>` cascade production uses (`apps/server/config.production.json`: `custom,groq` for agent + writer, `custom,fireworks` for extract), not a single slot. A single-slot eval never exercises the fallback, so a transient primary 4xx under load fails the run outright — that is what depressed a prior concurrency-3 pass by ~20 points on titled-contact recall, a load artifact rather than a quality change. `--concurrency` is 1 by default on `eval`, `eval-contacts` and `eval-invariance` for that reason, so a measured delta is quality rather than contention. Raising it makes a pass finish sooner and its numbers worth less; if you do raise it, say so beside the result, because the drop it causes looks exactly like a change that made the research worse.
 
 **Storage is local too.** Like the database, `STORAGE_*` must resolve to the worktree's own bucket (provisioned by `pnpm cli worktree up`), never the cloud one — a run has no business writing its scrape cache to prod. The dev Infisical env carries no `STORAGE_*`, so those come from the worktree automatically.
 
-**`DATABASE_URL` is the one you must pin by hand.** The dev Infisical env *does* carry it, and anything the caller exports outranks every `.env` file (`apps/cli/src/lib/load-env.ts`), so the worktree's own value cannot win. Put it in front of the command yourself:
-
-```bash
-infisical run --env=dev -- env DATABASE_URL="postgresql://batuda:batuda@localhost:5433/<worktree-db>" pnpm cli research eval …
-```
-
-The eval refuses to start against a database that is not on this machine, so a forgotten pin stops the run rather than filling a shared database with a pass's runs, sources and cached answers — several of which point at page text held only in that process's memory, which the server would later fail to read and pay to fetch again.
+**`DATABASE_URL` is the one that has to be pinned.** The dev Infisical env carries one, and anything the caller exports outranks every `.env` file, so the worktree's own value cannot win on its own. The wrapper pins it; a hand-written command puts it in front itself (`env DATABASE_URL="postgresql://batuda:batuda@localhost:5433/<worktree-db>"`). The eval refuses to start against a database that is not on this machine, and refuses one that differs from the worktree's `.env`, so a forgotten pin stops the run rather than filling a shared database with a pass's runs, sources and cached answers — several of which point at page text held only in that process's memory, which the server would later fail to read and pay to fetch again.
 
 **Check before the billable pass — it costs nothing.**
 
 ```bash
-pnpm cli research eval --org <org-id> --user <user-id> --golden eval/golden.json --dry-run --price-from report.json
+scripts/research-eval.sh --env dev --golden eval/golden.json --dry-run
+pnpm cli research eval --org <org-id> --user <user-id> --golden eval/golden.json --dry-run --price-from eval/reports/golden
 ```
 
-`--dry-run` spends nothing and runs every pre-flight a real pass runs: the database is this machine's, no part of the pipeline would answer with canned data, every golden row parses — each rejected row printed with its reason — and this machine can reach each vendor a pass would go to. It then says how many runs would execute, and with `--price-from <report.json>` prices them from what an earlier pass actually cost per run rather than from a guess. Without that flag it prints the count alone; no earlier pass, no price.
+`--dry-run` spends nothing and runs every pre-flight a real pass runs: the database is this machine's, no part of the pipeline would answer with canned data, every golden row parses — each rejected row printed with its reason — and this machine can reach each vendor a pass would go to. It then says how many runs would execute, and with `--price-from` prices them from what an earlier pass actually cost per run rather than from a guess — a report file, or a folder such as `eval/reports/<golden-stem>`, whose newest report it reads. Without that flag it prints the count alone; no earlier pass, no price.
 
 The pass refuses outright if a part it measures through would answer with canned data (a stub), so a mistyped vendor stops in seconds instead of running for hours and reporting a 100% empty rate. A part set to `none` is not refused — that is switched off, which is a deliberate setting and reads honestly in the result.
 
 The reachability line is about the connection and nothing else. It sends no key, so a vendor that turns the check away still counts as reached — being turned away proves the request arrived — and a vendor reported as unreachable is one this machine could not get to at all, which is a VPN, a proxy or a DNS filter rather than anything about a key. `pnpm cli doctor` reports the same thing outside a pass, and `pnpm cli research probe-config` is what says whether a key still works. Reaching a vendor's host does not prove the endpoint a run calls will answer, or that the account behind the key has allowance left.
 
-Even so, run a one-row golden with `--runs 1` (a few cents) before the full set: the guards prove the routing resolves and the vendors are reachable, not that a key is live.
+So when a key is in doubt, run a one-row golden with `--runs 1` (a few cents) before the full set — that is the one thing it proves, and the only reason to spend on a single row. The pre-flight already proves the routing resolves and the vendors are reachable.
 
 ## The golden file
 
@@ -273,9 +282,9 @@ A row cannot say why it is there. There is no field for it and JSON has nowhere 
 
 The `RegistryRouter` picks a registry by the company's country. **Companies House (UK)** is free — register a key at `developer.company-information.service.gov.uk` and set `RESEARCH_PROVIDER_REGISTRY_GB=companies-house`. **libreBORME (ES)** is ~€0.29/lookup — set `RESEARCH_PROVIDER_REGISTRY_ES=librebor` with `RESEARCH_API_KEY_REGISTRY_ES` (an `AccessId:AccessKey` pair).
 
-**For a pass measuring quality, turn both off** — `RESEARCH_PROVIDER_REGISTRY_ES=none` and `RESEARCH_PROVIDER_REGISTRY_GB=none`. A registry returns a company's directors, who are named people with titles, so leaving it on feeds the contact numbers from a source the change under test has nothing to do with. It also costs money and does not fire on every pass, which makes two passes differ for a reason that is not the change.
+**For a pass measuring quality, turn both off** — that is what `--quality` does, alongside switching the `ENRICH`, `MAP` and `VERIFY` tiers off so a pass never depends on a tier the dev environment holds no key for. It sets `RESEARCH_PROVIDER_REGISTRY_ES` and `_GB` to `none` before the pipeline is built, and `scripts/research-eval.sh` passes it unless `--production` is asked for. A registry returns a company's directors, who are named people with titles, so leaving it on feeds the contact numbers from a source the change under test has nothing to do with. It also costs money and does not fire on every pass, which makes two passes differ for a reason that is not the change.
 
-Know what turning them off costs: a registry lookup that resolves the target by its legal name counts toward grounding, and for a small business with a thin web presence that is often the only proof the run reached the right legal entity. So keep one registries-on pass as the figure that represents production, and read the registries-off passes as the comparison between two versions of the code.
+Know what turning them off costs: a registry lookup that resolves the target by its legal name counts toward grounding, and for a small business with a thin web presence that is often the only proof the run reached the right legal entity. So keep one registries-on pass (`--env prod --production`) as the figure that represents production, and read the registries-off passes as the comparison between two versions of the code.
 
 ## Note
 
