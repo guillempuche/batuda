@@ -17,6 +17,12 @@ export {
 	type DiscoveredContact,
 	estimateDiscoverCostCents,
 } from './application/contact-discovery'
+export {
+	baselineReportName,
+	goldenStem,
+	newestReportName,
+	stripReportForBaseline,
+} from './application/eval-baselines'
 // ── Application (contact-finding eval) ─────────────────────────────────────
 export {
 	type ContactGoldenParseResult,

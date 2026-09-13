@@ -48,6 +48,16 @@ export interface CreateApiKeyInput {
 	readonly name: string
 	readonly prefix: string
 	readonly expiresIn: number | undefined
+	/**
+	 * Who the key acts as. Stored on the key itself, and read back on every call
+	 * made with it — a key carrying none reaches nothing, because there is no
+	 * telling whose data it would be asking for.
+	 */
+	readonly metadata?: {
+		readonly organizationId: string
+		/** Left unset, the key acts as the user it was issued for. */
+		readonly createdByUserId?: string
+	}
 }
 
 export interface CreatedApiKey {

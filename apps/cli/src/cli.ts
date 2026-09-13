@@ -275,6 +275,29 @@ const confirmHostFlag = Flag.string('confirm-host').pipe(
 	Flag.optional,
 )
 
+// Shared by the measuring passes, which face the same two setup mistakes: a
+// vendor answering that the change under test had no part in, and an
+// environment quietly pointing the pass at another checkout's database.
+const qualityFlag = Flag.boolean('quality').pipe(
+	Flag.withDescription(
+		'Switch the company registers and the enrich, map and verify vendors off for this pass (they are set to none). A register answers with directors and a paid vendor with contact details, so leaving them on feeds the numbers from a source the change under test has nothing to do with — and they do not answer every time, which makes two passes differ for a reason that is not the change',
+	),
+)
+
+// The same idea, minus the enrichment tier: that tier is what this command
+// measures, so switching it off would measure nothing at all.
+const contactsQualityFlag = Flag.boolean('quality').pipe(
+	Flag.withDescription(
+		'Switch the company registers off for this pass (they are set to none). A register answers with directors, so leaving it on feeds the contact numbers from a source the change under test has nothing to do with — and it does not answer every time, which makes two passes differ for a reason that is not the change. The enrich, map and verify vendors are left as configured: the enrichment tier is what this command measures',
+	),
+)
+
+const databaseFromEnvFlag = Flag.boolean('database-from-env').pipe(
+	Flag.withDescription(
+		"Measure against the DATABASE_URL the environment exported, even when this checkout's .env names another database. Off by default: an environment that ships a connection string of its own otherwise sends the whole pass into somebody else's database, where its runs mix with theirs and the pages it reads back are not its own",
+	),
+)
+
 export class InvalidLocale extends Data.TaggedError('InvalidLocale')<{
 	readonly value: string
 }> {}
@@ -321,20 +344,34 @@ const authCreateKeyCommand = Command.make(
 			Flag.withDescription('Expiration in seconds (omit for no expiry)'),
 			Flag.optional,
 		),
+		org: Flag.string('org').pipe(
+			Flag.withDescription(
+				'Organization id the key works in. Written onto the key itself and read back on every call made with it, so a key without one reaches no data at all',
+			),
+			Flag.optional,
+		),
+		createdBy: Flag.string('created-by').pipe(
+			Flag.withDescription(
+				'User id the key acts as. Defaults to the user the key is issued for, which is almost always what is wanted; name another only when the key should act as somebody else',
+			),
+			Flag.optional,
+		),
 		confirmHost: confirmHostFlag,
 	},
-	({ email, name, prefix, expiresIn, confirmHost }) =>
+	({ email, name, prefix, expiresIn, org, createdBy, confirmHost }) =>
 		authCreateKey({
 			email,
 			name,
 			prefix,
 			expiresIn: Option.getOrUndefined(expiresIn),
+			org: Option.getOrUndefined(org),
+			createdBy: Option.getOrUndefined(createdBy),
 			confirmHost: Option.getOrUndefined(confirmHost),
 		}),
 ).pipe(
 	Command.withShortDescription('Create an API key for a user'),
 	Command.withDescription(
-		'Create a Better Auth API key for a user (local dev signup bypass)',
+		'Create a Better Auth API key for a user (local dev signup bypass). Pass --org to say which company the key works in, and --created-by to have it act as somebody other than its owner; both are written onto the key and read back on every call made with it.',
 	),
 )
 
@@ -1102,10 +1139,17 @@ const researchEvalCommand = Command.make(
 		),
 		priceFrom: Flag.string('price-from').pipe(
 			Flag.withDescription(
-				"Report JSON from an earlier pass, used to price a --dry-run from that pass's measured cost per run rather than a guess",
+				"Report JSON from an earlier pass, used to price a --dry-run from that pass's measured cost per run rather than a guess. A folder such as eval/reports/golden is read too, taking the newest report in it",
 			),
 			Flag.optional,
 		),
+		quality: qualityFlag,
+		baseline: Flag.boolean('baseline').pipe(
+			Flag.withDescription(
+				'Also file a copy of the report under eval/reports/<golden-stem>/<date>-<commit>.json and print the path, so a later pass can be read against this one and a dry run priced from it. The filed copy carries the rates, the breakdowns and the counts and cost of each run — never anything a run read off the pages of a company',
+			),
+		),
+		databaseFromEnv: databaseFromEnvFlag,
 	},
 	({
 		org,
@@ -1119,6 +1163,9 @@ const researchEvalCommand = Command.make(
 		byBucket,
 		dryRun,
 		priceFrom,
+		quality,
+		baseline,
+		databaseFromEnv,
 	}) =>
 		researchEval({
 			org,
@@ -1132,6 +1179,9 @@ const researchEvalCommand = Command.make(
 			byBucket,
 			dryRun,
 			priceFrom,
+			quality,
+			baseline,
+			databaseFromEnv,
 		}),
 ).pipe(
 	Command.withShortDescription(
@@ -1182,8 +1232,21 @@ const researchEvalContactsCommand = Command.make(
 			Flag.withDescription('Write the full JSON report to this path'),
 			Flag.optional,
 		),
+		quality: contactsQualityFlag,
+		databaseFromEnv: databaseFromEnvFlag,
 	},
-	({ org, user, golden, concurrency, runs, enrich, enrichMode, out }) =>
+	({
+		org,
+		user,
+		golden,
+		concurrency,
+		runs,
+		enrich,
+		enrichMode,
+		out,
+		quality,
+		databaseFromEnv,
+	}) =>
 		researchEvalContacts({
 			org,
 			user,
@@ -1193,6 +1256,8 @@ const researchEvalContactsCommand = Command.make(
 			enrich,
 			enrichMode,
 			out,
+			quality,
+			databaseFromEnv,
 		}),
 ).pipe(
 	Command.withShortDescription('Score contact discovery against a golden set'),

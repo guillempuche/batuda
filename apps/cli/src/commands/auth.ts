@@ -11,6 +11,10 @@ export interface AuthCreateKeyInput {
 	readonly prefix: string
 	readonly expiresIn: number | undefined
 	readonly confirmHost: string | undefined
+	/** The company the key works in. A key without one reaches nothing. */
+	readonly org: string | undefined
+	/** Who it acts as; the key's own owner when nobody else is named. */
+	readonly createdBy: string | undefined
 }
 
 /**
@@ -25,7 +29,22 @@ export const authCreateKey = (input: AuthCreateKeyInput) =>
 
 		const { keys } = yield* acquireAuthAdapter()
 
-		const created = yield* createApiKey(keys, input)
+		const created = yield* createApiKey(keys, {
+			email: input.email,
+			name: input.name,
+			prefix: input.prefix,
+			expiresIn: input.expiresIn,
+			...(input.org === undefined
+				? {}
+				: {
+						metadata: {
+							organizationId: input.org,
+							...(input.createdBy === undefined
+								? {}
+								: { createdByUserId: input.createdBy }),
+						},
+					}),
+		})
 
 		yield* Console.log('')
 		yield* Console.log('┌─── API key created ────────────────────────┐')
@@ -34,6 +53,15 @@ export const authCreateKey = (input: AuthCreateKeyInput) =>
 		yield* Console.log(`│  Name:   ${created.name.padEnd(33)}│`)
 		yield* Console.log(`│  KeyId:  ${created.id.padEnd(33)}│`)
 		yield* Console.log('└────────────────────────────────────────────┘')
+		if (input.org !== undefined) {
+			yield* Console.log(
+				`Works in company ${input.org}, acting as ${input.createdBy ?? 'the user it was issued for'}.`,
+			)
+		} else {
+			yield* Console.log(
+				'No company on this key: it reaches no data until one is set with --org.',
+			)
+		}
 		yield* Console.log('')
 		yield* Console.log('Plaintext key (shown only once — copy now):')
 		yield* Console.log('')
