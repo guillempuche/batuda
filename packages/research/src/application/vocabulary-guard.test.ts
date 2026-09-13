@@ -197,7 +197,7 @@ describe('constrainVocabulary', () => {
 				enrichment: {
 					industry: 'freight & logistics',
 					size_range: 'small',
-					current_tools: 'a spreadsheet',
+					location: 'Zaragoza',
 				},
 			}
 
@@ -211,7 +211,7 @@ describe('constrainVocabulary', () => {
 				.enrichment
 			expect(e['industry']).toBe('freight & logistics')
 			expect(e).not.toHaveProperty('size_range')
-			expect(e['current_tools']).toBe('a spreadsheet')
+			expect(e['location']).toBe('Zaragoza')
 			// AND nothing was rewritten, because only the size was a fixed vocabulary
 			expect(result.mapped).toBe(0)
 			expect(result.blanked).toBe(1)

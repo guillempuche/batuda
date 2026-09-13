@@ -10,7 +10,6 @@ interface EnrichmentView {
 	location?: unknown
 	country?: unknown
 	address?: unknown
-	current_tools?: unknown
 }
 const enrichment = (findings: unknown): EnrichmentView =>
 	(findings as { enrichment: EnrichmentView }).enrichment
@@ -412,24 +411,23 @@ describe('guardScalarFields', () => {
 			// GIVEN a plausible value but a quote whose words appear nowhere fetched
 			const findings = {
 				enrichment: {
-					current_tools: {
-						value: 'SAP ERP',
+					location: {
+						value: 'Zaragoza',
 						source_id: 'https://acme.es',
-						quote:
-							'we run our operations entirely on Oracle NetSuite and Salesforce',
+						quote: 'our head office and main warehouse sit in Zaragoza',
 						confidence: 0.8,
 					},
 				},
 			}
 
-			// WHEN grounded against a corpus that never mentions those tools
+			// WHEN grounded against a corpus that never says any of that
 			const result = guardScalarFields(
 				findings,
 				'acme is a logistics firm serving european shippers',
 			)
 
 			// THEN the fabricated-quote field is dropped
-			expect(enrichment(result.findings).current_tools).toBeNull()
+			expect(enrichment(result.findings).location).toBeNull()
 			expect(result.droppedUnsupported).toBe(1)
 		})
 	})
@@ -788,6 +786,264 @@ describe('isInCorpus — a value and a page that spell a town differently', () =
 			// THEN refused. Ignoring accents must not become ignoring the difference
 			// between one town and another
 			expect(isInCorpus('Gijón', 'fabrica en sevilla, andalucia')).toBe(false)
+		})
+	})
+})
+
+describe('guardScalarFields, when a headcount arrives as a number', () => {
+	const row = (employee_estimate: Record<string, unknown>) => ({
+		companies: [{ name: 'Acme', employee_estimate }],
+	})
+	const estimateOf = (findings: unknown): unknown =>
+		(findings as { companies: Array<{ employee_estimate: unknown }> })
+			.companies[0]?.employee_estimate
+
+	describe('when the quote states the number', () => {
+		it('should keep it, however the digits are grouped', () => {
+			// GIVEN 1200 quoted as "1.200 personas"
+			const findings = row({
+				value: 1200,
+				source_id: 'https://acme.es',
+				quote: 'una plantilla de 1.200 personas',
+			})
+
+			// WHEN grounded against a corpus holding the quote
+			const result = guardScalarFields(
+				findings,
+				'acme cuenta con una plantilla de 1.200 personas',
+			)
+
+			// THEN the number stands as it was
+			expect(estimateOf(result.findings)).toEqual(
+				findings.companies[0]?.employee_estimate,
+			)
+			expect(result.droppedUnsupported).toBe(0)
+		})
+	})
+
+	describe('when the quote writes the number another way', () => {
+		it('should read a decimal, a space-grouped thousand, and two numbers a space apart', () => {
+			// GIVEN 12.5 quoted as a decimal, 1000 grouped by a space, 45 after a year
+			const cases: ReadonlyArray<[number, string]> = [
+				[12.5, 'a turnover of 12.5 million'],
+				[1000, 'some 1 000 employees'],
+				[45, 'fundada en 1990 45 empleados'],
+				[1234.56, 'ingresos de 1.234,56 euros'],
+			]
+			for (const [value, quote] of cases) {
+				// WHEN grounded against a corpus holding the quote
+				const result = guardScalarFields(
+					row({ value, source_id: 'https://acme.es', quote }),
+					`acme. ${quote}`,
+				)
+				// THEN the number stands
+				expect(result.droppedUnsupported).toBe(0)
+			}
+		})
+
+		it('should not read a whole number into a decimal that starts with it', () => {
+			// GIVEN 12 quoted from "12,5"
+			const result = guardScalarFields(
+				row({
+					value: 12,
+					source_id: 'https://acme.es',
+					quote: 'uns 12,5 milions',
+				}),
+				'acme. uns 12,5 milions',
+			)
+			// THEN it is dropped
+			expect(result.droppedUnsupported).toBe(1)
+		})
+	})
+
+	describe('when the quote states a different number, or a longer one', () => {
+		it('should drop it as unsupported, logging the number as text', () => {
+			// GIVEN 120 quoted from a sentence about years, and 5 quoted from a year
+			const years = row({
+				value: 120,
+				source_id: 'https://acme.es',
+				quote: 'founded 30 years ago, with 4 sites',
+			})
+			const year = row({
+				value: 5,
+				source_id: 'https://acme.es',
+				quote: 'founded in 1950',
+			})
+
+			// WHEN grounded against a corpus holding both quotes
+			const corpus =
+				'acme was founded in 1950; founded 30 years ago, with 4 sites'
+			const first = guardScalarFields(years, corpus)
+			const second = guardScalarFields(year, corpus)
+
+			// THEN neither number survives, and the trace names each
+			expect(estimateOf(first.findings)).toBeNull()
+			expect(estimateOf(second.findings)).toBeNull()
+			expect(first.drops).toEqual([
+				{
+					field: 'employee_estimate',
+					reason: 'unsupported',
+					value: '120',
+					sourceId: 'https://acme.es',
+				},
+			])
+			expect(second.droppedUnsupported).toBe(1)
+		})
+	})
+
+	describe('when the number arrives with no quote at all', () => {
+		it('should drop it as unquoted, while a source alone still carries other fields', () => {
+			// GIVEN a sourced headcount with no words behind it, and a sourced
+			// industry with none either
+			const findings = {
+				enrichment: {
+					industry: { value: 'logistics', source_id: 'https://acme.es' },
+				},
+				companies: [
+					{
+						name: 'Acme',
+						employee_estimate: { value: 120, source_id: 'https://acme.es' },
+					},
+				],
+			}
+
+			// WHEN grounded
+			const result = guardScalarFields(findings, 'acme is a logistics firm')
+
+			// THEN the headcount goes and the industry stays
+			expect(estimateOf(result.findings)).toBeNull()
+			expect(result.droppedUnquoted).toBe(1)
+			expect(result.drops[0]?.reason).toBe('unquoted')
+			expect(enrichment(result.findings).industry).toEqual(
+				findings.enrichment.industry,
+			)
+		})
+	})
+
+	describe('when the value is neither text nor a whole number', () => {
+		it('should leave it alone', () => {
+			// GIVEN a wrapper carrying a list
+			const findings = row({ value: [1, 2], source_id: 'https://acme.es' })
+
+			// THEN nothing is judged or dropped
+			const result = guardScalarFields(findings, '')
+			expect(estimateOf(result.findings)).toEqual(
+				findings.companies[0]?.employee_estimate,
+			)
+			expect(result.drops).toEqual([])
+		})
+	})
+})
+
+describe('guardScalarFields, when a job title is held to its quote', () => {
+	const person = (role: Record<string, unknown>) => ({
+		contacts: [{ name: 'Ana Puig', role }],
+	})
+	const roleOf = (findings: unknown): unknown =>
+		(findings as { contacts: Array<{ role: unknown }> }).contacts[0]?.role
+
+	describe('when the quote never gives the title', () => {
+		it('should drop it as unsupported', () => {
+			// GIVEN "CEO" quoted from a sentence about pumps
+			const findings = person({
+				value: 'CEO',
+				source_id: 'https://acme.es',
+				quote: 'we make industrial pumps for the food sector',
+			})
+
+			// WHEN grounded against a corpus holding the quote
+			const result = guardScalarFields(
+				findings,
+				'acme: we make industrial pumps for the food sector',
+			)
+
+			// THEN the title goes, since an acronym is not given the benefit of the doubt
+			expect(roleOf(result.findings)).toBeNull()
+			expect(result.droppedUnsupported).toBe(1)
+		})
+	})
+
+	describe('when the quote names the title, in the same words or a different ending', () => {
+		it('should keep it', () => {
+			// GIVEN an acronym the quote gives, a Catalan title against its Spanish
+			// form, a feminine title against the masculine, and a stem alone
+			const cases = [
+				['CEO', 'Ana Puig, CEO of Acme'],
+				['Gerent', 'Ana Puig, gerente de la empresa'],
+				['Directora General', 'Ana Puig, director general de Acme'],
+				['Directora', 'Ana Puig es la director de la planta'],
+			] as const
+
+			for (const [value, quote] of cases) {
+				// WHEN grounded against a corpus holding the quote
+				const result = guardScalarFields(
+					person({ value, source_id: 'https://acme.es', quote }),
+					`acme. ${quote}`,
+				)
+				// THEN the title stands
+				expect(roleOf(result.findings)).toEqual({
+					value,
+					source_id: 'https://acme.es',
+					quote,
+				})
+			}
+		})
+	})
+
+	describe('when the title arrives with no quote', () => {
+		it('should drop it as unquoted', () => {
+			// GIVEN a sourced title with no words behind it
+			const result = guardScalarFields(
+				person({ value: 'CEO', source_id: 'https://acme.es' }),
+				'',
+			)
+
+			// THEN it goes, named in the trace
+			expect(roleOf(result.findings)).toBeNull()
+			expect(result.droppedUnquoted).toBe(1)
+			expect(result.drops[0]).toEqual({
+				field: 'role',
+				reason: 'unquoted',
+				value: 'CEO',
+				sourceId: 'https://acme.es',
+			})
+		})
+	})
+
+	describe('when a word is found only through its stem', () => {
+		it('should read a title through it and a place not', () => {
+			// GIVEN a title inflected differently from its quote, and a place whose
+			// quote shares only a stem with it
+			const title = guardScalarFields(
+				person({
+					value: 'Gerenta',
+					source_id: 'https://acme.es',
+					quote: 'Ana Puig, gerente de la planta',
+				}),
+				'acme. ana puig, gerente de la planta',
+			)
+			const place = guardScalarFields(
+				{
+					enrichment: {
+						location: {
+							value: 'Girona',
+							source_id: 'https://acme.es',
+							quote: 'the plant sits in Gironella',
+						},
+					},
+				},
+				'the plant sits in gironella',
+			)
+
+			// THEN the title stands and the place goes: a title is inflected, a
+			// place name is not
+			expect(roleOf(title.findings)).toEqual({
+				value: 'Gerenta',
+				source_id: 'https://acme.es',
+				quote: 'Ana Puig, gerente de la planta',
+			})
+			expect(enrichment(place.findings).location).toBeNull()
+			expect(place.droppedUnsupported).toBe(1)
 		})
 	})
 })

@@ -70,6 +70,7 @@ export const ATTRIBUTE_RESERVED_KEYS: ReadonlySet<string> = new Set([
 	'id',
 	'industry',
 	'is_primary',
+	'key',
 	'key_differentiators',
 	'kind',
 	'location',
@@ -185,7 +186,6 @@ export type CompanyAttributesInput = typeof CompanyAttributesInput.Type
 // research run. Always stamped by the server, never taken from a caller.
 const ATTRIBUTE_SETTERS = ['client', 'research'] as const
 const AttributeSetter = Schema.Literals(ATTRIBUTE_SETTERS)
-type AttributeSetter = typeof AttributeSetter.Type
 
 // One stored value, as it sits under its key on the company. The page it was
 // read from is kept by its address — what a reader can open — never by the id

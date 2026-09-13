@@ -499,8 +499,10 @@ describe('which vendor hosts a run would reach', () => {
 	const LIVE = {
 		RESEARCH_LLM_AGENT_PROVIDERS: 'groq',
 		RESEARCH_LLM_AGENT_MODEL: 'openai/gpt-oss-120b',
+		RESEARCH_LLM_AGENT_MAX_OUTPUT_TOKENS: '8192',
 		RESEARCH_LLM_EXTRACT_PROVIDERS: 'nebius',
 		RESEARCH_LLM_EXTRACT_MODEL: 'Qwen/Qwen3-32B',
+		RESEARCH_LLM_EXTRACT_MAX_OUTPUT_TOKENS: '16000',
 		RESEARCH_LLM_WRITER_PROVIDERS: 'stub',
 		RESEARCH_PROVIDER_SEARCH: 'brave',
 		RESEARCH_PROVIDER_SCRAPE: 'firecrawl',
@@ -611,8 +613,10 @@ describe('which vendor hosts a run would reach', () => {
 			const found = await read({
 				RESEARCH_LLM_AGENT_PROVIDERS: 'groq',
 				RESEARCH_LLM_AGENT_MODEL: 'openai/gpt-oss-120b',
+				RESEARCH_LLM_AGENT_MAX_OUTPUT_TOKENS: '8192',
 				RESEARCH_LLM_EXTRACT_PROVIDERS: 'groq',
 				RESEARCH_LLM_EXTRACT_MODEL: 'openai/gpt-oss-120b',
+				RESEARCH_LLM_EXTRACT_MAX_OUTPUT_TOKENS: '16000',
 			})
 
 			// WHEN read — THEN both configured tiers are reported; the unset one
@@ -655,6 +659,7 @@ describe('which vendor hosts a run would reach', () => {
 				...LIVE,
 				RESEARCH_LLM_WRITER_PROVIDERS: 'custom',
 				RESEARCH_LLM_WRITER_MODEL: 'some-model',
+				RESEARCH_LLM_WRITER_MAX_OUTPUT_TOKENS: '8192',
 				RESEARCH_LLM_WRITER_BASE_URL: 'api.example.com/v1',
 			})
 

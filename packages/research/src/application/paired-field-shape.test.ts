@@ -14,6 +14,62 @@ const settle = (findings: unknown) =>
 const rowsOf = (findings: unknown): Array<Record<string, unknown>> =>
 	(findings as { prospects: Array<Record<string, unknown>> }).prospects
 
+describe('settlePairedFields, on the attribute map', () => {
+	describe('when a scan row carries bare attribute values', () => {
+		it('should pair each one and count it, leaving a paired one alone', () => {
+			// GIVEN a number, a word, a no and one already paired
+			const { findings, wrapped } = settle(
+				scanWith({
+					name: 'Acme',
+					attributes: {
+						site_count: 3,
+						fit: 'strong',
+						takes_bookings: false,
+						founded_on: { value: '2020-01-01' },
+					},
+				}),
+			)
+
+			// THEN the three bare ones are paired with no page named
+			expect(rowsOf(findings)[0]?.['attributes']).toEqual({
+				site_count: { value: 3 },
+				fit: { value: 'strong' },
+				takes_bookings: { value: false },
+				founded_on: { value: '2020-01-01' },
+			})
+			expect(wrapped).toBe(3)
+		})
+	})
+
+	describe('when a company profile carries bare attribute values', () => {
+		it('should pair them beside the profile, and leave a profile without any as it is', () => {
+			// GIVEN a profile with one bare attribute, and one with none
+			const profile = {
+				enrichment: { industry: { value: 'x' } },
+				attributes: { site_count: 3 },
+			}
+			const plain = { enrichment: { industry: { value: 'x' } } }
+
+			// WHEN settled the way a profile is
+			const settled = settlePairedFields(
+				profile,
+				'company_enrichment_v1',
+				undefined,
+			)
+
+			// THEN the attribute is paired and the other profile is the same object
+			expect(settled.findings).toEqual({
+				enrichment: { industry: { value: 'x' } },
+				attributes: { site_count: { value: 3 } },
+			})
+			expect(settled.wrapped).toBe(1)
+			expect(
+				settlePairedFields(plain, 'company_enrichment_v1', undefined).findings,
+			).toBe(plain)
+		})
+	})
+})
+
 describe('settlePairedFields', () => {
 	describe('when a field that carries its evidence arrives on its own', () => {
 		it('should pair it, keeping the value and naming no page', () => {

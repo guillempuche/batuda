@@ -112,6 +112,34 @@ export const Sourced = <Value extends Schema.Top>(value: Value) =>
 		),
 	})
 
+// One attribute value a run read for a company: the key it was declared under,
+// the value as text, and the page and the words it was read from. A list of
+// entries rather than a map keyed by attribute, because a list is the one shape
+// a model fills reliably; the map every reader expects is made from it once the
+// reply is in. The words are required: a value with nothing behind it is what a
+// model writes from memory.
+export const AttributeEntry = Schema.Struct({
+	key: Schema.String.annotate({
+		description: 'The attribute key exactly as listed in the prompt.',
+	}),
+	value: Schema.String.annotate({
+		description:
+			'The value as text, in the form the key asks for: a number as digits only ("12"), a yes/no as "true" or "false", a date as YYYY-MM-DD, a choice as one of the words listed, text as the page states it.',
+	}),
+	source_id: Schema.String,
+	quote: Schema.String.annotate({
+		description:
+			'The words on that page that state the value, copied verbatim.',
+	}),
+})
+
+export const AttributeEntries = Schema.optionalKey(
+	Schema.Array(AttributeEntry).annotate({
+		description:
+			'One entry per attribute listed in the prompt that the evidence states. Leave out any it does not.',
+	}),
+)
+
 export const DiscoveredExisting = Schema.Struct({
 	subject_table: ResearchSubjectTable,
 	subject_id: Schema.String,

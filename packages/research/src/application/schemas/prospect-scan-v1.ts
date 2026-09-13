@@ -1,6 +1,7 @@
 import { Schema } from 'effect'
 
 import {
+	AttributeEntries,
 	Citation,
 	DiscoveredExisting,
 	LenientNumber,
@@ -134,6 +135,9 @@ export const ProspectScanV1Schema = Schema.Struct({
 						'Only people this company\'s own pages name — a team, leadership, management or "equipo" page. Never a person read off a directory listing about the company, and never somebody carried over from another company on the list.',
 				}),
 			),
+			// The facts the organisation declared for this run, one entry each,
+			// read for this company alone.
+			attributes: AttributeEntries,
 			citations: Schema.Array(Citation),
 		}),
 	),

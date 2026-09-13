@@ -401,23 +401,31 @@ At a glance:
   start_research  →  run row 'queued'  →  consumer daemon  →  fiber (own connection)
 
   Phase 1 · agent reflect-loop
+      told the rules, then the standing instructions and the attributes the
+          stack declares (each fenced as words to act on rather than rules),
+          then the request, fenced and bounded
       web_search · scrape_page · registry_lookup · discover_contacts
       site discovery (runs about one company): map its own domain and read
           its own pages first
       accumulate findings, record each page reached, archive the ones opened
 
   Phase 2 · structured extraction
+      the request fenced again; each declared attribute named by key, kind,
+          unit and choice words only; a reply cut off past the ceiling one
+          reply may write is asked for once more, shorter
       validate the findings against the run's schema
       guard chain — named links, run in the order they are written; a link
           prunes what it cannot stand behind and the run carries on:
-          organisation kind · citations · scalars · websites · contact entity
+          organisation kind · citations · scalars · attributes · websites
+          contact entity
           value provenance · fit evidence · vocabulary · applicability
           discovered-existing · scan evidence · prospect criteria
           prospect dedupe · network · place · unconfirmed mark
           name-only evidence · field-support critic · entity sources
           source tier · paired fields
-      gap rounds: fields still empty earn another targeted search and scrape,
-          until the run's budget or its deadline says stop
+      gap rounds: fields still empty — a declared attribute among them — earn
+          another targeted search and scrape, until the run's budget or its
+          deadline says stop
 
   Phase 3 · brief
       render a markdown summary, headed with the company and the date
@@ -449,6 +457,8 @@ What an organisation wants to know about every company differs by campaign: one 
 Values live in one merged JSON column on the company, `attributes`, keyed by attribute key. Every write merges into what is there — keys not named stay, a null removes one — and every value records who set it: a person or an assistant through the ordinary company tools, or a research run. A run's value carries the page it was read from, the quote, the date it was true as of and the run's id, and never overwrites a value a person set by hand. The rules about a value — the kinds, the key shape, the caps — are written once in `packages/domain` and read by the HTTP routes, the assistant's tools and the apply path alike; the database keeps a unique index as a race guard and a lookup index, as the [backend guide](backend.md#where-a-rule-about-a-value-lives) says.
 
 A run fills a stack's attributes only when that stack's `research_fills_attributes` switch is on, and the attributes always come from the organisation's stack in play — the named stack when the organisation owns it, else the org default — so a member's personal stack changes the prompt but never which facts the campaign records. A run's values land on its company only by a person's hand, only when the run was about that one company, and never over a value a person set. A key's kind, unit and choice words stay as declared while any company holds a value under it: a value read one way must go on being read that way. A company list can be narrowed by one attribute at a time, compared the way its kind allows: a number as a number, a date as a date, a choice by its word.
+
+How a run fills them: the searching pass is told what each attribute means — its label, unit and description, each fenced like a standing instruction — and the pass that writes the answer is told only the key, the kind, the unit and the choice words — the short, capped parts — so an admin's sentences never sit beside the rules on what counts as evidence. The values come back as a list of entries, become a map keyed by attribute before any guard reads them, and are held by a guard of their own to their page, the words quoted for them and their kind: a number the quote states digit for digit, a choice from the declared words, a date whose year the quote names, a yes or a no, text the quote supports. A gap round searches for a declared attribute a company lacks the way it searches for a missing website, by the attribute's label. The declarations ride on the run row, so a run restarted from its row asks for the same facts, and their fingerprint rides in the research cache key, so an edited declaration never serves a cached run made for the old wording.
 
 ### Contact discovery
 
