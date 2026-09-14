@@ -11,7 +11,11 @@
  * over a bare contact form.
  */
 
-import { DISTINCTIVE_NAME_LENGTH, domainHost } from './entity-guard'
+import {
+	DISTINCTIVE_NAME_LENGTH,
+	domainHost,
+	GENERIC_WORDS,
+} from './entity-guard'
 import { pathOf } from './source-key'
 
 // Path fragments that mark a page worth fetching, in three bands by what it usually
@@ -48,8 +52,20 @@ const ABOUT_HINTS = [
 	'ueber-uns',
 	'uber-uns',
 	'who-we-are',
-	'impressum',
 	'sobre',
+	// The legal notice, in the spellings the markets this serves use. A small
+	// firm often names its owner or manager nowhere else: German law puts the
+	// managing directors in the Impressum, French law the publication director
+	// in the mentions légales, and a Spanish or Italian site does the same for
+	// the administrator. The German one was the only one here, so a leader named
+	// only in a legal notice was reachable in Germany and nowhere else.
+	'impressum',
+	'mentions-legales',
+	'aviso-legal',
+	'avis-legal',
+	'note-legali',
+	'legal-notice',
+	'informacion-legal',
 ]
 const CONTACT_HINTS = ['contact', 'contacto', 'contacte', 'kontakt', 'contatti']
 
@@ -84,10 +100,14 @@ const segmentNames = (segment: string, words: ReadonlySet<string>): boolean =>
 	segment.split(/[^a-z0-9]+/).some(word => word !== '' && words.has(word))
 
 // A page the company named after itself. Every word long enough to carry a name
-// has to be one of the company's own, so "/ca/er-enginy" is ER Enginy talking
-// about itself while "/referencies/nau-industrial-a-girona" is a project of its
-// own that happens to sit on the same site. Short words are passed over, because
-// a name breaks into them — "er" in ER Enginy, "de" in anything Spanish.
+// has to be one of the company's own, or one of the generic words a name is
+// padded with — so "/ca/er-enginy" is ER Enginy talking about itself and
+// "/faresin-industries" is Faresin Industries doing the same, while
+// "/referencies/nau-industrial-a-girona" is a project of its own that happens
+// to sit on the same site. At least one word has to be the company's own,
+// since a segment of generic words alone ("industries") names nobody. Short
+// words are passed over, because a name breaks into them — "er" in ER Enginy,
+// "de" in anything Spanish.
 const namedAfterTheCompany = (
 	path: string,
 	ownWords: ReadonlySet<string>,
@@ -100,7 +120,10 @@ const namedAfterTheCompany = (
 			const words = segment
 				.split(/[^a-z0-9]+/)
 				.filter(word => word.length >= DISTINCTIVE_NAME_LENGTH)
-			return words.length > 0 && words.every(word => ownWords.has(word))
+			return (
+				words.some(word => ownWords.has(word)) &&
+				words.every(word => ownWords.has(word) || GENERIC_WORDS.has(word))
+			)
 		})
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { aboutPageCandidates } from './about-pages'
+import { distinctiveWords } from './entity-guard'
 
 describe('aboutPageCandidates', () => {
 	describe('when the homepage links include about/team/contact pages', () => {
@@ -127,6 +128,56 @@ describe('the pages a live search actually offered', () => {
 
 			// THEN nothing: a portfolio entry names the work, never the staff
 			expect(picked).toEqual([])
+		})
+	})
+
+	describe('when a leader is named only in the legal notice', () => {
+		it('should take the notice as an about page in every market it serves, not the German one alone', () => {
+			// GIVEN the legal-notice paths a French, Spanish, Catalan, Italian and
+			// German site use, each beside a contact page
+			const cases = [
+				['https://verpack.fr/mentions-legales/', 'https://verpack.fr/contact'],
+				['https://acme.es/aviso-legal', 'https://acme.es/contacto'],
+				['https://acme.cat/avis-legal', 'https://acme.cat/contacte'],
+				['https://acme.it/note-legali', 'https://acme.it/contatti'],
+				['https://rinn.net/impressum.html', 'https://rinn.net/kontakt'],
+			] as const
+
+			for (const [notice, contact] of cases) {
+				// WHEN picked with the contact page listed first
+				const host = new URL(notice).host
+				const picked = aboutPageCandidates([contact, notice], host, 2)
+				// THEN the notice ranks above the contact form
+				expect(picked[0], notice).toBe(notice)
+			}
+		})
+	})
+
+	describe('when a small firm names its about page after itself', () => {
+		it('should take it when told the company’s own words, and skip it otherwise', () => {
+			// GIVEN the real Faresin site, whose about page is /faresin-industries,
+			// beside a contact page
+			const links = [
+				'https://www.faresin.com/contatti',
+				'https://www.faresin.com/faresin-industries',
+			]
+
+			// WHEN picked with the company's own words, read off its name the way
+			// a run reads them — THEN the about page ranks above the contact form
+			expect(
+				aboutPageCandidates(links, 'faresin.com', 2, {
+					ownWords: distinctiveWords('Faresin Industries S.p.A.'),
+				}),
+			).toEqual([
+				'https://www.faresin.com/faresin-industries',
+				'https://www.faresin.com/contatti',
+			])
+
+			// AND without them only the contact page is left, since a path with no
+			// hint word in it is not read as an about page on its own
+			expect(aboutPageCandidates(links, 'faresin.com', 2)).toEqual([
+				'https://www.faresin.com/contatti',
+			])
 		})
 	})
 
