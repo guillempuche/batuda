@@ -36,6 +36,30 @@ export const RESPONSE_CUT_OFF = 'ResponseCutOff'
 export const isResponseCutOff = (err: unknown): err is ProviderError =>
 	err instanceof ProviderError && err.reason === RESPONSE_CUT_OFF
 
+/**
+ * A structured reply the model never finished, together with what it wrote
+ * before the cut. The text is a property of the object and not one of the
+ * error's fields, so it never rides the error over the wire — a reply of many
+ * thousand tokens has no place in an event — but a caller that would rather
+ * keep the complete part of the reply than lose the run can read it here.
+ */
+export class CutOffReply extends ProviderError {
+	declare readonly responseText: string
+
+	constructor(
+		fields: { readonly provider: string; readonly message: string },
+		responseText: string,
+	) {
+		super({ ...fields, recoverable: false, reason: RESPONSE_CUT_OFF })
+		// Kept off the enumerable properties, so a stringified error carries the
+		// failure and not the reply.
+		Object.defineProperty(this, 'responseText', {
+			value: responseText,
+			enumerable: false,
+		})
+	}
+}
+
 /** Per-run resource budget (cheap or paid tier) exceeded. */
 export class BudgetExceeded extends Schema.TaggedErrorClass<BudgetExceeded>()(
 	'BudgetExceeded',

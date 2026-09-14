@@ -48,7 +48,8 @@ import { Cause, Duration, Effect, Schedule, Semaphore } from 'effect'
 import type { LanguageModel } from 'effect/unstable/ai'
 import { AiError } from 'effect/unstable/ai'
 
-import { ProviderError, RESPONSE_CUT_OFF } from '../domain/errors'
+import { endsBeforeJsonCloses } from '../domain/cut-off-reply'
+import { CutOffReply, ProviderError, RESPONSE_CUT_OFF } from '../domain/errors'
 import { reclassifyRejectedToolCall } from './_tool-call-rejection'
 
 const DEFAULT_TIMEOUT: Duration.Input = '60 seconds'
@@ -89,29 +90,32 @@ interface FailureInfo {
 	readonly message: string
 }
 
-const parsesAsJson = (text: string): boolean => {
-	try {
-		JSON.parse(text)
-		return true
-	} catch {
-		return false
-	}
-}
-
-// A structured reply the model never finished: it began as JSON and ends before
-// the JSON closes, so nothing in it can be decoded. Told apart from a reply that
-// parsed and merely failed to fit the schema, and from one that was never JSON
-// at all — a fenced block, a refusal, an empty body — which a second try or the
-// next vendor may well fix.
-const isCutOffReply = (err: unknown): boolean => {
+// What a structured reply the model never finished got written: it began as
+// JSON and ends before the JSON closes, so nothing in it can be decoded. Told
+// apart from a reply that parsed and merely failed to fit the schema, from one
+// that closed its JSON and still broke somewhere in the middle, and from one
+// that was never JSON at all — a fenced block, a refusal, an empty body — all
+// of which a second try or the next vendor may well fix.
+//
+// Read once per failure: the retry gate, the failure log and the mapping to
+// a ProviderError all ask about the same error, and each reading walks a reply
+// that can run to hundreds of kilobytes.
+const cutOffReplyTexts = new WeakMap<object, string | undefined>()
+const cutOffReplyText = (err: unknown): string | undefined => {
 	if (
 		!(err instanceof AiError.AiError) ||
 		err.reason._tag !== 'StructuredOutputError'
 	)
-		return false
-	const text = err.reason.responseText.trimStart()
-	return (text.startsWith('{') || text.startsWith('[')) && !parsesAsJson(text)
+		return undefined
+	if (cutOffReplyTexts.has(err)) return cutOffReplyTexts.get(err)
+	const text = err.reason.responseText
+	const cutOff = endsBeforeJsonCloses(text) ? text : undefined
+	cutOffReplyTexts.set(err, cutOff)
+	return cutOff
 }
+
+const isCutOffReply = (err: unknown): boolean =>
+	cutOffReplyText(err) !== undefined
 
 // Read the true shape of a failure before it collapses into a ProviderError
 // (only provider + message + recoverable). `Effect.timeout` raises a bare
@@ -154,13 +158,15 @@ const toProviderError = (
 	// with an empty message rejects its own construction and throws a second,
 	// contentless error over the real one — so the non-empty invariant matters.
 	const info = describeFailure(provider, err, timeout)
+	// What the model wrote before the cut travels with the failure, so a caller
+	// can keep the part that arrived whole rather than lose the run.
+	const cutOffText = cutOffReplyText(err)
+	if (cutOffText !== undefined)
+		return new CutOffReply({ provider, message: info.message }, cutOffText)
 	return new ProviderError({
 		provider,
 		message: info.message,
-		recoverable:
-			err instanceof AiError.AiError
-				? err.isRetryable && !isCutOffReply(err)
-				: true,
+		recoverable: err instanceof AiError.AiError ? err.isRetryable : true,
 		...(info.reason !== undefined ? { reason: info.reason } : {}),
 	})
 }

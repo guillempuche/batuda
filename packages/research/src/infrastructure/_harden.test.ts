@@ -14,7 +14,7 @@ import type { LanguageModel } from 'effect/unstable/ai'
 import { AiError } from 'effect/unstable/ai'
 import { describe, expect, it } from 'vitest'
 
-import { ProviderError, RESPONSE_CUT_OFF } from '../domain/errors'
+import { CutOffReply, ProviderError, RESPONSE_CUT_OFF } from '../domain/errors'
 import { hardenLanguageModel, withFallbackLanguageModel } from './_harden'
 
 // ── Test helpers ──
@@ -115,6 +115,7 @@ const mkStructuredOutputError = (responseText: string): AiError.AiError =>
 
 const CUT_OFF_REPLY = '{"enrichment": {"industry": {"value": "logis'
 const MISFIT_REPLY = '{"enrichment": {"industry": 7}}'
+const BROKEN_REPLY = '{"enrichment": {"industry": {"value": "a" "b"}}}'
 
 // Counts generateObject calls the way makeStubLm counts generateText ones.
 const makeObjectStub = (
@@ -265,11 +266,36 @@ describe('hardenLanguageModel', () => {
 		const exit = await runWithVirtualClock(() => invokeGenerateObject(hardened))
 
 		// THEN it is asked once, and the error names the cut-off as not recoverable
+		// and carries what the model got to write, for a caller to keep
 		expect(Ref.getUnsafe(attemptsRef)).toBe(1)
 		const err = failureOf(exit)
-		expect(err).toBeInstanceOf(ProviderError)
+		expect(err).toBeInstanceOf(CutOffReply)
 		expect((err as ProviderError).reason).toBe(RESPONSE_CUT_OFF)
 		expect((err as ProviderError).recoverable).toBe(false)
+		expect((err as CutOffReply).responseText).toBe(CUT_OFF_REPLY)
+		// AND the reply stays off the error's own fields, so an event carrying
+		// the error does not carry the reply
+		expect(JSON.stringify(err)).not.toContain('logis')
+	})
+
+	it('should still retry a reply that closed its JSON but broke in the middle', async () => {
+		// GIVEN a stub whose reply closes every bracket and still does not parse
+		const attemptsRef = Ref.makeUnsafe(0)
+		const stub = makeObjectStub(attemptsRef, () =>
+			Effect.fail(mkStructuredOutputError(BROKEN_REPLY)),
+		)
+		const hardened = hardenLanguageModel(stub, 'together')
+
+		// WHEN generateObject is invoked
+		const exit = await runWithVirtualClock(() => invokeGenerateObject(hardened))
+
+		// THEN it is retried like any misfit — nothing was cut, the model wrote it
+		// wrong, and the next try may not — under the provider client's own reason
+		expect(Ref.getUnsafe(attemptsRef)).toBeGreaterThan(1)
+		const err = failureOf(exit)
+		expect(err).not.toBeInstanceOf(CutOffReply)
+		expect((err as ProviderError).reason).toBe('StructuredOutputError')
+		expect((err as ProviderError).recoverable).toBe(true)
 	})
 
 	it('should still retry a structured reply that closed but did not fit', async () => {

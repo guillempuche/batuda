@@ -412,7 +412,8 @@ At a glance:
   Phase 2 · structured extraction
       the request fenced again; each declared attribute named by key, kind,
           unit and choice words only; a reply cut off past the ceiling one
-          reply may write is asked for once more, shorter
+          reply may write is asked for once more, shorter, and if that one
+          is cut off too the part of it that arrived whole is kept
       validate the findings against the run's schema
       guard chain — named links, run in the order they are written; a link
           prunes what it cannot stand behind and the run carries on:

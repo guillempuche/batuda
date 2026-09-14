@@ -102,6 +102,11 @@ export interface RunQualityInput {
 	readonly citationsSeen: number
 	/** Of those, how many resolved to a page the run actually reached. */
 	readonly citationsKept: number
+	/**
+	 * Whether the extraction reply was cut off at the most one reply may write,
+	 * and the run kept the part of it that arrived whole.
+	 */
+	readonly replyCut?: boolean
 	/** Scan: how many results its primary list carries (null for a non-scan). */
 	readonly scanResults: number | null
 	/** Whether the one refined retry fired after a thin first pass. */
@@ -316,6 +321,12 @@ export interface RunQuality {
 	 * is not on it.
 	 */
 	readonly vendors_unavailable?: ReadonlyArray<string>
+	/**
+	 * True when the model's reply was cut off and the run kept what arrived
+	 * whole: the findings are what fitted in the reply, not all the evidence
+	 * held, so a thin list here is not the evidence being thin.
+	 */
+	readonly reply_cut?: true
 	/** True when the result is thin enough that an automation should not act on it unreviewed. */
 	readonly low_confidence: boolean
 }
@@ -372,6 +383,9 @@ export const computeRunQuality = (input: RunQualityInput): RunQuality => {
 		input.scanResults !== null &&
 		input.scanResults > 0 &&
 		input.place.inside === 0
+	// A reply cut off at the ceiling holds what fitted, not all the evidence
+	// held, so what the run says is worth a look before anything acts on it.
+	const answerWasCut = input.replyCut === true
 	const lowConfidence =
 		unsureOfTheCompany ||
 		thinlyVetted ||
@@ -379,7 +393,8 @@ export const computeRunQuality = (input: RunQualityInput): RunQuality => {
 		nothingStandsBehindIt ||
 		partsWentUnanswered ||
 		subjectWentUnchecked ||
-		noneWereInThePlaceAsked
+		noneWereInThePlaceAsked ||
+		answerWasCut
 
 	return {
 		rounds: input.rounds,
@@ -421,6 +436,7 @@ export const computeRunQuality = (input: RunQualityInput): RunQuality => {
 		...(input.vendorsUnavailable.length > 0
 			? { vendors_unavailable: input.vendorsUnavailable }
 			: {}),
+		...(input.replyCut === true ? { reply_cut: true as const } : {}),
 		low_confidence: lowConfidence,
 	}
 }
