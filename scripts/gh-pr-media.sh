@@ -19,6 +19,12 @@
 # case, and it is spelled out rather than the default.
 #
 # Usage: scripts/gh-pr-media.sh [--replace] <pr-number> <file> [<file> ...]
+#        scripts/gh-pr-media.sh --prune [--yes]
+#
+# --prune collects what belongs to pull requests closed WITHOUT merging, which is the
+# only state where the media has stopped being worth anything. Merged pull requests keep
+# theirs: their bodies embed it and are read long afterwards. Lists by default; --yes
+# is what actually deletes.
 #
 # Config (env, namespaced GITHUB_MEDIA_S3_* so it never collides with the backend
 # STORAGE_* or a teammate's own AWS_*). Source of truth = the team secrets
@@ -93,20 +99,47 @@ base="$GITHUB_MEDIA_PUBLIC_BASE"
 # screenshot cannot take down the recording beside it — which, on a merged pull request whose
 # body embeds both and whose captures exist nowhere else, is unrecoverable.
 replace=""
-case "${1:-}" in
---replace) replace=1; shift ;;
-esac
+prune=""
+confirm=""
+while [ "$#" -gt 0 ]; do
+	case "$1" in
+	--replace) replace=1; shift ;;
+	--prune) prune=1; shift ;;
+	--yes) confirm=1; shift ;;
+	--) shift; break ;;
+	-*)
+		echo "unknown flag: $1" >&2
+		exit 2
+		;;
+	*) break ;;
+	esac
+done
 
-[ "$#" -ge 2 ] || {
+usage() {
 	echo "usage: $(basename "$0") [--replace] <pr-number> <file>..." >&2
+	echo "       $(basename "$0") --prune [--yes]" >&2
 	echo "  --replace  delete anything already under this pull request's folder that" >&2
 	echo "             the files given here do not replace. Without it, nothing is deleted." >&2
-	exit 2
+	echo "  --prune    collect media belonging to pull requests that were closed without" >&2
+	echo "             merging. Lists what it would remove; --yes actually removes it." >&2
 }
-pr="$1"
-shift
+
+if [ -n "$prune" ]; then
+	[ "$#" -eq 0 ] || {
+		echo "--prune takes no pull request number and no files" >&2
+		usage
+		exit 2
+	}
+else
+	[ "$#" -ge 2 ] || {
+		usage
+		exit 2
+	}
+	pr="$1"
+	shift
+fi
 slug="$(gh repo view --json name -q .name)" # repo name = the per-repo folder
-prefix="${slug}/pr-${pr}"
+[ -n "$prune" ] || prefix="${slug}/pr-${pr}"
 
 # Converted files land here; removed on any exit.
 tmpdir="$(mktemp -d)"
@@ -127,6 +160,70 @@ export AWS_RESPONSE_CHECKSUM_VALIDATION=WHEN_REQUIRED
 export AWS_MAX_ATTEMPTS=5
 s3api() { "$awscli" s3api "$@" --endpoint-url "$endpoint"; }
 
+# Collect media belonging to pull requests that were closed without merging.
+#
+# Only that state is safe to sweep. A merged pull request keeps its media for as long as the
+# page is readable, which is the entire point of putting it there — and `gh` reports those as
+# MERGED, never CLOSED, so the two cannot be confused here. An abandoned one never landed and
+# nobody returns to it.
+#
+# Anything this cannot resolve to a pull request is left alone and named: a folder from a
+# mistyped number is a few kilobytes, and guessing wrong in the other direction is permanent.
+if [ -n "$prune" ]; then
+	all="$(s3api list-objects-v2 --bucket "$bucket" --prefix "${slug}/" \
+		--query 'Contents[].Key' --output text 2>"${tmpdir}/err")" || {
+		echo "could not list ${slug}/:" >&2
+		sed 's/^/  /' "${tmpdir}/err" >&2
+		exit 1
+	}
+
+	numbers="$(printf '%s\n' $all | sed -nE "s|^${slug}/pr-([0-9]+)/.+|\1|p" | sort -un)"
+	[ -n "$numbers" ] || {
+		echo "nothing stored under ${slug}/" >&2
+		exit 0
+	}
+
+	doomed=0
+	kept=0
+	for n in $numbers; do
+		state="$(gh pr view "$n" --json state -q .state 2>/dev/null)" || state=""
+		case "$state" in
+		CLOSED) : ;; # closed without merging — collect it
+		"")
+			echo "keep  pr-${n}: does not resolve to a pull request" >&2
+			kept=$((kept + 1))
+			continue
+			;;
+		*)
+			kept=$((kept + 1))
+			continue
+			;;
+		esac
+
+		for k in $all; do
+			case "$k" in
+			"${slug}/pr-${n}/"*)
+				doomed=$((doomed + 1))
+				if [ -z "$confirm" ]; then
+					echo "would delete ${k}"
+				elif s3api delete-object --bucket "$bucket" --key "$k" >/dev/null 2>&1; then
+					echo "deleted ${k}"
+				else
+					echo "warn: could not delete ${k}" >&2
+				fi
+				;;
+			esac
+		done
+	done
+
+	if [ -z "$confirm" ]; then
+		echo "${doomed} object(s) from closed pull requests, ${kept} pull request(s) untouched." >&2
+		echo "Nothing was removed — re-run with --yes to remove them." >&2
+	else
+		echo "${doomed} object(s) removed, ${kept} pull request(s) untouched." >&2
+	fi
+	exit 0
+fi
 
 lc() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 # Make a basename safe for an S3 key + public URL: spaces or odd characters would
