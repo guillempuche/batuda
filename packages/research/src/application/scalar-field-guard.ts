@@ -312,6 +312,16 @@ const initialsOf = (words: ReadonlyArray<string>): ReadonlyArray<string> => {
 		: [all]
 }
 
+// A title's English rendering that only says the title again ("CEO" glossed
+// "CEO" or "C.E.O.") says nothing, and a reader would show the same words
+// twice. One that spells an acronym out is kept: it may be the only English a
+// reader gets for a Spanish "DG", and nothing here can tell that from an
+// English "CEO".
+const lettersOnly = (text: string): string =>
+	text.replace(/[^\p{L}\p{N}]/gu, '')
+const glossRepeatsTitle = (title: string, gloss: string): boolean =>
+	lettersOnly(normalize(gloss)) === lettersOnly(normalize(title))
+
 // A title often names two posts in one — "Owner & CEO", "Chairman and Chief
 // Executive Officer" — and a bracketed aside, closed or cut short, is the
 // model's own gloss.
@@ -605,6 +615,17 @@ export const guardScalarFields = (
 				) {
 					return drop(key, 'unsupported', text, wrapper.source_id)
 				}
+			}
+			const gloss = (wrapper as Record<string, unknown>)['gloss']
+			if (
+				key === 'role' &&
+				typeof raw === 'string' &&
+				typeof gloss === 'string' &&
+				glossRepeatsTitle(raw, gloss)
+			) {
+				return Object.fromEntries(
+					Object.entries(wrapper).filter(([field]) => field !== 'gloss'),
+				)
 			}
 			return value
 		}

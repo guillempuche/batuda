@@ -507,6 +507,7 @@ describe('buildExtractionPrompt', () => {
 				citationInstruction: '',
 				evidenceBlock: '',
 				subjects: [],
+				titleGloss: true,
 			})
 
 			// THEN the scan is pushed to list every company the evidence names, and to
@@ -518,8 +519,14 @@ describe('buildExtractionPrompt', () => {
 			// AND it is told to keep a company it could not find a website for, so
 			// asking for the site cannot quietly shorten the list
 			expect(scan).toContain('Never drop a company for want of a website')
-			// AND a run that profiles one company is still asked for its people
+			// AND a run that profiles one company is still asked for its people,
+			// each title in the page's own language with an English rendering
+			// beside it, while a scan's rows carry the title alone
 			expect(profile).toContain('Name EVERY person')
+			expect(profile).toContain('in its own language')
+			expect(profile).toContain('`gloss`')
+			expect(scan).toContain('in its own language')
+			expect(scan).not.toContain('`gloss`')
 			expect(profile).not.toContain('List EVERY company')
 		})
 
@@ -561,6 +568,7 @@ describe('buildExtractionPrompt', () => {
 				citationInstruction: '',
 				evidenceBlock: '',
 				subjects: [],
+				titleGloss: true,
 			})
 
 			// THEN the scan is told to read a member list without listing the body that
@@ -926,6 +934,7 @@ describe('buildExtractionPrompt', () => {
 				citationInstruction: '',
 				evidenceBlock: '',
 				subjects: [],
+				titleGloss: true,
 			})
 
 			// THEN the scan is pushed to list every company the evidence names, and to
@@ -937,8 +946,14 @@ describe('buildExtractionPrompt', () => {
 			// AND it is told to keep a company it could not find a website for, so
 			// asking for the site cannot quietly shorten the list
 			expect(scan).toContain('Never drop a company for want of a website')
-			// AND a run that profiles one company is still asked for its people
+			// AND a run that profiles one company is still asked for its people,
+			// each title in the page's own language with an English rendering
+			// beside it, while a scan's rows carry the title alone
 			expect(profile).toContain('Name EVERY person')
+			expect(profile).toContain('in its own language')
+			expect(profile).toContain('`gloss`')
+			expect(scan).toContain('in its own language')
+			expect(scan).not.toContain('`gloss`')
 			expect(profile).not.toContain('List EVERY company')
 		})
 
@@ -980,6 +995,7 @@ describe('buildExtractionPrompt', () => {
 				citationInstruction: '',
 				evidenceBlock: '',
 				subjects: [],
+				titleGloss: true,
 			})
 
 			// THEN the scan is told to read a member list without listing the body that

@@ -14,7 +14,12 @@ export const ContactDiscoveryV1Schema = Schema.Struct({
 	contacts: Schema.Array(
 		Schema.Struct({
 			name: Schema.String,
-			role: Schema.optionalKey(Schema.String),
+			role: Schema.optionalKey(
+				Schema.String.annotate({
+					description:
+						'Their title exactly as the page gives it, in its own language — "Gerent", "Responsable de producció". Leave it out rather than translating or inventing one.',
+				}),
+			),
 			buying_role: Schema.optionalKey(
 				Schema.String.annotate({
 					description:

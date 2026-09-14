@@ -1057,6 +1057,67 @@ describe('guardScalarFields, when a job title is held to its quote', () => {
 		})
 	})
 
+	describe('when the title carries its English rendering beside it', () => {
+		it('should hold the page’s words to the quote and leave the rendering alone', () => {
+			// GIVEN a Catalan title with a gloss, quoted from the page
+			const quote = 'segons explica el seu propietari, Ramon Vendrell'
+			const role = {
+				value: 'propietari',
+				gloss: 'Owner',
+				source_id: 'https://acme.cat',
+				quote,
+			}
+
+			// WHEN grounded against a corpus holding the quote
+			const result = guardScalarFields(person(role), `acme. ${quote}`)
+
+			// THEN the title stands with its rendering, judged on the page's words
+			expect(roleOf(result.findings)).toEqual(role)
+			expect(result.droppedUnsupported).toBe(0)
+		})
+	})
+
+	describe('when the rendering only says the title again', () => {
+		it('should keep the title and drop the rendering', () => {
+			// GIVEN an English title rendered as itself, once as written and once
+			// with dots between its letters
+			const quote = 'Ana Puig, CEO of Acme'
+			for (const gloss of ['CEO', 'C.E.O.']) {
+				// WHEN grounded against a corpus holding the quote
+				const result = guardScalarFields(
+					person({ value: 'CEO', gloss, source_id: 'https://acme.es', quote }),
+					`acme. ${quote}`,
+				)
+
+				// THEN the title stands alone: a reader would show the same words twice
+				expect(roleOf(result.findings), gloss).toEqual({
+					value: 'CEO',
+					source_id: 'https://acme.es',
+					quote,
+				})
+			}
+		})
+
+		it('should keep a rendering that spells the title out', () => {
+			// GIVEN a Spanish acronym and an English one, each rendered into the
+			// words it stands for
+			const cases = [
+				['DG', 'Director General', 'Ana Puig, DG de Acme'],
+				['CEO', 'Chief Executive Officer', 'Ana Puig, CEO of Acme'],
+			] as const
+			for (const [value, gloss, quote] of cases) {
+				const role = { value, gloss, source_id: 'https://acme.es', quote }
+
+				// WHEN grounded
+				const result = guardScalarFields(person(role), `acme. ${quote}`)
+
+				// THEN the rendering stays: for the Spanish title it is the only
+				// English a reader gets, and nothing can tell the two apart
+				expect(roleOf(result.findings), value).toEqual(role)
+			}
+		})
+	})
+
 	describe('when the title arrives with no quote', () => {
 		it('should drop it as unquoted', () => {
 			// GIVEN a sourced title with no words behind it

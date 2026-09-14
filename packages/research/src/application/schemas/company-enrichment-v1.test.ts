@@ -34,7 +34,12 @@ describe('CompanyEnrichmentV1Schema', () => {
 				contacts: [
 					{
 						name: 'Ada Lovelace',
-						role: { value: 'CTO', source_id: 'src-1', confidence: null },
+						role: {
+							value: 'Directora tècnica',
+							gloss: 'CTO',
+							source_id: 'src-1',
+							confidence: null,
+						},
 						email: {
 							value: 'ada@acme.es',
 							source_id: 'src-1',
@@ -66,7 +71,9 @@ describe('CompanyEnrichmentV1Schema', () => {
 			expect(decoded.enrichment.country?.value).toBe('US')
 			expect(decoded.enrichment.country?.source_id).toBe('src-2')
 			expect(decoded.contacts?.[0]?.email?.value).toBe('ada@acme.es')
-			expect(decoded.contacts?.[0]?.role?.value).toBe('CTO')
+			// The title is the page's own words, with its English rendering beside
+			expect(decoded.contacts?.[0]?.role?.value).toBe('Directora tècnica')
+			expect(decoded.contacts?.[0]?.role?.gloss).toBe('CTO')
 			// The per-contact citation ties the person to the company's own page.
 			expect(decoded.contacts?.[0]?.citations?.[0]?.source_id).toBe('src-1')
 		})

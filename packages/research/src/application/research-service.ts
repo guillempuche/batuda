@@ -1424,7 +1424,7 @@ const proposeContactDirective = (companyId: string): string =>
 	[
 		"Separately, for a person the evidence identifies as one of this company's own leaders or employees who is NOT among the rows on file above, add an entry to `proposed_updates` offering them as somebody new:",
 		'- set `operation` to "create" and `subject_table` to "contacts"; leave `subject_id` out and set `expected_version` to null — there is no row for them yet;',
-		`- in \`fields\`, give their \`name\`, their \`role\`, and \`company_id\`: "${companyId}" copied exactly; add an email or phone only if the evidence states one for that person;`,
+		`- in \`fields\`, give their \`name\`, their \`role\` as the page writes it, in its own language (never an English rendering of it — that is held to the page, and a translated title is not on it), and \`company_id\`: "${companyId}" copied exactly; add an email or phone only if the evidence states one for that person;`,
 		'- pair their `name` and `role` with the page that names them, the same way as above, so the person keeps the page they were found on. `company_id` is a reference rather than something read off a page: give that one as a plain value;',
 		'- give a `reason`, and cite the page that names them — an entry with no citation is discarded.',
 		'Offer a person even when no address for them can be found: the name and the job title are the useful part on their own. Still list them in the people list as well — the offer is in addition to that list, not instead of it. Never offer somebody the evidence describes as a client, a partner, a supplier, or a competitor.',
@@ -1550,6 +1550,12 @@ export const buildExtractionPrompt = (args: {
 	 * the rest would name a field their answer has nowhere to put.
 	 */
 	readonly marksUnconfirmed?: boolean
+	/**
+	 * Whether this run's schema gives a person's title a place for its English
+	 * rendering. Only a company profile has one; asking a schema that does not
+	 * would name a field the answer has nowhere to put.
+	 */
+	readonly titleGloss?: boolean
 	/** The facts the organisation declared for this run; none when it declared none. */
 	readonly attributes?: ReadonlyArray<ResearchAttributeDeclaration>
 }): string => {
@@ -1570,13 +1576,17 @@ export const buildExtractionPrompt = (args: {
 		lines.push(DISCOVERY_BREADTH_DIRECTIVE, '')
 		lines.push(DISCOVERY_ORGANISATION_KIND_DIRECTIVE, '')
 		lines.push(
-			"Where the evidence names somebody as a company's own leader or employee — a titled person on its team page, a quoted founder, a signed author — put them in THAT company's `contacts`, with the job title written as the evidence writes it (a page that says CEO is copied as CEO, not spelt out) and the page you read them on. Under the company they work for, never the one listed beside them, and never in a list of their own. A company whose pages name its staff and comes back with an empty `contacts` is an incomplete row.",
+			"Where the evidence names somebody as a company's own leader or employee — a titled person on its team page, a quoted founder, a signed author — put them in THAT company's `contacts`, with the job title written as the evidence writes it, in its own language (a page that says CEO is copied as CEO, not spelt out; 'Gerent' stays 'Gerent') and the page you read them on. Under the company they work for, never the one listed beside them, and never in a list of their own. A company whose pages name its staff and comes back with an empty `contacts` is an incomplete row.",
 			'',
 		)
 		if (args.marksUnconfirmed) lines.push(DISCOVERY_UNCONFIRMED_DIRECTIVE, '')
 	} else {
 		lines.push(
-			"Name EVERY person the evidence identifies as this company's own leader or employee — a titled executive on the team page, a quoted founder, a signed author — each with the job title written as the evidence writes it (a page that says CEO is copied as CEO, not spelt out). Leaving the people list empty while the evidence names the company's own staff is an incomplete extraction.",
+			`Name EVERY person the evidence identifies as this company's own leader or employee — a titled executive on the team page, a quoted founder, a signed author — each with the job title written as the evidence writes it, in its own language (a page that says CEO is copied as CEO, not spelt out; 'propietari' stays 'propietari')${
+				args.titleGloss
+					? ', and an English rendering in `gloss` only when that language is not English'
+					: ''
+			}. Leaving the people list empty while the evidence names the company's own staff is an incomplete extraction.`,
 			'',
 		)
 	}
@@ -3604,6 +3614,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								evidenceBlock,
 								subjects: subjectsForPrompt(subjects),
 								fitVerdict: schemaName === 'company_enrichment_v1',
+								titleGloss: schemaName === 'company_enrichment_v1',
 								discoveryScan: isDiscoveryScan(schemaName),
 								marksUnconfirmed: schemaName === 'prospect_scan_v1',
 								attributes: runAttributes,

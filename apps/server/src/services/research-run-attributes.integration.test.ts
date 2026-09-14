@@ -53,8 +53,11 @@ const ANCHOR_CANONICAL = new URL(ANCHOR_URL).toString()
 const ANCHOR_URL_HASH = createHash('sha256')
 	.update(ANCHOR_CANONICAL)
 	.digest('hex')
+// The page names the owner in Catalan, so a run has a title to keep in the
+// page's own words and to render in English beside it.
 const ANCHOR_MARKDOWN =
-	'Acme Attributes Logistics — freight forwarding based in Barcelona.'
+	"Acme Attributes Logistics — freight forwarding based in Barcelona. El seu propietari, Ramon Vendrell, dirigeix l'empresa des de 1998."
+const OWNER_QUOTE = 'El seu propietari, Ramon Vendrell'
 
 interface Org {
 	id: string
@@ -158,10 +161,35 @@ const extractLlm: LanguageModel.Service = {
 						),
 			) as never
 		}
+		// The focused contacts pass asks with a shape of its own; it finds nobody
+		// here, so the broad reply is what the run keeps.
+		if (!hasField(schema, 'enrichment')) {
+			return Effect.succeed({ ...finalRound, value: { contacts: [] } }) as never
+		}
 		return Effect.succeed({
 			...finalRound,
 			value: {
 				summary: 'Acme Attributes Logistics is a Barcelona freight forwarder.',
+				enrichment: {},
+				contacts: [
+					{
+						name: 'Ramon Vendrell',
+						role: {
+							value: 'propietari',
+							gloss: 'Owner',
+							source_id: ANCHOR_CANONICAL,
+							quote: OWNER_QUOTE,
+							confidence: 1,
+						},
+						citations: [
+							{
+								source_id: ANCHOR_CANONICAL,
+								quote: OWNER_QUOTE,
+								confidence: 1,
+							},
+						],
+					},
+				],
 			},
 		}) as never
 	},
@@ -350,6 +378,10 @@ const runWith = (
 					return yield* poll(attemptsLeft - 1)
 				})
 			const status = yield* poll(50)
+			// What a reader of the run (the API, the assistant) is handed.
+			const read = (yield* svc.get(created.id).pipe(Effect.orDie)) as {
+				findings?: unknown
+			} | null
 
 			const [row] = yield* sql<{
 				attributeFingerprint: string | null
@@ -361,7 +393,7 @@ const runWith = (
 					findings
 				FROM research_runs WHERE id = ${created.id}::uuid
 			`.pipe(Effect.orDie)
-			return { status, row }
+			return { status, row, read }
 		}).pipe(Effect.provide(ResearchLive)) as Effect.Effect<
 			{
 				status: string
@@ -372,6 +404,7 @@ const runWith = (
 							findings: unknown
 					  }
 					| undefined
+				read: { findings?: unknown } | null
 			},
 			never,
 			never
@@ -451,6 +484,48 @@ describe('ResearchService, the attributes a run is asked for', () => {
 			// THEN one of the shapes extraction was handed holds the attribute list
 			expect(TERMINAL.has(status)).toBe(true)
 			expect(extractionSchemas.some(hasAttributesField)).toBe(true)
+		}, 60_000)
+	})
+
+	describe('when a page names a person in its own language', () => {
+		it('should keep the title as the page writes it, with the English rendering beside it, all the way to a reader', async () => {
+			// GIVEN the anchored run, whose page names its owner in Catalan and
+			// whose extraction writes the title as the page does with a gloss
+			const { status, row, read } = await runWith(
+				instructionsWith([]),
+				`Acme Attributes Logistics, ${ANCHOR_HOST}`,
+			)
+
+			// THEN the run ends with an answer, the stored title is the page's words
+			// with its rendering and its page beside it, and a reader is handed the
+			// words under `role`, the rendering under `role_gloss`, and the page
+			// under `evidence`
+			expect(TERMINAL.has(status)).toBe(true)
+			expect(status).not.toBe('failed')
+			const stored = row?.findings as {
+				contacts?: ReadonlyArray<{ name: string; role?: unknown }>
+			}
+			expect(stored.contacts?.[0]?.name).toBe('Ramon Vendrell')
+			expect(stored.contacts?.[0]?.role).toMatchObject({
+				value: 'propietari',
+				gloss: 'Owner',
+				source_id: ANCHOR_CANONICAL,
+				quote: OWNER_QUOTE,
+			})
+			const shown = read?.findings as {
+				contacts?: ReadonlyArray<{
+					name: string
+					role?: unknown
+					role_gloss?: unknown
+					evidence?: { role?: { quote?: unknown } }
+				}>
+			}
+			expect(shown.contacts?.[0]).toMatchObject({
+				name: 'Ramon Vendrell',
+				role: 'propietari',
+				role_gloss: 'Owner',
+				evidence: { role: { quote: OWNER_QUOTE } },
+			})
 		}, 60_000)
 	})
 
