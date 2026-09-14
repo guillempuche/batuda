@@ -10,9 +10,15 @@
 #   • WebM / MOV videos  → MP4       (downscaled ≤1280 wide, 15 fps, no audio)
 #   • already-compact .webp / .mp4 / .gif / .svg → uploaded as-is
 #
-# Re-running for a PR REPLACES its media: new files are uploaded first, then any
-# stale object left under the PR's folder is deleted — so updated screenshots
-# and recordings don't pile up.
+# Re-running ADDS and OVERWRITES; it never deletes. Anything already under the PR's
+# folder that this run does not replace is listed, not removed — a run handed one
+# updated screenshot must not take down the recording beside it, which on a merged
+# PR is embedded in the body and exists nowhere else.
+#
+# Pass --replace to delete those instead, once you mean to: that is the "clean slate"
+# case, and it is spelled out rather than the default.
+#
+# Usage: scripts/gh-pr-media.sh [--replace] <pr-number> <file> [<file> ...]
 #
 # Config (env, namespaced GITHUB_MEDIA_S3_* so it never collides with the backend
 # STORAGE_* or a teammate's own AWS_*). Source of truth = the team secrets
@@ -27,8 +33,6 @@
 #   AWS_CLI                           optional, default `aws` on PATH
 #
 # Tools: aws (upload) + cwebp & ffmpeg (compaction) — all from the nix dev shell.
-#
-# Usage: scripts/gh-pr-media.sh <pr-number> <file> [<file> ...]
 #   Emits one markdown line per file (image embed or <video> tag) on stdout.
 set -euo pipefail
 
@@ -57,13 +61,46 @@ command -v "$awscli" >/dev/null || {
 
 bucket="${GITHUB_MEDIA_S3_BUCKET:-github-media}"
 region="${GITHUB_MEDIA_S3_REGION:-auto}"
-endpoint="${GITHUB_MEDIA_S3_ENDPOINT:?set GITHUB_MEDIA_S3_ENDPOINT to the S3 endpoint, e.g. https://<account>.eu.r2.cloudflarestorage.com}"
-base="${GITHUB_MEDIA_PUBLIC_BASE:?set GITHUB_MEDIA_PUBLIC_BASE to the public read base, e.g. https://pub-<hash>.r2.dev}"
-: "${GITHUB_MEDIA_S3_ACCESS_KEY_ID:?set GITHUB_MEDIA_S3_ACCESS_KEY_ID}"
-: "${GITHUB_MEDIA_S3_SECRET_ACCESS_KEY:?set GITHUB_MEDIA_S3_SECRET_ACCESS_KEY}"
+
+# Say which file and which checkout, not just which variable. `.env` is copied into every
+# worktree when one is created, this one deliberately is not — so "set FOO" sends people
+# looking in the worktree they are standing in, which is the one place it never lives.
+missing=""
+for var in GITHUB_MEDIA_S3_ENDPOINT GITHUB_MEDIA_PUBLIC_BASE \
+	GITHUB_MEDIA_S3_ACCESS_KEY_ID GITHUB_MEDIA_S3_SECRET_ACCESS_KEY; do
+	eval "value=\${$var:-}"
+	[ -n "$value" ] || missing="${missing}${var} "
+done
+[ -z "$missing" ] || {
+	# Name the checkout when one can be found; outside a repository there is nothing
+	# useful to point at, and "— . —" is worse than saying nothing.
+	main_root="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" &&
+		main_root="$(dirname "$main_root")" || main_root=""
+	echo "missing: ${missing}" >&2
+	if [ -n "$main_root" ]; then
+		echo "These live in .env.pr-media in the main checkout, ${main_root}." >&2
+	else
+		echo "These live in .env.pr-media in the main checkout of the repository." >&2
+	fi
+	echo "Never in a worktree: a worktree finds that copy through the shared git directory," >&2
+	echo "so it is filled once. Start from .env.example.pr-media and fill it from the vault." >&2
+	exit 78
+}
+endpoint="$GITHUB_MEDIA_S3_ENDPOINT"
+base="$GITHUB_MEDIA_PUBLIC_BASE"
+
+# Deleting is opt-in. Without it a run only adds and overwrites, so handing over one updated
+# screenshot cannot take down the recording beside it — which, on a merged pull request whose
+# body embeds both and whose captures exist nowhere else, is unrecoverable.
+replace=""
+case "${1:-}" in
+--replace) replace=1; shift ;;
+esac
 
 [ "$#" -ge 2 ] || {
-	echo "usage: $(basename "$0") <pr-number> <file>..." >&2
+	echo "usage: $(basename "$0") [--replace] <pr-number> <file>..." >&2
+	echo "  --replace  delete anything already under this pull request's folder that" >&2
+	echo "             the files given here do not replace. Without it, nothing is deleted." >&2
 	exit 2
 }
 pr="$1"
@@ -89,6 +126,7 @@ export AWS_RESPONSE_CHECKSUM_VALIDATION=WHEN_REQUIRED
 # Let the CLI itself retry a transient connection drop before the outer loop does.
 export AWS_MAX_ATTEMPTS=5
 s3api() { "$awscli" s3api "$@" --endpoint-url "$endpoint"; }
+
 
 lc() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 # Make a basename safe for an S3 key + public URL: spaces or odd characters would
@@ -174,14 +212,30 @@ for f in "$@"; do
 	for attempt in 1 2 3 4 5; do
 		if s3api put-object --bucket "$bucket" --key "$key" --body "$local_file" \
 			--content-type "$(mime "$name")" \
-			--cache-control "public, max-age=31536000, immutable" >/dev/null 2>&1; then
+			--cache-control "public, max-age=31536000, immutable" \
+			>/dev/null 2>"${tmpdir}/err"; then
 			uploaded=1
 			break
+		fi
+		# A refused credential fails the same way five times, so retrying it only buys ten
+		# seconds and a message blaming the network. The credential is the likeliest thing to
+		# be wrong — it lives in one file and rotates rarely — so name it and stop.
+		# A revoked key gives AccessDenied or InvalidAccessKeyId; a mistyped one gives
+		# InvalidArgument naming the credential. None of them are worth a second attempt.
+		if grep -qiE "AccessDenied|InvalidAccessKeyId|SignatureDoesNotMatch|ExpiredToken|Unauthorized|InvalidArgument|Credential|403|401" \
+			"${tmpdir}/err"; then
+			echo "refused by the bucket — this reads like a credential, not a connection:" >&2
+			sed 's/^/  /' "${tmpdir}/err" >&2
+			echo "Check .env.pr-media in the main checkout; an R2 secret access key cannot be" >&2
+			echo "re-read after creation, so a rotated one has to be replaced there." >&2
+			exit 1
 		fi
 		sleep 2
 	done
 	[ -n "$uploaded" ] || {
-		echo "upload failed after retries: ${key}" >&2
+		echo "upload failed after 5 attempts: ${key}" >&2
+		# Without this the last error is swallowed and every failure looks alike.
+		sed 's/^/  /' "${tmpdir}/err" >&2
 		exit 1
 	}
 	# Remember this object so the delete pass below knows not to remove it.
@@ -190,18 +244,39 @@ done
 
 # 2) Delete anything still under the PR's folder that we didn't just upload —
 #    i.e. screenshots/recordings the PR no longer uses.
-existing="$(s3api list-objects-v2 --bucket "$bucket" --prefix "${prefix}/" \
-	--query 'Contents[].Key' --output text 2>/dev/null || true)"
-for k in $existing; do
-	[ "$k" = "None" ] && continue
-	# Is this object one we just uploaded? keep holds every uploaded key wrapped in
-	# spaces, so a space-padded match means "yes, leave it"; no match means stale.
-	case "$keep" in
-	*" $k "*) : ;; # just uploaded — keep
-	*) s3api delete-object --bucket "$bucket" --key "$k" >/dev/null ||
-		echo "warn: could not delete stale ${k}" >&2 ;;
-	esac
-done
+# `|| true` here used to hide a failed list behind an empty one, so a token without list
+# permission left every stale object in place while the run still reported success.
+if existing="$(s3api list-objects-v2 --bucket "$bucket" --prefix "${prefix}/" \
+	--query 'Contents[].Key' --output text 2>"${tmpdir}/err")"; then
+	stale=""
+	for k in $existing; do
+		[ "$k" = "None" ] && continue
+		# Is this object one we just uploaded? keep holds every uploaded key wrapped in
+		# spaces, so a space-padded match means "yes, leave it"; no match means stale.
+		case "$keep" in
+		*" $k "*) : ;; # just uploaded — keep
+		*) stale="${stale}${k} " ;;
+		esac
+	done
+
+	if [ -n "$stale" ] && [ -n "$replace" ]; then
+		for k in $stale; do
+			if s3api delete-object --bucket "$bucket" --key "$k" >/dev/null 2>&1; then
+				echo "deleted ${k}" >&2
+			else
+				echo "warn: could not delete stale ${k}" >&2
+			fi
+		done
+	elif [ -n "$stale" ]; then
+		# Named rather than removed: whatever is here may still be embedded in the pull
+		# request, and this run has no way to know.
+		echo "left in place under ${prefix}/ (pass --replace to remove):" >&2
+		for k in $stale; do echo "  ${k}" >&2; done
+	fi
+else
+	echo "warn: could not list ${prefix}/ — nothing was cleaned up:" >&2
+	sed 's/^/  /' "${tmpdir}/err" >&2
+fi
 
 # 3) Emit the markdown for the current set.
 for f in "$@"; do
