@@ -276,7 +276,7 @@ Move it rather than delete it. `--golden` takes any file, so a second set costs 
 
 **A fix deserves a row, and that row belongs in a file of its own.** When a fault is found and fixed — a listing page whose links were read the wrong way, a branch office folded onto its parent — the company that showed it is the only thing that will catch it coming back. The main set is the wrong place for it: the top-line figures are shares over whatever rows the file holds, so editing the file changes what they are measured over, and a before/after taken across that edit is comparing two different sets. Keep those rows in something like `golden-regressions.json`, run it as its own pass, and the main set's history stays comparable.
 
-A row cannot say why it is there. There is no field for it and JSON has nowhere to put a note, so the `id` is the only place the reason survives — name a regression row after the fault it holds (`branch-office-fold`, `listing-page-links`) rather than after the company, and it still reads six months later.
+A row cannot say why it is there. There is no field for it and JSON has nowhere to put a note, so the `id` is the only place the reason survives — name a regression row after the fault it holds (`branch-office-fold`, `listing-page-links`) rather than after the company, and it still reads six months later. `golden-regressions.example.json` ships one such row, `team-page-lost-to-main-content`: the team page of Maquinaria Agrícola SOLÀ names sixteen people with their titles, and the scraper's main-content extraction returns only its cookie banner, so a run reads nobody there; put the file through on its own after a change to how pages are fetched.
 
 ## Registries: UK is free, ES is paid
 
