@@ -80,7 +80,7 @@ export const LEGAL_SUFFIXES = new Set([
 // in the market this is measured on. Filling those in finishes nothing, for the
 // reason above — see `own-site.ts` for what these words still do, what was
 // priced to replace them, and which half of the question word order answers.
-const GENERIC_WORDS = new Set([
+export const GENERIC_WORDS = new Set([
 	'logistics',
 	'logistica',
 	'transport',

@@ -5535,10 +5535,13 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										? undefined
 										: domainHost(homepage.resolvedUrl ?? homepage.url)) ??
 									ownHost
+								// The company's own words go along, since a small firm often
+								// names its about page after itself rather than "about".
 								for (const aboutUrl of aboutPageCandidates(
 									homepage?.links ?? [],
 									reachedHost,
 									MAX_ABOUT_PAGES,
+									{ ownWords: entityTargets?.words ?? [] },
 								)) {
 									if (isUnsupportedScrapeUrl(aboutUrl)) continue
 									yield* Effect.gen(function* () {
@@ -5612,6 +5615,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										),
 										reachedHost,
 										MAX_DISCOVERY_PAGES,
+										{ ownWords: entityTargets?.words ?? [] },
 									)
 									if (discovered.length > 0) {
 										yield* Effect.logInfo('research.discovery.mapped').pipe(
