@@ -1,0 +1,22 @@
+[
+	{
+		"id": "team-page-lost-to-main-content",
+		"query": "Maquinaria Agrícola SOLÀ, Calaf",
+		"expectedOutput": {
+			"officialDomain": "solagrupo.com",
+			"bucket": "small",
+			"fields": {
+				"industry": "Agricultural machinery manufacturing",
+				"size_range": "51-200",
+				"country": "ES",
+				"location": "Calaf"
+			},
+			"contacts": [
+				"Jordi Solà",
+				"Ginevra Solà",
+				"Marcelo Tiraquini",
+				"Teodoro Meneses"
+			]
+		}
+	}
+]

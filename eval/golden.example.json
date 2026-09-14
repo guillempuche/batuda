@@ -307,5 +307,116 @@
 				"Christina Wegner"
 			]
 		}
+	},
+	{
+		"id": "rinn-beton",
+		"query": "Rinn Beton- und Naturstein, Heuchelheim",
+		"expectedOutput": {
+			"officialDomain": "rinn.net",
+			"bucket": "niche",
+			"fields": {
+				"industry": "Concrete and natural stone products",
+				"size_range": "501-1000",
+				"country": "DE",
+				"location": "Heuchelheim",
+				"phone": "0641 6009-0",
+				"tax_id": "DE112650986"
+			},
+			"contacts": [
+				"Christian Rinn",
+				"Luisa Rinn",
+				"Simeon Metz",
+				"Johannes Schramm"
+			]
+		}
+	},
+	{
+		"id": "kuebler-group",
+		"query": "Kübler Group, Villingen-Schwenningen",
+		"expectedOutput": {
+			"officialDomain": "kuebler.com",
+			"bucket": "big",
+			"fields": {
+				"industry": "Industrial sensor manufacturing",
+				"size_range": "501-1000",
+				"country": "DE",
+				"location": "Villingen-Schwenningen"
+			},
+			"contacts": ["Gebhard F. Kübler", "Lothar W. Kübler"]
+		}
+	},
+	{
+		"id": "faresin-industries",
+		"query": "Faresin Industries, Breganze",
+		"expectedOutput": {
+			"officialDomain": "faresin.com",
+			"bucket": "niche",
+			"fields": {
+				"industry": "Telehandler and mixer wagon manufacturing",
+				"size_range": "201-500",
+				"country": "IT",
+				"location": "Breganze"
+			},
+			"contacts": ["Sante Faresin", "Silvia Faresin", "Giulia Faresin"]
+		}
+	},
+	{
+		"id": "verpack",
+		"query": "Verpack, Paris",
+		"expectedOutput": {
+			"officialDomain": "verpack.fr",
+			"bucket": "niche",
+			"fields": {
+				"industry": "Luxury packaging manufacturing",
+				"country": "FR",
+				"location": "Paris",
+				"email": "contact@verpack.fr",
+				"phone": "+33 1 53 45 81 82",
+				"tax_id": "480157643"
+			},
+			"contacts": ["Stéphane Viers"]
+		}
+	},
+	{
+		"id": "ferpinta",
+		"query": "Ferpinta, Oliveira de Azeméis",
+		"expectedOutput": {
+			"officialDomain": "ferpinta.pt",
+			"altDomains": ["grupoferpinta.com"],
+			"bucket": "niche",
+			"fields": {
+				"industry": "Steel tube manufacturing",
+				"country": "PT",
+				"location": "Oliveira de Azeméis",
+				"email": "info@ferpinta.pt",
+				"phone": "+351 256 411 400"
+			},
+			"contacts": ["Fernando Pinho Teixeira"]
+		}
+	},
+	{
+		"id": "pemamek",
+		"query": "Pemamek, Loimaa",
+		"expectedOutput": {
+			"officialDomain": "pemamek.com",
+			"bucket": "niche",
+			"fields": {
+				"industry": "Welding automation machinery",
+				"size_range": "201-500",
+				"country": "FI",
+				"location": "Loimaa",
+				"email": "info@pemamek.com",
+				"phone": "+358 10 501 61"
+			},
+			"contacts": [
+				"Pekka Heikonen",
+				"Jaakko Heikonen",
+				"Juha Mäkitalo",
+				"Petri Heino",
+				"Mika Uusitalo",
+				"Mirkka Hirvonen",
+				"Lauri Heikonen"
+			]
+		}
 	}
 ]
