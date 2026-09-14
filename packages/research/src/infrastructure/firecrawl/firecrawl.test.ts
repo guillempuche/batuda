@@ -38,14 +38,17 @@ const jsonResponse = (
 interface CallLog {
 	count: number
 	last: HttpClientRequest.HttpClientRequest | undefined
+	requests: HttpClientRequest.HttpClientRequest[]
 }
 
 // Records every request (so retry counts are observable) and returns a canned
-// response built from the chosen status + body.
+// response built from the chosen status + body — or, given a list of bodies,
+// the next one on each call, the last of them for every call after.
 const countingClient = (
 	log: CallLog,
 	status: number,
 	body: unknown,
+	bodies?: ReadonlyArray<unknown>,
 ): HttpClient.HttpClient =>
 	HttpClient.makeWith<
 		HttpClientError.HttpClientError,
@@ -55,9 +58,14 @@ const countingClient = (
 	>(
 		effect =>
 			Effect.flatMap(effect, request => {
+				const answer =
+					bodies === undefined
+						? body
+						: (bodies[Math.min(log.count, bodies.length - 1)] ?? body)
 				log.count += 1
 				log.last = request
-				return Effect.succeed(jsonResponse(request, status, body))
+				log.requests.push(request)
+				return Effect.succeed(jsonResponse(request, status, answer))
 			}),
 		Effect.succeed,
 	)
@@ -108,9 +116,10 @@ const runScrape = (
 	status: number,
 	body: unknown,
 	url = 'https://acme.es/about',
+	bodies?: ReadonlyArray<unknown>,
 ) => {
-	const log: CallLog = { count: 0, last: undefined }
-	const client = countingClient(log, status, body)
+	const log: CallLog = { count: 0, last: undefined, requests: [] }
+	const client = countingClient(log, status, body, bodies)
 	const exit = runWithVirtualClock(() =>
 		Effect.gen(function* () {
 			const provider = yield* makeFirecrawlScrape(0)
@@ -132,7 +141,7 @@ const runSearch = (
 	body: unknown,
 	input: Partial<SearchInput> = {},
 ) => {
-	const log: CallLog = { count: 0, last: undefined }
+	const log: CallLog = { count: 0, last: undefined, requests: [] }
 	const client = countingClient(log, status, body)
 	const exit = runWithVirtualClock(() =>
 		Effect.gen(function* () {
@@ -151,7 +160,7 @@ const runSearch = (
 }
 
 const runMap = (status: number, body: unknown) => {
-	const log: CallLog = { count: 0, last: undefined }
+	const log: CallLog = { count: 0, last: undefined, requests: [] }
 	const client = countingClient(log, status, body)
 	const exit = runWithVirtualClock(() =>
 		Effect.gen(function* () {
@@ -240,12 +249,16 @@ describe('firecrawl map', () => {
 	})
 })
 
+// A page of ordinary prose, long enough to read as a whole page rather than
+// as a thin one that would be fetched once more.
+const A_FULL_PAGE = `# Acme\n\n${'Acme makes industrial pumps for the food sector. '.repeat(30).trim()}`
+
 describe('makeFirecrawlScrape', () => {
 	it('should map a 2xx response to a ScrapedPage with cost units', async () => {
 		// GIVEN a Firecrawl scrape response with markdown and metadata
 		const { exit, log } = runScrape(200, {
 			data: {
-				markdown: '# Acme',
+				markdown: A_FULL_PAGE,
 				links: ['https://acme.es'],
 				metadata: { title: 'Acme', language: 'es' },
 			},
@@ -255,11 +268,11 @@ describe('makeFirecrawlScrape', () => {
 		// content hash of the markdown, billed as one unit, with no retry
 		const resolved = await exit
 		const page = Exit.isSuccess(resolved) ? resolved.value : undefined
-		expect(page?.markdown).toBe('# Acme')
+		expect(page?.markdown).toBe(A_FULL_PAGE)
 		expect(page?.title).toBe('Acme')
 		expect(page?.language).toBe('es')
 		expect(page?.links).toEqual(['https://acme.es'])
-		expect(page?.contentHash).toBe(sha256('# Acme'))
+		expect(page?.contentHash).toBe(sha256(A_FULL_PAGE))
 		expect(page?.units).toBe(1)
 		expect(log.count).toBe(1)
 		// AND no resolvedUrl when the response reports no final URL
@@ -299,14 +312,168 @@ describe('makeFirecrawlScrape', () => {
 	})
 
 	it('should exclude <form> blocks so a contact-form pop-up cannot stand in for the page', async () => {
-		// GIVEN any successful scrape
-		const { exit, log } = runScrape(200, { data: { markdown: 'x' } })
+		// GIVEN any successful scrape of a whole page
+		const { exit, log } = runScrape(200, { data: { markdown: A_FULL_PAGE } })
 		await exit
 
 		// THEN the request drops <form> content while keeping main-content extraction
 		const body = bodyJson(log.last)
 		expect(body['excludeTags']).toEqual(['form'])
 		expect(body['onlyMainContent']).toBe(true)
+	})
+
+	it('should fetch a page once more whole when its main content is only a cookie notice, and keep the fuller reading', async () => {
+		// GIVEN two team pages whose main-content reading is the cookie banner,
+		// in a language and wording of the site's own: one under the banner's
+		// own title, one a consent notice that spells out every purpose and runs
+		// past two thousand characters
+		const titled = `## Diese Website verwendet Cookies\n\nWir verwenden Cookies, um Ihnen das beste Erlebnis zu bieten. ${'Einige davon sind notwendig, andere helfen uns, diese Website und Ihre Erfahrung zu verbessern. '.repeat(8)}Mehr erfahren. Einverstanden.`
+		const purposes = `Aquest lloc web fa servir galetes per oferir-te la millor experiència. ${'Funcionals: sempre actives, guarden les teves preferències. Estadístiques: ens diuen com fas servir el lloc. Màrqueting: mostren anuncis segons el que has visitat. '.repeat(13)}Accepta-les totes. Configura.`
+		expect(purposes.length).toBeGreaterThan(2000)
+		for (const banner of [titled, purposes]) {
+			// Read whole, the page carries the same banner and then the team block.
+			const whole = `${banner}\n\n# Team\n\nJordi Solà, Geschäftsführer\nGinevra Solà, Leitung Vertrieb\n${'Unsere Werte und unsere Geschichte. '.repeat(12)}`
+			const { exit, log } = runScrape(200, undefined, 'https://sola.es/equip', [
+				{ data: { markdown: banner }, creditsUsed: 1 },
+				{ data: { markdown: whole }, creditsUsed: 1 },
+			])
+
+			// THEN the page is asked for twice, the second time whole, the people
+			// are what comes back, and both fetches are billed
+			const resolved = await exit
+			const page = Exit.isSuccess(resolved) ? resolved.value : undefined
+			expect(log.count, banner.slice(0, 24)).toBe(2)
+			expect(bodyJson(log.requests[0])['onlyMainContent']).toBe(true)
+			expect(bodyJson(log.requests[1])['onlyMainContent']).toBe(false)
+			expect(page?.markdown).toContain('Jordi Solà, Geschäftsführer')
+			expect(page?.units).toBe(2)
+		}
+	})
+
+	it('should take the whole reading whenever it says more, even only a menu', async () => {
+		// GIVEN a page whose main content is a cookie notice and whose whole
+		// reading adds only the site's menu around it
+		const banner = 'We use cookies to improve your visit. Accept. Configure.'
+		const whole = `${banner}\n\nHome · Products · Contact`
+		const { exit, log } = runScrape(200, undefined, 'https://acme.es/equipo', [
+			{ data: { markdown: banner }, creditsUsed: 1 },
+			{ data: { markdown: whole }, creditsUsed: 1 },
+		])
+
+		// THEN the whole reading stands, since it holds the notice and whatever
+		// else the page had, and the run pays for both fetches
+		const resolved = await exit
+		const page = Exit.isSuccess(resolved) ? resolved.value : undefined
+		expect(log.count).toBe(2)
+		expect(page?.markdown).toBe(whole)
+		expect(page?.units).toBe(2)
+	})
+
+	it('should keep the notice, billed for both fetches, when the whole page says nothing more', async () => {
+		// GIVEN a page that really is nothing but its cookie notice
+		const banner = 'We use cookies to improve your visit. Accept. Configure.'
+		const { exit, log } = runScrape(200, undefined, 'https://acme.es/equipo', [
+			{ data: { markdown: banner }, creditsUsed: 1 },
+			{ data: { markdown: banner }, creditsUsed: 1 },
+		])
+
+		// THEN the first reading stands and the run still pays for both fetches
+		const resolved = await exit
+		const page = Exit.isSuccess(resolved) ? resolved.value : undefined
+		expect(log.count).toBe(2)
+		expect(page?.markdown).toBe(banner)
+		expect(page?.units).toBe(2)
+	})
+
+	it('should read a short page under one heading once more rather than risk a notice', async () => {
+		// GIVEN the site's own cookie-policy page: short, naming cookies at its
+		// top, under a single heading — the shape a notice has too
+		const policy =
+			'# Política de cookies\n\nAquest lloc fa servir galetes pròpies i de tercers per analitzar la navegació.'
+		const whole = `${policy}\n\nInici · Productes · Contacte`
+		const { exit, log } = runScrape(
+			200,
+			undefined,
+			'https://acme.cat/cookies',
+			[
+				{ data: { markdown: policy }, creditsUsed: 1 },
+				{ data: { markdown: whole }, creditsUsed: 1 },
+			],
+		)
+
+		// THEN the doubt costs one more fetch and loses nothing: the whole
+		// reading holds the page's words and the menu around them
+		const resolved = await exit
+		const page = Exit.isSuccess(resolved) ? resolved.value : undefined
+		expect(log.count).toBe(2)
+		expect(page?.markdown).toBe(whole)
+		expect(page?.units).toBe(2)
+	})
+
+	it('should measure the opening in words, not in the address of a logo link', async () => {
+		// GIVEN a banner reading that opens, as Firecrawl renders many sites,
+		// with the site's logo as a link whose address alone runs past the
+		// opening window
+		const logo = `[![Cambra](https://www.cambrabcn.org/wp-content/uploads/2024/01/logo-cambra-de-comerc-de-barcelona-horizontal-color-2x.png)](https://www.cambrabcn.org/${'seccio/'.repeat(30)})`
+		expect(logo.length).toBeGreaterThan(300)
+		const banner = `${logo}\n\nUtilitzem una galeta pròpia i galetes de tercers per millorar la teva experiència. Accepta. Configura.`
+		const whole = `${banner}\n\n# Equip\n\nJordi Solà, gerent\n${'La nostra història. '.repeat(20)}`
+		const { exit, log } = runScrape(200, undefined, 'https://sola.es/equip', [
+			{ data: { markdown: banner }, creditsUsed: 1 },
+			{ data: { markdown: whole }, creditsUsed: 1 },
+		])
+
+		// THEN the notice is still seen for what it is and the page read whole
+		const resolved = await exit
+		const page = Exit.isSuccess(resolved) ? resolved.value : undefined
+		expect(log.count).toBe(2)
+		expect(page?.markdown).toContain('Jordi Solà, gerent')
+	})
+
+	it('should keep the notice, billed once, when the whole-page fetch fails', async () => {
+		// GIVEN a page whose main content is a cookie notice and whose whole
+		// reading Firecrawl cannot deliver
+		const banner = 'We use cookies to improve your visit. Accept. Configure.'
+		const { exit, log } = runScrape(200, undefined, 'https://acme.es/equipo', [
+			{ data: { markdown: banner }, creditsUsed: 1 },
+			{ success: false, error: 'Internal server error' },
+		])
+
+		// THEN the notice is what the run has, and only the fetch that answered
+		// is billed
+		const resolved = await exit
+		const page = Exit.isSuccess(resolved) ? resolved.value : undefined
+		expect(log.count).toBeGreaterThanOrEqual(2)
+		expect(page?.markdown).toBe(banner)
+		expect(page?.units).toBe(1)
+	})
+
+	it('should leave a short page alone when it is written in sections', async () => {
+		// GIVEN a genuinely short contact page whose footer links the cookie
+		// policy, and a bakery's page about its biscuits ("galetes") — each a
+		// page of the site's own, its parts under headings
+		for (const short of [
+			'# Contacte\n\nAcme SL — Carrer Major 1, Ripollet. Tel. 93 000 00 00.\n\n## Horari\n\nDe 9 a 18 h.\n\nAvís legal · Política de cookies',
+			'# Galetes artesanes\n\nLes nostres galetes es fan cada matí al forn de Ripollet.\n\n## On som\n\nCarrer del Forn 3, Ripollet.',
+		]) {
+			const { exit, log } = runScrape(200, { data: { markdown: short } })
+
+			// THEN one fetch is all it takes, and the short reading stands
+			const resolved = await exit
+			const page = Exit.isSuccess(resolved) ? resolved.value : undefined
+			expect(log.count, short).toBe(1)
+			expect(page?.markdown).toBe(short)
+		}
+	})
+
+	it('should not fetch again a page whose main content is plainly enough', async () => {
+		// GIVEN an ordinary page of prose
+		const prose = `# Acme\n\n${'Acme makes industrial pumps for the food sector. '.repeat(30)}`
+		const { exit, log } = runScrape(200, { data: { markdown: prose } })
+
+		// THEN one fetch is all it takes
+		await exit
+		expect(log.count).toBe(1)
 	})
 
 	it('should default missing markdown to an empty string', async () => {
