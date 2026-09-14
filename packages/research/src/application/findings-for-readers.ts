@@ -102,6 +102,11 @@ const PROVENANCE_KEYS = ['source_id', 'quote', 'confidence', 'as_of'] as const
 
 const PROVENANCE = new Set<string>(PROVENANCE_KEYS)
 
+// A paired field may carry the value's English rendering beside it — a job
+// title the page writes as "Gerent" — which is neither the value nor evidence.
+// A reader gets it as `<field>_gloss` next to the field.
+const GLOSS_KEY = 'gloss'
+
 /**
  * A field written as its value paired with where it came from.
  *
@@ -127,7 +132,10 @@ const isPairedField = (
 ): value is { value: unknown } & Record<string, unknown> => {
 	if (!isValueWrapper(value)) return false
 	const others = Object.keys(value).filter(key => key !== 'value')
-	return others.length === 0 || others.some(key => PROVENANCE.has(key))
+	return (
+		others.length === 0 ||
+		others.some(key => PROVENANCE.has(key) || key === GLOSS_KEY)
+	)
 }
 
 const provenanceOf = (wrapper: Record<string, unknown>): FieldEvidence => {
@@ -160,6 +168,8 @@ const flattenObject = (
 		}
 		if (!evidenceKeyTaken && isPairedField(value)) {
 			flat.push([key, forReaders(value.value)])
+			if (typeof value[GLOSS_KEY] === 'string')
+				flat.push([`${key}_${GLOSS_KEY}`, value[GLOSS_KEY]])
 			// Only where there is a page to name. A value that arrived bare is
 			// stored paired with nothing beside it, and an empty entry here would
 			// read as provenance a reader could go and look at.

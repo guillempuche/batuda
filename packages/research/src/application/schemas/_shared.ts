@@ -112,6 +112,27 @@ export const Sourced = <Value extends Schema.Top>(value: Value) =>
 		),
 	})
 
+// A person's job title, held to the page and readable to anybody. The value is
+// the title exactly as the page writes it, in the page's own language, and the
+// gloss is an English rendering for when that language is not English. Two
+// fields on purpose: a model asked to copy the page and to be readable in one
+// field translates, and a translated title is no longer on the page for the
+// guard that holds it there.
+export const SourcedTitle = Schema.Struct({
+	...Sourced(
+		Schema.String.annotate({
+			description:
+				"The job title exactly as the page writes it, in the page's own language — 'Gerent', 'geschäftsführender Gesellschafter', 'CEO'. Never translated, spelt out or shortened.",
+		}),
+	).fields,
+	gloss: Schema.optionalKey(
+		Schema.String.annotate({
+			description:
+				"The plainest English equivalent of that title — 'manager' for 'Gerent', 'owner' for 'propietari' — only when the page's own words are not English, and never a grander or more specific title than the page gives. Left out otherwise.",
+		}),
+	),
+})
+
 // One attribute value a run read for a company: the key it was declared under,
 // the value as text, and the page and the words it was read from. A list of
 // entries rather than a map keyed by attribute, because a list is the one shape

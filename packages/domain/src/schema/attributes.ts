@@ -67,6 +67,7 @@ export const ATTRIBUTE_RESERVED_KEYS: ReadonlySet<string> = new Set([
 	'field',
 	'fields',
 	'fit_checks',
+	'gloss',
 	'id',
 	'industry',
 	'is_primary',

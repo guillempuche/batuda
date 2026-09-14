@@ -96,6 +96,9 @@ type CompetitorEntry = {
 type ContactEntry = {
 	readonly name: string
 	readonly role?: string
+	// The title's English rendering, present when the page writes it in another
+	// language; shown beside the page's own words, never instead of them.
+	readonly role_gloss?: string
 	readonly email?: string
 	readonly phone?: string
 	readonly evidence?: EvidenceMap
@@ -322,7 +325,13 @@ export function CompanyEnrichmentView({
 							<ListItem key={`${c.name}|${c.email ?? c.phone ?? ''}`}>
 								<RowHead>
 									<Pill>{c.name}</Pill>
-									{c.role !== undefined ? <Reason>{c.role}</Reason> : null}
+									{c.role !== undefined ? (
+										<Reason>
+											{c.role_gloss !== undefined && c.role_gloss !== ''
+												? `${c.role} (${c.role_gloss})`
+												: c.role}
+										</Reason>
+									) : null}
 								</RowHead>
 								<FieldsTable>
 									{c.email !== undefined ? (

@@ -62,6 +62,7 @@ describe('ATTRIBUTE_RESERVED_KEYS', () => {
 				'value',
 				'as_of',
 				'role',
+				'gloss',
 				'constructor',
 				'prototype',
 			])

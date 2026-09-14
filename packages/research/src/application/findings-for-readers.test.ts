@@ -33,6 +33,46 @@ describe('forReaders', () => {
 		})
 	})
 
+	describe('when a title carries its English rendering beside it', () => {
+		it('should give the rendering as a field of its own, not as evidence', () => {
+			// GIVEN a person whose title is the page's words with a gloss, and one
+			// whose title is a bare rendering with nothing else
+			const flat = forReaders({
+				contacts: [
+					{
+						name: 'Ramon Vendrell',
+						role: {
+							value: 'propietari',
+							gloss: 'Owner',
+							source_id: 'src_1',
+							quote: 'el seu propietari, Ramon Vendrell',
+						},
+					},
+					{ name: 'Ana Puig', role: { value: 'Gerent', gloss: 'Manager' } },
+				],
+			})
+
+			// THEN each reader sees the title under its name, the rendering beside it
+			// as role_gloss, and only the page in the evidence
+			expect(flat).toEqual({
+				contacts: [
+					{
+						name: 'Ramon Vendrell',
+						role: 'propietari',
+						role_gloss: 'Owner',
+						evidence: {
+							role: {
+								source_id: 'src_1',
+								quote: 'el seu propietari, Ramon Vendrell',
+							},
+						},
+					},
+					{ name: 'Ana Puig', role: 'Gerent', role_gloss: 'Manager' },
+				],
+			})
+		})
+	})
+
 	describe('when a run carries the attributes it was asked for', () => {
 		it('should give each value under its key and the page beside it', () => {
 			// GIVEN the map the fold and the guard leave behind

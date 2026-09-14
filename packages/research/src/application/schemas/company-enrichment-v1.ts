@@ -8,6 +8,7 @@ import {
 	ProposedUpdate,
 	SocialProfile,
 	Sourced,
+	SourcedTitle,
 } from './_shared'
 
 // The fields both shapes below are built from, so the one that leaves the
@@ -179,7 +180,7 @@ const companyEnrichmentFields = {
 		Schema.Array(
 			Schema.Struct({
 				name: Schema.String,
-				role: Schema.optionalKey(Sourced(Schema.String)),
+				role: Schema.optionalKey(SourcedTitle),
 				email: Schema.optionalKey(Sourced(Schema.String)),
 				phone: Schema.optionalKey(Sourced(Schema.String)),
 				// The page(s) that name this person as the company's own staff, so a

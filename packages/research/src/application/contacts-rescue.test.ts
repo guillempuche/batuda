@@ -145,6 +145,30 @@ describe('mergeContacts', () => {
 				value: 'VP Sales & Operations',
 			})
 		})
+
+		it('should fill a missing English rendering beside the title the broad pass kept', () => {
+			// GIVEN both passes found the same title, and only the rescue pass
+			// rendered it in English
+			const broad = [
+				{ name: 'Ana Puig', role: { value: 'Gerent', source_id: 'src_1' } },
+			]
+			const rescued = [
+				{
+					name: 'Ana Puig',
+					role: { value: 'Gerent', gloss: 'Manager', source_id: 'src_2' },
+				},
+			]
+
+			// WHEN merged
+			const merged = mergeContacts(broad, rescued)
+
+			// THEN the broad title stands, with the rendering beside it
+			expect(merged.contacts[0]?.role).toEqual({
+				value: 'Gerent',
+				source_id: 'src_1',
+				gloss: 'Manager',
+			})
+		})
 	})
 
 	describe('when two names differ by an initial', () => {

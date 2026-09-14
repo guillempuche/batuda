@@ -411,7 +411,10 @@ At a glance:
 
   Phase 2 · structured extraction
       the request fenced again; each declared attribute named by key, kind,
-          unit and choice words only; a reply cut off past the ceiling one
+          unit and choice words only; a person's title asked for in the
+          page's own words and, on an enrichment run, with an English
+          rendering beside it (`gloss`) that is never held to the page and
+          never becomes the CRM title; a reply cut off past the ceiling one
           reply may write is asked for once more, shorter, and if that one
           is cut off too the part of it that arrived whole is kept
       validate the findings against the run's schema

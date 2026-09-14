@@ -21,7 +21,8 @@ import { Schema } from 'effect'
 
 import { foldLabel } from '@batuda/domain'
 
-import { Citation, Sourced } from './schemas/_shared'
+import { isPlainObject } from './guard-shapes'
+import { Citation, SourcedTitle } from './schemas/_shared'
 
 // The narrow schema the focused pass fills: people only, each with a title and the
 // source(s) that name them as this company's own staff. Citations are required
@@ -29,7 +30,7 @@ import { Citation, Sourced } from './schemas/_shared'
 // never added without provenance to bind it to the target.
 const RescueContact = Schema.Struct({
 	name: Schema.String,
-	role: Schema.optionalKey(Sourced(Schema.String)),
+	role: Schema.optionalKey(SourcedTitle),
 	citations: Schema.Array(Citation),
 })
 
@@ -63,7 +64,7 @@ export const contactsRescuePrompt = (
 		`From the evidence below, list EVERY named person who is a leader or employee of "${target.name}"${
 			target.domain ? ` (official site ${target.domain})` : ''
 		}, with their exact job title.`,
-		"For each person return: their full name as written; `role` — their exact title with the source URL and a verbatim quote stating the name and title; and `citations` — the source URL(s) where they appear as this company's own person, each with a verbatim quote.",
+		"For each person return: their full name as written; `role` — their exact title as the page writes it, in its own language, with the source URL and a verbatim quote stating the name and title, and an English rendering in `gloss` only when that language is not English; and `citations` — the source URL(s) where they appear as this company's own person, each with a verbatim quote.",
 		'Rules:',
 		`- Only ${target.name}'s OWN leaders or staff. IGNORE anyone described as a client, customer, partner, vendor, or testimonial, and anyone who works for a DIFFERENT company — even when they are quoted on this company's own site.`,
 		'- Distinguish current leaders from founders: someone who "co-founded" the company is a founder; give a current role only if the evidence says they still hold it.',
@@ -151,6 +152,15 @@ export const mergeContacts = (
 	const order: string[] = []
 	let dropped = 0
 
+	// The title the broad pass kept stands, and the rescue pass's English
+	// rendering fills in beside it when the broad one came without: the
+	// rendering reads the same words, it is not a competing fact.
+	const mergedRole = (kept: unknown, found: unknown): unknown => {
+		if (!isPlainObject(kept) || !isPlainObject(found)) return kept ?? found
+		if ('gloss' in kept || typeof found['gloss'] !== 'string') return kept
+		return { ...kept, gloss: found['gloss'] }
+	}
+
 	const absorb = (c: RawContact): void => {
 		if (typeof c.name !== 'string') {
 			dropped++
@@ -170,7 +180,7 @@ export const mergeContacts = (
 			return
 		}
 		const joined: Record<string, unknown> = { name: existing.name }
-		addDetail(joined, 'role', existing.role ?? c.role)
+		addDetail(joined, 'role', mergedRole(existing.role, c.role))
 		addDetail(joined, 'email', existing.email ?? c.email)
 		addDetail(joined, 'phone', existing.phone ?? c.phone)
 		joined['citations'] = joinCitations(
