@@ -405,6 +405,8 @@ At a glance:
           stack declares (each fenced as words to act on rather than rules),
           then the request, fenced and bounded
       web_search · scrape_page · registry_lookup · discover_contacts
+          (a page whose main content came back as its cookie notice is read
+          once more whole, on every kind of run)
       site discovery (runs about one company): map its own domain and read
           its own pages first
       accumulate findings, record each page reached, archive the ones opened
