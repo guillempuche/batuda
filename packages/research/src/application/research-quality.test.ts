@@ -126,6 +126,23 @@ describe('computeRunQuality', () => {
 			expect(quality.low_confidence).toBe(true)
 		})
 
+		it('should say when the reply was cut off and flag the run, and stay silent otherwise', () => {
+			// GIVEN the good run, once with its extraction reply cut off and the
+			// whole part kept, once whole
+			const cut = computeRunQuality({
+				...base,
+				entityMatch: 'strong',
+				replyCut: true,
+			})
+			const whole = computeRunQuality({ ...base, entityMatch: 'strong' })
+			// THEN the cut run says so and is not safe to act on unreviewed, since
+			// what it holds is what fitted in the reply; the whole run says nothing
+			expect(cut.reply_cut).toBe(true)
+			expect(cut.low_confidence).toBe(true)
+			expect('reply_cut' in whole).toBe(false)
+			expect(whole.low_confidence).toBe(false)
+		})
+
 		it('should not flag a strong run just for thin grounding', () => {
 			// GIVEN a run that reached the right company (strong match) but filled little
 			// of the profile — a thin-web company, not a bad run

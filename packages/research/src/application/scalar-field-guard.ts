@@ -28,6 +28,7 @@
 
 import { clipText } from '@batuda/domain'
 
+import { LEGAL_SUFFIXES } from './entity-guard'
 import { isSourcedField } from './guard-shapes'
 import { writtenWithoutWordSpaces } from './term-match'
 
@@ -285,6 +286,80 @@ export const valueIsRightKind = (key: string, value: string): boolean => {
 // "gerente". Titles alone get this, since a place name is not inflected.
 const ROLE_STEM_CHARS = 5
 
+// The words of a text, accents off and lower-cased, so initials can be read off
+// them: "Président-Directeur Général" gives president, directeur, general.
+const wordsOf = (text: string): ReadonlyArray<string> =>
+	normalize(text)
+		.split(/[^\p{L}]+/u)
+		.filter(word => word.length > 0)
+
+// A word this short inside a title only joins the others — "of", "de", "und" —
+// and a page shortening the title may leave its letter out or keep it.
+const JOINER_MAX_CHARS = 3
+
+// The letters a title shortens to: "Chief Executive Officer" gives ceo. A title
+// with a joining word in it is read both ways, since "Head of Sales" is written
+// "HoS" on one page and "HS" on another.
+const initialsOf = (words: ReadonlyArray<string>): ReadonlyArray<string> => {
+	if (words.length < 2) return []
+	const all = words.map(word => word[0]).join('')
+	const withoutJoiners = words
+		.filter(word => word.length > JOINER_MAX_CHARS)
+		.map(word => word[0])
+		.join('')
+	return withoutJoiners.length >= 2 && withoutJoiners !== all
+		? [all, withoutJoiners]
+		: [all]
+}
+
+// A title often names two posts in one — "Owner & CEO", "Chairman and Chief
+// Executive Officer" — and a bracketed aside, closed or cut short, is the
+// model's own gloss.
+const TITLE_PART_JOINERS = /\s*(?:[&/,;]|\b(?:and|et|y|i|und|e)\b)\s*/iu
+const BRACKETED_ASIDE = /\([^)]*\)?/g
+
+// A run of capitals of the lengths a job title shortens to — CEO, PDG, CISO —
+// with a small letter allowed between them for a joiner kept in: HoS. The
+// word after it is read too, since a run of capitals next to a number is a
+// standard ("ISO 9001") and one before a legal form is a company ("ACME SL"),
+// and neither shortens anybody's title. Two bare capitals are left out on
+// purpose: "SL" and "SA" end half the company names in Spain, and "MD" after
+// a doctor's name is not a director.
+const SPELLED_ACRONYMS_RE =
+	/(?<![\p{L}\p{N}])([A-Z](?:[a-z]?[A-Z]){1,4})(?![\p{L}\p{N}])[\s.,]*([\p{L}\p{N}]+)?/gu
+const SPELLED_ACRONYM_MIN_CHARS = 3
+
+const acronymsSpelledIn = (quote: string): ReadonlySet<string> => {
+	const spelled = new Set<string>()
+	for (const match of quote.matchAll(SPELLED_ACRONYMS_RE)) {
+		const acronym = match[1] as string
+		const next = match[2]?.toLowerCase() ?? ''
+		if (acronym.length < SPELLED_ACRONYM_MIN_CHARS) continue
+		if (/^\d/.test(next) || LEGAL_SUFFIXES.has(next)) continue
+		spelled.add(acronym.toLowerCase())
+	}
+	return spelled
+}
+
+// A page and a model shorten a title differently: the page says "as its new
+// CEO" and the model writes "Chief Executive Officer". Neither is wrong, so a
+// title stands when its initials are an acronym the quote spells — read whole,
+// so "Président et Directeur Général" still gives pdg, and post by post, so
+// "Owner and Chief Executive Officer" finds its CEO. Read off the words
+// themselves, this holds in any language that shortens titles this way — PDG,
+// CISO, CHRO — with no list of titles to keep. The other way round, an acronym
+// read into the initials of whatever words the quote has, is not tried:
+// ordinary prose spells a C-suite acronym in its initials about once in forty
+// sentences, so it would back an invented title that often.
+const titleInitialsAgree = (quote: string, value: string): boolean => {
+	const spelled = acronymsSpelledIn(quote)
+	if (spelled.size === 0) return false
+	const title = value.replace(BRACKETED_ASIDE, ' ')
+	return [title, ...title.split(TITLE_PART_JOINERS)].some(part =>
+		initialsOf(wordsOf(part)).some(initials => spelled.has(initials)),
+	)
+}
+
 // The quote backs the value when it contains it outright, shares one of its
 // distinctive words, or — read strictly — shares the stem of one. A value with
 // nothing distinctive in it can't be judged this way and is given the benefit of
@@ -310,6 +385,11 @@ export const quoteSupportsValue = (
 			quoteWords.some(word => word.startsWith(token.slice(0, ROLE_STEM_CHARS))),
 	)
 }
+
+// A job title is read strictly, and in one more way: by the letters it
+// shortens to, since a page and a model do not always shorten it alike.
+export const quoteSupportsTitle = (quote: string, value: string): boolean =>
+	quoteSupportsValue(quote, value, true) || titleInitialsAgree(quote, value)
 
 // The numbers a text states, read the ways a page writes one: a bare run of
 // digits; digits grouped in threes by a dot, a comma, an apostrophe or a space
@@ -382,6 +462,7 @@ export type FieldDropReason =
 	| 'placeholder'
 	| 'wrong_kind'
 	| 'ungrounded'
+	| 'quote_absent'
 	| 'unsupported'
 	| 'unquoted'
 
@@ -406,7 +487,9 @@ export interface ScalarFieldGuardResult {
 	readonly droppedWrongKind: number
 	/** Fields dropped because no fetched source backed the value. */
 	readonly droppedUngrounded: number
-	/** Fields dropped because the quote did not support or was absent from evidence. */
+	/** Fields dropped because the quote itself appears nowhere in the evidence. */
+	readonly droppedQuoteAbsent: number
+	/** Fields dropped because the quote, real as it is, does not state the value. */
 	readonly droppedUnsupported: number
 	/** Fields dropped because a value only credible with its words arrived without a quote. */
 	readonly droppedUnquoted: number
@@ -507,7 +590,7 @@ export const guardScalarFields = (
 			}
 			if (quote !== '') {
 				if (corpus !== '' && !isInCorpus(quote, lowerCorpus)) {
-					return drop(key, 'unsupported', text, wrapper.source_id)
+					return drop(key, 'quote_absent', text, wrapper.source_id)
 				}
 				// A number has to be the number the quote states, digit for digit.
 				if (typeof raw === 'number' && !quoteStatesNumber(quote, raw)) {
@@ -516,7 +599,9 @@ export const guardScalarFields = (
 				if (
 					typeof raw === 'string' &&
 					PAGE_LITERAL_FIELDS.has(key) &&
-					!quoteSupportsValue(quote, raw, key === 'role')
+					!(key === 'role'
+						? quoteSupportsTitle(quote, raw)
+						: quoteSupportsValue(quote, raw))
 				) {
 					return drop(key, 'unsupported', text, wrapper.source_id)
 				}
@@ -541,6 +626,7 @@ export const guardScalarFields = (
 		droppedPlaceholder: countReason('placeholder'),
 		droppedWrongKind: countReason('wrong_kind'),
 		droppedUngrounded: countReason('ungrounded'),
+		droppedQuoteAbsent: countReason('quote_absent'),
 		droppedUnsupported: countReason('unsupported'),
 		droppedUnquoted: countReason('unquoted'),
 		drops,

@@ -25,7 +25,7 @@ import { isSocialPlatformHost } from './social-sites'
 
 // Legal-form suffixes dropped before matching, so "Acme Logistics S.L." and a
 // page that writes "Acme Logistica SL" still match on the same name core.
-const LEGAL_SUFFIXES = new Set([
+export const LEGAL_SUFFIXES = new Set([
 	'sl',
 	'slu',
 	'sa',

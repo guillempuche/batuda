@@ -426,9 +426,11 @@ describe('guardScalarFields', () => {
 				'acme is a logistics firm serving european shippers',
 			)
 
-			// THEN the fabricated-quote field is dropped
+			// THEN the fabricated-quote field is dropped, under the reason that
+			// names the quote rather than the value as the problem
 			expect(enrichment(result.findings).location).toBeNull()
-			expect(result.droppedUnsupported).toBe(1)
+			expect(result.droppedQuoteAbsent).toBe(1)
+			expect(result.droppedUnsupported).toBe(0)
 		})
 	})
 
@@ -610,7 +612,7 @@ describe('guardScalarFields', () => {
 					'email'
 				],
 			).toBeNull()
-			expect(result.droppedUnsupported).toBe(1)
+			expect(result.droppedQuoteAbsent).toBe(1)
 		})
 
 		it('should still ground a contact role', () => {
@@ -986,6 +988,71 @@ describe('guardScalarFields, when a job title is held to its quote', () => {
 					source_id: 'https://acme.es',
 					quote,
 				})
+			}
+		})
+	})
+
+	describe('when the page shortens the title the model wrote out', () => {
+		it('should keep a title whose initials the quote spells, in any language', () => {
+			// GIVEN a title written out against a page that shortens it, with an
+			// aside, a second post, and a joining word along the way
+			const cases = [
+				[
+					'Chief Executive Officer',
+					'Dyson announces the appointment of Roland Krueger as its new CEO.',
+				],
+				['Chief Executive Officer (global)', 'Ana Puig steps up as CEO'],
+				['Chief Executive Officer (glo', 'Ana Puig steps up as CEO'],
+				['Chief Operating Officer', 'Eric French – COO'],
+				['Owner and Chief Executive Officer', 'Ana Puig (CEO)'],
+				['Président-Directeur Général', 'Ana Puig, PDG'],
+				['Président et Directeur Général', 'Ana Puig, PDG'],
+				['Director de Ventas y Marketing', 'Ana Puig (DVM)'],
+				['Head of Sales', 'Ana Puig (HoS)'],
+			] as const
+
+			for (const [value, quote] of cases) {
+				// WHEN grounded against a corpus holding the quote
+				const result = guardScalarFields(
+					person({ value, source_id: 'https://acme.es', quote }),
+					`acme. ${quote}`,
+				)
+				// THEN the title stands
+				expect(roleOf(result.findings), `${value} / ${quote}`).toEqual({
+					value,
+					source_id: 'https://acme.es',
+					quote,
+				})
+			}
+		})
+
+		it('should still drop a title the quote does not give in either form', () => {
+			// GIVEN a written-out title against a different acronym; against two
+			// capitals that are a company's legal form or a doctor's letters;
+			// against capitals that are a standard's number or a company's name;
+			// an acronym against words that merely begin with its letters; and a
+			// title the quote only spells out word by word, since an acronym the
+			// model wrote has to be on the page as one
+			const cases = [
+				['Chief Executive Officer', 'Ana Puig, CFO of Acme'],
+				['Sales Lead', 'Joan Pons works at Acme SL in Girona'],
+				['Marketing Director', 'Dr. Rovira, MD, opened the clinic'],
+				['Ingeniero de Sistemas Operativos', 'planta certificada ISO 9001'],
+				['Area Chief Marketing Executive', 'ACME SL, Barcelona'],
+				['Director General', 'Ana Puig, nombrada DG de la empresa'],
+				['CEO', 'Carles Estruch organitza la trobada anual del sector'],
+				['CEO', 'Ana Puig, chief executive officer of Acme'],
+			] as const
+
+			for (const [value, quote] of cases) {
+				// WHEN grounded
+				const result = guardScalarFields(
+					person({ value, source_id: 'https://acme.es', quote }),
+					`acme. ${quote}`,
+				)
+				// THEN the title goes
+				expect(roleOf(result.findings), `${value} / ${quote}`).toBeNull()
+				expect(result.droppedUnsupported).toBe(1)
 			}
 		})
 	})

@@ -68,6 +68,7 @@ import {
 	criticPrompt,
 	critiqueFieldSupport,
 } from './critic-guard'
+import { keepWhatArrived } from './cut-off-salvage'
 import {
 	type DirectorySites,
 	linkedAddresses,
@@ -1569,13 +1570,13 @@ export const buildExtractionPrompt = (args: {
 		lines.push(DISCOVERY_BREADTH_DIRECTIVE, '')
 		lines.push(DISCOVERY_ORGANISATION_KIND_DIRECTIVE, '')
 		lines.push(
-			"Where the evidence names somebody as a company's own leader or employee — a titled person on its team page, a quoted founder, a signed author — put them in THAT company's `contacts`, with the exact job title the evidence gives them and the page you read them on. Under the company they work for, never the one listed beside them, and never in a list of their own. A company whose pages name its staff and comes back with an empty `contacts` is an incomplete row.",
+			"Where the evidence names somebody as a company's own leader or employee — a titled person on its team page, a quoted founder, a signed author — put them in THAT company's `contacts`, with the job title written as the evidence writes it (a page that says CEO is copied as CEO, not spelt out) and the page you read them on. Under the company they work for, never the one listed beside them, and never in a list of their own. A company whose pages name its staff and comes back with an empty `contacts` is an incomplete row.",
 			'',
 		)
 		if (args.marksUnconfirmed) lines.push(DISCOVERY_UNCONFIRMED_DIRECTIVE, '')
 	} else {
 		lines.push(
-			"Name EVERY person the evidence identifies as this company's own leader or employee — a titled executive on the team page, a quoted founder, a signed author — each with the exact job title the evidence gives them. Leaving the people list empty while the evidence names the company's own staff is an incomplete extraction.",
+			"Name EVERY person the evidence identifies as this company's own leader or employee — a titled executive on the team page, a quoted founder, a signed author — each with the job title written as the evidence writes it (a page that says CEO is copied as CEO, not spelt out). Leaving the people list empty while the evidence names the company's own staff is an incomplete extraction.",
 			'',
 		)
 	}
@@ -3407,6 +3408,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// double-counting a row that was extracted twice; see #457.
 					let citationsSeen = 0
 					let citationsKept = 0
+					// Whether the extraction reply was cut off and the run kept what
+					// arrived whole, so the quality block can say the findings are what
+					// fitted in the reply rather than all the evidence held.
+					let extractionSalvaged = false
 					// Where the list stands against the area the run was asked about, kept
 					// for the quality block the run finishes with. Overwritten by each
 					// pass for the same reason the two tallies above are: a gap round
@@ -3605,7 +3610,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							})
 							// A reply cut off before its JSON closed is asked for once more,
 							// shorter: the same evidence, told to write less per value. Once,
-							// since a second cut-off says the answer does not fit at all.
+							// since a second cut-off says the answer does not fit in one reply
+							// at all; what that reply got to write whole is then kept rather
+							// than the run lost — every value up to the cut is as grounded as
+							// any other, and the guards below read it the same way.
 							const structuredResponse = yield* extractLlm
 								.generateObject({
 									schema: outputSchema as typeof FreeformSchema,
@@ -3624,10 +3632,26 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												}),
 											),
 											Effect.andThen(
-												extractLlm.generateObject({
-													schema: outputSchema as typeof FreeformSchema,
-													prompt: withCompactionDirective(extractionPrompt),
-												}),
+												extractLlm
+													.generateObject({
+														schema: outputSchema as typeof FreeformSchema,
+														prompt: withCompactionDirective(extractionPrompt),
+													})
+													.pipe(
+														Effect.catchIf(isResponseCutOff, cutOff =>
+															keepWhatArrived(
+																cutOff,
+																outputSchema as typeof FreeformSchema,
+																researchId,
+															).pipe(
+																Effect.tap(() =>
+																	Effect.sync(() => {
+																		extractionSalvaged = true
+																	}),
+																),
+															),
+														),
+													),
 											),
 										),
 									),
@@ -4020,6 +4044,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												check.droppedPlaceholder > 0 ||
 												check.droppedWrongKind > 0 ||
 												check.droppedUngrounded > 0 ||
+												check.droppedQuoteAbsent > 0 ||
 												check.droppedUnsupported > 0 ||
 												check.droppedUnquoted > 0
 											) {
@@ -4032,6 +4057,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														dropped_placeholder: check.droppedPlaceholder,
 														dropped_wrong_kind: check.droppedWrongKind,
 														dropped_ungrounded: check.droppedUngrounded,
+														dropped_quote_absent: check.droppedQuoteAbsent,
 														dropped_unsupported: check.droppedUnsupported,
 														dropped_unquoted: check.droppedUnquoted,
 													}),
@@ -4065,6 +4091,8 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														check.droppedWrongKind,
 													'research.fields.dropped_ungrounded':
 														check.droppedUngrounded,
+													'research.fields.dropped_quote_absent':
+														check.droppedQuoteAbsent,
 													'research.fields.dropped_unsupported':
 														check.droppedUnsupported,
 													'research.fields.dropped_unquoted':
@@ -6105,6 +6133,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									),
 								}
 								yield* linkRunSources(again.scrapedUrlHashes)
+								// The list this pass writes replaces the last one, so a reply
+								// cut off in that one no longer describes what ships.
+								extractionSalvaged = false
 								return (yield* extractOverEverything()).findings
 							})
 
@@ -7609,6 +7640,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						notCompanies: notCompaniesAbsentFrom(undefined),
 						citationsSeen,
 						citationsKept,
+						replyCut: extractionSalvaged,
 						scanResults: isDiscoveryScan(schemaName) ? 0 : null,
 						refined: refinedRetry,
 						searchStopped,
@@ -7723,6 +7755,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						notCompanies: notCompaniesAbsentFrom(findings),
 						citationsSeen,
 						citationsKept,
+						replyCut: extractionSalvaged,
 						scanResults: discoveryResultCount(schemaName, findings),
 						refined: refinedRetry,
 						searchStopped,

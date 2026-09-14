@@ -18,6 +18,7 @@ import {
 	AgentLanguageModel,
 	ContactDiscovery,
 	type CreateResearchInput,
+	CutOffReply,
 	ExtractLanguageModel,
 	MapProvider,
 	ProviderError,
@@ -111,35 +112,50 @@ const agentLlm: LanguageModel.Service = {
 		Stream.succeed({ type: 'text-delta' as const, delta: '' }) as never,
 }
 
-// When set, the next extraction reply is cut off mid-answer, the way a vendor
-// cuts one at the ceiling, and the flag clears so the retry is answered.
-let cutOffNextExtraction = false
+// The extraction replies to cut off mid-answer, the way a vendor cuts one at
+// the ceiling, before a whole one is answered: null for a cut that kept
+// nothing, or the text the model got to write before the cut.
+let cutOffReplies: Array<string | null> = []
 
 // The shapes extraction was handed, so the test can say whether the model was
 // offered a place to put attribute values. Kept apart from `prompts`, which
 // stringifies what it is given and would throw a schema away.
 const extractionSchemas: unknown[] = []
 
-const hasAttributesField = (schema: unknown): boolean => {
+const hasField = (schema: unknown, name: string): boolean => {
 	const fields = (schema as { fields?: Record<string, unknown> } | undefined)
 		?.fields
-	return fields !== undefined && Object.hasOwn(fields, 'attributes')
+	return fields !== undefined && Object.hasOwn(fields, name)
 }
+const hasAttributesField = (schema: unknown): boolean =>
+	hasField(schema, 'attributes')
 
 const extractLlm: LanguageModel.Service = {
 	generateText: (_options: unknown) => Effect.succeed(finalRound) as never,
 	generateObject: (options: unknown) => {
 		remember(options)
-		extractionSchemas.push((options as { schema?: unknown }).schema)
-		if (cutOffNextExtraction) {
-			cutOffNextExtraction = false
+		const schema = (options as { schema?: unknown }).schema
+		// The critic asks this same model to rule on the fields a reply kept; an
+		// empty list of verdicts keeps every one, the way a judge with nothing to
+		// say does.
+		if (hasField(schema, 'verdicts')) {
+			return Effect.succeed({ ...finalRound, value: { verdicts: [] } }) as never
+		}
+		extractionSchemas.push(schema)
+		const cutOff = cutOffReplies.shift()
+		if (cutOff !== undefined) {
 			return Effect.fail(
-				new ProviderError({
-					provider: 'stub',
-					message: 'reply cut off',
-					recoverable: false,
-					reason: RESPONSE_CUT_OFF,
-				}),
+				cutOff === null
+					? new ProviderError({
+							provider: 'stub',
+							message: 'reply cut off',
+							recoverable: false,
+							reason: RESPONSE_CUT_OFF,
+						})
+					: new CutOffReply(
+							{ provider: 'stub', message: 'reply cut off' },
+							cutOff,
+						),
 			) as never
 		}
 		return Effect.succeed({
@@ -241,6 +257,7 @@ const instructionsWith = (
 
 const TERMINAL = new Set([
 	'succeeded',
+	'succeeded_low_confidence',
 	'failed',
 	'cancelled',
 	'no_reliable_data',
@@ -337,9 +354,11 @@ const runWith = (
 			const [row] = yield* sql<{
 				attributeFingerprint: string | null
 				attributeDeclarations: unknown
+				findings: unknown
 			}>`
 				SELECT attribute_fingerprint AS "attributeFingerprint",
-					attribute_declarations AS "attributeDeclarations"
+					attribute_declarations AS "attributeDeclarations",
+					findings
 				FROM research_runs WHERE id = ${created.id}::uuid
 			`.pipe(Effect.orDie)
 			return { status, row }
@@ -350,6 +369,7 @@ const runWith = (
 					| {
 							attributeFingerprint: string | null
 							attributeDeclarations: unknown
+							findings: unknown
 					  }
 					| undefined
 			},
@@ -438,7 +458,7 @@ describe('ResearchService, the attributes a run is asked for', () => {
 		it('should ask once more, shorter, and carry on', async () => {
 			// GIVEN a run anchored on a page the fiber fetches, whose first
 			// extraction reply is cut off
-			cutOffNextExtraction = true
+			cutOffReplies = [null]
 			prompts.length = 0
 
 			// WHEN the run goes through
@@ -455,8 +475,39 @@ describe('ResearchService, the attributes a run is asked for', () => {
 			expect(extractions.length).toBeGreaterThanOrEqual(2)
 			expect(extractions[0]).not.toContain('ran past the length')
 			expect(extractions[1]).toContain('ran past the length')
-			expect(cutOffNextExtraction).toBe(false)
+			expect(cutOffReplies).toEqual([])
 			expect(TERMINAL.has(status)).toBe(true)
+		}, 60_000)
+	})
+
+	describe('when the extraction reply is cut off twice', () => {
+		it('should keep what the second reply wrote whole, and end with an answer', async () => {
+			// GIVEN the anchored run, whose first reply is cut off and whose
+			// shorter second reply is cut off too, inside its second person's title
+			cutOffReplies = [
+				null,
+				`{"enrichment": {"location": {"value": "Barcelona", "source_id": "${ANCHOR_CANONICAL}", "quote": "based in Barcelona", "confidence": 1}}, "contacts": [{"name": "Ana Puig", "role": {"value": "CEO", "source_id": "${ANCHOR_CANONICAL}", "quote": "Ana Puig, CEO", "confidence": 1}}, {"name": "Jordi Vila", "role": {"value": "CTO"`,
+			]
+
+			// WHEN the run goes through
+			const { status, row } = await runWith(
+				instructionsWith([SITES]),
+				`Acme Attributes Logistics, ${ANCHOR_HOST}`,
+			)
+
+			// THEN both cuts were served, the run ended with an answer marked as
+			// one to look at, the answer says its reply was cut, and the value
+			// that arrived whole is what it holds
+			expect(cutOffReplies).toEqual([])
+			expect(status).toBe('succeeded_low_confidence')
+			const findings = row?.findings as
+				| {
+						enrichment?: { location?: { value?: string } | null }
+						quality?: { reply_cut?: boolean; low_confidence?: boolean }
+				  }
+				| undefined
+			expect(findings?.quality?.reply_cut).toBe(true)
+			expect(findings?.enrichment?.location?.value).toBe('Barcelona')
 		}, 60_000)
 	})
 })
