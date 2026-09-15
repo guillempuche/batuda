@@ -2,11 +2,17 @@ import { Schema } from 'effect'
 
 import { discoveryResultField } from '../discovery-scan'
 import { isPlainObject } from '../guard-shapes'
-import { CompanyEnrichmentV1Schema } from './company-enrichment-v1'
+import {
+	CompanyEnrichmentV1NoAttributesSchema,
+	CompanyEnrichmentV1Schema,
+} from './company-enrichment-v1'
 import { CompetitorScanV1Schema } from './competitor-scan-v1'
 import { ContactDiscoveryV1Schema } from './contact-discovery-v1'
 import { FreeformSchema } from './freeform'
-import { ProspectScanV1Schema } from './prospect-scan-v1'
+import {
+	ProspectScanV1NoAttributesSchema,
+	ProspectScanV1Schema,
+} from './prospect-scan-v1'
 
 // Closed set of server-compiled Effect Schemas. Versioned so schemas can
 // evolve without breaking old runs. The service resolves a name here for
@@ -95,11 +101,14 @@ export const schemaNameFor = (request: {
 
 // Fields every schema carries that are not something to go and find out: they
 // are how a run hands work back to the CRM, and the prompt covers them where it
-// explains that work.
+// explains that work. The attribute values are something to find out, but the
+// prompt asks for them in a block of their own, naming each key, so listing the
+// field here would only repeat the ask without the keys.
 const PLUMBING_FIELDS = new Set([
 	'proposed_updates',
 	'pending_paid_actions',
 	'discovered_existing',
+	'attributes',
 ])
 
 /**
@@ -185,6 +194,45 @@ const NON_SCAN_FOUND_FIELD = {
 	prospect_scan_v1: null,
 } satisfies Record<SchemaName, string | null>
 
+// The kinds of run whose answer has a place for the attribute values an
+// organisation declared: a company profile beside its other blocks, a prospect
+// scan on each company it found. A competitor scan, a hunt for people and a
+// brief have none, so a run of those kinds is asked for no attributes whatever
+// its stack declares. The test next door holds this table to the schemas.
+const FILLS_ATTRIBUTES = {
+	freeform: false,
+	company_enrichment_v1: true,
+	contact_discovery_v1: false,
+	competitor_scan_v1: false,
+	prospect_scan_v1: true,
+} satisfies Record<SchemaName, boolean>
+
+/** Whether a run of this kind has somewhere to put the attribute values. */
+export const schemaFillsAttributes = (schemaName: string): boolean =>
+	isSchemaName(schemaName) && FILLS_ATTRIBUTES[schemaName]
+
+/**
+ * The shape to extract with, given the kind of run and whether this particular
+ * run has any attributes to fill.
+ *
+ * A run whose organisation declared none is handed the same schema minus the
+ * attribute list: a field that is offered gets filled, and every entry a run
+ * with no declarations returns is thrown away again by the guard, so offering
+ * it only spends tokens and invites invention. Every other kind of run has no
+ * such field to begin with, so it gets its plain schema either way.
+ */
+export const extractionSchemaFor = (
+	schemaName: string,
+	fillsAttributes: boolean,
+): Schema.Top | undefined => {
+	const schema = resolveSchema(schemaName)
+	if (schema === undefined || fillsAttributes) return schema
+	if (schemaName === 'company_enrichment_v1')
+		return CompanyEnrichmentV1NoAttributesSchema
+	if (schemaName === 'prospect_scan_v1') return ProspectScanV1NoAttributesSchema
+	return schema
+}
+
 /**
  * Which list a kind of run fills with what it went looking for, or null for a
  * kind that hunts for none. Settled from the run's schema, which never changes,
@@ -230,9 +278,11 @@ export const countPendingProposals = (findings: unknown): number => {
 }
 
 export {
+	CompanyEnrichmentV1NoAttributesSchema,
 	CompanyEnrichmentV1Schema,
 	CompetitorScanV1Schema,
 	ContactDiscoveryV1Schema,
 	FreeformSchema,
+	ProspectScanV1NoAttributesSchema,
 	ProspectScanV1Schema,
 }

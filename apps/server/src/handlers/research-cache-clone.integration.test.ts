@@ -45,6 +45,16 @@ const SNAKE_FINDINGS = {
 }
 
 // Enter app_user org scope for the current transaction, mirroring middleware/org.ts.
+// One declaration, as the resolver hands it to a run.
+const SITES = {
+	key: 'site_count',
+	label: 'Sites',
+	kind: 'number' as const,
+	enumValues: null,
+	unit: 'sites',
+	description: null,
+}
+
 const enterOrgScope = Effect.gen(function* () {
 	const sql = yield* SqlClient.SqlClient
 	yield* sql`SET LOCAL ROLE app_user`
@@ -116,6 +126,8 @@ describe('cloneCacheHitRun', () => {
 							templateIds: [],
 							templateNames: [],
 							templateFingerprint: '',
+							attributeFingerprint: 'attr-fp',
+							attributeDeclarations: [SITES],
 						})
 						if (!cloned) return { clonedId: null, cmp: null }
 						const [cmp] = yield* sql<{
@@ -123,12 +135,16 @@ describe('cloneCacheHitRun', () => {
 							cloneText: string
 							kind: string
 							schemaName: string | null
+							attributeFingerprint: string | null
+							attributeDeclarations: unknown
 						}>`
 							SELECT
 								(c.findings = s.findings) AS eq,
 								c.findings::text AS clone_text,
 								c.kind AS kind,
-								c.schema_name AS schema_name
+								c.schema_name AS schema_name,
+								c.attribute_fingerprint AS attribute_fingerprint,
+								c.attribute_declarations AS attribute_declarations
 							FROM research_runs c, research_runs s
 							WHERE c.id = ${cloned.id} AND s.id = ${sourceId}
 						`
@@ -145,6 +161,10 @@ describe('cloneCacheHitRun', () => {
 			// The clone is recorded as a cache_hit and its findings are jsonb-equal.
 			expect(cmp.kind).toBe('cache_hit')
 			expect(cmp.eq).toBe(true)
+			// AND it carries the attributes it was filed under, so a run restarted
+			// from it asks for the same facts the answer was made for
+			expect(cmp.attributeFingerprint).toBe('attr-fp')
+			expect(cmp.attributeDeclarations).toEqual([SITES])
 
 			// AND it is filed under the kind it was reused for. A reused answer that
 			// went down as a different kind from the one that was asked for would be

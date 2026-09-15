@@ -20,6 +20,9 @@
  * any other.
  */
 
+import type { ResearchAttributeDeclaration } from '@batuda/domain'
+
+import { ATTRIBUTES_FIELD } from './attribute-bag'
 import {
 	mergeContacts,
 	normalizeContactName,
@@ -68,9 +71,60 @@ const SCAN_ROW_FIELDS_BY_SCHEMA: Record<string, ReadonlyArray<string>> = {
 	competitor_scan_v1: ['website'],
 }
 
-/** The facts worth searching for on one company this kind of scan found. */
-export const scanRowFields = (schemaName: string): ReadonlyArray<string> =>
-	SCAN_ROW_FIELDS_BY_SCHEMA[schemaName] ?? []
+// A declared attribute is read and written under its own key inside the row's
+// `attributes` map, so it is named here as a path into that map.
+const ATTRIBUTE_PATH = `${ATTRIBUTES_FIELD}.`
+
+/** The field name a declared attribute goes by among a row's facts. */
+export const attributeField = (key: string): string => `${ATTRIBUTE_PATH}${key}`
+
+const attributeKeyOf = (field: string): string | undefined =>
+	field.startsWith(ATTRIBUTE_PATH)
+		? field.slice(ATTRIBUTE_PATH.length)
+		: undefined
+
+/** What a row holds under a field name, reading into the attribute map for one. */
+export const readRowField = (
+	row: Record<string, unknown>,
+	field: string,
+): unknown => {
+	const key = attributeKeyOf(field)
+	if (key === undefined) return row[field]
+	const map = row[ATTRIBUTES_FIELD]
+	return isPlainObject(map) ? map[key] : undefined
+}
+
+// The row with one field written, into the attribute map for an attribute.
+const withRowField = (
+	row: Record<string, unknown>,
+	field: string,
+	value: unknown,
+): Record<string, unknown> => {
+	const key = attributeKeyOf(field)
+	if (key === undefined) return { ...row, [field]: value }
+	const map = row[ATTRIBUTES_FIELD]
+	return {
+		...row,
+		[ATTRIBUTES_FIELD]: {
+			...(isPlainObject(map) ? map : {}),
+			[key]: value,
+		},
+	}
+}
+
+/**
+ * The facts worth searching for on one company this kind of scan found: the
+ * scan's own, then the attributes the organisation declared, after them because
+ * a site is what makes a company reachable and a declared fact is what makes it
+ * worth reaching.
+ */
+export const scanRowFields = (
+	schemaName: string,
+	attributes: ReadonlyArray<ResearchAttributeDeclaration> = [],
+): ReadonlyArray<string> => [
+	...(SCAN_ROW_FIELDS_BY_SCHEMA[schemaName] ?? []),
+	...attributes.map(declaration => attributeField(declaration.key)),
+]
 
 // What a later read can add to somebody a row already names.
 const DETAILS = ['role', 'email', 'phone'] as const
@@ -157,8 +211,13 @@ const SCAN_ROW_FOLD_FIELDS_BY_SCHEMA: Record<string, ReadonlyArray<string>> = {
 }
 
 /** The facts a wider read may fill in on one company this kind of scan found. */
-export const scanRowFoldFields = (schemaName: string): ReadonlyArray<string> =>
-	SCAN_ROW_FOLD_FIELDS_BY_SCHEMA[schemaName] ?? []
+export const scanRowFoldFields = (
+	schemaName: string,
+	attributes: ReadonlyArray<ResearchAttributeDeclaration> = [],
+): ReadonlyArray<string> => [
+	...(SCAN_ROW_FOLD_FIELDS_BY_SCHEMA[schemaName] ?? []),
+	...attributes.map(declaration => attributeField(declaration.key)),
+]
 
 // At most this many extra searches per round for a company profile: an all-empty
 // profile would otherwise fire one per field. Any missing field beyond the cap is
@@ -214,7 +273,19 @@ const hasRowValue = (fieldValue: unknown): boolean => {
 	// A fact that holds a list of things — the pages a company opened in its own
 	// name — has something as soon as it holds one of them.
 	if (Array.isArray(held)) return held.length > 0
+	// A yes or a no is an answer: a declared yes/no attribute set to false is
+	// not a blank to buy again.
+	if (typeof held === 'boolean') return true
 	return typeof held === 'number' && Number.isFinite(held)
+}
+
+// The attribute map on a company profile, or nothing when it holds none.
+const attributesOf = (
+	findings: unknown,
+): Record<string, unknown> | undefined => {
+	if (!isPlainObject(findings)) return undefined
+	const map = findings[ATTRIBUTES_FIELD]
+	return isPlainObject(map) ? map : undefined
 }
 
 const enrichmentOf = (
@@ -261,7 +332,10 @@ export const needsPerFieldSearch = (args: {
 	readonly schemaName: string
 	/** The subject's own name, used for a company profile's single subject. */
 	readonly subjectName: string
+	/** The attributes the organisation declared for this run, each a fact to find. */
+	readonly attributes?: ReadonlyArray<ResearchAttributeDeclaration>
 }): ReadonlyArray<RescueTarget> => {
+	const attributes = args.attributes ?? []
 	// The schema decides which shape to read, not whether a list happens to hold
 	// anything: a scan that came back with nothing is still a scan, and reading it
 	// as a profile would search for facts it has nowhere to put.
@@ -277,9 +351,10 @@ export const needsPerFieldSearch = (args: {
 		// gets a headcount. Company by company would hand a whole round to whoever
 		// the list happens to name first.
 		const targets: RescueTarget[] = []
-		for (const field of scanRowFields(args.schemaName)) {
+		for (const field of scanRowFields(args.schemaName, attributes)) {
 			for (const { name, row } of named) {
-				if (!hasRowValue(row[field])) targets.push({ name, field })
+				if (!hasRowValue(readRowField(row, field)))
+					targets.push({ name, field })
 			}
 		}
 		return targets
@@ -288,10 +363,15 @@ export const needsPerFieldSearch = (args: {
 	// would only pay for an answer with nowhere to go.
 	if (enrichmentOf(args.findings) === undefined) return []
 	const missing = new Set(enrichmentFill(args.findings).missing)
-	return HIGH_VALUE_FIELDS.filter(field => missing.has(field)).map(field => ({
-		name: args.subjectName,
-		field,
-	}))
+	const held = attributesOf(args.findings) ?? {}
+	return [
+		...HIGH_VALUE_FIELDS.filter(field => missing.has(field)),
+		// A declared attribute nothing answered yet is a blank worth a search, the
+		// same as any high-value field; one already holding a value is not.
+		...attributes
+			.filter(declaration => !hasRowValue(held[declaration.key]))
+			.map(declaration => attributeField(declaration.key)),
+	].map(field => ({ name: args.subjectName, field }))
 }
 
 /**
@@ -308,7 +388,7 @@ export const needsPerFieldSearch = (args: {
 export const rowsMissing = (
 	rows: ReadonlyArray<Record<string, unknown>>,
 	field: string,
-): number => rows.filter(row => !hasRowValue(row[field])).length
+): number => rows.filter(row => !hasRowValue(readRowField(row, field))).length
 
 /** How many searches one round may fire for this shape of run. */
 export const perFieldSearchCap = (schemaName: string): number =>
@@ -376,14 +456,18 @@ const FIELD_INTENT: Record<string, string> = {
 /**
  * A focused web-search query for one missing fact: the company name (quoted so
  * search treats it as a phrase), the city if one was queried, and the fact wanted.
- * Example: `"Acme Corp" Barcelona number of employees`.
+ * Example: `"Acme Corp" Barcelona number of employees`. A declared attribute is
+ * asked for by its label, which is the words a person would search with.
  */
 export const perFieldSearchQuery = (
 	name: string,
 	city: string | undefined,
 	field: string,
+	attributes: ReadonlyArray<ResearchAttributeDeclaration> = [],
 ): string => {
-	const intent = FIELD_INTENT[field] ?? field
+	const key = attributeKeyOf(field)
+	const label = attributes.find(declaration => declaration.key === key)?.label
+	const intent = label ?? FIELD_INTENT[field] ?? field
 	const cityPart = city && city.trim() !== '' ? ` ${city.trim()}` : ''
 	return `"${name.trim()}"${cityPart} ${intent}`
 }
@@ -487,6 +571,7 @@ const mergeScanRows = (
 	findings: unknown,
 	refreshed: unknown,
 	runWords: RunWords,
+	attributes: ReadonlyArray<ResearchAttributeDeclaration>,
 ): PerFieldMerge => {
 	const field = discoveryResultField(schemaName)
 	const known = scanRowsOf(schemaName, findings)
@@ -529,11 +614,14 @@ const mergeScanRows = (
 			.map(key => foundByKey.get(key))
 			.find(found => found !== undefined)
 		if (match === undefined) return row
-		const next: Record<string, unknown> = { ...row }
+		let next: Record<string, unknown> = { ...row }
 		let filledHere = 0
-		for (const key of scanRowFoldFields(schemaName)) {
-			if (!hasRowValue(row[key]) && hasRowValue(match[key])) {
-				next[key] = match[key]
+		for (const rowField of scanRowFoldFields(schemaName, attributes)) {
+			if (
+				!hasRowValue(readRowField(row, rowField)) &&
+				hasRowValue(readRowField(match, rowField))
+			) {
+				next = withRowField(next, rowField, readRowField(match, rowField))
 				filledHere++
 			}
 		}
@@ -657,9 +745,10 @@ export const mergePerFieldSearch = (
 	refreshed: unknown,
 	schemaName: string,
 	runWords: RunWords,
+	attributes: ReadonlyArray<ResearchAttributeDeclaration> = [],
 ): PerFieldMerge => {
 	if (isDiscoveryScan(schemaName)) {
-		return mergeScanRows(schemaName, findings, refreshed, runWords)
+		return mergeScanRows(schemaName, findings, refreshed, runWords, attributes)
 	}
 	const enrichment = enrichmentOf(findings)
 	const refreshedEnrichment = enrichmentOf(refreshed)
@@ -672,6 +761,23 @@ export const mergePerFieldSearch = (
 		if (!hasValue(enrichment[key]) && hasValue(refreshedEnrichment[key])) {
 			nextEnrichment[key] = refreshedEnrichment[key]
 			filled++
+		}
+	}
+	// A declared attribute is filled in the same way: only where the first pass
+	// left it empty, and only with a value the wider read grounded.
+	const heldAttributes = attributesOf(findings)
+	const foundAttributes = attributesOf(refreshed)
+	const nextAttributes: Record<string, unknown> = { ...(heldAttributes ?? {}) }
+	if (foundAttributes !== undefined) {
+		for (const declaration of attributes) {
+			const key = declaration.key
+			if (
+				!hasRowValue(nextAttributes[key]) &&
+				hasRowValue(foundAttributes[key])
+			) {
+				nextAttributes[key] = foundAttributes[key]
+				filled++
+			}
 		}
 	}
 	const known = contactsOf(findings)
@@ -692,6 +798,9 @@ export const mergePerFieldSearch = (
 		findings: {
 			...(findings as object),
 			enrichment: nextEnrichment,
+			...(Object.keys(nextAttributes).length > 0
+				? { [ATTRIBUTES_FIELD]: nextAttributes }
+				: {}),
 			...(contactsChanged ? { contacts } : {}),
 		},
 		filled,

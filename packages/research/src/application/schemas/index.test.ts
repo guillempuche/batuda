@@ -1,18 +1,27 @@
 import { Schema } from 'effect'
+import { Tool } from 'effect/unstable/ai'
 import { describe, expect, it } from 'vitest'
 
 import { discoveryResultField } from '../discovery-scan'
 import {
+	CompanyEnrichmentV1NoAttributesSchema,
+	CompanyEnrichmentV1Schema,
 	countFoundRows,
 	countPendingProposals,
+	extractionSchemaFor,
 	isSchemaName,
 	resolveSchema,
 	SchemaNameSchema,
 	schemaFieldNames,
+	schemaFillsAttributes,
 	schemaNameFor,
 	schemaNames,
 	schemaRegistry,
 } from './index'
+
+// A struct's own field names, as the schema holds them.
+const fieldsOf = (schema: unknown): Record<string, unknown> =>
+	(schema as { fields: Record<string, unknown> }).fields
 
 // Decode through the canonical JSON codec, the way the HTTP route and the MCP
 // tools run a caller's schema_name.
@@ -38,6 +47,9 @@ describe('schemaFieldNames', () => {
 			// is nothing inside a verdict to go and find
 			expect(names).toContain('verdict')
 			expect(names).toContain('verdict_rationale')
+			// AND the attribute values are left out: the prompt asks for them in a
+			// block of their own that names each key
+			expect(names.some(name => name.startsWith('attributes'))).toBe(false)
 		})
 	})
 
@@ -80,6 +92,142 @@ describe('schemaFieldNames', () => {
 	describe('when the schema is not one we know', () => {
 		it('should return nothing rather than fail a run', () => {
 			expect(schemaFieldNames('made_up_v9')).toEqual([])
+		})
+	})
+})
+
+describe('schemaFillsAttributes', () => {
+	// Whether a shape, anywhere inside it, has a field called `attributes`.
+	const hasAttributesField = (node: unknown): boolean => {
+		if (typeof node !== 'object' || node === null) return false
+		const record = node as Record<string, unknown>
+		const properties = record['properties']
+		if (typeof properties === 'object' && properties !== null) {
+			if ('attributes' in properties) return true
+			if (Object.values(properties).some(hasAttributesField)) return true
+		}
+		for (const key of ['items', 'additionalProperties']) {
+			if (hasAttributesField(record[key])) return true
+		}
+		for (const key of ['anyOf', 'oneOf', 'allOf']) {
+			const members = record[key]
+			if (Array.isArray(members) && members.some(hasAttributesField))
+				return true
+		}
+		const defs = record['$defs']
+		return (
+			typeof defs === 'object' &&
+			defs !== null &&
+			Object.values(defs).some(hasAttributesField)
+		)
+	}
+
+	describe('for every kind of run', () => {
+		it('should say yes exactly when the schema has somewhere to put the values', () => {
+			// GIVEN each schema as the model is shown it
+			for (const [name, schema] of Object.entries(schemaRegistry)) {
+				const shape = Tool.getJsonSchemaFromSchema(schema)
+				// THEN the table agrees with the shape
+				expect(schemaFillsAttributes(name)).toBe(hasAttributesField(shape))
+			}
+			// AND a name this build does not know fills nothing
+			expect(schemaFillsAttributes('made_up_v9')).toBe(false)
+		})
+	})
+})
+
+describe('extractionSchemaFor', () => {
+	// Whether the shape the model is shown offers an attribute list anywhere.
+	const offersAttributes = (schema: unknown): boolean => {
+		const walk = (node: unknown): boolean => {
+			if (typeof node !== 'object' || node === null) return false
+			const record = node as Record<string, unknown>
+			const properties = record['properties']
+			if (typeof properties === 'object' && properties !== null) {
+				if ('attributes' in properties) return true
+				if (Object.values(properties).some(walk)) return true
+			}
+			for (const key of ['items', 'additionalProperties'])
+				if (walk(record[key])) return true
+			const defs = record['$defs']
+			return (
+				typeof defs === 'object' &&
+				defs !== null &&
+				Object.values(defs).some(walk)
+			)
+		}
+		return walk(Tool.getJsonSchemaFromSchema(schema as Schema.Top))
+	}
+
+	describe('when a run has attributes to fill', () => {
+		it('should hand over the shape that has a place for them', () => {
+			// GIVEN the two kinds of run whose answer can carry attribute values
+			for (const name of ['company_enrichment_v1', 'prospect_scan_v1']) {
+				// THEN the shape is the plain one, attribute list and all
+				expect(extractionSchemaFor(name, true)).toBe(resolveSchema(name))
+				expect(offersAttributes(extractionSchemaFor(name, true))).toBe(true)
+			}
+		})
+	})
+
+	describe('when a run declared no attributes', () => {
+		it('should hand over the same shape without the attribute list', () => {
+			// GIVEN an enrichment, whose list sits beside the profile
+			const enrichment = extractionSchemaFor('company_enrichment_v1', false)
+			// THEN the field is gone, and nothing else with it
+			expect(offersAttributes(enrichment)).toBe(false)
+			expect(Object.keys(fieldsOf(enrichment))).toEqual(
+				Object.keys(fieldsOf(resolveSchema('company_enrichment_v1'))).filter(
+					key => key !== 'attributes',
+				),
+			)
+
+			// GIVEN a scan, whose list sits on each company it found
+			const scan = extractionSchemaFor('prospect_scan_v1', false)
+			// THEN the row keeps every other field and loses that one
+			expect(offersAttributes(scan)).toBe(false)
+			expect(Object.keys(fieldsOf(scan))).toEqual(
+				Object.keys(fieldsOf(resolveSchema('prospect_scan_v1'))),
+			)
+		})
+
+		it('should still read back findings the full shape would read', () => {
+			// GIVEN a profile with no attribute values in it
+			const findings = {
+				enrichment: {
+					industry: { value: 'freight', source_id: 'a', confidence: null },
+				},
+				verdict: 'strong_fit',
+			}
+
+			// WHEN both shapes decode it
+			const full = Schema.decodeUnknownExit(
+				Schema.toCodecJson(CompanyEnrichmentV1Schema),
+			)(findings)
+			const lean = Schema.decodeUnknownExit(
+				Schema.toCodecJson(CompanyEnrichmentV1NoAttributesSchema),
+			)(findings)
+
+			// THEN neither refuses it
+			expect(full._tag).toBe('Success')
+			expect(lean._tag).toBe('Success')
+		})
+	})
+
+	describe('when a run is of a kind that never carries attributes', () => {
+		it('should hand over the plain schema either way', () => {
+			// GIVEN the kinds with no attribute list to leave out
+			for (const name of [
+				'freeform',
+				'competitor_scan_v1',
+				'contact_discovery_v1',
+			]) {
+				// THEN the same schema comes back whatever the run declared
+				expect(extractionSchemaFor(name, false)).toBe(resolveSchema(name))
+				expect(extractionSchemaFor(name, true)).toBe(resolveSchema(name))
+			}
+			// AND a name this build does not know is still nothing
+			expect(extractionSchemaFor('made_up_v9', false)).toBeUndefined()
 		})
 	})
 })

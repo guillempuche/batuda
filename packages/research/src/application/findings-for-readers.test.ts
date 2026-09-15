@@ -33,6 +33,37 @@ describe('forReaders', () => {
 		})
 	})
 
+	describe('when a run carries the attributes it was asked for', () => {
+		it('should give each value under its key and the page beside it', () => {
+			// GIVEN the map the fold and the guard leave behind
+			const flat = forReaders({
+				attributes: {
+					site_count: {
+						value: 12,
+						source_id: 'https://acme.example/about',
+						quote: '12 premises',
+						confidence: null,
+					},
+				},
+			})
+
+			// THEN a reader finds the value under the key and its page in the
+			// evidence map beside it, the same way as every other paired field
+			expect(flat).toEqual({
+				attributes: {
+					site_count: 12,
+					evidence: {
+						site_count: {
+							source_id: 'https://acme.example/about',
+							quote: '12 premises',
+							confidence: null,
+						},
+					},
+				},
+			})
+		})
+	})
+
 	describe('when a run was stored before the field was paired', () => {
 		it('should hand the row back untouched', () => {
 			// GIVEN a row written when every field was bare

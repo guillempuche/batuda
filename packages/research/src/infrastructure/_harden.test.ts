@@ -14,7 +14,7 @@ import type { LanguageModel } from 'effect/unstable/ai'
 import { AiError } from 'effect/unstable/ai'
 import { describe, expect, it } from 'vitest'
 
-import { ProviderError } from '../domain/errors'
+import { ProviderError, RESPONSE_CUT_OFF } from '../domain/errors'
 import { hardenLanguageModel, withFallbackLanguageModel } from './_harden'
 
 // ── Test helpers ──
@@ -98,6 +98,38 @@ const mkToolCallRefusedError = (): AiError.AiError =>
 			},
 		}),
 	})
+
+// A structured reply that ended before its JSON closed — what a vendor sends
+// when the model runs past the most it may write — beside one that closed but
+// did not fit the schema.
+const mkStructuredOutputError = (responseText: string): AiError.AiError =>
+	new AiError.AiError({
+		module: 'test',
+		method: 'generateObject',
+		reason: new AiError.StructuredOutputError({
+			description:
+				'Structured output validation failed: Expected a valid JSON object',
+			responseText,
+		}),
+	})
+
+const CUT_OFF_REPLY = '{"enrichment": {"industry": {"value": "logis'
+const MISFIT_REPLY = '{"enrichment": {"industry": 7}}'
+
+// Counts generateObject calls the way makeStubLm counts generateText ones.
+const makeObjectStub = (
+	counterRef: Ref.Ref<number>,
+	impl: (attempt: number) => Effect.Effect<unknown, AiError.AiError>,
+): LanguageModel.Service =>
+	({
+		generateText: () => Effect.succeed({}),
+		generateObject: () =>
+			Effect.gen(function* () {
+				const n = yield* Ref.updateAndGet(counterRef, x => x + 1)
+				return yield* impl(n)
+			}),
+		streamText: () => Effect.succeed({}),
+	}) as unknown as LanguageModel.Service
 
 const mkRateLimitError = (retryAfter: Duration.Duration): AiError.AiError =>
 	new AiError.AiError({
@@ -219,6 +251,119 @@ describe('hardenLanguageModel', () => {
 		// AND exactly one attempt was recorded — no retries on non-recoverable errors
 		expect(Exit.isFailure(exit)).toBe(true)
 		expect(Ref.getUnsafe(attemptsRef)).toBe(1)
+	})
+
+	it('should not retry a structured reply that ended before its JSON closed, and say so', async () => {
+		// GIVEN a stub whose every reply is cut off mid-JSON
+		const attemptsRef = Ref.makeUnsafe(0)
+		const stub = makeObjectStub(attemptsRef, () =>
+			Effect.fail(mkStructuredOutputError(CUT_OFF_REPLY)),
+		)
+		const hardened = hardenLanguageModel(stub, 'together')
+
+		// WHEN generateObject is invoked
+		const exit = await runWithVirtualClock(() => invokeGenerateObject(hardened))
+
+		// THEN it is asked once, and the error names the cut-off as not recoverable
+		expect(Ref.getUnsafe(attemptsRef)).toBe(1)
+		const err = failureOf(exit)
+		expect(err).toBeInstanceOf(ProviderError)
+		expect((err as ProviderError).reason).toBe(RESPONSE_CUT_OFF)
+		expect((err as ProviderError).recoverable).toBe(false)
+	})
+
+	it('should still retry a structured reply that closed but did not fit', async () => {
+		// GIVEN a stub whose reply parses and fails the schema
+		const attemptsRef = Ref.makeUnsafe(0)
+		const stub = makeObjectStub(attemptsRef, () =>
+			Effect.fail(mkStructuredOutputError(MISFIT_REPLY)),
+		)
+		const hardened = hardenLanguageModel(stub, 'together')
+
+		// WHEN generateObject is invoked
+		const exit = await runWithVirtualClock(() => invokeGenerateObject(hardened))
+
+		// THEN it is retried, since the next reply may fit, and the error keeps
+		// the provider client's own reason
+		expect(Ref.getUnsafe(attemptsRef)).toBeGreaterThan(1)
+		const err = failureOf(exit)
+		expect((err as ProviderError).reason).toBe('StructuredOutputError')
+		expect((err as ProviderError).recoverable).toBe(true)
+	})
+
+	it('should still retry a reply that was never JSON: a fenced block, an empty body', async () => {
+		// GIVEN replies that fail to parse without having been cut off
+		for (const reply of [
+			'```json\n{"a": 1}\n```',
+			'',
+			'I cannot help with that.',
+		]) {
+			const attemptsRef = Ref.makeUnsafe(0)
+			const stub = makeObjectStub(attemptsRef, () =>
+				Effect.fail(mkStructuredOutputError(reply)),
+			)
+			const hardened = hardenLanguageModel(stub, 'together')
+
+			// WHEN generateObject is invoked
+			const exit = await runWithVirtualClock(() =>
+				invokeGenerateObject(hardened),
+			)
+
+			// THEN it is retried like any misfit, since a second try or the next
+			// vendor may answer properly
+			expect(Ref.getUnsafe(attemptsRef)).toBeGreaterThan(1)
+			expect((failureOf(exit) as ProviderError).reason).toBe(
+				'StructuredOutputError',
+			)
+		}
+	})
+
+	it('should write the reason the model stopped, and warn when the ceiling cut it', async () => {
+		// GIVEN one reply the vendor cut at the ceiling and one that stopped by itself
+		for (const [finishReason, warned] of [
+			['length', 1],
+			['stop', 0],
+		] as const) {
+			const attemptsRef = Ref.makeUnsafe(0)
+			const stub = makeStubLm(attemptsRef, () =>
+				Effect.succeed({ text: 'x', usage: {}, finishReason }),
+			)
+			const hardened = hardenLanguageModel(stub, 'together', {
+				tier: 'extract',
+			})
+			const logs: Array<LoggedLine> = []
+
+			// WHEN generateText is invoked
+			await runWithVirtualClock(() =>
+				invokeGenerateText(hardened).pipe(Effect.provide(capturedLogs(logs))),
+			)
+
+			// THEN a cut reply is logged under the field it is read by, a whole one
+			// is not
+			const truncated = logs.filter(
+				line => line.message === 'llm.output_truncated',
+			)
+			expect(truncated).toHaveLength(warned)
+			if (warned === 1)
+				expect(truncated[0]?.annotations).toMatchObject({
+					event: 'llm.output_truncated',
+					provider: 'together',
+					tier: 'extract',
+				})
+		}
+	})
+
+	it("should carry the provider client's own reason on every other failure", async () => {
+		// GIVEN a stub failing on the network
+		const attemptsRef = Ref.makeUnsafe(0)
+		const stub = makeStubLm(attemptsRef, () => Effect.fail(mkNetworkError()))
+		const hardened = hardenLanguageModel(stub, 'together')
+
+		// WHEN generateText is invoked and gives up
+		const exit = await runWithVirtualClock(() => invokeGenerateText(hardened))
+
+		// THEN the error says what kind of failure it was
+		expect((failureOf(exit) as ProviderError).reason).toBe('NetworkError')
 	})
 
 	it('should stay quiet about retrying when it did not retry', async () => {
@@ -561,6 +706,32 @@ describe('withFallbackLanguageModel', () => {
 		// AND slot 1 was never tapped
 		expect(Exit.isSuccess(exit)).toBe(true)
 		expect(Ref.getUnsafe(callsRef)).toEqual(['a'])
+	})
+
+	it('should not hand a reply cut off mid-answer to the next slot', async () => {
+		// GIVEN slot 0 answering with a reply cut off mid-JSON, slot 1 ready
+		const firstRef = Ref.makeUnsafe(0)
+		const secondRef = Ref.makeUnsafe(0)
+		const slot0 = hardenLanguageModel(
+			makeObjectStub(firstRef, () =>
+				Effect.fail(mkStructuredOutputError(CUT_OFF_REPLY)),
+			),
+			'together',
+		)
+		const slot1 = hardenLanguageModel(
+			makeObjectStub(secondRef, () => Effect.succeed({ value: {} })),
+			'fireworks',
+		)
+		const composed = withFallbackLanguageModel([slot0, slot1])
+
+		// WHEN the composed model is invoked
+		const exit = await runWithVirtualClock(() => invokeGenerateObject(composed))
+
+		// THEN the cut-off surfaces as it is and slot 1 is never asked, since it
+		// would write the same reply and cut it at the same place
+		expect((failureOf(exit) as ProviderError).reason).toBe(RESPONSE_CUT_OFF)
+		expect(Ref.getUnsafe(firstRef)).toBe(1)
+		expect(Ref.getUnsafe(secondRef)).toBe(0)
 	})
 
 	it('should fall back to the next slot after the primary exhausts its retries', async () => {

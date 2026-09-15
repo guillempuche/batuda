@@ -1,8 +1,11 @@
 import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
 
+import type { ResearchAttributeDeclaration } from '@batuda/domain'
+
 import { discoveryRows } from './discovery-scan'
 import {
+	attributeField,
 	HIGH_VALUE_FIELDS,
 	MAX_PER_FIELD_SEARCHES,
 	MAX_SCAN_ROW_SEARCHES,
@@ -13,6 +16,7 @@ import {
 	perFieldSearchQuery,
 	perFieldSearchRound,
 	type RescueTarget,
+	readRowField,
 	roundChangedNothing,
 	rowsMissing,
 	scanRowFields,
@@ -347,6 +351,19 @@ describe('needsPerFieldSearch', () => {
 })
 
 describe('rowsMissing', () => {
+	describe('when the fact is a declared attribute', () => {
+		it("should read into each row's map", () => {
+			// GIVEN a row holding the attribute, one with no map, one with an empty map
+			const rows = [
+				{ name: 'A', attributes: { site_count: { value: 3 } } },
+				{ name: 'B' },
+				{ name: 'C', attributes: {} },
+			]
+			// THEN two are still short of it
+			expect(rowsMissing(rows, attributeField('site_count'))).toBe(2)
+		})
+	})
+
 	describe('when a scan came back with a list', () => {
 		it('should count the companies still short of the fact', () => {
 			// GIVEN three companies, one of which carries a website
@@ -744,8 +761,8 @@ describe('perFieldSearchQuery', () => {
 	describe('when the field has no known intent', () => {
 		it('should fall back to the raw field name', () => {
 			// GIVEN a field with no phrasing mapped
-			expect(perFieldSearchQuery('Acme', undefined, 'current_tools')).toBe(
-				'"Acme" current_tools',
+			expect(perFieldSearchQuery('Acme', undefined, 'founded_year')).toBe(
+				'"Acme" founded_year',
 			)
 		})
 	})
@@ -1758,6 +1775,215 @@ describe('the people on a company a wider read met again', () => {
 			// WHEN folded — THEN the round is honest about having added nobody
 			expect(merged.contactsChanged).toBe(false)
 			expect(peopleOn(merged.findings)).toHaveLength(1)
+		})
+	})
+})
+
+const SITES: ResearchAttributeDeclaration = {
+	key: 'site_count',
+	label: 'Sites',
+	kind: 'number',
+	enumValues: null,
+	unit: 'sites',
+	description: 'How many premises the business trades from.',
+}
+const BOOKINGS: ResearchAttributeDeclaration = {
+	key: 'takes_bookings',
+	label: 'Takes online bookings',
+	kind: 'boolean',
+	enumValues: null,
+	unit: null,
+	description: null,
+}
+
+describe('the attributes a run was asked for, as facts worth a search', () => {
+	describe('when a scan row lacks a declared attribute', () => {
+		it("should list it after the scan's own facts, and skip a row that holds one", () => {
+			// GIVEN two rows, one holding the attribute, one not, and one with a no
+			const findings = {
+				prospects: [
+					{
+						name: 'Held',
+						website: sourced('https://h.test'),
+						employee_estimate: sourced('4'),
+						location: sourced('x'),
+						attributes: { site_count: { value: 3 } },
+					},
+					{
+						name: 'Empty',
+						website: sourced('https://e.test'),
+						employee_estimate: sourced('4'),
+						location: sourced('x'),
+					},
+					{
+						name: 'Said no',
+						website: sourced('https://n.test'),
+						employee_estimate: sourced('4'),
+						location: sourced('x'),
+						attributes: { takes_bookings: { value: false } },
+					},
+				],
+			}
+
+			// WHEN the gaps are listed with two declarations
+			const targets = needsPerFieldSearch({
+				findings,
+				schemaName: SCAN,
+				subjectName: 'unused',
+				attributes: [SITES, BOOKINGS],
+			})
+
+			// THEN only the empty slots are targets, a no counts as an answer
+			expect(targets).toEqual([
+				{ name: 'Empty', field: 'attributes.site_count' },
+				{ name: 'Said no', field: 'attributes.site_count' },
+				{ name: 'Held', field: 'attributes.takes_bookings' },
+				{ name: 'Empty', field: 'attributes.takes_bookings' },
+			])
+		})
+	})
+
+	describe('when a company profile lacks a declared attribute', () => {
+		it('should list it beside the high-value facts', () => {
+			// GIVEN a full profile with one attribute held and one not
+			const findings = {
+				enrichment: {
+					industry: sourced('x'),
+					country: sourced('ES'),
+					location: sourced('y'),
+					size_range: sourced('1-10'),
+					website: sourced('https://a.test'),
+					email: sourced('a@a.test'),
+					phone: sourced('1'),
+					social_profiles: [],
+				},
+				attributes: { site_count: { value: 3 } },
+			}
+
+			// WHEN the gaps are listed
+			const targets = needsPerFieldSearch({
+				findings,
+				schemaName: PROFILE,
+				subjectName: 'Acme',
+				attributes: [SITES, BOOKINGS],
+			})
+
+			// THEN the missing attribute is the one target
+			expect(targets).toEqual([
+				{ name: 'Acme', field: 'attributes.takes_bookings' },
+			])
+		})
+	})
+
+	describe('when a search is phrased for an attribute', () => {
+		it('should use the label, which is the words a person would search with', () => {
+			expect(
+				perFieldSearchQuery('Acme', 'Girona', attributeField('site_count'), [
+					SITES,
+				]),
+			).toBe('"Acme" Girona Sites')
+			// AND falls back to the field when no declaration explains it
+			expect(
+				perFieldSearchQuery('Acme', undefined, attributeField('site_count')),
+			).toBe('"Acme" attributes.site_count')
+		})
+	})
+
+	describe('when a row is read for an attribute', () => {
+		it('should read into the map, and nothing when there is no map', () => {
+			expect(
+				readRowField(
+					{ attributes: { site_count: 3 } },
+					'attributes.site_count',
+				),
+			).toBe(3)
+			expect(
+				readRowField({ name: 'x' }, 'attributes.site_count'),
+			).toBeUndefined()
+			expect(readRowField({ name: 'x' }, 'name')).toBe('x')
+		})
+	})
+
+	describe('when a wider read found an attribute', () => {
+		it('should fill it on a profile only where it was empty', () => {
+			// GIVEN a profile holding one attribute, and a re-read with both
+			const findings = {
+				enrichment: { country: sourced('ES') },
+				attributes: { site_count: sourced('3') },
+			}
+			const refreshed = {
+				enrichment: { country: sourced('FR') },
+				attributes: {
+					site_count: sourced('9'),
+					takes_bookings: sourced('true'),
+				},
+			}
+
+			// WHEN merged with the declarations
+			const { findings: next, filled } = mergePerFieldSearch(
+				findings,
+				refreshed,
+				PROFILE,
+				noRunWords,
+				[SITES, BOOKINGS],
+			)
+
+			// THEN the held value stands and the empty one is filled
+			expect(
+				(next as { attributes: Record<string, unknown> }).attributes,
+			).toEqual({
+				site_count: sourced('3'),
+				takes_bookings: sourced('true'),
+			})
+			expect(filled).toBe(1)
+		})
+
+		it('should fill it on a scan row the re-read named again', () => {
+			// GIVEN a row without the attribute and a re-read of it with one
+			const findings = { prospects: [{ name: 'Acme', why_relevant: 'x' }] }
+			const refreshed = {
+				prospects: [
+					{
+						name: 'Acme',
+						why_relevant: 'x',
+						attributes: { site_count: sourced('3') },
+					},
+				],
+			}
+
+			// WHEN merged
+			const { findings: next, filled } = mergePerFieldSearch(
+				findings,
+				refreshed,
+				SCAN,
+				noRunWords,
+				[SITES],
+			)
+
+			// THEN the row gains the attribute
+			expect(rowsOf(next)[0]?.['attributes']).toEqual({
+				site_count: sourced('3'),
+			})
+			expect(filled).toBe(1)
+		})
+
+		it('should fill nothing when the run declared no attributes', () => {
+			// GIVEN a re-read carrying an attribute nobody asked for
+			const findings = { enrichment: { country: sourced('ES') } }
+			const refreshed = {
+				enrichment: { country: sourced('ES') },
+				attributes: { site_count: sourced('3') },
+			}
+
+			// WHEN merged without declarations — THEN nothing changes
+			const { findings: next, filled } = mergePerFieldSearch(
+				findings,
+				refreshed,
+				PROFILE,
+				noRunWords,
+			)
+			expect(next).toBe(findings)
+			expect(filled).toBe(0)
 		})
 	})
 })

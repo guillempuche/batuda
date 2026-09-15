@@ -168,6 +168,22 @@ export interface EntitySourceResult {
 }
 
 /**
+ * Whether a cited page was fetched this run AND reads as a different company.
+ * Host-aware: the company's own page passes on its host alone. A page that was
+ * never fetched is never held against the field.
+ */
+export const offEntityPageCheck =
+	(targets: EntityTargets, sourceMeta?: SourceMetaResolver) =>
+	(sourceId: string): boolean => {
+		const meta = sourceMeta?.(sourceId)
+		if (meta === undefined) return false
+		const [verdict] = classifyEntityMatchPerSource(targets, [
+			{ sourceId, text: meta.text, host: meta.host },
+		])
+		return verdict?.match === 'absent'
+	}
+
+/**
  * Apply both per-source checks to an enrichment result. Without `sourceMeta`
  * only the structural namespace block runs; with it, each company field's cited
  * page is also judged for the right company, and a citation that never resolves
@@ -188,16 +204,7 @@ export const guardEntitySources = (
 			droppedUncited: 0,
 		}
 
-	// True only when the cited page was fetched this run AND reads as a different
-	// company. Host-aware: the company's own page passes on its host alone.
-	const isOffEntityPage = (sourceId: string): boolean => {
-		const meta = sourceMeta?.(sourceId)
-		if (meta === undefined) return false
-		const [verdict] = classifyEntityMatchPerSource(targets, [
-			{ sourceId, text: meta.text, host: meta.host },
-		])
-		return verdict?.match === 'absent'
-	}
+	const isOffEntityPage = offEntityPageCheck(targets, sourceMeta)
 
 	let droppedCompanyFields = 0
 	let droppedOffEntity = 0
