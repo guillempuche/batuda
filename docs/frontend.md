@@ -859,7 +859,7 @@ Every list on this page is decided by the server, not assembled in the browser. 
 
 ### Company list (`/companies`)
 
-- Filter bar: stage (pills, several at once), then country, industry, priority, owner, what needs doing, tags, fit verdict and sort (dropdowns)
+- Filter bar: stage (pills, several at once), then country, industry, priority, owner, what needs doing, tags, fit verdict, one declared attribute (which fact, how to compare, what against) and sort (dropdowns)
 - Search input (name)
 - Company cards: name, location, status chip, industry, last contacted date, priority dot
 - Sorted by priority ASC, then last_contacted_at DESC
@@ -868,13 +868,15 @@ Several values inside one filter match any of them; different filters narrow eac
 
 Every filter the list can be narrowed by is reachable from this bar except two, deliberately: the free-form `metadata` key/value pair, whose control would be a query builder, and the map bounding box, which is a viewport's language. Both remain available to agents and to a hand-written link.
 
+The attribute filter is three search params that mean something only together (`attributeKey`, `attributeOp`, `attributeValue`), so the routes drop them as one when any is missing, and the comparison is held to the ones the server knows. The route validator (`src/lib/search-schema.ts`) shadows a param it drops and reads a bare number or boolean as text, because the router merges the raw parsed address under the validated search: without that, a hand-typed `?attributeValue=2` would arrive as the number 2 and crash the control. The control itself keeps only the draft of a filter being chosen; once applied, what it shows is read back from the address.
+
 The bar announces the resulting count through a live region, because every control here changes the list without moving the keyboard — including the two that quietly lift another filter (opening the bin puts down a stage or attention filter, since a deleted company is on none of those lists and the two together would always find nothing).
 
 ### Company detail (`/companies/$slug`)
 
 - Header: name, status chip, priority, location, website/linkedin/instagram links
 - Tabs: Overview | Conversations | People | Files
-- **Overview tab:** all fields, activity timeline, open tasks, upcoming meetings
+- **Overview tab:** all fields, activity timeline, open tasks, upcoming meetings. The About section carries an Attributes group: one editable row per attribute the organisation declares on its research stacks (text, number, choice, yes/no or date), a trail under a value a research run set (the page it was read from, the run, the quote), and a read-only list of values under keys that were since retired. While the declarations are not yet known the values are shown as stored, never as retired, so nothing is offered for clearing by mistake.
 - **Conversations tab:** emails, calls, meetings and logged interactions in one feed
 - **People tab:** the company's contacts; the tab badge counts everyone on file, not the rows fetched
 - **Files tab:** documents, offers and landing pages, each loading further rows as you reach the end of them

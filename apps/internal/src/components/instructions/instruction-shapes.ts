@@ -3,6 +3,8 @@
 // in one place means the personal library, the organization's page, and the
 // pickers all read the same fields the same way.
 
+import { listItems, str } from '#/lib/narrow'
+
 export type TemplateShape = {
 	readonly id: string
 	readonly name: string
@@ -11,10 +13,6 @@ export type TemplateShape = {
 	// When the guidance last changed — worth knowing for a template you follow
 	// but don't maintain.
 	readonly updatedAt: string | null
-}
-
-function str(r: Record<string, unknown>, key: string): string | null {
-	return typeof r[key] === 'string' ? (r[key] as string) : null
 }
 
 export function narrowTemplates(value: unknown): ReadonlyArray<TemplateShape> {
@@ -59,6 +57,8 @@ export type StackComposition = 'replace' | 'extend'
 // A named, ordered stack of templates for one agent. `scope` is derived from
 // ownership — an org-owned stack has no personal owner. `isDefault` marks the
 // one stack that applies to a run naming none (at most one per scope+agent).
+// `researchFillsAttributes` is the switch that lets a research run fill the
+// attributes declared on an org research stack; off until an admin turns it on.
 export type StackShape = {
 	readonly id: string
 	readonly agent: string
@@ -67,6 +67,7 @@ export type StackShape = {
 	readonly composition: StackComposition
 	readonly scope: 'org' | 'personal'
 	readonly templateIds: ReadonlyArray<string>
+	readonly researchFillsAttributes: boolean
 }
 
 function stringArray(value: unknown): ReadonlyArray<string> {
@@ -93,21 +94,15 @@ function narrowStack(row: unknown): StackShape | null {
 		composition,
 		scope: str(r, 'ownerUserId') === null ? 'org' : 'personal',
 		templateIds: stringArray(r['templateIds']),
+		researchFillsAttributes: r['researchFillsAttributes'] === true,
 	}
 }
 
 // listStacks returns `{ items: [...] }`; getStack returns a bare row. Accept
 // either an array or an `{ items }` wrapper and drop rows we can't key on.
 export function narrowStacks(value: unknown): ReadonlyArray<StackShape> {
-	const rows = Array.isArray(value)
-		? value
-		: value &&
-				typeof value === 'object' &&
-				Array.isArray((value as Record<string, unknown>)['items'])
-			? ((value as Record<string, unknown>)['items'] as ReadonlyArray<unknown>)
-			: []
 	const out: Array<StackShape> = []
-	for (const row of rows) {
+	for (const row of listItems(value)) {
 		const stack = narrowStack(row)
 		if (stack !== null) out.push(stack)
 	}

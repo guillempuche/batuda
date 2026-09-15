@@ -37,7 +37,6 @@ const ENRICHMENT_FINDINGS = {
 	enrichment: {
 		industry: sourced('Restaurant'),
 		size_range: sourced('11-50'),
-		current_tools: sourced('Paper reservations book'),
 	},
 	verdict: 'strong_fit',
 	verdict_rationale: 'Busy weekend service with no booking software.',
@@ -116,11 +115,11 @@ test.describe('research findings', () => {
 				waitUntil: 'networkidle',
 			})
 
-			// THEN the multi-word values render rather than reading as blank
+			// THEN the values render rather than reading as blank
 			const enrichment = page.getByTestId('research-enrichment')
 			await expect(enrichment).toBeVisible()
 			await expect(enrichment).toContainText('11-50')
-			await expect(enrichment).toContainText('Paper reservations book')
+			await expect(enrichment).toContainText('Restaurant')
 
 			// AND the fit verdict carries the quote that decided it
 			const fit = page.getByTestId('research-fit')

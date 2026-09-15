@@ -13,24 +13,39 @@ import {
 import { useSetDocumentTitle } from '#/components/layout/top-bar-title'
 import { RunDetail } from '#/components/research/run-detail'
 import { dehydrateAtom, handOverFromServer } from '#/lib/atom-hydration'
+import {
+	dehydrateAttributeDeclarations,
+	fetchAttributeDeclarations,
+} from '#/lib/attribute-declarations'
 import type { BatudaApiServerClient } from '#/lib/batuda-api-server'
 import { listPageQuery } from '#/lib/list-page'
 import { stenciledTitle } from '#/lib/workshop-mixins'
 
 /**
- * The run and its proposed updates, so the detail view and its review paint
- * on first render instead of flashing a spinner.
+ * The run, its proposed updates and the attributes the organisation declares, so
+ * the detail view and its review paint on first render instead of flashing a
+ * spinner. Without the declarations the values a run found would first read as
+ * their bare keys and then rename themselves a moment later.
+ *
+ * All three at once: none of them needs an answer from another, and asked one
+ * after the next the page waits three round trips to paint one frame.
  */
 function loadRunOnServer(client: BatudaApiServerClient, id: string) {
 	return Effect.gen(function* () {
-		const run = yield* client.research.get({ params: { id } })
-		const proposals = yield* client.research.listProposedUpdates({
-			params: { id },
-			// The review screen's own first slice, asked for the same way, so the
-			// browser reuses this answer instead of asking again.
-			query: listPageQuery(runProposedUpdatesFirstPage()),
-		})
-		return { run, proposals }
+		const [run, proposals, attributes] = yield* Effect.all(
+			[
+				client.research.get({ params: { id } }),
+				client.research.listProposedUpdates({
+					params: { id },
+					// The review screen's own first slice, asked for the same way, so the
+					// browser reuses this answer instead of asking again.
+					query: listPageQuery(runProposedUpdatesFirstPage()),
+				}),
+				fetchAttributeDeclarations(client),
+			],
+			{ concurrency: 3 },
+		)
+		return { run, proposals, attributes }
 	})
 }
 
@@ -40,13 +55,14 @@ export const Route = createFileRoute('/_authed/research/$id')({
 			label: 'ResearchRunLoader',
 			empty: { dehydrated: [] },
 			fetch: client => loadRunOnServer(client, id),
-			handOver: ({ run, proposals }) => ({
+			handOver: ({ run, proposals, attributes }) => ({
 				dehydrated: [
 					dehydrateAtom(researchDetailAtom(id), AsyncResult.success(run)),
 					dehydrateAtom(
 						runProposedUpdatesAtom(id, runProposedUpdatesFirstPage()),
 						AsyncResult.success(proposals),
 					),
+					...dehydrateAttributeDeclarations(attributes),
 				],
 			}),
 		}),

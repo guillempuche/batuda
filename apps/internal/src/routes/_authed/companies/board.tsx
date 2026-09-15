@@ -5,6 +5,7 @@ import { styled } from 'next-yak'
 
 import { CommaList } from '@batuda/controllers'
 import {
+	ATTRIBUTE_OPS,
 	AttentionFilter as AttentionFilterSchema,
 	CompanySort as CompanySortSchema,
 } from '@batuda/domain'
@@ -12,7 +13,10 @@ import {
 import { CompaniesHeader } from '#/components/companies/companies-header'
 import { PipelineBoard } from '#/components/companies/pipeline-board'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
-import { companiesSearchToQuery } from '#/lib/companies-search-params'
+import {
+	companiesSearchToQuery,
+	normaliseAttributeFilter,
+} from '#/lib/companies-search-params'
 import { validateSearchWith } from '#/lib/search-schema'
 
 // Either comma-separated text from a link somebody wrote, or the list the router
@@ -24,7 +28,7 @@ const ValueList = Schema.Union([Schema.Array(Schema.NonEmptyString), CommaList])
 // Every one of the others is named here, including what needs doing: a filter
 // left out is not merely unshown, it is dropped, so arriving from a dashboard
 // heading and switching to the board would silently widen the list.
-const validateSearch = validateSearchWith({
+const decodeSearch = validateSearchWith({
 	country: ValueList,
 	industry: Schema.NonEmptyString,
 	priority: Schema.Union([Schema.Number, Schema.NumberFromString]),
@@ -39,7 +43,18 @@ const validateSearch = validateSearchWith({
 	// this route does not name is not merely unshown, it is dropped — so going
 	// from the bin to the board would quietly show the live pipeline instead.
 	deleted: Schema.Literals(['only']),
+	// The attribute filter, carried across as three plain words: which fact, how
+	// to compare, and against what. The comparison is held to the ones the server
+	// knows, so a stale link cannot ask it for one it would refuse.
+	attributeKey: Schema.NonEmptyString,
+	attributeOp: Schema.Literals(ATTRIBUTE_OPS),
+	attributeValue: Schema.NonEmptyString,
 })
+
+// Two of the three params would ask the server for a filter it refuses, so a
+// link that lost one arrives here as no attribute filter at all.
+const validateSearch = (raw: Record<string, unknown>) =>
+	normaliseAttributeFilter(decodeSearch(raw))
 
 export const Route = createFileRoute('/_authed/companies/board')({
 	validateSearch,

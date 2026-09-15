@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { narrowProposedUpdates, strongestChannelTrust } from './proposal-narrow'
+import {
+	narrowProposedUpdates,
+	narrowRunAttributes,
+	strongestChannelTrust,
+} from './proposal-narrow'
 
 // One proposal exactly as a run stores it: the research schema's own names,
 // with the CRM change under `fields`.
@@ -179,6 +183,47 @@ describe('strongestChannelTrust', () => {
 			// THEN there is no verdict to show
 			expect(trust.verification).toBeNull()
 			expect(trust.machineCheckable).toBe(false)
+		})
+	})
+})
+
+describe('narrowRunAttributes [proposal-narrow.ts]', () => {
+	describe('when the run found values under the organisation keys', () => {
+		it('should read each one with the words behind it', () => {
+			// GIVEN a finished run's findings
+			const rows = narrowRunAttributes({
+				attributes: {
+					site_count: 3,
+					evidence: {
+						site_count: {
+							source_id: 'https://calpepfonda.cat/locals',
+							quote: 'Tres locals a Girona',
+						},
+					},
+				},
+				proposed_updates: [],
+			})
+
+			// WHEN read for the review screen — THEN the value and the words behind
+			// it are both there, so a reviewer sees what applying would record
+			expect(rows).toEqual([
+				{
+					key: 'site_count',
+					value: 3,
+					sourceId: 'https://calpepfonda.cat/locals',
+					quote: 'Tres locals a Girona',
+				},
+			])
+		})
+	})
+
+	describe('when the run found none', () => {
+		it('should read as nothing, whatever the findings hold', () => {
+			// GIVEN findings with no attributes, and runs with no findings at all
+			// THEN the review screen has nothing to announce
+			expect(narrowRunAttributes({ proposed_updates: [] })).toEqual([])
+			expect(narrowRunAttributes(null)).toEqual([])
+			expect(narrowRunAttributes('no reliable data')).toEqual([])
 		})
 	})
 })

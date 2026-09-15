@@ -21,6 +21,11 @@ msgstr "—"
 msgid "— Select a company —"
 msgstr "— Tria una empresa —"
 
+#. placeholder {0}: confirming?.label ?? ''
+#: src/components/instructions/attribute-section.tsx
+msgid "\"{0}\" goes off this campaign and runs stop filling it. The values companies already hold stay on their pages."
+msgstr "«{0}» deixa aquesta campanya i les recerques deixen d'omplir-lo. Els valors que les empreses ja tenen es queden a les seves pàgines."
+
 #. placeholder {0}: row.name
 #: src/components/instructions/template-library.tsx
 msgid "\"{0}\" is theirs now, so it has left your library."
@@ -191,6 +196,10 @@ msgstr "No s'han pogut actualitzar {0} fils."
 msgid "{0}: showing {1} of {shelfTotal} tasks."
 msgstr "{0}: es mostren {1} de {shelfTotal} tasques."
 
+#: src/components/instructions/attribute-section.tsx
+msgid "{active} of {ATTRIBUTES_PER_STACK_MAX} active"
+msgstr "{active} de {ATTRIBUTES_PER_STACK_MAX} actius"
+
 #: src/routes/_authed/settings/organization/members.tsx
 msgid "{addedEmail} is now a member. They've been emailed."
 msgstr "{addedEmail} ja és membre. Se li ha enviat un correu."
@@ -199,6 +208,7 @@ msgstr "{addedEmail} ja és membre. Se li ha enviat un correu."
 msgid "{confirmLabel}'s assistant stops reaching this organization on its next request. It keeps working in any other organization they belong to, and they can't undo this themselves."
 msgstr "L'assistent de {confirmLabel} deixarà d'accedir a aquesta organització a la següent petició. Continuarà funcionant a qualsevol altra organització de la qual formi part, i no ho podrà desfer pel seu compte."
 
+#: src/components/companies/attribute-filter.tsx
 #: src/routes/_authed/companies/index.tsx
 #: src/routes/_authed/companies/index.tsx
 #: src/routes/_authed/companies/index.tsx
@@ -335,9 +345,29 @@ msgstr "90%+"
 msgid "A \"Re:\" on a message that answers nothing reads as a forged reply. Reply from the conversation, or drop the \"Re:\"."
 msgstr "Un \"Re:\" en un missatge que no respon res es llegeix com una resposta falsificada. Respon des de la conversa, o treu-li el \"Re:\"."
 
+#: src/components/instructions/attribute-dialog.tsx
+msgid "A fact I record on every company \"{stackName}\" researches."
+msgstr "Una dada que apunto de cada empresa que «{stackName}» investiga."
+
+#: src/components/instructions/attribute-dialog.tsx
+msgid "A fact I record on every company I research."
+msgstr "Una dada que apunto de cada empresa que investigo."
+
 #: src/routes/_authed/index.tsx
 msgid "A high-priority company that has gone quiet is listed once, under Needs attention."
 msgstr "Una empresa prioritària que ha quedat en silenci apareix un sol cop, a Necessita atenció."
+
+#: src/components/instructions/attribute-messages.ts
+msgid "A key is lowercase letters, digits and underscores, starts with a letter, and is at least 2 characters long."
+msgstr "Una clau són lletres minúscules, dígits i guions baixos, comença amb una lletra i té com a mínim 2 caràcters."
+
+#: src/components/instructions/attribute-dialog.tsx
+msgid "A key stays as it was declared, so the values companies already hold keep their name."
+msgstr "Una clau es queda tal com es va declarar, així els valors que les empreses ja tenen conserven el nom."
+
+#: src/components/instructions/attribute-messages.ts
+msgid "A research run already uses that name for something else. Pick another key."
+msgstr "Una recerca ja fa servir aquest nom per a una altra cosa. Tria una altra clau."
 
 #: src/components/instructions/template-dialog.tsx
 msgid "A short label. Start it with a [tag] like [research] to group related templates if you like — the brackets are just part of the name."
@@ -474,6 +504,10 @@ msgstr "Afegeix almenys una plantilla abans de desar."
 #: src/components/emails/attachment-picker.tsx
 msgid "Add attachment"
 msgstr "Afegeix adjunt"
+
+#: src/components/instructions/attribute-section.tsx
+msgid "Add attribute"
+msgstr "Afegeix un atribut"
 
 #: src/components/emails/compose-form.tsx
 msgid "Add Cc / Bcc"
@@ -618,6 +652,10 @@ msgstr "Torna-hi a permetre"
 msgid "Allow again — {memberLabel}'s {assistantLabel}"
 msgstr "Torna a permetre — {assistantLabel} de {memberLabel}"
 
+#: src/components/instructions/attribute-dialog.tsx
+msgid "Allowed values"
+msgstr "Valors permesos"
+
 #. placeholder {0}: change.to
 #: src/components/research/inbox/research-inbox.tsx
 msgid "already {0}"
@@ -668,6 +706,10 @@ msgstr "Pot ser que una altra empresa n'estigui fent servir el nom."
 msgid "Another industry may already go by that name — merge them instead."
 msgstr "Pot ser que ja hi hagi una altra indústria amb aquest nom: fusiona-les."
 
+#: src/components/instructions/attribute-messages.ts
+msgid "Another stack already declares this key with a different kind, unit or choices. Match it or pick another key."
+msgstr "Una altra pila ja declara aquesta clau amb un tipus, una unitat o unes opcions diferents. Iguala-la o tria una altra clau."
+
 #: src/components/research/research-dialog.tsx
 msgid "Any"
 msgstr "Qualsevol"
@@ -676,6 +718,10 @@ msgstr "Qualsevol"
 msgid "Any agent using \"{confirmLabel}\" will stop working. This can't be undone."
 msgstr "Qualsevol agent que faci servir \"{confirmLabel}\" deixarà de funcionar. Això no es pot desfer."
 
+#: src/components/companies/attribute-filter.tsx
+msgid "Any attribute"
+msgstr "Qualsevol atribut"
+
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Any confidence"
 msgstr "Qualsevol confiança"
@@ -683,6 +729,10 @@ msgstr "Qualsevol confiança"
 #: src/routes/_authed/companies/index.tsx
 msgid "Any priority"
 msgstr "Qualsevol prioritat"
+
+#: src/components/companies/attribute-filter.tsx
+msgid "Any value"
+msgstr "Qualsevol valor"
 
 #: src/routes/_authed/companies/index.tsx
 msgid "Anything"
@@ -743,6 +793,10 @@ msgid "Applying a discovered contact merges it into a matching record if one alr
 msgstr "En aplicar un contacte descobert, es fusiona amb un registre coincident si ja existeix."
 
 #: src/components/research/review/proposed-updates-review.tsx
+msgid "Applying also records these attributes from the run's evidence, unless someone set them by hand."
+msgstr "En aplicar-ho també s'apunten aquests atributs a partir de les proves de la recerca, tret que algú els hagi posat a mà."
+
+#: src/components/research/review/proposed-updates-review.tsx
 msgid "Applying also replaces the company's account brief with this run's write-up. Nothing keeps what is there now."
 msgstr "En aplicar-ho també se substitueix el dossier del compte de l'empresa pel resum d'aquesta cerca. No es desa el que hi ha ara."
 
@@ -786,6 +840,7 @@ msgstr "Arxivat — no el continuo"
 msgid "Argues for it inside"
 msgstr "Hi dona suport internament"
 
+#: src/components/companies/attribute-field.tsx
 #: src/components/companies/company-fit-section.tsx
 msgid "as of"
 msgstr "a data de"
@@ -819,9 +874,17 @@ msgstr "Assistent"
 msgid "Assistants this organization has stopped. Allowing one back lets it reach this organization again from its next request, and nothing else — it can never reach an organization its owner has not chosen."
 msgstr "Assistents que aquesta organització ha aturat. Si en tornes a permetre un, podrà accedir a aquesta organització a partir de la petició següent, i a res més: mai no podrà accedir a una organització que el seu propietari no hagi triat."
 
+#: src/components/companies/attribute-filter.tsx
+msgid "at least"
+msgstr "com a mínim"
+
 #: src/components/research/run-detail.tsx
 msgid "At least one of these results needs reading before it is used. Open the ones marked below."
 msgstr "Almenys un d'aquests resultats s'ha de llegir abans de fer-lo servir. Obre els que estan marcats a sota."
+
+#: src/components/companies/attribute-filter.tsx
+msgid "at most"
+msgstr "com a màxim"
 
 #: src/components/emails/attachment-picker.tsx
 msgid "Attach"
@@ -840,6 +903,36 @@ msgstr "Atenció"
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Attention needed"
 msgstr "Requereix atenció"
+
+#: src/components/companies/attribute-filter.tsx
+msgid "Attribute"
+msgstr "Atribut"
+
+#: src/components/companies/attribute-filter.tsx
+msgid "Attribute {chosenKey}"
+msgstr "Atribut {chosenKey}"
+
+#: src/components/companies/attribute-filter.tsx
+msgid "Attribute {chosenKey}, no longer declared"
+msgstr "Atribut {chosenKey}, ja no està declarat"
+
+#: src/components/instructions/attribute-section.tsx
+msgid "Attribute deleted"
+msgstr "Atribut suprimit"
+
+#: src/components/instructions/attribute-dialog.tsx
+msgid "Attribute saved"
+msgstr "Atribut desat"
+
+#: src/components/companies/about-section.tsx
+#: src/components/instructions/attribute-section.tsx
+#: src/components/research/findings/attributes-block.tsx
+msgid "Attributes"
+msgstr "Atributs"
+
+#: src/components/instructions/attribute-section.tsx
+msgid "Attributes belong to a campaign. Create an org stack first."
+msgstr "Els atributs pertanyen a una campanya. Crea primer una pila d'organització."
 
 #: src/routes/_authed/tasks/index.tsx
 msgid "Audit log"
@@ -1050,6 +1143,7 @@ msgstr "Crides"
 #: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/contacts/manage-channels-dialog.tsx
+#: src/components/instructions/attribute-dialog.tsx
 #: src/components/instructions/stack-editor.tsx
 #: src/components/instructions/template-dialog.tsx
 #: src/components/instructions/template-transfer-dialog.tsx
@@ -1149,6 +1243,10 @@ msgstr "ChatGPT i Claude.ai no poden enviar una clau, així que es connecten amb
 msgid "Check your inbox"
 msgstr "Mira la safata d'entrada"
 
+#: src/components/instructions/attribute-messages.ts
+msgid "Choice"
+msgstr "Opció"
+
 #: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Choose organizations"
 msgstr "Tria les organitzacions"
@@ -1166,6 +1264,7 @@ msgstr "Tria algú de la teva organització"
 msgid "Claude Desktop can't reach a remote server directly, so this bridges through <0>mcp-remote</0> (needs Node installed). Or add it as an OAuth connector instead."
 msgstr "Claude Desktop no es pot connectar directament a un servidor remot, així que això fa de pont amb <0>mcp-remote</0> (cal tenir Node instal·lat). O afegeix-lo com a connector OAuth."
 
+#: src/components/companies/attribute-field.tsx
 #: src/components/companies/pipeline-board.tsx
 #: src/components/shared/multi-select-filter.tsx
 #: src/components/shared/task-item.tsx
@@ -1181,6 +1280,10 @@ msgstr "Neteja"
 msgid "Clear filters"
 msgstr "Neteja els filtres"
 
+#: src/components/companies/attribute-filter.tsx
+msgid "Clear the attribute filter"
+msgstr "Treu el filtre d'atribut"
+
 #: src/routes/_authed/settings/organization/templates.tsx
 msgid "Clear the org default"
 msgstr "Esborra el valor per defecte de l'organització"
@@ -1188,6 +1291,10 @@ msgstr "Esborra el valor per defecte de l'organització"
 #: src/routes/_authed/settings/organization/templates.tsx
 msgid "Clear the org default?"
 msgstr "Vols esborrar el valor per defecte de l'organització?"
+
+#: src/components/companies/attribute-field.tsx
+msgid "Clear?"
+msgstr "Esborrar?"
 
 #: src/routes/_authed/emails/$threadId.tsx
 msgid "Clicked"
@@ -1204,6 +1311,7 @@ msgstr "Client"
 #: src/components/companies/where-panel-client.client.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/contacts/manage-channels-dialog.tsx
+#: src/components/instructions/attribute-dialog.tsx
 #: src/components/instructions/template-dialog.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/components/research/research-dialog.tsx
@@ -1258,6 +1366,7 @@ msgstr "Plega"
 msgid "Columns"
 msgstr "Columnes"
 
+#: src/components/companies/attribute-filter.tsx
 #: src/components/emails/compose-form.tsx
 #: src/components/emails/compose-form.tsx
 msgid "Comma-separated"
@@ -1271,6 +1380,10 @@ msgstr "Comunicació"
 #: src/routes/_authed/companies/index.tsx
 msgid "Companies"
 msgstr "Empreses"
+
+#: src/components/instructions/attribute-messages.ts
+msgid "Companies already hold values under this key, so its kind, unit and choices cannot change. Retire it and declare a new key instead."
+msgstr "Hi ha empreses que ja tenen valors sota aquesta clau, així que el tipus, la unitat i les opcions no poden canviar. Retira-la i declara una clau nova."
 
 #: src/routes/_authed/index.tsx
 msgid "Companies marked hot with nothing scheduled at all. One that has also gone quiet is listed above instead, so it is only asked after once."
@@ -1440,6 +1553,10 @@ msgstr "Contactes trobats"
 #: src/routes/_authed/companies/$slug.tsx
 msgid "Contacts loaded: {0}"
 msgstr "Contactes carregats: {0}"
+
+#: src/components/companies/attribute-filter.tsx
+msgid "contains"
+msgstr "conté"
 
 #: src/routes/_authed/emails/inboxes.tsx
 msgid "Content"
@@ -1816,6 +1933,10 @@ msgstr "No s'ha pogut actualitzar aquesta cerca."
 msgid "Could not update verification"
 msgstr "No s'ha pogut actualitzar la verificació"
 
+#: src/components/instructions/attribute-messages.ts
+msgid "Couldn't change the attribute. Please try again."
+msgstr "No s'ha pogut canviar l'atribut. Torna-ho a provar."
+
 #: src/components/emails/compose-form.tsx
 msgid "Couldn't check whether these addresses can receive email. Sending will still be stopped if one of them can't."
 msgstr "No s’ha pogut comprovar si aquestes adreces poden rebre correu. Si alguna no pot, l’enviament es continuarà aturant."
@@ -1849,6 +1970,10 @@ msgstr "No s'ha pogut eliminar la plantilla. Torna-ho a provar."
 msgid "Couldn't hand it over"
 msgstr "No s’ha pogut traspassar"
 
+#: src/components/instructions/attribute-section.tsx
+msgid "Couldn't load the attributes."
+msgstr "No s'han pogut carregar els atributs."
+
 #: src/routes/_authed/settings/organization/templates.tsx
 #: src/routes/_authed/settings/organization/templates.tsx
 msgid "Couldn't load the org stacks."
@@ -1862,10 +1987,15 @@ msgstr "No s'han pogut carregar les teves piles."
 msgid "Couldn't load your templates."
 msgstr "No s'han pogut carregar les teves plantilles."
 
+#: src/components/instructions/attribute-section.tsx
 #: src/components/instructions/stack-editor.tsx
 #: src/components/instructions/stack-editor.tsx
 msgid "Couldn't save"
 msgstr "No s'ha pogut desar"
+
+#: src/components/instructions/attribute-messages.ts
+msgid "Couldn't save the attribute. Please try again."
+msgstr "No s'ha pogut desar l'atribut. Torna-ho a provar."
 
 #: src/components/instructions/stack-editor.tsx
 msgid "Couldn't save the stack. Please try again."
@@ -2012,11 +2142,6 @@ msgstr "Contrasenya actual"
 msgid "Current password is incorrect."
 msgstr "La contrasenya actual no és correcta."
 
-#: src/components/research/findings/company-enrichment-view.tsx
-#: src/components/research/run-labels.ts
-msgid "Current tools"
-msgstr "Eines actuals"
-
 #: src/components/research/inbox/research-inbox.tsx
 msgid "currently"
 msgstr "actualment"
@@ -2033,6 +2158,7 @@ msgstr "Fosc"
 msgid "Dark, high contrast"
 msgstr "Fosc, alt contrast"
 
+#: src/components/instructions/attribute-messages.ts
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Date"
 msgstr "Data"
@@ -2077,8 +2203,9 @@ msgid "Delete"
 msgstr "Elimina"
 
 #. placeholder {0}: company.name
+#. placeholder {0}: row.label
 #. placeholder {0}: row.name
-#. placeholder {0}: stack.name
+#: src/components/instructions/attribute-section.tsx
 #: src/components/instructions/stack-list.tsx
 #: src/components/instructions/template-library.tsx
 #: src/routes/_authed/companies/$slug.tsx
@@ -2106,6 +2233,10 @@ msgstr "Suprimir la bústia {0}? Els missatges desats es mantenen; la connexió 
 #: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Delete key"
 msgstr "Elimina la clau"
+
+#: src/components/instructions/attribute-section.tsx
+msgid "Delete this attribute?"
+msgstr "Vols suprimir aquest atribut?"
 
 #: src/routes/_authed/companies/$slug.tsx
 msgid "Delete this company?"
@@ -2295,6 +2426,18 @@ msgstr "p. ex. fleques independents a Barcelona amb 5–20 treballadors"
 msgid "e.g. Marta Puig"
 msgstr "p. ex. Marta Puig"
 
+#: src/components/instructions/attribute-dialog.tsx
+msgid "e.g. Number of sites"
+msgstr "p. ex. Nombre de locals"
+
+#: src/components/instructions/attribute-dialog.tsx
+msgid "e.g. own fleet, hired, both"
+msgstr "p. ex. flota pròpia, llogada, totes dues"
+
+#: src/components/instructions/attribute-dialog.tsx
+msgid "e.g. Premises the company runs, not the ones it sells to."
+msgstr "p. ex. Locals que l'empresa gestiona, no els que té com a clients."
+
 #: src/routes/_authed/emails/inboxes.tsx
 msgid "e.g. Sales — Acme"
 msgstr "p. ex. Vendes — Acme"
@@ -2303,9 +2446,17 @@ msgstr "p. ex. Vendes — Acme"
 msgid "e.g. Setup fee"
 msgstr "p. ex. Tarifa d'instal·lació"
 
+#: src/components/instructions/attribute-dialog.tsx
+msgid "e.g. sites"
+msgstr "p. ex. locals"
+
 #: src/components/research/research-dialog.tsx
 msgid "e.g. vip, warm"
 msgstr "p. ex. vip, càlid"
+
+#: src/components/instructions/attribute-messages.ts
+msgid "Each word has to be different and no longer than 32 characters."
+msgstr "Cada paraula ha de ser diferent i no fer més de 32 caràcters."
 
 #: src/components/companies/account-brief-section.tsx
 #: src/components/companies/documents-panel.tsx
@@ -2315,8 +2466,10 @@ msgstr "p. ex. vip, càlid"
 msgid "Edit"
 msgstr "Edita"
 
+#. placeholder {0}: row.label
 #. placeholder {0}: row.name
 #. placeholder {0}: stack.name
+#: src/components/instructions/attribute-section.tsx
 #: src/components/instructions/stack-list.tsx
 #: src/components/instructions/template-library.tsx
 msgid "Edit {0}"
@@ -2332,6 +2485,10 @@ msgstr "Edita {0} {1}"
 #: src/components/shared/editable-field.tsx
 msgid "Edit {label}"
 msgstr "Edita {label}"
+
+#: src/components/instructions/attribute-dialog.tsx
+msgid "Edit attribute"
+msgstr "Edita l'atribut"
 
 #: src/components/contacts/contact-edit-dialog.tsx
 msgid "Edit contact"
@@ -2448,9 +2605,17 @@ msgstr "Anglès"
 msgid "Enrichment"
 msgstr "Enriquiment"
 
+#: src/components/companies/attribute-field.tsx
+msgid "Enter a day as YYYY-MM-DD."
+msgstr "Escriu un dia com a AAAA-MM-DD."
+
 #: src/routes/login.tsx
 msgid "Enter a valid email above first."
 msgstr "Primer escriu un correu vàlid a sobre."
+
+#: src/components/companies/attribute-field.tsx
+msgid "Enter a whole or decimal number."
+msgstr "Escriu un nombre enter o decimal."
 
 #: src/routes/_authed/settings/organization/members.tsx
 msgid "Enter an email address."
@@ -2709,6 +2874,10 @@ msgstr "De la reserva"
 msgid "From email"
 msgstr "Del correu"
 
+#: src/components/companies/attribute-field.tsx
+msgid "from research"
+msgstr "de la recerca"
+
 #: src/components/shared/task-item.tsx
 msgid "From webhook"
 msgstr "Del webhook"
@@ -2737,6 +2906,10 @@ msgstr "General"
 #: src/routes/_authed/settings/mcp/index.tsx
 msgid "Give an AI assistant access to this organization's CRM. Chat apps like ChatGPT and Claude.ai connect over OAuth; coding tools use an API key."
 msgstr "Dona a un assistent d'IA accés al CRM d'aquesta organització. Les aplicacions de xat com ChatGPT i Claude.ai es connecten amb OAuth; les eines de programació fan servir una clau API."
+
+#: src/components/instructions/attribute-messages.ts
+msgid "Give the attribute a name."
+msgstr "Posa un nom a l'atribut."
 
 #: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Give the key a name so you can recognize it later."
@@ -2811,6 +2984,10 @@ msgstr "Prioritat alta"
 msgid "Holds the budget"
 msgstr "Té el pressupost"
 
+#: src/components/instructions/attribute-dialog.tsx
+msgid "How a value is read and filtered. It cannot change once companies hold values under this key."
+msgstr "Com es llegeix i es filtra un valor. No pot canviar quan hi ha empreses amb valors sota aquesta clau."
+
 #. placeholder {0}: ch.value
 #: src/components/contacts/manage-channels-dialog.tsx
 msgid "How far {0} is trusted"
@@ -2819,6 +2996,10 @@ msgstr "Fins a quin punt es confia en {0}"
 #: src/components/instructions/stack-editor.tsx
 msgid "How this stack uses the org default"
 msgstr "Com fa servir aquesta pila el valor per defecte de l'organització"
+
+#: src/components/companies/attribute-filter.tsx
+msgid "How to compare"
+msgstr "Com comparar"
 
 #: src/components/research/run-detail.tsx
 msgid "I couldn't confirm the company's own website, so the findings weren't reliable enough to keep."
@@ -2876,6 +3057,10 @@ msgstr "Port IMAP"
 #: src/routes/_authed/emails/inboxes.tsx
 msgid "IMAP security"
 msgstr "Seguretat IMAP"
+
+#: src/components/instructions/attribute-section.tsx
+msgid "Inactive"
+msgstr "Inactiu"
 
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/routes/_authed/emails/index.tsx
@@ -2984,6 +3169,14 @@ msgstr "Interessat"
 msgid "Invalid"
 msgstr "No vàlid"
 
+#: src/components/companies/attribute-filter.tsx
+msgid "is"
+msgstr "és"
+
+#: src/components/companies/attribute-filter.tsx
+msgid "is one of"
+msgstr "és un de"
+
 #: src/routes/_authed/settings/mcp/connections.tsx
 msgid "It can no longer reach this organization."
 msgstr "Ja no pot accedir a aquesta organització."
@@ -3025,6 +3218,11 @@ msgstr "Valora si funciona"
 msgid "Just a note to yourself — it changes nothing about how the mailbox works. Up to 200 characters."
 msgstr "Només és una nota per a tu: no canvia res del funcionament de la bústia. Fins a 200 caràcters."
 
+#. placeholder {0}: row.label
+#: src/components/instructions/attribute-section.tsx
+msgid "Keep {0} active"
+msgstr "Mantén {0} actiu"
+
 #: src/components/instructions/template-dialog.tsx
 msgid "Keep editing"
 msgstr "Continua editant"
@@ -3032,6 +3230,14 @@ msgstr "Continua editant"
 #: src/components/research/run-actions.tsx
 msgid "Keep it"
 msgstr "Conserva-la"
+
+#: src/components/companies/attribute-field.tsx
+msgid "Keep this to {ATTRIBUTE_TEXT_MAX} characters or fewer."
+msgstr "No passis de {ATTRIBUTE_TEXT_MAX} caràcters."
+
+#: src/components/instructions/attribute-dialog.tsx
+msgid "Key"
+msgstr "Clau"
 
 #: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Key deleted"
@@ -3047,6 +3253,7 @@ msgstr "Les claus permeten que els agents d'IA i els clients MCP actuïn en nom 
 
 #: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/contacts/manage-channels-dialog.tsx
+#: src/components/instructions/attribute-dialog.tsx
 msgid "Kind"
 msgstr "Tipus"
 
@@ -3135,6 +3342,10 @@ msgstr "Oportunitats trobades"
 msgid "Let mail through again"
 msgstr "Deixa passar el correu"
 
+#: src/components/instructions/stack-editor.tsx
+msgid "Let research runs fill this stack's attributes"
+msgstr "Deixa que les recerques omplin els atributs d'aquesta pila"
+
 #: src/components/profile/theme-select.tsx
 msgid "Light"
 msgstr "Clar"
@@ -3153,6 +3364,10 @@ msgstr "LinkedIn"
 #: src/components/companies/companies-header.tsx
 msgid "List"
 msgstr "Llista"
+
+#: src/components/instructions/attribute-messages.ts
+msgid "List the words this fact may take, separated by commas."
+msgstr "Escriu les paraules que pot prendre aquesta dada, separades per comes."
 
 #: src/components/research/run-detail.tsx
 msgid "Live updates have stopped. The run may still be working."
@@ -3190,6 +3405,10 @@ msgstr "S'estan carregant les execucions…"
 #: src/routes/_authed/tasks/index.tsx
 msgid "Loading tasks…"
 msgstr "S'estan carregant les tasques…"
+
+#: src/components/instructions/attribute-section.tsx
+msgid "Loading the attributes…"
+msgstr "S'estan carregant els atributs…"
 
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Loading the changes waiting for review."
@@ -3287,6 +3506,10 @@ msgstr "Baixa"
 #: src/components/shared/task-item.tsx
 msgid "Low priority"
 msgstr "Prioritat baixa"
+
+#: src/components/instructions/attribute-dialog.tsx
+msgid "Lowercase letters, digits and underscores, e.g. site_count. It cannot change later."
+msgstr "Lletres minúscules, dígits i guions baixos, p. ex. site_count. No es pot canviar després."
 
 #. placeholder {0}: blocked.recipient
 #: src/components/emails/compose-form.tsx
@@ -3552,6 +3775,7 @@ msgstr "Les meves piles"
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/contacts/manage-channels-dialog.tsx
+#: src/components/instructions/attribute-dialog.tsx
 #: src/components/instructions/stack-editor.tsx
 #: src/components/instructions/template-dialog.tsx
 #: src/routes/_authed/emails/inboxes.tsx
@@ -3631,6 +3855,10 @@ msgstr "Mai utilitzada"
 msgid "New"
 msgstr "Nova"
 
+#: src/components/instructions/attribute-dialog.tsx
+msgid "New attribute"
+msgstr "Atribut nou"
+
 #: src/routes/_authed/companies/$slug.tsx
 msgid "New client — set the next action (kick off onboarding)."
 msgstr "Client nou — defineix la següent acció (inicia l'onboarding)."
@@ -3696,6 +3924,14 @@ msgstr "Pròxim esdeveniment"
 msgid "Next: {0}"
 msgstr "Següent: {0}"
 
+#: src/components/companies/attribute-field.tsx
+#: src/components/companies/attribute-field.tsx
+#: src/components/companies/attribute-field.tsx
+#: src/components/companies/attribute-filter.tsx
+#: src/components/research/findings/attributes-block.tsx
+msgid "No"
+msgstr "No"
+
 #: src/components/layout/org-switcher.tsx
 msgid "No active organization"
 msgstr "Sense organització activa"
@@ -3711,6 +3947,14 @@ msgstr "Sense organització activa. Tria'n una al selector de la barra superior.
 #: src/routes/_authed/companies/$slug.tsx
 msgid "No activity yet"
 msgstr "Encara no hi ha activitat"
+
+#: src/components/companies/about-section.tsx
+msgid "No attributes declared yet. Declare them in the organisation's research templates."
+msgstr "Encara no hi ha atributs declarats. Declara'ls a les plantilles de recerca de l'organització."
+
+#: src/components/instructions/attribute-section.tsx
+msgid "No attributes yet. Declare the facts this campaign records on every company."
+msgstr "Encara no hi ha atributs. Declara les dades que aquesta campanya apunta de cada empresa."
 
 #: src/components/companies/account-brief-section.tsx
 msgid "No brief yet. Research writes one here, or you can start it yourself."
@@ -4030,6 +4274,7 @@ msgstr "No se sincronitza"
 msgid "Not yours to set"
 msgstr "No la pots definir tu"
 
+#: src/components/instructions/attribute-dialog.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Note"
 msgstr "Nota"
@@ -4049,6 +4294,10 @@ msgstr "Encara no ha canviat res."
 #: src/routes/_authed/tasks/index.tsx
 msgid "Nothing completed recently"
 msgstr "Res completat recentment"
+
+#: src/components/companies/attribute-rejected.ts
+msgid "Nothing declares this attribute any more, so it cannot take a value."
+msgstr "Ja no hi ha res que declari aquest atribut, així que no pot prendre cap valor."
 
 #: src/components/research/findings/prospect-scan-view.tsx
 msgid "Nothing found on the web names this company."
@@ -4110,6 +4359,10 @@ msgstr "No hi ha res escrit que hi coincideixi."
 msgid "Notifications"
 msgstr "Notificacions"
 
+#: src/components/instructions/attribute-messages.ts
+msgid "Number"
+msgstr "Nombre"
+
 #: src/components/primitives/pri-rich-text.tsx
 msgid "Numbered list"
 msgstr "Llista numerada"
@@ -4119,6 +4372,10 @@ msgstr "Llista numerada"
 msgid "of {0} allowed"
 msgstr "de {0} permesos"
 
+#: src/components/instructions/stack-editor.tsx
+msgid "Off, a run ignores the attributes declared below."
+msgstr "Apagat, una recerca ignora els atributs declarats a sota."
+
 #: src/routes/_authed/emails/$threadId.tsx
 msgid "On {date}, {who} wrote:"
 msgstr "El {date}, {who} va escriure:"
@@ -4126,6 +4383,22 @@ msgstr "El {date}, {who} va escriure:"
 #: src/routes/_authed/emails/inboxes.tsx
 msgid "Once it's connected, I can send and receive email for you right here — no switching tabs."
 msgstr "Un cop connectat, puc enviar i rebre correu per tu des d'aquí, sense canviar de pestanya."
+
+#: src/components/instructions/attribute-messages.ts
+msgid "Only a campaign the organisation owns records attributes."
+msgstr "Només una campanya de l'organització apunta atributs."
+
+#: src/components/instructions/attribute-messages.ts
+msgid "Only a choice takes a list of words."
+msgstr "Només una opció pren una llista de paraules."
+
+#: src/components/instructions/attribute-messages.ts
+msgid "Only a research campaign records attributes."
+msgstr "Només una campanya de recerca apunta atributs."
+
+#: src/components/instructions/attribute-messages.ts
+msgid "Only an organisation admin can change the attributes."
+msgstr "Només un administrador de l'organització pot canviar els atributs."
 
 #: src/components/instructions/stack-editor.tsx
 msgid "Only an organization admin can change this stack."
@@ -4222,6 +4495,10 @@ msgstr "Tasques obertes que vencen els propers set dies, comptats des d’aquest
 msgid "Open tasks due today, in your own timezone. Anything already past its due date is under Needs attention instead."
 msgstr "Tasques obertes que vencen avui, en el teu fus horari. Les que ja han passat la data són a Necessita atenció."
 
+#: src/components/companies/about-section.tsx
+msgid "Open templates"
+msgstr "Obre les plantilles"
+
 #: src/components/companies/where-panel-client.client.tsx
 msgid "Open the map full screen"
 msgstr "Obre el mapa a pantalla completa"
@@ -4267,6 +4544,10 @@ msgstr "Obert"
 #: src/components/companies/company-channels-section.tsx
 msgid "opens in a new tab"
 msgstr "s'obre en una pestanya nova"
+
+#: src/components/instructions/attribute-dialog.tsx
+msgid "Optional. Written after a number, like \"12 sites\"."
+msgstr "Opcional. S'escriu després d'un nombre, com ara «12 locals»."
 
 #: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/contacts/manage-channels-dialog.tsx
@@ -4325,6 +4606,7 @@ msgstr "Organitzacions actualitzades"
 msgid "organizer"
 msgstr "organitza"
 
+#: src/components/companies/about-section.tsx
 #: src/components/shared/channel-icon.tsx
 msgid "Other"
 msgstr "Altres"
@@ -4574,6 +4856,10 @@ msgstr "Tria'n una com a remitent per defecte."
 msgid "Pick somebody who is still a member."
 msgstr "Tria algú que encara en sigui membre."
 
+#: src/components/instructions/attribute-messages.ts
+msgid "Pick what kind of fact this is."
+msgstr "Tria quin tipus de dada és."
+
 #: src/routes/_authed/emails/inboxes.tsx
 msgid "Pick your email provider"
 msgstr "Tria el teu proveïdor de correu"
@@ -4786,6 +5072,10 @@ msgstr "Reexecutant…"
 #: src/components/instructions/template-library.tsx
 msgid "Read {0}"
 msgstr "Llegeix {0}"
+
+#: src/components/instructions/attribute-dialog.tsx
+msgid "Read by research runs to know what to look for."
+msgstr "Les recerques ho llegeixen per saber què buscar."
 
 #: src/routes/_authed/emails/index.tsx
 msgid "Read state update failed"
@@ -5048,6 +5338,11 @@ msgstr "Reprèn esborranys ({0})"
 msgid "Resume drafting (1)"
 msgstr "Reprèn l'esborrany (1)"
 
+#: src/components/companies/about-section.tsx
+msgid "Retired or no longer declared. They can be read or cleared; a run does not fill them any more."
+msgstr "Retirats o que ja no estan declarats. Es poden llegir o esborrar, però una recerca ja no els omple."
+
+#: src/components/instructions/attribute-section.tsx
 #: src/components/shared/error-state.tsx
 msgid "Retry"
 msgstr "Torna-ho a provar"
@@ -5091,6 +5386,7 @@ msgstr "Rol"
 msgid "Role (optional)"
 msgstr "Càrrec (opcional)"
 
+#: src/components/companies/attribute-field.tsx
 #: src/components/companies/company-fit-section.tsx
 msgid "run"
 msgstr "execució"
@@ -5144,6 +5440,7 @@ msgstr "Context comercial"
 #: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/contacts/manage-channels-dialog.tsx
+#: src/components/instructions/attribute-dialog.tsx
 #: src/components/instructions/template-dialog.tsx
 #: src/routes/_authed/emails/inboxes.tsx
 #: src/routes/_authed/emails/inboxes.tsx
@@ -5189,6 +5486,7 @@ msgstr "Desada, però no s'ha marcat com a predeterminada"
 #: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/emails/compose-form.tsx
+#: src/components/instructions/attribute-dialog.tsx
 #: src/components/instructions/stack-editor.tsx
 #: src/components/instructions/template-dialog.tsx
 #: src/routes/_authed/emails/inboxes.tsx
@@ -5312,6 +5610,10 @@ msgstr "T'envia a {0}"
 #: src/routes/_authed/emails/$threadId.tsx
 msgid "Sent"
 msgstr "Enviat"
+
+#: src/components/instructions/attribute-dialog.tsx
+msgid "Separate the words with commas. A value can only be one of them."
+msgstr "Separa les paraules amb comes. Un valor només pot ser una d'elles."
 
 #: src/routes/_authed/settings/mcp/index.tsx
 msgid "server URL"
@@ -5830,9 +6132,25 @@ msgstr "Prova fallida"
 msgid "Testing connection…"
 msgstr "Provant la connexió…"
 
+#: src/components/instructions/attribute-messages.ts
+msgid "Text"
+msgstr "Text"
+
 #: src/components/primitives/pri-rich-text.tsx
 msgid "Text formatting"
 msgstr "Format del text"
+
+#: src/components/instructions/attribute-messages.ts
+msgid "That campaign no longer exists."
+msgstr "Aquesta campanya ja no existeix."
+
+#: src/components/companies/attribute-rejected.ts
+msgid "That comparison does not fit the kind of this attribute."
+msgstr "Aquesta comparació no encaixa amb el tipus d'aquest atribut."
+
+#: src/components/companies/attribute-rejected.ts
+msgid "That comparison is not one the list knows."
+msgstr "La llista no coneix aquesta comparació."
 
 #: src/routes/login.tsx
 msgid "That connection request expired. Start it again from your AI assistant."
@@ -5862,6 +6180,10 @@ msgstr "Aquesta cerca no està disponible, així que només es pot ometre."
 msgid "That set of instructions is no longer available. Pick another and try again."
 msgstr "Aquest conjunt d'instruccions ja no està disponible. Tria'n un altre i torna-ho a provar."
 
+#: src/components/companies/attribute-rejected.ts
+msgid "That value does not fit the kind of this attribute."
+msgstr "Aquest valor no encaixa amb el tipus d'aquest atribut."
+
 #: src/routes/_authed/tasks/index.tsx
 msgid "The 20 most recently edited tasks on this shelf. Click one to reopen it."
 msgstr "Les 20 tasques editades més recentment d'aquest prestatge. Fes clic en una per reobrir-la."
@@ -5873,6 +6195,18 @@ msgstr "No s'ha pogut recuperar l'activitat d'aquesta empresa. Comprova que la s
 #: src/routes/_authed/settings/api-keys/index.tsx
 msgid "The API key can no longer be used."
 msgstr "La clau d'API ja no es pot fer servir."
+
+#: src/components/companies/attribute-rejected.ts
+msgid "The attribute filter needs an attribute, a comparison and a value."
+msgstr "El filtre d'atribut necessita un atribut, una comparació i un valor."
+
+#: src/components/companies/attribute-rejected.ts
+msgid "The attribute was refused."
+msgstr "L'atribut s'ha refusat."
+
+#: src/components/companies/about-section.tsx
+msgid "The attributes this organisation declares could not be loaded, so the values are shown as stored."
+msgstr "No s'han pogut carregar els atributs que declara aquesta organització, així que els valors es mostren tal com estan desats."
 
 #: src/components/companies/pipeline-board.tsx
 msgid "The board could not be fetched. Check that the session is valid, then try again."
@@ -5917,6 +6251,10 @@ msgstr "No s'han pogut recuperar els documents arxivats aquí. Comprova que la s
 msgid "The evidence places this company outside the area the search asked about."
 msgstr "Les proves situen aquesta empresa fora de la zona que demanava la cerca."
 
+#: src/components/instructions/attribute-section.tsx
+msgid "The facts I want on every company a campaign researches. A run fills them from what it reads, once the campaign is set to."
+msgstr "Les dades que vull de cada empresa que una campanya investiga. Una recerca les omple amb el que llegeix, quan la campanya ho té activat."
+
 #: src/components/companies/where-panel-client.client.tsx
 msgid "The geocoder did not return a match. Try editing the location field."
 msgstr "El geocodificador no ha trobat cap coincidència. Prova d'editar el camp d'ubicació."
@@ -5928,6 +6266,10 @@ msgstr "No s'han pogut carregar les safates. Comprova que la sessió sigui vàli
 #: src/routes/_authed/calendar/index.tsx
 msgid "The invitation gave no time zone, so this time may be wrong. Confirm it with the organizer."
 msgstr "La invitació no indicava cap fus horari, així que aquesta hora pot ser incorrecta. Confirma-la amb qui organitza."
+
+#: src/components/instructions/attribute-section.tsx
+msgid "The last refresh failed. This is the list as it was loaded before."
+msgstr "L'última actualització ha fallat. Aquesta és la llista tal com es va carregar abans."
 
 #: src/routes/_authed/tasks/index.tsx
 msgid "The ledger is clean."
@@ -5950,9 +6292,21 @@ msgstr "No s'ha pogut carregar la llista de canvis."
 msgid "The mailbox is ready."
 msgstr "La bústia està a punt."
 
+#: src/components/instructions/attribute-messages.ts
+msgid "The name has to fit on one line."
+msgstr "El nom ha de cabre en una línia."
+
+#: src/components/instructions/attribute-messages.ts
+msgid "The name is too long. Keep it to 40 characters."
+msgstr "El nom és massa llarg. No passis de 40 caràcters."
+
 #: src/components/research/run-detail.tsx
 msgid "The name matched too many companies to tell them apart."
 msgstr "El nom coincidia amb massa empreses per distingir-les."
+
+#: src/components/instructions/attribute-messages.ts
+msgid "The note is too long. Keep it to 500 characters."
+msgstr "La nota és massa llarga. No passis de 500 caràcters."
 
 #: src/routes/_authed/pages/$id.tsx
 msgid "The page could not be fetched. Check that the session is valid, then try again."
@@ -5982,6 +6336,10 @@ msgstr "No s'han pogut recuperar les propostes d'aquesta empresa. Comprova que l
 #: src/components/emails/compose-form.tsx
 msgid "The receiving server said: {0}"
 msgstr "El servidor que el rep ha dit: {0}"
+
+#: src/components/companies/attribute-rejected.ts
+msgid "The research run named for this value was not found."
+msgstr "No s'ha trobat la recerca indicada per a aquest valor."
 
 #: src/routes/_authed/companies/$slug.tsx
 msgid "The research runs for this company could not be fetched. Check that the session is valid, then try again."
@@ -6055,6 +6413,14 @@ msgstr "Les dues contrasenyes no coincideixen."
 msgid "The two passwords don't match."
 msgstr "Les dues contrasenyes no coincideixen."
 
+#: src/components/instructions/attribute-messages.ts
+msgid "The unit is too long. Keep it to 16 characters."
+msgstr "La unitat és massa llarga. No passis de 16 caràcters."
+
+#: src/components/companies/attribute-rejected.ts
+msgid "The value does not fit the kind this attribute was declared as."
+msgstr "El valor no encaixa amb el tipus amb què es va declarar aquest atribut."
+
 #: src/routes/_authed/tasks/index.tsx
 msgid "The week is clear — good time to plan."
 msgstr "La setmana és lliure: bon moment per planificar."
@@ -6116,6 +6482,18 @@ msgstr "Aquest assistent ara treballa en una sola organització."
 #: src/routes/_authed/settings/mcp/connections.tsx
 msgid "This assistant works in the organizations you tick here."
 msgstr "Aquest assistent treballa a les organitzacions que marquis aquí."
+
+#: src/components/instructions/attribute-messages.ts
+msgid "This attribute no longer exists."
+msgstr "Aquest atribut ja no existeix."
+
+#: src/components/instructions/attribute-messages.ts
+msgid "This campaign already records something under that key."
+msgstr "Aquesta campanya ja apunta alguna cosa sota aquesta clau."
+
+#: src/components/instructions/attribute-section.tsx
+msgid "This campaign is full at {ATTRIBUTES_PER_STACK_MAX} active attributes. Retire one to add another."
+msgstr "Aquesta campanya és plena amb {ATTRIBUTES_PER_STACK_MAX} atributs actius. Retira'n un per afegir-ne un altre."
 
 #: src/routes/_authed/companies/$slug.tsx
 msgid "This company can't be displayed"
@@ -6195,6 +6573,10 @@ msgstr "Aquesta execució ha acabat."
 #: src/components/research/research-dialog.tsx
 msgid "This runs research on {0, plural, one {# company} other {# companies}}, up to about {1} in paid data. Start the batch?"
 msgstr "Això farà recerca sobre {0, plural, one {# empresa} other {# empreses}}, fins a uns {1} en dades de pagament. Vols iniciar el lot?"
+
+#: src/components/instructions/attribute-messages.ts
+msgid "This stack already has 8 active attributes. Retire one first."
+msgstr "Aquesta pila ja té 8 atributs actius. Retira'n un primer."
 
 #: src/components/instructions/stack-editor.tsx
 msgid "This stack no longer exists."
@@ -6330,6 +6712,10 @@ msgstr "No es pot lliurar"
 msgid "Undo"
 msgstr "Desfés"
 
+#: src/components/instructions/attribute-dialog.tsx
+msgid "Unit"
+msgstr "Unitat"
+
 #: src/components/companies/proposals-panel.tsx
 msgid "Unit price"
 msgstr "Preu unitari"
@@ -6461,6 +6847,12 @@ msgstr "L'utilitza cada dia"
 msgid "Using the org default"
 msgstr "S'utilitza el valor per defecte de l'organització"
 
+#: src/components/companies/attribute-filter.tsx
+#: src/components/companies/attribute-filter.tsx
+#: src/components/companies/attribute-filter.tsx
+msgid "Value"
+msgstr "Valor"
+
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Verifiable only"
 msgstr "Només verificables"
@@ -6575,6 +6967,10 @@ msgstr "Quin tipus de recerca?"
 msgid "What needs to happen?"
 msgstr "Què cal fer?"
 
+#: src/components/instructions/attribute-dialog.tsx
+msgid "What people see on the company page."
+msgstr "El que la gent veu a la pàgina de l'empresa."
+
 #: src/components/research/inbox/research-inbox.tsx
 msgid "What this run has cost so far"
 msgstr "El que ha costat aquesta execució fins ara"
@@ -6609,6 +7005,10 @@ msgstr "D'on ve cada dada"
 #: src/components/research/research-dialog.tsx
 msgid "Where to look (optional)"
 msgstr "On cercar (opcional)"
+
+#: src/components/companies/about-section.tsx
+msgid "Which attributes this organisation declares is not known yet, so the values are shown as stored."
+msgstr "Encara no se sap quins atributs declara aquesta organització, així que els valors es mostren tal com estan desats."
 
 #: src/routes/_authed/emails/index.tsx
 #: src/routes/_authed/emails/index.tsx
@@ -6672,6 +7072,18 @@ msgstr "Empresa equivocada? Introdueix el seu lloc web oficial"
 #: src/components/contacts/channel-kind-label.tsx
 msgid "X"
 msgstr "X"
+
+#: src/components/companies/attribute-field.tsx
+#: src/components/companies/attribute-field.tsx
+#: src/components/companies/attribute-field.tsx
+#: src/components/companies/attribute-filter.tsx
+#: src/components/research/findings/attributes-block.tsx
+msgid "Yes"
+msgstr "Sí"
+
+#: src/components/instructions/attribute-messages.ts
+msgid "Yes or no"
+msgstr "Sí o no"
 
 #: src/routes/_authed/settings/profile/index.tsx
 msgid "You currently sign in from email links. Add a password to skip checking your email next time."

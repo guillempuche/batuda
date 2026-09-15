@@ -49,12 +49,12 @@ describe('fieldChanges', () => {
 			// GIVEN a change naming the field in one style
 			// WHEN the record names the same field in the other
 			const changes = fieldChanges(
-				{ currentTools: 'Notion' },
-				{ current_tools: 'Excel' },
+				{ sizeRange: '11-50' },
+				{ size_range: '1-10' },
 			)
 			// THEN the previous value is found rather than reported as absent,
 			// because both spellings are accepted when the change is applied
-			expect(changes[0]?.from).toBe('Excel')
+			expect(changes[0]?.from).toBe('1-10')
 		})
 	})
 

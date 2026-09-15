@@ -1,6 +1,6 @@
 import { Atom } from 'effect/unstable/reactivity'
 
-import type { AttentionFilter, CompanySort } from '@batuda/domain'
+import type { AttentionFilter, AttributeOp, CompanySort } from '@batuda/domain'
 
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import {
@@ -12,10 +12,16 @@ import {
 
 /**
  * Shape of the validated `/companies` search params: the company filters this
- * screen offers, each present only when set. Keeping the shape canonical (no
- * `undefined` literals, no empty strings) is what makes the cache key below
- * stable across equivalent searches, so a field added here has to be added to
- * that key too or two different searches will answer to one entry.
+ * screen offers, each present only when set.
+ *
+ * A filter the address carried but nothing could read of arrives here as a name
+ * holding nothing, which is how the raw address is kept from showing through.
+ * Every reader skips one of those — the cache key below, the query sent to the
+ * server, the link builder — so an unreadable filter costs nothing, and two
+ * searches that narrow the list the same way still answer to one cache entry.
+ *
+ * A field added here needs nothing added beside it: the cache key reads whatever
+ * the search holds rather than a list of names kept in step by hand.
  */
 export type CompaniesSearch = {
 	// Four of these hold a list and match any of the values in it, while
@@ -41,6 +47,15 @@ export type CompaniesSearch = {
 	// The companies taken out of view, which is how one is found again to be put
 	// back. Absent means the ones in use.
 	readonly deleted?: 'only'
+	// One of the facts the organisation declares, and the comparison to make on
+	// it: which attribute, how, and against what. Three params that only mean
+	// something together — the server refuses an incomplete triple — and they
+	// travel under the server's own names, so they flow through unchanged.
+	// A "one of" value is comma-separated; a yes/no is `true` or `false`; a day
+	// is YYYY-MM-DD.
+	readonly attributeKey?: string
+	readonly attributeOp?: AttributeOp
+	readonly attributeValue?: string
 }
 
 /**

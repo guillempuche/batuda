@@ -2,6 +2,7 @@ import { useLingui } from '@lingui/react/macro'
 import { Check, ChevronsUpDown, Pencil, X } from 'lucide-react'
 import { styled } from 'next-yak'
 import {
+	type InputHTMLAttributes,
 	type KeyboardEvent,
 	type ReactNode,
 	useCallback,
@@ -10,7 +11,7 @@ import {
 	useState,
 } from 'react'
 
-import { PriInput, PriSelect } from '@batuda/ui/pri'
+import { PriField, PriInput, PriSelect } from '@batuda/ui/pri'
 
 import { PriCombobox } from '#/components/primitives/pri-combobox'
 import {
@@ -19,21 +20,48 @@ import {
 	stenciledTitle,
 } from '#/lib/workshop-mixins'
 
-type InputKind = 'text' | 'email' | 'url' | 'tel' | 'number'
+type InputKind = 'text' | 'email' | 'url' | 'tel' | 'number' | 'date'
 
 export interface EditableFieldProps {
 	readonly label: string
 	readonly value: string | null
 	readonly onSave: (next: string | null) => Promise<void>
 	readonly type?: InputKind
+	/**
+	 * Which keys a phone offers. For a value typed as ordinary text but written
+	 * in digits — a number a reader may write with a comma — so the box still
+	 * asks for the number pad.
+	 */
+	readonly inputMode?: InputHTMLAttributes<HTMLInputElement>['inputMode']
 	readonly multiline?: boolean
-	readonly placeholder?: string
+	readonly placeholder?: string | undefined
 	/**
 	 * Drop the printed label while keeping it for anyone listening. For a field
 	 * that sits alone under a heading already saying the same word — printing it
 	 * twice reads as a mistake.
 	 */
 	readonly hideLabel?: boolean
+	/**
+	 * What to print instead of the stored text — a number in the reader's digits
+	 * with its unit after it, a day as a date. Typing still works on the stored
+	 * text, which is what the server takes back.
+	 */
+	readonly displayValue?: string | undefined
+	/** Where the value came from, printed under it. */
+	readonly trail?: ReactNode
+	/**
+	 * Why what was typed was not saved. Marks the box as holding something wrong
+	 * and is read out as soon as it appears, so a reader who cannot see it is
+	 * told too.
+	 */
+	readonly error?: string | undefined
+	/**
+	 * The edit ended without saving — Escape, or leaving the box with nothing
+	 * changed. A caller showing an `error` from the last attempt clears it here,
+	 * so a refusal does not greet whoever opens the box next.
+	 */
+	readonly onCancel?: (() => void) | undefined
+	readonly testId?: string | undefined
 }
 
 /**
@@ -47,9 +75,15 @@ export function EditableField({
 	value,
 	onSave,
 	type = 'text',
+	inputMode,
 	multiline = false,
 	placeholder,
 	hideLabel = false,
+	displayValue,
+	trail,
+	error,
+	onCancel,
+	testId,
 }: EditableFieldProps) {
 	const { t } = useLingui()
 	const [editing, setEditing] = useState(false)
@@ -65,6 +99,9 @@ export function EditableField({
 
 	useEffect(() => {
 		if (!editing) return
+		// A cancel that never saw its blur would otherwise swallow this edit's
+		// first commit, losing what somebody typed with nothing to show why.
+		cancelledRef.current = false
 		const el = multiline ? textareaRef.current : inputRef.current
 		if (el === null) return
 		el.focus()
@@ -78,24 +115,32 @@ export function EditableField({
 		}
 		const next = draft.trim()
 		const canonical = next.length === 0 ? null : next
-		if (canonical === (value ?? null)) {
+		// A stored empty string is no value either, so opening the box and leaving
+		// it does not go and save a clear over nothing.
+		const stored = value === null || value === '' ? null : value
+		if (canonical === stored) {
 			setEditing(false)
+			onCancel?.()
 			return
 		}
 		setPending(true)
 		try {
 			await onSave(canonical)
 			setEditing(false)
+		} catch {
+			// The caller has said why. Staying open with what was typed still in it
+			// is what lets it be fixed rather than retyped.
 		} finally {
 			setPending(false)
 		}
-	}, [draft, value, onSave])
+	}, [draft, value, onSave, onCancel])
 
 	const cancel = useCallback(() => {
 		cancelledRef.current = true
 		setDraft(value ?? '')
 		setEditing(false)
-	}, [value])
+		onCancel?.()
+	}, [value, onCancel])
 
 	const handleKey = (
 		e: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -112,35 +157,52 @@ export function EditableField({
 		}
 	}
 
+	// What is printed while nobody is typing: the reading the caller wrote for a
+	// person where there is one, and the stored text itself otherwise.
+	const shown = displayValue ?? value
+
 	return (
-		<Field>
+		<Field data-testid={testId}>
 			{!hideLabel && <FieldLabel>{label}</FieldLabel>}
 			{editing ? (
-				multiline ? (
-					<TextArea
-						ref={textareaRef}
-						value={draft}
-						onChange={e => setDraft(e.target.value)}
-						onBlur={() => void commit()}
-						onKeyDown={handleKey}
-						placeholder={placeholder}
-						disabled={pending}
-						rows={3}
-						aria-label={label}
-					/>
-				) : (
-					<PriInput
-						ref={inputRef}
-						type={type}
-						value={draft}
-						onChange={e => setDraft(e.target.value)}
-						onBlur={() => void commit()}
-						onKeyDown={handleKey}
-						placeholder={placeholder}
-						disabled={pending}
-						aria-label={label}
-					/>
-				)
+				<PriField.Root>
+					{multiline ? (
+						<TextArea
+							ref={textareaRef}
+							value={draft}
+							onChange={e => setDraft(e.target.value)}
+							onBlur={() => void commit()}
+							onKeyDown={handleKey}
+							placeholder={placeholder}
+							disabled={pending}
+							rows={3}
+							aria-label={label}
+							aria-invalid={error !== undefined ? true : undefined}
+						/>
+					) : (
+						<PriInput
+							ref={inputRef}
+							type={type}
+							inputMode={inputMode}
+							value={draft}
+							onChange={e => setDraft(e.target.value)}
+							onBlur={() => void commit()}
+							onKeyDown={handleKey}
+							placeholder={placeholder}
+							disabled={pending}
+							aria-label={label}
+							aria-invalid={error !== undefined ? true : undefined}
+						/>
+					)}
+					{/* The browser checks nothing here, so `match` is what shows the
+					    message. It appears after the box is already focused, so it is an
+					    alert: sitting inside the field alone would leave it unread. */}
+					{error !== undefined ? (
+						<PriField.Error match={true} role='alert'>
+							{error}
+						</PriField.Error>
+					) : null}
+				</PriField.Root>
 			) : (
 				<ReadTrigger
 					type='button'
@@ -148,11 +210,11 @@ export function EditableField({
 					$multiline={multiline}
 					aria-label={t`Edit ${label}`}
 				>
-					{value !== null && value !== '' ? (
+					{shown !== null && shown !== '' ? (
 						multiline ? (
-							<ValueMultiline>{value}</ValueMultiline>
+							<ValueMultiline>{shown}</ValueMultiline>
 						) : (
-							<Value>{value}</Value>
+							<Value>{shown}</Value>
 						)
 					) : (
 						<Empty>—</Empty>
@@ -162,6 +224,7 @@ export function EditableField({
 					</PencilMark>
 				</ReadTrigger>
 			)}
+			{trail}
 		</Field>
 	)
 }
@@ -177,6 +240,9 @@ export interface EditableSelectProps {
 	readonly options: ReadonlyArray<EditableSelectOption>
 	readonly onSave: (next: string | null) => Promise<void>
 	readonly placeholder?: string
+	/** Where the value came from, printed under it. */
+	readonly trail?: ReactNode
+	readonly testId?: string | undefined
 }
 
 /**
@@ -190,6 +256,8 @@ export function EditableSelect({
 	options,
 	onSave,
 	placeholder,
+	trail,
+	testId,
 }: EditableSelectProps) {
 	const [pending, setPending] = useState(false)
 	const current =
@@ -202,47 +270,53 @@ export function EditableSelect({
 		setPending(true)
 		try {
 			await onSave(next.length === 0 ? null : next)
+		} catch {
+			// The caller has said why. The dropdown shows the stored value again on
+			// its own, since that is still what the company holds.
 		} finally {
 			setPending(false)
 		}
 	}
 
 	return (
-		<Field>
+		<Field data-testid={testId}>
 			<FieldLabel>{label}</FieldLabel>
-			<PriSelect.Root
-				items={options as Array<EditableSelectOption>}
-				value={value ?? ''}
-				onValueChange={handleChange}
-				disabled={pending}
-			>
-				<SelectTrigger>
-					{current !== null ? (
-						<PriSelect.Value>{current.label}</PriSelect.Value>
-					) : (
-						<Empty>{placeholder ?? '—'}</Empty>
-					)}
-					<PriSelect.Icon>
-						<ChevronsUpDown size={12} aria-hidden />
-					</PriSelect.Icon>
-				</SelectTrigger>
-				<PriSelect.Portal>
-					<PriSelect.Positioner alignItemWithTrigger={false} sideOffset={6}>
-						<PriSelect.Popup>
-							<PriSelect.List>
-								{options.map(opt => (
-									<PriSelect.Item key={opt.value} value={opt.value}>
-										<PriSelect.ItemIndicator>
-											<Check size={12} />
-										</PriSelect.ItemIndicator>
-										<PriSelect.ItemText>{opt.label}</PriSelect.ItemText>
-									</PriSelect.Item>
-								))}
-							</PriSelect.List>
-						</PriSelect.Popup>
-					</PriSelect.Positioner>
-				</PriSelect.Portal>
-			</PriSelect.Root>
+			<PriField.Root>
+				<PriSelect.Root
+					items={options as Array<EditableSelectOption>}
+					value={value ?? ''}
+					onValueChange={handleChange}
+					disabled={pending}
+				>
+					<SelectTrigger>
+						{current !== null ? (
+							<PriSelect.Value>{current.label}</PriSelect.Value>
+						) : (
+							<Empty>{placeholder ?? '—'}</Empty>
+						)}
+						<PriSelect.Icon>
+							<ChevronsUpDown size={12} aria-hidden />
+						</PriSelect.Icon>
+					</SelectTrigger>
+					<PriSelect.Portal>
+						<PriSelect.Positioner alignItemWithTrigger={false} sideOffset={6}>
+							<PriSelect.Popup>
+								<PriSelect.List>
+									{options.map(opt => (
+										<PriSelect.Item key={opt.value} value={opt.value}>
+											<PriSelect.ItemIndicator>
+												<Check size={12} />
+											</PriSelect.ItemIndicator>
+											<PriSelect.ItemText>{opt.label}</PriSelect.ItemText>
+										</PriSelect.Item>
+									))}
+								</PriSelect.List>
+							</PriSelect.Popup>
+						</PriSelect.Positioner>
+					</PriSelect.Portal>
+				</PriSelect.Root>
+			</PriField.Root>
+			{trail}
 		</Field>
 	)
 }
@@ -306,6 +380,8 @@ export function EditableCombobox({
 			try {
 				await onSave(canonical)
 				setEditing(false)
+			} catch {
+				// The caller has said why. Staying open keeps what was typed.
 			} finally {
 				savingRef.current = false
 				setPending(false)
@@ -430,6 +506,8 @@ export function EditableChips({
 		setPending(true)
 		try {
 			await onSave(next)
+		} catch {
+			// The caller has said why, and the chips still show what is stored.
 		} finally {
 			setPending(false)
 		}

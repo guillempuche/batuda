@@ -13,6 +13,11 @@ import {
 	resolveProposalsBatchAtom,
 	runProposedUpdatesAtom,
 } from '#/atoms/research-atoms'
+import { AttributeRows } from '#/components/research/findings/attributes-block'
+import {
+	declaredAttributes,
+	type FoundAttribute,
+} from '#/components/research/findings/found-attributes'
 import {
 	type DiscoveredExisting,
 	DiscoveredExistingSection,
@@ -33,11 +38,13 @@ import {
 import { ResolveStatus } from '#/components/research/resolve-status'
 import {
 	narrowProposedUpdates,
+	narrowRunAttributes,
 	type ReviewProposal,
 	strongestChannelTrust,
 } from '#/components/research/review/proposal-narrow'
 import { TrustBadge } from '#/components/research/trust-badge'
 import { InfiniteListFooter } from '#/components/shared/infinite-list-footer'
+import { useAttributeDeclarations } from '#/hooks/use-attribute-declarations'
 import { useInfiniteList } from '#/hooks/use-infinite-list'
 import {
 	type ResolveDecision,
@@ -51,6 +58,18 @@ type RunContext = {
 	readonly completedAt: string | null
 	readonly sourceById: ReadonlyMap<string, ProvenanceSource>
 	readonly discoveredExisting: ReadonlyArray<DiscoveredExisting>
+	/** The facts the run found under the organisation's own keys. */
+	readonly attributes: ReadonlyArray<FoundAttribute>
+}
+
+// What the screen knows about a run it has not read yet, and about one whose
+// answer it cannot make sense of.
+const EMPTY_RUN_CONTEXT: RunContext = {
+	status: '',
+	completedAt: null,
+	sourceById: new Map(),
+	discoveredExisting: [],
+	attributes: [],
 }
 
 export function ProposedUpdatesReview({
@@ -110,13 +129,16 @@ export function ProposedUpdatesReview({
 		() =>
 			AsyncResult.isSuccess(detailResult)
 				? narrowRunContext(detailResult.value)
-				: {
-						status: '',
-						completedAt: null,
-						sourceById: new Map(),
-						discoveredExisting: [],
-					},
+				: EMPTY_RUN_CONTEXT,
 		[detailResult],
+	)
+
+	// Only what applying will actually record, read the same way the lead button
+	// reads it: anything the server would not write is not promised here.
+	const declarations = useAttributeDeclarations()
+	const landingAttributes = useMemo(
+		() => declaredAttributes(context.attributes, declarations),
+		[context.attributes, declarations],
 	)
 
 	// A terminal run with nothing proposed and no CRM matches still deserves a
@@ -171,6 +193,14 @@ export function ProposedUpdatesReview({
 	const fieldOnlyPending = needsReading
 		? []
 		: pending.filter(p => p.channels.length === 0 && p.scalarFields.length > 0)
+	// The company the run's attribute values would land on. They belong to the run
+	// rather than to one change, so a run asked about several companies could not
+	// say whose they are and they land on none of them — which is why this is the
+	// single subject or nothing.
+	const attributeSubject =
+		landingAttributes.length > 0 && subjectCompanyIds.size === 1
+			? ([...subjectCompanyIds][0] ?? null)
+			: null
 
 	function resolveOne(
 		proposal: ReviewProposal,
@@ -313,6 +343,13 @@ export function ProposedUpdatesReview({
 						sending={sendingResolve[proposal.id]}
 						completedAt={context.completedAt}
 						sources={sourcesFor(proposal, context.sourceById)}
+						attributes={
+							proposal.subjectTable === 'companies' &&
+							proposal.subjectId !== null &&
+							proposal.subjectId === attributeSubject
+								? landingAttributes
+								: []
+						}
 						onResolve={resolveOne}
 						onUndo={() => undo(proposal.id)}
 					/>
@@ -330,6 +367,7 @@ function ProposalCard({
 	sending,
 	completedAt,
 	sources,
+	attributes,
 	onResolve,
 	onUndo,
 }: {
@@ -339,6 +377,11 @@ function ProposalCard({
 	readonly sending: ResolveDecision | undefined
 	readonly completedAt: string | null
 	readonly sources: ReadonlyArray<ProvenanceSource>
+	/**
+	 * The run's attribute values, on the one change that writes them; empty on
+	 * every other card.
+	 */
+	readonly attributes: ReadonlyArray<FoundAttribute>
 	readonly onResolve: (p: ReviewProposal, decision: ResolveDecision) => void
 	readonly onUndo: () => void
 }) {
@@ -401,6 +444,23 @@ function ProposalCard({
 						</FieldRow>
 					))}
 				</FieldsTable>
+			) : null}
+
+			{/* Said only while the change is still somebody's to make: on a change
+			    already dealt with, "applying also records these" would read as
+			    something about to happen. */}
+			{attributes.length > 0 && shownOutcome === null ? (
+				<Attributes data-testid='research-review-attributes'>
+					<AttributesNote>
+						<Trans>
+							Applying also records these attributes from the run's evidence,
+							unless someone set them by hand.
+						</Trans>
+					</AttributesNote>
+					<FieldsTable>
+						<AttributeRows rows={attributes} />
+					</FieldsTable>
+				</Attributes>
 			) : null}
 
 			<Provenance date={completedAt} sources={sources} />
@@ -473,14 +533,7 @@ function dateToIsoOrNull(value: unknown): string | null {
 }
 
 function narrowRunContext(raw: unknown): RunContext {
-	if (!raw || typeof raw !== 'object') {
-		return {
-			status: '',
-			completedAt: null,
-			sourceById: new Map(),
-			discoveredExisting: [],
-		}
-	}
+	if (!raw || typeof raw !== 'object') return EMPTY_RUN_CONTEXT
 	const r = raw as Record<string, unknown>
 	const sourceById = new Map<string, ProvenanceSource>()
 	if (Array.isArray(r['sources'])) {
@@ -513,6 +566,7 @@ function narrowRunContext(raw: unknown): RunContext {
 		discoveredExisting: narrowDiscoveredExisting(
 			findings['discovered_existing'],
 		),
+		attributes: narrowRunAttributes(findings),
 	}
 }
 
@@ -662,6 +716,23 @@ const Reason = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	font-style: italic;
+	color: var(--color-on-surface-variant);
+	margin: 0;
+`
+
+// Set apart from the fields above it, which are the change itself: these values
+// ride along with it rather than being what was proposed.
+const Attributes = styled.div`
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3xs);
+	padding-top: var(--space-2xs);
+	border-top: 1px solid color-mix(in oklab, var(--color-on-surface) 10%, transparent);
+`
+
+const AttributesNote = styled.p`
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface-variant);
 	margin: 0;
 `

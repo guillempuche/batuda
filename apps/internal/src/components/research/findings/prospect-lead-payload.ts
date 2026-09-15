@@ -14,10 +14,22 @@
  * Free of JSX and of the translation macros, like the other logic beside these
  * components: what was dropped comes back as a word the component looks up, so
  * the sentence a person reads stays where the sentences live.
+ *
+ * The attribute values the scan read off the company travel too, each with the
+ * page it was read on, so the company arrives already carrying the facts the
+ * organisation asks every company for.
  */
 
+import type { AttributeValue, AttributeValueInput } from '@batuda/domain'
 import { WEBSITE_ADDRESS_PATTERN } from '@batuda/domain'
 import { mapCountry } from '@batuda/research/application/vocabulary-guard'
+
+import type { AttributeDeclaration } from '#/components/instructions/attribute-shapes'
+import {
+	declaredAttributes,
+	type FoundAttribute,
+	narrowFoundAttributes,
+} from './found-attributes'
 
 /** A field left out because nothing storable could be made of what the run said. */
 export type DroppedLeadField = 'country' | 'website'
@@ -36,6 +48,8 @@ export interface ProspectLeadSource {
 	readonly contacts?:
 		| ReadonlyArray<{ readonly name: string; readonly role?: string }>
 		| undefined
+	/** The values under the organisation's own keys, as the findings carry them. */
+	readonly attributes?: Record<string, unknown> | undefined
 }
 
 export interface LeadPayload {
@@ -56,6 +70,8 @@ export interface LeadPayload {
 			readonly name: string
 			readonly role?: string
 		}>
+		readonly attributes?: Readonly<Record<string, AttributeValueInput>>
+		readonly researchId?: string
 	}
 	/** Empty when everything the run said could be carried across. */
 	readonly dropped: ReadonlyArray<DroppedLeadField>
@@ -85,12 +101,60 @@ const usableProfiles = (source: ProspectLeadSource) =>
 		.map(p => ({ kind: p.kind.trim(), value: p.value.trim() }))
 
 /**
+ * One value as creating a company takes it.
+ *
+ * A value the run tied to a page travels with that page and the words on it, so
+ * the run is recorded as what found it. One it could not tie to a page travels
+ * bare and lands as the person's own value: naming a page nothing fetched would
+ * be refused, and inventing one would turn a missing citation into a false one.
+ */
+const withEvidence = (
+	found: FoundAttribute,
+	value: AttributeValue,
+): AttributeValueInput =>
+	found.sourceId === null
+		? value
+		: {
+				value,
+				source_id: found.sourceId,
+				...(found.quote === null ? {} : { quote: found.quote }),
+			}
+
+/**
+ * The attribute values the scan read, as creating a company takes them.
+ *
+ * Only what a declaration will take: the server turns down the whole create on
+ * the first key it does not recognise, so one retired fact would otherwise cost
+ * every row of the run its button.
+ */
+const leadAttributes = (
+	source: ProspectLeadSource,
+	declarations: ReadonlyArray<AttributeDeclaration> | null,
+): Readonly<Record<string, AttributeValueInput>> => {
+	const entries: Array<[string, AttributeValueInput]> = declaredAttributes(
+		narrowFoundAttributes(source.attributes),
+		declarations,
+	).map(found => [found.key, withEvidence(found, found.value)])
+	// Built from entries rather than by assigning keys: the keys are written by a
+	// model, and assigning one called `__proto__` reaches the prototype setter.
+	return Object.fromEntries(entries)
+}
+
+/**
  * The web address is passed in rather than built here, so the caller decides
  * what a company is filed under and this stays a plain reading of the row.
+ *
+ * `researchId` names the run whose pages the values were read on; without it the
+ * server has no way to tell an attribute the run found from one a person typed.
+ *
+ * `declarations` is what the organisation declares, or null when the page does
+ * not know yet — see `leadAttributes`.
  */
 export const buildLeadPayload = (
 	source: ProspectLeadSource,
 	slug: string,
+	researchId?: string | null,
+	declarations?: ReadonlyArray<AttributeDeclaration> | null,
 ): LeadPayload => {
 	const dropped: DroppedLeadField[] = []
 
@@ -119,6 +183,9 @@ export const buildLeadPayload = (
 		return [role ? { name, role } : { name }]
 	})
 
+	const attributes = leadAttributes(source, declarations ?? null)
+	const hasAttributes = Object.keys(attributes).length > 0
+
 	return {
 		payload: {
 			name: source.name,
@@ -131,6 +198,10 @@ export const buildLeadPayload = (
 			...(profiles.length > 0 ? { socialProfiles: profiles } : {}),
 			...(taxId ? { taxId } : {}),
 			...(people.length > 0 ? { contacts: people } : {}),
+			...(hasAttributes ? { attributes } : {}),
+			// Sent only alongside values: on its own the run's id changes nothing
+			// about the company, and it is only there to tie a value to a page.
+			...(hasAttributes && researchId ? { researchId } : {}),
 		},
 		dropped,
 	}

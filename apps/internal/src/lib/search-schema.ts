@@ -1,16 +1,32 @@
 import { Option, Schema } from 'effect'
 
 /**
- * Build a TanStack Router `validateSearch` that decodes each URL param
- * independently — one malformed param never invalidates its neighbors.
+ * Build a TanStack Router `validateSearch` that reads each address param on its
+ * own — one malformed param never invalidates its neighbours.
  *
- * Why per-field: applying `decodeUnknownOption` to a whole `Schema.Struct`
- * fails the struct when any field fails (`Issue.Composite` short-circuits
- * in `SchemaAST.ts`). URL params are user-typed and can be stale across
- * deploys, so `?status=xyzzy&query=acme` must still surface `query`.
+ * Why per-field: handing a whole `Schema.Struct` to `decodeUnknownOption` fails
+ * the struct as soon as one field fails, and address params are typed by hand
+ * and go stale across deploys, so `?status=xyzzy&query=acme` still has to
+ * surface `query`.
  *
- * Missing fields are omitted from the result (no `{ field: undefined }`)
- * so the shape satisfies `exactOptionalPropertyTypes` downstream.
+ * Two habits of the router decide the rest of this.
+ *
+ * It reads every param as JSON before this runs, so a hand-typed
+ * `?attributeValue=2` arrives as the number 2 and `?query=2024` as the number
+ * 2024. A field that takes text alone would drop both, though the digits are
+ * plainly what was meant, so a number or a yes/no is offered again as its own
+ * text before being given up on.
+ *
+ * It also lays what comes back from here over the raw address — `{ ...raw,
+ * ...validated }` — so a key left out of the answer returns as whatever JSON
+ * made of it, and the page would go on filtering by the very value it refused.
+ * A param that cannot be read is therefore answered with `undefined` instead of
+ * being left out: it covers the raw one, and nothing sees it afterwards, since
+ * every filter in the app skips an undefined value and so does the router's own
+ * address writer.
+ *
+ * A param the address does not carry at all stays absent, so the shape keeps
+ * satisfying `exactOptionalPropertyTypes` downstream.
  */
 export function validateSearchWith<
 	const Fields extends Record<string, Schema.Top>,
@@ -29,18 +45,31 @@ export function validateSearchWith<
 	return raw => {
 		const out: Record<string, unknown> = {}
 		for (const [key, decode] of decoders) {
-			try {
-				const decoded = decode(raw[key])
-				if (Option.isSome(decoded)) {
-					out[key] = decoded.value
-				}
-			} catch {
-				// A decoder may throw (e.g. `NumberFromString` on `"NaN"`);
-				// swallow so sibling fields survive.
-			}
+			const value = raw[key]
+			if (value === undefined) continue
+			const read = tryDecode(decode, value)
+			const decoded =
+				Option.isNone(read) &&
+				(typeof value === 'number' || typeof value === 'boolean')
+					? tryDecode(decode, String(value))
+					: read
+			out[key] = Option.isSome(decoded) ? decoded.value : undefined
 		}
 		return out as {
 			readonly [K in keyof Fields]?: Fields[K]['Type']
 		}
+	}
+}
+
+// A decoder may throw rather than answer, and a throw here would take the
+// sibling params down with it.
+function tryDecode(
+	decode: (input: unknown) => Option.Option<unknown>,
+	value: unknown,
+): Option.Option<unknown> {
+	try {
+		return decode(value)
+	} catch {
+		return Option.none()
 	}
 }
