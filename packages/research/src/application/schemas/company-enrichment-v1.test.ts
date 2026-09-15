@@ -231,7 +231,6 @@ describe('CompanyEnrichmentV1Schema', () => {
 				enrichment: {
 					industry: null,
 					size_range: null,
-					current_tools: null,
 					tags: null,
 					location: null,
 					country: null,
@@ -252,6 +251,48 @@ describe('CompanyEnrichmentV1Schema', () => {
 			// write but a faithful decode of "the model said nothing", the failure the
 			// fill counters exist to make visible
 			expect(Object.keys(decoded.enrichment)).toHaveLength(0)
+		})
+	})
+
+	describe('when the model fills attribute entries, through the real provider codec', () => {
+		it('should carry each entry through, and strip a null list', () => {
+			// GIVEN one entry and, separately, a null list
+			const { codec } = OpenAiStructuredOutput.toCodecOpenAI(
+				CompanyEnrichmentV1Schema,
+			)
+			const decodeJson = Schema.decodeUnknownSync(Schema.fromJsonString(codec))
+			const entry = {
+				key: 'site_count',
+				value: '12',
+				source_id: 'https://acme.example/about',
+				quote: '12 premises',
+			}
+			const base = {
+				enrichment: {
+					industry: null,
+					size_range: null,
+					tags: null,
+					location: null,
+					country: null,
+				},
+				competitors: null,
+				contacts: null,
+				discovered_existing: null,
+				proposed_updates: null,
+				pending_paid_actions: null,
+			}
+
+			// WHEN decoded
+			const withEntry = decodeJson(
+				JSON.stringify({ ...base, attributes: [entry] }),
+			) as { attributes?: unknown }
+			const withNone = decodeJson(
+				JSON.stringify({ ...base, attributes: null }),
+			) as { attributes?: unknown }
+
+			// THEN the entry arrives as written and the null leaves no field
+			expect(withEntry.attributes).toEqual([entry])
+			expect(withNone).not.toHaveProperty('attributes')
 		})
 	})
 })

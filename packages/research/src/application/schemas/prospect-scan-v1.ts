@@ -1,6 +1,7 @@
 import { Schema } from 'effect'
 
 import {
+	AttributeEntries,
 	Citation,
 	DiscoveredExisting,
 	LenientNumber,
@@ -10,134 +11,157 @@ import {
 	Sourced,
 } from './_shared'
 
-export const ProspectScanV1Schema = Schema.Struct({
-	prospects: Schema.Array(
-		Schema.Struct({
-			name: Schema.String,
-			website: Schema.optionalKey(
-				Sourced(
-					Schema.String.annotate({
-						description:
-							"The prospect's own official website, and the page you read it on — the site the company itself runs. It must belong to the named company: not a directory/aggregator profile page, not another company that happened to appear in search results, and not a page on a social platform. A company's Facebook, Instagram or LinkedIn page goes in `social_profiles`, never here, even when it is the only web presence you can find. Leave it out rather than assembling an address from the company's name: a guessed domain is worse than none.",
-					}),
-				),
-			),
-			// Where the company can be found on a platform, which is not the same
-			// question as its website and must not be answered in that field: a page
-			// on Facebook belongs to whoever opened the account, and a reader sent
-			// there instead of to the company's own site has been misled.
-			social_profiles: Schema.optionalKey(Schema.Array(SocialProfile)),
-			// Both paired with the page they were read on, like the website, the
-			// headcount and the place. Written bare they were out of every check's
-			// reach — the per-field guard only grades a value that names its source
-			// — so a registration number the model assembled and a trade it inferred
-			// from the request rather than from the company both travelled the whole
-			// way to a reader with nothing behind them.
-			tax_id: Schema.optionalKey(
-				Sourced(
-					Schema.String.annotate({
-						description:
-							'The number the company is registered or taxed under, copied exactly as printed — a Spanish NIF/CIF, a UK company number, an EU VAT number. Take it only from a page that states it for THIS company (its own legal notice or imprint, or an official register); never assemble or infer one.',
-					}),
-				),
-			),
-			industry: Schema.optionalKey(
-				Sourced(
-					Schema.String.annotate({
-						description:
-							"What the company actually does, in the words its own pages use. Take it from the company's own site where there is one, not from the request: a trade copied back off the request says only that the search asked for it.",
-					}),
-				),
-			),
-			countries: Schema.optionalKey(
-				Schema.Array(
-					Schema.String.annotate({
-						description: 'ISO 3166-1 alpha-2 country code, e.g. US, ES, DE.',
-					}),
-				).annotate({
-					description:
-						'Every country the company has a place in — a plant, an office, a depot — not only the one it is registered in, and listed with the registered one first. A firm headquartered in one country and manufacturing in another belongs in both: a request for one of them is asking about a company that operates there, and naming only the registration would read as a company that does not.',
-				}),
-			),
-			// A request confined to one country puts the same code on every row, which
-			// tells a reader working through the list nothing; the town and the
-			// province are what decide who to call first, and a search that turns up a
-			// company almost always turns those up with it.
-			// Paired with the page it was read on, like the website and the headcount
-			// above. Written bare, it was the one field on this row that no check
-			// could reach: the per-field guard only grades a value that names its
-			// source, so a place nothing supported — the requested area, with the
-			// towns around it in brackets — travelled all the way onto a CRM record
-			// and then onto a map.
-			location: Schema.optionalKey(
-				Sourced(
-					Schema.String.annotate({
-						description:
-							'Where the company is, written the way the evidence writes it — the town, the province, or both ("Córdoba", "Alcobendas, Madrid"). Only when a source states it for this company: name the page you read it on. The area the request asked about is not an answer — a company is somewhere, and the places it will travel to are a different question.',
-					}),
-				),
-			),
-			employee_estimate: Schema.optionalKey(
-				Sourced(
-					LenientNumber.annotate({
-						description:
-							'How many people work there, as a single whole number, only when a source states it (a page, a profile, a directory entry). Leave it out rather than guessing — a size band is not enough.',
-					}),
-				),
-			),
-			// The one field every row has to fill, so it is where a row is asked to say
-			// what the organisation IS before saying why it matches. That is what lets
-			// a check downstream tell a company from the trade body that represents
-			// companies — the two are indistinguishable from the other fields, and a
-			// body states neither a size nor a place to be filtered on.
-			why_relevant: Schema.String.annotate({
+// The fields of one company a scan found. Shared so the row that leaves the
+// attribute list out cannot drift from the row that keeps it.
+const prospectFields = {
+	name: Schema.String,
+	website: Schema.optionalKey(
+		Sourced(
+			Schema.String.annotate({
 				description:
-					'What this organisation is in its own right first — an installer, a manufacturer, a distributor, and roughly how big — and then why it matches the request.',
+					"The prospect's own official website, and the page you read it on — the site the company itself runs. It must belong to the named company: not a directory/aggregator profile page, not another company that happened to appear in search results, and not a page on a social platform. A company's Facebook, Instagram or LinkedIn page goes in `social_profiles`, never here, even when it is the only web presence you can find. Leave it out rather than assembling an address from the company's name: a guessed domain is worse than none.",
 			}),
-			// The marked-candidate half of "keep what you could not confirm". Without
-			// somewhere to record the doubt, a run asked not to drop an unconfirmed
-			// company has only two ways to answer: drop it anyway, or report it as
-			// solid. Both lose the one thing the reader needs to know.
-			unconfirmed_reason: Schema.optionalKey(
-				Schema.String.annotate({
-					description:
-						'Only about whether this is a real, trading company: fill it when the evidence names the company but does not establish that it exists and trades, saying in a few words what is missing. Never drop a company for want of that — list it with this instead. A field you could not confirm is not a reason to fill this: leave that field out and this one too.',
-				}),
-			),
-			// The people a search could name from pages it already read, so a list of
-			// companies arrives with somebody to ask for rather than a name and a
-			// phone number nobody answers.
-			//
-			// Deliberately thinner than the shape a contact-discovery run fills. It
-			// holds what a page states — who they are and what they are called — and
-			// no way of reaching them: an address is either published, in which case
-			// the company's own email already carries it, or it is guessed and
-			// checked, which costs money per person and is work a person approves for
-			// one company rather than a search doing it for fifty.
-			contacts: Schema.optionalKey(
-				Schema.Array(
-					Schema.Struct({
-						name: Schema.String.annotate({
-							description:
-								'The person as the page names them, in full. Not a job title on its own, and not a department.',
-						}),
-						role: Schema.optionalKey(
-							Schema.String.annotate({
-								description:
-									'Their title exactly as the page gives it, in its own language — "Gerent", "Responsable de producció". Leave it out rather than translating or inventing one.',
-							}),
-						),
-						citations: Schema.Array(Citation),
-					}),
-				).annotate({
-					description:
-						'Only people this company\'s own pages name — a team, leadership, management or "equipo" page. Never a person read off a directory listing about the company, and never somebody carried over from another company on the list.',
-				}),
-			),
-			citations: Schema.Array(Citation),
+		),
+	),
+	// Where the company can be found on a platform, which is not the same
+	// question as its website and must not be answered in that field: a page
+	// on Facebook belongs to whoever opened the account, and a reader sent
+	// there instead of to the company's own site has been misled.
+	social_profiles: Schema.optionalKey(Schema.Array(SocialProfile)),
+	// Both paired with the page they were read on, like the website, the
+	// headcount and the place. Written bare they were out of every check's
+	// reach — the per-field guard only grades a value that names its source
+	// — so a registration number the model assembled and a trade it inferred
+	// from the request rather than from the company both travelled the whole
+	// way to a reader with nothing behind them.
+	tax_id: Schema.optionalKey(
+		Sourced(
+			Schema.String.annotate({
+				description:
+					'The number the company is registered or taxed under, copied exactly as printed — a Spanish NIF/CIF, a UK company number, an EU VAT number. Take it only from a page that states it for THIS company (its own legal notice or imprint, or an official register); never assemble or infer one.',
+			}),
+		),
+	),
+	industry: Schema.optionalKey(
+		Sourced(
+			Schema.String.annotate({
+				description:
+					"What the company actually does, in the words its own pages use. Take it from the company's own site where there is one, not from the request: a trade copied back off the request says only that the search asked for it.",
+			}),
+		),
+	),
+	countries: Schema.optionalKey(
+		Schema.Array(
+			Schema.String.annotate({
+				description: 'ISO 3166-1 alpha-2 country code, e.g. US, ES, DE.',
+			}),
+		).annotate({
+			description:
+				'Every country the company has a place in — a plant, an office, a depot — not only the one it is registered in, and listed with the registered one first. A firm headquartered in one country and manufacturing in another belongs in both: a request for one of them is asking about a company that operates there, and naming only the registration would read as a company that does not.',
 		}),
 	),
+	// A request confined to one country puts the same code on every row, which
+	// tells a reader working through the list nothing; the town and the
+	// province are what decide who to call first, and a search that turns up a
+	// company almost always turns those up with it.
+	// Paired with the page it was read on, like the website and the headcount
+	// above. Written bare, it was the one field on this row that no check
+	// could reach: the per-field guard only grades a value that names its
+	// source, so a place nothing supported — the requested area, with the
+	// towns around it in brackets — travelled all the way onto a CRM record
+	// and then onto a map.
+	location: Schema.optionalKey(
+		Sourced(
+			Schema.String.annotate({
+				description:
+					'Where the company is, written the way the evidence writes it — the town, the province, or both ("Córdoba", "Alcobendas, Madrid"). Only when a source states it for this company: name the page you read it on. The area the request asked about is not an answer — a company is somewhere, and the places it will travel to are a different question.',
+			}),
+		),
+	),
+	employee_estimate: Schema.optionalKey(
+		Sourced(
+			LenientNumber.annotate({
+				description:
+					'How many people work there, as a single whole number, only when a source states it (a page, a profile, a directory entry). Leave it out rather than guessing — a size band is not enough.',
+			}),
+		),
+	),
+	// The one field every row has to fill, so it is where a row is asked to say
+	// what the organisation IS before saying why it matches. That is what lets
+	// a check downstream tell a company from the trade body that represents
+	// companies — the two are indistinguishable from the other fields, and a
+	// body states neither a size nor a place to be filtered on.
+	why_relevant: Schema.String.annotate({
+		description:
+			'What this organisation is in its own right first — an installer, a manufacturer, a distributor, and roughly how big — and then why it matches the request.',
+	}),
+	// The marked-candidate half of "keep what you could not confirm". Without
+	// somewhere to record the doubt, a run asked not to drop an unconfirmed
+	// company has only two ways to answer: drop it anyway, or report it as
+	// solid. Both lose the one thing the reader needs to know.
+	unconfirmed_reason: Schema.optionalKey(
+		Schema.String.annotate({
+			description:
+				'Only about whether this is a real, trading company: fill it when the evidence names the company but does not establish that it exists and trades, saying in a few words what is missing. Never drop a company for want of that — list it with this instead. A field you could not confirm is not a reason to fill this: leave that field out and this one too.',
+		}),
+	),
+	// The people a search could name from pages it already read, so a list of
+	// companies arrives with somebody to ask for rather than a name and a
+	// phone number nobody answers.
+	//
+	// Deliberately thinner than the shape a contact-discovery run fills. It
+	// holds what a page states — who they are and what they are called — and
+	// no way of reaching them: an address is either published, in which case
+	// the company's own email already carries it, or it is guessed and
+	// checked, which costs money per person and is work a person approves for
+	// one company rather than a search doing it for fifty.
+	contacts: Schema.optionalKey(
+		Schema.Array(
+			Schema.Struct({
+				name: Schema.String.annotate({
+					description:
+						'The person as the page names them, in full. Not a job title on its own, and not a department.',
+				}),
+				role: Schema.optionalKey(
+					Schema.String.annotate({
+						description:
+							'Their title exactly as the page gives it, in its own language — "Gerent", "Responsable de producció". Leave it out rather than translating or inventing one.',
+					}),
+				),
+				citations: Schema.Array(Citation),
+			}),
+		).annotate({
+			description:
+				'Only people this company\'s own pages name — a team, leadership, management or "equipo" page. Never a person read off a directory listing about the company, and never somebody carried over from another company on the list.',
+		}),
+	),
+	// The facts the organisation declared for this run, one entry each,
+	// read for this company alone.
+	attributes: AttributeEntries,
+	citations: Schema.Array(Citation),
+}
+
+// Everything a scan reports beside the companies themselves, the same in both
+// shapes.
+const scanFields = {
 	discovered_existing: Schema.optionalKey(Schema.Array(DiscoveredExisting)),
 	proposed_updates: Schema.optionalKey(Schema.Array(ProposedUpdate)),
 	pending_paid_actions: Schema.optionalKey(Schema.Array(PendingPaidAction)),
+}
+
+export const ProspectScanV1Schema = Schema.Struct({
+	prospects: Schema.Array(Schema.Struct(prospectFields)),
+	...scanFields,
+})
+
+// The same scan whose rows have no place to put attribute values, for a run
+// whose organisation declared none: offering the field on every row spends
+// tokens on a list every guard would throw away, and invites the model to make
+// one up.
+const { attributes: _attributes, ...prospectFieldsWithoutAttributes } =
+	prospectFields
+
+export const ProspectScanV1NoAttributesSchema = Schema.Struct({
+	prospects: Schema.Array(Schema.Struct(prospectFieldsWithoutAttributes)),
+	...scanFields,
 })

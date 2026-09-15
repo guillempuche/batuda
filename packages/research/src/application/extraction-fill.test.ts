@@ -25,7 +25,6 @@ describe('ENRICHMENT_FIELDS', () => {
 		// have found one and did not is exactly what this measure is for
 		expect([...ENRICHMENT_FIELDS].sort()).toEqual([
 			'country',
-			'current_tools',
 			'email',
 			'industry',
 			'location',

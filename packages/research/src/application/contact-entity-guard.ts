@@ -327,7 +327,7 @@ export const bindScanContactsToRows = (
 				lowerCorpus !== '' &&
 				typeof role === 'string' &&
 				role.trim() !== '' &&
-				!isInCorpus(role, lowerCorpus)
+				!isInCorpus(role, lowerCorpus, { acronyms: true })
 			) {
 				droppedTitles++
 				const { role: _removed, ...withoutRole } = held

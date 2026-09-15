@@ -184,22 +184,25 @@ describe('verifyValueProvenance', () => {
 			expect(result.droppedProposals).toBe(0)
 		})
 
-		it('should hold the camelCase tools field to the page too', () => {
-			// GIVEN a proposal naming a tool the evidence never mentions, keyed the
-			// way a CRM write keys it
-			const corpus = 'The company runs its fleet on an in-house system.'
-			const findings = {
-				proposed_updates: [
-					{ subject_id: 'c1', fields: { currentTools: 'Salesforce CRM' } },
-				],
+		it('should hold a proposed title to the page too', () => {
+			// GIVEN a proposal giving a person a title the evidence never gives,
+			// and one giving a title the page states
+			const corpus = 'Ana Puig, gerent de la planta, runs the site in Manresa.'
+			const invented = {
+				proposed_updates: [{ subject_id: 'p1', fields: { role: 'CEO' } }],
+			}
+			const stated = {
+				proposed_updates: [{ subject_id: 'p1', fields: { role: 'Gerent' } }],
 			}
 
 			// WHEN checked
-			const result = verifyValueProvenance(findings, corpus)
+			const dropped = verifyValueProvenance(invented, corpus)
+			const kept = verifyValueProvenance(stated, corpus)
 
-			// THEN the invented tool is dropped
-			expect(proposals(result.findings)).toHaveLength(0)
-			expect(result.droppedProposals).toBe(1)
+			// THEN the invented title is dropped and the stated one survives
+			expect(proposals(dropped.findings)).toHaveLength(0)
+			expect(dropped.droppedProposals).toBe(1)
+			expect(proposals(kept.findings)).toHaveLength(1)
 		})
 
 		it('should drop a proposal whose location names a reach, not a place', () => {
@@ -250,7 +253,7 @@ describe('verifyValueProvenance', () => {
 				proposed_updates: [
 					{ subject_id: 'a', fields: { phone: '936123456' } },
 					{ subject_id: 'b', fields: { email: 'fake@nowhere.io' } },
-					{ subject_id: 'c', fields: { role: 'friendly sort' } },
+					{ subject_id: 'c', fields: { notes: 'friendly sort' } },
 				],
 			}
 

@@ -151,7 +151,7 @@ export const verifyValueProvenance = (
 		// check against at all, so a real value is never dropped for want of a
 		// corpus.
 		if (PAGE_LITERAL_FIELDS.has(key) && ev.lowerCorpus.length > 0) {
-			return isInCorpus(value, ev.lowerCorpus)
+			return isInCorpus(value, ev.lowerCorpus, { acronyms: key === 'role' })
 		}
 		return true
 	}

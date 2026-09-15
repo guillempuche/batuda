@@ -589,6 +589,16 @@ const foldInto = (
 			).contacts
 			continue
 		}
+		// Two rows of one company each carry the attributes their page stated;
+		// joined by key, and where both have one the surviving row's stands.
+		if (field === 'attributes' && isPlainObject(value)) {
+			const held = kept['attributes']
+			merged['attributes'] = {
+				...value,
+				...(isPlainObject(held) ? held : {}),
+			}
+			continue
+		}
 		if (field === 'location' && alsoElsewhere) {
 			// A row that names nowhere leaves the field as it found it, rather than
 			// putting an empty reading where there was no field at all.

@@ -520,6 +520,39 @@ describe('bindScanContactsToRows', () => {
 		})
 	})
 
+	describe('when a title is an acronym no page the run read writes', () => {
+		it('should take it off, since an acronym is the whole of what a model may have made up', () => {
+			// GIVEN a person titled "CEO" whose pages name them but never the title
+			const findings = {
+				prospects: [
+					row('Egein', [
+						{
+							name: 'David Garrido',
+							role: 'CEO',
+							citations: [
+								{
+									quote: 'David Garrido',
+									source_id: 'https://example.com',
+									confidence: 90,
+								},
+							],
+						},
+					]),
+				],
+			}
+
+			// WHEN checked against a corpus that names the person and not the title
+			const result = bindScanContactsToRows(
+				findings,
+				'prospects',
+				'David Garrido leads the Egein team in Girona',
+			)
+
+			// THEN the title goes and the person stays
+			expect(result.droppedTitles).toBe(1)
+		})
+	})
+
 	describe('when a title is written on a page the run read', () => {
 		it('should keep it', () => {
 			// GIVEN a title copied verbatim off the team page
