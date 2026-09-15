@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-09-15 (internal-v2026.9.15)
+
+### Features
+
+* **cli:** make a research quality pass one command that cannot be misconfigured ([81a2f65](https://github.com/guillempuche/batuda/commit/81a2f656483b25a95f48a40a07cd1fef8d72dacf))
+* fill declared attributes from evidence and hold values to the page ([4a29c65](https://github.com/guillempuche/batuda/commit/4a29c6569cab37f2aacdb56bcc45a81ef90cb53d)), closes [#644](https://github.com/guillempuche/batuda/issues/644) [#645](https://github.com/guillempuche/batuda/issues/645) [#646](https://github.com/guillempuche/batuda/issues/646) [#647](https://github.com/guillempuche/batuda/issues/647)
+* **internal:** declare, show and filter a campaign's attributes ([6faffa9](https://github.com/guillempuche/batuda/commit/6faffa99451457f82a6ba3b2542c2d34b1782eed))
+* let a campaign declare the attributes recorded on every company ([ee1ec51](https://github.com/guillempuche/batuda/commit/ee1ec5157365764ced6de0a0d2d86d3d967b3776))
+* **research:** keep a title in the page's words, glossed in English ([8739f1f](https://github.com/guillempuche/batuda/commit/8739f1fd38678a94d6360b5b657ae8f1981ec5bc))
+
+### Bug Fixes
+
+* hold a title by its initials and keep a twice-cut research reply ([6971988](https://github.com/guillempuche/batuda/commit/69719887c9727719de7ae2da280bdb5103193f2c))
+* **research:** reach a small firm's about page and its legal notice ([92200fb](https://github.com/guillempuche/batuda/commit/92200fbe7a2dc64678e4e0c3892b8932a23e8965))
+* **research:** read a page whole when its main block is a cookie notice ([d782098](https://github.com/guillempuche/batuda/commit/d7820987f074ee54cbe3c12c6e9b4bdbb1ac4eed))
+
 ## 2026-09-12 (internal-v2026.9.12-2)
 
 ### Bug Fixes
