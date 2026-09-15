@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-09-15 (mail-worker-v2026.9.15)
+
+### Features
+
+* fill declared attributes from evidence and hold values to the page ([4a29c65](https://github.com/guillempuche/batuda/commit/4a29c6569cab37f2aacdb56bcc45a81ef90cb53d)), closes [#644](https://github.com/guillempuche/batuda/issues/644) [#645](https://github.com/guillempuche/batuda/issues/645) [#646](https://github.com/guillempuche/batuda/issues/646) [#647](https://github.com/guillempuche/batuda/issues/647)
+* let a campaign declare the attributes recorded on every company ([ee1ec51](https://github.com/guillempuche/batuda/commit/ee1ec5157365764ced6de0a0d2d86d3d967b3776))
+* **research:** keep a title in the page's words, glossed in English ([8739f1f](https://github.com/guillempuche/batuda/commit/8739f1fd38678a94d6360b5b657ae8f1981ec5bc))
+
 ## 2026-09-12 (mail-worker-v2026.9.12-1)
 
 ### Bug Fixes
