@@ -21,6 +21,11 @@ msgstr "—"
 msgid "— Select a company —"
 msgstr "— Select a company —"
 
+#. placeholder {0}: confirming?.label ?? ''
+#: src/components/instructions/attribute-section.tsx
+msgid "\"{0}\" goes off this campaign and runs stop filling it. The values companies already hold stay on their pages."
+msgstr "\"{0}\" goes off this campaign and runs stop filling it. The values companies already hold stay on their pages."
+
 #. placeholder {0}: row.name
 #: src/components/instructions/template-library.tsx
 msgid "\"{0}\" is theirs now, so it has left your library."
@@ -191,6 +196,10 @@ msgstr "{0} thread could not be updated."
 msgid "{0}: showing {1} of {shelfTotal} tasks."
 msgstr "{0}: showing {1} of {shelfTotal} tasks."
 
+#: src/components/instructions/attribute-section.tsx
+msgid "{active} of {ATTRIBUTES_PER_STACK_MAX} active"
+msgstr "{active} of {ATTRIBUTES_PER_STACK_MAX} active"
+
 #: src/routes/_authed/settings/organization/members.tsx
 msgid "{addedEmail} is now a member. They've been emailed."
 msgstr "{addedEmail} is now a member. They've been emailed."
@@ -199,6 +208,7 @@ msgstr "{addedEmail} is now a member. They've been emailed."
 msgid "{confirmLabel}'s assistant stops reaching this organization on its next request. It keeps working in any other organization they belong to, and they can't undo this themselves."
 msgstr "{confirmLabel}'s assistant stops reaching this organization on its next request. It keeps working in any other organization they belong to, and they can't undo this themselves."
 
+#: src/components/companies/attribute-filter.tsx
 #: src/routes/_authed/companies/index.tsx
 #: src/routes/_authed/companies/index.tsx
 #: src/routes/_authed/companies/index.tsx
@@ -335,9 +345,29 @@ msgstr "90%+"
 msgid "A \"Re:\" on a message that answers nothing reads as a forged reply. Reply from the conversation, or drop the \"Re:\"."
 msgstr "A \"Re:\" on a message that answers nothing reads as a forged reply. Reply from the conversation, or drop the \"Re:\"."
 
+#: src/components/instructions/attribute-dialog.tsx
+msgid "A fact I record on every company \"{stackName}\" researches."
+msgstr "A fact I record on every company \"{stackName}\" researches."
+
+#: src/components/instructions/attribute-dialog.tsx
+msgid "A fact I record on every company I research."
+msgstr "A fact I record on every company I research."
+
 #: src/routes/_authed/index.tsx
 msgid "A high-priority company that has gone quiet is listed once, under Needs attention."
 msgstr "A high-priority company that has gone quiet is listed once, under Needs attention."
+
+#: src/components/instructions/attribute-messages.ts
+msgid "A key is lowercase letters, digits and underscores, starts with a letter, and is at least 2 characters long."
+msgstr "A key is lowercase letters, digits and underscores, starts with a letter, and is at least 2 characters long."
+
+#: src/components/instructions/attribute-dialog.tsx
+msgid "A key stays as it was declared, so the values companies already hold keep their name."
+msgstr "A key stays as it was declared, so the values companies already hold keep their name."
+
+#: src/components/instructions/attribute-messages.ts
+msgid "A research run already uses that name for something else. Pick another key."
+msgstr "A research run already uses that name for something else. Pick another key."
 
 #: src/components/instructions/template-dialog.tsx
 msgid "A short label. Start it with a [tag] like [research] to group related templates if you like — the brackets are just part of the name."
@@ -474,6 +504,10 @@ msgstr "Add at least one template before saving."
 #: src/components/emails/attachment-picker.tsx
 msgid "Add attachment"
 msgstr "Add attachment"
+
+#: src/components/instructions/attribute-section.tsx
+msgid "Add attribute"
+msgstr "Add attribute"
 
 #: src/components/emails/compose-form.tsx
 msgid "Add Cc / Bcc"
@@ -618,6 +652,10 @@ msgstr "Allow again"
 msgid "Allow again — {memberLabel}'s {assistantLabel}"
 msgstr "Allow again — {memberLabel}'s {assistantLabel}"
 
+#: src/components/instructions/attribute-dialog.tsx
+msgid "Allowed values"
+msgstr "Allowed values"
+
 #. placeholder {0}: change.to
 #: src/components/research/inbox/research-inbox.tsx
 msgid "already {0}"
@@ -668,6 +706,10 @@ msgstr "Another company may be using its name now."
 msgid "Another industry may already go by that name — merge them instead."
 msgstr "Another industry may already go by that name — merge them instead."
 
+#: src/components/instructions/attribute-messages.ts
+msgid "Another stack already declares this key with a different kind, unit or choices. Match it or pick another key."
+msgstr "Another stack already declares this key with a different kind, unit or choices. Match it or pick another key."
+
 #: src/components/research/research-dialog.tsx
 msgid "Any"
 msgstr "Any"
@@ -676,6 +718,10 @@ msgstr "Any"
 msgid "Any agent using \"{confirmLabel}\" will stop working. This can't be undone."
 msgstr "Any agent using \"{confirmLabel}\" will stop working. This can't be undone."
 
+#: src/components/companies/attribute-filter.tsx
+msgid "Any attribute"
+msgstr "Any attribute"
+
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Any confidence"
 msgstr "Any confidence"
@@ -683,6 +729,10 @@ msgstr "Any confidence"
 #: src/routes/_authed/companies/index.tsx
 msgid "Any priority"
 msgstr "Any priority"
+
+#: src/components/companies/attribute-filter.tsx
+msgid "Any value"
+msgstr "Any value"
 
 #: src/routes/_authed/companies/index.tsx
 msgid "Anything"
@@ -743,6 +793,10 @@ msgid "Applying a discovered contact merges it into a matching record if one alr
 msgstr "Applying a discovered contact merges it into a matching record if one already exists."
 
 #: src/components/research/review/proposed-updates-review.tsx
+msgid "Applying also records these attributes from the run's evidence, unless someone set them by hand."
+msgstr "Applying also records these attributes from the run's evidence, unless someone set them by hand."
+
+#: src/components/research/review/proposed-updates-review.tsx
 msgid "Applying also replaces the company's account brief with this run's write-up. Nothing keeps what is there now."
 msgstr "Applying also replaces the company's account brief with this run's write-up. Nothing keeps what is there now."
 
@@ -786,6 +840,7 @@ msgstr "Archived — not pursuing"
 msgid "Argues for it inside"
 msgstr "Argues for it inside"
 
+#: src/components/companies/attribute-field.tsx
 #: src/components/companies/company-fit-section.tsx
 msgid "as of"
 msgstr "as of"
@@ -819,9 +874,17 @@ msgstr "Assistant"
 msgid "Assistants this organization has stopped. Allowing one back lets it reach this organization again from its next request, and nothing else — it can never reach an organization its owner has not chosen."
 msgstr "Assistants this organization has stopped. Allowing one back lets it reach this organization again from its next request, and nothing else — it can never reach an organization its owner has not chosen."
 
+#: src/components/companies/attribute-filter.tsx
+msgid "at least"
+msgstr "at least"
+
 #: src/components/research/run-detail.tsx
 msgid "At least one of these results needs reading before it is used. Open the ones marked below."
 msgstr "At least one of these results needs reading before it is used. Open the ones marked below."
+
+#: src/components/companies/attribute-filter.tsx
+msgid "at most"
+msgstr "at most"
 
 #: src/components/emails/attachment-picker.tsx
 msgid "Attach"
@@ -840,6 +903,36 @@ msgstr "Attention"
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Attention needed"
 msgstr "Attention needed"
+
+#: src/components/companies/attribute-filter.tsx
+msgid "Attribute"
+msgstr "Attribute"
+
+#: src/components/companies/attribute-filter.tsx
+msgid "Attribute {chosenKey}"
+msgstr "Attribute {chosenKey}"
+
+#: src/components/companies/attribute-filter.tsx
+msgid "Attribute {chosenKey}, no longer declared"
+msgstr "Attribute {chosenKey}, no longer declared"
+
+#: src/components/instructions/attribute-section.tsx
+msgid "Attribute deleted"
+msgstr "Attribute deleted"
+
+#: src/components/instructions/attribute-dialog.tsx
+msgid "Attribute saved"
+msgstr "Attribute saved"
+
+#: src/components/companies/about-section.tsx
+#: src/components/instructions/attribute-section.tsx
+#: src/components/research/findings/attributes-block.tsx
+msgid "Attributes"
+msgstr "Attributes"
+
+#: src/components/instructions/attribute-section.tsx
+msgid "Attributes belong to a campaign. Create an org stack first."
+msgstr "Attributes belong to a campaign. Create an org stack first."
 
 #: src/routes/_authed/tasks/index.tsx
 msgid "Audit log"
@@ -1050,6 +1143,7 @@ msgstr "Calls"
 #: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/contacts/manage-channels-dialog.tsx
+#: src/components/instructions/attribute-dialog.tsx
 #: src/components/instructions/stack-editor.tsx
 #: src/components/instructions/template-dialog.tsx
 #: src/components/instructions/template-transfer-dialog.tsx
@@ -1149,6 +1243,10 @@ msgstr "ChatGPT and Claude.ai can't send a key, so they connect over OAuth. Add 
 msgid "Check your inbox"
 msgstr "Check your inbox"
 
+#: src/components/instructions/attribute-messages.ts
+msgid "Choice"
+msgstr "Choice"
+
 #: src/routes/_authed/settings/mcp/connections.tsx
 msgid "Choose organizations"
 msgstr "Choose organizations"
@@ -1166,6 +1264,7 @@ msgstr "Choose someone in your organization"
 msgid "Claude Desktop can't reach a remote server directly, so this bridges through <0>mcp-remote</0> (needs Node installed). Or add it as an OAuth connector instead."
 msgstr "Claude Desktop can't reach a remote server directly, so this bridges through <0>mcp-remote</0> (needs Node installed). Or add it as an OAuth connector instead."
 
+#: src/components/companies/attribute-field.tsx
 #: src/components/companies/pipeline-board.tsx
 #: src/components/shared/multi-select-filter.tsx
 #: src/components/shared/task-item.tsx
@@ -1181,6 +1280,10 @@ msgstr "Clear"
 msgid "Clear filters"
 msgstr "Clear filters"
 
+#: src/components/companies/attribute-filter.tsx
+msgid "Clear the attribute filter"
+msgstr "Clear the attribute filter"
+
 #: src/routes/_authed/settings/organization/templates.tsx
 msgid "Clear the org default"
 msgstr "Clear the org default"
@@ -1188,6 +1291,10 @@ msgstr "Clear the org default"
 #: src/routes/_authed/settings/organization/templates.tsx
 msgid "Clear the org default?"
 msgstr "Clear the org default?"
+
+#: src/components/companies/attribute-field.tsx
+msgid "Clear?"
+msgstr "Clear?"
 
 #: src/routes/_authed/emails/$threadId.tsx
 msgid "Clicked"
@@ -1204,6 +1311,7 @@ msgstr "Client"
 #: src/components/companies/where-panel-client.client.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/contacts/manage-channels-dialog.tsx
+#: src/components/instructions/attribute-dialog.tsx
 #: src/components/instructions/template-dialog.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/components/research/research-dialog.tsx
@@ -1258,6 +1366,7 @@ msgstr "Collapse"
 msgid "Columns"
 msgstr "Columns"
 
+#: src/components/companies/attribute-filter.tsx
 #: src/components/emails/compose-form.tsx
 #: src/components/emails/compose-form.tsx
 msgid "Comma-separated"
@@ -1271,6 +1380,10 @@ msgstr "Comms"
 #: src/routes/_authed/companies/index.tsx
 msgid "Companies"
 msgstr "Companies"
+
+#: src/components/instructions/attribute-messages.ts
+msgid "Companies already hold values under this key, so its kind, unit and choices cannot change. Retire it and declare a new key instead."
+msgstr "Companies already hold values under this key, so its kind, unit and choices cannot change. Retire it and declare a new key instead."
 
 #: src/routes/_authed/index.tsx
 msgid "Companies marked hot with nothing scheduled at all. One that has also gone quiet is listed above instead, so it is only asked after once."
@@ -1440,6 +1553,10 @@ msgstr "Contacts found"
 #: src/routes/_authed/companies/$slug.tsx
 msgid "Contacts loaded: {0}"
 msgstr "Contacts loaded: {0}"
+
+#: src/components/companies/attribute-filter.tsx
+msgid "contains"
+msgstr "contains"
 
 #: src/routes/_authed/emails/inboxes.tsx
 msgid "Content"
@@ -1816,6 +1933,10 @@ msgstr "Could not update this lookup."
 msgid "Could not update verification"
 msgstr "Could not update verification"
 
+#: src/components/instructions/attribute-messages.ts
+msgid "Couldn't change the attribute. Please try again."
+msgstr "Couldn't change the attribute. Please try again."
+
 #: src/components/emails/compose-form.tsx
 msgid "Couldn't check whether these addresses can receive email. Sending will still be stopped if one of them can't."
 msgstr "Couldn't check whether these addresses can receive email. Sending will still be stopped if one of them can't."
@@ -1849,6 +1970,10 @@ msgstr "Couldn't delete the template. Please try again."
 msgid "Couldn't hand it over"
 msgstr "Couldn't hand it over"
 
+#: src/components/instructions/attribute-section.tsx
+msgid "Couldn't load the attributes."
+msgstr "Couldn't load the attributes."
+
 #: src/routes/_authed/settings/organization/templates.tsx
 #: src/routes/_authed/settings/organization/templates.tsx
 msgid "Couldn't load the org stacks."
@@ -1862,10 +1987,15 @@ msgstr "Couldn't load your stacks."
 msgid "Couldn't load your templates."
 msgstr "Couldn't load your templates."
 
+#: src/components/instructions/attribute-section.tsx
 #: src/components/instructions/stack-editor.tsx
 #: src/components/instructions/stack-editor.tsx
 msgid "Couldn't save"
 msgstr "Couldn't save"
+
+#: src/components/instructions/attribute-messages.ts
+msgid "Couldn't save the attribute. Please try again."
+msgstr "Couldn't save the attribute. Please try again."
 
 #: src/components/instructions/stack-editor.tsx
 msgid "Couldn't save the stack. Please try again."
@@ -2012,11 +2142,6 @@ msgstr "Current password"
 msgid "Current password is incorrect."
 msgstr "Current password is incorrect."
 
-#: src/components/research/findings/company-enrichment-view.tsx
-#: src/components/research/run-labels.ts
-msgid "Current tools"
-msgstr "Current tools"
-
 #: src/components/research/inbox/research-inbox.tsx
 msgid "currently"
 msgstr "currently"
@@ -2033,6 +2158,7 @@ msgstr "Dark"
 msgid "Dark, high contrast"
 msgstr "Dark, high contrast"
 
+#: src/components/instructions/attribute-messages.ts
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Date"
 msgstr "Date"
@@ -2077,8 +2203,9 @@ msgid "Delete"
 msgstr "Delete"
 
 #. placeholder {0}: company.name
+#. placeholder {0}: row.label
 #. placeholder {0}: row.name
-#. placeholder {0}: stack.name
+#: src/components/instructions/attribute-section.tsx
 #: src/components/instructions/stack-list.tsx
 #: src/components/instructions/template-library.tsx
 #: src/routes/_authed/companies/$slug.tsx
@@ -2106,6 +2233,10 @@ msgstr "Delete inbox {0}? Stored messages stay; the connection stops."
 #: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Delete key"
 msgstr "Delete key"
+
+#: src/components/instructions/attribute-section.tsx
+msgid "Delete this attribute?"
+msgstr "Delete this attribute?"
 
 #: src/routes/_authed/companies/$slug.tsx
 msgid "Delete this company?"
@@ -2295,6 +2426,18 @@ msgstr "e.g. independent bakeries in Barcelona with 5–20 staff"
 msgid "e.g. Marta Puig"
 msgstr "e.g. Marta Puig"
 
+#: src/components/instructions/attribute-dialog.tsx
+msgid "e.g. Number of sites"
+msgstr "e.g. Number of sites"
+
+#: src/components/instructions/attribute-dialog.tsx
+msgid "e.g. own fleet, hired, both"
+msgstr "e.g. own fleet, hired, both"
+
+#: src/components/instructions/attribute-dialog.tsx
+msgid "e.g. Premises the company runs, not the ones it sells to."
+msgstr "e.g. Premises the company runs, not the ones it sells to."
+
 #: src/routes/_authed/emails/inboxes.tsx
 msgid "e.g. Sales — Acme"
 msgstr "e.g. Sales — Acme"
@@ -2303,9 +2446,17 @@ msgstr "e.g. Sales — Acme"
 msgid "e.g. Setup fee"
 msgstr "e.g. Setup fee"
 
+#: src/components/instructions/attribute-dialog.tsx
+msgid "e.g. sites"
+msgstr "e.g. sites"
+
 #: src/components/research/research-dialog.tsx
 msgid "e.g. vip, warm"
 msgstr "e.g. vip, warm"
+
+#: src/components/instructions/attribute-messages.ts
+msgid "Each word has to be different and no longer than 32 characters."
+msgstr "Each word has to be different and no longer than 32 characters."
 
 #: src/components/companies/account-brief-section.tsx
 #: src/components/companies/documents-panel.tsx
@@ -2315,8 +2466,10 @@ msgstr "e.g. vip, warm"
 msgid "Edit"
 msgstr "Edit"
 
+#. placeholder {0}: row.label
 #. placeholder {0}: row.name
 #. placeholder {0}: stack.name
+#: src/components/instructions/attribute-section.tsx
 #: src/components/instructions/stack-list.tsx
 #: src/components/instructions/template-library.tsx
 msgid "Edit {0}"
@@ -2332,6 +2485,10 @@ msgstr "Edit {0} {1}"
 #: src/components/shared/editable-field.tsx
 msgid "Edit {label}"
 msgstr "Edit {label}"
+
+#: src/components/instructions/attribute-dialog.tsx
+msgid "Edit attribute"
+msgstr "Edit attribute"
 
 #: src/components/contacts/contact-edit-dialog.tsx
 msgid "Edit contact"
@@ -2448,9 +2605,17 @@ msgstr "English"
 msgid "Enrichment"
 msgstr "Enrichment"
 
+#: src/components/companies/attribute-field.tsx
+msgid "Enter a day as YYYY-MM-DD."
+msgstr "Enter a day as YYYY-MM-DD."
+
 #: src/routes/login.tsx
 msgid "Enter a valid email above first."
 msgstr "Enter a valid email above first."
+
+#: src/components/companies/attribute-field.tsx
+msgid "Enter a whole or decimal number."
+msgstr "Enter a whole or decimal number."
 
 #: src/routes/_authed/settings/organization/members.tsx
 msgid "Enter an email address."
@@ -2709,6 +2874,10 @@ msgstr "From booking"
 msgid "From email"
 msgstr "From email"
 
+#: src/components/companies/attribute-field.tsx
+msgid "from research"
+msgstr "from research"
+
 #: src/components/shared/task-item.tsx
 msgid "From webhook"
 msgstr "From webhook"
@@ -2737,6 +2906,10 @@ msgstr "General"
 #: src/routes/_authed/settings/mcp/index.tsx
 msgid "Give an AI assistant access to this organization's CRM. Chat apps like ChatGPT and Claude.ai connect over OAuth; coding tools use an API key."
 msgstr "Give an AI assistant access to this organization's CRM. Chat apps like ChatGPT and Claude.ai connect over OAuth; coding tools use an API key."
+
+#: src/components/instructions/attribute-messages.ts
+msgid "Give the attribute a name."
+msgstr "Give the attribute a name."
 
 #: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Give the key a name so you can recognize it later."
@@ -2811,6 +2984,10 @@ msgstr "High priority"
 msgid "Holds the budget"
 msgstr "Holds the budget"
 
+#: src/components/instructions/attribute-dialog.tsx
+msgid "How a value is read and filtered. It cannot change once companies hold values under this key."
+msgstr "How a value is read and filtered. It cannot change once companies hold values under this key."
+
 #. placeholder {0}: ch.value
 #: src/components/contacts/manage-channels-dialog.tsx
 msgid "How far {0} is trusted"
@@ -2819,6 +2996,10 @@ msgstr "How far {0} is trusted"
 #: src/components/instructions/stack-editor.tsx
 msgid "How this stack uses the org default"
 msgstr "How this stack uses the org default"
+
+#: src/components/companies/attribute-filter.tsx
+msgid "How to compare"
+msgstr "How to compare"
 
 #: src/components/research/run-detail.tsx
 msgid "I couldn't confirm the company's own website, so the findings weren't reliable enough to keep."
@@ -2876,6 +3057,10 @@ msgstr "IMAP port"
 #: src/routes/_authed/emails/inboxes.tsx
 msgid "IMAP security"
 msgstr "IMAP security"
+
+#: src/components/instructions/attribute-section.tsx
+msgid "Inactive"
+msgstr "Inactive"
 
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/routes/_authed/emails/index.tsx
@@ -2984,6 +3169,14 @@ msgstr "Interested"
 msgid "Invalid"
 msgstr "Invalid"
 
+#: src/components/companies/attribute-filter.tsx
+msgid "is"
+msgstr "is"
+
+#: src/components/companies/attribute-filter.tsx
+msgid "is one of"
+msgstr "is one of"
+
 #: src/routes/_authed/settings/mcp/connections.tsx
 msgid "It can no longer reach this organization."
 msgstr "It can no longer reach this organization."
@@ -3025,6 +3218,11 @@ msgstr "Judges whether it works"
 msgid "Just a note to yourself — it changes nothing about how the mailbox works. Up to 200 characters."
 msgstr "Just a note to yourself — it changes nothing about how the mailbox works. Up to 200 characters."
 
+#. placeholder {0}: row.label
+#: src/components/instructions/attribute-section.tsx
+msgid "Keep {0} active"
+msgstr "Keep {0} active"
+
 #: src/components/instructions/template-dialog.tsx
 msgid "Keep editing"
 msgstr "Keep editing"
@@ -3032,6 +3230,14 @@ msgstr "Keep editing"
 #: src/components/research/run-actions.tsx
 msgid "Keep it"
 msgstr "Keep it"
+
+#: src/components/companies/attribute-field.tsx
+msgid "Keep this to {ATTRIBUTE_TEXT_MAX} characters or fewer."
+msgstr "Keep this to {ATTRIBUTE_TEXT_MAX} characters or fewer."
+
+#: src/components/instructions/attribute-dialog.tsx
+msgid "Key"
+msgstr "Key"
 
 #: src/routes/_authed/settings/api-keys/index.tsx
 msgid "Key deleted"
@@ -3047,6 +3253,7 @@ msgstr "Keys let AI agents and MCP clients act on behalf of this organization."
 
 #: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/contacts/manage-channels-dialog.tsx
+#: src/components/instructions/attribute-dialog.tsx
 msgid "Kind"
 msgstr "Kind"
 
@@ -3135,6 +3342,10 @@ msgstr "Leads found"
 msgid "Let mail through again"
 msgstr "Let mail through again"
 
+#: src/components/instructions/stack-editor.tsx
+msgid "Let research runs fill this stack's attributes"
+msgstr "Let research runs fill this stack's attributes"
+
 #: src/components/profile/theme-select.tsx
 msgid "Light"
 msgstr "Light"
@@ -3153,6 +3364,10 @@ msgstr "LinkedIn"
 #: src/components/companies/companies-header.tsx
 msgid "List"
 msgstr "List"
+
+#: src/components/instructions/attribute-messages.ts
+msgid "List the words this fact may take, separated by commas."
+msgstr "List the words this fact may take, separated by commas."
 
 #: src/components/research/run-detail.tsx
 msgid "Live updates have stopped. The run may still be working."
@@ -3190,6 +3405,10 @@ msgstr "Loading runs…"
 #: src/routes/_authed/tasks/index.tsx
 msgid "Loading tasks…"
 msgstr "Loading tasks…"
+
+#: src/components/instructions/attribute-section.tsx
+msgid "Loading the attributes…"
+msgstr "Loading the attributes…"
 
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Loading the changes waiting for review."
@@ -3287,6 +3506,10 @@ msgstr "Low"
 #: src/components/shared/task-item.tsx
 msgid "Low priority"
 msgstr "Low priority"
+
+#: src/components/instructions/attribute-dialog.tsx
+msgid "Lowercase letters, digits and underscores, e.g. site_count. It cannot change later."
+msgstr "Lowercase letters, digits and underscores, e.g. site_count. It cannot change later."
 
 #. placeholder {0}: blocked.recipient
 #: src/components/emails/compose-form.tsx
@@ -3552,6 +3775,7 @@ msgstr "My stacks"
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/contacts/manage-channels-dialog.tsx
+#: src/components/instructions/attribute-dialog.tsx
 #: src/components/instructions/stack-editor.tsx
 #: src/components/instructions/template-dialog.tsx
 #: src/routes/_authed/emails/inboxes.tsx
@@ -3631,6 +3855,10 @@ msgstr "Never used"
 msgid "New"
 msgstr "New"
 
+#: src/components/instructions/attribute-dialog.tsx
+msgid "New attribute"
+msgstr "New attribute"
+
 #: src/routes/_authed/companies/$slug.tsx
 msgid "New client — set the next action (kick off onboarding)."
 msgstr "New client — set the next action (kick off onboarding)."
@@ -3696,6 +3924,14 @@ msgstr "Next event"
 msgid "Next: {0}"
 msgstr "Next: {0}"
 
+#: src/components/companies/attribute-field.tsx
+#: src/components/companies/attribute-field.tsx
+#: src/components/companies/attribute-field.tsx
+#: src/components/companies/attribute-filter.tsx
+#: src/components/research/findings/attributes-block.tsx
+msgid "No"
+msgstr "No"
+
 #: src/components/layout/org-switcher.tsx
 msgid "No active organization"
 msgstr "No active organization"
@@ -3711,6 +3947,14 @@ msgstr "No active organization. Pick one from the switcher in the top bar."
 #: src/routes/_authed/companies/$slug.tsx
 msgid "No activity yet"
 msgstr "No activity yet"
+
+#: src/components/companies/about-section.tsx
+msgid "No attributes declared yet. Declare them in the organisation's research templates."
+msgstr "No attributes declared yet. Declare them in the organisation's research templates."
+
+#: src/components/instructions/attribute-section.tsx
+msgid "No attributes yet. Declare the facts this campaign records on every company."
+msgstr "No attributes yet. Declare the facts this campaign records on every company."
 
 #: src/components/companies/account-brief-section.tsx
 msgid "No brief yet. Research writes one here, or you can start it yourself."
@@ -4030,6 +4274,7 @@ msgstr "Not syncing"
 msgid "Not yours to set"
 msgstr "Not yours to set"
 
+#: src/components/instructions/attribute-dialog.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Note"
 msgstr "Note"
@@ -4049,6 +4294,10 @@ msgstr "Nothing changed yet."
 #: src/routes/_authed/tasks/index.tsx
 msgid "Nothing completed recently"
 msgstr "Nothing completed recently"
+
+#: src/components/companies/attribute-rejected.ts
+msgid "Nothing declares this attribute any more, so it cannot take a value."
+msgstr "Nothing declares this attribute any more, so it cannot take a value."
 
 #: src/components/research/findings/prospect-scan-view.tsx
 msgid "Nothing found on the web names this company."
@@ -4110,6 +4359,10 @@ msgstr "Nothing written down matches that."
 msgid "Notifications"
 msgstr "Notifications"
 
+#: src/components/instructions/attribute-messages.ts
+msgid "Number"
+msgstr "Number"
+
 #: src/components/primitives/pri-rich-text.tsx
 msgid "Numbered list"
 msgstr "Numbered list"
@@ -4119,6 +4372,10 @@ msgstr "Numbered list"
 msgid "of {0} allowed"
 msgstr "of {0} allowed"
 
+#: src/components/instructions/stack-editor.tsx
+msgid "Off, a run ignores the attributes declared below."
+msgstr "Off, a run ignores the attributes declared below."
+
 #: src/routes/_authed/emails/$threadId.tsx
 msgid "On {date}, {who} wrote:"
 msgstr "On {date}, {who} wrote:"
@@ -4126,6 +4383,22 @@ msgstr "On {date}, {who} wrote:"
 #: src/routes/_authed/emails/inboxes.tsx
 msgid "Once it's connected, I can send and receive email for you right here — no switching tabs."
 msgstr "Once it's connected, I can send and receive email for you right here — no switching tabs."
+
+#: src/components/instructions/attribute-messages.ts
+msgid "Only a campaign the organisation owns records attributes."
+msgstr "Only a campaign the organisation owns records attributes."
+
+#: src/components/instructions/attribute-messages.ts
+msgid "Only a choice takes a list of words."
+msgstr "Only a choice takes a list of words."
+
+#: src/components/instructions/attribute-messages.ts
+msgid "Only a research campaign records attributes."
+msgstr "Only a research campaign records attributes."
+
+#: src/components/instructions/attribute-messages.ts
+msgid "Only an organisation admin can change the attributes."
+msgstr "Only an organisation admin can change the attributes."
 
 #: src/components/instructions/stack-editor.tsx
 msgid "Only an organization admin can change this stack."
@@ -4222,6 +4495,10 @@ msgstr "Open tasks due in the next seven days, counted from tonight rather than 
 msgid "Open tasks due today, in your own timezone. Anything already past its due date is under Needs attention instead."
 msgstr "Open tasks due today, in your own timezone. Anything already past its due date is under Needs attention instead."
 
+#: src/components/companies/about-section.tsx
+msgid "Open templates"
+msgstr "Open templates"
+
 #: src/components/companies/where-panel-client.client.tsx
 msgid "Open the map full screen"
 msgstr "Open the map full screen"
@@ -4267,6 +4544,10 @@ msgstr "Opened"
 #: src/components/companies/company-channels-section.tsx
 msgid "opens in a new tab"
 msgstr "opens in a new tab"
+
+#: src/components/instructions/attribute-dialog.tsx
+msgid "Optional. Written after a number, like \"12 sites\"."
+msgstr "Optional. Written after a number, like \"12 sites\"."
 
 #: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/contacts/manage-channels-dialog.tsx
@@ -4325,6 +4606,7 @@ msgstr "Organizations updated"
 msgid "organizer"
 msgstr "organizer"
 
+#: src/components/companies/about-section.tsx
 #: src/components/shared/channel-icon.tsx
 msgid "Other"
 msgstr "Other"
@@ -4574,6 +4856,10 @@ msgstr "Pick one to use as your default sender."
 msgid "Pick somebody who is still a member."
 msgstr "Pick somebody who is still a member."
 
+#: src/components/instructions/attribute-messages.ts
+msgid "Pick what kind of fact this is."
+msgstr "Pick what kind of fact this is."
+
 #: src/routes/_authed/emails/inboxes.tsx
 msgid "Pick your email provider"
 msgstr "Pick your email provider"
@@ -4786,6 +5072,10 @@ msgstr "Re-running…"
 #: src/components/instructions/template-library.tsx
 msgid "Read {0}"
 msgstr "Read {0}"
+
+#: src/components/instructions/attribute-dialog.tsx
+msgid "Read by research runs to know what to look for."
+msgstr "Read by research runs to know what to look for."
 
 #: src/routes/_authed/emails/index.tsx
 msgid "Read state update failed"
@@ -5048,6 +5338,11 @@ msgstr "Resume drafting ({0})"
 msgid "Resume drafting (1)"
 msgstr "Resume drafting (1)"
 
+#: src/components/companies/about-section.tsx
+msgid "Retired or no longer declared. They can be read or cleared; a run does not fill them any more."
+msgstr "Retired or no longer declared. They can be read or cleared; a run does not fill them any more."
+
+#: src/components/instructions/attribute-section.tsx
 #: src/components/shared/error-state.tsx
 msgid "Retry"
 msgstr "Retry"
@@ -5091,6 +5386,7 @@ msgstr "Role"
 msgid "Role (optional)"
 msgstr "Role (optional)"
 
+#: src/components/companies/attribute-field.tsx
 #: src/components/companies/company-fit-section.tsx
 msgid "run"
 msgstr "run"
@@ -5144,6 +5440,7 @@ msgstr "Sales context"
 #: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/contacts/manage-channels-dialog.tsx
+#: src/components/instructions/attribute-dialog.tsx
 #: src/components/instructions/template-dialog.tsx
 #: src/routes/_authed/emails/inboxes.tsx
 #: src/routes/_authed/emails/inboxes.tsx
@@ -5189,6 +5486,7 @@ msgstr "Saved, but not made the default"
 #: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/emails/compose-form.tsx
+#: src/components/instructions/attribute-dialog.tsx
 #: src/components/instructions/stack-editor.tsx
 #: src/components/instructions/template-dialog.tsx
 #: src/routes/_authed/emails/inboxes.tsx
@@ -5312,6 +5610,10 @@ msgstr "Sends you to {0}"
 #: src/routes/_authed/emails/$threadId.tsx
 msgid "Sent"
 msgstr "Sent"
+
+#: src/components/instructions/attribute-dialog.tsx
+msgid "Separate the words with commas. A value can only be one of them."
+msgstr "Separate the words with commas. A value can only be one of them."
 
 #: src/routes/_authed/settings/mcp/index.tsx
 msgid "server URL"
@@ -5830,9 +6132,25 @@ msgstr "Test failed"
 msgid "Testing connection…"
 msgstr "Testing connection…"
 
+#: src/components/instructions/attribute-messages.ts
+msgid "Text"
+msgstr "Text"
+
 #: src/components/primitives/pri-rich-text.tsx
 msgid "Text formatting"
 msgstr "Text formatting"
+
+#: src/components/instructions/attribute-messages.ts
+msgid "That campaign no longer exists."
+msgstr "That campaign no longer exists."
+
+#: src/components/companies/attribute-rejected.ts
+msgid "That comparison does not fit the kind of this attribute."
+msgstr "That comparison does not fit the kind of this attribute."
+
+#: src/components/companies/attribute-rejected.ts
+msgid "That comparison is not one the list knows."
+msgstr "That comparison is not one the list knows."
 
 #: src/routes/login.tsx
 msgid "That connection request expired. Start it again from your AI assistant."
@@ -5862,6 +6180,10 @@ msgstr "That lookup isn't available, so it can only be skipped."
 msgid "That set of instructions is no longer available. Pick another and try again."
 msgstr "That set of instructions is no longer available. Pick another and try again."
 
+#: src/components/companies/attribute-rejected.ts
+msgid "That value does not fit the kind of this attribute."
+msgstr "That value does not fit the kind of this attribute."
+
 #: src/routes/_authed/tasks/index.tsx
 msgid "The 20 most recently edited tasks on this shelf. Click one to reopen it."
 msgstr "The 20 most recently edited tasks on this shelf. Click one to reopen it."
@@ -5873,6 +6195,18 @@ msgstr "The activity for this company could not be fetched. Check that the sessi
 #: src/routes/_authed/settings/api-keys/index.tsx
 msgid "The API key can no longer be used."
 msgstr "The API key can no longer be used."
+
+#: src/components/companies/attribute-rejected.ts
+msgid "The attribute filter needs an attribute, a comparison and a value."
+msgstr "The attribute filter needs an attribute, a comparison and a value."
+
+#: src/components/companies/attribute-rejected.ts
+msgid "The attribute was refused."
+msgstr "The attribute was refused."
+
+#: src/components/companies/about-section.tsx
+msgid "The attributes this organisation declares could not be loaded, so the values are shown as stored."
+msgstr "The attributes this organisation declares could not be loaded, so the values are shown as stored."
 
 #: src/components/companies/pipeline-board.tsx
 msgid "The board could not be fetched. Check that the session is valid, then try again."
@@ -5917,6 +6251,10 @@ msgstr "The documents filed here could not be fetched. Check that the session is
 msgid "The evidence places this company outside the area the search asked about."
 msgstr "The evidence places this company outside the area the search asked about."
 
+#: src/components/instructions/attribute-section.tsx
+msgid "The facts I want on every company a campaign researches. A run fills them from what it reads, once the campaign is set to."
+msgstr "The facts I want on every company a campaign researches. A run fills them from what it reads, once the campaign is set to."
+
 #: src/components/companies/where-panel-client.client.tsx
 msgid "The geocoder did not return a match. Try editing the location field."
 msgstr "The geocoder did not return a match. Try editing the location field."
@@ -5928,6 +6266,10 @@ msgstr "The inboxes could not be fetched. Check that the session is valid, then 
 #: src/routes/_authed/calendar/index.tsx
 msgid "The invitation gave no time zone, so this time may be wrong. Confirm it with the organizer."
 msgstr "The invitation gave no time zone, so this time may be wrong. Confirm it with the organizer."
+
+#: src/components/instructions/attribute-section.tsx
+msgid "The last refresh failed. This is the list as it was loaded before."
+msgstr "The last refresh failed. This is the list as it was loaded before."
 
 #: src/routes/_authed/tasks/index.tsx
 msgid "The ledger is clean."
@@ -5950,9 +6292,21 @@ msgstr "The list of changes could not be loaded."
 msgid "The mailbox is ready."
 msgstr "The mailbox is ready."
 
+#: src/components/instructions/attribute-messages.ts
+msgid "The name has to fit on one line."
+msgstr "The name has to fit on one line."
+
+#: src/components/instructions/attribute-messages.ts
+msgid "The name is too long. Keep it to 40 characters."
+msgstr "The name is too long. Keep it to 40 characters."
+
 #: src/components/research/run-detail.tsx
 msgid "The name matched too many companies to tell them apart."
 msgstr "The name matched too many companies to tell them apart."
+
+#: src/components/instructions/attribute-messages.ts
+msgid "The note is too long. Keep it to 500 characters."
+msgstr "The note is too long. Keep it to 500 characters."
 
 #: src/routes/_authed/pages/$id.tsx
 msgid "The page could not be fetched. Check that the session is valid, then try again."
@@ -5982,6 +6336,10 @@ msgstr "The proposals for this company could not be fetched. Check that the sess
 #: src/components/emails/compose-form.tsx
 msgid "The receiving server said: {0}"
 msgstr "The receiving server said: {0}"
+
+#: src/components/companies/attribute-rejected.ts
+msgid "The research run named for this value was not found."
+msgstr "The research run named for this value was not found."
 
 #: src/routes/_authed/companies/$slug.tsx
 msgid "The research runs for this company could not be fetched. Check that the session is valid, then try again."
@@ -6055,6 +6413,14 @@ msgstr "The two password fields don't match."
 msgid "The two passwords don't match."
 msgstr "The two passwords don't match."
 
+#: src/components/instructions/attribute-messages.ts
+msgid "The unit is too long. Keep it to 16 characters."
+msgstr "The unit is too long. Keep it to 16 characters."
+
+#: src/components/companies/attribute-rejected.ts
+msgid "The value does not fit the kind this attribute was declared as."
+msgstr "The value does not fit the kind this attribute was declared as."
+
 #: src/routes/_authed/tasks/index.tsx
 msgid "The week is clear — good time to plan."
 msgstr "The week is clear — good time to plan."
@@ -6116,6 +6482,18 @@ msgstr "This assistant now works in one organization."
 #: src/routes/_authed/settings/mcp/connections.tsx
 msgid "This assistant works in the organizations you tick here."
 msgstr "This assistant works in the organizations you tick here."
+
+#: src/components/instructions/attribute-messages.ts
+msgid "This attribute no longer exists."
+msgstr "This attribute no longer exists."
+
+#: src/components/instructions/attribute-messages.ts
+msgid "This campaign already records something under that key."
+msgstr "This campaign already records something under that key."
+
+#: src/components/instructions/attribute-section.tsx
+msgid "This campaign is full at {ATTRIBUTES_PER_STACK_MAX} active attributes. Retire one to add another."
+msgstr "This campaign is full at {ATTRIBUTES_PER_STACK_MAX} active attributes. Retire one to add another."
 
 #: src/routes/_authed/companies/$slug.tsx
 msgid "This company can't be displayed"
@@ -6195,6 +6573,10 @@ msgstr "This run has finished."
 #: src/components/research/research-dialog.tsx
 msgid "This runs research on {0, plural, one {# company} other {# companies}}, up to about {1} in paid data. Start the batch?"
 msgstr "This runs research on {0, plural, one {# company} other {# companies}}, up to about {1} in paid data. Start the batch?"
+
+#: src/components/instructions/attribute-messages.ts
+msgid "This stack already has 8 active attributes. Retire one first."
+msgstr "This stack already has 8 active attributes. Retire one first."
 
 #: src/components/instructions/stack-editor.tsx
 msgid "This stack no longer exists."
@@ -6330,6 +6712,10 @@ msgstr "Undeliverable"
 msgid "Undo"
 msgstr "Undo"
 
+#: src/components/instructions/attribute-dialog.tsx
+msgid "Unit"
+msgstr "Unit"
+
 #: src/components/companies/proposals-panel.tsx
 msgid "Unit price"
 msgstr "Unit price"
@@ -6461,6 +6847,12 @@ msgstr "Uses it day to day"
 msgid "Using the org default"
 msgstr "Using the org default"
 
+#: src/components/companies/attribute-filter.tsx
+#: src/components/companies/attribute-filter.tsx
+#: src/components/companies/attribute-filter.tsx
+msgid "Value"
+msgstr "Value"
+
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Verifiable only"
 msgstr "Verifiable only"
@@ -6575,6 +6967,10 @@ msgstr "What kind of research?"
 msgid "What needs to happen?"
 msgstr "What needs to happen?"
 
+#: src/components/instructions/attribute-dialog.tsx
+msgid "What people see on the company page."
+msgstr "What people see on the company page."
+
 #: src/components/research/inbox/research-inbox.tsx
 msgid "What this run has cost so far"
 msgstr "What this run has cost so far"
@@ -6609,6 +7005,10 @@ msgstr "Where each fact came from"
 #: src/components/research/research-dialog.tsx
 msgid "Where to look (optional)"
 msgstr "Where to look (optional)"
+
+#: src/components/companies/about-section.tsx
+msgid "Which attributes this organisation declares is not known yet, so the values are shown as stored."
+msgstr "Which attributes this organisation declares is not known yet, so the values are shown as stored."
 
 #: src/routes/_authed/emails/index.tsx
 #: src/routes/_authed/emails/index.tsx
@@ -6672,6 +7072,18 @@ msgstr "Wrong company? Enter its official website"
 #: src/components/contacts/channel-kind-label.tsx
 msgid "X"
 msgstr "X"
+
+#: src/components/companies/attribute-field.tsx
+#: src/components/companies/attribute-field.tsx
+#: src/components/companies/attribute-field.tsx
+#: src/components/companies/attribute-filter.tsx
+#: src/components/research/findings/attributes-block.tsx
+msgid "Yes"
+msgstr "Yes"
+
+#: src/components/instructions/attribute-messages.ts
+msgid "Yes or no"
+msgstr "Yes or no"
 
 #: src/routes/_authed/settings/profile/index.tsx
 msgid "You currently sign in from email links. Add a password to skip checking your email next time."

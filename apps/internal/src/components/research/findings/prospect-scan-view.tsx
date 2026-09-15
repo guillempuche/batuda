@@ -12,8 +12,11 @@ import { prospectHoldBack } from '@batuda/research/application/prospect-hold-bac
 import type { CandidateReason } from '@batuda/research/application/row-marks'
 import { PriButton, usePriToast } from '@batuda/ui/pri'
 
+import { useResearchRunId } from '#/components/research/research-run-context'
 import { SafeLink } from '#/components/research/safe-link'
+import { useAttributeDeclarations } from '#/hooks/use-attribute-declarations'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
+import { AttributesBlock } from './attributes-block'
 import {
 	buildLeadPayload,
 	type DroppedLeadField,
@@ -71,6 +74,10 @@ type ProspectEntry = {
 		readonly name: string
 		readonly role?: string
 	}>
+	// The facts the organisation asked every company to carry, as far as this
+	// company's pages said. Read back by shape rather than typed key by key: which
+	// keys there are is the organisation's to decide, not this schema's.
+	readonly attributes?: Record<string, unknown>
 	readonly unconfirmed_reason?: string
 	// Doubt the run did not put into words but the engine established on its own, so
 	// the wording belongs here rather than in the finding.
@@ -275,6 +282,7 @@ function ProspectRow({ prospect }: { readonly prospect: ProspectEntry }) {
 				) : null}
 			</FieldsTable>
 			<CitationList citations={prospect.citations} />
+			<AttributesBlock attributes={prospect.attributes} />
 			<AddAsLeadButton
 				prospect={prospect}
 				heldBack={holdsBack}
@@ -343,6 +351,12 @@ function AddAsLeadButton({
 	const { t } = useLingui()
 	const toast = usePriToast()
 	const navigate = useNavigate()
+	// The run whose pages these values were read on, so the ones it found are
+	// recorded as its own rather than as this person's.
+	const runId = useResearchRunId()
+	// What the organisation declares, so a value under a key nobody declares any
+	// more is left behind rather than losing the whole lead.
+	const declarations = useAttributeDeclarations()
 	const createCompany = useAtomSet(
 		BatudaApiAtom.mutation('companies', 'create'),
 		{ mode: 'promiseExit' },
@@ -365,7 +379,12 @@ function AddAsLeadButton({
 	const add = async () => {
 		setBusy(true)
 		const slug = toSlug(prospect.name)
-		const { payload, dropped } = buildLeadPayload(prospect, slug)
+		const { payload, dropped } = buildLeadPayload(
+			prospect,
+			slug,
+			runId,
+			declarations,
+		)
 		const exit = await createCompany({ payload })
 		if (exit._tag !== 'Success') {
 			setBusy(false)

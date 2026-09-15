@@ -9,12 +9,17 @@ import {
 	X,
 } from 'lucide-react'
 import { styled } from 'next-yak'
+import type { ReactNode } from 'react'
 
 import { PriCollapsible } from '@batuda/ui/pri'
 
+import { provenanceLabel } from '#/components/companies/attribute-rows'
+import type { AttributeDeclaration } from '#/components/instructions/attribute-shapes'
 import { normalizeConfidence } from '#/components/research/proposal-logic'
+import { safeHref } from '#/components/research/safe-link'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { verdictLabel } from '#/lib/company-fit-verdict'
+import { sourceHost } from '#/lib/source-host'
 import { agedPaperSurface, stenciledTitle } from '#/lib/workshop-mixins'
 
 export type FitCheck = {
@@ -46,6 +51,28 @@ export type FitCompany = {
 }
 
 /**
+ * The page a run read something off. Every address here came out of a run, so
+ * it is only made clickable when it is an ordinary web address — a "source"
+ * that ran something the moment it was pressed would otherwise be one click
+ * away inside a signed-in page.
+ */
+function SourceRef({
+	href,
+	children,
+}: {
+	readonly href: string
+	readonly children: ReactNode
+}) {
+	const safe = safeHref(href)
+	if (safe === null) return <SourceText>{children}</SourceText>
+	return (
+		<SourceLink href={safe} target='_blank' rel='noreferrer noopener'>
+			{children}
+		</SourceLink>
+	)
+}
+
+/**
  * Whether this company is worth selling to, and why.
  *
  * The one-word verdict on its own asks to be taken on trust, so the rules behind
@@ -59,8 +86,13 @@ export type FitCompany = {
  */
 export function CompanyFitSection({
 	company,
+	declarations,
 }: {
 	readonly company: FitCompany
+	// An attribute's entry is filed under its key, which is a slug. These turn it
+	// back into the words somebody chose. Null while they are not known, which
+	// leaves each entry reading as its bare key.
+	readonly declarations: ReadonlyArray<AttributeDeclaration> | null
 }) {
 	const { i18n } = useLingui()
 	const checks = company.fitChecks ?? []
@@ -141,13 +173,9 @@ export function CompanyFitSection({
 											) : null}
 										</CheckBody>
 										{check.sourceId !== undefined ? (
-											<SourceLink
-												href={check.sourceId}
-												target='_blank'
-												rel='noreferrer noopener'
-											>
+											<SourceRef href={check.sourceId}>
 												<Trans>source</Trans>
-											</SourceLink>
+											</SourceRef>
 										) : null}
 									</CheckRow>
 								))}
@@ -175,13 +203,9 @@ export function CompanyFitSection({
 											<Quote>{conflict.note}</Quote>
 										) : null}
 										{conflict.sourceId !== undefined ? (
-											<SourceLink
-												href={conflict.sourceId}
-												target='_blank'
-												rel='noreferrer noopener'
-											>
+											<SourceRef href={conflict.sourceId}>
 												<Trans>source</Trans>
-											</SourceLink>
+											</SourceRef>
 										) : null}
 									</ConflictRow>
 								))}
@@ -205,14 +229,12 @@ export function CompanyFitSection({
 											key={field}
 											data-testid='company-field-source'
 										>
-											<Criterion>{field}</Criterion>
-											<SourceLink
-												href={source.sourceUrl}
-												target='_blank'
-												rel='noreferrer noopener'
-											>
-												{hostOf(source.sourceUrl)}
-											</SourceLink>
+											<Criterion>
+												{provenanceLabel(field, declarations ?? [])}
+											</Criterion>
+											<SourceRef href={source.sourceUrl}>
+												{sourceHost(source.sourceUrl)}
+											</SourceRef>
 											<RunLinkWrap>
 												<Link to='/research/$id' params={{ id: source.runId }}>
 													<Trans>run</Trans>
@@ -242,14 +264,6 @@ export function CompanyFitSection({
 			</PriCollapsible.Panel>
 		</PriCollapsible.Root>
 	)
-}
-
-function hostOf(url: string): string {
-	try {
-		return new URL(url).hostname.replace(/^www\./, '')
-	} catch {
-		return url
-	}
 }
 
 const TriggerWrap = styled.div`
@@ -381,6 +395,14 @@ const Quote = styled.span`
 const SourceLink = styled.a`
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-primary);
+`
+
+// An address that cannot be followed safely still says where the reading came
+// from, so it is shown rather than dropped — just not as something to press.
+const SourceText = styled.span`
+	font-size: var(--typescale-label-small-size);
+	color: var(--color-on-surface-variant);
+	word-break: break-word;
 `
 
 const RunLinkWrap = styled.span`

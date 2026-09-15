@@ -1,9 +1,9 @@
-import { useAtomRefresh, useAtomSet } from '@effect/atom-react'
+import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { DateTime, Effect, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
-import { ChevronsUpDown, Search, X } from 'lucide-react'
+import { Search, X } from 'lucide-react'
 import { LayoutGroup, motion } from 'motion/react'
 import { css, styled } from 'next-yak'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -11,13 +11,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CommaList } from '@batuda/controllers'
 import {
 	ATTENTION_FILTERS,
+	ATTRIBUTE_OPS,
 	type AttentionFilter,
 	AttentionFilter as AttentionFilterSchema,
 	COMPANY_SORTS,
 	type CompanySort,
 	CompanySort as CompanySortSchema,
 } from '@batuda/domain'
-import { PriButton, PriInput, PriSelect, usePriToast } from '@batuda/ui/pri'
+import { PriButton, PriInput, usePriToast } from '@batuda/ui/pri'
 
 import {
 	COMPANIES_FIRST_PAGE,
@@ -28,7 +29,10 @@ import {
 } from '#/atoms/companies-atoms'
 import { restoreCompanyAtom } from '#/atoms/company-atoms'
 import { companyFacetsAtom, facetsQuery } from '#/atoms/company-facets-atoms'
+import { AttributeFilter } from '#/components/companies/attribute-filter'
+import { attributeRejectedMessage } from '#/components/companies/attribute-rejected'
 import { CompaniesHeader } from '#/components/companies/companies-header'
+import { ALL, FilterSelect } from '#/components/companies/filter-select'
 import { SavedViews } from '#/components/companies/saved-views'
 import { CompanyCard } from '#/components/shared/company-card'
 import { EmptyState } from '#/components/shared/empty-state'
@@ -47,13 +51,22 @@ import {
 	StatusBadge,
 } from '#/components/shared/status-badge'
 import { useQuickCapture } from '#/context/quick-capture-context'
+import { useAttributeDeclarations } from '#/hooks/use-attribute-declarations'
 import { useCompanyFilterOptions } from '#/hooks/use-company-filter-options'
 import { useInfiniteList } from '#/hooks/use-infinite-list'
 import { dehydrateAtom, handOverFromServer } from '#/lib/atom-hydration'
+import {
+	dehydrateAttributeDeclarations,
+	fetchAttributeDeclarations,
+} from '#/lib/attribute-declarations'
 import type { BatudaApiServerClient } from '#/lib/batuda-api-server'
-import { companiesSearchToQuery } from '#/lib/companies-search-params'
+import {
+	companiesSearchToQuery,
+	normaliseAttributeFilter,
+} from '#/lib/companies-search-params'
 import { useOrgMembers } from '#/lib/org-members'
 import { validateSearchWith } from '#/lib/search-schema'
+import { taggedFailure } from '#/lib/tagged-failure'
 import { brushedMetalPlate } from '#/lib/workshop-mixins'
 
 /**
@@ -81,16 +94,23 @@ type CompanyRow = {
 const ValueList = Schema.Union([Schema.Array(Schema.NonEmptyString), CommaList])
 
 /**
- * TanStack Router `validateSearch` — runs on every search-param change
- * and produces the canonical `CompaniesSearch` shape. Empty strings and
- * non-numeric priorities are dropped entirely so the URL stays clean
- * (`?status=prospect` instead of `?status=prospect&query=&priority=`).
+ * The field-by-field half of `validateSearch` below — runs on every
+ * search-param change and produces the `CompaniesSearch` shape the screen works
+ * from. An empty search box or a priority that is not a number answers as
+ * nothing rather than as a filter, so neither reaches the list and neither is
+ * written back to the address (`?status=prospect`, not
+ * `?status=prospect&query=&priority=`).
+ *
+ * Answering as nothing is not the same as leaving the param out: the router lays
+ * this over the raw address, so a param left out would come back from it. Each
+ * one it cannot read is covered instead — the key stays, holding nothing — and
+ * every reader here skips a param holding nothing.
  *
  * `priority` accepts either a parsed number (client navigations where
  * TanStack already decoded the param) or a numeric string (raw URL on
  * first hit). Both decode to `number`.
  */
-const validateSearch = validateSearchWith({
+const decodeSearch = validateSearchWith({
 	status: ValueList,
 	country: ValueList,
 	industry: Schema.NonEmptyString,
@@ -112,7 +132,22 @@ const validateSearch = validateSearchWith({
 	// carrying anything else is dropped rather than passed on as a filter the
 	// server would not recognise.
 	deleted: Schema.Literals(['only']),
+	// One of the organisation's own facts: which attribute, how to compare, and
+	// against what. The value is text either way — a number, a day or a word
+	// depending on the attribute, which the server reads as its declared kind —
+	// while the comparison is held to the ones the server knows, so a stale link
+	// cannot ask it for one it would refuse.
+	attributeKey: Schema.NonEmptyString,
+	attributeOp: Schema.Literals(ATTRIBUTE_OPS),
+	attributeValue: Schema.NonEmptyString,
 })
+
+// The three attribute params mean something only together, so a link carrying
+// two of them arrives as no attribute filter rather than as one the server
+// refuses; a "one of" list is put in its canonical order here, where every
+// arrival passes, so one filter cannot answer to two spellings.
+const validateSearch = (raw: Record<string, unknown>) =>
+	normaliseAttributeFilter(decodeSearch(raw))
 
 function loadCompaniesOnServer(
 	client: BatudaApiServerClient,
@@ -144,8 +179,12 @@ function loadCompaniesOnServer(
 				facets: client.companies
 					.facets({ query: facetsQuery(search) })
 					.pipe(Effect.catchCause(() => Effect.succeed(undefined))),
+				// What the organisation declares a company may carry, for the
+				// attribute filter. Fetched here for the same reason as the menus: a
+				// control that arrives after the page appears under the reader's hand.
+				attributes: fetchAttributeDeclarations(client),
 			},
-			{ concurrency: 2 },
+			{ concurrency: 3 },
 		)
 	})
 }
@@ -158,7 +197,7 @@ export const Route = createFileRoute('/_authed/companies/')({
 			label: 'CompaniesLoader',
 			empty: { dehydrated: [] },
 			fetch: client => loadCompaniesOnServer(client, search),
-			handOver: ({ companies, facets }) => ({
+			handOver: ({ attributes, companies, facets }) => ({
 				// Whichever arrived is handed over. The other is left for the browser
 				// to ask for again, rather than costing the page the half that did.
 				dehydrated: [
@@ -178,6 +217,7 @@ export const Route = createFileRoute('/_authed/companies/')({
 									AsyncResult.success(facets),
 								),
 							]),
+					...dehydrateAttributeDeclarations(attributes),
 				],
 			}),
 		}),
@@ -185,14 +225,20 @@ export const Route = createFileRoute('/_authed/companies/')({
 	component: CompaniesListPage,
 })
 
+// Why the server refused the list, when it refused it over the attribute filter
+// rather than over anything else. Its reason is a word, not a sentence, so the
+// screen words it.
+function attributeRefusal(cause: unknown): string | null {
+	const reason = taggedFailure(cause, 'AttributeRejected')?.['reason']
+	return typeof reason === 'string' && reason !== '' ? reason : null
+}
+
 /**
  * Debounce window for the search input before we push to the URL. 300ms
  * strikes the usual balance — long enough to not hammer the API on every
  * keystroke, short enough that typing feels responsive.
  */
 const SEARCH_DEBOUNCE_MS = 300
-
-const ALL = '__all__'
 
 /** Strip `status` from the search when linking to the board — its columns are
  * the statuses, so a status filter there makes no sense. Everything else goes
@@ -228,6 +274,15 @@ function CompaniesListPage() {
 	const isLoading = list.isLoadingFirstPage
 	const isFailure = list.isError
 	const refreshCompanies = list.refresh
+	// The same first slice the list is reading, for the reason behind a failure:
+	// the server turns away an attribute filter it cannot make sense of, and that
+	// is worth repeating rather than blaming the session for.
+	const firstSlice = useAtomValue(
+		companiesSearchAtom(search, COMPANIES_FIRST_PAGE),
+	)
+	const refusedReason = AsyncResult.isFailure(firstSlice)
+		? attributeRefusal(firstSlice.cause)
+		: null
 	// Until the list actually loads there is no count to show — a failed or
 	// still-loading fetch must not read as "0 companies", an empty pipeline.
 	const hasResult = !isLoading && !isFailure
@@ -238,6 +293,12 @@ function CompaniesListPage() {
 
 	// ── Search input (debounced URL write) ──────────────────────
 	const [searchInput, setSearchInput] = useState(search.query ?? '')
+	// Bumped where a whole set of filters is replaced at once — "Clear filters", a
+	// saved view — to start the attribute control over on whatever the address now
+	// holds. It is counted rather than read off the address, because writing in the
+	// search box or picking a sort changes the address too, and a control rebuilt
+	// under the reader's hand loses a half-typed value and the cursor in it.
+	const [filterEpoch, setFilterEpoch] = useState(0)
 	useEffect(() => {
 		setSearchInput(search.query ?? '')
 	}, [search.query])
@@ -333,6 +394,7 @@ function CompaniesListPage() {
 
 	const handleClearFilters = useCallback(() => {
 		setSearchInput('')
+		setFilterEpoch(epoch => epoch + 1)
 		void navigate({ to: '/companies', search: {} })
 	}, [navigate])
 
@@ -349,6 +411,11 @@ function CompaniesListPage() {
 	// whatever is already chosen so it can be taken off again.
 	const { countries, industries, tags, fitVerdicts, industryValue } =
 		useCompanyFilterOptions(search)
+
+	// The facts this organisation declares, for the attribute filter. Handed over
+	// with the page, so the control is there on the first frame; null until they
+	// are in, which the control shows differently from none declared.
+	const declarations = useAttributeDeclarations()
 
 	const activeFilters = hasActiveFilters(search)
 	// Both counts have a singular form: narrowing down to a single match is
@@ -515,6 +582,7 @@ function CompaniesListPage() {
 					current={search}
 					onApply={next => {
 						setSearchInput(next.query ?? '')
+						setFilterEpoch(epoch => epoch + 1)
 						void navigate({ to: '/companies', search: next })
 					}}
 				/>
@@ -592,6 +660,12 @@ function CompaniesListPage() {
 						testId='companies-filter-fit'
 						countsStandAlone
 					/>
+					<AttributeFilter
+						key={filterEpoch}
+						declarations={declarations}
+						search={search}
+						onApply={applyPatch}
+					/>
 					<FilterSelect
 						label={t`Sort`}
 						value={search.sort ?? 'priority'}
@@ -619,7 +693,11 @@ function CompaniesListPage() {
 				<ErrorState
 					data-testid='companies-error'
 					title={t`Could not load companies`}
-					description={t`The list could not be fetched. Check that the session is valid, then try again.`}
+					description={
+						refusedReason === null
+							? t`The list could not be fetched. Check that the session is valid, then try again.`
+							: i18n._(attributeRejectedMessage(refusedReason))
+					}
 					onRetry={refreshCompanies}
 				/>
 			) : companies.length === 0 ? (
@@ -725,42 +803,6 @@ function CompaniesListPage() {
 /** Build the /companies/board URL, carrying the shared filters as query params. */
 function boardHref(search: CompaniesSearch): string {
 	return `/companies/board${companiesSearchToQuery(search)}`
-}
-
-function FilterSelect({
-	label,
-	value,
-	options,
-	onChange,
-	testId,
-}: {
-	readonly label: string
-	readonly value: string
-	readonly options: ReadonlyArray<{ value: string; label: string }>
-	readonly onChange: (value: string) => void
-	readonly testId: string
-}) {
-	return (
-		<PriSelect.Root
-			items={options}
-			value={value}
-			onValueChange={v => {
-				if (typeof v === 'string') onChange(v)
-			}}
-		>
-			<PriSelect.Trigger data-testid={testId} aria-label={label}>
-				<PriSelect.Value />
-				<PriSelect.Icon>
-					<ChevronsUpDown size={14} aria-hidden />
-				</PriSelect.Icon>
-			</PriSelect.Trigger>
-			<PriSelect.Options
-				items={options}
-				sideOffset={6}
-				optionTestId={v => `${testId}-option-${v}`}
-			/>
-		</PriSelect.Root>
-	)
 }
 
 // ── Helpers ──────────────────────────────────────────────────────

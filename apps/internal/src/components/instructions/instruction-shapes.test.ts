@@ -36,6 +36,19 @@ describe('narrowStacks [instruction-shapes.ts]', () => {
 		})
 	})
 
+	describe('when a row carries the research-fills-attributes switch', () => {
+		it('should read it on, and read a missing flag as off', () => {
+			// GIVEN one row with the switch on and one without the field
+			// WHEN narrowed
+			const stacks = narrowStacks([
+				{ ...orgRow, researchFillsAttributes: true },
+				personalRow,
+			])
+			// THEN the flag is on for the first and off for the second
+			expect(stacks.map(s => s.researchFillsAttributes)).toEqual([true, false])
+		})
+	})
+
 	describe('when the value is a listStacks { items } wrapper', () => {
 		it('should read the items array', () => {
 			// GIVEN the listStacks envelope shape

@@ -2,6 +2,7 @@ import { Plural, Trans } from '@lingui/react/macro'
 import type { ReactNode } from 'react'
 
 import { SafeLink } from '#/components/research/safe-link'
+import { AttributesBlock } from './attributes-block'
 import {
 	type Citation,
 	CitationList,
@@ -28,15 +29,15 @@ import {
 
 /**
  * Renders a `company_enrichment_v1` research finding. Surfaces the
- * enrichment object (industry, size_range, current_tools, etc.) as a
- * typed field table, then competitor + contact arrays as their own
- * sections, finally the cross-cutting common sections.
+ * enrichment object (industry, size_range, etc.) as a typed field
+ * table, then the attributes the run filled, then competitor + contact
+ * arrays as their own sections, finally the cross-cutting common
+ * sections.
  */
 
 type EnrichmentBlock = {
 	readonly industry?: string
 	readonly size_range?: string
-	readonly current_tools?: string
 	readonly tags?: ReadonlyArray<string>
 	readonly location?: string
 	readonly country?: string
@@ -103,6 +104,11 @@ type ContactEntry = {
 
 type CompanyEnrichmentFindings = CommonFindings & {
 	readonly enrichment?: EnrichmentBlock
+	// The facts the organisation asked every company to carry, which a run fills
+	// from what it read. Beside the enrichment block rather than inside it: the
+	// organisation declares these, and the block's own fields are the same on
+	// every run.
+	readonly attributes?: Record<string, unknown>
 	readonly verdict?: string
 	readonly verdict_rationale?: string
 	readonly fit_checks?: ReadonlyArray<FitCheck>
@@ -142,19 +148,13 @@ function CheckResult({ result }: { readonly result: string }) {
 }
 
 const ENRICHMENT_FIELDS: ReadonlyArray<{
-	readonly key:
-		| 'industry'
-		| 'size_range'
-		| 'country'
-		| 'location'
-		| 'current_tools'
+	readonly key: 'industry' | 'size_range' | 'country' | 'location'
 	readonly label: ReactNode
 }> = [
 	{ key: 'industry', label: <Trans>Industry</Trans> },
 	{ key: 'size_range', label: <Trans>Size</Trans> },
 	{ key: 'country', label: <Trans>Country</Trans> },
 	{ key: 'location', label: <Trans>Location</Trans> },
-	{ key: 'current_tools', label: <Trans>Current tools</Trans> },
 ]
 
 const CompetitorSite = ({
@@ -291,6 +291,8 @@ export function CompanyEnrichmentView({
 					</FieldsTable>
 				</Section>
 			) : null}
+
+			<AttributesBlock attributes={findings?.attributes} />
 
 			{competitors.length > 0 ? (
 				<Section data-testid='research-competitors'>

@@ -66,6 +66,11 @@ export function StackEditor({
 	const [makeDefault, setMakeDefault] = useState(
 		isCurrentDefault || (stack === null && !hasExistingDefault),
 	)
+	// Only an org research stack declares attributes, and a run leaves them alone
+	// until this is ticked.
+	const [fillsAttributes, setFillsAttributes] = useState(
+		stack?.researchFillsAttributes ?? false,
+	)
 	const [saving, setSaving] = useState(false)
 
 	// Re-seed when the editor retargets another stack (or switches to create).
@@ -76,6 +81,7 @@ export function StackEditor({
 		setMakeDefault(
 			stack?.isDefault === true || (stack === null && !hasExistingDefault),
 		)
+		setFillsAttributes(stack?.researchFillsAttributes ?? false)
 	}, [stack, hasExistingDefault])
 
 	// The org default's templates, shown read-only while a personal stack extends
@@ -85,6 +91,9 @@ export function StackEditor({
 		.filter((o): o is StackOption => o !== undefined)
 
 	const canSave = name.trim().length > 0 && ids.length > 0 && !saving
+	// Attributes are declared on the organisation's research stacks, so the switch
+	// for them belongs to nothing else.
+	const canFillAttributes = scope === 'org' && agent === 'research'
 
 	const errorForOutcome = (outcome: string | null): string => {
 		if (outcome === 'duplicate_name')
@@ -111,6 +120,9 @@ export function StackEditor({
 					template_ids: ids,
 					...(scope === 'personal' ? { composition: mode } : {}),
 					...(makeDefault ? { is_default: true } : {}),
+					...(canFillAttributes
+						? { research_fills_attributes: fillsAttributes }
+						: {}),
 				},
 			} as never)
 			const outcome = outcomeOf(exit)
@@ -134,6 +146,9 @@ export function StackEditor({
 				name: trimmed,
 				template_ids: ids,
 				...(scope === 'personal' ? { composition: mode } : {}),
+				...(canFillAttributes
+					? { research_fills_attributes: fillsAttributes }
+					: {}),
 			},
 		} as never)
 		const outcome = outcomeOf(exit)
@@ -273,6 +288,30 @@ export function StackEditor({
 				</DefaultLabel>
 			</DefaultRow>
 
+			{canFillAttributes ? (
+				<>
+					{/* The box draws its name from this label, so the words are part of
+					    the control rather than text sitting beside it. */}
+					<FillRow>
+						<PriCheckbox.Root
+							checked={fillsAttributes}
+							data-testid='stack-research-fills-attributes'
+							onCheckedChange={(next: boolean) => setFillsAttributes(next)}
+						>
+							<PriCheckbox.Indicator>
+								<Check size={12} aria-hidden />
+							</PriCheckbox.Indicator>
+						</PriCheckbox.Root>
+						<DefaultLabel>
+							<Trans>Let research runs fill this stack's attributes</Trans>
+						</DefaultLabel>
+					</FillRow>
+					<Hint>
+						<Trans>Off, a run ignores the attributes declared below.</Trans>
+					</Hint>
+				</>
+			) : null}
+
 			<Actions>
 				<PriButton
 					type='button'
@@ -410,6 +449,13 @@ const DefaultRow = styled.div`
 	display: flex;
 	align-items: center;
 	gap: var(--space-2xs);
+`
+
+const FillRow = styled.label`
+	display: flex;
+	align-items: center;
+	gap: var(--space-2xs);
+	cursor: pointer;
 `
 
 const DefaultLabel = styled.span`

@@ -3,6 +3,7 @@ import { Link2 } from 'lucide-react'
 import { styled } from 'next-yak'
 
 import { safeHref } from '#/components/research/safe-link'
+import { sourceHost } from '#/lib/source-host'
 
 /**
  * "Sourced from research on {date}" trail with links to the source pages a
@@ -53,7 +54,7 @@ export function Provenance({
 						const href = safeHref(source.url)
 						return href === null ? (
 							<SourceText key={source.url}>
-								{source.title ?? hostOf(source.url)}
+								{source.title ?? sourceHost(source.url)}
 							</SourceText>
 						) : (
 							<SourceLink
@@ -62,7 +63,7 @@ export function Provenance({
 								target='_blank'
 								rel='noopener noreferrer'
 							>
-								{source.title ?? hostOf(source.url)}
+								{source.title ?? sourceHost(source.url)}
 							</SourceLink>
 						)
 					})}
@@ -80,14 +81,6 @@ function formatDate(value: string, locale: string): string {
 		month: 'short',
 		day: 'numeric',
 	})
-}
-
-function hostOf(url: string): string {
-	try {
-		return new URL(url).hostname.replace(/^www\./, '')
-	} catch {
-		return url
-	}
 }
 
 const Wrap = styled.div`

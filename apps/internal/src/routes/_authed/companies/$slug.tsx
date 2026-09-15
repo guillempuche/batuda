@@ -64,6 +64,11 @@ import { pagesSearchAtom } from '#/atoms/pages-atoms'
 import { researchListAtom } from '#/atoms/research-atoms'
 import { AboutSection } from '#/components/companies/about-section'
 import { AccountBriefSection } from '#/components/companies/account-brief-section'
+import { attributeRejectedMessage } from '#/components/companies/attribute-rejected'
+import {
+	narrowCompanyAttributes,
+	type StoredAttribute,
+} from '#/components/companies/attribute-rows'
 import { CadenceCard } from '#/components/companies/cadence-card'
 import { CompanyChannelsSection } from '#/components/companies/company-channels-section'
 import {
@@ -133,12 +138,17 @@ import {
 import { ScrewDot } from '#/components/shared/workshop-decorations'
 import { useComposeEmail } from '#/context/compose-email-context'
 import { useQuickCapture } from '#/context/quick-capture-context'
+import { useAttributeDeclarationsState } from '#/hooks/use-attribute-declarations'
 import { useCompanyIndustries } from '#/hooks/use-company-industries'
 import {
 	dehydrateAtom,
 	handOverFromServer,
 	isNotFoundError,
 } from '#/lib/atom-hydration'
+import {
+	dehydrateAttributeDeclarations,
+	fetchAttributeDeclarations,
+} from '#/lib/attribute-declarations'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import type { BatudaApiServerClient } from '#/lib/batuda-api-server'
 import { documentsDlgMembers, proposalsDlgMembers } from '#/lib/company-dlg'
@@ -148,6 +158,7 @@ import { useOrgMembers } from '#/lib/org-members'
 import type { PaginatedList } from '#/lib/paginated-list'
 import { validateSearchWith } from '#/lib/search-schema'
 import { useTabSearchParam } from '#/lib/tab-search'
+import { taggedFailure } from '#/lib/tagged-failure'
 import { useDlg } from '#/lib/use-dlg'
 import {
 	agedPaperSurface,
@@ -206,6 +217,9 @@ type CompanyDetail = {
 	readonly fitChecks: ReadonlyArray<FitCheck> | null
 	readonly fitConflicts: ReadonlyArray<FitConflict> | null
 	readonly fieldProvenance: Readonly<Record<string, FieldSource>> | null
+	// The facts this organisation asked to be recorded on every company, by the
+	// key each one is filed under.
+	readonly attributes: ReadonlyMap<string, StoredAttribute>
 }
 
 type ContactProvenance = {
@@ -257,16 +271,29 @@ type DetailPayload = {
 	readonly company: (typeof CompanyDetailResponse)['Type']
 	readonly contacts: PaginatedList<(typeof ContactListItem)['Type']>
 	readonly tasks: PaginatedList<TaskListItem>
+	// Undefined when the declarations could not be fetched, which leaves the
+	// browser to ask for them instead of being handed an answer that says there
+	// are none.
+	readonly declarations: unknown
 }
 
 /**
- * The company row plus its contacts and tasks. The relations go through a
- * single `Effect.all` so they share one Better-Auth session roundtrip but
- * still run in parallel.
+ * The company row plus its contacts, tasks and the attributes this organisation
+ * declares. The relations go through a single `Effect.all` so they share one
+ * Better-Auth session roundtrip but still run in parallel.
  */
 function loadDetailOnServer(client: BatudaApiServerClient, slug: string) {
 	return Effect.gen(function* () {
-		const company = yield* client.companies.get({ params: { slug } })
+		// What a company may carry does not depend on the company, so it travels
+		// beside it. A page still reads without it, so it falls back rather than
+		// costing the whole page its server-rendered first frame.
+		const [company, declarations] = yield* Effect.all(
+			[
+				client.companies.get({ params: { slug } }),
+				fetchAttributeDeclarations(client),
+			],
+			{ concurrency: 2 },
+		)
 		const companyId = extractCompanyId(company)
 		if (companyId === null) {
 			const emptyPage = {
@@ -280,6 +307,7 @@ function loadDetailOnServer(client: BatudaApiServerClient, slug: string) {
 				company,
 				contacts: emptyPage,
 				tasks: emptyPage,
+				declarations,
 			} as DetailPayload
 		}
 		const [contacts, tasks] = yield* Effect.all(
@@ -292,7 +320,7 @@ function loadDetailOnServer(client: BatudaApiServerClient, slug: string) {
 			],
 			{ concurrency: 2 },
 		)
-		return { company, contacts, tasks } as DetailPayload
+		return { company, contacts, tasks, declarations } as DetailPayload
 	})
 }
 
@@ -352,12 +380,18 @@ export const Route = createFileRoute('/_authed/companies/$slug')({
 					companyAtomFor(slug),
 					AsyncResult.success(payload.company),
 				)
+				const declarations = dehydrateAttributeDeclarations(
+					payload.declarations,
+				)
 				// Without a company id the relations cannot be handed over; the
 				// browser fetches them after hydration.
-				if (companyId === null) return { dehydrated: [company], slug, name }
+				if (companyId === null) {
+					return { dehydrated: [company, ...declarations], slug, name }
+				}
 				return {
 					dehydrated: [
 						company,
+						...declarations,
 						dehydrateAtom(
 							contactsAtomFor(companyId),
 							AsyncResult.success(payload.contacts),
@@ -497,6 +531,12 @@ function DetailBody({
 		[company.id],
 	)
 
+	// What this organisation records on every company, or null while that is not
+	// known. The sections below tell that apart from "nothing declared", and a
+	// fetch that failed apart from one still on its way.
+	const { declarations, failed: declarationsFailed } =
+		useAttributeDeclarationsState()
+
 	const contactsResult = useAtomValue(contactsAtom)
 	const timelineResult = useAtomValue(timelineAtom)
 	const tasksResult = useAtomValue(tasksAtom)
@@ -548,15 +588,22 @@ function DetailBody({
 				refreshCompany()
 				return
 			}
+			// An attribute refusal names what was wrong with the value. Saying "try
+			// again" to somebody who wrote a word into a number would send them
+			// round the same loop.
+			const reason = taggedFailure(exit.cause, 'AttributeRejected')?.['reason']
 			toast.add({
 				title: t`Could not save`,
-				description: t`The workshop rejected the change. Try again.`,
+				description:
+					typeof reason === 'string'
+						? i18n._(attributeRejectedMessage(reason))
+						: t`The workshop rejected the change. Try again.`,
 				type: 'error',
 			})
 			console.error('[batuda] companies.update failed', exit.cause)
 			throw new Error('update-failed')
 		},
-		[updateCompany, company.id, refreshCompany, toast, t],
+		[updateCompany, company.id, refreshCompany, toast, t, i18n],
 	)
 
 	const verifyCompany = useAtomSet(
@@ -1406,9 +1453,14 @@ function DetailBody({
 										}
 									/>
 									<WherePanel company={company} compact />
-									<CompanyFitSection company={company} />
+									<CompanyFitSection
+										company={company}
+										declarations={declarations}
+									/>
 									<AboutSection
 										company={company}
+										declarations={declarations}
+										declarationsFailed={declarationsFailed}
 										onSave={(field, next) => saveField(field, next)}
 									/>
 								</Stack>
@@ -1898,6 +1950,7 @@ function narrowCompany(raw: unknown): CompanyDetail | null {
 		fitChecks: fitCheckList(r['fitChecks']),
 		fitConflicts: fitConflictList(r['fitConflicts']),
 		fieldProvenance: fieldSourceMap(r['fieldProvenance']),
+		attributes: narrowCompanyAttributes(r['attributes']),
 	}
 }
 

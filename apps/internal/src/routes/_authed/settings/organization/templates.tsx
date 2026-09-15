@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { Agent } from '@batuda/instructions/domain'
 import { PriButton, usePriToast } from '@batuda/ui/pri'
 
+import { attributeDeclarationsAtom } from '#/atoms/attribute-atoms'
 import {
 	clearDefaultStackAtom,
 	deleteStackAtom,
@@ -18,6 +19,8 @@ import {
 	setDefaultStackAtom,
 } from '#/atoms/instruction-atoms'
 import { AgentSelector } from '#/components/instructions/agent-selector'
+import { AttributeDialog } from '#/components/instructions/attribute-dialog'
+import { AttributeSection } from '#/components/instructions/attribute-section'
 import {
 	BackLink,
 	Empty,
@@ -42,6 +45,7 @@ import type { StackOption } from '#/components/instructions/stack-picker'
 import { TemplateLibrary } from '#/components/instructions/template-library'
 import { DeleteConfirm } from '#/components/shared/delete-confirm'
 import { ErrorState } from '#/components/shared/error-state'
+import { useAttributeDeclarationsState } from '#/hooks/use-attribute-declarations'
 import { useHydratedActiveMember, useHydratedSession } from '#/lib/auth-client'
 import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
 import { isOrgAdmin } from '#/lib/identity'
@@ -59,6 +63,10 @@ const orgTemplatesDlgSchema = Schema.Union([
 	dlgWithId('edit'),
 	dlgNoId('new-stack'),
 	dlgWithId('stack'),
+	// A new attribute is addressed by the stack it lands on; an existing one by
+	// its own id.
+	dlgWithId('new-attribute'),
+	dlgWithId('attribute'),
 ])
 
 export const Route = createFileRoute(
@@ -171,39 +179,59 @@ function OrgStacksViewer() {
 		[stacksResult, agent],
 	)
 
+	const { declarations, failed: declarationsFailed } =
+		useAttributeDeclarationsState()
+	const refreshDeclarations = useAtomRefresh(attributeDeclarationsAtom)
+
 	return (
-		<Section>
-			<SectionHead>
-				<SectionTitle id='org-stacks-surface-view'>
-					<Trans>Org stacks</Trans>
-				</SectionTitle>
-				<AgentSelector
-					agent={agent}
-					onChange={setAgent}
-					labelledBy='org-stacks-surface-view'
-				/>
-			</SectionHead>
-			{stacksFailed ? (
-				<ErrorState
-					variant='inline'
-					data-testid='org-stacks-error'
-					title={t`Couldn't load the org stacks.`}
-					onRetry={refreshStacks}
-				/>
-			) : orgStacks.length > 0 ? (
-				<StackList
-					stacks={orgStacks}
-					readOnly
-					onEdit={() => {}}
-					onSetDefault={() => {}}
-					onDelete={() => {}}
-				/>
-			) : (
-				<Empty>
-					<Trans>No org stacks yet.</Trans>
-				</Empty>
-			)}
-		</Section>
+		<>
+			<Section>
+				<SectionHead>
+					<SectionTitle id='org-stacks-surface-view'>
+						<Trans>Org stacks</Trans>
+					</SectionTitle>
+					<AgentSelector
+						agent={agent}
+						onChange={setAgent}
+						labelledBy='org-stacks-surface-view'
+					/>
+				</SectionHead>
+				{stacksFailed ? (
+					<ErrorState
+						variant='inline'
+						data-testid='org-stacks-error'
+						title={t`Couldn't load the org stacks.`}
+						onRetry={refreshStacks}
+					/>
+				) : orgStacks.length > 0 ? (
+					<StackList
+						stacks={orgStacks}
+						readOnly
+						onEdit={() => {}}
+						onSetDefault={() => {}}
+						onDelete={() => {}}
+					/>
+				) : (
+					<Empty>
+						<Trans>No org stacks yet.</Trans>
+					</Empty>
+				)}
+			</Section>
+
+			{/* What the organization records on every company it researches. A member
+			    can see it; changing it is admin-gated on the server. */}
+			<AttributeSection
+				agent={agent}
+				stacks={orgStacks}
+				declarations={declarations}
+				failed={declarationsFailed}
+				readOnly
+				onAdd={() => {}}
+				onEdit={() => {}}
+				onChanged={() => {}}
+				onRetry={refreshDeclarations}
+			/>
+		</>
 	)
 }
 
@@ -247,6 +275,13 @@ function OrgStacksAdmin({
 	)
 	const defaultStack = orgStacks.find(s => s.isDefault) ?? null
 
+	// Every declaration the organization holds, whatever the stack; the section
+	// groups them by the stack that declares them. null until an answer is in, and
+	// the last good list is kept when a refresh fails.
+	const { declarations, failed: declarationsFailed } =
+		useAttributeDeclarationsState()
+	const refreshDeclarations = useAtomRefresh(attributeDeclarationsAtom)
+
 	const templateNameById = useMemo(
 		() => new Map(orgTemplates.map(tpl => [tpl.id, tpl.name])),
 		[orgTemplates],
@@ -275,19 +310,70 @@ function OrgStacksAdmin({
 		dlg?.kind === 'new-stack' ||
 		(dlg?.kind === 'stack' && editingStack !== null)
 
+	const editingAttribute =
+		dlg?.kind === 'attribute'
+			? (declarations?.find(x => x.id === dlg.id) ?? null)
+			: null
+	// A new declaration is addressed by the stack it lands on.
+	const addingToStack =
+		dlg?.kind === 'new-attribute'
+			? (orgStacks.find(s => s.id === dlg.id) ?? null)
+			: null
+	const attributeStackName =
+		addingToStack?.name ?? editingAttribute?.stackName ?? null
+	// An edit waits for the row it edits: mounted without one the dialog reads as
+	// a new attribute, with an empty key box and no campaign to land on.
+	const attributeDialogOpen =
+		dlg?.kind === 'new-attribute' ||
+		(dlg?.kind === 'attribute' && editingAttribute !== null)
+
 	// A link to a stack that is gone — deleted, or belonging to another surface —
 	// drops itself once the list has loaded.
 	const stacksLoaded = AsyncResult.isSuccess(stacksResult)
+	const declarationsLoaded = declarations !== null
 	useEffect(() => {
 		if (dlg?.kind === 'stack' && stacksLoaded && editingStack === null) {
 			closeDlg()
 		}
 	}, [dlg, stacksLoaded, editingStack, closeDlg])
 
+	// Same for a link to an attribute, or to the stack a new one would land on.
+	useEffect(() => {
+		if (
+			dlg?.kind === 'attribute' &&
+			declarationsLoaded &&
+			editingAttribute === null
+		) {
+			closeDlg()
+			return
+		}
+		if (
+			dlg?.kind === 'new-attribute' &&
+			stacksLoaded &&
+			addingToStack === null
+		) {
+			closeDlg()
+		}
+	}, [
+		dlg,
+		declarationsLoaded,
+		editingAttribute,
+		stacksLoaded,
+		addingToStack,
+		closeDlg,
+	])
+
 	// Switching surface drops any open stack editor for the previous surface.
 	const selectAgent = (next: Agent) => {
 		setAgent(next)
-		if (dlg?.kind === 'new-stack' || dlg?.kind === 'stack') closeDlg()
+		if (
+			dlg?.kind === 'new-stack' ||
+			dlg?.kind === 'stack' ||
+			dlg?.kind === 'new-attribute' ||
+			dlg?.kind === 'attribute'
+		) {
+			closeDlg()
+		}
 	}
 
 	const setDefault = async (s: StackShape) => {
@@ -447,6 +533,33 @@ function OrgStacksAdmin({
 					</>
 				)}
 			</Section>
+
+			<AttributeSection
+				agent={agent}
+				stacks={orgStacks}
+				declarations={declarations}
+				failed={declarationsFailed}
+				readOnly={false}
+				onAdd={stackId => openDlg({ kind: 'new-attribute', id: stackId })}
+				onEdit={declaration =>
+					openDlg({ kind: 'attribute', id: declaration.id })
+				}
+				onChanged={refreshDeclarations}
+				onRetry={refreshDeclarations}
+			/>
+
+			{attributeDialogOpen ? (
+				<AttributeDialog
+					open
+					stackId={dlg?.kind === 'new-attribute' ? dlg.id : null}
+					stackName={attributeStackName}
+					declaration={editingAttribute}
+					onOpenChange={next => {
+						if (!next) closeDlg()
+					}}
+					onSaved={refreshDeclarations}
+				/>
+			) : null}
 
 			<DeleteConfirm
 				open={confirmStack !== null}

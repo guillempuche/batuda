@@ -1,9 +1,28 @@
 import { describe, expect, it } from 'vitest'
 
+import type { AttributeDeclaration } from '#/components/instructions/attribute-shapes'
 import {
 	buildLeadPayload,
 	type ProspectLeadSource,
 } from './prospect-lead-payload'
+
+// One declaration as the settings page narrows it, for the keys a lead may carry.
+const declaration = (
+	over: Partial<AttributeDeclaration>,
+): AttributeDeclaration => ({
+	id: 'a1',
+	stackId: 's1',
+	stackName: 'Girona',
+	key: 'site_count',
+	label: 'Sites',
+	kind: 'number',
+	enumValues: [],
+	unit: null,
+	description: null,
+	isActive: true,
+	createdAt: null,
+	...over,
+})
 
 // Rows as a real scan wrote them — a Girona industrial-engineering search whose
 // countries came back as words rather than codes, which is what made half of
@@ -228,6 +247,206 @@ describe("the people a search read off the company's own pages", () => {
 
 			// THEN nothing is sent rather than an empty list
 			expect(payload.contacts).toBeUndefined()
+		})
+	})
+})
+
+describe('the attribute values a scan read off the company', () => {
+	describe('when the run tied a value to a page', () => {
+		it('should carry the page and the words on it, so the run is what found it', () => {
+			// GIVEN a row with two values, one read off a page the run fetched and one
+			// the run could not tie to any page
+			const { payload } = buildLeadPayload(
+				{
+					name: 'Egein',
+					attributes: {
+						site_count: 3,
+						takes_bookings: true,
+						evidence: {
+							site_count: {
+								source_id: 'https://egein.com/instalacions',
+								quote: 'Tres naus a Celrà',
+								confidence: null,
+							},
+						},
+					},
+				},
+				'egein',
+				'run-1',
+			)
+
+			// THEN the grounded value travels with its page, the other travels bare —
+			// and the run is named, which is what lets the CRM tell the two apart
+			expect(payload.attributes).toEqual({
+				site_count: {
+					value: 3,
+					source_id: 'https://egein.com/instalacions',
+					quote: 'Tres naus a Celrà',
+				},
+				takes_bookings: true,
+			})
+			expect(payload.researchId).toBe('run-1')
+		})
+	})
+
+	describe('when a value names a page but no words on it', () => {
+		it('should carry the page without inventing a quote', () => {
+			// GIVEN evidence holding only the page
+			const { payload } = buildLeadPayload(
+				{
+					name: 'Egein',
+					attributes: {
+						site_count: 3,
+						evidence: { site_count: { source_id: 'https://egein.com' } },
+					},
+				},
+				'egein',
+				'run-1',
+			)
+
+			// THEN nothing is quoted
+			expect(payload.attributes).toEqual({
+				site_count: { value: 3, source_id: 'https://egein.com' },
+			})
+		})
+	})
+
+	describe('when the evidence names no page', () => {
+		it('should pass the value on its own', () => {
+			// GIVEN an entry with words but no page to go and read them on
+			const { payload } = buildLeadPayload(
+				{
+					name: 'Egein',
+					attributes: {
+						site_count: 3,
+						evidence: { site_count: { quote: 'Tres naus' } },
+					},
+				},
+				'egein',
+				'run-1',
+			)
+
+			// THEN the value lands as the person's own: a page nothing fetched would
+			// be refused, and there is none to name
+			expect(payload.attributes).toEqual({ site_count: 3 })
+		})
+	})
+
+	describe('when the run filled none', () => {
+		it('should name neither the values nor the run', () => {
+			// GIVEN a row with no attributes at all
+			const { payload } = buildLeadPayload({ name: 'Egein' }, 'egein', 'run-1')
+
+			// THEN nothing is sent rather than an empty map, and the run's id has
+			// nothing to tie and so is left off
+			expect(payload.attributes).toBeUndefined()
+			expect(payload.researchId).toBeUndefined()
+		})
+	})
+
+	describe('when there is no run to name', () => {
+		it('should still carry the values, as the person adding them', () => {
+			// GIVEN a lead added from outside a run page
+			const { payload } = buildLeadPayload(
+				{ name: 'Egein', attributes: { site_count: 3 } },
+				'egein',
+			)
+
+			// THEN the values travel and nothing claims a run found them
+			expect(payload.attributes).toEqual({ site_count: 3 })
+			expect(payload.researchId).toBeUndefined()
+		})
+	})
+
+	describe('when a key nobody declares any more turns up', () => {
+		it('should leave it behind rather than lose the whole lead', () => {
+			// GIVEN a run that filled a key since retired, beside one still declared
+			const { payload } = buildLeadPayload(
+				{
+					name: 'Egein',
+					attributes: { site_count: 3, takes_bookings: true },
+				},
+				'egein',
+				'run-1',
+				[
+					declaration({}),
+					declaration({
+						id: 'a2',
+						key: 'takes_bookings',
+						kind: 'boolean',
+						isActive: false,
+					}),
+				],
+			)
+
+			// THEN only the declared key travels: the server refuses the whole create
+			// on the first key it does not recognise
+			expect(payload.attributes).toEqual({ site_count: 3 })
+		})
+	})
+
+	describe('when a value does not read as the kind it was declared with', () => {
+		it('should leave it behind, since the server would refuse it', () => {
+			// GIVEN a number key the run filled with words that are not a number
+			const { payload } = buildLeadPayload(
+				{ name: 'Egein', attributes: { site_count: 'a few' } },
+				'egein',
+				'run-1',
+				[declaration({})],
+			)
+
+			// THEN nothing is sent rather than a value the write would be refused for
+			expect(payload.attributes).toBeUndefined()
+			expect(payload.researchId).toBeUndefined()
+		})
+	})
+
+	describe('when a declared key carries what it was declared to carry', () => {
+		it('should travel with the page it was read on', () => {
+			// GIVEN a grounded value under a key declared active
+			const { payload } = buildLeadPayload(
+				{
+					name: 'Egein',
+					attributes: {
+						site_count: '3',
+						evidence: {
+							site_count: {
+								source_id: 'https://egein.com/instalacions',
+								quote: 'Tres naus a Celrà',
+							},
+						},
+					},
+				},
+				'egein',
+				'run-1',
+				[declaration({})],
+			)
+
+			// THEN it lands as the declared kind, with its page and words intact
+			expect(payload.attributes).toEqual({
+				site_count: {
+					value: 3,
+					source_id: 'https://egein.com/instalacions',
+					quote: 'Tres naus a Celrà',
+				},
+			})
+			expect(payload.researchId).toBe('run-1')
+		})
+	})
+
+	describe('when the page does not know what is declared yet', () => {
+		it('should send everything and let the server decide', () => {
+			// GIVEN declarations that have not arrived
+			const { payload } = buildLeadPayload(
+				{ name: 'Egein', attributes: { site_count: 'a few', anything: 2 } },
+				'egein',
+				'run-1',
+				null,
+			)
+
+			// THEN nothing is held back: guessing here would drop a value that is
+			// perfectly declared, on a page that simply has not been told
+			expect(payload.attributes).toEqual({ site_count: 'a few', anything: 2 })
 		})
 	})
 })

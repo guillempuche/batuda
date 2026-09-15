@@ -1,4 +1,8 @@
 import {
+	type FoundAttribute,
+	narrowFoundAttributes,
+} from '#/components/research/findings/found-attributes'
+import {
 	normalizeConfidence,
 	type TrustSignal,
 	verdictRank,
@@ -137,6 +141,22 @@ function narrowCitations(
 		})
 	}
 	return out
+}
+
+/**
+ * The attribute values a run found, read off its findings.
+ *
+ * They belong to the run rather than to any one proposal, and applying a change
+ * to the company the run was about is what writes them, so the review screen
+ * shows them on that change rather than as a block of their own.
+ */
+export function narrowRunAttributes(
+	findings: unknown,
+): ReadonlyArray<FoundAttribute> {
+	if (!findings || typeof findings !== 'object') return []
+	return narrowFoundAttributes(
+		(findings as Record<string, unknown>)['attributes'],
+	)
 }
 
 /**
