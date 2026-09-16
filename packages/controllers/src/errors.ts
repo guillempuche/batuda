@@ -198,9 +198,10 @@ export class ConfirmRequired extends Schema.TaggedErrorClass<ConfirmRequired>()(
  * A company write or a company list asked for an attribute in a way it cannot
  * be used: a value under a key the organisation never declared, a value that
  * does not read as the key's kind, a research run that is not this
- * organisation's, or a filter that arrived half-given or whose operator or
- * value does not fit the kind. `key` is the attribute at fault, null when the
- * reason names none.
+ * organisation's, a research-tagged write that would overwrite a value a
+ * person set (`held_by_person`), or a filter that arrived half-given or whose
+ * operator or value does not fit the kind. `key` is the attribute at fault,
+ * null when the reason names none.
  *
  * It carries the reason rather than a sentence, so the side facing the reader
  * writes the wording and telemetry can count the reasons apart, as
@@ -214,6 +215,7 @@ export const attributeRejectedReasons = [
 	'unknown_operator',
 	'operator_not_for_kind',
 	'value_not_for_kind',
+	'held_by_person',
 ] as const
 export type AttributeRejectedReason = (typeof attributeRejectedReasons)[number]
 

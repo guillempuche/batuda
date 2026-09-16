@@ -128,6 +128,116 @@ describe('attributeMergeFor', () => {
 			).toBeUndefined()
 		})
 	})
+
+	describe('when a run is named', () => {
+		const PAGE = 'https://acme.example/tools'
+		const withRun = (current: unknown) => ({
+			declared: declared(SITES),
+			run: { id: RUN, pages: new Map([['src_1', PAGE]]) },
+			current,
+		})
+
+		it("should refuse with held_by_person, naming the key, when the current entry is a person's", () => {
+			// GIVEN a value already stamped as a person's
+			const context = withRun({
+				site_count: { value: 2, set_by: 'client' },
+			})
+			// WHEN a research-tagged write names that same key
+			const exit = Effect.runSyncExit(
+				attributeMergeFor(context, {
+					site_count: { value: 9, source_id: 'src_1' },
+				}),
+			)
+			// THEN it is refused, naming the key
+			if (Exit.isSuccess(exit)) throw new Error('expected a refusal')
+			expect(Cause.squash(exit.cause)).toMatchObject({
+				reason: 'held_by_person',
+				key: 'site_count',
+			})
+		})
+
+		it("should land when the current entry is the run's own", () => {
+			// GIVEN a value already stamped as research's
+			const context = withRun({
+				site_count: { value: 2, set_by: 'research', research_id: RUN },
+			})
+			// WHEN the same key is written again, citing the fetched page
+			const merge = Effect.runSync(
+				attributeMergeFor(context, {
+					site_count: { value: 9, source_id: 'src_1' },
+				}),
+			)
+			// THEN the new reading lands
+			expect(merge?.entries['site_count']).toMatchObject({
+				value: 9,
+				set_by: 'research',
+			})
+		})
+
+		it('should land when the key holds nothing yet', () => {
+			// GIVEN no current entries at all
+			const context = withRun(undefined)
+			// WHEN a research-tagged write names the key
+			const merge = Effect.runSync(
+				attributeMergeFor(context, {
+					site_count: { value: 9, source_id: 'src_1' },
+				}),
+			)
+			// THEN it lands
+			expect(merge?.entries['site_count']).toMatchObject({
+				value: 9,
+				set_by: 'research',
+			})
+		})
+
+		it("should not check a key the write does not touch, even if it is a person's", () => {
+			// GIVEN a person's value under a key the write leaves alone
+			const context = withRun({
+				site_count: { value: 2, set_by: 'client' },
+			})
+			// WHEN the write names no attributes at all
+			// THEN there is nothing to refuse
+			expect(
+				Effect.runSync(attributeMergeFor(context, undefined)),
+			).toBeUndefined()
+		})
+
+		it("should refuse to remove a person's value on a run's behalf", () => {
+			// GIVEN a person's value
+			const context = withRun({
+				site_count: { value: 2, set_by: 'client' },
+			})
+			// WHEN a research-tagged write sends null for that key
+			const exit = Effect.runSyncExit(
+				attributeMergeFor(context, { site_count: null }),
+			)
+			// THEN it is refused the same way an overwrite is
+			if (Exit.isSuccess(exit)) throw new Error('expected a refusal')
+			expect(Cause.squash(exit.cause)).toMatchObject({
+				reason: 'held_by_person',
+				key: 'site_count',
+			})
+		})
+
+		it("should let a value that would land as the caller's own replace a person's", () => {
+			// GIVEN a person's value, and a write naming the run but citing a page
+			// the run never fetched, which is recorded as the caller's own
+			const context = withRun({
+				site_count: { value: 2, set_by: 'client' },
+			})
+			// WHEN written
+			const merge = Effect.runSync(
+				attributeMergeFor(context, {
+					site_count: { value: 9, source_id: 'src_unknown' },
+				}),
+			)
+			// THEN it lands as the caller's, like any edit of theirs
+			expect(merge?.entries['site_count']).toMatchObject({
+				value: 9,
+				set_by: 'client',
+			})
+		})
+	})
 })
 
 describe('researchAttributePatch', () => {

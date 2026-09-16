@@ -1193,8 +1193,11 @@ export class CompanyService extends Context.Service<CompanyService>()(
 						// updated: the addresses and the trade are written first, so a
 						// check further down would let those land on a company nobody
 						// can see and then report the edit as having done nothing.
-						const live = yield* sql`
-							SELECT 1 FROM companies
+						// The attributes column rides along with this same read, so a
+						// research-tagged write can be checked against what a person
+						// already set without a second trip to the row.
+						const live = yield* sql<{ attributes: unknown }>`
+							SELECT attributes FROM companies
 							WHERE id = ${id}
 								AND organization_id = ${currentOrg.id}
 								AND deleted_at IS NULL
@@ -1217,7 +1220,12 @@ export class CompanyService extends Context.Service<CompanyService>()(
 						)
 						// Refused before the addresses land, for the same reason as the
 						// liveness check above.
-						const merge = yield* readAttributeMerge(sql, currentOrg.id, lifted)
+						const merge = yield* readAttributeMerge(
+							sql,
+							currentOrg.id,
+							lifted,
+							live[0]?.attributes,
+						)
 						const written = attributeWriteFragments(sql, merge)
 						if (split.channels.length > 0) {
 							yield* writeChannels(

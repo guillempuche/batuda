@@ -12,6 +12,7 @@ const REASON_MESSAGE: Record<string, MessageDescriptor> = {
 	unknown_operator: msg`That comparison is not one the list knows.`,
 	operator_not_for_kind: msg`That comparison does not fit the kind of this attribute.`,
 	value_not_for_kind: msg`That value does not fit the kind of this attribute.`,
+	held_by_person: msg`A person already set this value, so a research update cannot overwrite it.`,
 }
 
 const FALLBACK = msg`The attribute was refused.`

@@ -365,6 +365,10 @@ msgstr "A key is lowercase letters, digits and underscores, starts with a letter
 msgid "A key stays as it was declared, so the values companies already hold keep their name."
 msgstr "A key stays as it was declared, so the values companies already hold keep their name."
 
+#: src/components/companies/attribute-rejected.ts
+msgid "A person already set this value, so a research update cannot overwrite it."
+msgstr "A person already set this value, so a research update cannot overwrite it."
+
 #: src/components/instructions/attribute-messages.ts
 msgid "A research run already uses that name for something else. Pick another key."
 msgstr "A research run already uses that name for something else. Pick another key."
