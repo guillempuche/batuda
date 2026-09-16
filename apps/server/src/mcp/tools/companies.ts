@@ -209,7 +209,7 @@ const GetCompany = Tool.make('get_company', {
 	.annotate(Tool.OpenWorld, false)
 
 // Written once for both company writes, so the two tools describe one shape.
-const ATTRIBUTES_INPUT_DESCRIPTION = `Values for the attributes this organisation declared (manage_instructions list_attributes), keyed by attribute key: \`{ "site_count": 4, "fit": "strong" }\`. Each value is the bare value — text, or ${HOW_A_VALUE_READS} — or \`{ value, source_id, quote, as_of }\` when you know the page it was read from (a quote is kept to ${ATTRIBUTE_QUOTE_MAX} characters); null removes the key. A key nobody declared, or a value that does not read as the key's kind, refuses the whole write and names the key. Values merge into what the company already holds. When a value was read during a research run, pass the run's id as research_id beside the list and give the value in the wrapped form with the page it was read on as source_id: a value whose page that run fetched is recorded as the run's, with the page, the run and the date; any other is recorded as yours.`
+const ATTRIBUTES_INPUT_DESCRIPTION = `Values for the attributes this organisation declared (manage_instructions list_attributes), keyed by attribute key: \`{ "site_count": 4, "fit": "strong" }\`. Each value is the bare value — text, or ${HOW_A_VALUE_READS} — or \`{ value, source_id, quote, as_of }\` when you know the page it was read from (a quote is kept to ${ATTRIBUTE_QUOTE_MAX} characters); null removes the key. A key nobody declared, or a value that does not read as the key's kind, refuses the whole write and names the key. Values merge into what the company already holds. When a value was read during a research run, pass the run's id as research_id beside the list and give the value in the wrapped form with the page it was read on as source_id: a value whose page that run fetched is recorded as the run's, with the page, the run and the date; any other is recorded as yours. A value a person set is never replaced by a run's word: naming research_id on a key someone set by hand, with a page that run fetched behind the value, or sending null for that key, refuses the whole write with held_by_person. A value the run cannot vouch for (no page, or one it never fetched) lands as your own edit, like any other.`
 
 // The fields a new company carries — one array element of a create_companies call.
 const companyInputFields = {
@@ -632,6 +632,8 @@ const attributeRejectedMessage = (e: AttributeRejected): string => {
 			return `That operator does not fit the kind of ${key}: text takes eq, in, contains; a choice eq, in; yes/no eq; a number or a date eq, gte, lte.`
 		case 'value_not_for_kind':
 			return `attribute_value does not read as the kind of ${key}: ${HOW_A_VALUE_READS}.`
+		case 'held_by_person':
+			return `${key} was set by a person, not a run, so this research-tagged write does not overwrite it. Send it without research_id if this is your own correction.`
 	}
 }
 

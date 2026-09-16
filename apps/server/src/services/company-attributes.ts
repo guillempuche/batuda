@@ -93,19 +93,25 @@ export const splitCompanyAttributes = (
 export interface AttributeWriteContext {
 	readonly declared: ReadonlyMap<string, DeclaredAttribute>
 	readonly run: { readonly id: string; readonly pages: RunPages } | undefined
+	// The row's own `attributes` column, read before the write so a
+	// research-tagged value can be checked against what a person already set.
+	// Undefined when there is no row to protect yet — a create, or a caller
+	// that named no run.
+	readonly current?: unknown
 }
 
 export const readAttributeWriteContext = (
 	sql: SqlClient.SqlClient,
 	orgId: string,
 	researchId: string | undefined,
+	current?: unknown,
 ): Effect.Effect<
 	AttributeWriteContext,
 	AttributeRejected | SqlError.SqlError
 > =>
 	Effect.gen(function* () {
 		const declared = yield* readDeclared(sql, orgId)
-		if (researchId === undefined) return { declared, run: undefined }
+		if (researchId === undefined) return { declared, run: undefined, current }
 		// Checked for shape first: the column is a uuid, and asking it about
 		// anything else is a database error rather than a run not found.
 		const runs = isUuidRef(researchId)
@@ -120,8 +126,16 @@ export const readAttributeWriteContext = (
 				new AttributeRejected({ reason: 'unknown_run', key: null }),
 			)
 		const pages = yield* readRunPages(sql, researchId)
-		return { declared, run: { id: researchId, pages } }
+		return { declared, run: { id: researchId, pages }, current }
 	})
+
+// Whether a key's current entry was stamped as a person's, read straight off
+// the JSONB column without trusting its shape beyond that one field.
+const heldByPerson = (current: unknown, key: string): boolean => {
+	if (!isPlainObject(current)) return false
+	const entry = current[key]
+	return isPlainObject(entry) && entry['set_by'] === 'client'
+}
 
 // What one write does to the column and to the record of where each fact came
 // from. Every write merges: keys not named are left alone.
@@ -189,6 +203,15 @@ export const attributeMergeFor = (
 				new AttributeRejected({ reason: check.reason, key: check.key }),
 			)
 		const { values, removed } = check.plan
+		// A run's hand-on never removes a value a person set: the person's word
+		// stands until they change it themselves. A write with no run named
+		// still removes anything, as it always has.
+		if (context.run !== undefined)
+			for (const key of removed)
+				if (heldByPerson(context.current, key))
+					return yield* refuse(
+						new AttributeRejected({ reason: 'held_by_person', key }),
+					)
 		const entries: Array<[string, AttributeValueEntry]> = []
 		const provenance: Array<[string, FieldSource]> = []
 		const provenanceCleared: Array<string> = removed.map(attributeProvenanceKey)
@@ -197,6 +220,12 @@ export const attributeMergeFor = (
 				context.run !== undefined && checked.source_id !== undefined
 					? pageFor(context.run.pages, checked.source_id)
 					: undefined
+			// A value that would land as the run's never overwrites one a person
+			// set; one that would land as the caller's own may, like any edit.
+			if (page !== undefined && heldByPerson(context.current, key))
+				return yield* refuse(
+					new AttributeRejected({ reason: 'held_by_person', key }),
+				)
 			const source =
 				context.run !== undefined && page !== undefined
 					? {
@@ -372,6 +401,9 @@ export const readAttributeMerge = (
 		readonly attributes: unknown
 		readonly researchId: string | undefined
 	},
+	// The row's own `attributes` column, when there is a row to protect —
+	// an update passes it, a create leaves it out because nothing is there yet.
+	current?: unknown,
 ): Effect.Effect<
 	AttributeMerge | undefined,
 	AttributeRejected | SqlError.SqlError
@@ -379,7 +411,7 @@ export const readAttributeMerge = (
 	write.attributes === undefined
 		? Effect.succeed(undefined)
 		: Effect.flatMap(
-				readAttributeWriteContext(sql, orgId, write.researchId),
+				readAttributeWriteContext(sql, orgId, write.researchId, current),
 				context => attributeMergeFor(context, write.attributes),
 			)
 

@@ -365,6 +365,10 @@ msgstr "Una clau són lletres minúscules, dígits i guions baixos, comença amb
 msgid "A key stays as it was declared, so the values companies already hold keep their name."
 msgstr "Una clau es queda tal com es va declarar, així els valors que les empreses ja tenen conserven el nom."
 
+#: src/components/companies/attribute-rejected.ts
+msgid "A person already set this value, so a research update cannot overwrite it."
+msgstr "Una persona ja ha establert aquest valor, així que una actualització de recerca no el pot sobreescriure."
+
 #: src/components/instructions/attribute-messages.ts
 msgid "A research run already uses that name for something else. Pick another key."
 msgstr "Una recerca ja fa servir aquest nom per a una altra cosa. Tria una altra clau."

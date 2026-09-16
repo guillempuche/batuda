@@ -353,6 +353,113 @@ describe('writing attribute values through update', () => {
 		})
 	})
 
+	describe('when a research-tagged write names a key a person already set', () => {
+		it('should refuse the whole write with held_by_person, naming that key, and touch nothing', async () => {
+			// GIVEN two keys a person set, one of them about to be named by a run
+			const id = await seedCompany(ORG, {
+				[SITES]: { value: 2, set_by: 'client' },
+				[CRM]: { value: 'zoho', set_by: 'client' },
+			})
+			const page = `https://acme.example/${suffix}/held`
+			const { runId, sourceId } = await seedRunWithPage(ORG, page)
+
+			// WHEN a research-tagged write names that key beside an untouched one
+			const outcome = await attempt(org, svc =>
+				svc.update(id, {
+					researchId: runId,
+					attributes: {
+						[SITES]: { value: 9, source_id: sourceId },
+						[CRM]: { value: 'hubspot', source_id: sourceId },
+					},
+				}),
+			)
+
+			// THEN the write is refused, naming the held key, and the row is
+			// exactly as it was
+			expect(refusal(outcome)).toMatchObject({
+				reason: 'held_by_person',
+				key: SITES,
+			})
+			const row = await readRow(id)
+			expect(row.attributes).toEqual({
+				[SITES]: { value: 2, set_by: 'client' },
+				[CRM]: { value: 'zoho', set_by: 'client' },
+			})
+		})
+
+		it("should still let a person's own write land, with no run named", async () => {
+			// GIVEN a value a person set
+			const id = await seedCompany(ORG, {
+				[SITES]: { value: 2, set_by: 'client' },
+			})
+
+			// WHEN a plain write, naming no run, changes it
+			await inOrg(org, svc => svc.update(id, { attributes: { [SITES]: 3 } }))
+
+			// THEN it lands, as a person's write always has
+			expect((await readRow(id)).attributes).toEqual({
+				[SITES]: { value: 3, set_by: 'client' },
+			})
+		})
+
+		it('should let a research-tagged write land on a key a run set before', async () => {
+			// GIVEN a value a run already holds
+			const page = `https://acme.example/${suffix}/research-held`
+			const { runId, sourceId } = await seedRunWithPage(ORG, page)
+			const id = await seedCompany(ORG, {
+				[SITES]: {
+					value: 2,
+					set_by: 'research',
+					research_id: runId,
+					source_url: page,
+				},
+			})
+
+			// WHEN the same run updates it
+			await inOrg(org, svc =>
+				svc.update(id, {
+					researchId: runId,
+					attributes: { [SITES]: { value: 5, source_id: sourceId } },
+				}),
+			)
+
+			// THEN the run's new reading lands
+			expect((await readRow(id)).attributes).toEqual({
+				[SITES]: {
+					value: 5,
+					source_url: page,
+					research_id: runId,
+					set_by: 'research',
+				},
+			})
+		})
+
+		it('should let a research-tagged write land on a key with no value yet', async () => {
+			// GIVEN a company with nothing under the key
+			const page = `https://acme.example/${suffix}/fresh`
+			const { runId, sourceId } = await seedRunWithPage(ORG, page)
+			const id = await seedCompany(ORG)
+
+			// WHEN a research-tagged write names it
+			await inOrg(org, svc =>
+				svc.update(id, {
+					researchId: runId,
+					attributes: { [SITES]: { value: 6, source_id: sourceId } },
+				}),
+			)
+
+			// THEN it lands as the run's
+			expect((await readRow(id)).attributes).toEqual({
+				[SITES]: {
+					value: 6,
+					source_url: page,
+					research_id: runId,
+					set_by: 'research',
+				},
+			})
+		})
+	})
+
 	describe('when the write is refused', () => {
 		it('should name an undeclared key and leave the row untouched, version included', async () => {
 			// GIVEN a write with a new name and a key nobody declared
