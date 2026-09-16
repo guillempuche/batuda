@@ -397,7 +397,9 @@ describe('bindScanContactsToRows', () => {
 			// GIVEN a row that can decide nothing about whose staff anybody is
 			const findings = {
 				prospects: [
-					row('Transportes y Logistica SL', [{ name: 'Ghost', citations: [] }]),
+					row('Transportes y Logistica SL', [
+						{ name: 'Ghost Name', citations: [] },
+					]),
 				],
 			}
 
@@ -623,6 +625,80 @@ describe('bindScanContactsToRows', () => {
 			const result = bindScanContactsToRows(findings, undefined)
 			expect(result.findings).toBe(findings)
 			expect(result.dropped).toBe(0)
+		})
+	})
+
+	describe('when a contact name is not a person', () => {
+		it('should drop an email folded in as a name', () => {
+			// GIVEN a scan row whose contact carries an address, not a name
+			const findings = {
+				prospects: [
+					row('Talleres Vidal SL', [
+						person('pgimenez@tous.com', 'pgimenez@tous.com, Gerent'),
+					]),
+				],
+			}
+
+			// WHEN checked
+			const result = bindScanContactsToRows(findings, 'prospects')
+
+			// THEN it is dropped under its own count, not read as a person
+			expect(result.droppedNotPerson).toBe(1)
+			expect(result.dropped).toBe(0)
+			expect(contactsOn(result.findings, 0)).toHaveLength(0)
+		})
+
+		it('should drop a phone number folded in as a name', () => {
+			// GIVEN a scan row whose contact carries a phone number, not a name
+			const findings = {
+				prospects: [
+					row('Talleres Vidal SL', [person('935603166', '935603166')]),
+				],
+			}
+
+			// WHEN checked
+			const result = bindScanContactsToRows(findings, 'prospects')
+
+			// THEN it is dropped under its own count
+			expect(result.droppedNotPerson).toBe(1)
+			expect(contactsOn(result.findings, 0)).toHaveLength(0)
+		})
+
+		it('should drop a one-word name from a testimonial page', () => {
+			// GIVEN a scan row whose contact is a bare first name
+			const findings = {
+				prospects: [
+					row('Talleres Vidal SL', [
+						person('Maryline', 'Maryline says the team is great'),
+					]),
+				],
+			}
+
+			// WHEN checked
+			const result = bindScanContactsToRows(findings, 'prospects')
+
+			// THEN it is dropped under its own count
+			expect(result.droppedNotPerson).toBe(1)
+			expect(contactsOn(result.findings, 0)).toHaveLength(0)
+		})
+
+		it('should keep a name written in a script with no word spaces', () => {
+			// GIVEN a scan row whose contact is named in Chinese
+			const findings = {
+				prospects: [
+					row('Talleres Vidal SL', [person('王小明', '王小明, Gerent')]),
+				],
+			}
+
+			// WHEN checked
+			const result = bindScanContactsToRows(findings, 'prospects')
+
+			// THEN the name stays, and nothing is counted against it
+			expect(result.droppedNotPerson).toBe(0)
+			expect(
+				(contactsOn(result.findings, 0) as ReadonlyArray<{ name: string }>)[0]
+					?.name,
+			).toBe('王小明')
 		})
 	})
 })

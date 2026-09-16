@@ -312,15 +312,27 @@ const initialsOf = (words: ReadonlyArray<string>): ReadonlyArray<string> => {
 		: [all]
 }
 
-// A title's English rendering that only says the title again ("CEO" glossed
-// "CEO" or "C.E.O.") says nothing, and a reader would show the same words
-// twice. One that spells an acronym out is kept: it may be the only English a
-// reader gets for a Spanish "DG", and nothing here can tell that from an
-// English "CEO".
-const lettersOnly = (text: string): string =>
-	text.replace(/[^\p{L}\p{N}]/gu, '')
-const glossRepeatsTitle = (title: string, gloss: string): boolean =>
-	lettersOnly(normalize(gloss)) === lettersOnly(normalize(title))
+// A rendering is a few English words for the title and nothing more. One with
+// a bracket, a bar or a clause in it is the model explaining the page
+// ("Publisher-Director (he is also the President)"), which is not a rendering.
+const GLOSS_MAX_WORDS = 5
+const readsAsGloss = (gloss: string): boolean =>
+	!/[()|]/.test(gloss) && wordsOf(gloss).length <= GLOSS_MAX_WORDS
+
+// A rendering that only says the title again, whole ("CEO" glossed "CEO" or
+// "C.E.O.") or word for word in part ("Sales Director" glossed "Director"),
+// says nothing, and a reader would show the same words twice. Whole words,
+// not letters: "Director" is the right rendering of "Directora". One that
+// spells an acronym out is kept: it may be the only English a reader gets for
+// a Spanish "DG", and nothing here can tell that from an English "CEO".
+const glossRepeatsTitle = (title: string, gloss: string): boolean => {
+	if (lettersAndDigits(gloss) === lettersAndDigits(title)) return true
+	const titleWords = wordsOf(title)
+	const glossWords = wordsOf(gloss)
+	return (
+		glossWords.length > 0 && glossWords.every(word => titleWords.includes(word))
+	)
+}
 
 // A title often names two posts in one — "Owner & CEO", "Chairman and Chief
 // Executive Officer" — and a bracketed aside, closed or cut short, is the
@@ -401,6 +413,106 @@ export const quoteSupportsValue = (
 export const quoteSupportsTitle = (quote: string, value: string): boolean =>
 	quoteSupportsValue(quote, value, true) || titleInitialsAgree(quote, value)
 
+// Labels a page puts beside a person that are not their post: a directory's
+// "Contact Diego Navarro", a footer's "Tel", "Email". Seen stored as job titles.
+const NOT_TITLES = new Set([
+	'contact',
+	'contacto',
+	'contacte',
+	'kontakt',
+	'email',
+	'e-mail',
+	'mail',
+	'correo',
+	'tel',
+	'telefono',
+	'telefon',
+	'telephone',
+	'phone',
+	'mobile',
+	'movil',
+	'mobil',
+	'fax',
+	'web',
+	'website',
+	'linkedin',
+])
+
+// A LinkedIn headline strings several posts and interests together with
+// bars; the first is the post, the rest is the person's pitch.
+const HEADLINE_SEPARATOR = /\s*[|·•]\s*/
+
+// A job title is a handful of words; past this it is a sentence or a headline.
+const TITLE_MAX_WORDS = 8
+
+/** Whether a value is the shape of a job title rather than a label or a headline. */
+export const readsAsTitle = (value: string): boolean => {
+	const plain = normalize(value)
+	return (
+		plain.length > 0 &&
+		!NOT_TITLES.has(plain) &&
+		wordsOf(plain).length <= TITLE_MAX_WORDS
+	)
+}
+
+/**
+ * The title as the page writes it, or null when the quote does not back it.
+ * A headline is cut to its first post; a word the model inflected differently
+ * from the page ("propietario" for a page that says "propietari") is put back
+ * to the page's word, since the page's words are what the title is.
+ */
+export const titleAsPageWrites = (
+	quote: string,
+	value: string,
+): string | null => {
+	const title = (value.split(HEADLINE_SEPARATOR)[0] ?? '').trim()
+	if (!readsAsTitle(title)) return null
+	if (!quoteSupportsTitle(quote, title)) return null
+	const quoteWords = quote.split(WORD_BOUNDARY)
+	const plainQuoteWords = quoteWords.map(word => normalize(word))
+	return title
+		.split(WORD_BOUNDARY)
+		.map(word => {
+			const plain = normalize(word)
+			if (plain.length < ROLE_STEM_CHARS || plainQuoteWords.includes(plain))
+				return word
+			// The page's word is the one that is this word with another ending,
+			// and the only such word: not a longer word that happens to start
+			// alike ("direccion" for "director", "directorio" for "directora").
+			const candidates = [
+				...new Set(
+					plainQuoteWords.filter(
+						candidate =>
+							candidate !== plain && differOnlyInEnding(candidate, plain),
+					),
+				),
+			]
+			if (candidates.length !== 1) return word
+			return quoteWords[plainQuoteWords.indexOf(candidates[0] ?? '')] ?? word
+		})
+		.join('')
+}
+
+// Where one run of letters or digits ends and something else begins, kept in
+// the split so a title comes back together with its own hyphens and slashes.
+const WORD_BOUNDARY =
+	/(?<=[\p{L}\p{N}])(?=[^\p{L}\p{N}])|(?<=[^\p{L}\p{N}])(?=[\p{L}\p{N}])/u
+
+// How many letters, over both words together, may follow the part they share
+// for the two to be endings of one word: "gerente" and "gerenta" spend two,
+// "director" and "direccion" spend seven.
+const ENDINGS_MAX_CHARS = 2
+
+const differOnlyInEnding = (a: string, b: string): boolean => {
+	let shared = 0
+	while (shared < a.length && shared < b.length && a[shared] === b[shared])
+		shared++
+	return (
+		shared >= ROLE_STEM_CHARS &&
+		a.length - shared + (b.length - shared) <= ENDINGS_MAX_CHARS
+	)
+}
+
 // The numbers a text states, read the ways a page writes one: a bare run of
 // digits; digits grouped in threes by a dot, a comma, an apostrophe or a space
 // ("1.200", "1 000"); a decimal with one or two digits after a dot or a comma
@@ -467,6 +579,68 @@ export const isInCorpus = (
 	return present / tokens.length >= QUOTE_PRESENCE_THRESHOLD
 }
 
+// A text reduced to the letters and digits it is made of, accents off, so a
+// quote and a page compare the same whatever the markdown, spacing or
+// punctuation around the words.
+const lettersAndDigits = (text: string): string =>
+	foldAccents(text.toLowerCase()).replace(/[^\p{L}\p{N}]/gu, '')
+
+// The corpus reduced the same way, remembered between calls for the same
+// reason the accent-free corpus is.
+let lastVerbatimCorpus = ''
+let lastVerbatimFolded = ''
+const verbatimCorpus = (lowerCorpus: string): string => {
+	if (lowerCorpus !== lastVerbatimCorpus) {
+		lastVerbatimCorpus = lowerCorpus
+		lastVerbatimFolded = lettersAndDigits(lowerCorpus)
+	}
+	return lastVerbatimFolded
+}
+
+// A quote may skip over part of a page with an ellipsis; each part it keeps
+// is then looked for on its own. A part shorter than this says too little to
+// be looked for at all.
+const ELLIPSIS = /…|\.{3}/
+const VERBATIM_PART_MIN_CHARS = 4
+
+// Whether the quote is the page's own words: every part of it long enough to
+// be looked for appears in the evidence as a run of the same letters. A quote
+// the model reworded, or wrote as a remark of its own ("no se indica carácter
+// familiar"), shares most of its words with some page and still passes the
+// share test above; it never passes this one.
+export const quoteIsVerbatim = (
+	quote: string,
+	lowerCorpus: string,
+): boolean => {
+	const corpus = verbatimCorpus(lowerCorpus)
+	const parts = quote.split(ELLIPSIS).map(lettersAndDigits)
+	const lookable = parts.filter(part => part.length >= VERBATIM_PART_MIN_CHARS)
+	// A quote of one short word ("CEO") has no part long enough on its own, so
+	// it is looked for as a whole word instead: run into the letters around
+	// it, "ceo" sits inside "trece ocupaciones" on almost any Spanish page.
+	if (lookable.length === 0) {
+		const word = normalize(quote)
+			.replace(/[^\p{L}\p{N}]+/gu, ' ')
+			.trim()
+		return (
+			word.length >= 2 &&
+			new RegExp(
+				`(?<![\\p{L}\\p{N}])${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}\\p{N}])`,
+				'u',
+			).test(accentFreeCorpus(lowerCorpus))
+		)
+	}
+	return lookable.every(part => corpus.includes(part))
+}
+
+// A date a value is said to hold as of is kept only when the quote names its
+// year; a model asked for a date writes one whether the page gives it or not.
+export const quoteNamesYearOf = (quote: string, asOf: unknown): boolean => {
+	if (typeof asOf !== 'string') return false
+	const year = asOf.match(/\d{4}/)?.[0]
+	return year !== undefined && quote.includes(year)
+}
+
 /** Why a per-field scalar was dropped, for the run's grounding trace. */
 export type FieldDropReason =
 	| 'placeholder'
@@ -475,6 +649,7 @@ export type FieldDropReason =
 	| 'quote_absent'
 	| 'unsupported'
 	| 'unquoted'
+	| 'not_a_title'
 
 /**
  * One dropped scalar, recorded so a run can show exactly which field it nulled and
@@ -503,6 +678,8 @@ export interface ScalarFieldGuardResult {
 	readonly droppedUnsupported: number
 	/** Fields dropped because a value only credible with its words arrived without a quote. */
 	readonly droppedUnquoted: number
+	/** Titles dropped because the value was a label beside a name, or a headline, not a post. */
+	readonly droppedNotTitle: number
 	/** Each drop with its field, reason, value, and source — for the grounding trace. */
 	readonly drops: ReadonlyArray<FieldDrop>
 }
@@ -598,36 +775,60 @@ export const guardScalarFields = (
 			if (quote === '' && QUOTE_REQUIRED_FIELDS.has(key)) {
 				return drop(key, 'unquoted', text, wrapper.source_id)
 			}
+			if (key === 'role' && typeof raw === 'string' && !readsAsTitle(raw)) {
+				return drop(key, 'not_a_title', raw, wrapper.source_id)
+			}
+			let written: unknown = raw
 			if (quote !== '') {
-				if (corpus !== '' && !isInCorpus(quote, lowerCorpus)) {
+				// A title's quote has to be the page's own words: a model that rewords
+				// the line it quotes has usually reworded the title too.
+				const quotePresent =
+					key === 'role'
+						? quoteIsVerbatim(quote, lowerCorpus)
+						: isInCorpus(quote, lowerCorpus)
+				if (corpus !== '' && !quotePresent) {
 					return drop(key, 'quote_absent', text, wrapper.source_id)
 				}
 				// A number has to be the number the quote states, digit for digit.
 				if (typeof raw === 'number' && !quoteStatesNumber(quote, raw)) {
 					return drop(key, 'unsupported', text, wrapper.source_id)
 				}
-				if (
-					typeof raw === 'string' &&
-					PAGE_LITERAL_FIELDS.has(key) &&
-					!(key === 'role'
-						? quoteSupportsTitle(quote, raw)
-						: quoteSupportsValue(quote, raw))
-				) {
-					return drop(key, 'unsupported', text, wrapper.source_id)
+				if (typeof raw === 'string' && PAGE_LITERAL_FIELDS.has(key)) {
+					if (key === 'role') {
+						const title = titleAsPageWrites(quote, raw)
+						if (title === null)
+							return drop(key, 'unsupported', text, wrapper.source_id)
+						written = title
+					} else if (!quoteSupportsValue(quote, raw)) {
+						return drop(key, 'unsupported', text, wrapper.source_id)
+					}
 				}
 			}
-			const gloss = (wrapper as Record<string, unknown>)['gloss']
-			if (
-				key === 'role' &&
-				typeof raw === 'string' &&
-				typeof gloss === 'string' &&
-				glossRepeatsTitle(raw, gloss)
-			) {
-				return Object.fromEntries(
-					Object.entries(wrapper).filter(([field]) => field !== 'gloss'),
-				)
-			}
-			return value
+			// A date the quote does not name was written from memory, so it goes
+			// while the value stays. A rendering that only repeats the title, or is
+			// a remark rather than a rendering, goes the same way.
+			const fields = wrapper as Record<string, unknown>
+			const asOfStands =
+				fields['as_of'] === undefined ||
+				(quote !== '' && quoteNamesYearOf(quote, fields['as_of']))
+			const gloss = fields['gloss']
+			const glossStands =
+				gloss === undefined ||
+				(key === 'role' &&
+					typeof written === 'string' &&
+					typeof gloss === 'string' &&
+					readsAsGloss(gloss) &&
+					!glossRepeatsTitle(written, gloss))
+			if (written === raw && asOfStands && glossStands) return value
+			return Object.fromEntries(
+				Object.entries(fields)
+					.filter(
+						([field]) =>
+							(asOfStands || field !== 'as_of') &&
+							(glossStands || field !== 'gloss'),
+					)
+					.map(([field, held]) => [field, field === 'value' ? written : held]),
+			)
 		}
 
 		return Object.fromEntries(
@@ -650,6 +851,7 @@ export const guardScalarFields = (
 		droppedQuoteAbsent: countReason('quote_absent'),
 		droppedUnsupported: countReason('unsupported'),
 		droppedUnquoted: countReason('unquoted'),
+		droppedNotTitle: countReason('not_a_title'),
 		drops,
 	}
 }

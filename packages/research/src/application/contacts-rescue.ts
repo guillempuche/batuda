@@ -21,8 +21,10 @@ import { Schema } from 'effect'
 
 import { foldLabel } from '@batuda/domain'
 
+import { personName, readsAsPersonName } from './contact-name'
 import { isPlainObject } from './guard-shapes'
 import { Citation, SourcedTitle } from './schemas/_shared'
+import { isFirstPartyHost } from './source-tier-guard'
 
 // The narrow schema the focused pass fills: people only, each with a title and the
 // source(s) that name them as this company's own staff. Citations are required
@@ -64,7 +66,7 @@ export const contactsRescuePrompt = (
 		`From the evidence below, list EVERY named person who is a leader or employee of "${target.name}"${
 			target.domain ? ` (official site ${target.domain})` : ''
 		}, with their exact job title.`,
-		"For each person return: their full name as written; `role` — their exact title as the page writes it, in its own language, with the source URL and a verbatim quote stating the name and title, and an English rendering in `gloss` only when that language is not English; and `citations` — the source URL(s) where they appear as this company's own person, each with a verbatim quote.",
+		"For each person return: their full name as written; `role` — their exact title as the page writes it, in its own language, with the source URL and a verbatim quote stating the name and title, and in `gloss` the English words for that title alone (at most four, no brackets or remarks) when that language is not English, or null when it is; and `citations` — the source URL(s) where they appear as this company's own person, each with a verbatim quote.",
 		'Rules:',
 		`- Only ${target.name}'s OWN leaders or staff. IGNORE anyone described as a client, customer, partner, vendor, or testimonial, and anyone who works for a DIFFERENT company — even when they are quoted on this company's own site.`,
 		'- Distinguish current leaders from founders: someone who "co-founded" the company is a founder; give a current role only if the evidence says they still hold it.',
@@ -74,6 +76,15 @@ export const contactsRescuePrompt = (
 		'Evidence:',
 		evidence,
 	].join('\n')
+}
+
+// The host a page's address names, or none when the source id is not an address.
+const hostOf = (sourceId: string): string | undefined => {
+	try {
+		return new URL(sourceId).hostname.toLowerCase()
+	} catch {
+		return undefined
+	}
 }
 
 // A person's name reduced to a comparison key: decoration removed, lower case,
@@ -147,18 +158,35 @@ export interface ContactsMergeResult {
 export const mergeContacts = (
 	broad: ReadonlyArray<RawContact>,
 	rescued: ReadonlyArray<RawContact>,
+	ownHosts: ReadonlyArray<string> = [],
 ): ContactsMergeResult => {
 	const byKey = new Map<string, RawContact>()
 	const order: string[] = []
 	let dropped = 0
 
-	// The title the broad pass kept stands, and the rescue pass's English
-	// rendering fills in beside it when the broad one came without: the
-	// rendering reads the same words, it is not a competing fact.
+	// A title read off the company's own site outranks one read off a
+	// directory or a news post, whichever pass found it: the site is what the
+	// company says of itself, and it is the one a registry does not date.
+	const onOwnSite = (role: Record<string, unknown>): boolean => {
+		const sourceId = role['source_id']
+		const host = typeof sourceId === 'string' ? hostOf(sourceId) : undefined
+		return host !== undefined && isFirstPartyHost(host, ownHosts)
+	}
+
+	// The title the broad pass kept stands unless the rescue pass read one off
+	// the company's own site and it did not; the English rendering fills in
+	// from whichever has one, since a rendering reads the same words and is not
+	// a competing fact.
 	const mergedRole = (kept: unknown, found: unknown): unknown => {
 		if (!isPlainObject(kept) || !isPlainObject(found)) return kept ?? found
-		if ('gloss' in kept || typeof found['gloss'] !== 'string') return kept
-		return { ...kept, gloss: found['gloss'] }
+		const [first, second] =
+			!onOwnSite(kept) && onOwnSite(found) ? [found, kept] : [kept, found]
+		if (
+			typeof first['gloss'] === 'string' ||
+			typeof second['gloss'] !== 'string'
+		)
+			return first
+		return { ...first, gloss: second['gloss'] }
 	}
 
 	const absorb = (c: RawContact): void => {
@@ -166,7 +194,17 @@ export const mergeContacts = (
 			dropped++
 			return
 		}
-		const key = normalizeContactName(c.name)
+		// An email, a phone number, or a testimonial's bare first name folded in
+		// under the name field — none of those is a person, so none is kept.
+		if (!readsAsPersonName(c.name)) {
+			dropped++
+			return
+		}
+		// The aside comes off before the name is kept or keyed, so "Stéphane
+		// (Cutting-folding, Bordeaux)" and "Stéphane" are the same entry rather
+		// than two.
+		const cleaned: RawContact = { ...c, name: personName(c.name) }
+		const key = normalizeContactName(cleaned.name as string)
 		// Nothing to key on. Such entries cannot be kept apart from each other
 		// either — they would all share one key — so they go, and are counted.
 		if (key === '') {
@@ -175,17 +213,17 @@ export const mergeContacts = (
 		}
 		const existing = byKey.get(key)
 		if (existing === undefined) {
-			byKey.set(key, c)
+			byKey.set(key, cleaned)
 			order.push(key)
 			return
 		}
 		const joined: Record<string, unknown> = { name: existing.name }
-		addDetail(joined, 'role', mergedRole(existing.role, c.role))
-		addDetail(joined, 'email', existing.email ?? c.email)
-		addDetail(joined, 'phone', existing.phone ?? c.phone)
+		addDetail(joined, 'role', mergedRole(existing.role, cleaned.role))
+		addDetail(joined, 'email', existing.email ?? cleaned.email)
+		addDetail(joined, 'phone', existing.phone ?? cleaned.phone)
 		joined['citations'] = joinCitations(
 			citationsArray(existing),
-			citationsArray(c),
+			citationsArray(cleaned),
 		)
 		byKey.set(key, joined as RawContact)
 	}

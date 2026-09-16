@@ -191,10 +191,54 @@ describe('mergeContacts', () => {
 	describe('when a contact has a blank name', () => {
 		it('should drop it', () => {
 			// GIVEN a nameless entry
-			const merged = mergeContacts([{ name: '  ' }], [{ name: 'Ada' }])
+			const merged = mergeContacts([{ name: '  ' }], [{ name: 'Ada Lovelace' }])
 
 			// THEN only the named one survives
-			expect(merged.contacts.map(c => c.name)).toEqual(['Ada'])
+			expect(merged.contacts.map(c => c.name)).toEqual(['Ada Lovelace'])
+		})
+	})
+
+	describe('when a contact name is not a person', () => {
+		it('should drop an email, a phone number, and a bare first name', () => {
+			// GIVEN a scan row's contact fields folded in under "name"
+			const merged = mergeContacts(
+				[
+					{ name: 'pgimenez@tous.com' },
+					{ name: '935603166' },
+					{ name: 'Maryline' },
+				],
+				[{ name: 'Ada Lovelace' }],
+			)
+
+			// THEN only the real person survives, the rest are counted
+			expect(merged.contacts.map(c => c.name)).toEqual(['Ada Lovelace'])
+			expect(merged.dropped).toBe(3)
+		})
+	})
+
+	describe('when a name and the same name with a bracketed aside both appear', () => {
+		it('should key them the same and drop both, since the aside is the only second word', () => {
+			// GIVEN one contact from a testimonial page with an aside naming a
+			// place, and the same first name with the aside already stripped
+			const merged = mergeContacts(
+				[{ name: 'Stéphane (Cutting‑folding, Bordeaux)' }],
+				[{ name: 'Stéphane' }],
+			)
+
+			// THEN neither is a person on its own — both reduce to one word once
+			// the aside is gone, so both are dropped rather than merged into one
+			expect(merged.contacts).toHaveLength(0)
+			expect(merged.dropped).toBe(2)
+		})
+	})
+
+	describe('when a real contact carries a bracketed aside', () => {
+		it('should keep the name with the aside removed', () => {
+			// GIVEN a two-word name with a role/place aside attached
+			const merged = mergeContacts([{ name: 'Ana Puig (CEO, Girona)' }], [])
+
+			// THEN the aside is gone from the kept name
+			expect(merged.contacts.map(c => c.name)).toEqual(['Ana Puig'])
 		})
 	})
 })
@@ -243,9 +287,9 @@ describe('mergeContacts, on names outside plain a-z', () => {
 			// THEN neither is kept, neither absorbs the other, and the count says so
 			const merged = mergeContacts(
 				[{ name: '  ' }, { name: '—' }],
-				[{ name: 'Ada' }],
+				[{ name: 'Ada Lovelace' }],
 			)
-			expect(merged.contacts.map(c => c.name)).toEqual(['Ada'])
+			expect(merged.contacts.map(c => c.name)).toEqual(['Ada Lovelace'])
 			expect(merged.dropped).toBe(2)
 		})
 	})
