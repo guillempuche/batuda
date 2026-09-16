@@ -48,6 +48,7 @@ import { canAffordAnotherRound, runAgentResearchLoop } from './agent-loop'
 import { filterApplicableProposals } from './applicability-guard'
 import { foldAttributeEntries } from './attribute-bag'
 import { guardAttributes } from './attribute-guard'
+import { withAttributeProposal } from './attribute-proposal'
 import { makeBudgetLayer, monthlyRemainingCents } from './budget'
 import {
 	groundedCitationTest,
@@ -1584,7 +1585,7 @@ export const buildExtractionPrompt = (args: {
 		lines.push(
 			`Name EVERY person the evidence identifies as this company's own leader or employee — a titled executive on the team page, a quoted founder, a signed author — each with the job title written as the evidence writes it, in its own language (a page that says CEO is copied as CEO, not spelt out; 'propietari' stays 'propietari')${
 				args.titleGloss
-					? ', and an English rendering in `gloss` only when that language is not English'
+					? ', and in `gloss` the English words for that title alone (at most four, no brackets or remarks) when that language is not English, or null when it is'
 					: ''
 			}. Leaving the people list empty while the evidence names the company's own staff is an incomplete extraction.`,
 			'',
@@ -1618,7 +1619,7 @@ export const buildExtractionPrompt = (args: {
 	if (attributes.length > 0) {
 		lines.push(
 			'',
-			`Also fill \`attributes\`${args.discoveryScan ? ' on each company' : ''}: one entry per key below that the evidence states, with the key exactly as written, the value in the form its kind asks for, the page it was read on and the words on that page that state it. Leave out any key the evidence does not state.`,
+			`Also fill \`attributes\`${args.discoveryScan ? ' on each company' : ''}: one entry per key below that the evidence states, with the key exactly as written, the value in the form its kind asks for, the page it was read on and the words on that page that state it, copied as they stand. Leave out any key the evidence does not state: a yes/no or a number is written only when the page says it in those words, never as false or zero for "not stated", and a quote is never a remark of your own about the page.`,
 			...attributes.map(
 				attribute =>
 					`- ${attribute.key} (${attribute.kind}${attribute.unit ? `, unit ${attribute.unit}` : ''}${attribute.enumValues ? `, one of: ${attribute.enumValues.join(' | ')}` : ''})`,
@@ -3791,6 +3792,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									const merged = mergeContacts(
 										broadContacts,
 										rescue.contacts as Array<Record<string, unknown>>,
+										entityTargets?.domains ?? [],
 									)
 									result = {
 										...(result as object),
@@ -4057,7 +4059,8 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												check.droppedUngrounded > 0 ||
 												check.droppedQuoteAbsent > 0 ||
 												check.droppedUnsupported > 0 ||
-												check.droppedUnquoted > 0
+												check.droppedUnquoted > 0 ||
+												check.droppedNotTitle > 0
 											) {
 												yield* Effect.logWarning(
 													'research.fields.ungrounded',
@@ -4071,6 +4074,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														dropped_quote_absent: check.droppedQuoteAbsent,
 														dropped_unsupported: check.droppedUnsupported,
 														dropped_unquoted: check.droppedUnquoted,
+														dropped_not_title: check.droppedNotTitle,
 													}),
 												)
 											}
@@ -4108,6 +4112,8 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														check.droppedUnsupported,
 													'research.fields.dropped_unquoted':
 														check.droppedUnquoted,
+													'research.fields.dropped_not_title':
+														check.droppedNotTitle,
 												},
 											}
 										}),
@@ -4161,6 +4167,29 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													'research.attributes.dropped': check.drops.length,
 												},
 											}
+										}),
+								},
+								{
+									// A run whose only news is the attributes it read proposes
+									// nothing on its own, and a value nobody can apply never lands.
+									name: 'attribute-proposal',
+									run: findings =>
+										Effect.succeed({
+											findings:
+												isEnrichmentRun && companySubject !== undefined
+													? withAttributeProposal(
+															findings,
+															{
+																id: companySubject.id,
+																version:
+																	typeof companySubject.expected_version ===
+																	'number'
+																		? companySubject.expected_version
+																		: null,
+															},
+															randomUUID(),
+														)
+													: findings,
 										}),
 								},
 								{
@@ -4253,7 +4282,8 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												check.dropped > 0 ||
 												check.droppedUncited > 0 ||
 												check.droppedOffSite > 0 ||
-												check.droppedTitles > 0
+												check.droppedTitles > 0 ||
+												check.droppedNotPerson > 0
 											) {
 												yield* Effect.logWarning(
 													'research.contacts.wrong_entity',
@@ -4265,6 +4295,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														dropped_uncited: check.droppedUncited,
 														dropped_off_site: check.droppedOffSite,
 														dropped_titles: check.droppedTitles,
+														dropped_not_person: check.droppedNotPerson,
 													}),
 												)
 											}

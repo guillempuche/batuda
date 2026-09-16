@@ -966,25 +966,30 @@ describe('guardScalarFields, when a job title is held to its quote', () => {
 	})
 
 	describe('when the quote names the title, in the same words or a different ending', () => {
-		it('should keep it', () => {
+		it('should keep it, in the words the page uses', () => {
 			// GIVEN an acronym the quote gives, a Catalan title against its Spanish
 			// form, a feminine title against the masculine, and a stem alone
 			const cases = [
-				['CEO', 'Ana Puig, CEO of Acme'],
-				['Gerent', 'Ana Puig, gerente de la empresa'],
-				['Directora General', 'Ana Puig, director general de Acme'],
-				['Directora', 'Ana Puig es la director de la planta'],
+				['CEO', 'Ana Puig, CEO of Acme', 'CEO'],
+				['Gerent', 'Ana Puig, gerente de la empresa', 'gerente'],
+				[
+					'Directora General',
+					'Ana Puig, director general de Acme',
+					'director General',
+				],
+				['Directora', 'Ana Puig es la director de la planta', 'director'],
 			] as const
 
-			for (const [value, quote] of cases) {
+			for (const [value, quote, written] of cases) {
 				// WHEN grounded against a corpus holding the quote
 				const result = guardScalarFields(
 					person({ value, source_id: 'https://acme.es', quote }),
 					`acme. ${quote}`,
 				)
-				// THEN the title stands
-				expect(roleOf(result.findings)).toEqual({
-					value,
+				// THEN the title stands, and a word the model inflected its own way
+				// is put back to the page's word
+				expect(roleOf(result.findings), value).toEqual({
+					value: written,
 					source_id: 'https://acme.es',
 					quote,
 				})
@@ -1163,10 +1168,10 @@ describe('guardScalarFields, when a job title is held to its quote', () => {
 				'the plant sits in gironella',
 			)
 
-			// THEN the title stands and the place goes: a title is inflected, a
-			// place name is not
+			// THEN the title stands in the page's own word and the place goes: a
+			// title is inflected, a place name is not
 			expect(roleOf(title.findings)).toEqual({
-				value: 'Gerenta',
+				value: 'gerente',
 				source_id: 'https://acme.es',
 				quote: 'Ana Puig, gerente de la planta',
 			})

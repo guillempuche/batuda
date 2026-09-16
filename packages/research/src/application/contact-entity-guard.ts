@@ -17,6 +17,7 @@
  * the two mistakes.
  */
 
+import { readsAsPersonName } from './contact-name'
 import {
 	classifyEntityMatch,
 	deriveEntityTargets,
@@ -25,7 +26,7 @@ import {
 	namesNobodyInParticular,
 } from './entity-guard'
 import { isValueWrapper, unwrapValue } from './guard-shapes'
-import { isInCorpus } from './scalar-field-guard'
+import { isInCorpus, readsAsTitle } from './scalar-field-guard'
 import { isFirstPartyHost } from './source-tier-guard'
 
 // A proper name (one to five capitalised words) directly followed by a company
@@ -112,6 +113,9 @@ export interface ContactEntityResult {
 	readonly droppedOffSite: number
 	/** Titles removed because the pages the run read never say them. */
 	readonly droppedTitles: number
+	/** Contacts dropped because the name is not a person's — an email, a phone
+	 * number, or a bare first name folded in under the name field. */
+	readonly droppedNotPerson: number
 }
 
 /**
@@ -134,6 +138,7 @@ export const bindContactsToEntity = (
 			droppedUncited: 0,
 			droppedOffSite: 0,
 			droppedTitles: 0,
+			droppedNotPerson: 0,
 		}
 	}
 	const contacts = (findings as { contacts?: unknown }).contacts
@@ -144,11 +149,20 @@ export const bindContactsToEntity = (
 			droppedUncited: 0,
 			droppedOffSite: 0,
 			droppedTitles: 0,
+			droppedNotPerson: 0,
 		}
 
 	let dropped = 0
+	let droppedNotPerson = 0
 	const kept = contacts.filter(contact => {
 		if (contact === null || typeof contact !== 'object') return true
+		// An address, a number or a bare first name is not a person, whichever
+		// pass wrote it down.
+		const name = (contact as Record<string, unknown>)['name']
+		if (typeof name === 'string' && !readsAsPersonName(name)) {
+			droppedNotPerson++
+			return false
+		}
 		const orgs = orgPhrasesIn(contactQuotes(contact as Record<string, unknown>))
 		// No company named in the evidence → can't tell from here; keep and let the
 		// critic judge. A company named → keep only if one of them is the target.
@@ -169,6 +183,7 @@ export const bindContactsToEntity = (
 		droppedUncited: 0,
 		droppedOffSite: 0,
 		droppedTitles: 0,
+		droppedNotPerson,
 	}
 }
 
@@ -225,6 +240,7 @@ export const bindScanContactsToRows = (
 		droppedUncited: 0,
 		droppedOffSite: 0,
 		droppedTitles: 0,
+		droppedNotPerson: 0,
 	}
 	if (
 		listField === undefined ||
@@ -242,6 +258,7 @@ export const bindScanContactsToRows = (
 	let droppedUncited = 0
 	let droppedOffSite = 0
 	let droppedTitles = 0
+	let droppedNotPerson = 0
 	const keptRows = rows.map(row => {
 		if (row === null || typeof row !== 'object') return row
 		const record = row as Record<string, unknown>
@@ -260,6 +277,14 @@ export const bindScanContactsToRows = (
 				continue
 			}
 			const held = contact as Record<string, unknown>
+			// A contact channel — an email, a phone number — or a testimonial's bare
+			// first name, folded in under the name field. A search reaching fifty
+			// companies meets far more of these than a single-company run ever does.
+			const name = held['name']
+			if (!readsAsPersonName(typeof name === 'string' ? name : '')) {
+				droppedNotPerson++
+				continue
+			}
 			// Nothing says where this person was read. Either the model named a
 			// page the run never fetched — the citation guard, which runs before
 			// this, will have just taken it away — or it named none at all. A run
@@ -322,12 +347,15 @@ export const bindScanContactsToRows = (
 			// says so in the same breath — "Director/a (the page does not give the
 			// exact title)" reached a real row — and a made-up title is worse than
 			// none: it is what somebody opens a call with.
+			// A label the page put beside the name ("Contact", "Tel") goes the same
+			// way: it is on the page, and it is still not a post.
 			const role = held['role']
 			if (
-				lowerCorpus !== '' &&
 				typeof role === 'string' &&
 				role.trim() !== '' &&
-				!isInCorpus(role, lowerCorpus, { acronyms: true })
+				(!readsAsTitle(role) ||
+					(lowerCorpus !== '' &&
+						!isInCorpus(role, lowerCorpus, { acronyms: true })))
 			) {
 				droppedTitles++
 				const { role: _removed, ...withoutRole } = held
@@ -345,7 +373,8 @@ export const bindScanContactsToRows = (
 	return dropped === 0 &&
 		droppedUncited === 0 &&
 		droppedOffSite === 0 &&
-		droppedTitles === 0
+		droppedTitles === 0 &&
+		droppedNotPerson === 0
 		? nothingToDo
 		: {
 				findings: { ...(findings as object), [listField]: keptRows },
@@ -353,5 +382,6 @@ export const bindScanContactsToRows = (
 				droppedUncited,
 				droppedOffSite,
 				droppedTitles,
+				droppedNotPerson,
 			}
 }

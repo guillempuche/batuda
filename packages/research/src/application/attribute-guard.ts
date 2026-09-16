@@ -25,8 +25,8 @@ import { discoveryResultField, isDiscoveryScan } from './discovery-scan'
 import { classifyNamespace } from './entity-source-guard'
 import { isPlainObject } from './guard-shapes'
 import {
-	isInCorpus,
 	isPlaceholderValue,
+	quoteIsVerbatim,
 	quoteStatesNumber,
 	quoteSupportsValue,
 } from './scalar-field-guard'
@@ -119,7 +119,11 @@ const guardMap = (
 			drops.push({ key, reason: 'unquoted' })
 			continue
 		}
-		if (corpus !== '' && !isInCorpus(quote, lowerCorpus)) {
+		// The quote has to be the page's own words, run for run. A remark the
+		// model wrote about the page ("no se indica carácter familiar") shares
+		// enough words with any page to pass a looser test, and it is how "not
+		// stated" was stored as a false fact.
+		if (corpus !== '' && !quoteIsVerbatim(quote, lowerCorpus)) {
 			drops.push({ key, reason: 'unsupported' })
 			continue
 		}

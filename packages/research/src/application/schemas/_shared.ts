@@ -125,10 +125,13 @@ export const SourcedTitle = Schema.Struct({
 				"The job title exactly as the page writes it, in the page's own language — 'Gerent', 'geschäftsführender Gesellschafter', 'CEO'. Never translated, spelt out or shortened.",
 		}),
 	).fields,
-	gloss: Schema.optionalKey(
+	// Required and nullable rather than optional: asked to decide for every
+	// title, the model renders the ones that need it; left optional, it skipped
+	// half of them.
+	gloss: Schema.NullOr(
 		Schema.String.annotate({
 			description:
-				"The plainest English equivalent of that title — 'manager' for 'Gerent', 'owner' for 'propietari' — only when the page's own words are not English, and never a grander or more specific title than the page gives. Left out otherwise.",
+				"The English words for that title and nothing else — 'manager' for 'Gerent', 'owner' for 'propietari', at most four words, no brackets or remarks — when the page's own words are not English, and never a grander or more specific title than the page gives. null when the title is already English.",
 		}),
 	),
 })

@@ -65,12 +65,31 @@ export const filterApplicableProposals = (
 		return { ...proposal, fields: Object.fromEntries(kept) }
 	}
 
-	const isApplicable = (proposal: unknown): boolean => {
+	// A run that read attribute values for the company on file hands them on
+	// through an update with no fields of its own; the values ride beside the
+	// proposal, in the findings, and the apply path reads them from there.
+	const attributes = isPlainObject(findings)
+		? findings['attributes']
+		: undefined
+	const carriesAttributes =
+		isPlainObject(attributes) && Object.keys(attributes).length > 0
+
+	const isApplicable = (proposal: unknown, atTop: boolean): boolean => {
 		if (!isPlainObject(proposal)) return false
 		const { operation, subject_table, subject_id, fields } = proposal
 		// Every proposal needs real values to write; the model sometimes emits
 		// `fields` as prose or an empty object, neither of which can apply.
-		if (!isPlainObject(fields) || Object.keys(fields).length === 0) return false
+		if (!isPlainObject(fields)) return false
+		if (
+			Object.keys(fields).length === 0 &&
+			!(
+				atTop &&
+				carriesAttributes &&
+				subject_table === 'companies' &&
+				operation !== 'create'
+			)
+		)
+			return false
 		// A create carries the new row in `fields` and needs no subject of its own,
 		// but it is only ever a person, and a person belongs to a company. Held to
 		// that here so a create naming the wrong table, or naming no company, is
@@ -93,11 +112,14 @@ export const filterApplicableProposals = (
 		return subjectExists(subject_table, subject_id)
 	}
 
-	const walk = (value: unknown, key?: string): unknown => {
+	// `atTop` says the list sits directly on the findings, where the attribute
+	// values a run read for the company on file also sit; a list under a scan
+	// row is judged without them.
+	const walk = (value: unknown, key?: string, atTop = false): unknown => {
 		if (Array.isArray(value)) {
 			if (key === 'proposed_updates') {
 				return value.map(withoutEmptyFields).filter(proposal => {
-					const ok = isApplicable(proposal)
+					const ok = isApplicable(proposal, atTop)
 					if (!ok) dropped++
 					return ok
 				})
@@ -106,7 +128,9 @@ export const filterApplicableProposals = (
 		}
 		if (isPlainObject(value)) {
 			return Object.fromEntries(
-				Object.entries(value).map(([k, v]) => [k, walk(v, k)] as const),
+				Object.entries(value).map(
+					([k, v]) => [k, walk(v, k, value === findings)] as const,
+				),
 			)
 		}
 		return value
