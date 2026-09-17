@@ -205,6 +205,26 @@ export const agentToolChoice = (
 }
 
 /**
+ * One tool's arguments, written out exactly as a provider is sent them.
+ *
+ * The one place this conversion happens. The wire format below asks a provider
+ * whether it accepts our tools, and telling a model what a tool accepts has to
+ * describe the very same thing — so both read this, and a description of a
+ * tool's arguments cannot drift from the definition the provider was given.
+ */
+export const toolParametersWireFormat = (
+	toolName: string,
+): Record<string, unknown> | undefined => {
+	const tool = Object.values(researchToolkit.tools).find(
+		candidate => candidate.name === toolName,
+	)
+	if (tool === undefined) return undefined
+	return Tool.getJsonSchema(tool, {
+		transformer: OpenAiStructuredOutput.toCodecOpenAI,
+	}) as Record<string, unknown>
+}
+
+/**
  * The tool list written out exactly as it is sent to a provider.
  *
  * A provider can accept a simple made-up tool and still reject these over a
@@ -223,9 +243,7 @@ export const researchToolkitWireFormat = (): ReadonlyArray<
 		function: {
 			name: tool.name,
 			description: Tool.getDescription(tool),
-			parameters: Tool.getJsonSchema(tool, {
-				transformer: OpenAiStructuredOutput.toCodecOpenAI,
-			}),
+			parameters: toolParametersWireFormat(tool.name),
 			// A provider checks a tool's arguments strictly unless the tool opts
 			// out, and none of these do.
 			strict: Tool.getStrictMode(tool) ?? true,

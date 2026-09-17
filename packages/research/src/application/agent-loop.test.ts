@@ -1,6 +1,7 @@
-import { Effect } from 'effect'
+import { Cause, Effect, Exit } from 'effect'
 import { describe, expect, it } from 'vitest'
 
+import { RejectedToolCall } from '../domain/errors'
 import { BudgetSnapshot } from '../domain/types'
 import {
 	canAffordAnotherRound,
@@ -341,6 +342,168 @@ describe('runAgentResearchLoop — token budget', () => {
 			)
 			// THEN the token cap is a no-op and the model finishing ends it
 			expect(result.stopReason).toBe('finished_looking')
+		})
+	})
+})
+
+describe('runAgentResearchLoop — a tool call the model wrote wrongly', () => {
+	// A stub model whose first round writes a tool call the tool would not take,
+	// and which writes a good one once it has been told what was wrong. The
+	// failure stands in for what reaches the loop in production: every retry on
+	// every vendor slot already spent, re-sending the same conversation and
+	// getting the same bad call back each time.
+	const badCall = new RejectedToolCall(
+		{
+			provider: 'groq',
+			message:
+				"Invalid parameters for tool 'web_search': missing properties: 'limit'",
+		},
+		'web_search',
+		"missing properties: 'limit'",
+	)
+
+	const rejectedOnce =
+		(correctionsMade: { count: number }) => (round: number) =>
+			round === 1 && correctionsMade.count === 0
+				? Effect.fail(badCall)
+				: Effect.succeed(round <= 2 ? toolRound(round) : finalRound('grounded'))
+
+	// What the run fiber does with the failure: notes that the model has now been
+	// told, and asks for another round — bounded, as it is in the run fiber.
+	const correctionHook =
+		(correctionsMade: { count: number }, limit = 2) =>
+		(_error: RejectedToolCall) =>
+			Effect.sync(() => {
+				if (correctionsMade.count >= limit) return false
+				correctionsMade.count++
+				return true
+			})
+
+	describe('when the model is told what it got wrong', () => {
+		it('should carry on searching instead of failing the run', async () => {
+			// GIVEN a model that writes a bad web_search call on round one and a good
+			// one after the correction
+			const correctionsMade = { count: 0 }
+			const runRound = rejectedOnce(correctionsMade)
+
+			// WHEN the loop runs with a correction hook
+			const result = await Effect.runPromise(
+				runAgentResearchLoop({
+					maxSteps: 10,
+					runRound,
+					budgetSnapshot: Effect.succeed(snapshot(100, 100)),
+					shouldContinueAfterFailure: correctionHook(correctionsMade),
+				}),
+			)
+
+			// THEN the run reached the model's own answer rather than dying on the
+			// bad call
+			expect(result.stopReason).toBe('finished_looking')
+			expect(result.researchText).toContain('grounded')
+
+			// AND the model was told exactly once
+			expect(correctionsMade.count).toBe(1)
+		})
+
+		it('should count the lost round but put none of it in the transcript', async () => {
+			// GIVEN the same model and correction hook
+			const correctionsMade = { count: 0 }
+			const runRound = rejectedOnce(correctionsMade)
+
+			// WHEN the loop runs
+			const result = await Effect.runPromise(
+				runAgentResearchLoop({
+					maxSteps: 10,
+					runRound,
+					budgetSnapshot: Effect.succeed(snapshot(100, 100)),
+					shouldContinueAfterFailure: correctionHook(correctionsMade),
+				}),
+			)
+
+			// THEN the round that was lost still counts against the step cap — one
+			// lost round, then the search round, then the answer — so a model that
+			// keeps fumbling cannot search forever for free
+			expect(result.rounds).toBe(3)
+
+			// AND it left nothing behind: a refused call gathered no evidence, and a
+			// transcript carrying the correction would offer the extractor a page
+			// that was never read
+			expect(result.researchText).not.toContain('web_search')
+			expect(result.evidenceText).not.toContain('web_search')
+		})
+	})
+
+	describe('when the correction budget is spent', () => {
+		it('should let the failure end the run', async () => {
+			// GIVEN a model that writes the same bad call every round, and a hook
+			// that has no corrections left to make
+			const correctionsMade = { count: 5 }
+
+			// WHEN the loop runs
+			const exit = await Effect.runPromiseExit(
+				runAgentResearchLoop({
+					maxSteps: 10,
+					runRound: () => Effect.fail(badCall),
+					budgetSnapshot: Effect.succeed(snapshot(100, 100)),
+					shouldContinueAfterFailure: correctionHook(correctionsMade),
+				}),
+			)
+
+			// THEN the failure reaches the run fiber unchanged, so the run is marked
+			// failed rather than shipping a transcript with nothing in it
+			expect(Exit.isFailure(exit)).toBe(true)
+			expect(Exit.isFailure(exit) ? Cause.squash(exit.cause) : undefined).toBe(
+				badCall,
+			)
+		})
+	})
+
+	describe('when a round succeeds', () => {
+		it('should not consult the correction hook at all', async () => {
+			// GIVEN a model that never fails, and a hook that records being asked
+			let asked = 0
+
+			// WHEN the loop runs with the correction hook wired in
+			await Effect.runPromise(
+				runAgentResearchLoop({
+					maxSteps: 10,
+					runRound: scriptedRounds([toolRound(1), finalRound('done')]),
+					budgetSnapshot: Effect.succeed(snapshot(100, 100)),
+					shouldContinueAfterFailure: () =>
+						Effect.sync(() => {
+							asked++
+							return true
+						}),
+				}),
+			)
+
+			// THEN it was never asked: the hook appends to the prompt, so one
+			// consulted on a good round would put a correction in front of a model
+			// that had done nothing wrong, on every round of every run
+			expect(asked).toBe(0)
+		})
+	})
+
+	describe('when no correction hook is given', () => {
+		it('should fail the run on the first failing round', async () => {
+			// GIVEN a failing round and no hook — every failure that is not the
+			// model's own bad arguments still has to end the run
+			const boom = new Error('provider down')
+
+			// WHEN the loop runs
+			const exit = await Effect.runPromiseExit(
+				runAgentResearchLoop({
+					maxSteps: 10,
+					runRound: () => Effect.fail(boom),
+					budgetSnapshot: Effect.succeed(snapshot(100, 100)),
+				}),
+			)
+
+			// THEN it propagates rather than being swallowed into a half-built result
+			expect(Exit.isFailure(exit)).toBe(true)
+			expect(Exit.isFailure(exit) ? Cause.squash(exit.cause) : undefined).toBe(
+				boom,
+			)
 		})
 	})
 })
