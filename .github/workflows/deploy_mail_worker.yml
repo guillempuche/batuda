@@ -18,8 +18,11 @@ permissions:
 env:
   KRAFTCLOUD_METRO: fra
   # Pinned new Unikraft CLI (`unikraft`, from unikraft-cloud/cli) version.
-  # Bump deliberately after verifying a new release against a dry-run deploy.
-  UNIKRAFT_CLI_VERSION: "0.4.1"
+  # Bump deliberately after verifying a new release against a dry-run
+  # deploy; run it with dummy values, since it prints every variable it
+  # would send. 0.5 is the floor — below it, `-e` cuts its own value at
+  # every comma.
+  UNIKRAFT_CLI_VERSION: "0.5.1"
   # Image namespace on Unikraft Cloud is the organization slug; published
   # images and running instances live under `<org>/<name>`.
   KRAFTCLOUD_ORG: gaaaa
@@ -78,12 +81,14 @@ jobs:
         env:
           OTLP_HEADERS: ${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }}
         run: |
-          # The dataset name is appended to the secret, so anything the secret
-          # carries at its end lands in the middle of the value. A stray newline
-          # there truncates everything after it, which is how both instances
-          # ended up holding the team key and no dataset (seen 2026-09-01). Read
-          # from the environment rather than pasted into the command, and
-          # stripped of line breaks before anything is added to it.
+          # The dataset name is appended to the secret, so the value carries a
+          # comma — and below CLI 0.5, the -e flag cut its value at every
+          # comma. That left both instances holding the team key alone, with
+          # the dataset arriving as a separate variable nothing reads, so
+          # every metric was filed under one shared dataset (blamed on a
+          # stray newline on 2026-09-01). Line breaks are stripped all the
+          # same: the secret is read from the environment rather than pasted
+          # into the command, and one at its end would land mid-value.
           headers="$(printf '%s' "$OTLP_HEADERS" | tr -d '\r\n'),x-honeycomb-dataset=batuda-mail-worker"
 
           # Unikraft Cloud bakes every -e var into the unikernel kernel command
@@ -151,9 +156,10 @@ jobs:
           #   Scale-to-zero stays off via the Kraftfile label (baked into the
           #     image), keeping the IDLE-holding worker always-warm.
           command: |
-            # Line breaks stripped before the dataset name is appended: a stray
-            # one at the end of the secret would land mid-value and truncate
-            # everything after it (seen 2026-09-01).
+            # Line breaks stripped before the dataset name is appended: one at
+            # the end of the secret would land mid-value. The comma this adds
+            # only survives on CLI 0.5 and up; older ones split the value here
+            # and the dataset never reached the instance.
             headers="$(printf '%s' "$OTLP_HEADERS" | tr -d '\r\n'),x-honeycomb-dataset=batuda-mail-worker"
 
             # instances delete/get/logs take a bare name and reject --metro
@@ -193,21 +199,37 @@ jobs:
               -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
               -e EMAIL_CREDENTIAL_KEY="${{ secrets.EMAIL_CREDENTIAL_KEY }}" \
               -e STORAGE_ACCESS_KEY_ID="${{ secrets.STORAGE_ACCESS_KEY_ID }}" \
-              -e STORAGE_SECRET_ACCESS_KEY="${{ secrets.STORAGE_SECRET_ACCESS_KEY }}"
+              -e STORAGE_SECRET_ACCESS_KEY="${{ secrets.STORAGE_SECRET_ACCESS_KEY }}" \
+              -f name,state
 
       - name: Verify deployment
         run: |
           sleep 5
-          unikraft instances get batuda-mail-worker
+          # Read without -f, this prints the instance's entire environment in
+          # clear text, so name only the fields wanted.
+          unikraft instances get batuda-mail-worker -f name,state -o table
 
-          # Confirm the dataset name survived into the running instance. Only
-          # the count is read: this API hands back the whole environment in
-          # clear text, so nothing from it is ever printed. A warning rather
-          # than a failure — traces route by service name and land either way;
-          # what goes astray without it is where metrics are filed.
-          if [ "$(unikraft instances get batuda-mail-worker -o json 2>/dev/null \
-                    | grep -c 'x-honeycomb-dataset')" -eq 0 ]; then
-            echo "::warning::x-honeycomb-dataset is missing from the running instance; metrics will be filed under a shared default dataset"
+          # Confirm the dataset name reached the running instance, and that it
+          # sits inside the header value rather than split into a variable of
+          # its own: a value cut at its comma still carries the header's name,
+          # so a search for that name alone would not catch it. Nothing read
+          # here is ever printed.
+          instance_env="$(unikraft instances get batuda-mail-worker \
+                            -f runtime.env -o json 2>/dev/null || true)"
+          if [ -z "$instance_env" ]; then
+            echo "::error::Could not read the instance's environment to check the telemetry header"
+            exit 1
+          fi
+          # A variable of its own is the fingerprint of a value cut at its comma,
+          # whatever shape the read comes back in; inside the header value the
+          # name always follows one.
+          if printf '%s' "$instance_env" | grep -q '"x-honeycomb-dataset'; then
+            echo "::error::x-honeycomb-dataset arrived as a variable of its own, so OTEL_EXPORTER_OTLP_HEADERS was cut at its comma; check the pinned Unikraft CLI version"
+            exit 1
+          fi
+          if ! printf '%s' "$instance_env" | grep -q ',x-honeycomb-dataset=batuda-mail-worker'; then
+            echo "::error::x-honeycomb-dataset is missing from OTEL_EXPORTER_OTLP_HEADERS on the running instance; metrics would be filed under a shared default dataset instead of batuda-mail-worker"
+            exit 1
           fi
           # claimAvailableInboxes runs every 5 s, so an IDLE-established
           # log line should appear within ~10 s if any inbox is provisioned.
