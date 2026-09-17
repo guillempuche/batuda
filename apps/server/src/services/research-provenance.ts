@@ -31,7 +31,7 @@ export const researchProvenance = (
 			COALESCE((
 				SELECT json_agg(json_build_object('sourceId', s.id, 'url', s.url))
 				FROM jsonb_array_elements(rl.citations) cit
-				JOIN sources s ON s.id = cit->>'source_id'
+				JOIN sources s ON s.id = cit->>'source_id' OR s.url = cit->>'source_id'
 			), '[]'::json) AS sources
 		FROM research_links rl
 		JOIN research_runs r ON r.id = rl.research_id

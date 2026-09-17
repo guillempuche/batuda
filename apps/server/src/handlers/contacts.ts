@@ -60,7 +60,7 @@ export const ContactsLive = HttpApiBuilder.group(
 									'sources', COALESCE((
 										SELECT json_agg(json_build_object('sourceId', s.id, 'url', s.url))
 										FROM jsonb_array_elements(rl.citations) cit
-										JOIN sources s ON s.id = cit->>'source_id'
+										JOIN sources s ON s.id = cit->>'source_id' OR s.url = cit->>'source_id'
 									), '[]'::json)
 								) ORDER BY r.completed_at DESC NULLS LAST)
 								FROM research_links rl
