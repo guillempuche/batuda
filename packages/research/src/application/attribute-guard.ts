@@ -7,8 +7,8 @@
  * the run read, that page is a page rather than a post and speaks for the right
  * company, and the value reads as the kind the key was declared with — a number
  * the quote states, a choice from the declared words, a date that names a day, a
- * yes or a no, text the quote supports. What is kept is the typed value with its
- * citation, which is what the CRM column stores.
+ * yes or a no, text in the quote's own words. What is kept is the typed value
+ * with its citation, which is what the CRM column stores.
  *
  * Graded here and nowhere else: the scalar guard walks past the attribute map on
  * purpose, so an entry is judged once, by rules that know its kind.
@@ -28,7 +28,7 @@ import {
 	isPlaceholderValue,
 	quoteIsVerbatim,
 	quoteStatesNumber,
-	quoteSupportsValue,
+	textValueAsQuoteWrites,
 } from './scalar-field-guard'
 
 export type AttributeDropReason =
@@ -38,6 +38,7 @@ export type AttributeDropReason =
 	| 'unsupported'
 	| 'off_entity'
 	| 'wrong_kind'
+	| 'value_not_quoted'
 
 export interface AttributeDrop {
 	readonly key: string
@@ -54,38 +55,46 @@ export interface AttributeGuardResult {
 /** Whether the page a value cites reads as a company other than the run's. */
 export type OffEntityCheck = (sourceId: string) => boolean
 
-// The value the way its kind reads it, or null when it does not read that way
-// or the quote does not carry it. A number is held to the digits the quote
-// writes; a date to the year the quote names; text to the words in the quote.
-// A yes/no and a choice stand on the quote being real, which was checked before.
+// The value the way its kind reads it, or the reason it does not read that
+// way. A number is held to the digits the quote writes; a date to the year the
+// quote names; text to the quote's own words, with a remark of the model's own
+// taken off its end. A yes/no and a choice stand on the quote being real, which
+// was checked before.
 const readsAsKind = (
 	declaration: ResearchAttributeDeclaration,
 	raw: unknown,
 	quote: string,
-): AttributeValue | null => {
+):
+	| { readonly value: AttributeValue }
+	| { readonly reason: AttributeDropReason } => {
 	const value = coerceAttributeValue(
 		declaration.kind,
 		raw,
 		declaration.enumValues,
 	)
-	if (value === null) return null
+	if (value === null) return { reason: 'wrong_kind' }
 	switch (declaration.kind) {
 		case 'number':
 			return typeof value === 'number' && quoteStatesNumber(quote, value)
-				? value
-				: null
+				? { value }
+				: { reason: 'wrong_kind' }
 		case 'date':
 			return typeof value === 'string' && quote.includes(value.slice(0, 4))
-				? value
-				: null
-		case 'text':
-			return typeof value === 'string' &&
-				!isPlaceholderValue(value, declaration.key) &&
-				quoteSupportsValue(quote, value, true)
-				? value
-				: null
+				? { value }
+				: { reason: 'wrong_kind' }
+		case 'text': {
+			if (
+				typeof value !== 'string' ||
+				isPlaceholderValue(value, declaration.key)
+			)
+				return { reason: 'wrong_kind' }
+			const asQuoted = textValueAsQuoteWrites(quote, value)
+			return asQuoted === null
+				? { reason: 'value_not_quoted' }
+				: { value: asQuoted }
+		}
 		default:
-			return value
+			return { value }
 	}
 }
 
@@ -131,12 +140,12 @@ const guardMap = (
 			drops.push({ key, reason: 'off_entity' })
 			continue
 		}
-		const value = readsAsKind(declaration, entry['value'], quote)
-		if (value === null) {
-			drops.push({ key, reason: 'wrong_kind' })
+		const read = readsAsKind(declaration, entry['value'], quote)
+		if ('reason' in read) {
+			drops.push({ key, reason: read.reason })
 			continue
 		}
-		kept.push([key, { ...entry, value }])
+		kept.push([key, { ...entry, value: read.value }])
 	}
 	return Object.fromEntries(kept)
 }

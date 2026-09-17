@@ -17,7 +17,12 @@
  * the two mistakes.
  */
 
-import { readsAsPersonName } from './contact-name'
+import { isLegalNoticePath } from './about-pages'
+import {
+	isSiteCreditLine,
+	readsAsPersonName,
+	readsAsSiteCredit,
+} from './contact-name'
 import {
 	classifyEntityMatch,
 	deriveEntityTargets,
@@ -25,7 +30,12 @@ import {
 	type EntityTargets,
 	namesNobodyInParticular,
 } from './entity-guard'
-import { isValueWrapper, unwrapValue } from './guard-shapes'
+import {
+	isPlainObject,
+	isValueWrapper,
+	readTextValue,
+	unwrapValue,
+} from './guard-shapes'
 import { isInCorpus, readsAsTitle } from './scalar-field-guard'
 import { isFirstPartyHost } from './source-tier-guard'
 
@@ -103,6 +113,33 @@ const contactQuotes = (contact: Record<string, unknown>): string => {
 	return parts.join(' ')
 }
 
+// Whether a contact is one of the people who made the site rather than one who
+// works at the company. Only a legal notice says so — the page the law makes
+// name the company's director, where the site's photographer and developer are
+// credited beside them — so it is asked only of a person every one of whose
+// lines was read there: the label beside the name is a credit ("Photographie",
+// "Développement"), or there is no label and every line is a credit line. A
+// "Design" or "Desarrollo" read off a team page is a post, and stays.
+const creditedWithMakingTheSite = (
+	contact: Record<string, unknown>,
+): boolean => {
+	const citations = contact['citations']
+	if (!Array.isArray(citations) || citations.length === 0) return false
+	const readOnLegalNotice = citations.every(citation => {
+		const sourceId = isPlainObject(citation) ? citation['source_id'] : undefined
+		return typeof sourceId === 'string' && isLegalNoticePath(sourceId)
+	})
+	if (!readOnLegalNotice) return false
+	const label = readTextValue(contact['role']) ?? ''
+	if (label.trim() !== '') return readsAsSiteCredit(label)
+	const name = contact['name']
+	if (typeof name !== 'string') return false
+	return citations.every(citation => {
+		const quote = isPlainObject(citation) ? citation['quote'] : undefined
+		return typeof quote === 'string' && isSiteCreditLine(quote, name)
+	})
+}
+
 export interface ContactEntityResult {
 	readonly findings: unknown
 	/** Contacts dropped because their evidence named only a different company. */
@@ -116,7 +153,22 @@ export interface ContactEntityResult {
 	/** Contacts dropped because the name is not a person's — an email, a phone
 	 * number, or a bare first name folded in under the name field. */
 	readonly droppedNotPerson: number
+	/** Contacts dropped because the page credited them with making the site —
+	 * its photographer or developer — rather than naming a post at the company. */
+	readonly droppedSiteCredit: number
 }
+
+// The result when nothing was taken away: the findings as they came, every
+// count at nought.
+const untouched = (findings: unknown): ContactEntityResult => ({
+	findings,
+	dropped: 0,
+	droppedUncited: 0,
+	droppedOffSite: 0,
+	droppedTitles: 0,
+	droppedNotPerson: 0,
+	droppedSiteCredit: 0,
+})
 
 /**
  * Remove contacts whose supporting quotes name only other companies. `targets` are
@@ -126,44 +178,41 @@ export const bindContactsToEntity = (
 	findings: unknown,
 	targets: EntityTargets | null,
 ): ContactEntityResult => {
+	const nothingToDo = untouched(findings)
 	if (
-		targets === null ||
 		findings === null ||
 		typeof findings !== 'object' ||
 		Array.isArray(findings)
 	) {
-		return {
-			findings,
-			dropped: 0,
-			droppedUncited: 0,
-			droppedOffSite: 0,
-			droppedTitles: 0,
-			droppedNotPerson: 0,
-		}
+		return nothingToDo
 	}
 	const contacts = (findings as { contacts?: unknown }).contacts
-	if (!Array.isArray(contacts))
-		return {
-			findings,
-			dropped: 0,
-			droppedUncited: 0,
-			droppedOffSite: 0,
-			droppedTitles: 0,
-			droppedNotPerson: 0,
-		}
+	if (!Array.isArray(contacts)) return nothingToDo
 
 	let dropped = 0
 	let droppedNotPerson = 0
+	let droppedSiteCredit = 0
 	const kept = contacts.filter(contact => {
 		if (contact === null || typeof contact !== 'object') return true
+		const held = contact as Record<string, unknown>
 		// An address, a number or a bare first name is not a person, whichever
 		// pass wrote it down.
-		const name = (contact as Record<string, unknown>)['name']
+		const name = held['name']
 		if (typeof name === 'string' && !readsAsPersonName(name)) {
 			droppedNotPerson++
 			return false
 		}
-		const orgs = orgPhrasesIn(contactQuotes(contact as Record<string, unknown>))
+		// The site's photographer or developer, credited on its legal notice, is
+		// not the company's staff, whatever page they were read on.
+		if (creditedWithMakingTheSite(held)) {
+			droppedSiteCredit++
+			return false
+		}
+		// With no keys there is nothing to hold a quote against: one naming
+		// another company cannot be told from one naming this one, so every
+		// person left passes through.
+		if (targets === null) return true
+		const orgs = orgPhrasesIn(contactQuotes(held))
 		// No company named in the evidence → can't tell from here; keep and let the
 		// critic judge. A company named → keep only if one of them is the target.
 		if (orgs.length === 0) return true
@@ -174,6 +223,7 @@ export const bindContactsToEntity = (
 		return namesTarget
 	})
 
+	if (kept.length === contacts.length) return nothingToDo
 	return {
 		findings: { ...(findings as object), contacts: kept },
 		dropped,
@@ -184,6 +234,7 @@ export const bindContactsToEntity = (
 		droppedOffSite: 0,
 		droppedTitles: 0,
 		droppedNotPerson,
+		droppedSiteCredit,
 	}
 }
 
@@ -234,14 +285,7 @@ export const bindScanContactsToRows = (
 	listField: string | undefined,
 	corpus = '',
 ): ContactEntityResult => {
-	const nothingToDo = {
-		findings,
-		dropped: 0,
-		droppedUncited: 0,
-		droppedOffSite: 0,
-		droppedTitles: 0,
-		droppedNotPerson: 0,
-	}
+	const nothingToDo = untouched(findings)
 	if (
 		listField === undefined ||
 		findings === null ||
@@ -259,6 +303,7 @@ export const bindScanContactsToRows = (
 	let droppedOffSite = 0
 	let droppedTitles = 0
 	let droppedNotPerson = 0
+	let droppedSiteCredit = 0
 	const keptRows = rows.map(row => {
 		if (row === null || typeof row !== 'object') return row
 		const record = row as Record<string, unknown>
@@ -283,6 +328,11 @@ export const bindScanContactsToRows = (
 			const name = held['name']
 			if (!readsAsPersonName(typeof name === 'string' ? name : '')) {
 				droppedNotPerson++
+				continue
+			}
+			// Whoever a page credits with making it is not the company's staff.
+			if (creditedWithMakingTheSite(held)) {
+				droppedSiteCredit++
 				continue
 			}
 			// Nothing says where this person was read. Either the model named a
@@ -374,7 +424,8 @@ export const bindScanContactsToRows = (
 		droppedUncited === 0 &&
 		droppedOffSite === 0 &&
 		droppedTitles === 0 &&
-		droppedNotPerson === 0
+		droppedNotPerson === 0 &&
+		droppedSiteCredit === 0
 		? nothingToDo
 		: {
 				findings: { ...(findings as object), [listField]: keptRows },
@@ -383,5 +434,6 @@ export const bindScanContactsToRows = (
 				droppedOffSite,
 				droppedTitles,
 				droppedNotPerson,
+				droppedSiteCredit,
 			}
 }

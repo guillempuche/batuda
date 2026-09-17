@@ -39,4 +39,28 @@ describe('bindContactsToEntity, when a run about one company lists something tha
 		expect(result.droppedNotPerson).toBe(3)
 		expect(result.dropped).toBe(0)
 	})
+
+	it('should drop it with no company to hold the people against either', () => {
+		// GIVEN a run with no keys of its own — a scan row, or a company the run
+		// could not pin down — listing a mailbox as a person
+		const findings = {
+			contacts: [
+				{ name: 'Ana Puig', citations: [] },
+				{ name: 'info@acme.es', citations: [] },
+			],
+		}
+
+		// WHEN bound with nothing to hold a quote against
+		const result = bindContactsToEntity(findings, null)
+
+		// THEN the address goes all the same: it is not a person whoever it
+		// belongs to
+		expect(
+			(result.findings as { contacts: Array<{ name: string }> }).contacts.map(
+				c => c.name,
+			),
+		).toEqual(['Ana Puig'])
+		expect(result.droppedNotPerson).toBe(1)
+		expect(result.dropped).toBe(0)
+	})
 })

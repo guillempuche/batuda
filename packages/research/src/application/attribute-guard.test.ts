@@ -196,7 +196,7 @@ describe('guardAttributes', () => {
 
 			// THEN only the quoted one stands
 			expect(dropped.drops).toEqual([
-				{ key: 'current_tools', reason: 'wrong_kind' },
+				{ key: 'current_tools', reason: 'value_not_quoted' },
 			])
 			expect(kept.kept).toBe(1)
 		})

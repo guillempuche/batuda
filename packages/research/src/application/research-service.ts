@@ -51,9 +51,11 @@ import { guardAttributes } from './attribute-guard'
 import { withAttributeProposal } from './attribute-proposal'
 import { makeBudgetLayer, monthlyRemainingCents } from './budget'
 import {
+	citationSourceResolver,
 	groundedCitationTest,
 	validateFindingCitations,
 } from './citation-guard'
+import { tidyQuotes } from './citation-text'
 import { ContactDiscovery } from './contact-discovery'
 import {
 	bindContactsToEntity,
@@ -219,6 +221,7 @@ import {
 	type SearchStopped,
 	wasCutOff,
 } from './search-stopped'
+import { dropSharedHandles } from './shared-handles-guard'
 import {
 	hasHeadcountSignal,
 	mergeSizeRescue,
@@ -673,6 +676,47 @@ const withPendingIds = (
 			})
 		: items
 
+// The same stamp for what a later round added to those lists: an entry that
+// has an id keeps it, since a person may already be holding it; one without
+// gets one, or it would be listed and could never be resolved.
+const withIdsForTheUnstamped = (findings: unknown): unknown => {
+	if (
+		typeof findings !== 'object' ||
+		findings === null ||
+		Array.isArray(findings)
+	)
+		return findings
+	const record = findings as Record<string, unknown>
+	const stampMissing = (
+		items: unknown,
+		settle?: (item: Record<string, unknown>) => Record<string, unknown>,
+	): unknown =>
+		Array.isArray(items)
+			? items.map(item =>
+					typeof item === 'object' &&
+					item !== null &&
+					!Array.isArray(item) &&
+					typeof (item as Record<string, unknown>)['id'] !== 'string'
+						? (withPendingIds([item], settle) as ReadonlyArray<unknown>)[0]
+						: item,
+				)
+			: items
+	return {
+		...record,
+		...(Array.isArray(record['proposed_updates'])
+			? { proposed_updates: stampMissing(record['proposed_updates']) }
+			: {}),
+		...(Array.isArray(record['pending_paid_actions'])
+			? {
+					pending_paid_actions: stampMissing(
+						record['pending_paid_actions'],
+						settlePaidAction,
+					),
+				}
+			: {}),
+	}
+}
+
 // What a paid follow-up really costs, where the answer is a single figure.
 // Contact discovery is not one: it pays per candidate it checks, so there the
 // run's own estimate is the best number available and is left alone.
@@ -702,6 +746,28 @@ const settlePaidAction = (
 		tool: canonical,
 		...(realCost === undefined ? {} : { estimated_cents: realCost }),
 	}
+}
+
+// The company a run is about, as the CRM holds it: its id and the version the
+// run read, so a write proposed against it is refused once the row has moved
+// on. Undefined for a run about nobody on file.
+const companyOnFile = (
+	subjects: ReadonlyArray<{
+		readonly table: string
+		readonly id: string
+		readonly expected_version?: unknown
+	}>,
+): { readonly id: string; readonly version: number | null } | undefined => {
+	const company = subjects.find(subject => subject.table === 'companies')
+	return company === undefined
+		? undefined
+		: {
+				id: company.id,
+				version:
+					typeof company.expected_version === 'number'
+						? company.expected_version
+						: null,
+			}
 }
 
 /**
@@ -1337,7 +1403,7 @@ export const buildResearchSystemPrompt = (args: {
 		`Name the people who run the company — each with the exact title they are given — and treat that as part of the job, not an extra. They are listed on a team, leadership, management or "equipo" page, almost never on the homepage, so open one when the site has it. ${
 			isDiscoveryScan(args.schemaName)
 				? "Put each one in that company's own `contacts`, with the page you read them on — a list of companies is worth far more with somebody to ask for on each. When reading the pages turns up nobody, the tools that would buy you names are not yours to call on a list of companies: add a `pending_paid_actions` entry naming discover_contacts and the company, and a person decides whether to spend it."
-				: 'When reading the pages turns up nobody with a title, discover_contacts is the tool that finds them.'
+				: "When reading the pages turns up nobody with a title, discover_contacts is the tool that finds them. When it answers with nobody — no budget for it, or nothing on file — search the web for the company's team, management, about and news pages and read the names there: a run that stops at the vendor's silence has not looked."
 		}`,
 		'A search result quotes only the one sentence of a page that matched your query. When a page looks like it holds more than that sentence, open it with scrape_page rather than settling for the snippet.',
 		'For discovery or prospecting queries, prefer authoritative sources — business directories, industry association member lists, and sector registries — over social media, forums, or glossary pages. Treat such a page as somewhere to find candidates, not as the answer: a "top N" or "largest" ranking lists the biggest firms in a sector, which is the opposite of what most prospecting asks for. Carry every qualifier in the request — size, place, and niche — into each search, and check each candidate against all of them before returning it; leave out one that fails any, however prominently a directory listed it.',
@@ -1619,7 +1685,7 @@ export const buildExtractionPrompt = (args: {
 	if (attributes.length > 0) {
 		lines.push(
 			'',
-			`Also fill \`attributes\`${args.discoveryScan ? ' on each company' : ''}: one entry per key below that the evidence states, with the key exactly as written, the value in the form its kind asks for, the page it was read on and the words on that page that state it, copied as they stand. Leave out any key the evidence does not state: a yes/no or a number is written only when the page says it in those words, never as false or zero for "not stated", and a quote is never a remark of your own about the page.`,
+			`Also fill \`attributes\`${args.discoveryScan ? ' on each company' : ''}: one entry per key below that the evidence states, with the key exactly as written, the value in the form its kind asks for, the page it was read on and the words on that page that state it, copied as they stand. Leave out any key the evidence does not state: a yes/no or a number is written only when the page says it in those words, never as false or zero for "not stated", and a quote is never a remark of your own about the page. A text value is copied from those words rather than written about them — no remark of your own, in brackets or otherwise — and the page to read an attribute on is the company's own before a directory's or a network's.`,
 			...attributes.map(
 				attribute =>
 					`- ${attribute.key} (${attribute.kind}${attribute.unit ? `, unit ${attribute.unit}` : ''}${attribute.enumValues ? `, one of: ${attribute.enumValues.join(' | ')}` : ''})`,
@@ -3689,20 +3755,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// the checks below, so it is held to the same standard as every
 							// other value the run produces.
 							const harvestedMailboxes = harvestRoleMailboxes()
-							const companySubject = subjects.find(s => s.table === 'companies')
 							let result = withProposalIds(
 								withRoleMailbox(
 									attributeFold.findings,
 									harvestedMailboxes,
-									companySubject === undefined
-										? undefined
-										: {
-												id: companySubject.id,
-												version:
-													typeof companySubject.expected_version === 'number'
-														? companySubject.expected_version
-														: null,
-											},
+									companyOnFile(subjects),
 								),
 							)
 							if (harvestedMailboxes.length > 0) {
@@ -3880,6 +3937,17 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// assembled from the links themselves.
 							const organizationId = (run as { organizationId: string })
 								.organizationId
+							// Every page and passage the run read, for the checks that ask
+							// whether words are on ANY fetched page — a citation's quote, a
+							// fit check's — rather than on a page that grounds on the subject:
+							// a competitor's or a registry's page is fetched and quotable
+							// without grounding on the company the run is about.
+							const everyPageRead = [
+								evidenceCorpus,
+								...scrapeCorpus.map(page => page.text),
+							]
+								.join('\n')
+								.toLowerCase()
 							const guardChain: ReadonlyArray<GuardLink> = [
 								{
 									// Organisation kind: a search for a trade's companies runs through
@@ -3989,6 +4057,27 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										}),
 								},
 								{
+									// Quote text: the words a run quotes are stripped of what the
+									// model dressed them in — its own quote marks, a search result's
+									// "[source: host]" marker, a snippet's joiners. Before the
+									// citation guard, so what it judges is the words themselves.
+									name: 'quote-text',
+									run: findings =>
+										Effect.gen(function* () {
+											const check = tidyQuotes(findings)
+											if (check.cleaned > 0) {
+												yield* Effect.logInfo('research.quotes.tidied').pipe(
+													Effect.annotateLogs({
+														event: 'research.quotes.tidied',
+														research_id: researchId,
+														cleaned: check.cleaned,
+													}),
+												)
+											}
+											return { findings: check.findings }
+										}),
+								},
+								{
 									// Drop citations the model invented: keep only source_ids that
 									// map to a page this run actually fetched. A proposed CRM update
 									// left with no valid citation is dropped whole.
@@ -4000,6 +4089,16 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												groundedCitationTest(groundedRows, [
 													...searchResultHosts,
 												]),
+												{
+													resolve: citationSourceResolver(
+														groundedRows,
+														scrapeCorpus.map(page => ({
+															sourceId: sourceIdFor(page.urlHash),
+															text: page.text,
+														})),
+													),
+													lowerCorpus: everyPageRead,
+												},
 											)
 											citationsSeen = check.total
 											citationsKept = check.kept
@@ -4012,6 +4111,8 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														research_id: researchId,
 														total: check.total,
 														kept: check.kept,
+														stripped_quotes: check.strippedQuotes,
+														folded: check.folded,
 													}),
 												)
 											}
@@ -4039,6 +4140,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												spanCounts: {
 													'research.citations.total': check.total,
 													'research.citations.kept': check.kept,
+													'research.citations.folded': check.folded,
 												},
 											}
 										}),
@@ -4170,29 +4272,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										}),
 								},
 								{
-									// A run whose only news is the attributes it read proposes
-									// nothing on its own, and a value nobody can apply never lands.
-									name: 'attribute-proposal',
-									run: findings =>
-										Effect.succeed({
-											findings:
-												isEnrichmentRun && companySubject !== undefined
-													? withAttributeProposal(
-															findings,
-															{
-																id: companySubject.id,
-																version:
-																	typeof companySubject.expected_version ===
-																	'number'
-																		? companySubject.expected_version
-																		: null,
-															},
-															randomUUID(),
-														)
-													: findings,
-										}),
-								},
-								{
 									// Website sanity: a scanned competitor or prospect sometimes comes
 									// back with a directory's profile page ("cbinsights.com/company/…")
 									// where its own site belongs, with a note glued to the address,
@@ -4283,7 +4362,8 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												check.droppedUncited > 0 ||
 												check.droppedOffSite > 0 ||
 												check.droppedTitles > 0 ||
-												check.droppedNotPerson > 0
+												check.droppedNotPerson > 0 ||
+												check.droppedSiteCredit > 0
 											) {
 												yield* Effect.logWarning(
 													'research.contacts.wrong_entity',
@@ -4296,6 +4376,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														dropped_off_site: check.droppedOffSite,
 														dropped_titles: check.droppedTitles,
 														dropped_not_person: check.droppedNotPerson,
+														dropped_site_credit: check.droppedSiteCredit,
 													}),
 												)
 											}
@@ -4342,7 +4423,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									name: 'fit-evidence',
 									run: findings =>
 										Effect.gen(function* () {
-											const check = guardFitEvidence(findings, evidenceCorpus)
+											const check = guardFitEvidence(findings, everyPageRead)
 											if (
 												check.droppedDisqualifiers > 0 ||
 												check.unverifiedChecks > 0
@@ -4652,6 +4733,37 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												findings: check.findings,
 												spanCounts: {
 													'research.prospects.deduplicated': check.merged,
+												},
+											}
+										}),
+								},
+								{
+									// Shared handles: a social profile two rows carry stays only on
+									// the row whose own pages show it. After the fold, so a company
+									// written twice does not read as two rows sharing its own account.
+									name: 'shared-handles',
+									run: findings =>
+										Effect.gen(function* () {
+											const check = dropSharedHandles(
+												findings,
+												discoveryResultField(schemaName),
+												openedPages(scrapeCorpus),
+											)
+											if (check.dropped > 0) {
+												yield* Effect.logInfo(
+													'research.prospects.shared_handles',
+												).pipe(
+													Effect.annotateLogs({
+														event: 'research.prospects.shared_handles',
+														research_id: researchId,
+														dropped: check.dropped,
+													}),
+												)
+											}
+											return {
+												findings: check.findings,
+												spanCounts: {
+													'research.prospects.shared_handles': check.dropped,
 												},
 											}
 										}),
@@ -7126,7 +7238,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							wordsTheRunBrings,
 							runAttributes,
 						)
-						findings = merged.findings
+						findings = withIdsForTheUnstamped(merged.findings)
 						// Nothing has judged this list yet: every extraction was judged on
 						// its own and then folded in, so an address one round condemned for
 						// one company can still be standing on a row another round carried
@@ -7555,6 +7667,47 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									unsearched: requestCoverage.unsearched,
 								}),
 							)
+						}
+					}
+
+					// ── Attribute-only proposal ──
+					// A run about one company whose only news is the attribute values it
+					// read proposes nothing on its own, and a value nobody can apply never
+					// lands. Added here, after the last gap round, rather than in the guard
+					// chain: the chain runs once per extraction and a round's fold keeps
+					// the base run's proposal list, so a proposal made inside it for an
+					// attribute a round was the first to read never reached the list.
+					if (schemaName === 'company_enrichment_v1') {
+						const company = companyOnFile(subjects)
+						// Held to the test the guard chain puts every proposed write
+						// through: the row has to be there to write to. A company deleted
+						// while the run was out reading is proposed nothing.
+						const stillOnFile =
+							company === undefined
+								? []
+								: yield* sql<{ id: string }>`
+										SELECT id FROM companies
+										WHERE id = ${company.id}
+											AND organization_id = ${(run as { organizationId: string }).organizationId}
+											AND deleted_at IS NULL
+										LIMIT 1
+									`.pipe(Effect.catchTag('SqlError', () => Effect.succeed([])))
+						if (company !== undefined && stillOnFile.length > 0) {
+							const proposed = withAttributeProposal(
+								findings,
+								company,
+								randomUUID(),
+							)
+							if (proposed !== findings) {
+								findings = proposed
+								yield* Effect.logInfo('research.attributes.proposed').pipe(
+									Effect.annotateLogs({
+										event: 'research.attributes.proposed',
+										research_id: researchId,
+										subject_id: company.id,
+									}),
+								)
+							}
 						}
 					}
 

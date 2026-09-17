@@ -3,6 +3,7 @@
 // is never counted as a person twice over by two guards disagreeing.
 
 import { LEGAL_SUFFIXES } from './entity-guard'
+import { termTokens } from './term-match'
 
 const HAS_AT_SIGN = /@/
 const HAS_URL_SCHEME = /:\/\//
@@ -69,4 +70,94 @@ export const readsAsPersonName = (name: string): boolean => {
 		lastWord === lastWord.toUpperCase() ||
 		words.length >= 3
 	return tokens.length >= 2 && !(looksLikeAForm && LEGAL_SUFFIXES.has(form))
+}
+
+// The labels a site puts beside the people who made the site — the credits on a
+// legal-notice page — rather than beside the people who run the company. Read
+// with accents off and in lower case, so "Vidéo" and "video" are one label.
+const SITE_CREDIT_LABELS: ReadonlySet<string> = new Set([
+	'photographie',
+	'photographies',
+	'photo',
+	'photos',
+	'photography',
+	'photographer',
+	'fotografia',
+	'fotografias',
+	'fotografo',
+	'fotograf',
+	'fotos',
+	'video',
+	'videos',
+	'videaste',
+	'webdesign',
+	'web design',
+	'webdesigner',
+	'web designer',
+	'diseno web',
+	'disseny web',
+	'design',
+	'graphisme',
+	'graphiste',
+	'graphic design',
+	'grafica',
+	'illustration',
+	'illustrations',
+	'developpement',
+	'development',
+	'developpeur',
+	'developer',
+	'desarrollo',
+	'desenvolupament',
+	'sviluppo',
+	'programacion',
+	'hebergement',
+	'hebergeur',
+	'hosting',
+	'realisation',
+	'conception',
+	'creation',
+	'creation du site',
+	'site realise par',
+	'realise par',
+	'concu par',
+	'credits',
+	'creditos',
+	'credits photo',
+	'redaction',
+	'textes',
+	'traduction',
+	'translation',
+	'webmaster',
+	'agence',
+	'agencia',
+	'agence web',
+	'maintenance',
+])
+
+// A label the way the set above spells it: lower case, accents off, one space
+// between words, nothing but letters and digits inside them.
+const asLabel = (text: string): string => termTokens(text).join(' ')
+
+/**
+ * Whether a label beside a name credits whoever made the site rather than
+ * naming a post at the company. "Photographie", "Développement" and "Webdesign"
+ * on a legal-notice page are such credits, and the person beside them is the
+ * site's photographer or developer, not the company's staff.
+ */
+export const readsAsSiteCredit = (label: string): boolean =>
+	SITE_CREDIT_LABELS.has(asLabel(label))
+
+/**
+ * Whether a quote is a credit line and nothing more — the name with a credit
+ * label beside it, "Photographie Thierry Laroche", so that with the name taken
+ * out what is left is the label alone.
+ */
+export const isSiteCreditLine = (quote: string, name: string): boolean => {
+	const person = asLabel(personName(name))
+	if (person === '') return false
+	const line = asLabel(quote)
+	if (!line.includes(person)) return false
+	const rest = line.replace(person, ' ').replace(/\s+/g, ' ').trim()
+	return rest !== '' && readsAsSiteCredit(rest)
 }

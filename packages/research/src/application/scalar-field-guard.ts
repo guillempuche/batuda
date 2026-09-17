@@ -413,6 +413,44 @@ export const quoteSupportsValue = (
 export const quoteSupportsTitle = (quote: string, value: string): boolean =>
 	quoteSupportsValue(quote, value, true) || titleInitialsAgree(quote, value)
 
+// A remark a model writes after a value, in brackets — "HP Indigo VP37 (digital
+// printing press)", "Tornos CNC (según descripción de servicios)".
+const TRAILING_REMARK = /\s*\(([^()]*)\)\s*$/
+
+// Where one item of a value ends and the next begins: a comma, a semicolon, or
+// an ellipsis standing for words left out between them.
+// A comma followed by a digit is a thousands separator ("1,500 m²"), not a
+// break.
+const BETWEEN_ITEMS = /;|…|\.{3}|,(?!\d)/
+
+/**
+ * A declared text value in the quote's own words, or null when the quote does
+ * not write it. A remark in brackets the quote never says comes off the end
+ * first; then each item of what is left — the whole value, or the items a
+ * comma or a semicolon separates — has to run through the quote as the quote
+ * writes it, letter for letter and in its order. The page's words, chosen by
+ * the model, rather than the model's account of the page ("state-of-the-art
+ * equipment, including a new MAZAK…" over a page that says "Nueva MAZAK") or a
+ * new phrase made of the page's words.
+ */
+export const textValueAsQuoteWrites = (
+	quote: string,
+	value: string,
+): string | null => {
+	const lowerQuote = quote.toLowerCase()
+	let text = value.trim()
+	const remark = TRAILING_REMARK.exec(text)
+	if (remark !== null && !quoteIsVerbatim(remark[1] ?? '', lowerQuote))
+		text = text.slice(0, remark.index).trim()
+	if (text === '') return null
+	const items = text
+		.split(BETWEEN_ITEMS)
+		.map(item => item.trim())
+		.filter(item => item !== '')
+	if (items.length === 0) return null
+	return items.every(item => quoteIsVerbatim(item, lowerQuote)) ? text : null
+}
+
 // Labels a page puts beside a person that are not their post: a directory's
 // "Contact Diego Navarro", a footer's "Tel", "Email". Seen stored as job titles.
 const NOT_TITLES = new Set([
@@ -582,7 +620,7 @@ export const isInCorpus = (
 // A text reduced to the letters and digits it is made of, accents off, so a
 // quote and a page compare the same whatever the markdown, spacing or
 // punctuation around the words.
-const lettersAndDigits = (text: string): string =>
+export const lettersAndDigits = (text: string): string =>
 	foldAccents(text.toLowerCase()).replace(/[^\p{L}\p{N}]/gu, '')
 
 // The corpus reduced the same way, remembered between calls for the same
