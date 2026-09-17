@@ -16,7 +16,9 @@
  *   - Retry gated on `AiError.isRetryable` (network, 5xx, 429, structured-output)
  *   - A tool call the provider refused because the model's arguments did not fit
  *     the tool's schema is re-read as the model's mistake before that gate, so it
- *     is retried like the same mistake caught on our side (`_tool-call-rejection`)
+ *     is retried like the same mistake caught on our side (`_tool-call-rejection`).
+ *     Once the retries are spent it surfaces as `RejectedToolCall`, naming the
+ *     tool, so a caller can put the mistake to the model rather than ask again.
  *   - An `llm.retry` log written ONLY when another attempt is really about to be
  *     made — not for a failure the gate above refuses, and not on the final
  *     exhausted attempt.
@@ -49,7 +51,13 @@ import type { LanguageModel } from 'effect/unstable/ai'
 import { AiError } from 'effect/unstable/ai'
 
 import { endsBeforeJsonCloses } from '../domain/cut-off-reply'
-import { CutOffReply, ProviderError, RESPONSE_CUT_OFF } from '../domain/errors'
+import {
+	CutOffReply,
+	ProviderError,
+	REJECTED_TOOL_CALL,
+	RESPONSE_CUT_OFF,
+	RejectedToolCall,
+} from '../domain/errors'
 import { reclassifyRejectedToolCall } from './_tool-call-rejection'
 
 const DEFAULT_TIMEOUT: Duration.Input = '60 seconds'
@@ -117,6 +125,19 @@ const cutOffReplyText = (err: unknown): string | undefined => {
 const isCutOffReply = (err: unknown): boolean =>
 	cutOffReplyText(err) !== undefined
 
+// The tool a call named and what was wrong with it, when the failure is the
+// model having written that call with arguments the tool does not take. Both the
+// mistake we catch ourselves and the one a provider catches first arrive here as
+// the same reason, because `_tool-call-rejection` has already made them the
+// same. The objection is read off the reason rather than the error's `message`,
+// which opens with the module and method that raised it.
+const rejectedToolCall = (
+	err: unknown,
+): { readonly toolName: string; readonly mistake: string } | undefined =>
+	err instanceof AiError.AiError && err.reason._tag === REJECTED_TOOL_CALL
+		? { toolName: err.reason.toolName, mistake: err.reason.description }
+		: undefined
+
 // Read the true shape of a failure before it collapses into a ProviderError
 // (only provider + message + recoverable). `Effect.timeout` raises a bare
 // TimeoutError with no message, and a provider blip can arrive as an AiError
@@ -154,15 +175,24 @@ const toProviderError = (
 	timeout: Duration.Input,
 ): ProviderError => {
 	if (err instanceof ProviderError) return err
-	// `describeFailure` always yields a non-empty message; a ProviderError built
-	// with an empty message rejects its own construction and throws a second,
-	// contentless error over the real one — so the non-empty invariant matters.
+	// `describeFailure` always yields a non-empty message, so whatever leaves
+	// here says something a reader can act on rather than surfacing as a blank
+	// failure with a provider's name on it.
 	const info = describeFailure(provider, err, timeout)
 	// What the model wrote before the cut travels with the failure, so a caller
 	// can keep the part that arrived whole rather than lose the run.
 	const cutOffText = cutOffReplyText(err)
 	if (cutOffText !== undefined)
 		return new CutOffReply({ provider, message: info.message }, cutOffText)
+	// Which tool the model fumbled travels with the failure, so a caller can put
+	// the mistake to the model instead of asking the same question again.
+	const rejected = rejectedToolCall(err)
+	if (rejected !== undefined)
+		return new RejectedToolCall(
+			{ provider, message: info.message },
+			rejected.toolName,
+			rejected.mistake,
+		)
 	return new ProviderError({
 		provider,
 		message: info.message,

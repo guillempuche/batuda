@@ -94,11 +94,35 @@ export interface RunAgentResearchLoopParams<E, R> {
 	readonly shouldContinueAfterFinal?:
 		| (() => Effect.Effect<boolean, E, R>)
 		| undefined
+	/**
+	 * Consulted when a round failed instead of returning. Return true to run
+	 * another round — the caller appends whatever the model needs to know first,
+	 * so the next round is asked a different question rather than the same one.
+	 * Returning false re-raises the failure unchanged. Omitted = a failing round
+	 * ends the run, which is what every other failure should still do.
+	 */
+	readonly shouldContinueAfterFailure?:
+		| ((error: E) => Effect.Effect<boolean, E, R>)
+		| undefined
+}
+
+// A round the model spent on a tool call it wrote wrongly. It gathered nothing,
+// so it carries no transcript and no evidence — and it counts as the model still
+// wanting to search, because it is: it asked for a tool and only fumbled how.
+const CORRECTED_ROUND: LoopRound = {
+	text: '',
+	hasToolCalls: true,
+	scrapeUrlHashes: [],
+	renderedResults: [],
+	promptChars: 0,
+	inputTokens: 0,
 }
 
 // A failing round (e.g. the model provider erroring after its retries) is not
 // swallowed: it propagates as E so the run fiber marks the run failed rather
-// than shipping a half-built transcript.
+// than shipping a half-built transcript. The one exception is a caller that says
+// it has told the model something that would change the answer — see
+// `shouldContinueAfterFailure`.
 export const runAgentResearchLoop = <E, R>(
 	params: RunAgentResearchLoopParams<E, R>,
 ): Effect.Effect<AgentLoopResult, E, R> =>
@@ -112,9 +136,29 @@ export const runAgentResearchLoop = <E, R>(
 		let totalPromptChars = 0
 		let stopReason: SearchStopped = 'finished_looking'
 
+		const shouldContinueAfterFailure = params.shouldContinueAfterFailure
+
+		// One round, with a failure the caller says it has put to the model read as
+		// a round that gathered nothing rather than as the end of the run.
+		const roundOrCorrection = (
+			roundNumber: number,
+		): Effect.Effect<LoopRound, E, R> => {
+			const attemptedRound = params.runRound(roundNumber)
+			if (shouldContinueAfterFailure === undefined) return attemptedRound
+			return attemptedRound.pipe(
+				Effect.catch(error =>
+					shouldContinueAfterFailure(error).pipe(
+						Effect.flatMap(corrected =>
+							corrected ? Effect.succeed(CORRECTED_ROUND) : Effect.fail(error),
+						),
+					),
+				),
+			)
+		}
+
 		while (true) {
 			round++
-			const result = yield* params.runRound(round)
+			const result = yield* roundOrCorrection(round)
 			totalPromptChars += result.promptChars
 			if (result.text.length > 0) transcript.push(result.text)
 			for (const rendered of result.renderedResults) {

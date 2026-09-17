@@ -14,7 +14,14 @@ import type { LanguageModel } from 'effect/unstable/ai'
 import { AiError } from 'effect/unstable/ai'
 import { describe, expect, it } from 'vitest'
 
-import { CutOffReply, ProviderError, RESPONSE_CUT_OFF } from '../domain/errors'
+import {
+	CutOffReply,
+	isRejectedToolCall,
+	ProviderError,
+	REJECTED_TOOL_CALL,
+	RESPONSE_CUT_OFF,
+	type RejectedToolCall,
+} from '../domain/errors'
 import { hardenLanguageModel, withFallbackLanguageModel } from './_harden'
 
 // ── Test helpers ──
@@ -500,6 +507,39 @@ describe('hardenLanguageModel', () => {
 		expect(Ref.getUnsafe(attemptsRef)).toBe(3)
 	})
 
+	it('should name the tool the model fumbled on the failure it gives up with', async () => {
+		// GIVEN a provider that refuses the same tool call every time, so the
+		// retries are spent and the failure reaches the caller
+		const attemptsRef = Ref.makeUnsafe(0)
+		const stub = makeStubLm(attemptsRef, () =>
+			Effect.fail(mkToolCallRefusedError()),
+		)
+		const hardened = hardenLanguageModel(stub, 'groq')
+
+		// WHEN generateText is invoked
+		const exit = await runWithVirtualClock(() => invokeGenerateText(hardened))
+
+		// THEN the failure says which tool was fumbled, so a caller can tell the
+		// model what the tool really accepts instead of asking the same question
+		// again — the retries above have already proved asking again does nothing
+		const failure = failureOf(exit)
+		expect(isRejectedToolCall(failure)).toBe(true)
+		expect((failure as RejectedToolCall).toolName).toBe('web_search')
+
+		// AND the reason on it still reads as the provider client's own name for
+		// the mistake, so a failure log's `reason` reads the same here as on every
+		// other provider failure
+		expect((failure as RejectedToolCall).reason).toBe(REJECTED_TOOL_CALL)
+
+		// AND the objection travels as the provider worded it. A caller repeats
+		// this to the model, so it carries what was wrong with the call and not
+		// the module and method that raised it, which the `message` opens with
+		expect((failure as RejectedToolCall).mistake).toBe(
+			'Tool call validation failed: parameters for tool web_search did not match schema',
+		)
+		expect((failure as RejectedToolCall).mistake).not.toContain('OpenAiClient')
+	})
+
 	it('should sleep for the RateLimitError retryAfter before re-attempting', async () => {
 		// GIVEN a stub LM that fails twice with a 7-second retryAfter hint then succeeds
 		// AND a harness whose default jittered-exponential backoff would normally fire at ~500ms/~1s
@@ -825,5 +865,40 @@ describe('withFallbackLanguageModel', () => {
 		const calls = Ref.getUnsafe(callsRef)
 		expect(calls.filter(c => c === 'a').length).toBe(1)
 		expect(calls.filter(c => c === 'b').length).toBe(1)
+	})
+
+	it('should still name the fumbled tool after every slot has refused the call', async () => {
+		// GIVEN both slots refusing the same tool call — the shape of the run that
+		// prompted this: the model names an argument the tool does not have, and
+		// every vendor slot says no to the same call in turn
+		const firstRef = Ref.makeUnsafe(0)
+		const secondRef = Ref.makeUnsafe(0)
+		const slot0 = hardenLanguageModel(
+			makeStubLm(firstRef, () => Effect.fail(mkToolCallRefusedError())),
+			'custom',
+		)
+		const slot1 = hardenLanguageModel(
+			makeStubLm(secondRef, () => Effect.fail(mkToolCallRefusedError())),
+			'groq',
+		)
+		const composed = withFallbackLanguageModel([slot0, slot1])
+
+		// WHEN the composed model is invoked
+		const exit = await runWithVirtualClock(() => invokeGenerateText(composed))
+
+		// THEN both slots were tried and spent their retries
+		expect(Ref.getUnsafe(firstRef)).toBe(3)
+		expect(Ref.getUnsafe(secondRef)).toBe(3)
+
+		// AND the error that escapes the cascade still names the tool, so the
+		// correction survives the whole retry-and-fall-back path rather than only
+		// working on a single-slot tier
+		const failure = failureOf(exit)
+		expect(isRejectedToolCall(failure)).toBe(true)
+		expect((failure as RejectedToolCall).toolName).toBe('web_search')
+
+		// AND it is the last slot that is reported, so the log names the vendor
+		// that actually had the final word
+		expect((failure as RejectedToolCall).provider).toBe('groq')
 	})
 })

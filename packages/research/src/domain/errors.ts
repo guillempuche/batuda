@@ -1,9 +1,11 @@
 import { Schema } from 'effect'
 
 // ── Research domain errors ──
-// These are internal to the research bounded context. The server maps them
-// to HTTP errors at the handler layer (e.g., BudgetExceeded → 409). They
-// are Schema.TaggedErrorClass so they serialize over SSE tool error events.
+// These are internal to the research bounded context. The server maps them to
+// HTTP errors at the handler layer (e.g., BudgetExceeded → 409), and what it
+// actually answers a request with is declared apart from these, in
+// @batuda/controllers — so none of these is written onto a wire. The class they
+// are built from follows the other domain packages rather than any need here.
 
 /** External provider call failed (Firecrawl, Exa, libreBORME, etc.). */
 export class ProviderError extends Schema.TaggedErrorClass<ProviderError>()(
@@ -59,6 +61,54 @@ export class CutOffReply extends ProviderError {
 		})
 	}
 }
+
+/**
+ * The `reason` a ProviderError carries when the model's tool arguments did not
+ * fit the tool's own schema — whether our own decoding noticed or the provider
+ * refused the call first. It is the provider client's own name for the mistake,
+ * so a failure log reads the same whichever side caught it.
+ */
+export const REJECTED_TOOL_CALL = 'ToolParameterValidationError'
+
+/**
+ * A tool call the model wrote wrongly: the tool it named, and the objection in
+ * the words of whoever raised it.
+ *
+ * The tool's name is here so a caller can tell the model what that tool really
+ * accepts, which is the one thing that changes the call it writes next.
+ *
+ * `mistake` is the objection alone, without the module and method the error's
+ * own `message` opens with. A caller that repeats it to the model should be
+ * quoting what was wrong with the call, not our internal call path.
+ */
+export class RejectedToolCall extends ProviderError {
+	declare readonly toolName: string
+	declare readonly mistake: string
+
+	constructor(
+		fields: { readonly provider: string; readonly message: string },
+		toolName: string,
+		mistake: string,
+	) {
+		super({ ...fields, recoverable: true, reason: REJECTED_TOOL_CALL })
+		// Kept off the enumerable properties: the error travels as provider +
+		// message + reason, and these two are for a caller here rather than for
+		// the wire.
+		Object.defineProperty(this, 'toolName', {
+			value: toolName,
+			enumerable: false,
+		})
+		Object.defineProperty(this, 'mistake', {
+			value: mistake,
+			enumerable: false,
+		})
+	}
+}
+
+// A tool call the model wrote wrongly. Worth telling apart from every other
+// provider failure because it is the one a caller can do something about.
+export const isRejectedToolCall = (err: unknown): err is RejectedToolCall =>
+	err instanceof RejectedToolCall
 
 /** Per-run resource budget (cheap or paid tier) exceeded. */
 export class BudgetExceeded extends Schema.TaggedErrorClass<BudgetExceeded>()(

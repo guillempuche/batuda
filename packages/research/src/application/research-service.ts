@@ -240,6 +240,10 @@ import { recordSeenSource } from './source-record'
 import { enforceSourceTier, isFirstPartyHost } from './source-tier-guard'
 import { stripReasoning } from './strip-reasoning'
 import {
+	correctionForFailedRound,
+	toolkitAnsweringBadCalls,
+} from './tool-call-correction'
+import {
 	REGISTRY_LOOKUP_COST_CENTS,
 	SCRAPE_COST_CENTS,
 	SEARCH_COST_CENTS,
@@ -475,6 +479,12 @@ const groundingRetryInstruction = (schemaName: string): string =>
 // figure is rarely on the company's homepage, so a run that stops there leaves
 // size_range empty.
 const MAX_HEADCOUNT_RETRIES = 1
+
+// How many times a pass will tell the model it wrote a tool call wrongly before
+// the run fails on it. Each one has already cost every retry on every vendor
+// slot, and a model that cannot write the call right twice running will not on
+// the third.
+const MAX_TOOL_CORRECTIONS = 2
 
 // Appended after such a finish: push the model to search for the headcount (its own
 // site rarely states it) rather than concluding the size is unknown.
@@ -5409,7 +5419,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// model response into the plain data the loop decides on.
 					const phaseOutcome = yield* Effect.gen(function* () {
 						const budget = yield* Budget
-						const toolkit = yield* researchToolkit
+						// A call the model wrote wrongly comes back to it as a result
+						// rather than ending the round.
+						const toolkit = toolkitAnsweringBadCalls(yield* researchToolkit)
 						const scrape = yield* ScrapeProvider
 						const siteMap = yield* MapProvider
 						const registry = yield* RegistryRouter
@@ -6185,6 +6197,27 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								// finishing; bounded so a run that still cannot ground fails closed.
 								let groundingRetries = 0
 								let headcountRetries = 0
+								let toolCorrections = 0
+								const shouldContinueAfterFailure = (error: unknown) =>
+									Effect.gen(function* () {
+										const correction = correctionForFailedRound(
+											error,
+											toolCorrections,
+											MAX_TOOL_CORRECTIONS,
+										)
+										if (correction === undefined) return false
+										toolCorrections++
+										prompt = Prompt.concat(prompt, Prompt.make(correction.text))
+										yield* Effect.logInfo('research.tool_call_corrected').pipe(
+											Effect.annotateLogs({
+												event: 'research.tool_call_corrected',
+												research_id: researchId,
+												tool: correction.toolName,
+												provider: correction.provider,
+											}),
+										)
+										return true
+									})
 								const shouldContinueAfterFinal = () =>
 									Effect.sync(() => {
 										const corpus = scrapeCorpus
@@ -6236,6 +6269,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									maxPromptTokens: maxLoopPromptTokens,
 									runRound,
 									shouldContinueAfterFinal,
+									shouldContinueAfterFailure,
 									budgetSnapshot: budget.snapshot(),
 								})
 							})
