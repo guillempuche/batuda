@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-09-17 (internal-v2026.9.17-1)
+
+### Bug Fixes
+
+* **research:** carry a round's news and hold a run to the page's words ([8906d3a](https://github.com/guillempuche/batuda/commit/8906d3a950984f2a40638b2257c18622ac922bc0))
+
 ## 2026-09-17 (internal-v2026.9.17)
 
 ### Bug Fixes
