@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-09-17 (server-v2026.9.17)
+
+### Bug Fixes
+
+* hold attributes and titles to the page's own words ([a97bde7](https://github.com/guillempuche/batuda/commit/a97bde78c4709e3877e012401b412b2523966595))
+* keep a person's attribute value from a run's hand-on ([50c2ff3](https://github.com/guillempuche/batuda/commit/50c2ff3de0526257b63f38173c28408d82b419c9))
+
 ## 2026-09-15 (server-v2026.9.15)
 
 ### Features
