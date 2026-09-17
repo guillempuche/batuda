@@ -206,8 +206,24 @@ jobs:
         run: |
           sleep 5
           # Read without -f, this prints the instance's entire environment in
-          # clear text, so name only the fields wanted.
-          unikraft instances get batuda-mail-worker -f name,state -o table
+          # clear text, so name only the fields wanted. The worker serves no
+          # HTTP, so there is no /health to curl: this state is the only thing
+          # standing between a crash-looping worker and a green deploy. It
+          # reads `starting` for a few seconds after boot (~6 s on 2026-09-15),
+          # so give it a little while to settle.
+          worker_state=""
+          for _ in 1 2 3 4 5 6; do
+            worker_state="$(unikraft instances get batuda-mail-worker -f name,state -o table 2>/dev/null || true)"
+            if printf '%s' "$worker_state" | grep -q running; then break; fi
+            sleep 5
+          done
+          printf '%s\n' "$worker_state"
+          if [ -z "$worker_state" ]; then
+            echo "::warning::Could not read the instance's state after the deploy"
+          elif ! printf '%s' "$worker_state" | grep -q running; then
+            echo "::error::batuda-mail-worker is not running after the deploy"
+            exit 1
+          fi
 
           # Confirm the dataset name reached the running instance, and that it
           # sits inside the header value rather than split into a variable of
@@ -216,24 +232,33 @@ jobs:
           # here is ever printed.
           instance_env="$(unikraft instances get batuda-mail-worker \
                             -f runtime.env -o json 2>/dev/null || true)"
+          # Coming back empty means the read did not happen, which is not the
+          # same as the header being wrong: asking by name makes the CLI ask
+          # every metro, and one being unwell somewhere else is enough to sink
+          # the whole answer (2026-08-31). Say so and carry on; only a header
+          # actually seen to be wrong stops the job.
           if [ -z "$instance_env" ]; then
-            echo "::error::Could not read the instance's environment to check the telemetry header"
-            exit 1
+            echo "::warning::Could not read the instance's environment, so the telemetry header went unchecked"
+          else
+            # A variable of its own is the fingerprint of a value cut at its
+            # comma, whatever shape the read comes back in; inside the header
+            # value the name always follows one.
+            if printf '%s' "$instance_env" | grep -q '"x-honeycomb-dataset'; then
+              echo "::error::x-honeycomb-dataset arrived as a variable of its own, so OTEL_EXPORTER_OTLP_HEADERS was cut at its comma; check the pinned Unikraft CLI version"
+              exit 1
+            fi
+            if ! printf '%s' "$instance_env" | grep -q ',x-honeycomb-dataset=batuda-mail-worker'; then
+              echo "::error::x-honeycomb-dataset is missing from OTEL_EXPORTER_OTLP_HEADERS on the running instance; metrics would be filed under a shared default dataset instead of batuda-mail-worker"
+              exit 1
+            fi
           fi
-          # A variable of its own is the fingerprint of a value cut at its comma,
-          # whatever shape the read comes back in; inside the header value the
-          # name always follows one.
-          if printf '%s' "$instance_env" | grep -q '"x-honeycomb-dataset'; then
-            echo "::error::x-honeycomb-dataset arrived as a variable of its own, so OTEL_EXPORTER_OTLP_HEADERS was cut at its comma; check the pinned Unikraft CLI version"
-            exit 1
-          fi
-          if ! printf '%s' "$instance_env" | grep -q ',x-honeycomb-dataset=batuda-mail-worker'; then
-            echo "::error::x-honeycomb-dataset is missing from OTEL_EXPORTER_OTLP_HEADERS on the running instance; metrics would be filed under a shared default dataset instead of batuda-mail-worker"
-            exit 1
-          fi
-          # claimAvailableInboxes runs every 5 s, so an IDLE-established
-          # log line should appear within ~10 s if any inbox is provisioned.
-          unikraft instances logs batuda-mail-worker --tail 100 || echo "::warning::No logs yet"
+          # The worker's console is deliberately not read here. Asking for it by
+          # name makes the CLI ask every metro and fail over the ones the
+          # instance is not in, so it has never once returned a line (checked
+          # back to 2026-09-08); and were it ever to work, those lines name
+          # mailboxes and carry provider errors, which are nobody's repository
+          # secret and so would reach the job log unmasked. The state read above
+          # is what says the instance is up.
 
       # Every release publishes a ~430 MiB image, and for a long time nothing
       # removed the old ones. The registry filled to its 10 GiB ceiling and a

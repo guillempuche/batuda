@@ -404,20 +404,25 @@ jobs:
           # whole environment in clear text.
           instance_env="$(unikraft instances get batuda-server-${{ steps.meta.outputs.short_sha }} \
                             -f runtime.env -o json 2>/dev/null || true)"
+          # Coming back empty means the read did not happen, which is not the
+          # same as the header being wrong: asking by name makes the CLI ask
+          # every metro, and one being unwell somewhere else is enough to sink
+          # the whole answer (2026-08-31). Say so and carry on; only a header
+          # actually seen to be wrong stops the job.
           if [ -z "$instance_env" ]; then
-            echo "::error::Could not read the instance's environment to check the telemetry header"
-            exit 1
-          fi
-          # A variable of its own is the fingerprint of a value cut at its comma,
-          # whatever shape the read comes back in; inside the header value the
-          # name always follows one.
-          if printf '%s' "$instance_env" | grep -q '"x-honeycomb-dataset'; then
-            echo "::error::x-honeycomb-dataset arrived as a variable of its own, so OTEL_EXPORTER_OTLP_HEADERS was cut at its comma; check the pinned Unikraft CLI version"
-            exit 1
-          fi
-          if ! printf '%s' "$instance_env" | grep -q ',x-honeycomb-dataset=batuda-server'; then
-            echo "::error::x-honeycomb-dataset is missing from OTEL_EXPORTER_OTLP_HEADERS on the running instance; metrics would be filed under a shared default dataset instead of batuda-server"
-            exit 1
+            echo "::warning::Could not read the instance's environment, so the telemetry header went unchecked"
+          else
+            # A variable of its own is the fingerprint of a value cut at its
+            # comma, whatever shape the read comes back in; inside the header
+            # value the name always follows one.
+            if printf '%s' "$instance_env" | grep -q '"x-honeycomb-dataset'; then
+              echo "::error::x-honeycomb-dataset arrived as a variable of its own, so OTEL_EXPORTER_OTLP_HEADERS was cut at its comma; check the pinned Unikraft CLI version"
+              exit 1
+            fi
+            if ! printf '%s' "$instance_env" | grep -q ',x-honeycomb-dataset=batuda-server'; then
+              echo "::error::x-honeycomb-dataset is missing from OTEL_EXPORTER_OTLP_HEADERS on the running instance; metrics would be filed under a shared default dataset instead of batuda-server"
+              exit 1
+            fi
           fi
 
       # Every release publishes a ~430 MiB image, and for a long time nothing
