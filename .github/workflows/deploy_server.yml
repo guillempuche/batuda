@@ -23,8 +23,11 @@ permissions:
 env:
   KRAFTCLOUD_METRO: fra
   # Pinned new Unikraft CLI (`unikraft`, from unikraft-cloud/cli) version.
-  # Bump deliberately after verifying a new release against a dry-run deploy.
-  UNIKRAFT_CLI_VERSION: "0.4.1"
+  # Bump deliberately after verifying a new release against a dry-run
+  # deploy; run it with dummy values, since it prints every variable it
+  # would send. 0.5 is the floor — below it, `-e` cuts its own value at
+  # every comma.
+  UNIKRAFT_CLI_VERSION: "0.5.1"
   # Image namespace on Unikraft Cloud is the organization slug; published
   # images and running instances live under `<org>/<name>`.
   KRAFTCLOUD_ORG: gaaaa
@@ -225,9 +228,9 @@ jobs:
             if ! unikraft services create \
                    --name batuda-server \
                    --metro ${{ env.KRAFTCLOUD_METRO }} \
-                   --domains api.batuda.co \
-                   --services 443:3000/tls+http \
-                   --services 80:443/http+redirect >/tmp/svc-create.log 2>&1; then
+                   --domain api.batuda.co \
+                   --service 443:3000/tls+http \
+                   --service 80:443/http+redirect >/tmp/svc-create.log 2>&1; then
               cat /tmp/svc-create.log
               grep -q "already exists" /tmp/svc-create.log
             fi
@@ -237,12 +240,14 @@ jobs:
         env:
           OTLP_HEADERS: ${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }}
         run: |
-          # The dataset name is appended to the secret, so anything the secret
-          # carries at its end lands in the middle of the value. A stray newline
-          # there truncates everything after it, which is how both instances
-          # ended up holding the team key and no dataset (seen 2026-09-01). Read
-          # from the environment rather than pasted into the command, and
-          # stripped of line breaks before anything is added to it.
+          # The dataset name is appended to the secret, so the value carries a
+          # comma — and below CLI 0.5, the -e flag cut its value at every
+          # comma. That left both instances holding the team key alone, with
+          # the dataset arriving as a separate variable nothing reads, so
+          # every metric was filed under one shared dataset (blamed on a
+          # stray newline on 2026-09-01). Line breaks are stripped all the
+          # same: the secret is read from the environment rather than pasted
+          # into the command, and one at its end would land mid-value.
           headers="$(printf '%s' "$OTLP_HEADERS" | tr -d '\r\n'),x-honeycomb-dataset=batuda-server"
 
           # Unikraft Cloud bakes every -e var into the unikernel kernel command
@@ -323,9 +328,10 @@ jobs:
           #     with the process crash-guards in main.ts.
           #   Scale-to-zero stays off via the Kraftfile label (baked in).
           command: |
-            # Line breaks stripped before the dataset name is appended: a stray
-            # one at the end of the secret would land mid-value and truncate
-            # everything after it (seen 2026-09-01).
+            # Line breaks stripped before the dataset name is appended: one at
+            # the end of the secret would land mid-value. The comma this adds
+            # only survives on CLI 0.5 and up; older ones split the value here
+            # and the dataset never reached the instance.
             headers="$(printf '%s' "$OTLP_HEADERS" | tr -d '\r\n'),x-honeycomb-dataset=batuda-server"
 
             # No users yet, so a brief gap is fine: remove every current
@@ -374,7 +380,8 @@ jobs:
               -e RESEARCH_API_KEY_ENRICH="${{ secrets.RESEARCH_API_KEY_ENRICH }}" \
               -e RESEARCH_API_KEY_ENRICH_2="${{ secrets.RESEARCH_API_KEY_ENRICH_2 }}" \
               -e RESEARCH_API_KEY_VERIFY="${{ secrets.RESEARCH_API_KEY_VERIFY }}" \
-              -e RESEARCH_API_KEY_REGISTRY_GB="${{ secrets.RESEARCH_API_KEY_REGISTRY_GB }}"
+              -e RESEARCH_API_KEY_REGISTRY_GB="${{ secrets.RESEARCH_API_KEY_REGISTRY_GB }}" \
+              -f name,state
 
       - name: Verify deployment
         run: |
@@ -383,20 +390,33 @@ jobs:
           # Gate the deploy on /health actually serving. curl already retries
           # to absorb cold-boot latency; fail the job if it never comes up so a
           # broken release doesn't pass with only a warning.
-          # Confirm the dataset name survived into the running instance. Only
-          # the count is read: this API hands back the whole environment in
-          # clear text, so nothing from it is ever printed. A warning rather
-          # than a failure — traces route by service name and land either way;
-          # what goes astray without it is where metrics are filed.
-          if [ "$(unikraft instances get batuda-server -o json 2>/dev/null \
-                    | grep -c 'x-honeycomb-dataset')" -eq 0 ]; then
-            echo "::warning::x-honeycomb-dataset is missing from the running instance; metrics will be filed under a shared default dataset"
-          fi
-
           if curl --retry 5 --retry-delay 5 --retry-all-errors -sf https://api.batuda.co/health -o /dev/null; then
             echo "Health check passed"
           else
             echo "::error::Health check failed after deploy"
+            exit 1
+          fi
+
+          # Confirm the dataset name reached the running instance. Ask for it
+          # by `batuda-server-<sha>`, the instance's own name: `batuda-server`
+          # is the service, and `instances get` finds no instance under that
+          # name. Nothing read here is ever printed — the API hands back the
+          # whole environment in clear text.
+          instance_env="$(unikraft instances get batuda-server-${{ steps.meta.outputs.short_sha }} \
+                            -f runtime.env -o json 2>/dev/null || true)"
+          if [ -z "$instance_env" ]; then
+            echo "::error::Could not read the instance's environment to check the telemetry header"
+            exit 1
+          fi
+          # A variable of its own is the fingerprint of a value cut at its comma,
+          # whatever shape the read comes back in; inside the header value the
+          # name always follows one.
+          if printf '%s' "$instance_env" | grep -q '"x-honeycomb-dataset'; then
+            echo "::error::x-honeycomb-dataset arrived as a variable of its own, so OTEL_EXPORTER_OTLP_HEADERS was cut at its comma; check the pinned Unikraft CLI version"
+            exit 1
+          fi
+          if ! printf '%s' "$instance_env" | grep -q ',x-honeycomb-dataset=batuda-server'; then
+            echo "::error::x-honeycomb-dataset is missing from OTEL_EXPORTER_OTLP_HEADERS on the running instance; metrics would be filed under a shared default dataset instead of batuda-server"
             exit 1
           fi
 
