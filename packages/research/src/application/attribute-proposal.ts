@@ -5,6 +5,11 @@
  * only news is the attributes proposed nothing and the values never landed.
  * This adds the proposal the model left out: an update with no fields, on the
  * company on file, that the apply path fills from the attributes it carries.
+ *
+ * Asked once, on the findings the run finally reports — after the last gap
+ * round has folded what it read into them — because an attribute is as often
+ * read in a round as in the first pass, and a proposal made before the fold
+ * for a value the fold brings in is a proposal the fold never keeps.
  */
 
 import { ATTRIBUTES_FIELD } from './attribute-bag'

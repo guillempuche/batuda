@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { personName, readsAsPersonName } from './contact-name'
+import {
+	isSiteCreditLine,
+	personName,
+	readsAsPersonName,
+	readsAsSiteCredit,
+} from './contact-name'
 
 describe('readsAsPersonName', () => {
 	describe('when given a plain two-word Latin name', () => {
@@ -127,5 +132,39 @@ describe('readsAsPersonName, when the name is a company’s', () => {
 		// is written as a word
 		expect(readsAsPersonName('Paulo Sa')).toBe(true)
 		expect(readsAsPersonName('Ana Co')).toBe(true)
+	})
+})
+
+describe('readsAsSiteCredit, when the label is punctuated or says nothing', () => {
+	it('should read past the marks between the words and refuse an empty label', () => {
+		// GIVEN a credit written with a dash, with a colon, and with spare spaces
+		expect(readsAsSiteCredit('Web-Design')).toBe(true)
+		expect(readsAsSiteCredit('  Développement :  ')).toBe(true)
+		expect(readsAsSiteCredit('Crédits photo')).toBe(true)
+		// AND a label holding nothing, which credits nobody
+		expect(readsAsSiteCredit('')).toBe(false)
+		expect(readsAsSiteCredit('   ')).toBe(false)
+	})
+})
+
+describe('isSiteCreditLine, when the line or the name says too little', () => {
+	it('should refuse a line that is the name alone, and a name that is empty', () => {
+		// GIVEN the name quoted with no label left beside it
+		expect(isSiteCreditLine('Thierry Laroche', 'Thierry Laroche')).toBe(false)
+		// AND a contact with no name to take out of the line
+		expect(isSiteCreditLine('Photographie', '')).toBe(false)
+		expect(isSiteCreditLine('Photographie (Bordeaux)', '(Bordeaux)')).toBe(
+			false,
+		)
+	})
+
+	it('should read the line with the aside off the name', () => {
+		// GIVEN a name carrying an aside the page does not repeat
+		expect(
+			isSiteCreditLine(
+				'Photographie Thierry Laroche',
+				'Thierry Laroche (Bordeaux)',
+			),
+		).toBe(true)
 	})
 })

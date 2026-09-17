@@ -40,6 +40,31 @@ const TEAM_HINTS = [
 	'equip',
 	'leaders',
 ]
+// The legal notice, in the spellings the markets this serves use. A small
+// firm often names its owner or manager nowhere else: German law puts the
+// managing directors in the Impressum, French law the publication director
+// in the mentions légales, and a Spanish or Italian site does the same for
+// the administrator. The German one was the only one here, so a leader named
+// only in a legal notice was reachable in Germany and nowhere else.
+const LEGAL_NOTICE_HINTS = [
+	'impressum',
+	'mentions-legales',
+	'aviso-legal',
+	'avis-legal',
+	'note-legali',
+	'legal-notice',
+	'informacion-legal',
+]
+
+/**
+ * Whether an address is a site's legal notice: the page the law makes name the
+ * company's director, and where the site's makers are credited beside them.
+ */
+export const isLegalNoticePath = (url: string): boolean => {
+	const path = (pathOf(url) ?? url).toLowerCase()
+	return LEGAL_NOTICE_HINTS.some(hint => path.includes(hint))
+}
+
 const ABOUT_HINTS = [
 	'about',
 	'company',
@@ -53,19 +78,7 @@ const ABOUT_HINTS = [
 	'uber-uns',
 	'who-we-are',
 	'sobre',
-	// The legal notice, in the spellings the markets this serves use. A small
-	// firm often names its owner or manager nowhere else: German law puts the
-	// managing directors in the Impressum, French law the publication director
-	// in the mentions légales, and a Spanish or Italian site does the same for
-	// the administrator. The German one was the only one here, so a leader named
-	// only in a legal notice was reachable in Germany and nowhere else.
-	'impressum',
-	'mentions-legales',
-	'aviso-legal',
-	'avis-legal',
-	'note-legali',
-	'legal-notice',
-	'informacion-legal',
+	...LEGAL_NOTICE_HINTS,
 ]
 const CONTACT_HINTS = ['contact', 'contacto', 'contacte', 'kontakt', 'contatti']
 

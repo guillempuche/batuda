@@ -740,7 +740,7 @@ const mergeScanRows = (
  * already known, adds anyone new, and fills in a title for someone who had none,
  * so a second look can only ever leave the list better than it found it.
  */
-export const mergePerFieldSearch = (
+const mergePerFieldFacts = (
 	findings: unknown,
 	refreshed: unknown,
 	schemaName: string,
@@ -809,3 +809,81 @@ export const mergePerFieldSearch = (
 		folded: 0,
 	}
 }
+
+// The lists a run hands back to the CRM rather than facts it found: what to
+// write, what to buy, what is already on file.
+const NEWS_LISTS = [
+	'proposed_updates',
+	'pending_paid_actions',
+	'discovered_existing',
+] as const
+
+// What tells two entries of one list apart: a proposed write by what it writes
+// and to whom, every other entry by the whole of it minus the id and status a
+// run stamps on each extraction anew.
+const newsKey = (entry: unknown): string => {
+	if (!isPlainObject(entry)) return JSON.stringify(entry)
+	if ('subject_table' in entry || 'operation' in entry) {
+		// The values as well as the names: two people a round proposes as new
+		// share every field name and no subject, and differ only in what the
+		// fields say.
+		const fields = entry['fields']
+		const written = isPlainObject(fields)
+			? JSON.stringify(
+					Object.keys(fields)
+						.sort()
+						.map(key => [key, unwrapValue(fields[key])]),
+				)
+			: JSON.stringify(fields)
+		return `${String(entry['subject_table'])}|${String(entry['subject_id'])}|${String(entry['operation'])}|${written}`
+	}
+	const { id: _id, status: _status, ...rest } = entry
+	return JSON.stringify(rest)
+}
+
+// Each list with the entries the wider read handed back put onto it: one the
+// list already holds, by what it says, is left out; every other is added. A
+// round that fills a field also proposes the write for it, and a fold that kept
+// the field and lost the proposal handed a person a value nobody could apply.
+const withNewsAdded = (
+	merge: PerFieldMerge,
+	refreshed: unknown,
+): PerFieldMerge => {
+	if (!isPlainObject(merge.findings) || !isPlainObject(refreshed)) return merge
+	let findings: Record<string, unknown> = merge.findings
+	let changed = false
+	for (const list of NEWS_LISTS) {
+		const found = refreshed[list]
+		if (!Array.isArray(found) || found.length === 0) continue
+		const held = findings[list]
+		const base: ReadonlyArray<unknown> = Array.isArray(held) ? held : []
+		const seen = new Set(base.map(newsKey))
+		const added = found.filter(entry => {
+			const key = newsKey(entry)
+			if (seen.has(key)) return false
+			seen.add(key)
+			return true
+		})
+		if (added.length === 0) continue
+		findings = { ...findings, [list]: [...base, ...added] }
+		changed = true
+	}
+	return changed ? { ...merge, findings } : merge
+}
+
+/**
+ * The findings with what a wider read filled folded in — its facts, its people
+ * and the news it hands back to the CRM. See `mergePerFieldFacts` for how each
+ * field and person is settled.
+ */
+export const mergePerFieldSearch = (
+	findings: unknown,
+	refreshed: unknown,
+	schemaName: string,
+	runWords: RunWords,
+	attributes: ReadonlyArray<ResearchAttributeDeclaration> = [],
+): PerFieldMerge =>
+	withNewsAdded(
+		mergePerFieldFacts(findings, refreshed, schemaName, runWords, attributes),
+		refreshed,
+	)

@@ -131,7 +131,10 @@ describe('bindContactsToEntity', () => {
 			// GIVEN null targets
 			const findings = {
 				contacts: [
-					{ name: 'X', role: { value: 'VP', quote: 'X, VP at Other Corp' } },
+					{
+						name: 'Xavi Roca',
+						role: { value: 'VP', quote: 'Xavi Roca, VP at Other Corp' },
+					},
 				],
 			}
 

@@ -4,9 +4,10 @@
  * `disqualifiers` and `fit_checks` each carry an `evidence_quote` + `source_id`,
  * but no other guard reads them — so a confident model could disqualify a company
  * or mark a fit criterion failed on a quote that appears in no fetched page,
- * shipping a fabricated "auditable" trail to the salesperson. This checks each
- * quote against the evidence (the same fuzzy salient-token match the scalar guard
- * uses, so a lightly-reworded real quote still passes) and:
+ * shipping a fabricated "auditable" trail to the salesperson. This holds each
+ * quote to the evidence run for run — the same rule a title or an attribute
+ * answers to, so a remark of the model's own ("no indication of high-volume
+ * RFQs") reads as fabricated however many of its words some page shares — and:
  *  - drops a disqualifier whose quote is fabricated — an unsupported negative
  *    claim about the company must not stand;
  *  - downgrades a fit check with a fabricated quote to `unknown` and clears the
@@ -20,7 +21,7 @@
  */
 
 import { isPlainObject } from './guard-shapes'
-import { isInCorpus } from './scalar-field-guard'
+import { quoteIsVerbatim } from './scalar-field-guard'
 
 export interface FitEvidenceResult {
 	readonly findings: unknown
@@ -40,12 +41,12 @@ export const guardFitEvidence = (
 	if (lowerCorpus.trim().length === 0)
 		return { findings, droppedDisqualifiers: 0, unverifiedChecks: 0 }
 
-	// A quote is fabricated when it is present but most of its salient tokens are
-	// not in the evidence. An absent/blank quote can't be refuted, so it passes.
+	// A quote is fabricated when it is present and its words do not run through
+	// the evidence as written. An absent/blank quote can't be refuted, so it passes.
 	const quoteFabricated = (quote: unknown): boolean =>
 		typeof quote === 'string' &&
 		quote.trim() !== '' &&
-		!isInCorpus(quote, lowerCorpus)
+		!quoteIsVerbatim(quote, lowerCorpus)
 
 	let droppedDisqualifiers = 0
 	let unverifiedChecks = 0

@@ -91,6 +91,14 @@
  * a nuisance on a list somebody reads; a wrong fold takes a real company off it with
  * nothing said, and — since a row is confirmed by the websites naming it — hands the
  * survivor evidence gathered about somebody else.
+ *
+ * One pair on a shared host is folded without the domain spelling either of them:
+ * two names that are the same letters give or take a few — "Decolletaje Sabadell"
+ * beside "Decoletatge Sabadell", one company written in two languages on one site.
+ * Two companies that different rarely share a site, and two that are one company
+ * read this way often; the host has to be the rows' own kind of address rather
+ * than a platform's, and the names have to be long enough for a few letters to be
+ * a small share of them. See `nearlyTheSameName`.
  */
 
 import { mergeContacts, type RawContact } from './contacts-rescue'
@@ -109,6 +117,7 @@ import { ownSiteVerdict } from './own-site'
 import { rowGroups } from './row-groups'
 import { MARKS_FIELD, OUTSIDE_PLACE_REASON_FIELD } from './row-marks'
 import type { RunWords } from './run-words'
+import { isSocialPlatformHost } from './social-sites'
 import { hostOf, isBareWebAddress } from './source-key'
 
 // What marks a key as filing a row under its site. Written once, because a caller
@@ -118,7 +127,7 @@ const SITE_KEY_PREFIX = 'host:'
 // The host of a row's own site, or null when the field holds nothing an address can
 // be read from. Null is also what a branch page looks like: it is the head office
 // that registers the domain, and the branch is a page on it at most.
-const siteHostOf = (row: Record<string, unknown>): string | null => {
+export const siteHostOf = (row: Record<string, unknown>): string | null => {
 	const website = readTextValue(row['website'])
 	return website !== null && isBareWebAddress(website) ? hostOf(website) : null
 }
@@ -192,6 +201,98 @@ export const hostsEstablishedAsOwn = (
 			hosts.add(host)
 	}
 	return hosts
+}
+
+// A word has to be this long before a few letters' difference can be a slip of
+// spelling rather than another word: "solar" and "sonar" are one letter and two
+// things. Past that, one letter in three may differ — "decolletaje" beside
+// "decoletatge", a Spanish and a Catalan spelling of one trade.
+const SPELLING_WORD_MIN_LETTERS = 8
+const SPELLING_TOLERANCE = 1 / 3
+
+// The fewest edits (a letter added, dropped or swapped) that turn one word into
+// the other, given up early once past `limit` — the answer is only ever compared
+// against it.
+const editsBetween = (one: string, other: string, limit: number): number => {
+	if (Math.abs(one.length - other.length) > limit) return limit + 1
+	let previous = Array.from({ length: other.length + 1 }, (_, at) => at)
+	for (let row = 1; row <= one.length; row++) {
+		const current = [row]
+		let least = row
+		for (let column = 1; column <= other.length; column++) {
+			const cost = one[row - 1] === other[column - 1] ? 0 : 1
+			const edits = Math.min(
+				(previous[column] ?? 0) + 1,
+				(current[column - 1] ?? 0) + 1,
+				(previous[column - 1] ?? 0) + cost,
+			)
+			current.push(edits)
+			if (edits < least) least = edits
+		}
+		if (least > limit) return limit + 1
+		previous = current
+	}
+	return previous[other.length] ?? limit + 1
+}
+
+// Whether two words are one word spelled twice: the same, or long ones a few
+// letters apart.
+const nearlyTheSameWord = (one: string, other: string): boolean => {
+	if (one === other) return true
+	const shorter = Math.min(one.length, other.length)
+	if (shorter < SPELLING_WORD_MIN_LETTERS) return false
+	const limit = Math.floor(shorter * SPELLING_TOLERANCE)
+	return editsBetween(one, other, limit) <= limit
+}
+
+/**
+ * Whether two names are one name spelled twice: the same words, once the legal
+ * form is off the end, with each word the same or a long word a few letters
+ * apart. Word by word rather than over the whole name, so the letters that
+ * differ have to be a slip inside one word — "Instalaciones Pérez" beside
+ * "Instalaciones Gómez" shares a trade and differs in the whole of the name.
+ * Only asked of two rows that share a site, which is what makes a spelling
+ * slip read as one company.
+ */
+export const nearlyTheSameName = (one: string, other: string): boolean => {
+	const words = nameCoreTokens(withoutFormDots(one))
+	const otherWords = nameCoreTokens(withoutFormDots(other))
+	if (words.length === 0 || words.length !== otherWords.length) return false
+	return words.every((word, at) =>
+		nearlyTheSameWord(word, otherWords[at] ?? ''),
+	)
+}
+
+// The rows sharing a site that the domain spells for neither, joined where their
+// names are one name spelled twice. A platform's host is nobody's own site, and
+// a row with no address or no name of its own shares nothing.
+const spellingPairsOnSharedHosts = (
+	rows: ReadonlyArray<unknown>,
+	ownSiteHosts: ReadonlySet<string>,
+): ReadonlyArray<readonly [number, number]> => {
+	const namedByHost = new Map<
+		string,
+		Array<{ readonly at: number; readonly name: string }>
+	>()
+	rows.forEach((row, at) => {
+		if (!isPlainObject(row) || typeof row['name'] !== 'string') return
+		const host = siteHostOf(row)
+		if (host === null || ownSiteHosts.has(host) || isSocialPlatformHost(host))
+			return
+		const listed = namedByHost.get(host) ?? []
+		listed.push({ at, name: row['name'] })
+		namedByHost.set(host, listed)
+	})
+	const pairs: Array<readonly [number, number]> = []
+	for (const listed of namedByHost.values()) {
+		listed.forEach((one, first) => {
+			for (const other of listed.slice(first + 1)) {
+				if (nearlyTheSameName(one.name, other.name))
+					pairs.push([one.at, other.at])
+			}
+		})
+	}
+	return pairs
 }
 
 /**
@@ -673,6 +774,11 @@ export const dedupeDiscoveryRows = (
 				else sameCompany(seen, at)
 			}
 		})
+		for (const [first, second] of spellingPairsOnSharedHosts(
+			rows,
+			ownSiteHosts,
+		))
+			sameCompany(first, second)
 		const parentOfBranch = branchOfficeParents(rows)
 		for (const [branch, parent] of parentOfBranch) sameCompany(parent, branch)
 		const parentOfNote = bracketedNoteParents(rows, ownSiteHosts)

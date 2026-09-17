@@ -52,6 +52,35 @@ describe('guardFitEvidence', () => {
 		})
 	})
 
+	describe('when a disqualifier writes the page’s words into a line of its own', () => {
+		it('should drop it — sharing the words is not quoting the line', () => {
+			// GIVEN a line whose every word is on the page, in an order the page
+			// never wrote, beside the page's own line
+			const findings = {
+				disqualifiers: [
+					{
+						rule: 'too small a fleet',
+						evidence_quote: 'Acme Freight operates 40 owned trucks',
+						source_id: 'https://acme.example/about',
+					},
+				],
+				fit_checks: [
+					{
+						criterion: 'refrigerated freight',
+						result: 'pass',
+						evidence_quote: 'refrigerated loads for regional grocers',
+						source_id: 'https://acme.example/about',
+					},
+				],
+			}
+
+			// WHEN guarded — THEN the rewritten line goes and the copied one stays
+			const out = guardFitEvidence(findings, CORPUS)
+			expect(out.droppedDisqualifiers).toBe(1)
+			expect(out.unverifiedChecks).toBe(0)
+		})
+	})
+
 	describe('when a fit check asserts pass/fail on a fabricated quote', () => {
 		it('should downgrade it to unknown and clear the quote', () => {
 			// GIVEN a "fail" check whose quote appears in no page
@@ -88,6 +117,21 @@ describe('guardFitEvidence', () => {
 			}
 
 			// WHEN guarded — THEN nothing is dropped or downgraded
+			const out = guardFitEvidence(findings, CORPUS)
+			expect(out.droppedDisqualifiers).toBe(0)
+			expect(out.unverifiedChecks).toBe(0)
+		})
+
+		it('should read a blank quote as no quote at all', () => {
+			// GIVEN the quote written as an empty string rather than left out
+			const findings = {
+				disqualifiers: [{ rule: 'too small', evidence_quote: '' }],
+				fit_checks: [
+					{ criterion: 'sector match', result: 'pass', evidence_quote: '   ' },
+				],
+			}
+
+			// WHEN guarded — THEN neither is refuted on nothing
 			const out = guardFitEvidence(findings, CORPUS)
 			expect(out.droppedDisqualifiers).toBe(0)
 			expect(out.unverifiedChecks).toBe(0)
