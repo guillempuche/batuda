@@ -203,6 +203,8 @@ jobs:
               -f name,state
 
       - name: Verify deployment
+        env:
+          MONITORING_API_KEY: ${{ secrets.MONITORING_API_KEY }}
         run: |
           sleep 5
           # Read without -f, this prints the instance's entire environment in
@@ -252,6 +254,42 @@ jobs:
               exit 1
             fi
           fi
+
+          # This process answers no requests, so an alert on a gap in its
+          # heartbeat is the only thing that would ever say it died. Nothing
+          # else would notice that alert being deleted, and a comment claiming
+          # one existed went unchallenged for two months, so the claim is
+          # checked here rather than trusted. Only the alert's name is matched;
+          # nothing read is printed.
+          # Being set up wrong stops the job; the vendor having a bad minute only
+          # warns. A missing key is our own mistake and stays broken until
+          # somebody is made to look at it, which a warning never achieves.
+          if [ -z "${MONITORING_API_KEY:-}" ]; then
+            echo "::error::MONITORING_API_KEY is not set for this job, so the heartbeat alert cannot be checked. It belongs on the production environment, the one this job runs in."
+            exit 1
+          fi
+          status="$(curl -s -o "$RUNNER_TEMP/alerts.json" -w '%{http_code}' \
+                      -H "X-Honeycomb-Team: $MONITORING_API_KEY" \
+                      https://api.eu1.honeycomb.io/1/triggers/batuda-mail-worker || echo 000)"
+          case "$status" in
+            200)
+              if ! grep -q 'heartbeat stopped' "$RUNNER_TEMP/alerts.json"; then
+                echo "::error::No alert on this worker's heartbeat, so nothing would report it dying. It is matched by name, so a rename counts as gone here — restore the name or update this check."
+                rm -f "$RUNNER_TEMP/alerts.json"
+                exit 1
+              fi
+              ;;
+            401 | 403)
+              echo "::error::The monitoring key was refused (HTTP $status). It has to be a configuration key with the Triggers permission; an ingest key cannot read alerts."
+              rm -f "$RUNNER_TEMP/alerts.json"
+              exit 1
+              ;;
+            *)
+              echo "::warning::Could not reach the alerts API (HTTP $status), so the heartbeat alert went unchecked"
+              ;;
+          esac
+          rm -f "$RUNNER_TEMP/alerts.json"
+
           # The worker's console is deliberately not read here. Asking for it by
           # name makes the CLI ask every metro and fail over the ones the
           # instance is not in, so it has never once returned a line (checked

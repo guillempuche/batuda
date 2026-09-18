@@ -207,10 +207,20 @@ As a solo operation there is no on-call rotation or war room. Two questions matt
 
 **Start with few, high-signal alerts.** Alert fatigue is worse than no alerts.
 
+**Built, and firing today:**
+
+| Alert                  | Condition                                      | Severity |
+| ---------------------- | ---------------------------------------------- | -------- |
+| **Telemetry Silent**   | No spans from any prod dataset over 15 min     | Critical |
+| **Mail Worker Silent** | Under 5 `mail_worker.heartbeat` logs in 15 min | Critical |
+
+**Wanted, not built.** Nothing below exists — no alert, no recipient, nobody told.
+Written down because the thinking is worth keeping, not because it is watching:
+
 | Alert                | Condition                                     | Severity |
 | -------------------- | --------------------------------------------- | -------- |
+| **Server Silent**    | Under 5 `server.heartbeat` logs in 15 min     | Critical |
 | **API Down**         | Health check fails for > 2 min                | Critical |
-| **Telemetry Silent** | No spans from any prod dataset over 15 min    | Critical |
 | **High Error Rate**  | > 10% API 5xx responses in 15 min             | High     |
 | **Email Failures**   | > 5 consecutive email send failures           | High     |
 | **Mailbox Refused**  | The same mailbox fails its check for > 30 min | High     |
@@ -226,6 +236,18 @@ Mail Not Syncing catches the other way a tenant goes quiet: the credentials are 
 Checks Stopped is what makes the silence of a passing check safe to rely on, since a round that never runs writes nothing and a round that finds nothing wrong now writes one line.
 
 **When counting these, filter on `meta.signal_type`.** A business event inside a request leaves both a log record and a span, by design — so a count that does not pick one reads exactly double, and a threshold written that way means half what it says.
+
+**One alert for the whole environment cannot say which process died.**
+Worse, it cannot always tell that one did: it asks whether *anything* is still arriving, and each process is loud enough to answer for both, so a dead mail worker sat behind a chatty API server raises nothing.
+That is why each process sends a pulse of its own once a minute — `mail_worker.heartbeat`, `server.heartbeat` — and each is watched for a gap separately.
+Requests cannot play that part for the API server: whole quarter-hours pass overnight with no traffic, so a watch on request volume would cry wolf on a quiet night.
+Both pulses are written at `info`; raising `MIN_LOG_LEVEL` above it would delete the only ongoing sign either process is alive.
+
+Thresholds come from what the pulse actually does, not from a guess: the worker's floor was 13.8 per 15 minutes across seven days and two deploys, so it is held to 5 — silence of more than ten minutes, with room for a restart.
+
+Watching for absence borrows two assumptions from how these processes are hosted.
+The first is that they stay awake: scale-to-zero is off for both, so a quiet instance is a running one, and turning it back on would make a sleeping process read as a dead one.
+The second is the instance's clock, because each pulse is filed under the time the instance claims it happened — which is the other reason a stopped instance is redeployed rather than started, since a resumed one carries a clock that stopped with it and would drop its pulses into the wrong window, reading as silence or hiding a real gap.
 
 **Telemetry Silent is the one alert that cannot be raised from inside.** Every other row above is a question asked of the records, so it needs the records to be arriving. This one has to be evaluated by the vendor, environment-wide, so it still fires when the services are stopped or cut off and cannot report for themselves — the gap that let the 2026-08-31 outage run seven hours unnoticed while `/health` answered 200 throughout. Note the consequence: once it fires it stays fired until export is restored, so it cannot warn about a second outage in the meantime.
 

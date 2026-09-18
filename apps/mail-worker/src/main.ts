@@ -35,11 +35,12 @@ const program = Effect.gen(function* () {
 		new Map(),
 	)
 
-	// Liveness signal. A dead/crash-looping worker exports no telemetry, so a
-	// Honeycomb absence trigger watches for a gap in this event. The scan tick
-	// fires every 5s; throttle the heartbeat to ~1/min so it stays a cheap
-	// "still alive" pulse rather than per-tick noise. Starts at 0 so the first
-	// tick emits immediately (a boot heartbeat).
+	// Liveness signal. This process answers no requests and a dead one sends
+	// nothing at all, so a gap in this event is the only ongoing sign that it
+	// stopped. The scan tick fires every 5s; throttle the heartbeat to ~1/min so
+	// it stays a cheap "still alive" pulse rather than per-tick noise. Starts at
+	// 0 so the first tick emits immediately (a boot heartbeat). Kept at `info`
+	// deliberately: raising MIN_LOG_LEVEL above it deletes the signal.
 	const HEARTBEAT_INTERVAL_MS = 60_000
 	const lastHeartbeatAt = yield* Ref.make(0)
 	const emitHeartbeat = Effect.gen(function* () {
