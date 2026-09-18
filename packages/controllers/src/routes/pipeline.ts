@@ -115,7 +115,8 @@ export const PRIORITY_AT_LEAST_BOUNDS = {
 
 // Shared with the company list, which takes the same threshold on its own
 // attention filter so a link from the dashboard carries the number it was
-// showing rather than falling back to the default.
+// showing rather than falling back to the default — and with the conversation
+// list, where the same number is how long a conversation has gone quiet.
 export const StaleDays = Schema.FiniteFromString.pipe(
 	Schema.check(Schema.isInt(), Schema.isBetween(STALE_DAYS_BOUNDS)),
 )

@@ -13,6 +13,10 @@ interface InboxSpec {
 	// What the mailbox is for, in the words its owner would use.
 	readonly description: string
 	readonly isDefault: boolean
+	// A mailbox one person keeps to themselves. Mail in it reaches nobody else,
+	// so the seed carries one: without it, nothing local ever exercises the
+	// rule, and a screen that leaks private mail looks fine on demo data.
+	readonly isPrivate?: boolean
 	readonly footerText: string
 	readonly grantStatus:
 		| 'connected'
@@ -36,6 +40,7 @@ const RESTAURANT_AGENT_INBOX_ID = '44444444-4444-4444-8444-444444444444'
 const TALLER_AUTH_FAILED_INBOX_ID = '55555555-5555-4555-8555-555555555555'
 const TALLER_CONNECT_FAILED_INBOX_ID = '66666666-6666-4666-8666-666666666666'
 const TALLER_DISABLED_INBOX_ID = '77777777-7777-4777-8777-777777777777'
+const TALLER_PRIVATE_INBOX_ID = '88888888-8888-4888-8888-888888888888'
 
 export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 	Effect.gen(function* () {
@@ -94,6 +99,18 @@ export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 				isDefault: false,
 				footerText: '— Taller Demo',
 				grantStatus: 'connect_failed',
+			},
+			{
+				id: TALLER_PRIVATE_INBOX_ID,
+				email: 'alice.private@taller.cat',
+				displayName: 'Alice (private)',
+				ownerEmail: 'admin@taller.cat',
+				orgId: tallerOrgId,
+				description: 'Alice’s own mailbox, not the team’s',
+				isDefault: false,
+				isPrivate: true,
+				footerText: '— Alice',
+				grantStatus: 'connected',
 			},
 			{
 				id: TALLER_DISABLED_INBOX_ID,
@@ -187,7 +204,7 @@ export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 					description: spec.description,
 					ownerUserId: ownerId,
 					isDefault: spec.isDefault,
-					isPrivate: false,
+					isPrivate: spec.isPrivate ?? false,
 					active: true,
 					imapHost: 'localhost',
 					imapPort: 1143,

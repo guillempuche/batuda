@@ -143,19 +143,16 @@ describe('email_messages.attachments storage contract', () => {
 			},
 		])
 
+		// No thread link is created for this message, so it stands as its
+		// own conversation: thread_key is its own message id.
+		const externalMessageId = `<test-${messageId}@example.com>`
 		await pool.query(
 			`INSERT INTO email_messages
-			   (id, organization_id, inbox_id, message_id, direction, folder,
+			   (id, organization_id, inbox_id, message_id, thread_key, direction, folder,
 			    raw_rfc822_ref, subject, attachments, status)
-			 VALUES ($1::uuid, $2, $3::uuid, $4, 'inbound', 'INBOX',
+			 VALUES ($1::uuid, $2, $3::uuid, $4, $4, 'inbound', 'INBOX',
 			         'sentinel', 'attachment test', $5::jsonb, 'normal')`,
-			[
-				messageId,
-				FIXTURE_ORG_ID,
-				inboxId,
-				`<test-${messageId}@example.com>`,
-				attachments,
-			],
+			[messageId, FIXTURE_ORG_ID, inboxId, externalMessageId, attachments],
 		)
 		return { messageId, storageKey }
 	}
@@ -214,19 +211,15 @@ describe('email_messages.attachments storage contract', () => {
 					storageKey: ghostKey,
 				},
 			])
+			// No thread link either, so thread_key is this message's own id.
+			const externalMessageId = `<ghost-${messageId}@example.com>`
 			await pool.query(
 				`INSERT INTO email_messages
-				   (id, organization_id, inbox_id, message_id, direction, folder,
+				   (id, organization_id, inbox_id, message_id, thread_key, direction, folder,
 				    raw_rfc822_ref, subject, attachments, status)
-				 VALUES ($1::uuid, $2, $3::uuid, $4, 'inbound', 'INBOX',
+				 VALUES ($1::uuid, $2, $3::uuid, $4, $4, 'inbound', 'INBOX',
 				         'sentinel', 'ghost', $5::jsonb, 'normal')`,
-				[
-					messageId,
-					FIXTURE_ORG_ID,
-					inboxId,
-					`<ghost-${messageId}@example.com>`,
-					attachments,
-				],
+				[messageId, FIXTURE_ORG_ID, inboxId, externalMessageId, attachments],
 			)
 
 			// WHEN we GET the missing key

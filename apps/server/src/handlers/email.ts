@@ -2,13 +2,14 @@ import { Effect, Stream } from 'effect'
 import { HttpServerResponse, Multipart } from 'effect/unstable/http'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 
-import { BatudaApi, SessionContext } from '@batuda/controllers'
+import { BadRequest, BatudaApi, SessionContext } from '@batuda/controllers'
 
 import { EmailService } from '../services/email'
 import {
 	EmailAttachmentStaging,
 	type StagingRef,
 } from '../services/email-attachment-staging'
+import { checkDateRange } from '../services/email-list-filters'
 
 export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 	Effect.gen(function* () {
@@ -116,18 +117,59 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 					),
 				)
 				.handle('listThreads', _ =>
-					svc.listThreads({
-						...(_.query.inboxId !== undefined && {
-							inboxId: _.query.inboxId,
-						}),
-						...(_.query.companyId !== undefined && {
-							companyId: _.query.companyId,
-						}),
-						...(_.query.status !== undefined && { status: _.query.status }),
-						...(_.query.query !== undefined && { query: _.query.query }),
-						...(_.query.limit !== undefined && { limit: _.query.limit }),
-						...(_.query.offset !== undefined && { offset: _.query.offset }),
-						...(_.query.count !== undefined && { count: _.query.count }),
+					Effect.gen(function* () {
+						// A range that can only find nothing is refused in words, so
+						// nobody reads an empty page as "you have none of those".
+						const refused = checkDateRange({
+							...(_.query.lastMessageAfter !== undefined && {
+								after: _.query.lastMessageAfter,
+							}),
+							...(_.query.lastMessageBefore !== undefined && {
+								before: _.query.lastMessageBefore,
+							}),
+							names: ['lastMessageAfter', 'lastMessageBefore'],
+						})
+						if (refused) {
+							return yield* new BadRequest({ message: refused.refused })
+						}
+						return yield* svc.listThreads({
+							...(_.query.inboxId !== undefined && {
+								inboxId: _.query.inboxId,
+							}),
+							...(_.query.companyId !== undefined && {
+								companyId: _.query.companyId,
+							}),
+							...(_.query.contactId !== undefined && {
+								contactId: _.query.contactId,
+							}),
+							...(_.query.status !== undefined && { status: _.query.status }),
+							...(_.query.waitingOn !== undefined && {
+								waitingOn: _.query.waitingOn,
+							}),
+							...(_.query.unread !== undefined && {
+								unread: _.query.unread === 'true',
+							}),
+							...(_.query.quietDays !== undefined && {
+								quietDays: _.query.quietDays,
+							}),
+							...(_.query.lastMessageAfter !== undefined && {
+								lastMessageAfter: _.query.lastMessageAfter,
+							}),
+							...(_.query.lastMessageBefore !== undefined && {
+								lastMessageBefore: _.query.lastMessageBefore,
+							}),
+							...(_.query.hasAttachments !== undefined && {
+								hasAttachments: _.query.hasAttachments === 'true',
+							}),
+							...(_.query.companyOwner !== undefined && {
+								companyOwner: _.query.companyOwner,
+							}),
+							...(_.query.sort !== undefined && { sort: _.query.sort }),
+							...(_.query.query !== undefined && { query: _.query.query }),
+							...(_.query.limit !== undefined && { limit: _.query.limit }),
+							...(_.query.offset !== undefined && { offset: _.query.offset }),
+							...(_.query.count !== undefined && { count: _.query.count }),
+						})
 					}),
 				)
 				.handle('getThread', _ =>
@@ -161,25 +203,57 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 					svc.markThreadUnread(_.params.threadId),
 				)
 				.handle('listMessages', _ =>
-					svc.listMessages({
-						...(_.query.contactId !== undefined && {
-							contactId: _.query.contactId,
-						}),
-						...(_.query.companyId !== undefined && {
-							companyId: _.query.companyId,
-						}),
-						...(_.query.status !== undefined && {
-							status: _.query.status,
-						}),
-						...(_.query.limit !== undefined && {
-							limit: _.query.limit,
-						}),
-						...(_.query.offset !== undefined && {
-							offset: _.query.offset,
-						}),
-						...(_.query.count !== undefined && {
-							count: _.query.count,
-						}),
+					Effect.gen(function* () {
+						const refused = checkDateRange({
+							...(_.query.receivedAfter !== undefined && {
+								after: _.query.receivedAfter,
+							}),
+							...(_.query.receivedBefore !== undefined && {
+								before: _.query.receivedBefore,
+							}),
+							names: ['receivedAfter', 'receivedBefore'],
+						})
+						if (refused) {
+							return yield* new BadRequest({ message: refused.refused })
+						}
+						return yield* svc.listMessages({
+							...(_.query.contactId !== undefined && {
+								contactId: _.query.contactId,
+							}),
+							...(_.query.companyId !== undefined && {
+								companyId: _.query.companyId,
+							}),
+							...(_.query.inboxId !== undefined && {
+								inboxId: _.query.inboxId,
+							}),
+							...(_.query.status !== undefined && {
+								status: _.query.status,
+							}),
+							...(_.query.direction !== undefined && {
+								direction: _.query.direction,
+							}),
+							...(_.query.bounceType !== undefined && {
+								bounceType: _.query.bounceType,
+							}),
+							...(_.query.receivedAfter !== undefined && {
+								receivedAfter: _.query.receivedAfter,
+							}),
+							...(_.query.receivedBefore !== undefined && {
+								receivedBefore: _.query.receivedBefore,
+							}),
+							...(_.query.query !== undefined && {
+								query: _.query.query,
+							}),
+							...(_.query.limit !== undefined && {
+								limit: _.query.limit,
+							}),
+							...(_.query.offset !== undefined && {
+								offset: _.query.offset,
+							}),
+							...(_.query.count !== undefined && {
+								count: _.query.count,
+							}),
+						})
 					}),
 				)
 				.handle('getMessage', _ =>

@@ -71,3 +71,17 @@ Read `verification` on the channels a contact carries (`list_contacts`) before c
 A batch is where this matters: finding out one address at a time, after writing each message, wastes the writing.
 
 Note that the verdict is read from **the address being written to**, not from the person — so a contact with a cleared default address and a second address marked `risky` will still stop a send addressed to the second one.
+
+# Finding the conversations that need work
+
+`list_email_threads` answers the daily questions directly, so filter rather than reading a page and sorting it yourself.
+
+- **"Who needs a reply?"** — `waiting_on: "us"`: open conversations where they wrote last and nobody has answered. Junk and delivery failure notices do not count as somebody waiting.
+- **"Who have we heard nothing from?"** — `waiting_on: "them"` with `quiet_days` (14 is a fortnight). A send that bounced is not awaiting their answer; it is waiting for a working address.
+- **"What is mine?"** — `company_owner` takes user ids from `list_members`, and `"none"` for companies nobody has taken. Pass both for "mine plus what is going spare".
+- **"Anything unread?"** — `unread: true`.
+- **"Who at this customer?"** — `participant` takes one address, or a whole domain written as `@acme.com`.
+
+`waiting_on` reads only open conversations, so pairing it with `status: ["closed"]` finds nothing at all — say so rather than reporting an empty list as "none".
+
+Mail in a colleague's private mailbox never appears in any of this, and an API key reads as the person who created it.

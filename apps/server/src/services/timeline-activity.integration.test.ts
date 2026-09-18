@@ -37,6 +37,10 @@ const FIXTURE_SLUG = `cadence-${randomUUID()}`
 let pool: pg.Pool
 let tallerOrgId: string
 let companyId: string
+// A message a history entry can be about. An entry naming one nobody has is
+// refused, so the email events below have to point at a message that is there.
+let inboxId: string
+let emailMessageId: string
 
 beforeAll(async () => {
 	pool = new pg.Pool({ connectionString: DATABASE_URL, max: 4 })
@@ -56,6 +60,32 @@ beforeAll(async () => {
 		[tallerOrgId, FIXTURE_SLUG],
 	)
 	companyId = company.rows[0]!.id
+
+	// A shared mailbox and one message in it, so the email events below name a
+	// message the team can see.
+	const inbox = await pool.query<{ id: string }>(
+		`INSERT INTO inboxes
+		 (organization_id, owner_user_id, email, is_private,
+		  imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security,
+		  username, password_ciphertext, password_nonce, password_tag)
+		 VALUES ($1, NULL, $2, false,
+		         'imap.test', 993, 'tls', 'smtp.test', 465, 'tls',
+		         $2, '\\x00'::bytea, '\\x00'::bytea, '\\x00'::bytea)
+		 RETURNING id`,
+		[tallerOrgId, `${FIXTURE_SLUG}@cadence.test`],
+	)
+	inboxId = inbox.rows[0]!.id
+	const rfcId = `<${FIXTURE_SLUG}@cadence.test>`
+	const message = await pool.query<{ id: string }>(
+		`INSERT INTO email_messages
+		 (organization_id, inbox_id, message_id, thread_key, direction, folder,
+		  raw_rfc822_ref, subject, received_at, status)
+		 VALUES ($1, $2, $3, $3, 'outbound', 'Sent', 'cadence-test', 'cadence',
+		         now(), 'normal')
+		 RETURNING id`,
+		[tallerOrgId, inboxId, rfcId],
+	)
+	emailMessageId = message.rows[0]!.id
 }, 30_000)
 
 afterAll(async () => {
@@ -67,6 +97,8 @@ afterAll(async () => {
 		companyId,
 	])
 	await pool.query(`DELETE FROM companies WHERE id = $1`, [companyId])
+	await pool.query(`DELETE FROM email_messages WHERE id = $1`, [emailMessageId])
+	await pool.query(`DELETE FROM inboxes WHERE id = $1`, [inboxId])
 	await pool.end()
 })
 
@@ -142,7 +174,7 @@ describe('TimelineActivityService.record', () => {
 			const t1 = new Date(Date.now() - 3_600_000)
 			const email = (occurredAt: Date) =>
 				new EmailSent({
-					emailMessageId: randomUUID(),
+					emailMessageId,
 					companyId,
 					contactId: null,
 					subject: 'cadence',

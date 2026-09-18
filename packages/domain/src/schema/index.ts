@@ -103,13 +103,23 @@ export {
 } from './documents'
 export { EmailDraft, EmailDraftId } from './email-drafts'
 export {
+	EMAIL_BOUNCE_TYPES,
+	EMAIL_DIRECTIONS,
+	EMAIL_MESSAGE_STATUSES,
+	EmailBounceType,
 	EmailDirection,
-	EmailMessage,
-	EmailMessageId,
 	EmailMessageStatus,
+	INBOUND_CLASSIFICATIONS,
 	InboundClassification,
 } from './email-messages'
-export { EmailThreadLink, EmailThreadLinkId } from './email-thread-links'
+export {
+	THREAD_SORTS,
+	THREAD_STATUSES,
+	THREAD_WAITING_ON,
+	ThreadSort,
+	ThreadStatus,
+	ThreadWaitingOn,
+} from './email-thread-links'
 export { InboxFooter, InboxFooterId } from './inbox-footers'
 export {
 	Inbox,
@@ -119,11 +129,7 @@ export {
 } from './inboxes'
 export { Interaction, InteractionId } from './interactions'
 export { isLangCode, LANG_CODES, LangCode } from './locales'
-export {
-	MessageParticipant,
-	MessageParticipantId,
-	ParticipantRole,
-} from './message-participants'
+export { PARTICIPANT_ROLES, ParticipantRole } from './message-participants'
 export { Page, PageId } from './pages'
 export { Product, ProductId } from './products'
 export { Proposal, ProposalId } from './proposals'

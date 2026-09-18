@@ -10,8 +10,19 @@ import {
 	EmailThreadListItem,
 	type NoDefaultInboxReason,
 	SessionContext,
+	STALE_DAYS_BOUNDS,
 } from '@batuda/controllers'
-import { EmailDraft, Inbox, InboxFooter } from '@batuda/domain'
+import {
+	EmailBounceType,
+	EmailDirection,
+	EmailDraft,
+	EmailMessageStatus,
+	Inbox,
+	InboxFooter,
+	ThreadSort,
+	ThreadStatus,
+	ThreadWaitingOn,
+} from '@batuda/domain'
 import { EmailBlocks } from '@batuda/email/schema'
 
 import { EmailService, smtpFailureReason } from '../../services/email'
@@ -19,6 +30,15 @@ import {
 	EmailAttachmentStaging,
 	type StagingRef,
 } from '../../services/email-attachment-staging'
+import {
+	checkDateRange,
+	parseParticipant,
+} from '../../services/email-list-filters'
+import {
+	answerable,
+	inThreadKey,
+	latestFirst,
+} from '../../services/email-threading-sql'
 import {
 	recipientAddresses,
 	replyAddressees,
@@ -107,7 +127,6 @@ const SendEmailResult = Schema.Union([
 // stay a JSON object (never bare void) alongside the entity/send members.
 const DeletedResult = Schema.Struct({ _tag: Schema.Literal('deleted') })
 
-const ThreadStatus = Schema.Literals(['open', 'closed', 'archived'])
 const Recipients = Schema.Union([Schema.String, Schema.Array(Schema.String)])
 
 // MCP attachments reference staged uploads — agents call
@@ -238,14 +257,55 @@ const StageEmailAttachment = Tool.make('stage_email_attachment', {
 
 const ListEmailThreads = Tool.make('list_email_threads', {
 	description:
-		'List email threads with filters. Returns an envelope {items, limit, offset, hasMore} — `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true. Each item carries message_count, last_message_at, last_message_direction, last_inbound_at, is_unread, and the linked inbox {email, displayName, description}. Supports search by subject (query) and status (open/closed/archived). Default limit is 100, max 500.',
+		'Filter email conversations by mailbox, company, the company\'s owner, contact, status, who is waiting for an answer, unread, how long they have been quiet, a date range on the latest message, an address or domain on them, whether they carry attachments, or a search. `status` takes a list and matches ANY of the values in it, while different filters narrow one another — so status ["open","closed"] with unread true is those two stages among the unread. `waiting_on` reads only conversations still open: "us" means they wrote last and nobody has answered, "them" means we wrote last and the message did not bounce; pairing it with status closed or archived finds nothing at all, because a settled conversation waits for nobody. `quiet_days` is how long since the latest message, so 14 is "not a word in a fortnight". `last_message_after` and `last_message_before` take a day (2026-09-01) or a moment that says its timezone (2026-09-01T09:00:00Z); after includes that instant and before stops just short of it. `participant` is one address, or a whole domain written as @acme.com, matched against everyone on a message — it is the precise form of what `query` does loosely. `company_owner` takes user ids from list_members and/or the word "none" for companies nobody has taken; a conversation with no company matches neither. `has_attachments` counts files somebody attached, not images inside the message; a message this system sent gets its list of attachments when the mailbox\'s Sent folder is next read, so a very recent send may not count yet. `sort` reads the list by recent activity (the default) or by the date of the latest message. `query` searches subject, preview, body and addresses. Returns an envelope {items, limit, offset, hasMore} — `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true. Each item carries message_count, last_message_at, last_message_direction, last_inbound_at, is_unread, and the linked inbox {email, displayName, description}. Mail in a colleague\'s private mailbox is not yours to read and never appears; an API key reads as the person who created it. Default limit is 100, max 500.',
 	parameters: Schema.Struct({
 		inbox_id: Schema.optionalKey(Schema.String).annotate({
 			description:
-				'Narrow to one mailbox, from list_email_inboxes. Leave it out to look across every mailbox you can see — unlike the tools that write a message, where leaving it out means the one you send from by default.',
+				'Narrow to one mailbox, from list_email_inboxes. A conversation is in a mailbox when one of its messages arrived there. Leave it out to look across every mailbox you can see — unlike the tools that write a message, where leaving it out means the one you send from by default.',
 		}),
 		company_id: Schema.optionalKey(Schema.String),
-		status: Schema.optionalKey(ThreadStatus),
+		contact_id: Schema.optionalKey(Schema.String).annotate({
+			description:
+				'The person a conversation is with, from list_contacts. Set when the conversation was matched to them, which is not every conversation.',
+		}),
+		status: Schema.optionalKey(Schema.Array(ThreadStatus)).annotate({
+			description:
+				'Any of these stages. An empty list is nobody asking rather than a stage nothing can meet.',
+		}),
+		waiting_on: Schema.optionalKey(ThreadWaitingOn).annotate({
+			description:
+				'Who owes the next message, among conversations still open: "us" is what needs a reply from this side, "them" is what has been answered and is awaiting theirs.',
+		}),
+		unread: Schema.optionalKey(Schema.Boolean).annotate({
+			description:
+				'true for conversations with mail nobody has read yet, false for the ones already read. A conversation with nothing but outgoing mail counts as read.',
+		}),
+		quiet_days: Schema.optionalKey(
+			Schema.Number.pipe(
+				Schema.check(Schema.isInt(), Schema.isBetween(STALE_DAYS_BOUNDS)),
+			),
+		).annotate({
+			description:
+				'How long a conversation has gone without a message, in days. 14 is "not a word in a fortnight".',
+		}),
+		last_message_after: Schema.optionalKey(Schema.String).annotate({
+			description:
+				'Only conversations whose latest message is at or after this day or moment.',
+		}),
+		last_message_before: Schema.optionalKey(Schema.String).annotate({
+			description:
+				'Only conversations whose latest message is before this day or moment.',
+		}),
+		participant: Schema.optionalKey(Schema.String).annotate({
+			description:
+				'One address (ana@acme.com) or a whole domain (@acme.com), matched against everyone written to or from on the conversation. A domain matches that domain alone, not one that merely ends the same way.',
+		}),
+		has_attachments: Schema.optionalKey(Schema.Boolean),
+		company_owner: Schema.optionalKey(Schema.Array(Schema.String)).annotate({
+			description:
+				'Owners of the company the conversation is with: user ids from list_members, and/or the literal "none" for companies nobody has taken.',
+		}),
+		sort: Schema.optionalKey(ThreadSort),
 		query: Schema.optionalKey(Schema.String),
 		limit: Schema.optionalKey(McpPageLimit),
 		offset: Schema.optionalKey(McpPageOffset),
@@ -321,11 +381,24 @@ const MarkThreadUnread = Tool.make('mark_email_thread_unread', {
 
 const ListEmailMessages = Tool.make('list_email_messages', {
 	description:
-		'List per-message deliverability records (sent, delivered, bounced, complained, rejected). Filter by contact, company, or status. Use this to audit which sends failed and why. `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true.',
+		'List one message at a time rather than by conversation: what was stored, which way it went, and how it fared. Use it to audit which sends failed and why. `status` is what became of the message — normal for ordinary mail, bounced for one a mail server refused, spam or blocked for one a check set aside — and takes a list matching ANY of those words; asking for a word that is not on that list is refused rather than answered with an empty page. `direction` is inbound or outbound. `bounce_type` is how final a refusal was: hard is "no such address", soft is "not now"; a refusal that said neither matches neither. `received_after` and `received_before` take a day (2026-09-01) or a moment that says its timezone (2026-09-01T09:00:00Z); after includes that instant and before stops just short of it. `participant` is one address, or a whole domain written as @acme.com. `query` searches subject, preview, body and addresses. Mail in a colleague\'s private mailbox never appears. `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true.',
 	parameters: Schema.Struct({
 		contact_id: Schema.optionalKey(Schema.String),
 		company_id: Schema.optionalKey(Schema.String),
-		status: Schema.optionalKey(Schema.String),
+		inbox_id: Schema.optionalKey(Schema.String).annotate({
+			description:
+				'The mailbox the message is stored under, from list_email_inboxes.',
+		}),
+		status: Schema.optionalKey(Schema.Array(EmailMessageStatus)),
+		direction: Schema.optionalKey(EmailDirection),
+		bounce_type: Schema.optionalKey(EmailBounceType),
+		received_after: Schema.optionalKey(Schema.String),
+		received_before: Schema.optionalKey(Schema.String),
+		participant: Schema.optionalKey(Schema.String).annotate({
+			description:
+				'One address (ana@acme.com) or a whole domain (@acme.com), matched against everyone written to or from on the message.',
+		}),
+		query: Schema.optionalKey(Schema.String),
 		limit: Schema.optionalKey(McpPageLimit),
 		offset: Schema.optionalKey(McpPageOffset),
 	}),
@@ -778,6 +851,19 @@ export const EmailHandlersLive = EmailTools.toLayer(
 				return yield* riskyRecipientFor(sql, currentOrg.id, addresses)
 			})
 
+		// An address or domain that cannot be matched is said out loud rather
+		// than quietly finding nothing: "@" on its own would otherwise read as
+		// "nobody here writes to anybody".
+		const checkedParticipant = (raw: string | undefined) =>
+			Effect.gen(function* () {
+				if (raw === undefined) return undefined
+				const parsed = parseParticipant(raw)
+				if (parsed.kind === 'refused') {
+					return yield* Effect.die(new ToolMessage(parsed.why))
+				}
+				return raw
+			})
+
 		// Outbound count + where a reply lands, for the reply guard.
 		const threadSendState = (threadLinkId: string, orgId: string) =>
 			Effect.gen(function* () {
@@ -792,11 +878,10 @@ export const EmailHandlersLive = EmailTools.toLayer(
 				const link = links[0]
 				if (!link) return { count: 0, replyingTo: [] as string[] }
 				const counts = yield* sql<{ n: number }>`
-					SELECT count(*)::int AS n FROM email_messages
-					WHERE direction = 'outbound' AND organization_id = ${orgId}
-					AND (message_id = ${link.externalThreadId}
-					     OR "references" @> ARRAY[${link.externalThreadId}]::text[])
-					AND deleted_at IS NULL
+					SELECT count(*)::int AS n FROM email_messages m
+					WHERE m.direction = 'outbound'
+					AND ${inThreadKey(sql, orgId, link.externalThreadId)}
+					AND ${answerable(sql)}
 				`
 				// Where a reply will actually land. This has to pick the same
 				// addresses the send itself picks, or the guard judges one mailbox
@@ -815,13 +900,10 @@ export const EmailHandlersLive = EmailTools.toLayer(
 					direction: string
 					recipients: { from?: string | null; to?: string[] } | null
 				}>`
-					SELECT direction, recipients FROM email_messages
-					WHERE organization_id = ${orgId}
-						AND (message_id = ${link.externalThreadId}
-						     OR "references" @> ARRAY[${link.externalThreadId}]::text[])
-						AND deleted_at IS NULL
-					ORDER BY received_at DESC NULLS LAST,
-					         status_updated_at DESC, message_id DESC
+					SELECT m.direction, m.recipients FROM email_messages m
+					WHERE ${inThreadKey(sql, orgId, link.externalThreadId)}
+						AND ${answerable(sql)}
+					${latestFirst(sql)}
 					LIMIT 1
 				`
 				const newest = latest[0]
@@ -1062,20 +1144,60 @@ export const EmailHandlersLive = EmailTools.toLayer(
 					}
 				}).pipe(Effect.orDie),
 			list_email_threads: params =>
-				svc
-					.listThreads({
-						...(params.inbox_id !== undefined && {
-							inboxId: params.inbox_id,
+				Effect.gen(function* () {
+					// A range that can only find nothing is said out loud, rather
+					// than answered with an empty page that reads as "you have none".
+					const refused = checkDateRange({
+						...(params.last_message_after !== undefined && {
+							after: params.last_message_after,
 						}),
-						...(params.company_id !== undefined && {
-							companyId: params.company_id,
+						...(params.last_message_before !== undefined && {
+							before: params.last_message_before,
 						}),
-						...(params.status !== undefined && { status: params.status }),
-						...(params.query !== undefined && { query: params.query }),
-						...(params.limit !== undefined && { limit: params.limit }),
-						...(params.offset !== undefined && { offset: params.offset }),
+						names: ['last_message_after', 'last_message_before'],
 					})
-					.pipe(Effect.orDie, Effect.map(toPage)),
+					if (refused)
+						return yield* Effect.die(new ToolMessage(refused.refused))
+					const participant = yield* checkedParticipant(params.participant)
+					return yield* svc
+						.listThreads({
+							...(params.inbox_id !== undefined && {
+								inboxId: params.inbox_id,
+							}),
+							...(params.company_id !== undefined && {
+								companyId: params.company_id,
+							}),
+							...(params.contact_id !== undefined && {
+								contactId: params.contact_id,
+							}),
+							...(params.status !== undefined && { status: params.status }),
+							...(params.waiting_on !== undefined && {
+								waitingOn: params.waiting_on,
+							}),
+							...(params.unread !== undefined && { unread: params.unread }),
+							...(params.quiet_days !== undefined && {
+								quietDays: params.quiet_days,
+							}),
+							...(params.last_message_after !== undefined && {
+								lastMessageAfter: params.last_message_after,
+							}),
+							...(params.last_message_before !== undefined && {
+								lastMessageBefore: params.last_message_before,
+							}),
+							...(participant !== undefined && { participant }),
+							...(params.has_attachments !== undefined && {
+								hasAttachments: params.has_attachments,
+							}),
+							...(params.company_owner !== undefined && {
+								companyOwner: params.company_owner,
+							}),
+							...(params.sort !== undefined && { sort: params.sort }),
+							...(params.query !== undefined && { query: params.query }),
+							...(params.limit !== undefined && { limit: params.limit }),
+							...(params.offset !== undefined && { offset: params.offset }),
+						})
+						.pipe(Effect.orDie, Effect.map(toPage))
+				}),
 			get_email_thread: ({ thread_id }) =>
 				svc
 					.getThread(thread_id)
@@ -1097,21 +1219,52 @@ export const EmailHandlersLive = EmailTools.toLayer(
 			mark_email_thread_unread: ({ thread_id }) =>
 				svc.markThreadUnread(thread_id),
 			list_email_messages: params =>
-				svc
-					.listMessages({
-						...(params.contact_id !== undefined && {
-							contactId: params.contact_id,
+				Effect.gen(function* () {
+					const refused = checkDateRange({
+						...(params.received_after !== undefined && {
+							after: params.received_after,
 						}),
-						...(params.company_id !== undefined && {
-							companyId: params.company_id,
+						...(params.received_before !== undefined && {
+							before: params.received_before,
 						}),
-						...(params.status !== undefined && {
-							status: params.status,
-						}),
-						...(params.limit !== undefined && { limit: params.limit }),
-						...(params.offset !== undefined && { offset: params.offset }),
+						names: ['received_after', 'received_before'],
 					})
-					.pipe(Effect.orDie, Effect.map(toPage)),
+					if (refused)
+						return yield* Effect.die(new ToolMessage(refused.refused))
+					const participant = yield* checkedParticipant(params.participant)
+					return yield* svc
+						.listMessages({
+							...(params.contact_id !== undefined && {
+								contactId: params.contact_id,
+							}),
+							...(params.company_id !== undefined && {
+								companyId: params.company_id,
+							}),
+							...(params.inbox_id !== undefined && {
+								inboxId: params.inbox_id,
+							}),
+							...(params.status !== undefined && {
+								status: params.status,
+							}),
+							...(params.direction !== undefined && {
+								direction: params.direction,
+							}),
+							...(params.bounce_type !== undefined && {
+								bounceType: params.bounce_type,
+							}),
+							...(params.received_after !== undefined && {
+								receivedAfter: params.received_after,
+							}),
+							...(params.received_before !== undefined && {
+								receivedBefore: params.received_before,
+							}),
+							...(participant !== undefined && { participant }),
+							...(params.query !== undefined && { query: params.query }),
+							...(params.limit !== undefined && { limit: params.limit }),
+							...(params.offset !== undefined && { offset: params.offset }),
+						})
+						.pipe(Effect.orDie, Effect.map(toPage))
+				}),
 			get_email_message: ({ message_id }) =>
 				svc
 					.getMessage(message_id)

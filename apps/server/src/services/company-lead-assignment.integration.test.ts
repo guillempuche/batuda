@@ -291,12 +291,14 @@ describe('claimLeadOnEmail', () => {
 			// GIVEN a company that wrote in first, and a date on the row to match.
 			// The claim never reads either: what the archive holds says nothing
 			// about whether anybody is working the lead now.
+			// No thread link is created for this message, so it stands as its
+			// own conversation: thread_key is its own message id.
 			const seeded = await pool.query(
 				`INSERT INTO email_messages (
-					organization_id, inbox_id, folder, message_id, direction,
+					organization_id, inbox_id, folder, message_id, thread_key, direction,
 					received_at, status, status_updated_at, company_id, raw_rfc822_ref
 				)
-				VALUES ($1, $5, 'INBOX', $2, 'inbound', now(), 'normal', now(), $3, $4)`,
+				VALUES ($1, $5, 'INBOX', $2, $2, 'inbound', now(), 'normal', now(), $3, $4)`,
 				[
 					tallerOrgId,
 					`<older-${randomUUID()}@example.test>`,
@@ -385,15 +387,32 @@ describe('claimLeadOnEmail', () => {
 
 	describe('when the company wrote to us first', () => {
 		it('should land on responded, not contacted', async () => {
-			// GIVEN a company that emailed us — the worker files an entry on the
-			// company's history for a message that arrived and matched it
+			// GIVEN a company that emailed us — the worker stores the message
+			// that arrived and files an entry on the company's history for it.
+			// The entry has to name the stored message: one about a message
+			// nobody can reach is read as though it were not there
+			const arrived = await pool.query<{ id: string }>(
+				`INSERT INTO email_messages (
+					organization_id, inbox_id, folder, message_id, thread_key, direction,
+					received_at, status, status_updated_at, company_id, raw_rfc822_ref
+				)
+				VALUES ($1, $5, 'INBOX', $2, $2, 'inbound', now(), 'normal', now(), $3, $4)
+				RETURNING id`,
+				[
+					tallerOrgId,
+					`<theirs-${randomUUID()}@example.test>`,
+					companyId,
+					`raw/${randomUUID()}`,
+					inboxId,
+				],
+			)
 			await pool.query(
 				`INSERT INTO timeline_activity (
 					organization_id, kind, entity_type, entity_id, company_id,
 					channel, direction, occurred_at, payload
-				) VALUES ($1, 'email_received', 'email_message', gen_random_uuid(),
+				) VALUES ($1, 'email_received', 'email_message', $3,
 					$2, 'email', 'inbound', now(), '{}'::jsonb)`,
-				[tallerOrgId, companyId],
+				[tallerOrgId, companyId, arrived.rows[0]!.id],
 			)
 			// WHEN Alice writes back
 			await claimScoped(ALICE)

@@ -12,6 +12,10 @@ interface SeedAttachment {
 	readonly filename: string
 	readonly contentType: string
 	readonly content: Buffer
+	// An image the message draws in its own body — a logo in a signature — as
+	// against a file somebody meant to send. The filters tell them apart, so the
+	// seed has to hold one of each.
+	readonly isInline?: boolean
 }
 
 interface SeedMessageArgs {
@@ -33,6 +37,7 @@ interface SeedMessageArgs {
 	readonly attachments?: readonly SeedAttachment[]
 	readonly receivedAt?: Date
 	readonly inboundClassification?: 'normal' | 'spam' | 'blocked'
+	readonly isDeliveryNotice?: boolean
 	readonly status?: 'normal' | 'spam' | 'blocked' | 'bounced'
 	readonly statusReason?: string
 	readonly bounceType?: string
@@ -119,8 +124,8 @@ export const seedDemoEmails = (
 							filename: a.filename,
 							contentType: a.contentType,
 							sizeBytes: a.content.length,
-							cid: null,
-							isInline: false,
+							cid: a.isInline === true ? `seed-${slug}-${i}` : null,
+							isInline: a.isInline === true,
 							storageKey,
 						})
 					}
@@ -130,6 +135,11 @@ export const seedDemoEmails = (
 					organizationId: args.inbox.orgId,
 					inboxId: args.inbox.id,
 					messageId: args.messageId,
+					// Which conversation this message is in, said outright the way
+					// the mail worker says it. Left out, the message belongs to no
+					// thread any read can find.
+					threadKey: args.threadRootMessageId,
+					isDeliveryNotice: args.isDeliveryNotice ?? false,
 					inReplyTo: args.inReplyTo ?? null,
 					references: args.references ?? [],
 					direction: args.direction ?? 'inbound',
@@ -203,6 +213,9 @@ export const seedDemoEmails = (
 
 		const tallerHuman = seededInboxes.find(i => i.email === 'admin@taller.cat')
 		const tallerAgent = seededInboxes.find(i => i.email === 'agent@taller.cat')
+		const tallerPrivate = seededInboxes.find(
+			i => i.email === 'alice.private@taller.cat',
+		)
 		const restaurantHuman = seededInboxes.find(
 			i => i.email === 'admin@restaurant.demo',
 		)
@@ -215,6 +228,7 @@ export const seedDemoEmails = (
 		// the inbox seed; ids stay null if the CRM seed was skipped.
 		const tallerOrgId = tallerHuman?.orgId
 		let calPepCompanyId: string | null = null
+		let unownedCompanyId: string | null = null
 		let pepContactId: string | null = null
 		if (tallerOrgId) {
 			const companyRows = yield* sql<{ id: string }>`
@@ -223,6 +237,12 @@ export const seedDemoEmails = (
 				LIMIT 1
 			`
 			calPepCompanyId = companyRows[0]?.id ?? null
+			const unownedRows = yield* sql<{ id: string }>`
+				SELECT id FROM companies
+				WHERE organization_id = ${tallerOrgId} AND slug = 'ferros-baix-llobregat'
+				LIMIT 1
+			`
+			unownedCompanyId = unownedRows[0]?.id ?? null
 			const contactRows = yield* sql<{ id: string }>`
 				SELECT c.id FROM contacts c
 				JOIN channels ch ON ch.subject_table = 'contacts' AND ch.subject_id = c.id
@@ -338,8 +358,8 @@ export const seedDemoEmails = (
 				// with a hard-bounce reason on the same CRM-linked thread.
 				status: 'bounced',
 				statusReason: 'Recipient address rejected: user unknown',
-				bounceType: 'Permanent',
-				bounceSubType: 'General',
+				bounceType: 'hard',
+				bounceSubType: 'general',
 				inReplyTo: m1Id,
 				references: [m1Id],
 				direction: 'outbound',
@@ -394,6 +414,126 @@ export const seedDemoEmails = (
 				inboundClassification: 'blocked',
 				receivedAt: new Date('2026-05-03T10:15:00Z'),
 			})
+
+			// A conversation where we answered last and the message arrived:
+			// "waiting on them" has nothing to find without one, and every other
+			// seeded thread ends with somebody writing to us.
+			const m15Id = '<m15-our-answer@taller.cat>'
+			yield* insertSeedMessage({
+				inbox: tallerHuman,
+				threadRootMessageId: m15Id,
+				threadSubject: 'Availability for the October fit-out',
+				threadCompanyId: unownedCompanyId,
+				companyId: unownedCompanyId,
+				messageId: m15Id,
+				direction: 'outbound',
+				fromAddress: 'admin@taller.cat',
+				toAddresses: ['marta@ferrosbl.com'],
+				subject: 'Availability for the October fit-out',
+				textBody:
+					'Hi Marta,\n\nWe can start the week of the 12th. Shall I hold it?\n\nAlice',
+				receivedAt: new Date('2026-05-02T15:00:00Z'),
+			})
+
+			// A message whose only attachment is the logo in its signature, so
+			// "has attachments" has something it must NOT match.
+			const m16Id = '<m16-signature-logo@ferrosbl.com>'
+			yield* insertSeedMessage({
+				inbox: tallerHuman,
+				threadRootMessageId: m16Id,
+				threadSubject: 'Thanks for the visit',
+				messageId: m16Id,
+				fromAddress: 'marta@ferrosbl.com',
+				toAddresses: ['admin@taller.cat'],
+				subject: 'Thanks for the visit',
+				textBody: 'Good to see the workshop yesterday.\n\nMarta',
+				attachments: [
+					{
+						filename: 'signature-logo.png',
+						contentType: 'image/png',
+						content: Buffer.from(
+							'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+							'base64',
+						),
+						isInline: true,
+					},
+				],
+				receivedAt: new Date('2026-05-02T18:00:00Z'),
+			})
+
+			// A delivery failure notice, chained to the send it is about the way
+			// some mail servers chain one. It must not read as the other side
+			// writing back, which is the whole reason a notice is marked as one.
+			const m19Id = '<m19-mailer-daemon@taller.cat>'
+			yield* insertSeedMessage({
+				inbox: tallerHuman,
+				// The conversation the failed send belongs to, not the send itself:
+				// a notice joins the exchange it is about, which is what makes it
+				// the newest message there and worth passing over.
+				threadRootMessageId: m1Id,
+				threadSubject: 'Quote for the booking module',
+				messageId: m19Id,
+				fromAddress: 'mailer-daemon@calpepfonda.cat',
+				toAddresses: ['admin@taller.cat'],
+				subject: 'Undelivered Mail Returned to Sender',
+				textBody:
+					'This is the mail system at host calpepfonda.cat.\n\nYour message could not be delivered.',
+				isDeliveryNotice: true,
+				inReplyTo: m9Id,
+				references: [m9Id],
+				receivedAt: new Date('2026-05-02T11:05:00Z'),
+			})
+
+			// Something from this week. Every other seeded conversation is months
+			// old, so without one "gone quiet for a fortnight" matches everything
+			// and a filter that matches everything proves nothing.
+			const m20Id = '<m20-this-week@calpepfonda.cat>'
+			yield* insertSeedMessage({
+				inbox: tallerHuman,
+				threadRootMessageId: m20Id,
+				threadSubject: 'Are you free on Thursday?',
+				threadCompanyId: calPepCompanyId,
+				companyId: calPepCompanyId,
+				contactId: pepContactId,
+				messageId: m20Id,
+				fromAddress: 'pep@calpepfonda.cat',
+				toAddresses: ['admin@taller.cat'],
+				subject: 'Are you free on Thursday?',
+				textBody: 'Podem quedar dijous al matí?\n\nPep',
+				receivedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+			})
+
+			// Mail in a mailbox Alice keeps to herself: one message inside the
+			// conversation the team shares, and one conversation of its own.
+			// Nothing else local exercises the rule that keeps them apart.
+			if (tallerPrivate) {
+				yield* insertSeedMessage({
+					inbox: tallerPrivate,
+					threadRootMessageId: m1Id,
+					threadSubject: 'Quote for the booking module',
+					messageId: '<m17-private-note@calpepfonda.cat>',
+					fromAddress: 'pep@calpepfonda.cat',
+					toAddresses: ['alice.private@taller.cat'],
+					subject: 'Re: Quote for the booking module',
+					textBody:
+						'Entre nosaltres: puc estirar el pressupost fins a 12.000 €.\n\nPep',
+					inReplyTo: m1Id,
+					references: [m1Id],
+					receivedAt: new Date('2026-05-04T08:00:00Z'),
+				})
+				const m18Id = '<m18-private-thread@gestoria.example>'
+				yield* insertSeedMessage({
+					inbox: tallerPrivate,
+					threadRootMessageId: m18Id,
+					threadSubject: 'Your tax return',
+					messageId: m18Id,
+					fromAddress: 'gestoria@gestoria.example',
+					toAddresses: ['alice.private@taller.cat'],
+					subject: 'Your tax return',
+					textBody: 'Adjuntem l’esborrany de la declaració.',
+					receivedAt: new Date('2026-05-04T09:00:00Z'),
+				})
+			}
 
 			// An in-flight reply draft on Pep's quote thread, so /emails shows a
 			// resumable draft. body_json is the EmailBlocks block tree (same shape
@@ -504,6 +644,35 @@ export const seedDemoEmails = (
 			})
 			yield* Effect.logInfo('  restaurant agent: M7 (single)')
 		}
+
+		// A conversation's activity time is when something last happened on it,
+		// which for seeded mail is its newest message. Left to the database
+		// default every conversation would carry the same instant, and the two
+		// orders the list offers — by activity, by latest message — would be the
+		// same order on this data, so neither could be seen to work.
+		yield* sql`
+			UPDATE email_thread_links tl
+			SET updated_at = newest.at
+			FROM (
+				SELECT m.thread_key, m.organization_id, max(m.received_at) AS at
+				FROM email_messages m
+				GROUP BY m.thread_key, m.organization_id
+			) newest
+			WHERE newest.organization_id = tl.organization_id
+			  AND newest.thread_key = tl.external_thread_id
+			  AND newest.at IS NOT NULL
+		`
+
+		// Filing a conversation away is activity too, and it is what makes the
+		// two orders the list offers differ: a conversation closed this morning
+		// sits at the top by activity and near the bottom by its latest message,
+		// which is months old. Without this every conversation's activity time
+		// equals its last message and the two orders are one order.
+		yield* sql`
+			UPDATE email_thread_links
+			SET updated_at = now() - interval '2 hours'
+			WHERE status <> 'open'
+		`
 
 		yield* Effect.logInfo('Demo emails seeded — open /emails to see them.')
 	})

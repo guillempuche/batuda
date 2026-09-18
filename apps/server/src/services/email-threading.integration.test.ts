@@ -124,6 +124,7 @@ const body = [
 
 let inboxId = ''
 let otherInboxId = ''
+let theirPrivateInboxId = ''
 let companyId = ''
 
 const ROOT_ID = '<threading-root@client.test>'
@@ -143,6 +144,8 @@ interface SeedMessage {
 	readonly deleted?: boolean
 	// A mailbox other than the suite's default one.
 	readonly inboxId?: string
+	// Mail from a mail server rather than from a person: a failure notice.
+	readonly deliveryNotice?: boolean
 }
 
 // A conversation, seeded straight into the database: how it got there is not
@@ -172,15 +175,19 @@ const seedThread = (opts: {
 				RETURNING id
 			`
 			for (const message of opts.messages ?? []) {
+				// Every message here belongs to the conversation the thread link
+				// above opens, so thread_key is that conversation's root id —
+				// its own id when it is the root, the same rootId when it is a
+				// later message answering it.
 				yield* sql`
 					INSERT INTO email_messages (
-						organization_id, inbox_id, folder, message_id, "references",
+						organization_id, inbox_id, folder, message_id, thread_key, "references",
 						subject, received_at, recipients, attachments,
 						status, status_updated_at, direction, raw_rfc822_ref,
-						deleted_at
+						deleted_at, is_delivery_notice
 					) VALUES (
 						${org}, ${org === ORG ? (message.inboxId ?? inboxId) : null}, 'INBOX',
-						${message.messageId},
+						${message.messageId}, ${rootId},
 						${(message.references ?? []) as unknown as string[]},
 						${message.subject},
 						COALESCE(
@@ -189,7 +196,8 @@ const seedThread = (opts: {
 						),
 						${JSON.stringify({ from: 'client@example.com', to: ['sender@taller.test'], cc: [], bcc: [] })}::jsonb,
 						'[]'::jsonb, 'normal', now(), 'inbound', 'sentinel',
-						${message.deleted ? new Date().toISOString() : null}::timestamptz
+						${message.deleted ? new Date().toISOString() : null}::timestamptz,
+						${message.deliveryNotice === true}
 					)
 				`
 			}
@@ -336,6 +344,22 @@ beforeAll(async () => {
 				RETURNING id
 			`
 			otherInboxId = others[0]!.id
+			const theirs = yield* sql<{ id: string }>`
+				INSERT INTO inboxes (
+					organization_id, email, owner_user_id, is_default, is_private,
+					imap_host, imap_port, imap_security,
+					smtp_host, smtp_port, smtp_security, username,
+					password_ciphertext, password_nonce, password_tag,
+					grant_status, active
+				) VALUES (
+					${ORG}, 'colleague-private@taller.test', 'threading-colleague', false, true,
+					'imap.test', 993, 'tls', 'smtp.test', 465, 'tls', 'colleague-private@taller.test',
+					${placeholder}, ${placeholder}, ${placeholder},
+					'connected', true
+				)
+				RETURNING id
+			`
+			theirPrivateInboxId = theirs[0]!.id
 		}),
 	)
 })
@@ -584,6 +608,91 @@ describe('EmailService.reply', () => {
 			expect(rows[0]?.subject).toBe('Re: your pallet pools')
 		})
 
+		it('should answer the person rather than the mail server that refused', async () => {
+			// GIVEN a conversation whose newest message is a failure notice,
+			// chained onto the send it is about the way some mail servers chain
+			// one
+			const threadId = await seedThread({
+				linkSubject: null,
+				messages: [
+					{ messageId: ROOT_ID, subject: 'your pallet pools', daysAgo: 3 },
+					{
+						messageId: LATEST_ID,
+						subject: 'Re: your pallet pools',
+						references: [ROOT_ID],
+						daysAgo: 2,
+					},
+					{
+						messageId: '<mailer-daemon@example.com>',
+						subject: 'Undelivered Mail Returned to Sender',
+						references: [ROOT_ID],
+						daysAgo: 1,
+						deliveryNotice: true,
+					},
+				],
+			})
+
+			// WHEN a reply is sent
+			await reply(threadId)
+
+			// THEN it answers what the person wrote, not the notice — a reply to
+			// a mail server goes nowhere, and its id in the chain is one the
+			// other side has never seen
+			expect(lastOutbound?.inReplyTo).toBe(LATEST_ID)
+			expect(lastOutbound?.references).not.toContain(
+				'<mailer-daemon@example.com>',
+			)
+		})
+
+		it('should go out through the mailbox the conversation is read under', async () => {
+			// GIVEN a conversation that began in a colleague's private mailbox —
+			// so this sender may not write from it — and carries a later message
+			// in a mailbox they can, which is what lets them read it at all
+			const threadId = await seedThread({
+				linkSubject: null,
+				externalThreadId: '<began-elsewhere@client.test>',
+				inboxId: theirPrivateInboxId,
+				messages: [
+					{
+						messageId: '<began-elsewhere@client.test>',
+						subject: 'your pallet pools',
+						daysAgo: 2,
+						inboxId: theirPrivateInboxId,
+					},
+					{
+						messageId: '<answered-here@client.test>',
+						subject: 'Re: your pallet pools',
+						references: ['<began-elsewhere@client.test>'],
+						daysAgo: 1,
+					},
+				],
+			})
+
+			// WHEN a reply is sent
+			const exit = await reply(threadId)
+
+			// THEN it goes out rather than being refused: a conversation somebody
+			// is allowed to open is one they can answer, through the mailbox its
+			// readable messages arrived in
+			expect(Exit.isSuccess(exit)).toBe(true)
+			expect(lastOutbound?.inReplyTo).toBe('<answered-here@client.test>')
+			// AND it is stored under that readable mailbox, not the private one
+			// it could never have been sent from
+			const sent = await sqlOnly(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* sql<{ inboxId: string }>`
+						SELECT inbox_id AS "inboxId" FROM email_messages
+						WHERE organization_id = ${ORG}
+						  AND direction = 'outbound'
+						  AND in_reply_to = '<answered-here@client.test>'
+						LIMIT 1
+					`
+				}),
+			)
+			expect(sent[0]?.inboxId).toBe(inboxId)
+		})
+
 		it('should stay in the same conversation', async () => {
 			// GIVEN an existing conversation
 			const threadId = await seedTwoMessageThread(null)
@@ -796,9 +905,16 @@ describe('EmailService.sendDraft', () => {
 			await sendDraft(draft.draftId)
 			expect(lastOutbound?.subject).toBe('Re: your pallet pools')
 		})
+	})
 
-		it('should fall back to the conversation root when it holds no messages', async () => {
-			// GIVEN a conversation row with nothing under it yet
+	describe('when the conversation it names holds no messages', () => {
+		// A conversation is only there while it holds a message somebody may
+		// read, so one holding none — every message in it private, or the row
+		// left behind on its own — is answered as though it were not there at
+		// all. The draft then stands on what it says by itself.
+		it('should refuse a "Re: " subject, which now answers nothing', async () => {
+			// GIVEN a conversation row with nothing under it, and a draft written
+			// as a reply to it
 			const threadId = await seedThread({
 				linkSubject: 'your pallet pools',
 				messages: [],
@@ -813,12 +929,42 @@ describe('EmailService.sendDraft', () => {
 			)
 
 			// WHEN it is sent
+			const exit = await sendDraft(draft.draftId)
+
+			// THEN it is turned away rather than delivered as a forged reply
+			// AND nothing went to the transport, and no second conversation
+			// appeared beside the one it named
+			expect(refusalReason(exit)).toBe('forged_reply')
+			expect(lastOutbound).toBeNull()
+			expect(await threadLinkCount()).toBe(1)
+		})
+
+		it('should start its own conversation when the subject stands alone', async () => {
+			// GIVEN the same empty conversation, and a draft whose subject does
+			// not claim to answer anything
+			const threadId = await seedThread({
+				linkSubject: 'your pallet pools',
+				messages: [],
+			})
+			const draft = await createDraft(
+				{
+					to: 'client@example.com',
+					subject: 'a fresh quote',
+					bodyJson: body,
+				},
+				{ companyId, threadLinkId: threadId },
+			)
+
+			// WHEN it is sent
 			await sendDraft(draft.draftId)
 
-			// THEN there is no parent message to name, so the conversation's own
-			// id answers for it and the message still threads
-			expect(lastOutbound?.inReplyTo).toBe(ROOT_ID)
-			expect(lastOutbound?.references).toEqual([ROOT_ID])
+			// THEN it goes out naming no parent and borrowing no subject
+			// AND it opens a conversation of its own, the same way a draft
+			// pointed at another mailbox's conversation does
+			expect(lastOutbound?.subject).toBe('a fresh quote')
+			expect(lastOutbound?.inReplyTo).toBeUndefined()
+			expect(lastOutbound?.references).toBeUndefined()
+			expect(await threadLinkCount()).toBe(2)
 		})
 	})
 
