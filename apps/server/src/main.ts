@@ -67,6 +67,7 @@ import { EmailAttachmentStaging } from './services/email-attachment-staging'
 import { DraftStore } from './services/email-draft-store'
 import { EmailProviderLive } from './services/email-provider-live'
 import { Geocoder } from './services/geocoder'
+import { heartbeatDaemonLayer } from './services/heartbeat'
 import { InboxHealthProbe } from './services/inbox-health-probe'
 import { InstructionsService } from './services/instructions'
 import { MailTransport } from './services/mail-transport'
@@ -131,6 +132,9 @@ const ServicesLive = Layer.mergeAll(
 	// skip building it (nothing requires it). Listing it inside `mergeAll`
 	// forces the build, which fires the side-effect that forks the probe.
 	InboxHealthProbe.daemonLayer.pipe(Layer.provide(InboxHealthProbe.layer)),
+	// Same `never`-output trick. Says once a minute that this process is alive,
+	// which is what an absence alert watches for.
+	heartbeatDaemonLayer,
 	// Same `never`-output trick; EmailAttachmentStaging is supplied via the `provideMerge` below.
 	EmailAttachmentStaging.sweepDaemonLayer,
 	// Prunes expired research caches, old run transcripts, and orphaned scrape
